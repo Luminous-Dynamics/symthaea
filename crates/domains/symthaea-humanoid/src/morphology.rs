@@ -16,27 +16,52 @@ pub enum HumanoidMorphology {
     Dmc21,
     Dexterous53,
     FullSpine,
-    /// WARNING (2026-07 robotics deep review): currently a NO-OP alias of
-    /// [`Dmc21`](Self::Dmc21) — same 21 actuators, same limits/inertia/
-    /// damping; no neck or wrist joints are actually added. Selecting it
-    /// gets plain DMC21. Implement the extra DOF or remove the variant
-    /// (SYMTHAEA_ROBOTICS_IMPROVEMENT_PLAN_2026-07-06.md Tier 2.2).
+    /// DMC21 body with bilateral two-axis wrists and a two-axis neck.
+    /// Joint indices 21..27 are right wrist pitch/yaw, left wrist pitch/yaw,
+    /// neck pitch/yaw.
     WithNeckWrist,
 }
 
 impl HumanoidMorphology {
-    pub fn num_actuators(&self) -> usize {
+    pub const fn num_actuators(&self) -> usize {
         match self {
             HumanoidMorphology::Dmc21 => 21,
-            HumanoidMorphology::WithNeckWrist => 21,
+            HumanoidMorphology::WithNeckWrist => 27,
             HumanoidMorphology::Dexterous53 => 53,
             HumanoidMorphology::FullSpine => 64,
         }
     }
 
+    /// Number of positional extremity channels appended to the observation.
+    pub const fn num_extremity_channels(&self) -> usize {
+        match self {
+            HumanoidMorphology::Dmc21 | HumanoidMorphology::WithNeckWrist => 12,
+            HumanoidMorphology::Dexterous53 | HumanoidMorphology::FullSpine => 18,
+        }
+    }
+
+    /// Total channels emitted by `HumanoidState::to_channels()` for this morphology.
+    pub const fn num_observation_channels(&self) -> usize {
+        // Fixed channels: root height (1), quaternion (4), root velocities
+        // (3 + 3), head height (1), torso vertical (3), COM velocity (3).
+        18 + 2 * self.num_actuators() + self.num_extremity_channels()
+    }
+
+    /// Stable identifier suitable for checkpoints, datasets, and HAL handshakes.
+    pub const fn schema_id(&self) -> &'static str {
+        match self {
+            HumanoidMorphology::Dmc21 => "symthaea.humanoid.dmc21.obs.v1",
+            HumanoidMorphology::WithNeckWrist => "symthaea.humanoid.neck-wrist.obs.v1",
+            HumanoidMorphology::Dexterous53 => "symthaea.humanoid.dexterous53.obs.v1",
+            HumanoidMorphology::FullSpine => "symthaea.humanoid.full-spine64.obs.v1",
+        }
+    }
+
     pub fn joint_limits(&self) -> Vec<[f64; 2]> {
-        // CORE ANATOMICAL SIGN ALIGNMENT: Knee upper extensions (indices 6 and 12)
-        // are flipped to positive boundaries [0.15, 2.40] to force human-like backward bending.
+        // Knee signs match the bundled dm_control model: flexion is negative
+        // and full extension approaches zero (`range=-160deg..2deg`). Keeping
+        // this convention aligned is essential because the PD gait targets and
+        // MuJoCo position actuators both use negative knee flexion.
         let mut limits = vec![
             [-1.31, 0.52],
             [-0.79, 0.79],
@@ -44,13 +69,13 @@ impl HumanoidMorphology {
             [-0.44, 0.09],
             [-1.05, 0.61],
             [-1.92, 0.35],
-            [0.15, 2.40],
+            [-2.7925268, 0.0349066],
             [-0.87, 0.87],
             [-0.87, 0.87], // Right Leg [3..9]
             [-0.44, 0.09],
             [-1.05, 0.61],
             [-1.92, 0.35],
-            [0.15, 2.40],
+            [-2.7925268, 0.0349066],
             [-0.87, 0.87],
             [-0.87, 0.87], // Left Leg [9..15]
             [-1.48, 1.05],
@@ -61,6 +86,16 @@ impl HumanoidMorphology {
             [-1.57, 0.87], // Left Arm [18..21]
         ];
 
+        if *self == HumanoidMorphology::WithNeckWrist {
+            limits.extend([
+                [-0.70, 0.70],
+                [-1.05, 1.05],
+                [-0.70, 0.70],
+                [-1.05, 1.05],
+                [-0.61, 0.61],
+                [-1.22, 1.22],
+            ]);
+        }
         if *self == HumanoidMorphology::Dexterous53 || *self == HumanoidMorphology::FullSpine {
             for _ in 0..32 {
                 limits.push([-0.78, 0.78]);
@@ -79,6 +114,9 @@ impl HumanoidMorphology {
             0.30, 0.30, 0.30, 0.50, 0.50, 0.50, 0.20, 0.05, 0.05, 0.50, 0.50, 0.50, 0.20, 0.05,
             0.05, 0.10, 0.10, 0.06, 0.10, 0.10, 0.06,
         ];
+        if *self == HumanoidMorphology::WithNeckWrist {
+            inertias.extend([0.018, 0.012, 0.018, 0.012, 0.035, 0.030]);
+        }
         if *self == HumanoidMorphology::Dexterous53 || *self == HumanoidMorphology::FullSpine {
             inertias.extend(vec![0.005; 32]);
         }
@@ -93,6 +131,9 @@ impl HumanoidMorphology {
             6.0, 6.0, 6.0, 8.0, 8.0, 8.0, 5.0, 3.0, 3.0, 8.0, 8.0, 8.0, 5.0, 3.0, 3.0, 2.0, 2.0,
             1.5, 2.0, 2.0, 1.5,
         ];
+        if *self == HumanoidMorphology::WithNeckWrist {
+            damping.extend([1.2, 1.0, 1.2, 1.0, 2.2, 2.0]);
+        }
         if *self == HumanoidMorphology::Dexterous53 || *self == HumanoidMorphology::FullSpine {
             damping.extend(vec![0.6; 32]);
         }
@@ -107,6 +148,9 @@ impl HumanoidMorphology {
             100.0, 100.0, 100.0, 100.0, 100.0, 300.0, 200.0, 100.0, 100.0, 100.0, 100.0, 300.0,
             200.0, 100.0, 100.0, 25.0, 25.0, 25.0, 25.0, 25.0, 25.0,
         ];
+        if *self == HumanoidMorphology::WithNeckWrist {
+            scales.extend([18.0, 14.0, 18.0, 14.0, 22.0, 18.0]);
+        }
         if *self == HumanoidMorphology::Dexterous53 || *self == HumanoidMorphology::FullSpine {
             scales.extend(vec![6.0; 32]);
         }
@@ -122,9 +166,20 @@ impl HumanoidMorphology {
     /// hip joints by these names — generic names here previously made the
     /// Red-tier gravity-comp baseline a silent no-op.
     pub fn joint_names(&self) -> Vec<String> {
+        const NECK_WRIST_NAMES: [&str; 6] = [
+            "right_wrist_pitch",
+            "right_wrist_yaw",
+            "left_wrist_pitch",
+            "left_wrist_yaw",
+            "neck_pitch",
+            "neck_yaw",
+        ];
         (0..self.num_actuators())
             .map(|i| match crate::types::JOINT_NAMES.get(i) {
                 Some(name) => (*name).to_string(),
+                None if *self == HumanoidMorphology::WithNeckWrist => {
+                    NECK_WRIST_NAMES[i - 21].to_string()
+                }
                 None => format!("j_{}", i),
             })
             .collect()
@@ -134,6 +189,16 @@ impl HumanoidMorphology {
         let n = self.num_actuators();
         let mut kp = vec![200.0; n];
         let mut kd = vec![12.0; n];
+        if *self == HumanoidMorphology::WithNeckWrist {
+            for i in 21..25 {
+                kp[i] = 70.0;
+                kd[i] = 4.0;
+            }
+            for i in 25..27 {
+                kp[i] = 90.0;
+                kd[i] = 6.0;
+            }
+        }
         if n >= 53 {
             for i in 21..53 {
                 kp[i] = 45.0;
@@ -204,12 +269,13 @@ impl HumanoidMorphology {
         ));
         out.push_str("        <geom name=\"r_thigh_g\" type=\"capsule\" size=\"0.045\" fromto=\"0 0 0 0 0 -0.34\" mass=\"5.5\"/>\n");
         out.push_str("        <body name=\"r_shin\" pos=\"0 0 -0.34\">\n");
+        out.push_str("          <site name=\"r_knee_site\" pos=\"0 0 0\" size=\"0.045\" rgba=\"1 0 0 0\"/>\n");
         out.push_str(&format!(
-            "          <joint name=\"j_6\" type=\"hinge\" axis=\"0 1 0\" range=\"{} {}\"/>\n",
+            "          <joint name=\"j_6\" type=\"hinge\" axis=\"0 -1 0\" range=\"{} {}\"/>\n",
             lim[6][0], lim[6][1]
         ));
         out.push_str("          <geom name=\"r_shin_g\" type=\"capsule\" size=\"0.038\" fromto=\"0 0 0 0 0 -0.32\" mass=\"4.0\"/>\n");
-        out.push_str("          <body name=\"r_foot\" pos=\"0 0 -0.32\">\n");
+        out.push_str("          <body name=\"right_foot\" pos=\"0 0 -0.32\">\n");
         out.push_str(&format!(
             "            <joint name=\"j_7\" type=\"hinge\" axis=\"0 1 0\" range=\"{} {}\"/>\n",
             lim[7][0], lim[7][1]
@@ -239,12 +305,13 @@ impl HumanoidMorphology {
         ));
         out.push_str("        <geom name=\"l_thigh_g\" type=\"capsule\" size=\"0.045\" fromto=\"0 0 0 0 0 -0.34\" mass=\"5.5\"/>\n");
         out.push_str("        <body name=\"l_shin\" pos=\"0 0 -0.34\">\n");
+        out.push_str("          <site name=\"l_knee_site\" pos=\"0 0 0\" size=\"0.045\" rgba=\"1 0 0 0\"/>\n");
         out.push_str(&format!(
-            "          <joint name=\"j_12\" type=\"hinge\" axis=\"0 1 0\" range=\"{} {}\"/>\n",
+            "          <joint name=\"j_12\" type=\"hinge\" axis=\"0 -1 0\" range=\"{} {}\"/>\n",
             lim[12][0], lim[12][1]
         ));
         out.push_str("          <geom name=\"l_shin_g\" type=\"capsule\" size=\"0.038\" fromto=\"0 0 0 0 0 -0.32\" mass=\"4.0\"/>\n");
-        out.push_str("          <body name=\"l_foot\" pos=\"0 0 -0.32\">\n");
+        out.push_str("          <body name=\"left_foot\" pos=\"0 0 -0.32\">\n");
         out.push_str(&format!(
             "            <joint name=\"j_13\" type=\"hinge\" axis=\"0 1 0\" range=\"{} {}\"/>\n",
             lim[13][0], lim[13][1]
@@ -274,7 +341,7 @@ impl HumanoidMorphology {
         ));
         out.push_str("        <geom name=\"lower_torso_g\" type=\"capsule\" size=\"0.065\" fromto=\"0 0 0 0 0 0.12\" mass=\"4.0\"/>\n");
 
-        out.push_str("        <body name=\"upper_chest\" pos=\"0 0 0.12\">\n");
+        out.push_str("        <body name=\"torso\" pos=\"0 0 0.12\">\n");
         out.push_str("          <geom name=\"chest_g\" type=\"capsule\" size=\"0.08\" fromto=\"0 -0.12 0.08 0 0.12 0.08\" mass=\"8.0\"/>\n");
 
         // Sub-Branch 3A: Right Arm Tree
@@ -289,22 +356,31 @@ impl HumanoidMorphology {
         ));
         out.push_str("            <geom name=\"r_uarm_g\" type=\"capsule\" size=\"0.035\" fromto=\"0 0 0 0 0 -0.22\" mass=\"1.5\"/>\n");
         out.push_str("            <body name=\"r_forearm\" pos=\"0 0 -0.22\">\n");
+        out.push_str("              <site name=\"r_forearm_site\" pos=\"0 0 -0.09\" size=\"0.03\" rgba=\"1 0 0 0\"/>\n");
         out.push_str(&format!(
             "              <joint name=\"j_17\" type=\"hinge\" axis=\"0 1 0\" range=\"{} {}\"/>\n",
             lim[17][0], lim[17][1]
         ));
         out.push_str("              <geom name=\"r_farm_g\" type=\"capsule\" size=\"0.028\" fromto=\"0 0 0 0 0 -0.18\" mass=\"1.0\"/>\n");
-        out.push_str("              <body name=\"r_hand\" pos=\"0 0 -0.18\">\n");
-        for k in 0..16 {
-            out.push_str(&format!(
-                "                <body name=\"r_finger_{}\" pos=\"{} {} -0.01\">\n",
-                k,
-                (k % 4) as f64 * 0.012 - 0.02,
-                (k / 4) as f64 * 0.012 - 0.02
-            ));
-            out.push_str(&format!("                  <joint name=\"j_{}\" type=\"hinge\" axis=\"0 1 0\" range=\"-0.78 0.78\" stiffness=\"10.0\" damping=\"1.0\"/>\n", 21 + k));
-            out.push_str(&format!("                  <geom name=\"r_fg_{}\" type=\"capsule\" size=\"0.005\" fromto=\"0 0 0 0 0 -0.03\" mass=\"0.05\"/>\n", k));
-            out.push_str("                </body>\n");
+        out.push_str("              <body name=\"right_hand\" pos=\"0 0 -0.18\">\n");
+        if *self == HumanoidMorphology::WithNeckWrist {
+            out.push_str(&format!("                <joint name=\"j_21\" type=\"hinge\" axis=\"0 1 0\" range=\"{} {}\"/>\n", lim[21][0], lim[21][1]));
+            out.push_str(&format!("                <joint name=\"j_22\" type=\"hinge\" axis=\"0 0 1\" range=\"{} {}\"/>\n", lim[22][0], lim[22][1]));
+        }
+        out.push_str("                <geom name=\"right_palm_g\" type=\"box\" size=\"0.035 0.045 0.012\" mass=\"0.35\"/>\n");
+        out.push_str("                <site name=\"r_hand_site\" type=\"box\" size=\"0.037 0.047 0.014\" rgba=\"1 0 0 0\"/>\n");
+        if actuators_count >= 53 {
+            for k in 0..16 {
+                out.push_str(&format!(
+                    "                <body name=\"r_finger_{}\" pos=\"{} {} -0.01\">\n",
+                    k,
+                    (k % 4) as f64 * 0.012 - 0.02,
+                    (k / 4) as f64 * 0.012 - 0.02
+                ));
+                out.push_str(&format!("                  <joint name=\"j_{}\" type=\"hinge\" axis=\"0 1 0\" range=\"-0.78 0.78\" stiffness=\"10.0\" damping=\"1.0\"/>\n", 21 + k));
+                out.push_str(&format!("                  <geom name=\"r_fg_{}\" type=\"capsule\" size=\"0.005\" fromto=\"0 0 0 0 0 -0.03\" mass=\"0.05\"/>\n", k));
+                out.push_str("                </body>\n");
+            }
         }
         out.push_str("              </body>\n            </body>\n          </body>\n");
 
@@ -320,50 +396,70 @@ impl HumanoidMorphology {
         ));
         out.push_str("            <geom name=\"l_uarm_g\" type=\"capsule\" size=\"0.035\" fromto=\"0 0 0 0 0 -0.22\" mass=\"1.5\"/>\n");
         out.push_str("            <body name=\"l_forearm\" pos=\"0 0 -0.22\">\n");
+        out.push_str("              <site name=\"l_forearm_site\" pos=\"0 0 -0.09\" size=\"0.03\" rgba=\"1 0 0 0\"/>\n");
         out.push_str(&format!(
             "              <joint name=\"j_20\" type=\"hinge\" axis=\"0 1 0\" range=\"{} {}\"/>\n",
             lim[20][0], lim[20][1]
         ));
         out.push_str("              <geom name=\"l_farm_g\" type=\"capsule\" size=\"0.028\" fromto=\"0 0 0 0 0 -0.18\" mass=\"1.0\"/>\n");
-        out.push_str("              <body name=\"l_hand\" pos=\"0 0 -0.18\">\n");
-        for k in 0..16 {
-            out.push_str(&format!(
-                "                <body name=\"l_finger_{}\" pos=\"{} {} -0.01\">\n",
-                k,
-                (k % 4) as f64 * 0.012 - 0.02,
-                (k / 4) as f64 * 0.012 - 0.02
-            ));
-            out.push_str(&format!("                  <joint name=\"j_{}\" type=\"hinge\" axis=\"0 1 0\" range=\"-0.78 0.78\" stiffness=\"10.0\" damping=\"1.0\"/>\n", 37 + k));
-            out.push_str(&format!("                  <geom name=\"l_fg_{}\" type=\"capsule\" size=\"0.005\" fromto=\"0 0 0 0 0 -0.03\" mass=\"0.05\"/>\n", k));
-            out.push_str("                </body>\n");
+        out.push_str("              <body name=\"left_hand\" pos=\"0 0 -0.18\">\n");
+        if *self == HumanoidMorphology::WithNeckWrist {
+            out.push_str(&format!("                <joint name=\"j_23\" type=\"hinge\" axis=\"0 1 0\" range=\"{} {}\"/>\n", lim[23][0], lim[23][1]));
+            out.push_str(&format!("                <joint name=\"j_24\" type=\"hinge\" axis=\"0 0 1\" range=\"{} {}\"/>\n", lim[24][0], lim[24][1]));
+        }
+        out.push_str("                <geom name=\"left_palm_g\" type=\"box\" size=\"0.035 0.045 0.012\" mass=\"0.35\"/>\n");
+        out.push_str("                <site name=\"l_hand_site\" type=\"box\" size=\"0.037 0.047 0.014\" rgba=\"1 0 0 0\"/>\n");
+        if actuators_count >= 53 {
+            for k in 0..16 {
+                out.push_str(&format!(
+                    "                <body name=\"l_finger_{}\" pos=\"{} {} -0.01\">\n",
+                    k,
+                    (k % 4) as f64 * 0.012 - 0.02,
+                    (k / 4) as f64 * 0.012 - 0.02
+                ));
+                out.push_str(&format!("                  <joint name=\"j_{}\" type=\"hinge\" axis=\"0 1 0\" range=\"-0.78 0.78\" stiffness=\"10.0\" damping=\"1.0\"/>\n", 37 + k));
+                out.push_str(&format!("                  <geom name=\"l_fg_{}\" type=\"capsule\" size=\"0.005\" fromto=\"0 0 0 0 0 -0.03\" mass=\"0.05\"/>\n", k));
+                out.push_str("                </body>\n");
+            }
         }
         out.push_str("              </body>\n            </body>\n          </body>\n");
 
-        // Sub-Branch 3C: Compact Proportional Cervical Spine Chain
-        out.push_str("          <body name=\"spine_base\" pos=\"0 0 0.14\">\n");
-        out.push_str("            <body name=\"v_seg_0\" pos=\"0 0 0.012\">\n");
-        out.push_str(&format!("              <joint name=\"j_53\" type=\"hinge\" axis=\"0 1 0\" range=\"{} {}\" stiffness=\"60.0\"/>\n", lim[53][0], lim[53][1]));
-        out.push_str("              <geom name=\"vg_0\" type=\"capsule\" size=\"0.022\" fromto=\"0 0 0 0 0 0.012\" mass=\"0.2\"/>\n");
-        for k in 1..11 {
-            out.push_str(&format!(
-                "              <body name=\"v_seg_{}\" pos=\"0 0 0.012\">\n",
-                k
-            ));
-            out.push_str(&format!("                <joint name=\"j_{}\" type=\"hinge\" axis=\"0 1 0\" range=\"{} {}\" stiffness=\"60.0\"/>\n", 53 + k, lim[53+k][0], lim[53+k][1]));
-            out.push_str(&format!("                <geom name=\"vg_{}\" type=\"capsule\" size=\"0.022\" fromto=\"0 0 0 0 0 0.012\" mass=\"0.2\"/>\n", k));
+        // Sub-Branch 3C: FullSpine owns joints 53..64. Simpler morphologies
+        // mount the sensory head rigidly so MJCF generation never indexes
+        // joints that are absent from their morphology contract.
+        if actuators_count >= 64 {
+            out.push_str("          <body name=\"spine_base\" pos=\"0 0 0.14\">\n");
+            out.push_str("            <body name=\"v_seg_0\" pos=\"0 0 0.012\">\n");
+            out.push_str(&format!("              <joint name=\"j_53\" type=\"hinge\" axis=\"0 1 0\" range=\"{} {}\" stiffness=\"60.0\"/>\n", lim[53][0], lim[53][1]));
+            out.push_str("              <geom name=\"vg_0\" type=\"capsule\" size=\"0.022\" fromto=\"0 0 0 0 0 0.012\" mass=\"0.2\"/>\n");
+            for k in 1..11 {
+                out.push_str(&format!(
+                    "              <body name=\"v_seg_{}\" pos=\"0 0 0.012\">\n",
+                    k
+                ));
+                out.push_str(&format!("                <joint name=\"j_{}\" type=\"hinge\" axis=\"0 1 0\" range=\"{} {}\" stiffness=\"60.0\"/>\n", 53 + k, lim[53+k][0], lim[53+k][1]));
+                out.push_str(&format!("                <geom name=\"vg_{}\" type=\"capsule\" size=\"0.022\" fromto=\"0 0 0 0 0 0.012\" mass=\"0.2\"/>\n", k));
+            }
+            out.push_str("                <body name=\"head\" pos=\"0 0 0.012\">\n");
+            out.push_str("                  <geom name=\"head_g\" type=\"sphere\" size=\"0.075\" mass=\"2.5\" pos=\"0 0 0.05\" rgba=\"0.85 0.65 0.45 1\"/>\n");
+            out.push_str("                  <geom name=\"visor_g\" type=\"box\" size=\"0.035 0.045 0.02\" pos=\"0.05 0 0.05\" rgba=\"0.15 0.15 0.15 1\"/>\n");
+            out.push_str("                  <camera name=\"visor_camera\" pos=\"0.06 0 0.05\" euler=\"0 1.5708 0\" fovy=\"85\"/>\n");
+            out.push_str("                </body>\n");
+            for _ in 0..11 {
+                out.push_str("              </body>\n");
+            }
+            out.push_str("          </body>\n");
+        } else {
+            out.push_str("          <body name=\"head\" pos=\"0 0 0.14\">\n");
+            if *self == HumanoidMorphology::WithNeckWrist {
+                out.push_str(&format!("            <joint name=\"j_25\" type=\"hinge\" axis=\"0 1 0\" range=\"{} {}\"/>\n", lim[25][0], lim[25][1]));
+                out.push_str(&format!("            <joint name=\"j_26\" type=\"hinge\" axis=\"0 0 1\" range=\"{} {}\"/>\n", lim[26][0], lim[26][1]));
+            }
+            out.push_str("            <geom name=\"head_g\" type=\"sphere\" size=\"0.075\" mass=\"2.5\" pos=\"0 0 0.05\" rgba=\"0.85 0.65 0.45 1\"/>\n");
+            out.push_str("            <geom name=\"visor_g\" type=\"box\" size=\"0.035 0.045 0.02\" pos=\"0.05 0 0.05\" rgba=\"0.15 0.15 0.15 1\"/>\n");
+            out.push_str("            <camera name=\"visor_camera\" pos=\"0.06 0 0.05\" euler=\"0 1.5708 0\" fovy=\"85\"/>\n");
+            out.push_str("          </body>\n");
         }
-
-        // Mount sensory head cluster with camera layout
-        out.push_str("                <body name=\"head\" pos=\"0 0 0.012\">\n");
-        out.push_str("                  <geom name=\"head_g\" type=\"sphere\" size=\"0.075\" mass=\"2.5\" pos=\"0 0 0.05\" rgba=\"0.85 0.65 0.45 1\"/>\n");
-        out.push_str("                  <geom name=\"visor_g\" type=\"box\" size=\"0.035 0.045 0.02\" pos=\"0.05 0 0.05\" rgba=\"0.15 0.15 0.15 1\"/>\n");
-        out.push_str("                  <camera name=\"visor_camera\" pos=\"0.06 0 0.05\" euler=\"0 1.5708 0\" fovy=\"85\"/>\n");
-        out.push_str("                </body>\n");
-
-        for _ in 0..11 {
-            out.push_str("              </body>\n");
-        }
-        out.push_str("          </body>\n");
 
         out.push_str("        </body>\n");
         out.push_str("      </body>\n");
@@ -371,10 +467,10 @@ impl HumanoidMorphology {
         out.push_str("  </worldbody>\n");
 
         out.push_str("  <contact>\n");
-        out.push_str("    <exclude body1=\"upper_chest\" body2=\"r_upper_arm\"/>\n");
-        out.push_str("    <exclude body1=\"upper_chest\" body2=\"l_upper_arm\"/>\n");
-        out.push_str("    <exclude body1=\"upper_chest\" body2=\"r_forearm\"/>\n");
-        out.push_str("    <exclude body1=\"upper_chest\" body2=\"l_forearm\"/>\n");
+        out.push_str("    <exclude body1=\"torso\" body2=\"r_upper_arm\"/>\n");
+        out.push_str("    <exclude body1=\"torso\" body2=\"l_upper_arm\"/>\n");
+        out.push_str("    <exclude body1=\"torso\" body2=\"r_forearm\"/>\n");
+        out.push_str("    <exclude body1=\"torso\" body2=\"l_forearm\"/>\n");
         out.push_str("  </contact>\n");
 
         out.push_str("  <sensor>\n");
@@ -423,4 +519,73 @@ pub fn compute_hand_centroid(hand_base: [f64; 3], joint_angles: &[f64], dir: [f6
         hand_base[1] + dir[1] * reach,
         hand_base[2] + dir[2] * reach,
     ]
+}
+
+#[cfg(test)]
+mod mjcf_tests {
+    use super::HumanoidMorphology;
+
+    #[test]
+    fn every_morphology_generates_a_complete_backend_contract() {
+        for morphology in [
+            HumanoidMorphology::Dmc21,
+            HumanoidMorphology::WithNeckWrist,
+            HumanoidMorphology::Dexterous53,
+            HumanoidMorphology::FullSpine,
+        ] {
+            let mjcf = morphology.to_mjcf();
+            assert!(mjcf.contains("<body name=\"torso\""));
+            assert!(mjcf.contains("<body name=\"right_hand\""));
+            assert!(mjcf.contains("<body name=\"left_hand\""));
+            assert!(mjcf.contains("<body name=\"right_foot\""));
+            assert!(mjcf.contains("<body name=\"left_foot\""));
+            assert!(mjcf.contains("<body name=\"head\""));
+            for site in [
+                "r_foot_site",
+                "l_foot_site",
+                "r_hand_site",
+                "l_hand_site",
+                "r_knee_site",
+                "l_knee_site",
+                "r_forearm_site",
+                "l_forearm_site",
+            ] {
+                assert!(
+                    mjcf.contains(&format!("site name=\"{site}\"")),
+                    "missing {site}"
+                );
+            }
+            assert_eq!(
+                mjcf.matches("<position name=\"actuator_").count(),
+                morphology.num_actuators()
+            );
+        }
+    }
+
+    #[test]
+    fn morphology_specific_joints_are_emitted_only_when_supported() {
+        let dmc = HumanoidMorphology::Dmc21.to_mjcf();
+        assert!(!dmc.contains("joint name=\"j_21\""));
+        assert!(!dmc.contains("joint name=\"j_53\""));
+        assert!(!dmc.contains("body name=\"spine_base\""));
+
+        let neck_wrist = HumanoidMorphology::WithNeckWrist.to_mjcf();
+        for index in 21..27 {
+            assert!(neck_wrist.contains(&format!("joint name=\"j_{index}\"")));
+        }
+        assert!(!neck_wrist.contains("joint name=\"j_27\""));
+        assert_eq!(HumanoidMorphology::WithNeckWrist.num_actuators(), 27);
+
+        let dexterous = HumanoidMorphology::Dexterous53.to_mjcf();
+        assert!(dexterous.contains("joint name=\"j_21\""));
+        assert!(dexterous.contains("joint name=\"j_52\""));
+        assert!(!dexterous.contains("joint name=\"j_53\""));
+        assert!(!dexterous.contains("body name=\"spine_base\""));
+
+        let full_spine = HumanoidMorphology::FullSpine.to_mjcf();
+        assert!(full_spine.contains("joint name=\"j_21\""));
+        assert!(full_spine.contains("joint name=\"j_53\""));
+        assert!(full_spine.contains("joint name=\"j_63\""));
+        assert!(full_spine.contains("body name=\"spine_base\""));
+    }
 }

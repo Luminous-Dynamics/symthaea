@@ -151,7 +151,7 @@ impl ChannelLayout {
     /// [12+2n..15+2n] torso_vert, [15+2n..15+2n+ext] extremities, [..] com_vel
     fn for_morphology(morph: HumanoidMorphology) -> Self {
         let n_joints = morph.num_actuators();
-        let n_extremities = if n_joints > 21 { 18 } else { 12 };
+        let n_extremities = morph.num_extremity_channels();
 
         // Build ranges following to_channels() order
         let mut ranges: Vec<[f32; 2]> = Vec::new();

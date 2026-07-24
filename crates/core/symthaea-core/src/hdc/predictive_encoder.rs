@@ -98,7 +98,35 @@ pub struct EncodingResult {
 
     /// Peak attention weight this cycle (for MCE consciousness calculation)
     pub peak_attention: f32,
+
+    /// Relative predictive "bits saved" by the shortest-horizon prediction vs
+    /// the persistence baseline (previous encoding predicts the current one),
+    /// under a shared online Gaussian residual model on unit vectors. `None`
+    /// until a prediction + baseline exist and the shared variance is warm.
+    /// Measurement-only — feeds no control path. See
+    /// docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md (§2 + Amendment 1).
+    pub bits_saved_persist: Option<f32>,
+
+    /// Same, vs the zero-prediction floor (a zero vector has no direction;
+    /// its cosine is defined as 0).
+    pub bits_saved_zero: Option<f32>,
+
+    /// The shared concentration κ = 1/(σ² + ε) used for this cycle's bits
+    /// values. Exposed so analysis can recover the dimensionless
+    /// Δcos = bits·ln2/κ — the quantity C1 verdicts are evaluated on
+    /// (Amendment 3). `Some` exactly when the bits fields are.
+    pub bits_kappa: Option<f32>,
 }
+
+/// EMA rate for the shared bits-saved residual variance (registered in
+/// docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md Amendment 1 §5).
+const BITS_RESID_EMA_ALPHA: f32 = 0.01;
+/// Additive σ² regularizer (Amendment 3): caps κ at ~1/ε so near-constant
+/// streams (repetitive regime) can't blow bits up to ±10⁶. A bare floor was
+/// the registered v1 and failed exactly that way in the pre-run smoke.
+const BITS_RESID_VAR_EPSILON: f32 = 1e-3;
+/// Residual-variance warm-up samples before bits fields report `Some`.
+const BITS_WARMUP_SAMPLES: usize = 20;
 
 /// Statistics for monitoring the encoder
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -120,6 +148,30 @@ pub struct EncoderStats {
 
     /// Cycles with significant error (above threshold)
     pub high_error_cycles: usize,
+
+    /// Cycles where PE was the max-error sentinel because no prediction was set
+    #[serde(default)]
+    pub degenerate_no_prediction_cycles: usize,
+
+    /// Cycles where PE was the max-error sentinel because the prediction was
+    /// empty or had (near-)zero norm — a broken upstream signal, not real surprise
+    #[serde(default)]
+    pub degenerate_zero_prediction_cycles: usize,
+}
+
+/// Why a prediction-error value is (or isn't) a trustworthy comparison.
+///
+/// The legacy behavior returns 1.0 ("maximum surprise") for all degenerate
+/// cases, which makes a broken prediction path indistinguishable from a
+/// genuinely surprising input. This enum makes the difference observable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PredictionDegeneracy {
+    /// A real comparison between two nonzero vectors
+    Genuine,
+    /// No prediction was set for this cycle (cold start or upstream never fed one)
+    NoPrediction,
+    /// A prediction was set but it was empty or had (near-)zero norm
+    ZeroPrediction,
 }
 
 /// Predictive HDC Encoder with attention modulation
@@ -138,6 +190,21 @@ pub struct PredictiveHdcEncoder {
 
     /// Running prediction from LTC (compressed HDV)
     predicted_hdv: Option<Vec<f32>>,
+
+    /// Shortest-horizon raw CfC prediction (bits-saved diagnostics only) —
+    /// the registered C1 metric uses this, never the multi-horizon average
+    first_horizon_prediction: Option<Vec<f32>>,
+
+    /// Previous cycle's unit-normalized compressed encoding — the persistence
+    /// baseline b̂ for the bits-saved diagnostics
+    prev_compressed_unit: Option<Vec<f32>>,
+
+    /// EMA of the persistence-baseline squared residual ‖â − b̂‖² on unit
+    /// vectors (the shared σ² of the bits-saved residual model)
+    bits_resid_var_ema: f32,
+
+    /// Number of σ² EMA samples so far (warm-up gate for bits fields)
+    bits_resid_samples: usize,
 
     /// Prediction error history for smoothing
     error_history: VecDeque<f32>,
@@ -164,6 +231,9 @@ pub struct PredictiveHdcEncoder {
     /// Avoids calling `to_bipolar_i8()` (16KB allocation) on every primitive match per cycle.
     /// Built once at construction; all values are `Arc` so cache lookups are O(1).
     primitive_i8_cache: HashMap<String, Arc<Vec<i8>>>,
+
+    /// Degeneracy classification of the most recent cycle's prediction error
+    last_degeneracy: PredictionDegeneracy,
 }
 
 impl PredictiveHdcEncoder {
@@ -222,11 +292,16 @@ impl PredictiveHdcEncoder {
             text_encoder,
             attention_weights,
             predicted_hdv: None,
+            first_horizon_prediction: None,
+            prev_compressed_unit: None,
+            bits_resid_var_ema: 0.0,
+            bits_resid_samples: 0,
             error_history: VecDeque::with_capacity(50),
             stats: EncoderStats::default(),
             primitive_names,
             primitive_names_lower,
             peak_attention: initial_attention,
+            last_degeneracy: PredictionDegeneracy::NoPrediction,
             conversion_buffer: vec![0.0f32; dimension],
             detected_buffer: Vec::with_capacity(32),
             primitive_i8_cache,
@@ -261,7 +336,26 @@ impl PredictiveHdcEncoder {
         let attended_hdv = self.apply_attention_in_place(base_hdv, &detected_primitives);
 
         // 4. Compute prediction error if we have a prediction
-        let prediction_error = self.compute_prediction_error(&attended_hdv);
+        let (prediction_error, degeneracy) = self.compute_prediction_error(&attended_hdv);
+        self.last_degeneracy = degeneracy;
+        match degeneracy {
+            PredictionDegeneracy::NoPrediction => {
+                self.stats.degenerate_no_prediction_cycles += 1;
+            }
+            PredictionDegeneracy::ZeroPrediction => {
+                // A broken upstream prediction path would otherwise silently
+                // masquerade as "maximally surprised" every cycle. The cognitive
+                // loop reads last_prediction_degeneracy() and logs there (this
+                // crate has no logging dependency by design).
+                self.stats.degenerate_zero_prediction_cycles += 1;
+            }
+            PredictionDegeneracy::Genuine => {}
+        }
+
+        // 4b. Relative bits-saved diagnostics (measurement-only — reads state,
+        // feeds nothing back into attention, PE, or any control path).
+        let (bits_saved_persist, bits_saved_zero, bits_kappa) =
+            self.compute_bits_saved(&attended_hdv);
 
         // 5. Update attention weights based on error
         self.update_attention(&detected_primitives, prediction_error);
@@ -274,6 +368,9 @@ impl PredictiveHdcEncoder {
             prediction_error,
             detected_primitives,
             peak_attention: self.peak_attention,
+            bits_saved_persist,
+            bits_saved_zero,
+            bits_kappa,
         }
     }
 
@@ -292,9 +389,25 @@ impl PredictiveHdcEncoder {
         self.predicted_hdv = Some(predicted);
     }
 
+    /// Receive the shortest-horizon raw prediction for the bits-saved
+    /// diagnostics (Predictive Compression Program P0). `None` means the
+    /// upstream prediction path produced no per-horizon predictions this
+    /// cycle (fallback/degenerate paths) — the diagnostics skip that cycle.
+    pub fn set_first_horizon_prediction(&mut self, predicted: Option<Vec<f32>>) {
+        self.first_horizon_prediction = predicted;
+    }
+
+    /// Whether the most recent cycle's prediction error was a genuine comparison
+    /// or a degenerate max-error sentinel (see [`PredictionDegeneracy`]).
+    pub fn last_prediction_degeneracy(&self) -> PredictionDegeneracy {
+        self.last_degeneracy
+    }
+
     /// Clear the current prediction (for reset)
     pub fn clear_prediction(&mut self) {
         self.predicted_hdv = None;
+        self.first_horizon_prediction = None;
+        self.prev_compressed_unit = None;
     }
 
     /// Get current attention weights
@@ -432,14 +545,26 @@ impl PredictiveHdcEncoder {
             return base_hdv;
         }
 
-        // Compute composite attention weight from detected primitives
-        let total_attention: f32 = detected_primitives
-            .iter()
-            .filter_map(|name| self.attention_weights.get(name))
-            .sum();
-
-        let avg_attention = if !detected_primitives.is_empty() {
-            total_attention / detected_primitives.len() as f32
+        // Compute composite attention weight from detected primitives.
+        //
+        // Average over MATCHED weights only. `detect_semantic_patterns` can
+        // emit names with no entry in `attention_weights` (e.g. "IMPLICATION"
+        // and "ACTION" exist nowhere in the primitive system), and dividing by
+        // the full detected count made a phantom-only detection compute
+        // avg = 0/len = 0 — scaling the entire encoding to an exact zero
+        // vector, i.e. the loop went BLIND to any such input. Found 2026-07-18
+        // via the bits-saved coverage diagnostic: "life" contains "if" →
+        // phantom IMPLICATION → sentence perceived as all-zeros.
+        let mut total_attention = 0.0f32;
+        let mut matched = 0usize;
+        for name in detected_primitives {
+            if let Some(w) = self.attention_weights.get(name) {
+                total_attention += w;
+                matched += 1;
+            }
+        }
+        let avg_attention = if matched > 0 {
+            total_attention / matched as f32
         } else {
             1.0
         };
@@ -453,33 +578,133 @@ impl PredictiveHdcEncoder {
     ///
     /// IMPORTANT: Comparison happens in the COMPRESSED space (LTC output dimension)
     /// to ensure we're comparing apples to apples.
-    fn compute_prediction_error(&self, current_hdv: &ContinuousHV) -> f32 {
+    fn compute_prediction_error(&self, current_hdv: &ContinuousHV) -> (f32, PredictionDegeneracy) {
         match &self.predicted_hdv {
             Some(predicted) => {
                 // Compress current HDV to same dimension as prediction (NOT expand prediction!)
                 // This ensures we compare in the same space the LTC operates in
                 let compressed_current = self.compress_for_ltc(current_hdv, predicted.len());
 
-                // Compute normalized L2 distance in compressed space
-                let diff: f32 = compressed_current
-                    .iter()
-                    .zip(predicted.iter())
-                    .map(|(a, b)| (a - b).powi(2))
-                    .sum();
-
                 let norm_current: f32 =
                     compressed_current.iter().map(|x| x * x).sum::<f32>().sqrt();
                 let norm_pred: f32 = predicted.iter().map(|x| x * x).sum::<f32>().sqrt();
 
                 if norm_current > 0.0 && norm_pred > 0.0 {
-                    // Normalized error in [0, 1] range
-                    (diff.sqrt() / (norm_current + norm_pred)).clamp(0.0, 1.0)
+                    // SCALE-INVARIANT comparison: the prediction lives in the
+                    // CfC's training space, which is the compressed encoding
+                    // scaled by a per-cycle attention weight (plus small additive
+                    // modulations). Comparing raw magnitudes therefore inflated
+                    // PE by the scale mismatch. In HDC space direction carries
+                    // the meaning, so compare unit vectors: 0.5·‖â − p̂‖ ∈ [0,1]
+                    // (0 = parallel, ~0.71 = uncorrelated, 1 = anti-parallel).
+                    let diff: f32 = compressed_current
+                        .iter()
+                        .zip(predicted.iter())
+                        .map(|(a, b)| {
+                            let a_hat = a / norm_current;
+                            let b_hat = b / norm_pred;
+                            (a_hat - b_hat).powi(2)
+                        })
+                        .sum();
+                    (
+                        (0.5 * diff.sqrt()).clamp(0.0, 1.0),
+                        PredictionDegeneracy::Genuine,
+                    )
                 } else {
-                    1.0 // Maximum error if norms are zero
+                    // Max-error sentinel: a zero-norm side means the comparison is
+                    // meaningless (broken upstream prediction), not real surprise.
+                    (1.0, PredictionDegeneracy::ZeroPrediction)
                 }
             }
-            None => 1.0, // No prediction = maximum surprise
+            None => (1.0, PredictionDegeneracy::NoPrediction),
         }
+    }
+
+    /// Relative NLL ("bits saved") of the shortest-horizon prediction vs the
+    /// persistence and zero baselines, under one shared Gaussian residual
+    /// model on unit vectors:
+    ///
+    /// `Δbits = κ·(cos_model − cos_baseline)/ln 2`, with `κ = 1/σ²` and
+    /// `σ²` = EMA of the persistence residual `‖â − b̂‖²`.
+    ///
+    /// The Gaussian normalization constants cancel between model and baseline
+    /// (same σ² on both sides), so no discretization convention is needed and
+    /// the quantity is well-defined despite the prediction space's known scale
+    /// pathologies. Estimator registered BEFORE this code existed:
+    /// docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md §2 + Amendment 1 §5.
+    fn compute_bits_saved(
+        &mut self,
+        current_hdv: &ContinuousHV,
+    ) -> (Option<f32>, Option<f32>, Option<f32>) {
+        let pred_dim = match &self.first_horizon_prediction {
+            Some(p) if !p.is_empty() => p.len(),
+            _ => {
+                // No prediction: the compressed dimension is undefined this
+                // cycle — drop the baseline so a later dimension change can
+                // never pair mismatched vectors.
+                self.prev_compressed_unit = None;
+                return (None, None, None);
+            }
+        };
+
+        let compressed = self.compress_for_ltc(current_hdv, pred_dim);
+        let norm_cur: f32 = compressed.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm_cur <= 0.0 {
+            self.prev_compressed_unit = None;
+            return (None, None, None);
+        }
+        let a_hat: Vec<f32> = compressed.iter().map(|x| x / norm_cur).collect();
+
+        let predicted = self
+            .first_horizon_prediction
+            .as_ref()
+            .expect("checked above");
+        let norm_pred: f32 = predicted.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm_pred <= 0.0 {
+            // Zero-norm prediction: degenerate (same class the PE sentinel
+            // flags) — skip this cycle but keep the baseline chain alive.
+            self.prev_compressed_unit = Some(a_hat);
+            return (None, None, None);
+        }
+        let cos_model: f32 = a_hat
+            .iter()
+            .zip(predicted.iter())
+            .map(|(a, p)| a * p)
+            .sum::<f32>()
+            / norm_pred;
+
+        let mut result = (None, None, None);
+        if let Some(prev) = self
+            .prev_compressed_unit
+            .as_ref()
+            .filter(|p| p.len() == a_hat.len())
+        {
+            let cos_persist: f32 = a_hat.iter().zip(prev.iter()).map(|(a, b)| a * b).sum();
+            // Shared σ² from the persistence residual on unit vectors:
+            // ‖â − b̂‖² = 2 − 2·cos_persist.
+            let resid_sq = (2.0 - 2.0 * cos_persist).max(0.0);
+            if self.bits_resid_samples == 0 {
+                self.bits_resid_var_ema = resid_sq;
+            } else {
+                self.bits_resid_var_ema = self.bits_resid_var_ema * (1.0 - BITS_RESID_EMA_ALPHA)
+                    + resid_sq * BITS_RESID_EMA_ALPHA;
+            }
+            self.bits_resid_samples += 1;
+
+            if self.bits_resid_samples >= BITS_WARMUP_SAMPLES {
+                // Additive ε (Amendment 3): a bare floor let κ hit 1/1e-6 on
+                // near-constant streams, exploding bits to ±10⁶ in the smoke.
+                let kappa = 1.0 / (self.bits_resid_var_ema.max(0.0) + BITS_RESID_VAR_EPSILON);
+                let ln2 = std::f32::consts::LN_2;
+                result = (
+                    Some(kappa * (cos_model - cos_persist) / ln2),
+                    Some(kappa * cos_model / ln2),
+                    Some(kappa),
+                );
+            }
+        }
+        self.prev_compressed_unit = Some(a_hat);
+        result
     }
 
     /// Expand compressed prediction to full dimension
@@ -726,5 +951,136 @@ mod tests {
 
         assert_eq!(encoder.stats.total_cycles, 5);
         assert!(encoder.stats.cumulative_error > 0.0);
+    }
+
+    #[test]
+    fn bits_saved_none_without_prediction() {
+        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
+        for _ in 0..5 {
+            let r = encoder.encode("test input");
+            assert!(r.bits_saved_persist.is_none());
+            assert!(r.bits_saved_zero.is_none());
+        }
+    }
+
+    #[test]
+    fn bits_saved_warms_up_then_reports() {
+        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
+
+        // Self-prediction loop: feed the compressed previous encoding back as
+        // the first-horizon prediction (a perfect persistence predictor).
+        let mut last: Option<Vec<f32>> = None;
+        let mut first_some_at = None;
+        for i in 0..40 {
+            encoder.set_first_horizon_prediction(last.clone());
+            let r = encoder.encode("the cat sat on the mat");
+            last = Some(encoder.compress_for_ltc(&r.hdv, 64));
+
+            if i < BITS_WARMUP_SAMPLES {
+                assert!(
+                    r.bits_saved_persist.is_none(),
+                    "bits must be None during warm-up (cycle {i})"
+                );
+            }
+            if r.bits_saved_persist.is_some() && first_some_at.is_none() {
+                first_some_at = Some(i);
+                assert!(r.bits_saved_zero.is_some());
+            }
+        }
+        let at = first_some_at.expect("bits_saved should report after warm-up");
+        // Prediction chain starts at cycle 1, baseline at cycle 2 → first
+        // σ² sample at cycle 2, warm at 2 + BITS_WARMUP_SAMPLES − 1.
+        assert!(at >= BITS_WARMUP_SAMPLES, "warm-up honored (got {at})");
+
+        // On a constant stream with a perfect persistence predictor, the model
+        // matches the baseline: bits_saved_persist ≈ 0, bits_saved_zero > 0
+        // (the prediction is far better than a directionless zero vector).
+        encoder.set_first_horizon_prediction(last.clone());
+        let r = encoder.encode("the cat sat on the mat");
+        let persist = r.bits_saved_persist.unwrap();
+        let zero = r.bits_saved_zero.unwrap();
+        assert!(
+            persist.abs() < 1.0,
+            "self-prediction on a constant stream ≈ persistence baseline (got {persist})"
+        );
+        assert!(
+            zero > 0.0,
+            "any real prediction beats the zero floor (got {zero})"
+        );
+    }
+
+    #[test]
+    fn bits_saved_measurement_only_does_not_perturb_pe_or_attention() {
+        // Two encoders, identical input schedule and predictions; one also
+        // receives first-horizon predictions (activating the bits path).
+        // PE and attention trajectories must be bit-identical.
+        let mut a = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
+        let mut b = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
+
+        let mut last: Option<Vec<f32>> = None;
+        for i in 0..30 {
+            let input = if i % 3 == 0 {
+                "cause and effect"
+            } else {
+                "the cat sat"
+            };
+            if let Some(p) = last.clone() {
+                a.set_prediction(p.clone());
+                b.set_prediction(p.clone());
+                // Only `b` gets the bits-saved path activated.
+                b.set_first_horizon_prediction(Some(p));
+            }
+            let ra = a.encode(input);
+            let rb = b.encode(input);
+            assert_eq!(
+                ra.prediction_error, rb.prediction_error,
+                "bits path must not perturb PE (cycle {i})"
+            );
+            assert_eq!(
+                ra.peak_attention, rb.peak_attention,
+                "bits path must not perturb attention (cycle {i})"
+            );
+            assert!(ra.bits_saved_persist.is_none());
+            last = Some(a.compress_for_ltc(&ra.hdv, 64));
+        }
+    }
+
+    #[test]
+    fn phantom_primitive_detection_does_not_zero_encoding() {
+        // Regression: "life" contains the substring "if", so
+        // detect_semantic_patterns emits "IMPLICATION" — a name that exists
+        // nowhere in the primitive system. The old attention average divided
+        // by ALL detected names (0 matched / 1 detected = 0), scaling the
+        // entire encoding to an exact zero vector: the loop was blind to any
+        // sentence whose only detections were phantom names.
+        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
+        for input in [
+            "What is the meaning of a life well lived?",
+            "Critical failure: coolant pressure dropping, meltdown risk rising!",
+        ] {
+            let r = encoder.encode(input);
+            let norm: f32 = r.hdv.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+            assert!(
+                norm > 0.0,
+                "encoding must not be zeroed by phantom primitive names: {input:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn bits_saved_dimension_change_resets_baseline() {
+        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
+        // Establish a 64-dim chain.
+        let r = encoder.encode("test input");
+        let c64 = encoder.compress_for_ltc(&r.hdv, 64);
+        encoder.set_first_horizon_prediction(Some(c64));
+        encoder.encode("test input");
+        // Switch to a 32-dim prediction: the stored 64-dim baseline must not
+        // pair with the new 32-dim encoding (no panic, no bogus cosine).
+        let r2 = encoder.encode("test input");
+        let c32 = encoder.compress_for_ltc(&r2.hdv, 32);
+        encoder.set_first_horizon_prediction(Some(c32));
+        let r3 = encoder.encode("test input");
+        assert!(r3.bits_saved_persist.is_none());
     }
 }

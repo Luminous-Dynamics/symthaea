@@ -133,8 +133,20 @@ pub struct DomainCalibration {
     /// Lifetime Brier score (all predictions)
     pub lifetime_brier: f64,
 
-    /// Expected Calibration Error
+    /// Expected Calibration Error.
+    ///
+    /// HONESTY NOTE (2026-07-16): 0.0 here means "not yet computed" until
+    /// `ece_computed` is true (needs `min_predictions_for_ece` resolved
+    /// predictions) — it is NOT evidence of perfect calibration. Check
+    /// `ece_computed` before treating this as a measurement.
     pub ece: f64,
+
+    /// Whether `ece` has actually been computed (vs. its 0.0 initial value).
+    /// Before this flag existed, `is_well_calibrated` returned true for any
+    /// system with <50 resolved predictions regardless of how miscalibrated
+    /// it was (E5 observed ece=0.0/"well calibrated" at 21% accuracy).
+    #[serde(default)]
+    pub ece_computed: bool,
 
     /// Number of predictions made
     pub prediction_count: usize,
@@ -176,6 +188,7 @@ impl DomainCalibration {
             rolling_brier: 0.0,
             lifetime_brier: 0.0,
             ece: 0.0,
+            ece_computed: false,
             prediction_count: 0,
             correct_count: 0,
             brier_sum: 0.0,
@@ -244,6 +257,7 @@ impl DomainCalibration {
     fn update_ece(&mut self, num_bins: usize) {
         if self.recent_predictions.is_empty() {
             self.ece = 0.0;
+            self.ece_computed = false; // no data — 0.0 is a sentinel, not a measurement
             return;
         }
 
@@ -292,6 +306,8 @@ impl DomainCalibration {
             / total_predictions;
 
         self.is_overconfident = avg_confidence > accuracy;
+        // ECE is now a real measurement, not the 0.0 initial value.
+        self.ece_computed = true;
     }
 
     /// Update confidence adjustment based on calibration
@@ -362,6 +378,11 @@ impl DomainCalibration {
             rolling_brier,
             lifetime_brier,
             ece,
+            // Persisted snapshots predate the ece_computed flag. Trust a
+            // persisted nonzero ECE as computed; a persisted 0.0 is ambiguous
+            // (could be the old never-computed sentinel) — treat as uncomputed
+            // and let the next update_ece() re-establish it honestly.
+            ece_computed: ece != 0.0,
             prediction_count,
             correct_count,
             brier_sum,
@@ -527,9 +548,16 @@ impl BrierScoreTracker {
             .unwrap_or(raw_confidence)
     }
 
-    /// Check if system is well-calibrated (ECE below threshold)
+    /// Check if system is well-calibrated (ECE below threshold).
+    ///
+    /// Requires the ECE to have actually been computed: before 2026-07-16 this
+    /// returned true for any system with fewer than `min_predictions_for_ece`
+    /// resolved predictions (ece still at its 0.0 initial value), which let a
+    /// 21%-accuracy overconfident run report "well calibrated" (E5 finding).
+    /// A system that hasn't measured its calibration is NOT well-calibrated —
+    /// it is unmeasured.
     pub fn is_well_calibrated(&self, threshold: f64) -> bool {
-        self.global_calibration.ece < threshold
+        self.global_calibration.ece_computed && self.global_calibration.ece < threshold
     }
 
     /// Check if a domain is overconfident
@@ -828,6 +856,48 @@ mod tests {
         // ECE should be calculated
         let ece = tracker.expected_calibration_error();
         assert!(ece >= 0.0 && ece <= 1.0);
+    }
+
+    #[test]
+    fn uncalibrated_system_is_not_well_calibrated() {
+        // E5 regression (2026-07-08 finding, fixed 2026-07-16): ece's 0.0
+        // initial value passed the `< threshold` check before any ECE had been
+        // computed, so a 21%-accuracy overconfident run reported
+        // "well calibrated". A system that hasn't measured its calibration
+        // must not claim to be well-calibrated.
+        let config = CalibrationConfig {
+            min_predictions_for_ece: 50,
+            ..Default::default()
+        };
+        let mut tracker = BrierScoreTracker::new(config);
+
+        // 20 maximally-overconfident wrong predictions — below the ECE gate,
+        // so ECE is never computed. Pre-fix, this claimed well_calibrated=true.
+        for _ in 0..20 {
+            let mut pred = create_test_prediction(0.9, PredictionDomain::Factual);
+            pred.resolve_false(OutcomeCategory::SafeFailure, 1.0);
+            tracker.record_prediction(&pred);
+        }
+        assert!(
+            !tracker.is_well_calibrated(0.15),
+            "ECE never computed — must not claim calibration"
+        );
+
+        // Past the gate, ECE computes and correctly flags the miscalibration.
+        for _ in 0..40 {
+            let mut pred = create_test_prediction(0.9, PredictionDomain::Factual);
+            pred.resolve_false(OutcomeCategory::SafeFailure, 1.0);
+            tracker.record_prediction(&pred);
+        }
+        assert!(
+            !tracker.is_well_calibrated(0.15),
+            "60 wrong 0.9-confidence predictions is maximal miscalibration"
+        );
+        assert!(
+            tracker.expected_calibration_error() > 0.5,
+            "ECE should be large for systematic overconfidence: {}",
+            tracker.expected_calibration_error()
+        );
     }
 
     #[test]

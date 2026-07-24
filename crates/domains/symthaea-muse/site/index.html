@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Muse — music with provenance</title>
+<meta name="description" content="Symthaea Muse: a symbolic composition engine with memory, judgment, and identity. Every piece editable, every note explainable, zero scraped training data.">
+<style>
+  :root {
+    --bg: #16130f; --panel: #201b15; --ink: #e8dfd2; --dim: #a3968a;
+    --amber: #d9a05b; --amber-soft: #8a6a44; --green: #7ba05b; --line: #322a1f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: radial-gradient(ellipse at 20% -10%, #241e16, var(--bg) 60%);
+    color: var(--ink); font: 17px/1.65 Georgia, 'Times New Roman', serif;
+    min-height: 100vh;
+  }
+  main { max-width: 46rem; margin: 0 auto; padding: 4rem 1.5rem 6rem; }
+  h1 { font-weight: normal; font-size: 2.6rem; letter-spacing: 0.05em; margin: 0 0 0.3rem; }
+  h1 em { color: var(--amber); font-style: normal; }
+  h2 { font-weight: normal; font-size: 1.5rem; color: var(--amber); margin: 3.5rem 0 0.8rem; letter-spacing: 0.04em; }
+  h3 { font-weight: normal; font-size: 1.05rem; color: var(--ink); margin: 1.6rem 0 0.2rem; }
+  p { margin: 0.8rem 0; }
+  .sub { color: var(--dim); font-size: 1.05rem; margin-bottom: 2.5rem; }
+  .badge { display: inline-block; font-size: 0.78rem; color: var(--dim); border: 1px solid var(--line);
+           border-radius: 999px; padding: 0.15rem 0.7rem; margin: 0 0.3rem 0.3rem 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+          padding: 1.1rem 1.4rem; margin: 1rem 0; }
+  .card p { color: var(--dim); font-size: 0.92rem; margin: 0.4rem 0 0.6rem; }
+  .card audio { width: 100%; height: 2.2rem; }
+  .quiet { color: var(--dim); font-size: 0.9rem; }
+  a { color: var(--amber); }
+  .provenance { border-left: 3px solid var(--amber-soft); padding-left: 1.1rem; }
+  .journal p { font-size: 0.95rem; }
+  .journal .verdict { color: var(--green); }
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--line);
+           color: var(--dim); font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1><em>Muse</em></h1>
+  <p class="sub">A composition engine that writes music the way composers do — with hooks worth
+  remembering, forms that argue, and judgment about what deserves to survive. Part of the
+  <a href="https://github.com/Luminous-Dynamics/symthaea">Symthaea</a> project.</p>
+
+  <div>
+    <span class="badge">symbolic composition — every note is a decision, not a sample</span>
+    <span class="badge">zero scraped training data</span>
+    <span class="badge">CC0 instruments</span>
+    <span class="badge">you own the MIDI</span>
+    <span class="badge">runs locally</span>
+  </div>
+
+  <h2>The provenance, first</h2>
+  <div class="provenance">
+    <p>Muse contains no melody it learned from anyone. The composer is <strong>symbolic music
+    theory in Rust</strong> — scales, voice leading, counterpoint, form — so every note has a
+    reason you can ask for. The instrument samples are <strong>CC0</strong> (VCSL/VSCO2). The
+    expressive performance model is fitted on the research-licensed MAESTRO corpus, with
+    provenance embedded in every export. When Muse hands you a piece, it is yours: a MIDI file
+    you can open in any DAW, with no one else's music inside it.</p>
+  </div>
+
+  <h2>Listen</h2>
+  <p class="quiet">Every piece below was composed deterministically from a seed — same seed,
+  same piece, forever. Recorded through a soundfont render; the symbolic score is the real
+  artifact.</p>
+
+  <div class="card">
+    <h3>Tango</h3>
+    <p>The melody is born from the dance: dotted calls and wide reaches over a habanera whose
+    accent hierarchy the bass locks to. The phrase rhetoric is declamatory — statement,
+    interruption, answer, sharp stop.</p>
+    <audio controls preload="none" src="audio/style_demo_tango.ogg"></audio>
+  </div>
+
+  <div class="card">
+    <h3>Nocturne</h3>
+    <p>The same engine, thinking differently: sighing stepwise hooks, suspensions that overstay
+    into each cadence, arrivals that land softly and off the barline. Same seed as the tango
+    above — a different musical identity, not a different dressing.</p>
+    <audio controls preload="none" src="audio/style_demo_nocturne_dna.ogg"></audio>
+  </div>
+
+  <div class="card">
+    <h3>Passacaglia — <span class="quiet">persistence</span></h3>
+    <p>Seven statements of a ground that remembers: stated, walked, filled, altered, restored
+    as the climax, fragmented, and finally completed. The foundation is the piece's name,
+    slowed into the bass.</p>
+    <audio controls preload="none" src="audio/style_demo_passacaglia.ogg"></audio>
+  </div>
+
+  <div class="card">
+    <h3>Erosion Nocturne — <span class="quiet">an elegy</span></h3>
+    <p>Persistence failing. The ground loses one tone per cycle while the melody continues
+    above it. Near the end it nearly recovers — then the final return arrives missing the one
+    tone that would carry it home, and the melody reaches for the tonic and stops one step
+    short.</p>
+    <audio controls preload="none" src="audio/style_demo_erosion_nocturne.ogg"></audio>
+  </div>
+
+  <div class="card">
+    <h3>Lineage</h3>
+    <p>The ground becomes its descendants: every cycle a recognizable child of the same
+    ancestor — figured, transposed, never contour-flipped. Measured the most integrated form
+    the engine has produced.</p>
+    <audio controls preload="none" src="audio/style_demo_lineage.ogg"></audio>
+  </div>
+
+  <div class="card">
+    <h3>Fugue</h3>
+    <p>Three voices, one subject: exposition with a real answer at the fifth, episodes on the
+    subject's head, an inverted middle entry, a true stretto, and an augmented final entry —
+    with species-checked counterpoint fitting the free voices to the theme.</p>
+    <audio controls preload="none" src="audio/style_demo_fugue.ogg"></audio>
+  </div>
+
+  <div class="card">
+    <h3>Theme &amp; Variations — <span class="quiet">a lullaby</span></h3>
+    <p>Variation as structured remembering: theme, minore, figuration, and the theme returned —
+    every section over the same harmonic skeleton. The ground never moves; only the surface.</p>
+    <audio controls preload="none" src="audio/style_demo_variations_lullaby.ogg"></audio>
+  </div>
+
+  <div class="card">
+    <h3>Rondo — <span class="quiet">a memory arc</span></h3>
+    <p>Every return of the theme but the last comes back wounded — shrunk, cut, ornamented, or
+    incomplete, by the piece's emotional attitude. The final return alone is verbatim, lifted:
+    finally complete.</p>
+    <audio controls preload="none" src="audio/wistful_rondo_memory_arc.ogg"></audio>
+  </div>
+
+  <h2>How it gets better: hypotheses that are allowed to die</h2>
+  <div class="journal">
+    <p class="quiet">Muse improves through listening reviews and pre-registered experiments —
+    deterministic tests, committed to the repository, that fail loudly when a hypothesis is
+    wrong. Three that shaped the engine:</p>
+
+    <h3>Species counterpoint should raise integration — <span class="verdict">falsified, twice</span></h3>
+    <p>Making the fugue's verticals consonant measurably improved them (+25% on the consonance
+    channel) and the integration score didn't move: the metric's bottleneck was temporal, not
+    vertical. The falsification redirected the roadmap to the passacaglia — a form built on
+    exactly the dimension the metric said mattered.</p>
+
+    <h3>An invariant ground should out-integrate an anonymous bass — <span class="verdict">confirmed</span></h3>
+    <p>Pre-registered against a control with identical rhythm, register, and density: the
+    persistent ground won on every seed, up to 2×. The failed hypothesis above had predicted
+    where to look.</p>
+
+    <h3>Kinship should integrate like invariance — <span class="verdict">falsified three times, then confirmed with a law</span></h3>
+    <p>Chains of contour flips lost. Drifting transpositions lost. Only when every generation
+    descended from the ancestor by interval-preserving steps did lineage win — and then it beat
+    strict invariance itself, 3×. The law the experiments left behind: kinship integrates in
+    proportion to how much interval identity the transformation preserves.</p>
+  </div>
+
+  <h2>What Muse knows about its own music</h2>
+  <p>Every candidate the engine offers carries its measurements: an integration score (a
+  spectral, minimum-cut analysis of how hard the piece is to pull apart), local and global
+  coherence reported separately, and — for ground forms — a five-score judgment of whether the
+  subject deserved to become a foundation at all. The measurements are observables, never
+  fitness functions: the only thing Muse optimizes toward is what a listener keeps.</p>
+
+  <h2>Where it runs</h2>
+  <p>Locally. Muse Studio is a small web app served from your own machine: describe a feeling,
+  audition genuinely different candidates (identities, not variations), and take away the MIDI
+  you own. Nothing leaves the machine.</p>
+  <p class="quiet">Source lives in the
+  <a href="https://github.com/Luminous-Dynamics/symthaea">Symthaea repository</a>
+  (<code>crates/domains/symthaea-muse</code> and <code>symthaea-music-theory</code>), AGPL-3.0.</p>
+
+  <footer>
+    <p>Symthaea Muse · <a href="https://github.com/Luminous-Dynamics/symthaea">Luminous Dynamics</a> ·
+    consciousness-first technology. All audio on this page: composed by Muse, CC0 samples,
+    no scraped training data — listen with that in mind.</p>
+  </footer>
+</main>
+</body>
+</html>

@@ -1,36 +1,27 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! EmbodimentBridge implementation for the browser agent.
+//! Browser embodiment telemetry for the synchronous cognitive loop.
 //!
-//! Bridges the synchronous cognitive loop to the async CDP session using
-//! tokio channels. The cognitive loop calls `step()` synchronously; the
-//! bridge encodes the last observation, applies safety gating, and queues
-//! actions for async execution.
+//! The bridge stores the latest bounded observation and exposes its HDC
+//! encoding. It does not select or asynchronously dispatch actions; action
+//! proposals are executed separately by [`crate::executor::BrowserExecutor`].
+//! Consecutive-observation distance is reported as perceptual change/novelty,
+//! not as sensor confidence.
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 
 pub use symthaea_core::embodiment::{
-    EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MotorSafetyLevel,
-    grounding_from_prediction_error, grounding_label,
+    EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel, grounding_label,
 };
 
 use crate::encoder::BrowserHdcEncoder;
 use crate::observation::PageObservation;
 use crate::safety::BrowserSafetyPolicy;
 
-/// Grounding level for browser perception (higher number = less grounded).
-/// Web content is second-hand information, not direct sensory experience.
-/// Uses the same scale as GROUNDING_SOCIAL (2) since web is mediated info.
 const GROUNDING_BROWSER: u8 = 2;
 
-/// Browser embodiment bridge for the cognitive loop.
-///
-/// Unlike physical platforms (vehicle, helicopter), the browser bridge
-/// operates on a different timescale — page loads take seconds, not
-/// milliseconds. The bridge maintains the last observation and encodes
-/// it on demand.
 pub struct BrowserBridge {
     encoder: BrowserHdcEncoder,
     safety: BrowserSafetyPolicy,
@@ -39,13 +30,12 @@ pub struct BrowserBridge {
     total_steps: usize,
     current_safety: MotorSafetyLevel,
     safety_override: Option<MotorSafetyLevel>,
-    last_prediction_error: f32,
-    /// Number of actions blocked by safety policy this session.
+    last_observation_delta: f32,
+    last_observation_confidence: f32,
     actions_blocked: usize,
 }
 
 impl BrowserBridge {
-    /// Create a new browser bridge.
     pub fn new(genesis: &GenesisSeed, safety: BrowserSafetyPolicy) -> Self {
         Self {
             encoder: BrowserHdcEncoder::new(genesis),
@@ -55,212 +45,211 @@ impl BrowserBridge {
             total_steps: 0,
             current_safety: MotorSafetyLevel::Green,
             safety_override: None,
-            last_prediction_error: 0.0,
+            last_observation_delta: 0.0,
+            last_observation_confidence: 0.0,
             actions_blocked: 0,
         }
     }
 
-    /// Update the observation from a CDP fetch (called from async context).
     pub fn update_observation(&mut self, observation: PageObservation) {
+        self.last_observation_confidence = observation_confidence(&observation);
         self.last_observation = Some(observation);
     }
 
-    /// Get the current observation, if any.
     pub fn observation(&self) -> Option<&PageObservation> {
         self.last_observation.as_ref()
     }
 
-    /// Set a safety override (immune system or external halt).
     pub fn set_safety_override(&mut self, level: MotorSafetyLevel) {
         self.safety_override = Some(level);
     }
 
-    /// Clear the safety override.
     pub fn clear_safety_override(&mut self) {
         self.safety_override = None;
     }
 
-    /// Cognitive loop step: encode observation, check safety, return result.
+    /// Encode the current observation and report perceptual change.
     ///
-    /// The `thought_hv` is not directly used for action selection here
-    /// (that happens in the cognitive loop's output phase). Instead, we
-    /// compute prediction error between consecutive observations.
+    /// `thought_hv` and `dt` are accepted for compatibility with the common
+    /// embodiment interface. Browser action selection occurs outside this
+    /// bridge and page-load timing is asynchronous.
     pub fn step(&mut self, _thought_hv: &ContinuousHV, _dt: f32, phi: f64) -> EmbodimentResult {
-        let phi_level = MotorSafetyLevel::from_phi(phi);
+        let bounded_phi = if phi.is_finite() {
+            phi.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let phi_level = MotorSafetyLevel::from_phi(bounded_phi);
         self.current_safety = match self.safety_override {
             Some(override_level) => phi_level.max(override_level),
             None => phi_level,
         };
 
-        // Encode current observation
         let perception = match &self.last_observation {
-            Some(obs) => self.encoder.encode(obs),
+            Some(observation) => self.encoder.encode(observation),
             None => ContinuousHV::zero(symthaea_core::hdc::HDC_DIMENSION),
         };
 
-        // Prediction error from consecutive observations
-        let pred_error = if let Some(ref prev) = self.last_perception {
-            (1.0 - perception.similarity(prev).max(0.0)).min(1.0)
+        let observation_delta = if let Some(previous) = &self.last_perception {
+            (1.0 - perception.similarity(previous).max(0.0)).clamp(0.0, 1.0)
         } else {
-            0.0_f32
+            0.0
         };
-        self.last_prediction_error = pred_error;
+        self.last_observation_delta = observation_delta;
         self.last_perception = Some(perception);
         self.total_steps += 1;
 
         EmbodimentResult {
-            num_actuators: 4,    // navigate, click, type, scroll
-            control_effort: 0.0, // browser has no physical effort
+            num_actuators: 4,
+            control_effort: 0.0,
             success: self.last_observation.is_some(),
-            prediction_error: pred_error,
+            // The common field is named prediction_error. Until an
+            // action-conditioned browser world model exists, this is the
+            // consecutive-observation delta and must be interpreted as such.
+            prediction_error: observation_delta,
             safety_level: self.current_safety,
             epistemic_grounding: GROUNDING_BROWSER,
-            observation_confidence: grounding_from_prediction_error(pred_error),
+            observation_confidence: self.last_observation_confidence,
         }
     }
 
-    /// Encode the current page state as a 16,384D perception HV.
     pub fn encode_perception(&mut self) -> ContinuousHV {
-        let hv = match &self.last_observation {
-            Some(obs) => self.encoder.encode(obs),
+        let vector = match &self.last_observation {
+            Some(observation) => self.encoder.encode(observation),
             None => ContinuousHV::zero(symthaea_core::hdc::HDC_DIMENSION),
         };
-        self.last_perception = Some(hv.clone());
-        hv
+        self.last_perception = Some(vector.clone());
+        vector
     }
 
-    /// Reset the bridge state.
     pub fn reset(&mut self) {
         self.last_observation = None;
         self.last_perception = None;
         self.total_steps = 0;
         self.current_safety = MotorSafetyLevel::Green;
         self.safety_override = None;
-        self.last_prediction_error = 0.0;
+        self.last_observation_delta = 0.0;
+        self.last_observation_confidence = 0.0;
         self.actions_blocked = 0;
     }
 
-    /// Current safety level.
     pub fn safety_level(&self) -> MotorSafetyLevel {
         self.current_safety
     }
 
-    /// Total cognitive steps completed.
     pub fn total_steps(&self) -> usize {
         self.total_steps
     }
 
-    /// Number of actions blocked by safety policy.
     pub fn actions_blocked(&self) -> usize {
         self.actions_blocked
     }
 
-    /// Get a reference to the safety policy.
+    pub fn observation_delta(&self) -> f32 {
+        self.last_observation_delta
+    }
+
+    pub fn observation_confidence(&self) -> f32 {
+        self.last_observation_confidence
+    }
+
     pub fn safety_policy(&self) -> &BrowserSafetyPolicy {
         &self.safety
     }
 
-    /// Check whether an action would be allowed under current policy and Phi.
     pub fn would_allow(&self, action: &crate::actions::BrowserAction, phi: f64) -> bool {
         self.safety.is_action_allowed(action, phi)
     }
 
-    /// Record that an action was blocked.
     pub fn record_blocked(&mut self) {
         self.actions_blocked += 1;
     }
 
-    /// Telemetry snapshot.
     pub fn telemetry(&self) -> EmbodimentTelemetry {
         EmbodimentTelemetry {
             total_steps: self.total_steps as u64,
             control_effort: 0.0,
-            prediction_error: self.last_prediction_error,
-            safety_level: format!("{:?}", self.current_safety),
+            prediction_error: self.last_observation_delta,
+            safety_level: self.current_safety,
             platform: "browser".to_string(),
             num_actuators: 4,
             epistemic_grounding: grounding_label(GROUNDING_BROWSER).to_string(),
-            observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
+            observation_confidence: self.last_observation_confidence,
             platform_specific: Vec::new(),
         }
     }
+}
+
+fn observation_confidence(observation: &PageObservation) -> f32 {
+    let mut confidence = 0.45_f32;
+    if url::Url::parse(&observation.url).is_ok() {
+        confidence += 0.20;
+    }
+    if !observation.title.is_empty() {
+        confidence += 0.10;
+    }
+    if !observation.elements.is_empty() {
+        confidence += 0.15;
+    }
+    confidence.min(0.90)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_step_without_observation() {
-        let genesis = GenesisSeed::from_phrase("test-browser");
-        let mut bridge = BrowserBridge::new(&genesis, BrowserSafetyPolicy::default());
-        let hv = ContinuousHV::random(16384, 42);
-        let r = bridge.step(&hv, 0.05, 0.7);
-        assert!(!r.success); // no observation loaded
-        assert_eq!(r.num_actuators, 4);
-    }
-
-    #[test]
-    fn test_step_with_observation() {
-        let genesis = GenesisSeed::from_phrase("test-browser");
-        let mut bridge = BrowserBridge::new(&genesis, BrowserSafetyPolicy::default());
-
-        bridge.update_observation(PageObservation {
-            url: "https://example.com".into(),
-            title: "Example".into(),
-            elements: vec![],
+    fn observation(url: &str, title: &str) -> PageObservation {
+        PageObservation {
+            url: url.into(),
+            title: title.into(),
+            elements: Vec::new(),
             focused_element: None,
-        });
-
-        let hv = ContinuousHV::random(16384, 42);
-        let r = bridge.step(&hv, 0.05, 0.7);
-        assert!(r.success);
+        }
     }
 
     #[test]
-    fn test_safety_gating() {
+    fn step_without_observation_reports_no_sensor_confidence() {
         let genesis = GenesisSeed::from_phrase("test-browser");
         let mut bridge = BrowserBridge::new(&genesis, BrowserSafetyPolicy::default());
-        let hv = ContinuousHV::random(16384, 42);
-        let r = bridge.step(&hv, 0.05, 0.05);
-        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+        let thought = ContinuousHV::random(16384, 42);
+        let result = bridge.step(&thought, 0.05, 0.7);
+        assert!(!result.success);
+        assert_eq!(result.observation_confidence, 0.0);
     }
 
     #[test]
-    fn test_perception_encoding() {
+    fn observation_change_does_not_reduce_sensor_confidence() {
         let genesis = GenesisSeed::from_phrase("test-browser");
         let mut bridge = BrowserBridge::new(&genesis, BrowserSafetyPolicy::default());
+        let thought = ContinuousHV::random(16384, 42);
 
-        bridge.update_observation(PageObservation {
-            url: "https://example.com".into(),
-            title: "Test".into(),
-            elements: vec![],
-            focused_element: None,
-        });
+        bridge.update_observation(observation("https://example.com", "First"));
+        bridge.step(&thought, 0.05, 0.7);
+        let first_confidence = bridge.observation_confidence();
 
-        let p = bridge.encode_perception();
-        assert_eq!(p.dim(), 16384);
+        bridge.update_observation(observation("https://other.example", "Second"));
+        let result = bridge.step(&thought, 0.05, 0.7);
+        assert!(result.prediction_error > 0.0);
+        assert_eq!(result.observation_confidence, first_confidence);
     }
 
     #[test]
-    fn test_reset() {
+    fn non_finite_phi_fails_to_red_safety() {
         let genesis = GenesisSeed::from_phrase("test-browser");
         let mut bridge = BrowserBridge::new(&genesis, BrowserSafetyPolicy::default());
-        let hv = ContinuousHV::random(16384, 42);
-        bridge.step(&hv, 0.05, 0.7);
+        let thought = ContinuousHV::random(16384, 42);
+        let result = bridge.step(&thought, 0.05, f64::NAN);
+        assert_eq!(result.safety_level, MotorSafetyLevel::Red);
+    }
+
+    #[test]
+    fn reset_clears_telemetry() {
+        let genesis = GenesisSeed::from_phrase("test-browser");
+        let mut bridge = BrowserBridge::new(&genesis, BrowserSafetyPolicy::default());
+        let thought = ContinuousHV::random(16384, 42);
+        bridge.step(&thought, 0.05, 0.7);
         bridge.reset();
         assert_eq!(bridge.total_steps(), 0);
-        assert_eq!(bridge.actions_blocked(), 0);
-    }
-
-    #[test]
-    fn test_telemetry() {
-        let genesis = GenesisSeed::from_phrase("test-browser");
-        let mut bridge = BrowserBridge::new(&genesis, BrowserSafetyPolicy::default());
-        let hv = ContinuousHV::random(16384, 42);
-        bridge.step(&hv, 0.05, 0.7);
-        let t = bridge.telemetry();
-        assert_eq!(t.total_steps, 1);
-        assert_eq!(t.platform, "browser");
+        assert_eq!(bridge.observation_confidence(), 0.0);
     }
 }

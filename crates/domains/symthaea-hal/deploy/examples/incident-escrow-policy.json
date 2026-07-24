@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "required_key_purpose": "incident-escrow",
+  "allowed_encryption_algorithms": ["age-x25519", "hpke-base"],
+  "minimum_distinct_recipients": 2,
+  "maximum_ciphertext_size_bytes": 536870912,
+  "maximum_lifetime_ms": 2592000000
+}

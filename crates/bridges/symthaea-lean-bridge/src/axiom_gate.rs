@@ -23,20 +23,36 @@ use symthaea_proof_audit::{GateInput, gate};
 
 /// Append a `#print axioms <theorem>` command to a proof-file body so Lean
 /// prints the proof's axiom dependencies to stdout when it checks the file.
-pub fn with_axiom_probe(script_body: &str, theorem: &str) -> String {
-    format!("{}\n\n#print axioms {}\n", script_body.trim_end(), theorem)
+pub fn with_axiom_probe(script_body: &str, theorem: &str) -> Result<String, String> {
+    let valid = !theorem.is_empty()
+        && theorem.split('.').all(|segment| {
+            !segment.is_empty()
+                && segment
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '\'')
+        });
+    if !valid {
+        return Err("theorem name is not a safe dotted Lean identifier".into());
+    }
+    Ok(format!(
+        "{}\n\n#print axioms {}\n",
+        script_body.trim_end(),
+        theorem
+    ))
 }
 
 /// Gate captured Lean output (containing a `#print axioms` result) against a
 /// policy and pinned spec. Pure — no subprocess.
 pub fn gate_lean_output(
     lean_output: &str,
+    expected_theorem: &str,
     proved_statement: &str,
     expected_statement: &str,
     policy: &AxiomPolicy,
 ) -> GateReport {
     gate(&GateInput {
         print_axioms_output: lean_output,
+        expected_theorem,
         proved_statement,
         expected_statement,
         policy,
@@ -70,6 +86,12 @@ fn run_lean_capture(path: &Path, bin: &str) -> Result<String, ProofAuditOutcome>
     };
     let mut combined = String::from_utf8_lossy(&output.stdout).into_owned();
     combined.push_str(&String::from_utf8_lossy(&output.stderr));
+    if !output.status.success() {
+        return Err(ProofAuditOutcome::ProcessError(format!(
+            "Lean exited with {}: {}",
+            output.status, combined
+        )));
+    }
     Ok(combined)
 }
 
@@ -80,6 +102,7 @@ fn run_lean_capture(path: &Path, bin: &str) -> Result<String, ProofAuditOutcome>
 /// `expected_statement` is the pinned spec it must match.
 pub fn audit_lean_file<P: AsRef<Path>>(
     path: P,
+    expected_theorem: &str,
     proved_statement: &str,
     expected_statement: &str,
     policy: &AxiomPolicy,
@@ -88,6 +111,7 @@ pub fn audit_lean_file<P: AsRef<Path>>(
     match run_lean_capture(path.as_ref(), &bin) {
         Ok(output) => ProofAuditOutcome::Audited(gate_lean_output(
             &output,
+            expected_theorem,
             proved_statement,
             expected_statement,
             policy,
@@ -102,7 +126,7 @@ mod tests {
 
     #[test]
     fn probe_is_appended() {
-        let probed = with_axiom_probe("theorem t : True := by trivial", "t");
+        let probed = with_axiom_probe("theorem t : True := by trivial", "t").unwrap();
         assert!(probed.contains("theorem t : True := by trivial"));
         assert!(probed.contains("#print axioms t"));
     }
@@ -110,14 +134,14 @@ mod tests {
     #[test]
     fn clean_output_is_accepted() {
         let out = "'t' depends on axioms: [propext, Quot.sound]";
-        let r = gate_lean_output(out, "a = a", "a = a", &AxiomPolicy::constitutional());
+        let r = gate_lean_output(out, "t", "a = a", "a = a", &AxiomPolicy::constitutional());
         assert!(r.accepted());
     }
 
     #[test]
     fn sorry_output_is_rejected() {
         let out = "'t' depends on axioms: [sorryAx]";
-        let r = gate_lean_output(out, "hard", "hard", &AxiomPolicy::classical());
+        let r = gate_lean_output(out, "t", "hard", "hard", &AxiomPolicy::classical());
         assert!(!r.accepted());
     }
 
@@ -126,6 +150,7 @@ mod tests {
         let out = "'t' does not depend on any axioms";
         let r = gate_lean_output(
             out,
+            "t",
             "True",
             "forall n, n + 0 = n",
             &AxiomPolicy::constitutional(),
@@ -142,5 +167,24 @@ mod tests {
             "symthaea-no-such-lean-binary-xyzzy",
         );
         assert_eq!(err, Err(ProofAuditOutcome::LeanNotInstalled));
+    }
+
+    #[test]
+    fn malformed_output_and_probe_names_fail_closed() {
+        let report = gate_lean_output(
+            "Lean compilation failed",
+            "t",
+            "P",
+            "P",
+            &AxiomPolicy::constitutional(),
+        );
+        assert!(!report.accepted());
+        assert!(
+            with_axiom_probe(
+                "theorem t : True := by trivial",
+                "t\naxiom injected : False"
+            )
+            .is_err()
+        );
     }
 }

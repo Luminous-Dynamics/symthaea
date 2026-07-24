@@ -492,8 +492,69 @@ impl CognitiveLoopService {
         self.record_attention_visualizer_snapshot(perception, dynamics, feedback);
         self.apply_final_output_clamps();
 
+        // Voice synthesis: drain audio completed by the background thread and
+        // feed its quality metrics into the voice→cognition feedback bridge
+        // (this is what makes voice_articulation_quality/LR modulation a real
+        // signal instead of frozen defaults). Audio is buffered (bounded) for
+        // drain_voice_audio().
+        if self.voice_synthesis.is_some() {
+            let completed = self
+                .voice_synthesis
+                .as_ref()
+                .map(|vs| vs.drain_responses())
+                .unwrap_or_default();
+            for resp in completed {
+                self.update_voice_feedback(resp.metrics.clone());
+                // Self-hearing: queue her own utterance's acoustic HV for the
+                // next perception phase (latest-wins).
+                #[cfg(feature = "voice-stt")]
+                if let Some(ref hv) = resp.self_hv {
+                    self.pending_self_voice_hv = Some(hv.clone());
+                }
+                self.voice_audio_buffer.push_back(resp);
+            }
+            while self.voice_audio_buffer.len() > super::voice_channel::VOICE_AUDIO_BUFFER_CAP {
+                self.voice_audio_buffer.pop_front();
+            }
+        }
+
+        // Take the CfC output ONCE, before any use: the previous struct-literal
+        // ordering took `output` first and then cloned the (already emptied)
+        // vec into the VoiceRequest, so voice prosody never saw real CfC state.
+        let output = mem::take(&mut dynamics.core.output);
+
+        let language_output = self.language_comm.last_broca_text.take();
+        if let (Some(t), Some(vs)) = (&language_output, &self.voice_synthesis) {
+            // Effective time-constant for pacing: adaptive FEP-surprise × Φ tau
+            // factors (each ~1.0 baseline; 0.0 means not populated this cycle).
+            let fep_tau = if dynamics.fep_tau_factor > 0.0 {
+                dynamics.fep_tau_factor
+            } else {
+                1.0
+            };
+            let phi_tau = if dynamics.phi_tau_factor > 0.0 {
+                dynamics.phi_tau_factor
+            } else {
+                1.0
+            };
+            let _ = vs.send(super::voice_channel::VoiceRequest {
+                text: t.clone(),
+                cfc_output: output.clone(),
+                tau: fep_tau * phi_tau,
+                prediction_error: dynamics.core.prediction_error,
+                detected_primitives: perception
+                    .encoding
+                    .encoding_result
+                    .detected_primitives
+                    .clone(),
+                speech_rate_multiplier: self.behavior.adaptive_behavior.speech_rate_multiplier,
+                pause_multiplier: self.behavior.adaptive_behavior.pause_multiplier,
+                cycle_num: self.stats.total_cycles as u64,
+            });
+        }
+
         CycleResult {
-            output: mem::take(&mut dynamics.core.output),
+            output,
             prediction_error: dynamics.core.prediction_error,
             peak_attention: perception.encoding.encoding_result.peak_attention,
             detected_primitives: mem::take(
@@ -501,27 +562,14 @@ impl CognitiveLoopService {
             ),
             learning_occurred: dynamics.core.learning_occurred,
             training_loss: dynamics.core.training_loss,
+            bits_saved_persist: perception.encoding.encoding_result.bits_saved_persist,
+            bits_saved_zero: perception.encoding.encoding_result.bits_saved_zero,
+            bits_kappa: perception.encoding.encoding_result.bits_kappa,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             metadata,
             thought_vector,
             wisdom_hv: perception.encoding.hv16_cached,
-            language_output: {
-                let text = self.language_comm.last_broca_text.take();
-                if let (Some(t), Some(vs)) = (&text, &self.voice_synthesis) {
-                    let _ = vs.send(super::voice_channel::VoiceRequest {
-                        text: t.clone(),
-                        cfc_output: dynamics.core.output.clone(),
-                        prediction_error: dynamics.core.prediction_error,
-                        detected_primitives: perception
-                            .encoding
-                            .encoding_result
-                            .detected_primitives
-                            .clone(),
-                        cycle_num: self.stats.total_cycles as u64,
-                    });
-                }
-                text
-            },
+            language_output,
             language_source: self.language_comm.last_language_source.take(),
             #[cfg(feature = "canvas")]
             canvas_svg: self.sensorimotor.motor_rendering.last_canvas_svg.take(),

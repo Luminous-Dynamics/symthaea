@@ -70,6 +70,8 @@ impl ConjectureEngine {
             let mut status_tag = match &c.status {
                 ConjectureStatus::FormallyVerified { .. } => "\\textbf{Formal}",
                 ConjectureStatus::NumericallyTested { .. } => "Numeric",
+                ConjectureStatus::BoundedChecked { .. } => "Bounded data check",
+                ConjectureStatus::SmtSamplesChecked { .. } => "SMT samples",
                 ConjectureStatus::SymbolicallyChecked => "Symbolic",
                 ConjectureStatus::Refuted { .. } => "Refuted",
                 ConjectureStatus::Proposed => "Proposed",
@@ -150,6 +152,13 @@ impl ConjectureEngine {
                     format!("FORMAL ✓ ({} steps)", proof_steps)
                 }
                 ConjectureStatus::NumericallyTested { .. } => "Numeric".to_string(),
+                ConjectureStatus::BoundedChecked {
+                    checked_points,
+                    max_n,
+                } => format!("Bounded data check ({checked_points} points, n≤{max_n})"),
+                ConjectureStatus::SmtSamplesChecked { checked_points } => {
+                    format!("SMT samples ({checked_points} fixed inputs)")
+                }
                 ConjectureStatus::SymbolicallyChecked => "Symbolic".to_string(),
                 ConjectureStatus::Refuted { .. } => "REFUTED".to_string(),
                 ConjectureStatus::Proposed => "Proposed".to_string(),

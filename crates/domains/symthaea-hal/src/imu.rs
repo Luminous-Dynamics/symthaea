@@ -70,7 +70,7 @@ impl SensorDecoder for Mpu6050Decoder {
 
     fn decode(&self, raw: &[u8]) -> Vec<f32> {
         if raw.len() < BURST_LEN {
-            return vec![0.0; 6];
+            return vec![f32::NAN; 6];
         }
 
         let ax = i16_from_be(raw[0], raw[1]) as f32 / ACCEL_SCALE;
@@ -137,7 +137,9 @@ impl ComplementaryFilter {
     /// Higher alpha → more gyro trust, less accel noise.
     /// Lower alpha → faster convergence to accelerometer angle.
     pub fn with_alpha(mut self, alpha: f32) -> Self {
-        self.alpha = alpha.clamp(0.0, 1.0);
+        if alpha.is_finite() {
+            self.alpha = alpha.clamp(0.0, 1.0);
+        }
         self
     }
 
@@ -159,7 +161,7 @@ impl HalSensorAdapter for ComplementaryFilter {
 
     fn read_raw(&mut self) -> Option<Vec<f32>> {
         let values = self.inner.read_raw()?;
-        if values.len() < 6 {
+        if values.len() < 6 || values[..6].iter().any(|value| !value.is_finite()) {
             return None;
         }
 
@@ -257,9 +259,9 @@ mod tests {
         let raw = [0u8; 4]; // too short
         let values = decoder.decode(&raw);
         assert_eq!(values.len(), 6);
-        // All zeros (graceful fallback)
+        // Malformed evidence must not be represented as a valid level reading.
         for &v in &values {
-            assert!(v.abs() < f32::EPSILON);
+            assert!(v.is_nan());
         }
     }
 
@@ -360,6 +362,15 @@ mod tests {
     }
 
     #[test]
+    fn test_complementary_filter_rejects_non_finite_input() {
+        let readings = vec![vec![f32::NAN, 0.0, 1.0, 0.0, 0.0, 0.0]];
+        let sensor = MockHalSensor::new("mpu", readings);
+        let mut filter = ComplementaryFilter::new(Box::new(sensor)).with_alpha(f32::NAN);
+        assert!((filter.alpha - 0.98).abs() < f32::EPSILON);
+        assert!(filter.read_raw().is_none());
+    }
+
+    #[test]
     fn test_complementary_filter_short_reading() {
         // Only 4 values — should return None (need 6)
         let readings = vec![vec![1.0, 2.0, 3.0, 4.0]];
@@ -386,13 +397,13 @@ mod proptests {
         }
 
         #[test]
-        fn decode_short_buffer_produces_zeros(len in 0usize..14) {
+        fn decode_short_buffer_produces_non_finite_evidence(len in 0usize..14) {
             let decoder = Mpu6050Decoder;
             let raw = vec![0u8; len];
             let values = decoder.decode(&raw);
             prop_assert_eq!(values.len(), 6);
             for v in &values {
-                prop_assert!(v.abs() < f32::EPSILON);
+                prop_assert!(v.is_nan());
             }
         }
     }

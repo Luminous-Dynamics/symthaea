@@ -14,6 +14,17 @@
 //!   marginal, knife-edge value; a population that evolves it upward should genuinely do better).
 //! - `action_temperature`: `select_action`'s softmax exploration/exploitation balance --
 //!   previously hardcoded to `symthaea-fep`'s own default, now a real, mutable trait.
+//! - `perceptual_grain`: `Option<f64>`, `None` unless an organism was explicitly constructed
+//!   as part of the Hoffman Fitness-Beats-Truth experiment
+//!   (`tests/hoffman_fitness_beats_truth.rs`, per `HOFFMAN_INTERFACE_THEORY_PLAN_2026-07-22.md`).
+//!   `None` reproduces this crate's exact pre-existing behavior (raw, unquantized resource
+//!   observation, no added perceptual-resolution energy cost) and mutation never activates it --
+//!   `Genome::mutate` only perturbs an already-`Some` value, so every organism/population that
+//!   doesn't explicitly opt in is provably unaffected by this trait's existence. `Some(grain)`
+//!   coarse-grains the resource observation to bucket width `grain` and charges a real Landauer
+//!   cost for the resolved detail (see `metabolism::{quantize_to_grain,
+//!   perceptual_resolution_bits}`) -- smaller `grain` is finer/costlier/closer to truth-tracking,
+//!   larger `grain` is coarser/cheaper/closer to Hoffman's "interface" strategies.
 //!
 //! All other `OrganismConfig` fields (metabolic/activity costs, thermodynamic constants, death
 //! threshold, `goal_precision`) are treated as fixed environmental/physiological constants
@@ -28,12 +39,16 @@ use crate::organism::OrganismConfig;
 const SET_POINT_BOUNDS: (f64, f64) = (0.2, 0.95);
 const FORAGE_EFFICIENCY_BOUNDS: (f64, f64) = (0.01, 2.0);
 const ACTION_TEMPERATURE_BOUNDS: (f64, f64) = (0.1, 5.0);
+/// Only applies once `perceptual_grain` is `Some` -- see the module docs above. `0.02` is ~50
+/// distinguishable buckets across `[0,1]` (~5.6 bits); `0.5` is ~2 buckets (~1 bit).
+const GRAIN_BOUNDS: (f64, f64) = (0.02, 0.5);
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Genome {
     pub set_point: f64,
     pub forage_efficiency: f64,
     pub action_temperature: f64,
+    pub perceptual_grain: Option<f64>,
 }
 
 impl Genome {
@@ -42,6 +57,7 @@ impl Genome {
             set_point: cfg.set_point,
             forage_efficiency: cfg.forage_efficiency,
             action_temperature: cfg.action_temperature,
+            perceptual_grain: cfg.perceptual_grain,
         }
     }
 
@@ -51,6 +67,7 @@ impl Genome {
         cfg.set_point = self.set_point;
         cfg.forage_efficiency = self.forage_efficiency;
         cfg.action_temperature = self.action_temperature;
+        cfg.perceptual_grain = self.perceptual_grain;
         cfg
     }
 
@@ -59,6 +76,10 @@ impl Genome {
     /// `rng_state` is advanced (iterated xorshift64, same algorithm used elsewhere in this
     /// crate) -- deliberately a plain `&mut u64`, not a shared RNG type, matching
     /// `predator_prey.rs`'s precedent of each concern owning an independent stream.
+    ///
+    /// `perceptual_grain` is the one exception to "always mutates": a `None` value is left
+    /// `None` (never spontaneously activated by mutation), while a `Some(v)` perturbs `v` within
+    /// [`GRAIN_BOUNDS`] exactly like the other traits. See the module docs for why.
     pub fn mutate(&self, rng_state: &mut u64, mutation_rate: f64, mutation_std: f64) -> Self {
         let mut maybe_mutate = |value: f64, bounds: (f64, f64)| -> f64 {
             if next_unit(rng_state) < mutation_rate {
@@ -69,10 +90,16 @@ impl Genome {
             }
         };
 
+        let set_point = maybe_mutate(self.set_point, SET_POINT_BOUNDS);
+        let forage_efficiency = maybe_mutate(self.forage_efficiency, FORAGE_EFFICIENCY_BOUNDS);
+        let action_temperature = maybe_mutate(self.action_temperature, ACTION_TEMPERATURE_BOUNDS);
+        let perceptual_grain = self.perceptual_grain.map(|v| maybe_mutate(v, GRAIN_BOUNDS));
+
         Self {
-            set_point: maybe_mutate(self.set_point, SET_POINT_BOUNDS),
-            forage_efficiency: maybe_mutate(self.forage_efficiency, FORAGE_EFFICIENCY_BOUNDS),
-            action_temperature: maybe_mutate(self.action_temperature, ACTION_TEMPERATURE_BOUNDS),
+            set_point,
+            forage_efficiency,
+            action_temperature,
+            perceptual_grain,
         }
     }
 }
@@ -103,6 +130,7 @@ mod tests {
             set_point: 0.5,
             forage_efficiency: 0.9,
             action_temperature: 2.0,
+            perceptual_grain: Some(0.1),
         };
         let mutated_cfg = mutant.apply_to(cfg);
         assert_eq!(mutated_cfg.metabolic_cost, cfg.metabolic_cost);
@@ -111,6 +139,7 @@ mod tests {
             cfg.death_energy_threshold
         );
         assert_eq!(mutated_cfg.set_point, 0.5);
+        assert_eq!(mutated_cfg.perceptual_grain, Some(0.1));
     }
 
     #[test]
@@ -119,6 +148,7 @@ mod tests {
             set_point: 0.5,
             forage_efficiency: 0.5,
             action_temperature: 1.0,
+            perceptual_grain: Some(0.2),
         };
         let mut rng_state = 12345u64;
         for _ in 0..10_000 {
@@ -132,6 +162,10 @@ mod tests {
                 (ACTION_TEMPERATURE_BOUNDS.0..=ACTION_TEMPERATURE_BOUNDS.1)
                     .contains(&mutated.action_temperature)
             );
+            let grain = mutated
+                .perceptual_grain
+                .expect("Some stays Some under mutation");
+            assert!((GRAIN_BOUNDS.0..=GRAIN_BOUNDS.1).contains(&grain));
         }
     }
 
@@ -141,11 +175,35 @@ mod tests {
             set_point: 0.5,
             forage_efficiency: 0.5,
             action_temperature: 1.0,
+            perceptual_grain: Some(0.2),
         };
         let mut rng_state = 999u64;
         for _ in 0..1000 {
             let mutated = genome.mutate(&mut rng_state, 0.0, 1.0);
             assert_eq!(mutated, genome);
+        }
+    }
+
+    #[test]
+    fn perceptual_grain_none_is_never_activated_by_mutation() {
+        // The load-bearing safety property: every pre-existing phase/test constructs organisms
+        // with `perceptual_grain: None` (via `OrganismConfig::default()`) and never touches this
+        // trait -- if mutation could spontaneously turn `None` into `Some`, those populations
+        // would silently start paying a perceptual-resolution cost they were never designed
+        // around. `always-mutate, huge perturbation` settings are deliberately hostile here.
+        let genome = Genome {
+            set_point: 0.5,
+            forage_efficiency: 0.5,
+            action_temperature: 1.0,
+            perceptual_grain: None,
+        };
+        let mut rng_state = 42u64;
+        for _ in 0..10_000 {
+            let mutated = genome.mutate(&mut rng_state, 1.0, 10.0);
+            assert_eq!(
+                mutated.perceptual_grain, None,
+                "None must never be activated by mutation"
+            );
         }
     }
 }

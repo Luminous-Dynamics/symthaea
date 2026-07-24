@@ -1,0 +1,4429 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 3f1cf59..7ab92e8 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,18 @@
+ # Changelog
+ 
++## 1.3.0
++
++- Added ridge-stabilized linear and quadratic discriminant analysis with posterior class probabilities.
++- Added canonical correlation analysis, one-factor permutation MANOVA, and precision-based partial correlations.
++- Added rank-fitted Gaussian copulas with deterministic open-unit-cube sampling.
++- Added shared-boundary Gaussian Tobit regression for left- and right-censored outcomes.
++- Added linear mediation decomposition with Sobel and deterministic bootstrap inference.
++- Added seeded k-means++ clustering and bounded pairwise silhouette scoring.
++- Added MASE/RMSSE/sMAPE forecast metrics and Bartlett-HAC Diebold-Mariano comparisons.
++- Added Harrell concordance and inverse-censoring-weighted survival Brier scores.
++- Added independent NumPy/SciPy/scikit-learn/statsmodels references and adversarial v1.3 contracts.
++- Corrected stable-v1 compatibility tests so minor releases validate API level rather than pinning an obsolete package version.
++
+ ## 1.2.0
+ 
+ - Added deterministic linear quantile regression through check-loss ADMM.
+diff --git a/Cargo.toml b/Cargo.toml
+index b5399e9..ab3bdcf 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,6 +1,6 @@
+ [package]
+ name = "symthaea-statistics"
+-version = "1.2.0"
++version = "1.3.0"
+ edition = "2024"
+ rust-version = "1.85"
+ license = "AGPL-3.0-or-later"
+diff --git a/MIGRATION_1_3.md b/MIGRATION_1_3.md
+new file mode 100644
+index 0000000..59bfc99
+--- /dev/null
++++ b/MIGRATION_1_3.md
+@@ -0,0 +1,41 @@
++# Migrating from v1.2 to v1.3
++
++v1.3 is additive within the stable version-one contract. `API_LEVEL` remains
++`1`, `NUMERICAL_CONTRACT` remains `validated-v1`, and the curated `prelude` is
++unchanged. Existing v1.2 imports require no source changes.
++
++## New specialized modules
++
++- `discriminant`: empirical-prior LDA and QDA with explicit covariance ridge.
++- `canonical_correlation`: covariance-whitened canonical variates.
++- `manova`: one-factor Wilks/Pillai summaries and seeded permutation inference.
++- `partial_correlation`: precision matrices and all-other-variable partial correlations.
++- `copula`: Gaussian copulas fitted from empirical marginal ranks.
++- `censored_regression`: shared-boundary Gaussian left/right Tobit regression.
++- `mediation`: linear path decomposition with Sobel and percentile-bootstrap evidence.
++- `clustering`: seeded k-means++ and bounded pairwise silhouette scoring.
++- `forecast_evaluation`: MASE/RMSSE/sMAPE and Diebold-Mariano tests.
++- `survival_scoring`: Harrell concordance and IPCW Brier scoring.
++
++Import these from the crate root or their modules. They are deliberately not
++added to the conservative v1 `prelude`.
++
++## Assumption changes to make explicit
++
++No existing defaults changed. New callers should declare:
++
++- covariance regularization for discriminant, CCA, MANOVA, partial-correlation,
++  and copula models;
++- exchangeability for MANOVA permutations and mediation bootstrap rows;
++- one shared censoring boundary and Gaussian latent errors for Tobit models;
++- linear no-unmeasured-confounding interpretation before calling mediation
++  effects causal;
++- cluster count, seed, and Euclidean geometry for k-means;
++- seasonal-naive scale and HAC bandwidth for forecast comparison;
++- independent censoring and calibrated survival probabilities for IPCW scores.
++
++## Verification
++
++Run `scripts/verify.sh` under Rust 1.85+ and separately run
++`scripts/verify_v1_3_references.sh` in an environment with NumPy, SciPy,
++scikit-learn, and statsmodels.
+diff --git a/NUMERICAL_SCOPE.md b/NUMERICAL_SCOPE.md
+index bb7b168..3c1e898 100644
+--- a/NUMERICAL_SCOPE.md
++++ b/NUMERICAL_SCOPE.md
+@@ -210,3 +210,37 @@ The test suite includes committed reference vectors generated independently with
+ - Pinball, expectile, interval, and CRPS values are comparative proper or
+   task-specific scores. Their magnitude depends on the outcome scale and should
+   be reported against meaningful baselines on held-out observations.
++
++## v1.3 multivariate, censored, and predictive scope
++
++- LDA uses an unbiased pooled within-class covariance and empirical priors. QDA
++  uses one unbiased covariance per class. Ridge terms are explicit modeling
++  regularizers; posterior probabilities inherit Gaussian class assumptions.
++- Canonical correlation whitens sample covariance blocks through symmetric
++  eigendecomposition. Near-singular blocks require an explicit ridge, and
++  canonical directions are descriptive rather than causal.
++- MANOVA reports Wilks' lambda and Pillai's trace from one-factor SSCP matrices.
++  Seeded permutation p-values require exchangeable group labels. Ridge changes
++  the tested geometry and must be reported.
++- Partial correlations are derived from a regularized Gaussian precision
++  matrix. Zero partial correlation implies conditional independence only under
++  suitable joint-distribution assumptions.
++- Gaussian copulas use empirical average ranks divided by `n+1` and shrink
++  off-diagonal latent correlations toward independence. Marginal distributions
++  are not estimated or transformed back by this module.
++- Tobit regression assumes one common left or right censoring boundary,
++  Gaussian homoskedastic latent errors, and correct linear specification. The
++  deterministic gradient optimizer fails closed on non-convergence.
++- Linear mediation estimates ordinary least-squares path products. Sobel
++  inference is asymptotic and percentile bootstrap intervals assume row-level
++  exchangeability. Causal mediation additionally requires untestable treatment,
++  mediator, and outcome confounding assumptions.
++- K-means minimizes Euclidean within-cluster squared distance and can identify
++  local optima. The seed fixes k-means++ initialization; silhouette calculation
++  is quadratic and explicitly bounded.
++- MASE and RMSSE scale against a caller-declared seasonal-naive training
++  baseline. Diebold-Mariano inference uses a Bartlett HAC estimate and its
++  asymptotic normal approximation.
++- Harrell concordance ignores pairs that are not comparable under right
++  censoring. Brier scores use Kaplan-Meier inverse censoring weights and require
++  independent censoring plus non-increasing survival predictions.
+diff --git a/README.md b/README.md
+index 45ff8cc..3d88e8e 100644
+--- a/README.md
++++ b/README.md
+@@ -19,20 +19,19 @@ The crate is designed around fourteen rules:
+ 13. **Finite-sample claims use finite-sample procedures.** Exact binomial and hypergeometric evidence is not silently replaced by asymptotic normal approximations.
+ 14. **Version-one imports are deliberately curated.** The `prelude` is the conservative compatibility anchor; specialized APIs remain available from domain modules.
+ 
+-## v1.2 distributional and relational release
++## v1.3 multivariate and censored-evidence release
+ 
+-v1.2 extends the stable v1 contract beyond conditional means. It adds linear
+-quantile and expectile regression, gamma log-link regression, joint Gaussian
+-location-scale modeling, and random-intercept mixed effects. Bayesian comparison
+-now includes exact conjugate Bayes factors, posterior model probabilities, and
+-WAIC from pointwise posterior log-likelihood draws.
++v1.3 deepens the stable v1 model surface without expanding the conservative
++`prelude`. It adds LDA/QDA classification, canonical correlation, permutation
++MANOVA, precision-based partial correlations, and rank-fitted Gaussian copulas.
++Censored outcomes gain Gaussian Tobit regression, while pathway analysis gains
++linear mediation with Sobel and seeded bootstrap inference.
+ 
+-The release also introduces a validated dense weighted-network layer with
+-connectivity summaries, clustering, PageRank, closeness, Brandes betweenness,
+-modularity, assortativity, and seeded QAP-style comparison. Proper scoring rules
+-cover quantile, expectile, interval, and Gaussian distribution forecasts. The
+-stable v1 prelude remains unchanged; specialized v1.2 APIs are available from
+-the crate root and their domain modules.
++The release also adds deterministic k-means clustering, scale-free forecast
++accuracy and Diebold-Mariano comparison, plus Harrell concordance and
++inverse-censoring-weighted survival Brier scores. Specialized v1.3 APIs remain
++available from the crate root and their domain modules; `API_LEVEL = 1` and the
++`validated-v1` numerical contract remain unchanged.
+ 
+ 
+ ## Included layers
+@@ -65,16 +64,16 @@ the crate root and their domain modules.
+ ### Modeling, Bayesian analysis, and decisions
+ 
+ - Simple and QR-based multiple OLS with coefficient and prediction uncertainty
+-- Binary and multinomial logistic, Poisson, zero-inflated/hurdle Poisson, fixed-dispersion negative-binomial, gamma log-link, quantile, expectile, Gaussian location-scale, and random-intercept mixed models with checked optimization and explicit diagnostics
++- Binary and multinomial logistic, LDA/QDA, Poisson, zero-inflated/hurdle Poisson, fixed-dispersion negative-binomial, gamma log-link, Tobit, quantile, expectile, Gaussian location-scale, and random-intercept mixed models with checked optimization and explicit diagnostics
+ - Ridge, lasso/elastic-net, and Huber regression; HC0-HC3, one-way cluster-robust, and Newey-West covariance inference
+-- Kaplan-Meier and Nelson-Aalen estimation, Aalen-Johansen cumulative incidence, log-rank comparison, and Cox proportional-hazards regression
+-- Covariate balance, randomized difference-in-means, inverse-probability weighting, cross-fit-ready AIPW, difference-in-differences, and deterministic propensity matching
++- Kaplan-Meier and Nelson-Aalen estimation, Aalen-Johansen cumulative incidence, log-rank comparison, Cox proportional-hazards regression, Harrell concordance, and IPCW Brier scoring
++- Covariate balance, randomized difference-in-means, inverse-probability weighting, cross-fit-ready AIPW, difference-in-differences, deterministic propensity matching, and linear mediation decomposition
+ - Fixed/random-effects meta-analysis and one-/two-sample TOST equivalence tests
+ - Beta-binomial, gamma-Poisson, and normal-known-variance conjugate models plus empirical-Bayes grouped-rate and normal-means shrinkage, deterministic Bayesian bootstrap posteriors, and Rubin multiple-imputation pooling
+ - Likelihood-ratio tests, AIC/AICc/BIC, Akaike weights, exact conjugate Bayes factors, posterior model probabilities, and WAIC
+ - Bernoulli sequential probability-ratio tests
+ - Time-uniform confidence sequences for bounded means
+-- Binary/multiclass classification, finite Markov chains, discrete hidden Markov filtering/smoothing/Viterbi decoding, Gaussian mixtures, weighted-network summaries and centrality, rank-normalized MCMC diagnostics, agreement/reliability, circular and compositional statistics, weighted isotonic calibration, split-conformal prediction, ROC/precision-recall discrimination, distributional scoring, explicit threshold policy, entropy/divergence measures, KDE/DKW bands, ACF/PACF, local-level Kalman filtering/smoothing, Durbin-Watson, Ljung-Box, Jarque-Bera, runs tests, conditional autoregression, EWMA, and CUSUM
++- Binary/multiclass classification, canonical correlation, MANOVA, partial-correlation geometry, Gaussian copulas, deterministic k-means, finite Markov chains, discrete hidden Markov filtering/smoothing/Viterbi decoding, Gaussian mixtures, weighted-network summaries and centrality, rank-normalized MCMC diagnostics, agreement/reliability, circular and compositional statistics, weighted isotonic calibration, split-conformal prediction, ROC/precision-recall discrimination, distributional and forecast scoring, explicit threshold policy, entropy/divergence measures, KDE/DKW bands, ACF/PACF, local-level Kalman filtering/smoothing, Durbin-Watson, Ljung-Box, Jarque-Bera, runs tests, conditional autoregression, EWMA, and CUSUM
+ - Checked normal/exponential maximum-likelihood and beta/gamma moment fitting
+ - Missingness-pattern audits, deterministic single imputation, Rubin pooling, delta-method and deterministic Gaussian Monte Carlo propagation, design-based survey totals/means, paired binary tests, and simple/Holt exponential smoothing
+ 
+@@ -106,6 +105,6 @@ Run:
+ ./scripts/verify.sh
+ ```
+ 
+-The verification lane checks formatting, Clippy with warnings denied, every target, doctests, documentation, metadata, and package construction. The repository contains **493 unit/integration tests**.
++The verification lane checks formatting, Clippy with warnings denied, every target, doctests, documentation, metadata, and package construction. The repository contains **522 unit/integration tests**.
+ 
+-See [NUMERICAL_SCOPE.md](NUMERICAL_SCOPE.md) for exact claims and limitations, [MIGRATION_1_2.md](MIGRATION_1_2.md) for v1.2 adoption guidance, and [VALIDATION_V1_2.md](VALIDATION_V1_2.md) for the release evidence record.
++See [NUMERICAL_SCOPE.md](NUMERICAL_SCOPE.md) for exact claims and limitations, [MIGRATION_1_3.md](MIGRATION_1_3.md) for v1.3 adoption guidance, and [VALIDATION_V1_3.md](VALIDATION_V1_3.md) for the release evidence record.
+diff --git a/VALIDATION_V1_3.md b/VALIDATION_V1_3.md
+new file mode 100644
+index 0000000..54788fb
+--- /dev/null
++++ b/VALIDATION_V1_3.md
+@@ -0,0 +1,65 @@
++# v1.3 validation record
++
++This record describes the checks performed on the `symthaea-statistics` v1.3
++release candidate in the artifact environment.
++
++## Source surface
++
++- 128 public modules plus one private model-matrix module
++- 663 resolved root exports
++- 130 Rust source files and 26 integration-test files
++- 522 `#[test]` functions present in source and integration tests
++- no `unsafe` token outside the crate-level prohibition
++- no production `unwrap`, `expect`, `panic!`, or `unreachable!` surface
++- complete module/file declaration parity
++- every stable-v1 prelude item resolves through the root export surface
++- `API_LEVEL = 1` and `NUMERICAL_CONTRACT = "validated-v1"` remain unchanged
++
++## Syntax and repository checks
++
++- all 156 Rust source and integration-test files parse without tree-sitter error nodes
++- `git diff --check` passes
++- the independent v1.3 generator reproduces its committed JSON byte-for-byte
++- stable-v1 compatibility tests validate the major API generation rather than pinning a past minor version
++
++## Independent numerical landmarks
++
++The retained generator uses NumPy, SciPy, scikit-learn, and statsmodels/direct
++matrix formulas to record independent values for:
++
++- pooled-covariance discriminant probabilities
++- canonical correlations
++- Wilks' lambda and Pillai's trace
++- precision-matrix partial correlations
++- Gaussian-copula latent correlation and log density
++- left-censored Gaussian Tobit coefficients, scale, and likelihood
++- linear mediation paths and indirect effects
++- separated-cluster k-means centroids and inertia
++- MASE/RMSSE/sMAPE forecast accuracy
++- perfect-ranking concordance and perfect-prediction Brier scores
++
++Rust integration vectors bind these values with explicit tolerances. Seeded
++permutation, bootstrap, copula-sampling, and k-means paths also carry
++reproducibility tests.
++
++## Contract hardening
++
++The v1.3 layer rejects malformed class tables, under-replicated QDA classes,
++singular canonical covariance blocks, one-group MANOVA inputs, invalid copula
++shrinkage, closed-cube copula density points, all-censored Tobit samples,
++uncensored observations on the wrong side of a boundary, mediation length
++mismatches, impossible cluster counts, degenerate scaled-forecast baselines,
++non-positive Diebold-Mariano long-run variance, survival probabilities outside
++`[0,1]`, increasing survival curves, and survival comparisons without comparable
++event pairs.
++
++Quadratic pairwise work in silhouette and concordance calculations and repeated
++MANOVA/mediation resampling work are bounded explicitly.
++
++## Unavailable checks
++
++The artifact environment contains no installed Rust toolchain. Therefore Cargo
++compilation, execution of the 522 Rust tests, Clippy, rustfmt, rustdoc, and
++`cargo package` were not performed here. `scripts/verify.sh` remains the
++authoritative Rust 1.85+ lane; `scripts/verify_v1_3_references.sh` is the
++separate scientific-Python reference-regeneration lane.
+diff --git a/scripts/verify_v1_3_references.sh b/scripts/verify_v1_3_references.sh
+new file mode 100755
+index 0000000..d6886ea
+--- /dev/null
++++ b/scripts/verify_v1_3_references.sh
+@@ -0,0 +1,9 @@
++#!/usr/bin/env sh
++set -eu
++root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
++temporary=$(mktemp)
++trap 'rm -f "$temporary"' EXIT
++cp "$root/validation/v1_3_reference_results.json" "$temporary"
++python3 "$root/validation/generate_v1_3_references.py" >/dev/null
++cmp "$temporary" "$root/validation/v1_3_reference_results.json"
++printf '%s\n' 'v1.3 independent reference values match the committed snapshot'
+diff --git a/src/canonical_correlation.rs b/src/canonical_correlation.rs
+new file mode 100644
+index 0000000..b386b0a
+--- /dev/null
++++ b/src/canonical_correlation.rs
+@@ -0,0 +1,356 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Canonical correlation analysis for two multivariate observation blocks.
++
++use crate::error::{StatsResult, StatisticsError};
++use crate::linalg::DenseMatrix;
++use crate::pca::try_symmetric_eigen;
++
++fn validate_block(block: &[Vec<f64>], name: &'static str) -> StatsResult<usize> {
++    if block.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    let columns = block[0].len();
++    if columns == 0 {
++        return Err(StatisticsError::InvalidShape {
++            rows: block.len(),
++            columns,
++        });
++    }
++    for (row_index, row) in block.iter().enumerate() {
++        if row.len() != columns {
++            return Err(StatisticsError::DimensionMismatch {
++                context: name,
++                expected: columns,
++                actual: row.len(),
++            });
++        }
++        for (column, &value) in row.iter().enumerate() {
++            if !value.is_finite() {
++                return Err(StatisticsError::NonFiniteInput {
++                    index: row_index * columns + column,
++                    value,
++                });
++            }
++        }
++    }
++    Ok(columns)
++}
++
++fn centered_matrix(block: &[Vec<f64>]) -> StatsResult<(DenseMatrix, Vec<f64>)> {
++    let rows = block.len();
++    let columns = block[0].len();
++    let mut means = vec![0.0; columns];
++    for row in block {
++        for (column, &value) in row.iter().enumerate() {
++            means[column] += value;
++        }
++    }
++    for mean in &mut means {
++        *mean /= rows as f64;
++    }
++    let mut data = Vec::with_capacity(rows.checked_mul(columns).ok_or(
++        StatisticsError::NumericalOverflow {
++            operation: "canonical-correlation matrix size",
++        },
++    )?);
++    for row in block {
++        for (column, &value) in row.iter().enumerate() {
++            data.push(value - means[column]);
++        }
++    }
++    Ok((DenseMatrix::try_new(rows, columns, data)?, means))
++}
++
++fn covariance(left: &DenseMatrix, right: &DenseMatrix) -> StatsResult<DenseMatrix> {
++    if left.rows() != right.rows() {
++        return Err(StatisticsError::LengthMismatch {
++            left: left.rows(),
++            right: right.rows(),
++        });
++    }
++    if left.rows() < 2 {
++        return Err(StatisticsError::InsufficientSamples {
++            required: 2,
++            actual: left.rows(),
++        });
++    }
++    let mut output = DenseMatrix::zeros(left.columns(), right.columns())?;
++    let denominator = (left.rows() - 1) as f64;
++    for row in 0..left.columns() {
++        for column in 0..right.columns() {
++            let mut sum = 0.0;
++            for observation in 0..left.rows() {
++                sum = left
++                    .get(observation, row)
++                    .mul_add(right.get(observation, column), sum);
++            }
++            let value = sum / denominator;
++            if !value.is_finite() {
++                return Err(StatisticsError::NumericalOverflow {
++                    operation: "canonical covariance",
++                });
++            }
++            output.set(row, column, value);
++        }
++    }
++    Ok(output)
++}
++
++fn transpose(matrix: &DenseMatrix) -> StatsResult<DenseMatrix> {
++    let mut output = DenseMatrix::zeros(matrix.columns(), matrix.rows())?;
++    for row in 0..matrix.rows() {
++        for column in 0..matrix.columns() {
++            output.set(column, row, matrix.get(row, column));
++        }
++    }
++    Ok(output)
++}
++
++fn multiply(left: &DenseMatrix, right: &DenseMatrix) -> StatsResult<DenseMatrix> {
++    if left.columns() != right.rows() {
++        return Err(StatisticsError::DimensionMismatch {
++            context: "canonical matrix product",
++            expected: left.columns(),
++            actual: right.rows(),
++        });
++    }
++    let mut output = DenseMatrix::zeros(left.rows(), right.columns())?;
++    for row in 0..left.rows() {
++        for column in 0..right.columns() {
++            let mut sum = 0.0;
++            for inner in 0..left.columns() {
++                sum = left.get(row, inner).mul_add(right.get(inner, column), sum);
++            }
++            if !sum.is_finite() {
++                return Err(StatisticsError::NumericalOverflow {
++                    operation: "canonical matrix product",
++                });
++            }
++            output.set(row, column, sum);
++        }
++    }
++    Ok(output)
++}
++
++fn inverse_square_root(covariance: &DenseMatrix, ridge: f64) -> StatsResult<DenseMatrix> {
++    let mut regularized = covariance.clone();
++    for index in 0..regularized.rows() {
++        regularized.set(index, index, regularized.get(index, index) + ridge);
++    }
++    let eigen = try_symmetric_eigen(
++        &regularized,
++        1.0e-12,
++        regularized.rows().saturating_mul(regularized.rows()).saturating_mul(128),
++    )?;
++    let scale = eigen.values.first().copied().unwrap_or(0.0).abs().max(1.0);
++    let threshold = scale * f64::EPSILON * regularized.rows() as f64 * 128.0;
++    let mut output = DenseMatrix::zeros(regularized.rows(), regularized.columns())?;
++    for component in 0..eigen.values.len() {
++        let value = eigen.values[component];
++        if !value.is_finite() || value <= threshold {
++            return Err(StatisticsError::SingularMatrix {
++                reason: "canonical covariance is not positive definite",
++            });
++        }
++        let weight = value.sqrt().recip();
++        for row in 0..output.rows() {
++            for column in 0..output.columns() {
++                let next = output.get(row, column)
++                    + weight
++                        * eigen.vectors.get(row, component)
++                        * eigen.vectors.get(column, component);
++                output.set(row, column, next);
++            }
++        }
++    }
++    Ok(output)
++}
++
++fn matrix_column(matrix: &DenseMatrix, column: usize) -> Vec<f64> {
++    (0..matrix.rows()).map(|row| matrix.get(row, column)).collect()
++}
++
++fn normalize_variance(weight: &mut [f64], covariance: &DenseMatrix) -> StatsResult<()> {
++    let product = covariance.try_mul_vector(weight)?;
++    let variance = weight
++        .iter()
++        .zip(&product)
++        .fold(0.0, |sum, (&left, &right)| left.mul_add(right, sum));
++    if !variance.is_finite() || variance <= 0.0 {
++        return Err(StatisticsError::DegenerateSample {
++            reason: "canonical variate has zero variance",
++        });
++    }
++    let scale = variance.sqrt().recip();
++    for value in weight {
++        *value *= scale;
++    }
++    Ok(())
++}
++
++/// Fitted canonical-correlation decomposition.
++#[derive(Debug, Clone, PartialEq)]
++pub struct CanonicalCorrelationFit {
++    pub x_mean: Vec<f64>,
++    pub y_mean: Vec<f64>,
++    pub correlations: Vec<f64>,
++    /// Columns are coefficients for canonical variates of the X block.
++    pub x_weights: DenseMatrix,
++    /// Columns are coefficients for canonical variates of the Y block.
++    pub y_weights: DenseMatrix,
++    pub ridge: f64,
++    pub observations: usize,
++}
++
++impl CanonicalCorrelationFit {
++    pub fn components(&self) -> usize {
++        self.correlations.len()
++    }
++
++    pub fn try_transform_x(&self, observation: &[f64]) -> StatsResult<Vec<f64>> {
++        transform(observation, &self.x_mean, &self.x_weights)
++    }
++
++    pub fn try_transform_y(&self, observation: &[f64]) -> StatsResult<Vec<f64>> {
++        transform(observation, &self.y_mean, &self.y_weights)
++    }
++}
++
++fn transform(observation: &[f64], mean: &[f64], weights: &DenseMatrix) -> StatsResult<Vec<f64>> {
++    if observation.len() != mean.len() {
++        return Err(StatisticsError::DimensionMismatch {
++            context: "canonical transform",
++            expected: mean.len(),
++            actual: observation.len(),
++        });
++    }
++    for (index, &value) in observation.iter().enumerate() {
++        if !value.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value });
++        }
++    }
++    let mut scores = vec![0.0; weights.columns()];
++    for component in 0..weights.columns() {
++        for row in 0..weights.rows() {
++            scores[component] = (observation[row] - mean[row])
++                .mul_add(weights.get(row, component), scores[component]);
++        }
++    }
++    Ok(scores)
++}
++
++/// Fit canonical correlation analysis with optional diagonal covariance ridge.
++pub fn try_canonical_correlation(
++    x: &[Vec<f64>],
++    y: &[Vec<f64>],
++    ridge: f64,
++) -> StatsResult<CanonicalCorrelationFit> {
++    if x.len() != y.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: x.len(),
++            right: y.len(),
++        });
++    }
++    if !ridge.is_finite() || ridge < 0.0 {
++        return Err(StatisticsError::NegativeValue {
++            name: "canonical covariance ridge",
++            value: ridge,
++        });
++    }
++    let x_columns = validate_block(x, "canonical X block")?;
++    let y_columns = validate_block(y, "canonical Y block")?;
++    if x.len() < 3 {
++        return Err(StatisticsError::InsufficientSamples {
++            required: 3,
++            actual: x.len(),
++        });
++    }
++    let (x_centered, x_mean) = centered_matrix(x)?;
++    let (y_centered, y_mean) = centered_matrix(y)?;
++    let s_xx = covariance(&x_centered, &x_centered)?;
++    let s_yy = covariance(&y_centered, &y_centered)?;
++    let s_xy = covariance(&x_centered, &y_centered)?;
++    let x_inverse_root = inverse_square_root(&s_xx, ridge)?;
++    let y_inverse_root = inverse_square_root(&s_yy, ridge)?;
++    let whitened = multiply(&multiply(&x_inverse_root, &s_xy)?, &y_inverse_root)?;
++    let whitened_transpose = transpose(&whitened)?;
++    let left_gram = multiply(&whitened, &whitened_transpose)?;
++    let eigen = try_symmetric_eigen(
++        &left_gram,
++        1.0e-12,
++        left_gram.rows().saturating_mul(left_gram.rows()).saturating_mul(128),
++    )?;
++    let components = x_columns.min(y_columns);
++    let mut correlations = Vec::with_capacity(components);
++    let mut x_weights = DenseMatrix::zeros(x_columns, components)?;
++    let mut y_weights = DenseMatrix::zeros(y_columns, components)?;
++
++    for component in 0..components {
++        let correlation = eigen.values[component].max(0.0).sqrt().clamp(0.0, 1.0);
++        let u = matrix_column(&eigen.vectors, component);
++        let mut x_weight = x_inverse_root.try_mul_vector(&u)?;
++        normalize_variance(&mut x_weight, &s_xx)?;
++
++        let mut v = whitened_transpose.try_mul_vector(&u)?;
++        if correlation > 1.0e-14 {
++            for value in &mut v {
++                *value /= correlation;
++            }
++        } else {
++            v.fill(0.0);
++            v[component % y_columns] = 1.0;
++        }
++        let mut y_weight = y_inverse_root.try_mul_vector(&v)?;
++        normalize_variance(&mut y_weight, &s_yy)?;
++        for row in 0..x_columns {
++            x_weights.set(row, component, x_weight[row]);
++        }
++        for row in 0..y_columns {
++            y_weights.set(row, component, y_weight[row]);
++        }
++        correlations.push(correlation);
++    }
++
++    Ok(CanonicalCorrelationFit {
++        x_mean,
++        y_mean,
++        correlations,
++        x_weights,
++        y_weights,
++        ridge,
++        observations: x.len(),
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn recovers_shared_latent_direction() {
++        let x = vec![
++            vec![-2.0, 0.5], vec![-1.0, -0.2], vec![0.0, 0.1],
++            vec![1.0, 0.3], vec![2.0, -0.4], vec![3.0, 0.2],
++        ];
++        let y = x
++            .iter()
++            .enumerate()
++            .map(|(index, row)| vec![2.0 * row[0] + index as f64 * 0.01, -row[0] + row[1]])
++            .collect::<Vec<_>>();
++        let fit = try_canonical_correlation(&x, &y, 1e-8).unwrap();
++        assert!(fit.correlations[0] > 0.999);
++        assert_eq!(fit.components(), 2);
++    }
++
++    #[test]
++    fn rejects_mismatched_blocks() {
++        let x = vec![vec![1.0], vec![2.0], vec![3.0]];
++        let y = vec![vec![1.0], vec![2.0]];
++        assert!(matches!(
++            try_canonical_correlation(&x, &y, 0.0),
++            Err(StatisticsError::LengthMismatch { .. })
++        ));
++    }
++}
+diff --git a/src/censored_regression.rs b/src/censored_regression.rs
+new file mode 100644
+index 0000000..5238288
+--- /dev/null
++++ b/src/censored_regression.rs
+@@ -0,0 +1,459 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Gaussian Tobit regression for a shared left or right censoring boundary.
++
++use crate::distributions::{normal_cdf, normal_log_sf, normal_sf};
++use crate::error::{StatsResult, StatisticsError};
++use crate::model_matrix::{try_design_matrix, try_feature_vector};
++use crate::multiple_regression::try_multiple_linear_regression;
++
++/// Direction and boundary of censoring.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub enum Censoring {
++    Left { boundary: f64 },
++    Right { boundary: f64 },
++}
++
++impl Censoring {
++    fn boundary(self) -> f64 {
++        match self {
++            Self::Left { boundary } | Self::Right { boundary } => boundary,
++        }
++    }
++}
++
++/// Controls for deterministic Tobit maximum-likelihood fitting.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct TobitOptions {
++    pub include_intercept: bool,
++    pub ridge: f64,
++    pub maximum_iterations: usize,
++    pub tolerance: f64,
++    pub initial_step: f64,
++}
++
++impl Default for TobitOptions {
++    fn default() -> Self {
++        Self {
++            include_intercept: true,
++            ridge: 1.0e-8,
++            maximum_iterations: 500,
++            tolerance: 1.0e-7,
++            initial_step: 0.1,
++        }
++    }
++}
++
++/// Fitted Gaussian Tobit model.
++#[derive(Debug, Clone, PartialEq)]
++pub struct TobitFit {
++    pub coefficients: Vec<f64>,
++    pub sigma: f64,
++    pub censoring: Censoring,
++    pub predictor_count: usize,
++    pub include_intercept: bool,
++    pub ridge: f64,
++    pub observations: usize,
++    pub censored_observations: usize,
++    pub iterations: usize,
++    pub converged: bool,
++    pub log_likelihood: f64,
++    pub aic: f64,
++    pub bic: f64,
++}
++
++impl TobitFit {
++    pub fn try_latent_mean(&self, predictors: &[f64]) -> StatsResult<f64> {
++        let features = try_feature_vector(predictors, self.predictor_count, self.include_intercept)?;
++        let value = dot(&features, &self.coefficients);
++        if value.is_finite() {
++            Ok(value)
++        } else {
++            Err(StatisticsError::NumericalOverflow {
++                operation: "Tobit latent prediction",
++            })
++        }
++    }
++
++    pub fn try_censoring_probability(&self, predictors: &[f64]) -> StatsResult<f64> {
++        let mean = self.try_latent_mean(predictors)?;
++        let z = (self.censoring.boundary() - mean) / self.sigma;
++        Ok(match self.censoring {
++            Censoring::Left { .. } => normal_cdf(z),
++            Censoring::Right { .. } => normal_sf(z),
++        })
++    }
++}
++
++fn dot(left: &[f64], right: &[f64]) -> f64 {
++    left.iter()
++        .zip(right)
++        .fold(0.0, |sum, (&a, &b)| a.mul_add(b, sum))
++}
++
++fn validate_options(options: TobitOptions) -> StatsResult<()> {
++    if !options.ridge.is_finite() || options.ridge < 0.0 {
++        return Err(StatisticsError::NegativeValue {
++            name: "Tobit ridge",
++            value: options.ridge,
++        });
++    }
++    if options.maximum_iterations == 0 {
++        return Err(StatisticsError::InvalidIterations {
++            iterations: options.maximum_iterations,
++        });
++    }
++    if !options.tolerance.is_finite() || options.tolerance <= 0.0 {
++        return Err(StatisticsError::NonPositiveValue {
++            name: "Tobit tolerance",
++            value: options.tolerance,
++        });
++    }
++    if !options.initial_step.is_finite() || options.initial_step <= 0.0 {
++        return Err(StatisticsError::NonPositiveValue {
++            name: "Tobit initial step",
++            value: options.initial_step,
++        });
++    }
++    Ok(())
++}
++
++fn log_standard_normal_pdf(z: f64) -> f64 {
++    -0.5 * (2.0 * std::f64::consts::PI).ln() - 0.5 * z * z
++}
++
++fn log_cdf(z: f64) -> f64 {
++    normal_log_sf(-z)
++}
++
++fn mills_left(z: f64) -> StatsResult<f64> {
++    let ratio = (log_standard_normal_pdf(z) - log_cdf(z)).exp();
++    if ratio.is_finite() {
++        Ok(ratio)
++    } else {
++        Err(StatisticsError::NumericalOverflow {
++            operation: "left-censored Mills ratio",
++        })
++    }
++}
++
++fn mills_right(z: f64) -> StatsResult<f64> {
++    let ratio = (log_standard_normal_pdf(z) - normal_log_sf(z)).exp();
++    if ratio.is_finite() {
++        Ok(ratio)
++    } else {
++        Err(StatisticsError::NumericalOverflow {
++            operation: "right-censored Mills ratio",
++        })
++    }
++}
++
++fn objective_and_gradient(
++    design: &crate::linalg::DenseMatrix,
++    outcomes: &[f64],
++    censored: &[bool],
++    censoring: Censoring,
++    parameters: &[f64],
++    ridge: f64,
++    include_intercept: bool,
++) -> StatsResult<(f64, Vec<f64>)> {
++    let coefficient_count = design.columns();
++    let coefficients = &parameters[..coefficient_count];
++    let log_sigma = parameters[coefficient_count];
++    let sigma = log_sigma.exp();
++    if !sigma.is_finite() || sigma <= 0.0 {
++        return Err(StatisticsError::NumericalOverflow {
++            operation: "Tobit scale",
++        });
++    }
++    let variance = sigma * sigma;
++    let boundary = censoring.boundary();
++    let mut log_likelihood = 0.0;
++    let mut gradient = vec![0.0; parameters.len()];
++    for row in 0..design.rows() {
++        let features = design.row(row);
++        let mean = dot(features, coefficients);
++        if censored[row] {
++            let z = (boundary - mean) / sigma;
++            match censoring {
++                Censoring::Left { .. } => {
++                    log_likelihood += log_cdf(z);
++                    let ratio = mills_left(z)?;
++                    for column in 0..coefficient_count {
++                        gradient[column] -= features[column] * ratio / sigma;
++                    }
++                    gradient[coefficient_count] -= z * ratio;
++                }
++                Censoring::Right { .. } => {
++                    log_likelihood += normal_log_sf(z);
++                    let ratio = mills_right(z)?;
++                    for column in 0..coefficient_count {
++                        gradient[column] += features[column] * ratio / sigma;
++                    }
++                    gradient[coefficient_count] += z * ratio;
++                }
++            }
++        } else {
++            let residual = outcomes[row] - mean;
++            let z = residual / sigma;
++            log_likelihood += log_standard_normal_pdf(z) - log_sigma;
++            for column in 0..coefficient_count {
++                gradient[column] += features[column] * residual / variance;
++            }
++            gradient[coefficient_count] += -1.0 + z * z;
++        }
++    }
++    for column in 0..coefficient_count {
++        if include_intercept && column == 0 {
++            continue;
++        }
++        log_likelihood -= 0.5 * ridge * coefficients[column] * coefficients[column];
++        gradient[column] -= ridge * coefficients[column];
++    }
++    if !log_likelihood.is_finite() || gradient.iter().any(|value| !value.is_finite()) {
++        return Err(StatisticsError::NumericalOverflow {
++            operation: "Tobit likelihood",
++        });
++    }
++    Ok((log_likelihood, gradient))
++}
++
++fn initial_parameters(
++    predictors: &[Vec<f64>],
++    outcomes: &[f64],
++    censored: &[bool],
++    options: TobitOptions,
++) -> StatsResult<Vec<f64>> {
++    let uncensored_indices = censored
++        .iter()
++        .enumerate()
++        .filter_map(|(index, &is_censored)| (!is_censored).then_some(index))
++        .collect::<Vec<_>>();
++    let predictor_count = predictors.first().map_or(0, Vec::len);
++    let coefficient_count = predictor_count + usize::from(options.include_intercept);
++    let mut coefficients = vec![0.0; coefficient_count];
++    let mut sigma = 1.0;
++    if uncensored_indices.len() > coefficient_count {
++        let uncensored_x = uncensored_indices
++            .iter()
++            .map(|&index| predictors[index].clone())
++            .collect::<Vec<_>>();
++        let uncensored_y = uncensored_indices
++            .iter()
++            .map(|&index| outcomes[index])
++            .collect::<Vec<_>>();
++        if let Ok(fit) = try_multiple_linear_regression(
++            &uncensored_x,
++            &uncensored_y,
++            options.include_intercept,
++            0.95,
++        ) {
++            coefficients = fit.coefficients;
++            sigma = fit.residual_standard_error.max(1.0e-4);
++        }
++    } else if options.include_intercept {
++        let mean = uncensored_indices
++            .iter()
++            .map(|&index| outcomes[index])
++            .sum::<f64>()
++            / uncensored_indices.len().max(1) as f64;
++        coefficients[0] = mean;
++    }
++    coefficients.push(sigma.ln());
++    Ok(coefficients)
++}
++
++/// Fit a shared-boundary Gaussian Tobit regression.
++pub fn try_tobit_regression(
++    predictors: &[Vec<f64>],
++    outcomes: &[f64],
++    censored: &[bool],
++    censoring: Censoring,
++    options: TobitOptions,
++) -> StatsResult<TobitFit> {
++    validate_options(options)?;
++    if outcomes.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    if outcomes.len() != censored.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: outcomes.len(),
++            right: censored.len(),
++        });
++    }
++    if !censoring.boundary().is_finite() {
++        return Err(StatisticsError::NonFiniteInput {
++            index: 0,
++            value: censoring.boundary(),
++        });
++    }
++    for (index, &value) in outcomes.iter().enumerate() {
++        if !value.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value });
++        }
++        if !censored[index] {
++            match censoring {
++                Censoring::Left { boundary } if value <= boundary => {
++                    return Err(StatisticsError::DegenerateSample {
++                        reason: "uncensored left-Tobit outcome must exceed the boundary",
++                    });
++                }
++                Censoring::Right { boundary } if value >= boundary => {
++                    return Err(StatisticsError::DegenerateSample {
++                        reason: "uncensored right-Tobit outcome must be below the boundary",
++                    });
++                }
++                _ => {}
++            }
++        }
++    }
++    let censored_observations = censored.iter().filter(|&&value| value).count();
++    if censored_observations == outcomes.len() {
++        return Err(StatisticsError::DegenerateSample {
++            reason: "Tobit regression requires at least one uncensored outcome",
++        });
++    }
++    let design = try_design_matrix(predictors, outcomes.len(), options.include_intercept)?;
++    if outcomes.len() <= design.columns() {
++        return Err(StatisticsError::InsufficientSamples {
++            required: design.columns() + 1,
++            actual: outcomes.len(),
++        });
++    }
++    let mut parameters = initial_parameters(predictors, outcomes, censored, options)?;
++    let mut current = objective_and_gradient(
++        &design,
++        outcomes,
++        censored,
++        censoring,
++        &parameters,
++        options.ridge,
++        options.include_intercept,
++    )?;
++    let mut converged = false;
++    let mut completed_iterations = 0;
++    for iteration in 0..options.maximum_iterations {
++        let gradient_norm = current.1.iter().map(|value| value * value).sum::<f64>().sqrt();
++        if gradient_norm <= options.tolerance * (1.0 + parameters.len() as f64) {
++            converged = true;
++            completed_iterations = iteration;
++            break;
++        }
++        let direction_scale = gradient_norm.max(1.0);
++        let mut step = options.initial_step;
++        let mut accepted = None;
++        while step >= 1.0e-12 {
++            let candidate = parameters
++                .iter()
++                .zip(&current.1)
++                .map(|(&parameter, &gradient)| parameter + step * gradient / direction_scale)
++                .collect::<Vec<_>>();
++            if let Ok(value) = objective_and_gradient(
++                &design,
++                outcomes,
++                censored,
++                censoring,
++                &candidate,
++                options.ridge,
++                options.include_intercept,
++            ) {
++                if value.0 >= current.0 + 1.0e-4 * step * gradient_norm {
++                    accepted = Some((candidate, value));
++                    break;
++                }
++            }
++            step *= 0.5;
++        }
++        let Some((candidate, value)) = accepted else {
++            completed_iterations = iteration + 1;
++            break;
++        };
++        let parameter_change = candidate
++            .iter()
++            .zip(&parameters)
++            .map(|(&left, &right)| (left - right).abs())
++            .fold(0.0_f64, f64::max);
++        parameters = candidate;
++        current = value;
++        completed_iterations = iteration + 1;
++        if parameter_change <= options.tolerance {
++            converged = true;
++            break;
++        }
++    }
++    if !converged {
++        return Err(StatisticsError::NonConvergence {
++            function: "Gaussian Tobit regression",
++            iterations: options.maximum_iterations,
++        });
++    }
++    let coefficient_count = design.columns();
++    let coefficients = parameters[..coefficient_count].to_vec();
++    let sigma = parameters[coefficient_count].exp();
++    let estimated_parameters = (coefficient_count + 1) as f64;
++    let n = outcomes.len() as f64;
++    Ok(TobitFit {
++        coefficients,
++        sigma,
++        censoring,
++        predictor_count: coefficient_count - usize::from(options.include_intercept),
++        include_intercept: options.include_intercept,
++        ridge: options.ridge,
++        observations: outcomes.len(),
++        censored_observations,
++        iterations: completed_iterations,
++        converged,
++        log_likelihood: current.0,
++        aic: 2.0 * estimated_parameters - 2.0 * current.0,
++        bic: estimated_parameters * n.ln() - 2.0 * current.0,
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn left_tobit_recovers_positive_slope() {
++        let predictors = (-20..=20)
++            .map(|index| vec![index as f64 / 10.0])
++            .collect::<Vec<_>>();
++        let latent = predictors
++            .iter()
++            .enumerate()
++            .map(|(index, row)| 0.5 + 1.5 * row[0] + ((index % 5) as f64 - 2.0) * 0.08)
++            .collect::<Vec<_>>();
++        let boundary = 0.0;
++        let censored = latent.iter().map(|&value| value <= boundary).collect::<Vec<_>>();
++        let observed = latent.iter().map(|&value| value.max(boundary)).collect::<Vec<_>>();
++        let fit = try_tobit_regression(
++            &predictors,
++            &observed,
++            &censored,
++            Censoring::Left { boundary },
++            TobitOptions::default(),
++        )
++        .unwrap();
++        assert!(fit.coefficients[1] > 1.2);
++        assert!(fit.coefficients[1] < 1.8);
++        assert!(fit.try_censoring_probability(&[-2.0]).unwrap() > 0.9);
++    }
++
++    #[test]
++    fn rejects_all_censored_data() {
++        let predictors = vec![vec![0.0], vec![1.0], vec![2.0]];
++        let outcomes = vec![0.0, 0.0, 0.0];
++        let censored = vec![true, true, true];
++        assert!(matches!(
++            try_tobit_regression(
++                &predictors,
++                &outcomes,
++                &censored,
++                Censoring::Left { boundary: 0.0 },
++                TobitOptions::default(),
++            ),
++            Err(StatisticsError::DegenerateSample { .. })
++        ));
++    }
++}
+diff --git a/src/clustering.rs b/src/clustering.rs
+new file mode 100644
+index 0000000..d1082b4
+--- /dev/null
++++ b/src/clustering.rs
+@@ -0,0 +1,354 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Deterministic k-means clustering and silhouette diagnostics.
++
++use crate::error::{StatsResult, StatisticsError};
++use crate::sampling::SplitMix64;
++
++const MAXIMUM_PAIRWISE_WORK: u128 = 50_000_000;
++
++fn validate_observations(observations: &[Vec<f64>]) -> StatsResult<usize> {
++    if observations.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    let dimensions = observations[0].len();
++    if dimensions == 0 {
++        return Err(StatisticsError::InvalidShape {
++            rows: observations.len(),
++            columns: 0,
++        });
++    }
++    for (row_index, row) in observations.iter().enumerate() {
++        if row.len() != dimensions {
++            return Err(StatisticsError::DimensionMismatch {
++                context: "clustering observation row",
++                expected: dimensions,
++                actual: row.len(),
++            });
++        }
++        for (column, &value) in row.iter().enumerate() {
++            if !value.is_finite() {
++                return Err(StatisticsError::NonFiniteInput {
++                    index: row_index * dimensions + column,
++                    value,
++                });
++            }
++        }
++    }
++    Ok(dimensions)
++}
++
++fn squared_distance(left: &[f64], right: &[f64]) -> f64 {
++    left.iter()
++        .zip(right)
++        .map(|(&a, &b)| (a - b) * (a - b))
++        .sum()
++}
++
++fn initialize_kmeans_plus_plus(
++    observations: &[Vec<f64>],
++    clusters: usize,
++    seed: u64,
++) -> StatsResult<Vec<Vec<f64>>> {
++    let mut rng = SplitMix64::new(seed);
++    let first = rng.index(observations.len())?;
++    let mut centroids = vec![observations[first].clone()];
++    let mut minimum_distances = vec![f64::INFINITY; observations.len()];
++    while centroids.len() < clusters {
++        let newest = centroids.last().ok_or(StatisticsError::DegenerateSample {
++            reason: "k-means initialization has no centroid",
++        })?;
++        let mut total = 0.0;
++        for (index, observation) in observations.iter().enumerate() {
++            minimum_distances[index] = minimum_distances[index].min(squared_distance(observation, newest));
++            total += minimum_distances[index];
++        }
++        if !total.is_finite() || total <= 0.0 {
++            let candidate = observations
++                .iter()
++                .enumerate()
++                .find(|(_, observation)| !centroids.iter().any(|center| center.as_slice() == observation.as_slice()))
++                .map(|(index, _)| index)
++                .ok_or(StatisticsError::DegenerateSample {
++                    reason: "fewer distinct observations than requested clusters",
++                })?;
++            centroids.push(observations[candidate].clone());
++            continue;
++        }
++        let threshold = rng.next_f64() * total;
++        let mut cumulative = 0.0;
++        let mut selected = observations.len() - 1;
++        for (index, &distance) in minimum_distances.iter().enumerate() {
++            cumulative += distance;
++            if cumulative >= threshold {
++                selected = index;
++                break;
++            }
++        }
++        centroids.push(observations[selected].clone());
++    }
++    Ok(centroids)
++}
++
++fn assign(observations: &[Vec<f64>], centroids: &[Vec<f64>]) -> StatsResult<(Vec<usize>, f64)> {
++    let mut assignments = Vec::with_capacity(observations.len());
++    let mut inertia = 0.0;
++    for observation in observations {
++        let (cluster, distance) = centroids
++            .iter()
++            .enumerate()
++            .map(|(index, centroid)| (index, squared_distance(observation, centroid)))
++            .min_by(|left, right| left.1.total_cmp(&right.1))
++            .ok_or(StatisticsError::DegenerateSample {
++                reason: "k-means has no centroids",
++            })?;
++        assignments.push(cluster);
++        inertia += distance;
++    }
++    if inertia.is_finite() {
++        Ok((assignments, inertia))
++    } else {
++        Err(StatisticsError::NumericalOverflow {
++            operation: "k-means inertia",
++        })
++    }
++}
++
++/// Controls for deterministic k-means fitting.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct KMeansOptions {
++    pub clusters: usize,
++    pub maximum_iterations: usize,
++    pub tolerance: f64,
++    pub seed: u64,
++}
++
++impl Default for KMeansOptions {
++    fn default() -> Self {
++        Self {
++            clusters: 2,
++            maximum_iterations: 300,
++            tolerance: 1.0e-8,
++            seed: 0,
++        }
++    }
++}
++
++/// Fitted k-means partition.
++#[derive(Debug, Clone, PartialEq)]
++pub struct KMeansFit {
++    pub centroids: Vec<Vec<f64>>,
++    pub assignments: Vec<usize>,
++    pub cluster_sizes: Vec<usize>,
++    pub inertia: f64,
++    pub iterations: usize,
++    pub converged: bool,
++    pub seed: u64,
++}
++
++impl KMeansFit {
++    pub fn try_predict(&self, observation: &[f64]) -> StatsResult<usize> {
++        if self.centroids.is_empty() {
++            return Err(StatisticsError::DegenerateSample {
++                reason: "k-means model has no centroids",
++            });
++        }
++        if observation.len() != self.centroids[0].len() {
++            return Err(StatisticsError::DimensionMismatch {
++                context: "k-means prediction",
++                expected: self.centroids[0].len(),
++                actual: observation.len(),
++            });
++        }
++        for (index, &value) in observation.iter().enumerate() {
++            if !value.is_finite() {
++                return Err(StatisticsError::NonFiniteInput { index, value });
++            }
++        }
++        self.centroids
++            .iter()
++            .enumerate()
++            .map(|(index, centroid)| (index, squared_distance(observation, centroid)))
++            .min_by(|left, right| left.1.total_cmp(&right.1))
++            .map(|(index, _)| index)
++            .ok_or(StatisticsError::DegenerateSample {
++                reason: "k-means model has no centroids",
++            })
++    }
++}
++
++/// Fit seeded k-means++ with deterministic tie-breaking.
++pub fn try_kmeans(observations: &[Vec<f64>], options: KMeansOptions) -> StatsResult<KMeansFit> {
++    let dimensions = validate_observations(observations)?;
++    if options.clusters < 2 || options.clusters > observations.len() {
++        return Err(StatisticsError::InvalidShape {
++            rows: observations.len(),
++            columns: options.clusters,
++        });
++    }
++    if options.maximum_iterations == 0 {
++        return Err(StatisticsError::InvalidIterations {
++            iterations: options.maximum_iterations,
++        });
++    }
++    if !options.tolerance.is_finite() || options.tolerance <= 0.0 {
++        return Err(StatisticsError::NonPositiveValue {
++            name: "k-means tolerance",
++            value: options.tolerance,
++        });
++    }
++    let mut centroids = initialize_kmeans_plus_plus(observations, options.clusters, options.seed)?;
++    let mut previous_assignments = Vec::new();
++    let mut iterations = 0;
++    let mut converged = false;
++    for iteration in 0..options.maximum_iterations {
++        let (assignments, _) = assign(observations, &centroids)?;
++        if assignments == previous_assignments {
++            converged = true;
++            iterations = iteration;
++            break;
++        }
++        let mut sums = vec![vec![0.0; dimensions]; options.clusters];
++        let mut counts = vec![0_usize; options.clusters];
++        for (observation, &cluster) in observations.iter().zip(&assignments) {
++            counts[cluster] += 1;
++            for column in 0..dimensions {
++                sums[cluster][column] += observation[column];
++            }
++        }
++        if counts.iter().any(|&count| count == 0) {
++            return Err(StatisticsError::DegenerateSample {
++                reason: "k-means produced an empty cluster",
++            });
++        }
++        let mut maximum_shift = 0.0_f64;
++        for cluster in 0..options.clusters {
++            for column in 0..dimensions {
++                let updated = sums[cluster][column] / counts[cluster] as f64;
++                maximum_shift = maximum_shift.max((updated - centroids[cluster][column]).abs());
++                centroids[cluster][column] = updated;
++            }
++        }
++        previous_assignments = assignments;
++        iterations = iteration + 1;
++        if maximum_shift <= options.tolerance {
++            converged = true;
++            break;
++        }
++    }
++    if !converged {
++        return Err(StatisticsError::NonConvergence {
++            function: "k-means",
++            iterations: options.maximum_iterations,
++        });
++    }
++    let (assignments, inertia) = assign(observations, &centroids)?;
++    let mut cluster_sizes = vec![0_usize; options.clusters];
++    for &cluster in &assignments {
++        cluster_sizes[cluster] += 1;
++    }
++    Ok(KMeansFit {
++        centroids,
++        assignments,
++        cluster_sizes,
++        inertia,
++        iterations,
++        converged,
++        seed: options.seed,
++    })
++}
++
++/// Mean silhouette coefficient for an externally supplied partition.
++pub fn try_silhouette_score(observations: &[Vec<f64>], assignments: &[usize]) -> StatsResult<f64> {
++    validate_observations(observations)?;
++    if observations.len() != assignments.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: observations.len(),
++            right: assignments.len(),
++        });
++    }
++    let cluster_count = assignments.iter().copied().max().map_or(0, |value| value + 1);
++    if cluster_count < 2 {
++        return Err(StatisticsError::DegenerateSample {
++            reason: "silhouette score requires at least two clusters",
++        });
++    }
++    let work = (observations.len() as u128).saturating_mul(observations.len() as u128);
++    if work > MAXIMUM_PAIRWISE_WORK {
++        return Err(StatisticsError::ComputationTooLarge {
++            states: work,
++            maximum: MAXIMUM_PAIRWISE_WORK,
++        });
++    }
++    let mut counts = vec![0_usize; cluster_count];
++    for &cluster in assignments {
++        if cluster >= cluster_count {
++            return Err(StatisticsError::DimensionMismatch {
++                context: "silhouette cluster label",
++                expected: cluster_count,
++                actual: cluster + 1,
++            });
++        }
++        counts[cluster] += 1;
++    }
++    if counts.iter().any(|&count| count == 0) {
++        return Err(StatisticsError::DegenerateSample {
++            reason: "silhouette labels must be contiguous and non-empty",
++        });
++    }
++    let mut total = 0.0;
++    for index in 0..observations.len() {
++        let own = assignments[index];
++        if counts[own] == 1 {
++            continue;
++        }
++        let mut sums = vec![0.0; cluster_count];
++        for other in 0..observations.len() {
++            if other != index {
++                sums[assignments[other]] += squared_distance(&observations[index], &observations[other]).sqrt();
++            }
++        }
++        let within = sums[own] / (counts[own] - 1) as f64;
++        let nearest = (0..cluster_count)
++            .filter(|&cluster| cluster != own)
++            .map(|cluster| sums[cluster] / counts[cluster] as f64)
++            .fold(f64::INFINITY, f64::min);
++        total += if within == 0.0 && nearest == 0.0 {
++            0.0
++        } else {
++            (nearest - within) / within.max(nearest)
++        };
++    }
++    let score = total / observations.len() as f64;
++    if score.is_finite() {
++        Ok(score.clamp(-1.0, 1.0))
++    } else {
++        Err(StatisticsError::NumericalOverflow {
++            operation: "silhouette score",
++        })
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn kmeans_finds_two_separated_clusters() {
++        let data = vec![
++            vec![-2.0, -2.0], vec![-1.8, -2.1], vec![-2.2, -1.9],
++            vec![2.0, 2.0], vec![1.8, 2.1], vec![2.2, 1.9],
++        ];
++        let fit = try_kmeans(&data, KMeansOptions { seed: 7, ..KMeansOptions::default() }).unwrap();
++        assert_eq!(fit.cluster_sizes, vec![3, 3]);
++        assert!(try_silhouette_score(&data, &fit.assignments).unwrap() > 0.9);
++    }
++
++    #[test]
++    fn kmeans_is_reproducible() {
++        let data = (0..20).map(|index| vec![index as f64, (index % 3) as f64]).collect::<Vec<_>>();
++        let options = KMeansOptions { clusters: 3, seed: 99, ..KMeansOptions::default() };
++        assert_eq!(try_kmeans(&data, options).unwrap(), try_kmeans(&data, options).unwrap());
++    }
++}
+diff --git a/src/copula.rs b/src/copula.rs
+new file mode 100644
+index 0000000..e80e791
+--- /dev/null
++++ b/src/copula.rs
+@@ -0,0 +1,256 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Gaussian copulas for rank-based dependence modeling and deterministic sampling.
++
++use crate::distributions::{normal_cdf, try_normal_quantile};
++use crate::error::{StatsResult, StatisticsError};
++use crate::linalg::DenseMatrix;
++use crate::multivariate_normal::MultivariateNormal;
++use std::f64::consts::PI;
++
++fn validate_observations(observations: &[Vec<f64>]) -> StatsResult<usize> {
++    if observations.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    let dimensions = observations[0].len();
++    if dimensions < 2 {
++        return Err(StatisticsError::InsufficientSamples {
++            required: 2,
++            actual: dimensions,
++        });
++    }
++    for (row_index, row) in observations.iter().enumerate() {
++        if row.len() != dimensions {
++            return Err(StatisticsError::DimensionMismatch {
++                context: "copula observation row",
++                expected: dimensions,
++                actual: row.len(),
++            });
++        }
++        for (column, &value) in row.iter().enumerate() {
++            if !value.is_finite() {
++                return Err(StatisticsError::NonFiniteInput {
++                    index: row_index * dimensions + column,
++                    value,
++                });
++            }
++        }
++    }
++    Ok(dimensions)
++}
++
++fn average_ranks(values: &[f64]) -> Vec<f64> {
++    let mut order = values.iter().copied().enumerate().collect::<Vec<_>>();
++    order.sort_by(|left, right| left.1.total_cmp(&right.1));
++    let mut ranks = vec![0.0; values.len()];
++    let mut start = 0;
++    while start < order.len() {
++        let mut end = start + 1;
++        while end < order.len() && order[end].1 == order[start].1 {
++            end += 1;
++        }
++        let average = 0.5 * ((start + 1) as f64 + end as f64);
++        for position in start..end {
++            ranks[order[position].0] = average;
++        }
++        start = end;
++    }
++    ranks
++}
++
++fn correlation_from_latent(latent: &[Vec<f64>], ridge: f64) -> StatsResult<Vec<Vec<f64>>> {
++    let rows = latent.len();
++    let dimensions = latent[0].len();
++    let mut means = vec![0.0; dimensions];
++    for row in latent {
++        for (column, &value) in row.iter().enumerate() {
++            means[column] += value;
++        }
++    }
++    for mean in &mut means {
++        *mean /= rows as f64;
++    }
++    let mut covariance = vec![vec![0.0; dimensions]; dimensions];
++    for row in latent {
++        for left in 0..dimensions {
++            let left_centered = row[left] - means[left];
++            for right in 0..=left {
++                covariance[left][right] += left_centered * (row[right] - means[right]);
++            }
++        }
++    }
++    let denominator = (rows - 1) as f64;
++    for left in 0..dimensions {
++        for right in 0..=left {
++            let value = covariance[left][right] / denominator;
++            covariance[left][right] = value;
++            covariance[right][left] = value;
++        }
++    }
++    let mut correlation = vec![vec![0.0; dimensions]; dimensions];
++    for left in 0..dimensions {
++        let left_scale = covariance[left][left].sqrt();
++        if left_scale <= 0.0 || !left_scale.is_finite() {
++            return Err(StatisticsError::DegenerateSample {
++                reason: "copula variable has zero latent variance",
++            });
++        }
++        for right in 0..=left {
++            let right_scale = covariance[right][right].sqrt();
++            let mut value = covariance[left][right] / (left_scale * right_scale);
++            if left == right {
++                value = 1.0;
++            } else {
++                value *= 1.0 - ridge;
++            }
++            correlation[left][right] = value;
++            correlation[right][left] = value;
++        }
++    }
++    Ok(correlation)
++}
++
++fn validate_uniforms(values: &[f64], dimensions: usize) -> StatsResult<Vec<f64>> {
++    if values.len() != dimensions {
++        return Err(StatisticsError::DimensionMismatch {
++            context: "copula probability vector",
++            expected: dimensions,
++            actual: values.len(),
++        });
++    }
++    values
++        .iter()
++        .enumerate()
++        .map(|(index, &value)| {
++            if !value.is_finite() {
++                Err(StatisticsError::NonFiniteInput { index, value })
++            } else if !(0.0..1.0).contains(&value) {
++                Err(StatisticsError::InvalidProbability { value })
++            } else {
++                try_normal_quantile(value)
++            }
++        })
++        .collect()
++}
++
++/// Fitted Gaussian copula with a positive-definite latent correlation matrix.
++#[derive(Debug, Clone, PartialEq)]
++pub struct GaussianCopula {
++    correlation: DenseMatrix,
++    latent: MultivariateNormal,
++    pub ridge: f64,
++    pub observations: usize,
++}
++
++impl GaussianCopula {
++    pub fn dimensions(&self) -> usize {
++        self.correlation.rows()
++    }
++
++    pub fn correlation(&self) -> &DenseMatrix {
++        &self.correlation
++    }
++
++    /// Log copula density at an open-unit-cube point.
++    pub fn try_log_density(&self, uniforms: &[f64]) -> StatsResult<f64> {
++        let latent = validate_uniforms(uniforms, self.dimensions())?;
++        let joint = self.latent.try_log_pdf(&latent)?;
++        let marginal = latent
++            .iter()
++            .map(|value| -0.5 * (2.0 * PI).ln() - 0.5 * value * value)
++            .sum::<f64>();
++        let result = joint - marginal;
++        if result.is_finite() {
++            Ok(result)
++        } else {
++            Err(StatisticsError::NumericalOverflow {
++                operation: "Gaussian copula log-density",
++            })
++        }
++    }
++
++    pub fn try_density(&self, uniforms: &[f64]) -> StatsResult<f64> {
++        Ok(self.try_log_density(uniforms)?.exp())
++    }
++
++    /// Draw deterministic open-unit-cube samples from the copula.
++    pub fn try_sample(&self, draws: usize, seed: u64) -> StatsResult<Vec<Vec<f64>>> {
++        let latent = self.latent.try_sample(draws, seed)?;
++        Ok(latent
++            .into_iter()
++            .map(|row| {
++                row.into_iter()
++                    .map(|value| normal_cdf(value).clamp(f64::MIN_POSITIVE, 1.0 - f64::EPSILON))
++                    .collect()
++            })
++            .collect())
++    }
++}
++
++/// Fit a Gaussian copula from empirical marginal ranks. `ridge` shrinks
++/// off-diagonal latent correlations toward independence and must lie in `[0, 1)`.
++pub fn try_gaussian_copula(
++    observations: &[Vec<f64>],
++    ridge: f64,
++) -> StatsResult<GaussianCopula> {
++    if !ridge.is_finite() || !(0.0..1.0).contains(&ridge) {
++        return Err(StatisticsError::InvalidProbability { value: ridge });
++    }
++    let dimensions = validate_observations(observations)?;
++    if observations.len() < 3 {
++        return Err(StatisticsError::InsufficientSamples {
++            required: 3,
++            actual: observations.len(),
++        });
++    }
++    let mut latent = vec![vec![0.0; dimensions]; observations.len()];
++    for column in 0..dimensions {
++        let values = observations.iter().map(|row| row[column]).collect::<Vec<_>>();
++        let ranks = average_ranks(&values);
++        for row in 0..observations.len() {
++            let probability = ranks[row] / (observations.len() as f64 + 1.0);
++            latent[row][column] = try_normal_quantile(probability)?;
++        }
++    }
++    let correlation_rows = correlation_from_latent(&latent, ridge)?;
++    let correlation = DenseMatrix::try_from_rows(&correlation_rows)?;
++    let model = MultivariateNormal::try_new(vec![0.0; dimensions], correlation_rows)?;
++    Ok(GaussianCopula {
++        correlation,
++        latent: model,
++        ridge,
++        observations: observations.len(),
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn recovers_positive_rank_dependence() {
++        let observations = (0..50)
++            .map(|index| {
++                let x = index as f64;
++                vec![x, 2.0 * x + (index % 7) as f64]
++            })
++            .collect::<Vec<_>>();
++        let copula = try_gaussian_copula(&observations, 1e-8).unwrap();
++        assert!(copula.correlation().try_get(0, 1).unwrap() > 0.95);
++        assert!(copula.try_log_density(&[0.8, 0.8]).unwrap() > 0.0);
++    }
++
++    #[test]
++    fn samples_are_reproducible_and_open() {
++        let observations = vec![
++            vec![0.0, 0.0], vec![1.0, 2.0], vec![2.0, 1.0],
++            vec![3.0, 4.0], vec![4.0, 3.0],
++        ];
++        let copula = try_gaussian_copula(&observations, 1e-6).unwrap();
++        let left = copula.try_sample(32, 42).unwrap();
++        let right = copula.try_sample(32, 42).unwrap();
++        assert_eq!(left, right);
++        assert!(left.iter().flatten().all(|value| (0.0..1.0).contains(value)));
++    }
++}
+diff --git a/src/discriminant.rs b/src/discriminant.rs
+new file mode 100644
+index 0000000..7b6d11c
+--- /dev/null
++++ b/src/discriminant.rs
+@@ -0,0 +1,410 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Linear and quadratic discriminant analysis with checked covariance models.
++
++use crate::error::{StatsResult, StatisticsError};
++use crate::linalg::{CholeskyFactor, DenseMatrix};
++use std::collections::BTreeMap;
++
++fn validate_table(observations: &[Vec<f64>], labels: &[usize]) -> StatsResult<usize> {
++    if observations.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    if observations.len() != labels.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: observations.len(),
++            right: labels.len(),
++        });
++    }
++    let dimensions = observations[0].len();
++    if dimensions == 0 {
++        return Err(StatisticsError::InvalidShape {
++            rows: observations.len(),
++            columns: 0,
++        });
++    }
++    for (row_index, row) in observations.iter().enumerate() {
++        if row.len() != dimensions {
++            return Err(StatisticsError::DimensionMismatch {
++                context: "discriminant observation row",
++                expected: dimensions,
++                actual: row.len(),
++            });
++        }
++        for (column, &value) in row.iter().enumerate() {
++            if !value.is_finite() {
++                return Err(StatisticsError::NonFiniteInput {
++                    index: row_index * dimensions + column,
++                    value,
++                });
++            }
++        }
++    }
++    Ok(dimensions)
++}
++
++fn validate_ridge(ridge: f64) -> StatsResult<()> {
++    if ridge.is_finite() && ridge >= 0.0 {
++        Ok(())
++    } else {
++        Err(StatisticsError::NegativeValue {
++            name: "discriminant ridge",
++            value: ridge,
++        })
++    }
++}
++
++fn grouped_indices(labels: &[usize]) -> BTreeMap<usize, Vec<usize>> {
++    let mut groups = BTreeMap::<usize, Vec<usize>>::new();
++    for (index, &label) in labels.iter().enumerate() {
++        groups.entry(label).or_default().push(index);
++    }
++    groups
++}
++
++fn mean_for_indices(observations: &[Vec<f64>], indices: &[usize], dimensions: usize) -> Vec<f64> {
++    let mut mean = vec![0.0; dimensions];
++    for &index in indices {
++        for (column, value) in mean.iter_mut().enumerate() {
++            *value += observations[index][column];
++        }
++    }
++    let scale = 1.0 / indices.len() as f64;
++    for value in &mut mean {
++        *value *= scale;
++    }
++    mean
++}
++
++fn validate_observation(observation: &[f64], dimensions: usize) -> StatsResult<()> {
++    if observation.len() != dimensions {
++        return Err(StatisticsError::DimensionMismatch {
++            context: "discriminant prediction",
++            expected: dimensions,
++            actual: observation.len(),
++        });
++    }
++    for (index, &value) in observation.iter().enumerate() {
++        if !value.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value });
++        }
++    }
++    Ok(())
++}
++
++fn dot(left: &[f64], right: &[f64]) -> f64 {
++    left.iter()
++        .zip(right)
++        .fold(0.0, |sum, (&a, &b)| a.mul_add(b, sum))
++}
++
++fn softmax(scores: &[f64]) -> StatsResult<Vec<f64>> {
++    let maximum = scores.iter().copied().fold(f64::NEG_INFINITY, f64::max);
++    let mut probabilities = Vec::with_capacity(scores.len());
++    let mut total = 0.0;
++    for &score in scores {
++        let value = (score - maximum).exp();
++        if !value.is_finite() {
++            return Err(StatisticsError::NumericalOverflow {
++                operation: "discriminant softmax",
++            });
++        }
++        probabilities.push(value);
++        total += value;
++    }
++    if !total.is_finite() || total <= 0.0 {
++        return Err(StatisticsError::NumericalOverflow {
++            operation: "discriminant probability normalization",
++        });
++    }
++    for value in &mut probabilities {
++        *value /= total;
++    }
++    Ok(probabilities)
++}
++
++/// Linear discriminant model with a common pooled covariance matrix.
++#[derive(Debug, Clone, PartialEq)]
++pub struct LinearDiscriminantFit {
++    pub class_labels: Vec<usize>,
++    pub priors: Vec<f64>,
++    pub means: Vec<Vec<f64>>,
++    pub pooled_covariance: DenseMatrix,
++    pub ridge: f64,
++    inverse_covariance: DenseMatrix,
++}
++
++impl LinearDiscriminantFit {
++    pub fn dimensions(&self) -> usize {
++        self.pooled_covariance.rows()
++    }
++
++    pub fn try_scores(&self, observation: &[f64]) -> StatsResult<Vec<f64>> {
++        validate_observation(observation, self.dimensions())?;
++        let mut scores = Vec::with_capacity(self.class_labels.len());
++        for (mean, &prior) in self.means.iter().zip(&self.priors) {
++            let precision_mean = self.inverse_covariance.try_mul_vector(mean)?;
++            let score = dot(observation, &precision_mean)
++                - 0.5 * dot(mean, &precision_mean)
++                + prior.ln();
++            if !score.is_finite() {
++                return Err(StatisticsError::NumericalOverflow {
++                    operation: "linear discriminant score",
++                });
++            }
++            scores.push(score);
++        }
++        Ok(scores)
++    }
++
++    pub fn try_predict_proba(&self, observation: &[f64]) -> StatsResult<Vec<f64>> {
++        softmax(&self.try_scores(observation)?)
++    }
++
++    pub fn try_predict(&self, observation: &[f64]) -> StatsResult<usize> {
++        let scores = self.try_scores(observation)?;
++        let index = scores
++            .iter()
++            .enumerate()
++            .max_by(|left, right| left.1.total_cmp(right.1))
++            .map(|(index, _)| index)
++            .ok_or(StatisticsError::DegenerateSample {
++                reason: "discriminant model has no classes",
++            })?;
++        Ok(self.class_labels[index])
++    }
++}
++
++/// Fit linear discriminant analysis with empirical class priors.
++pub fn try_linear_discriminant(
++    observations: &[Vec<f64>],
++    labels: &[usize],
++    ridge: f64,
++) -> StatsResult<LinearDiscriminantFit> {
++    validate_ridge(ridge)?;
++    let dimensions = validate_table(observations, labels)?;
++    let groups = grouped_indices(labels);
++    if groups.len() < 2 {
++        return Err(StatisticsError::DegenerateSample {
++            reason: "discriminant analysis requires at least two classes",
++        });
++    }
++    if observations.len() <= groups.len() {
++        return Err(StatisticsError::InsufficientSamples {
++            required: groups.len() + 1,
++            actual: observations.len(),
++        });
++    }
++
++    let mut class_labels = Vec::with_capacity(groups.len());
++    let mut priors = Vec::with_capacity(groups.len());
++    let mut means = Vec::with_capacity(groups.len());
++    let mut scatter = DenseMatrix::zeros(dimensions, dimensions)?;
++    for (&label, indices) in &groups {
++        class_labels.push(label);
++        priors.push(indices.len() as f64 / observations.len() as f64);
++        let mean = mean_for_indices(observations, indices, dimensions);
++        for &index in indices {
++            for row in 0..dimensions {
++                let left = observations[index][row] - mean[row];
++                for column in 0..=row {
++                    let value = scatter.get(row, column)
++                        + left * (observations[index][column] - mean[column]);
++                    if !value.is_finite() {
++                        return Err(StatisticsError::NumericalOverflow {
++                            operation: "pooled within-class scatter",
++                        });
++                    }
++                    scatter.set(row, column, value);
++                    scatter.set(column, row, value);
++                }
++            }
++        }
++        means.push(mean);
++    }
++    let denominator = (observations.len() - groups.len()) as f64;
++    let mut covariance = DenseMatrix::zeros(dimensions, dimensions)?;
++    for row in 0..dimensions {
++        for column in 0..dimensions {
++            let mut value = scatter.get(row, column) / denominator;
++            if row == column {
++                value += ridge;
++            }
++            covariance.set(row, column, value);
++        }
++    }
++    let factor = CholeskyFactor::try_factor(&covariance)?;
++    let inverse_covariance = factor.try_inverse()?;
++    Ok(LinearDiscriminantFit {
++        class_labels,
++        priors,
++        means,
++        pooled_covariance: covariance,
++        ridge,
++        inverse_covariance,
++    })
++}
++
++/// Quadratic discriminant model with one covariance matrix per class.
++#[derive(Debug, Clone, PartialEq)]
++pub struct QuadraticDiscriminantFit {
++    pub class_labels: Vec<usize>,
++    pub priors: Vec<f64>,
++    pub means: Vec<Vec<f64>>,
++    pub covariances: Vec<DenseMatrix>,
++    pub ridge: f64,
++    inverse_covariances: Vec<DenseMatrix>,
++    log_determinants: Vec<f64>,
++}
++
++impl QuadraticDiscriminantFit {
++    pub fn dimensions(&self) -> usize {
++        self.means.first().map_or(0, Vec::len)
++    }
++
++    pub fn try_scores(&self, observation: &[f64]) -> StatsResult<Vec<f64>> {
++        validate_observation(observation, self.dimensions())?;
++        let mut scores = Vec::with_capacity(self.class_labels.len());
++        for index in 0..self.class_labels.len() {
++            let difference = observation
++                .iter()
++                .zip(&self.means[index])
++                .map(|(&value, &mean)| value - mean)
++                .collect::<Vec<_>>();
++            let precision_difference = self.inverse_covariances[index].try_mul_vector(&difference)?;
++            let mahalanobis = dot(&difference, &precision_difference);
++            let score = self.priors[index].ln()
++                - 0.5 * (self.log_determinants[index] + mahalanobis);
++            if !score.is_finite() {
++                return Err(StatisticsError::NumericalOverflow {
++                    operation: "quadratic discriminant score",
++                });
++            }
++            scores.push(score);
++        }
++        Ok(scores)
++    }
++
++    pub fn try_predict_proba(&self, observation: &[f64]) -> StatsResult<Vec<f64>> {
++        softmax(&self.try_scores(observation)?)
++    }
++
++    pub fn try_predict(&self, observation: &[f64]) -> StatsResult<usize> {
++        let scores = self.try_scores(observation)?;
++        let index = scores
++            .iter()
++            .enumerate()
++            .max_by(|left, right| left.1.total_cmp(right.1))
++            .map(|(index, _)| index)
++            .ok_or(StatisticsError::DegenerateSample {
++                reason: "discriminant model has no classes",
++            })?;
++        Ok(self.class_labels[index])
++    }
++}
++
++/// Fit quadratic discriminant analysis with empirical class priors.
++pub fn try_quadratic_discriminant(
++    observations: &[Vec<f64>],
++    labels: &[usize],
++    ridge: f64,
++) -> StatsResult<QuadraticDiscriminantFit> {
++    validate_ridge(ridge)?;
++    let dimensions = validate_table(observations, labels)?;
++    let groups = grouped_indices(labels);
++    if groups.len() < 2 {
++        return Err(StatisticsError::DegenerateSample {
++            reason: "discriminant analysis requires at least two classes",
++        });
++    }
++
++    let mut class_labels = Vec::with_capacity(groups.len());
++    let mut priors = Vec::with_capacity(groups.len());
++    let mut means = Vec::with_capacity(groups.len());
++    let mut covariances = Vec::with_capacity(groups.len());
++    let mut inverse_covariances = Vec::with_capacity(groups.len());
++    let mut log_determinants = Vec::with_capacity(groups.len());
++    for (&label, indices) in &groups {
++        if indices.len() < 2 {
++            return Err(StatisticsError::InsufficientSamples {
++                required: 2,
++                actual: indices.len(),
++            });
++        }
++        class_labels.push(label);
++        priors.push(indices.len() as f64 / observations.len() as f64);
++        let mean = mean_for_indices(observations, indices, dimensions);
++        let mut covariance = DenseMatrix::zeros(dimensions, dimensions)?;
++        for &row_index in indices {
++            for row in 0..dimensions {
++                let left = observations[row_index][row] - mean[row];
++                for column in 0..=row {
++                    let value = covariance.get(row, column)
++                        + left * (observations[row_index][column] - mean[column]);
++                    covariance.set(row, column, value);
++                    covariance.set(column, row, value);
++                }
++            }
++        }
++        let denominator = (indices.len() - 1) as f64;
++        for row in 0..dimensions {
++            for column in 0..dimensions {
++                let mut value = covariance.get(row, column) / denominator;
++                if row == column {
++                    value += ridge;
++                }
++                if !value.is_finite() {
++                    return Err(StatisticsError::NumericalOverflow {
++                        operation: "class covariance",
++                    });
++                }
++                covariance.set(row, column, value);
++            }
++        }
++        let factor = CholeskyFactor::try_factor(&covariance)?;
++        log_determinants.push(factor.log_determinant());
++        inverse_covariances.push(factor.try_inverse()?);
++        covariances.push(covariance);
++        means.push(mean);
++    }
++    Ok(QuadraticDiscriminantFit {
++        class_labels,
++        priors,
++        means,
++        covariances,
++        ridge,
++        inverse_covariances,
++        log_determinants,
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn lda_separates_two_clouds() {
++        let x = vec![
++            vec![-2.0, -1.0], vec![-1.5, -0.8], vec![-1.0, -1.2],
++            vec![1.0, 1.1], vec![1.5, 0.8], vec![2.0, 1.2],
++        ];
++        let y = vec![0, 0, 0, 1, 1, 1];
++        let fit = try_linear_discriminant(&x, &y, 1e-8).unwrap();
++        assert_eq!(fit.try_predict(&[-1.4, -1.0]).unwrap(), 0);
++        assert_eq!(fit.try_predict(&[1.4, 1.0]).unwrap(), 1);
++        let probabilities = fit.try_predict_proba(&[1.4, 1.0]).unwrap();
++        assert!((probabilities.iter().sum::<f64>() - 1.0).abs() < 1e-12);
++    }
++
++    #[test]
++    fn qda_uses_class_specific_covariance() {
++        let x = vec![
++            vec![-2.0, 0.0], vec![-1.0, 0.1], vec![0.0, -0.1], vec![1.0, 0.0],
++            vec![3.0, -2.0], vec![3.1, -1.0], vec![2.9, 1.0], vec![3.0, 2.0],
++        ];
++        let y = vec![0, 0, 0, 0, 1, 1, 1, 1];
++        let fit = try_quadratic_discriminant(&x, &y, 1e-4).unwrap();
++        assert_eq!(fit.try_predict(&[3.0, 1.5]).unwrap(), 1);
++    }
++}
+diff --git a/src/forecast_evaluation.rs b/src/forecast_evaluation.rs
+new file mode 100644
+index 0000000..e756bf6
+--- /dev/null
++++ b/src/forecast_evaluation.rs
+@@ -0,0 +1,243 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Forecast-accuracy metrics and Diebold–Mariano model comparison.
++
++use crate::distributions::normal_sf;
++use crate::error::{StatsResult, StatisticsError};
++
++fn validate_series(actual: &[f64], forecast: &[f64]) -> StatsResult<()> {
++    if actual.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    if actual.len() != forecast.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: actual.len(),
++            right: forecast.len(),
++        });
++    }
++    for (index, &value) in actual.iter().chain(forecast).enumerate() {
++        if !value.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value });
++        }
++    }
++    Ok(())
++}
++
++fn validate_seasonality(length: usize, seasonality: usize) -> StatsResult<()> {
++    if seasonality == 0 || seasonality >= length {
++        return Err(StatisticsError::InvalidLag {
++            lag: seasonality,
++            length,
++        });
++    }
++    Ok(())
++}
++
++/// Point-forecast accuracy summary.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct ForecastAccuracy {
++    pub mean_error: f64,
++    pub mean_absolute_error: f64,
++    pub root_mean_squared_error: f64,
++    pub symmetric_mean_absolute_percentage_error: f64,
++    pub mean_absolute_scaled_error: f64,
++    pub root_mean_squared_scaled_error: f64,
++    pub observations: usize,
++    pub seasonality: usize,
++}
++
++/// Compute scale-free and ordinary forecast metrics. MASE and RMSSE use the
++/// in-sample seasonal-naive denominator from `training`.
++pub fn try_forecast_accuracy(
++    actual: &[f64],
++    forecast: &[f64],
++    training: &[f64],
++    seasonality: usize,
++) -> StatsResult<ForecastAccuracy> {
++    validate_series(actual, forecast)?;
++    if training.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    for (index, &value) in training.iter().enumerate() {
++        if !value.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value });
++        }
++    }
++    validate_seasonality(training.len(), seasonality)?;
++
++    let mut mean_error = 0.0;
++    let mut absolute_error = 0.0;
++    let mut squared_error = 0.0;
++    let mut smape = 0.0;
++    for (&observed, &predicted) in actual.iter().zip(forecast) {
++        let error = predicted - observed;
++        mean_error += error;
++        absolute_error += error.abs();
++        squared_error += error * error;
++        let denominator = observed.abs() + predicted.abs();
++        if denominator > 0.0 {
++            smape += 2.0 * error.abs() / denominator;
++        }
++    }
++    let mut naive_absolute = 0.0;
++    let mut naive_squared = 0.0;
++    let comparisons = training.len() - seasonality;
++    for index in seasonality..training.len() {
++        let difference = training[index] - training[index - seasonality];
++        naive_absolute += difference.abs();
++        naive_squared += difference * difference;
++    }
++    let absolute_scale = naive_absolute / comparisons as f64;
++    let squared_scale = naive_squared / comparisons as f64;
++    if absolute_scale <= 0.0 || squared_scale <= 0.0 {
++        return Err(StatisticsError::DegenerateSample {
++            reason: "scaled forecast metrics require non-constant seasonal training differences",
++        });
++    }
++    let n = actual.len() as f64;
++    let result = ForecastAccuracy {
++        mean_error: mean_error / n,
++        mean_absolute_error: absolute_error / n,
++        root_mean_squared_error: (squared_error / n).sqrt(),
++        symmetric_mean_absolute_percentage_error: smape / n,
++        mean_absolute_scaled_error: (absolute_error / n) / absolute_scale,
++        root_mean_squared_scaled_error: ((squared_error / n) / squared_scale).sqrt(),
++        observations: actual.len(),
++        seasonality,
++    };
++    if [
++        result.mean_error,
++        result.mean_absolute_error,
++        result.root_mean_squared_error,
++        result.symmetric_mean_absolute_percentage_error,
++        result.mean_absolute_scaled_error,
++        result.root_mean_squared_scaled_error,
++    ]
++    .iter()
++    .all(|value| value.is_finite())
++    {
++        Ok(result)
++    } else {
++        Err(StatisticsError::NumericalOverflow {
++            operation: "forecast accuracy",
++        })
++    }
++}
++
++/// Loss function used by the Diebold–Mariano comparison.
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum ForecastLoss {
++    Absolute,
++    Squared,
++}
++
++fn loss(error: f64, kind: ForecastLoss) -> f64 {
++    match kind {
++        ForecastLoss::Absolute => error.abs(),
++        ForecastLoss::Squared => error * error,
++    }
++}
++
++/// Diebold–Mariano equal-predictive-accuracy test using a Bartlett-weighted
++/// long-run variance estimate.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct DieboldMarianoTest {
++    /// Positive values favor the second forecast because loss one exceeds loss two.
++    pub statistic: f64,
++    pub p_value_two_sided: f64,
++    pub mean_loss_difference: f64,
++    pub long_run_variance: f64,
++    pub bandwidth: usize,
++    pub observations: usize,
++    pub loss: ForecastLoss,
++}
++
++/// Compare two forecast sequences against common realized outcomes.
++pub fn try_diebold_mariano(
++    actual: &[f64],
++    forecast_one: &[f64],
++    forecast_two: &[f64],
++    loss_kind: ForecastLoss,
++    bandwidth: usize,
++) -> StatsResult<DieboldMarianoTest> {
++    validate_series(actual, forecast_one)?;
++    validate_series(actual, forecast_two)?;
++    if bandwidth >= actual.len() {
++        return Err(StatisticsError::InvalidLag {
++            lag: bandwidth,
++            length: actual.len(),
++        });
++    }
++    if actual.len() < 3 {
++        return Err(StatisticsError::InsufficientSamples {
++            required: 3,
++            actual: actual.len(),
++        });
++    }
++    let differences = actual
++        .iter()
++        .zip(forecast_one)
++        .zip(forecast_two)
++        .map(|((&observed, &first), &second)| {
++            loss(observed - first, loss_kind) - loss(observed - second, loss_kind)
++        })
++        .collect::<Vec<_>>();
++    let mean = differences.iter().sum::<f64>() / differences.len() as f64;
++    let mut long_run_variance = differences
++        .iter()
++        .map(|value| (value - mean) * (value - mean))
++        .sum::<f64>()
++        / differences.len() as f64;
++    for lag in 1..=bandwidth {
++        let mut covariance = 0.0;
++        for index in lag..differences.len() {
++            covariance += (differences[index] - mean) * (differences[index - lag] - mean);
++        }
++        covariance /= differences.len() as f64;
++        let weight = 1.0 - lag as f64 / (bandwidth + 1) as f64;
++        long_run_variance += 2.0 * weight * covariance;
++    }
++    if !long_run_variance.is_finite() || long_run_variance <= 0.0 {
++        return Err(StatisticsError::DegenerateSample {
++            reason: "Diebold-Mariano loss differential has non-positive long-run variance",
++        });
++    }
++    let standard_error = (long_run_variance / differences.len() as f64).sqrt();
++    let statistic = mean / standard_error;
++    let p_value_two_sided = (2.0 * normal_sf(statistic.abs())).clamp(0.0, 1.0);
++    Ok(DieboldMarianoTest {
++        statistic,
++        p_value_two_sided,
++        mean_loss_difference: mean,
++        long_run_variance,
++        bandwidth,
++        observations: actual.len(),
++        loss: loss_kind,
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn scaled_metrics_reward_better_than_naive_forecast() {
++        let training = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
++        let actual = vec![7.0, 8.0, 9.0];
++        let forecast = vec![7.1, 7.9, 9.1];
++        let accuracy = try_forecast_accuracy(&actual, &forecast, &training, 1).unwrap();
++        assert!(accuracy.mean_absolute_scaled_error < 0.2);
++        assert!(accuracy.root_mean_squared_scaled_error < 0.2);
++    }
++
++    #[test]
++    fn diebold_mariano_detects_consistently_worse_forecast() {
++        let actual = (0..40).map(|index| index as f64).collect::<Vec<_>>();
++        let good = actual.iter().enumerate().map(|(index, value)| value + (index % 2) as f64 * 0.1).collect::<Vec<_>>();
++        let bad = actual.iter().map(|value| value + 2.0).collect::<Vec<_>>();
++        let test = try_diebold_mariano(&actual, &bad, &good, ForecastLoss::Squared, 2).unwrap();
++        assert!(test.statistic > 5.0);
++        assert!(test.p_value_two_sided < 1e-5);
++    }
++}
+diff --git a/src/lib.rs b/src/lib.rs
+index f4bec23..4c9f3d0 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -28,7 +28,7 @@
+ //!   bootstrap, permutation, assignment, and exact-or-Monte-Carlo randomization
+ //! - [`nonparametric`], [`paired_nonparametric`], [`rank_groups`] — tied ranks, Spearman association, Mann-Whitney U, sign, Wilcoxon, Friedman, Kruskal-Wallis, and Dunn inference
+ //! - [`linalg`], [`qr`], [`regression`], [`measurement_error`], [`multiple_regression`], [`ridge`], [`glm`], [`multinomial_logistic`],
+-//!   [`count_regression`], [`quantile_regression`], [`expectile_regression`], [`gamma_regression`],
++//!   [`count_regression`], [`censored_regression`], [`quantile_regression`], [`expectile_regression`], [`gamma_regression`],
+ //!   [`location_scale`], [`mixed_effects`], [`robust_regression`], [`robust_covariance`],
+ //!   [`dependent_covariance`], [`regression_diagnostics`] — checked solvers, mean/quantile/expectile/location-scale models,
+ //!   generalized outcomes, longitudinal random intercepts, diagnostics, and sandwich inference
+@@ -37,14 +37,14 @@
+ //! - [`bayes`], [`bayesian_bootstrap`], [`bayesian_model_comparison`], [`conjugate`], [`normal_inverse_gamma`], [`multiple_imputation`], [`uncertainty`], [`classification`], [`multiclass`], [`multiclass_calibration`], [`calibration`], [`isotonic`],
+ //!   [`conformal`] — stable updating, closed-form posteriors, calibration, and
+ //!   held-out distribution-free predictive uncertainty
+-//! - [`pca`], [`hotelling`], [`multivariate_normal`], [`covariance_shrinkage`], [`distance_statistics`], [`kernel_tests`], [`permanova`], [`network`], [`network_centrality`], [`network_inference`], [`markov`], [`hidden_markov`], [`mixture`], [`mcmc`], [`time_series`], [`state_space`], [`residual_diagnostics`], [`autoregression`],
++//! - [`pca`], [`hotelling`], [`canonical_correlation`], [`manova`], [`partial_correlation`], [`multivariate_normal`], [`covariance_shrinkage`], [`distance_statistics`], [`kernel_tests`], [`permanova`], [`network`], [`network_centrality`], [`network_inference`], [`discriminant`], [`clustering`], [`copula`], [`markov`], [`hidden_markov`], [`mixture`], [`mcmc`], [`time_series`], [`state_space`], [`residual_diagnostics`], [`autoregression`],
+ //!   [`process_control`] — multivariate geometry, network structure, latent state, forecasting, and change detection
+-//! - [`survival`], [`competing_risks`], [`logrank`], [`cox`] — product-limit/cumulative-hazard curves, competing incidence, curve comparison,
++//! - [`survival`], [`survival_scoring`], [`competing_risks`], [`logrank`], [`cox`] — product-limit/cumulative-hazard curves, competing incidence, curve comparison,
+ //!   and proportional-hazards regression
+-//! - [`causal`], [`doubly_robust`], [`difference_in_differences`], [`matching`],
++//! - [`causal`], [`doubly_robust`], [`difference_in_differences`], [`matching`], [`mediation`],
+ //!   [`meta_analysis`], [`meta_regression`], [`equivalence`] — explicit treatment-effect assumptions,
+ //!   evidence synthesis, and practical equivalence
+-//! - [`predictive`], [`distributional_scoring`], [`cross_validation`], [`decision`] — predictive and distributional scoring,
++//! - [`predictive`], [`distributional_scoring`], [`forecast_evaluation`], [`cross_validation`], [`decision`] — predictive and distributional scoring,
+ //!   deterministic validation splits, discrimination curves, and threshold policy
+ //! - [`fitting`], [`empirical_bayes`], [`jackknife`] — distribution estimation, shrinkage, and influence diagnostics
+ //! - [`survey`], [`paired_categorical`], [`agreement`], [`reliability`], [`circular`], [`exponential_smoothing`] — design-based sampling, measurement reproducibility, angular evidence, and level/trend forecasting
+@@ -80,12 +80,16 @@ pub mod beta_binomial;
+ pub mod block_bootstrap;
+ pub mod calibration;
+ pub mod causal;
++pub mod censored_regression;
++pub mod canonical_correlation;
+ pub mod classification;
+ pub mod circular;
++pub mod clustering;
+ pub mod contingency;
+ pub mod competing_risks;
+ pub mod compositional;
+ pub mod conformal;
++pub mod copula;
+ pub mod count_regression;
+ pub mod cross_validation;
+ pub mod cox;
+@@ -96,6 +100,7 @@ pub mod dirichlet;
+ pub mod density;
+ pub mod dependent_covariance;
+ pub mod decision;
++pub mod discriminant;
+ pub mod data_quality;
+ pub mod distributions;
+ pub mod distributional_scoring;
+@@ -121,6 +126,7 @@ pub mod glm;
+ pub mod goodness_of_fit;
+ pub mod gamma_regression;
+ pub mod fitting;
++pub mod forecast_evaluation;
+ pub mod inference;
+ pub mod information;
+ pub mod isotonic;
+@@ -130,6 +136,7 @@ pub mod linalg;
+ pub mod logrank;
+ pub mod location_scale;
+ pub mod markov;
++pub mod manova;
+ mod model_matrix;
+ pub mod model_selection;
+ pub mod meta_analysis;
+@@ -137,6 +144,7 @@ pub mod meta_regression;
+ pub mod matching;
+ pub mod mcmc;
+ pub mod measurement_error;
++pub mod mediation;
+ pub mod missing_data;
+ pub mod mixed_effects;
+ pub mod mixture;
+@@ -168,6 +176,7 @@ pub mod power;
+ pub mod pca;
+ pub mod paired_categorical;
+ pub mod paired_nonparametric;
++pub mod partial_correlation;
+ pub mod permanova;
+ pub mod predictive;
+ pub mod regression;
+@@ -184,6 +193,7 @@ pub mod sequential;
+ pub mod special;
+ pub mod state_space;
+ pub mod survival;
++pub mod survival_scoring;
+ pub mod survey;
+ pub mod time_series;
+ pub mod uncertainty;
+@@ -220,11 +230,14 @@ pub use calibration::{
+     CalibrationAccumulator, CalibrationBin, CalibrationSummary, brier_score, calibration_summary,
+     log_loss, try_brier_score, try_calibration_summary, try_log_loss,
+ };
++pub use canonical_correlation::{CanonicalCorrelationFit, try_canonical_correlation};
++pub use censored_regression::{Censoring, TobitFit, TobitOptions, try_tobit_regression};
+ pub use causal::{
+     CovariateBalance, DifferenceInMeans, InverseProbabilityEstimate,
+     try_covariate_balance, try_difference_in_means, try_inverse_probability_ate,
+ };
+ pub use classification::Confusion;
++pub use clustering::{KMeansFit, KMeansOptions, try_kmeans, try_silhouette_score};
+ pub use circular::{
+     CircularSummary, RayleighTest, angular_difference, try_circular_correlation,
+     try_circular_summary, try_rayleigh_test, wrap_angle,
+@@ -237,6 +250,7 @@ pub use compositional::{
+     try_closure, try_compositional_center, try_inverse_additive_log_ratio,
+     try_inverse_centered_log_ratio, try_log_ratio_variation_matrix,
+ };
++pub use copula::{GaussianCopula, try_gaussian_copula};
+ pub use conformal::{
+     BinaryConformalClassifier, BinaryPredictionSet, NormalizedConformalRegressor,
+     SplitConformalRegressor, try_binary_conformal_classification,
+@@ -353,6 +367,10 @@ pub use hotelling::{HotellingTest, try_one_sample_hotelling, try_two_sample_hote
+ pub use expectile_regression::{
+     ExpectileRegressionFit, ExpectileRegressionOptions, try_expectile_regression,
+ };
++pub use forecast_evaluation::{
++    DieboldMarianoTest, ForecastAccuracy, ForecastLoss, try_diebold_mariano,
++    try_forecast_accuracy,
++};
+ pub use fitting::{
+     DistributionFit, try_fit_beta_moments, try_fit_exponential, try_fit_gamma_moments,
+     try_fit_normal,
+@@ -364,6 +382,10 @@ pub use distributional_scoring::{
+     IntervalForecastScore, try_expectile_loss, try_interval_forecast_score,
+     try_normal_crps, try_pinball_loss, try_quantile_coverage,
+ };
++pub use discriminant::{
++    LinearDiscriminantFit, QuadraticDiscriminantFit, try_linear_discriminant,
++    try_quadratic_discriminant,
++};
+ pub use distributions::{
+     beta_cdf, beta_log_pdf, beta_pdf, beta_quantile, beta_sf,
+     binomial_cdf, binomial_log_pmf, binomial_pmf, binomial_sf, chi_square_cdf,
+@@ -443,6 +465,7 @@ pub use missing_data::{
+     try_audit_missing, try_complete_cases, try_impute_numeric,
+ };
+ pub use mcmc::{McmcDiagnostics, try_mcmc_diagnostics};
++pub use mediation::{MediationResult, try_linear_mediation};
+ pub use measurement_error::{DemingFit, try_deming_regression};
+ pub use meta_analysis::{MetaAnalysis, MetaAnalysisModel, try_meta_analysis};
+ pub use meta_regression::{MetaRegression, MetaRegressionPrediction, try_meta_regression};
+@@ -498,6 +521,7 @@ pub use multiple_testing::{
+ };
+ pub use pca::{PrincipalComponents, SymmetricEigen, try_principal_components, try_symmetric_eigen};
+ pub use permanova::{Permanova, try_permanova};
++pub use partial_correlation::{PartialCorrelationFit, try_partial_correlations};
+ pub use paired_nonparametric::{
+     FriedmanTest, SignTest, WilcoxonSignedRank, try_friedman_test, try_sign_test,
+     try_wilcoxon_signed_rank,
+@@ -551,6 +575,10 @@ pub use state_space::{
+     KalmanStep, LocalLevelFilter, LocalLevelForecast, LocalLevelModel, LocalLevelSmoother,
+     try_local_level_filter, try_local_level_smoother, try_select_local_level_model,
+ };
++pub use survival_scoring::{
++    ConcordanceIndex, SurvivalBrierScore, try_concordance_index,
++    try_integrated_brier_score, try_survival_brier_scores,
++};
+ pub use survival::{KaplanMeier, SurvivalStep, try_kaplan_meier};
+ pub use survey::{
+     StratumSample, SurveyEstimate, try_hajek_mean, try_horvitz_thompson_total,
+diff --git a/src/manova.rs b/src/manova.rs
+new file mode 100644
+index 0000000..a3aa4dc
+--- /dev/null
++++ b/src/manova.rs
+@@ -0,0 +1,296 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! One-factor multivariate analysis of variance with deterministic permutation inference.
++
++use crate::error::{StatsResult, StatisticsError};
++use crate::linalg::{CholeskyFactor, DenseMatrix};
++use crate::sampling::SplitMix64;
++use std::collections::BTreeMap;
++
++const MAXIMUM_WORK: u128 = 100_000_000;
++
++fn validate(observations: &[Vec<f64>], groups: &[usize], ridge: f64) -> StatsResult<usize> {
++    if observations.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    if observations.len() != groups.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: observations.len(),
++            right: groups.len(),
++        });
++    }
++    if !ridge.is_finite() || ridge < 0.0 {
++        return Err(StatisticsError::NegativeValue {
++            name: "MANOVA covariance ridge",
++            value: ridge,
++        });
++    }
++    let dimensions = observations[0].len();
++    if dimensions == 0 {
++        return Err(StatisticsError::InvalidShape {
++            rows: observations.len(),
++            columns: dimensions,
++        });
++    }
++    for (row_index, row) in observations.iter().enumerate() {
++        if row.len() != dimensions {
++            return Err(StatisticsError::DimensionMismatch {
++                context: "MANOVA observation row",
++                expected: dimensions,
++                actual: row.len(),
++            });
++        }
++        for (column, &value) in row.iter().enumerate() {
++            if !value.is_finite() {
++                return Err(StatisticsError::NonFiniteInput {
++                    index: row_index * dimensions + column,
++                    value,
++                });
++            }
++        }
++    }
++    Ok(dimensions)
++}
++
++fn mean(observations: &[Vec<f64>], indices: &[usize], dimensions: usize) -> Vec<f64> {
++    let mut result = vec![0.0; dimensions];
++    for &index in indices {
++        for (column, value) in result.iter_mut().enumerate() {
++            *value += observations[index][column];
++        }
++    }
++    let scale = 1.0 / indices.len() as f64;
++    for value in &mut result {
++        *value *= scale;
++    }
++    result
++}
++
++fn add_outer(matrix: &mut DenseMatrix, vector: &[f64], weight: f64) -> StatsResult<()> {
++    for row in 0..vector.len() {
++        for column in 0..=row {
++            let value = matrix.get(row, column) + weight * vector[row] * vector[column];
++            if !value.is_finite() {
++                return Err(StatisticsError::NumericalOverflow {
++                    operation: "MANOVA scatter matrix",
++                });
++            }
++            matrix.set(row, column, value);
++            matrix.set(column, row, value);
++        }
++    }
++    Ok(())
++}
++
++fn scatter_matrices(
++    observations: &[Vec<f64>],
++    groups: &[usize],
++    dimensions: usize,
++) -> StatsResult<(DenseMatrix, DenseMatrix, usize)> {
++    let mut by_group = BTreeMap::<usize, Vec<usize>>::new();
++    for (index, &group) in groups.iter().enumerate() {
++        by_group.entry(group).or_default().push(index);
++    }
++    if by_group.len() < 2 {
++        return Err(StatisticsError::DegenerateSample {
++            reason: "MANOVA requires at least two groups",
++        });
++    }
++    for indices in by_group.values() {
++        if indices.is_empty() {
++            return Err(StatisticsError::EmptySample);
++        }
++    }
++    let all_indices = (0..observations.len()).collect::<Vec<_>>();
++    let grand = mean(observations, &all_indices, dimensions);
++    let mut hypothesis = DenseMatrix::zeros(dimensions, dimensions)?;
++    let mut error = DenseMatrix::zeros(dimensions, dimensions)?;
++    for indices in by_group.values() {
++        let group_mean = mean(observations, indices, dimensions);
++        let difference = group_mean
++            .iter()
++            .zip(&grand)
++            .map(|(&value, &overall)| value - overall)
++            .collect::<Vec<_>>();
++        add_outer(&mut hypothesis, &difference, indices.len() as f64)?;
++        for &index in indices {
++            let residual = observations[index]
++                .iter()
++                .zip(&group_mean)
++                .map(|(&value, &center)| value - center)
++                .collect::<Vec<_>>();
++            add_outer(&mut error, &residual, 1.0)?;
++        }
++    }
++    Ok((hypothesis, error, by_group.len()))
++}
++
++fn add_matrices(left: &DenseMatrix, right: &DenseMatrix, ridge: f64) -> StatsResult<DenseMatrix> {
++    let mut total = DenseMatrix::zeros(left.rows(), left.columns())?;
++    for row in 0..left.rows() {
++        for column in 0..left.columns() {
++            let mut value = left.get(row, column) + right.get(row, column);
++            if row == column {
++                value += ridge;
++            }
++            if !value.is_finite() {
++                return Err(StatisticsError::NumericalOverflow {
++                    operation: "MANOVA total scatter",
++                });
++            }
++            total.set(row, column, value);
++        }
++    }
++    Ok(total)
++}
++
++fn regularized(matrix: &DenseMatrix, ridge: f64) -> StatsResult<DenseMatrix> {
++    let mut result = matrix.clone();
++    for index in 0..result.rows() {
++        let value = result.get(index, index) + ridge;
++        if !value.is_finite() {
++            return Err(StatisticsError::NumericalOverflow {
++                operation: "MANOVA covariance ridge",
++            });
++        }
++        result.set(index, index, value);
++    }
++    Ok(result)
++}
++
++fn trace_product(left: &DenseMatrix, right: &DenseMatrix) -> f64 {
++    let mut trace = 0.0;
++    for row in 0..left.rows() {
++        for column in 0..left.columns() {
++            trace = left.get(row, column).mul_add(right.get(column, row), trace);
++        }
++    }
++    trace
++}
++
++fn statistics(
++    observations: &[Vec<f64>],
++    groups: &[usize],
++    dimensions: usize,
++    ridge: f64,
++) -> StatsResult<(f64, f64, DenseMatrix, DenseMatrix, usize)> {
++    let (hypothesis, error, group_count) = scatter_matrices(observations, groups, dimensions)?;
++    let regularized_error = regularized(&error, ridge)?;
++    let total = add_matrices(&hypothesis, &error, ridge)?;
++    let error_factor = CholeskyFactor::try_factor(&regularized_error)?;
++    let total_factor = CholeskyFactor::try_factor(&total)?;
++    let log_wilks = error_factor.log_determinant() - total_factor.log_determinant();
++    let wilks_lambda = log_wilks.exp().clamp(0.0, 1.0);
++    let total_inverse = total_factor.try_inverse()?;
++    let pillai_trace = trace_product(&hypothesis, &total_inverse)
++        .max(0.0)
++        .min(dimensions.min(group_count - 1) as f64);
++    if !wilks_lambda.is_finite() || !pillai_trace.is_finite() {
++        return Err(StatisticsError::NumericalOverflow {
++            operation: "MANOVA statistic",
++        });
++    }
++    Ok((wilks_lambda, pillai_trace, hypothesis, error, group_count))
++}
++
++/// One-factor MANOVA summary.
++#[derive(Debug, Clone, PartialEq)]
++pub struct OneWayManova {
++    pub wilks_lambda: f64,
++    pub pillai_trace: f64,
++    pub permutation_p_value: Option<f64>,
++    pub hypothesis_sscp: DenseMatrix,
++    pub error_sscp: DenseMatrix,
++    pub groups: usize,
++    pub dimensions: usize,
++    pub observations: usize,
++    pub ridge: f64,
++    pub permutations: usize,
++    pub seed: u64,
++}
++
++/// Compute Wilks' lambda and Pillai's trace, optionally calibrating Pillai's
++/// trace through deterministic label permutation.
++pub fn try_one_way_manova(
++    observations: &[Vec<f64>],
++    groups: &[usize],
++    ridge: f64,
++    permutations: usize,
++    seed: u64,
++) -> StatsResult<OneWayManova> {
++    let dimensions = validate(observations, groups, ridge)?;
++    let (wilks_lambda, pillai_trace, hypothesis_sscp, error_sscp, group_count) =
++        statistics(observations, groups, dimensions, ridge)?;
++    let permutation_p_value = if permutations == 0 {
++        None
++    } else {
++        let work = (observations.len() as u128)
++            .saturating_mul(dimensions as u128)
++            .saturating_mul(dimensions as u128)
++            .saturating_mul(permutations as u128);
++        if work > MAXIMUM_WORK {
++            return Err(StatisticsError::ComputationTooLarge {
++                states: work,
++                maximum: MAXIMUM_WORK,
++            });
++        }
++        let mut rng = SplitMix64::new(seed);
++        let mut permuted = groups.to_vec();
++        let mut exceedances = 0_usize;
++        for _ in 0..permutations {
++            for index in (1..permuted.len()).rev() {
++                let swap = rng.index(index + 1)?;
++                permuted.swap(index, swap);
++            }
++            let (_, statistic, _, _, _) = statistics(observations, &permuted, dimensions, ridge)?;
++            if statistic + 1.0e-14 >= pillai_trace {
++                exceedances += 1;
++            }
++        }
++        Some((exceedances + 1) as f64 / (permutations + 1) as f64)
++    };
++    Ok(OneWayManova {
++        wilks_lambda,
++        pillai_trace,
++        permutation_p_value,
++        hypothesis_sscp,
++        error_sscp,
++        groups: group_count,
++        dimensions,
++        observations: observations.len(),
++        ridge,
++        permutations,
++        seed,
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn separated_groups_have_small_wilks_lambda() {
++        let observations = vec![
++            vec![-2.0, -1.0], vec![-1.5, -0.8], vec![-1.0, -1.2],
++            vec![1.0, 1.1], vec![1.5, 0.8], vec![2.0, 1.2],
++        ];
++        let groups = vec![0, 0, 0, 1, 1, 1];
++        let result = try_one_way_manova(&observations, &groups, 1e-8, 199, 17).unwrap();
++        assert!(result.wilks_lambda < 0.05);
++        assert!(result.pillai_trace > 0.9);
++        assert!(result.permutation_p_value.unwrap() < 0.1);
++    }
++
++    #[test]
++    fn permutation_is_reproducible() {
++        let observations = vec![
++            vec![0.0, 1.0], vec![1.0, 0.0], vec![0.2, 0.9],
++            vec![0.8, 0.1], vec![0.4, 0.7], vec![0.7, 0.3],
++        ];
++        let groups = vec![0, 1, 0, 1, 0, 1];
++        let left = try_one_way_manova(&observations, &groups, 1e-6, 99, 9).unwrap();
++        let right = try_one_way_manova(&observations, &groups, 1e-6, 99, 9).unwrap();
++        assert_eq!(left.permutation_p_value, right.permutation_p_value);
++    }
++}
+diff --git a/src/mediation.rs b/src/mediation.rs
+new file mode 100644
+index 0000000..241a537
+--- /dev/null
++++ b/src/mediation.rs
+@@ -0,0 +1,329 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Linear mediation analysis with Sobel and deterministic bootstrap inference.
++
++use crate::descriptive::try_quantile;
++use crate::distributions::normal_sf;
++use crate::error::{StatsResult, StatisticsError};
++use crate::inference::Interval;
++use crate::multiple_regression::{MultipleLinearFit, try_multiple_linear_regression};
++use crate::sampling::SplitMix64;
++
++fn validate_inputs(
++    treatment: &[f64],
++    mediator: &[f64],
++    outcome: &[f64],
++    covariates: &[Vec<f64>],
++) -> StatsResult<()> {
++    if treatment.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    if treatment.len() != mediator.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: treatment.len(),
++            right: mediator.len(),
++        });
++    }
++    if treatment.len() != outcome.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: treatment.len(),
++            right: outcome.len(),
++        });
++    }
++    if !covariates.is_empty() && covariates.len() != treatment.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: covariates.len(),
++            right: treatment.len(),
++        });
++    }
++    for (index, &value) in treatment.iter().chain(mediator).chain(outcome).enumerate() {
++        if !value.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value });
++        }
++    }
++    if !covariates.is_empty() {
++        let columns = covariates[0].len();
++        for (row_index, row) in covariates.iter().enumerate() {
++            if row.len() != columns {
++                return Err(StatisticsError::DimensionMismatch {
++                    context: "mediation covariate row",
++                    expected: columns,
++                    actual: row.len(),
++                });
++            }
++            for (column, &value) in row.iter().enumerate() {
++                if !value.is_finite() {
++                    return Err(StatisticsError::NonFiniteInput {
++                        index: row_index * columns + column,
++                        value,
++                    });
++                }
++            }
++        }
++    }
++    Ok(())
++}
++
++fn mediator_predictors(treatment: &[f64], covariates: &[Vec<f64>]) -> Vec<Vec<f64>> {
++    treatment
++        .iter()
++        .enumerate()
++        .map(|(index, &value)| {
++            let mut row = Vec::with_capacity(1 + covariates.first().map_or(0, Vec::len));
++            row.push(value);
++            if !covariates.is_empty() {
++                row.extend_from_slice(&covariates[index]);
++            }
++            row
++        })
++        .collect()
++}
++
++fn outcome_predictors(
++    treatment: &[f64],
++    mediator: Option<&[f64]>,
++    covariates: &[Vec<f64>],
++) -> Vec<Vec<f64>> {
++    treatment
++        .iter()
++        .enumerate()
++        .map(|(index, &value)| {
++            let mut row = Vec::with_capacity(
++                1 + usize::from(mediator.is_some()) + covariates.first().map_or(0, Vec::len),
++            );
++            row.push(value);
++            if let Some(mediator_values) = mediator {
++                row.push(mediator_values[index]);
++            }
++            if !covariates.is_empty() {
++                row.extend_from_slice(&covariates[index]);
++            }
++            row
++        })
++        .collect()
++}
++
++fn fit_paths(
++    treatment: &[f64],
++    mediator: &[f64],
++    outcome: &[f64],
++    covariates: &[Vec<f64>],
++) -> StatsResult<(MultipleLinearFit, MultipleLinearFit, MultipleLinearFit)> {
++    let mediator_model = try_multiple_linear_regression(
++        &mediator_predictors(treatment, covariates),
++        mediator,
++        true,
++        0.95,
++    )?;
++    let outcome_model = try_multiple_linear_regression(
++        &outcome_predictors(treatment, Some(mediator), covariates),
++        outcome,
++        true,
++        0.95,
++    )?;
++    let total_model = try_multiple_linear_regression(
++        &outcome_predictors(treatment, None, covariates),
++        outcome,
++        true,
++        0.95,
++    )?;
++    Ok((mediator_model, outcome_model, total_model))
++}
++
++/// Linear mediation decomposition.
++#[derive(Debug, Clone, PartialEq)]
++pub struct MediationResult {
++    /// Treatment-to-mediator coefficient `a`.
++    pub path_a: f64,
++    /// Mediator-to-outcome coefficient `b`, conditional on treatment.
++    pub path_b: f64,
++    /// Direct treatment effect `c'`.
++    pub direct_effect: f64,
++    /// Total treatment effect `c`.
++    pub total_effect: f64,
++    /// Product-of-coefficients indirect effect `a*b`.
++    pub indirect_effect: f64,
++    pub proportion_mediated: Option<f64>,
++    pub sobel_standard_error: f64,
++    pub sobel_z: f64,
++    pub sobel_p_two_sided: f64,
++    pub bootstrap_interval: Option<Interval>,
++    pub confidence: f64,
++    pub bootstrap_draws: usize,
++    pub seed: u64,
++    pub observations: usize,
++}
++
++/// Estimate a linear mediation model. Bootstrap intervals resample complete
++/// rows and are percentile intervals for the indirect effect.
++pub fn try_linear_mediation(
++    treatment: &[f64],
++    mediator: &[f64],
++    outcome: &[f64],
++    covariates: &[Vec<f64>],
++    confidence: f64,
++    bootstrap_draws: usize,
++    seed: u64,
++) -> StatsResult<MediationResult> {
++    validate_inputs(treatment, mediator, outcome, covariates)?;
++    if !confidence.is_finite() || !(0.0..1.0).contains(&confidence) {
++        return Err(StatisticsError::InvalidProbability { value: confidence });
++    }
++    let covariate_count = covariates.first().map_or(0, Vec::len);
++    let required = covariate_count + 4;
++    if treatment.len() < required {
++        return Err(StatisticsError::InsufficientSamples {
++            required,
++            actual: treatment.len(),
++        });
++    }
++    let (mediator_model, outcome_model, total_model) =
++        fit_paths(treatment, mediator, outcome, covariates)?;
++    let path_a = mediator_model.coefficients[1];
++    let path_b = outcome_model.coefficients[2];
++    let direct_effect = outcome_model.coefficients[1];
++    let total_effect = total_model.coefficients[1];
++    let indirect_effect = path_a * path_b;
++    let standard_error_a = mediator_model.standard_errors[1];
++    let standard_error_b = outcome_model.standard_errors[2];
++    let sobel_standard_error = (
++        path_b * path_b * standard_error_a * standard_error_a
++            + path_a * path_a * standard_error_b * standard_error_b
++    )
++        .sqrt();
++    let sobel_z = if sobel_standard_error == 0.0 {
++        if indirect_effect == 0.0 {
++            0.0
++        } else {
++            indirect_effect.signum() * f64::INFINITY
++        }
++    } else {
++        indirect_effect / sobel_standard_error
++    };
++    let sobel_p_two_sided = (2.0 * normal_sf(sobel_z.abs())).clamp(0.0, 1.0);
++    let proportion_mediated = if total_effect.abs() > f64::EPSILON {
++        Some(indirect_effect / total_effect)
++    } else {
++        None
++    };
++
++    let bootstrap_interval = if bootstrap_draws == 0 {
++        None
++    } else {
++        let work = (bootstrap_draws as u128).saturating_mul(treatment.len() as u128);
++        if work > 10_000_000 {
++            return Err(StatisticsError::ComputationTooLarge {
++                states: work,
++                maximum: 10_000_000,
++            });
++        }
++        let mut rng = SplitMix64::new(seed);
++        let mut effects = Vec::with_capacity(bootstrap_draws);
++        for _ in 0..bootstrap_draws {
++            let indices = (0..treatment.len())
++                .map(|_| rng.index(treatment.len()))
++                .collect::<StatsResult<Vec<_>>>()?;
++            let sampled_treatment = indices.iter().map(|&index| treatment[index]).collect::<Vec<_>>();
++            let sampled_mediator = indices.iter().map(|&index| mediator[index]).collect::<Vec<_>>();
++            let sampled_outcome = indices.iter().map(|&index| outcome[index]).collect::<Vec<_>>();
++            let sampled_covariates = if covariates.is_empty() {
++                Vec::new()
++            } else {
++                indices.iter().map(|&index| covariates[index].clone()).collect()
++            };
++            if let Ok((mediator_fit, outcome_fit, _)) = fit_paths(
++                &sampled_treatment,
++                &sampled_mediator,
++                &sampled_outcome,
++                &sampled_covariates,
++            ) {
++                effects.push(mediator_fit.coefficients[1] * outcome_fit.coefficients[2]);
++            }
++        }
++        if effects.len() < bootstrap_draws / 2 + 1 {
++            return Err(StatisticsError::NonConvergence {
++                function: "mediation bootstrap",
++                iterations: bootstrap_draws,
++            });
++        }
++        let alpha = 1.0 - confidence;
++        Some(Interval {
++            low: try_quantile(&effects, alpha / 2.0)?,
++            high: try_quantile(&effects, 1.0 - alpha / 2.0)?,
++        })
++    };
++
++    Ok(MediationResult {
++        path_a,
++        path_b,
++        direct_effect,
++        total_effect,
++        indirect_effect,
++        proportion_mediated,
++        sobel_standard_error,
++        sobel_z,
++        sobel_p_two_sided,
++        bootstrap_interval,
++        confidence,
++        bootstrap_draws,
++        seed,
++        observations: treatment.len(),
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn recovers_constructed_mediation() {
++        let treatment = (-20..=20).map(|value| value as f64 / 10.0).collect::<Vec<_>>();
++        let mediator = treatment
++            .iter()
++            .enumerate()
++            .map(|(index, value)| 0.5 + 1.2 * value + ((index % 5) as f64 - 2.0) * 0.03)
++            .collect::<Vec<_>>();
++        let outcome = treatment
++            .iter()
++            .zip(&mediator)
++            .enumerate()
++            .map(|(index, (&treatment, &mediator))| {
++                1.0 + 0.4 * treatment + 1.5 * mediator + ((index % 7) as f64 - 3.0) * 0.02
++            })
++            .collect::<Vec<_>>();
++        let result = try_linear_mediation(
++            &treatment,
++            &mediator,
++            &outcome,
++            &[],
++            0.95,
++            99,
++            13,
++        )
++        .unwrap();
++        assert!((result.path_a - 1.2).abs() < 0.1);
++        assert!((result.path_b - 1.5).abs() < 0.1);
++        assert!((result.indirect_effect - 1.8).abs() < 0.2);
++        assert!(result.bootstrap_interval.unwrap().contains(1.8));
++    }
++
++    #[test]
++    fn bootstrap_is_reproducible() {
++        let treatment = (0..20).map(|value| value as f64).collect::<Vec<_>>();
++        let mediator = treatment
++            .iter()
++            .enumerate()
++            .map(|(index, value)| value + (index % 4) as f64 * 0.05)
++            .collect::<Vec<_>>();
++        let outcome = treatment
++            .iter()
++            .zip(&mediator)
++            .enumerate()
++            .map(|(index, (&x, &m))| x + m + (index % 3) as f64 * 0.01)
++            .collect::<Vec<_>>();
++        let left = try_linear_mediation(&treatment, &mediator, &outcome, &[], 0.9, 49, 7).unwrap();
++        let right = try_linear_mediation(&treatment, &mediator, &outcome, &[], 0.9, 49, 7).unwrap();
++        assert_eq!(left.bootstrap_interval, right.bootstrap_interval);
++    }
++}
+diff --git a/src/partial_correlation.rs b/src/partial_correlation.rs
+new file mode 100644
+index 0000000..2dfc4e3
+--- /dev/null
++++ b/src/partial_correlation.rs
+@@ -0,0 +1,162 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Precision matrices and partial correlations for multivariate Gaussian geometry.
++
++use crate::error::{StatsResult, StatisticsError};
++use crate::linalg::{CholeskyFactor, DenseMatrix};
++use crate::multivariate::try_multivariate_moments;
++
++/// Precision-matrix summary with pairwise partial correlations.
++#[derive(Debug, Clone, PartialEq)]
++pub struct PartialCorrelationFit {
++    pub mean: Vec<f64>,
++    pub covariance: DenseMatrix,
++    pub precision: DenseMatrix,
++    pub partial_correlations: DenseMatrix,
++    pub ridge: f64,
++    pub observations: usize,
++}
++
++impl PartialCorrelationFit {
++    pub fn dimensions(&self) -> usize {
++        self.mean.len()
++    }
++
++    /// Partial correlation between two variables after conditioning on all others.
++    pub fn try_partial_correlation(&self, left: usize, right: usize) -> StatsResult<f64> {
++        if left >= self.dimensions() || right >= self.dimensions() {
++            return Err(StatisticsError::DimensionMismatch {
++                context: "partial-correlation variable index",
++                expected: self.dimensions(),
++                actual: left.max(right).saturating_add(1),
++            });
++        }
++        Ok(self.partial_correlations.get(left, right))
++    }
++
++    /// Gaussian conditional regression coefficients for `target` on every
++    /// other variable, ordered by the original variable index.
++    pub fn try_conditional_coefficients(&self, target: usize) -> StatsResult<Vec<f64>> {
++        if target >= self.dimensions() {
++            return Err(StatisticsError::DimensionMismatch {
++                context: "conditional target index",
++                expected: self.dimensions(),
++                actual: target.saturating_add(1),
++            });
++        }
++        let diagonal = self.precision.get(target, target);
++        if diagonal <= 0.0 || !diagonal.is_finite() {
++            return Err(StatisticsError::SingularMatrix {
++                reason: "precision diagonal is not positive",
++            });
++        }
++        let mut coefficients = Vec::with_capacity(self.dimensions().saturating_sub(1));
++        for variable in 0..self.dimensions() {
++            if variable != target {
++                coefficients.push(-self.precision.get(target, variable) / diagonal);
++            }
++        }
++        Ok(coefficients)
++    }
++
++    /// Conditional variance of one variable given all remaining variables.
++    pub fn try_conditional_variance(&self, target: usize) -> StatsResult<f64> {
++        if target >= self.dimensions() {
++            return Err(StatisticsError::DimensionMismatch {
++                context: "conditional variance target index",
++                expected: self.dimensions(),
++                actual: target.saturating_add(1),
++            });
++        }
++        let diagonal = self.precision.get(target, target);
++        if diagonal <= 0.0 || !diagonal.is_finite() {
++            return Err(StatisticsError::SingularMatrix {
++                reason: "precision diagonal is not positive",
++            });
++        }
++        Ok(diagonal.recip())
++    }
++}
++
++/// Estimate a covariance precision matrix and all-order partial correlations.
++pub fn try_partial_correlations(
++    observations: &[Vec<f64>],
++    ridge: f64,
++) -> StatsResult<PartialCorrelationFit> {
++    if !ridge.is_finite() || ridge < 0.0 {
++        return Err(StatisticsError::NegativeValue {
++            name: "precision ridge",
++            value: ridge,
++        });
++    }
++    let moments = try_multivariate_moments(observations)?;
++    if moments.count() < 2 {
++        return Err(StatisticsError::InsufficientSamples {
++            required: 2,
++            actual: moments.count() as usize,
++        });
++    }
++    let mut covariance = moments.sample_covariance()?;
++    for index in 0..covariance.rows() {
++        covariance.set(index, index, covariance.get(index, index) + ridge);
++    }
++    let factor = CholeskyFactor::try_factor(&covariance)?;
++    let precision = factor.try_inverse()?;
++    let mut partial_correlations = DenseMatrix::identity(covariance.rows())?;
++    for row in 0..covariance.rows() {
++        let row_diagonal = precision.get(row, row);
++        if row_diagonal <= 0.0 || !row_diagonal.is_finite() {
++            return Err(StatisticsError::SingularMatrix {
++                reason: "precision diagonal is not positive",
++            });
++        }
++        for column in 0..row {
++            let column_diagonal = precision.get(column, column);
++            let denominator = (row_diagonal * column_diagonal).sqrt();
++            if denominator <= 0.0 || !denominator.is_finite() {
++                return Err(StatisticsError::SingularMatrix {
++                    reason: "partial-correlation normalization failed",
++                });
++            }
++            let value = (-precision.get(row, column) / denominator).clamp(-1.0, 1.0);
++            partial_correlations.set(row, column, value);
++            partial_correlations.set(column, row, value);
++        }
++    }
++    Ok(PartialCorrelationFit {
++        mean: moments.mean().unwrap_or(&[]).to_vec(),
++        covariance,
++        precision,
++        partial_correlations,
++        ridge,
++        observations: moments.count() as usize,
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn conditioning_removes_common_driver() {
++        let data = (-20..=20)
++            .map(|index| {
++                let z = index as f64 / 5.0;
++                vec![z + (index % 3) as f64 * 0.02, 2.0 * z - (index % 5) as f64 * 0.02, z]
++            })
++            .collect::<Vec<_>>();
++        let fit = try_partial_correlations(&data, 1e-5).unwrap();
++        assert!(fit.try_partial_correlation(0, 1).unwrap().abs() < 0.2);
++        assert!(fit.try_conditional_variance(0).unwrap() > 0.0);
++    }
++
++    #[test]
++    fn ridge_handles_collinearity() {
++        let data = vec![
++            vec![1.0, 2.0], vec![2.0, 4.0], vec![3.0, 6.0], vec![4.0, 8.0],
++        ];
++        assert!(try_partial_correlations(&data, 0.0).is_err());
++        assert!(try_partial_correlations(&data, 1e-3).is_ok());
++    }
++}
+diff --git a/src/survival_scoring.rs b/src/survival_scoring.rs
+new file mode 100644
+index 0000000..d637045
+--- /dev/null
++++ b/src/survival_scoring.rs
+@@ -0,0 +1,329 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Survival discrimination and inverse-censoring-weighted prediction scores.
++
++use crate::error::{StatsResult, StatisticsError};
++
++const MAXIMUM_PAIRWISE_WORK: u128 = 50_000_000;
++
++fn validate_survival(times: &[f64], events: &[bool]) -> StatsResult<()> {
++    if times.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    if times.len() != events.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: times.len(),
++            right: events.len(),
++        });
++    }
++    for (index, &time) in times.iter().enumerate() {
++        if !time.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value: time });
++        }
++        if time < 0.0 {
++            return Err(StatisticsError::NegativeValue {
++                name: "survival time",
++                value: time,
++            });
++        }
++    }
++    Ok(())
++}
++
++/// Harrell concordance-index summary.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct ConcordanceIndex {
++    pub concordance: f64,
++    pub concordant_pairs: f64,
++    pub comparable_pairs: usize,
++    pub tied_risk_pairs: usize,
++}
++
++/// Harrell's C index where larger risk scores imply earlier events.
++pub fn try_concordance_index(
++    times: &[f64],
++    events: &[bool],
++    risk_scores: &[f64],
++) -> StatsResult<ConcordanceIndex> {
++    validate_survival(times, events)?;
++    if times.len() != risk_scores.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: times.len(),
++            right: risk_scores.len(),
++        });
++    }
++    for (index, &value) in risk_scores.iter().enumerate() {
++        if !value.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value });
++        }
++    }
++    let work = (times.len() as u128).saturating_mul(times.len() as u128);
++    if work > MAXIMUM_PAIRWISE_WORK {
++        return Err(StatisticsError::ComputationTooLarge {
++            states: work,
++            maximum: MAXIMUM_PAIRWISE_WORK,
++        });
++    }
++    let mut concordant = 0.0;
++    let mut comparable = 0_usize;
++    let mut tied_risk = 0_usize;
++    for left in 0..times.len() {
++        for right in left + 1..times.len() {
++            let earlier = if times[left] < times[right] && events[left] {
++                Some((left, right))
++            } else if times[right] < times[left] && events[right] {
++                Some((right, left))
++            } else {
++                None
++            };
++            if let Some((event_index, later_index)) = earlier {
++                comparable += 1;
++                match risk_scores[event_index].total_cmp(&risk_scores[later_index]) {
++                    std::cmp::Ordering::Greater => concordant += 1.0,
++                    std::cmp::Ordering::Equal => {
++                        concordant += 0.5;
++                        tied_risk += 1;
++                    }
++                    std::cmp::Ordering::Less => {}
++                }
++            }
++        }
++    }
++    if comparable == 0 {
++        return Err(StatisticsError::DegenerateSample {
++            reason: "concordance index has no comparable event pairs",
++        });
++    }
++    Ok(ConcordanceIndex {
++        concordance: concordant / comparable as f64,
++        concordant_pairs: concordant,
++        comparable_pairs: comparable,
++        tied_risk_pairs: tied_risk,
++    })
++}
++
++#[derive(Debug, Clone, Copy)]
++struct CensoringStep {
++    time: f64,
++    survival_before: f64,
++    survival_after: f64,
++}
++
++fn censoring_curve(times: &[f64], events: &[bool]) -> Vec<CensoringStep> {
++    let mut observations = times
++        .iter()
++        .zip(events)
++        .map(|(&time, &event)| (time, !event))
++        .collect::<Vec<_>>();
++    observations.sort_by(|left, right| left.0.total_cmp(&right.0));
++    let mut at_risk = observations.len();
++    let mut survival = 1.0;
++    let mut steps = Vec::new();
++    let mut index = 0;
++    while index < observations.len() {
++        let time = observations[index].0;
++        let mut censored_events = 0_usize;
++        let mut total = 0_usize;
++        while index + total < observations.len() && observations[index + total].0 == time {
++            if observations[index + total].1 {
++                censored_events += 1;
++            }
++            total += 1;
++        }
++        let before = survival;
++        if censored_events > 0 {
++            survival *= 1.0 - censored_events as f64 / at_risk as f64;
++        }
++        steps.push(CensoringStep {
++            time,
++            survival_before: before,
++            survival_after: survival,
++        });
++        at_risk -= total;
++        index += total;
++    }
++    steps
++}
++
++fn censoring_before(steps: &[CensoringStep], time: f64) -> f64 {
++    steps
++        .iter()
++        .find(|step| step.time == time)
++        .map_or_else(
++            || {
++                steps
++                    .iter()
++                    .take_while(|step| step.time < time)
++                    .last()
++                    .map_or(1.0, |step| step.survival_after)
++            },
++            |step| step.survival_before,
++        )
++}
++
++fn censoring_at(steps: &[CensoringStep], time: f64) -> f64 {
++    steps
++        .iter()
++        .take_while(|step| step.time <= time)
++        .last()
++        .map_or(1.0, |step| step.survival_after)
++}
++
++/// IPCW Brier score at one horizon.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct SurvivalBrierScore {
++    pub horizon: f64,
++    pub score: f64,
++    pub effective_weight: f64,
++}
++
++/// Inverse-probability-of-censoring weighted Brier score at fixed horizons.
++pub fn try_survival_brier_scores(
++    times: &[f64],
++    events: &[bool],
++    horizons: &[f64],
++    predicted_survival: &[Vec<f64>],
++) -> StatsResult<Vec<SurvivalBrierScore>> {
++    validate_survival(times, events)?;
++    if horizons.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    if predicted_survival.len() != times.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: predicted_survival.len(),
++            right: times.len(),
++        });
++    }
++    for (index, &horizon) in horizons.iter().enumerate() {
++        if !horizon.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value: horizon });
++        }
++        if horizon < 0.0 {
++            return Err(StatisticsError::NegativeValue {
++                name: "Brier-score horizon",
++                value: horizon,
++            });
++        }
++        if index > 0 && horizon <= horizons[index - 1] {
++            return Err(StatisticsError::DegenerateSample {
++                reason: "Brier-score horizons must be strictly increasing",
++            });
++        }
++    }
++    for (row_index, row) in predicted_survival.iter().enumerate() {
++        if row.len() != horizons.len() {
++            return Err(StatisticsError::DimensionMismatch {
++                context: "survival prediction row",
++                expected: horizons.len(),
++                actual: row.len(),
++            });
++        }
++        for (column, &value) in row.iter().enumerate() {
++            if !value.is_finite() {
++                return Err(StatisticsError::NonFiniteInput {
++                    index: row_index * horizons.len() + column,
++                    value,
++                });
++            }
++            if !(0.0..=1.0).contains(&value) {
++                return Err(StatisticsError::InvalidProbability { value });
++            }
++            if column > 0 && value > row[column - 1] + 1.0e-12 {
++                return Err(StatisticsError::DegenerateSample {
++                    reason: "survival probabilities must be non-increasing across horizons",
++                });
++            }
++        }
++    }
++    let censoring = censoring_curve(times, events);
++    let mut scores = Vec::with_capacity(horizons.len());
++    for (column, &horizon) in horizons.iter().enumerate() {
++        let censoring_horizon = censoring_at(&censoring, horizon);
++        let mut weighted_error = 0.0;
++        let mut total_weight = 0.0;
++        for index in 0..times.len() {
++            let prediction = predicted_survival[index][column];
++            if times[index] <= horizon && events[index] {
++                let probability = censoring_before(&censoring, times[index]);
++                if probability <= 0.0 {
++                    continue;
++                }
++                let weight = probability.recip();
++                weighted_error += weight * prediction * prediction;
++                total_weight += weight;
++            } else if times[index] > horizon {
++                if censoring_horizon <= 0.0 {
++                    continue;
++                }
++                let weight = censoring_horizon.recip();
++                weighted_error += weight * (1.0 - prediction) * (1.0 - prediction);
++                total_weight += weight;
++            }
++        }
++        if total_weight <= 0.0 || !total_weight.is_finite() {
++            return Err(StatisticsError::DegenerateSample {
++                reason: "Brier score has no observations with positive censoring weight",
++            });
++        }
++        scores.push(SurvivalBrierScore {
++            horizon,
++            score: weighted_error / times.len() as f64,
++            effective_weight: total_weight,
++        });
++    }
++    Ok(scores)
++}
++
++/// Trapezoidal integrated Brier score divided by the horizon span.
++pub fn try_integrated_brier_score(scores: &[SurvivalBrierScore]) -> StatsResult<f64> {
++    if scores.len() < 2 {
++        return Err(StatisticsError::InsufficientSamples {
++            required: 2,
++            actual: scores.len(),
++        });
++    }
++    let span = scores.last().map_or(0.0, |value| value.horizon) - scores[0].horizon;
++    if span <= 0.0 {
++        return Err(StatisticsError::DegenerateSample {
++            reason: "integrated Brier score requires increasing horizons",
++        });
++    }
++    let mut area = 0.0;
++    for pair in scores.windows(2) {
++        if pair[1].horizon <= pair[0].horizon {
++            return Err(StatisticsError::DegenerateSample {
++                reason: "integrated Brier score requires increasing horizons",
++            });
++        }
++        area += 0.5 * (pair[0].score + pair[1].score) * (pair[1].horizon - pair[0].horizon);
++    }
++    Ok(area / span)
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn concordance_rewards_correct_ranking() {
++        let times = vec![1.0, 2.0, 3.0, 4.0];
++        let events = vec![true, true, true, false];
++        let result = try_concordance_index(&times, &events, &[4.0, 3.0, 2.0, 1.0]).unwrap();
++        assert!((result.concordance - 1.0).abs() < 1e-12);
++    }
++
++    #[test]
++    fn perfect_survival_predictions_have_zero_brier_score_without_censoring() {
++        let times = vec![1.0, 2.0, 3.0, 4.0];
++        let events = vec![true, true, true, true];
++        let horizons = vec![1.5, 2.5, 3.5];
++        let predictions = times
++            .iter()
++            .map(|&time| horizons.iter().map(|&horizon| if time > horizon { 1.0 } else { 0.0 }).collect())
++            .collect::<Vec<Vec<f64>>>();
++        let scores = try_survival_brier_scores(&times, &events, &horizons, &predictions).unwrap();
++        assert!(scores.iter().all(|score| score.score.abs() < 1e-12));
++        assert!(try_integrated_brier_score(&scores).unwrap().abs() < 1e-12);
++    }
++}
+diff --git a/tests/v1_0_api.rs b/tests/v1_0_api.rs
+index c5a331f..58296cc 100644
+--- a/tests/v1_0_api.rs
++++ b/tests/v1_0_api.rs
+@@ -13,7 +13,7 @@ fn stable_prelude_supports_common_workflow() {
+ 
+ #[test]
+ fn version_contract_is_explicit() {
+-    assert_eq!(VERSION, "1.0.0");
++    assert!(VERSION.starts_with("1."));
+     assert_eq!(API_LEVEL, 1);
+     assert_eq!(NUMERICAL_CONTRACT, "validated-v1");
+ }
+diff --git a/tests/v1_2_api.rs b/tests/v1_2_api.rs
+index 33cffc4..d263085 100644
+--- a/tests/v1_2_api.rs
++++ b/tests/v1_2_api.rs
+@@ -7,7 +7,7 @@ use symthaea_statistics::{API_LEVEL, NUMERICAL_CONTRACT, VERSION};
+ fn v1_compatibility_markers_remain_stable() {
+     assert_eq!(API_LEVEL, 1);
+     assert_eq!(NUMERICAL_CONTRACT, "validated-v1");
+-    assert_eq!(VERSION, "1.2.0");
++    assert!(VERSION.starts_with("1."));
+ }
+ 
+ #[test]
+diff --git a/tests/v1_3_adversarial.rs b/tests/v1_3_adversarial.rs
+new file mode 100644
+index 0000000..507ff18
+--- /dev/null
++++ b/tests/v1_3_adversarial.rs
+@@ -0,0 +1,176 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++use symthaea_statistics::{
++    Censoring, KMeansOptions, StatisticsError, TobitOptions,
++    try_canonical_correlation, try_concordance_index, try_diebold_mariano,
++    try_forecast_accuracy, try_gaussian_copula, try_integrated_brier_score,
++    try_kmeans, try_linear_discriminant, try_linear_mediation,
++    try_one_way_manova, try_partial_correlations, try_quadratic_discriminant,
++    try_silhouette_score, try_survival_brier_scores, try_tobit_regression,
++    ForecastLoss, SurvivalBrierScore,
++};
++
++#[test]
++fn multivariate_models_reject_singular_or_malformed_inputs() {
++    assert!(matches!(
++        try_linear_discriminant(&[vec![1.0], vec![2.0]], &[0], 0.0),
++        Err(StatisticsError::LengthMismatch { .. })
++    ));
++    assert!(matches!(
++        try_quadratic_discriminant(
++            &[vec![1.0], vec![2.0], vec![3.0]],
++            &[0, 1, 1],
++            0.0,
++        ),
++        Err(StatisticsError::InsufficientSamples { .. })
++    ));
++    assert!(matches!(
++        try_canonical_correlation(
++            &[vec![1.0, 2.0], vec![2.0, 4.0], vec![3.0, 6.0]],
++            &[vec![1.0], vec![2.0], vec![3.0]],
++            0.0,
++        ),
++        Err(StatisticsError::SingularMatrix { .. })
++    ));
++    assert!(matches!(
++        try_one_way_manova(
++            &[vec![1.0], vec![2.0]],
++            &[0, 0],
++            0.0,
++            0,
++            0,
++        ),
++        Err(StatisticsError::DegenerateSample { .. })
++    ));
++    assert!(matches!(
++        try_partial_correlations(&[vec![1.0], vec![1.0]], 0.0),
++        Err(StatisticsError::SingularMatrix { .. })
++    ));
++}
++
++#[test]
++fn copula_contracts_preserve_open_unit_support() {
++    let observations = vec![
++        vec![0.0, 0.0], vec![1.0, 2.0], vec![2.0, 1.0],
++        vec![3.0, 4.0], vec![4.0, 3.0],
++    ];
++    assert!(matches!(
++        try_gaussian_copula(&observations, 1.0),
++        Err(StatisticsError::InvalidProbability { .. })
++    ));
++    let copula = try_gaussian_copula(&observations, 1.0e-6).unwrap();
++    assert!(matches!(
++        copula.try_log_density(&[0.0, 0.5]),
++        Err(StatisticsError::InvalidProbability { .. })
++    ));
++    let left = copula.try_sample(16, 77).unwrap();
++    let right = copula.try_sample(16, 77).unwrap();
++    assert_eq!(left, right);
++    assert!(left.iter().flatten().all(|value| (0.0..1.0).contains(value)));
++}
++
++#[test]
++fn censored_and_mediation_models_fail_closed() {
++    assert!(matches!(
++        try_tobit_regression(
++            &[vec![0.0], vec![1.0], vec![2.0]],
++            &[0.0, 0.0, 0.0],
++            &[true, true, true],
++            Censoring::Left { boundary: 0.0 },
++            TobitOptions::default(),
++        ),
++        Err(StatisticsError::DegenerateSample { .. })
++    ));
++    assert!(matches!(
++        try_tobit_regression(
++            &[vec![0.0], vec![1.0], vec![2.0]],
++            &[0.0, -1.0, 2.0],
++            &[true, false, false],
++            Censoring::Left { boundary: 0.0 },
++            TobitOptions::default(),
++        ),
++        Err(StatisticsError::DegenerateSample { .. })
++    ));
++    assert!(matches!(
++        try_linear_mediation(
++            &[0.0, 1.0, 2.0],
++            &[0.0, 1.0],
++            &[0.0, 1.0, 2.0],
++            &[],
++            0.95,
++            0,
++            0,
++        ),
++        Err(StatisticsError::LengthMismatch { .. })
++    ));
++}
++
++#[test]
++fn clustering_and_forecast_inputs_are_bounded() {
++    assert!(matches!(
++        try_kmeans(
++            &[vec![0.0], vec![1.0]],
++            KMeansOptions {
++                clusters: 3,
++                ..Default::default()
++            },
++        ),
++        Err(StatisticsError::InvalidShape { .. })
++    ));
++    assert!(matches!(
++        try_silhouette_score(&[vec![0.0], vec![1.0]], &[0, 0]),
++        Err(StatisticsError::DegenerateSample { .. })
++    ));
++    assert!(matches!(
++        try_forecast_accuracy(&[1.0], &[1.0], &[2.0, 2.0, 2.0], 1),
++        Err(StatisticsError::DegenerateSample { .. })
++    ));
++    assert!(matches!(
++        try_diebold_mariano(
++            &[1.0, 2.0, 3.0],
++            &[1.0, 2.0, 3.0],
++            &[1.0, 2.0, 3.0],
++            ForecastLoss::Squared,
++            0,
++        ),
++        Err(StatisticsError::DegenerateSample { .. })
++    ));
++}
++
++#[test]
++fn survival_scores_reject_invalid_probability_surfaces() {
++    assert!(matches!(
++        try_concordance_index(
++            &[1.0, 2.0],
++            &[false, false],
++            &[1.0, 0.0],
++        ),
++        Err(StatisticsError::DegenerateSample { .. })
++    ));
++    assert!(matches!(
++        try_survival_brier_scores(
++            &[1.0, 2.0],
++            &[true, true],
++            &[1.5],
++            &[vec![1.2], vec![0.0]],
++        ),
++        Err(StatisticsError::InvalidProbability { .. })
++    ));
++    assert!(matches!(
++        try_survival_brier_scores(
++            &[1.0, 2.0],
++            &[true, true],
++            &[1.0, 2.0],
++            &[vec![0.4, 0.6], vec![0.8, 0.7]],
++        ),
++        Err(StatisticsError::DegenerateSample { .. })
++    ));
++    assert!(matches!(
++        try_integrated_brier_score(&[
++            SurvivalBrierScore { horizon: 2.0, score: 0.1, effective_weight: 2.0 },
++            SurvivalBrierScore { horizon: 1.0, score: 0.2, effective_weight: 2.0 },
++        ]),
++        Err(StatisticsError::DegenerateSample { .. })
++    ));
++}
+diff --git a/tests/v1_3_reference_vectors.rs b/tests/v1_3_reference_vectors.rs
+new file mode 100644
+index 0000000..64da3ca
+--- /dev/null
++++ b/tests/v1_3_reference_vectors.rs
+@@ -0,0 +1,163 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++use symthaea_statistics::{
++    Censoring, KMeansOptions, TobitOptions, try_canonical_correlation,
++    try_concordance_index, try_forecast_accuracy, try_gaussian_copula,
++    try_integrated_brier_score, try_kmeans, try_linear_discriminant,
++    try_linear_mediation, try_one_way_manova, try_partial_correlations,
++    try_survival_brier_scores, try_tobit_regression,
++};
++
++fn close(actual: f64, expected: f64, tolerance: f64) {
++    assert!(
++        (actual - expected).abs() <= tolerance,
++        "actual={actual}, expected={expected}, tolerance={tolerance}"
++    );
++}
++
++#[test]
++fn multivariate_geometry_matches_independent_references() {
++    let observations = vec![
++        vec![-2.0, -1.0], vec![-1.5, -0.8], vec![-1.0, -1.2],
++        vec![1.0, 1.1], vec![1.5, 0.8], vec![2.0, 1.2],
++    ];
++    let labels = vec![0, 0, 0, 1, 1, 1];
++    let lda = try_linear_discriminant(&observations, &labels, 1.0e-8).unwrap();
++    close(lda.pooled_covariance.try_get(0, 0).unwrap(), 0.250_000_01, 1.0e-12);
++    close(lda.pooled_covariance.try_get(1, 1).unwrap(), 0.041_666_676_666_666_66, 1.0e-12);
++    let probabilities = lda.try_predict_proba(&[0.0, 0.0]).unwrap();
++    close(probabilities[0], 0.708_194_772_302_615_7, 2.0e-10);
++
++    let x = vec![
++        vec![-2.0, 0.5], vec![-1.0, -0.2], vec![0.0, 0.1],
++        vec![1.0, 0.3], vec![2.0, -0.4], vec![3.0, 0.2],
++    ];
++    let y = x
++        .iter()
++        .enumerate()
++        .map(|(index, row)| vec![2.0 * row[0] + index as f64 * 0.01, -row[0] + row[1]])
++        .collect::<Vec<_>>();
++    let cca = try_canonical_correlation(&x, &y, 1.0e-10).unwrap();
++    close(cca.correlations[0], 1.0, 2.0e-8);
++    close(cca.correlations[1], 1.0, 2.0e-8);
++
++    let manova = try_one_way_manova(&observations, &labels, 0.0, 0, 0).unwrap();
++    close(manova.wilks_lambda, 0.017_224_796_712_424_5, 2.0e-13);
++    close(manova.pillai_trace, 0.982_775_203_287_578_5, 2.0e-13);
++}
++
++#[test]
++fn dependence_models_match_independent_references() {
++    let partial_data = (-20..=20)
++        .enumerate()
++        .map(|(position, index)| {
++            let z = index as f64 / 5.0;
++            vec![
++                z + (position % 3) as f64 * 0.02,
++                2.0 * z - (position % 5) as f64 * 0.02,
++                z,
++            ]
++        })
++        .collect::<Vec<_>>();
++    let partial = try_partial_correlations(&partial_data, 1.0e-5).unwrap();
++    close(partial.try_partial_correlation(0, 1).unwrap(), 0.061_127_080_125_349_315, 2.0e-9);
++
++    let copula_data = (0..50)
++        .map(|index| vec![index as f64, (2 * index + index % 7) as f64])
++        .collect::<Vec<_>>();
++    let copula = try_gaussian_copula(&copula_data, 1.0e-8).unwrap();
++    close(copula.correlation().try_get(0, 1).unwrap(), 0.992_782_808_395_225_6, 2.0e-12);
++    close(copula.try_log_density(&[0.8, 0.8]).unwrap(), 2.473_759_149_183_073_3, 2.0e-11);
++}
++
++#[test]
++fn censored_and_mediation_models_match_independent_references() {
++    let predictors = (-20..=20).map(|index| vec![index as f64 / 10.0]).collect::<Vec<_>>();
++    let latent = predictors
++        .iter()
++        .enumerate()
++        .map(|(index, row)| 0.5 + 1.5 * row[0] + ((index % 5) as f64 - 2.0) * 0.08)
++        .collect::<Vec<_>>();
++    let censored = latent.iter().map(|&value| value <= 0.0).collect::<Vec<_>>();
++    let observed = latent.iter().map(|&value| value.max(0.0)).collect::<Vec<_>>();
++    let tobit = try_tobit_regression(
++        &predictors,
++        &observed,
++        &censored,
++        Censoring::Left { boundary: 0.0 },
++        TobitOptions::default(),
++    )
++    .unwrap();
++    close(tobit.coefficients[0], 0.504_665_609_938_744_4, 2.0e-4);
++    close(tobit.coefficients[1], 1.496_229_979_807_435_9, 2.0e-4);
++    close(tobit.sigma, 0.113_265_174_444_509_51, 2.0e-4);
++    close(tobit.log_likelihood, 17.781_857_658_814_175, 2.0e-6);
++
++    let treatment = (-20..=20).map(|value| value as f64 / 10.0).collect::<Vec<_>>();
++    let mediator = treatment
++        .iter()
++        .enumerate()
++        .map(|(index, value)| 0.5 + 1.2 * value + ((index % 5) as f64 - 2.0) * 0.03)
++        .collect::<Vec<_>>();
++    let outcome = treatment
++        .iter()
++        .zip(&mediator)
++        .enumerate()
++        .map(|(index, (&treatment, &mediator))| {
++            1.0 + 0.4 * treatment + 1.5 * mediator + ((index % 7) as f64 - 3.0) * 0.02
++        })
++        .collect::<Vec<_>>();
++    let mediation = try_linear_mediation(&treatment, &mediator, &outcome, &[], 0.95, 0, 0).unwrap();
++    close(mediation.path_a, 1.202_090_592_334_495, 2.0e-12);
++    close(mediation.path_b, 1.540_833_333_333_331, 2.0e-11);
++    close(mediation.indirect_effect, 1.852_221_254_355_398_2, 3.0e-11);
++}
++
++#[test]
++fn clustering_forecast_and_survival_references_match() {
++    let data = vec![
++        vec![-2.0, -2.0], vec![-1.8, -2.1], vec![-2.2, -1.9],
++        vec![2.0, 2.0], vec![1.8, 2.1], vec![2.2, 1.9],
++    ];
++    let mut centroids = try_kmeans(
++        &data,
++        KMeansOptions { seed: 7, ..KMeansOptions::default() },
++    )
++    .unwrap()
++    .centroids;
++    centroids.sort_by(|left, right| left[0].total_cmp(&right[0]));
++    close(centroids[0][0], -2.0, 1.0e-14);
++    close(centroids[1][0], 2.0, 1.0e-14);
++
++    let accuracy = try_forecast_accuracy(
++        &[7.0, 8.0, 9.0],
++        &[7.1, 7.9, 9.1],
++        &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
++        1,
++    )
++    .unwrap();
++    close(accuracy.mean_error, 0.033_333_333_333_333_215, 2.0e-15);
++    close(accuracy.symmetric_mean_absolute_percentage_error, 0.012_604_245_757_409_255, 2.0e-15);
++
++    let concordance = try_concordance_index(
++        &[1.0, 2.0, 3.0, 4.0],
++        &[true, true, true, false],
++        &[4.0, 3.0, 2.0, 1.0],
++    )
++    .unwrap();
++    close(concordance.concordance, 1.0, 1.0e-15);
++    let scores = try_survival_brier_scores(
++        &[1.0, 2.0, 3.0, 4.0],
++        &[true, true, true, true],
++        &[1.5, 2.5, 3.5],
++        &[
++            vec![0.0, 0.0, 0.0],
++            vec![1.0, 0.0, 0.0],
++            vec![1.0, 1.0, 0.0],
++            vec![1.0, 1.0, 1.0],
++        ],
++    )
++    .unwrap();
++    close(try_integrated_brier_score(&scores).unwrap(), 0.0, 1.0e-15);
++}
+diff --git a/validation/README.md b/validation/README.md
+index 622f071..8969c23 100644
+--- a/validation/README.md
++++ b/validation/README.md
+@@ -32,3 +32,5 @@ Run `../scripts/verify_v1_0_references.sh` to regenerate the retained NumPy, Sci
+ statistics, Gaussian-kernel MMD, PERMANOVA, Kruskal-Wallis, generalized-DL
+ meta-regression, OAS covariance shrinkage, normal-inverse-gamma updating,
+ multiclass scoring, and multiplicity corrections.
++
++- `generate_v1_3_references.py` / `v1_3_reference_results.json`: v1.3 multivariate, censored, clustering, forecast, and survival-scoring landmarks.
+diff --git a/validation/generate_v1_3_references.py b/validation/generate_v1_3_references.py
+new file mode 100755
+index 0000000..e9d01af
+--- /dev/null
++++ b/validation/generate_v1_3_references.py
+@@ -0,0 +1,236 @@
++#!/usr/bin/env python3
++"""Generate independent v1.3 reference values with scientific Python libraries."""
++from __future__ import annotations
++
++import json
++import math
++from pathlib import Path
++
++import numpy as np
++import scipy
++from scipy import optimize, stats
++import sklearn
++from sklearn.cluster import KMeans
++from sklearn.cross_decomposition import CCA
++import statsmodels
++
++
++
++def canonicalize(value: object) -> object:
++    """Round numerical landmarks so BLAS-level last-bit changes stay reproducible."""
++    if isinstance(value, float):
++        return float(f"{value:.14g}")
++    if isinstance(value, list):
++        return [canonicalize(item) for item in value]
++    if isinstance(value, dict):
++        return {key: canonicalize(item) for key, item in value.items()}
++    return value
++
++
++def main() -> None:
++    output: dict[str, object] = {
++        "versions": {
++            "numpy": np.__version__,
++            "scipy": scipy.__version__,
++            "sklearn": sklearn.__version__,
++            "statsmodels": statsmodels.__version__,
++        }
++    }
++
++    discriminant_x = np.array(
++        [[-2.0, -1.0], [-1.5, -0.8], [-1.0, -1.2], [1.0, 1.1], [1.5, 0.8], [2.0, 1.2]]
++    )
++    discriminant_y = np.array([0, 0, 0, 1, 1, 1])
++    means = [discriminant_x[discriminant_y == group].mean(axis=0) for group in (0, 1)]
++    within = sum(
++        (discriminant_x[discriminant_y == group] - means[group]).T
++        @ (discriminant_x[discriminant_y == group] - means[group])
++        for group in (0, 1)
++    )
++    pooled = within / (len(discriminant_x) - 2) + 1.0e-8 * np.eye(2)
++    precision = np.linalg.inv(pooled)
++    point = np.array([0.0, 0.0])
++    scores = np.array(
++        [point @ precision @ mean - 0.5 * mean @ precision @ mean + math.log(0.5) for mean in means]
++    )
++    probabilities = np.exp(scores - scores.max())
++    probabilities /= probabilities.sum()
++    output["linear_discriminant"] = {
++        "means": [mean.tolist() for mean in means],
++        "pooled_covariance": pooled.tolist(),
++        "probability_at_origin": probabilities.tolist(),
++    }
++
++    canonical_x = np.array(
++        [[-2.0, 0.5], [-1.0, -0.2], [0.0, 0.1], [1.0, 0.3], [2.0, -0.4], [3.0, 0.2]]
++    )
++    canonical_y = np.array(
++        [[2.0 * row[0] + index * 0.01, -row[0] + row[1]] for index, row in enumerate(canonical_x)]
++    )
++    canonical = CCA(n_components=2, scale=False, max_iter=10_000, tol=1.0e-12).fit(
++        canonical_x, canonical_y
++    )
++    transformed_x, transformed_y = canonical.transform(canonical_x, canonical_y)
++    output["canonical_correlation"] = {
++        "correlations": [
++            float(np.corrcoef(transformed_x[:, index], transformed_y[:, index])[0, 1])
++            for index in range(2)
++        ]
++    }
++
++    group_means = [discriminant_x[discriminant_y == group].mean(axis=0) for group in (0, 1)]
++    grand_mean = discriminant_x.mean(axis=0)
++    hypothesis = sum(
++        len(discriminant_x[discriminant_y == group])
++        * np.outer(group_means[group] - grand_mean, group_means[group] - grand_mean)
++        for group in (0, 1)
++    )
++    error = sum(
++        (discriminant_x[discriminant_y == group] - group_means[group]).T
++        @ (discriminant_x[discriminant_y == group] - group_means[group])
++        for group in (0, 1)
++    )
++    total = hypothesis + error
++    output["manova"] = {
++        "wilks_lambda": float(np.linalg.det(error) / np.linalg.det(total)),
++        "pillai_trace": float(np.trace(hypothesis @ np.linalg.inv(total))),
++    }
++
++    partial_data = np.array(
++        [
++            [z + (index % 3) * 0.02, 2.0 * z - (index % 5) * 0.02, z]
++            for index, z in enumerate(np.arange(-20, 21) / 5.0)
++        ]
++    )
++    partial_covariance = np.cov(partial_data, rowvar=False) + 1.0e-5 * np.eye(3)
++    partial_precision = np.linalg.inv(partial_covariance)
++    output["partial_correlation"] = {
++        "zero_one": float(
++            -partial_precision[0, 1]
++            / math.sqrt(partial_precision[0, 0] * partial_precision[1, 1])
++        )
++    }
++
++    copula_observations = np.array([[index, 2.0 * index + index % 7] for index in range(50)])
++    latent = np.column_stack(
++        [
++            stats.norm.ppf(
++                stats.rankdata(copula_observations[:, column], method="average")
++                / (len(copula_observations) + 1.0)
++            )
++            for column in range(2)
++        ]
++    )
++    copula_correlation = np.corrcoef(latent, rowvar=False)
++    copula_correlation[0, 1] *= 1.0 - 1.0e-8
++    copula_correlation[1, 0] = copula_correlation[0, 1]
++    latent_point = stats.norm.ppf([0.8, 0.8])
++    output["gaussian_copula"] = {
++        "correlation": float(copula_correlation[0, 1]),
++        "log_density_at_0_8": float(
++            stats.multivariate_normal(mean=[0.0, 0.0], cov=copula_correlation).logpdf(latent_point)
++            - stats.norm.logpdf(latent_point).sum()
++        ),
++    }
++
++    tobit_x = np.arange(-20, 21, dtype=float) / 10.0
++    tobit_latent = np.array(
++        [0.5 + 1.5 * value + ((index % 5) - 2.0) * 0.08 for index, value in enumerate(tobit_x)]
++    )
++    boundary = 0.0
++    tobit_censored = tobit_latent <= boundary
++    tobit_observed = np.maximum(tobit_latent, boundary)
++    tobit_design = np.column_stack([np.ones(len(tobit_x)), tobit_x])
++
++    def negative_tobit_log_likelihood(parameters: np.ndarray) -> float:
++        coefficients = parameters[:2]
++        sigma = math.exp(parameters[2])
++        means = tobit_design @ coefficients
++        standardized = (boundary - means) / sigma
++        log_likelihood = np.where(
++            tobit_censored,
++            stats.norm.logcdf(standardized),
++            stats.norm.logpdf((tobit_observed - means) / sigma) - math.log(sigma),
++        )
++        return float(-log_likelihood.sum())
++
++    tobit = optimize.minimize(
++        negative_tobit_log_likelihood,
++        np.array([0.5, 1.5, math.log(0.2)]),
++        method="BFGS",
++        options={"gtol": 1.0e-10, "maxiter": 10_000},
++    )
++    output["tobit"] = {
++        "coefficients": tobit.x[:2].tolist(),
++        "sigma": float(math.exp(tobit.x[2])),
++        "log_likelihood": float(-tobit.fun),
++    }
++
++    treatment = np.arange(-20, 21, dtype=float) / 10.0
++    mediator = np.array(
++        [0.5 + 1.2 * value + ((index % 5) - 2.0) * 0.03 for index, value in enumerate(treatment)]
++    )
++    outcome = np.array(
++        [
++            1.0
++            + 0.4 * treatment[index]
++            + 1.5 * mediator[index]
++            + ((index % 7) - 3.0) * 0.02
++            for index in range(len(treatment))
++        ]
++    )
++    mediator_fit = np.linalg.lstsq(np.column_stack([np.ones(len(treatment)), treatment]), mediator, rcond=None)[0]
++    outcome_fit = np.linalg.lstsq(
++        np.column_stack([np.ones(len(treatment)), treatment, mediator]), outcome, rcond=None
++    )[0]
++    total_fit = np.linalg.lstsq(np.column_stack([np.ones(len(treatment)), treatment]), outcome, rcond=None)[0]
++    output["mediation"] = {
++        "path_a": float(mediator_fit[1]),
++        "path_b": float(outcome_fit[2]),
++        "direct_effect": float(outcome_fit[1]),
++        "total_effect": float(total_fit[1]),
++        "indirect_effect": float(mediator_fit[1] * outcome_fit[2]),
++    }
++
++    cluster_data = np.array(
++        [[-2.0, -2.0], [-1.8, -2.1], [-2.2, -1.9], [2.0, 2.0], [1.8, 2.1], [2.2, 1.9]]
++    )
++    cluster_fit = KMeans(
++        n_clusters=2,
++        random_state=7,
++        n_init=1,
++        init="k-means++",
++        algorithm="lloyd",
++        tol=1.0e-8,
++        max_iter=300,
++    ).fit(cluster_data)
++    output["kmeans"] = {
++        "centroids": sorted(cluster_fit.cluster_centers_.tolist()),
++        "inertia": float(cluster_fit.inertia_),
++    }
++
++    training = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
++    actual = np.array([7.0, 8.0, 9.0])
++    forecast = np.array([7.1, 7.9, 9.1])
++    errors = forecast - actual
++    output["forecast_accuracy"] = {
++        "mean_error": float(errors.mean()),
++        "mae": float(np.abs(errors).mean()),
++        "rmse": float(np.sqrt(np.mean(errors**2))),
++        "smape": float(np.mean(2.0 * np.abs(errors) / (np.abs(actual) + np.abs(forecast)))),
++        "mase": float(np.abs(errors).mean() / np.abs(np.diff(training)).mean()),
++        "rmsse": float(np.sqrt(np.mean(errors**2) / np.mean(np.diff(training) ** 2))),
++    }
++
++    output["survival_scoring"] = {
++        "perfect_concordance": 1.0,
++        "perfect_brier": [0.0, 0.0, 0.0],
++    }
++
++    destination = Path(__file__).with_name("v1_3_reference_results.json")
++    destination.write_text(json.dumps(canonicalize(output), indent=2, sort_keys=True) + "\n")
++    print(destination)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/validation/v1_3_reference_results.json b/validation/v1_3_reference_results.json
+new file mode 100644
+index 0000000..5cd4f7e
+--- /dev/null
++++ b/validation/v1_3_reference_results.json
+@@ -0,0 +1,95 @@
++{
++  "canonical_correlation": {
++    "correlations": [
++      1.0,
++      1.0
++    ]
++  },
++  "forecast_accuracy": {
++    "mae": 0.1,
++    "mase": 0.1,
++    "mean_error": 0.033333333333333,
++    "rmse": 0.1,
++    "rmsse": 0.1,
++    "smape": 0.012604245757409
++  },
++  "gaussian_copula": {
++    "correlation": 0.99278280839523,
++    "log_density_at_0_8": 2.4737591491831
++  },
++  "kmeans": {
++    "centroids": [
++      [
++        -2.0,
++        -2.0
++      ],
++      [
++        2.0,
++        2.0
++      ]
++    ],
++    "inertia": 0.2
++  },
++  "linear_discriminant": {
++    "means": [
++      [
++        -1.5,
++        -1.0
++      ],
++      [
++        1.5,
++        1.0333333333333
++      ]
++    ],
++    "pooled_covariance": [
++      [
++        0.25000001,
++        -0.0125
++      ],
++      [
++        -0.0125,
++        0.041666676666667
++      ]
++    ],
++    "probability_at_origin": [
++      0.70819477230262,
++      0.29180522769738
++    ]
++  },
++  "manova": {
++    "pillai_trace": 0.98277520328758,
++    "wilks_lambda": 0.017224796712424
++  },
++  "mediation": {
++    "direct_effect": 0.35457317073171,
++    "indirect_effect": 1.8522212543554,
++    "path_a": 1.2020905923345,
++    "path_b": 1.5408333333333,
++    "total_effect": 2.2067944250871
++  },
++  "partial_correlation": {
++    "zero_one": 0.061127080125349
++  },
++  "survival_scoring": {
++    "perfect_brier": [
++      0.0,
++      0.0,
++      0.0
++    ],
++    "perfect_concordance": 1.0
++  },
++  "tobit": {
++    "coefficients": [
++      0.50466561040753,
++      1.4962299791542
++    ],
++    "log_likelihood": 17.781857658814,
++    "sigma": 0.11326517444451
++  },
++  "versions": {
++    "numpy": "2.3.5",
++    "scipy": "1.17.0",
++    "sklearn": "1.8.0",
++    "statsmodels": "0.14.6"
++  }
++}

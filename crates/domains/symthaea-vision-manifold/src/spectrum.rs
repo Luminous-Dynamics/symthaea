@@ -37,14 +37,14 @@
 //! - Kanerva (2009) — Hyperdimensional Computing
 //! - Elachi & Van Zyl (2006) — Introduction to the Physics and Techniques of Remote Sensing
 
+use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::encoder::PatchHdcEncoder;
 use crate::types::VisionConfig;
 
 /// Electromagnetic spectrum bands supported by the multi-spectral pipeline.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SpectrumBand {
     /// Visible light (400–700 nm). Standard camera channels (RGB or grayscale).
     Visible,
@@ -120,7 +120,58 @@ pub struct MultiSpectralFrame {
     pub layers: Vec<SpectralLayer>,
 }
 
+/// One ranked spectral-band explanation for an encoded observation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BandProbeScore {
+    pub band: SpectrumBand,
+    pub score: f32,
+}
+
+/// Ambiguity-aware evidence returned by spectral probing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BandProbeEvidence {
+    /// Ranked explanations, best first.
+    pub rankings: Vec<BandProbeScore>,
+    /// Best band only when evidence is available.
+    pub best_band: Option<SpectrumBand>,
+    /// Similarity of the best explanation.
+    pub best_score: f32,
+    /// Difference between the best and runner-up explanations.
+    pub margin: f32,
+    /// Whether score and margin both satisfy the caller's thresholds.
+    pub confident: bool,
+}
+
+/// Serializable temporal and cached evidence for one spectral encoder.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SpectralBandEncoderState {
+    pub band: SpectrumBand,
+    pub prev_patch_lum: Vec<f32>,
+    pub last_frame_hv: Option<Vec<f32>>,
+}
+
+/// Serializable state for a [`MultiSpectralEncoder`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MultiSpectralEncoderState {
+    pub schema_version: u32,
+    pub hdc_dim: usize,
+    pub bands: Vec<SpectralBandEncoderState>,
+}
+
+const MULTISPECTRAL_STATE_SCHEMA_VERSION: u32 = 1;
+
 impl MultiSpectralFrame {
+    /// Create an empty frame at the given resolution, with no layers yet.
+    ///
+    /// Layers are added via [`Self::with_layer`].
+    pub fn new(width: u32, height: u32) -> Self {
+        Self {
+            width,
+            height,
+            layers: Vec::new(),
+        }
+    }
+
     /// Create a frame from a single visible-light grayscale image.
     ///
     /// Convenience constructor for the common single-band case.
@@ -147,10 +198,13 @@ impl MultiSpectralFrame {
 /// Maintains one per-band identity HV and delegates per-band pixel encoding
 /// to the standard [`PatchHdcEncoder`].
 pub struct MultiSpectralEncoder {
-    /// Shared encoder for converting pixel patches → HVs.
-    encoder: PatchHdcEncoder,
+    /// Independent temporal encoder per spectral band. Sharing one encoder
+    /// would misinterpret cross-band differences as frame-to-frame motion.
+    encoders: Vec<(SpectrumBand, PatchHdcEncoder)>,
     /// Pre-generated identity HVs for each supported band.
     band_hvs: Vec<(SpectrumBand, ContinuousHV)>,
+    /// Most recent untagged frame encoding for each observed band.
+    last_band_frames: Vec<(SpectrumBand, ContinuousHV)>,
     /// HDC dimension (cached for convenience).
     hdc_dim: usize,
 }
@@ -162,7 +216,10 @@ impl MultiSpectralEncoder {
     /// - `config` — Vision config (shared with the main pipeline).
     /// - `max_width`, `max_height` — Maximum frame dimensions.
     pub fn new(config: &VisionConfig, max_width: u32, max_height: u32) -> Self {
-        let encoder = PatchHdcEncoder::new(config, max_width, max_height);
+        let encoders = SpectrumBand::ALL
+            .iter()
+            .map(|&band| (band, PatchHdcEncoder::new(config, max_width, max_height)))
+            .collect();
         let hdc_dim = config.hdc_dim;
 
         // Generate orthogonal identity HVs for each band.
@@ -180,10 +237,25 @@ impl MultiSpectralEncoder {
             .collect();
 
         Self {
-            encoder,
+            encoders,
             band_hvs,
+            last_band_frames: Vec::new(),
             hdc_dim,
         }
+    }
+
+    /// Clear per-band temporal history and cached probe evidence while
+    /// preserving band identities and learned feature weights.
+    pub fn reset_runtime(&mut self) {
+        for (_, encoder) in &mut self.encoders {
+            encoder.prev_patch_lum.clear();
+        }
+        self.last_band_frames.clear();
+    }
+
+    /// Current HDC dimension of all band encoders and identities.
+    pub fn hdc_dim(&self) -> usize {
+        self.hdc_dim
     }
 
     /// Perform 'Holographic Dilation' - scale all internal encoders and band HVs.
@@ -192,66 +264,341 @@ impl MultiSpectralEncoder {
             return;
         }
 
-        self.encoder.dilate(target_dim);
+        for (_, encoder) in &mut self.encoders {
+            encoder.dilate(target_dim);
+        }
         for (_, hv) in &mut self.band_hvs {
             *hv = hv.dilate(target_dim);
+        }
+        for (_, frame_hv) in &mut self.last_band_frames {
+            *frame_hv = frame_hv.dilate(target_dim);
         }
         self.hdc_dim = target_dim;
     }
 
     /// Encode a multi-spectral frame into a single holographic hypervector.
     ///
-    /// Each band's pixel data is:
-    /// 1. Encoded by the patch-HDC encoder → `frame_hv`
-    /// 2. Bound with the band's identity HV: `band_id_hv ⊗ frame_hv`
-    ///
-    /// All band contributions are bundled with equal weight and normalized.
-    ///
-    /// Returns a zero-filled HV if no layers are present.
+    /// This compatibility wrapper fails closed to a zero HV on malformed
+    /// sensor input. New integrations should prefer [`Self::encode_checked`]
+    /// so geometry or duplicate-band errors remain visible to the caller.
     pub fn encode(&mut self, frame: &MultiSpectralFrame) -> ContinuousHV {
+        match self.encode_checked(frame) {
+            Ok(hv) => hv,
+            Err(error) => {
+                tracing::warn!(%error, "rejected malformed multispectral frame");
+                ContinuousHV::zero(self.hdc_dim)
+            }
+        }
+    }
+
+    /// Validate and encode a multi-spectral frame.
+    ///
+    /// Every layer must match `width × height`, dimensions must be non-zero,
+    /// and a physical band may appear at most once. Rejecting duplicate bands
+    /// prevents accidental re-weighting of one sensor by repetition.
+    pub fn encode_checked(&mut self, frame: &MultiSpectralFrame) -> Result<ContinuousHV, String> {
         if frame.layers.is_empty() {
-            return ContinuousHV::zero(self.hdc_dim);
+            return Ok(ContinuousHV::zero(self.hdc_dim));
+        }
+        if frame.width == 0 || frame.height == 0 {
+            return Err(format!(
+                "multispectral dimensions must be non-zero, got {}x{}",
+                frame.width, frame.height
+            ));
+        }
+
+        let expected_len = (frame.width as usize)
+            .checked_mul(frame.height as usize)
+            .ok_or_else(|| "multispectral frame geometry overflow".to_string())?;
+        let mut seen = std::collections::HashSet::new();
+        for layer in &frame.layers {
+            if !seen.insert(layer.band) {
+                return Err(format!(
+                    "duplicate multispectral band: {}",
+                    layer.band.label()
+                ));
+            }
+            if layer.data.len() != expected_len {
+                return Err(format!(
+                    "{} layer length mismatch: got {}, expected {} for {}x{}",
+                    layer.band.label(),
+                    layer.data.len(),
+                    expected_len,
+                    frame.width,
+                    frame.height
+                ));
+            }
+        }
+
+        // Capacity validation must also happen before any per-band encoder
+        // advances its temporal history. Otherwise an oversized later layer can
+        // leave earlier bands committed even though the frame is rejected.
+        for layer in &frame.layers {
+            let encoder = self
+                .encoders
+                .iter()
+                .find(|(band, _)| *band == layer.band)
+                .map(|(_, encoder)| encoder)
+                .expect("all bands have an independent encoder");
+            let grid = encoder.grid_for(frame.width, frame.height);
+            if grid.rows > encoder.max_rows() || grid.cols > encoder.max_cols() {
+                return Err(format!(
+                    "{} layer {}x{} exceeds encoder capacity of {}x{} patches",
+                    layer.band.label(),
+                    frame.width,
+                    frame.height,
+                    encoder.max_cols(),
+                    encoder.max_rows()
+                ));
+            }
         }
 
         let mut band_encoded: Vec<ContinuousHV> = Vec::with_capacity(frame.layers.len());
 
         for layer in &frame.layers {
-            // Encode the band's pixels using the shared patch encoder
-            // encode_frame returns (frame_hv, patch_hvs); we only need the frame HV here.
-            let (frame_hv, _patch_hvs) = self.encoder.encode_frame(
-                &layer.data,
-                frame.width,
-                frame.height,
-                1, // channels (grayscale)
-            );
+            let frame_hv = {
+                let encoder = self
+                    .encoders
+                    .iter_mut()
+                    .find(|(band, _)| *band == layer.band)
+                    .map(|(_, encoder)| encoder)
+                    .expect("all bands have an independent encoder");
+                let (frame_hv, _patch_hvs) =
+                    encoder.encode_frame(&layer.data, frame.width, frame.height, 1);
+                frame_hv
+            };
 
-            // Bind with band-identity HV (tags the encoding with spectral origin)
-            let band_id_hv = self.band_id_hv(layer.band);
-            let tagged_hv = band_id_hv.bind(&frame_hv);
+            if let Some((_, cached)) = self
+                .last_band_frames
+                .iter_mut()
+                .find(|(band, _)| *band == layer.band)
+            {
+                *cached = frame_hv.clone();
+            } else {
+                self.last_band_frames.push((layer.band, frame_hv.clone()));
+            }
+
+            let tagged_hv = self.band_id_hv(layer.band).bind(&frame_hv);
             band_encoded.push(tagged_hv);
         }
 
-        // Bundle all band HVs with equal weight
         let refs: Vec<&ContinuousHV> = band_encoded.iter().collect();
         let weights = vec![1.0f32; refs.len()];
-        ContinuousHV::weighted_bundle(&refs, &weights).normalize()
+        Ok(ContinuousHV::weighted_bundle(&refs, &weights).normalize())
     }
 
-    /// Decode which band a bound HV came from by probing band identity vectors.
-    ///
-    /// Returns the band with the highest cosine similarity to `hv ⊗ band_id_hv^{-1}`.
-    /// Useful for attention probing: "which spectral region is this thought about?"
-    pub fn probe_band(&self, hv: &ContinuousHV) -> SpectrumBand {
-        self.band_hvs
+    /// Snapshot independent per-band temporal histories and cached evidence.
+    pub fn save_state(&self) -> MultiSpectralEncoderState {
+        MultiSpectralEncoderState {
+            schema_version: MULTISPECTRAL_STATE_SCHEMA_VERSION,
+            hdc_dim: self.hdc_dim,
+            bands: self
+                .encoders
+                .iter()
+                .map(|(band, encoder)| SpectralBandEncoderState {
+                    band: *band,
+                    prev_patch_lum: encoder.prev_patch_lum.clone(),
+                    last_frame_hv: self
+                        .last_band_frames
+                        .iter()
+                        .find(|(cached_band, _)| cached_band == band)
+                        .map(|(_, hv)| hv.as_slice().to_vec()),
+                })
+                .collect(),
+        }
+    }
+
+    /// Validate a saved state without mutating the encoder.
+    pub fn validate_state(&self, state: &MultiSpectralEncoderState) -> Result<(), String> {
+        if state.schema_version > MULTISPECTRAL_STATE_SCHEMA_VERSION {
+            return Err(format!(
+                "unsupported multispectral checkpoint schema: saved={}, supported={}",
+                state.schema_version, MULTISPECTRAL_STATE_SCHEMA_VERSION
+            ));
+        }
+        if state.schema_version == 0 {
+            return Err("multispectral checkpoint schema must be non-zero".to_string());
+        }
+        if state.hdc_dim != self.hdc_dim {
+            return Err(format!(
+                "multispectral HDC dimension mismatch: saved={}, current={}",
+                state.hdc_dim, self.hdc_dim
+            ));
+        }
+        if state.bands.len() != SpectrumBand::ALL.len() {
+            return Err(format!(
+                "multispectral band-state count mismatch: saved={}, expected={}",
+                state.bands.len(),
+                SpectrumBand::ALL.len()
+            ));
+        }
+
+        let mut seen = std::collections::HashSet::new();
+        for band_state in &state.bands {
+            if !seen.insert(band_state.band) {
+                return Err(format!(
+                    "duplicate multispectral checkpoint band: {}",
+                    band_state.band.label()
+                ));
+            }
+            if band_state
+                .prev_patch_lum
+                .iter()
+                .any(|value| !value.is_finite())
+            {
+                return Err(format!(
+                    "{} temporal history contains non-finite values",
+                    band_state.band.label()
+                ));
+            }
+            if let Some(values) = &band_state.last_frame_hv {
+                if values.len() != self.hdc_dim {
+                    return Err(format!(
+                        "{} cached frame dimension mismatch: saved={}, expected={}",
+                        band_state.band.label(),
+                        values.len(),
+                        self.hdc_dim
+                    ));
+                }
+                if values.iter().any(|value| !value.is_finite()) {
+                    return Err(format!(
+                        "{} cached frame contains non-finite values",
+                        band_state.band.label()
+                    ));
+                }
+            }
+        }
+        for band in SpectrumBand::ALL {
+            if !seen.contains(&band) {
+                return Err(format!(
+                    "multispectral checkpoint is missing band: {}",
+                    band.label()
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Restore per-band temporal histories and probe references atomically.
+    pub fn load_state(&mut self, state: &MultiSpectralEncoderState) -> Result<(), String> {
+        self.validate_state(state)?;
+
+        for band_state in &state.bands {
+            let encoder = self
+                .encoders
+                .iter_mut()
+                .find(|(band, _)| *band == band_state.band)
+                .map(|(_, encoder)| encoder)
+                .expect("validated checkpoints contain every supported band");
+            encoder.prev_patch_lum = band_state.prev_patch_lum.clone();
+        }
+        self.last_band_frames = state
+            .bands
             .iter()
-            .map(|(band, band_hv)| {
-                // Unbind: HRR inverse is the same vector for ContinuousHV (self-inverse bind)
-                let unbound = band_hv.bind(hv);
-                let sim = unbound.similarity(hv);
-                (*band, sim)
+            .filter_map(|band_state| {
+                band_state
+                    .last_frame_hv
+                    .as_ref()
+                    .map(|values| (band_state.band, ContinuousHV::from_vec(values.clone())))
             })
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(band, _)| band)
+            .collect();
+        Ok(())
+    }
+
+    /// Rank recently observed bands by how well they explain a tagged or
+    /// bundled HV. Only bands with cached, untagged evidence are returned.
+    pub fn probe_bands(&self, hv: &ContinuousHV) -> Vec<(SpectrumBand, f32)> {
+        let mut scores: Vec<(SpectrumBand, f32)> = self
+            .band_hvs
+            .iter()
+            .filter_map(|(band, band_hv)| {
+                let reference = self
+                    .last_band_frames
+                    .iter()
+                    .find(|(cached_band, _)| cached_band == band)
+                    .map(|(_, frame_hv)| frame_hv)?;
+                if hv.dim() != band_hv.dim() || reference.dim() != hv.dim() {
+                    return None;
+                }
+                let unbound = band_hv.bind(hv);
+                let score = unbound.similarity(reference);
+                score.is_finite().then_some((*band, score))
+            })
+            .collect();
+        scores.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.0.seed_offset().cmp(&b.0.seed_offset()))
+        });
+        scores
+    }
+
+    /// Evaluate spectral identity without forcing a label under ambiguity.
+    pub fn probe_evidence(
+        &self,
+        hv: &ContinuousHV,
+        min_score: f32,
+        min_margin: f32,
+    ) -> Result<BandProbeEvidence, String> {
+        if !min_score.is_finite() || !min_margin.is_finite() {
+            return Err("spectral probe thresholds must be finite".to_string());
+        }
+        if min_margin < 0.0 {
+            return Err("spectral probe margin must be non-negative".to_string());
+        }
+        if hv.dim() != self.hdc_dim {
+            return Err(format!(
+                "spectral probe dimension mismatch: got {}, expected {}",
+                hv.dim(),
+                self.hdc_dim
+            ));
+        }
+
+        let rankings: Vec<BandProbeScore> = self
+            .probe_bands(hv)
+            .into_iter()
+            .map(|(band, score)| BandProbeScore { band, score })
+            .collect();
+        let best_band = rankings.first().map(|entry| entry.band);
+        let best_score = rankings.first().map_or(0.0, |entry| entry.score);
+        let margin = match rankings.get(1) {
+            Some(runner_up) => best_score - runner_up.score,
+            None if best_score > 0.0 => best_score,
+            None => 0.0,
+        };
+        let confident = best_band.is_some() && best_score >= min_score && margin >= min_margin;
+
+        Ok(BandProbeEvidence {
+            rankings,
+            best_band,
+            best_score,
+            margin,
+            confident,
+        })
+    }
+
+    /// Return a band only when score and runner-up margin are sufficient.
+    pub fn probe_band_confident(
+        &self,
+        hv: &ContinuousHV,
+        min_score: f32,
+        min_margin: f32,
+    ) -> Result<Option<SpectrumBand>, String> {
+        let evidence = self.probe_evidence(hv, min_score, min_margin)?;
+        Ok(if evidence.confident {
+            evidence.best_band
+        } else {
+            None
+        })
+    }
+
+    /// Decode which recently observed band best explains a tagged or bundled
+    /// HV. Returns `Visible` only when no band evidence is available.
+    /// Prefer [`Self::probe_band_confident`] for decisions that must fail closed.
+    pub fn probe_band(&self, hv: &ContinuousHV) -> SpectrumBand {
+        self.probe_bands(hv)
+            .first()
+            .map(|(band, _)| *band)
             .unwrap_or(SpectrumBand::Visible)
     }
 
@@ -526,5 +873,228 @@ mod tests {
             sim < 0.95,
             "Hot and cold thermal frames should produce different HVs, sim={sim}"
         );
+    }
+
+    #[test]
+    fn test_layer_order_does_not_create_cross_band_motion() {
+        let config = default_config();
+        let visible = solid_frame(64, 64, 40);
+        let thermal = solid_frame(64, 64, 220);
+        let frame_a = MultiSpectralFrame {
+            width: 64,
+            height: 64,
+            layers: vec![
+                SpectralLayer {
+                    band: SpectrumBand::Visible,
+                    data: visible.clone(),
+                },
+                SpectralLayer {
+                    band: SpectrumBand::ThermalIR,
+                    data: thermal.clone(),
+                },
+            ],
+        };
+        let frame_b = MultiSpectralFrame {
+            width: 64,
+            height: 64,
+            layers: vec![
+                SpectralLayer {
+                    band: SpectrumBand::ThermalIR,
+                    data: thermal,
+                },
+                SpectralLayer {
+                    band: SpectrumBand::Visible,
+                    data: visible,
+                },
+            ],
+        };
+
+        let mut enc_a = MultiSpectralEncoder::new(&config, 64, 64);
+        let mut enc_b = MultiSpectralEncoder::new(&config, 64, 64);
+        let hv_a = enc_a.encode(&frame_a);
+        let hv_b = enc_b.encode(&frame_b);
+        assert!(
+            hv_a.similarity(&hv_b) > 0.999,
+            "band order must not alter temporal features"
+        );
+    }
+
+    #[test]
+    fn test_probe_band_uses_cached_untagged_reference() {
+        let config = default_config();
+        let mut encoder = MultiSpectralEncoder::new(&config, 64, 64);
+        let frame = MultiSpectralFrame {
+            width: 64,
+            height: 64,
+            layers: vec![SpectralLayer {
+                band: SpectrumBand::ThermalIR,
+                data: solid_frame(64, 64, 180),
+            }],
+        };
+        let tagged = encoder.encode(&frame);
+        assert_eq!(encoder.probe_band(&tagged), SpectrumBand::ThermalIR);
+    }
+    #[test]
+    fn test_checked_encode_rejects_malformed_layer() {
+        let config = default_config();
+        let mut encoder = MultiSpectralEncoder::new(&config, 8, 8);
+        let frame = MultiSpectralFrame::from_visible(vec![0; 63], 8, 8);
+        let error = encoder.encode_checked(&frame).unwrap_err();
+        assert!(error.contains("length mismatch"));
+    }
+
+    #[test]
+    fn test_checked_encode_rejects_duplicate_band() {
+        let config = default_config();
+        let mut encoder = MultiSpectralEncoder::new(&config, 8, 8);
+        let frame = MultiSpectralFrame::from_visible(vec![10; 64], 8, 8)
+            .with_layer(SpectrumBand::Visible, vec![20; 64]);
+        let error = encoder.encode_checked(&frame).unwrap_err();
+        assert!(error.contains("duplicate"));
+    }
+
+    #[test]
+    fn test_checked_encode_rejects_over_capacity_before_mutation() {
+        let mut config = default_config();
+        config.hdc_dim = 256;
+        config.patch_size = 4;
+        let mut encoder = MultiSpectralEncoder::new(&config, 8, 8);
+        encoder
+            .encode_checked(&MultiSpectralFrame::from_visible(vec![80; 64], 8, 8))
+            .unwrap();
+        let before = encoder.save_state();
+
+        let oversized = MultiSpectralFrame::from_visible(vec![90; 16 * 8], 16, 8);
+        let error = encoder.encode_checked(&oversized).unwrap_err();
+
+        assert!(error.contains("exceeds encoder capacity"));
+        assert_eq!(encoder.save_state(), before);
+    }
+
+    #[test]
+    fn test_multispectral_state_roundtrip_preserves_band_histories() {
+        let mut config = default_config();
+        config.hdc_dim = 256;
+        config.patch_size = 4;
+        let mut source = MultiSpectralEncoder::new(&config, 8, 8);
+
+        let visible = MultiSpectralFrame::from_visible(vec![30; 64], 8, 8);
+        source.encode_checked(&visible).unwrap();
+        let thermal = MultiSpectralFrame {
+            width: 8,
+            height: 8,
+            layers: vec![SpectralLayer {
+                band: SpectrumBand::ThermalIR,
+                data: vec![210; 64],
+            }],
+        };
+        let tagged_thermal = source.encode_checked(&thermal).unwrap();
+        let saved = source.save_state();
+
+        let visible_state = saved
+            .bands
+            .iter()
+            .find(|state| state.band == SpectrumBand::Visible)
+            .unwrap();
+        let thermal_state = saved
+            .bands
+            .iter()
+            .find(|state| state.band == SpectrumBand::ThermalIR)
+            .unwrap();
+        assert!(!visible_state.prev_patch_lum.is_empty());
+        assert!(!thermal_state.prev_patch_lum.is_empty());
+        assert_ne!(visible_state.prev_patch_lum, thermal_state.prev_patch_lum);
+
+        let mut restored = MultiSpectralEncoder::new(&config, 8, 8);
+        restored.load_state(&saved).unwrap();
+        assert_eq!(restored.save_state(), saved);
+        assert_eq!(
+            restored
+                .probe_band_confident(&tagged_thermal, 0.5, 0.2)
+                .unwrap(),
+            Some(SpectrumBand::ThermalIR)
+        );
+    }
+
+    #[test]
+    fn test_spectral_probe_refuses_ambiguous_bundle() {
+        let mut config = default_config();
+        config.hdc_dim = 1024;
+        config.patch_size = 4;
+        let mut encoder = MultiSpectralEncoder::new(&config, 8, 8);
+        let frame = MultiSpectralFrame::from_visible(vec![40; 64], 8, 8)
+            .with_layer(SpectrumBand::ThermalIR, vec![220; 64]);
+        encoder.encode_checked(&frame).unwrap();
+
+        let visible_frame = &encoder
+            .last_band_frames
+            .iter()
+            .find(|(band, _)| *band == SpectrumBand::Visible)
+            .unwrap()
+            .1;
+        let thermal_frame = &encoder
+            .last_band_frames
+            .iter()
+            .find(|(band, _)| *band == SpectrumBand::ThermalIR)
+            .unwrap()
+            .1;
+        let tagged_visible = encoder
+            .band_id_hv(SpectrumBand::Visible)
+            .bind(visible_frame);
+        let tagged_thermal = encoder
+            .band_id_hv(SpectrumBand::ThermalIR)
+            .bind(thermal_frame);
+        let ambiguous =
+            ContinuousHV::weighted_bundle(&[&tagged_visible, &tagged_thermal], &[1.0, 1.0])
+                .normalize();
+
+        let evidence = encoder.probe_evidence(&ambiguous, 0.2, 0.2).unwrap();
+        assert_eq!(evidence.rankings.len(), 2);
+        assert!(!evidence.confident);
+        assert!(evidence.margin < 0.2);
+        assert_eq!(
+            encoder.probe_band_confident(&ambiguous, 0.2, 0.2).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn test_multispectral_future_schema_rejected_before_mutation() {
+        let mut config = default_config();
+        config.hdc_dim = 256;
+        config.patch_size = 4;
+        let mut encoder = MultiSpectralEncoder::new(&config, 8, 8);
+        encoder
+            .encode_checked(&MultiSpectralFrame::from_visible(vec![80; 64], 8, 8))
+            .unwrap();
+        let before = encoder.save_state();
+        let mut future = before.clone();
+        future.schema_version = MULTISPECTRAL_STATE_SCHEMA_VERSION + 1;
+        future.bands[0].prev_patch_lum.clear();
+
+        let error = encoder.load_state(&future).unwrap_err();
+        assert!(error.contains("unsupported multispectral checkpoint schema"));
+        assert_eq!(encoder.save_state(), before);
+    }
+
+    #[test]
+    fn test_probe_bands_exposes_ranked_evidence() {
+        let config = default_config();
+        let mut encoder = MultiSpectralEncoder::new(&config, 8, 8);
+        let thermal = MultiSpectralFrame {
+            width: 8,
+            height: 8,
+            layers: vec![SpectralLayer {
+                band: SpectrumBand::ThermalIR,
+                data: vec![180; 64],
+            }],
+        };
+        let tagged = encoder.encode_checked(&thermal).unwrap();
+        let scores = encoder.probe_bands(&tagged);
+        assert_eq!(
+            scores.first().map(|entry| entry.0),
+            Some(SpectrumBand::ThermalIR)
+        );
+        assert!(scores.first().unwrap().1.is_finite());
     }
 }

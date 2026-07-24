@@ -3,7 +3,7 @@ name = "symthaea-coding-theory"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-description = "Error-correcting codes for Symthaea: Hamming distance/weight, the Hamming(7,4) single-error-correcting code, repetition codes (majority decode), and Reed-Solomon encoding + syndrome detection over GF(2^8) (via symthaea-finite-field). Bridges information theory and cryptography. Pure-std, ground-truth-checked."
+description = "Error-correcting codes for Symthaea: Hamming distance/weight, the Hamming(7,4) single-error-correcting code, repetition codes (majority decode), and Reed-Solomon encoding, syndrome detection, bounded-distance correction, known-erasure recovery, and mixed error/erasure recovery over GF(2^8) (via symthaea-finite-field). Bridges information theory and cryptography. Pure-std, with explicit field conventions and checked APIs."
 
 # Pure-std (only the sibling pure-std finite-field crate), no symthaea-core link.
 [dependencies]

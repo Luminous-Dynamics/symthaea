@@ -1,0 +1,40 @@
+[package]
+name = "symthaea-muse-ui"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Leptos web UI for Muse — Listen/Create/Research modes over the muse_studio HTTP API (MUSE_STUDIO/LISTEN/RESEARCH_MODE_DESIGN_SPEC.md)"
+
+[dependencies]
+leptos = { version = "0.8", features = ["csr"] }
+leptos_router = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+symthaea-muse-protocol = { path = "../symthaea-muse-protocol" }
+gloo-net = "0.5"
+gloo-timers = { version = "0.3", features = ["futures"] }
+futures = "0.3"
+wasm-bindgen-futures = "0.4"
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+send_wrapper = "0.6"
+web-sys = { version = "0.3", features = [
+    "Storage",
+    "Window",
+    "HtmlCanvasElement",
+    "CanvasRenderingContext2d",
+    "CanvasGradient",
+    "HtmlAudioElement",
+    "HtmlInputElement",
+    "CssStyleDeclaration",
+    "DomRect",
+    "Performance",
+    "KeyboardEvent",
+    "AudioContext",
+    "AudioNode",
+    "AudioDestinationNode",
+    "AnalyserNode",
+    "MediaElementAudioSourceNode",
+    "MediaQueryList",
+    "Document",
+] }

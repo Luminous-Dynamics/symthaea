@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Muse",
+  "version": "0.1.0",
+  "identifier": "org.luminous-dynamics.muse",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://127.0.0.1:8402"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Muse by Symthaea",
+        "width": 1200,
+        "height": 850,
+        "minWidth": 800,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false
+  }
+}

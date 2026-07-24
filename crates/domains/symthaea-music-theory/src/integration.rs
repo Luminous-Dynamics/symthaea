@@ -32,6 +32,16 @@ pub struct MusicalPhi {
     pub phi: f32,
     /// Number of (voice × segment) nodes that carried material.
     pub nodes: usize,
+    /// Diagnostic: mean consonance-excess weight over co-sounding pairs
+    /// (same segment, different voices). Near 0 in sparse/staggered
+    /// textures where voices rarely share ≥8 slots — which means Φ there
+    /// is carried almost entirely by the motif channel. Added during the
+    /// species-counterpoint wave, when a fitted fugue LOWERED Φ and the
+    /// question "which channel moved?" had no observable answer.
+    pub mean_consonance_edge: f32,
+    /// Diagnostic: mean trigram-overlap weight over all node pairs — the
+    /// motif-sharing channel.
+    pub mean_trigram_edge: f32,
 }
 
 /// Number of time segments the piece is divided into per voice.
@@ -120,17 +130,29 @@ pub fn musical_phi(score: &Score) -> MusicalPhi {
     }
     let n = nodes.len();
     if n < 3 {
-        return MusicalPhi { phi: 0.0, nodes: n };
+        return MusicalPhi {
+            phi: 0.0,
+            nodes: n,
+            mean_consonance_edge: 0.0,
+            mean_trigram_edge: 0.0,
+        };
     }
 
     let mut w = vec![vec![0f32; n]; n];
+    let (mut dep_sum, mut dep_cnt) = (0f32, 0u32);
+    let (mut motif_sum, mut motif_cnt) = (0f32, 0u32);
     for i in 0..n {
         for j in (i + 1)..n {
             let motif = trigram_overlap(&nodes[i].trigrams, &nodes[j].trigrams);
+            motif_sum += motif;
+            motif_cnt += 1;
             // Dependency channel only exists where the two parts SOUND
             // TOGETHER: different voices, same segment.
             let dependency = if nodes[i].seg == nodes[j].seg && nodes[i].voice != nodes[j].voice {
-                consonance_excess(&nodes[i].slots, &nodes[j].slots)
+                let d = consonance_excess(&nodes[i].slots, &nodes[j].slots);
+                dep_sum += d;
+                dep_cnt += 1;
+                d
             } else {
                 0.0
             };
@@ -139,6 +161,16 @@ pub fn musical_phi(score: &Score) -> MusicalPhi {
             w[j][i] = weight;
         }
     }
+    let mean_consonance_edge = if dep_cnt > 0 {
+        dep_sum / dep_cnt as f32
+    } else {
+        0.0
+    };
+    let mean_trigram_edge = if motif_cnt > 0 {
+        motif_sum / motif_cnt as f32
+    } else {
+        0.0
+    };
 
     // Exclude near-isolated nodes before the spectral step: a fragment
     // with no measurable dependency on anything would make Φ = 0 for the
@@ -149,7 +181,12 @@ pub fn musical_phi(score: &Score) -> MusicalPhi {
         .filter(|&i| w[i].iter().sum::<f32>() > 0.05)
         .collect();
     if keep.len() < 3 {
-        return MusicalPhi { phi: 0.0, nodes: n };
+        return MusicalPhi {
+            phi: 0.0,
+            nodes: n,
+            mean_consonance_edge,
+            mean_trigram_edge,
+        };
     }
     let w: Vec<Vec<f32>> = keep
         .iter()
@@ -162,6 +199,8 @@ pub fn musical_phi(score: &Score) -> MusicalPhi {
         // the value reads on a stable scale across piece sizes.
         phi: (phi / n as f32).clamp(0.0, 1.0),
         nodes: n,
+        mean_consonance_edge,
+        mean_trigram_edge,
     }
 }
 
@@ -264,8 +303,25 @@ mod tests {
         // every pitch scrambled (rhythm intact) must measure much less
         // integrated — pitch-class alignment and interval-trigram sharing
         // are what the scramble destroys.
+        //
+        // A THIRD finding (Diversity Truth pass, once Classical got its own
+        // MelodicDna): hook-cell must stay off for THIS test specifically.
+        // Diagnosed empirically (4-way comparison: appoggiatura on/off,
+        // default-vs-custom DNA, hook on/off) — neither the custom DNA
+        // alone nor the hook mechanism alone breaks the real>null margin;
+        // only custom DNA played THROUGH the hook-quotation machinery does
+        // (real 0.017 vs null 0.031). Root cause: the hook is deliberately
+        // echoed verbatim in RHYTHM across voices (`apply_hidden_bass_quote`,
+        // `apply_counter_hook_echoes`) — a real compositional feature, not a
+        // bug — and this null model only scrambles PITCH, so that cross-
+        // voice rhythmic correlation survives into the "null" baseline too,
+        // inflating it. That's the same "hook-on/off is orthogonal to what
+        // this test measures" finding already on record above, just newly
+        // exposed by a hook whose specific rhythm content correlates more
+        // strongly across voices than the shared default pool's did.
         let mut spec = crate::style::Style::Classical.spec();
         spec.texture.damage = 0.0;
+        spec.texture.hook_cell = false;
         let intent = MusicalIntent::default();
         let real = compose_with_spec(&intent, &spec);
         let mut scrambled = real.clone();

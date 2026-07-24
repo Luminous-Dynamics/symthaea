@@ -4,7 +4,7 @@
 //! CognitiveSnapshot → AestheticState: maps cognitive telemetry to visual parameters.
 
 use crate::CognitiveSnapshot;
-use crate::animation::breathing_phase;
+use crate::animation::{FrameContext, breathing_phase, smoothing_alpha};
 use crate::color::Palette;
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +21,14 @@ pub struct AestheticState {
     pub energy: f32,
     /// Color warmth from valence.
     pub warmth: f32,
+    /// Living-mind vitality: pulse amplitude and growth pressure.
+    pub vitality: f32,
+    /// Living-mind coherence: alignment and orbital regularity.
+    pub coherence: f32,
+    /// Acetylcholine-derived attentional sharpness.
+    pub attention: f32,
+    /// Allostatic load: visual compression and constraint.
+    pub allostatic_load: f32,
     /// Fractal recursion depth (0-5).
     pub fractal_depth: u8,
     /// Color palette from neuromodulators.
@@ -49,19 +57,31 @@ pub struct AestheticState {
 /// Applies EMA smoothing for visual stability.
 pub struct AestheticEngine {
     ema_alpha: f32,
+    smoothing_time_constant: f32,
     prev: Option<AestheticState>,
 }
 
 impl AestheticEngine {
     pub fn new() -> Self {
         Self {
-            ema_alpha: 0.3, // 30% new, 70% old — smooth transitions
+            ema_alpha: 0.3, // compatibility path for process()
+            smoothing_time_constant: 0.25,
             prev: None,
         }
     }
 
     pub fn with_ema_alpha(mut self, alpha: f32) -> Self {
-        self.ema_alpha = alpha.clamp(0.01, 1.0);
+        if alpha.is_finite() {
+            self.ema_alpha = alpha.clamp(0.01, 1.0);
+        }
+        self
+    }
+
+    /// Configure frame-rate-independent smoothing for [`Self::process_frame`].
+    pub fn with_smoothing_time_constant(mut self, tau_seconds: f32) -> Self {
+        if tau_seconds.is_finite() && tau_seconds > 0.0 {
+            self.smoothing_time_constant = tau_seconds;
+        }
         self
     }
 
@@ -69,7 +89,23 @@ impl AestheticEngine {
     pub fn process(&mut self, snap: &CognitiveSnapshot) -> AestheticState {
         let raw = self.map_raw(snap);
         let smoothed = match &self.prev {
-            Some(prev) => self.smooth(prev, &raw),
+            Some(prev) => self.smooth_with_alpha(prev, &raw, self.ema_alpha),
+            None => raw,
+        };
+        self.prev = Some(smoothed.clone());
+        smoothed
+    }
+
+    /// Map and smooth on an explicit monotonic frame timeline.
+    pub fn process_frame(
+        &mut self,
+        snap: &CognitiveSnapshot,
+        frame: FrameContext,
+    ) -> AestheticState {
+        let raw = self.map_raw_with_phase(snap, frame.breathing_phase());
+        let alpha = smoothing_alpha(frame.delta_seconds, self.smoothing_time_constant);
+        let smoothed = match &self.prev {
+            Some(prev) => self.smooth_with_alpha(prev, &raw, alpha),
             None => raw,
         };
         self.prev = Some(smoothed.clone());
@@ -78,13 +114,21 @@ impl AestheticEngine {
 
     /// Direct mapping without smoothing (for testing).
     pub fn map_raw(&self, snap: &CognitiveSnapshot) -> AestheticState {
+        self.map_raw_with_phase(snap, breathing_phase(snap.cycle_count))
+    }
+
+    fn map_raw_with_phase(&self, snap: &CognitiveSnapshot, cycle_phase: f64) -> AestheticState {
+        let snap = snap.sanitized();
         let psi = snap.consciousness_level;
 
         // Luminosity: Ψ^0.7 (gamma curve — never fully dark)
         let luminosity = (psi as f32).powf(0.7);
 
         // Complexity: Cantor depth (0-5) + Betti sum, scaled
-        let betti_sum = (snap.betti_0 + snap.betti_1 + snap.betti_2) as f32;
+        let betti_sum = snap
+            .betti_0
+            .saturating_add(snap.betti_1)
+            .saturating_add(snap.betti_2) as f32;
         let complexity = (snap.cantor_metacognitive_depth * 0.3 + betti_sum * 0.1).clamp(0.0, 1.0);
 
         // Turbulence: PE^0.5 (emphasize small errors)
@@ -95,6 +139,12 @@ impl AestheticEngine {
 
         // Warmth: valence [-1,1] → [0,1]
         let warmth = (snap.valence + 1.0) / 2.0;
+
+        // Living-system channels have distinct visual contracts.
+        let vitality = snap.living_mind_vitality as f32;
+        let coherence = snap.living_mind_coherence as f32;
+        let attention = snap.acetylcholine;
+        let allostatic_load = snap.allostatic_load;
 
         // Fractal depth: clamped to 0-5
         let fractal_depth = snap.cantor_last_depth.min(5);
@@ -127,14 +177,16 @@ impl AestheticEngine {
             256.0
         };
 
-        let cycle_phase = breathing_phase(snap.cycle_count);
-
         AestheticState {
             luminosity,
             complexity,
             turbulence,
             energy,
             warmth,
+            vitality,
+            coherence,
+            attention,
+            allostatic_load,
             fractal_depth,
             palette,
             component_count: snap.betti_0,
@@ -150,8 +202,13 @@ impl AestheticEngine {
     }
 
     /// EMA smooth between previous and new state.
-    fn smooth(&self, prev: &AestheticState, new: &AestheticState) -> AestheticState {
-        let a = self.ema_alpha;
+    fn smooth_with_alpha(
+        &self,
+        prev: &AestheticState,
+        new: &AestheticState,
+        alpha: f32,
+    ) -> AestheticState {
+        let a = alpha.clamp(0.0, 1.0);
         let b = 1.0 - a;
 
         let harmony_radii: [f32; 8] =
@@ -163,6 +220,10 @@ impl AestheticEngine {
             turbulence: prev.turbulence * b + new.turbulence * a,
             energy: prev.energy * b + new.energy * a,
             warmth: prev.warmth * b + new.warmth * a,
+            vitality: prev.vitality * b + new.vitality * a,
+            coherence: prev.coherence * b + new.coherence * a,
+            attention: prev.attention * b + new.attention * a,
+            allostatic_load: prev.allostatic_load * b + new.allostatic_load * a,
             fractal_depth: new.fractal_depth, // discrete, no smoothing
             palette: new.palette.clone(),     // palette changes are intentional
             component_count: new.component_count,
@@ -249,6 +310,45 @@ mod tests {
         let raw = engine.map_raw(&make_snapshot(0.1));
         // Smoothed should be between raw(0.1) and previous(0.9)
         assert!(smoothed.luminosity > raw.luminosity);
+    }
+
+    #[test]
+    fn non_finite_snapshot_cannot_poison_state() {
+        let mut snap = make_snapshot(f64::NAN);
+        snap.prediction_error = f32::INFINITY;
+        snap.thought_vector = vec![f32::NAN, f32::NEG_INFINITY];
+        let state = AestheticEngine::new().map_raw(&snap);
+        assert!(state.luminosity.is_finite());
+        assert!(state.turbulence.is_finite());
+        assert!(state.layout_center.0.is_finite());
+        assert!(state.layout_center.1.is_finite());
+    }
+
+    #[test]
+    fn nan_ema_alpha_is_ignored() {
+        let mut engine = AestheticEngine::new().with_ema_alpha(f32::NAN);
+        let _ = engine.process(&make_snapshot(0.9));
+        let state = engine.process(&make_snapshot(0.1));
+        assert!(state.luminosity.is_finite());
+    }
+
+    #[test]
+    fn process_frame_uses_explicit_time() {
+        let snap = make_snapshot(0.5);
+        let mut engine = AestheticEngine::new();
+        let first = engine.process_frame(&snap, FrameContext::new(0.0, 1.0 / 60.0));
+        let second = engine.process_frame(&snap, FrameContext::new(0.25, 1.0 / 60.0));
+        assert_ne!(first.cycle_phase, second.cycle_phase);
+    }
+
+    #[test]
+    fn living_system_channels_are_mapped() {
+        let snap = make_snapshot(0.5);
+        let state = AestheticEngine::new().map_raw(&snap);
+        assert_eq!(state.vitality, 0.5);
+        assert_eq!(state.coherence, 0.5);
+        assert_eq!(state.attention, 0.4);
+        assert_eq!(state.allostatic_load, 0.2);
     }
 
     #[test]

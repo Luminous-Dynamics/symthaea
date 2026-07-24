@@ -295,7 +295,7 @@ fn full_battery_report() {
     report.add(ProofConstructionBenchmark.run(&config));
     report.add(DefiniteIntegralsBenchmark.run(&config));
 
-    // ── Security (HDC-FHE) ──
+    // ── Insecure shared-mask algebra demo ──
     report.add(EncryptedClassificationBenchmark.run(&config));
     report.add(CollectiveAggregationBenchmark.run(&config));
     report.add(EncryptedLearningBenchmark.run(&config));

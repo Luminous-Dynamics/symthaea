@@ -7,6 +7,7 @@
 //! the key metric for detecting shuffling, toe-dragging, and fall risk.
 //! Used by the training loop for diagnostics and optional reward shaping.
 
+use crate::contact::ContactFrame;
 use crate::types::HumanoidState;
 
 /// Summary of gait quality metrics over an episode.
@@ -684,5 +685,114 @@ mod tests {
             (quality - 0.5).abs() < 0.1,
             "Flat foot touchdown should give quality ≈ 0.5: {quality}"
         );
+    }
+}
+
+/// Contact-locked gait phase oscillator.
+///
+/// Pure wall-clock phase drifts away from actual touchdown under perturbations.
+/// This oscillator advances continuously but re-anchors phase to observed
+/// foot-strike events: right touchdown at phase 0, left touchdown at phase 0.5.
+#[derive(Debug, Clone)]
+pub struct ContactLockedGaitClock {
+    phase: f64,
+    previous_right_contact: bool,
+    previous_left_contact: bool,
+    contact_threshold_m: f64,
+    correction_gain: f64,
+}
+
+impl Default for ContactLockedGaitClock {
+    fn default() -> Self {
+        Self {
+            phase: 0.0,
+            previous_right_contact: true,
+            previous_left_contact: true,
+            contact_threshold_m: 0.04,
+            correction_gain: 0.65,
+        }
+    }
+}
+
+impl ContactLockedGaitClock {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn phase(&self) -> f64 {
+        self.phase
+    }
+
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+
+    pub fn advance(&mut self, state: &HumanoidState, dt: f64, nominal_hz: f64) -> f64 {
+        let contacts = ContactFrame::estimated_from_state(state, self.contact_threshold_m);
+        self.advance_with_contacts(&contacts, dt, nominal_hz)
+    }
+
+    pub fn advance_with_contacts(
+        &mut self,
+        contacts: &ContactFrame,
+        dt: f64,
+        nominal_hz: f64,
+    ) -> f64 {
+        if !dt.is_finite() || !nominal_hz.is_finite() || dt <= 0.0 || nominal_hz <= 0.0 {
+            self.phase = 0.0;
+            return self.phase;
+        }
+        self.phase = (self.phase + dt * nominal_hz).rem_euclid(1.0);
+
+        let right_contact = contacts.right.in_contact;
+        let left_contact = contacts.left.in_contact;
+        let right_touchdown = right_contact && !self.previous_right_contact;
+        let left_touchdown = left_contact && !self.previous_left_contact;
+
+        if right_touchdown {
+            self.phase = circular_blend(self.phase, 0.0, self.correction_gain);
+        } else if left_touchdown {
+            self.phase = circular_blend(self.phase, 0.5, self.correction_gain);
+        }
+
+        self.previous_right_contact = right_contact;
+        self.previous_left_contact = left_contact;
+        self.phase
+    }
+}
+
+fn circular_blend(current: f64, target: f64, gain: f64) -> f64 {
+    let mut delta = target - current;
+    if delta > 0.5 {
+        delta -= 1.0;
+    } else if delta < -0.5 {
+        delta += 1.0;
+    }
+    (current + gain.clamp(0.0, 1.0) * delta).rem_euclid(1.0)
+}
+
+#[cfg(test)]
+mod contact_clock_tests {
+    use super::*;
+
+    #[test]
+    fn advances_at_nominal_frequency() {
+        let state = HumanoidState::standing();
+        let mut clock = ContactLockedGaitClock::new();
+        let phase = clock.advance(&state, 0.1, 1.0);
+        assert!((phase - 0.1).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn right_touchdown_reanchors_toward_zero() {
+        let mut state = HumanoidState::standing();
+        let mut clock = ContactLockedGaitClock::new();
+        state.extremities[8] = 0.1;
+        state.extremities[11] = 0.1;
+        clock.advance(&state, 0.25, 1.0);
+        state.extremities[8] = 0.0;
+        let before = clock.phase();
+        let after = clock.advance(&state, 0.01, 1.0);
+        assert!(after < before);
     }
 }

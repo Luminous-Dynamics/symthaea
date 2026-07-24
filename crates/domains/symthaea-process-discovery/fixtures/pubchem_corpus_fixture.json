@@ -1,0 +1,760 @@
+{
+  "entries": [
+    {
+      "smiles": "CC(=O)O",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143886,
+      "content_hash": "c31d68b211f476dfce73a8bf2728cca3ad0efc9b712467bb88aadf034b53a587",
+      "outcome": {
+        "Found": {
+          "cid": 176,
+          "molecular_formula": "C2H4O2",
+          "connectivity_smiles": "CC(=O)O",
+          "iupac_name": "acetic acid"
+        }
+      }
+    },
+    {
+      "smiles": "CCO",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143886,
+      "content_hash": "7815656facb3b6fb8dd8c384e720d30390c6367934b6d9024f1fa991b98b5583",
+      "outcome": {
+        "Found": {
+          "cid": 702,
+          "molecular_formula": "C2H6O",
+          "connectivity_smiles": "CCO",
+          "iupac_name": "ethanol"
+        }
+      }
+    },
+    {
+      "smiles": "CC(=O)OCC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143888,
+      "content_hash": "c6d2461eac84c14d279b8512270787bece1fe815e9fef38b82d5647e7c05d83d",
+      "outcome": {
+        "Found": {
+          "cid": 8857,
+          "molecular_formula": "C4H8O2",
+          "connectivity_smiles": "CCOC(=O)C",
+          "iupac_name": "ethyl acetate"
+        }
+      }
+    },
+    {
+      "smiles": "O",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143889,
+      "content_hash": "39d21ae2d44c36737bc4ec064aaeae14a6d233758ca604d0f8bc371f4bfa8852",
+      "outcome": {
+        "Found": {
+          "cid": 962,
+          "molecular_formula": "H2O",
+          "connectivity_smiles": "O",
+          "iupac_name": "oxidane"
+        }
+      }
+    },
+    {
+      "smiles": "CO",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143890,
+      "content_hash": "bca8ff1a9515110a3a735a611de072a53b1186d00aa0aa9baaa9386cdb820788",
+      "outcome": {
+        "Found": {
+          "cid": 887,
+          "molecular_formula": "CH4O",
+          "connectivity_smiles": "CO",
+          "iupac_name": "methanol"
+        }
+      }
+    },
+    {
+      "smiles": "CC(=O)OC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143892,
+      "content_hash": "43204f716cd27ad323475b8a94ecfeac40054deea8309c478ca3f505868f32ef",
+      "outcome": {
+        "Found": {
+          "cid": 6584,
+          "molecular_formula": "C3H6O2",
+          "connectivity_smiles": "CC(=O)OC",
+          "iupac_name": "methyl acetate"
+        }
+      }
+    },
+    {
+      "smiles": "CCC(=O)O",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143893,
+      "content_hash": "10f3d0ea0f05589422f77ff5dc1d8c4eb39c1b875826212c6c254b7dcb1c4365",
+      "outcome": {
+        "Found": {
+          "cid": 1032,
+          "molecular_formula": "C3H6O2",
+          "connectivity_smiles": "CCC(=O)O",
+          "iupac_name": "propanoic acid"
+        }
+      }
+    },
+    {
+      "smiles": "CCC(=O)OCC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143894,
+      "content_hash": "c8e92d3e4465224949c802e4c8552c31cd35b236e613b3c4aed1a138bd0dc834",
+      "outcome": {
+        "Found": {
+          "cid": 7749,
+          "molecular_formula": "C5H10O2",
+          "connectivity_smiles": "CCC(=O)OCC",
+          "iupac_name": "ethyl propanoate"
+        }
+      }
+    },
+    {
+      "smiles": "CCC(=O)OC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143896,
+      "content_hash": "a0f508c34211a5e8e2dbb462bd6d3b99e563b7aee16cd34e7641faa6e2f76635",
+      "outcome": {
+        "Found": {
+          "cid": 11124,
+          "molecular_formula": "C4H8O2",
+          "connectivity_smiles": "CCC(=O)OC",
+          "iupac_name": "methyl propanoate"
+        }
+      }
+    },
+    {
+      "smiles": "c1ccccc1C(=O)O",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143897,
+      "content_hash": "bc9f21301c187c1212a7c9d6f70df38ca3c8b158877b5727159b6dffa3010258",
+      "outcome": {
+        "Found": {
+          "cid": 243,
+          "molecular_formula": "C7H6O2",
+          "connectivity_smiles": "C1=CC=C(C=C1)C(=O)O",
+          "iupac_name": "benzoic acid"
+        }
+      }
+    },
+    {
+      "smiles": "c1ccccc1C(=O)OC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143898,
+      "content_hash": "a7d79e5fdbd78bdf8b071e609f16c12ec96917fc1227dcca53ff4139d91b61d4",
+      "outcome": {
+        "Found": {
+          "cid": 7150,
+          "molecular_formula": "C8H8O2",
+          "connectivity_smiles": "COC(=O)C1=CC=CC=C1",
+          "iupac_name": "methyl benzoate"
+        }
+      }
+    },
+    {
+      "smiles": "c1ccccc1C(=O)OCC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143899,
+      "content_hash": "ad8f0663782d88350df4b6dc38b08ec76f3ee5f4ca1cc5e2082d5e0f8b34d39c",
+      "outcome": {
+        "Found": {
+          "cid": 7165,
+          "molecular_formula": "C9H10O2",
+          "connectivity_smiles": "CCOC(=O)C1=CC=CC=C1",
+          "iupac_name": "ethyl benzoate"
+        }
+      }
+    },
+    {
+      "smiles": "OC=O",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143900,
+      "content_hash": "a9b0472168ce875ae084795ec8778d7849683ff8789b981e59b2a517b6e8389a",
+      "outcome": {
+        "Found": {
+          "cid": 284,
+          "molecular_formula": "CH2O2",
+          "connectivity_smiles": "C(=O)O",
+          "iupac_name": "formic acid"
+        }
+      }
+    },
+    {
+      "smiles": "COC=O",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143901,
+      "content_hash": "6b534f39816793a7468747ad56afe2b011d66571e2c53027377d8b411a5af7bb",
+      "outcome": {
+        "Found": {
+          "cid": 7865,
+          "molecular_formula": "C2H4O2",
+          "connectivity_smiles": "COC=O",
+          "iupac_name": "methyl formate"
+        }
+      }
+    },
+    {
+      "smiles": "CCCC(=O)O",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143903,
+      "content_hash": "5120ff14fa328d4aca4bb529390a3464a621fe2075c01aef121d4d8f2029f189",
+      "outcome": {
+        "Found": {
+          "cid": 264,
+          "molecular_formula": "C4H8O2",
+          "connectivity_smiles": "CCCC(=O)O",
+          "iupac_name": "butanoic acid"
+        }
+      }
+    },
+    {
+      "smiles": "CCCC(=O)OCC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143904,
+      "content_hash": "b20e7817697641bcb063ecd70c7c8d5b6179b4e5dc6d51399ed18f3fc7f6780c",
+      "outcome": {
+        "Found": {
+          "cid": 7762,
+          "molecular_formula": "C6H12O2",
+          "connectivity_smiles": "CCCC(=O)OCC",
+          "iupac_name": "ethyl butanoate"
+        }
+      }
+    },
+    {
+      "smiles": "CN",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143906,
+      "content_hash": "7a6670247b0d1997a910f16301f28d35fbe60c4e0526cdf4f186377ec449debe",
+      "outcome": {
+        "Found": {
+          "cid": 6329,
+          "molecular_formula": "CH5N",
+          "connectivity_smiles": "CN",
+          "iupac_name": "methanamine"
+        }
+      }
+    },
+    {
+      "smiles": "CC(=O)NC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143907,
+      "content_hash": "18d1a05341ec8d66776321b8ece3527e1397912fe23338980fb25b8d3c46d5d1",
+      "outcome": {
+        "Found": {
+          "cid": 6582,
+          "molecular_formula": "C3H7NO",
+          "connectivity_smiles": "CC(=O)NC",
+          "iupac_name": "N-methylacetamide"
+        }
+      }
+    },
+    {
+      "smiles": "CCN",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143908,
+      "content_hash": "85b9427638c88b2cd8bdbf8ad6f9343861f32dc79f11e9658b3726c6fd0f17e5",
+      "outcome": {
+        "Found": {
+          "cid": 6341,
+          "molecular_formula": "C2H7N",
+          "connectivity_smiles": "CCN",
+          "iupac_name": "ethanamine"
+        }
+      }
+    },
+    {
+      "smiles": "c1ccccc1C(=O)NCC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143910,
+      "content_hash": "e28396e44342af26733a846377ea8f6a3b1e24f3cd6c5a439c14c27cd446abb7",
+      "outcome": {
+        "Found": {
+          "cid": 11959,
+          "molecular_formula": "C9H11NO",
+          "connectivity_smiles": "CCNC(=O)C1=CC=CC=C1",
+          "iupac_name": "N-ethylbenzamide"
+        }
+      }
+    },
+    {
+      "smiles": "NCCO",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143911,
+      "content_hash": "df00ed7a8733ec88d344271ed628bc5852477e3b721beb81ed50c4695940f520",
+      "outcome": {
+        "Found": {
+          "cid": 700,
+          "molecular_formula": "C2H7NO",
+          "connectivity_smiles": "C(CO)N",
+          "iupac_name": "2-aminoethanol"
+        }
+      }
+    },
+    {
+      "smiles": "CC(=O)NCCO",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143913,
+      "content_hash": "d57eae78cf39bd9822d3266aad42eb0c1f5d4b33090a9e77dedddc5dac488f3d",
+      "outcome": {
+        "Found": {
+          "cid": 8880,
+          "molecular_formula": "C4H9NO2",
+          "connectivity_smiles": "CC(=O)NCCO",
+          "iupac_name": "N-(2-hydroxyethyl)acetamide"
+        }
+      }
+    },
+    {
+      "smiles": "C=C",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143914,
+      "content_hash": "7e2e7227d81d1f7a26787eae3526f0e5f9d2444dc144cc57a83d463b2a2becf2",
+      "outcome": {
+        "Found": {
+          "cid": 6325,
+          "molecular_formula": "C2H4",
+          "connectivity_smiles": "C=C",
+          "iupac_name": "ethene"
+        }
+      }
+    },
+    {
+      "smiles": "[H][H]",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143915,
+      "content_hash": "cd93dd92cac9254b06ede69c880b021dd478e0a2d3bbabe3ced05dcca5c37cd2",
+      "outcome": {
+        "Found": {
+          "cid": 783,
+          "molecular_formula": "H2",
+          "connectivity_smiles": "[HH]",
+          "iupac_name": "molecular hydrogen"
+        }
+      }
+    },
+    {
+      "smiles": "CC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143917,
+      "content_hash": "6efff38548bf015fe87bc31cdcc1b9705201ac87213c70d808055fd64c74585e",
+      "outcome": {
+        "Found": {
+          "cid": 6324,
+          "molecular_formula": "C2H6",
+          "connectivity_smiles": "CC",
+          "iupac_name": "ethane"
+        }
+      }
+    },
+    {
+      "smiles": "CC=C",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143918,
+      "content_hash": "eab6d51ea6b677681b280125a4cfafa1514cae96df40ffac7b1b6d00dc6beae4",
+      "outcome": {
+        "Found": {
+          "cid": 8252,
+          "molecular_formula": "C3H6",
+          "connectivity_smiles": "CC=C",
+          "iupac_name": "prop-1-ene"
+        }
+      }
+    },
+    {
+      "smiles": "CCC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143919,
+      "content_hash": "05a3603d48c68ba0a4411c8e26e334d5aaa6fc480d47b768fc2f05ca74dc0e7c",
+      "outcome": {
+        "Found": {
+          "cid": 6334,
+          "molecular_formula": "C3H8",
+          "connectivity_smiles": "CCC",
+          "iupac_name": "propane"
+        }
+      }
+    },
+    {
+      "smiles": "C=CCC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143921,
+      "content_hash": "a58f3b01a5495ff5b8efbac5247dd04a1891530e64a691bd96d09861fd69da39",
+      "outcome": {
+        "Found": {
+          "cid": 7844,
+          "molecular_formula": "C4H8",
+          "connectivity_smiles": "CCC=C",
+          "iupac_name": "but-1-ene"
+        }
+      }
+    },
+    {
+      "smiles": "CCCC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143921,
+      "content_hash": "fd6c715215b9436e64025af660b44407b1060354eee9f1b3a78cd87ab8764050",
+      "outcome": {
+        "Found": {
+          "cid": 7843,
+          "molecular_formula": "C4H10",
+          "connectivity_smiles": "CCCC",
+          "iupac_name": "butane"
+        }
+      }
+    },
+    {
+      "smiles": "CC=CC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143923,
+      "content_hash": "b6283978df9d721c46e008afacaa11a7afd8766d082279482c9eeb041f909ba6",
+      "outcome": {
+        "Found": {
+          "cid": 12220,
+          "molecular_formula": "C4H8",
+          "connectivity_smiles": "CC=CC",
+          "iupac_name": "but-2-ene"
+        }
+      }
+    },
+    {
+      "smiles": "C1=CCCCC1",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143924,
+      "content_hash": "8cdfe377ccb914ba0044b6f3006e0c3d66949aa85f775317018db0ca7025b519",
+      "outcome": {
+        "Found": {
+          "cid": 8079,
+          "molecular_formula": "C6H10",
+          "connectivity_smiles": "C1CCC=CC1",
+          "iupac_name": "cyclohexene"
+        }
+      }
+    },
+    {
+      "smiles": "C1CCCCC1",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143926,
+      "content_hash": "a2ceafebb094af4753d1a7d06ab641f1ce93f6d138e3f991e8096899a0d7c28c",
+      "outcome": {
+        "Found": {
+          "cid": 8078,
+          "molecular_formula": "C6H12",
+          "connectivity_smiles": "C1CCCCC1",
+          "iupac_name": "cyclohexane"
+        }
+      }
+    },
+    {
+      "smiles": "c1ccccc1C=C",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143927,
+      "content_hash": "f8ea78f4f4dc21c8e5c638bfd3cb8d7ec16f948b0a240ea66a30c49e6009f9ad",
+      "outcome": {
+        "Found": {
+          "cid": 7501,
+          "molecular_formula": "C8H8",
+          "connectivity_smiles": "C=CC1=CC=CC=C1",
+          "iupac_name": "styrene"
+        }
+      }
+    },
+    {
+      "smiles": "c1ccccc1CC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143929,
+      "content_hash": "d2802326f7798e4b63b10bf06aab9249199b59e90901594798f9a7941faab9bd",
+      "outcome": {
+        "Found": {
+          "cid": 7500,
+          "molecular_formula": "C8H10",
+          "connectivity_smiles": "CCC1=CC=CC=C1",
+          "iupac_name": "ethylbenzene"
+        }
+      }
+    },
+    {
+      "smiles": "C=CC#N",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143931,
+      "content_hash": "f614985251a30c467136265627fc518376a0e25374436a23d90988d3dd565800",
+      "outcome": {
+        "Found": {
+          "cid": 7855,
+          "molecular_formula": "C3H3N",
+          "connectivity_smiles": "C=CC#N",
+          "iupac_name": "prop-2-enenitrile"
+        }
+      }
+    },
+    {
+      "smiles": "CCC#N",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143932,
+      "content_hash": "ce1a7ccdd9ace62c4d2705f7e9eb098c6d15328e326d91a12630e66ebc8b1b2b",
+      "outcome": {
+        "Found": {
+          "cid": 7854,
+          "molecular_formula": "C3H5N",
+          "connectivity_smiles": "CCC#N",
+          "iupac_name": "propanenitrile"
+        }
+      }
+    },
+    {
+      "smiles": "C=CCCCC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143933,
+      "content_hash": "0b6ec304eade7f8676794c9debf7419977030b229c19d61b5efaecaa92eb5ad5",
+      "outcome": {
+        "Found": {
+          "cid": 11597,
+          "molecular_formula": "C6H12",
+          "connectivity_smiles": "CCCCC=C",
+          "iupac_name": "hex-1-ene"
+        }
+      }
+    },
+    {
+      "smiles": "CCCCCC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143934,
+      "content_hash": "43645b050d0ca667993a36e15102d9b594444269b4f8b70bb6995ccf88aacde7",
+      "outcome": {
+        "Found": {
+          "cid": 8058,
+          "molecular_formula": "C6H14",
+          "connectivity_smiles": "CCCCCC",
+          "iupac_name": "hexane"
+        }
+      }
+    },
+    {
+      "smiles": "C1=CC=CC=C1C(=O)O",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143935,
+      "content_hash": "bc9f21301c187c1212a7c9d6f70df38ca3c8b158877b5727159b6dffa3010258",
+      "outcome": {
+        "Found": {
+          "cid": 243,
+          "molecular_formula": "C7H6O2",
+          "connectivity_smiles": "C1=CC=C(C=C1)C(=O)O",
+          "iupac_name": "benzoic acid"
+        }
+      }
+    },
+    {
+      "smiles": "C1=CC=CC=C1C(=O)OC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143937,
+      "content_hash": "a7d79e5fdbd78bdf8b071e609f16c12ec96917fc1227dcca53ff4139d91b61d4",
+      "outcome": {
+        "Found": {
+          "cid": 7150,
+          "molecular_formula": "C8H8O2",
+          "connectivity_smiles": "COC(=O)C1=CC=CC=C1",
+          "iupac_name": "methyl benzoate"
+        }
+      }
+    },
+    {
+      "smiles": "c1ccccc1[N+](=O)[O-]",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143938,
+      "content_hash": "49557a9375918c4282b9fc095ed4a0c6a36c995bef3cc25e0bbbf4eb46db89bd",
+      "outcome": {
+        "Found": {
+          "cid": 7416,
+          "molecular_formula": "C6H5NO2",
+          "connectivity_smiles": "C1=CC=C(C=C1)[N+](=O)[O-]",
+          "iupac_name": "nitrobenzene"
+        }
+      }
+    },
+    {
+      "smiles": "c1ccccc1N",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143940,
+      "content_hash": "774bb8269fd1eadc5869befaf32497143363dcda87fc3b82d6c5a4a9a41b3a74",
+      "outcome": {
+        "Found": {
+          "cid": 6115,
+          "molecular_formula": "C6H7N",
+          "connectivity_smiles": "C1=CC=C(C=C1)N",
+          "iupac_name": "aniline"
+        }
+      }
+    },
+    {
+      "smiles": "OCCOOCC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143941,
+      "content_hash": "d5e8f2007a52ac8e29e320a084f27db27f0cf719f24b1f47b713b6bd77ba6137",
+      "outcome": {
+        "Found": {
+          "cid": 72365531,
+          "molecular_formula": "C4H10O3",
+          "connectivity_smiles": "CCOOCCO",
+          "iupac_name": "2-ethylperoxyethanol"
+        }
+      }
+    },
+    {
+      "smiles": "CC(=O)OCCOOCC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143942,
+      "content_hash": "64cea44a0c3744c4671c0c0f7d2c7e9513b36fec7cf91df5057b21496534fda2",
+      "outcome": {
+        "Found": {
+          "cid": 20215751,
+          "molecular_formula": "C6H12O4",
+          "connectivity_smiles": "CCOOCCOC(=O)C",
+          "iupac_name": "2-ethylperoxyethyl acetate"
+        }
+      }
+    },
+    {
+      "smiles": "OCCN(=O)=O",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143944,
+      "content_hash": "5a91e4d6044d25f71a50b9df8e4b4e67e4c46ef4ba9168f55017f6e71d2fdbb7",
+      "outcome": {
+        "Found": {
+          "cid": 12252,
+          "molecular_formula": "C2H5NO3",
+          "connectivity_smiles": "C(CO)[N+](=O)[O-]",
+          "iupac_name": "2-nitroethanol"
+        }
+      }
+    },
+    {
+      "smiles": "CC(=O)OCCN(=O)=O",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143945,
+      "content_hash": "cd8f5a30eeeed149f1c2150ba206b74cde8a790b536cbf4bdbbfd208c459090e",
+      "outcome": {
+        "Found": {
+          "cid": 11815399,
+          "molecular_formula": "C4H7NO4",
+          "connectivity_smiles": "CC(=O)OCC[N+](=O)[O-]",
+          "iupac_name": "2-nitroethyl acetate"
+        }
+      }
+    },
+    {
+      "smiles": "C",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143946,
+      "content_hash": "95823690dce8943972d9eba6b0e242ea14139f5a91a043ab354ee11878a2631e",
+      "outcome": {
+        "Found": {
+          "cid": 297,
+          "molecular_formula": "CH4",
+          "connectivity_smiles": "C",
+          "iupac_name": "methane"
+        }
+      }
+    },
+    {
+      "smiles": "ClCl",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143948,
+      "content_hash": "0052d853709049d7fba8e00e4f670c086e73d531a1cb3faa14434e9a291fbd57",
+      "outcome": {
+        "Found": {
+          "cid": 24526,
+          "molecular_formula": "Cl2",
+          "connectivity_smiles": "ClCl",
+          "iupac_name": "molecular chlorine"
+        }
+      }
+    },
+    {
+      "smiles": "CCl",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143949,
+      "content_hash": "545f90c5d201b0ea04a8303f2f98be0cfa217a88480d2dae91ec3596c00764ca",
+      "outcome": {
+        "Found": {
+          "cid": 6327,
+          "molecular_formula": "CH3Cl",
+          "connectivity_smiles": "CCl",
+          "iupac_name": "chloromethane"
+        }
+      }
+    },
+    {
+      "smiles": "Cl",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143951,
+      "content_hash": "57a218067f5917433f0ca8fe06230b3694a11183ece72fbf3df5529117add5d7",
+      "outcome": {
+        "Found": {
+          "cid": 313,
+          "molecular_formula": "ClH",
+          "connectivity_smiles": "Cl",
+          "iupac_name": "chlorane"
+        }
+      }
+    },
+    {
+      "smiles": "CC(=O)C",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143952,
+      "content_hash": "28c64518ce8e6b300a8a0863e86ff3814e3d4c59bf25ba4cd52ee2d2361e0e38",
+      "outcome": {
+        "Found": {
+          "cid": 180,
+          "molecular_formula": "C3H6O",
+          "connectivity_smiles": "CC(=O)C",
+          "iupac_name": "propan-2-one"
+        }
+      }
+    },
+    {
+      "smiles": "CC(O)C",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143953,
+      "content_hash": "aaca7bfb0b355f831b5c2381ad810c1ebef7475a4e40c172b4cc4cf6d8883c2a",
+      "outcome": {
+        "Found": {
+          "cid": 3776,
+          "molecular_formula": "C3H8O",
+          "connectivity_smiles": "CC(C)O",
+          "iupac_name": "propan-2-ol"
+        }
+      }
+    },
+    {
+      "smiles": "c1ccccc1N(=O)=O",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143955,
+      "content_hash": "49557a9375918c4282b9fc095ed4a0c6a36c995bef3cc25e0bbbf4eb46db89bd",
+      "outcome": {
+        "Found": {
+          "cid": 7416,
+          "molecular_formula": "C6H5NO2",
+          "connectivity_smiles": "C1=CC=C(C=C1)[N+](=O)[O-]",
+          "iupac_name": "nitrobenzene"
+        }
+      }
+    },
+    {
+      "smiles": "CC(=O)OCCC",
+      "source_host": "pubchem.ncbi.nlm.nih.gov",
+      "retrieved_at_unix_secs": 1784143956,
+      "content_hash": "2ba4bbf677cd904060c08661a61536e29adf25defe95cbce6f25a5e6d7a35d91",
+      "outcome": {
+        "Found": {
+          "cid": 7997,
+          "molecular_formula": "C5H10O2",
+          "connectivity_smiles": "CCCOC(=O)C",
+          "iupac_name": "propyl acetate"
+        }
+      }
+    }
+  ]
+}

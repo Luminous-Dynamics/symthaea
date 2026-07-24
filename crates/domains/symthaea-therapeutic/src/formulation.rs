@@ -9,6 +9,7 @@
 //! Science: Persons (2008) case formulation, Johnstone & Dallos (2013) 5P model,
 //! Beck (1979) cognitive model (core beliefs → intermediate → automatic thoughts).
 
+use crate::semantic_encoding::encode_therapeutic_text;
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::BinaryHV;
 
@@ -29,12 +30,10 @@ pub struct FormulationFactor {
 impl FormulationFactor {
     /// Create a new formulation factor with HDC encoding.
     pub fn new(description: &str, confidence: f32) -> Self {
-        let hash = blake3::hash(format!("factor:{}", description).as_bytes());
-        let seed = u64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap());
         Self {
             description: description.to_string(),
             confidence: confidence.clamp(0.0, 1.0),
-            encoding: Some(BinaryHV::random(seed)),
+            encoding: encode_therapeutic_text(description),
         }
     }
 }

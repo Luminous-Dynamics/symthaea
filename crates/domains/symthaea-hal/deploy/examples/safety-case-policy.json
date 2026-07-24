@@ -1,0 +1,12 @@
+{
+  "required_claim_ids": [
+    "configuration.reviewed",
+    "hil.current-decay",
+    "hil.shutdown",
+    "operator.dual-control",
+    "procedure.maintenance-lockout",
+    "procedure.recovery",
+    "watchdog.independent"
+  ],
+  "maximum_future_issue_skew_ms": 5000
+}

@@ -108,10 +108,34 @@ fn test_engine_spectral_mip_fires_at_interval_47() {
 fn test_unified_consciousness_bounded() {
     let engine = make_engine();
 
-    assert!(engine.compute_unified(Some(100.0), 1.0, 1.0, 1.0) <= 1.0);
-    assert!(engine.compute_unified(Some(0.0), 0.0, 0.0, 0.0) >= 0.0);
-    assert!(engine.compute_unified(None, 0.5, 0.5, 0.5) >= 0.0);
-    assert!(engine.compute_unified(None, 0.5, 0.5, 0.5) <= 1.0);
+    assert!(engine.compute_unified(Some(100.0), Some(1.0), Some(1.0), Some(1.0)) <= 1.0);
+    assert!(engine.compute_unified(Some(0.0), Some(0.0), Some(0.0), Some(0.0)) >= 0.0);
+    assert!(engine.compute_unified(None, Some(0.5), Some(0.5), Some(0.5)) >= 0.0);
+    assert!(engine.compute_unified(None, Some(0.5), Some(0.5), Some(0.5)) <= 1.0);
+}
+
+#[test]
+fn test_unified_consciousness_renormalizes_over_present_systems() {
+    let engine = make_engine();
+
+    // Absent systems must not deflate the consensus: spectral-only (the
+    // production configuration — the other three are None at the construction
+    // site) should equal the value where the others are present AND agree
+    // with the normalized spectral score, and must exceed the old behavior
+    // of counting absences as zeros.
+    let spectral_only = engine.compute_unified(Some(2.0), None, None, None);
+    let with_zeros = {
+        // Simulate the old bug: present systems reporting literal 0.0
+        engine.compute_unified(Some(2.0), Some(0.0), Some(0.0), Some(0.0))
+    };
+    assert!(
+        spectral_only > with_zeros,
+        "absent systems must not act as zero-votes: spectral_only={spectral_only} with_zeros={with_zeros}"
+    );
+
+    // All-absent (no spectral either) hits the consciousness floor, not NaN.
+    let none_at_all = engine.compute_unified(None, None, None, None);
+    assert!(none_at_all.is_finite() && none_at_all >= 0.05);
 }
 
 #[test]
@@ -745,9 +769,9 @@ fn test_unified_consciousness_still_bounded() {
     };
     engine.update_weights_from_emergence(structural.emergence_ratio);
 
-    let unified = engine.compute_unified(Some(100.0), 1.0, 1.0, 1.0);
+    let unified = engine.compute_unified(Some(100.0), Some(1.0), Some(1.0), Some(1.0));
     assert!((0.0..=1.0).contains(&unified));
-    let unified2 = engine.compute_unified(Some(0.0), 0.0, 0.0, 0.0);
+    let unified2 = engine.compute_unified(Some(0.0), Some(0.0), Some(0.0), Some(0.0));
     assert!((0.0..=1.0).contains(&unified2));
 }
 

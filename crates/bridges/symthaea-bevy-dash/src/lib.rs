@@ -55,6 +55,10 @@ pub struct CognitiveStateResource {
     pub self_awareness: f64,
     /// Phi_master: the full 7-theory product invariant [0..1]
     pub topological_unity: f64,
+    /// Live neuromodulator levels: [ACh (plasticity), NE (surprise), DA (utility), 5-HT (exploration)]
+    pub neuromodulators: [f32; 4],
+    /// Active inference motor command type string
+    pub motor_command: String,
 }
 
 /// Component for a node in the 3D consciousness graph.
@@ -89,11 +93,7 @@ pub struct ImaginationTexture {
     pub last_update: f64,
 }
 
-/// Non-blocking receiver resource for incoming telemetry frames
-#[derive(Resource)]
-struct TelemetryReceiver {
-    rx: std::sync::Mutex<std::sync::mpsc::Receiver<symthaea_telemetry_grpc::TelemetryFrame>>,
-}
+// Mutex-wrapped struct deleted in favor of direct NonSend resource insertion.
 
 /// Plugin to add Symthaea visualization capabilities to a Bevy app.
 pub struct SymthaeaDashPlugin;
@@ -150,9 +150,7 @@ impl Plugin for SymthaeaDashPlugin {
 
         app.add_plugins(EguiPlugin)
             .add_plugins(UiMaterialPlugin::<ImaginationScreenMaterial>::default())
-            .insert_resource(TelemetryReceiver {
-                rx: std::sync::Mutex::new(rx),
-            })
+            .insert_non_send_resource(rx)
             .init_resource::<CognitiveStateResource>()
             .add_systems(Startup, setup_scene)
             .add_systems(
@@ -171,66 +169,73 @@ impl Plugin for SymthaeaDashPlugin {
 }
 
 fn poll_telemetry_stream(
-    receiver: Res<TelemetryReceiver>,
+    receiver: NonSend<std::sync::mpsc::Receiver<symthaea_telemetry_grpc::TelemetryFrame>>,
     mut state: ResMut<CognitiveStateResource>,
 ) {
-    if let Ok(rx) = receiver.rx.lock() {
-        while let Ok(frame) = rx.try_recv() {
-            state.phi = frame.phi;
-            state.arousal = frame.arousal as f64;
-            state.uncertainty = frame.uncertainty as f64;
-            // LTC-inspired fast attack for surprise spikes
-            if frame.surprise > state.surprise {
-                state.surprise = frame.surprise;
-                state.surprise_visual_decay = frame.surprise;
-            } else {
-                state.surprise = frame.surprise;
-            }
+    while let Ok(frame) = receiver.try_recv() {
+        state.phi = frame.phi;
+        if frame.neuromodulators.len() >= 4 {
+            state.neuromodulators = [
+                frame.neuromodulators[0],
+                frame.neuromodulators[1],
+                frame.neuromodulators[2],
+                frame.neuromodulators[3],
+            ];
+        }
+        state.arousal = frame.arousal as f64;
+        state.uncertainty = frame.uncertainty as f64;
+        // LTC-inspired fast attack for surprise spikes
+        if frame.surprise > state.surprise {
+            state.surprise = frame.surprise;
+            state.surprise_visual_decay = frame.surprise;
+        } else {
+            state.surprise = frame.surprise;
+        }
 
-            // === Ingest 7-Theory Fields ===
-            state.gwt_broadcast = frame.gwt_broadcast;
-            state.hot_metacognitive = frame.hot_metacognitive;
-            state.ast_temporal = frame.ast_temporal;
-            state.knowledge_coherence = frame.knowledge_coherence;
-            state.embodiment_level = frame.embodiment_level;
-            state.self_awareness = frame.self_awareness;
-            state.topological_unity = frame.topological_unity;
+        // === Ingest 7-Theory Fields ===
+        state.gwt_broadcast = frame.gwt_broadcast;
+        state.hot_metacognitive = frame.hot_metacognitive;
+        state.ast_temporal = frame.ast_temporal;
+        state.knowledge_coherence = frame.knowledge_coherence;
+        state.embodiment_level = frame.embodiment_level;
+        state.self_awareness = frame.self_awareness;
+        state.topological_unity = frame.topological_unity;
+        state.motor_command = frame.motor_command.clone();
 
-            // Construct integration report from received data
-            let report = IntegrationReport {
-                integration_index: frame.phi,
-                total_mutual_information: 1.0,
-                minimum_information_partition: (vec![], vec![]),
-                spectral_order: vec![0; frame.harmonies.len()],
-                temporal_coherence: None,
-                normalized_index: frame.phi,
-                variable_contributions: vec![],
-                betti_numbers: [1, frame.harmonies.len(), 0],
-                persistent_cycles: frame
-                    .harmonies
-                    .iter()
-                    .enumerate()
-                    .map(|(i, &h)| symthaea_phi_oracle::PersistentCycle {
-                        birth: i as f64,
-                        death: (i + 1) as f64,
-                        lifespan: h as f64,
-                        participants: vec![],
-                    })
-                    .collect(),
-                num_observations: 1,
-            };
-            state.report = Some(report);
+        // Construct integration report from received data
+        let report = IntegrationReport {
+            integration_index: frame.phi,
+            total_mutual_information: 1.0,
+            minimum_information_partition: (vec![], vec![]),
+            spectral_order: vec![0; frame.harmonies.len()],
+            temporal_coherence: None,
+            normalized_index: frame.phi,
+            variable_contributions: vec![],
+            betti_numbers: [1, frame.harmonies.len(), 0],
+            persistent_cycles: frame
+                .harmonies
+                .iter()
+                .enumerate()
+                .map(|(i, &h)| symthaea_phi_oracle::PersistentCycle {
+                    birth: i as f64,
+                    death: (i + 1) as f64,
+                    lifespan: h as f64,
+                    participants: vec![],
+                })
+                .collect(),
+            num_observations: 1,
+        };
+        state.report = Some(report);
 
-            if let Some(movie) = frame.mental_movie {
-                state.last_imagination = Some(MentalMovie {
-                    pixel_data: movie.pixel_data,
-                    width: movie.width,
-                    height: movie.height,
-                    channels: movie.channels as usize,
-                    semantic_coherence: movie.semantic_coherence,
-                    sequence_index: movie.sequence_index,
-                });
-            }
+        if let Some(movie) = frame.mental_movie {
+            state.last_imagination = Some(MentalMovie {
+                pixel_data: movie.pixel_data,
+                width: movie.width,
+                height: movie.height,
+                channels: movie.channels as usize,
+                semantic_coherence: movie.semantic_coherence,
+                sequence_index: movie.sequence_index,
+            });
         }
     }
 }
@@ -657,5 +662,59 @@ fn render_consciousness_equation(mut contexts: EguiContexts, state: Res<Cognitiv
                     egui::Color32::BLACK,
                 );
             }
+
+            ui.separator();
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("Motor Action:")
+                        .size(10.0)
+                        .color(egui::Color32::GRAY),
+                );
+                ui.label(
+                    egui::RichText::new(&state.motor_command)
+                        .monospace()
+                        .size(10.0)
+                        .color(egui::Color32::from_rgb(255, 180, 0)),
+                );
+            });
+        });
+
+    egui::Window::new("Neuromodulator State")
+        .default_pos([300.0, 450.0])
+        .default_width(240.0)
+        .resizable(true)
+        .show(ctx, |ui| {
+            theory_row(
+                ui,
+                "ACh",
+                "Plasticity / Learn Rate",
+                state.neuromodulators[0] as f64,
+                180.0,
+                200.0,
+            );
+            theory_row(
+                ui,
+                "NE",
+                "Surprise / TD Error",
+                state.neuromodulators[1] as f64,
+                0.0,
+                30.0,
+            );
+            theory_row(
+                ui,
+                "DA",
+                "Utility / Pragmatic",
+                state.neuromodulators[2] as f64,
+                100.0,
+                120.0,
+            );
+            theory_row(
+                ui,
+                "5-HT",
+                "Epistemic / Explore",
+                state.neuromodulators[3] as f64,
+                240.0,
+                260.0,
+            );
         });
 }

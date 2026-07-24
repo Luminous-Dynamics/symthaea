@@ -133,6 +133,135 @@ impl Default for MisakiVocab {
     }
 }
 
+/// The REAL Kokoro-82M token vocabulary (115 tokens, IDs 0-177, sparse),
+/// generated verbatim from `onnx-community/Kokoro-82M-v1.0-ONNX/tokenizer.json`
+/// (fetched 2026-07-15, voice plan LF4). Every token is a single char.
+///
+/// This is deliberately separate from [`MisakiVocab`]: that 45-ID space is
+/// also consumed by the orchestrator's phoneme→formant fallback table, so it
+/// must not change; the Kokoro engine needs *these* IDs to produce anything
+/// but garbled audio.
+pub fn kokoro_token_id(c: char) -> Option<u32> {
+    match c {
+        '$' => Some(0),
+        ';' => Some(1),
+        ':' => Some(2),
+        ',' => Some(3),
+        '.' => Some(4),
+        '!' => Some(5),
+        '?' => Some(6),
+        '—' => Some(9),
+        '…' => Some(10),
+        '"' => Some(11),
+        '(' => Some(12),
+        ')' => Some(13),
+        '“' => Some(14),
+        '”' => Some(15),
+        ' ' => Some(16),
+        '\u{303}' => Some(17),
+        'ʣ' => Some(18),
+        'ʥ' => Some(19),
+        'ʦ' => Some(20),
+        'ʨ' => Some(21),
+        'ᵝ' => Some(22),
+        'ꭧ' => Some(23),
+        'A' => Some(24),
+        'I' => Some(25),
+        'O' => Some(31),
+        'Q' => Some(33),
+        'S' => Some(35),
+        'T' => Some(36),
+        'W' => Some(39),
+        'Y' => Some(41),
+        'ᵊ' => Some(42),
+        'a' => Some(43),
+        'b' => Some(44),
+        'c' => Some(45),
+        'd' => Some(46),
+        'e' => Some(47),
+        'f' => Some(48),
+        'h' => Some(50),
+        'i' => Some(51),
+        'j' => Some(52),
+        'k' => Some(53),
+        'l' => Some(54),
+        'm' => Some(55),
+        'n' => Some(56),
+        'o' => Some(57),
+        'p' => Some(58),
+        'q' => Some(59),
+        'r' => Some(60),
+        's' => Some(61),
+        't' => Some(62),
+        'u' => Some(63),
+        'v' => Some(64),
+        'w' => Some(65),
+        'x' => Some(66),
+        'y' => Some(67),
+        'z' => Some(68),
+        'ɑ' => Some(69),
+        'ɐ' => Some(70),
+        'ɒ' => Some(71),
+        'æ' => Some(72),
+        'β' => Some(75),
+        'ɔ' => Some(76),
+        'ɕ' => Some(77),
+        'ç' => Some(78),
+        'ɖ' => Some(80),
+        'ð' => Some(81),
+        'ʤ' => Some(82),
+        'ə' => Some(83),
+        'ɚ' => Some(85),
+        'ɛ' => Some(86),
+        'ɜ' => Some(87),
+        'ɟ' => Some(90),
+        'ɡ' => Some(92),
+        'ɥ' => Some(99),
+        'ɨ' => Some(101),
+        'ɪ' => Some(102),
+        'ʝ' => Some(103),
+        'ɯ' => Some(110),
+        'ɰ' => Some(111),
+        'ŋ' => Some(112),
+        'ɳ' => Some(113),
+        'ɲ' => Some(114),
+        'ɴ' => Some(115),
+        'ø' => Some(116),
+        'ɸ' => Some(118),
+        'θ' => Some(119),
+        'œ' => Some(120),
+        'ɹ' => Some(123),
+        'ɾ' => Some(125),
+        'ɻ' => Some(126),
+        'ʁ' => Some(128),
+        'ɽ' => Some(129),
+        'ʂ' => Some(130),
+        'ʃ' => Some(131),
+        'ʈ' => Some(132),
+        'ʧ' => Some(133),
+        'ʊ' => Some(135),
+        'ʋ' => Some(136),
+        'ʌ' => Some(138),
+        'ɣ' => Some(139),
+        'ɤ' => Some(140),
+        'χ' => Some(142),
+        'ʎ' => Some(143),
+        'ʒ' => Some(147),
+        'ʔ' => Some(148),
+        'ˈ' => Some(156),
+        'ˌ' => Some(157),
+        'ː' => Some(158),
+        'ʰ' => Some(162),
+        'ʲ' => Some(164),
+        '↓' => Some(169),
+        '→' => Some(171),
+        '↗' => Some(172),
+        '↘' => Some(173),
+        'ᵻ' => Some(177),
+        _ => None,
+    }
+}
+
 /// G2P converter using espeak-ng when available, with fallback to lookup table.
 pub struct G2PConverter {
     /// Misaki vocabulary for IPA → phoneme ID conversion
@@ -267,6 +396,36 @@ impl G2PConverter {
         }
     }
 
+    /// Convert text to REAL Kokoro-82M token IDs (espeak IPA → per-char
+    /// [`kokoro_token_id`] lookup). Returns `None` when espeak is unavailable
+    /// or produced nothing — there is deliberately no fallback here, because
+    /// feeding approximate IDs to the neural model is how the old 45-ID
+    /// mapping produced garble. Unknown IPA chars are skipped.
+    #[cfg(feature = "voice-tts")]
+    pub fn text_to_kokoro_tokens(&self, text: &str) -> Option<Vec<u32>> {
+        use espeak_rs::text_to_phonemes;
+
+        if !self.espeak_available {
+            return None;
+        }
+        let phoneme_strings = text_to_phonemes(text, "en-us", None, false, false).ok()?;
+        let mut ids = Vec::new();
+        for (i, sentence) in phoneme_strings.iter().enumerate() {
+            if i > 0 {
+                // Sentence boundary → period token.
+                ids.push(4);
+            }
+            for c in sentence.trim().chars() {
+                // espeak emits newlines between clauses; normalize to space.
+                let c = if c == '\n' { ' ' } else { c };
+                if let Some(id) = kokoro_token_id(c) {
+                    ids.push(id);
+                }
+            }
+        }
+        if ids.is_empty() { None } else { Some(ids) }
+    }
+
     /// Convert text to a sequence of phoneme IDs.
     pub fn text_to_phonemes(&self, text: &str) -> Vec<u32> {
         // Try espeak-ng first if available
@@ -399,5 +558,34 @@ mod tests {
     fn test_vocab_size() {
         let g2p = G2PConverter::new();
         assert_eq!(g2p.vocab_size(), 45);
+    }
+
+    #[test]
+    fn test_kokoro_vocab_spot_checks() {
+        // Verbatim values from onnx-community/Kokoro-82M-v1.0-ONNX
+        // tokenizer.json (2026-07-15).
+        assert_eq!(kokoro_token_id('$'), Some(0));
+        assert_eq!(kokoro_token_id(' '), Some(16));
+        assert_eq!(kokoro_token_id('a'), Some(43));
+        assert_eq!(kokoro_token_id('z'), Some(68));
+        assert_eq!(kokoro_token_id('ə'), Some(83));
+        assert_eq!(kokoro_token_id('ʃ'), Some(131));
+        assert_eq!(kokoro_token_id('ˈ'), Some(156));
+        assert_eq!(kokoro_token_id('ᵻ'), Some(177));
+        assert_eq!(kokoro_token_id('~'), None);
+    }
+
+    #[cfg(feature = "voice-tts")]
+    #[test]
+    fn test_kokoro_tokens_via_espeak() {
+        let g2p = G2PConverter::new();
+        if let Some(ids) = g2p.text_to_kokoro_tokens("hello world") {
+            assert!(ids.len() >= 6, "expected several tokens: {ids:?}");
+            // All IDs must be within the model's 0-177 sparse space.
+            assert!(ids.iter().all(|&id| id <= 177));
+            // Word boundary space token should be present.
+            assert!(ids.contains(&16));
+        }
+        // None (espeak missing at runtime) is acceptable — no fallback by design.
     }
 }

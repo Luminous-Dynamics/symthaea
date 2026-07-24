@@ -2,11 +2,10 @@
 name = "symthaea-muse"
 version = "0.1.0"
 edition = "2024"
-description = "Consciousness-driven music synthesis for Symthaea — CfC temporal dynamics to tonal art"
+description = "Symbolic composition, cognitive planning, and audio realization for Symthaea"
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-wgpu.workspace = true
 
 
 symthaea-core = { path = "../../core/symthaea-core" }
@@ -19,12 +18,13 @@ flacenc = "0.5.1"
 rustfft = { workspace = true }
 midly = "0.5"
 serde_json = { workspace = true }
+sha2 = "0.10"
 bevy = { version = "0.18", default-features = false, optional = true }
-symthaea-voice = { path = "../symthaea-voice", optional = true }
 symthaea-vocal-tract = { path = "../symthaea-vocal-tract", optional = true }
 symthaea-broca = { path = "../symthaea-broca", optional = true }
 # Symbolic music theory: the "what to play" composer whose Score muse realizes.
 symthaea-music-theory = { path = "../symthaea-music-theory", optional = true }
+symthaea-muse-protocol = { path = "../symthaea-muse-protocol", optional = true }
 
 # Real-time audio output (optional)
 cpal = { version = "0.17", optional = true }
@@ -43,6 +43,16 @@ tokenizers = { version = "0.21", optional = true }
 # Muse Studio local web app (feature `studio`).
 axum = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
+tower-http = { version = "0.5", features = ["cors", "fs"], optional = true }
+# Genealogy ledger (src/genealogy.rs): structured/relational metadata only —
+# audio/MIDI bytes stay in the existing data/taste/audio/<key>/ content-
+# addressed layout, matching the workspace's established embedded-DB choice
+# (symthaea-memory, symthaea-nix also use rusqlite).
+rusqlite = { workspace = true, optional = true }
+# Shared DTOs for Muse Studio's evidence-bundle endpoints (listen/performance/
+# provenance bundles) and title provenance. Also proves at compile time that
+# muse_studio.rs's real CandidateMeta/ComposeResponse JSON output matches
+# symthaea-muse-ui's shared client types (see wire_compat_tests).
 
 [dev-dependencies]
 # MP3 decoding for the DEAM emotion-regressor example (real audio features)
@@ -52,17 +62,27 @@ symphonia = { version = "0.5", default-features = false, features = ["mp3"] }
 default = []
 bevy = ["dep:bevy"]
 muse-live = ["cpal", "ringbuf"]
-voice = ["symthaea-voice", "symthaea-vocal-tract"]
-voice-kokoro = ["voice", "symthaea-voice/kokoro"]
+# Speech synthesis now comes from symthaea-vocal-tract's `speech` module
+# (the orphaned symthaea-voice crate was retired 2026-07-15; its Kokoro
+# engine never ran — the root crate's voice::kokoro_engine is the survivor).
+voice = ["symthaea-vocal-tract"]
+# Deprecated alias: muse no longer carries its own Kokoro path.
+voice-kokoro = ["voice"]
 broca = ["symthaea-broca"]
 voice-broca = ["voice-kokoro", "broca"]
 # Render a symbolic Score (from symthaea-music-theory) to audio.
-theory = ["dep:symthaea-music-theory"]
+# symthaea-muse-protocol is required here too, not just by `studio`:
+# analyst.rs (deterministic score/grammar analysis, gated on `theory` since
+# it has nothing to do with the studio web server) unconditionally imports
+# it, so `theory` alone (without `studio`) failed to compile -- found
+# 2026-07-23 building an unrelated Kokoro singing eval that transitively
+# needs `theory` via `singing`.
+theory = ["dep:symthaea-music-theory", "dep:symthaea-muse-protocol"]
 # Real Fréchet Audio Distance via a pretrained CLAP audio-tower ONNX model.
 clap-fad = ["dep:ort", "dep:hf-hub", "dep:anyhow", "dep:tokenizers"]
 # Muse Studio: the local sketch-partner web app (src/bin/muse_studio.rs).
 # Add clap-fad on top for prompt ranking.
-studio = ["theory", "dep:axum", "dep:tokio", "dep:anyhow"]
+studio = ["theory", "dep:axum", "dep:tokio", "dep:anyhow", "dep:tower-http", "dep:symthaea-muse-protocol", "dep:rusqlite"]
 
 [[example]]
 name = "live_demo"
@@ -84,7 +104,35 @@ required-features = ["clap-fad", "theory"]
 name = "muse_studio"
 required-features = ["studio"]
 
+[[bin]]
+name = "listening_test"
+required-features = ["studio"]
+
+[[bin]]
+name = "cognitive_study"
+required-features = ["theory"]
+
+[[bin]]
+name = "muse_analyst_pack"
+required-features = ["theory"]
+
+[[bin]]
+name = "muse152_listening_pack"
+required-features = ["theory"]
+
+[[bin]]
+name = "muse_motif_foundry_pilot"
+required-features = ["theory"]
+
+[[bin]]
+name = "cognitive_study_runner"
+required-features = ["studio"]
+
 [[example]]
 name = "luminous_library_hymn"
+required-features = ["theory"]
+
+[[example]]
+name = "render_ablation"
 required-features = ["theory"]
 

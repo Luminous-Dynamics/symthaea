@@ -238,6 +238,10 @@ impl CognitiveLoopService {
             detected_primitives: Vec::new(), // No text primitives for embedding input
             learning_occurred,
             training_loss,
+            // Embedding path bypasses the text encoder's bits-saved diagnostics.
+            bits_saved_persist: None,
+            bits_saved_zero: None,
+            bits_kappa: None,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             metadata: super::CycleMetadata::default(),
             thought_vector: vec![0.0; 32],
@@ -440,6 +444,9 @@ impl CognitiveLoopService {
             detected_primitives: Vec::new(),
             learning_occurred,
             training_loss,
+            bits_saved_persist: None,
+            bits_saved_zero: None,
+            bits_kappa: None,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             metadata: super::CycleMetadata {
                 urgency,

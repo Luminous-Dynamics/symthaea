@@ -5,6 +5,26 @@
 
 use crate::mesh::TriangleMesh;
 
+/// Bounded STL parser profile for untrusted uploads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StlParseLimits {
+    pub max_input_bytes: usize,
+    pub max_triangles: usize,
+    pub max_ascii_lines: usize,
+    pub max_ascii_line_bytes: usize,
+}
+
+impl Default for StlParseLimits {
+    fn default() -> Self {
+        Self {
+            max_input_bytes: 512 * 1024 * 1024,
+            max_triangles: 5_000_000,
+            max_ascii_lines: 25_000_000,
+            max_ascii_line_bytes: 16 * 1024,
+        }
+    }
+}
+
 /// Parse a binary STL file into a TriangleMesh.
 ///
 /// Binary STL format:
@@ -15,12 +35,41 @@ use crate::mesh::TriangleMesh;
 ///   - 36 bytes: 3 vertices (9×f32 LE)
 ///   - 2 bytes: attribute byte count (ignored)
 pub fn parse_binary_stl(data: &[u8]) -> Result<TriangleMesh, StlError> {
+    parse_binary_stl_with_limits(data, StlParseLimits::default())
+}
+
+/// Parse binary STL with explicit allocation and work limits.
+pub fn parse_binary_stl_with_limits(
+    data: &[u8],
+    limits: StlParseLimits,
+) -> Result<TriangleMesh, StlError> {
+    if data.len() > limits.max_input_bytes {
+        return Err(StlError::ResourceLimit {
+            resource: "input bytes",
+            limit: limits.max_input_bytes,
+        });
+    }
     if data.len() < 84 {
         return Err(StlError::TooShort(data.len()));
     }
 
     let tri_count = u32::from_le_bytes([data[80], data[81], data[82], data[83]]) as usize;
-    let expected_len = 84 + tri_count * 50;
+    if tri_count > limits.max_triangles {
+        return Err(StlError::ResourceLimit {
+            resource: "triangles",
+            limit: limits.max_triangles,
+        });
+    }
+    let triangle_bytes = tri_count.checked_mul(50).ok_or(StlError::ResourceLimit {
+        resource: "triangle bytes",
+        limit: limits.max_input_bytes,
+    })?;
+    let expected_len = 84usize
+        .checked_add(triangle_bytes)
+        .ok_or(StlError::ResourceLimit {
+            resource: "input bytes",
+            limit: limits.max_input_bytes,
+        })?;
     if data.len() < expected_len {
         return Err(StlError::TruncatedData {
             expected: expected_len,
@@ -77,12 +126,38 @@ pub fn is_ascii_stl(data: &[u8]) -> bool {
 
 /// Parse ASCII STL text into a TriangleMesh
 pub fn parse_ascii_stl(text: &str) -> Result<TriangleMesh, StlError> {
+    parse_ascii_stl_with_limits(text, StlParseLimits::default())
+}
+
+/// Parse ASCII STL with explicit allocation and work limits.
+pub fn parse_ascii_stl_with_limits(
+    text: &str,
+    limits: StlParseLimits,
+) -> Result<TriangleMesh, StlError> {
     let mut vertices = Vec::new();
     let mut normals = Vec::new();
     let mut indices = Vec::new();
+    if text.len() > limits.max_input_bytes {
+        return Err(StlError::ResourceLimit {
+            resource: "input bytes",
+            limit: limits.max_input_bytes,
+        });
+    }
     let mut tri_verts: Vec<[f32; 3]> = Vec::new();
 
-    for line in text.lines() {
+    for (line_index, line) in text.lines().enumerate() {
+        if line_index >= limits.max_ascii_lines {
+            return Err(StlError::ResourceLimit {
+                resource: "ASCII lines",
+                limit: limits.max_ascii_lines,
+            });
+        }
+        if line.len() > limits.max_ascii_line_bytes {
+            return Err(StlError::ResourceLimit {
+                resource: "ASCII line bytes",
+                limit: limits.max_ascii_line_bytes,
+            });
+        }
         let trimmed = line.trim();
         if trimmed.starts_with("vertex") {
             let parts: Vec<&str> = trimmed.split_whitespace().collect();
@@ -104,6 +179,12 @@ pub fn parse_ascii_stl(text: &str) -> Result<TriangleMesh, StlError> {
             tri_verts.push([x, y, z]);
 
             if tri_verts.len() == 3 {
+                if indices.len() >= limits.max_triangles {
+                    return Err(StlError::ResourceLimit {
+                        resource: "triangles",
+                        limit: limits.max_triangles,
+                    });
+                }
                 let normal = compute_normal(tri_verts[0], tri_verts[1], tri_verts[2]);
                 let idx = vertices.len() as u32;
                 vertices.extend_from_slice(&tri_verts);
@@ -127,12 +208,20 @@ pub fn parse_ascii_stl(text: &str) -> Result<TriangleMesh, StlError> {
 
 /// Auto-detect format and parse
 pub fn parse_stl(data: &[u8]) -> Result<TriangleMesh, StlError> {
+    parse_stl_with_limits(data, StlParseLimits::default())
+}
+
+/// Auto-detect and parse STL with explicit resource limits.
+pub fn parse_stl_with_limits(
+    data: &[u8],
+    limits: StlParseLimits,
+) -> Result<TriangleMesh, StlError> {
     if is_ascii_stl(data) {
         let text =
             std::str::from_utf8(data).map_err(|_| StlError::ParseError("invalid UTF-8".into()))?;
-        parse_ascii_stl(text)
+        parse_ascii_stl_with_limits(text, limits)
     } else {
-        parse_binary_stl(data)
+        parse_binary_stl_with_limits(data, limits)
     }
 }
 
@@ -176,9 +265,16 @@ fn compute_normal(v0: [f32; 3], v1: [f32; 3], v2: [f32; 3]) -> [f32; 3] {
 #[derive(Debug)]
 pub enum StlError {
     TooShort(usize),
-    TruncatedData { expected: usize, actual: usize },
+    TruncatedData {
+        expected: usize,
+        actual: usize,
+    },
     NonFiniteCoordinate(usize),
     ParseError(String),
+    ResourceLimit {
+        resource: &'static str,
+        limit: usize,
+    },
 }
 
 impl std::fmt::Display for StlError {
@@ -194,6 +290,9 @@ impl std::fmt::Display for StlError {
                 write!(f, "non-finite coordinate in triangle {}", tri)
             }
             Self::ParseError(msg) => write!(f, "STL parse error: {}", msg),
+            Self::ResourceLimit { resource, limit } => {
+                write!(f, "STL resource limit exceeded: {} > {}", resource, limit)
+            }
         }
     }
 }
@@ -211,6 +310,63 @@ mod tests {
             normals: vec![[0.0, 0.0, 1.0]; 3],
             indices: vec![[0, 1, 2]],
         }
+    }
+
+    #[test]
+    fn binary_triangle_limit_is_enforced_before_allocation() {
+        let mut data = vec![0u8; 84];
+        data[80..84].copy_from_slice(&2u32.to_le_bytes());
+        let result = parse_binary_stl_with_limits(
+            &data,
+            StlParseLimits {
+                max_triangles: 1,
+                ..StlParseLimits::default()
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(StlError::ResourceLimit {
+                resource: "triangles",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn ascii_line_limit_is_enforced() {
+        let result = parse_ascii_stl_with_limits(
+            "solid x\nendsolid x",
+            StlParseLimits {
+                max_ascii_lines: 1,
+                ..StlParseLimits::default()
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(StlError::ResourceLimit {
+                resource: "ASCII lines",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn ascii_triangle_limit_is_enforced() {
+        let ascii = "solid x\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendsolid x";
+        let result = parse_ascii_stl_with_limits(
+            ascii,
+            StlParseLimits {
+                max_triangles: 0,
+                ..StlParseLimits::default()
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(StlError::ResourceLimit {
+                resource: "triangles",
+                ..
+            })
+        ));
     }
 
     #[test]

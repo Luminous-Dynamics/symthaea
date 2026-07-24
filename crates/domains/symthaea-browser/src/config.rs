@@ -8,9 +8,11 @@ use serde::{Deserialize, Serialize};
 use crate::safety::BrowserSafetyPolicy;
 
 /// Configuration for a browser agent instance.
+///
+/// Observation and timeout limits are enforced by `CdpSession`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserAgentConfig {
-    /// WebSocket URL for CDP connection (e.g. "ws://127.0.0.1:9222").
+    /// CDP debug endpoint (e.g. "http://127.0.0.1:9222" or a WebSocket URL).
     /// If `None`, a new Chrome process will be launched.
     pub cdp_url: Option<String>,
     /// Run Chrome in headless mode.

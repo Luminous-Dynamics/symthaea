@@ -610,7 +610,7 @@ mod tests {
             urgency,
             timestamp_s: 1_700_000_000,
             payload_type: super::super::PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0; 32],
             ttl: 0,
             wisdom: test_hv(0xAB),
         }
@@ -828,9 +828,9 @@ mod tests {
 
         mesh.send(&heartbeat).unwrap();
 
-        // Uncompressed would need 11 fragments (2072 bytes / 210-byte LoRa payload).
+        // Uncompressed needs 11 fragments (2104 bytes / 214-byte LoRa payload).
         // With the COMPRESS_NONE envelope (1-byte header) but no LZ4 feature,
-        // we get 2073 bytes → 11 fragments. With LZ4, all-zero payload compresses
+        // we get 2105 bytes → 11 fragments. With LZ4, all-zero payload compresses
         // dramatically → significantly fewer fragments.
         // This test verifies the pipeline doesn't panic and round-trips correctly.
         // Fragment count reduction is validated when lz4_compression feature is on.

@@ -4,7 +4,10 @@
 
 use std::net::SocketAddr;
 use std::time::Duration;
-use symthaea_fep::{ActiveInferenceAgentConfig, EnhancedFEPBridge};
+use symthaea_consciousness_equation::{
+    ConsciousnessInputs, MasterConsciousnessEquation, MasterEquationConfig,
+};
+use symthaea_fep::{ActiveInferenceAgentConfig, EnhancedFEPBridge, MotorCommandType};
 use symthaea_telemetry_grpc::{TelemetryBroadcaster, TelemetryFrame};
 
 #[tokio::main]
@@ -31,6 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let broadcaster_clone = broadcaster.clone();
     tokio::spawn(async move {
+        let mut equation = MasterConsciousnessEquation::new(MasterEquationConfig::default());
         let mut count: u64 = 0;
         loop {
             // Run at roughly ~200Hz
@@ -107,37 +111,61 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // Run the full FEP perception-action-learning cycle
                 let fep_result = fep.core.process(phi, integration, coherence, attention);
 
-                // === Map FEP outputs to 7-Theory gRPC fields ===
+                // === Feed live FEP & Oracle telemetry into the MasterConsciousnessEquation ===
 
-                // A_GWT: Global broadcast = integration (how much phi escapes local partitions)
-                let gwt_broadcast = integration.clamp(0.0, 1.0);
+                // 1. Update embodiment factor with FEP sensory-motor prediction error
+                equation
+                    .embodiment_factor
+                    .record_prediction(fep_result.prediction_error, 0.0);
+                equation.embodiment_factor.update_interoceptive(
+                    fep_result.model_confidence,
+                    fep_result.belief_confidence,
+                );
 
-                // M_HOT: Metacognitive confidence = FEP model_confidence (TD-learned)
+                // 2. Update narrative coherence on a periodic basis to simulate narrative consolidation
+                if count % 100 == 0 {
+                    equation.narrative_coherence.add_episode(
+                        format!("Telemetry epoch {}, sequence: {}", count / 100, count),
+                        fep_result.pragmatic_value,
+                    );
+                }
+
+                // 3. Update self-model of social embedding based on active inference confidence
+                equation.social_embedding.update_self_model(
+                    vec![
+                        "epistemic_minimization".to_string(),
+                        "pragmatic_utility".to_string(),
+                    ],
+                    vec!["active_inference_generative_model".to_string()],
+                    fep_result.pragmatic_value,
+                );
+
+                // 4. Populate 8 component inputs for the Master Equation
+                let inputs = ConsciousnessInputs {
+                    phi,
+                    broadcast: integration.clamp(0.0, 1.0),
+                    working_memory: fep_result.learning_rate_modulation.clamp(0.0, 1.0),
+                    attention: attention.clamp(0.0, 1.0),
+                    recurrence: 0.85, // Recurrent processing proxy
+                    embodiment: (1.0 - (fep_result.free_energy / 5.0).clamp(0.0, 1.0))
+                        .clamp(0.0, 1.0),
+                    knowledge: fep_result.belief_confidence.clamp(0.0, 1.0),
+                    synchrony: fep_result.epistemic_value.clamp(0.0, 1.0),
+                };
+
+                // 5. Evaluate the Master Consciousness Equation C(t)
+                let eq_result = equation.compute(&inputs);
+
+                // === Map 7-Theory fields to evaluated Master Equation outputs ===
+                let gwt_broadcast = eq_result.factors.broadcast;
                 let hot_metacognitive = fep_result.model_confidence.clamp(0.0, 1.0);
+                let ast_temporal = eq_result.factors.attention;
 
-                // S_AST: Attention schema = attention signal (spectral entropy of ordering)
-                let ast_temporal = attention.clamp(0.0, 1.0);
-
-                // K_W: Knowledge coherence = belief_confidence (how tight the posterior is)
-                let knowledge_coherence = fep_result.belief_confidence.clamp(0.0, 1.0);
-
-                // E_FEP: Embodiment = 1 - normalized free energy (low FE = high embodied grounding)
-                // free_energy is typically in [0, ~5], clamp to [0,1] range
-                let embodiment_level =
-                    (1.0 - (fep_result.free_energy / 5.0).clamp(0.0, 1.0)).clamp(0.0, 1.0);
-
-                // Φ_sync: Neural synchrony = epistemic value from action selection
-                let self_awareness = fep_result.epistemic_value.clamp(0.0, 1.0);
-
-                // Φ_master: The unified 7-theory product invariant
-                let topological_unity = (phi
-                    * gwt_broadcast
-                    * (hot_metacognitive + 0.1)
-                    * (ast_temporal + 0.1)
-                    * embodiment_level
-                    * (knowledge_coherence + 0.1)
-                    * (self_awareness + 0.1))
-                    .min(1.0);
+                // M', N', Soc' modulate the final result and represent actual factors
+                let knowledge_coherence = eq_result.narrative_coherence;
+                let embodiment_level = eq_result.embodiment_factor;
+                let self_awareness = eq_result.social_embedding;
+                let topological_unity = eq_result.consciousness_level; // C(t)
 
                 // Arousal ← prediction error (high surprise = high arousal)
                 let arousal = fep_result.prediction_error.clamp(0.0, 1.0) as f32;
@@ -168,7 +196,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     uncertainty,
                     surprise,
                     timestamp: chrono::Utc::now().to_rfc3339(),
-                    // === 7-Theory fields — all grounded in real FEP math ===
+                    // === 7-Theory fields — grounded in evaluated Master Equation output ===
                     gwt_broadcast,
                     hot_metacognitive,
                     ast_temporal,
@@ -176,6 +204,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     embodiment_level,
                     self_awareness,
                     topological_unity,
+                    motor_command: format!(
+                        "{:?}",
+                        MotorCommandType::from_action_index(fep_result.recommended_action)
+                    ),
                     mental_movie: Some(symthaea_telemetry_grpc::MentalMovieFrame {
                         pixel_data: (0..128 * 128)
                             .map(|i| (i as u8).wrapping_add(count as u8))
@@ -183,7 +215,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         width: 128,
                         height: 128,
                         channels: 1,
-                        semantic_coherence: fep_result.model_confidence as f32,
+                        semantic_coherence: eq_result.consciousness_level as f32,
                         sequence_index: count,
                     }),
                 };

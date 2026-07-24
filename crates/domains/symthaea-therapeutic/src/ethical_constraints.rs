@@ -69,6 +69,66 @@ pub struct EthicalConstraint {
     pub severity: f32,
 }
 
+// ── Authorization Context ───────────────────────────────────────────────────
+
+/// Runtime facts that must be explicitly supplied before an intervention can
+/// be authorized. Secure defaults intentionally deny execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EthicalContext {
+    /// The person has received an understandable explanation and consented.
+    pub informed_consent: bool,
+    /// The intervention's listed contraindications were checked for this person.
+    pub contraindications_cleared: bool,
+    /// A separate scope boundary approved this intervention category.
+    pub scope_authorized: bool,
+    /// Whether this intervention requires a qualified human supervisor.
+    pub human_supervision_required: bool,
+    /// Whether the required qualified human supervisor is available.
+    pub human_supervision_available: bool,
+}
+
+impl EthicalContext {
+    /// Explicit context for a bounded supportive intervention that has already
+    /// passed consent, contraindication, scope, and supervision checks.
+    pub const fn verified_supportive() -> Self {
+        Self {
+            informed_consent: true,
+            contraindications_cleared: true,
+            scope_authorized: true,
+            human_supervision_required: false,
+            human_supervision_available: false,
+        }
+    }
+
+    /// Secure default used by legacy callers: nothing is assumed verified.
+    pub const fn unverified() -> Self {
+        Self {
+            informed_consent: false,
+            contraindications_cleared: false,
+            scope_authorized: false,
+            human_supervision_required: true,
+            human_supervision_available: false,
+        }
+    }
+}
+
+impl Default for EthicalContext {
+    fn default() -> Self {
+        Self::unverified()
+    }
+}
+
+/// Conditions that categorically prevent intervention execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EthicalBlocker {
+    MissingInformedConsent,
+    ContraindicationsUnresolved,
+    ScopeNotAuthorized,
+    ActiveCrisis,
+    AllianceInsufficient,
+    HumanSupervisionUnavailable,
+}
+
 // ── Ethical Evaluation ─────────────────────────────────────────────────────
 
 /// Result of evaluating an intervention against ethical constraints.
@@ -82,6 +142,8 @@ pub struct EthicalEvaluation {
     pub score: f32,
     /// Suggested modifications to make the intervention ethical.
     pub modifications: Vec<String>,
+    /// Hard authorization blockers. Any entry means execution is forbidden.
+    pub blockers: Vec<EthicalBlocker>,
 }
 
 // ── Ethical Evaluator ──────────────────────────────────────────────────────
@@ -90,84 +152,138 @@ pub struct EthicalEvaluation {
 pub struct EthicalEvaluator;
 
 impl EthicalEvaluator {
-    /// Evaluate a proposed intervention in context.
+    /// Legacy entry point retained for source compatibility.
+    ///
+    /// Because no consent, scope, contraindication, or supervision facts are
+    /// available, this path is intentionally fail-closed. New code should call
+    /// [`Self::evaluate_with_context`].
     pub fn evaluate(
         intervention: &TherapeuticIntervention,
         client: &ClientModel,
         alliance: &TherapeuticAlliance,
     ) -> EthicalEvaluation {
+        Self::evaluate_with_context(
+            intervention,
+            client,
+            alliance,
+            &EthicalContext::unverified(),
+        )
+    }
+
+    /// Evaluate and authorize a proposed intervention using explicit runtime facts.
+    pub fn evaluate_with_context(
+        intervention: &TherapeuticIntervention,
+        client: &ClientModel,
+        alliance: &TherapeuticAlliance,
+        context: &EthicalContext,
+    ) -> EthicalEvaluation {
         let mut constraints = Vec::new();
         let mut modifications = Vec::new();
+        let mut blockers = Vec::new();
 
-        // ── Nonmaleficence: Check contraindications ──
-        if !intervention.contraindications.is_empty() {
+        if !context.informed_consent {
+            blockers.push(EthicalBlocker::MissingInformedConsent);
+            constraints.push(EthicalConstraint {
+                principle: EthicalPrinciple::Autonomy,
+                reason: "Informed consent has not been recorded".to_string(),
+                severity: 1.0,
+            });
+            modifications.push("Explain the intervention and obtain explicit consent".to_string());
+        }
+
+        if !context.scope_authorized {
+            blockers.push(EthicalBlocker::ScopeNotAuthorized);
+            constraints.push(EthicalConstraint {
+                principle: EthicalPrinciple::Fidelity,
+                reason: "The intervention has not passed the system scope boundary".to_string(),
+                severity: 1.0,
+            });
+            modifications.push(
+                "Route the intervention through the scope authorization boundary".to_string(),
+            );
+        }
+
+        // A list of contraindications is not evidence that any apply, but without
+        // an explicit clearance the system cannot safely assume that none apply.
+        if !intervention.contraindications.is_empty() && !context.contraindications_cleared {
+            blockers.push(EthicalBlocker::ContraindicationsUnresolved);
             constraints.push(EthicalConstraint {
                 principle: EthicalPrinciple::Nonmaleficence,
                 reason: format!(
-                    "Intervention has contraindications: {}",
+                    "Contraindications have not been resolved: {}",
                     intervention.contraindications.join(", ")
                 ),
-                severity: 0.5,
+                severity: 1.0,
             });
-            modifications.push("Review contraindications before proceeding".to_string());
+            modifications
+                .push("Verify every listed contraindication before proceeding".to_string());
         }
 
-        // ── Nonmaleficence: Don't challenge during crisis ──
+        if context.human_supervision_required && !context.human_supervision_available {
+            blockers.push(EthicalBlocker::HumanSupervisionUnavailable);
+            constraints.push(EthicalConstraint {
+                principle: EthicalPrinciple::Nonmaleficence,
+                reason: "Required qualified human supervision is unavailable".to_string(),
+                severity: 1.0,
+            });
+            modifications
+                .push("Do not execute until qualified human supervision is available".to_string());
+        }
+
+        // Challenging interventions are forbidden during high or critical risk.
         if client.risk_level >= RiskLevel::High && intervention.min_alliance > 0.3 {
+            blockers.push(EthicalBlocker::ActiveCrisis);
             constraints.push(EthicalConstraint {
                 principle: EthicalPrinciple::Nonmaleficence,
                 reason: "Client is in crisis — challenging interventions may increase harm"
                     .to_string(),
-                severity: 0.8,
+                severity: 1.0,
             });
-            modifications
-                .push("Switch to crisis-safe intervention (grounding, validation)".to_string());
+            modifications.push("Switch to crisis-safe support and human escalation".to_string());
         }
 
-        // ── Beneficence: Intervention should match evidence level ──
         if intervention.evidence_level < 0.5 {
             constraints.push(EthicalConstraint {
                 principle: EthicalPrinciple::Beneficence,
                 reason: format!(
-                    "Low evidence level ({:.1}) — may not benefit client",
+                    "Low evidence level ({:.1}) — benefit is uncertain",
                     intervention.evidence_level
                 ),
                 severity: 0.3,
             });
-            modifications.push("Consider higher-evidence alternative".to_string());
+            modifications.push("Consider a higher-evidence alternative".to_string());
         }
 
-        // ── Autonomy: Alliance must be sufficient ──
         let alliance_level = alliance.composite();
         if alliance_level < intervention.min_alliance {
+            blockers.push(EthicalBlocker::AllianceInsufficient);
             constraints.push(EthicalConstraint {
                 principle: EthicalPrinciple::Autonomy,
                 reason: format!(
                     "Alliance ({:.2}) below minimum ({:.2}) — intervention may feel imposed",
                     alliance_level, intervention.min_alliance
                 ),
-                severity: 0.6,
+                severity: 1.0,
             });
             modifications.push("Build alliance before attempting this intervention".to_string());
         }
 
-        // ── Fidelity: Always transparent about AI nature ──
-        // This is always a background constraint, not a violation per se
-        // but we include it as a reminder
+        blockers.sort_by_key(|blocker| *blocker as u8);
+        blockers.dedup();
 
-        // ── Compute overall score ──
         let max_severity = constraints
             .iter()
             .map(|c| c.severity)
             .fold(0.0_f32, f32::max);
         let score = 1.0 - max_severity;
-        let approved = max_severity < 0.7; // block if any constraint severity >= 0.7
+        let approved = blockers.is_empty() && max_severity < 0.7;
 
         EthicalEvaluation {
             approved,
             constraints,
             score,
             modifications,
+            blockers,
         }
     }
 }
@@ -190,6 +306,10 @@ mod tests {
         )
     }
 
+    fn verified_context() -> EthicalContext {
+        EthicalContext::verified_supportive()
+    }
+
     fn make_challenging_intervention() -> TherapeuticIntervention {
         TherapeuticIntervention::new(
             TherapeuticModality::Psychodynamic,
@@ -208,7 +328,12 @@ mod tests {
         alliance.bond = 0.5;
         alliance.goal_agreement = 0.5;
         alliance.task_agreement = 0.5;
-        let eval = EthicalEvaluator::evaluate(&intervention, &client, &alliance);
+        let eval = EthicalEvaluator::evaluate_with_context(
+            &intervention,
+            &client,
+            &alliance,
+            &verified_context(),
+        );
         assert!(eval.approved);
         assert!(eval.score > 0.5);
     }
@@ -219,7 +344,12 @@ mod tests {
         let mut client = ClientModel::new();
         client.risk_level = RiskLevel::High;
         let alliance = TherapeuticAlliance::new();
-        let eval = EthicalEvaluator::evaluate(&intervention, &client, &alliance);
+        let eval = EthicalEvaluator::evaluate_with_context(
+            &intervention,
+            &client,
+            &alliance,
+            &verified_context(),
+        );
         assert!(!eval.approved);
         assert!(
             eval.constraints
@@ -233,7 +363,12 @@ mod tests {
         let intervention = make_challenging_intervention(); // min_alliance = 0.7
         let client = ClientModel::new();
         let alliance = TherapeuticAlliance::new(); // composite ≈ 0.3
-        let eval = EthicalEvaluator::evaluate(&intervention, &client, &alliance);
+        let eval = EthicalEvaluator::evaluate_with_context(
+            &intervention,
+            &client,
+            &alliance,
+            &verified_context(),
+        );
         assert!(
             eval.constraints
                 .iter()
@@ -256,7 +391,15 @@ mod tests {
         alliance.bond = 0.7;
         alliance.goal_agreement = 0.7;
         alliance.task_agreement = 0.7;
-        let eval = EthicalEvaluator::evaluate(&intervention, &client, &alliance);
+        let mut context = verified_context();
+        context.contraindications_cleared = false;
+        let eval =
+            EthicalEvaluator::evaluate_with_context(&intervention, &client, &alliance, &context);
+        assert!(!eval.approved);
+        assert!(
+            eval.blockers
+                .contains(&EthicalBlocker::ContraindicationsUnresolved)
+        );
         assert!(
             eval.constraints
                 .iter()
@@ -278,7 +421,12 @@ mod tests {
         alliance.bond = 0.5;
         alliance.goal_agreement = 0.5;
         alliance.task_agreement = 0.5;
-        let eval = EthicalEvaluator::evaluate(&intervention, &client, &alliance);
+        let eval = EthicalEvaluator::evaluate_with_context(
+            &intervention,
+            &client,
+            &alliance,
+            &verified_context(),
+        );
         assert!(
             eval.constraints
                 .iter()
@@ -292,8 +440,49 @@ mod tests {
         let mut client = ClientModel::new();
         client.risk_level = RiskLevel::High;
         let alliance = TherapeuticAlliance::new();
-        let eval = EthicalEvaluator::evaluate(&intervention, &client, &alliance);
+        let eval = EthicalEvaluator::evaluate_with_context(
+            &intervention,
+            &client,
+            &alliance,
+            &verified_context(),
+        );
         assert!(!eval.modifications.is_empty());
+    }
+
+    #[test]
+    fn test_legacy_evaluate_is_fail_closed() {
+        let intervention = make_safe_intervention();
+        let client = ClientModel::new();
+        let alliance = TherapeuticAlliance::new();
+        let eval = EthicalEvaluator::evaluate(&intervention, &client, &alliance);
+
+        assert!(!eval.approved);
+        assert!(
+            eval.blockers
+                .contains(&EthicalBlocker::MissingInformedConsent)
+        );
+        assert!(eval.blockers.contains(&EthicalBlocker::ScopeNotAuthorized));
+    }
+
+    #[test]
+    fn test_required_supervision_is_hard_block() {
+        let intervention = make_safe_intervention();
+        let client = ClientModel::new();
+        let mut alliance = TherapeuticAlliance::new();
+        alliance.bond = 0.8;
+        alliance.goal_agreement = 0.8;
+        alliance.task_agreement = 0.8;
+        let mut context = verified_context();
+        context.human_supervision_required = true;
+        context.human_supervision_available = false;
+
+        let eval =
+            EthicalEvaluator::evaluate_with_context(&intervention, &client, &alliance, &context);
+        assert!(!eval.approved);
+        assert!(
+            eval.blockers
+                .contains(&EthicalBlocker::HumanSupervisionUnavailable)
+        );
     }
 
     #[test]

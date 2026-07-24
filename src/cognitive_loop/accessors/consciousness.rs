@@ -448,4 +448,17 @@ impl CognitiveLoopService {
             .as_ref()
             .map(|viz| viz.render_heatmap())
     }
+
+    /// MCE calibration telemetry: (bottleneck dimension name, softmin factor,
+    /// weighted sum) from the most recent cycle. Added 2026-07-18 for the
+    /// post-scale-fix CL/safety-tier recalibration (consciousness_level
+    /// saturates ~0.95 now that all MCE inputs float high — see keystone
+    /// Phase-5 results; this exposes WHICH dimension binds per regime).
+    pub fn mce_summary(&self) -> (String, f64, f64) {
+        (
+            self.carryover.consciousness.mce_bottleneck_name.clone(),
+            self.carryover.consciousness.mce_softmin,
+            self.carryover.consciousness.mce_weighted_sum,
+        )
+    }
 }

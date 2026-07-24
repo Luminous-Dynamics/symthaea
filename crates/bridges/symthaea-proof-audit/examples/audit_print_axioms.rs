@@ -33,7 +33,13 @@ fn main() -> ExitCode {
         }
     };
 
-    let report = AxiomReport::parse(&output);
+    let report = match AxiomReport::parse(&output) {
+        Ok(report) => report,
+        Err(error) => {
+            eprintln!("invalid Lean evidence: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
     let verdict = audit(&report, &policy);
 
     if verdict.is_clean() {

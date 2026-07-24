@@ -11,6 +11,12 @@
 #![deny(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
+use std::io::Read;
+use std::process::Stdio;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::seed_from_name;
 use thiserror::Error;
@@ -183,6 +189,12 @@ pub struct Interval {
 impl Interval {
     /// Construct an interval, ordering bounds if needed.
     pub fn new(a: f64, b: f64) -> Self {
+        if !a.is_finite() || !b.is_finite() {
+            return Self {
+                lower: f64::NAN,
+                upper: f64::NAN,
+            };
+        }
         Self {
             lower: a.min(b),
             upper: a.max(b),
@@ -221,8 +233,16 @@ impl UncertaintyEstimate {
     /// Construct a bounded uncertainty estimate.
     pub fn new(epistemic: f64, aleatoric: f64) -> Self {
         Self {
-            epistemic: epistemic.clamp(0.0, 1.0),
-            aleatoric: aleatoric.clamp(0.0, 1.0),
+            epistemic: if epistemic.is_finite() {
+                epistemic.clamp(0.0, 1.0)
+            } else {
+                1.0
+            },
+            aleatoric: if aleatoric.is_finite() {
+                aleatoric.clamp(0.0, 1.0)
+            } else {
+                1.0
+            },
             interval: None,
         }
     }
@@ -235,7 +255,11 @@ impl UncertaintyEstimate {
 
     /// Conservative scalar summary.
     pub fn total(&self) -> f64 {
-        (self.epistemic + self.aleatoric).clamp(0.0, 1.0)
+        if self.epistemic.is_finite() && self.aleatoric.is_finite() {
+            (self.epistemic + self.aleatoric).clamp(0.0, 1.0)
+        } else {
+            1.0
+        }
     }
 }
 
@@ -305,6 +329,68 @@ impl SimulationRequest {
         }
         self
     }
+
+    /// Validate values and provenance before an adapter sees the request.
+    pub fn validate(&self) -> Result<(), SimulationError> {
+        if self.id.trim().is_empty() {
+            return Err(SimulationError::InvalidRequest(
+                "request id cannot be empty".into(),
+            ));
+        }
+        if self.objective.trim().is_empty() {
+            return Err(SimulationError::InvalidRequest(
+                "request objective cannot be empty".into(),
+            ));
+        }
+        for parameter in &self.parameters {
+            if parameter.name.trim().is_empty()
+                || parameter.unit.trim().is_empty()
+                || parameter.provenance.trim().is_empty()
+            {
+                return Err(SimulationError::InvalidRequest(
+                    "parameters require a name, unit, and provenance".into(),
+                ));
+            }
+            if !parameter.value.is_finite() {
+                return Err(SimulationError::InvalidRequest(format!(
+                    "parameter {:?} is not finite",
+                    parameter.name
+                )));
+            }
+            if let Some(uncertainty) = parameter.uncertainty {
+                validate_uncertainty(uncertainty).map_err(SimulationError::InvalidRequest)?;
+            }
+        }
+        if self
+            .requested_metrics
+            .iter()
+            .any(|metric| metric.trim().is_empty())
+        {
+            return Err(SimulationError::InvalidRequest(
+                "requested metric names cannot be empty".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+fn validate_uncertainty(uncertainty: UncertaintyEstimate) -> Result<(), String> {
+    if !uncertainty.epistemic.is_finite()
+        || !(0.0..=1.0).contains(&uncertainty.epistemic)
+        || !uncertainty.aleatoric.is_finite()
+        || !(0.0..=1.0).contains(&uncertainty.aleatoric)
+    {
+        return Err("uncertainty components must be finite values in [0, 1]".into());
+    }
+    if let Some(interval) = uncertainty.interval {
+        if !interval.lower.is_finite()
+            || !interval.upper.is_finite()
+            || interval.lower > interval.upper
+        {
+            return Err("uncertainty interval must have finite ordered bounds".into());
+        }
+    }
+    Ok(())
 }
 
 /// Metric returned by a solver adapter.
@@ -319,6 +405,66 @@ pub struct SimulationMetric {
     /// Optional uncertainty estimate for this metric.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uncertainty: Option<UncertaintyEstimate>,
+}
+
+/// How a normalized result was produced.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutionMode {
+    /// Legacy/deserialized result with no trustworthy execution provenance.
+    #[default]
+    Unknown,
+    /// Deterministic orchestration fixture; never engineering evidence.
+    DryRun,
+    /// Parsed output from an external solver invocation.
+    ExternalSolver,
+}
+
+/// Provenance needed to distinguish fixtures from solver-backed evidence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct SimulationEvidence {
+    /// Execution path that produced the result.
+    #[serde(default)]
+    pub mode: ExecutionMode,
+    /// Stable adapter/backend name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backend: Option<String>,
+    /// Solver version reported by the external executable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub solver_version: Option<String>,
+    /// Digest of the fully rendered solver input.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_digest: Option<String>,
+    /// Digest of the raw solver output parsed by the adapter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_digest: Option<String>,
+    /// Version of the adapter/parser that normalized the result.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parser_version: Option<String>,
+}
+
+impl SimulationEvidence {
+    fn has_complete_provenance(&self) -> bool {
+        self.backend
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
+            && self
+                .solver_version
+                .as_deref()
+                .is_some_and(|value| !value.trim().is_empty())
+            && self
+                .input_digest
+                .as_deref()
+                .is_some_and(|value| !value.trim().is_empty())
+            && self
+                .output_digest
+                .as_deref()
+                .is_some_and(|value| !value.trim().is_empty())
+            && self
+                .parser_version
+                .as_deref()
+                .is_some_and(|value| !value.trim().is_empty())
+    }
 }
 
 /// Solver result normalized for downstream reasoning.
@@ -337,19 +483,62 @@ pub struct SimulationResult {
     pub metrics: Vec<SimulationMetric>,
     /// Adapter warnings, simplifications, or unit conversions.
     pub warnings: Vec<String>,
+    /// Execution and parser provenance. Defaults to `Unknown` for legacy data.
+    #[serde(default)]
+    pub evidence: SimulationEvidence,
 }
 
 impl SimulationResult {
     /// Create a converged result with bounded confidence.
     pub fn converged(request_id: impl Into<String>, confidence: f64) -> Self {
+        let confidence = if confidence.is_finite() {
+            confidence.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         Self {
             request_id: request_id.into(),
             converged: true,
-            confidence: confidence.clamp(0.0, 1.0),
-            uncertainty: UncertaintyEstimate::new(1.0 - confidence.clamp(0.0, 1.0), 0.0),
+            confidence,
+            uncertainty: UncertaintyEstimate::new(1.0 - confidence, 0.0),
             metrics: Vec::new(),
             warnings: Vec::new(),
+            evidence: SimulationEvidence::default(),
         }
+    }
+
+    /// Create a deterministic fixture result that cannot be mistaken for
+    /// solver-backed engineering evidence.
+    pub fn dry_run(
+        request_id: impl Into<String>,
+        backend: impl Into<String>,
+        confidence: f64,
+    ) -> Self {
+        let mut result = Self::converged(request_id, confidence);
+        result.evidence = SimulationEvidence {
+            mode: ExecutionMode::DryRun,
+            backend: Some(backend.into()),
+            ..SimulationEvidence::default()
+        };
+        result
+            .warnings
+            .push("dry-run fixture: metrics were not produced by an external solver".into());
+        result
+    }
+
+    /// Attach provenance for a genuinely parsed external-solver result.
+    pub fn with_external_evidence(mut self, evidence: SimulationEvidence) -> Self {
+        self.evidence = evidence;
+        self
+    }
+
+    /// True only for a parsed external-solver result with complete provenance.
+    pub fn is_engineering_evidence(&self) -> bool {
+        self.validate().is_ok()
+            && self.converged
+            && !self.metrics.is_empty()
+            && self.evidence.mode == ExecutionMode::ExternalSolver
+            && self.evidence.has_complete_provenance()
     }
 
     /// Add a metric with no explicit uncertainty.
@@ -373,6 +562,45 @@ impl SimulationResult {
         self.uncertainty = uncertainty;
         self.confidence = (1.0 - uncertainty.total()).clamp(0.0, 1.0);
         self
+    }
+
+    /// Validate normalized values before downstream reasoning or encoding.
+    pub fn validate(&self) -> Result<(), SimulationError> {
+        if self.request_id.trim().is_empty() {
+            return Err(SimulationError::Adapter(
+                "simulation result has an empty request id".into(),
+            ));
+        }
+        if !self.confidence.is_finite() || !(0.0..=1.0).contains(&self.confidence) {
+            return Err(SimulationError::Adapter(
+                "simulation result confidence must be finite and in [0, 1]".into(),
+            ));
+        }
+        validate_uncertainty(self.uncertainty).map_err(|error| {
+            SimulationError::Adapter(format!("invalid result uncertainty: {error}"))
+        })?;
+        for metric in &self.metrics {
+            if metric.name.trim().is_empty() || metric.unit.trim().is_empty() {
+                return Err(SimulationError::Adapter(
+                    "simulation metrics require a name and unit".into(),
+                ));
+            }
+            if !metric.value.is_finite() {
+                return Err(SimulationError::Adapter(format!(
+                    "simulation metric {:?} is not finite",
+                    metric.name
+                )));
+            }
+            if let Some(uncertainty) = metric.uncertainty {
+                validate_uncertainty(uncertainty).map_err(|error| {
+                    SimulationError::Adapter(format!(
+                        "invalid uncertainty for metric {:?}: {error}",
+                        metric.name
+                    ))
+                })?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -438,10 +666,34 @@ impl SimulationRegistry {
 
     /// Run a simulation request using the first matching backend.
     pub fn run(&self, request: &SimulationRequest) -> Result<SimulationResult, SimulationError> {
+        request.validate()?;
         let backend = self
             .find_backend(request.solver)
             .ok_or(SimulationError::SolverUnavailable(request.solver))?;
-        backend.run(request)
+        let result = backend.run(request)?;
+        result.validate()?;
+        if result.request_id != request.id {
+            return Err(SimulationError::Adapter(format!(
+                "backend {:?} returned result for request {:?}, expected {:?}",
+                backend.name(),
+                result.request_id,
+                request.id
+            )));
+        }
+        if result.evidence.mode == ExecutionMode::ExternalSolver {
+            if result.evidence.backend.as_deref() != Some(backend.name()) {
+                return Err(SimulationError::Adapter(format!(
+                    "external evidence backend does not match dispatched backend {:?}",
+                    backend.name()
+                )));
+            }
+            if !result.evidence.has_complete_provenance() {
+                return Err(SimulationError::Adapter(
+                    "external solver result has incomplete provenance".into(),
+                ));
+            }
+        }
+        Ok(result)
     }
 
     /// Spawn a simulation daemon using the first matching backend.
@@ -449,6 +701,7 @@ impl SimulationRegistry {
         &self,
         request: &SimulationRequest,
     ) -> Result<Option<std::process::Child>, SimulationError> {
+        request.validate()?;
         let backend = self
             .find_backend(request.solver)
             .ok_or(SimulationError::SolverUnavailable(request.solver))?;
@@ -469,8 +722,22 @@ impl MetricEncoder {
         Self { dimension }
     }
 
-    /// Project a simulation result into an HDC vector.
-    pub fn encode_result(&self, result: &SimulationResult) -> ContinuousHV {
+    /// Project a validated simulation result into an HDC vector.
+    pub fn encode_result(
+        &self,
+        result: &SimulationResult,
+    ) -> Result<ContinuousHV, SimulationError> {
+        result.validate()?;
+        if self.dimension == 0 {
+            return Err(SimulationError::InvalidRequest(
+                "metric encoder dimension must be greater than zero".into(),
+            ));
+        }
+        if result.metrics.is_empty() {
+            return Err(SimulationError::Adapter(
+                "cannot encode a simulation result with no metrics".into(),
+            ));
+        }
         let mut hv = ContinuousHV::zero(self.dimension);
 
         for (i, metric) in result.metrics.iter().enumerate() {
@@ -486,7 +753,7 @@ impl MetricEncoder {
             }
         }
 
-        hv.normalize()
+        Ok(hv.normalize())
     }
 }
 
@@ -499,6 +766,64 @@ pub struct CommandSolver {
     pub args: Vec<String>,
     /// Environment variables.
     pub env: std::collections::HashMap<String, String>,
+    /// Wall-clock execution limit in milliseconds.
+    #[serde(default = "default_solver_timeout_ms")]
+    pub timeout_ms: u64,
+    /// Maximum bytes retained from each output stream.
+    #[serde(default = "default_solver_output_limit")]
+    pub max_output_bytes: usize,
+}
+
+const MAX_SOLVER_TIMEOUT_MS: u64 = 24 * 60 * 60 * 1000;
+const MAX_SOLVER_OUTPUT_BYTES: usize = 64 * 1024 * 1024;
+
+const fn default_solver_timeout_ms() -> u64 {
+    5 * 60 * 1000
+}
+
+const fn default_solver_output_limit() -> usize {
+    1024 * 1024
+}
+
+fn capture_output<R: Read>(
+    mut reader: R,
+    limit: usize,
+    exceeded: Arc<AtomicBool>,
+) -> std::io::Result<Vec<u8>> {
+    let mut retained = Vec::with_capacity(limit.min(8192));
+    let mut buffer = [0u8; 8192];
+    loop {
+        let count = reader.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        let keep = count.min(limit.saturating_sub(retained.len()));
+        retained.extend_from_slice(&buffer[..keep]);
+        if keep < count {
+            exceeded.store(true, Ordering::Relaxed);
+        }
+    }
+    Ok(retained)
+}
+
+fn receive_output(
+    receiver: mpsc::Receiver<std::io::Result<Vec<u8>>>,
+    stream: &str,
+    deadline: Instant,
+) -> Result<Vec<u8>, SimulationError> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    match receiver.recv_timeout(remaining) {
+        Ok(Ok(output)) => Ok(output),
+        Ok(Err(error)) => Err(SimulationError::Adapter(format!(
+            "failed reading solver {stream}: {error}"
+        ))),
+        Err(mpsc::RecvTimeoutError::Timeout) => Err(SimulationError::Adapter(format!(
+            "solver {stream} remained open after the process exited"
+        ))),
+        Err(mpsc::RecvTimeoutError::Disconnected) => Err(SimulationError::Adapter(format!(
+            "solver {stream} reader terminated unexpectedly"
+        ))),
+    }
 }
 
 impl CommandSolver {
@@ -508,6 +833,8 @@ impl CommandSolver {
             cmd: cmd.into(),
             args: Vec::new(),
             env: std::collections::HashMap::new(),
+            timeout_ms: default_solver_timeout_ms(),
+            max_output_bytes: default_solver_output_limit(),
         }
     }
 
@@ -517,8 +844,21 @@ impl CommandSolver {
         self
     }
 
+    /// Set the wall-clock execution limit. Values are checked by [`execute`](Self::execute).
+    pub fn timeout(mut self, timeout: Duration) -> Self {
+        self.timeout_ms = timeout.as_millis().min(u64::MAX as u128) as u64;
+        self
+    }
+
+    /// Set the maximum bytes retained from stdout and stderr independently.
+    pub fn max_output_bytes(mut self, max_output_bytes: usize) -> Self {
+        self.max_output_bytes = max_output_bytes;
+        self
+    }
+
     /// Execute the solver, spawning `cmd` with `args`/`env`, and return its
-    /// captured stdout.
+    /// captured stdout. Execution is killed on timeout or as soon as either
+    /// output stream exceeds the configured retention limit.
     ///
     /// Returns `SimulationError::Adapter` if the process cannot be spawned
     /// (e.g. the solver binary is not installed) or exits with a non-zero
@@ -527,24 +867,119 @@ impl CommandSolver {
     /// returned stdout, which is solver-specific and is the caller's
     /// responsibility.
     pub fn execute(&self) -> Result<String, SimulationError> {
-        let output = std::process::Command::new(&self.cmd)
+        if self.cmd.trim().is_empty() {
+            return Err(SimulationError::Adapter(
+                "solver command cannot be empty".into(),
+            ));
+        }
+        if self.timeout_ms == 0 || self.timeout_ms > MAX_SOLVER_TIMEOUT_MS {
+            return Err(SimulationError::Adapter(format!(
+                "solver timeout must be between 1 ms and {MAX_SOLVER_TIMEOUT_MS} ms"
+            )));
+        }
+        if self.max_output_bytes == 0 || self.max_output_bytes > MAX_SOLVER_OUTPUT_BYTES {
+            return Err(SimulationError::Adapter(format!(
+                "solver output limit must be between 1 and {MAX_SOLVER_OUTPUT_BYTES} bytes"
+            )));
+        }
+
+        let mut child = std::process::Command::new(&self.cmd)
             .args(&self.args)
             .envs(&self.env)
-            .output()
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
             .map_err(|e| {
                 SimulationError::Adapter(format!("failed to spawn '{}': {e}", self.cmd))
             })?;
 
-        if !output.status.success() {
+        let stdout = child.stdout.take().ok_or_else(|| {
+            SimulationError::Adapter(format!("failed to capture '{}' stdout", self.cmd))
+        })?;
+        let stderr = child.stderr.take().ok_or_else(|| {
+            SimulationError::Adapter(format!("failed to capture '{}' stderr", self.cmd))
+        })?;
+        let output_exceeded = Arc::new(AtomicBool::new(false));
+        let (stdout_tx, stdout_rx) = mpsc::channel();
+        let (stderr_tx, stderr_rx) = mpsc::channel();
+        let stdout_exceeded = Arc::clone(&output_exceeded);
+        let stderr_exceeded = Arc::clone(&output_exceeded);
+        let output_limit = self.max_output_bytes;
+        std::thread::spawn(move || {
+            let _ = stdout_tx.send(capture_output(stdout, output_limit, stdout_exceeded));
+        });
+        std::thread::spawn(move || {
+            let _ = stderr_tx.send(capture_output(stderr, output_limit, stderr_exceeded));
+        });
+
+        let started = Instant::now();
+        let timeout = Duration::from_millis(self.timeout_ms);
+        let mut timed_out = false;
+        let mut killed_for_output = false;
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(status)) => break status,
+                Ok(None) if output_exceeded.load(Ordering::Relaxed) => {
+                    killed_for_output = true;
+                    let _ = child.kill();
+                    break child.wait().map_err(|e| {
+                        SimulationError::Adapter(format!(
+                            "failed waiting for '{}' after output limit: {e}",
+                            self.cmd
+                        ))
+                    })?;
+                }
+                Ok(None) if started.elapsed() >= timeout => {
+                    timed_out = true;
+                    let _ = child.kill();
+                    break child.wait().map_err(|e| {
+                        SimulationError::Adapter(format!(
+                            "failed waiting for '{}' after timeout: {e}",
+                            self.cmd
+                        ))
+                    })?;
+                }
+                Ok(None) => std::thread::sleep(Duration::from_millis(10)),
+                Err(error) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(SimulationError::Adapter(format!(
+                        "failed polling '{}': {error}",
+                        self.cmd
+                    )));
+                }
+            }
+        };
+
+        // A solver can spawn descendants that inherit its pipes. Do not let
+        // those descendants make this API wait forever after the child exits.
+        let capture_deadline = Instant::now() + Duration::from_secs(2);
+        let stdout = receive_output(stdout_rx, "stdout", capture_deadline)?;
+        let stderr = receive_output(stderr_rx, "stderr", capture_deadline)?;
+
+        if timed_out {
             return Err(SimulationError::Adapter(format!(
-                "'{}' exited with {}: {}",
-                self.cmd,
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
+                "'{}' exceeded its {} ms timeout",
+                self.cmd, self.timeout_ms
+            )));
+        }
+        if killed_for_output || output_exceeded.load(Ordering::Relaxed) {
+            return Err(SimulationError::Adapter(format!(
+                "'{}' exceeded the {} byte per-stream output limit",
+                self.cmd, self.max_output_bytes
             )));
         }
 
-        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+        if !status.success() {
+            return Err(SimulationError::Adapter(format!(
+                "'{}' exited with {}: {}",
+                self.cmd,
+                status,
+                String::from_utf8_lossy(&stderr)
+            )));
+        }
+
+        Ok(String::from_utf8_lossy(&stdout).into_owned())
     }
 }
 
@@ -592,7 +1027,10 @@ pub struct AmygdalaInterlock {
     /// Maximum allowable vibration/oscillation.
     pub vibration_threshold: f32,
     /// Current safety status.
-    pub status: SafetyStatus,
+    status: SafetyStatus,
+    /// Emergency stops remain active until an explicit reset.
+    #[serde(default)]
+    latched_stop: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -611,15 +1049,36 @@ impl Default for AmygdalaInterlock {
             torque_limit: 100.0,
             vibration_threshold: 10.0,
             status: SafetyStatus::Green,
+            latched_stop: false,
         }
     }
 }
 
 impl AmygdalaInterlock {
+    /// Current safety status.
+    pub fn status(&self) -> SafetyStatus {
+        self.status
+    }
+
     /// Process sensory data and update the safety status.
     pub fn monitor(&mut self, peak_torque: f32, vibration: f32) -> SafetyStatus {
-        if peak_torque > self.torque_limit * 1.5 || vibration > self.vibration_threshold * 2.0 {
+        if self.latched_stop {
             self.status = SafetyStatus::Red;
+            return self.status;
+        }
+
+        let invalid_input = !peak_torque.is_finite()
+            || !vibration.is_finite()
+            || !self.torque_limit.is_finite()
+            || !self.vibration_threshold.is_finite()
+            || self.torque_limit <= 0.0
+            || self.vibration_threshold <= 0.0;
+        if invalid_input
+            || peak_torque > self.torque_limit * 1.5
+            || vibration > self.vibration_threshold * 2.0
+        {
+            self.status = SafetyStatus::Red;
+            self.latched_stop = true;
         } else if peak_torque > self.torque_limit || vibration > self.vibration_threshold {
             self.status = SafetyStatus::Yellow;
         } else {
@@ -630,6 +1089,9 @@ impl AmygdalaInterlock {
 
     /// Apply the interlock to an output value.
     pub fn apply_override(&self, raw_value: f32) -> f32 {
+        if !raw_value.is_finite() {
+            return 0.0;
+        }
         match self.status {
             SafetyStatus::Green => raw_value,
             SafetyStatus::Yellow => raw_value * 0.5, // Dampen output
@@ -640,6 +1102,18 @@ impl AmygdalaInterlock {
     /// Manually trigger a high-speed emergency stop.
     pub fn trigger_emergency_stop(&mut self) {
         self.status = SafetyStatus::Red;
+        self.latched_stop = true;
+    }
+
+    /// Whether an emergency stop is currently latched.
+    pub fn is_latched(&self) -> bool {
+        self.latched_stop
+    }
+
+    /// Explicitly re-arm the interlock after the external cause has been cleared.
+    pub fn reset_emergency_stop(&mut self) {
+        self.latched_stop = false;
+        self.status = SafetyStatus::Green;
     }
 }
 
@@ -699,6 +1173,57 @@ mod tests {
     }
 
     #[test]
+    fn registry_rejects_non_finite_requests_before_dispatch() {
+        let mut registry = SimulationRegistry::new();
+        registry.register(MockBackend);
+        let request = SimulationRequest::new(
+            "invalid-1",
+            EngineeringDomain::Civil,
+            SolverKind::FiniteElement,
+            "invalid load case",
+        )
+        .with_parameter("load", f64::NAN, "N", "sensor");
+
+        assert!(matches!(
+            registry.run(&request),
+            Err(SimulationError::InvalidRequest(_))
+        ));
+    }
+
+    #[test]
+    fn registry_rejects_result_for_a_different_request() {
+        #[derive(Debug)]
+        struct WrongIdBackend;
+        impl SimulationBackend for WrongIdBackend {
+            fn name(&self) -> &'static str {
+                "wrong-id"
+            }
+            fn supported_solvers(&self) -> &[SolverKind] {
+                &[SolverKind::FiniteElement]
+            }
+            fn run(
+                &self,
+                _request: &SimulationRequest,
+            ) -> Result<SimulationResult, SimulationError> {
+                Ok(SimulationResult::converged("another-request", 0.9))
+            }
+        }
+
+        let mut registry = SimulationRegistry::new();
+        registry.register(WrongIdBackend);
+        let request = SimulationRequest::new(
+            "expected-request",
+            EngineeringDomain::Civil,
+            SolverKind::FiniteElement,
+            "load case",
+        );
+        assert!(matches!(
+            registry.run(&request),
+            Err(SimulationError::Adapter(_))
+        ));
+    }
+
+    #[test]
     fn request_builder_preserves_parameters() {
         let request = SimulationRequest::new(
             "bridge-load-001",
@@ -716,6 +1241,63 @@ mod tests {
     fn result_confidence_is_bounded() {
         let result = SimulationResult::converged("run-1", 1.7);
         assert_eq!(result.confidence, 1.0);
+
+        let non_finite = SimulationResult::converged("run-2", f64::NAN);
+        assert_eq!(non_finite.confidence, 0.0);
+        assert_eq!(non_finite.uncertainty.epistemic, 1.0);
+    }
+
+    #[test]
+    fn dry_run_is_explicitly_not_engineering_evidence() {
+        let result = SimulationResult::dry_run("fixture-1", "mock", 0.8);
+        assert_eq!(result.evidence.mode, ExecutionMode::DryRun);
+        assert!(!result.is_engineering_evidence());
+        assert!(result.warnings.iter().any(|w| w.contains("dry-run")));
+    }
+
+    #[test]
+    fn engineering_evidence_requires_valid_metrics() {
+        let evidence = SimulationEvidence {
+            mode: ExecutionMode::ExternalSolver,
+            backend: Some("mock".into()),
+            solver_version: Some("1.0".into()),
+            input_digest: Some("input-digest".into()),
+            output_digest: Some("output-digest".into()),
+            parser_version: Some("parser-1".into()),
+        };
+        let valid = SimulationResult::converged("run-1", 0.9)
+            .with_metric("stress", 12.0, "MPa")
+            .with_external_evidence(evidence);
+        assert!(valid.is_engineering_evidence());
+
+        let mut invalid = valid;
+        invalid.metrics[0].value = f64::NAN;
+        assert!(!invalid.is_engineering_evidence());
+        assert!(invalid.validate().is_err());
+    }
+
+    #[test]
+    fn metric_encoder_rejects_invalid_or_empty_results() {
+        let encoder = MetricEncoder::new(128);
+        let empty = SimulationResult::converged("empty", 0.8);
+        assert!(encoder.encode_result(&empty).is_err());
+
+        let invalid =
+            SimulationResult::converged("invalid", 0.8).with_metric("stress", f64::INFINITY, "MPa");
+        assert!(encoder.encode_result(&invalid).is_err());
+    }
+
+    #[test]
+    fn emergency_stop_is_latched_and_nan_fails_closed() {
+        let mut interlock = AmygdalaInterlock::default();
+        assert_eq!(interlock.monitor(f32::NAN, 0.0), SafetyStatus::Red);
+        assert!(interlock.is_latched());
+        assert_eq!(interlock.monitor(0.0, 0.0), SafetyStatus::Red);
+        assert_eq!(interlock.apply_override(f32::NAN), 0.0);
+
+        interlock.reset_emergency_stop();
+        assert!(!interlock.is_latched());
+        assert_eq!(interlock.monitor(0.0, 0.0), SafetyStatus::Green);
     }
 
     #[test]
@@ -728,6 +1310,11 @@ mod tests {
         assert_eq!(uncertainty.epistemic, 1.0);
         assert_eq!(uncertainty.aleatoric, 0.0);
         assert_eq!(uncertainty.interval.unwrap().midpoint(), 6.0);
+
+        let non_finite = UncertaintyEstimate::new(f64::NAN, f64::INFINITY);
+        assert_eq!(non_finite.epistemic, 1.0);
+        assert_eq!(non_finite.aleatoric, 1.0);
+        assert_eq!(non_finite.total(), 1.0);
     }
 
     #[test]
@@ -770,6 +1357,14 @@ mod tests {
     }
 
     #[test]
+    fn command_solver_deserialization_applies_resource_defaults() {
+        let solver: CommandSolver =
+            serde_json::from_str(r#"{"cmd":"echo","args":[],"env":{}}"#).unwrap();
+        assert_eq!(solver.timeout_ms, default_solver_timeout_ms());
+        assert_eq!(solver.max_output_bytes, default_solver_output_limit());
+    }
+
+    #[test]
     fn command_solver_errors_on_missing_binary() {
         let solver = CommandSolver::new("symthaea-nonexistent-solver-binary-xyz");
         let err = solver.execute().unwrap_err();
@@ -780,6 +1375,26 @@ mod tests {
     fn command_solver_errors_on_nonzero_exit() {
         // `false` is a standard POSIX utility that always exits non-zero.
         let solver = CommandSolver::new("false");
+        let err = solver.execute().unwrap_err();
+        assert!(matches!(err, SimulationError::Adapter(_)));
+    }
+
+    #[test]
+    fn command_solver_kills_timed_out_process() {
+        let solver = CommandSolver::new("sleep")
+            .arg("1")
+            .timeout(Duration::from_millis(20));
+        let started = Instant::now();
+        let err = solver.execute().unwrap_err();
+        assert!(matches!(err, SimulationError::Adapter(_)));
+        assert!(started.elapsed() < Duration::from_secs(1));
+    }
+
+    #[test]
+    fn command_solver_rejects_excess_output() {
+        let solver = CommandSolver::new("printf")
+            .arg("0123456789abcdef")
+            .max_output_bytes(8);
         let err = solver.execute().unwrap_err();
         assert!(matches!(err, SimulationError::Adapter(_)));
     }

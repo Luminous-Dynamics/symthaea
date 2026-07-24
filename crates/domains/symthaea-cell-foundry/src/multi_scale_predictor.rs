@@ -25,7 +25,11 @@ use crate::types::BIO_HORIZONS;
 /// which requires no integration steps.
 pub struct MultiScalePredictor {
     neuron: HdcLtcUnifiedNeuron,
+    config: UnifiedConfig,
+    seed: u64,
 }
+
+const DEFAULT_PREDICTOR_SEED: u64 = 0xB10_BEAD;
 
 impl MultiScalePredictor {
     /// Create a new predictor with default configuration.
@@ -38,15 +42,21 @@ impl MultiScalePredictor {
             dimension: HDC_DIMENSION,
             ..UnifiedConfig::default()
         };
-        Self {
-            neuron: HdcLtcUnifiedNeuron::new(config, 0xB10_BEAD),
-        }
+        Self::with_config_and_seed(config, DEFAULT_PREDICTOR_SEED)
     }
 
     /// Create with a custom configuration.
     pub fn with_config(config: UnifiedConfig) -> Self {
+        Self::with_config_and_seed(config, DEFAULT_PREDICTOR_SEED)
+    }
+
+    /// Create with a custom configuration and deterministic seed.
+    pub fn with_config_and_seed(config: UnifiedConfig, seed: u64) -> Self {
+        let neuron = HdcLtcUnifiedNeuron::new(config.clone(), seed);
         Self {
-            neuron: HdcLtcUnifiedNeuron::new(config, 0xB10_BEAD),
+            neuron,
+            config,
+            seed,
         }
     }
 
@@ -93,16 +103,20 @@ impl MultiScalePredictor {
         self.neuron.state()
     }
 
-    /// Reset the predictor to its initial state.
+    /// Reset the predictor to its initial state while preserving the complete
+    /// caller-supplied configuration and deterministic seed.
     pub fn reset(&mut self) {
-        let config = self.neuron.state().dim(); // preserve dimension
-        let new_config = UnifiedConfig {
-            tau_base: 3600.0,
-            backbone_tau: 0.1,
-            dimension: config,
-            ..UnifiedConfig::default()
-        };
-        self.neuron = HdcLtcUnifiedNeuron::new(new_config, 0xB10_BEAD);
+        self.neuron = HdcLtcUnifiedNeuron::new(self.config.clone(), self.seed);
+    }
+
+    /// Configuration currently governing prediction dynamics.
+    pub fn config(&self) -> &UnifiedConfig {
+        &self.config
+    }
+
+    /// Deterministic seed used to initialize and reset the predictor.
+    pub fn seed(&self) -> u64 {
+        self.seed
     }
 }
 
@@ -278,6 +292,33 @@ mod tests {
             sim < 0.5,
             "Reset should produce different state from evolved, similarity={}",
             sim
+        );
+    }
+
+    #[test]
+    fn test_reset_preserves_custom_configuration_and_seed() {
+        let config = UnifiedConfig {
+            tau_base: 1.0,
+            backbone_tau: 0.75,
+            dimension: HDC_DIMENSION,
+            ..UnifiedConfig::default()
+        };
+        let seed = 0xC0FF_EE42;
+        let mut predictor = MultiScalePredictor::with_config_and_seed(config.clone(), seed);
+        let input = ContinuousHV::random(HDC_DIMENSION, 777);
+        predictor.observe(&input, 25.0);
+        predictor.reset();
+
+        let fresh = MultiScalePredictor::with_config_and_seed(config, seed);
+        let reset_prediction = predictor.predict_at_horizon(&input, 3.0);
+        let fresh_prediction = fresh.predict_at_horizon(&input, 3.0);
+
+        assert_eq!(predictor.seed(), seed);
+        assert!((predictor.config().tau_base as f64 - 1.0).abs() < 1e-9);
+        assert!((predictor.config().backbone_tau as f64 - 0.75).abs() < 1e-9);
+        assert!(
+            reset_prediction.similarity(&fresh_prediction) > 0.9999,
+            "reset predictor should match a fresh predictor with the same configuration"
         );
     }
 

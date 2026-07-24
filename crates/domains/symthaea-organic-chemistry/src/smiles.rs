@@ -11,9 +11,25 @@
 //! - ring-closure digits `1`–`9` and `%nn`
 //! - lowercase aromatic atoms `c n o s p`
 //!
-//! Out of v0.1 scope: isotopes, stereochemistry (`/ \ @`), disconnected
-//! structures (`.`), and radicals. These parse-or-error explicitly rather than
-//! silently mis-modelling.
+//! **Stereochemistry syntax (`/ \ @ @@`) is tolerated, not modelled (Phase
+//! A.6, 2026-07-16).** These tokens are parsed past and their geometric/
+//! chiral information is discarded -- `Atom`/`Bond` have no field for it.
+//! This is a deliberate, disclosed scope decision, not an oversight: every
+//! structural comparison this crate's consumers perform (e.g.
+//! `symthaea-process-discovery`'s `isomorphism.rs`) is already
+//! stereochemistry-blind graph isomorphism, so a parser that *understood*
+//! `@`/`@@`/`/`/`\` still couldn't distinguish stereoisomers anywhere
+//! downstream -- rejecting the syntax outright bought nothing but spurious
+//! parse failures (found live: 489/489 of one real 1,282-record external
+//! evaluation's "representation" parse failures were exactly these two
+//! syntax classes, see `PROCESS_DISCOVERY_PHASE_A3_FIRST_RUN_ANALYSIS_2026-07-13.md`
+//! in the monorepo root). Enantiomers, diastereomers, and cis/trans isomers
+//! of the same connectivity are treated as structurally identical.
+//!
+//! Out of v0.1 scope, still parse-or-error explicitly: isotopes, disconnected
+//! structures (`.` -- a different concern, already handled at a higher level
+//! by callers splitting multi-molecule SMILES before parsing each piece),
+//! and radicals.
 
 use crate::element;
 
@@ -238,9 +254,23 @@ impl Parser {
                     pending_bond = Some(BondOrder::Aromatic);
                     self.pos += 1;
                 }
-                '.' | '/' | '\\' | '@' => {
+                '/' | '\\' => {
+                    // Cis/trans bond-direction markers -- tolerated, not
+                    // modelled (see module doc). The bond they annotate is
+                    // otherwise an ordinary single bond; treated exactly
+                    // like '-' above, only the E/Z directionality is
+                    // discarded.
+                    pending_bond = Some(BondOrder::Single);
+                    self.pos += 1;
+                }
+                '.' | '@' => {
+                    // '.' (disconnected structures) and a bare top-level '@'
+                    // (not valid standard SMILES outside a bracket atom --
+                    // real tetrahedral stereo only ever appears inside
+                    // `[...]`, handled separately in read_bracket_atom)
+                    // remain genuinely out of scope; see module doc.
                     return Err(ParseError(format!(
-                        "unsupported SMILES feature '{c}' (v0.1 scope: no stereo/disconnected/isotope)"
+                        "unsupported SMILES feature '{c}' (v0.1 scope: no disconnected structures/isotopes; bare '@' outside a bracket atom is not valid SMILES)"
                     )));
                 }
                 d if d.is_ascii_digit() || d == '%' => {
@@ -422,6 +452,26 @@ impl Parser {
         let el = element::lookup(&sym)
             .ok_or_else(|| ParseError(format!("unknown bracket element '{sym}'")))?;
 
+        // Tetrahedral stereo descriptors ('@'/'@@', e.g. `[C@H]`/`[C@@H]`)
+        // land here, inside the bracket atom. Tolerated, not modelled (Phase
+        // A.6, see module doc): consume one '@' (and a second, for '@@')
+        // and fall through to parse the rest of the bracket atom normally
+        // -- `Atom` has no stereo field, so this is a clean discard, not a
+        // partial/lossy representation. Previously rejected outright; found
+        // live via a 1,282-record external evaluation where this was
+        // 337/489 of all "representation" parse failures in that corpus
+        // (see PROCESS_DISCOVERY_PHASE_A3_FIRST_RUN_ANALYSIS_2026-07-13.md
+        // in the monorepo root) -- but every structural comparison this
+        // crate's consumers perform is already stereochemistry-blind graph
+        // isomorphism, so rejecting the syntax bought nothing but spurious
+        // failures.
+        if self.chars.get(self.pos) == Some(&'@') {
+            self.pos += 1;
+            if self.chars.get(self.pos) == Some(&'@') {
+                self.pos += 1;
+            }
+        }
+
         let mut hydrogens: u8 = 0;
         if self.chars.get(self.pos) == Some(&'H') {
             self.pos += 1;
@@ -494,5 +544,99 @@ impl Parser {
                 atom.hydrogens = implicit as u8;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Phase A.6 (2026-07-16): stereochemistry syntax is now TOLERATED, not
+    // rejected -- see the module doc for why (every structural comparison
+    // this crate's consumers perform is already stereochemistry-blind graph
+    // isomorphism, so rejecting the syntax bought nothing but spurious
+    // parse failures on real external data). These tests replace the prior
+    // "must be rejected" assertions with "must parse to the identical
+    // structure as the non-stereo form" -- the strongest available proof
+    // that the stereo token was cleanly consumed and nothing else was
+    // corrupted or misparsed, not just that parsing happened to succeed.
+
+    #[test]
+    fn tetrahedral_stereo_in_bracket_atom_is_tolerated_and_discarded() {
+        let stereo = Molecule::from_smiles("C[C@H](N)C(=O)O").unwrap(); // alanine, '@'
+        let plain = Molecule::from_smiles("C[CH](N)C(=O)O").unwrap(); // same, no stereo marker
+        assert_eq!(
+            stereo, plain,
+            "the '@' must be cleanly consumed, producing an identical structure"
+        );
+    }
+
+    #[test]
+    fn double_at_stereo_in_bracket_atom_is_also_tolerated_and_discarded() {
+        let stereo = Molecule::from_smiles("C[C@@H](N)C(=O)O").unwrap();
+        let plain = Molecule::from_smiles("C[CH](N)C(=O)O").unwrap();
+        assert_eq!(
+            stereo, plain,
+            "'@@' must be cleanly consumed (both '@' characters), producing an identical structure"
+        );
+    }
+
+    #[test]
+    fn cis_trans_bond_direction_markers_are_tolerated_and_discarded() {
+        // trans- and cis-1,2-difluoroethene ('/C=C/' vs '/C=C\') must both
+        // parse successfully now, and -- since geometry isn't recorded --
+        // produce IDENTICAL structure to each other and to the undirected
+        // form. All three share the same atom traversal order (F, C, C, F),
+        // so this is a direct struct equality, not just isomorphism.
+        let trans = Molecule::from_smiles("F/C=C/F").unwrap();
+        let cis = Molecule::from_smiles("F/C=C\\F").unwrap();
+        let undirected = Molecule::from_smiles("FC=CF").unwrap();
+        assert_eq!(trans, cis, "cis/trans directionality must be discarded");
+        assert_eq!(
+            trans, undirected,
+            "a directed double bond must parse identically to an undirected one"
+        );
+        assert_eq!(trans.molecular_formula(), "C2H2F2");
+    }
+
+    #[test]
+    fn non_stereo_bracket_atoms_are_unaffected_by_this_fix() {
+        // Confirms the '@' consumption doesn't false-positive on ordinary
+        // bracket atoms that never reach it.
+        assert!(Molecule::from_smiles("C[N+](=O)[O-]").is_ok());
+        assert!(Molecule::from_smiles("[H][H]").is_ok());
+    }
+
+    #[test]
+    fn genuinely_unterminated_bracket_still_reports_the_original_message() {
+        // A real missing ']' (no '@' involved) must still get the original
+        // error -- unaffected by the Phase A.6 tolerance change.
+        let err = Molecule::from_smiles("C[NH2").unwrap_err();
+        assert!(
+            err.0.contains("unterminated"),
+            "expected the genuine unterminated-bracket error, got: {}",
+            err.0
+        );
+    }
+
+    #[test]
+    fn disconnected_structures_and_bare_top_level_at_sign_remain_rejected() {
+        // '.' (disconnected structures) and a bare top-level '@' (not valid
+        // standard SMILES outside a bracket atom) are a different concern
+        // from stereochemistry tolerance and must remain out of scope --
+        // explicit regression guard since Phase A.6 split what used to be
+        // one shared match arm ('.' | '/' | '\\' | '@') into separate ones.
+        let dot_err = Molecule::from_smiles("CC.CC").unwrap_err();
+        assert!(
+            dot_err.0.contains("unsupported SMILES feature '.'"),
+            "got: {}",
+            dot_err.0
+        );
+        let bare_at_err = Molecule::from_smiles("C@C").unwrap_err();
+        assert!(
+            bare_at_err.0.contains("unsupported SMILES feature '@'"),
+            "got: {}",
+            bare_at_err.0
+        );
     }
 }

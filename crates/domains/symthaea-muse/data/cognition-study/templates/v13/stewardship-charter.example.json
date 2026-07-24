@@ -1,0 +1,18 @@
+{
+  "charter_version": "symthaea-muse-stewardship-governance-v1",
+  "stewardship_id": "REPLACE_STEWARDSHIP_ID",
+  "source_final_release_sha256": "REPLACE_64_HEX",
+  "members": [],
+  "ordinary_quorum": 2,
+  "emergency_quorum": 2,
+  "succession_plan_sha256": "REPLACE_64_HEX",
+  "continuity_drill_sha256": "REPLACE_64_HEX",
+  "vulnerability_disclosure_uri": "https://replace.invalid/security",
+  "vulnerability_policy_sha256": "REPLACE_64_HEX",
+  "evidence_correction_policy_sha256": "REPLACE_64_HEX",
+  "end_of_life_policy_sha256": "REPLACE_64_HEX",
+  "funding_conflict_policy_sha256": "REPLACE_64_HEX",
+  "charter_public_uri": "https://replace.invalid/stewardship",
+  "effective_at_utc": "REPLACE_RFC3339",
+  "charter_sha256": ""
+}

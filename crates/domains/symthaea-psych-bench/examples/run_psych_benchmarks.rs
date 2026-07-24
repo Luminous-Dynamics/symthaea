@@ -95,7 +95,7 @@ use symthaea_psych_bench::benchmarks::qualia_confidence::{
 use symthaea_psych_bench::benchmarks::reasoning::{
     ArcAbductiveBenchmark, ArcAlgebraBenchmark, ArcAnalogyBenchmark, ArcChainBenchmark,
     ArcCompositionalBenchmark, ArcFewShotBenchmark, ArcFluidBenchmark, ArcNoiseBenchmark,
-    ArcRsaBenchmark, ArcScalingBenchmark, ArcStaircaseBenchmark,
+    ArcRsaBenchmark, ArcScalingBenchmark, ArcStaircaseBenchmark, ArcStrictBenchmark,
 };
 use symthaea_psych_bench::benchmarks::social::{
     DictatorGameBenchmark, MachiavelliBenchmark, PrisonersDilemmaBenchmark, PublicGoodsBenchmark,
@@ -264,6 +264,7 @@ fn main() {
         Box::new(ArcRsaBenchmark),
         Box::new(ArcAlgebraBenchmark),
         Box::new(ArcStaircaseBenchmark),
+        Box::new(ArcStrictBenchmark),
         // Additional MemoryAgent
         Box::new(ProspectiveMemoryBenchmark),
         // Additional Metacognition

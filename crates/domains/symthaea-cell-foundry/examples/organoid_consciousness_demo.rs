@@ -70,9 +70,9 @@ fn main() {
     // Consciousness onset analysis
     println!();
     println!("=== Consciousness Onset ===");
-    let _phi_curve = pipeline.phi_curve();
+    let _phi_curve = pipeline.integration_proxy_curve();
     for threshold in [0.01, 0.05, 0.1, 0.2, 0.3] {
-        if let Some(day) = pipeline.consciousness_onset_day(threshold) {
+        if let Some(day) = pipeline.integration_proxy_threshold_day(threshold) {
             println!("Phi > {:.2} at day: {}", threshold, day);
         }
     }

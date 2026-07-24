@@ -783,10 +783,37 @@ plausibly RIGHT: its consonance-excess channel is detecting that the
 derived countersubject is not voice-led (vertical intervals hover at/below
 the independence baseline), i.e. it flagged exactly the documented
 limitation. Species-checked counterpoint is now not just a craft upgrade
-but a falsifiable one: doing it should move Φ.) 4. Tango (WAITS on real rhythm cells: habanera
-accompaniment first) 5. Celtic (ornament, drones, dance rhythms) 6.
-Passacaglia (ground bass: everything changes, the foundation remains — maps
-directly onto the memory architecture) 7. March ✓ (shipped; deepen) 8. Nordic
+but a falsifiable one: doing it should move Φ. FOLLOW-UP 2026-07-11: it
+was built, and the hypothesis was falsified TWICE — first draft bent
+thematic material and LOWERED Φ; the redesign (themes sacrosanct, bass
+bends, strong-beats-only) raised the consonance channel +25% with the
+motif web intact and Φ didn't move: λ₂ is a bottleneck measure and the
+fugue's min-cut is TEMPORAL. The insight redirected the roadmap to the
+passacaglia, below.) 4. Tango (WAITS on real rhythm cells: habanera
+accompaniment first) 5. ~~Celtic~~ ✓ (2026-07-12: Mixolydian, sextuple
+meter with a real JigGait rhythm cell — FiveGait's 3+2 anchor mechanism
+extended to 3+3 — a sustained tonic-fifth drone that deliberately IGNORES
+the harmony above it, and unaccented "cut" ornaments distinguished from
+appoggiaturas by construction: always quieter, always brief, never on the
+beat. Live-verified against the running Studio server: the served Bass
+voice alternates 65.4Hz/98.0Hz [C2/G2] every ~1.5s regardless of chord
+motion, and 58 short-quiet-then-louder note pairs [cuts] appear in a
+4-bar Melody voice.) 6.
+~~Passacaglia~~ ✓ (2026-07-11: promoted out of order BY the Φ-bottleneck
+result and shipped with a pre-registered in-tree experiment — invariant
+identity-bearing ground vs anonymous ever-changing bass, CONFIRMED on
+all seeds: Φ 0.038-0.048 vs 0.019-0.040, up to 2×, the highest Φ of any
+contrapuntal form measured. Two lessons kept in-code: the first control
+was contaminated (oriented() transforms of a subject-derived ground =
+a RIVAL integration strategy — bass imitating the melody's family
+integrates ~as well as strict invariance — not a null); and mean edge
+weights ≠ λ₂ (seed 1's control had higher means on BOTH channels and
+lower Φ — invariance fixes the WEAKEST link). The ground REMEMBERS per
+the review's design: stated / walked / filled / ALTERED (deepest tone
+lifted) / RESTORED as peak / FRAGMENTED / COMPLETE with tonic bend +
+lift. Studio now also reports local_coherence + global_coherence per
+candidate and logs both to keepers — "two kinds of coherence" as
+observables.) 7. March ✓ (shipped; deepen) 8. Nordic
 (sparse texture, open intervals, long silences) 9. Japanese (ma — space,
 pentatonic restraint, asymmetry) 10. Maqam traditions (the tuning support
 exists; build the compositional style).
@@ -804,7 +831,137 @@ existing four) · **Palette** (chamber/piano/folk/ambient). A user then
 composes combinations ("Nocturne harmony + Nordic palette + Curiosity +
 Theme & Variations") — far more expressive than a hundred-genre dropdown.
 Styles become curated PRESETS over these dimensions, which they already are
-in embryo (CompositionSpec is the substrate).
+in embryo (CompositionSpec is the substrate). UPDATE 2026-07-11: the
+Identity Grammar dropdown became the first shipped axis of this
+decomposition (Grammar × Form × Style × Attitude × Palette).
+
+**THE STYLE RULE (2026-07-11 review, adopted as the standing criterion):**
+"Every new style must teach Muse one compositional habit that improves at
+least one other style." Fugue taught imitation; Passacaglia taught
+persistence; Nocturne taught lyricism; March taught rhythmic insistence;
+~~Tango~~ ✓ taught RHYTHM CELLS (2026-07-11: `Accompaniment::Habanera` —
+the first accompaniment whose identity is rhythm AND accent together, a
+per-event accent table the bass locks to with a dotted anchor; blues
+shuffle, baroque dance figures, and minimalist pulses are the same
+mechanism with different tables. Style::Tango: harmonic minor, 4/4,
+100-132 BPM, dotted/syncopated banks, i-iv-V-i, violin/piano/upright
+bass).
+
+**The reviewer's 3-group style roadmap (2026-07-11):**
+- Group 1 (teach new grammar): ~~Tango~~ ✓, ~~Celtic~~ ✓ (2026-07-12:
+  taught the drone — a genuinely static pedal texture, reusable by
+  Nordic's open intervals and Ambient's near-stillness — and the
+  unaccented cut, the first embellishment device that isn't a lean),
+  ~~Blues~~ ✓ (2026-07-12: taught the shuffle — Accompaniment::Shuffle,
+  the literal "blues shuffle" the Habanera doc predicted the rhythm-cell
+  mechanism would generalize to — and the blue note: the first ornament
+  that ALTERS an existing pitch instead of adding a new one, a deliberate
+  melody/harmony scale mismatch reusable by Jazz Ballad. 12-bar chorus via
+  the existing Archetype progression mechanism, no new form machinery;
+  call-and-response left honestly attributed to the engine's existing
+  period grammar rather than reimplemented as fake-new machinery),
+  ~~Impressionism~~ ✓ (2026-07-12: taught PARALLEL PLANING —
+  `TextureSpec.planing` — harmony that abandons functional root motion in
+  the contrast section and instead rides the melody's exact contour, a
+  struck chord shape re-centered per melody note; Lydian mode, dominant-
+  free progression. Shipped in two commits: the device landed initially
+  with a real bug found by its own test [the section-boundary window
+  copied `apply_development_style`'s antecedent-only formula, landing
+  exactly where `thin_departure` strips all harmony — 0 chords found in
+  every run], root-caused via eprintln instrumentation and fixed by
+  widening to the full section; live-verified via /api/notes scan, 43
+  confirmed planing pairs in one piece).
+- Group 2 (expand emotional range): ~~Minimalism~~ ✓ (2026-07-12: taught
+  the additive process — `apply_additive_process`, the FIRST pass that
+  wholesale REPLACES a voice within its window rather than decorating
+  what's already there [every prior ornament adds/alters; drone/planing
+  replace but only bass/harmony]. The piece's own hook cell grows one
+  note at a time until it sounds whole, then shrinks back down, in the
+  theme sections — the process substitutes for melodic argument entirely.
+  Static mostly-tonic harmony under a pulsing Arpeggio ostinato; no coda
+  [minimalist pieces stop, they don't resolve]. Aligns with identity
+  grammars exactly as predicted — the additive process IS a kind of
+  Memory grammar at the phrase level), ~~Sacred Choral~~ ✓ (2026-07-12:
+  taught the harmonic
+  suspension — `apply_suspensions`, the first ornament living in the
+  HARMONY voice rather than the melody. Real voice-leading candidates
+  [outgoing chord tone a diatonic step above an incoming one] get tied
+  over as a prepared dissonance, resolving down by step — the actual
+  4-3/7-6 mechanism, not appoggiatura wearing a different name. Phrygian
+  mode [the ecclesiastical mode no prior style had used]; the plagal
+  "Amen" coda needed ZERO new code — `append_coda`'s subdominant-then-
+  tonic ending already existed, just switched on. Live-verified: bass
+  ends F2→C2 [Amen], 11 confirmed suspension pairs in one piece), ~~Jazz
+  Ballad~~ ✓ (2026-07-12: taught `TextureSpec.seventh_chords` — extends the
+  existing dominant-only 7th coloring [already safe, already used at
+  cadences] to EVERY chord in the progression, not just the cadential one;
+  reusable by any future jazz-adjacent style [bebop, big band]. Aeolian
+  mode, ii-V-I-vi turnaround via the existing Archetype progression
+  mechanism, blue notes + appoggiaturas compounded onto Nocturne's Singing
+  rhetoric. Two real bugs found by its own tests, not shipped blind: the
+  Harmony voice excludes the chord root [`voicing::lead_upper` skips it],
+  so triad→2 tones/seventh→3 tones, not 3/4 as first assumed; and the
+  live-gate initially false-negatived because performed/served notes carry
+  humanization jitter that splits simultaneous onsets across naive
+  rounding buckets — fixed by clustering onsets within 0.05s instead of
+  exact-matching them. Also forgot the front-end style-selector/palette
+  entries on first deploy [`include_str!` compiles the Studio HTML in at
+  build time, so this needed a second full release rebuild]. Live-verified
+  via /api/notes scan: 41/53 real seventh-chord onsets in served audio).
+- Group 3 (stress the engine): ~~Baroque Dance Suite~~ ✓ (2026-07-12:
+  taught HARMONIC SEQUENCE — `TextureSpec.harmonic_sequence`, realized by
+  `apply_harmonic_sequence` — the first pass to rewrite a section's
+  harmonic PLAN itself [the stored scale-degree progression on the Form]
+  rather than decorate or substitute already-realized chords. The B
+  section gets a genuine descending-fifths circle
+  [I-IV-vii°-iii-vi-ii-V-I], the quintessential Baroque/Pachelbel device;
+  cadential tails left untouched so the harmony still resolves under the
+  melody's already-baked cadence. Functional tonality [no exotic mode —
+  identity comes from harmony/form], slow triple meter, broken-chord
+  continuo [violin/organ/cello]. Two real bugs caught by its own isolated
+  test before shipping: the antecedent/consequent seam skipped one step
+  in the circle [fixed: resume from `ante_len - 1`, not `ante_len`,
+  since the antecedent's cadential slot is diverted rather than spent];
+  and the motif banks didn't total the style's own 3-beat meter, caught
+  by `validate()`. 298 theory + 524 muse green), ~~Progressive Folk/
+  Rock~~ ✓ (2026-07-12: taught a genuine mid-piece METER CHANGE — new
+  `FormKind::ProgSuite`/`crate::prog_suite`, which bypasses the period
+  pipeline (no single `meter_beats` scalar can represent more than one
+  meter, so `realize_melody`/`harmony`/`bass` are called separately per
+  section) and splices four independently-realized sections onto one
+  timeline: theme in 4 → asymmetric riff in 7 (home key) → bridge in 5
+  (relative key) → theme's return in 4 (home key), voice-leading carried
+  continuously across every change. Reuses `Form::ternary`'s own
+  `contrasting_transform` mechanism for the riff/bridge. This is exactly
+  the pattern `live.rs` documents as the caller's job — "the crate gives
+  you the pieces, not a scripted arc" — realized as that arc. Both new
+  tests passed FIRST TRY, no debugging cycle, applying the Baroque wave's
+  exact-sequence-assertion lesson from the start. 300 theory + 524 muse
+  green. Live-verified: the served bass line's inter-onset gaps form
+  three clearly distinct plateaus [~1.0s/~1.8s/~1.3s] — the meter change
+  is real in rendered audio, not just the symbolic Score), ~~Ambient~~ ✓
+  (2026-07-12: taught HARMONIC STASIS —
+  `TextureSpec.harmonic_stasis`/`apply_harmonic_stasis` — when a voice
+  [Harmony or Bass] repeats the exact same pitch across two consecutive
+  chord onsets, tie the notes into one longer sustained note instead of
+  re-striking; a sequential per-pitch sweep chains arbitrarily long runs
+  into ONE note. Turns a static repeated progression into a genuine
+  drone — repetition becomes duration, not re-attack. Slowest tempo of
+  any style [32-52bpm], motifs never faster than quarter notes even at
+  the busy tier, zero ornamentation, no damage, no coda [doesn't
+  resolve, it stops]. 302 theory + 524 muse green, both new tests first
+  try. Live-verified: Harmony sustaining up to 38s, Bass up to 47.75s,
+  only 144 total note events in a 322-second piece — genuine "almost no
+  events" stillness in real served audio), Film Score (leitmotifs =
+  lineage in practice — still unscoped, outside the currently-planned
+  roadmap).
+- Still postponed: trap/dubstep/hyperpop/metal/EDM (identity lives in
+  production/sound design, not symbolic structure).
+- The reviewer's year-order: Tango✓ → Celtic✓ → Blues✓ → Impressionism✓ →
+  Sacred Choral✓ → Minimalism✓ → Jazz Ballad✓ → Baroque Dance Suite✓ →
+  Prog Folk/Rock✓ → Ambient✓. **The currently-scoped style roadmap is
+  CLOSED — 15 styles shipped this session (Tango through Ambient).**
+  Only Film Score remains unscoped in Group 3 if a future wave wants it.
 
 **Echo confidence** (same review): echoes should have gradations — strong
 (near-identical) / fading (shortened) / distant (rhythm kept, contour
@@ -928,25 +1085,97 @@ seeds), and a statistical front-vs-back-of-phrase test on a real piece.
 Artifacts: wistful v14 / dorian v8 (FluidSynth renders).
 
 **UX Wave 1 — the workspace inversion (UI only, no engine work):**
-- Mode toggle: **Artist** (default: prompt, style, mood, energy, length,
+- **Mode toggle**: **Artist** (default: prompt, style, mood, energy, length,
   Compose — nothing else visible) / **Studio** (today's full panel) /
-  **Research** (spec JSON, consciousness sliders, diagnostics).
-- Prompt-first layout with rotating example prompts; candidates dominate the
-  page after generation; controls collapse.
-- Musical language on the dials: Dark•Melancholic•Reflective•Hopeful•Radiant
-  instead of "-1 ↔ 1"; Sparse•Gentle•Flowing•Driving•Epic for energy.
+  **Research** (spec JSON, consciousness sliders, diagnostics). **DONE
+  (2026-07-13, commit `5046625c0f`)** — a single unduplicated `<form>`,
+  fields tagged `data-tier="studio"`/`data-tier="research"` (untagged =
+  always-visible Artist tier), 2 CSS rules do the hiding, each mode a
+  strict superset of the one before. No duplicate inputs, so switching
+  modes never loses a value. Compose drawer flipped to open-by-default
+  so Artist's minimal set shows on load with no extra click. Live-
+  verified on the Pixel 8 Pro: Artist mode shows exactly Style/Mood/
+  Energy/Bars/Prompt/Compose; Research mode reveals every field in one
+  screenshot. "Diagnostics" is already covered by the existing
+  per-candidate Φ badge — no separate panel was invented for it.
+- **Prompt-first layout** with rotating example prompts; candidates
+  dominate the page after generation; controls collapse. **DONE
+  (2026-07-13, commit `75672b8e04`)** — a hero prompt input is the true
+  entry point of the Studio surface, above Today's Discoveries; its
+  placeholder rotates through 7 example phrases every 3.5s, paused
+  while focused. It's the sole source of the compose body's `prompt`
+  field (the old duplicate in-drawer field was removed). The Compose
+  `<details>` drawer now auto-collapses after every successful compose
+  so candidates dominate the page; one click on "Compose" brings it
+  back. This closes the workspace-inversion bullet in full. Verified
+  live on the Pixel 8 Pro that the hero prompt renders first and its
+  rotation matches the JS array; the manual collapse/expand toggle was
+  confirmed via a real tap (same `<details>` DOM operation the auto-
+  collapse uses) — but the auto-collapse firing after a live generate
+  was not independently observed on-device this session, because the
+  device happened to be under extreme *unrelated* system load
+  (concurrent sessions' builds) during the verification window. See
+  the commit message and `symthaea_muse_phase6_industry.md` for the
+  full disclosure.
+- **Musical language on the dials**: Dark•Melancholic•Reflective•Hopeful•
+  Radiant instead of "-1 ↔ 1"; Sparse•Gentle•Flowing•Driving•Epic for
+  energy. **DONE (2026-07-13, commit `080c5ae1d5`)** — a live word label
+  above each of the Mood/Arousal/Energy sliders, updating on every drag
+  via a plain `input` listener (`dialWord()` in `studio/index.html`).
+  Added a matching 5-word arousal bank (Calm•Settled•Engaged•Restless•
+  Electric) — not explicitly named in this bullet, designed to match the
+  valence/energy banks' tone and granularity. Verified live on the actual
+  Pixel 8 Pro device via adb: default sliders render "Mood Hopeful /
+  Arousal Engaged / Energy Driving", exactly matching an independent
+  Python dry-run of the bucketing logic. Could not get ADB touch-drag to
+  reliably register on the native range-slider thumb to confirm the
+  live-drag path device-side (tooling limitation, not a code gap) — the
+  `input`-listener pattern itself is standard and low-risk.
 - **Generated titles**: deterministic word-bank naming from seed/mode/hook
   ("The Long Return", "Ash Before Dawn") — no LLM, provenance-clean, people
-  remember names, not "candidate 3".
-- Consciousness sliders re-labeled as a Creative State console
+  remember names, not "candidate 3". **DONE (2026-07-13, commit
+  `ec1821d7f8`)** — see `describe::title_for`. `identity_card`'s title
+  needed a premise to describe its features fairly, which left the
+  Listen tab (never premised) showing "seed N" for every piece; `title_for`
+  reads mode/valence/arousal straight off the resolved spec/intent
+  instead, so it works with no premise. Shares its actual naming shape
+  (`build_title`) with `identity_card`, so both use the same word banks
+  and sentence form — just two ways of arriving at the two real inputs
+  (color, motion) that pick from them.
+- **Consciousness sliders re-labeled as a Creative State console**
   (Warmth/Focus/Wonder/Urgency) + presets (Dreaming, Storytelling, Flow…) —
-  same parameters underneath, honest mental model on top.
+  same parameters underneath, honest mental model on top. **DONE
+  (2026-07-13, commit `c6ab956186`)** — Dopamine/Serotonin/Noradrenaline/
+  Consciousness renamed to Wonder/Warmth/Urgency/Focus (API param names
+  and [0,1] ranges unchanged), each keeping its existing plain-language
+  badge as a secondary hint. Added the three named one-click presets;
+  verified live on the Pixel 8 Pro — tapping "Flow" moved all four
+  sliders to the exact designed values, a clean button-click interaction
+  (unlike the dial-words wave's slider-drag, which ADB couldn't reliably
+  simulate).
 
 **UX Wave 2 — explainability (the true differentiator; the engine is symbolic
 so every explanation is TRUE, not confabulated):**
 - **"Why this piece"** panel per candidate from data we already have:
   hook cell (name + rhythm), damage plan, cadence grammar, mode, ensemble,
-  form. `/api/explain/{id}`.
+  form. `/api/explain/{id}`. **PARTIALLY DONE (2026-07-13, commit
+  `667a9269e4`)** — see `describe::why_lines`. Shipped as an always-present
+  `why: Vec<String>` field on `/api/compose`'s own response (no separate
+  endpoint needed) covering grammar/development/accompaniment-rhythm-cell/
+  texture-device facts, wired into both the Discover card and a new Listen-
+  tab panel. Found and fixed a real, long-standing gap while building it:
+  `card` (the identity title+traits) is only populated when `exploring` is
+  true, which requires `n_candidates > 1` — the Listen tab's actual calls
+  always use `n_candidates: 1`, so `card` has been `null` for EVERY single
+  piece ever played there, the entire time this style roster has existed.
+  `why` needs no premise so it's unconditional, fixing this for the
+  highest-traffic surface. **Hook-cell character added (2026-07-13,
+  commit `a9ddbd0f4c`)** — `why_lines` now takes a seed and describes the
+  piece's own hook ("built from bold leaps" / "leans on a repeated note" /
+  "moves by smooth, stepwise motion"), sharing one classification with
+  `identity_card`'s trait via a new `hook_character()` helper (pinned by a
+  test that the two renderings agree). NOT yet covered: the damage plan
+  and per-note provenance (below) — still open.
 - **Iteration verbs**: More adventurous (damage↑) · More peaceful (damage↓,
   arousal↓) · Different hook (reroll hook seed, hold the rest) · Better
   melody (N hook candidates, keep arrangement) · Different instrumentation
@@ -960,7 +1189,39 @@ so every explanation is TRUE, not confabulated):**
 - **Per-voice instrument pickers** (Lead/Counter/Harmony/Bass dropdowns
   writing into the spec — the spec already supports all of it), grouped
   browser (Woodwinds/Strings/Pads) with preview, Randomize-Ensemble /
-  Keep-Melody-Change-Instruments buttons.
+  Keep-Melody-Change-Instruments buttons. **Core pickers DONE
+  (2026-07-13, commit `dc79e677c4`)** — 4 dropdowns (Melody/Harmony/
+  Bass/Counter-melody) grouped into Keys & Mallets/Strings/Winds/
+  Plucked/Pads & Synths (22 instruments), each defaulting to Auto.
+  Writes directly into the existing "Advanced: edit style spec"
+  textarea (`ensemble_pool` collapsed to the chosen triple,
+  `counter_instrument` set or deleted for Auto) — no parallel state,
+  same JSON round-trip `loadSpec`/`saveSpec` already use. Verified
+  end-to-end via curl (patched spec → real compose → `/api/notes`
+  confirmed Melody→Violin/Harmony→Cello/Bass→UprightBass/Counter→Oud
+  exactly as picked) and live on the Pixel 8 Pro (native grouped
+  picker renders correctly, selection updates the shown value) — see
+  the commit message for what device verification could and couldn't
+  confirm this session. **Randomize-Ensemble / Keep-Melody-Change-
+  Instruments buttons DONE (2026-07-13, commit `2f1c866194`)** — both
+  reuse the exact same load-then-patch path a manual picker change
+  uses; "keep melody" pins melody to the spec's current pool value
+  first if it was still on Auto, so there's something concrete to
+  keep. **Audio preview per instrument DONE (2026-07-13, commit
+  `8e5622b6b4`)** — a "▶" beside each voice select renders a ~3.5s
+  scale on that instrument, entirely decoupled from Score/
+  CompositionSpec (`midi_export::export_preview_midi` builds a
+  hand-constructed MIDI directly from the `Instrument`'s GM program
+  number), served via a new `GET /api/preview/{instrument}` that
+  renders once and caches to `data/previews/{name}.wav` — same
+  file-serving shape as the existing keeper-audio endpoint. Verified
+  live against the running server (uncached render 1.4s, cached hit
+  10ms, distinct instruments produce distinct files, real RIFF/WAVE
+  bytes confirmed, unknown names 404) plus a new unit test. **Wave 3's
+  per-voice-picker bullet is now fully done.** The other 2 Wave 3
+  bullets (palettes-over-styles, wordless-voice-as-instrument) remain
+  unstarted — both bigger, one needing a new data model and one
+  needing engine-level singing-voice work.
 - **Palettes over styles**: a palette = ensemble + articulation + room +
   humanization bundle ("Nordic Winter", "Desert Caravan" — we have Ney, Oud,
   Koto banks already). Styles remain as composition-structure presets;
@@ -989,3 +1250,457 @@ on the articulation work).
 Gate: the awaiting blind A/B listening artifacts (`audio_output/ab_melody/`,
 `theory_ab/`, mastered `instrument_ensembles/`) should keep gating which improvements
 get promoted to default paths.
+
+## The Persistence Plan (2026-07-11) — from the passacaglia listening review
+
+The review's verdict on the passacaglia artifacts: "the ground does not
+feel like mere repetition. It feels like a persistent identity that the
+upper voices keep having to reinterpret... restoration feels like
+recognition, and completion feels like consequence." Seed 8 proved the
+counterpoint: "ground suitability is a distinct compositional property —
+a good melodic hook is not automatically a good ostinato."
+
+**New primitive named by the review: PERSISTENCE** (distinct from memory:
+memory asks "what returns?"; persistence asks "what refuses to
+disappear?"). The contaminated-control finding adds a second long-range
+strategy: **LINEAGE** (familial identity — Ground → Ground′ → Ground″,
+kinship instead of literal repetition, "remarkably close to how human
+composers work"). Keep them separate primitives.
+
+**Next, in order (review-endorsed):**
+
+1. **Ground-worthiness judgment** — score candidate subjects BEFORE
+   granting them a ground: recurrence recognizability (hook identity
+   predicates + trigram self-similarity), harmonic affordance (how few
+   fitter-bends the uppers need over it — measurable with the existing
+   species fitter), rhythmic durability, fragmentation survival (does
+   the one-tone-per-bar skeleton retain the contour signature),
+   transformation legibility (is the one-note alteration detectable).
+   All five computable symbolically today. Studio composes N candidate
+   subjects, ranks, grants the ground to the best — and logs the five
+   scores into keeper entries so ♥ data eventually LEARNS the weighting.
+   This answers "which subjects deserve to become grounds" empirically.
+2. **Erosion** — the inverse arc: the ground loses confidence cycle by
+   cycle (progressive, deterministic degradation) until the final cycle
+   either reconstructs it or — the darker ending — never does. Persistence
+   failing is as expressive as persistence winning. Small build: one
+   degradation operator + an ending switch.
+3. **Lineage ground** — formalize the contaminated control as a real
+   mode: a chaconne-like form whose bass EVOLVES through the subject's
+   transformation family while remaining kin. The experiment already
+   measured it integrating ~as well as strict invariance.
+4. **Cycle rhetoric** — give each cycle a bolder stated function
+   (lyrical / imitative / agitated / sparse / dense / nearly-empty /
+   reconciled); the current arc implies it, the uppers should declare it.
+
+**Standing guard (review, adopted as policy):** Φ is an observable and an
+experiment instrument, NEVER a fitness function. The moment Muse
+optimizes for Φ it will exploit the metric instead of composing. Keeps
+(♥) remain the only optimization target; Φ/local/global stay reported.
+
+## The Music Knowledge Graph Plan (2026-07-11) — continuity beyond a composition
+
+From the DKG review: build a **local-first, cryptographically verifiable
+graph of musical identity, transformation, authorship, taste, and
+provenance** — NOT "blockchain for compositions." Nodes: piece/version/
+hook/motif/form/palette/attitude/memory-arc/damage-plan/render/artist/
+sample/model/license/keeper-event. Edges: DERIVED_FROM / TRANSFORMS /
+QUOTES / INVERTS / AUGMENTS / ECHOES / KEPT_BY / RENDERED_WITH /
+TRAINED_FROM / LICENSED_UNDER...
+
+Why Muse specifically: the symbolic engine KNOWS these facts at compose
+time (exact hook, what the coda remembered, which palette rendered which
+role, which sample bank sounded it) — provenance is recorded, not
+narrated after the fact. And the engine is deterministic: (spec, seed,
+intent) reproduces a piece bit-exactly, so a provenance record is tiny —
+the recipe IS the content address.
+
+**Sequence (adopted verbatim from the review):** local graph →
+content-addressed musical objects → signed provenance records →
+exportable bundles → optional federation → public DKG later. No
+consensus/tokens/ledger at the start. The keeper jsonl is the embryo of
+the taste subgraph and v0 can grow out of it: extend each Studio
+generation record with parentage (parent piece/version), spec hash, hook
+identity, memory transformations, damage plan, palette + sample/model
+provenance — then the first queries ("show ancestors", "where else was
+this hook used?", "which changes led to pieces I kept?") need no new
+infrastructure at all.
+
+**Ecosystem note (later, not a dependency):** when federation is actually
+wanted, the rails already exist in-house — mycelix-attribution
+(dependency registry, usage receipts, reciprocity) and mycelix-knowledge
+(claims/graph/DKG) are built clusters. The bridge is a future wave;
+nothing in v0 should wait on it.
+
+**Main danger (adopted):** an ontology artists never use. The graph is
+populated automatically by the engine; artists only ever see Branch /
+Merge / Keep / Credit / Publish / Trace / Explain.
+
+## The Melodic DNA Plan (2026-07-11) — "the melody still sounds like Muse"
+
+The tango review isolated the remaining cross-style similarity: "I hear
+tango accompaniment + Muse melody, not tango melody + tango accompaniment."
+Root cause confirmed in code: `HookCell::generate(seed, meter)` is
+STYLE-BLIND — one shared rhythm-skeleton pool × one shared contour pool
+births every piece's name, whatever the style. The style dresses the hook;
+it should own it.
+
+**The reviewer's experiment (adopted as the acceptance test):** strip the
+accompaniment and play only melodies — if you can't reliably tell which
+style each came from, that's the bottleneck. Pinned in-tree at the hook
+layer: per-style hook feature distributions (interval width, dotted
+fraction) must separate.
+
+**v1 (this wave):** `MelodicDna { hook_rhythms, hook_contours }` on
+CompositionSpec (serde-default empty = classic shared pools — zero change
+for existing styles/specs). Style presets: Tango (dotted calls, pickup
+snaps; wide reaches, repeated-note insistence, descending tension),
+Nocturne (long-short sighs; stepwise identities anchored by repetition or
+gentle thirds), March (dotted-march cells; fourth/fifth reaches). All DNA
+cells still pass the hook identity predicates — DNA changes WHICH
+identities a style prefers, never whether the hook has identity.
+
+**Later (the full decomposition the review sketched):** Style Rhythm /
+Style Melody / Style Harmony / Style Counterpoint / Style Ornament as
+separate axes; phrase rhetoric per style (tango: statement-interruption-
+answer-stop; nocturne: breathe-continue-resolve); rhythm-first generation
+(the melody born FROM the cell); melody arguing with the accompaniment.
+Rule: hold new styles until the melodic layer exists (reviewer: the leap
+in perceived diversity beats ten new styles).
+
+## The Identity Explorer Plan (2026-07-11) — candidates, not renderings
+
+The four-candidates screenshot review: seeds explore a NEIGHBORHOOD, not
+continents — "four renderings of one compositional idea." Muse's
+subsystems all ask "how do I preserve identity?"; almost none ask "how do
+I invent a different one?" Planned subsystem (after Melodic DNA):
+
+1. **Identity search**: generate ~dozens of symbolic hooks per intent,
+   score, CLUSTER, select the N maximally-different that still match the
+   intent — novelty as a first-class objective (distance from every other
+   candidate), then compose.
+2. **Composer personalities** (not attitudes, not styles): Minimalist /
+   Architect / Storyteller / Wanderer / Dancer as reasoning biases — ask
+   four composers once instead of one composer four times.
+3. **Lineage BETWEEN pieces**: candidate ancestry (child/grandchild vs
+   independent) as a diversification mechanism.
+4. **UI language**: identities, not seeds ("The Lantern Keeper", not
+   "seed 69"); "More like this" gains siblings: "Find distant cousin" /
+   "Surprise me"; the Studio should read "discover music," not
+   "configure a generator."
+
+## The Discovery Plan (2026-07-11) — from control panel to place of discovery
+
+The month's verdict, distilled from the card-browser reviews: "earlier, the
+interface felt like a frontend for a composition engine. Now it feels like
+the beginning of a musical studio. The next leap isn't adding another
+dropdown — it's making the Studio feel like a place where you discover
+ideas rather than configure them." The machinery is largely built (melodic
+DNA, identity grammars, premises, meter families, worthiness, judgment,
+Explorer); this plan makes it work together and VISIBLE.
+
+**Phase 1 — Novelty Score + "why is this candidate different?"**
+(the review's one engineering request). Decompose the Explorer's identity
+distance into named channels — melodic (hook contour + motif head),
+rhythmic (hook rhythm), premise (tempo/texture/length/mode/meter/form),
+orchestration (ensemble + accompaniment), **harmonic (real chord-degree
+sequence per seed — added 2026-07-12, commit `61b315437`, the channel
+the original request named but the first pass left out; honestly near-
+zero for Archetype-sourced styles across most seed pairs, genuinely
+nonzero for Grammar-sourced ones)** — and report, per candidate, its
+distance-to-nearest-batch-neighbor per channel. The card answers the
+review's question directly: "differs most in: rhythm, premise." Keeper
+logs the breakdown (taste data learns which KINDS of novelty get kept).
+Novelty is an observable, never a fitness function — same policy as Φ.
+
+**Phase 2 — Discovery-first Studio.** The candidate browser becomes the
+hero: land on "Today's Discoveries" (a date-deterministic intent composed
+on load), controls collapse into a "tweak after you pick" drawer.
+"More like this" gains its siblings: "Find distant cousin" (re-explore
+from the far end of the window) and "Surprise me" (new premise draw).
+
+**Phase 3 — Development DNA.** The localized remaining convergence:
+styles share the development machinery mid-piece. `DevelopmentDna`
+(Sequential/Figural/Fragmenting, `apply_development_style`) already
+existed and covers Tango/Nocturne/March/Blues/Celtic/Impressionism/
+JazzBallad/BaroqueSuite/Cinematic — but as of 2026-07-12, **12 of 21
+styles still share the plain `Classic` no-op** (Classical, Waltz,
+Folk, Playful, Lullaby, ModalFolk, SacredChoral — some legitimately,
+e.g. Fugue/Passacaglia bypass this pipeline entirely and Minimalism/
+Ambient/ProgFolk have their own alternate development mechanism).
+Triggered by a full-catalog listening review (2026-07-12, see
+`memory/feedback_muse_style_ecosystem_review_jul12.md`) that named
+this the #1 remaining gap ("not hook DNA, not accompaniment — the
+middle. How does a style continue thinking?"). First move: new
+`DevelopmentDna::Intensifying` (register climbs monotonically +
+figuration accumulates + velocity itself crescendos — three axes
+toward one peak, a real dramatic arc) replacing Cinematic's stale
+Sequential assignment (commit `638924069`).
+
+**DONE (commit `073abcc89`)**: assigned real identities to the 6
+genuinely-undifferentiated styles — Classical→Figural, Waltz→
+Sequential, Folk→Wandering (NEW variant: a genuine random walk, ±1/±2
+diatonic degrees per bar, can reverse direction mid-passage — unlike
+Sequential's single commitment), Playful→Fragmenting, Lullaby→Figural,
+ModalFolk→Wandering. **Found and fixed a real pre-existing bug this
+exposed**: `apply_development_style` could silently erase the note
+marked as the piece's climax if it fell inside the rebuilt window —
+latent since Tango/Nocturne/March adopted non-Classic development, but
+never tripped a test until Classical (compose()'s own default)
+finally exercised it. Fixed by exempting the climax's own bar from
+clearing/rebuilding. 302 theory + 524 muse green.
+
+Only 6 styles remain on `Classic`, all deliberately: Fugue/Passacaglia
+(bypass this pipeline — their texture IS the counterpoint),
+Minimalism/Ambient/ProgFolk (own alternate mechanisms), SacredChoral
+(homophonic — "nothing to develop"). **Development DNA phase is
+essentially complete** — every style that could meaningfully use it
+now does. Possible future refinement (not urgent): reconsider whether
+Tango/Blues/BaroqueSuite's shared Sequential assignment still fits
+each individually now that Wandering/Intensifying exist as
+alternatives.
+
+**Phase 4 — Idiomatic meter cells + the formal listening test.** 5/4
+currently generalizes mechanically; give Cinematic a real five-gait via
+the rhythm-cell machinery. Then the randomized style-identification
+harness — as diversity grows, the instrument that tells us the spread is
+PERCEIVED, not just measured.
+
+**Phase 5 — MKG v0 + site.** Keeper jsonl grows into the local music
+knowledge graph (titles now give nodes human names); the site gallery
+inherits identity cards.
+
+**Liked Songs view — DONE (2026-07-12, commit `c32167631`)**, ahead of
+its own phase number because it was a direct user request. New "Liked"
+Studio tab reads `GET /api/keepers` and plays back the piece's ACTUAL
+saved audio (`data/taste/audio/{ts}_{seed}.{wav,mid}`, written at keep
+time) rather than recomposing an approximation — `Candidate` never
+retained the original `MusicalIntent` (arousal/valence/energy/tonic/
+bars), only spec+seed+state, so a later recompose from (style, seed)
+alone couldn't reliably reproduce the exact heard piece. This is a
+real precedent for MKG v0 above: keeper entries are already the
+embryo, now also each pointing at real durable audio, not just
+metadata.
+
+**Audio/MIDI import — SCOPED, NOT STARTED** (2026-07-12 vision, see
+`memory/feedback_muse_audio_import_vision_jul12.md` for the full
+write-up). Explicit warning worth repeating here: do not build the
+obvious version first (upload → clone/continue). Five ordered levels —
+Listen (pure analysis: key/tempo/meter/phrase/form/motifs, no
+generation), Explain (causal symbolic answers — "why does this feel
+nostalgic" grounded in slow harmonic rhythm/descending thirds/etc, not
+an AI summary), Learn (taste profile from imports, not model
+training), Transform (rewrite in another style/grammar — generation
+finally enters here), Converse (Muse RESPONDS to an imported piece
+rather than continuing it). MIDI should be built before audio
+(no transcription step needed). Audio pipeline must go Audio →
+Transcription → Symbolic → everything else, never Audio → neural
+continuation. "Explain this moment" (click a timestamp, get a named
+symbolic event) is the single most-requested concrete feature inside
+the vision.
+
+## Future Style Roadmap v2 (2026-07-12) — capability over labels
+
+A second full-catalog review, after the Tango→Ambient roadmap closed, gave a
+new prioritized list — same discipline as the original Style Rule, restated
+sharper: **"What new way of thinking does this style teach Muse?"** not
+"what styles are popular?" The reviewer's own summary: "adding a Sonata
+style is useful because it teaches exposition, development, and
+recapitulation. Adding Viennese Classical after that might only be a
+preset." Four tiers, ordered by how much NEW capability each teaches:
+
+**Tier 1 — high priority (new capabilities Muse doesn't fully have yet):**
+- ~~Sonata~~ ✓ **DONE (2026-07-12, commit `47cdbd5ac`)** — see `sonata.rs`.
+  Tonal CONFLICT AND RESOLUTION: exposition states P (home) and S (a real
+  foreign key), development compresses P through a third key,
+  recapitulation restates BOTH home — S's return is provably the same
+  scale-degree idea, only the key changed. New `Key::dominant()`.
+- Theme & Variations — **note: `FormKind::Variations` already exists**
+  (shipped 2026-07-11, in Nocturne/Lullaby's form_pool) and covers most of
+  what this item asks for (transformation/inversion/augmentation/
+  ornamentation/identity preservation). Not re-scoped as a fresh item;
+  worth a quick audit of whether it deserves its OWN dedicated Style
+  identity rather than living only inside two other styles' pools.
+- ~~Opera/Art Song~~ ✓ **DONE (2026-07-13, commit `c03c12dd9b`)** — see
+  `FormKind::Opera` / `opera.rs`. Theme A (Melody) and Theme B
+  (CounterMelody) are genuinely unrelated material, not a transform of one
+  into the other — solo statements, a bar-by-bar trading dialogue, then a
+  literal interruption (B's phrase cut off mid-way, A enters early to
+  resolve). Found and fixed a real `Period::parallel_in` doubling bug
+  (antecedent+consequent built from the same progression silently doubles
+  section length) while wiring the harmony/bass Form.
+- Impressionist Orchestra — orchestral color, register painting, harmonic
+  atmosphere, instrumental conversation (beyond Impressionism's existing
+  planing device).
+- ~~Renaissance Polyphony~~ ✓ **DONE (2026-07-12, commit `601d83dfd1`)** — see
+  `renaissance.rs`. Three independent monophonic voices (soprano/alto/bass),
+  deliberately NO `VoiceRole::Harmony` — real equal-voice polyphony, not
+  melody-plus-accompaniment. Differs from Fugue at its foundation, not just
+  its surface: imitation at the octave (not a fifth-transposed answer), two
+  points of imitation with ROTATING voice entry order, a hand-built modal
+  cadence (7-6 suspension + Landini under-third approach). Live-verified via
+  `/api/notes`: served voices are Bass/Counter/Melody/Doubling with zero
+  Harmony-role notes.
+
+**Tier 2 — rhythm:** ~~Afro-Cuban~~ ✓ **DONE (2026-07-13, commit
+`d28366c571`)** — see `Accompaniment::Montuno` in `accompaniment.rs`. Son
+clave (3-2) as a genuine TWO-BAR cycle (the first pattern whose identity
+isn't a single repeating bar), alternating a tresillo three-side with a
+backbeat two-side; a tumbao bass interlocks with — never lands on — the
+montuno's own onsets, making "rhythmic conversation" a checkable
+non-overlap property. No new bypass form needed; the novelty is entirely
+in the accompaniment/bass layer. ~~Bossa Nova~~ ✓ **DONE (2026-07-13,
+commit `a9e768496d`)** — see `Accompaniment::BossaComp`. Syncopated onsets
+(0,1.5,3.0) whose durations chain with ZERO silence (the first cell
+defined by an absence of gaps, not a presence of accent) — "floating"
+legato harmony instead of punctuated stabs, `seventh_chords` for the jazz
+color, soft dynamics throughout. ~~Irish Traditional~~ ✓ **DONE
+(2026-07-13, commit `cd94285b28`)** — see `apply_roll_ornaments` /
+`TextureSpec::roll_ornaments`. The engine's first ORNAMENT CHAIN: not
+Celtic's single grace-note "cut" but a full five-note roll (main, upper
+cut, main, lower cut, main), the reel (meter 4, Dorian — distinct from
+Celtic's jig/Mixolydian), a real session trio (flute/guitar/upright bass).
+~~Hindustani-inspired~~ ✓ **DONE (2026-07-13, commit `f45f18da95`)** — see
+`apply_full_drone` / `TextureSpec::full_drone`. The engine's first FULL
+drone: not just Celtic's bass pedal under a moving harmony, but Harmony
+too, replaced with a static tonic-fifth-octave pad tied into one
+continuous sustain — no chord progression exists anywhere, so "tension
+without modulation" is a structural guarantee, not a mood. Live-verified:
+an entire ~5-minute composed piece's Harmony voice is 3 notes total, each
+spanning the whole duration.
+
+**Tier 3 — long-form architecture (forms that stress memory):**
+Passacaglia (already done), Chaconne (variation over a harmonic
+progression instead of a strict repeating bass — different enough from
+Passacaglia to justify itself), Tone Poem (narrative composition).
+
+**Tier 4 — modern, deliberately NOT rushed:** Progressive Rock (already
+done — changing meter, thematic return, long arcs), Post-rock (texture,
+patience, gradual growth), Neo-classical piano ("probably popular but
+doesn't teach much new — I'd wait"), Lo-fi ("mostly production, not
+theory").
+
+**Deliberately skipped for now:** Dubstep/Trap/Hyperpop/Hardstyle/Brostep
+— "the interesting work there is synthesis/sound design/production rather
+than symbolic composition."
+
+**Named as missing entirely — improvisational styles:** Jazz Combo, NOT
+jazz harmony (already have that via JazzBallad) but real improvisation:
+motif trading, call-and-response, spontaneous variation, accompaniment
+REACTING. Flagged as "a huge leap," not yet scoped as a concrete
+mechanism.
+
+**The reviewer's "secretly most wanted" style: ~~Flamenco~~ ✓ DONE
+(2026-07-13, commit `9df77060eb`)** — see `Accompaniment::CompasGait` in
+`accompaniment.rs`. The 12-beat compás (3+3+2+2+2, accents only on counts
+3/6/8/10/12, every other beat silent — the first cell defined as much by
+its rests as its hits), Phrygian mode (the engine's first Phrygian style),
+Andalusian cadence (progression `[4,3,2,1]`, a descending stepwise
+tetrachord rather than the usual fifths motion), the roster's highest
+ornament/appoggiatura rates, oud/guitar/cello ensemble. Full call-and-
+response turn-taking between melody and accompaniment (as opposed to the
+simultaneous non-collision Montuno/AfroCuban already covers) was
+deliberately left for a future wave — this ship covers rhythm, mode,
+harmony, and melody, not the full "conversation" ambition.
+
+**Beyond style — musical dialects** (explicitly a LATER idea, once styles
+feel sufficient): the same style rendered through different expressive
+lineages (e.g. Nocturne → French → Russian → Late Romantic → Modern) —
+not presets, different ways of expressing the same musical idea. Not
+scoped; flagged for whenever the style list itself feels complete.
+
+**Full "top ten" ranking as given:** 1. Sonata (done), 2. Theme &
+Variations (mostly already exists), 3. Renaissance Polyphony (done), 4.
+Afro-Cuban (done), 5. Flamenco (done), 6. Bossa Nova (done), 7. Opera/Art
+Song (done), 8. Irish Traditional (done), 9. Hindustani-inspired (done),
+10. Tone Poem.
+
+**All ten items are now done or effectively covered** (Theme & Variations
+already existed as `FormKind::Variations`). Remaining open items outside
+the top ten: Tone Poem (#10, Tier 3, narrative composition — the list's
+last un-shipped entry), Impressionist Orchestra (Tier 1, orchestral
+color/register painting/instrumental conversation), Chaconne (Tier 3),
+Post-rock/Neo-classical piano/Lo-fi (Tier 4, deliberately not rushed),
+Jazz Combo improvisation and Flamenco-adjacent "musical dialects" (both
+explicitly flagged as later ideas, not yet scoped as concrete mechanisms).
+
+Standing question for every future addition, restated per the review:
+**"If I build this style, what new musical habit will every other style
+inherit?"**
+
+## The Listening Test Battery (2026-07-12) — beyond Test A
+
+Test A (style recognition, `listening_test.rs`) is live and produced a real
+result: the reviewer scored the March clips wrong across the board (piano,
+no drums, and — the deeper finding — March had no `PhraseRhetoric` of its
+own and hook contours that passed the identity predicate only via a cheap
+immediate repeat, not a genuinely march-shaped leap). Fixed: March now has
+real bugle-call hook contours (triadic reaches to the octave, arpeggio
+call-and-drop, upper call-and-answer, full descent — each predicate-valid
+for a musical reason) and its own `PhraseRhetoric::Martial` (statement —
+statement — STRIKE: no interruption, no silence — a march never stops —
+but every cadence lands clipped and hard-accented, with its own pickup
+accent on the note leading in). The fix deliberately did NOT lean on
+drums — the test strips them on purpose, and re-adding rhythmic cues to
+compensate would defeat its point. Test set regenerates once this lands;
+worth re-running just the March-vs-others portion.
+
+The reviewer's proposed extension — a battery, not a single test, each
+probing a different claim the engine makes:
+
+- **Test A — Style recognition** (built). "Which style is this?" Verifies
+  a style's melodic thought is perceptible without its texture.
+- **Test B — Identity-grammar recognition.** Play pairs from the same
+  grammar (Memory/Persistence/Lineage/Erosion) vs. unrelated pairs. Ask:
+  "are these the same idea, remembered/varied/eroding — or unrelated?"
+  Verifies the identity-grammar layer is heard as continuity, not just
+  computed as one.
+- **Test C — Emotional-intention agreement.** Not a correctness test —
+  there's no ground truth to score against. Play a clip, ask the listener
+  to name the intended valence/arousal in their own words, compare to the
+  `MusicalIntent` that generated it. Agreement (or a legible, explicable
+  disagreement) is the signal.
+- **Test D — Family resemblance / lineage.** Play a piece and its
+  lineage-descendant (`crate::passacaglia` kinship chains) against a
+  piece and an unrelated one. Ask: "which pair sounds related?" Verifies
+  kinship is perceptible, following up on the lineage-experiment's
+  quantified Φ result (figuration-kinship 0.150) with a perceptual one.
+- **Test E — Continuation expectation.** Cut a phrase mid-cadence, offer
+  two completions (the real one; a plausible-but-wrong one — e.g. a
+  deceptive close where the piece actually resolves, or vice versa). Ask
+  which continuation feels right. Verifies the cadence/expectation
+  machinery (deceptive first close, evaded return close, pivot
+  modulation) is shaping listener expectation, not just decorating notes
+  that were already going to be there.
+
+**Confidence scoring** (done, 2026-07-12): `listening_test score` now
+accepts an optional `@N` confidence (0-100) per guess and reports average
+confidence overall, when-right, and when-wrong, plus a per-style
+breakdown and a confusion table (which truth gets heard as which guess —
+the most direct signal for "which layer to work on next," sharper than a
+bare accuracy number). A well-calibrated listener shows a real gap
+between right-confidence and wrong-confidence; a listener who's *guessing*
+confidently shows none.
+
+**MKG v0 is deliberately deferred, not cancelled.** The reviewer's
+argument: a knowledge graph encoding "commonly confused with…" or "this
+identity-grammar chain reads as continuity to N/M listeners" needs
+listening-test DATA to encode — building it first would mean guessing at
+the very relationships it exists to capture. Sequence: accumulate Test
+A-E results across enough listeners/sessions, THEN build MKG v0 with real
+edges instead of placeholder ones. This reorders Discovery Phase 5 without
+removing it.
+
+**Research Mode (future, not started).** The listening test proved a
+pattern worth productizing: ship a feature with a stated, falsifiable
+hypothesis, then auto-generate a blinded experiment that tests it — not
+after the fact, as part of landing the feature. Concretely: a new feature
+lands with a one-line hypothesis (e.g. "Martial rhetoric makes March
+melodically distinguishable without drums"), `listening_test` (or a
+generalized harness sharing its shuffle/answer-key/scoring machinery)
+auto-generates a before/after or A/B clip set targeting exactly that
+claim, and the result — confirmed, falsified, or inconclusive — gets
+recorded next to the feature the way the species-counterpoint and lineage
+falsifications already are in code comments. This is the same
+"observable, not fitness function" discipline the Φ/novelty/worthiness
+policy already enforces, extended to melodic identity itself.

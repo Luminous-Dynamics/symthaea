@@ -81,15 +81,25 @@ pub struct HelicopterHdcEncoder {
 impl HelicopterHdcEncoder {
     /// Create a new encoder from a genesis seed.
     pub fn new(genesis: &GenesisSeed, num_levels: usize) -> Self {
+        assert!(num_levels >= 2, "HDC encoder requires at least two levels");
         let dim = symthaea_core::hdc::HDC_DIMENSION;
 
         let base_vectors: Vec<ContinuousHV> = (0..NUM_STATE_CHANNELS)
             .map(|i| ContinuousHV::from_genesis(genesis, &format!("helicopter::channel::{i}"), dim))
             .collect();
 
-        let level_vectors: Vec<ContinuousHV> = (0..num_levels)
+        // Precompute cumulative thermometer levels once. The previous hot
+        // path rebuilt and normalized levels 0..=k for every channel at every
+        // physics tick.
+        let raw_levels: Vec<ContinuousHV> = (0..num_levels)
             .map(|i| ContinuousHV::from_genesis(genesis, &format!("helicopter::level::{i}"), dim))
             .collect();
+        let mut cumulative = ContinuousHV::zero(dim);
+        let mut level_vectors = Vec::with_capacity(num_levels);
+        for level in &raw_levels {
+            cumulative.add_in_place(level);
+            level_vectors.push(cumulative.clone().normalize());
+        }
 
         let deriv_base_vectors: Vec<ContinuousHV> = (0..NUM_STATE_CHANNELS)
             .map(|i| ContinuousHV::from_genesis(genesis, &format!("helicopter::deriv::{i}"), dim))
@@ -106,7 +116,16 @@ impl HelicopterHdcEncoder {
     }
 
     /// Encode a helicopter state into a 16,384D ContinuousHV.
+    ///
+    /// This compatibility entry point treats the interval as one second.
+    /// Control loops should call [`Self::encode_with_dt`] so derivative
+    /// channels represent rates rather than scheduler-dependent deltas.
     pub fn encode(&mut self, state: &HelicopterState) -> ContinuousHV {
+        self.encode_with_dt(state, 1.0)
+    }
+
+    /// Encode a state with an explicit sample interval in seconds.
+    pub fn encode_with_dt(&mut self, state: &HelicopterState, dt: f64) -> ContinuousHV {
         let channels = state.to_channels();
         let dim = symthaea_core::hdc::HDC_DIMENSION;
         let mut result = ContinuousHV::zero(dim);
@@ -124,11 +143,7 @@ impl HelicopterHdcEncoder {
             // Level encode: bundle levels 0..k where k = normalized * (num_levels - 1)
             let k = (normalized * (self.num_levels - 1) as f32).round() as usize;
             let k = k.min(self.num_levels - 1);
-            let mut level_hv = ContinuousHV::zero(dim);
-            for l in 0..=k {
-                level_hv.add_in_place(&self.level_vectors[l]);
-            }
-            level_hv = level_hv.normalize();
+            let level_hv = &self.level_vectors[k];
 
             // Bind with channel base vector
             let bound = level_hv.bind(&self.base_vectors[ch]);
@@ -146,20 +161,11 @@ impl HelicopterHdcEncoder {
                 let delta = channels[ch] - prev[ch];
                 let [lo, hi] = CHANNEL_RANGES[ch];
                 let range = hi - lo;
-                // Normalize delta relative to channel range
-                let normalized_delta = if range.abs() < 1e-10 {
-                    0.0
-                } else {
-                    (delta / range).clamp(-1.0, 1.0) * 0.5 + 0.5 // Map to [0, 1]
-                };
+                let normalized_delta = normalize_rate(delta, range, dt);
 
                 let k = (normalized_delta * (self.num_levels - 1) as f32).round() as usize;
                 let k = k.min(self.num_levels - 1);
-                let mut level_hv = ContinuousHV::zero(dim);
-                for l in 0..=k {
-                    level_hv.add_in_place(&self.level_vectors[l]);
-                }
-                level_hv = level_hv.normalize();
+                let level_hv = &self.level_vectors[k];
 
                 let bound = level_hv.bind(&self.deriv_base_vectors[ch]);
                 let mut scaled = bound;
@@ -179,6 +185,14 @@ impl HelicopterHdcEncoder {
     }
 }
 
+fn normalize_rate(delta: f32, range: f32, dt: f64) -> f32 {
+    if range.abs() < 1e-10 || !dt.is_finite() || dt <= 0.0 {
+        return 0.5;
+    }
+    let rate_fraction = delta / dt as f32 / range;
+    rate_fraction.clamp(-1.0, 1.0) * 0.5 + 0.5
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,6 +200,21 @@ mod tests {
     fn make_encoder() -> HelicopterHdcEncoder {
         let genesis = GenesisSeed::from_phrase("test-helicopter-encoder");
         HelicopterHdcEncoder::new(&genesis, 32)
+    }
+
+    #[test]
+    #[should_panic(expected = "at least two levels")]
+    fn test_encoder_rejects_degenerate_codebook() {
+        let genesis = GenesisSeed::from_phrase("test-helicopter-encoder");
+        let _ = HelicopterHdcEncoder::new(&genesis, 1);
+    }
+
+    #[test]
+    fn test_derivative_normalization_is_rate_based() {
+        let slow = normalize_rate(1.0, 100.0, 0.1);
+        let fast = normalize_rate(0.1, 100.0, 0.01);
+        assert!((slow - fast).abs() < 1e-6);
+        assert_eq!(normalize_rate(1.0, 100.0, 0.0), 0.5);
     }
 
     #[test]

@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::embodiment::SubterraneanEmbodiment;
-use crate::types::NUM_ACTUATORS;
+use crate::types::NUM_PHYSICAL_ACTUATORS;
 use symthaea_core::embodiment::{EmbodimentBridge, EmbodimentPlatform, PlatformPlugin};
 use symthaea_core::genesis::GenesisSeed;
 
@@ -17,7 +17,7 @@ impl PlatformPlugin for SubterraneanPlugin {
     }
 
     fn num_actuators(&self) -> usize {
-        NUM_ACTUATORS
+        NUM_PHYSICAL_ACTUATORS
     }
 
     fn create_bridge(&self, genesis: &GenesisSeed) -> Box<dyn EmbodimentBridge> {

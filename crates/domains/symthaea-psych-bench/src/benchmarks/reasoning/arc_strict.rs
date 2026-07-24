@@ -9,28 +9,56 @@
 //! tests whether the HDC pipeline can produce exact output grids.
 //!
 //! Expected results: strict solve rate 0-3%. The HDC approach encodes grid
-//! structure faithfully (2-AFC ~85-95%) but cannot reconstruct pixel-perfect
-//! outputs because majority-vote bundling is lossy. This is a fundamental
-//! limitation of the representation, not a tuning issue.
+//! structure faithfully under 2-AFC scoring but cannot reconstruct
+//! pixel-perfect outputs because majority-vote bundling is lossy. This is a
+//! fundamental limitation of the representation, not a tuning issue.
+//!
+//! **RETRACTION + FIX (2026-07-18, `examples/arc_2afc_reaudit.rs`)**: this
+//! file's 2-AFC distractor used to be `BinaryHV::random`, which is not a fair
+//! alternative — see `arc_dataset.rs`'s retraction note for the mechanism and
+//! the real-ARC-data numbers that exposed it (random 99.0% vs. fair
+//! distractors 13.8-67.8%). Fixed to use `arc_dataset::fair_distractor_grid`
+//! (a generic wrong transform of the test input) instead. Even fixed, this
+//! remains **encoding-fidelity** scoring, not solve rate — read
+//! `twoafc_accuracy`/`encoding_fidelity_gap` accordingly.
 //!
 //! ## Comparison
 //!
 //! - GPT-4: ~5% (Chollet 2024)
 //! - o3-high: ~87.5% (OpenAI 2024)
 //! - Human average: ~84% (Chollet 2019)
-//! - HDC-LTC (2-AFC): ~85-95% (encoding fidelity, not solve rate)
+//! - HDC-LTC (2-AFC): encoding fidelity under a fair distractor, not solve rate
 //! - HDC-LTC (strict): ~0-3% (grid reconstruction noise)
 //!
 //! The gap between 2-AFC and strict scores is the key finding: XOR binding
 //! tests algebraic rule transfer, not generalization. Strict scoring exposes
 //! this honestly.
+//!
+//! **REVIVED (2026-07-18, same day as the bit-rot was found)**: this file had
+//! been bit-rotted for an unknown period — it called
+//! `BinaryGridEncoder::decode_grid`/`grid_accuracy`/`grid_exact_match`, none
+//! of which existed on that type, and was silently un-declared from
+//! `reasoning/mod.rs` (and unregistered in `examples/run_psych_benchmarks.rs`)
+//! as a result. This is very likely the actual source of the retracted "100%
+//! 2-AFC, 4% strict" claim in `book/src/research/validation.md`/
+//! `publications.md` (via `examples/arc_agi_benchmark.rs`, which imports this
+//! type directly) — a one-time historical run whose numbers were published
+//! and never re-verified once the module rotted. Fixed by adding a real
+//! per-cell argmax-similarity decode to `BinaryGridEncoder`
+//! (`decode_cell`/`decode_grid`: unbind each cell's row/col keys from the
+//! grid HV, then nearest-neighbor cleanup against the color codebook — the
+//! standard VSA "cleanup memory" retrieval pattern) plus `grid_accuracy`/
+//! `grid_exact_match` as plain cell-by-cell grid comparisons. Re-declared in
+//! `reasoning/mod.rs` and re-registered in `run_psych_benchmarks.rs`.
+//! Verified: `cargo test -p symthaea-psych-bench --lib arc_strict` green,
+//! plus new decode-specific unit tests in `binary_grid_encoder.rs`.
 
+use crate::benchmarks::reasoning::arc_dataset::fair_distractor_grid;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
-#[allow(unused_imports)]
 use symthaea_core::hdc::BinaryHV;
 use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 
@@ -233,11 +261,13 @@ fn run_strict_trial(seed: u64, _dimension: usize) -> StrictTrialResult {
     let pixel_accuracy = BinaryGridEncoder::grid_accuracy(&predicted_grid, &test_output);
     let strict_match = BinaryGridEncoder::grid_exact_match(&predicted_grid, &test_output);
 
-    // 2-AFC: compare similarity to actual vs random distractor
+    // 2-AFC: compare similarity to actual vs a fair (equally structured) distractor
     let test_out_hv = encoder.encode_grid(&test_output);
     let actual_sim = predicted_hv.similarity(&test_out_hv);
-    let distractor = BinaryHV::random(seed ^ 0xDEADBEEF);
-    let dist_sim = predicted_hv.similarity(&distractor);
+    let distractor_grid =
+        fair_distractor_grid(&test_input, &test_output).unwrap_or_else(|| test_input.clone());
+    let distractor_hv = encoder.encode_grid(&distractor_grid);
+    let dist_sim = predicted_hv.similarity(&distractor_hv);
     let twoafc_correct = actual_sim > dist_sim;
 
     StrictTrialResult {

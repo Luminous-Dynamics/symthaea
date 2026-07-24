@@ -10,6 +10,7 @@
 use crate::analytical::{AnalyticalBackend, CrossSection, MaterialProperties};
 use crate::csg::CSGNode;
 use crate::mesh::{TriangleMesh, resolve_to_mesh};
+use crate::units::{Meters, Millimeters, Newtons};
 use crate::validate::validate_mesh;
 
 /// Default transverse load (Newtons) for structural fitness evaluation.
@@ -22,9 +23,9 @@ const DEFAULT_TRANSVERSE_LOAD: f64 = 1000.0;
 /// Default beam length (meters) derived from mesh bounding box extent.
 ///
 /// Falls back to 0.1 m if the mesh has no vertices.
-fn beam_length_from_mesh(mesh: &TriangleMesh) -> f64 {
+fn beam_length_from_mesh(mesh: &TriangleMesh) -> Meters {
     if mesh.vertices.is_empty() {
-        return 0.1;
+        return Meters::positive(0.1).expect("constant fallback is positive");
     }
     let mut min_x = f32::INFINITY;
     let mut max_x = f32::NEG_INFINITY;
@@ -45,7 +46,10 @@ fn beam_length_from_mesh(mesh: &TriangleMesh) -> f64 {
     let dz = (max_z - min_z) as f64;
     // Use the longest axis as the effective beam length
     let longest = dx.max(dy).max(dz);
-    if longest < 1e-10 { 0.1 } else { longest }
+    let millimeters = if longest < 1e-10 { 100.0 } else { longest };
+    Millimeters::positive(millimeters)
+        .expect("finite positive mesh extent")
+        .to_meters()
 }
 
 /// Cross-section approximation from mesh bounding box.
@@ -74,8 +78,15 @@ fn cross_section_from_mesh(mesh: &TriangleMesh) -> CrossSection {
     ];
     extents.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     // The two shorter dimensions form the cross-section
-    let width = extents[0].max(0.001);
-    let height = extents[1].max(0.001);
+    // Mesh coordinates are millimetres; the analytical backend requires metres.
+    let width = Millimeters::positive(extents[0].max(1.0))
+        .expect("finite positive mesh width")
+        .to_meters()
+        .get();
+    let height = Millimeters::positive(extents[1].max(1.0))
+        .expect("finite positive mesh height")
+        .to_meters()
+        .get();
     CrossSection::Rectangle { width, height }
 }
 
@@ -101,6 +112,10 @@ pub fn structural_fitness_with_load(
     target_triangle_count: usize,
     transverse_force: f64,
 ) -> f64 {
+    if !transverse_force.is_finite() {
+        return 0.0;
+    }
+
     // 1. Resolve CSG tree to triangle mesh
     let mesh = resolve_to_mesh(node);
 
@@ -112,12 +127,22 @@ pub fn structural_fitness_with_load(
     // 2. Validate the mesh
     let report = validate_mesh(&mesh);
 
+    if !report.is_valid() {
+        return 0.0;
+    }
+
     // 3. Structural score via AnalyticalBackend
     let beam_length = beam_length_from_mesh(&mesh);
     let cross_section = cross_section_from_mesh(&mesh);
     let material = MaterialProperties::steel();
-    let backend = AnalyticalBackend::new(material, cross_section, beam_length);
-    let result = backend.analyze(0.0, transverse_force);
+    let backend = AnalyticalBackend::new_checked(material, cross_section, beam_length)
+        .expect("mesh-derived analytical inputs are finite and positive");
+    let result = backend
+        .analyze_checked(
+            Newtons::new(0.0).expect("zero is finite"),
+            Newtons::new(transverse_force).expect("caller load must be finite"),
+        )
+        .expect("typed forces are finite");
 
     // Normalize safety_factor to [0, 1]: sf=1 maps to 0.5, sf>=10 maps to ~1.0
     // Uses 1 - 1/(1 + sf/5) so the curve rises steeply then saturates.
@@ -128,11 +153,10 @@ pub fn structural_fitness_with_load(
     };
 
     // 4. Manufacturability score
-    let manufacturability_score = if report.is_watertight && report.degenerate_triangles.is_empty()
-    {
+    let manufacturability_score = if report.is_printable() {
         1.0
-    } else if report.is_watertight {
-        0.5
+    } else if report.is_valid() {
+        0.25
     } else {
         0.0
     };
@@ -152,6 +176,25 @@ pub fn structural_fitness_with_load(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::csg::Transform3D;
+
+    #[test]
+    fn mesh_dimensions_are_converted_from_mm_to_si() {
+        let mesh = resolve_to_mesh(&CSGNode::cube().with_transform(Transform3D {
+            scale: [100.0, 40.0, 20.0],
+            ..Default::default()
+        }));
+        let length = beam_length_from_mesh(&mesh);
+        let section = cross_section_from_mesh(&mesh);
+        assert!((length.get() - 0.1).abs() < 1.0e-9);
+        match section {
+            CrossSection::Rectangle { width, height } => {
+                assert!((width - 0.02).abs() < 1.0e-9);
+                assert!((height - 0.04).abs() < 1.0e-9);
+            }
+            _ => panic!("mesh approximation should be rectangular"),
+        }
+    }
 
     #[test]
     fn cube_has_nonzero_fitness() {

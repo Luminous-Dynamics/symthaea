@@ -4,7 +4,11 @@
 //!
 //! Unlike the passive journey test, this example actually clicks buttons,
 //! types text, navigates pages, and takes a mock exam — all driven by
-//! consciousness-gated decisions.
+//! simulated threshold decisions inside the example itself.
+//!
+//!
+//! WARNING: This is a raw CDP exploration harness. It bypasses
+//! `BrowserExecutor` and must not be treated as production safety evidence.
 //!
 //! Prerequisites: Chrome on :9222, Praxis on :8107
 //!

@@ -393,6 +393,12 @@ pub struct Symthaea {
     /// back into the ethics evaluation the same turn (Option B). See
     /// `enable_experience_bridge()`.
     loop_bridge: Option<crate::cognitive_loop::CognitiveLoopService>,
+    /// Most recent `CycleResult` from `loop_bridge.cycle()`, captured for
+    /// external telemetry consumers (SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md
+    /// Phase 2). Turn-synchronous like the bridge itself: one snapshot per
+    /// `process()` call, overwritten each turn, `None` until the bridge is
+    /// enabled and has cycled at least once.
+    last_bridge_cycle: Option<crate::cognitive_loop::CycleResult>,
     /// Memory coordinator: graduation pipeline + cross-tier signals.
     memory_coordinator: MemoryCoordinator,
     /// Episodic memory: Phi-weighted priority queue for significant moments.
@@ -401,6 +407,11 @@ pub struct Symthaea {
     // ── Output & Actions ────────────────────────────────────────────────
     /// Resonant speech: user-adaptive response generation.
     resonant_speech: crate::resonant_speech::ResonantSpeech,
+    /// Text/behavior-driven user-state inference (frustration, cognitive load,
+    /// context, experience) feeding Phase 6.5 resonant speech. Distinct from
+    /// `thought.*`-derived signals: this reads the user's actual input and
+    /// interaction history, not the AI's own internal state.
+    user_state_inference: crate::user_state_inference::UserStateInference,
     /// Registry of primitive action bindings.
     pub action_registry: ActionRegistry,
     /// Action executor with safety policy and dream integration.
@@ -607,9 +618,11 @@ impl Symthaea {
             neural_bridge,
             database: None,
             loop_bridge: None,
+            last_bridge_cycle: None,
             memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
             episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
+            user_state_inference: crate::user_state_inference::UserStateInference::new(),
             action_registry: ActionRegistry::standard(),
             executor: SimpleExecutor::new(),
             #[cfg(feature = "school_learning")]
@@ -743,6 +756,15 @@ impl Symthaea {
         self.loop_bridge.is_some()
     }
 
+    /// The `CycleResult` from the most recent experience-bridge cycle, if
+    /// the bridge is enabled and has run at least once this turn. Read-only
+    /// snapshot for telemetry consumers (e.g. the HTTP gateway's live
+    /// stream) — does not affect `process()`'s own control flow, which
+    /// reads `reasoning_context()` off `loop_bridge` directly.
+    pub fn last_bridge_cycle(&self) -> Option<&crate::cognitive_loop::CycleResult> {
+        self.last_bridge_cycle.as_ref()
+    }
+
     /// Derive the ethics engine's `knowledge_moral_context` /
     /// `knowledge_confidence_multiplier` inputs from the loop's reasoning
     /// context (AGW Phase 3, Option B). Pure function so the mapping is
@@ -803,8 +825,10 @@ impl Symthaea {
 
     /// Resume from a saved state file.
     ///
-    /// Loads persisted partnership state, trajectory, and interaction count.
-    /// Reconstructs the mind and language systems fresh (stateless between sessions).
+    /// Loads persisted partnership state, trajectory, interaction count, and
+    /// the Phase 6.5 user-state-inference snapshot (frustration, cognitive
+    /// load, experience, engagement). Reconstructs the mind and language
+    /// systems fresh (stateless between sessions).
     pub fn resume(path: &str) -> Result<Self> {
         let data = std::fs::read_to_string(path)
             .with_context(|| format!("Failed to read state file: {path}"))?;
@@ -938,9 +962,14 @@ impl Symthaea {
             neural_bridge,
             database: None,
             loop_bridge: None,
+            last_bridge_cycle: None,
             memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
             episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
+            user_state_inference: state
+                .user_state
+                .map(crate::user_state_inference::UserStateInference::from_persisted)
+                .unwrap_or_default(),
             action_registry: ActionRegistry::standard(),
             executor: SimpleExecutor::new(),
             #[cfg(feature = "school_learning")]
@@ -2180,20 +2209,26 @@ impl Symthaea {
         // PHASE 6.5: RESONANT SPEECH (User-adaptive polishing)
         // ====================================================================
         let response_text = {
-            let load = crate::resonant_speech::CognitiveLoad::from_level(thought.psi);
-            let user_state = crate::resonant_speech::UserState {
-                cognitive_load: load,
-                frustration: ((-thought.emotional_tone.valence).max(0.0)).min(1.0),
-                confidence: thought.meta_awareness.clamp(0.0, 1.0),
-                trust_in_sophia: thought.trust as f64,
-                is_rushed: thought.emotional_tone.arousal > 0.7 && thought.coherence < 0.4,
-                is_learning: matches!(
-                    thought.epistemic_status,
-                    crate::mind::structured_thought::EpistemicStatus::Uncertain
-                        | crate::mind::structured_thought::EpistemicStatus::Unknown
+            // Real text/behavior-driven inference (frustration, cognitive load,
+            // context, experience) instead of re-deriving user state from the
+            // AI's own internal thought fields.
+            let context = crate::user_state_inference::ContextKind::detect(content);
+            self.user_state_inference
+                .process(content, !translation_verified);
+            // Experience level was previously never updated from anywhere
+            // (dead code) and stayed at Beginner forever. Derive it from the
+            // partnership model's real, persisted, cross-session interaction
+            // count rather than UserStateInference's own session-scoped
+            // counter, so it actually reflects relationship depth over time.
+            self.user_state_inference.update_experience(
+                crate::user_state_inference::ExperienceLevel::from_interaction_count(
+                    self.relational.partner.interactions_count,
                 ),
-                ..Default::default()
-            };
+            );
+            let mut user_state = self.user_state_inference.infer(context, "en-US");
+            // Trust is tracked by the persisted partnership model (Phase 4),
+            // not re-derived from this turn's text.
+            user_state.trust_in_sophia = thought.trust as f64;
 
             self.resonant_speech.update_state(user_state);
             self.resonant_speech.generate(&generation.text, content)
@@ -2665,7 +2700,7 @@ impl Symthaea {
         // for Option B (read back into the ethics evaluation immediately below)
         // in one call. A loop error here must not break the response path.
         if let Some(ref mut lb) = self.loop_bridge {
-            let _ = lb.cycle(content);
+            self.last_bridge_cycle = Some(lb.cycle(content));
         }
 
         // Grounded moral context read back from the loop's reasoning context
@@ -3188,6 +3223,7 @@ impl Symthaea {
             trajectory: self.relational.trajectory.clone(),
             recent_ai_states: self.relational.recent_ai_states.clone(),
             database_path: None,
+            user_state: Some(self.user_state_inference.state().clone()),
         };
 
         let json = serde_json::to_string_pretty(&state).context("Failed to serialize state")?;
@@ -3935,6 +3971,42 @@ mod tests {
             resp.is_ok(),
             "process() must not fail with the bridge active"
         );
+    }
+
+    #[tokio::test]
+    async fn last_bridge_cycle_tracks_the_bridge_turn_synchronously() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        assert!(
+            s.last_bridge_cycle().is_none(),
+            "no bridge enabled yet — nothing to report"
+        );
+
+        s.enable_experience_bridge(None)
+            .expect("in-memory experience bridge must construct cleanly");
+        assert!(
+            s.last_bridge_cycle().is_none(),
+            "bridge enabled but has not cycled yet"
+        );
+
+        s.process("first turn").await.expect("process succeeds");
+        let first = s
+            .last_bridge_cycle()
+            .expect("bridge cycled during process()")
+            .metadata
+            .clone();
+
+        s.process("second turn").await.expect("process succeeds");
+        let second = s
+            .last_bridge_cycle()
+            .expect("bridge cycled again")
+            .metadata
+            .clone();
+        // Not asserting field-level difference (many fields are legitimately
+        // stable turn-to-turn) — the contract under test is "overwritten
+        // each turn," which cycle_time_us/timing jitter alone won't prove
+        // deterministically. The real assertion is that both reads
+        // succeeded without the field going stale/None.
+        let _ = (first, second);
     }
 
     #[cfg(feature = "creative")]

@@ -143,34 +143,76 @@ impl VoiceOrchestrator {
         prediction_error: f32,
         detected_primitives: Vec<String>,
     ) -> Vec<f32> {
-        // 1. Update bridge with CfC state
-        self.voice_bridge.update(
+        self.thought_to_speech_paced(
+            broca_text,
             cfc_output,
             1.0,
+            prediction_error,
+            detected_primitives,
+            1.0,
+            1.0,
+        )
+        .0
+    }
+
+    /// Low-level pipeline with explicit CfC time-constant, adaptive-behavior rate
+    /// multipliers, and post-synthesis quality metrics.
+    ///
+    /// This is the loop-facing entry point: `tau` comes from the cycle's adaptive
+    /// time-constant factors (FEP surprise × Φ modulation), and the multipliers
+    /// come from `AdaptiveBehavior`. The returned [`VoiceOutputMetrics`] are
+    /// computed from the produced formant frames so callers can feed the
+    /// voice→cognition feedback bridge (`update_voice_feedback`).
+    #[allow(clippy::too_many_arguments)]
+    pub fn thought_to_speech_paced(
+        &mut self,
+        broca_text: &str,
+        cfc_output: &[f32],
+        tau: f32,
+        prediction_error: f32,
+        detected_primitives: Vec<String>,
+        rate_multiplier: f32,
+        pause_multiplier: f32,
+    ) -> (Vec<f32>, crate::voice::voice_feedback::VoiceOutputMetrics) {
+        use crate::voice::voice_feedback::VoiceOutputMetrics;
+
+        // 1. Update bridge with CfC state (tau guards against unset factors)
+        let tau = if tau > 0.0 { tau } else { 1.0 };
+        self.voice_bridge.update(
+            cfc_output,
+            tau,
             prediction_error,
             HashMap::new(),
             detected_primitives,
         );
 
-        // 2. Get pacing
-        let pacing = self.voice_bridge.get_ltc_pacing();
+        // 2. Get pacing, then apply adaptive-behavior multipliers
+        let mut pacing = self.voice_bridge.get_ltc_pacing();
+        let rate_multiplier = rate_multiplier.clamp(0.25, 4.0);
+        let pause_multiplier = pause_multiplier.clamp(0.25, 4.0);
+        pacing.rate = (pacing.rate * rate_multiplier).clamp(0.1, 4.0);
+        pacing.phrase_pause *= pause_multiplier;
+        pacing.sentence_pause *= pause_multiplier;
 
         // 3. G2P conversion
         let phoneme_ids = self.g2p.text_to_phonemes(broca_text);
 
         if phoneme_ids.is_empty() {
-            return Vec::new();
+            return (Vec::new(), VoiceOutputMetrics::default());
         }
 
         // 4. Convert phoneme IDs to formant frames with pacing-modulated timing
         let frames = phoneme_ids_to_formant_frames(&phoneme_ids, &pacing);
 
         if frames.is_empty() {
-            return Vec::new();
+            return (Vec::new(), VoiceOutputMetrics::default());
         }
 
-        // 5. Vocoder synthesis
-        self.vocoder.synthesize(&frames)
+        // 5. Quality metrics from the produced frames (voice→cognition feedback)
+        let metrics = VoiceOutputMetrics::from_formant_frames(&frames, None);
+
+        // 6. Vocoder synthesis
+        (self.vocoder.synthesize(&frames), metrics)
     }
 
     /// Get a reference to the internal cognitive voice bridge.

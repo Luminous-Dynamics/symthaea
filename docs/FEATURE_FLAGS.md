@@ -101,6 +101,7 @@ hal, ssm-power-hal (I2C hardware)
 | `neural-vocoder` | BigVGAN ONNX vocoder | ort + vocal-tract |
 | `neural-vocoder-gpu` | GPU vocoder | neural-vocoder |
 | `live-voice` | Real-time speaker | cpal, ringbuf, vocal-tract |
+| `singing` | Lyrics+melody singing (muse singing_bridge → FormantVocoder); REPL `/sing` | muse, vocal-tract, symthaea-muse/voice |
 
 ### Perception & Embeddings (10)
 

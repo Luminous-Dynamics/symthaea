@@ -11,10 +11,16 @@
 //! Pure `std`, only depends on the sibling `symthaea-finite-field` crate.
 //!
 //! ## Contents
-//! - [`hamming`] — Hamming distance/weight and the single-error-correcting
-//!   Hamming(7,4) code
-//! - [`repetition`] — repetition code with majority decoding
-//! - [`reed_solomon`] — Reed-Solomon encoding + syndrome detection over GF(2⁸)
+//! - [`channel`] — deterministic bit, symbol, erasure, and burst channel models
+//! - [`experiments`] — reproducible end-to-end decoder evidence and manifests
+//! - [`parameters`] — shared minimum-distance and correction-capability metadata
+//! - [`reliability`] — analytical independent-errata recovery guarantees
+//! - [`interoperability`] — explicit profiles and independent golden vectors
+//! - [`interleaving`] — checked rectangular burst-dispersing permutations
+//! - [`hamming`] — Hamming distance/weight, Hamming(7,4), and Hamming(8,4) SECDED
+//! - [`repetition`] — validated odd repetition codes with strict majority decoding
+//! - [`reed_solomon`] — checked Reed-Solomon encoding, correction, mixed
+//!   errata decoding, decode policies, shortened/fixed frames, and streaming parity over GF(2⁸)
 //!
 //! ## Example
 //!
@@ -26,8 +32,16 @@
 //! assert_eq!(hamming74_decode(codeword), data); // still recovered
 //! ```
 
+pub mod channel;
+pub mod experiments;
 pub mod hamming;
+pub mod interoperability;
+pub mod interleaving;
+pub mod parameters;
 pub mod reed_solomon;
+pub mod reliability;
 pub mod repetition;
 
-pub use hamming::{distance, hamming74_decode, hamming74_encode, weight};
+pub use hamming::{
+    distance, hamming74_decode, hamming74_encode, hamming84_decode, hamming84_encode, weight,
+};

@@ -20,6 +20,12 @@ exclude = [
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
+    # ARCHIVED 2026-07-16 (vision review P2.2): real SigLIP/Moondream/ocrs ONNX
+    # stack, but zero consumers — its only reference is foveation's non-default
+    # `perception` feature nothing enables, and it duplicates src/perception/'s
+    # live modules. Excluded so the workspace stops compiling a dead island;
+    # the adopt path (foveation RealVentralPipeline) still works via path dep.
+    "crates/domains/symthaea-perception",
 ]
 default-members = [
     "xtask",
@@ -122,6 +128,7 @@ csv = "1.3"
 axum = { version = "0.8", features = ["ws"] }
 symthaea-fep = { path = "crates/core/symthaea-fep" }
 symthaea-core = { path = "crates/core/symthaea-core" }
+symthaea-communication = { path = "crates/core/symthaea-communication" }
 symthaea-epidemiology = { path = "crates/domains/symthaea-epidemiology" }
 symthaea-memetics = { path = "crates/domains/symthaea-memetics" }
 symthaea-earth-system = { path = "crates/domains/symthaea-earth-system" }
@@ -154,6 +161,7 @@ mycelix-zkp-core = { workspace = true, features = ["dilithium"] }
 # Symthaea Core - HDC, Φ engine, and minimal consciousness pipeline
 symthaea-core = { path = "crates/core/symthaea-core" }
 # Shared epistemic types (E/N/M, Prismatic context, provenance)
+symthaea-communication = { workspace = true }
 symthaea-epistemic-types = { path = "crates/domains/symthaea-epistemic-types" }
 
 # Symthaea Consciousness Equation - Master Consciousness Equation C(t)
@@ -182,7 +190,9 @@ symthaea-statistics = { path = "crates/domains/symthaea-statistics" }
 symthaea-social-choice = { path = "crates/domains/symthaea-social-choice" }
 symthaea-formal-language = { path = "crates/domains/symthaea-formal-language" }
 symthaea-structural = { path = "crates/domains/symthaea-structural" }
+symthaea-grid-physics = { path = "crates/domains/symthaea-grid-physics" }
 symthaea-pragmatics = { path = "crates/domains/symthaea-pragmatics" }
+symthaea-information-theory = { path = "crates/domains/symthaea-information-theory" }
 symthaea-alife = { path = "crates/domains/symthaea-alife" }
 symthaea-memetics = { path = "crates/domains/symthaea-memetics", optional = true }
 
@@ -201,6 +211,7 @@ symthaea-dream = { path = "crates/domains/symthaea-dream" }
 # Symthaea Phi Search - Phi-guided architecture search (always enabled)
 symthaea-phi-search = { path = "crates/domains/symthaea-phi-search" }
 sha2 = { version = "0.10", optional = true }
+hmac = { version = "0.12", optional = true }
 
 # Symthaea Narrative Self - Narrative self-model (always enabled)
 symthaea-narrative-self = { path = "crates/domains/symthaea-narrative-self" }
@@ -217,12 +228,11 @@ symthaea-factor-graph = { path = "crates/domains/symthaea-factor-graph" }
 # Symthaea Enactive - Enactive cognition paradigm (always enabled)
 symthaea-enactive = { path = "crates/domains/symthaea-enactive" }
 
-# Symthaea Sensorimotor - Sensorimotor contingency theory (optional)
-symthaea-sensorimotor = { path = "crates/domains/symthaea-sensorimotor", optional = true }
 symthaea-consciousness-topology = { path = "crates/domains/symthaea-consciousness-topology" }
 symthaea-exploration = { path = "crates/domains/symthaea-exploration" }
 symthaea-wisdom = { path = "crates/domains/symthaea-wisdom" }
 symthaea-types = { path = "crates/core/symthaea-types" }
+symthaea-cognitive-types = { path = "crates/core/symthaea-cognitive-types" }
 symthaea-harmonies = { path = "crates/domains/symthaea-harmonies" }
 symthaea-consciousness-resonance = { path = "crates/domains/symthaea-consciousness-resonance" }
 symthaea-embeddings = { path = "crates/domains/symthaea-embeddings" }
@@ -428,6 +438,8 @@ hound = { workspace = true, optional = true }
 
 # API server (optional)
 tower-http = { version = "0.5", features = ["cors", "fs"], optional = true }
+# ws-live projection exits: mental-movie frames are base64'd on the wire
+base64 = { version = "0.22", optional = true }
 
 # Core async utilities
 async-trait = "0.1"
@@ -570,7 +582,7 @@ shell = ["crossterm", "ratatui"]            # symthaea-shell TUI binary
 gui = ["eframe", "egui"]                    # symthaea-gui binary
 demo = ["clap", "ctrlc"]                    # Demo binaries (CLI args + signal handling)
 full = ["service", "shell", "gui", "demo"]  # All binaries
-api_module = ["tower-http"]         # HTTP API binary + module
+api_module = ["tower-http", "dep:base64"]         # HTTP API binary + module
 holon-quic = ["api_module", "mesh-encryption", "dep:bytes", "dep:quinn", "dep:rustls", "dep:rcgen"]  # Phase I.C QUIC transport for Holon RDP
 holon-viewer = ["eframe", "egui", "dep:tokio-tungstenite", "dep:futures-util", "mesh-encryption", "holon-quic"]  # Phase I.A.2 viewer + Phase I.C transport A/B
 
@@ -588,6 +600,7 @@ rdp-x11 = ["rdp-server"]                   # X11 SHM capture + XTest injection (
 #   live-voice      → real-time cpal output + vocal-tract (UNTESTED in CI)
 #   liquid-mamba    → SSM language center + pre-trained Mamba fusion (CPU; see ssm_language)
 voice-tts = ["ort", "hound", "hf-hub", "espeak-rs"]  # TTS with Kokoro (ONNX) + espeak-ng G2P
+voice-tts-gpu = ["voice-tts"]                         # GPU-accelerated Kokoro synthesis (CUDA execution provider) -- VERIFIED LIVE 2026-07-18 on an RTX 2070: RTF ~0.22 vs CPU's ~1.42 (~6x speedup, comfortably real-time), see kokoro_realtime_factor.rs. Requires ORT_DYLIB_PATH pointing at a CUDA-enabled onnxruntime build + KokoroConfig::use_gpu (or VoiceOutputConfig::use_gpu)
 voice-stt = ["symthaea-stt", "hound"]                 # STT with symthaea-stt crate (HDC + LTC + CfC)
 voice-stt-live = ["voice-stt", "cpal", "ringbuf"]     # Live microphone capture → STT → perception HV (cpal input + ring buffer)
 
@@ -604,13 +617,18 @@ neural-vocoder-gpu = ["neural-vocoder"]                  # UNTESTED: not in CI m
 live-voice = ["cpal", "ringbuf", "vocal-tract"]         # Real-time speaker output (cpal + ringbuf + vocal tract pipeline)
 muse = ["dep:symthaea-muse"]                             # Consciousness-driven music synthesis in cognitive loop (streaming PCM)
 muse-live = ["muse", "symthaea-muse/muse-live"]          # Real-time speaker output for muse streaming (cpal + ringbuf); gates MuseManager::live_output. NOTE: cpal needs ALSA — build inside `nix develop` (same constraint as live-voice)
-singing = ["muse", "vocal-tract", "symthaea-muse/voice"]  # Bridges symthaea-muse::singing_bridge (lyrics + melody -> FormantFrame) into the root crate's FormantVocoder — Phase 3.1 of ART_CULTURE_REVIEW_AND_PLAN_2026-07-06.md
+singing = ["muse", "vocal-tract", "symthaea-muse/voice", "symthaea-muse/theory"]  # Bridges symthaea-muse::singing_bridge (lyrics + melody -> FormantFrame) into the root crate's FormantVocoder — Phase 3.1 of ART_CULTURE_REVIEW_AND_PLAN_2026-07-06.md. `theory` added 2026-07-18 (SYMTHAEA_SINGING_PLAN Phase 1) so /sing can call compose_and_perform_melody instead of a hardcoded arc.
 
 # ── Perception & Embeddings ─────────────────────────────────────────
 embeddings = ["tokenizers", "hf-hub", "symthaea-embeddings/burn-hub"]  # Qwen3/BGE text embeddings via Burn + HF Hub
 # REMOVED: embeddings-gpu (0 cfg gates; pure dependency passthrough, never tested in CI)
-vision = ["ort", "hf-hub"]                            # SigLIP image embeddings via ONNX
-perception = ["embeddings", "vision"]                 # Full multimodal perception stack
+# REMOVED 2026-07-16 (vision review P2.2): `vision` and `perception` features. Their only
+# cfg users were src/perception/{model_hub,model_loader_actor}.rs — orphan files never
+# declared in any mod.rs (uncompiled since extraction), deleted along with the bit-rotted
+# examples/multimodal_io_test.rs + tests/perception_integration.rs, which imported symbols
+# from the non-dependency symthaea-perception island crate: `--features perception` builds
+# were broken by construction. The SigLIP/ONNX stack lives on in
+# crates/domains/symthaea-perception (currently unconsumed — adopt or archive, review P2.2).
 webcam = []                                           # Live webcam capture (gates cfg blocks in source)
 vision-manifold = ["dep:symthaea-vision-manifold"]    # Patch-based HDC video encoding + CfC temporal manifold
 phone = ["dep:symthaea-phone-embodiment", "vision-manifold"]  # ADB phone screen embodiment
@@ -646,7 +664,7 @@ self_schema = []                             # Autobiographical self-model in kn
 digital_metabolism = []                      # Real hardware constraints as embodiment (Sterling 2012: allostasis)
 
 # ── Distributed / Network ──────────────────────────────────────────
-mesh = []                                   # Physical mesh radio (LoRa + B.A.T.M.A.N. + Yggdrasil)
+mesh = ["dep:hmac", "dep:sha2"]            # Physical mesh radio with HMAC-SHA-256 packet authentication
 lz4_compression = ["mesh", "dep:lz4_flex"]  # LZ4 packet compression for mesh radio
 holon-lz4 = ["mesh-encryption", "dep:lz4_flex"]  # Phase II.A: LZ4-before-seal for holon RDP wire
 mesh-encryption = ["mesh", "dep:chacha20poly1305", "dep:zeroize"]  # ChaCha20-Poly1305 AEAD encryption for mesh packets
@@ -659,7 +677,7 @@ mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix 
 # Mycelix/Holochain workspace. This feature intentionally has no dependencies
 # in Symthaea's main graph, preserving the serde boundary.
 external-mycelix-bridge-tests = []
-epistemic = []                                                 # Epistemic integration: immune threats, thermodynamic cost, provenance tags, collective health
+epistemic = ["symthaea-cognitive-types/epistemic"]             # Epistemic integration: immune threats, thermodynamic cost, provenance tags, collective health
 neural_validation = ["symthaea-core/neural_validation"]        # TRIBE v2 fMRI comparison: cortical activation maps, Glasser parcellation, HRF
 
 # ── Sovereign Inoculation ──────────────────────────────────────────
@@ -707,18 +725,20 @@ ssm_language = ["dep:symthaea-broca"]          # Native CfC-HDC language center 
 canvas = ["dep:symthaea-canvas", "dep:symthaea-aesthetic"]  # Living topology UI: cognitive geometry → animated SVG. Includes symthaea-aesthetic so the canvas Birkhoff score can close the loop into the neuromod bath (AestheticFeedback) without requiring the full `creative` tier.
 neuroevolution = ["dep:symthaea-neuroevolution"]  # CfC-HDC neuroevolution: evolve neural organisms via Free Energy minimization
 jepa = ["dep:symthaea-jepa"]                         # JEPA: latent-space prediction for thermodynamically efficient FEP
-therapeutic = ["dep:symthaea-clinical", "dep:symthaea-therapeutic", "ssm_language", "symthaea-broca/therapeutic"]
+therapeutic = ["dep:symthaea-clinical", "dep:symthaea-therapeutic", "ssm_language", "symthaea-broca/therapeutic", "symthaea-cognitive-types/therapeutic"]
 liquid-mamba = ["ssm_language", "symthaea-broca/mamba-cpu"]  # Liquid-Mamba fusion: pre-trained Mamba SSM + HDC consciousness gating (CPU; use symthaea-broca/mamba for GPU)
 humanoid-mujoco = ["humanoid", "symthaea-humanoid/mujoco"]  # Humanoid with MuJoCo physics
 humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid with MuJoCo viewer
 
 # ── Storage ────────────────────────────────────────────────────────
 hdc-store = ["dep:symthaea-hdc-store"]  # Zero-copy mmap'd BinaryHV storage with persistent LSH
-fhe-wisdom = []                        # FHE collective wisdom pool for privacy-preserving peer learning
+fhe-wisdom = []                        # QUARANTINED legacy shared-mask algebra demo; not FHE or privacy preserving
+insecure-experimental-crypto = []      # Explicit opt-in for forgeable legacy HDC compatibility APIs
 space-alerts = []                      # Space situational awareness alerts from mycelix-space
 circular = []                          # Waste/circular economy tracking (SwarmEvent + telemetry)
 field-dynamics = ["dep:symthaea-field-dynamics"]   # Consciousness field wave equations
-sensorimotor = ["dep:symthaea-sensorimotor"]       # Sensorimotor contingency theory
+# REMOVED 2026-07-16: `sensorimotor` feature + symthaea-sensorimotor crate (vision review
+# P2.1) — zero-consumer drifted duplicate of symthaea-core's hdc::sensorimotor_contingencies.
 
 # ── Database backends ───────────────────────────────────────────────
 # DuckDB is an unconditional dep. Others deferred:
@@ -737,7 +757,10 @@ interoceptive_inference = []                # Interoceptive prediction error in 
 england_dissipation = []                    # England's dissipation-driven adaptation + Prigogine regime gating (England 2013)
 iit4 = ["symthaea-core/iit4"]              # IIT 4.0: concept structures, cause-effect power (Albantakis 2023)
 full_consciousness = []                     # Extended consciousness submodules
-full_perception = []                        # Extended perception submodules
+# REMOVED 2026-07-16 (vision review P2.3): `full_perception` — gated only the deleted
+# byte-hash stratum (visual_cortex/semantic_vision/multi_modal + conscious_perception/
+# resilience), which fabricated captions and confidences from hash noise and had no
+# consumers. Real vision: visual_features.rs, vision-manifold, art-eye.
 full_language = ["neural-bridge"]                          # Advanced language features (grammar, parsers) — candle deps via neural-bridge
 magi_loop = []                              # MAGI Loop world-grounded prediction
 # Unified reasoning engine: epistemic conflict, tool gating, temporal planning, counterfactual.
@@ -898,7 +921,6 @@ profile-distributed = [
     "swarm",
     "identity",
     "pqc-handshake",
-    "fhe-wisdom",
 ]
 
 # Reasoning + code understanding + scientific method
@@ -1065,7 +1087,32 @@ required-features = ["safety-agents", "sentinel"]
 name = "flight_integration"
 required-features = ["multirotor"]
 
+# autotests = false makes undeclared files in tests/ silently dead — these two
+# had 24+22 tests that never ran anywhere until registered (found 2026-07-15,
+# vision/projection review P0 pass).
+[[test]]
+name = "vision_manifold_integration"
+required-features = ["vision-manifold"]
+
+[[test]]
+name = "foveal_bridge_integration"
+required-features = ["foveation"]
+
 # Examples needing cfg-gated modules
+[[example]]
+name = "benchmark_mental_rotation_rendered"
+required-features = ["art-eye", "vision-manifold"]
+
+# MNIST HDC benchmark — file predates autotests/autoexamples=false and was
+# never declared, making the documented 88.49% result unrunnable (same
+# dead-target class as the vision integration tests; found 2026-07-16 when
+# scripts/fetch-mnist.sh restored the data and the run command failed).
+[[example]]
+name = "benchmark_mnist_hdc"
+
+[[example]]
+name = "check_prediction_error_degeneracy"
+
 [[example]]
 name = "quadrotor_hover"
 required-features = ["multirotor"]
@@ -1129,6 +1176,10 @@ required-features = ["humanoid", "manipulator"]
 
 [[test]]
 name = "robotics_scenarios"
+required-features = ["humanoid"]
+
+[[test]]
+name = "consciousness_transfer"
 required-features = ["humanoid"]
 
 [[test]]
@@ -1399,10 +1450,6 @@ name = "multi_day_narrative"
 required-features = ["unstable-examples"]
 
 [[example]]
-name = "multimodal_io_test"
-required-features = ["perception"]
-
-[[example]]
 name = "nixos_assistant_demo"
 
 [[example]]
@@ -1551,6 +1598,12 @@ required-features = ["reasoning_engine"]
 [[example]]
 name = "counterfactual_planning"
 required-features = ["reasoning_engine"]
+
+# Observer-ΔΨ A/B experiment: does her consciousness respond to the artwork's
+# COMPOSITION or to any bright frame? (visual-art plan Option 2 follow-up)
+[[example]]
+name = "art_observer_ab"
+required-features = ["art-observer"]
 
 # End-to-end pipeline demo (no required features)
 [[example]]
@@ -1720,8 +1773,121 @@ required-features = ["voice-tts"]
 name = "voice_demo"
 required-features = ["voice-tts"]
 
+# Round-trip intelligibility: formant voice -> Whisper worker -> WER.
+# The voice quality regression gate (voice plan LF2, 2026-07-15).
+[[example]]
+name = "voice_roundtrip_wer"
+required-features = ["voice-tts"]
+
+# Oracle test: Kokoro reference audio -> extracted formant tracks ->
+# FormantVocoder -> Whisper. Measures the vocoder's intelligibility CEILING
+# (voice plan, 2026-07-16) — decides whether distillation targets the
+# controller or the renderer.
+[[example]]
+name = "voice_oracle_wer"
+required-features = ["voice-tts"]
+
+# Generate the Kokoro-teacher distillation corpus (60 training sentences,
+# disjoint from the evaluation gate).
+[[example]]
+name = "voice_distill_corpus"
+required-features = ["voice-tts"]
+
 [[example]]
 name = "voice_diagnostic"
+required-features = ["voice-tts"]
+
+# Dose-response affect gate: does consciousness-modulated pacing reach the
+# acoustic signal in a detectable, direction-sensible way (2026-07-17,
+# "make TTS better" follow-on). See module doc for why this is scoped to
+# the external half only (no live audio->arousal/valence perception path
+# exists yet to close a self-hearing loop against).
+[[example]]
+name = "voice_affect_gate"
+required-features = ["vocal-tract"]
+
+# P2.3 release gate: commits a real Whisper transcription-quality bundle
+# against 200 real FLEURS en/af samples (2026-07-17), closing the gap the
+# voice plan flagged since 2026-07-15.
+[[example]]
+name = "fleurs_release_gate"
+required-features = ["voice-tts"]
+
+# Self-consistency quality gate for the singing path (sing -> transcribe ->
+# compare back to the original lyrics) — SYMTHAEA_SINGING_PLAN_2026-07-18.md
+# Phase 3, closing the "no committed singing quality number" gap.
+[[example]]
+name = "singing_intelligibility_gate"
+required-features = ["singing", "voice-tts"]
+
+# Same self-consistency intelligibility gate as singing_intelligibility_gate,
+# but pointed at the newer Kokoro-based singing engine (src/voice/kokoro_singing.rs,
+# real STFT phase vocoder + acoustic-boundary alignment) instead of FormantVocoder —
+# that engine's word intelligibility had never been measured.
+# Registered as [[bin]] (see compression_bits above): [[example]] targets need
+# [dev-dependencies], and symthaea-humanoid (unconditional dev-dep) is broken
+# at HEAD, which would otherwise block this unrelated gate from building.
+[[bin]]
+name = "kokoro_singing_intelligibility_gate"
+path = "examples/kokoro_singing_intelligibility_gate.rs"
+required-features = ["singing", "voice-tts"]
+
+# Root-cause tool for the human listening report on kokoro_singing_intelligibility_gate's
+# output ("random fart noises") -- objective render-cleanliness (via singing_quality.rs's
+# analyze_render_cleanliness) + pitch-track diagnostics on the actual generated WAVs.
+[[bin]]
+name = "kokoro_singing_diagnose"
+path = "examples/kokoro_singing_diagnose.rs"
+required-features = ["singing", "voice-tts"]
+
+# Fast (no Kokoro synthesis) syllable/note timing inspection -- chases the
+# "most of the audio is silent" report after the phase-vocoder norm-floor
+# hypothesis was empirically ruled out.
+[[bin]]
+name = "kokoro_singing_timing_probe"
+path = "examples/kokoro_singing_timing_probe.rs"
+required-features = ["singing", "voice-tts"]
+
+# Same phrase set/render path as kokoro_singing_intelligibility_gate but
+# skips the (slow, ASR-worker-dependent) Whisper transcription step --
+# for fast render-side iteration.
+[[bin]]
+name = "kokoro_singing_render_only"
+path = "examples/kokoro_singing_render_only.rs"
+required-features = ["singing", "voice-tts"]
+
+# Ground-truth singing quality judge: compares actual sung pitch/timing
+# against the intended melody (singing_quality::analyze_vocal_stem), not
+# just generic audio cleanliness or Whisper intelligibility.
+[[bin]]
+name = "kokoro_singing_quality_judge"
+path = "examples/kokoro_singing_quality_judge.rs"
+required-features = ["singing", "voice-tts"]
+
+# Backend-comparative objective + blind-human Muse vocal release gate.
+[[example]]
+name = "muse_vocal_release_gate"
+required-features = ["singing", "voice-tts"]
+
+# Quick spike: does pitch-shifted Kokoro sound better as a singing voice than
+# the formant vocoder (rejected by the user after listening to it)? —
+# SYMTHAEA_SINGING_PLAN_2026-07-18.md post-Phase-6 pivot.
+[[example]]
+name = "kokoro_singing_spike"
+required-features = ["voice-tts"]
+
+# Synthesizes the same phrase with a spread of Kokoro's built-in voices so a
+# human can pick one — the user asked for something "sexy silk to the ears"
+# after rejecting the formant vocoder outright.
+[[example]]
+name = "kokoro_voice_gallery"
+required-features = ["voice-tts"]
+
+# Isolates synthesis-only speed (engine loaded once) from kokoro_voice_gallery's
+# per-voice full reload cost, to answer whether CPU-only Kokoro can keep pace
+# with live conversation (real-time factor).
+[[example]]
+name = "kokoro_realtime_factor"
 required-features = ["voice-tts"]
 
 [[example]]
@@ -2082,3 +2248,38 @@ name = "exp_epistemic_redteam"
 
 [[example]]
 name = "exp_facade_loop_divergence"
+
+# Vision-tier validation examples (2026-07-15): these existed in examples/ but were
+# never declared after autoexamples=false, so the documented reproduction commands
+# (docs/BUTLIN_VALIDATION_RESULTS.md, VISION.md ETHICS figures) could not actually run.
+# Both compile with default features.
+[[example]]
+name = "butlin_validation"
+
+[[example]]
+name = "benchmark_ethics_moral_algebra"
+
+# Empty-input hang diagnostic (docs/PHI_SIGNAL_TRACE_2026-07-15.md follow-up 6)
+[[example]]
+name = "probe_empty_hang"
+
+# Keystone consciousness-on/off A/B (docs/KEYSTONE_AB_PROTOCOL_2026-07-17.md)
+[[example]]
+name = "keystone_ab"
+
+# Signal-scale diagnostic (PHI_SIGNAL_TRACE follow-up 1: output norm ~3e-8)
+[[example]]
+name = "probe_signal_scale"
+
+# CL/safety-tier calibration probe (post-scale-fix saturation, 2026-07-18)
+[[example]]
+name = "probe_cl_calibration"
+
+# Earn-or-demote: moral/safety discrimination A/B (docs/EARN_OR_DEMOTE_PROTOCOL_2026-07-18.md)
+[[example]]
+name = "earn_or_demote"
+
+# Predictive Compression C1 bits-saved A/B
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md)
+[[example]]
+name = "compression_bits"

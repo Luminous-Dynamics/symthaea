@@ -60,15 +60,6 @@ impl ConjectureEngine {
                         conjecture.confidence = (conjecture.confidence + 0.7) / 2.0;
                     }
 
-                    const NEAR_EXACT_MSE: f64 = 1e-10;
-                    if train_mse < NEAR_EXACT_MSE && test_mse < NEAR_EXACT_MSE {
-                        conjecture.status = ConjectureStatus::FormallyVerified {
-                            proof_steps: seq.data.len(),
-                        };
-                        elevate_macro_promotion_tier(conjecture, MacroPromotionTier::Formal);
-                        conjecture.confidence = (conjecture.confidence + 0.95) / 2.0;
-                    }
-
                     if is_constant
                         && let Expr::Const(c) = &conjecture.formula
                         && let Some(name) = identify_constant(*c)
@@ -89,13 +80,17 @@ impl ConjectureEngine {
         }
     }
 
-    /// Formally verify conjectures by bounded induction.
-    pub fn verify_formal(&mut self, max_n: usize) {
+    /// Check conjectures against known observations in `1..=max_n`.
+    ///
+    /// This performs neither induction nor a universal proof. Integers for
+    /// which no observation exists are not considered checked.
+    pub fn verify_bounded(&mut self, max_n: usize) {
         let observations = self.observations.clone();
         for conjecture in &mut self.conjectures {
             if !matches!(
                 conjecture.status,
                 ConjectureStatus::NumericallyTested { .. }
+                    | ConjectureStatus::BoundedChecked { .. }
             ) {
                 continue;
             }
@@ -131,16 +126,20 @@ impl ConjectureEngine {
                             first_failure = Some(n as f64);
                             break;
                         }
+                        checked += 1;
                     }
-                    checked += 1;
                 }
 
-                if all_exact && checked >= 100 {
-                    conjecture.status = ConjectureStatus::FormallyVerified {
-                        proof_steps: checked,
+                if all_exact && checked > 0 {
+                    conjecture.status = ConjectureStatus::BoundedChecked {
+                        checked_points: checked,
+                        max_n,
                     };
-                    elevate_macro_promotion_tier(conjecture, MacroPromotionTier::Formal);
-                    conjecture.confidence = 0.95;
+                    elevate_macro_promotion_tier(
+                        conjecture,
+                        MacroPromotionTier::RecurrentNumerical,
+                    );
+                    conjecture.confidence = conjecture.confidence.max(0.9);
                 } else if let Some(cx) = first_failure
                     && known.contains_key(&(cx as i64))
                 {
@@ -161,18 +160,33 @@ impl ConjectureEngine {
         }
     }
 
-    /// Attempt to formally prove all numerically-verified conjectures via Z3.
-    pub fn auto_prove_via_z3(&mut self) {
+    /// Compatibility wrapper for the historical, misleading method name.
+    #[deprecated(note = "bounded data checking is not formal verification; use verify_bounded")]
+    pub fn verify_formal(&mut self, max_n: usize) {
+        self.verify_bounded(max_n);
+    }
+
+    /// Ask Z3 to check equality at each fixed observed input.
+    ///
+    /// The generated queries bind `n` to sample values; they do not prove a
+    /// universally quantified identity.
+    pub fn check_samples_via_z3(&mut self) {
         let z3_path = match detect_z3_path() {
             Some(p) => p,
             None => {
                 eprintln!(
-                    "[conjecture_engine] auto_prove_via_z3: z3 not found — \
+                    "[conjecture_engine] check_samples_via_z3: z3 not found — \
                      set $Z3_PATH or add z3 to PATH (e.g. `nix-shell -p z3`). \
-                     Formal verification skipped for {} conjectures.",
+                     SMT sample checking skipped for {} conjectures.",
                     self.conjectures
                         .iter()
-                        .filter(|c| matches!(c.status, ConjectureStatus::NumericallyTested { .. }))
+                        .filter(|c| {
+                            matches!(
+                                c.status,
+                                ConjectureStatus::NumericallyTested { .. }
+                                    | ConjectureStatus::BoundedChecked { .. }
+                            )
+                        })
                         .count()
                 );
                 return;
@@ -185,6 +199,7 @@ impl ConjectureEngine {
             if !matches!(
                 conjecture.status,
                 ConjectureStatus::NumericallyTested { .. }
+                    | ConjectureStatus::BoundedChecked { .. }
             ) {
                 continue;
             }
@@ -249,12 +264,18 @@ impl ConjectureEngine {
             }
 
             if all_verified && tested_points > 0 {
-                conjecture.status = ConjectureStatus::FormallyVerified {
-                    proof_steps: tested_points,
+                conjecture.status = ConjectureStatus::SmtSamplesChecked {
+                    checked_points: tested_points,
                 };
-                elevate_macro_promotion_tier(conjecture, MacroPromotionTier::Formal);
-                conjecture.confidence = 0.99;
+                elevate_macro_promotion_tier(conjecture, MacroPromotionTier::RecurrentNumerical);
+                conjecture.confidence = conjecture.confidence.max(0.95);
             }
         }
+    }
+
+    /// Compatibility wrapper for the historical, misleading method name.
+    #[deprecated(note = "fixed-input SMT checks are not a formal proof; use check_samples_via_z3")]
+    pub fn auto_prove_via_z3(&mut self) {
+        self.check_samples_via_z3();
     }
 }

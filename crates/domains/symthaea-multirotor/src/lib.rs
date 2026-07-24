@@ -41,6 +41,7 @@ pub mod encoder;
 pub mod fep_agent;
 pub mod formation;
 pub mod perturbations;
+pub mod plugin;
 pub mod simulator;
 pub mod training;
 pub mod types;

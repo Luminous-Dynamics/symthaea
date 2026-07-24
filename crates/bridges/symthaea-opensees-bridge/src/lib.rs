@@ -64,7 +64,7 @@ impl SimulationBackend for OpenSeesBridge {
         }
 
         if self.dry_run {
-            return Ok(SimulationResult::converged(&request.id, 0.55)
+            return Ok(SimulationResult::dry_run(&request.id, self.name(), 0.55)
                 .with_metric("max_drift_ratio", 0.012, "ratio")
                 .with_metric("demand_capacity_ratio", 0.72, "ratio"));
         }

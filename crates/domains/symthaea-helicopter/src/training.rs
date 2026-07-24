@@ -8,7 +8,7 @@
 use crate::controller::{HelicopterController, pd_hover_baseline};
 use crate::encoder::HelicopterHdcEncoder;
 use crate::fep_agent::ActiveInferenceHelicopterAgent;
-use crate::simulator::{HelicopterPhysicsSimulator, SimpleHelicopterSimulator};
+use crate::simulator::{HelicopterPhysicsSimulator, LandingOutcome, SimpleHelicopterSimulator};
 use crate::types::{HelicopterConfig, HelicopterTask};
 
 /// Episode metrics for tracking training progress.
@@ -20,6 +20,8 @@ pub struct EpisodeMetrics {
     pub final_altitude: f64,
     pub steps_survived: usize,
     pub fell: bool,
+    /// Ground-contact outcome, preserving safe vs hard vs crash evidence.
+    pub landing_outcome: LandingOutcome,
     /// Mean pre-update imitation MSE against the PD hover baseline —
     /// the learning signal. Decreasing across episodes = the controller is
     /// actually learning.
@@ -84,7 +86,7 @@ impl HelicopterTrainer {
 
         for step in 0..self.config.steps_per_episode {
             // Encode current state
-            let hv = self.encoder.encode(self.simulator.state());
+            let hv = self.encoder.encode_with_dt(self.simulator.state(), dt);
 
             // Cognitive tick (every N physics steps). FEP loop closed:
             // τ modulates the controller's effective timestep, the LR factor
@@ -116,9 +118,11 @@ impl HelicopterTrainer {
             angular_sum += state.angular_speed();
             metrics.steps_survived = step + 1;
 
-            // Early termination: crashed or flipped
-            if state.altitude() <= 0.01 && step > 10 {
-                metrics.fell = true;
+            // Early termination after any landing; preserve its classification.
+            let landing = self.simulator.landing_contact().outcome;
+            if !matches!(landing, LandingOutcome::Airborne) {
+                metrics.landing_outcome = landing;
+                metrics.fell = matches!(landing, LandingOutcome::Crash);
                 break;
             }
             if !state.is_finite() {

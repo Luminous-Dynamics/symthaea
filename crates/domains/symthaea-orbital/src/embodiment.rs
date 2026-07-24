@@ -191,7 +191,7 @@ impl OrbitalEmbodiment {
             total_steps: self.steps as u64,
             control_effort: self.effort,
             prediction_error: self.pe,
-            safety_level: format!("{:?}", self.safety),
+            safety_level: self.safety,
             platform: "orbital".to_string(),
             num_actuators: NUM_ACTUATORS,
             epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),

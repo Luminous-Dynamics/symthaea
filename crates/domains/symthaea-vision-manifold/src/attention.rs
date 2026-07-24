@@ -9,7 +9,7 @@
 
 use symthaea_core::hdc::ContinuousHV;
 
-use crate::types::{AttentionMap, PatchGrid};
+use crate::types::{AttentionMap, PatchGrid, SurpriseMapState};
 
 /// Tracks per-patch surprise (free energy proxy) over time.
 pub struct SurpriseMap {
@@ -98,10 +98,50 @@ impl SurpriseMap {
     /// * `row`, `col` — Grid coordinates of the patch to dampen.
     /// * `factor` — Multiplicative factor (0.0 = full suppression, 1.0 = no change).
     pub fn dampen(&mut self, row: usize, col: usize, factor: f32) {
-        let idx = self.grid.patch_index(row, col);
-        if let Some(s) = self.surprise.get_mut(idx) {
-            *s *= factor.clamp(0.0, 1.0);
+        let _ = self.dampen_checked(row, col, factor);
+    }
+
+    /// Checked variant of [`Self::dampen`] that rejects malformed policy input
+    /// before mutating the accumulated surprise map.
+    pub fn dampen_checked(&mut self, row: usize, col: usize, factor: f32) -> Result<(), String> {
+        if !factor.is_finite() || !(0.0..=1.0).contains(&factor) {
+            return Err(format!(
+                "dampen factor must be finite and in [0, 1], got {factor}"
+            ));
         }
+        if row >= self.grid.rows || col >= self.grid.cols {
+            return Err(format!(
+                "surprise coordinate ({row}, {col}) is outside {}x{} grid",
+                self.grid.rows, self.grid.cols
+            ));
+        }
+        let idx = self.grid.patch_index(row, col);
+        self.surprise[idx] *= factor;
+        Ok(())
+    }
+
+    /// Update the temporal persistence of accumulated surprise.
+    ///
+    /// Larger values retain evidence longer. The value is clamped below one so
+    /// the steady-state cap remains finite.
+    pub fn set_decay(&mut self, decay: f32) {
+        let _ = self.set_decay_checked(decay);
+    }
+
+    /// Checked surprise-persistence update.
+    pub fn set_decay_checked(&mut self, decay: f32) -> Result<(), String> {
+        if !decay.is_finite() || !(0.001..=0.999).contains(&decay) {
+            return Err(format!(
+                "surprise decay must be finite and in [0.001, 0.999], got {decay}"
+            ));
+        }
+        self.decay = decay;
+        Ok(())
+    }
+
+    /// Current temporal surprise persistence.
+    pub fn decay(&self) -> f32 {
+        self.decay
     }
 
     /// Access the underlying grid.
@@ -126,15 +166,104 @@ impl SurpriseMap {
     /// * `weight` — Mixing weight for the injected signal (0.0 = no injection,
     ///   1.0 = full cross-scale signal). Typical value: 0.3.
     pub fn inject_cross_scale_error(&mut self, patch_errors: &[f32], weight: f32) {
+        let _ = self.inject_cross_scale_error_checked(patch_errors, weight);
+    }
+
+    /// Checked cross-scale evidence injection.
+    ///
+    /// All supplied values are validated before any patch is updated, so one
+    /// malformed value cannot leave the attention map partially mutated.
+    pub fn inject_cross_scale_error_checked(
+        &mut self,
+        patch_errors: &[f32],
+        weight: f32,
+    ) -> Result<(), String> {
+        if !weight.is_finite() || !(0.0..=1.0).contains(&weight) {
+            return Err(format!(
+                "cross-scale weight must be finite and in [0, 1], got {weight}"
+            ));
+        }
+        if let Some((index, value)) = patch_errors
+            .iter()
+            .copied()
+            .enumerate()
+            .find(|(_, value)| !value.is_finite() || !(0.0..=1.0).contains(value))
+        {
+            return Err(format!(
+                "cross-scale error at index {index} must be finite and in [0, 1], got {value}"
+            ));
+        }
         if weight < 1e-6 || patch_errors.is_empty() {
-            return;
+            return Ok(());
         }
         let max_surprise = 1.0 / (1.0 - self.decay).max(0.01);
         let n = patch_errors.len().min(self.surprise.len());
-        for i in 0..n {
-            self.surprise[i] += weight * patch_errors[i].clamp(0.0, 1.0);
-            self.surprise[i] = self.surprise[i].min(max_surprise);
+        for (surprise, error) in self.surprise[..n].iter_mut().zip(&patch_errors[..n]) {
+            *surprise = (*surprise + weight * *error).min(max_surprise);
         }
+        Ok(())
+    }
+
+    pub(crate) fn save_state(&self) -> SurpriseMapState {
+        SurpriseMapState {
+            values: self.surprise.clone(),
+            decay: self.decay,
+            threshold: self.threshold,
+            cols: self.grid.cols,
+            rows: self.grid.rows,
+            patch_size: self.grid.patch_size,
+            frame_width: self.grid.frame_width,
+            frame_height: self.grid.frame_height,
+        }
+    }
+
+    pub(crate) fn validate_state(
+        state: &SurpriseMapState,
+        expected_grid: &PatchGrid,
+    ) -> Result<(), String> {
+        if state.cols != expected_grid.cols
+            || state.rows != expected_grid.rows
+            || state.patch_size != expected_grid.patch_size
+            || state.frame_width != expected_grid.frame_width
+            || state.frame_height != expected_grid.frame_height
+        {
+            return Err(format!(
+                "surprise grid mismatch: saved={}x{}@{} for {}x{}, expected={}x{}@{} for {}x{}",
+                state.cols,
+                state.rows,
+                state.patch_size,
+                state.frame_width,
+                state.frame_height,
+                expected_grid.cols,
+                expected_grid.rows,
+                expected_grid.patch_size,
+                expected_grid.frame_width,
+                expected_grid.frame_height
+            ));
+        }
+        if state.values.len() != expected_grid.num_patches() {
+            return Err(format!(
+                "surprise value count mismatch: saved={}, expected={}",
+                state.values.len(),
+                expected_grid.num_patches()
+            ));
+        }
+        if !state.values.iter().all(|value| value.is_finite()) {
+            return Err("surprise state contains non-finite values".to_string());
+        }
+        if !(0.0..1.0).contains(&state.decay) {
+            return Err(format!("invalid surprise decay: {}", state.decay));
+        }
+        if !state.threshold.is_finite() || state.threshold <= 0.0 {
+            return Err(format!("invalid surprise threshold: {}", state.threshold));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn load_state(&mut self, state: &SurpriseMapState) {
+        self.surprise = state.values.clone();
+        self.decay = state.decay;
+        self.threshold = state.threshold;
     }
 
     /// Reset all surprise to zero.
@@ -228,6 +357,28 @@ mod tests {
         assert!(
             surprise_after_same < surprise_after_change,
             "Surprise should decay: {surprise_after_same} < {surprise_after_change}"
+        );
+    }
+
+    #[test]
+    fn test_runtime_decay_update_changes_retention() {
+        let grid = make_grid();
+        let prev = random_patch_hvs(16, 1000);
+        let curr = random_patch_hvs(16, 2000);
+
+        let mut short_memory = SurpriseMap::new(grid.clone(), 0.5, 0.3);
+        let mut long_memory = SurpriseMap::new(grid, 0.5, 0.3);
+        short_memory.update(&curr, &prev);
+        long_memory.update(&curr, &prev);
+        long_memory.set_decay(0.95);
+
+        short_memory.update(&curr, &curr);
+        long_memory.update(&curr, &curr);
+
+        assert_eq!(long_memory.decay(), 0.95);
+        assert!(
+            long_memory.mean_surprise() > short_memory.mean_surprise(),
+            "higher decay should retain surprise evidence longer"
         );
     }
 
@@ -386,6 +537,38 @@ mod tests {
         for &s in &values[4..] {
             assert_eq!(s, 0.0, "Patches beyond error count should be untouched");
         }
+    }
+
+    #[test]
+    fn checked_surprise_policy_rejects_non_finite_input_atomically() {
+        let grid = make_grid();
+        let mut sm = SurpriseMap::new(grid, 0.9, 0.3);
+        sm.inject_cross_scale_error(&vec![0.5; 16], 0.5);
+        let before = sm.attention_map().values;
+        let decay_before = sm.decay();
+
+        assert!(sm.dampen_checked(0, 0, f32::NAN).is_err());
+        assert!(sm.set_decay_checked(f32::INFINITY).is_err());
+        let mut malformed = vec![0.25; 16];
+        malformed[7] = f32::NAN;
+        assert!(
+            sm.inject_cross_scale_error_checked(&malformed, 0.5)
+                .is_err()
+        );
+
+        assert_eq!(sm.attention_map().values, before);
+        assert_eq!(sm.decay(), decay_before);
+    }
+
+    #[test]
+    fn checked_surprise_policy_rejects_out_of_range_input() {
+        let grid = make_grid();
+        let mut sm = SurpriseMap::new(grid, 0.9, 0.3);
+        assert!(sm.dampen_checked(4, 0, 0.5).is_err());
+        assert!(sm.dampen_checked(0, 0, 1.1).is_err());
+        assert!(sm.set_decay_checked(1.0).is_err());
+        assert!(sm.inject_cross_scale_error_checked(&[0.5], -0.1).is_err());
+        assert_eq!(sm.max_surprise(), 0.0);
     }
 
     #[test]

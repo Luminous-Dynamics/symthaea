@@ -1,0 +1,7 @@
+{
+  "maximum_receipt_age_ms": 2592000000,
+  "maximum_scrub_interval_ms": 2592000000,
+  "minimum_verified_replicas": 3,
+  "minimum_fault_domains": 2,
+  "require_full_byte_verification": true
+}

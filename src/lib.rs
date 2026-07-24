@@ -298,7 +298,7 @@ pub use errors::{SymthaeaError, SymthaeaResult};
 // Symthaea Facade (Primary Entry Point)
 // ============================================================================
 pub mod symthaea;
-pub use symthaea::Symthaea;
+pub use symthaea::{CreativeArtifact, Symthaea};
 
 // ============================================================================
 // Core Modules (Stable, Verified Working)
@@ -374,6 +374,10 @@ pub mod soul;
 
 // Language processing (enabled - core modules, advanced gated behind full_language)
 pub mod language;
+
+// Evidence-gated, modality-neutral contracts shared by language, STT, and
+// non-human communication research paths.
+pub use symthaea_communication as communication;
 
 // School: anticipatory curriculum learning with CfC lookahead, mastery tracking
 #[cfg(feature = "school_learning")]

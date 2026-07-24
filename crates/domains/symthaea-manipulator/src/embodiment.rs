@@ -10,6 +10,9 @@ use crate::admittance::apply_admittance;
 use crate::controller::ManipulatorController;
 use crate::encoder::ManipulatorHdcEncoder;
 use crate::kitchen_scenario::{clamp_grip_command, hazard_tier, KitchenObject};
+use crate::predictor::normalized_state_prediction_error;
+use crate::safety_supervisor::{ManipulatorSafetySupervisor, SafetyIntervention};
+use crate::sensorimotor::{ControllerInputSchema, SensorimotorInputBinder};
 use crate::simulator::{ManipulatorPhysicsSimulator, SimpleManipulatorSimulator};
 use crate::types::ManipulatorConfig;
 
@@ -30,6 +33,7 @@ pub struct ManipulatorEmbodiment {
     controller: ManipulatorController,
     simulator: SimpleManipulatorSimulator,
     encoder: ManipulatorHdcEncoder,
+    sensorimotor_input: SensorimotorInputBinder,
     last_perception: Option<ContinuousHV>,
     total_steps: usize,
     current_safety: MotorSafetyLevel,
@@ -41,6 +45,10 @@ pub struct ManipulatorEmbodiment {
     last_grounding: u8,
     fallback_stage: ManipulatorFallbackStage,
     fallback_cycles_in_stage: u32,
+    safety_supervisor: ManipulatorSafetySupervisor,
+    last_safety_intervention: SafetyIntervention,
+    last_workspace_clearance_m: f64,
+    last_measured_force_n: f64,
     /// Object currently grasped, if any — see `kitchen_scenario.rs`. An
     /// environmental hazard (hot/sharp), not a Φ/confidence signal, so it
     /// composes into `current_safety` the same way `safety_override` and
@@ -51,10 +59,13 @@ pub struct ManipulatorEmbodiment {
 impl ManipulatorEmbodiment {
     pub fn new(genesis: &GenesisSeed) -> Self {
         let config = ManipulatorConfig::default();
+        let simulator = SimpleManipulatorSimulator::new();
+        let safety_supervisor = ManipulatorSafetySupervisor::new(simulator.state().joint_angles);
         Self {
             controller: ManipulatorController::new(genesis, &config),
-            simulator: SimpleManipulatorSimulator::new(),
+            simulator,
             encoder: ManipulatorHdcEncoder::new(genesis, 32),
+            sensorimotor_input: SensorimotorInputBinder::new(genesis),
             last_perception: None,
             total_steps: 0,
             current_safety: MotorSafetyLevel::Green,
@@ -66,6 +77,10 @@ impl ManipulatorEmbodiment {
             last_grounding: GROUNDING_SENSORIMOTOR,
             fallback_stage: ManipulatorFallbackStage::GravityHold,
             fallback_cycles_in_stage: 0,
+            safety_supervisor,
+            last_safety_intervention: SafetyIntervention::None,
+            last_workspace_clearance_m: f64::INFINITY,
+            last_measured_force_n: 0.0,
             held_object: None,
         }
     }
@@ -73,14 +88,6 @@ impl ManipulatorEmbodiment {
     /// Current SafeFallback stage (always `GravityHold` for this platform).
     pub fn fallback_stage(&self) -> ManipulatorFallbackStage {
         self.fallback_stage
-    }
-
-    /// Override the commanded torques with a gravity-compensation hold and
-    /// freeze the gripper at its current opening. Executes at full authority
-    /// (not scaled by motor_gain) per the SafeFallback contract.
-    fn apply_gravity_hold(&self, cmd: &mut crate::types::ManipulatorCommand) {
-        cmd.joint_torques = self.simulator.gravity_compensation_torques();
-        cmd.gripper = self.simulator.state().gripper_opening as f32;
     }
 
     /// Apply moral gate from the ethics engine.
@@ -112,6 +119,13 @@ impl ManipulatorEmbodiment {
         &mut self,
         weights: &crate::controller::ControllerWeights,
     ) -> Result<(), String> {
+        if weights.input_schema != ControllerInputSchema::SensorimotorBoundV1 {
+            return Err(format!(
+                "controller input schema mismatch: snapshot {:?}, runtime {:?}",
+                weights.input_schema,
+                ControllerInputSchema::SensorimotorBoundV1
+            ));
+        }
         self.controller.import_weights(weights)
     }
 
@@ -119,6 +133,18 @@ impl ManipulatorEmbodiment {
     /// tests, benchmarks, and telemetry consumers).
     pub fn body_state(&self) -> &crate::types::ManipulatorState {
         self.simulator.state()
+    }
+
+    pub fn safety_supervisor(&self) -> &ManipulatorSafetySupervisor {
+        &self.safety_supervisor
+    }
+
+    pub fn safety_supervisor_mut(&mut self) -> &mut ManipulatorSafetySupervisor {
+        &mut self.safety_supervisor
+    }
+
+    pub fn last_applied_command(&self) -> crate::types::ManipulatorCommand {
+        self.safety_supervisor.last_applied_command()
     }
 
     pub fn set_safety_override(&mut self, level: MotorSafetyLevel) {
@@ -157,32 +183,16 @@ impl ManipulatorEmbodiment {
         self.current_safety = self
             .current_safety
             .max(hazard_tier(self.held_object.as_ref()));
-        let gain = self.current_safety.motor_gain();
+        let body_hv = self.encoder.encode(self.simulator.state());
+        let control_input = self.sensorimotor_input.fuse(thought_hv, &body_hv);
+        let mut cmd = self.controller.forward(&control_input, dt);
 
-        let mut cmd = self.controller.forward(thought_hv, dt);
-
-        // ── SafeFallback: GravityHold at Red ─────────────────────────
-        // "No force" for a loaded arm means "drop whatever it's holding" —
-        // gain=0.0 alone is NOT safe here. Hold the current pose against
-        // gravity instead, at full torque authority (not gain-scaled).
         if matches!(self.current_safety, MotorSafetyLevel::Red) {
             self.fallback_cycles_in_stage = self.fallback_cycles_in_stage.saturating_add(1);
-            self.apply_gravity_hold(&mut cmd);
         } else {
             self.fallback_stage = ManipulatorFallbackStage::GravityHold;
             self.fallback_cycles_in_stage = 0;
-            if gain < 1.0 {
-                for t in &mut cmd.joint_torques {
-                    *t *= gain;
-                }
-            }
 
-            // ── Admittance: yield to sensed contact force ────────────
-            // Never fight an external push at full cognitive authority
-            // (chatter risk) — subtract a safety-tier-scaled fraction of
-            // the equivalent joint torque for the *previous* step's sensed
-            // end-effector force. One-tick feedback, same convention as
-            // every other sensor-driven correction here.
             apply_admittance(
                 &mut cmd,
                 self.simulator.kinematics(),
@@ -191,29 +201,36 @@ impl ManipulatorEmbodiment {
                 self.simulator.max_torques(),
                 self.current_safety,
             );
-
-            // Cap squeeze force to whichever is stricter: this safety tier's
-            // own grip authority, or the held object's crush threshold. Only
-            // meaningful here — the Red/GravityHold branch above already
-            // freezes the gripper at its current opening (a stricter, more
-            // conservative behavior in its own right), and this tier-based
-            // cap would otherwise force it *open* instead of held, which is
-            // exactly the "drop whatever it's holding" outcome GravityHold's
-            // own comment says gain=0 alone must not cause.
             cmd.gripper =
                 clamp_grip_command(cmd.gripper, self.current_safety, self.held_object.as_ref());
         }
 
-        self.last_control_effort = cmd.control_effort();
-        self.simulator.step(&cmd, dt as f64);
+        // Final authority: no command reaches physics without passing through
+        // the stateful safety supervisor.
+        let state_before = self.simulator.state().clone();
+        let gravity_hold = self.simulator.gravity_compensation_torques();
+        let max_torques = *self.simulator.max_torques();
+        let decision = self.safety_supervisor.supervise(
+            cmd,
+            &state_before,
+            self.simulator.kinematics(),
+            &max_torques,
+            gravity_hold,
+            self.current_safety,
+            dt as f64,
+        );
+        self.last_safety_intervention = decision.intervention;
+        self.last_workspace_clearance_m = decision.workspace_clearance_m;
+        self.last_measured_force_n = decision.measured_force_n;
+        self.last_control_effort = decision.command.control_effort();
+        let predicted_state = self
+            .simulator
+            .predict_next_state(&decision.command, dt as f64);
+        self.simulator.step(&decision.command, dt as f64);
 
         let perception = self.encoder.encode(self.simulator.state());
-
-        let pred_error = if let Some(ref prev) = self.last_perception {
-            (1.0 - perception.similarity(prev).max(0.0)).min(1.0)
-        } else {
-            0.0_f32
-        };
+        let pred_error =
+            normalized_state_prediction_error(&predicted_state, self.simulator.state());
         self.last_prediction_error = pred_error;
         self.last_perception = Some(perception);
         self.total_steps += 1;
@@ -256,6 +273,10 @@ impl ManipulatorEmbodiment {
         self.last_grounding = GROUNDING_SENSORIMOTOR;
         self.fallback_stage = ManipulatorFallbackStage::GravityHold;
         self.fallback_cycles_in_stage = 0;
+        self.safety_supervisor.reset();
+        self.last_safety_intervention = SafetyIntervention::None;
+        self.last_workspace_clearance_m = f64::INFINITY;
+        self.last_measured_force_n = 0.0;
         self.held_object = None;
     }
 
@@ -272,7 +293,7 @@ impl ManipulatorEmbodiment {
             total_steps: self.total_steps as u64,
             control_effort: self.last_control_effort,
             prediction_error: self.last_prediction_error,
-            safety_level: format!("{:?}", self.current_safety),
+            safety_level: self.current_safety,
             platform: "manipulator".to_string(),
             num_actuators: 8,
             epistemic_grounding: grounding_label(self.last_grounding).to_string(),
@@ -288,6 +309,11 @@ impl ManipulatorEmbodiment {
             "joint_angles": state.joint_angles,
             "ee_force": state.end_effector_force,
             "gripper": state.gripper_opening,
+            "safety_intervention": format!("{:?}", self.last_safety_intervention),
+            "workspace_clearance_m": self.last_workspace_clearance_m,
+            "measured_force_n": self.last_measured_force_n,
+            "prediction_model": "one_step_simple_dynamics",
+            "controller_input_schema": "sensorimotor_bound_v1",
         }))
         .unwrap_or_default()
     }
@@ -590,5 +616,45 @@ mod tests {
         let r = bridge.step(&hv, 0.002, 0.5); // Yellow, gain 0.6
         assert_eq!(r.safety_level, MotorSafetyLevel::Yellow);
         assert_eq!(bridge.fallback_cycles_in_stage, 0);
+    }
+    #[test]
+    fn live_human_zone_is_enforced_at_actuator_boundary() {
+        let mut bridge = ManipulatorEmbodiment::new(&GenesisSeed::from_phrase("zone-test"));
+        let position = bridge.body_state().end_effector_position;
+        bridge
+            .safety_supervisor_mut()
+            .workspace_mut()
+            .human_zones
+            .push([position[0], position[1], position[2], 0.2]);
+
+        let hv = ContinuousHV::random(16384, 44);
+        let result = bridge.step(&hv, 0.002, 0.8);
+        assert!(result.success);
+        assert_ne!(
+            bridge.safety_supervisor().last_intervention(),
+            SafetyIntervention::None
+        );
+    }
+
+    #[test]
+    fn deterministic_digital_twin_prediction_is_low_error() {
+        let mut bridge = ManipulatorEmbodiment::new(&GenesisSeed::from_phrase("prediction-test"));
+        let hv = ContinuousHV::random(16384, 71);
+        let result = bridge.step(&hv, 0.002, 0.8);
+        assert!(
+            result.prediction_error < 1e-6,
+            "matching digital twin should predict its own next state: {}",
+            result.prediction_error
+        );
+    }
+
+    #[test]
+    fn bridge_rejects_legacy_direct_input_weights() {
+        let genesis = GenesisSeed::from_phrase("schema-test");
+        let config = ManipulatorConfig::default();
+        let controller = ManipulatorController::new(&genesis, &config);
+        let weights = controller.export_weights();
+        let mut bridge = ManipulatorEmbodiment::new(&genesis);
+        assert!(bridge.install_weights(&weights).is_err());
     }
 }

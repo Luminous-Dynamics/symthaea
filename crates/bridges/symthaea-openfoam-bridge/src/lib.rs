@@ -67,7 +67,7 @@ impl SimulationBackend for OpenFoamBridge {
         }
 
         if self.dry_run {
-            return Ok(SimulationResult::converged(&request.id, 0.5)
+            return Ok(SimulationResult::dry_run(&request.id, self.name(), 0.5)
                 .with_metric("drag_coefficient", 0.31, "dimensionless")
                 .with_metric("residual_norm", 1e-4, "dimensionless"));
         }

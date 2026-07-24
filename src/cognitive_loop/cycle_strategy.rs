@@ -291,6 +291,23 @@ impl CognitiveLoopService {
         let prediction_error = encoding_result.prediction_error;
         module_timings.core_hdc_encode = _t_core.elapsed().as_micros() as u64;
 
+        // Surface degenerate prediction errors: PE=1.0 from an empty/zero-norm
+        // prediction is a broken upstream signal, not real surprise (rate-limited
+        // to powers of two so a persistent break doesn't flood the log).
+        {
+            use symthaea_core::hdc::predictive_encoder::PredictionDegeneracy;
+            if self.encoder.last_prediction_degeneracy() == PredictionDegeneracy::ZeroPrediction {
+                let n = self.encoder.stats().degenerate_zero_prediction_cycles;
+                if n.is_power_of_two() {
+                    tracing::warn!(
+                        degenerate_cycles = n,
+                        total_cycles = self.stats.total_cycles,
+                        "prediction reaching the encoder was empty/zero-norm — PE=1.0 is a sentinel, not surprise"
+                    );
+                }
+            }
+        }
+
         // Pre-compute BinaryHV once for all subsystems that need it.
         let _t_core = Instant::now();
         let mut hv16_cached = real_hv_to_hv16(&encoding_result.hdv);

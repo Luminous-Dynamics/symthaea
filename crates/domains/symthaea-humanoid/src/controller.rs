@@ -9,19 +9,41 @@ use symthaea_core::hdc::{
     ContinuousHV, HDC_DIMENSION, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig,
 };
 
+use crate::morphology::HumanoidMorphology;
 use crate::types::{HumanoidCommand, HumanoidConfig, NUM_ACTUATORS};
 
+fn checkpoint_version() -> u32 {
+    3
+}
+
+/// Versioned output-head checkpoint.
+///
+/// The underlying HDC-LTC network is deterministically reconstructed from the
+/// genesis phrase; learned recurrent parameters/state are not serialized by the
+/// current core API. `recurrent_state_included` makes that limitation explicit so
+/// evaluation tooling cannot mistake this for a full learner snapshot.
 #[derive(Serialize, Deserialize)]
 pub struct ControllerCheckpoint {
+    #[serde(default = "checkpoint_version")]
+    pub version: u32,
     pub output_weights: Vec<f32>,
     pub output_bias: Vec<f32>,
     pub learning_rate: f32,
     pub genesis_phrase: String,
     pub network_layers: usize,
     pub neurons_per_layer: usize,
+    #[serde(default)]
+    pub morphology: Option<HumanoidMorphology>,
+    #[serde(default)]
+    pub observation_schema_id: Option<String>,
+    #[serde(default)]
+    pub recurrent_state_included: bool,
+    #[serde(default)]
+    pub recurrent_learning_enabled: bool,
 }
 
 const BOTTLENECK_DIM: usize = 64;
+const DEFAULT_TAU_BASE: f32 = 0.025;
 
 pub struct HumanoidController {
     network: HdcLtcUnifiedNetwork,
@@ -31,12 +53,14 @@ pub struct HumanoidController {
     num_outputs: usize,
     learning_rate: f32,
     lr_scale: f32,
+    nominal_tau_base: f32,
+    tau_factor: f32,
 }
 
 impl HumanoidController {
     pub fn new(genesis: &GenesisSeed, config: &HumanoidConfig) -> Self {
         let neuron_config = UnifiedConfig {
-            tau_base: 0.025,
+            tau_base: DEFAULT_TAU_BASE,
             backbone_tau: 0.3,
             dimension: HDC_DIMENSION,
             learning_rate: config.learning_rate,
@@ -74,6 +98,8 @@ impl HumanoidController {
             num_outputs,
             learning_rate: config.learning_rate,
             lr_scale: 1.0,
+            nominal_tau_base: DEFAULT_TAU_BASE,
+            tau_factor: 1.0,
         }
     }
 
@@ -98,6 +124,8 @@ impl HumanoidController {
             num_outputs,
             learning_rate: 0.0005,
             lr_scale: 1.0,
+            nominal_tau_base: DEFAULT_TAU_BASE,
+            tau_factor: 1.0,
         }
     }
 
@@ -332,16 +360,30 @@ impl HumanoidController {
         }
     }
 
+    /// Set an absolute modulation relative to the nominal time constant.
+    ///
+    /// Previous behavior multiplied the already-modulated tau on every cognitive
+    /// tick, causing exponential drift. Repeated calls with the same factor are now
+    /// idempotent.
     pub fn modulate_tau(&mut self, factor: f32) {
         let factor = factor.clamp(0.3, 3.0);
+        let target_tau = self.nominal_tau_base * factor;
         for layer_idx in 0..self.network.n_layers() {
             if let Some(layer) = self.network.layer_mut(layer_idx) {
                 for neuron in layer.iter_mut() {
-                    let new_tau = neuron.config().tau_base * factor;
-                    neuron.set_tau_base(new_tau);
+                    neuron.set_tau_base(target_tau);
                 }
             }
         }
+        self.tau_factor = factor;
+    }
+
+    pub fn tau_factor(&self) -> f32 {
+        self.tau_factor
+    }
+
+    pub fn nominal_tau_base(&self) -> f32 {
+        self.nominal_tau_base
     }
 
     pub fn normalize_states(&mut self) {
@@ -401,13 +443,24 @@ impl HumanoidController {
     }
 
     pub fn save_checkpoint(&self, path: &str, config: &HumanoidConfig) -> std::io::Result<()> {
+        if config.enable_recurrent_learning {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "cannot save a complete learner checkpoint while recurrent learning is enabled; the core network does not yet expose recurrent parameter serialization",
+            ));
+        }
         let checkpoint = ControllerCheckpoint {
+            version: checkpoint_version(),
             output_weights: self.output_weights.clone(),
             output_bias: self.output_bias.to_vec(),
             learning_rate: self.learning_rate,
             genesis_phrase: config.genesis_phrase.clone(),
             network_layers: config.network_layers,
             neurons_per_layer: config.neurons_per_layer,
+            morphology: Some(config.morphology),
+            observation_schema_id: Some(config.morphology.schema_id().to_string()),
+            recurrent_state_included: false,
+            recurrent_learning_enabled: config.enable_recurrent_learning,
         };
         let json = serde_json::to_string_pretty(&checkpoint).map_err(std::io::Error::other)?;
         std::fs::write(path, json)
@@ -418,16 +471,42 @@ impl HumanoidController {
         let checkpoint: ControllerCheckpoint =
             serde_json::from_str(&json).map_err(std::io::Error::other)?;
         let genesis = GenesisSeed::from_phrase(&checkpoint.genesis_phrase);
+        if checkpoint.recurrent_state_included {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "checkpoint claims recurrent state that this loader cannot restore",
+            ));
+        }
+        if checkpoint.recurrent_learning_enabled {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "checkpoint was produced with recurrent learning enabled but contains no recurrent parameters",
+            ));
+        }
+        let morphology = checkpoint.morphology.unwrap_or(HumanoidMorphology::Dmc21);
+        if let Some(schema_id) = checkpoint.observation_schema_id.as_deref()
+            && schema_id != morphology.schema_id()
+        {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "checkpoint observation schema {schema_id} does not match {}",
+                    morphology.schema_id()
+                ),
+            ));
+        }
         let config = HumanoidConfig {
+            morphology,
             network_layers: checkpoint.network_layers,
             neurons_per_layer: checkpoint.neurons_per_layer,
             learning_rate: checkpoint.learning_rate,
             genesis_phrase: checkpoint.genesis_phrase,
+            enable_recurrent_learning: checkpoint.recurrent_learning_enabled,
             ..HumanoidConfig::default()
         };
 
         let neuron_config = UnifiedConfig {
-            tau_base: 0.025,
+            tau_base: DEFAULT_TAU_BASE,
             backbone_tau: 0.3,
             dimension: HDC_DIMENSION,
             learning_rate: config.learning_rate,
@@ -443,6 +522,25 @@ impl HumanoidController {
 
         let network = HdcLtcUnifiedNetwork::from_genesis(net_config, &genesis);
         let num_outputs = config.morphology.num_actuators();
+        let expected_weights = num_outputs * BOTTLENECK_DIM;
+        if checkpoint.output_weights.len() != expected_weights {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "checkpoint has {} output weights; expected {expected_weights} for {num_outputs} actuators",
+                    checkpoint.output_weights.len()
+                ),
+            ));
+        }
+        if checkpoint.output_bias.len() != num_outputs {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "checkpoint has {} output biases; expected {num_outputs}",
+                    checkpoint.output_bias.len()
+                ),
+            ));
+        }
         let mut output_bias = vec![0.0f32; num_outputs];
         for (i, &v) in checkpoint.output_bias.iter().enumerate().take(num_outputs) {
             output_bias[i] = v;
@@ -460,6 +558,8 @@ impl HumanoidController {
             num_outputs,
             learning_rate: checkpoint.learning_rate,
             lr_scale: 1.0,
+            nominal_tau_base: DEFAULT_TAU_BASE,
+            tau_factor: 1.0,
         })
     }
 }

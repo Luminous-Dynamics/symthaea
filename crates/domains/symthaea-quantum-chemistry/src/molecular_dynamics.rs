@@ -7,6 +7,20 @@
 //! using Velocity-Verlet integration. Forces are computed from finite-difference
 //! gradients of the quantum chemical energy.
 //!
+//! ## Status (Phase Q0, 2026-07-16): initial conditions are not real thermal sampling
+//!
+//! Initial velocities are drawn from a **uniform**, not Gaussian, distribution
+//! via a hand-rolled deterministic hash (not a real RNG) -- see `run_md`'s
+//! velocity-initialization comment for detail. Real Maxwell-Boltzmann sampling
+//! needs each velocity component drawn from a normal distribution with
+//! variance `kT/m`; this crate does neither the Gaussian sampling nor a
+//! subsequent center-of-mass momentum removal (there is currently no COM
+//! subtraction step anywhere in this module) or exact-temperature rescale.
+//! Forces are central finite-difference only, not analytic. The energy-drift
+//! regression test (`test_md_energy_conservation_approximate` below) allows
+//! drift up to 0.1 Hartree (~63 kcal/mol) over a short trajectory -- a
+//! deliberately loose bound, not a validated conservation guarantee.
+//!
 //! References:
 //! - Car & Parrinello (1985). Phys. Rev. Lett. 55, 2471.
 //! - Marx & Hutter (2009). *Ab Initio Molecular Dynamics*. Cambridge UP.
@@ -17,18 +31,19 @@ use crate::molecule::Molecule;
 use crate::scf::rhf::{RhfConfig, restricted_hartree_fock};
 
 /// Atomic masses in atomic units (electron masses). 1 amu = 1822.888 a.u.
-const AMU_TO_AU: f64 = 1822.888;
+pub(crate) const AMU_TO_AU: f64 = 1822.888;
 
-fn atomic_mass_au(z: u8) -> f64 {
-    match z {
-        1 => 1.008 * AMU_TO_AU,
-        2 => 4.003 * AMU_TO_AU,
-        6 => 12.011 * AMU_TO_AU,
-        7 => 14.007 * AMU_TO_AU,
-        8 => 15.999 * AMU_TO_AU,
-        9 => 18.998 * AMU_TO_AU,
-        _ => z as f64 * AMU_TO_AU,
-    }
+/// Real atomic mass (a.u.) for element `z`, via Phase Q1's `element_data`
+/// table (118 confirmed real elements). Fixed Phase Q4, 2026-07-17 -- this
+/// used to hardcode real masses for only 6 elements (H/He/C/N/O/F) and
+/// fall back to `z as f64 * AMU_TO_AU` for everything else, a bad
+/// approximation (e.g. gave Li roughly half its real mass: 3 vs. the real
+/// 6.94 amu).
+pub(crate) fn atomic_mass_au(z: u8) -> f64 {
+    crate::element_data::element_metadata(z)
+        .unwrap_or_else(|| panic!("no element metadata for Z={z}"))
+        .atomic_mass
+        * AMU_TO_AU
 }
 
 /// MD trajectory configuration.
@@ -126,7 +141,11 @@ pub fn run_md(molecule: &Molecule, config: &MdConfig) -> MdResult {
     let mut positions: Vec<[f64; 3]> = molecule.atoms.iter().map(|a| a.position).collect();
     let mut velocities = vec![[0.0; 3]; n_atoms];
 
-    // Initialize velocities from Maxwell-Boltzmann (simplified: random uniform scaled)
+    // NOT real Maxwell-Boltzmann sampling (Phase Q0, 2026-07-16): draws each
+    // velocity component from a UNIFORM distribution on [-v_scale, v_scale]
+    // via a hand-rolled deterministic hash, not a Gaussian/normal
+    // distribution and not a real RNG. No center-of-mass momentum removal
+    // or temperature rescale follows. See the module doc's status note.
     if config.temperature > 0.0 {
         let seed = 42u64;
         for i in 0..n_atoms {

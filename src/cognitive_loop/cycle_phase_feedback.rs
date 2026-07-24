@@ -787,6 +787,10 @@ impl CognitiveLoopService {
         // to move the Vec without allocation.
         self.encoder
             .set_prediction(std::mem::take(&mut dynamics.core.prediction));
+        // Shortest-horizon raw prediction for the bits-saved diagnostics
+        // (Predictive Compression Program P0; measurement-only).
+        self.encoder
+            .set_first_horizon_prediction(dynamics.core.prediction_first_horizon.take());
 
         // ═══════════════════════════════════════════════════════════════════════
         // LATE CONSCIOUSNESS MONITORS
@@ -881,183 +885,224 @@ impl CognitiveLoopService {
         // UNIFIED CONSCIOUSNESS ENGINE
         // ═══════════════════════════════════════════════════════════════════════
         let encoding_hdv = &perception.encoding.encoding_result.hdv;
+
+        // Φ input: bind the stimulus encoding with internal temporal state so
+        // SpectralMIPFinder measures the system, not the input stream. With the
+        // bare stimulus push, an identical input schedule produced byte-identical
+        // Φ across subsystem ablations (docs/PHI_SIGNAL_TRACE_2026-07-15.md,
+        // symptom 2). The small CfC state vector is tiled across the HDC
+        // dimension, normalized, and bound (element-wise multiply) into the
+        // stimulus HV. `phi_measures_stimulus_only` restores legacy behavior.
+        let phi_push_hdv_owned: Option<symthaea_core::hdc::unified_hv::ContinuousHV> =
+            if self.config.phi_measures_stimulus_only {
+                None
+            } else {
+                self.temporal_network.read_state().ok().and_then(|state| {
+                    let dim = encoding_hdv.values.len();
+                    if state.is_empty() || dim == 0 {
+                        return None;
+                    }
+                    let mut tiled = Vec::with_capacity(dim);
+                    for i in 0..dim {
+                        tiled.push(state[i % state.len()]);
+                    }
+                    let state_hv =
+                        symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(tiled).normalize();
+                    // A zero state (e.g. cold start) would bind everything to
+                    // zero and destroy the signal — fall back to stimulus-only.
+                    if state_hv.values.iter().all(|v| *v == 0.0) {
+                        return None;
+                    }
+                    Some(encoding_hdv.bind(&state_hv))
+                })
+            };
+        let phi_push_hdv = phi_push_hdv_owned.as_ref().unwrap_or(encoding_hdv);
+
         let phi_spectral_weight = self.carryover.quality.phi_spectral_weight;
-        let consciousness_output = self.consciousness.consciousness_engine.measure(
-            &super::consciousness_engine::ConsciousnessEngineInput {
-                hdv: encoding_hdv,
-                hv16: &perception.encoding.hv16_cached,
-                cycle: self.stats.total_cycles as u64,
-                unified_psi,
-                coherence,
-                prediction_error,
-                phi_attention_weight: perception.encoding.phi_attention_weight,
-                epistemic_quality: self.carryover.quality.last_epistemic_quality,
-                phi_validation_correlation: self.carryover.quality.phi_validation_correlation,
-                // Phase 6: bath → consciousness coupling
-                bath_entropy: self.neuromod.phase_tracker.entropy(),
-                attractor_detected: self.neuromod.phase_tracker.detect_attractor().is_some(),
-                sht_2a_signal: self.neuromod.bath.sht_2a_signal(),
-                gaba_a_signal: self.neuromod.bath.gaba_a_signal(),
-                substrate_feasibility: self.substrate_manager.effective_feasibility,
-                // Substrate requirement dimensions → consciousness coupling
-                binding_capability: self.substrate_manager.binding_capability(&self.config),
-                workspace_capability: self.substrate_manager.workspace_capability(&self.config),
-                attention_capability: self.substrate_manager.attention_capability(&self.config),
-                // GWT broadcast state → Workspace component
-                gwt_broadcast_occurred: self.carryover.gwt_broadcast_occurred,
-                gwt_coalition_size: self.carryover.gwt_coalition_size,
-                // Prediction precision (inverse variance of recent PE)
-                prediction_precision: {
-                    let pe_history = &self.carryover.history.error_history;
-                    if pe_history.len() >= 4 {
-                        let mean: f32 = pe_history.iter().sum::<f32>() / pe_history.len() as f32;
-                        let variance: f32 =
-                            pe_history.iter().map(|e| (e - mean).powi(2)).sum::<f32>()
-                                / pe_history.len() as f32;
-                        (1.0 / (variance + 1e-6)).clamp(0.1, 10.0)
+        let consciousness_output = if self.config.enable_consciousness_engine {
+            self.consciousness.consciousness_engine.measure(
+                &super::consciousness_engine::ConsciousnessEngineInput {
+                    hdv: phi_push_hdv,
+                    hv16: &perception.encoding.hv16_cached,
+                    cycle: self.stats.total_cycles as u64,
+                    unified_psi,
+                    coherence,
+                    prediction_error,
+                    phi_attention_weight: perception.encoding.phi_attention_weight,
+                    epistemic_quality: self.carryover.quality.last_epistemic_quality,
+                    phi_validation_correlation: self.carryover.quality.phi_validation_correlation,
+                    // Phase 6: bath → consciousness coupling
+                    bath_entropy: self.neuromod.phase_tracker.entropy(),
+                    attractor_detected: self.neuromod.phase_tracker.detect_attractor().is_some(),
+                    sht_2a_signal: self.neuromod.bath.sht_2a_signal(),
+                    gaba_a_signal: self.neuromod.bath.gaba_a_signal(),
+                    substrate_feasibility: self.substrate_manager.effective_feasibility,
+                    // Substrate requirement dimensions → consciousness coupling
+                    binding_capability: self.substrate_manager.binding_capability(&self.config),
+                    workspace_capability: self.substrate_manager.workspace_capability(&self.config),
+                    attention_capability: self.substrate_manager.attention_capability(&self.config),
+                    // GWT broadcast state → Workspace component
+                    gwt_broadcast_occurred: self.carryover.gwt_broadcast_occurred,
+                    gwt_coalition_size: self.carryover.gwt_coalition_size,
+                    // Prediction precision (inverse variance of recent PE)
+                    prediction_precision: {
+                        let pe_history = &self.carryover.history.error_history;
+                        if pe_history.len() >= 4 {
+                            let mean: f32 =
+                                pe_history.iter().sum::<f32>() / pe_history.len() as f32;
+                            let variance: f32 =
+                                pe_history.iter().map(|e| (e - mean).powi(2)).sum::<f32>()
+                                    / pe_history.len() as f32;
+                            (1.0 / (variance + 1e-6)).clamp(0.1, 10.0)
+                        } else {
+                            1.0 // neutral precision when insufficient history
+                        }
+                    },
+                    // Moral topology → consciousness coupling
+                    moral_drift: self.ethics_engine.moral_topology().moral_drift(20),
+                    moral_anomaly_score: self.ethics_engine.last_anomaly_report().anomaly_score,
+                    // HOT recursion depth: meta_cognition depth × substrate HOT capability
+                    // Attenuated by moral hubris: overconfidence undermines self-knowledge.
+                    // Basis: Kruger & Dunning (1999) — miscalibrated self-assessment.
+                    hot_depth: {
+                        let raw_hot = self
+                            .consciousness
+                            .self_model_tier
+                            .meta_cognition
+                            .as_ref()
+                            .map(|mc| {
+                                // ── Continuous HOT depth (Brown, Lau & LeDoux 2019) ──
+                                // When `continuous_hot` is enabled, blend discrete recursion
+                                // depth with meta-cognitive accuracy for sub-level resolution,
+                                // and enrich with narrative self-Φ (self-integration deepens
+                                // recursive awareness) and attention schema focus (Graziano 2019:
+                                // consciousness IS the model of attention).
+                                #[cfg(feature = "continuous_hot")]
+                                {
+                                    let discrete = mc.depth() as f64 / 3.0;
+                                    let accuracy = mc.accuracy() as f64;
+
+                                    // Blend: 60% discrete depth + 20% meta-cognitive accuracy
+                                    let mut continuous = discrete * 0.6 + accuracy * 0.2;
+
+                                    // Self-Phi enrichment: narrative integration deepens recursion
+                                    let self_phi = narrative_self_psi; // from late_result
+                                    continuous += 0.1 * self_phi.clamp(0.0, 1.0);
+
+                                    // Attention schema: focus intensity as HOT modulator
+                                    continuous +=
+                                        0.1 * (attention_schema_focus as f64).clamp(0.0, 1.0);
+
+                                    // Scale by substrate HOT capability
+                                    continuous.clamp(0.0, 1.0)
+                                        * self.substrate_manager.hot_capability(&self.config)
+                                }
+
+                                #[cfg(not(feature = "continuous_hot"))]
+                                {
+                                    let normalized_depth = mc.depth() as f64 / 3.0;
+                                    normalized_depth
+                                        * self.substrate_manager.hot_capability(&self.config)
+                                }
+                            })
+                            .unwrap_or(HOT_DEPTH_DEFAULT); // preserve backward compat when disabled
+                        // Hubris attenuates HOT: can't claim deep self-knowledge while
+                        // morally overconfident. 0.7× during hubris, 1.0× otherwise.
+                        if self.ethics_engine.last_anomaly_report().moral_hubris {
+                            raw_hot * HOT_HUBRIS_CONFIDENCE_DAMPEN as f64
+                        } else {
+                            raw_hot
+                        }
+                    },
+                    // CPG sync → consciousness coupling (Varela et al. 2001)
+                    cpg_sync_index: {
+                        #[cfg(feature = "cpg")]
+                        {
+                            self.cpg_manager.sync_index()
+                        }
+                        #[cfg(not(feature = "cpg"))]
+                        {
+                            0.5
+                        } // Neutral: no modulation when CPG disabled
+                    },
+                    // Cantor metacognitive depth: derived from dream surprise EMA
+                    // Higher surprise = richer fractal structure = deeper self-reference
+                    cantor_metacognitive_depth: (self.cantor_dream.dream_surprise as f64)
+                        .clamp(0.0, 1.0),
+                    // Governance collective Phi: inter-agent consciousness integration
+                    governance_collective_phi: {
+                        #[cfg(feature = "mycelix")]
+                        {
+                            self.governance_mgr.last_collective_phi()
+                        }
+                        #[cfg(not(feature = "mycelix"))]
+                        {
+                            0.0
+                        }
+                    },
+                    // Knowledge grounding: dynamic from KnowledgeManager signals
+                    // Science: Barsalou (2008), Clark (2013) — grounded cognition modulates consciousness
+                    knowledge_grounding: if let Some(ref km) = self.memory.knowledge_manager {
+                        let s = km.signals();
+                        let grounding = (s.relevance
+                            * super::thresholds::KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT
+                            + (1.0 - s.uncertainty)
+                                * super::thresholds::KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT)
+                            .clamp(0.0, 1.0);
+                        if grounding.is_finite() {
+                            grounding
+                        } else {
+                            0.5
+                        }
                     } else {
-                        1.0 // neutral precision when insufficient history
-                    }
-                },
-                // Moral topology → consciousness coupling
-                moral_drift: self.ethics_engine.moral_topology().moral_drift(20),
-                moral_anomaly_score: self.ethics_engine.last_anomaly_report().anomaly_score,
-                // HOT recursion depth: meta_cognition depth × substrate HOT capability
-                // Attenuated by moral hubris: overconfidence undermines self-knowledge.
-                // Basis: Kruger & Dunning (1999) — miscalibrated self-assessment.
-                hot_depth: {
-                    let raw_hot = self
-                        .consciousness
-                        .self_model_tier
-                        .meta_cognition
-                        .as_ref()
-                        .map(|mc| {
-                            // ── Continuous HOT depth (Brown, Lau & LeDoux 2019) ──
-                            // When `continuous_hot` is enabled, blend discrete recursion
-                            // depth with meta-cognitive accuracy for sub-level resolution,
-                            // and enrich with narrative self-Φ (self-integration deepens
-                            // recursive awareness) and attention schema focus (Graziano 2019:
-                            // consciousness IS the model of attention).
-                            #[cfg(feature = "continuous_hot")]
-                            {
-                                let discrete = mc.depth() as f64 / 3.0;
-                                let accuracy = mc.accuracy() as f64;
-
-                                // Blend: 60% discrete depth + 20% meta-cognitive accuracy
-                                let mut continuous = discrete * 0.6 + accuracy * 0.2;
-
-                                // Self-Phi enrichment: narrative integration deepens recursion
-                                let self_phi = narrative_self_psi; // from late_result
-                                continuous += 0.1 * self_phi.clamp(0.0, 1.0);
-
-                                // Attention schema: focus intensity as HOT modulator
-                                continuous += 0.1 * (attention_schema_focus as f64).clamp(0.0, 1.0);
-
-                                // Scale by substrate HOT capability
-                                continuous.clamp(0.0, 1.0)
-                                    * self.substrate_manager.hot_capability(&self.config)
-                            }
-
-                            #[cfg(not(feature = "continuous_hot"))]
-                            {
-                                let normalized_depth = mc.depth() as f64 / 3.0;
-                                normalized_depth
-                                    * self.substrate_manager.hot_capability(&self.config)
-                            }
-                        })
-                        .unwrap_or(HOT_DEPTH_DEFAULT); // preserve backward compat when disabled
-                    // Hubris attenuates HOT: can't claim deep self-knowledge while
-                    // morally overconfident. 0.7× during hubris, 1.0× otherwise.
-                    if self.ethics_engine.last_anomaly_report().moral_hubris {
-                        raw_hot * HOT_HUBRIS_CONFIDENCE_DAMPEN as f64
-                    } else {
-                        raw_hot
-                    }
-                },
-                // CPG sync → consciousness coupling (Varela et al. 2001)
-                cpg_sync_index: {
-                    #[cfg(feature = "cpg")]
-                    {
-                        self.cpg_manager.sync_index()
-                    }
-                    #[cfg(not(feature = "cpg"))]
-                    {
                         0.5
-                    } // Neutral: no modulation when CPG disabled
-                },
-                // Cantor metacognitive depth: derived from dream surprise EMA
-                // Higher surprise = richer fractal structure = deeper self-reference
-                cantor_metacognitive_depth: (self.cantor_dream.dream_surprise as f64)
-                    .clamp(0.0, 1.0),
-                // Governance collective Phi: inter-agent consciousness integration
-                governance_collective_phi: {
-                    #[cfg(feature = "mycelix")]
-                    {
-                        self.governance_mgr.last_collective_phi()
-                    }
-                    #[cfg(not(feature = "mycelix"))]
-                    {
-                        0.0
-                    }
-                },
-                // Knowledge grounding: dynamic from KnowledgeManager signals
-                // Science: Barsalou (2008), Clark (2013) — grounded cognition modulates consciousness
-                knowledge_grounding: if let Some(ref km) = self.memory.knowledge_manager {
-                    let s = km.signals();
-                    let grounding = (s.relevance
-                        * super::thresholds::KNOWLEDGE_GROUNDING_RELEVANCE_WEIGHT
-                        + (1.0 - s.uncertainty)
-                            * super::thresholds::KNOWLEDGE_GROUNDING_CERTAINTY_WEIGHT)
-                        .clamp(0.0, 1.0);
-                    if grounding.is_finite() {
-                        grounding
-                    } else {
-                        0.5
-                    }
-                } else {
-                    0.5
-                },
-                // Knowledge coherence: composite quality from graph size, calibration, contradictions.
-                // Formula: (log2(graph_size+1)/10) × (1-ece) × (1/(1 + contradictions×0.1))
-                // Science: Stanovich (2009) — epistemic rationality; Guo et al. (2017) — calibration.
-                knowledge_coherence: if let Some(ref km) = self.memory.knowledge_manager {
-                    let t = km.telemetry();
-                    let log_scale = super::thresholds::KNOWLEDGE_COHERENCE_LOG_SCALE;
-                    let size_factor =
-                        ((t.graph_size as f64 + 1.0).log2() / log_scale).clamp(0.0, 1.0);
-                    let ece_factor = (1.0 - t.calibration_ece).clamp(0.0, 1.0);
-                    let contradiction_factor = 1.0
-                        / (1.0
-                            + t.contradictions_detected as f64
-                                * KNOWLEDGE_CONTRADICTION_FACTOR_DENOM as f64);
-                    let coherence = size_factor * ece_factor * contradiction_factor;
-                    if coherence.is_finite() {
-                        coherence
+                    },
+                    // Knowledge coherence: composite quality from graph size, calibration, contradictions.
+                    // Formula: (log2(graph_size+1)/10) × (1-ece) × (1/(1 + contradictions×0.1))
+                    // Science: Stanovich (2009) — epistemic rationality; Guo et al. (2017) — calibration.
+                    knowledge_coherence: if let Some(ref km) = self.memory.knowledge_manager {
+                        let t = km.telemetry();
+                        let log_scale = super::thresholds::KNOWLEDGE_COHERENCE_LOG_SCALE;
+                        let size_factor =
+                            ((t.graph_size as f64 + 1.0).log2() / log_scale).clamp(0.0, 1.0);
+                        let ece_factor = (1.0 - t.calibration_ece).clamp(0.0, 1.0);
+                        let contradiction_factor = 1.0
+                            / (1.0
+                                + t.contradictions_detected as f64
+                                    * KNOWLEDGE_CONTRADICTION_FACTOR_DENOM as f64);
+                        let coherence = size_factor * ece_factor * contradiction_factor;
+                        if coherence.is_finite() {
+                            coherence
+                        } else {
+                            0.0
+                        }
                     } else {
                         0.0
-                    }
-                } else {
-                    0.0
+                    },
+                    // Glyph coherence: symbolic consciousness field integration
+                    glyph_coherence: {
+                        #[cfg(feature = "glyph_codex")]
+                        {
+                            self.glyph_manager.last_coherence().value
+                        }
+                        #[cfg(not(feature = "glyph_codex"))]
+                        {
+                            0.0
+                        }
+                    },
+                    // CfC temporal coherence → consciousness (Clark 2013)
+                    temporal_coherence_phi: self
+                        .language_comm
+                        .voice_coherence
+                        .bridge
+                        .phi_contribution(),
                 },
-                // Glyph coherence: symbolic consciousness field integration
-                glyph_coherence: {
-                    #[cfg(feature = "glyph_codex")]
-                    {
-                        self.glyph_manager.last_coherence().value
-                    }
-                    #[cfg(not(feature = "glyph_codex"))]
-                    {
-                        0.0
-                    }
-                },
-                // CfC temporal coherence → consciousness (Clark 2013)
-                temporal_coherence_phi: self
-                    .language_comm
-                    .voice_coherence
-                    .bridge
-                    .phi_contribution(),
-            },
-        );
+            )
+        } else {
+            // Engine kill-switch: skip measurement entirely; neutral no-op
+            // output (see ConsciousnessEngineOutput::disabled and the flag doc).
+            super::consciousness_engine::ConsciousnessEngineOutput::disabled()
+        };
         self.consciousness
             .consciousness_engine
             .update_cache(&mut self.carryover.consciousness);

@@ -7,7 +7,7 @@
 //! suitable for FDM 3D printers. Handles preamble/postamble, extrusion
 //! calculation, retraction on long travel moves, and temperature control.
 
-use crate::slicer::{Contour, Point2, Segment2, SliceConfig, SliceLayer};
+use crate::slicer::{Contour, Point2, Segment2, SliceConfig, SliceError, SliceLayer};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -46,6 +46,60 @@ impl Default for ToolpathConfig {
             bed_temp_c: 60,
             nozzle_temp_c: 210,
         }
+    }
+}
+
+/// Invalid toolpath configuration or layer geometry.
+#[derive(Debug, Clone, PartialEq)]
+pub enum GCodeGenerationError {
+    InvalidSliceConfig(SliceError),
+    InvalidConfig(&'static str),
+    EmptyJob,
+    InvalidLayer {
+        layer_index: usize,
+        reason: &'static str,
+    },
+}
+
+impl fmt::Display for GCodeGenerationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidSliceConfig(error) => write!(f, "invalid slice configuration: {error}"),
+            Self::InvalidConfig(field) => write!(f, "invalid toolpath configuration: {field}"),
+            Self::EmptyJob => write!(f, "toolpath job contains no printable geometry"),
+            Self::InvalidLayer {
+                layer_index,
+                reason,
+            } => {
+                write!(f, "invalid layer {layer_index}: {reason}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for GCodeGenerationError {}
+
+impl ToolpathConfig {
+    /// Validate all scalar inputs without coercion.
+    pub fn validate_strict(&self) -> Result<(), GCodeGenerationError> {
+        for (name, value) in [
+            ("print_speed_mm_s", self.print_speed_mm_s),
+            ("travel_speed_mm_s", self.travel_speed_mm_s),
+            ("retract_speed_mm_s", self.retract_speed_mm_s),
+            ("extrusion_width_mm", self.extrusion_width_mm),
+            ("filament_diameter_mm", self.filament_diameter_mm),
+        ] {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(GCodeGenerationError::InvalidConfig(name));
+            }
+        }
+        if !self.retract_distance_mm.is_finite() || self.retract_distance_mm < 0.0 {
+            return Err(GCodeGenerationError::InvalidConfig("retract_distance_mm"));
+        }
+        if self.nozzle_temp_c == 0 {
+            return Err(GCodeGenerationError::InvalidConfig("nozzle_temp_c"));
+        }
+        Ok(())
     }
 }
 
@@ -315,6 +369,64 @@ fn trace_contour(
 /// * `layers` — Sliced layers (from `slice_mesh` or similar).
 /// * `slice_config` — Slice configuration (provides `layer_height`).
 /// * `config` — Toolpath/printer configuration.
+pub fn try_generate_gcode(
+    layers: &[SliceLayer],
+    slice_config: &SliceConfig,
+    config: &ToolpathConfig,
+) -> Result<GCodeProgram, GCodeGenerationError> {
+    slice_config
+        .validate_strict()
+        .map_err(GCodeGenerationError::InvalidSliceConfig)?;
+    config.validate_strict()?;
+    if layers.is_empty()
+        || !layers.iter().any(|layer| {
+            layer
+                .outer_contours
+                .iter()
+                .any(|contour| contour.points.len() >= 2)
+                || layer
+                    .inner_contours
+                    .iter()
+                    .any(|contour| contour.points.len() >= 2)
+                || layer
+                    .infill_lines
+                    .iter()
+                    .any(|segment| segment.length() > 0.0)
+        })
+    {
+        return Err(GCodeGenerationError::EmptyJob);
+    }
+
+    for (layer_index, layer) in layers.iter().enumerate() {
+        if !layer.z.is_finite() || layer.z < 0.0 {
+            return Err(GCodeGenerationError::InvalidLayer {
+                layer_index,
+                reason: "z must be finite and non-negative",
+            });
+        }
+        let invalid_point = layer
+            .outer_contours
+            .iter()
+            .chain(layer.inner_contours.iter())
+            .flat_map(|contour| contour.points.iter())
+            .chain(
+                layer
+                    .infill_lines
+                    .iter()
+                    .flat_map(|segment| [&segment.start, &segment.end]),
+            )
+            .any(|point| !point.x.is_finite() || !point.y.is_finite());
+        if invalid_point {
+            return Err(GCodeGenerationError::InvalidLayer {
+                layer_index,
+                reason: "coordinates must be finite",
+            });
+        }
+    }
+
+    Ok(generate_gcode(layers, slice_config, config))
+}
+
 pub fn generate_gcode(
     layers: &[SliceLayer],
     slice_config: &SliceConfig,
@@ -505,6 +617,61 @@ pub fn generate_gcode(
 mod tests {
     use super::*;
     use crate::slicer::{Segment2, SliceConfig};
+
+    #[test]
+    fn strict_gcode_rejects_empty_job() {
+        assert!(matches!(
+            try_generate_gcode(&[], &SliceConfig::default(), &ToolpathConfig::default()),
+            Err(GCodeGenerationError::EmptyJob)
+        ));
+
+        let empty_layer = vec![SliceLayer {
+            z: 0.2,
+            outer_contours: vec![],
+            inner_contours: vec![],
+            infill_lines: vec![],
+        }];
+        assert!(matches!(
+            try_generate_gcode(
+                &empty_layer,
+                &SliceConfig::default(),
+                &ToolpathConfig::default(),
+            ),
+            Err(GCodeGenerationError::EmptyJob)
+        ));
+    }
+
+    #[test]
+    fn strict_gcode_rejects_zero_filament_diameter() {
+        let config = ToolpathConfig {
+            filament_diameter_mm: 0.0,
+            ..Default::default()
+        };
+        let error = try_generate_gcode(&single_layer(), &SliceConfig::default(), &config)
+            .err()
+            .expect("invalid filament diameter must fail");
+        assert_eq!(
+            error,
+            GCodeGenerationError::InvalidConfig("filament_diameter_mm")
+        );
+    }
+
+    #[test]
+    fn strict_gcode_rejects_non_finite_layer_coordinates() {
+        let mut layers = single_layer();
+        layers[0].outer_contours[0].points[0].x = f32::NAN;
+        let error =
+            try_generate_gcode(&layers, &SliceConfig::default(), &ToolpathConfig::default())
+                .err()
+                .expect("non-finite layer coordinates must fail");
+        assert_eq!(
+            error,
+            GCodeGenerationError::InvalidLayer {
+                layer_index: 0,
+                reason: "coordinates must be finite",
+            }
+        );
+    }
 
     fn square_contour() -> Contour {
         Contour {

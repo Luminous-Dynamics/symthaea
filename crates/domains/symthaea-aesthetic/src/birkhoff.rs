@@ -52,7 +52,9 @@ impl BirkhoffFeatures {
     /// Weights: 0.4 × symmetry + 0.4 × harmony_balance + 0.2 × consciousness_coupling
     /// (matching the original canvas implementation).
     pub fn order(&self) -> f32 {
-        0.4 * self.symmetry + 0.4 * self.harmony_balance + 0.2 * self.consciousness_coupling
+        0.4 * finite_unit(self.symmetry)
+            + 0.4 * finite_unit(self.harmony_balance)
+            + 0.2 * finite_unit(self.consciousness_coupling)
     }
 
     /// Compute complexity: weighted combination of structural, topological,
@@ -60,17 +62,35 @@ impl BirkhoffFeatures {
     ///
     /// Returns a minimum of 0.01 to avoid division by zero.
     pub fn complexity(&self) -> f32 {
-        (0.5 * self.structural_complexity
-            + 0.3 * self.topological_complexity
-            + 0.2 * self.diversity)
-            .clamp(0.01, 1.0)
+        (0.5 * finite_unit(self.structural_complexity)
+            + 0.3 * finite_unit(self.topological_complexity)
+            + 0.2 * finite_unit(self.diversity))
+        .clamp(0.01, 1.0)
     }
 
-    /// Compute the Birkhoff measure M = O / C, clamped to [0, 1].
+    /// Compute the unbounded classical Birkhoff ratio M = O / C.
+    ///
+    /// This is exposed for diagnostics and comparison with historical uses of
+    /// the measure. Consumers should generally prefer [`Self::birkhoff`],
+    /// which calibrates the ratio without saturating half of the input space.
+    pub fn birkhoff_raw_ratio(&self) -> f32 {
+        self.order().max(0.0) / self.complexity()
+    }
+
+    /// Compute a calibrated Birkhoff measure in [0, 1].
+    ///
+    /// A direct `clamp(order / complexity, 0, 1)` collapses every ratio above
+    /// one to the same perfect score. We instead map the log-ratio through a
+    /// logistic curve. A ratio of one maps to 0.5, larger ratios approach one,
+    /// and smaller ratios approach zero while preserving rank information.
     pub fn birkhoff(&self) -> f32 {
-        let o = self.order();
-        let c = self.complexity();
-        (o / c).clamp(0.0, 1.0)
+        let order = self.order().max(0.0);
+        if order <= f32::EPSILON {
+            return 0.0;
+        }
+
+        let log_ratio = (order / self.complexity()).ln();
+        1.0 / (1.0 + (-1.5 * log_ratio).exp())
     }
 
     /// Compute a full `AestheticScore` from these features.
@@ -83,7 +103,12 @@ impl BirkhoffFeatures {
         let birkhoff = self.birkhoff();
 
         // Harmony: average activation of the Eight Harmonies
-        let harmony_mean: f32 = self.harmony_activations.iter().sum::<f32>() / 8.0;
+        let harmony_mean: f32 = self
+            .harmony_activations
+            .iter()
+            .map(|&activation| finite_unit(activation))
+            .sum::<f32>()
+            / 8.0;
 
         let mut score = AestheticScore {
             order,
@@ -111,31 +136,36 @@ pub fn extract_common_features(
     diversity: f32,
 ) -> BirkhoffFeatures {
     // Symmetry: how evenly distributed harmony activations are
-    let mean: f32 = harmony_activations.iter().sum::<f32>() / 8.0;
+    let sanitized: [f32; 8] = std::array::from_fn(|i| finite_unit(harmony_activations[i]));
+    let mean: f32 = sanitized.iter().sum::<f32>() / 8.0;
     let symmetry = if mean < 0.01 {
         0.0
     } else {
-        let variance: f32 = harmony_activations
-            .iter()
-            .map(|r| (r - mean).powi(2))
-            .sum::<f32>()
-            / 8.0;
+        let variance: f32 = sanitized.iter().map(|r| (r - mean).powi(2)).sum::<f32>() / 8.0;
         let cv = variance.sqrt() / mean;
         (1.0 - cv).clamp(0.0, 1.0)
     };
 
     // Harmony balance: fraction of harmonies above 0.3 threshold
-    let active = harmony_activations.iter().filter(|&&r| r > 0.3).count();
+    let active = sanitized.iter().filter(|&&r| r > 0.3).count();
     let harmony_balance = (active as f32) / 8.0;
 
     BirkhoffFeatures {
         symmetry,
         harmony_balance,
-        consciousness_coupling: consciousness_level.clamp(0.0, 1.0),
-        structural_complexity: structural_complexity.clamp(0.0, 1.0),
-        topological_complexity: topological_complexity.clamp(0.0, 1.0),
-        diversity: diversity.clamp(0.0, 1.0),
-        harmony_activations: *harmony_activations,
+        consciousness_coupling: finite_unit(consciousness_level),
+        structural_complexity: finite_unit(structural_complexity),
+        topological_complexity: finite_unit(topological_complexity),
+        diversity: finite_unit(diversity),
+        harmony_activations: sanitized,
+    }
+}
+
+fn finite_unit(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        0.0
     }
 }
 
@@ -230,6 +260,22 @@ mod tests {
     }
 
     #[test]
+    fn calibrated_birkhoff_does_not_hard_saturate() {
+        let features = BirkhoffFeatures {
+            symmetry: 1.0,
+            harmony_balance: 1.0,
+            consciousness_coupling: 1.0,
+            structural_complexity: 0.1,
+            topological_complexity: 0.1,
+            diversity: 0.1,
+            harmony_activations: [1.0; 8],
+        };
+        assert!(features.birkhoff_raw_ratio() > 1.0);
+        assert!(features.birkhoff() < 1.0);
+        assert!(features.birkhoff() > 0.5);
+    }
+
+    #[test]
     fn complexity_never_zero() {
         let features = BirkhoffFeatures {
             symmetry: 0.5,
@@ -241,5 +287,21 @@ mod tests {
             harmony_activations: [0.5; 8],
         };
         assert!(features.complexity() >= 0.01);
+    }
+
+    #[test]
+    fn non_finite_features_do_not_poison_scores() {
+        let features = BirkhoffFeatures {
+            symmetry: f32::NAN,
+            harmony_balance: f32::INFINITY,
+            consciousness_coupling: 0.5,
+            structural_complexity: f32::NAN,
+            topological_complexity: 0.5,
+            diversity: 0.5,
+            harmony_activations: [f32::NAN; 8],
+        };
+        let score = features.to_score();
+        assert!(score.composite.is_finite());
+        assert!(score.birkhoff.is_finite());
     }
 }

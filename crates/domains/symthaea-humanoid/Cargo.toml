@@ -22,15 +22,27 @@ anyhow = { workspace = true }
 # MuJoCo bindings (optional — required for full contact dynamics)
 mujoco-rs = { version = "4.0.1", optional = true, features = ["auto-download-mujoco"] }
 symthaea-vision-manifold = { version = "0.1.0", path = "../symthaea-vision-manifold" }
+osqp = { version = "1.0.1", optional = true }
 
 [dev-dependencies]
 approx = "0.5"
+# Only examples/run_perception_climb.rs uses the vision manifold — dev-dep so
+# the default robotics build doesn't pull the whole vision stack (review P2.4).
+symthaea-vision-manifold = { version = "0.1.0", path = "../symthaea-vision-manifold" }
+
+# run_perception_climb needs the MuJoCo simulator; without this declaration
+# a plain `cargo check --examples` tried (and failed) to build it featureless.
+[[example]]
+name = "run_perception_climb"
+required-features = ["mujoco"]
 
 [features]
 default = []
 mujoco = ["dep:mujoco-rs"]
 viewer = ["mujoco", "mujoco-rs/viewer"]
+osqp-backend = ["dep:osqp"]
 
-[[example]]
-name = "run_perception_climb"
+[[bin]]
+name = "symthaea_mujoco_oracle_worker"
+path = "src/bin/symthaea_mujoco_oracle_worker.rs"
 required-features = ["mujoco"]

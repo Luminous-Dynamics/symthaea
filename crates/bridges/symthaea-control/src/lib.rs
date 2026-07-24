@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: Apache-2.0 OR MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Trajectory optimisation, state estimation, and control primitives for Symthaea.
 //!
 //! # Provided Primitives
@@ -7,7 +7,7 @@
 //! - [`KalmanFilter`] — Discrete-time linear Kalman filter (predict / update)
 //! - [`LinearMpc`] — Unconstrained linear MPC via batch prediction matrices
 //! - [`LqgController`] — LQG = LQR + Kalman (output-feedback optimal control)
-//! - [`HInfBound`] — H-∞ robustness metric (structured singular value upper bound)
+//! - [`StaticSmallGainBound`] — static induced-norm bound from the small-gain theorem
 //! - [`LyapunovChecker`] — Verifies Lyapunov stability for a closed-loop system
 //! - [`ConsciousnessGainScheduler`] — Scales control gains by Φ (phi) level
 //!
@@ -415,36 +415,45 @@ impl LinearMpc {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// H-∞ Robustness Bound
+// Static small-gain bound
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// H-∞ robustness analysis via the structured singular value (μ) upper bound.
+/// Static small-gain sufficient condition using an induced 2-norm.
 ///
-/// For a closed-loop system with gain matrix `K` and plant `A`, computes an
-/// upper bound on the H-∞ norm of the sensitivity function `(I − K A)^{-1}`.
-/// A small bound (< 1) indicates robust stability against bounded perturbations.
+/// For compatible static matrices `K` and `A`, this computes
+/// `1 / (1 - ‖KA‖₂)` when `‖KA‖₂ < 1`. The returned sensitivity upper bound is
+/// always at least one. This is not a frequency-domain H∞ norm calculation and
+/// not a structured singular value (μ) bound.
 ///
 /// # Background
-/// The H-∞ norm of a transfer function bounds the worst-case amplification of
-/// exogenous disturbances.  We approximate it as:
 /// `‖(I − KA)^{-1}‖₂ ≤ 1 / (1 − ‖KA‖₂)`
 /// when `‖KA‖₂ < 1` (small-gain theorem).
-pub struct HInfBound;
+pub struct StaticSmallGainBound;
 
-impl HInfBound {
+impl StaticSmallGainBound {
     /// Compute the spectral norm upper bound for the sensitivity operator
     /// `(I − KA)^{-1}` using the small-gain theorem.
     ///
     /// Returns `Err(ControlError::NotStable)` if the open-loop gain `‖KA‖₂ ≥ 1`
     /// (the bound is not finite, so stability cannot be certified this way).
     pub fn sensitivity_bound(k: &DMatrix<f64>, a: &DMatrix<f64>) -> Result<f64, ControlError> {
-        if k.ncols() != a.nrows() {
+        if k.ncols() != a.nrows() || k.nrows() != a.ncols() {
             return Err(ControlError::InvalidDimension(
-                "K columns must match A rows for K·A product".into(),
+                "K·A must be a square operator".into(),
+            ));
+        }
+        if !k.iter().chain(a.iter()).all(|value| value.is_finite()) {
+            return Err(ControlError::InvalidParameter(
+                "small-gain matrices must contain only finite values".into(),
             ));
         }
         let ka = k * a;
         let sigma_max = Self::spectral_norm(&ka);
+        if !sigma_max.is_finite() {
+            return Err(ControlError::InvalidParameter(
+                "spectral norm calculation produced a non-finite value".into(),
+            ));
+        }
         if sigma_max >= 1.0 {
             return Err(ControlError::NotStable);
         }
@@ -477,11 +486,24 @@ impl HInfBound {
         lambda_max.sqrt().max(0.0)
     }
 
-    /// Returns `true` if the small-gain theorem certifies robust stability.
-    pub fn is_robustly_stable(k: &DMatrix<f64>, a: &DMatrix<f64>) -> bool {
+    /// Returns `true` when the static small-gain sufficient condition holds.
+    pub fn certifies_small_gain(k: &DMatrix<f64>, a: &DMatrix<f64>) -> bool {
         Self::sensitivity_bound(k, a).is_ok()
     }
+
+    /// Backward-compatible predicate name.
+    #[deprecated(note = "use certifies_small_gain; this is only a sufficient static condition")]
+    pub fn is_robustly_stable(k: &DMatrix<f64>, a: &DMatrix<f64>) -> bool {
+        Self::certifies_small_gain(k, a)
+    }
 }
+
+/// Backward-compatible name for the former API. This type does not compute an
+/// H∞ norm or a structured singular value.
+#[deprecated(
+    note = "use StaticSmallGainBound; this is a static induced-norm bound, not H-infinity"
+)]
+pub type HInfBound = StaticSmallGainBound;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lyapunov Stability Checker
@@ -593,22 +615,21 @@ impl LyapunovChecker {
 /// Consciousness-gated adaptive gain scheduler.
 ///
 /// Scales the LQR feedback gain matrix **K** by a factor derived from the
-/// current Integrated Information (Φ) level.  Higher Φ → more conservative
-/// control (lower gain, softer actuation); lower Φ → more aggressive recovery.
+/// current Integrated Information (Φ) level. Low or invalid Φ reduces control
+/// authority; high Φ restores at most the nominal gain.
 ///
 /// # Rationale
 /// In Symthaea's architecture the consciousness level modulates confidence in
-/// the internal world model.  High Φ indicates strong self-model coherence, so
-/// small control corrections suffice.  Low Φ (distress, uncertainty) warrants
-/// stronger corrective action.
+/// the internal world model. Uncertainty must not amplify actuator commands, so
+/// the default schedule stays in `[0.4, 1.0]`.
 ///
 /// The mapping used is a logistic schedule:
-/// `α(Φ) = α_min + (α_max − α_min) · σ(−k · (Φ − Φ_mid))`
+/// `α(Φ) = α_min + (α_max − α_min) · σ(k · (Φ − Φ_mid))`
 /// where σ is the logistic sigmoid and k is the schedule steepness.
 pub struct ConsciousnessGainScheduler {
-    /// Minimum gain scale (at Φ = 1.0, maximum consciousness)
+    /// Minimum gain scale (approached at Φ = 0.0)
     pub alpha_min: f64,
-    /// Maximum gain scale (at Φ = 0.0, minimum consciousness)
+    /// Maximum gain scale (approached at Φ = 1.0); must not exceed 1.0
     pub alpha_max: f64,
     /// Midpoint of Φ at which α = (α_min + α_max) / 2
     pub phi_mid: f64,
@@ -620,7 +641,7 @@ impl Default for ConsciousnessGainScheduler {
     fn default() -> Self {
         Self {
             alpha_min: 0.4,
-            alpha_max: 1.6,
+            alpha_max: 1.0,
             phi_mid: 0.5,
             steepness: 8.0,
         }
@@ -630,10 +651,27 @@ impl Default for ConsciousnessGainScheduler {
 impl ConsciousnessGainScheduler {
     /// Compute the gain scale α ∈ [α_min, α_max] for a given Φ ∈ [0, 1].
     ///
-    /// `phi` is clamped to [0, 1] before evaluation.
+    /// Finite `phi` is clamped to [0, 1]. A non-finite value is treated as
+    /// minimum confidence. Invalid scheduler parameters return zero authority.
     pub fn alpha(&self, phi: f64) -> f64 {
-        let phi = phi.clamp(0.0, 1.0);
-        let sigma = 1.0 / (1.0 + (self.steepness * (phi - self.phi_mid)).exp());
+        if !self.alpha_min.is_finite()
+            || !self.alpha_max.is_finite()
+            || !self.phi_mid.is_finite()
+            || !self.steepness.is_finite()
+            || self.alpha_min < 0.0
+            || self.alpha_min > self.alpha_max
+            || self.alpha_max > 1.0
+            || !(0.0..=1.0).contains(&self.phi_mid)
+            || self.steepness <= 0.0
+        {
+            return 0.0;
+        }
+        let phi = if phi.is_finite() {
+            phi.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let sigma = 1.0 / (1.0 + (-self.steepness * (phi - self.phi_mid)).exp());
         self.alpha_min + (self.alpha_max - self.alpha_min) * sigma
     }
 
@@ -834,32 +872,40 @@ mod tests {
         assert!(matches!(result, Err(ControlError::InvalidDimension(_))));
     }
 
-    // ── H-∞ Bound ───────────────────────────────────────────────────────────
+    // ── Static small-gain bound ─────────────────────────────────────────────
 
     #[test]
-    fn test_hinf_small_gain_stable() {
+    fn test_static_small_gain_condition_holds() {
         // Stable if ‖KA‖₂ < 1 — use a gain and plant that satisfy this
-        let k = DMatrix::from_row_slice(1, 2, &[0.1, 0.1]);
+        let k = DMatrix::from_row_slice(2, 2, &[0.1, 0.0, 0.0, 0.1]);
         let a = DMatrix::from_row_slice(2, 2, &[0.5, 0.0, 0.0, 0.5]);
-        let bound = HInfBound::sensitivity_bound(&k, &a).unwrap();
+        let bound = StaticSmallGainBound::sensitivity_bound(&k, &a).unwrap();
         assert!(bound > 1.0, "Sensitivity bound must be ≥ 1");
         assert!(bound < 100.0, "Bound should be finite for stable system");
-        assert!(HInfBound::is_robustly_stable(&k, &a));
+        assert!(StaticSmallGainBound::certifies_small_gain(&k, &a));
     }
 
     #[test]
-    fn test_hinf_unstable_system() {
+    fn test_static_small_gain_condition_fails() {
         // Gain × plant spectral norm > 1 → NotStable
         let k = DMatrix::from_row_slice(2, 2, &[5.0, 0.0, 0.0, 5.0]);
         let a = DMatrix::from_row_slice(2, 2, &[2.0, 0.0, 0.0, 2.0]);
-        let result = HInfBound::sensitivity_bound(&k, &a);
+        let result = StaticSmallGainBound::sensitivity_bound(&k, &a);
         assert!(matches!(result, Err(ControlError::NotStable)));
+    }
+
+    #[test]
+    fn test_static_small_gain_rejects_non_finite_input() {
+        let k = DMatrix::from_row_slice(1, 1, &[f64::NAN]);
+        let a = DMatrix::from_row_slice(1, 1, &[0.5]);
+        let result = StaticSmallGainBound::sensitivity_bound(&k, &a);
+        assert!(matches!(result, Err(ControlError::InvalidParameter(_))));
     }
 
     #[test]
     fn test_spectral_norm_identity() {
         let m = DMatrix::<f64>::identity(3, 3);
-        let sigma = HInfBound::spectral_norm(&m);
+        let sigma = StaticSmallGainBound::spectral_norm(&m);
         assert!((sigma - 1.0).abs() < 0.01, "σ_max(I) = 1, got {sigma}");
     }
 
@@ -921,14 +967,15 @@ mod tests {
     // ── Consciousness Gain Scheduler ────────────────────────────────────────
 
     #[test]
-    fn test_gain_scheduler_high_phi_reduces_gain() {
+    fn test_gain_scheduler_low_phi_reduces_authority() {
         let scheduler = ConsciousnessGainScheduler::default();
         let alpha_high = scheduler.alpha(0.95);
         let alpha_low = scheduler.alpha(0.05);
         assert!(
-            alpha_high < alpha_low,
-            "High Φ should produce lower gain scale: α(0.95)={alpha_high:.4}, α(0.05)={alpha_low:.4}"
+            alpha_low < alpha_high,
+            "Low Φ should produce lower gain scale: α(0.05)={alpha_low:.4}, α(0.95)={alpha_high:.4}"
         );
+        assert!(alpha_high <= 1.0, "scheduler must not amplify nominal gain");
     }
 
     #[test]
@@ -950,6 +997,17 @@ mod tests {
         let a2 = scheduler.alpha(1.5);
         assert!((a1 - scheduler.alpha(0.0)).abs() < 1e-9);
         assert!((a2 - scheduler.alpha(1.0)).abs() < 1e-9);
+        assert!((scheduler.alpha(f64::NAN) - scheduler.alpha(0.0)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_gain_scheduler_invalid_config_removes_authority() {
+        let scheduler = ConsciousnessGainScheduler {
+            alpha_max: 1.5,
+            ..ConsciousnessGainScheduler::default()
+        };
+
+        assert_eq!(scheduler.alpha(0.5), 0.0);
     }
 
     #[test]

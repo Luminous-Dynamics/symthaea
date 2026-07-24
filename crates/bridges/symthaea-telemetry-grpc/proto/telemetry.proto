@@ -39,6 +39,8 @@ message TelemetryFrame {
   double self_awareness = 14;
   // Topological unity (the Phi_master multiplicative invariant)
   double topological_unity = 15;
+  // Active inference motor command type string
+  string motor_command = 16;
 }
 
 message MentalMovieFrame {

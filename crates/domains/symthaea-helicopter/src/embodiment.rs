@@ -16,24 +16,12 @@ pub use symthaea_core::embodiment::{
 
 use crate::controller::HelicopterController;
 use crate::encoder::HelicopterHdcEncoder;
+use crate::safety_envelope::FlightAuthorityPolicy;
 use crate::simulator::{HelicopterPhysicsSimulator, SimpleHelicopterSimulator};
 use crate::types::HelicopterConfig;
 
-/// Multi-stage emergency fallback for helicopter.
-///
-/// Real helicopter pilots follow a procedure:
-///   1. Stabilize hover (try to hold position)
-///   2. If hover impossible: controlled descent (autorotation profile)
-///   3. Near ground: flare + touchdown
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HelicopterFallbackStage {
-    /// Stage 1: Try to hover in place. Stop drifting, maintain altitude.
-    StabilizeHover,
-    /// Stage 2: Controlled autorotation descent if hover failed.
-    AutorotationDescent,
-    /// Stage 3: Flare maneuver near ground (< 5m AGL).
-    Touchdown,
-}
+use crate::emergency_landing::EmergencyLandingController;
+pub use crate::emergency_landing::HelicopterFallbackStage;
 
 /// Helicopter embodiment bridge.
 ///
@@ -50,10 +38,10 @@ pub struct HelicopterEmbodiment {
     moral_safety: Option<MotorSafetyLevel>,
     last_control_effort: f32,
     last_prediction_error: f32,
-    /// Multi-stage fallback state.
-    fallback_stage: HelicopterFallbackStage,
-    /// Cycles spent in the current fallback stage (for timeout-based escalation).
-    fallback_cycles_in_stage: u32,
+    /// Canonical time-based emergency fallback controller.
+    emergency_landing: EmergencyLandingController,
+    /// Explicit Green/Yellow/Orange flight-envelope policy.
+    authority_policy: FlightAuthorityPolicy,
 }
 
 impl HelicopterEmbodiment {
@@ -75,8 +63,8 @@ impl HelicopterEmbodiment {
             moral_safety: None,
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
-            fallback_stage: HelicopterFallbackStage::StabilizeHover,
-            fallback_cycles_in_stage: 0,
+            emergency_landing: EmergencyLandingController::new(),
+            authority_policy: FlightAuthorityPolicy::new(),
         }
     }
 
@@ -97,47 +85,9 @@ impl HelicopterEmbodiment {
             };
     }
 
-    /// Update fallback stage based on current state and time-in-stage.
-    fn update_fallback_stage(&mut self) {
-        let state = self.simulator.state();
-        let altitude = state.altitude();
-        let vertical_speed = state.linear_velocity[2]; // negative = descending
-
-        match self.fallback_stage {
-            HelicopterFallbackStage::StabilizeHover => {
-                // If we're descending fast (>2 m/s) for more than 100 cycles → escalate
-                if vertical_speed < -2.0 && self.fallback_cycles_in_stage > 100 {
-                    self.fallback_stage = HelicopterFallbackStage::AutorotationDescent;
-                    self.fallback_cycles_in_stage = 0;
-                }
-                // If we're below 10m AGL → escalate to touchdown
-                if altitude < 10.0 {
-                    self.fallback_stage = HelicopterFallbackStage::Touchdown;
-                    self.fallback_cycles_in_stage = 0;
-                }
-            }
-            HelicopterFallbackStage::AutorotationDescent => {
-                // Approach ground → flare for touchdown
-                if altitude < 5.0 {
-                    self.fallback_stage = HelicopterFallbackStage::Touchdown;
-                    self.fallback_cycles_in_stage = 0;
-                }
-            }
-            HelicopterFallbackStage::Touchdown => {
-                // Stay in touchdown until on ground
-            }
-        }
-    }
-
-    /// Reset the fallback state machine (call when exiting Red tier).
-    fn reset_fallback_stage(&mut self) {
-        self.fallback_stage = HelicopterFallbackStage::StabilizeHover;
-        self.fallback_cycles_in_stage = 0;
-    }
-
     /// Current fallback stage (for telemetry/testing).
     pub fn fallback_stage(&self) -> HelicopterFallbackStage {
-        self.fallback_stage
+        self.emergency_landing.stage()
     }
 
     pub fn set_safety_override(&mut self, level: MotorSafetyLevel) {
@@ -160,8 +110,6 @@ impl HelicopterEmbodiment {
         if let Some(m) = self.moral_safety {
             self.current_safety = self.current_safety.max(m);
         }
-        let gain = self.current_safety.motor_gain();
-
         let mut cmd = self.controller.forward(thought_hv, dt);
 
         // ── MULTI-STAGE SAFE FALLBACK for Red tier ──────────────
@@ -170,56 +118,23 @@ impl HelicopterEmbodiment {
         //   Stage 2: Autorotation descent (if hover impossible)
         //   Stage 3: Touchdown flare (near ground)
         if matches!(self.current_safety, MotorSafetyLevel::Red) {
-            self.fallback_cycles_in_stage += 1;
-            self.update_fallback_stage();
-
-            match self.fallback_stage {
-                HelicopterFallbackStage::StabilizeHover => {
-                    // Try to hover: maintain hover thrust, level cyclic
-                    cmd.collective = 0.55; // Hover collective
-                    cmd.cyclic_lon = 0.0; // Level pitch
-                    cmd.cyclic_lat = 0.0; // Level roll
-                    cmd.pedal = 0.0; // Centered yaw
-                    cmd.thrust = 0.6; // Hover thrust
-                    cmd.tail_rotor = 0.5; // Anti-torque for hover
-                }
-                HelicopterFallbackStage::AutorotationDescent => {
-                    // Engine cut + windmilling rotor
-                    cmd.collective = 0.15; // Low positive pitch → windmill
-                    cmd.cyclic_lon = 0.0; // Level pitch
-                    cmd.cyclic_lat = 0.0; // Level roll
-                    cmd.pedal = 0.0; // Centered yaw
-                    cmd.thrust = 0.0; // Engine OFF
-                    cmd.tail_rotor = 0.1; // Minimal anti-torque
-                }
-                HelicopterFallbackStage::Touchdown => {
-                    // Flare maneuver: increase collective to cushion landing
-                    cmd.collective = 0.4; // Flare pitch
-                    cmd.cyclic_lon = -0.1; // Slight nose-up
-                    cmd.cyclic_lat = 0.0;
-                    cmd.pedal = 0.0;
-                    cmd.thrust = 0.2; // Restart cushion thrust
-                    cmd.tail_rotor = 0.3;
-                }
-            }
+            cmd = self
+                .emergency_landing
+                .command(self.simulator.state(), dt as f64);
         } else {
-            // Not in Red — reset fallback state machine
-            self.reset_fallback_stage();
-            if gain < 1.0 {
-                // Yellow/Orange: scaled authority but pilot retains control
-                cmd.collective *= gain;
-                cmd.cyclic_lon *= gain;
-                cmd.cyclic_lat *= gain;
-                cmd.pedal *= gain;
-                cmd.thrust *= gain;
-                cmd.tail_rotor *= gain;
-            }
+            // Not in Red — reset the canonical fallback state machine.
+            self.emergency_landing.reset();
         }
+        cmd = self
+            .authority_policy
+            .apply(self.current_safety, self.simulator.state(), cmd);
 
         self.last_control_effort = cmd.control_effort();
         self.simulator.step(&cmd, dt as f64);
 
-        let perception = self.encoder.encode(self.simulator.state());
+        let perception = self
+            .encoder
+            .encode_with_dt(self.simulator.state(), dt as f64);
 
         let pred_error = if let Some(ref prev) = self.last_perception {
             let sim = perception.similarity(prev);
@@ -263,8 +178,8 @@ impl HelicopterEmbodiment {
         self.moral_safety = None;
         self.last_control_effort = 0.0;
         self.last_prediction_error = 0.0;
-        self.fallback_stage = HelicopterFallbackStage::StabilizeHover;
-        self.fallback_cycles_in_stage = 0;
+        self.emergency_landing.reset();
+        self.authority_policy.reset();
     }
 
     pub fn safety_level(&self) -> MotorSafetyLevel {
@@ -283,7 +198,7 @@ impl HelicopterEmbodiment {
             total_steps: self.total_steps as u64,
             control_effort: self.last_control_effort,
             prediction_error: self.last_prediction_error,
-            safety_level: format!("{:?}", self.current_safety),
+            safety_level: self.current_safety,
             platform: "helicopter".to_string(),
             num_actuators: 6,
             epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
@@ -331,16 +246,17 @@ impl symthaea_core::embodiment::EmbodimentBridge for HelicopterEmbodiment {
 
 /// SafeFallback for Helicopter — Multi-Stage Emergency Procedure.
 ///
-/// Real helicopter pilots follow a tiered procedure. Symthaea mirrors this:
+/// The simulator uses a conservative tiered policy inspired by rotorcraft
+/// emergency-control objectives:
 ///
 ///   Stage 1 — StabilizeHover: First try to hold position. Hover thrust + level cyclic.
-///             Escalates if descent rate >2 m/s for >100 cycles, OR altitude <10m.
+///             Escalates using elapsed time, descent rate, rotor RPM, and altitude.
 ///   Stage 2 — AutorotationDescent: Engine cut, windmilling rotor for controlled descent.
 ///             Escalates to Touchdown when altitude <5m.
 ///   Stage 3 — Touchdown: Flare maneuver — increased collective + slight nose-up to
 ///             cushion the landing.
 ///
-/// This mirrors FAA emergency procedure 27.143 (Engine failure in flight).
+/// This is a simulation fallback policy, not an FAA procedure or certified controller.
 impl SafeFallback for HelicopterEmbodiment {
     fn platform_name(&self) -> &'static str {
         "helicopter"
@@ -362,6 +278,7 @@ impl SafeFallback for HelicopterEmbodiment {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::HelicopterCommand;
 
     fn make_bridge() -> HelicopterEmbodiment {
         let genesis = GenesisSeed::from_phrase("test-heli-embodiment");
@@ -404,11 +321,11 @@ mod tests {
             result.control_effort > 0.0,
             "Red fallback must command a staged hover, not dead motors"
         );
-        // Stage 1 hover command: collective 0.55, thrust 0.6, tail 0.5,
-        // cyclic/pedal zeroed → effort = 1.65/6 = 0.275
+        // Stable Red entry uses the same calibrated hover backbone rather than
+        // a hard-coded over-collective command.
         assert!(
-            (result.control_effort - 0.275).abs() < 1e-4,
-            "expected StabilizeHover effort 0.275, got {}",
+            (result.control_effort - HelicopterCommand::hover().control_effort()).abs() < 1e-4,
+            "expected calibrated hover effort, got {}",
             result.control_effort
         );
     }

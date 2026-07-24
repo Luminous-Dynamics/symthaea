@@ -21,7 +21,7 @@
 //! ## Safety Guarantee
 //!
 //! Safety architecture (Phase 3) is built *before* any dialogue generation.
-//! The `ScopeGuard` architecturally prevents diagnostic claims and prescriptions.
+//! The `ScopeGuard` fail-closed boundary discards diagnostic claims and prescriptions.
 //!
 //! Science: Bordin (1979), Safran & Muran (2000), Gross (2015), Beck (1979),
 //! APA Ethics Code (2017).
@@ -32,23 +32,53 @@ pub mod client_model;
 pub mod dream_integration;
 pub mod ethical_constraints;
 pub mod formulation;
+pub mod jurisdiction;
 pub mod narrative_integration;
+pub mod privacy;
 pub mod safety;
 pub mod scope_guard;
+mod semantic_encoding;
 pub mod shadow;
+pub mod uncertainty;
 
-// Research directions
+// Research directions are excluded from default builds. These modules expose
+// exploratory simulations, not clinical decision tools.
+#[cfg(feature = "experimental-consciousness-protocols")]
 pub mod consciousness_protocols;
+#[cfg(feature = "experimental-computational-psychiatry")]
 pub mod digital_twin_psychiatry;
+#[cfg(feature = "experimental-consciousness-protocols")]
 pub mod twin_therapeutic_bridge;
 
 pub use affect_regulation::{RegulationEngine, RegulationStrategy};
 pub use alliance::{RuptureType, TherapeuticAlliance};
-pub use client_model::{ClientModel, OutcomeSummary};
+#[cfg(feature = "legacy-clinical-scale-analogues")]
+pub use client_model::OutcomeSummary;
+pub use client_model::{
+    ClientModel, InferredOutcomeMetrics, InstrumentAdministrationStatus, OutcomeMetricSource,
+};
 pub use dream_integration::TherapeuticAction;
-pub use ethical_constraints::{EthicalConstraint, EthicalEvaluation};
+pub use ethical_constraints::{
+    EthicalBlocker, EthicalConstraint, EthicalContext, EthicalEvaluation, EthicalEvaluator,
+};
 pub use formulation::CaseFormulation;
+pub use jurisdiction::{
+    CrisisResource, CrisisResourceKind, JurisdictionId, JurisdictionPolicy,
+    JurisdictionPolicyError, MandatoryReportingRule, ReportingAction,
+};
 pub use narrative_integration::{NarrativeFragment, TherapeuticNarrative};
-pub use safety::{CrisisAlert, CrisisDetector, CrisisType, EscalationAction, SafetyPlan};
-pub use scope_guard::{ScopeGuard, ScopeViolation};
+pub use privacy::{
+    RedactedClientSnapshot, RedactedFormulationSummary, RedactedNarrativeSummary,
+    RedactedSafetyPlanSummary, RedactedShadowFragment, RedactedShadowSummary,
+    TherapeuticDataCategory, TherapeuticDataClass,
+};
+pub use safety::{
+    CrisisAlert, CrisisAssertionContext, CrisisDetector, CrisisDisposition, CrisisResourceRegion,
+    CrisisType, EscalationAction, SafetyPlan,
+};
+pub use scope_guard::{GuardedResponse, ScopeGuard, ScopeViolation};
 pub use shadow::{ShadowDetector, ShadowSnapshot, ShadowTelemetry};
+pub use uncertainty::{
+    AbstentionPolicy, AbstentionReason, EstimateDecision, EstimateEnvelope, EstimateSource,
+    EstimateUse,
+};

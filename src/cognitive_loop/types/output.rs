@@ -41,6 +41,17 @@ pub struct CycleResult {
     pub detected_primitives: Vec<String>,
     pub learning_occurred: bool,
     pub training_loss: Option<f32>,
+    /// Relative predictive "bits saved" vs the persistence baseline
+    /// (measurement-only diagnostic; see
+    /// docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md §2 + Amendment 1).
+    /// None until the shortest-horizon prediction, baseline, and shared
+    /// residual variance are all warm.
+    pub bits_saved_persist: Option<f32>,
+    /// Same, vs the zero-prediction floor.
+    pub bits_saved_zero: Option<f32>,
+    /// Shared concentration κ behind the bits fields — Δcos = bits·ln2/κ
+    /// (the quantity C1 verdicts use; Amendment 3).
+    pub bits_kappa: Option<f32>,
     pub cycle_time_us: u64,
     pub metadata: CycleMetadata,
     pub thought_vector: Vec<f32>,

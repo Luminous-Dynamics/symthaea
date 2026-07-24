@@ -6,9 +6,13 @@
 //! **Honesty note:** This benchmark uses procedurally generated grid tasks.
 //! It tests how HDC majority-vote bundling improves with more examples — a
 //! property of the encoding algebra, not of learning or generalization.
-//! The 2-AFC scoring uses random BinaryHV distractors (chance = ~50%),
-//! which is a lenient baseline. The z-scores reflect bundling efficiency,
-//! not few-shot learning ability.
+//! **FIXED (2026-07-18)**: the 2-AFC scoring used to use random BinaryHV
+//! distractors (chance = ~50%) — see `arc_dataset.rs`'s retraction note for
+//! why that's a discriminability artifact, not a fair baseline (on real
+//! ARC-AGI data it measured 99.0% vs. 13.8-67.8% under fair distractors). Now
+//! uses `arc_dataset::fair_distractor_grid` (a generic wrong transform of the
+//! test input) instead. The z-scores still reflect bundling efficiency, not
+//! few-shot learning ability.
 //!
 //! Tests how transfer accuracy scales with the number of training examples
 //! (1, 2, 3, 4, 5). This reveals the learning curve of HDC rule bundling:
@@ -24,12 +28,12 @@
 //! - saturation_point: ~3 (SD~1) — where gains plateau
 //! - learning_rate: ~0.06 (SD~0.03) — accuracy gain per example
 
+use crate::benchmarks::reasoning::arc_dataset::fair_distractor_grid;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
-use symthaea_core::hdc::BinaryHV;
 use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
 
@@ -163,9 +167,11 @@ impl ArcFewShotBenchmark {
                 let test_in_hv = encoder.encode_grid(&test_input);
                 let test_out_hv = encoder.encode_grid(&test_output);
 
-                // 2-AFC distractor
+                // 2-AFC distractor: fair (equally structured), not random noise
                 xor_shift(&mut rng);
-                let distractor = BinaryHV::random(rng);
+                let distractor_grid = fair_distractor_grid(&test_input, &test_output)
+                    .unwrap_or_else(|| test_input.clone());
+                let distractor = encoder.encode_grid(&distractor_grid);
 
                 // Test at each shot count (1..=5)
                 for k in 1..=MAX_SHOTS {
@@ -329,8 +335,8 @@ impl PsychBenchmark for ArcFewShotBenchmark {
         result.notes.push(
             "SYNTHETIC: Uses procedural grid transforms, not Chollet's real ARC. \
              Tests HDC bundling efficiency (majority-vote consensus), not few-shot \
-             learning. 2-AFC uses random BinaryHV distractors (chance ~50%), a \
-             lenient baseline. Z-scores reflect bundling quality."
+             learning. 2-AFC uses a fair (equally structured) distractor, not random \
+             noise (fixed 2026-07-18). Z-scores reflect bundling quality."
                 .to_string(),
         );
         result.elapsed_ms = start.elapsed().as_millis() as u64;

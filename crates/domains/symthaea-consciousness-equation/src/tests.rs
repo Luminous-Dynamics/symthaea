@@ -180,6 +180,76 @@ fn test_gating_factors() {
     assert!(result.consciousness_level > 0.0);
 }
 
+/// Contract test (2026-07-18, CL/safety-tier calibration probe finding):
+/// `compute_weighted_sum`'s component weights sum to exactly 1.0, so
+/// `weighted_sum` (and therefore `consciousness_level`, before the
+/// softmin/synchrony/M/N/Soc multipliers) is only guaranteed to stay in
+/// [0, 1] if every `ConsciousnessInputs` field is itself in [0, 1]. A caller
+/// once fed a [0.5, 1.5]-ranged multiplicative modulation factor into
+/// `embodiment` (symthaea's `body_psi_modulation`), inflating weighted_sum
+/// past 1.0 (measured mean 1.1567 in an "alarming" input regime) and pushing
+/// consciousness_level toward its clamp ceiling faster than intended. This
+/// pins the crate's own contract so a future caller regression is caught here,
+/// not three call-sites away.
+#[test]
+fn test_weighted_sum_bounded_for_unit_inputs() {
+    let mut equation = MasterConsciousnessEquation::default();
+    let inputs = ConsciousnessInputs {
+        phi: 1.0,
+        broadcast: 1.0,
+        working_memory: 1.0,
+        attention: 1.0,
+        recurrence: 1.0,
+        embodiment: 1.0,
+        knowledge: 1.0,
+        synchrony: 1.0,
+    };
+    let result = equation.compute(&inputs);
+    assert!(
+        result.weighted_sum <= 1.0 + 1e-9,
+        "weighted_sum should not exceed 1.0 when every input is at its max of 1.0, got {}",
+        result.weighted_sum
+    );
+}
+
+/// Contract test (2026-07-22, probe_cl_calibration follow-up): the sibling bug to
+/// `test_weighted_sum_bounded_for_unit_inputs` above. That test proved the equation's
+/// OWN 7 weighted fields sum to <= 1.0 at their documented max of 1.0 each — but a
+/// real caller (symthaea's cognitive_loop, `peak_attention`) fed a raw magnitude from
+/// a *different* range ([0.1, 3.0], not [0,1]) straight into `attention`, unclamped,
+/// which this crate can't prevent by construction (`ConsciousnessInputs` is a public
+/// struct with public f64 fields — nothing stops a caller from putting an out-of-range
+/// value in any field). `compute()`'s `weighted_sum` now defensively clamps to [0,1]
+/// (engine.rs) specifically so a caller mistake like this can't silently inflate
+/// consciousness_level toward its ceiling. This test proves that defense holds even
+/// when a field is fed a value far outside its documented [0,1] contract.
+#[test]
+fn test_weighted_sum_bounded_for_out_of_range_field() {
+    let mut equation = MasterConsciousnessEquation::default();
+    let inputs = ConsciousnessInputs {
+        phi: 1.0,
+        broadcast: 1.0,
+        working_memory: 1.0,
+        attention: 3.0, // out-of-contract: e.g. an un-normalized raw magnitude
+        recurrence: 1.0,
+        embodiment: 1.0,
+        knowledge: 1.0,
+        synchrony: 1.0,
+    };
+    let result = equation.compute(&inputs);
+    assert!(
+        result.weighted_sum <= 1.0 + 1e-9,
+        "weighted_sum should stay clamped to <= 1.0 even when a field is fed an \
+         out-of-range value, got {}",
+        result.weighted_sum
+    );
+    assert!(
+        result.consciousness_level <= 1.0 + 1e-9,
+        "consciousness_level should stay <= 1.0, got {}",
+        result.consciousness_level
+    );
+}
+
 #[test]
 fn test_new_factors_integration() {
     let mut equation = MasterConsciousnessEquation::default();

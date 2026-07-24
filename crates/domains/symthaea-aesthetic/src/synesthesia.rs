@@ -3,8 +3,10 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Cross-modal synesthesia: bidirectional audio-visual mappings.
 //!
-//! Implements Scriabin's pitch-to-hue correspondences and inverse mappings
-//! for unified aesthetic evaluation across sensory modalities.
+//! Provides configurable-style pitch/hue transforms and inverse mappings for
+//! unified aesthetic evaluation across sensory modalities. The default is a
+//! simple chromatic hue wheel inspired by historical color-music systems; it is
+//! not presented as a universal or literal reconstruction of Scriabin's clavier.
 //!
 //! # References
 //!
@@ -14,12 +16,11 @@
 
 use crate::AestheticFeedback;
 
-/// Scriabin's pitch-class-to-hue mapping (degrees, C=0 through B=11).
+/// Default chromatic pitch-class-to-hue wheel (degrees, C=0 through B=11).
 ///
-/// C=red(0), C#=orange(30), D=yellow(60), D#=yellow-green(90),
-/// E=green(120), F=cyan(150), F#=blue(180), G=blue-violet(210),
-/// G#=violet(240), A=purple(270), A#=magenta(300), B=rose(330).
-const SCRIABIN_HUE: [f32; 12] = [
+/// This equal 30-degree wheel is a deterministic creative mapping, not an
+/// empirical claim that all listeners or historical systems share it.
+const CHROMATIC_HUE_WHEEL: [f32; 12] = [
     0.0, 30.0, 60.0, 90.0, 120.0, 150.0, 180.0, 210.0, 240.0, 270.0, 300.0, 330.0,
 ];
 
@@ -51,12 +52,12 @@ pub struct SynestheticFrame {
 
 // ─── Audio → Visual ─────────────────────────────────────────────────────────
 
-/// Map a frequency (Hz) to a Scriabin hue (0-360 degrees).
+/// Map a frequency (Hz) to the default chromatic hue wheel (0-360 degrees).
 ///
 /// Converts frequency to MIDI note, extracts pitch class, then interpolates
-/// between adjacent Scriabin hues for smooth chromatic transitions.
+/// circularly between adjacent hue anchors for smooth chromatic transitions.
 pub fn pitch_to_hue(freq_hz: f32) -> f32 {
-    if freq_hz <= 0.0 {
+    if !freq_hz.is_finite() || freq_hz <= 0.0 {
         return 0.0;
     }
     // MIDI note number (A4=440Hz=69)
@@ -67,8 +68,8 @@ pub fn pitch_to_hue(freq_hz: f32) -> f32 {
     let pc_ceil = (pc_floor + 1) % 12;
     let frac = pitch_class - pitch_class.floor();
 
-    let hue_a = SCRIABIN_HUE[pc_floor];
-    let hue_b = SCRIABIN_HUE[pc_ceil];
+    let hue_a = CHROMATIC_HUE_WHEEL[pc_floor];
+    let hue_b = CHROMATIC_HUE_WHEEL[pc_ceil];
 
     // Handle wraparound (330 -> 0)
     let diff = hue_b - hue_a;
@@ -89,17 +90,17 @@ pub fn pitch_to_hue(freq_hz: f32) -> f32 {
 /// Uses a power curve (gamma 0.8) to match perceptual brightness,
 /// with a floor of 0.15 so silence is still faintly visible.
 pub fn loudness_to_lightness(loudness: f32) -> f32 {
-    let l = loudness.clamp(0.0, 1.0);
+    let l = finite_unit(loudness);
     (0.15 + 0.7 * l.powf(0.8)).clamp(0.0, 1.0)
 }
 
 /// Map a 4-element timbre vector (spectral centroid, spectral spread,
 /// spectral flatness, spectral rolloff) to visual texture parameters.
 pub fn timbre_to_texture(timbre: &[f32; 4]) -> TextureParams {
-    let centroid = timbre[0].clamp(0.0, 1.0);
-    let spread = timbre[1].clamp(0.0, 1.0);
-    let flatness = timbre[2].clamp(0.0, 1.0);
-    let rolloff = timbre[3].clamp(0.0, 1.0);
+    let centroid = finite_unit(timbre[0]);
+    let spread = finite_unit(timbre[1]);
+    let flatness = finite_unit(timbre[2]);
+    let rolloff = finite_unit(timbre[3]);
 
     TextureParams {
         grain_size: spread * 0.7 + flatness * 0.3,
@@ -112,7 +113,11 @@ pub fn timbre_to_texture(timbre: &[f32; 4]) -> TextureParams {
 ///
 /// 30 BPM maps to 0.0, 300 BPM maps to 1.0, linear interpolation.
 pub fn tempo_to_motion(bpm: f32) -> f32 {
-    let clamped = bpm.clamp(30.0, 300.0);
+    let clamped = if bpm.is_finite() {
+        bpm.clamp(30.0, 300.0)
+    } else {
+        30.0
+    };
     (clamped - 30.0) / 270.0
 }
 
@@ -120,16 +125,16 @@ pub fn tempo_to_motion(bpm: f32) -> f32 {
 
 /// Map a hue (0-360 degrees) to a pitch frequency (Hz) in octave 4.
 ///
-/// Inverse of `pitch_to_hue`: finds the bracketing Scriabin hues,
+/// Inverse of `pitch_to_hue`: finds the bracketing hue-wheel anchors,
 /// interpolates the fractional pitch class, converts to frequency.
 pub fn hue_to_pitch(hue: f32) -> f32 {
-    let h = ((hue % 360.0) + 360.0) % 360.0;
+    let h = normalize_hue(hue);
 
     // Find bracketing hues
     let mut best_below = 0usize;
     let mut best_dist = f32::MAX;
 
-    for (i, &scriabin_h) in SCRIABIN_HUE.iter().enumerate() {
+    for (i, &scriabin_h) in CHROMATIC_HUE_WHEEL.iter().enumerate() {
         // Distance going clockwise from scriabin_h to h
         let dist = ((h - scriabin_h) % 360.0 + 360.0) % 360.0;
         if dist < best_dist {
@@ -139,8 +144,8 @@ pub fn hue_to_pitch(hue: f32) -> f32 {
     }
 
     let next = (best_below + 1) % 12;
-    let hue_a = SCRIABIN_HUE[best_below];
-    let hue_b = SCRIABIN_HUE[next];
+    let hue_a = CHROMATIC_HUE_WHEEL[best_below];
+    let hue_b = CHROMATIC_HUE_WHEEL[next];
 
     // Compute the span between these two hues (clockwise)
     let span = ((hue_b - hue_a) % 360.0 + 360.0) % 360.0;
@@ -162,7 +167,7 @@ pub fn hue_to_pitch(hue: f32) -> f32 {
 /// High saturation produces bright, focused timbres (high centroid, low flatness).
 /// Low saturation produces dull, diffuse timbres.
 pub fn saturation_to_timbre(saturation: f32) -> [f32; 4] {
-    let s = saturation.clamp(0.0, 1.0);
+    let s = finite_unit(saturation);
     [
         s * 0.8 + 0.1,         // spectral centroid: saturated = bright
         (1.0 - s) * 0.6 + 0.1, // spectral spread: saturated = focused
@@ -175,7 +180,7 @@ pub fn saturation_to_timbre(saturation: f32) -> [f32; 4] {
 ///
 /// Low complexity = sparse (0.3), high complexity = dense (2.0).
 pub fn complexity_to_density(complexity: f32) -> f32 {
-    let c = complexity.clamp(0.0, 1.0);
+    let c = finite_unit(complexity);
     0.3 + c * 1.7
 }
 
@@ -235,20 +240,36 @@ pub fn extract_synesthetic_features(
             let h = pitch_to_hue(*freq).to_radians();
             sin_sum += h.sin();
             cos_sum += h.cos();
-            loudness_sum += vel;
+            loudness_sum += finite_unit(*vel);
         }
 
         let n = beat_notes.len() as f32;
-        let avg_hue = sin_sum.atan2(cos_sum).to_degrees();
-        let avg_hue = ((avg_hue % 360.0) + 360.0) % 360.0;
+        let avg_hue = circular_mean_from_components(sin_sum, cos_sum);
         let avg_loudness = loudness_sum / n;
 
         // Simple timbre estimate from frequency spread
-        let freq_mean = beat_notes.iter().map(|(f, _, _, _)| f).sum::<f32>() / n;
+        let freq_mean = beat_notes
+            .iter()
+            .map(|&&(frequency, _, _, _)| {
+                if frequency.is_finite() && frequency > 0.0 {
+                    frequency
+                } else {
+                    0.0
+                }
+            })
+            .sum::<f32>()
+            / n;
         let freq_spread = if n > 1.0 {
             (beat_notes
                 .iter()
-                .map(|(f, _, _, _)| (f - freq_mean).powi(2))
+                .map(|&&(frequency, _, _, _)| {
+                    let frequency = if frequency.is_finite() && frequency > 0.0 {
+                        frequency
+                    } else {
+                        0.0
+                    };
+                    (frequency - freq_mean).powi(2)
+                })
                 .sum::<f32>()
                 / n)
                 .sqrt()
@@ -277,32 +298,10 @@ pub fn extract_synesthetic_features(
 
 /// Blend multiple aesthetic feedbacks into a single combined feedback.
 ///
-/// All fields are averaged across the input feedbacks.
+/// Kept as a compatibility wrapper around the canonical implementation in
+/// [`crate::feedback`].
 pub fn blend_feedbacks(feedbacks: &[AestheticFeedback]) -> AestheticFeedback {
-    if feedbacks.is_empty() {
-        return AestheticFeedback::neutral();
-    }
-
-    let n = feedbacks.len() as f32;
-    let mut result = AestheticFeedback::neutral();
-
-    for fb in feedbacks {
-        result.dopamine_delta += fb.dopamine_delta;
-        result.serotonin_delta += fb.serotonin_delta;
-        result.surprise_signal += fb.surprise_signal;
-        for i in 0..8 {
-            result.harmony_projection[i] += fb.harmony_projection[i];
-        }
-    }
-
-    result.dopamine_delta /= n;
-    result.serotonin_delta /= n;
-    result.surprise_signal /= n;
-    for i in 0..8 {
-        result.harmony_projection[i] /= n;
-    }
-
-    result
+    crate::feedback::blend_feedbacks(feedbacks)
 }
 
 // ── Cross-Modal Coherence ────────────────────────────────────────────────────
@@ -337,22 +336,40 @@ pub fn coherence_score(
 
     let n = syn_frames.len() as f32;
 
-    // Average musical features
-    let avg_hue: f32 = syn_frames.iter().map(|f| f.hue).sum::<f32>() / n;
-    let avg_lightness: f32 = syn_frames.iter().map(|f| f.lightness).sum::<f32>() / n;
-    let avg_motion: f32 = syn_frames.iter().map(|f| f.motion).sum::<f32>() / n;
-    let avg_roughness: f32 = syn_frames.iter().map(|f| f.texture.roughness).sum::<f32>() / n;
+    // Average circular and linear musical features. Arithmetic hue averaging
+    // would turn 350° + 10° into cyan rather than red.
+    let (sin_sum, cos_sum) = syn_frames.iter().fold((0.0f32, 0.0f32), |acc, frame| {
+        let hue = normalize_hue(frame.hue).to_radians();
+        (acc.0 + hue.sin(), acc.1 + hue.cos())
+    });
+    let avg_hue = circular_mean_from_components(sin_sum, cos_sum);
+    let avg_lightness: f32 = syn_frames
+        .iter()
+        .map(|frame| finite_unit(frame.lightness))
+        .sum::<f32>()
+        / n;
+    let avg_motion: f32 = syn_frames
+        .iter()
+        .map(|frame| finite_unit(frame.motion))
+        .sum::<f32>()
+        / n;
+    let avg_roughness: f32 = syn_frames
+        .iter()
+        .map(|frame| finite_unit(frame.texture.roughness))
+        .sum::<f32>()
+        / n;
 
-    // 1. Hue-valence alignment
-    // Warm hues (0-120°) → positive valence expected
-    // Cool hues (180-360°) → negative/contemplative valence expected
-    let music_warmth = if avg_hue < 180.0 {
-        1.0 - avg_hue / 180.0 // 1.0 at red, 0.0 at cyan
+    // 1. Hue-valence alignment. Cosine gives a continuous circular warmth
+    // axis: red=+1, cyan=-1, and 359° remains adjacent to 0°.
+    let music_warmth = avg_hue.to_radians().cos();
+    let visual_valence = if visual_valence.is_finite() {
+        visual_valence.clamp(-1.0, 1.0)
     } else {
-        -(avg_hue - 180.0) / 180.0 // -1.0 at rose, 0.0 at cyan
+        0.0
     };
-    // Visual valence in [-1, 1]: positive = warm, negative = cool
-    let hue_valence_alignment = 1.0 - (music_warmth - visual_valence).abs();
+    let visual_arousal = finite_unit(visual_arousal);
+    let visual_complexity = finite_unit(visual_complexity);
+    let hue_valence_alignment = (1.0 - (music_warmth - visual_valence).abs()).clamp(0.0, 1.0);
 
     // 2. Energy alignment
     // High motion (tempo) → high visual arousal expected
@@ -373,6 +390,30 @@ pub fn coherence_score(
         + 0.20 * lightness_complexity_alignment
         + 0.15 * texture_alignment)
         .clamp(0.0, 1.0)
+}
+
+fn normalize_hue(hue: f32) -> f32 {
+    if hue.is_finite() {
+        ((hue % 360.0) + 360.0) % 360.0
+    } else {
+        0.0
+    }
+}
+
+fn circular_mean_from_components(sin_sum: f32, cos_sum: f32) -> f32 {
+    if sin_sum.abs() <= f32::EPSILON && cos_sum.abs() <= f32::EPSILON {
+        0.0
+    } else {
+        normalize_hue(sin_sum.atan2(cos_sum).to_degrees())
+    }
+}
+
+fn finite_unit(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
 }
 
 #[cfg(test)]
@@ -673,5 +714,36 @@ mod tests {
             high_arousal > low_arousal,
             "fast music should align better with high arousal: {high_arousal} vs {low_arousal}"
         );
+    }
+
+    #[test]
+    fn wraparound_hues_average_to_red_not_cyan() {
+        let frame = |hue| SynestheticFrame {
+            hue,
+            lightness: 0.5,
+            texture: TextureParams {
+                grain_size: 0.5,
+                roughness: 0.5,
+                warmth: 0.5,
+            },
+            motion: 0.5,
+            time: 0.0,
+        };
+        let score = coherence_score(&[frame(350.0), frame(10.0)], 1.0, 0.5, 0.5);
+        assert!(score > 0.6, "red wraparound should remain warm: {score}");
+    }
+
+    #[test]
+    fn hue_warmth_is_continuous_at_zero_boundary() {
+        let warmth_1 = normalize_hue(1.0).to_radians().cos();
+        let warmth_359 = normalize_hue(359.0).to_radians().cos();
+        assert!((warmth_1 - warmth_359).abs() < 1e-5);
+    }
+
+    #[test]
+    fn non_finite_mapping_inputs_fail_safe() {
+        assert_eq!(pitch_to_hue(f32::NAN), 0.0);
+        assert_eq!(tempo_to_motion(f32::NAN), 0.0);
+        assert!(loudness_to_lightness(f32::NAN).is_finite());
     }
 }

@@ -27,6 +27,8 @@ pub mod amplifier;
 pub mod controller;
 pub mod embodiment;
 pub mod encoder;
+pub mod energetics;
+pub mod equivalence_principle;
 pub mod simulator;
 pub mod types;
 
@@ -34,5 +36,7 @@ pub use amplifier::*;
 pub use controller::*;
 pub use embodiment::*;
 pub use encoder::*;
+pub use energetics::*;
+pub use equivalence_principle::*;
 pub use simulator::*;
 pub use types::*;

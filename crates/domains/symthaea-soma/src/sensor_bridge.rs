@@ -340,7 +340,7 @@ impl SensorBridge {
     // ── HDC Context Key Derivation ───────────────────────────────────────
 
     /// Encode the current sensor snapshot as BinaryHV vectors and derive an
-    /// HDC context key that is physically bound to the device's environment.
+    /// deterministic HDC context fingerprint for the device's environment.
     ///
     /// The key changes when:
     /// - The device moves to a different location (GPS novelty)
@@ -352,8 +352,11 @@ impl SensorBridge {
     /// quantized seed values, then combined via `HdcContextKey::derive()`
     /// (bind + permute chain — order matters, non-commutative).
     ///
-    /// The resulting 32-byte symmetric key can be used for ChaCha20-Poly1305
-    /// session encryption that is locked to the current physical context.
+    /// **Security warning:** this deterministic value is a context fingerprint,
+    /// not a secret key. The quantized sensor domain can be enumerated offline.
+    /// It may be used as context input to a standard KDF only when combined with
+    /// independent secret entropy.
+    #[deprecated(note = "deterministic context fingerprint, not secret key material")]
     pub fn derive_context_key(&self) -> [u8; 32] {
         let sensors = self.encode_sensors_as_hvs();
         HdcContextKey::derive_symmetric(&sensors)
@@ -361,8 +364,8 @@ impl SensorBridge {
 
     /// Get the raw HDC context vector (16,384-bit BinaryHV) before BLAKE3 extraction.
     ///
-    /// Useful for HDC-native operations (e.g., similarity comparison between
-    /// two contexts, or threshold sharing of the context key).
+    /// Useful for non-security HDC operations such as similarity comparison
+    /// between two public context fingerprints.
     pub fn derive_context_hv(&self) -> BinaryHV {
         let sensors = self.encode_sensors_as_hvs();
         HdcContextKey::derive(&sensors)
@@ -484,6 +487,23 @@ mod tests {
         let key1 = bridge.derive_context_key();
         let key2 = bridge.derive_context_key();
         assert_eq!(key1, key2, "Same sensors should produce same context key");
+    }
+
+    /// CI-005: once the non-secret context is narrowed, a quantized sensor
+    /// component can be recovered by enumerating its small public domain.
+    #[test]
+    fn legacy_attack_enumerates_quantized_sensor_context() {
+        let mut target = SensorBridge::new();
+        target.set_sensors(0.0, 370.0, false, 1013.0, 0.0);
+        let target_fingerprint = target.derive_context_key();
+
+        let recovered_light_band = (0..=100u32).find(|band| {
+            let mut candidate = SensorBridge::new();
+            candidate.set_sensors(0.0, *band as f32 * 10.0, false, 1013.0, 0.0);
+            candidate.derive_context_key() == target_fingerprint
+        });
+
+        assert_eq!(recovered_light_band, Some(37));
     }
 
     #[test]

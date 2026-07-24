@@ -1,0 +1,15 @@
+{
+  "source_result": {
+    "source_final_release_sha256": "REPLACE_64_HEX",
+    "endpoint_id": "REPLACE_PRIMARY_ENDPOINT",
+    "estimate": 0.0,
+    "standard_error": 0.01,
+    "confidence_lower": -0.01959963984540054,
+    "confidence_upper": 0.01959963984540054
+  },
+  "analysis_implementation_sha256": "REPLACE_64_HEX",
+  "independent_analysis_sha256": "REPLACE_64_HEX",
+  "crosscheck_sha256": "REPLACE_64_HEX",
+  "public_release_uri": "https://replace.invalid/replication-synthesis",
+  "completed_at_utc": "REPLACE_RFC3339"
+}

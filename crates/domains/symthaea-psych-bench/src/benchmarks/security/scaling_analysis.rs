@@ -58,7 +58,7 @@ pub struct ScalingAnalysisBenchmark;
 
 impl PsychBenchmark for ScalingAnalysisBenchmark {
     fn name(&self) -> &str {
-        "Security::ScalingAnalysis"
+        "InsecureAlgebraDemo::ScalingAnalysis"
     }
 
     fn provenance(&self) -> Option<BenchmarkProvenance> {

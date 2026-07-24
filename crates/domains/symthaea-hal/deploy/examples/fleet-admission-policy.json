@@ -1,0 +1,9 @@
+{
+  "expected_deployment_id": "production-humanoid-v1",
+  "minimum_update_generation": 1,
+  "minimum_authority_epoch": 1,
+  "maximum_evidence_age_ms": 900000,
+  "require_recovery_media": true,
+  "require_all_inventory_devices": true,
+  "maximum_device_count": 10000
+}

@@ -13,15 +13,15 @@
 //!   learning path (`helpers/parallel.rs`) compresses the full HDV when encoding
 //!   high-Phi experiences.
 //!
-//! - **FHE wisdom pool**: NOT compressed — uses BinaryHV (2048 bytes = 16,384 bits),
-//!   which is already 32x smaller than ContinuousHV. PolarQuant operates on f32
-//!   vectors and cannot improve on 1-bit binary encoding.
+//! - **Quarantined shared-mask wisdom demo**: NOT compressed — uses BinaryHV
+//!   (2048 bytes = 16,384 bits), which is already 32x smaller than ContinuousHV.
+//!   PolarQuant operates on f32 vectors and cannot improve on 1-bit encoding.
 //!
 //! - **Dream consolidation**: NOT compressed — dream replay uses phi/surprise scores
 //!   and BinaryHV bindings, not raw ContinuousHV storage.
 //!
 //! - **Mesh wisdom packets**: NOT compressed — WisdomPacket carries BinaryHV (2048
-//!   bytes) in a fixed 2072-byte frame. Already optimally compact.
+//!   bytes) in a fixed 2,104-byte version-2 frame. Already optimally compact.
 //!
 //! # Usage
 //!

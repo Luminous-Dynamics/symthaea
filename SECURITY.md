@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---------|-----------|
-| 1.9.x (latest main) | Yes |
+| 2.0.x | Yes |
+| 1.9.x | Security fixes only |
 | < 1.9.0 | No |
 
 ## Reporting Vulnerabilities

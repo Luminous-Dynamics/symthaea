@@ -1,0 +1,24 @@
+[package]
+name = "symthaea-ui"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Unified Leptos web UI for symthaea-service — Converse + Observe panes over the HTTP gateway (SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md Phase 3)"
+
+[dependencies]
+leptos = { version = "0.8", features = ["csr"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+gloo-net = "0.5"
+gloo-timers = { version = "0.3", features = ["futures"] }
+futures = "0.3"
+wasm-bindgen-futures = "0.4"
+wasm-bindgen = "0.2"
+base64 = "0.22"
+web-sys = { version = "0.3", features = [
+    "Storage",
+    "Window",
+    "HtmlCanvasElement",
+    "CanvasRenderingContext2d",
+    "ImageData",
+] }

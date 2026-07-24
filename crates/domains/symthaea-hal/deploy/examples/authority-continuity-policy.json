@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "allowed_witness_nodes": ["safety-supervisor-a", "safety-supervisor-b", "offline-operator-station"],
+  "minimum_distinct_witnesses": 2,
+  "minimum_distinct_fault_domains": 2,
+  "require_distinct_signature_keys": true,
+  "required_key_purpose": "authority-witness",
+  "maximum_witness_age_ms": 600000
+}

@@ -1060,6 +1060,20 @@ mod tests {
     }
 
     #[test]
+    fn engine_kill_switch_cycles_safely() {
+        // enable_consciousness_engine = false must skip measurement without
+        // destabilizing the loop: neutral feedback, no fabricated Phi.
+        let mut config = super::super::CognitiveLoopConfig::default();
+        config.enable_consciousness_engine = false;
+        config.async_training = false;
+        let mut s = CognitiveLoopService::new(config).expect("construct with engine off");
+        for i in 0..5 {
+            let r = s.cycle(&format!("engine off cycle {i}"));
+            assert!(r.prediction_error.is_finite());
+        }
+    }
+
+    #[test]
     fn empty_input_does_not_panic() {
         let mut s = make_service();
         let result = s.cycle("");
@@ -1077,18 +1091,73 @@ mod tests {
     #[test]
     fn repeated_identical_input_reduces_prediction_error() {
         let mut s = make_service();
-        // First cycle has no prior prediction
+        // First cycle has no prior prediction (PE is the max-error sentinel)
         let r1 = s.cycle("repeating input");
+        assert!((r1.prediction_error - 1.0).abs() < 1e-6);
+
         // Run several identical cycles so the system can learn the pattern
         let mut last_error = r1.prediction_error;
         for _ in 0..20 {
             last_error = s.cycle("repeating input").prediction_error;
         }
-        // After 20 identical cycles, error should be lower or comparable
-        // (not necessarily strictly lower due to stochastic subsystems)
+        // HISTORY: this test's assertion was once weakened to `is_finite()`
+        // when PE sat frozen at the 1.0 degenerate sentinel (zero-vector
+        // predictions from per-cycle state wipes). That hid the broken
+        // prediction path for months — see docs/PHI_SIGNAL_TRACE_2026-07-15.md.
+        // The assertions below are deliberately real: weaken them again only
+        // with a documented reason, not to make CI green.
         assert!(
             last_error.is_finite(),
             "error should remain finite after repeated cycles"
+        );
+        assert!(
+            last_error < 0.999,
+            "PE stuck at the 1.0 sentinel after 20 identical cycles — the \
+             prediction path is degenerate (zero/empty predictions), not surprised: {last_error}"
+        );
+        assert!(
+            last_error < 0.9,
+            "PE should meaningfully drop below 0.9 after 20 identical cycles \
+             (uncorrelated vectors give ~0.71 under the scale-invariant metric): {last_error}"
+        );
+    }
+
+    #[test]
+    fn temporal_state_persists_across_cycles() {
+        // The liquid brain must not be memoryless: internal temporal state has
+        // to influence later cycles. With per-cycle state wipes (the pre-fix
+        // behavior), the CfC output for a given input string is a pure function
+        // of that input — so an A/B/A input schedule would yield identical
+        // outputs for both A-cycles. With real temporal dynamics, the second
+        // A-cycle starts from different internal state and must differ.
+        let mut s = make_service();
+        let out_a1 = s.cycle("input pattern alpha").output.clone();
+        let _ = s.cycle("completely different beta payload");
+        let out_a2 = s.cycle("input pattern alpha").output.clone();
+
+        // The projected CfC output has a tiny absolute magnitude (norm ~1e-8
+        // in early cycles — 16K near-cancelling terms per projected dim), so an
+        // absolute element tolerance would classify everything as "same".
+        // Compare DIRECTION via cosine similarity instead: with per-cycle state
+        // wipes (the pre-fix behavior) the two A-cycle outputs are bit-identical
+        // (cos = 1.0 exactly); with real temporal dynamics the second A-cycle
+        // starts from post-beta state and must point measurably elsewhere.
+        // (Probe 2026-07-16: post-fix cos ≈ well below 0.999; the tiny output
+        // norm itself is a tracked follow-up — downstream `output` consumers
+        // currently receive a near-zero-magnitude signal.)
+        assert_eq!(out_a1.len(), out_a2.len());
+        let dot: f32 = out_a1.iter().zip(out_a2.iter()).map(|(x, y)| x * y).sum();
+        let norm = |v: &[f32]| v.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let (n1, n2) = (norm(&out_a1), norm(&out_a2));
+        assert!(
+            n1 > 0.0 && n2 > 0.0,
+            "CfC output is exactly zero — temporal network produced no signal"
+        );
+        let cos = dot / (n1 * n2);
+        assert!(
+            cos < 0.999,
+            "same-direction outputs (cos={cos:.6}) for the same input at different \
+             times — temporal state is being wiped between cycles (memoryless dynamics)"
         );
     }
 

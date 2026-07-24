@@ -44,23 +44,49 @@ impl InstrumentKey {
     pub fn from_instrument(inst: Instrument) -> Self {
         match inst {
             Instrument::Piano | Instrument::PianoPP => Self::Piano,
-            Instrument::Violin | Instrument::Cello => Self::Strings,
+            Instrument::Violin
+            | Instrument::Cello
+            | Instrument::Viola
+            | Instrument::StringEnsemble => Self::Strings,
             Instrument::Flute
             | Instrument::Ney
             | Instrument::Clarinet
             | Instrument::Trumpet
-            | Instrument::Saxophone => Self::Wind,
+            | Instrument::Saxophone
+            | Instrument::Oboe
+            | Instrument::Bassoon
+            | Instrument::FrenchHorn => Self::Wind,
             Instrument::AcousticGuitar
             | Instrument::Harp
             | Instrument::Koto
             | Instrument::Oud
             | Instrument::Sitar
-            | Instrument::UprightBass => Self::Plucked,
+            | Instrument::UprightBass
+            | Instrument::Mandolin
+            | Instrument::Banjo
+            | Instrument::ElectricBass => Self::Plucked,
             Instrument::ElectricPiano
             | Instrument::Bell
             | Instrument::Marimba
-            | Instrument::Kalimba => Self::Keys,
-            Instrument::Pad | Instrument::Organ | Instrument::SawLead => Self::Pad,
+            | Instrument::Kalimba
+            | Instrument::Vibraphone
+            | Instrument::Celesta
+            | Instrument::Timpani
+            | Instrument::MusicBox => Self::Keys,
+            Instrument::Pad
+            | Instrument::Organ
+            | Instrument::SawLead
+            | Instrument::Accordion
+            | Instrument::ChoirAah
+            | Instrument::ChoirOoh => Self::Pad,
+            // Wave 2 additions: Harpsichord is plucked (joins the
+            // guitar/harp family), Tuba/Trombone/Duduk are sustaining
+            // winds/brass (joins the flute/clarinet/brass family), and
+            // Xylophone is struck mallet percussion (joins the
+            // bell/marimba/vibraphone family).
+            Instrument::Harpsichord => Self::Plucked,
+            Instrument::Tuba | Instrument::Trombone | Instrument::Duduk => Self::Wind,
+            Instrument::Xylophone => Self::Keys,
         }
     }
 }

@@ -12,9 +12,12 @@
 //! - Contour closure validation with gap-closing search
 //! - Orientation enforcement (outer CCW, inner CW)
 
-use crate::infill::{InfillConfig, generate_infill_for_layer};
+use crate::infill::{InfillConfig, InfillError, generate_infill_for_layer};
 use crate::mesh::TriangleMesh;
+use crate::qualification::ManufacturingReadyMesh;
+use crate::validate::FabricationReadyMesh;
 use std::collections::HashMap;
+use std::fmt;
 
 // ── 2D types ────────────────────────────────────────────────────────────
 
@@ -109,6 +112,34 @@ impl Contour {
 
 // ── Slice parameters ────────────────────────────────────────────────────
 
+/// Failure returned by strict slicing entry points.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SliceError {
+    InvalidLayerHeight,
+    InvalidNozzleDiameter,
+    InvalidTolerance,
+    InvalidInfill(InfillError),
+    InvalidMesh(&'static str),
+    InvalidSliceHeight,
+}
+
+impl fmt::Display for SliceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidLayerHeight => write!(f, "layer height must be finite and positive"),
+            Self::InvalidNozzleDiameter => {
+                write!(f, "nozzle diameter must be finite and positive")
+            }
+            Self::InvalidTolerance => write!(f, "tolerance must be finite and positive"),
+            Self::InvalidInfill(error) => write!(f, "invalid infill configuration: {error}"),
+            Self::InvalidMesh(reason) => write!(f, "mesh is not sliceable: {reason}"),
+            Self::InvalidSliceHeight => write!(f, "slice height must be finite"),
+        }
+    }
+}
+
+impl std::error::Error for SliceError {}
+
 /// Configuration for the slicer.
 #[derive(Debug, Clone)]
 pub struct SliceConfig {
@@ -152,6 +183,25 @@ impl SliceConfig {
             ));
         }
         warnings
+    }
+
+    /// Validate configuration without applying clamping or fallback behavior.
+    pub fn validate_strict(&self) -> Result<(), SliceError> {
+        if !self.layer_height.is_finite() || self.layer_height <= 0.0 {
+            return Err(SliceError::InvalidLayerHeight);
+        }
+        if !self.nozzle_diameter.is_finite() || self.nozzle_diameter <= 0.0 {
+            return Err(SliceError::InvalidNozzleDiameter);
+        }
+        if !self.tolerance.is_finite() || self.tolerance <= 0.0 {
+            return Err(SliceError::InvalidTolerance);
+        }
+        if let Some(infill) = &self.infill {
+            infill
+                .validate_strict()
+                .map_err(SliceError::InvalidInfill)?;
+        }
+        Ok(())
     }
 }
 
@@ -549,6 +599,71 @@ fn classify_contours(contours: Vec<Contour>) -> (Vec<Contour>, Vec<Contour>) {
 
 // ── Public API ──────────────────────────────────────────────────────────
 
+fn validate_slice_mesh_input(mesh: &TriangleMesh) -> Result<(), SliceError> {
+    if mesh.vertices.is_empty() || mesh.indices.is_empty() {
+        return Err(SliceError::InvalidMesh("mesh is empty"));
+    }
+    if mesh
+        .vertices
+        .iter()
+        .flatten()
+        .any(|component| !component.is_finite())
+    {
+        return Err(SliceError::InvalidMesh("mesh contains non-finite vertices"));
+    }
+    if mesh
+        .indices
+        .iter()
+        .flatten()
+        .any(|index| *index as usize >= mesh.vertices.len())
+    {
+        return Err(SliceError::InvalidMesh(
+            "mesh contains out-of-bounds indices",
+        ));
+    }
+    Ok(())
+}
+
+/// Strict single-plane slicing that rejects invalid configuration and geometry.
+pub fn try_slice_mesh_at_z(
+    mesh: &TriangleMesh,
+    z: f32,
+    config: &SliceConfig,
+) -> Result<SliceLayer, SliceError> {
+    config.validate_strict()?;
+    validate_slice_mesh_input(mesh)?;
+    if !z.is_finite() {
+        return Err(SliceError::InvalidSliceHeight);
+    }
+    Ok(slice_mesh_at_z(mesh, z, config))
+}
+
+/// Slice only geometry that has already passed the closed-solid mesh gate.
+pub fn slice_fabrication_ready(
+    mesh: &FabricationReadyMesh,
+    config: &SliceConfig,
+) -> Result<Vec<SliceLayer>, SliceError> {
+    try_slice_mesh(mesh.mesh(), config)
+}
+
+/// Slice only geometry that crossed process and minimum-feature qualification.
+pub fn slice_manufacturing_ready(
+    mesh: &ManufacturingReadyMesh,
+    config: &SliceConfig,
+) -> Result<Vec<SliceLayer>, SliceError> {
+    try_slice_mesh(mesh.mesh(), config)
+}
+
+/// Strict multi-layer slicing that rejects invalid configuration and geometry.
+pub fn try_slice_mesh(
+    mesh: &TriangleMesh,
+    config: &SliceConfig,
+) -> Result<Vec<SliceLayer>, SliceError> {
+    config.validate_strict()?;
+    validate_slice_mesh_input(mesh)?;
+    Ok(slice_mesh(mesh, config))
+}
+
 /// Slice a mesh at a single Z-height with full hardening.
 pub fn slice_mesh_at_z(mesh: &TriangleMesh, z: f32, config: &SliceConfig) -> SliceLayer {
     let mut segments = slice_at_z(mesh, z);
@@ -631,6 +746,23 @@ fn mesh_z_bounds(mesh: &TriangleMesh) -> (f32, f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn strict_config_rejects_non_finite_tolerance() {
+        let config = SliceConfig {
+            tolerance: f32::NAN,
+            ..Default::default()
+        };
+        assert_eq!(config.validate_strict(), Err(SliceError::InvalidTolerance));
+    }
+
+    #[test]
+    fn strict_slicer_rejects_empty_mesh() {
+        let error = try_slice_mesh(&TriangleMesh::empty(), &SliceConfig::default())
+            .err()
+            .expect("empty mesh must fail");
+        assert_eq!(error, SliceError::InvalidMesh("mesh is empty"));
+    }
     use crate::csg::CSGNode;
     use crate::mesh::resolve_to_mesh;
 

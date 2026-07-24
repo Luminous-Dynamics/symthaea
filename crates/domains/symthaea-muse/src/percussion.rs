@@ -22,6 +22,17 @@ pub enum DrumType {
     HiHat,
 }
 
+impl DrumType {
+    /// General MIDI percussion key (channel 10) for this drum voice.
+    pub fn gm_note(&self) -> u8 {
+        match self {
+            Self::Kick => 36,  // Bass Drum 1
+            Self::Snare => 38, // Acoustic Snare
+            Self::HiHat => 42, // Closed Hi-Hat
+        }
+    }
+}
+
 /// A single percussion hit.
 #[derive(Debug, Clone, Copy)]
 pub struct DrumHit {

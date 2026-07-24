@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: Apache-2.0 OR MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Generic MuJoCo adapter boundary.
 
@@ -75,7 +75,7 @@ impl SimulationBackend for MuJoCoBridge {
         }
 
         if self.dry_run {
-            return Ok(SimulationResult::converged(&request.id, 0.6)
+            return Ok(SimulationResult::dry_run(&request.id, self.name(), 0.6)
                 .with_metric("trajectory_feasibility", 1.0, "ratio")
                 .with_metric("contact_events", 0.0, "count"));
         }

@@ -4,9 +4,12 @@
 
 //! # symthaea-hdc-crypto
 //!
-//! Information-theoretically secure cryptographic primitives built on 16,384-bit
-//! binary hypervectors. Achieves **FHE at plaintext speed** by exploiting the
-//! algebraic structure of hyperdimensional computing (HDC).
+//! **INSECURE EXPERIMENTAL RESEARCH CODE. DO NOT USE FOR SECURITY.**
+//!
+//! This crate preserves HDC masking and algebra demonstrations for compatibility
+//! and adversarial study. It does not provide a secure MAC, threshold secret
+//! sharing, commitment scheme, FHE, privacy-preserving aggregation, or a secure
+//! sensor-derived KDF.
 //!
 //! ## Core Idea
 //!
@@ -17,15 +20,14 @@
 //! bundle(enc(A), enc(B)) ~ enc(bundle(A, B))   [majority vote preserves under shared mask]
 //! ```
 //!
-//! This enables privacy-preserving collective computation without the
-//! 1000x+ overhead of lattice-based FHE schemes.
+//! These identities demonstrate XOR/majority algebra. They do not establish a
+//! privacy-preserving protocol.
 //!
 //! ## Security Model
 //!
-//! - **Perfect secrecy** (Shannon 1949): OTP encryption with D = 16,384 bit masks
-//! - **Zero collision probability**: XOR binding is a bijection per-operand
-//! - **Information-theoretic MAC**: 5-10 ns authentication (vs 50-400 ns for hash-based MACs)
-//! - **Threshold secret sharing**: (k,n) splitting via majority-vote bundling
+//! A fresh uniform XOR mask can implement a one-time pad for one message. The
+//! higher-level constructions in this crate violate or fail to enforce the
+//! assumptions required for their former security claims.
 //!
 //! ## What This Is NOT
 //!
@@ -44,5 +46,14 @@ pub mod crypto;
 pub mod fhe;
 
 pub use binary_hv::BinaryHV;
+
+/// Root re-exports of the quarantined types below require this explicit
+/// feature so a consumer of this crate cannot stumble onto
+/// `symthaea_hdc_crypto::HdcMac` or `::EncryptedHV` looking like ordinary,
+/// safe security APIs. Use `crypto::HdcMac` / `fhe::EncryptedHV` etc.
+/// directly (still available unconditionally) if you specifically need to
+/// study or exercise these constructions.
+#[cfg(feature = "insecure-experimental-crypto")]
 pub use crypto::{HdcCommitment, HdcContextKey, HdcMac, HdcShare, HdcThresholdSharing};
+#[cfg(feature = "insecure-experimental-crypto")]
 pub use fhe::{CollectiveWisdomPool, EncryptedHV, generate_collective_mask};

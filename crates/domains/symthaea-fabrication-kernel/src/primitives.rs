@@ -62,10 +62,30 @@ pub fn intersect_hv() -> ContinuousHV {
     ContinuousHV::random(FAB_KERNEL_DIM, INTERSECT_SEED)
 }
 
-/// Encode a scalar parameter as an HV by scaling a base random vector
+/// Encode an exact scalar parameter as a deterministic role-specific HV.
+///
+/// The previous `base.scale(value).normalize()` construction erased every
+/// positive magnitude: `0.1`, `1.0`, and `100.0` normalized to the same vector.
+/// Mixing the canonical IEEE-754 bits into the seed preserves parameter identity
+/// without relying on vector magnitude surviving later normalization.
 pub fn param_hv(param_seed: u64, value: f32) -> ContinuousHV {
-    let base = ContinuousHV::random(FAB_KERNEL_DIM, param_seed);
-    base.scale(value).normalize()
+    let canonical_bits = if value == 0.0 {
+        0
+    } else if value.is_nan() {
+        f32::NAN.to_bits()
+    } else {
+        value.to_bits()
+    } as u64;
+    ContinuousHV::random(FAB_KERNEL_DIM, mix_seed(param_seed ^ canonical_bits))
+}
+
+fn mix_seed(mut value: u64) -> u64 {
+    // SplitMix64 finalizer: deterministic avalanche without mutable global state.
+    value ^= value >> 30;
+    value = value.wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    value ^= value >> 27;
+    value = value.wrapping_mul(0x94d0_49bb_1331_11eb);
+    value ^ (value >> 31)
 }
 
 /// Identify which primitive an HV is closest to
@@ -117,6 +137,14 @@ mod tests {
         let (name, sim) = identify_primitive(&cube_hv());
         assert_eq!(name, "cube");
         assert!(sim > 0.99);
+    }
+
+    #[test]
+    fn scalar_parameter_magnitude_is_not_erased() {
+        let one = param_hv(0xABCD, 1.0);
+        let two = param_hv(0xABCD, 2.0);
+        assert!(one.similarity(&two).abs() < 0.15);
+        assert_eq!(one.values, param_hv(0xABCD, 1.0).values);
     }
 
     #[test]

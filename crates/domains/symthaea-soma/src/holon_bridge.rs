@@ -95,9 +95,8 @@ pub struct HolonBridge {
     resuscitation: Option<([f32; 4], Vec<f32>)>,
     sequence: u64,
     cycles_since_heartbeat: u64,
-    /// HDC-derived session encryption key (32 bytes from sensor context).
-    /// Set via `set_session_key()` from SensorBridge::derive_context_key().
-    /// When set, outbound messages should be encrypted (requires chacha20poly1305).
+    /// Session key established by a future authenticated key exchange.
+    /// Deterministic sensor context must never be installed as the secret.
     session_key: Option<[u8; 32]>,
 }
 
@@ -131,8 +130,8 @@ impl HolonBridge {
         self.connected = connected;
     }
 
-    /// Set the HDC-derived session encryption key.
-    /// When set, outbound messages will be encrypted (once chacha20poly1305 is wired).
+    /// Set a key obtained from an authenticated secret-key establishment
+    /// protocol. Sensor fingerprints alone are not acceptable key material.
     pub fn set_session_key(&mut self, key: [u8; 32]) {
         self.session_key = Some(key);
     }

@@ -612,7 +612,7 @@ mod tests {
             urgency: MeshUrgency::Cruise,
             timestamp_s: 1_700_000_000,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0; 32],
             ttl: 0,
             wisdom: test_hv(seed),
         }

@@ -1,6 +1,9 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! **Experimental research module.** This API is excluded from default builds and
+//! must not autonomously deliver therapy, infer clinical state, or replace qualified care.
+//!
 //! Therapeutic consciousness protocols: structured interventions that
 //! target specific consciousness states using multiple modalities
 //! (biofeedback, music, guided narrative, pharmacological modeling).
@@ -71,6 +74,14 @@ pub enum BiofeedbackMetric {
     GammaSynchrony,
     SkinConductance,
     RespirationRate,
+    /// EEG frontal alpha asymmetry; not a mood diagnosis.
+    EegFrontalAlphaAsymmetry,
+    /// EEG beta/gamma power ratio; not heart-rate variability.
+    EegBetaGammaRatio,
+    /// EEG global delta power.
+    EegDeltaPower,
+    /// EEG theta/beta ratio; not skin conductance.
+    EegThetaBetaRatio,
 }
 
 /// Guided-narrative themes grounded in clinical practice.
@@ -153,6 +164,24 @@ pub enum SafetyAction {
     ReduceIntensity(f32),
     TerminateSession(String),
     AlertTherapist,
+}
+
+/// Explicitly observed safety signals for a protocol tick.
+///
+/// `None` means the signal was not measured. Missing values never masquerade
+/// as zero and therefore cannot silently satisfy or trigger a threshold.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SafetySignals {
+    pub cortisol: Option<f32>,
+    pub dissociation_detected: Option<bool>,
+    pub panic_detected: Option<bool>,
+}
+
+/// Detailed result of a protocol tick.
+#[derive(Debug, Clone)]
+pub struct ProtocolTick {
+    pub modalities: Vec<Modality>,
+    pub safety_action: Option<SafetyAction>,
 }
 
 /// A named safety constraint binding a condition to an action.
@@ -696,11 +725,26 @@ impl SessionState {
         }
     }
 
-    /// Advance one tick (one minute).  Returns the modalities that should be
-    /// active during this tick.
+    /// Advance one tick using no additional observed safety signals.
+    ///
+    /// This compatibility wrapper never infers cortisol from skin conductance.
     pub fn tick(&mut self, phi: f64, metrics: &[(BiofeedbackMetric, f32)]) -> Vec<Modality> {
+        self.tick_with_signals(phi, metrics, &SafetySignals::default())
+            .modalities
+    }
+
+    /// Advance one tick with explicit observed safety signals.
+    pub fn tick_with_signals(
+        &mut self,
+        phi: f64,
+        metrics: &[(BiofeedbackMetric, f32)],
+        safety_signals: &SafetySignals,
+    ) -> ProtocolTick {
         if self.status != SessionStatus::Active {
-            return Vec::new();
+            return ProtocolTick {
+                modalities: Vec::new(),
+                safety_action: None,
+            };
         }
 
         self.elapsed_mins += 1;
@@ -709,59 +753,64 @@ impl SessionState {
             self.metric_history.push((m, v));
         }
 
-        // --- safety first ---
-        // We check cortisol from metrics if present, else 0.
-        let cortisol = metrics
-            .iter()
-            .find(|(m, _)| *m == BiofeedbackMetric::SkinConductance)
-            .map(|(_, v)| *v)
-            .unwrap_or(0.0);
-
-        if let Some(action) = self.check_safety(phi, cortisol) {
+        // Safety is evaluated exactly once per tick from explicitly identified signals.
+        let safety_action = self.check_safety_observed(phi, safety_signals);
+        if let Some(action) = &safety_action {
             self.safety_events.push((self.elapsed_mins, action.clone()));
-            match &action {
+            match action {
                 SafetyAction::TerminateSession(reason) => {
                     self.status = SessionStatus::Terminated(reason.clone());
-                    return Vec::new();
+                    return ProtocolTick {
+                        modalities: Vec::new(),
+                        safety_action: safety_action.clone(),
+                    };
                 }
                 SafetyAction::PauseProtocol => {
                     self.status = SessionStatus::Paused("Safety constraint triggered".into());
-                    return Vec::new();
+                    return ProtocolTick {
+                        modalities: Vec::new(),
+                        safety_action: safety_action.clone(),
+                    };
                 }
                 _ => { /* ReduceIntensity, GroundingExercise, AlertTherapist — continue */ }
             }
         }
 
-        // --- target tracking ---
         if self.is_in_target(phi, metrics) {
             self.time_in_target_mins += 1;
         }
 
-        // --- phase transition check ---
         self.try_advance_phase(phi, metrics);
 
-        // --- check completion ---
         if self.current_phase >= self.protocol.phases.len() {
             self.status = SessionStatus::Completed;
-            return Vec::new();
+            return ProtocolTick {
+                modalities: Vec::new(),
+                safety_action,
+            };
         }
 
-        self.protocol.phases[self.current_phase].modalities.clone()
+        ProtocolTick {
+            modalities: self.protocol.phases[self.current_phase].modalities.clone(),
+            safety_action,
+        }
     }
 
-    /// Evaluate all safety constraints. Returns the highest-priority action
-    /// if any constraint fires.
-    pub fn check_safety(&self, phi: f64, cortisol: f32) -> Option<SafetyAction> {
-        // Priority: Terminate > Pause > AlertTherapist > GroundingExercise > ReduceIntensity
+    /// Evaluate safety constraints from explicitly observed signals.
+    pub fn check_safety_observed(&self, phi: f64, signals: &SafetySignals) -> Option<SafetyAction> {
         let mut triggered: Vec<&SafetyAction> = Vec::new();
 
         for c in &self.protocol.safety_constraints {
             let fires = match &c.condition {
                 SafetyCondition::PhiBelow(t) => phi < *t,
                 SafetyCondition::PhiAbove(t) => phi > *t,
-                SafetyCondition::CortisolAbove(t) => cortisol > *t,
-                SafetyCondition::DissociationDetected => false, // needs external signal
-                SafetyCondition::PanicSignal => false,          // needs external signal
+                SafetyCondition::CortisolAbove(t) => {
+                    signals.cortisol.is_some_and(|value| value > *t)
+                }
+                SafetyCondition::DissociationDetected => {
+                    signals.dissociation_detected == Some(true)
+                }
+                SafetyCondition::PanicSignal => signals.panic_detected == Some(true),
                 SafetyCondition::SessionTimeout(t) => self.elapsed_mins >= *t,
             };
             if fires {
@@ -769,11 +818,6 @@ impl SessionState {
             }
         }
 
-        if triggered.is_empty() {
-            return None;
-        }
-
-        // Pick highest priority action.
         triggered
             .into_iter()
             .max_by_key(|a| match a {
@@ -786,7 +830,18 @@ impl SessionState {
             .cloned()
     }
 
-    /// Check safety with external dissociation / panic signals.
+    /// Compatibility wrapper for callers that provide an observed cortisol value.
+    pub fn check_safety(&self, phi: f64, cortisol: f32) -> Option<SafetyAction> {
+        self.check_safety_observed(
+            phi,
+            &SafetySignals {
+                cortisol: Some(cortisol),
+                ..SafetySignals::default()
+            },
+        )
+    }
+
+    /// Compatibility wrapper for explicit external safety signals.
     pub fn check_safety_with_signals(
         &self,
         phi: f64,
@@ -794,36 +849,14 @@ impl SessionState {
         dissociation: bool,
         panic: bool,
     ) -> Option<SafetyAction> {
-        let mut triggered: Vec<&SafetyAction> = Vec::new();
-
-        for c in &self.protocol.safety_constraints {
-            let fires = match &c.condition {
-                SafetyCondition::PhiBelow(t) => phi < *t,
-                SafetyCondition::PhiAbove(t) => phi > *t,
-                SafetyCondition::CortisolAbove(t) => cortisol > *t,
-                SafetyCondition::DissociationDetected => dissociation,
-                SafetyCondition::PanicSignal => panic,
-                SafetyCondition::SessionTimeout(t) => self.elapsed_mins >= *t,
-            };
-            if fires {
-                triggered.push(&c.action);
-            }
-        }
-
-        if triggered.is_empty() {
-            return None;
-        }
-
-        triggered
-            .into_iter()
-            .max_by_key(|a| match a {
-                SafetyAction::TerminateSession(_) => 5,
-                SafetyAction::PauseProtocol => 4,
-                SafetyAction::AlertTherapist => 3,
-                SafetyAction::GroundingExercise => 2,
-                SafetyAction::ReduceIntensity(_) => 1,
-            })
-            .cloned()
+        self.check_safety_observed(
+            phi,
+            &SafetySignals {
+                cortisol: Some(cortisol),
+                dissociation_detected: Some(dissociation),
+                panic_detected: Some(panic),
+            },
+        )
     }
 
     /// Manually advance to the next phase. Returns `true` if a phase existed.
@@ -1136,5 +1169,21 @@ mod tests {
             matches!(action, Some(SafetyAction::TerminateSession(_))),
             "Panic should trigger session termination"
         );
+    }
+    #[test]
+    fn missing_cortisol_does_not_masquerade_as_skin_conductance() {
+        let mut protocol = Protocol::restorative_sleep();
+        protocol.safety_constraints.push(SafetyConstraint {
+            name: "cortisol".into(),
+            condition: SafetyCondition::CortisolAbove(0.2),
+            action: SafetyAction::PauseProtocol,
+        });
+        let mut session = SessionState::new(protocol);
+        let tick = session.tick_with_signals(
+            0.5,
+            &[(BiofeedbackMetric::SkinConductance, 0.9)],
+            &SafetySignals::default(),
+        );
+        assert_eq!(tick.safety_action, None);
     }
 }

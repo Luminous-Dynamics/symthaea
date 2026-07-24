@@ -15,6 +15,30 @@
 //! provenance gate catches an unproved proof even if the source string was
 //! scrubbed.
 
+use std::fmt;
+
+/// A `#print axioms` transcript that cannot be authenticated as a Lean report.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AxiomParseError {
+    /// No supported `#print axioms` report was present in the captured output.
+    MissingReport,
+    /// A report marker was present, but its theorem name or axiom list was malformed.
+    MalformedReport(String),
+}
+
+impl fmt::Display for AxiomParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingReport => write!(f, "missing Lean #print axioms report"),
+            Self::MalformedReport(reason) => {
+                write!(f, "malformed Lean #print axioms report: {reason}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for AxiomParseError {}
+
 /// The axiom dependencies of a single proved theorem.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AxiomReport {
@@ -26,34 +50,45 @@ pub struct AxiomReport {
 
 impl AxiomReport {
     /// Parse the textual output of `#print axioms <name>`.
-    pub fn parse(output: &str) -> AxiomReport {
+    ///
+    /// Empty output, compiler diagnostics, and truncated lists are errors,
+    /// never evidence of an axiom-free proof.
+    pub fn parse(output: &str) -> Result<AxiomReport, AxiomParseError> {
         let flat = output.replace('\n', " ");
-        let theorem = first_quoted(&flat).unwrap_or_default();
+        let theorem = first_quoted(&flat).ok_or_else(|| {
+            if flat.contains("depend on any axioms") || flat.contains("depends on axioms:") {
+                AxiomParseError::MalformedReport("missing quoted theorem name".into())
+            } else {
+                AxiomParseError::MissingReport
+            }
+        })?;
 
         if flat.contains("does not depend on any axioms") {
-            return AxiomReport {
+            return Ok(AxiomReport {
                 theorem,
                 axioms: Vec::new(),
-            };
+            });
         }
 
-        let axioms = match flat.find("depends on axioms:") {
-            Some(idx) => {
-                let after = &flat[idx + "depends on axioms:".len()..];
-                let inner = match (after.find('['), after.find(']')) {
-                    (Some(a), Some(b)) if b > a => &after[a + 1..b],
-                    _ => after.trim(),
-                };
-                inner
-                    .split(',')
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect()
-            }
-            None => Vec::new(),
-        };
+        let idx = flat
+            .find("depends on axioms:")
+            .ok_or(AxiomParseError::MissingReport)?;
+        let after = &flat[idx + "depends on axioms:".len()..];
+        let open = after
+            .find('[')
+            .ok_or_else(|| AxiomParseError::MalformedReport("missing opening '['".into()))?;
+        let close = after[open + 1..]
+            .find(']')
+            .map(|relative| open + 1 + relative)
+            .ok_or_else(|| AxiomParseError::MalformedReport("missing closing ']'".into()))?;
+        let axioms = after[open + 1..close]
+            .split(',')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(ToOwned::to_owned)
+            .collect();
 
-        AxiomReport { theorem, axioms }
+        Ok(AxiomReport { theorem, axioms })
     }
 
     /// True if the proof depends on `sorryAx` — i.e. it is not actually proved.
@@ -97,7 +132,7 @@ mod tests {
 
     #[test]
     fn parses_no_axioms() {
-        let r = AxiomReport::parse("'foo' does not depend on any axioms");
+        let r = AxiomReport::parse("'foo' does not depend on any axioms").unwrap();
         assert_eq!(r.theorem, "foo");
         assert!(r.axioms.is_empty());
         assert!(!r.has_sorry());
@@ -106,7 +141,8 @@ mod tests {
     #[test]
     fn parses_axiom_list() {
         let r =
-            AxiomReport::parse("'thm' depends on axioms: [propext, Classical.choice, Quot.sound]");
+            AxiomReport::parse("'thm' depends on axioms: [propext, Classical.choice, Quot.sound]")
+                .unwrap();
         assert_eq!(r.theorem, "thm");
         assert_eq!(r.axioms, vec!["propext", "Classical.choice", "Quot.sound"]);
         assert_eq!(r.classical_axioms(), vec!["Classical.choice"]);
@@ -114,14 +150,14 @@ mod tests {
 
     #[test]
     fn detects_sorry() {
-        let r = AxiomReport::parse("'bad' depends on axioms: [sorryAx]");
+        let r = AxiomReport::parse("'bad' depends on axioms: [sorryAx]").unwrap();
         assert!(r.has_sorry());
     }
 
     #[test]
     fn tolerates_multiline_output() {
         let out = "'gate_mono' depends on axioms: [propext,\n  Quot.sound]";
-        let r = AxiomReport::parse(out);
+        let r = AxiomReport::parse(out).unwrap();
         assert_eq!(r.axioms, vec!["propext", "Quot.sound"]);
     }
 
@@ -132,5 +168,22 @@ mod tests {
         assert!(is_classical("Classical.choice"));
         assert!(is_classical("Classical.em"));
         assert!(!is_classical("propext"));
+    }
+
+    #[test]
+    fn rejects_empty_or_unrelated_output() {
+        assert_eq!(AxiomReport::parse(""), Err(AxiomParseError::MissingReport));
+        assert_eq!(
+            AxiomReport::parse("error: declaration uses 'sorry'"),
+            Err(AxiomParseError::MissingReport)
+        );
+    }
+
+    #[test]
+    fn rejects_truncated_axiom_list() {
+        assert!(matches!(
+            AxiomReport::parse("'t' depends on axioms: [propext"),
+            Err(AxiomParseError::MalformedReport(_))
+        ));
     }
 }

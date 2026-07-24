@@ -135,6 +135,19 @@ impl Key {
         }
     }
 
+    /// The dominant key: same tonality, tonic transposed up a perfect
+    /// fifth (7 semitones). The classic sonata-form second-subject key
+    /// when the home key is MAJOR; a minor-mode sonata moves to the
+    /// RELATIVE major instead (see [`Self::relative`]) — real
+    /// common-practice usage, not a uniform fifth-transposition. See
+    /// [`crate::sonata`].
+    pub fn dominant(self) -> Key {
+        Key {
+            tonic: self.tonic.transpose(7),
+            tonality: self.tonality,
+        }
+    }
+
     /// The relative key: major → its relative minor (scale degree 6 as the
     /// new tonic), minor → its relative major (scale degree 3). Relative
     /// keys share the same set of diatonic pitch classes, so this is a real

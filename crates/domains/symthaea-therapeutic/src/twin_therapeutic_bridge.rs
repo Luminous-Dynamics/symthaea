@@ -1,6 +1,9 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! **Experimental research module.** This API is excluded from default builds and
+//! must not autonomously deliver therapy, infer clinical state, or replace qualified care.
+//!
 //! Twin-therapeutic bridge: connects the neuro-digital twin (Direction A)
 //! to therapeutic consciousness protocols (Direction H) for closed-loop
 //! biofeedback-driven therapy.
@@ -22,8 +25,8 @@
 //! - Carhart-Harris & Friston (2019). REBUS model.
 
 use crate::consciousness_protocols::{
-    BiofeedbackMetric, Modality, Protocol, SafetyAction, SessionOutcome, SessionState,
-    SessionStatus, TargetState,
+    BiofeedbackMetric, Modality, Protocol, SafetyAction, SafetySignals, SessionOutcome,
+    SessionState, SessionStatus, TargetState,
 };
 
 // ---------------------------------------------------------------------------
@@ -64,6 +67,35 @@ pub struct EegFeatures {
 }
 
 // ---------------------------------------------------------------------------
+// Signal truth
+// ---------------------------------------------------------------------------
+
+/// Provenance attached to every signal crossing the bridge boundary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SignalProvenance {
+    /// A feature computed directly from an observed sensor stream.
+    ObservedDerived {
+        sensor_modality: &'static str,
+        feature: &'static str,
+    },
+    /// A model estimate that must never be relabeled as an observation.
+    Inferred {
+        model_id: &'static str,
+        source_feature: &'static str,
+    },
+    /// A value generated inside a simulation.
+    Simulated { model_id: &'static str },
+}
+
+/// A biofeedback value with explicit provenance.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BiofeedbackReading {
+    pub metric: BiofeedbackMetric,
+    pub value: f32,
+    pub provenance: SignalProvenance,
+}
+
+// ---------------------------------------------------------------------------
 // Bridge output
 // ---------------------------------------------------------------------------
 
@@ -76,8 +108,8 @@ pub struct TherapeuticOutput {
     pub progress: f64,
     /// Safety action if any constraint was triggered.
     pub safety_action: Option<SafetyAction>,
-    /// Current biofeedback readings derived from EEG.
-    pub biofeedback_readings: Vec<(BiofeedbackMetric, f32)>,
+    /// Current readings with source provenance.
+    pub biofeedback_readings: Vec<BiofeedbackReading>,
 }
 
 // ---------------------------------------------------------------------------
@@ -170,8 +202,12 @@ impl TwinTherapeuticBridge {
         }
         self.phi_history.push(phi);
 
-        // Step 1: Convert EEG to biofeedback metrics.
+        // Step 1: Convert EEG to truthfully named, provenance-carrying metrics.
         let biofeedback = self.eeg_to_biofeedback(eeg);
+        let protocol_metrics: Vec<(BiofeedbackMetric, f32)> = biofeedback
+            .iter()
+            .map(|reading| (reading.metric, reading.value))
+            .collect();
 
         // Step 2: Check bridge-level safety override.
         if phi < SAFETY_PHI_FLOOR && !self.safety_override {
@@ -200,19 +236,19 @@ impl TwinTherapeuticBridge {
             };
         }
 
-        // Step 3: Tick the underlying session.
-        let modalities = self.session.tick(phi, &biofeedback);
-
-        // Step 4: Check protocol-level safety.
-        let protocol_safety = self
-            .session
-            .check_safety(phi, 0.0)
-            .or_else(|| self.last_safety.clone().filter(|_| self.safety_override));
+        // Step 3: Tick the underlying session. Safety is evaluated exactly once
+        // inside the session from explicitly observed safety signals. EEG-derived
+        // metrics are not relabeled as cortisol, HRV, or skin conductance.
+        let tick =
+            self.session
+                .tick_with_signals(phi, &protocol_metrics, &SafetySignals::default());
+        let protocol_safety = tick.safety_action;
+        let modalities = tick.modalities;
         if protocol_safety.is_some() {
             self.last_safety.clone_from(&protocol_safety);
         }
 
-        // Step 5: Update progress toward target.
+        // Step 4: Update progress toward target.
         let raw_progress = self.compute_raw_progress(eeg, phi);
         let alpha = self.adaptation_rate as f64;
         self.progress_ema = self.progress_ema * (1.0 - alpha) + raw_progress * alpha;
@@ -225,23 +261,52 @@ impl TwinTherapeuticBridge {
         }
     }
 
-    /// Convert EEG features to biofeedback metrics the protocol understands.
-    fn eeg_to_biofeedback(&self, eeg: &EegFeatures) -> Vec<(BiofeedbackMetric, f32)> {
+    /// Convert EEG features to truthfully named biofeedback readings.
+    fn eeg_to_biofeedback(&self, eeg: &EegFeatures) -> Vec<BiofeedbackReading> {
+        let observed = |metric, value, feature| BiofeedbackReading {
+            metric,
+            value,
+            provenance: SignalProvenance::ObservedDerived {
+                sensor_modality: "EEG",
+                feature,
+            },
+        };
+
         vec![
-            (BiofeedbackMetric::AlphaCoherence, eeg.alpha_coherence),
-            (BiofeedbackMetric::ThetaPower, eeg.theta_frontal_midline),
-            (BiofeedbackMetric::GammaSynchrony, eeg.gamma_synchrony),
-            // beta_gamma_ratio proxies arousal; map to HRV (inverse relationship:
-            // high arousal = low HRV). Hammond (2011).
-            (
-                BiofeedbackMetric::HeartRateVariability,
-                (1.0 - eeg.beta_gamma_ratio).clamp(0.0, 1.0),
+            observed(
+                BiofeedbackMetric::EegFrontalAlphaAsymmetry,
+                eeg.frontal_alpha_asymmetry,
+                "frontal_alpha_asymmetry",
             ),
-            // theta_beta_ratio proxies inattention; map to skin conductance
-            // (higher inattention = lower conductance). Monastra et al. (2001).
-            (
-                BiofeedbackMetric::SkinConductance,
-                (1.0 - eeg.theta_beta_ratio).clamp(0.0, 1.0),
+            observed(
+                BiofeedbackMetric::ThetaPower,
+                eeg.theta_frontal_midline,
+                "theta_frontal_midline",
+            ),
+            observed(
+                BiofeedbackMetric::EegBetaGammaRatio,
+                eeg.beta_gamma_ratio,
+                "beta_gamma_ratio",
+            ),
+            observed(
+                BiofeedbackMetric::EegDeltaPower,
+                eeg.delta_power,
+                "delta_power",
+            ),
+            observed(
+                BiofeedbackMetric::AlphaCoherence,
+                eeg.alpha_coherence,
+                "alpha_coherence",
+            ),
+            observed(
+                BiofeedbackMetric::GammaSynchrony,
+                eeg.gamma_synchrony,
+                "gamma_synchrony",
+            ),
+            observed(
+                BiofeedbackMetric::EegThetaBetaRatio,
+                eeg.theta_beta_ratio,
+                "theta_beta_ratio",
             ),
         ]
     }
@@ -390,13 +455,32 @@ mod tests {
     fn eeg_maps_to_biofeedback_metrics() {
         let bridge = TwinTherapeuticBridge::new(Protocol::flow_state());
         let readings = bridge.eeg_to_biofeedback(&relaxed_eeg());
-        assert_eq!(readings.len(), 5);
-        let metrics: Vec<BiofeedbackMetric> = readings.iter().map(|(m, _)| *m).collect();
+        assert_eq!(readings.len(), 7);
+        let metrics: Vec<BiofeedbackMetric> = readings.iter().map(|r| r.metric).collect();
         assert!(metrics.contains(&BiofeedbackMetric::AlphaCoherence));
         assert!(metrics.contains(&BiofeedbackMetric::ThetaPower));
         assert!(metrics.contains(&BiofeedbackMetric::GammaSynchrony));
-        assert!(metrics.contains(&BiofeedbackMetric::HeartRateVariability));
-        assert!(metrics.contains(&BiofeedbackMetric::SkinConductance));
+        assert!(metrics.contains(&BiofeedbackMetric::EegBetaGammaRatio));
+        assert!(metrics.contains(&BiofeedbackMetric::EegThetaBetaRatio));
+        assert!(!metrics.contains(&BiofeedbackMetric::HeartRateVariability));
+        assert!(!metrics.contains(&BiofeedbackMetric::SkinConductance));
+        assert!(readings.iter().all(|r| matches!(
+            &r.provenance,
+            SignalProvenance::ObservedDerived {
+                sensor_modality: "EEG",
+                ..
+            }
+        )));
+    }
+
+    #[test]
+    fn eeg_proxies_never_claim_peripheral_measurements() {
+        let bridge = TwinTherapeuticBridge::new(Protocol::flow_state());
+        let readings = bridge.eeg_to_biofeedback(&anxious_eeg());
+        assert!(!readings.iter().any(|r| matches!(
+            r.metric,
+            BiofeedbackMetric::HeartRateVariability | BiofeedbackMetric::SkinConductance
+        )));
     }
 
     #[test]
@@ -409,8 +493,8 @@ mod tests {
         let readings = bridge.eeg_to_biofeedback(&eeg);
         let alpha_val = readings
             .iter()
-            .find(|(m, _)| *m == BiofeedbackMetric::AlphaCoherence)
-            .map(|(_, v)| *v)
+            .find(|reading| reading.metric == BiofeedbackMetric::AlphaCoherence)
+            .map(|reading| reading.value)
             .unwrap();
         assert!((alpha_val - 0.95).abs() < 1e-6);
     }
@@ -472,10 +556,16 @@ mod tests {
     fn therapeutic_output_includes_biofeedback_readings() {
         let mut bridge = TwinTherapeuticBridge::new(Protocol::flow_state());
         let output = bridge.process(&relaxed_eeg(), 0.6);
-        assert_eq!(output.biofeedback_readings.len(), 5);
-        // All values should be in [0, 1].
-        for (_, v) in &output.biofeedback_readings {
-            assert!(*v >= 0.0 && *v <= 1.0, "Metric out of range: {v}");
+        assert_eq!(output.biofeedback_readings.len(), 7);
+        for reading in &output.biofeedback_readings {
+            assert!(reading.value.is_finite());
+            assert!(matches!(
+                &reading.provenance,
+                SignalProvenance::ObservedDerived {
+                    sensor_modality: "EEG",
+                    ..
+                }
+            ));
         }
     }
 

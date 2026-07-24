@@ -11,9 +11,27 @@
 //! novel rule discovery. The XOR self-inverse property means "rule application"
 //! is exact algebraic recovery, not generalization to unseen transform types.
 //!
-//! The 2-AFC scoring (predicted vs random distractor) is a lenient baseline that
-//! primarily tests whether the encoding preserves any signal at all, not whether
-//! the system can solve ARC tasks in the way humans or LLMs do. Do not interpret
+//! **RETRACTION + FIX (2026-07-18)**: the "2-AFC" scoring here used to compare
+//! the predicted output HV's similarity to the real answer against its
+//! similarity to a **literally random `BinaryHV`** — and since
+//! `BinaryGridEncoder` builds every grid HV from a shared per-task basis
+//! (row/col/color HVs), ANY structured grid encoding beats random noise
+//! regardless of whether the predicted output's *rule* is correct. That
+//! scoring measured 99.0% on the real 400-task ARC-AGI training set (matching
+//! the previously published "100% 2-AFC" claim in
+//! `book/src/research/validation.md`) but collapsed to 13.8% (identity
+//! distractor, *below* chance) and 64.9%/67.8% (reflect_x/reflect_y) once the
+//! distractor was fair (equally structured). See `examples/arc_2afc_reaudit.rs`
+//! for the standalone re-audit that found this — same inflation class as the
+//! retracted Hendrycks ETHICS 94.5%→56.2% figure.
+//!
+//! `fair_distractor_grid()` below is the fix: it builds a distractor by
+//! applying a generic wrong transform (reflect/color-swap, in the same spirit
+//! as `arc_analogy.rs`'s "wrong transform on C" distractor) to the test input,
+//! falling back to identity only if every transform coincides with the real
+//! answer. `evaluate_arc_tasks()` now scores against this fair distractor by
+//! default. Even so: this remains **encoding-fidelity** scoring (XOR
+//! bind/unbind rule recovery), not novel rule discovery — do not interpret
 //! high 2-AFC accuracy as comparable to ARC solve rates reported for LLMs or
 //! humans, which require generating exact pixel-perfect outputs.
 //!
@@ -32,6 +50,34 @@
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::path::Path;
+use symthaea_core::hdc::grid_encoder::GridEncoder;
+
+/// Build a fair (equally-structured) 2-AFC distractor grid for ARC-style
+/// rule-transfer scoring. See this file's 2026-07-18 retraction note for why
+/// a literally random `BinaryHV` is not a fair alternative.
+///
+/// Tries a small set of generic wrong transforms of `test_input` — in the
+/// same spirit as `arc_analogy.rs`'s "wrong transform on C" distractor — and
+/// returns the first one that actually differs from `true_output` (a 2-AFC
+/// trial needs two distinct alternatives). Identity (test input unchanged)
+/// is included only as a last resort: it's a legitimate "no transformation
+/// happened" wrong guess, but as the harshest of the candidates (see the
+/// re-audit's 13.8% figure) it shouldn't be the *first* thing tried against
+/// every task. Returns `None` in the rare case where every candidate
+/// coincides with the true answer — callers should skip that trial.
+pub fn fair_distractor_grid(
+    test_input: &[Vec<u8>],
+    true_output: &[Vec<u8>],
+) -> Option<Vec<Vec<u8>>> {
+    let candidates = [
+        GridEncoder::reflect_x(test_input),
+        GridEncoder::reflect_y(test_input),
+        GridEncoder::color_replace(test_input, 0, 1),
+        GridEncoder::color_replace(test_input, 1, 2),
+        test_input.to_vec(),
+    ];
+    candidates.into_iter().find(|g| g != true_output)
+}
 
 /// A single ARC input/output pair.
 #[derive(Debug, Clone, Deserialize)]
@@ -120,13 +166,12 @@ pub fn load_arc_tasks(dir: &Path) -> Result<BTreeMap<String, ArcTask>, String> {
 ///   1. Encode all training pairs, compute rule HVs.
 ///   2. Bundle training rules into a consensus rule.
 ///   3. Apply consensus rule to test input, compare to test output.
-///   4. Score: 2-AFC (predicted vs random grid distractor).
+///   4. Score: 2-AFC (predicted vs fair-distractor grid — see `fair_distractor_grid()`).
 pub fn evaluate_arc_tasks(
     tasks: &BTreeMap<String, ArcTask>,
     dimension: usize,
     seed: u64,
 ) -> ArcDatasetResult {
-    use symthaea_core::hdc::BinaryHV;
     use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 
     let _dimension = dimension;
@@ -204,8 +249,14 @@ pub fn evaluate_arc_tasks(
         let pred_sim = predicted.similarity(&test_out_hv) as f64;
         similarity_sum += pred_sim;
 
-        // 2-AFC: predicted vs random distractor
-        let distractor = BinaryHV::random(seed ^ (task_count as u64) ^ 0xDEAD);
+        // 2-AFC: predicted vs a fair (equally structured) distractor — see
+        // this file's 2026-07-18 retraction note. Falls back to the test
+        // input unchanged in the rare case every generic transform happens
+        // to coincide with the true output; that fallback can never register
+        // as a false "correct" (comparing predicted to itself is never >).
+        let distractor_grid = fair_distractor_grid(&test_pair.input, &test_pair.output)
+            .unwrap_or_else(|| test_pair.input.clone());
+        let distractor = encoder.encode_grid(&distractor_grid);
         let dist_sim = predicted.similarity(&distractor) as f64;
         let correct = pred_sim > dist_sim;
         if correct {
@@ -377,7 +428,10 @@ pub fn format_arc_dataset_result(result: &ArcDatasetResult) -> String {
     };
     lines.push(String::new());
     lines.push("Reference: Real ARC-AGI solve rates (NOT directly comparable):".to_string());
-    lines.push("  NOTE: Symthaea uses 2-AFC (predicted vs random distractor),".to_string());
+    lines.push(
+        "  NOTE: Symthaea uses 2-AFC (predicted vs fair equally-structured distractor),"
+            .to_string(),
+    );
     lines.push("  while the scores below require exact pixel-perfect generation.".to_string());
     lines.push("  Our metric tests encoding fidelity, not rule discovery.".to_string());
     lines.push(format!(

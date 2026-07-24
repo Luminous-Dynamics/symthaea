@@ -48,10 +48,15 @@ pub(crate) struct ConsciousnessEngineOutput {
     /// Structural Phi decomposition — cluster-level micro/meso/macro
     pub structural_phi: Option<StructuralPhiResult>,
     /// Multi-modal integrated Phi — cross-modal binding [0, 1]
+    /// 0.0 means the subsystem is absent (never constructed in production —
+    /// constructor.rs passes None), not a measured zero. Absent subsystems do
+    /// NOT deflate unified_consciousness (compute_unified renormalizes).
     pub multimodal_phi: f64,
     /// Consciousness Equation V2 — 7-theory unified C(t) [0, 1]
+    /// 0.0 = absent (see multimodal_phi doc)
     pub equation_v2_consciousness: f64,
     /// Pipeline consciousness — end-to-end sensory→consciousness [0, 1]
+    /// 0.0 = absent (see multimodal_phi doc)
     pub pipeline_consciousness: f64,
     /// Limiting component from equation v2
     pub limiting_component: Option<CoreComponent>,
@@ -94,11 +99,51 @@ pub(crate) struct ConsciousnessEngineOutput {
     pub total_us: u64,
 }
 
+impl ConsciousnessEngineOutput {
+    /// Neutral output for the engine kill-switch
+    /// (`CognitiveLoopConfig::enable_consciousness_engine = false`): every
+    /// feedback field is its no-op value (lr factors 1.0, deltas 0.0,
+    /// measurements absent). Consciousness_level downstream degrades to its
+    /// own unmeasured fallback — "no measurement" must never fabricate one
+    /// (the absent-vs-zero rule). Added 2026-07-18 so experiments can finally
+    /// ablate the measurement spine itself (keystone P5 open question).
+    pub fn disabled() -> Self {
+        Self {
+            spectral_mip_phi: None,
+            hierarchical_mip_phi: None,
+            structural_phi: None,
+            multimodal_phi: 0.0,
+            equation_v2_consciousness: 0.0,
+            pipeline_consciousness: 0.0,
+            limiting_component: None,
+            unified_consciousness: 0.0,
+            sigma: None,
+            confidence_delta: 0.0,
+            lr_factor: 1.0,
+            exploration_delta: 0.0,
+            subsystem_lr_factor: 1.0,
+            episodic_consolidation_boost: None,
+            current_weights: [0.0; 4],
+            weight_variance: 0.0,
+            convergence_state: WeightConvergenceState::Initializing,
+            spectral_mip_us: 0,
+            equation_v2_us: 0,
+            pipeline_us: 0,
+            multimodal_us: 0,
+            total_us: 0,
+        }
+    }
+}
+
 /// Input snapshot for the consciousness engine.
 ///
 /// Collected once per cycle by the caller, passed immutably.
 pub(crate) struct ConsciousnessEngineInput<'a> {
-    /// Current HDC encoding (ContinuousHV, 16384-dim) — for SpectralMIP push
+    /// HV for the SpectralMIP push (its only consumer). In production this is
+    /// the stimulus encoding BOUND with internal temporal state, so Φ measures
+    /// the system rather than the input stream — pushing the bare stimulus
+    /// encoding made Φ byte-identical across subsystem ablations (see
+    /// docs/PHI_SIGNAL_TRACE_2026-07-15.md symptom 2).
     pub hdv: &'a ContinuousHV,
     /// Current HDC encoding (BinaryHV, 16384-bit) — for multimodal + pipeline
     pub hv16: &'a BinaryHV,

@@ -85,7 +85,7 @@ fn main() -> anyhow::Result<()> {
     println!("\n[7] SECURE DREAMING (Confidential Evolution)");
     let secure_engine = SecureDreamingEngine::new(std::env::current_dir()?);
     let secure_result = secure_engine.dream_securely(
-        std::path::Path::new("crates/symthaea-broca/src/gating.rs"),
+        std::path::Path::new("crates/domains/symthaea-broca/src/gating.rs"),
         "Improve performance while maintaining formal correctness and safety",
     )?;
 

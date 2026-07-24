@@ -45,6 +45,10 @@ pub enum HalError {
     #[error("calibration error: {0}")]
     Calibration(String),
 
+    /// Sensor configuration, identity, or sample validation failure.
+    #[error("sensor '{name}': {detail}")]
+    Sensor { name: String, detail: String },
+
     /// PCA9685 device not responding or misconfigured.
     #[error("PCA9685 at address 0x{address:02X}: {detail}")]
     Pca9685 { address: u8, detail: String },

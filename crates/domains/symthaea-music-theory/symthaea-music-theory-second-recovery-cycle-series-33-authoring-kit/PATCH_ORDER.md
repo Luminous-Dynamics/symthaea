@@ -1,0 +1,33 @@
+# Series 33 patch order
+
+1. `0001-audit-freeze-second-recovery-cycle-scenario.patch-plan.md`
+2. `0002-test-add-qualified-series-32-frozen-baseline-fixture.patch-plan.md`
+3. `0003-refactor-extend-shared-identities-for-cycle-two.patch-plan.md`
+4. `0004-feat-implement-content-derived-cycle-two-identity.patch-plan.md`
+5. `0005-feat-implement-minimal-recovery-cycle-ledger.patch-plan.md`
+6. `0006-feat-implement-cycle-scoped-recovery-authority-policy.patch-plan.md`
+7. `0007-feat-implement-cycle-scoped-recovered-witness-policy.patch-plan.md`
+8. `0008-feat-implement-explicit-quarantine-carry-forward.patch-plan.md`
+9. `0009-feat-implement-cycle-two-branch-candidate-set.patch-plan.md`
+10. `0010-feat-implement-cycle-two-recovery-plan.patch-plan.md`
+11. `0011-feat-implement-cycle-two-authorization-statements.patch-plan.md`
+12. `0012-feat-implement-dual-quorum-cycle-two-authorization.patch-plan.md`
+13. `0013-refactor-extend-transition-gate-for-cycle-selection.patch-plan.md`
+14. `0014-feat-extend-reference-store-for-cycle-selection.patch-plan.md`
+15. `0015-feat-commit-cycle-two-branch-selection-atomically.patch-plan.md`
+16. `0016-security-bound-active-cycle-two-attempts.patch-plan.md`
+17. `0017-feat-implement-post-cycle-two-fresh-checkpoint-input.patch-plan.md`
+18. `0018-feat-implement-cycle-two-reentry-certification.patch-plan.md`
+19. `0019-feat-implement-cycle-two-closure-plan.patch-plan.md`
+20. `0020-feat-implement-cycle-two-closure-authorization.patch-plan.md`
+21. `0021-feat-commit-cycle-two-closure-transactionally.patch-plan.md`
+22. `0022-feat-implement-multi-cycle-lifecycle-audit-through-cycle-two.patch-plan.md`
+23. `0023-feat-register-cycle-two-slice-schema-prefix.patch-plan.md`
+24. `0024-feat-add-shell-free-external-verifier-cycle-two-roles.patch-plan.md`
+25. `0025-feat-add-cycle-two-recovery-cli.patch-plan.md`
+26. `0026-test-run-positive-freeze-to-cycle-two-closure-scenario.patch-plan.md`
+27. `0027-test-run-cross-cycle-replay-lineage-and-quarantine-corpus.patch-plan.md`
+28. `0028-test-run-cycle-two-race-crash-abandonment-and-limit-matrix.patch-plan.md`
+29. `0029-feat-freeze-independent-cycle-two-conformance-vectors.patch-plan.md`
+30. `0030-ci-add-cycle-two-build-test-and-reproduction-lanes.patch-plan.md`
+31. `0031-docs-publish-series-33-cycle-two-qualification-report.patch-plan.md`

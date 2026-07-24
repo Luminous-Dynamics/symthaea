@@ -106,6 +106,11 @@ pub fn humanize_with_consciousness(
 /// - optional legato overlap for sustained melodic/bass lines (block chords
 ///   should NOT get it — extending every chord tone smears the harmonic
 ///   rhythm into mud).
+///
+/// `timing_scale` scales the TIMING jitter SD only (velocity noise is
+/// dynamics, not clock) — the performance-dialect hook: a groove dialect
+/// tightens it (e.g. 0.6), a session dialect loosens it (e.g. 1.2). Pass
+/// 1.0 for the historical behavior (bit-identical — ×1.0 is exact).
 pub fn humanize_score_note(
     note: &mut Note,
     beat_position: f32,
@@ -113,8 +118,9 @@ pub fn humanize_score_note(
     seed: u32,
     phi: f32,
     legato: bool,
+    timing_scale: f32,
 ) {
-    let sd_ms = timing_sd_ms(phi);
+    let sd_ms = timing_sd_ms(phi) * timing_scale.max(0.0);
     let beat_in_bar = beat_position % beats_per_bar.max(1.0);
     // Downbeats anchor tighter (humans lock to beat 1).
     let beat_tightness = if beat_in_bar < 0.5 { 0.5 } else { 1.0 };
@@ -214,8 +220,8 @@ mod tests {
         for seed in 0..200 {
             let mut a = make();
             let mut b = make();
-            humanize_score_note(&mut a, 1.0, 4.0, seed, 0.5, true);
-            humanize_score_note(&mut b, 1.0, 4.0, seed, 0.5, true);
+            humanize_score_note(&mut a, 1.0, 4.0, seed, 0.5, true, 1.0);
+            humanize_score_note(&mut b, 1.0, 4.0, seed, 0.5, true, 1.0);
             assert_eq!(a.start_time, b.start_time, "same seed → same jitter");
             assert_eq!(a.velocity, b.velocity);
             // Jitter must stay in the tens-of-milliseconds regime — audible
@@ -238,10 +244,39 @@ mod tests {
             velocity: 0.7,
         };
         let mut chordal = melodic;
-        humanize_score_note(&mut melodic, 0.0, 4.0, 3, 0.5, true);
-        humanize_score_note(&mut chordal, 0.0, 4.0, 3, 0.5, false);
+        humanize_score_note(&mut melodic, 0.0, 4.0, 3, 0.5, true, 1.0);
+        humanize_score_note(&mut chordal, 0.0, 4.0, 3, 0.5, false, 1.0);
         assert!(melodic.duration > 0.5, "legato should extend");
         assert_eq!(chordal.duration, 0.5, "chords keep their written length");
+    }
+
+    #[test]
+    fn score_humanize_timing_scale_scales_only_the_clock() {
+        // The dialect hook: timing_scale shrinks (or grows) the onset
+        // jitter proportionally, leaves velocity noise untouched, and at
+        // 0.0 pins the note to its written onset exactly.
+        for seed in 1..100 {
+            let make = || Note {
+                frequency: 440.0,
+                start_time: 2.0,
+                duration: 0.5,
+                velocity: 0.7,
+            };
+            let (mut full, mut tight, mut frozen) = (make(), make(), make());
+            humanize_score_note(&mut full, 1.0, 4.0, seed, 0.5, false, 1.0);
+            humanize_score_note(&mut tight, 1.0, 4.0, seed, 0.5, false, 0.6);
+            humanize_score_note(&mut frozen, 1.0, 4.0, seed, 0.5, false, 0.0);
+            let full_dev = full.start_time - 2.0;
+            let tight_dev = tight.start_time - 2.0;
+            assert!(
+                (tight_dev - full_dev * 0.6).abs() < 1e-6,
+                "seed {seed}: jitter must scale linearly ({full_dev} vs {tight_dev})"
+            );
+            assert_eq!(frozen.start_time, 2.0, "scale 0.0 must freeze the clock");
+            // Velocity noise is NOT the clock — identical across scales.
+            assert_eq!(full.velocity, tight.velocity);
+            assert_eq!(full.velocity, frozen.velocity);
+        }
     }
 
     #[test]
@@ -257,7 +292,7 @@ mod tests {
                 duration: 0.5,
                 velocity: 0.6,
             };
-            humanize_score_note(&mut note, 2.0, 4.0, seed, 0.5, false);
+            humanize_score_note(&mut note, 2.0, 4.0, seed, 0.5, false, 1.0);
             sum += note.velocity;
         }
         let mean = sum / n as f32;

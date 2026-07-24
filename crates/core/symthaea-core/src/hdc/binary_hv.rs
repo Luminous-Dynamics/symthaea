@@ -101,10 +101,8 @@ impl BinaryHV {
     ///
     /// Fills all 2048 bytes from the OS entropy source (`rand::rngs::OsRng`).
     /// Unlike [`Self::random`], the result is unpredictable and cannot be
-    /// recomputed from a known input. **Use this to generate any HDC-MAC
-    /// key, one-time-pad mask, or secret-sharing mask** -- those primitives'
-    /// claimed information-theoretic security only holds when keys/masks
-    /// come from a true entropy source, not a deterministic seed.
+    /// recomputed from a known input. This supplies entropy only; it does not
+    /// make the quarantined HDC MAC or threshold constructions secure.
     pub fn secure_random() -> Self {
         use rand::RngCore;
         use rand::rngs::OsRng;
@@ -709,10 +707,16 @@ impl BinaryHV {
 
         let shift = shift % Self::DIM;
 
-        // Convert bytes to u64 words for efficient rotation (2048 bytes = 256 u64 words)
+        // Convert bytes to u64 words for efficient rotation (2048 bytes = 256 u64 words).
+        // Explicit little-endian (not native-endian) so the result is architecture-
+        // independent: two machines permuting the same input bytes by the same shift
+        // must get the same output bytes, which native-endian conversion does not
+        // guarantee on a big-endian host. This is a no-op on every currently deployed
+        // target (x86_64, aarch64 are both little-endian), so it changes no observed
+        // behavior today -- it only pins down the specification.
         let mut words = [0u64; 256];
         for (i, chunk) in self.0.chunks_exact(8).enumerate() {
-            words[i] = u64::from_ne_bytes([
+            words[i] = u64::from_le_bytes([
                 chunk[0], chunk[1], chunk[2], chunk[3], chunk[4], chunk[5], chunk[6], chunk[7],
             ]);
         }
@@ -745,10 +749,10 @@ impl BinaryHV {
             }
         }
 
-        // Convert u64 words back to bytes
+        // Convert u64 words back to bytes (little-endian, matching the decode above)
         let mut result = [0u8; 2048];
         for (i, word) in result_words.iter().enumerate() {
-            let bytes = word.to_ne_bytes();
+            let bytes = word.to_le_bytes();
             result[i * 8..i * 8 + 8].copy_from_slice(&bytes);
         }
 
@@ -2283,6 +2287,39 @@ mod tests {
                 shift
             );
         }
+    }
+
+    /// Known-answer vectors for `permute()`, independently computed (Python
+    /// re-implementation of the exact word-rotation algorithm, little-endian
+    /// word conversion). Input: byte `i` = `i % 256` for `i` in `0..2048`.
+    /// Guards against a regression back to native-endian byte conversion,
+    /// which would silently change these outputs on a big-endian host (see
+    /// `symthaea-hdc-crypto`'s copy of this same fix and KAT for the
+    /// standalone quarantine crate).
+    #[test]
+    fn test_permute_known_answer_vectors() {
+        let mut bytes = [0u8; 2048];
+        for (i, b) in bytes.iter_mut().enumerate() {
+            *b = (i % 256) as u8;
+        }
+        let input = BinaryHV(bytes);
+
+        // Case 1: shift=137 exercises the general (non-word-aligned) path.
+        let r137 = input.permute(137);
+        assert_eq!(&r137.0[0..8], &[223, 225, 227, 229, 231, 233, 235, 237]);
+        assert_eq!(r137.0[1000], 175);
+        assert_eq!(r137.0[1023], 221);
+        assert_eq!(r137.0[1024], 223);
+        assert_eq!(&r137.0[2040..], &[207, 209, 211, 213, 215, 217, 219, 221]);
+
+        // Case 2: shift=128 is word-aligned (128 bits = 16 bytes = 2 words),
+        // exercising the `bit_shift == 0` branch.
+        let r128 = input.permute(128);
+        assert_eq!(&r128.0[0..8], &[240, 241, 242, 243, 244, 245, 246, 247]);
+        assert_eq!(r128.0[1000], 216);
+        assert_eq!(r128.0[1023], 239);
+        assert_eq!(r128.0[1024], 240);
+        assert_eq!(&r128.0[2040..], &[232, 233, 234, 235, 236, 237, 238, 239]);
     }
 
     #[test]

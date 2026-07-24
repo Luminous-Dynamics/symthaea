@@ -135,7 +135,23 @@ impl MasterConsciousnessEquation {
         let sigmoid_bottleneck = self.sigmoid(bottleneck_factor);
 
         // Step 3: Compute weighted sum of components [Σ(wᵢ × Cᵢ × γᵢ) / Σ(wᵢ)]
-        let weighted_sum = self.compute_weighted_sum(inputs, m, n, soc);
+        //
+        // Defensive clamp (2026-07-22, probe_cl_calibration finding): the 7 fields on
+        // `ConsciousnessInputs` are each clamped to [0,1] by their callers (see the
+        // 2026-07-18 embodiment unit fix), but `m`/`n`/`soc` here are NOT — they come
+        // straight from `EmbodimentFactor::compute()` / `NarrativeCoherence::compute()`
+        // / `SocialEmbedding::compute()`, products of internal state fields with no
+        // equivalent upper-bound guarantee. `test_weighted_sum_bounded_for_unit_inputs`
+        // only exercises the 7 bounded inputs, not m/n/soc, so it didn't catch this.
+        // Measured live (probe_cl_calibration, "alarming" regime, 300 cycles post the
+        // embodiment fix): mean weighted_sum = 1.1057 > 1.0, and consciousness_level
+        // was pinned at the Green safety tier for all 300 cycles with zero transitions
+        // — the intended [0,1] invariant this component should hold (documented in
+        // `test_weighted_sum_bounded_for_unit_inputs`'s own doc comment) was silently
+        // violated, pushing consciousness_level toward its outer clamp ceiling and
+        // destroying tier resolution in exactly the high-arousal regime where graduated
+        // motor-safety discrimination matters most.
+        let weighted_sum = self.compute_weighted_sum(inputs, m, n, soc).clamp(0.0, 1.0);
 
         // Step 4: Compute temporal stability ρ(t)
         let temporal_stability = self.compute_temporal_stability();

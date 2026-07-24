@@ -205,11 +205,12 @@ pub struct OrganoidEthicsAssessment {
     pub current_tier: EthicsTier,
     /// Actions required at this tier.
     pub required_actions: Vec<RequiredAction>,
-    /// IIT Phi estimate.
+    /// Graph/activity/maturity integration proxy (historical field name).
     pub phi_estimate: f64,
     /// Confidence in Phi estimate (0.0-1.0).
     pub phi_confidence: f64,
-    /// Unix-style timestamp of assessment.
+    /// Caller-provided timestamp of assessment. Zero is reserved for the
+    /// deprecated legacy `assess` wrapper and means unspecified.
     pub assessment_timestamp: u64,
     /// Developmental day of the organoid.
     pub developmental_day: u32,
@@ -367,11 +368,12 @@ impl ConsciousnessEthicsFramework {
         }
     }
 
-    /// Run a full ethics assessment on an organoid's current metrics.
-    pub fn assess(
+    /// Run a full ethics assessment with an explicit caller-provided timestamp.
+    pub fn assess_at(
         &mut self,
         metrics: &OrganoidMetrics,
         lfp: Option<&LocalFieldPotential>,
+        assessment_timestamp: u64,
     ) -> OrganoidEthicsAssessment {
         let indicators = self.detect_indicators(metrics, lfp);
         let (tier, convergence_count, tier_from_convergence) = self.classify_tier(&indicators);
@@ -385,7 +387,7 @@ impl ConsciousnessEthicsFramework {
             required_actions: actions,
             phi_estimate: metrics.phi_estimate,
             phi_confidence: self.phi_confidence(metrics),
-            assessment_timestamp: 0, // caller should set real timestamp
+            assessment_timestamp,
             developmental_day: metrics.stage as u32,
             risk_score: risk,
             recommendation,
@@ -398,6 +400,20 @@ impl ConsciousnessEthicsFramework {
         }
         self.assessment_history.push(assessment.clone());
         assessment
+    }
+
+    /// Historical compatibility wrapper. Prefer [`Self::assess_at`] so audit
+    /// records cannot silently lose temporal provenance.
+    #[deprecated(
+        since = "0.1.0",
+        note = "use assess_at and provide an explicit assessment timestamp"
+    )]
+    pub fn assess(
+        &mut self,
+        metrics: &OrganoidMetrics,
+        lfp: Option<&LocalFieldPotential>,
+    ) -> OrganoidEthicsAssessment {
+        self.assess_at(metrics, lfp, 0)
     }
 
     /// Detect all consciousness indicators from organoid metrics and LFP.
@@ -891,10 +907,22 @@ mod tests {
     }
 
     #[test]
+    fn assess_at_preserves_timestamp() {
+        let mut fw = ConsciousnessEthicsFramework::new();
+        let metrics = make_metrics(0.0, 0.0, 0.0, false, 0.0, 0, 0);
+        let assessment = fw.assess_at(&metrics, None, 1_721_234_567);
+        assert_eq!(assessment.assessment_timestamp, 1_721_234_567);
+        assert_eq!(
+            fw.assessment_history.last().unwrap().assessment_timestamp,
+            1_721_234_567
+        );
+    }
+
+    #[test]
     fn tier0_for_no_activity() {
         let mut fw = ConsciousnessEthicsFramework::new();
         let metrics = make_metrics(0.0, 0.0, 0.0, false, 0.0, 0, 0);
-        let assessment = fw.assess(&metrics, None);
+        let assessment = fw.assess_at(&metrics, None, 1);
         assert_eq!(assessment.current_tier, EthicsTier::Tier0);
         assert!(assessment.required_actions.is_empty());
         assert_eq!(
@@ -908,7 +936,7 @@ mod tests {
         let mut fw = ConsciousnessEthicsFramework::new();
         // Above threshold (precautionary: 0.1 * 0.7 = 0.07)
         let metrics = make_metrics(0.5, 0.6, 0.0, false, 1.0, 100, 200);
-        let assessment = fw.assess(&metrics, None);
+        let assessment = fw.assess_at(&metrics, None, 1);
         assert_eq!(assessment.current_tier, EthicsTier::Tier1);
         assert!(
             assessment
@@ -923,7 +951,7 @@ mod tests {
         let mut fw = ConsciousnessEthicsFramework::new();
         let metrics = make_metrics(0.5, 0.6, 0.0, false, 1.0, 100, 200);
         let lfp = make_lfp(0.1, 0.02, 0.0);
-        let assessment = fw.assess(&metrics, Some(&lfp));
+        let assessment = fw.assess_at(&metrics, Some(&lfp), 1);
         assert_eq!(assessment.current_tier, EthicsTier::Tier2);
         assert!(
             assessment
@@ -938,7 +966,7 @@ mod tests {
         let mut fw = ConsciousnessEthicsFramework::new();
         // Phi = 0.15 > 0.1 * 0.7 = 0.07 (precautionary Tier 3)
         let metrics = make_metrics(0.5, 0.6, 0.15, false, 1.0, 200, 500);
-        let assessment = fw.assess(&metrics, None);
+        let assessment = fw.assess_at(&metrics, None, 1);
         assert_eq!(assessment.current_tier, EthicsTier::Tier3);
     }
 
@@ -947,7 +975,7 @@ mod tests {
         let mut fw = ConsciousnessEthicsFramework::new();
         // Phi = 0.5 > 0.3 * 0.7 = 0.21 (precautionary Tier 4)
         let metrics = make_metrics(1.0, 0.9, 0.5, true, 10.0, 500, 3000);
-        let assessment = fw.assess(&metrics, None);
+        let assessment = fw.assess_at(&metrics, None, 1);
         assert_eq!(assessment.current_tier, EthicsTier::Tier4);
     }
 
@@ -958,12 +986,12 @@ mod tests {
         // With precautionary: Tier 3 threshold = 0.1 * 0.7 = 0.07, so 0.08 triggers Tier 3
         let mut fw_precautionary = ConsciousnessEthicsFramework::new();
         fw_precautionary.set_precautionary_mode(true);
-        let a1 = fw_precautionary.assess(&metrics, None);
+        let a1 = fw_precautionary.assess_at(&metrics, None, 1);
 
         // Without precautionary: Tier 3 threshold = 0.1, so 0.08 does NOT trigger Tier 3
         let mut fw_normal = ConsciousnessEthicsFramework::new();
         fw_normal.set_precautionary_mode(false);
-        let a2 = fw_normal.assess(&metrics, None);
+        let a2 = fw_normal.assess_at(&metrics, None, 1);
 
         assert!(a1.current_tier > a2.current_tier);
     }
@@ -986,7 +1014,7 @@ mod tests {
         // Feed accelerating Phi: 0.0, 0.01, 0.03, 0.06, 0.10
         for phi in [0.0, 0.01, 0.03, 0.06, 0.10] {
             let metrics = make_metrics(0.5, 0.3, phi, false, 1.0, 100, 200);
-            fw.assess(&metrics, None);
+            fw.assess_at(&metrics, None, 1);
         }
         let trend = fw.trend_analysis();
         assert!(trend.phi_slope > 0.0, "Phi slope should be positive");
@@ -998,7 +1026,7 @@ mod tests {
         let mut fw = ConsciousnessEthicsFramework::new();
         // Tier 3
         let metrics = make_metrics(1.0, 0.8, 0.2, true, 8.0, 300, 1000);
-        let assessment = fw.assess(&metrics, None);
+        let assessment = fw.assess_at(&metrics, None, 1);
         assert!(assessment.current_tier >= EthicsTier::Tier3);
         assert!(
             assessment
@@ -1012,7 +1040,7 @@ mod tests {
     fn external_review_required_at_tier4() {
         let mut fw = ConsciousnessEthicsFramework::new();
         let metrics = make_metrics(2.0, 0.95, 0.6, true, 15.0, 800, 5000);
-        let assessment = fw.assess(&metrics, None);
+        let assessment = fw.assess_at(&metrics, None, 1);
         assert_eq!(assessment.current_tier, EthicsTier::Tier4);
         assert!(
             assessment
@@ -1029,7 +1057,7 @@ mod tests {
 
         for i in 0..5 {
             let metrics = make_metrics(0.5, 0.3, i as f64 * 0.05, false, 1.0, 100, 200);
-            fw.assess(&metrics, None);
+            fw.assess_at(&metrics, None, 1);
         }
         assert_eq!(fw.history().len(), 5);
     }
@@ -1038,7 +1066,7 @@ mod tests {
     fn report_format_is_nonempty() {
         let mut fw = ConsciousnessEthicsFramework::new();
         let metrics = make_metrics(1.0, 0.8, 0.2, true, 8.0, 300, 1000);
-        let assessment = fw.assess(&metrics, None);
+        let assessment = fw.assess_at(&metrics, None, 1);
         let report = fw.format_report(&assessment);
         assert!(!report.is_empty());
         assert!(report.contains("ORGANOID CONSCIOUSNESS ETHICS REPORT"));

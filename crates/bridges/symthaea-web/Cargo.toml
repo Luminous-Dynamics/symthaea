@@ -3,6 +3,7 @@ name = "symthaea-web"
 version = "0.1.0"
 edition = "2024"
 description = "Symthaea consciousness portal — pure Rust/Leptos CSR frontend"
+license = "AGPL-3.0-or-later"
 
 [dependencies]
 leptos = { version = "0.8", features = ["csr"] }
@@ -36,7 +37,7 @@ features = [
     # WebSocket + Storage for installer
     "WebSocket", "CloseEvent", "Storage",
     # URL params for QR code auto-connect
-    "Location", "UrlSearchParams",
+    "History", "Location", "UrlSearchParams",
 ]
 
 [features]

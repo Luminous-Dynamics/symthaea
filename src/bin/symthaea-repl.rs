@@ -13,6 +13,11 @@
 //! This binary demonstrates the Track 6 integration goal: connecting
 //! the existing but disconnected cognitive components.
 //!
+//! See also: `symthaea-ui` (`crates/bridges/symthaea-ui/`), a web UI over
+//! the `symthaea-service` HTTP gateway for the same kind of conversation —
+//! kept as a separate surface, not a replacement for this terminal REPL,
+//! per `SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md`'s non-goals.
+//!
 //! ## Usage
 //!
 //! ```bash
@@ -81,6 +86,12 @@ struct Args {
     /// Audio output device name (default: system default)
     #[arg(long, value_name = "DEVICE")]
     voice_device: Option<String>,
+
+    /// Enable live microphone capture: auditory HVs blend into perception
+    /// each cycle (requires the voice-stt-live feature).
+    #[cfg(feature = "voice-stt-live")]
+    #[arg(long)]
+    mic: bool,
 
     /// Number of cognitive cycles per input (default: 3)
     #[arg(long, default_value = "3")]
@@ -348,6 +359,14 @@ impl ReplState {
             // Speak the text
             if let Err(e) = voice.speak(text) {
                 warn!("Voice synthesis error: {}", e);
+            }
+
+            // Close the voice→cognition feedback loop: feed the synthesis
+            // quality metrics (audio-informed when the vocal-tract pipeline
+            // ran) into the loop's VoiceFeedbackBridge, which modulates
+            // learning rate and telemetry. Previously computed and dropped.
+            if let Some(metrics) = voice.take_voice_metrics() {
+                self.cognitive.update_voice_feedback(metrics);
             }
         }
     }
@@ -622,6 +641,15 @@ CRITICAL PERSONA DIRECTIVE:
                     search_query
                 );
 
+                // Pre-existing gap found while building a different feature
+                // combination (demo,voice-tts,singing) that had never been
+                // compiled together before: this call site referenced
+                // symthaea::web_research unconditionally even though the
+                // module itself is `#[cfg(feature = "web_research_module")]`
+                // -- fixed by gating the call site the same way, matching
+                // the pattern the /sing handler already uses for its own
+                // feature-gated fallback.
+                #[cfg(feature = "web_research_module")]
                 if let Ok(mut epistemic_bridge) =
                     symthaea::web_research::EpistemicConsciousness::new()
                 {
@@ -653,6 +681,13 @@ CRITICAL PERSONA DIRECTIVE:
                             println!("\x1b[31m[TOOL ERROR] Epistemic search failed: {}\x1b[0m", e)
                         }
                     }
+                }
+                #[cfg(not(feature = "web_research_module"))]
+                {
+                    println!(
+                        "\x1b[33m[WEB RESEARCH] Not compiled in — rebuild with \
+                         `--features web_research_module` to enable.\x1b[0m"
+                    );
                 }
             }
         }
@@ -1134,6 +1169,10 @@ fn display_banner() {
     println!("    /metrics    - Display full consciousness metrics");
     println!("    /stats      - Display loop statistics");
     println!("    /voice      - Display voice output status");
+    println!(
+        "    /sing [lyrics] - Sing lyrics to a real composed melody, driven by the \
+         live consciousness state (needs `singing` feature)"
+    );
     println!("    /reset      - Reset cognitive state");
     println!("    /help       - Show this help");
     println!("    /primitives - List available primitives");
@@ -1194,6 +1233,24 @@ fn main() -> Result<()> {
     );
     if voice_enabled {
         info!("Voice output enabled");
+    }
+
+    // Live microphone → auditory HV blend into perception. First shipped
+    // caller of start_stt_capture(): the whole voice-stt-live stack existed
+    // with zero activation sites before this flag.
+    #[cfg(feature = "voice-stt-live")]
+    if args.mic {
+        match state
+            .cognitive
+            .start_stt_capture(symthaea::perception::MicCaptureConfig::default())
+        {
+            Ok(()) => {
+                println!("  🎤 Live microphone capture active — auditory HVs blend into");
+                println!("     perception each cycle (set SYMTHAEA_STT_PROTOTYPES to also");
+                println!("     decode frame-level phonemes).");
+            }
+            Err(e) => eprintln!("  Failed to start microphone capture: {e}"),
+        }
     }
 
     // Initial cognitive warmup
@@ -1397,6 +1454,180 @@ fn main() -> Result<()> {
                 {
                     println!("\n  Voice Output Status: Not Available");
                     println!("  Compile with --features voice-tts to enable\n");
+                }
+                continue;
+            }
+            _ if input.starts_with("/sing") => {
+                // First audible caller for the muse→voice singing bridge
+                // (sing_to_pcm previously had zero non-test call sites).
+                #[cfg(all(feature = "singing", feature = "voice-tts"))]
+                {
+                    let lyrics = {
+                        let arg = input.trim_start_matches("/sing").trim();
+                        if arg.is_empty() {
+                            "la la la la la"
+                        } else {
+                            arg
+                        }
+                    };
+                    if let Some(ref mut voice) = state.voice_output {
+                        // Real composed melody (SYMTHAEA_SINGING_PLAN_2026-07-18.md
+                        // Phase 1): the same music-theory composer muse's own
+                        // compose_and_realize_styled uses, driven by the live
+                        // consciousness state -- replaces the old hardcoded
+                        // 5-note pentatonic arc, which ignored both what
+                        // Symthaea could compose and what she was feeling.
+                        let n_tokens = lyrics.split_whitespace().count();
+                        let snapshot = state.cognitive.consciousness_snapshot();
+                        // ~2 words/bar is a small, tunable heuristic so short
+                        // and long lyrics both get a proportionate melody
+                        // instead of a fixed length.
+                        let bars = (n_tokens as f32 / 2.0).ceil().max(1.0) as usize;
+                        let intent = symthaea_muse::MusicalIntent {
+                            valence: snapshot.unified_valence,
+                            arousal: snapshot.unified_arousal,
+                            energy: snapshot.unified_psi.clamp(0.0, 1.0),
+                            bars,
+                            // Deterministic per-phrase seed: same lyrics
+                            // (at the same consciousness state) sing the
+                            // same melody, but different lyrics vary it --
+                            // not cryptographic, just needs to differ
+                            // phrase-to-phrase (std::hash::Hash's
+                            // DefaultHasher is fine for this).
+                            seed: {
+                                use std::hash::{Hash, Hasher};
+                                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                                lyrics.hash(&mut hasher);
+                                hasher.finish()
+                            },
+                            ..symthaea_muse::MusicalIntent::default()
+                        };
+                        let musical_state = symthaea_muse::MusicalState {
+                            arousal: snapshot.unified_arousal,
+                            valence: snapshot.unified_valence,
+                            consciousness_level: snapshot.unified_psi.clamp(0.0, 1.0),
+                            prediction_error: snapshot.prediction_error,
+                            ..symthaea_muse::MusicalState::default()
+                        };
+                        let mut melody = symthaea_muse::theory_realize::compose_and_perform_melody(
+                            &intent,
+                            symthaea_muse::Style::Classical,
+                            &musical_state,
+                        );
+                        // Cap the composed melody to (roughly) the lyrics'
+                        // real syllable count. A composed melody is sized by
+                        // `bars`/the composer's own density defaults, not by
+                        // the lyrics -- an over-long melody relative to
+                        // syllable count means sing()'s sustain-last-vowel
+                        // policy stretches the FINAL syllable's vowel across
+                        // most of the extra notes, which in practice
+                        // produces mostly-one-held-vowel audio (found via
+                        // examples/singing_intelligibility_gate.rs,
+                        // SYMTHAEA_SINGING_PLAN Phase 3: a 3-syllable phrase
+                        // sung to an uncapped 22-note melody spent ~85% of
+                        // its duration on one drone and Whisper transcribed
+                        // pure hallucinated filler).
+                        let target_notes =
+                            symthaea_muse::singing_bridge::syllable_count(lyrics).max(1);
+                        melody.truncate(target_notes);
+                        // The formant vocoder was rejected by the user
+                        // ("not pleasant") -- see memory
+                        // feedback_no_formant_vocoder_voice.md. This handler
+                        // still called it until now; it was overlooked when
+                        // the Kokoro/DiffSinger singing pipelines landed via
+                        // standalone examples (SING-1..SING-16) without ever
+                        // being wired back into the interactive REPL.
+                        //
+                        // Backend order: DiffSinger (placeholder voice --
+                        // see voice::diffsinger_engine module docs) when
+                        // SYMTHAEA_DIFFSINGER_WORKER is configured, since
+                        // SING-15 verified it actually holds a target pitch
+                        // where Kokoro's post-hoc retune could not
+                        // (SING-13/14); Kokoro otherwise.
+                        let performance =
+                            symthaea::voice::singing_engine::VocalPerformance::from_melody(
+                                lyrics, &melody, "en",
+                            )
+                            .ok();
+
+                        let mut rendered: Option<(Vec<f32>, u32, &'static str)> = None;
+                        if let (Some(performance), Ok(worker_path)) =
+                            (&performance, std::env::var("SYMTHAEA_DIFFSINGER_WORKER"))
+                        {
+                            match symthaea::voice::diffsinger::DiffSingerEngine::spawn(
+                                std::path::Path::new(&worker_path),
+                            ) {
+                                Ok(mut engine) => {
+                                    use symthaea::voice::singing_engine::SingingVoiceEngine;
+                                    match engine.render(performance) {
+                                        Ok(stem) if !stem.samples.is_empty() => {
+                                            rendered = Some((
+                                                stem.samples,
+                                                stem.sample_rate,
+                                                "DiffSinger (placeholder voice)",
+                                            ));
+                                        }
+                                        Ok(_) => {}
+                                        Err(e) => println!(
+                                            "\n  DiffSinger render failed ({e}), falling back \
+                                             to Kokoro...\n"
+                                        ),
+                                    }
+                                }
+                                Err(e) => println!(
+                                    "\n  DiffSinger worker unavailable ({e}), falling back to \
+                                     Kokoro...\n"
+                                ),
+                            }
+                        }
+                        if rendered.is_none() {
+                            match symthaea::voice::kokoro_singing::sing_with_kokoro(
+                                lyrics, &melody, "af_heart",
+                            ) {
+                                Ok((samples, rate)) if !samples.is_empty() => {
+                                    rendered = Some((samples, rate, "Kokoro"));
+                                }
+                                Ok(_) => {}
+                                Err(e) => println!("\n  Kokoro singing failed: {e}\n"),
+                            }
+                        }
+
+                        match rendered {
+                            Some((audio, rate, backend)) => {
+                                let secs = audio.len() as f32 / rate as f32;
+                                match voice.play_samples_at(&audio, rate) {
+                                    Ok(()) if voice.is_audio_available() => {
+                                        println!(
+                                            "\n  ♪ Singing {} composed notes via {backend} \
+                                             ({secs:.1}s)...\n",
+                                            melody.len()
+                                        );
+                                    }
+                                    Ok(()) => {
+                                        println!(
+                                            "\n  ♪ Synthesized {} composed notes via {backend} \
+                                             ({secs:.1}s) but no audio backend is available — \
+                                             build with `audio` or `live-voice` to hear it.\n",
+                                            melody.len()
+                                        );
+                                    }
+                                    Err(e) => println!("\n  Singing playback failed: {e}\n"),
+                                }
+                            }
+                            None => println!(
+                                "\n  Nothing to sing (empty lyrics/melody, or no singing \
+                                 backend available -- set SYMTHAEA_DIFFSINGER_WORKER or check \
+                                 Kokoro's model download).\n"
+                            ),
+                        }
+                    } else {
+                        println!("\n  Voice output is disabled. Start with --voice to sing.\n");
+                    }
+                }
+                #[cfg(not(all(feature = "singing", feature = "voice-tts")))]
+                {
+                    println!("\n  Singing not compiled in.");
+                    println!("  Rebuild with: --features \"demo,voice-tts,audio,singing\"\n");
                 }
                 continue;
             }

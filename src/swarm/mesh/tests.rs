@@ -20,13 +20,14 @@ fn wisdom_packet_roundtrip() {
         urgency: MeshUrgency::Cruise,
         timestamp_s: 1_700_000_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0xFF),
     };
 
     let bytes = packet.to_bytes();
     assert_eq!(bytes.len(), WISDOM_PACKET_SIZE);
+    assert_eq!(bytes[0], WISDOM_PACKET_VERSION);
 
     let decoded = WisdomPacket::from_bytes(&bytes).unwrap();
     assert_eq!(decoded.source_id, packet.source_id);
@@ -47,13 +48,13 @@ fn wisdom_packet_fragment_count() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0xAA),
     };
 
     let frags = packet.fragment();
-    // 2072 / 214 = 9.68 → 10 data + 1 FEC = 11
+    // 2104 / 214 = 9.84 → 10 data + 1 FEC = 11
     assert_eq!(frags.len(), 11);
 }
 
@@ -66,7 +67,7 @@ fn wisdom_packet_full_radio_roundtrip() {
         urgency: MeshUrgency::Critical,
         timestamp_s: 1_708_000_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0x42),
     };
@@ -117,6 +118,25 @@ fn payload_type_byte_roundtrip() {
 fn wisdom_packet_too_short_rejected() {
     assert!(WisdomPacket::from_bytes(&[0; 100]).is_none());
     assert!(WisdomPacket::from_bytes(&[0; WISDOM_PACKET_SIZE - 1]).is_none());
+    assert!(WisdomPacket::from_bytes(&[0; WISDOM_PACKET_SIZE + 1]).is_none());
+}
+
+#[test]
+fn wisdom_packet_rejects_legacy_or_unknown_wire_version() {
+    let packet = WisdomPacket {
+        source_id: [0; 8],
+        sequence: 1,
+        phi: 0.5,
+        urgency: MeshUrgency::Normal,
+        timestamp_s: 0,
+        payload_type: PayloadType::WisdomVector,
+        auth_mac: [0; 32],
+        ttl: 0,
+        wisdom: test_hv(1),
+    };
+    let mut bytes = packet.to_bytes();
+    bytes[0] = 1;
+    assert!(WisdomPacket::from_bytes(&bytes).is_none());
 }
 
 #[test]
@@ -156,7 +176,7 @@ fn affective_packet(
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000,
         payload_type: PayloadType::Affective,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: BinaryHV(wisdom_bytes),
     }
@@ -241,7 +261,7 @@ fn test_extract_gradient_wrong_type() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     };
@@ -268,7 +288,7 @@ fn test_extract_gradient_nan_rejected() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::Gradient,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: BinaryHV(bytes),
     };
@@ -292,7 +312,7 @@ fn test_extract_gradient_nan_trust_rejected() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::Gradient,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: BinaryHV(bytes),
     };
@@ -316,7 +336,7 @@ fn test_extract_gradient_overflow_rejected() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::Gradient,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: BinaryHV(bytes),
     };
@@ -380,7 +400,7 @@ fn test_peer_registry_tracks_packets() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0x01),
     };
@@ -391,7 +411,7 @@ fn test_peer_registry_tracks_packets() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0x02),
     };
@@ -402,7 +422,7 @@ fn test_peer_registry_tracks_packets() {
         urgency: MeshUrgency::Critical,
         timestamp_s: 0,
         payload_type: PayloadType::Heartbeat,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0x03),
     };
@@ -432,7 +452,7 @@ fn test_peer_registry_expire_stale() {
         urgency: MeshUrgency::Cruise,
         timestamp_s: 0,
         payload_type: PayloadType::Heartbeat,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0x04),
     };
@@ -461,7 +481,7 @@ fn test_peer_registry_average_phi() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0x10),
     };
@@ -472,7 +492,7 @@ fn test_peer_registry_average_phi() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0x20),
     };
@@ -582,7 +602,7 @@ fn test_rate_limit_allows_under_limit() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0x01),
     };
@@ -606,7 +626,7 @@ fn test_rate_limit_blocks_over_limit() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0x02),
     };
@@ -635,7 +655,7 @@ fn test_rate_limit_window_resets() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0x03),
     };
@@ -672,7 +692,7 @@ fn test_ttl_wire_roundtrip() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 5,
         wisdom: test_hv(0x01),
     };
@@ -691,12 +711,12 @@ fn test_ttl_zero_backward_compat() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0x01),
     };
     let bytes = packet.to_bytes();
-    assert_eq!(bytes[23], 0);
+    assert_eq!(bytes[WISDOM_PACKET_TTL_OFFSET], 0);
     let decoded = WisdomPacket::from_bytes(&bytes).unwrap();
     assert_eq!(decoded.ttl, 0);
 }
@@ -715,12 +735,22 @@ fn test_packet_mac_roundtrip() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 3,
         wisdom: test_hv(0xAB),
     };
     let mut bytes = packet.to_bytes();
     let mac = compute_packet_mac(&bytes, &key);
+    // Independently generated with Python's stdlib HMAC/SHA-256 over the
+    // version-2 wire image (the 32-byte tag field is all zeroes).
+    assert_eq!(
+        mac,
+        [
+            0x09, 0x1a, 0x84, 0xf8, 0xf0, 0xba, 0x7b, 0x85, 0xa0, 0x49, 0xb9, 0x5e, 0x3c, 0xf2,
+            0x1c, 0x10, 0x0a, 0x41, 0x3c, 0xbc, 0x26, 0x29, 0xf2, 0x51, 0xa2, 0x89, 0xc5, 0x5b,
+            0x17, 0x4f, 0xbc, 0x70,
+        ]
+    );
     packet.auth_mac = mac;
     bytes = packet.to_bytes();
     assert!(verify_packet_mac(&bytes, &key));
@@ -736,7 +766,7 @@ fn test_packet_mac_rejects_tampered() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 3,
         wisdom: test_hv(0xAB),
     };
@@ -760,7 +790,7 @@ fn test_packet_mac_rejects_wrong_key() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 3,
         wisdom: test_hv(0xAB),
     };
@@ -769,6 +799,54 @@ fn test_packet_mac_rejects_wrong_key() {
     packet.auth_mac = mac;
     bytes = packet.to_bytes();
     assert!(!verify_packet_mac(&bytes, &key_b));
+}
+
+/// Regression for the historical 8-bit tag: knowing or guessing the first
+/// byte is no longer sufficient because all 256 tag bits are verified.
+#[test]
+fn test_packet_mac_rejects_first_byte_only_tag() {
+    let key = [0x42u8; 32];
+    let mut packet = WisdomPacket {
+        source_id: [0xDE; 8],
+        sequence: 42,
+        phi: 0.7,
+        urgency: MeshUrgency::Normal,
+        timestamp_s: 1_700_000,
+        payload_type: PayloadType::WisdomVector,
+        auth_mac: [0; 32],
+        ttl: 3,
+        wisdom: test_hv(0xAB),
+    };
+    let full_tag = compute_packet_mac(&packet.to_bytes(), &key);
+    packet.auth_mac[0] = full_tag[0];
+
+    assert!(!verify_packet_mac(&packet.to_bytes(), &key));
+}
+
+#[test]
+fn test_packet_mac_rejects_wrong_length_or_wire_version() {
+    let key = [0x42u8; 32];
+    let packet = WisdomPacket {
+        source_id: [0xDE; 8],
+        sequence: 42,
+        phi: 0.7,
+        urgency: MeshUrgency::Normal,
+        timestamp_s: 1_700_000,
+        payload_type: PayloadType::WisdomVector,
+        auth_mac: [0; 32],
+        ttl: 3,
+        wisdom: test_hv(0xAB),
+    };
+    let mut bytes = packet.to_bytes();
+    let tag = compute_packet_mac(&bytes, &key);
+    bytes[WISDOM_PACKET_AUTH_TAG_START..WISDOM_PACKET_AUTH_TAG_END].copy_from_slice(&tag);
+
+    let mut with_trailer = bytes.to_vec();
+    with_trailer.push(0);
+    assert!(!verify_packet_mac(&with_trailer, &key));
+
+    bytes[0] = 1;
+    assert!(!verify_packet_mac(&bytes, &key));
 }
 
 #[test]
@@ -780,11 +858,11 @@ fn test_packet_mac_zero_without_key() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0xAB),
     };
-    assert_eq!(packet.auth_mac, 0);
+    assert_eq!(packet.auth_mac, [0; 32]);
 }
 
 #[test]
@@ -796,13 +874,13 @@ fn test_packet_mac_preserved_through_serde() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0xAB,
+        auth_mac: [0xAB; 32],
         ttl: 3,
         wisdom: test_hv(0xAB),
     };
     let bytes = packet.to_bytes();
     let decoded = WisdomPacket::from_bytes(&bytes).unwrap();
-    assert_eq!(decoded.auth_mac, 0xAB);
+    assert_eq!(decoded.auth_mac, [0xAB; 32]);
     assert_eq!(decoded.ttl, 3);
 }
 
@@ -816,7 +894,7 @@ fn test_packet_mac_fragment_roundtrip() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 3,
         wisdom: test_hv(0xAB),
     };
@@ -844,9 +922,10 @@ fn test_packet_mac_fragment_roundtrip() {
 }
 
 // ====================================================================
-// HDC-MAC on WisdomPacket (Phase 4 wiring)
+// Quarantined legacy HDC tag compatibility tests
 // ====================================================================
 
+#[cfg(feature = "insecure-experimental-crypto")]
 #[test]
 fn test_wisdom_packet_hdc_mac_roundtrip() {
     let packet = WisdomPacket {
@@ -856,7 +935,7 @@ fn test_wisdom_packet_hdc_mac_roundtrip() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 3,
         wisdom: BinaryHV::random(42),
     };
@@ -865,6 +944,7 @@ fn test_wisdom_packet_hdc_mac_roundtrip() {
     assert!(packet.verify_hdc_mac(&key, &mac));
 }
 
+#[cfg(feature = "insecure-experimental-crypto")]
 #[test]
 fn test_wisdom_packet_hdc_mac_wrong_key_fails() {
     let packet = WisdomPacket {
@@ -874,7 +954,7 @@ fn test_wisdom_packet_hdc_mac_wrong_key_fails() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 3,
         wisdom: BinaryHV::random(42),
     };
@@ -884,6 +964,7 @@ fn test_wisdom_packet_hdc_mac_wrong_key_fails() {
     assert!(!packet.verify_hdc_mac(&key_b, &mac));
 }
 
+#[cfg(feature = "insecure-experimental-crypto")]
 #[test]
 fn test_wisdom_packet_hdc_mac_tampered_wisdom_fails() {
     let key = BinaryHV::random(99);
@@ -894,7 +975,7 @@ fn test_wisdom_packet_hdc_mac_tampered_wisdom_fails() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 3,
         wisdom: BinaryHV::random(42),
     };
@@ -906,6 +987,7 @@ fn test_wisdom_packet_hdc_mac_tampered_wisdom_fails() {
     assert!(!tampered.verify_hdc_mac(&key, &mac));
 }
 
+#[cfg(feature = "insecure-experimental-crypto")]
 #[test]
 fn test_wisdom_packet_hdc_mac_noisy_verify() {
     let packet = WisdomPacket {
@@ -915,7 +997,7 @@ fn test_wisdom_packet_hdc_mac_noisy_verify() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 3,
         wisdom: BinaryHV::random(42),
     };
@@ -957,7 +1039,7 @@ fn test_peer_registry_has_peer() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0x01),
     };
@@ -978,7 +1060,7 @@ fn test_compress_decompress_roundtrip() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 3,
         wisdom: test_hv(0xAB),
     };
@@ -1000,7 +1082,7 @@ fn test_compress_heartbeat_uses_envelope() {
         urgency: MeshUrgency::Cruise,
         timestamp_s: 0,
         payload_type: PayloadType::Heartbeat,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: BinaryHV([0u8; 2048]),
     };
@@ -1029,7 +1111,7 @@ fn test_decompress_tolerates_trailing_bytes() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: test_hv(0x42),
     };
@@ -1080,7 +1162,7 @@ fn test_from_affective_sets_ttl_and_urgency() {
     assert_eq!(pkt.ttl, MESH_DEFAULT_TTL);
     assert!(matches!(pkt.urgency, MeshUrgency::Cruise));
     assert!(matches!(pkt.payload_type, PayloadType::Affective));
-    assert_eq!(pkt.auth_mac, 0);
+    assert_eq!(pkt.auth_mac, [0; 32]);
 }
 
 #[test]
@@ -1098,7 +1180,7 @@ fn test_from_gradient_sets_ttl_and_urgency() {
     assert_eq!(pkt.ttl, MESH_DEFAULT_TTL);
     assert!(matches!(pkt.urgency, MeshUrgency::Normal));
     assert!(matches!(pkt.payload_type, PayloadType::Gradient));
-    assert_eq!(pkt.auth_mac, 0);
+    assert_eq!(pkt.auth_mac, [0; 32]);
 }
 
 #[test]
@@ -1110,14 +1192,14 @@ fn test_heartbeat_packet_fields() {
         urgency: MeshUrgency::Cruise,
         timestamp_s: 1_700_000_000,
         payload_type: PayloadType::Heartbeat,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: MESH_DEFAULT_TTL,
         wisdom: BinaryHV::zero(),
     };
     assert_eq!(pkt.ttl, MESH_DEFAULT_TTL);
     assert!(matches!(pkt.urgency, MeshUrgency::Cruise));
     assert!(matches!(pkt.payload_type, PayloadType::Heartbeat));
-    assert_eq!(pkt.auth_mac, 0);
+    assert_eq!(pkt.auth_mac, [0; 32]);
 }
 
 // ====================================================================
@@ -1135,7 +1217,7 @@ fn test_compress_none_envelope_size() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: raw,
     };
@@ -1193,7 +1275,7 @@ fn test_compress_fragment_reassemble_roundtrip() {
         urgency: MeshUrgency::Critical,
         timestamp_s: 1_700_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 3,
         wisdom: test_hv(0xBB),
     };
@@ -1239,7 +1321,7 @@ fn test_compress_fragment_reassemble_with_fec_loss() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 2_000_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 2,
         wisdom: test_hv(0xDD),
     };
@@ -1290,7 +1372,7 @@ fn test_compress_fragment_reassemble_heartbeat() {
         urgency: MeshUrgency::Cruise,
         timestamp_s: 3_000_000,
         payload_type: PayloadType::Heartbeat,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 1,
         wisdom: BinaryHV::zero(), // heartbeat has zero BinaryHV
     };
@@ -1343,7 +1425,7 @@ fn test_is_partitioned_false_with_peers() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: BinaryHV::zero(),
     };
@@ -1373,7 +1455,7 @@ fn test_stale_peer_count() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0; 32],
         ttl: 0,
         wisdom: BinaryHV::zero(),
     };

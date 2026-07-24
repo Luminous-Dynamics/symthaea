@@ -1,0 +1,33 @@
+{
+  "plan_version": "symthaea-muse-study-artifact-plan-v1",
+  "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "methodology_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "schedule_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "renderer_binary_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "render_environment_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "soundfont_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "required_sample_rate_hz": 48000,
+  "required_channels": 2,
+  "maximum_absolute_peak": 0.99,
+  "minimum_duration_ms": 30000,
+  "maximum_duration_ms": 180000,
+  "maximum_within_fixture_duration_delta_ms": 250,
+  "renderer_command_template": [
+    "nix",
+    "develop",
+    "--command",
+    "render-frozen-cognition-artifact"
+  ],
+  "entries": [
+    {
+      "presentation_id": "replace-with-public-presentation-id",
+      "audio_relative_path": "audio/replace.wav",
+      "recipe_relative_path": "recipes/replace.json",
+      "score_relative_path": "scores/replace.json",
+      "validation_report_relative_path": "validation/replace.json",
+      "midi_relative_path": "midi/replace.mid",
+      "renderer_log_relative_path": "logs/replace.json"
+    }
+  ],
+  "minimum_absolute_peak": 0.001
+}

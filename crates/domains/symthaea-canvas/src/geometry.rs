@@ -30,9 +30,24 @@ pub fn build_scene(state: &AestheticState) -> SceneNode {
     // Layer 1: Background (always present)
     root.children.push(build_background(state));
 
+    // Semantic field layers: complexity, attention, and physiological constraint.
+    let semantic_opacity = layer_opacity(psi, 0.15, 0.2);
+    if semantic_opacity > 0.0 && state.complexity > 0.05 {
+        root.children
+            .push(build_complexity_contours(state, semantic_opacity));
+    }
+    if semantic_opacity > 0.0 && state.attention > 0.05 {
+        root.children
+            .push(build_attention_halo(state, semantic_opacity));
+    }
+    if semantic_opacity > 0.0 && state.allostatic_load > 0.05 {
+        root.children
+            .push(build_allostatic_boundary(state, semantic_opacity));
+    }
+
     // Layer 7: Turbulence filter definition (threshold 0.1)
     let turb_opacity = layer_opacity(psi, 0.1, 0.15);
-    if turb_opacity > 0.0 {
+    if turb_opacity > 0.0 && state.turbulence > 0.01 {
         root.children.push(build_turbulence_filter(state));
     }
 
@@ -96,9 +111,11 @@ pub fn build_scene(state: &AestheticState) -> SceneNode {
 /// Layer 1: Dark background with consciousness-responsive radial gradient.
 fn build_background(state: &AestheticState) -> SceneNode {
     let psi = state.luminosity;
-    // HSL(220, 15%, 5% + Ψ*15%)
-    let bg_color = Color::from_hsl(220.0, 0.15, 0.05 + psi * 0.15);
-    let bg_center = Color::from_hsl(220.0, 0.2, 0.08 + psi * 0.2);
+    // Valence warmth shifts the field from indigo/cobalt toward violet/amber.
+    let field_hue = 240.0 - state.warmth * 75.0;
+    let center_hue = 230.0 - state.warmth * 105.0;
+    let bg_color = Color::from_hsl(field_hue, 0.15 + state.warmth * 0.05, 0.05 + psi * 0.15);
+    let bg_center = Color::from_hsl(center_hue, 0.2 + state.warmth * 0.1, 0.08 + psi * 0.2);
 
     let mut group = SceneNode::group(Some("background"));
 
@@ -133,6 +150,78 @@ fn build_background(state: &AestheticState) -> SceneNode {
     group
 }
 
+/// Complexity is rendered as nested structural contours rather than hidden metadata.
+fn build_complexity_contours(state: &AestheticState, opacity: f32) -> SceneNode {
+    let mut group = SceneNode::group(Some("complexity"));
+    group.style.opacity = Some(opacity * (0.25 + state.complexity * 0.5));
+
+    let (cx, cy) = state.layout_center;
+    let count = (1 + (state.complexity * 5.0).round() as usize).min(6);
+    for i in 0..count {
+        let radius = 34.0 + i as f32 * 22.0;
+        group.children.push(
+            SceneNode::circle(cx, cy, radius).with_style(Style {
+                fill: None,
+                stroke: Some(
+                    state
+                        .palette
+                        .ambient
+                        .with_alpha(0.12 + state.complexity * 0.18),
+                ),
+                stroke_width: Some(0.4 + state.complexity * 0.8),
+                ..Style::default()
+            }),
+        );
+    }
+
+    group
+}
+
+/// Acetylcholine sharpens and expands the attentional aperture.
+fn build_attention_halo(state: &AestheticState, opacity: f32) -> SceneNode {
+    let mut group = SceneNode::group(Some("attention"));
+    group.style.opacity = Some(opacity * (0.2 + state.attention * 0.6));
+    let (cx, cy) = state.layout_center;
+    let radius = 20.0 + state.attention * 34.0;
+    group.children.push(
+        SceneNode::circle(cx, cy, radius).with_style(Style {
+            fill: None,
+            stroke: Some(
+                state
+                    .palette
+                    .accent
+                    .with_alpha(0.2 + state.attention * 0.45),
+            ),
+            stroke_width: Some(0.5 + state.attention * 2.0),
+            ..Style::default()
+        }),
+    );
+    group
+}
+
+/// Allostatic load contracts the available visual field into a visible boundary.
+fn build_allostatic_boundary(state: &AestheticState, opacity: f32) -> SceneNode {
+    let mut group = SceneNode::group(Some("allostatic-boundary"));
+    group.style.opacity = Some(opacity * state.allostatic_load);
+    let inset = 12.0 + state.allostatic_load * 76.0;
+    let width = (VIEWPORT_W - inset * 2.0).max(0.0);
+    let height = (VIEWPORT_H - inset * 2.0).max(0.0);
+    let mut boundary = SceneNode::rect(inset, inset, width, height);
+    if let NodeKind::Rect { rx, .. } = &mut boundary.kind {
+        *rx = 8.0 + state.allostatic_load * 24.0;
+    }
+    boundary.style = Style {
+        fill: None,
+        stroke: Some(
+            Color::from_hsl(8.0, 0.65, 0.5).with_alpha(0.25 + state.allostatic_load * 0.5),
+        ),
+        stroke_width: Some(0.75 + state.allostatic_load * 2.25),
+        ..Style::default()
+    };
+    group.children.push(boundary);
+    group
+}
+
 /// Layer 2: 8-spoke mandala with harmony-driven radii.
 fn build_harmonic_octagon(state: &AestheticState, opacity: f32) -> SceneNode {
     let mut group = SceneNode::group(Some("harmonics"));
@@ -150,9 +239,19 @@ fn build_harmonic_octagon(state: &AestheticState, opacity: f32) -> SceneNode {
     }
 
     let poly = SceneNode::polygon(points.clone(), true).with_style(Style {
-        fill: Some(state.palette.primary.with_alpha(0.15)),
-        stroke: Some(state.palette.primary.with_alpha(0.6)),
-        stroke_width: Some(1.5),
+        fill: Some(
+            state
+                .palette
+                .primary
+                .with_alpha(0.08 + state.coherence * 0.12),
+        ),
+        stroke: Some(
+            state
+                .palette
+                .primary
+                .with_alpha(0.35 + state.coherence * 0.45),
+        ),
+        stroke_width: Some(0.75 + state.coherence * 1.5),
         ..Style::default()
     });
     group.children.push(poly);
@@ -160,8 +259,13 @@ fn build_harmonic_octagon(state: &AestheticState, opacity: f32) -> SceneNode {
     // Spoke lines from center to each vertex
     for (px, py) in &points {
         let spoke = SceneNode::line(cx, cy, *px, *py).with_style(Style {
-            stroke: Some(state.palette.primary.with_alpha(0.2)),
-            stroke_width: Some(0.5),
+            stroke: Some(
+                state
+                    .palette
+                    .primary
+                    .with_alpha(0.12 + state.coherence * 0.22),
+            ),
+            stroke_width: Some(0.35 + state.coherence * 0.45),
             ..Style::default()
         });
         group.children.push(spoke);
@@ -174,6 +278,7 @@ fn build_harmonic_octagon(state: &AestheticState, opacity: f32) -> SceneNode {
 fn build_topological_masses(state: &AestheticState, opacity: f32) -> SceneNode {
     let mut group = SceneNode::group(Some("masses"));
     group.style.opacity = Some(opacity);
+    apply_turbulence(&mut group, state);
 
     let (cx, cy) = state.layout_center;
     let count = state.component_count.min(8); // cap at 8 for visual sanity
@@ -181,10 +286,10 @@ fn build_topological_masses(state: &AestheticState, opacity: f32) -> SceneNode {
 
     for i in 0..count {
         let angle = (i as f32 / count as f32) * 2.0 * PI + phase * 0.5;
-        let dist = 60.0 + (i as f32) * 15.0;
+        let dist = (60.0 + (i as f32) * 15.0) * (0.9 + state.vitality * 0.2);
         let x = cx + dist * angle.cos();
         let y = cy + dist * angle.sin();
-        let r = 8.0 + state.luminosity * 12.0;
+        let r = (8.0 + state.luminosity * 12.0) * (0.75 + state.vitality * 0.5);
 
         let mass = SceneNode::circle(x, y, r).with_style(Style {
             fill: Some(state.palette.secondary.with_alpha(0.4)),
@@ -202,20 +307,21 @@ fn build_topological_masses(state: &AestheticState, opacity: f32) -> SceneNode {
 fn build_orbital_rings(state: &AestheticState, opacity: f32) -> SceneNode {
     let mut group = SceneNode::group(Some("rings"));
     group.style.opacity = Some(opacity);
+    apply_turbulence(&mut group, state);
 
     let (cx, cy) = state.layout_center;
     let count = state.ring_count.min(5);
 
     for i in 0..count {
         let rx = 50.0 + (i as f32) * 30.0;
-        let ry = rx * 0.6; // elliptical
+        let ry = rx * (0.45 + state.coherence * 0.45); // coherent states approach circular orbits
         let rotation = (i as f32) * 30.0 + state.cycle_phase as f32 * 60.0;
 
         let ring = SceneNode::ellipse(cx, cy, rx, ry)
             .with_style(Style {
                 fill: None,
-                stroke: Some(state.palette.accent.with_alpha(0.4)),
-                stroke_width: Some(1.0),
+                stroke: Some(state.palette.accent.with_alpha(0.2 + state.coherence * 0.4)),
+                stroke_width: Some(0.6 + state.coherence * 1.0),
                 ..Style::default()
             })
             .with_transform(Transform {
@@ -238,6 +344,7 @@ fn build_orbital_rings(state: &AestheticState, opacity: f32) -> SceneNode {
 fn build_persistence_arcs(state: &AestheticState, opacity: f32) -> SceneNode {
     let mut group = SceneNode::group(Some("persistence"));
     group.style.opacity = Some(opacity);
+    apply_turbulence(&mut group, state);
 
     let (cx, cy) = state.layout_center;
     let max_radius = 100.0;
@@ -334,9 +441,13 @@ fn build_void_portals(state: &AestheticState, opacity: f32) -> SceneNode {
 fn build_fractal_detail(state: &AestheticState, opacity: f32) -> SceneNode {
     let mut group = SceneNode::group(Some("fractals"));
     group.style.opacity = Some(opacity);
+    apply_turbulence(&mut group, state);
 
     let (cx, cy) = state.layout_center;
-    let depth = state.fractal_depth.min(5) as usize;
+    let attention_gain = 0.5 + state.attention * 0.5;
+    let depth = ((state.fractal_depth.min(5) as f32) * attention_gain)
+        .round()
+        .clamp(1.0, 5.0) as usize;
     let base_r = 120.0;
 
     // Fractal on each spoke
@@ -389,6 +500,12 @@ fn fractal_branch(
     }
 }
 
+fn apply_turbulence(group: &mut SceneNode, state: &AestheticState) {
+    if state.turbulence > 0.01 {
+        group.style.filter = Some("turb-filter".to_string());
+    }
+}
+
 /// Layer 7: Turbulence SVG filter.
 fn build_turbulence_filter(state: &AestheticState) -> SceneNode {
     SceneNode {
@@ -414,7 +531,8 @@ fn build_center_bloom(state: &AestheticState) -> SceneNode {
 
     // Breathing modulation
     let breath = state.cycle_phase as f32;
-    let breath_scale = 0.9 + breath * 0.2; // 0.9 to 1.1
+    let breath_amplitude = 0.04 + state.vitality * 0.14;
+    let breath_scale = 1.0 + (breath * 2.0 - 1.0) * breath_amplitude;
 
     // Color: gold at high Ψ, warm amber at low Ψ
     let bloom_color = if psi > 0.5 {
@@ -453,6 +571,7 @@ fn build_center_bloom(state: &AestheticState) -> SceneNode {
 fn build_energy_particles(state: &AestheticState, opacity: f32) -> SceneNode {
     let mut group = SceneNode::group(Some("particles"));
     group.style.opacity = Some(opacity);
+    apply_turbulence(&mut group, state);
 
     let (cx, cy) = state.layout_center;
     let count = ((state.energy - 0.3) * 15.0).round() as usize; // 0-10 particles
@@ -465,7 +584,7 @@ fn build_energy_particles(state: &AestheticState, opacity: f32) -> SceneNode {
         let x = cx + dist * angle.cos();
         let y = cy + dist * angle.sin();
 
-        let particle = SceneNode::circle(x, y, 2.0).with_style(Style {
+        let particle = SceneNode::circle(x, y, 1.5 + state.attention).with_style(Style {
             fill: Some(state.palette.accent.with_alpha(0.6)),
             ..Style::default()
         });
@@ -487,6 +606,10 @@ mod tests {
             turbulence: 0.2,
             energy: 0.5,
             warmth: 0.5,
+            vitality: 0.5,
+            coherence: 0.5,
+            attention: 0.5,
+            allostatic_load: 0.2,
             fractal_depth: 3,
             palette: Palette::default(),
             component_count: 3,
@@ -599,6 +722,98 @@ mod tests {
             |c| matches!(&c.kind, NodeKind::Group { id } if id.as_deref() == Some("particles")),
         );
         assert!(has_particles2);
+    }
+
+    #[test]
+    fn semantic_channels_have_distinct_visual_effects() {
+        let mut low = make_state(0.9);
+        low.vitality = 0.0;
+        low.coherence = 0.0;
+        low.attention = 0.1;
+        low.allostatic_load = 0.1;
+        low.complexity = 0.1;
+        low.warmth = 0.0;
+
+        let mut high = low.clone();
+        high.vitality = 1.0;
+        high.coherence = 1.0;
+        high.attention = 1.0;
+        high.allostatic_load = 1.0;
+        high.complexity = 1.0;
+        high.warmth = 1.0;
+
+        let low_scene = build_scene(&low);
+        let high_scene = build_scene(&high);
+
+        let group = |scene: &SceneNode, wanted: &str| {
+            scene
+                .children
+                .iter()
+                .find(|node| {
+                    matches!(
+                        &node.kind,
+                        NodeKind::Group { id } if id.as_deref() == Some(wanted)
+                    )
+                })
+                .unwrap_or_else(|| panic!("missing group {wanted}"))
+        };
+
+        assert!(
+            group(&high_scene, "complexity").children.len()
+                > group(&low_scene, "complexity").children.len()
+        );
+
+        let halo_radius = |scene: &SceneNode| match group(scene, "attention").children[0].kind {
+            NodeKind::Circle { r, .. } => r,
+            _ => panic!("attention halo must be a circle"),
+        };
+        assert!(halo_radius(&high_scene) > halo_radius(&low_scene));
+
+        let boundary_inset =
+            |scene: &SceneNode| match group(scene, "allostatic-boundary").children[0].kind {
+                NodeKind::Rect { x, .. } => x,
+                _ => panic!("allostatic boundary must be a rect"),
+            };
+        assert!(boundary_inset(&high_scene) > boundary_inset(&low_scene));
+
+        let bloom_radius = |scene: &SceneNode| match group(scene, "bloom").children[0].kind {
+            NodeKind::Circle { r, .. } => r,
+            _ => panic!("bloom must be a circle"),
+        };
+        assert!(bloom_radius(&high_scene) > bloom_radius(&low_scene));
+
+        let ring_ry = |scene: &SceneNode| match group(scene, "rings").children[0].kind {
+            NodeKind::Ellipse { ry, .. } => ry,
+            _ => panic!("ring must be an ellipse"),
+        };
+        assert!(ring_ry(&high_scene) > ring_ry(&low_scene));
+
+        let background_center =
+            |scene: &SceneNode| match &group(scene, "background").children[0].kind {
+                NodeKind::RadialGradient { stops, .. } => stops[0].color,
+                _ => panic!("background must define a radial gradient"),
+            };
+        assert_ne!(
+            background_center(&high_scene),
+            background_center(&low_scene)
+        );
+    }
+
+    #[test]
+    fn prediction_error_filter_is_applied_to_artwork() {
+        let mut state = make_state(0.9);
+        state.turbulence = 0.8;
+        let scene = build_scene(&state);
+        let masses = scene
+            .children
+            .iter()
+            .find(|c| matches!(&c.kind, NodeKind::Group { id } if id.as_deref() == Some("masses")))
+            .expect("masses layer");
+        assert_eq!(masses.style.filter.as_deref(), Some("turb-filter"));
+        assert!(scene.children.iter().any(|node| matches!(
+            &node.kind,
+            NodeKind::Filter { id, .. } if id == "turb-filter"
+        )));
     }
 
     #[test]

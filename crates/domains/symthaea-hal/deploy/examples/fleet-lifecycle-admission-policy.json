@@ -1,0 +1,13 @@
+{
+  "expected_fleet_id": "production-fleet",
+  "minimum_inventory_generation": 1,
+  "maximum_bundle_age_ms": 86400000,
+  "maximum_devices": 10000,
+  "minimum_partition_checkpoints": 1,
+  "minimum_archive_replication_bundles": 2,
+  "minimum_archive_scrub_reports": 2,
+  "allow_quarantined_devices": false,
+  "require_provenance_for_live_devices": true,
+  "require_custody_for_replacements": true,
+  "maximum_unreferenced_replacements": 0
+}

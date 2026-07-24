@@ -152,6 +152,7 @@ impl LiveComposer {
             pattern,
             true, // single-section form: the B-thinning gate never fires
             true,
+            self.style.spec().texture.seventh_chords,
         );
         crate::composer::realize_bass(
             &mut score,

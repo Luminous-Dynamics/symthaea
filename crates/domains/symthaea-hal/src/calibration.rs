@@ -84,9 +84,37 @@ impl JointCalibration {
         self.angle_to_pulse_us(angle)
     }
 
+    /// Validate this joint's calibration geometry.
+    pub fn validate(&self, index: usize) -> HalResult<()> {
+        if self.name.trim().is_empty() {
+            return Err(HalError::Calibration(format!(
+                "joint {index} has an empty name"
+            )));
+        }
+        if self.pulse_min_us >= self.pulse_max_us {
+            return Err(HalError::Calibration(format!(
+                "joint {index} ({}) has invalid pulse range {}..{}",
+                self.name, self.pulse_min_us, self.pulse_max_us
+            )));
+        }
+        if !self.angle_min_deg.is_finite() || !self.angle_max_deg.is_finite() {
+            return Err(HalError::Calibration(format!(
+                "joint {index} ({}) has non-finite angle bounds",
+                self.name
+            )));
+        }
+        if self.angle_min_deg >= self.angle_max_deg {
+            return Err(HalError::Calibration(format!(
+                "joint {index} ({}) has invalid angle range {}..{}",
+                self.name, self.angle_min_deg, self.angle_max_deg
+            )));
+        }
+        Ok(())
+    }
+
     /// The center (neutral) pulse width in µs.
     pub fn center_pulse_us(&self) -> u16 {
-        (self.pulse_min_us + self.pulse_max_us) / 2
+        ((self.pulse_min_us as u32 + self.pulse_max_us as u32) / 2) as u16
     }
 }
 
@@ -115,18 +143,13 @@ impl CalibrationProfile {
     pub fn from_json(json: &str) -> HalResult<Self> {
         let profile: Self =
             serde_json::from_str(json).map_err(|e| HalError::Calibration(e.to_string()))?;
-        if profile.joints.len() != NUM_ACTUATORS {
-            return Err(HalError::Calibration(format!(
-                "expected {} joints, got {}",
-                NUM_ACTUATORS,
-                profile.joints.len()
-            )));
-        }
+        profile.validate()?;
         Ok(profile)
     }
 
     /// Serialize the profile to a JSON string.
     pub fn to_json(&self) -> HalResult<String> {
+        self.validate()?;
         serde_json::to_string_pretty(self).map_err(|e| HalError::Calibration(e.to_string()))
     }
 
@@ -137,11 +160,43 @@ impl CalibrationProfile {
         Self::from_json(&json)
     }
 
-    /// Save the profile to a JSON file.
+    /// Save the profile atomically to a JSON file.
     pub fn save(&self, path: &std::path::Path) -> HalResult<()> {
+        use std::io::Write;
+
         let json = self.to_json()?;
-        std::fs::write(path, json)
-            .map_err(|e| HalError::Calibration(format!("write {}: {}", path.display(), e)))
+        let file_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| {
+                HalError::Calibration(format!("invalid output path: {}", path.display()))
+            })?;
+        let temp_name = format!(".{file_name}.tmp-{}", std::process::id());
+        let temp_path = path.with_file_name(temp_name);
+
+        let result = (|| -> HalResult<()> {
+            let mut file = std::fs::File::create(&temp_path).map_err(|e| {
+                HalError::Calibration(format!("create {}: {e}", temp_path.display()))
+            })?;
+            file.write_all(json.as_bytes()).map_err(|e| {
+                HalError::Calibration(format!("write {}: {e}", temp_path.display()))
+            })?;
+            file.sync_all()
+                .map_err(|e| HalError::Calibration(format!("sync {}: {e}", temp_path.display())))?;
+            std::fs::rename(&temp_path, path).map_err(|e| {
+                HalError::Calibration(format!(
+                    "rename {} to {}: {e}",
+                    temp_path.display(),
+                    path.display()
+                ))
+            })?;
+            Ok(())
+        })();
+
+        if result.is_err() {
+            let _ = std::fs::remove_file(&temp_path);
+        }
+        result
     }
 
     /// Get calibration for a joint by index.
@@ -154,13 +209,43 @@ impl CalibrationProfile {
         self.joints.get_mut(index)
     }
 
-    /// Convert torques to pulse widths (µs).
-    pub fn torques_to_pulses(&self, torques: &[f32]) -> [u16; NUM_ACTUATORS] {
-        let mut pulses = [1500u16; NUM_ACTUATORS];
-        for i in 0..NUM_ACTUATORS.min(torques.len()) {
+    /// Validate profile shape and every joint calibration.
+    pub fn validate(&self) -> HalResult<()> {
+        if self.joints.len() != NUM_ACTUATORS {
+            return Err(HalError::Calibration(format!(
+                "expected {} joints, got {}",
+                NUM_ACTUATORS,
+                self.joints.len()
+            )));
+        }
+        for (index, joint) in self.joints.iter().enumerate() {
+            joint.validate(index)?;
+        }
+        Ok(())
+    }
+
+    /// Convert a complete, finite torque command to pulse widths (µs).
+    pub fn torques_to_pulses(&self, torques: &[f32]) -> HalResult<[u16; NUM_ACTUATORS]> {
+        self.validate()?;
+        if torques.len() != NUM_ACTUATORS {
+            return Err(HalError::Safety(format!(
+                "expected exactly {} actuator torques, got {}",
+                NUM_ACTUATORS,
+                torques.len()
+            )));
+        }
+
+        let mut pulses = [0u16; NUM_ACTUATORS];
+        for i in 0..NUM_ACTUATORS {
+            if !torques[i].is_finite() {
+                return Err(HalError::Safety(format!(
+                    "non-finite torque for joint {i} ({})",
+                    self.joints[i].name
+                )));
+            }
             pulses[i] = self.joints[i].torque_to_pulse_us(torques[i]);
         }
-        pulses
+        Ok(pulses)
     }
 }
 
@@ -248,6 +333,20 @@ mod tests {
     }
 
     #[test]
+    fn test_profile_atomic_save_roundtrip() {
+        let profile = CalibrationProfile::default_21();
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-hal-calibration-{}-{}.json",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("test")
+        ));
+        profile.save(&path).unwrap();
+        let restored = CalibrationProfile::load(&path).unwrap();
+        assert_eq!(restored.joints.len(), NUM_ACTUATORS);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn test_profile_wrong_count_rejected() {
         let mut profile = CalibrationProfile::default_21();
         profile.joints.pop(); // now 20 joints
@@ -260,10 +359,33 @@ mod tests {
     fn test_profile_torques_to_pulses() {
         let profile = CalibrationProfile::default_21();
         let torques = [0.0f32; NUM_ACTUATORS];
-        let pulses = profile.torques_to_pulses(&torques);
+        let pulses = profile.torques_to_pulses(&torques).unwrap();
         for &p in &pulses {
             assert_eq!(p, 1500);
         }
+    }
+
+    #[test]
+    fn test_profile_short_command_rejected() {
+        let profile = CalibrationProfile::default_21();
+        let result = profile.torques_to_pulses(&[0.0; NUM_ACTUATORS - 1]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_profile_non_finite_torque_rejected() {
+        let profile = CalibrationProfile::default_21();
+        let mut torques = [0.0; NUM_ACTUATORS];
+        torques[3] = f32::NAN;
+        assert!(profile.torques_to_pulses(&torques).is_err());
+    }
+
+    #[test]
+    fn test_invalid_joint_geometry_rejected() {
+        let mut profile = CalibrationProfile::default_21();
+        profile.joints[0].pulse_min_us = 2500;
+        profile.joints[0].pulse_max_us = 500;
+        assert!(profile.validate().is_err());
     }
 
     #[test]

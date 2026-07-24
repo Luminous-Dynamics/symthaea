@@ -9,7 +9,7 @@
 //!
 //! It is intentionally minimal and focused on:
 //! - Quality assessment of gradients / hypergradients
-//! - Φ-based anomaly detection hooks
+//! - Connectivity-based anomaly detection hooks
 //! - Mapping results into `mycelix_sdk::epistemic` classifications
 
 pub mod fl_plugin;
@@ -54,9 +54,6 @@ struct LocalEpistemicClassification {
 enum LocalEmpiricalLevel {
     Subjective,
     Testimonial,
-    PrivatelyVerifiable,
-    CryptographicallyVerifiable,
-    PubliclyReproducible,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,15 +111,6 @@ impl LocalEpistemicClassification {
             LocalEmpiricalLevel::Testimonial => {
                 mycelix_sdk::epistemic::EmpiricalLevel::E1Testimonial
             }
-            LocalEmpiricalLevel::PrivatelyVerifiable => {
-                mycelix_sdk::epistemic::EmpiricalLevel::E2PrivateVerify
-            }
-            LocalEmpiricalLevel::CryptographicallyVerifiable => {
-                mycelix_sdk::epistemic::EmpiricalLevel::E3Cryptographic
-            }
-            LocalEmpiricalLevel::PubliclyReproducible => {
-                mycelix_sdk::epistemic::EmpiricalLevel::E4PublicRepro
-            }
         };
         let normative = match self.normative {
             LocalNormativeLevel::Internal => mycelix_sdk::epistemic::NormativeLevel::N0Personal,
@@ -150,38 +138,26 @@ impl LocalEpistemicClassification {
     }
 }
 
-/// Simplified Phi→E/N/M mapper (inlined from symthaea::mycelix::mapper).
-struct PhiToEpistemicMapper {
-    e1_threshold: f32,
-    e2_threshold: f32,
-    e3_threshold: f32,
-    e4_threshold: f32,
-}
+/// Maps observed evidence into E/N/M coordinates.
+///
+/// Connectivity is a model output, not evidence provenance. A validation run
+/// performed by this node therefore supports an E1 testimonial claim only;
+/// stronger levels require replay artifacts, cryptographic verification, or a
+/// public reproduction protocol that this bridge does not currently accept.
+struct EvidenceToEpistemicMapper;
 
-impl PhiToEpistemicMapper {
+impl EvidenceToEpistemicMapper {
     fn new() -> Self {
-        Self {
-            e1_threshold: 0.1,
-            e2_threshold: 0.2,
-            e3_threshold: 0.3,
-            e4_threshold: 0.4,
-        }
+        Self
     }
 
     fn classify(
         &self,
-        phi: f32,
         scope: WorkspaceScope,
         importance: f32,
-        is_reproducible: bool,
+        validation_observed: bool,
     ) -> LocalEpistemicClassification {
-        let empirical = if phi >= self.e4_threshold && is_reproducible {
-            LocalEmpiricalLevel::PubliclyReproducible
-        } else if phi >= self.e3_threshold {
-            LocalEmpiricalLevel::CryptographicallyVerifiable
-        } else if phi >= self.e2_threshold {
-            LocalEmpiricalLevel::PrivatelyVerifiable
-        } else if phi >= self.e1_threshold {
+        let empirical = if validation_observed {
             LocalEmpiricalLevel::Testimonial
         } else {
             LocalEmpiricalLevel::Subjective
@@ -289,6 +265,12 @@ pub type Result<T> = std::result::Result<T, BridgeError>;
 /// into MATL's ProofOfGradientQuality without depending on the internal
 /// anomaly heuristics.
 pub fn pogq_from_quality_score(q: &QualityScore) -> ProofOfGradientQuality {
+    if q.validate().is_err() {
+        // Preserve the infallible adapter API while ensuring malformed or
+        // non-finite scores can never turn into a permissive MATL signal.
+        return ProofOfGradientQuality::new(0.0, 0.0, 1.0);
+    }
+
     // Treat epistemic confidence as the primary quality signal.
     let quality = q.epistemic_confidence as f64;
 
@@ -377,7 +359,23 @@ impl ConsciousnessVector {
         self.true_phi
             .or(self.phi_fast)
             .or(self.spectral_connectivity)
+            .filter(|value| value.is_finite())
             .unwrap_or(0.0)
+    }
+
+    /// Whether every populated dimension is finite and lies in [0, 1].
+    pub fn is_valid(&self) -> bool {
+        [
+            self.spectral_connectivity,
+            self.true_phi,
+            self.phi_fast,
+            self.entropy,
+            self.coherence,
+            self.epistemic_confidence,
+        ]
+        .into_iter()
+        .flatten()
+        .all(|value| value.is_finite() && (0.0..=1.0).contains(&value))
     }
 
     /// Weighted composite for backward compatibility.
@@ -385,6 +383,10 @@ impl ConsciousnessVector {
     ///
     /// Only populated dimensions contribute; result is renormalized.
     pub fn composite(&self) -> f64 {
+        if !self.is_valid() {
+            return 0.0;
+        }
+
         let mut total = 0.0;
         let mut weight_sum = 0.0;
 
@@ -492,6 +494,60 @@ pub struct QualityScore {
     pub causes: Vec<String>,
 }
 
+impl QualityScore {
+    /// Validate all numeric inputs before they influence aggregation weights or
+    /// signed attestations.
+    pub fn validate(&self) -> Result<()> {
+        if !self.accuracy.is_finite() || !(0.0..=1.0).contains(&self.accuracy) {
+            return Err(BridgeError::Mycelix(
+                "quality accuracy must be finite and in [0, 1]".into(),
+            ));
+        }
+        if !self.loss.is_finite() || self.loss < 0.0 {
+            return Err(BridgeError::Mycelix(
+                "quality loss must be finite and non-negative".into(),
+            ));
+        }
+        if !self.epistemic_confidence.is_finite()
+            || !(0.0..=1.0).contains(&self.epistemic_confidence)
+        {
+            return Err(BridgeError::Mycelix(
+                "epistemic confidence must be finite and in [0, 1]".into(),
+            ));
+        }
+        if !self.spectral.connectivity_before.is_finite()
+            || !self.spectral.connectivity_after.is_finite()
+            || !self.spectral.connectivity_gain.is_finite()
+            || !(0.0..=1.0).contains(&self.spectral.connectivity_before)
+            || !(0.0..=1.0).contains(&self.spectral.connectivity_after)
+        {
+            return Err(BridgeError::Mycelix(
+                "spectral connectivity must be finite and in [0, 1]".into(),
+            ));
+        }
+        let expected_gain = self.spectral.connectivity_after - self.spectral.connectivity_before;
+        if (self.spectral.connectivity_gain - expected_gain).abs() > 1e-5 {
+            return Err(BridgeError::Mycelix(
+                "spectral connectivity gain is inconsistent".into(),
+            ));
+        }
+        if self
+            .similarity
+            .is_some_and(|value| !value.is_finite() || !(-1.0..=1.0).contains(&value))
+        {
+            return Err(BridgeError::Mycelix(
+                "similarity must be finite and in [-1, 1]".into(),
+            ));
+        }
+        if !self.consciousness_vector.is_valid() {
+            return Err(BridgeError::Mycelix(
+                "consciousness vector values must be finite and in [0, 1]".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Severity classification for conscious anomaly detection.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum ConsciousAnomalySeverity {
@@ -547,14 +603,14 @@ pub trait ConsciousnessBackend {
 ///   continuous hypervector via a sparse random projection,
 /// - uses `PhiEngine` to compute a simple Φ score over a 1-node
 ///   "topology" (the update in isolation),
-/// - maps that Φ into an epistemic classification using the existing
-///   `PhiToEpistemicMapper`,
+/// - records the local validation as testimonial evidence without inferring
+///   stronger provenance from Φ,
 /// - combines it with validation metrics from the `ModelSnapshot` to
 ///   produce a `QualityScore`.
 pub struct SymthaeaBackend {
     config: SymthaeaBackendConfig,
     phi_engine: PhiEngine,
-    mapper: PhiToEpistemicMapper,
+    mapper: EvidenceToEpistemicMapper,
     /// Vector store for gradient prototypes (content-addressable cosine recall).
     memory: VectorStore,
     /// Per-node state for trend-aware connectivity tracking and anomaly counts.
@@ -716,7 +772,7 @@ impl SymthaeaBackend {
         cvector_config: ConsciousnessVectorConfig,
     ) -> Self {
         let phi_engine = PhiEngine::new(PhiMethod::SpectralConnectivity);
-        let mapper = PhiToEpistemicMapper::new();
+        let mapper = EvidenceToEpistemicMapper::new();
         Self {
             config,
             phi_engine,
@@ -816,10 +872,10 @@ impl SymthaeaBackend {
         Ok((hv, best_sim))
     }
 
-    /// Helper: derive an epistemic classification from connectivity and Mycelix context.
-    fn classify_from_connectivity(
+    /// Derive an epistemic classification from the observed validation and FL context.
+    fn classify_from_validation(
         &self,
-        phi: f32,
+        _connectivity: f32,
         update: &HyperGradient,
     ) -> LocalEpistemicClassification {
         // WorkspaceScope is not directly known here; treat FL updates as
@@ -828,16 +884,14 @@ impl SymthaeaBackend {
 
         // Importance: use a simple heuristic based on gradient magnitude
         // (quality_score is L2 norm) and compression ratio.
-        let importance = (update.quality_score / (update.compression_ratio + 1.0))
-            .min(1.0)
-            .max(0.0);
+        let raw_importance = update.quality_score / (update.compression_ratio + 1.0);
+        let importance = if raw_importance.is_finite() {
+            raw_importance.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
 
-        // HyperGradients are reproducible at the node: they can be re-run
-        // given the same training data and code.
-        let is_reproducible = true;
-
-        self.mapper
-            .classify(phi, scope, importance, is_reproducible)
+        self.mapper.classify(scope, importance, true)
     }
 
     /// Helper: map Symthaea's classification into a canonical Mycelix claim.
@@ -847,7 +901,10 @@ impl SymthaeaBackend {
         snapshot: &dyn ModelSnapshot,
         classification: &LocalEpistemicClassification,
     ) -> EpistemicClaim {
-        let acc_before = snapshot.current_accuracy().unwrap_or(0.0);
+        let acc_before = snapshot
+            .current_accuracy()
+            .filter(|value| value.is_finite() && (0.0..=1.0).contains(value))
+            .unwrap_or(0.0);
         let content = format!(
             "Symthaea assessed FL update: Φ={:.3}, accuracy_before≈{:.3}",
             phi, acc_before
@@ -944,6 +1001,30 @@ impl ConsciousnessBackend for SymthaeaBackend {
         snapshot: &dyn ModelSnapshot,
         update: &HyperGradient,
     ) -> Result<QualityScore> {
+        // Validate the transport shape before applying untrusted update data to
+        // a model backend or mutating bridge state.
+        if update.node_id.trim().is_empty() {
+            return Err(BridgeError::Mycelix(
+                "HyperGradient node_id must not be empty".into(),
+            ));
+        }
+        self.hypergradient_to_hv(update)?;
+
+        // Evaluate a clone with the update applied. The original snapshot is
+        // intentionally retained for the before-update claim metadata.
+        let updated_snapshot = snapshot.apply_update_clone(update)?;
+        let (accuracy, loss) = updated_snapshot.evaluate()?;
+        if !accuracy.is_finite() || !(0.0..=1.0).contains(&accuracy) {
+            return Err(BridgeError::Mycelix(
+                "updated snapshot accuracy must be finite and in [0, 1]".into(),
+            ));
+        }
+        if !loss.is_finite() || loss < 0.0 {
+            return Err(BridgeError::Mycelix(
+                "updated snapshot loss must be finite and non-negative".into(),
+            ));
+        }
+
         // 1. Identify node and load prior state (extract connectivity_before, drop borrow)
         let node_id = update.node_id.to_string();
         let connectivity_before = self
@@ -958,14 +1039,16 @@ impl ConsciousnessBackend for SymthaeaBackend {
         // 3. Compute spectral connectivity score for this node
         let phi_result = self.phi_engine.compute(&[hv.clone()]);
         let connectivity_after = phi_result.phi as f32;
+        if !connectivity_after.is_finite() || !(0.0..=1.0).contains(&connectivity_after) {
+            return Err(BridgeError::Symthaea(
+                "spectral connectivity must be finite and in [0, 1]".into(),
+            ));
+        }
         let spectral_assessment =
             SpectralConnectivityAssessment::new(connectivity_before, connectivity_after);
 
-        // 4. Evaluate validation metrics on the updated snapshot
-        let (accuracy, loss) = snapshot.evaluate()?;
-
-        // 5. Map connectivity to epistemic classification
-        let classification = self.classify_from_connectivity(connectivity_after, update);
+        // 4. Record the locally-observed validation at an honest evidence level.
+        let classification = self.classify_from_validation(connectivity_after, update);
 
         // 6. Build a canonical EpistemicClaim (currently unused, but ready
         //    for callers that want to store it in Mycelix UESS)
@@ -975,19 +1058,17 @@ impl ConsciousnessBackend for SymthaeaBackend {
         // 7. Epistemic confidence: scaled combination of connectivity and accuracy
         let epistemic_confidence = ((connectivity_after + accuracy) / 2.0).clamp(0.0, 1.0);
 
-        // 7b. Update node HV history and compute ConsciousnessVector
-        {
-            let state = self.node_states.get_mut(&node_id).unwrap();
-            if state.recent_hvs.len() >= NODE_HV_HISTORY_CAP {
-                state.recent_hvs.pop_front();
-            }
-            state.recent_hvs.push_back(hv.clone());
-        }
-        let components: Vec<ContinuousHV> = self.node_states[&node_id]
+        // 7b. Compute the prospective C-Vector without committing node state
+        // until the complete quality result has passed validation.
+        let mut components: Vec<ContinuousHV> = self.node_states[&node_id]
             .recent_hvs
             .iter()
             .cloned()
             .collect();
+        if components.len() >= NODE_HV_HISTORY_CAP {
+            components.remove(0);
+        }
+        components.push(hv);
         let consciousness_vector = self.compute_consciousness_vector(
             &components,
             connectivity_after as f64,
@@ -1008,14 +1089,6 @@ impl ConsciousnessBackend for SymthaeaBackend {
         let low_confidence = epistemic_confidence < 0.2;
 
         let is_anomalous = is_drop || is_ambiguous || low_confidence;
-
-        // 9. Update node state (re-borrow now that other methods are done)
-        if let Some(state) = self.node_states.get_mut(&node_id) {
-            state.last_connectivity = connectivity_after;
-            if is_anomalous {
-                state.anomaly_count = state.anomaly_count.saturating_add(1);
-            }
-        }
 
         // 10. Classify severity
         let severity = if !is_anomalous {
@@ -1044,7 +1117,7 @@ impl ConsciousnessBackend for SymthaeaBackend {
             causes.push("low_confidence".into());
         }
 
-        Ok(QualityScore {
+        let quality = QualityScore {
             accuracy,
             loss,
             spectral: spectral_assessment,
@@ -1055,7 +1128,19 @@ impl ConsciousnessBackend for SymthaeaBackend {
             is_ambiguous,
             severity,
             causes,
-        })
+        };
+        quality.validate()?;
+
+        // Commit the prospective history and trend only after validation.
+        if let Some(state) = self.node_states.get_mut(&node_id) {
+            state.recent_hvs = components.into_iter().collect();
+            state.last_connectivity = connectivity_after;
+            if is_anomalous {
+                state.anomaly_count = state.anomaly_count.saturating_add(1);
+            }
+        }
+
+        Ok(quality)
     }
 }
 
@@ -1169,26 +1254,111 @@ impl From<&ConsciousnessVector> for ConsciousnessVectorSerde {
     }
 }
 
+impl ConsciousnessVectorSerde {
+    fn is_valid(&self) -> bool {
+        [
+            self.spectral_connectivity,
+            self.true_phi,
+            self.phi_fast,
+            self.entropy,
+            self.coherence,
+            self.epistemic_confidence,
+        ]
+        .into_iter()
+        .flatten()
+        .all(|value| value.is_finite() && (0.0..=1.0).contains(&value))
+    }
+}
+
+fn append_length_prefixed(output: &mut Vec<u8>, value: &str) {
+    output.extend_from_slice(&(value.len() as u64).to_be_bytes());
+    output.extend_from_slice(value.as_bytes());
+}
+
+fn append_optional_f64(output: &mut Vec<u8>, value: Option<f64>) {
+    match value {
+        Some(value) => {
+            output.push(1);
+            output.extend_from_slice(&value.to_bits().to_be_bytes());
+        }
+        None => output.push(0),
+    }
+}
+
 impl ConsciousnessAttestationData {
+    /// Validate the complete signed payload.
+    pub fn validate_for_signing(&self) -> Result<()> {
+        if self.agent_did.trim().is_empty() {
+            return Err(BridgeError::Mycelix(
+                "attestation agent DID must not be empty".into(),
+            ));
+        }
+        if self.source.trim().is_empty() {
+            return Err(BridgeError::Mycelix(
+                "attestation source must not be empty".into(),
+            ));
+        }
+        if !self.consciousness_level.is_finite() || !(0.0..=1.0).contains(&self.consciousness_level)
+        {
+            return Err(BridgeError::Mycelix(
+                "attestation consciousness level must be finite and in [0, 1]".into(),
+            ));
+        }
+        if self.captured_at_us == 0 {
+            return Err(BridgeError::Mycelix(
+                "attestation timestamp must be non-zero".into(),
+            ));
+        }
+        if self
+            .consciousness_vector
+            .as_ref()
+            .is_some_and(|vector| !vector.is_valid())
+        {
+            return Err(BridgeError::Mycelix(
+                "attestation vector values must be finite and in [0, 1]".into(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Compute the canonical message bytes to sign for this attestation.
     ///
-    /// Format: `"symthaea-consciousness-attestation:v1:{agent_did}:{consciousness_level}:{cycle_id}:{captured_at_us}"`
+    /// Version 2 is an unambiguous binary encoding. It covers the DID,
+    /// composite level, cycle, timestamp, source, and every C-Vector field.
+    /// The mutable `signature` field itself is intentionally excluded.
     ///
     /// The caller should sign these bytes with their agent key and store the
     /// result in the `signature` field before submitting to governance.
-    pub fn sign_message(&self) -> Vec<u8> {
-        format!(
-            "symthaea-consciousness-attestation:v1:{}:{:.6}:{}:{}",
-            self.agent_did, self.consciousness_level, self.cycle_id, self.captured_at_us,
-        )
-        .into_bytes()
+    pub fn sign_message(&self) -> Result<Vec<u8>> {
+        self.validate_for_signing()?;
+
+        let mut message = b"symthaea-consciousness-attestation:v2\0".to_vec();
+        append_length_prefixed(&mut message, &self.agent_did);
+        message.extend_from_slice(&self.consciousness_level.to_bits().to_be_bytes());
+        message.extend_from_slice(&self.cycle_id.to_be_bytes());
+        message.extend_from_slice(&self.captured_at_us.to_be_bytes());
+        append_length_prefixed(&mut message, &self.source);
+
+        match &self.consciousness_vector {
+            Some(vector) => {
+                message.push(1);
+                append_optional_f64(&mut message, vector.spectral_connectivity);
+                append_optional_f64(&mut message, vector.true_phi);
+                append_optional_f64(&mut message, vector.phi_fast);
+                append_optional_f64(&mut message, vector.entropy);
+                append_optional_f64(&mut message, vector.coherence);
+                append_optional_f64(&mut message, vector.epistemic_confidence);
+            }
+            None => message.push(0),
+        }
+
+        Ok(message)
     }
 }
 
 /// Create an unsigned `ConsciousnessAttestationData` from a `QualityScore`.
 ///
-/// The `consciousness_level` is taken from `quality.spectral.connectivity_after`
-/// (the post-update spectral connectivity score).
+/// The `consciousness_level` is the validated C-Vector composite.
 /// The caller must:
 /// 1. Call `.sign_message()` to get the canonical bytes
 /// 2. Sign those bytes with their agent key
@@ -1199,8 +1369,8 @@ impl ConsciousnessAttestationData {
 ///
 /// ```ignore
 /// let quality = backend.assess_update(&snapshot, &gradient)?;
-/// let mut attestation = create_consciousness_attestation_data(&quality, "did:key:z6Mk...", 42);
-/// let message = attestation.sign_message();
+/// let mut attestation = create_consciousness_attestation_data(&quality, "did:key:z6Mk...", 42)?;
+/// let message = attestation.sign_message()?;
 /// attestation.signature = my_sign_fn(&message);
 /// // Submit to Holochain governance bridge...
 /// ```
@@ -1208,15 +1378,24 @@ pub fn create_consciousness_attestation_data(
     quality: &QualityScore,
     agent_did: &str,
     cycle_id: u64,
-) -> ConsciousnessAttestationData {
-    let now_us = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_micros() as u64)
-        .unwrap_or(0);
+) -> Result<ConsciousnessAttestationData> {
+    quality.validate()?;
+    if agent_did.trim().is_empty() {
+        return Err(BridgeError::Mycelix(
+            "attestation agent DID must not be empty".into(),
+        ));
+    }
 
-    ConsciousnessAttestationData {
+    let now_us: u64 = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| BridgeError::Mycelix(format!("system clock error: {error}")))?
+        .as_micros()
+        .try_into()
+        .map_err(|_| BridgeError::Mycelix("attestation timestamp exceeds u64".into()))?;
+
+    let attestation = ConsciousnessAttestationData {
         agent_did: agent_did.to_string(),
-        consciousness_level: quality.consciousness_vector.composite().clamp(0.0, 1.0),
+        consciousness_level: quality.consciousness_vector.composite(),
         cycle_id,
         captured_at_us: now_us,
         signature: Vec::new(), // Caller must fill this
@@ -1224,7 +1403,9 @@ pub fn create_consciousness_attestation_data(
         consciousness_vector: Some(ConsciousnessVectorSerde::from(
             &quality.consciousness_vector,
         )),
-    }
+    };
+    attestation.validate_for_signing()?;
+    Ok(attestation)
 }
 
 #[cfg(test)]
@@ -1312,6 +1493,62 @@ mod tests {
             result.spectral.connectivity_after >= 0.0 && result.spectral.connectivity_after <= 1.0
         );
         assert!(result.epistemic_confidence >= 0.0 && result.epistemic_confidence <= 1.0);
+    }
+
+    #[test]
+    fn assessment_evaluates_the_updated_clone() {
+        struct OriginalSnapshot;
+        struct UpdatedSnapshot;
+
+        impl ModelSnapshot for OriginalSnapshot {
+            fn apply_update_clone(
+                &self,
+                _update: &HyperGradient,
+            ) -> Result<Box<dyn ModelSnapshot>> {
+                Ok(Box::new(UpdatedSnapshot))
+            }
+
+            fn evaluate(&self) -> Result<(f32, f32)> {
+                Ok((0.2, 2.0))
+            }
+
+            fn current_accuracy(&self) -> Option<f32> {
+                Some(0.2)
+            }
+        }
+
+        impl ModelSnapshot for UpdatedSnapshot {
+            fn apply_update_clone(
+                &self,
+                _update: &HyperGradient,
+            ) -> Result<Box<dyn ModelSnapshot>> {
+                Ok(Box::new(UpdatedSnapshot))
+            }
+
+            fn evaluate(&self) -> Result<(f32, f32)> {
+                Ok((0.9, 0.1))
+            }
+
+            fn current_accuracy(&self) -> Option<f32> {
+                Some(0.9)
+            }
+        }
+
+        let update = HyperGradient::new(
+            "node-updated".to_string(),
+            1,
+            vec![128u8; HV16_BYTES],
+            0.5,
+            4_000_000,
+            10.0,
+            [0u8; 32],
+        );
+        let result = SymthaeaBackend::new()
+            .assess_update(&OriginalSnapshot, &update)
+            .unwrap();
+
+        assert_eq!(result.accuracy, 0.9);
+        assert_eq!(result.loss, 0.1);
     }
 
     #[test]
@@ -1458,11 +1695,11 @@ mod tests {
     }
 
     // ============================================================================
-    // classify_from_connectivity tests
+    // Validation evidence classification tests
     // ============================================================================
 
     #[test]
-    fn classify_from_connectivity_produces_valid_classification() {
+    fn validation_classification_is_testimonial() {
         let backend = SymthaeaBackend::new();
         let hg = HyperGradient::new(
             "node-1".to_string(),
@@ -1473,13 +1710,12 @@ mod tests {
             10.0,
             [0u8; 32],
         );
-        let classification = backend.classify_from_connectivity(0.9, &hg);
-        // Must produce a classification without panicking
-        let _ = classification;
+        let classification = backend.classify_from_validation(0.9, &hg);
+        assert_eq!(classification.empirical, LocalEmpiricalLevel::Testimonial);
     }
 
     #[test]
-    fn classify_from_connectivity_low_phi_does_not_panic() {
+    fn validation_classification_does_not_depend_on_low_connectivity() {
         let backend = SymthaeaBackend::new();
         let hg = HyperGradient::new(
             "node-2".to_string(),
@@ -1490,11 +1726,11 @@ mod tests {
             1.0,
             [0u8; 32],
         );
-        let _classification = backend.classify_from_connectivity(0.05, &hg);
+        let _classification = backend.classify_from_validation(0.05, &hg);
     }
 
     #[test]
-    fn classify_from_connectivity_reproducible_for_same_inputs() {
+    fn validation_classification_is_deterministic_for_same_inputs() {
         let backend = SymthaeaBackend::new();
         let hg = HyperGradient::new(
             "node-3".to_string(),
@@ -1505,8 +1741,8 @@ mod tests {
             5.0,
             [1u8; 32],
         );
-        let c1 = backend.classify_from_connectivity(0.5, &hg);
-        let c2 = backend.classify_from_connectivity(0.5, &hg);
+        let c1 = backend.classify_from_validation(0.5, &hg);
+        let c2 = backend.classify_from_validation(0.5, &hg);
         assert_eq!(format!("{:?}", c1), format!("{:?}", c2));
     }
 
@@ -1538,7 +1774,8 @@ mod tests {
             causes: Vec::new(),
         };
 
-        let attestation = create_consciousness_attestation_data(&quality, "did:key:z6MkTest", 42);
+        let attestation =
+            create_consciousness_attestation_data(&quality, "did:key:z6MkTest", 42).unwrap();
 
         assert_eq!(attestation.agent_did, "did:key:z6MkTest");
         assert!(
@@ -1558,8 +1795,7 @@ mod tests {
     }
 
     #[test]
-    fn test_attestation_consciousness_clamped_to_unit() {
-        // C-Vector with all values > 1.0 to test clamping
+    fn test_attestation_rejects_out_of_range_consciousness() {
         let cvec = ConsciousnessVector {
             spectral_connectivity: Some(1.5),
             true_phi: Some(1.5),
@@ -1581,11 +1817,8 @@ mod tests {
             causes: Vec::new(),
         };
 
-        let attestation = create_consciousness_attestation_data(&quality, "did:key:z6MkTest", 1);
-        assert!(
-            (attestation.consciousness_level - 1.0).abs() < 1e-6,
-            "should be clamped to 1.0"
-        );
+        let result = create_consciousness_attestation_data(&quality, "did:key:z6MkTest", 1);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1600,18 +1833,32 @@ mod tests {
             consciousness_vector: None,
         };
 
-        let msg1 = attestation.sign_message();
-        let msg2 = attestation.sign_message();
+        let msg1 = attestation.sign_message().unwrap();
+        let msg2 = attestation.sign_message().unwrap();
         assert_eq!(msg1, msg2, "Sign message should be deterministic");
 
-        let msg_str = String::from_utf8(msg1).unwrap();
-        assert!(msg_str.starts_with("symthaea-consciousness-attestation:v1:did:key:z6MkABC:"));
-        assert!(msg_str.contains(":100:"));
+        assert!(msg1.starts_with(b"symthaea-consciousness-attestation:v2\0"));
 
         // Changing consciousness_level changes the message
         attestation.consciousness_level = 0.999;
-        let msg3 = attestation.sign_message();
+        let msg3 = attestation.sign_message().unwrap();
         assert_ne!(msg2, msg3);
+
+        // Source and vector fields are governance-relevant and must also be covered.
+        attestation.consciousness_level = 0.654321;
+        attestation.source = "different-source".to_string();
+        assert_ne!(msg2, attestation.sign_message().unwrap());
+
+        attestation.source = "symthaea".to_string();
+        attestation.consciousness_vector = Some(ConsciousnessVectorSerde {
+            spectral_connectivity: Some(0.5),
+            true_phi: None,
+            phi_fast: None,
+            entropy: None,
+            coherence: None,
+            epistemic_confidence: None,
+        });
+        assert_ne!(msg2, attestation.sign_message().unwrap());
     }
 
     #[test]
@@ -1688,6 +1935,27 @@ mod tests {
             pogq_bad.entropy > pogq_high.entropy,
             "expected higher entropy for anomalous update"
         );
+    }
+
+    #[test]
+    fn malformed_quality_maps_to_fail_closed_pogq() {
+        let malformed = QualityScore {
+            accuracy: 0.9,
+            loss: 0.1,
+            spectral: SpectralConnectivityAssessment::new(0.4, 0.6),
+            consciousness_vector: ConsciousnessVector::default(),
+            epistemic_confidence: f32::NAN,
+            is_anomalous: false,
+            similarity: Some(0.9),
+            is_ambiguous: false,
+            severity: ConsciousAnomalySeverity::None,
+            causes: Vec::new(),
+        };
+
+        let pogq = pogq_from_quality_score(&malformed);
+        assert_eq!(pogq.quality, 0.0);
+        assert_eq!(pogq.consistency, 0.0);
+        assert_eq!(pogq.entropy, 1.0);
     }
 
     // ============================================================================

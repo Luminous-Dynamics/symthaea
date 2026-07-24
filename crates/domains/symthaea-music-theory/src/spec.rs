@@ -17,6 +17,7 @@
 //!   collision avoidance, the superset-only substitution rules). A spec can
 //!   reshape the aesthetic space completely, but it cannot make the engine
 //!   write a wrong note.
+//!
 //! [`CompositionSpec::validate`] enforces the boundary: malformed specs are
 //! rejected with human-readable reasons, never silently "fixed".
 //!
@@ -39,6 +40,16 @@ pub enum ProgressionSpec {
     Grammar,
     /// A fixed archetype of scale degrees, cycled to the requested length.
     Archetype(Vec<i32>),
+    /// A seed-selected pool of archetypes, each cycled to the requested
+    /// length. Unlike a single [`ProgressionSpec::Archetype`], this varies
+    /// with `seed` — added to fix a real diversity-census finding: several
+    /// styles that each hardcoded ONE archetype had zero within-style
+    /// harmonic variety and, when those archetypes happened to share the
+    /// same underlying chord-degree set (e.g. rotations of {I,IV,V,vi}),
+    /// bled into each other as near-duplicates. Pool members should be
+    /// chosen so the WHOLE pool stays harmonically distinct from other
+    /// styles' pools, not just internally varied.
+    ArchetypePool(Vec<Vec<i32>>),
 }
 
 /// Large-scale forms the seed may choose between.
@@ -59,6 +70,57 @@ pub enum FormKind {
     /// pipeline entirely — a fugue's texture IS its counterpoint. See
     /// [`crate::fugue`].
     Fugue,
+    /// Variations over a remembering ground bass: seven cycles (stated,
+    /// walked, filled, ALTERED, restored-as-peak, fragmented, completed).
+    /// Bypasses the period pipeline like the fugue — the ground is the
+    /// form. See [`crate::passacaglia`].
+    Passacaglia,
+    /// Persistence FAILING: the ground loses one tone per cycle while the
+    /// melody persists above; the ending (recovery / acceptance / elegy,
+    /// attitude-mapped) decides what persistence cost. See
+    /// [`crate::passacaglia::realize_erosion`].
+    Erosion,
+    /// Identity evolving through kinship: each cycle's ground is ONE
+    /// legible transformation step from its parent — "I become my
+    /// descendants" instead of "I remain." See
+    /// [`crate::passacaglia::realize_lineage`].
+    Lineage,
+    /// LONG FORM via a genuine mid-piece METER CHANGE: four sections
+    /// realized separately, each in its own time signature (4 → 7 → 5 →
+    /// 4) and the middle two in contrasting keys, spliced onto one
+    /// continuous timeline with voice-leading carried across every
+    /// change. Bypasses the period pipeline like the fugue/passacaglia
+    /// family — no single `meter_beats` scalar can represent more than
+    /// one meter. See [`crate::prog_suite`].
+    ProgSuite,
+    /// Sonata form: exposition (first subject home, second subject in a
+    /// real foreign key), development (a third key, fragmented), and
+    /// recapitulation (both subjects home — the second subject's return
+    /// is the exact same idea, now resolved). The first form built
+    /// around TONAL CONFLICT AND RESOLUTION rather than contrast alone.
+    /// Bypasses the period pipeline like the fugue/passacaglia/prog-
+    /// suite family — the key relationships across sections can't be
+    /// expressed by the plain ternary/rondo B-key machinery. See
+    /// [`crate::sonata`].
+    Sonata,
+    /// Renaissance polyphony: three EQUAL voices, no subject-entry
+    /// hierarchy (unlike fugue's subject/answer/countersubject). Two
+    /// points of imitation entering at the OCTAVE rather than the fifth,
+    /// voice order rotating between them, closing on a real modal
+    /// suspension-and-under-third cadence. Bypasses the period pipeline
+    /// — the whole texture IS three independent species-fitted lines,
+    /// not a melody-plus-accompaniment realization. See
+    /// [`crate::renaissance`].
+    Renaissance,
+    /// Opera / Art Song: two genuinely INDEPENDENT melodic identities
+    /// (Theme A in Melody, Theme B in CounterMelody — unrelated contour
+    /// and register, not a transform of one into the other) in structured
+    /// conversation — solo statements, a bar-by-bar dialogue trading the
+    /// active voice, and a literal interruption (one theme's phrase is cut
+    /// off mid-way and the other enters early) resolving to a cadence.
+    /// Bypasses the period pipeline — no single continuous melody voice
+    /// can carry a dialogue between two characters. See [`crate::opera`].
+    Opera,
 }
 
 /// Drum policy, interpreted by the renderer (the symbolic layer only names
@@ -99,6 +161,148 @@ pub enum Attitude {
     /// the new, resolving down by step), sparse block accompaniment, a
     /// slower pulse.
     Grief,
+}
+
+/// How a style CONVERSES after its opening statement — the phrase-level
+/// rhetoric the second melodic-DNA review demanded ("the opening sentence
+/// differs; the conversation afterward still sounds recognizably Muse").
+/// Applied as a late pass over cadences and the approaches to them; the
+/// default is the classic shared behavior, byte-identical (pinned by
+/// test).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum PhraseRhetoric {
+    /// The existing shared phrase behavior, untouched.
+    #[default]
+    Classic,
+    /// Statement — INTERRUPTION — answer — sharp stop (the tango's
+    /// rhetoric): the melody stops dead before each cadence approach (a
+    /// composed silence), and the cadence itself is short and accented
+    /// rather than held.
+    Declamatory,
+    /// Question — expansion — SUSPENSION — quiet arrival (the nocturne's
+    /// rhetoric): the tone before each cadence leans into the arrival
+    /// (written-out suspension timing — it overstays, delaying the
+    /// resolution), and the arrival lands softly.
+    Singing,
+    /// Statement — statement — STRIKE (the march's rhetoric, added after
+    /// the melody-only listening test localized the failure to March: no
+    /// rhetoric of its own, so stripped of drums it sounded generic). A
+    /// march never stops — there is no interruption, no silence, no
+    /// suspension. Instead every cadence lands clipped and hard-accented,
+    /// and the note immediately before it (the drum-major's pickup) gets
+    /// its own accent, so the metrical insistence survives even with the
+    /// kit gone.
+    Martial,
+    /// Statement — statement — SUSTAINED, UNHURRIED close (the hymn's
+    /// rhetoric — added after a melody-only listening test found
+    /// SacredChoral and Nocturne collapsing into the same perceived
+    /// identity: both slow, both stepwise, and SacredChoral had no
+    /// rhetoric of its own, same root cause as March's original gap). The
+    /// opposite of `Singing` on both axes that make `Singing` distinctive:
+    /// no suspension-lean (the cadence arrives EXACTLY on the beat, not
+    /// delayed) and no softening (the note holds at a steady, slightly
+    /// firm dynamic — a congregation doesn't trail off). Instead the
+    /// cadential note is HELD past its written value — the choral
+    /// tradition of a fermata lingering on a phrase-final tone — a
+    /// mechanism no other rhetoric uses (`Declamatory`/`Martial` clip
+    /// short; `Singing` shortens the arrival note to make room for the
+    /// suspension).
+    Chorale,
+}
+
+/// How a style DEVELOPS its material in departure sections — the last
+/// shared language the listening reviews localized ("the hooks are
+/// different; the development grammar is still shared"). Applied to the
+/// departure's antecedent: the home theme, put through the style's own
+/// way of thinking, fitted against the section's real bass.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum DevelopmentDna {
+    /// The existing shared behavior, untouched (pinned no-op).
+    #[default]
+    Classic,
+    /// The classical sequence schema: the theme restated down (or up)
+    /// the steps, one transposition per bar — insistence through motion.
+    Sequential,
+    /// The theme ornaments itself: progressive figuration (division),
+    /// more connecting tones each statement — development as decoration.
+    Figural,
+    /// The theme compresses: each bar keeps a shorter head than the
+    /// last, silence growing behind it — development as distillation.
+    Fragmenting,
+    /// The theme climbs: register rises a diatonic step every bar
+    /// (monotonically, not direction-by-seed like Sequential) while
+    /// figuration accumulates like Figural AND the velocity itself
+    /// crescendos bar over bar — three axes all pointing the same way,
+    /// toward a peak on the section's LAST bar. Development as a real
+    /// dramatic arc (rising tension, a delayed climax) rather than
+    /// decoration or insistence. Cinematic's habit — reusable by any
+    /// future style whose identity is a build, not a statement.
+    Intensifying,
+    /// The theme wanders: each bar's transposition takes a small step
+    /// (±1 or ±2 diatonic degrees) from where the LAST bar ended — a
+    /// genuine random walk, not a directed one. Unlike Sequential (which
+    /// commits to a single direction for the whole span), Wandering can
+    /// reverse mid-passage; unlike Figural/Fragmenting it never touches
+    /// note count, only where the line sits. Development as drift, not
+    /// argument — the Folk/ModalFolk habit.
+    Wandering,
+}
+
+/// A style's MELODIC DNA: the pools its hooks are born from. Empty pools
+/// (the serde default) mean the classic shared pools — so every existing
+/// style and saved spec is unchanged. Non-empty pools replace the shared
+/// ones for that axis; every cell is still filtered through the hook
+/// identity predicates (see [`crate::hook::HookCell::generate_with`]).
+/// This is the layer the tango listening review demanded: "the style
+/// should own the hook... not because of instrumentation — because tango
+/// melodies naturally prefer different things."
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct MelodicDna {
+    /// Hook rhythm skeletons, as (num, den) beat pairs per note.
+    #[serde(default)]
+    pub hook_rhythms: Vec<Vec<(i64, i64)>>,
+    /// Hook contour skeletons (1-based scale degrees).
+    #[serde(default)]
+    pub hook_contours: Vec<Vec<i32>>,
+    /// Appoggiatura rate [0,1]: how often a cadential melody tone is
+    /// approached by an ACCENTED upper neighbor on the beat, resolving
+    /// down onto the real tone — the leaning dissonance the tango review
+    /// asked for by name ("dramatic appoggiaturas"). 0 (the default) =
+    /// never; the ornament is style DNA, not a global habit.
+    #[serde(default)]
+    pub appoggiatura_rate: f32,
+    /// Ornament ("cut") rate [0,1]: how often ANY melody note (not just
+    /// cadential ones) gets a quick, UNACCENTED grace note a diatonic step
+    /// above, borrowing a sliver of the main note's own time. The
+    /// mechanism that distinguishes it from an appoggiatura: a cut never
+    /// takes the beat, is always brief, and is always the quieter of the
+    /// pair — a flick, not a lean. 0 (the default) = never. The reusable
+    /// habit Celtic teaches the engine: a genuinely unaccented
+    /// embellishment device, where appoggiaturas only had an accented one.
+    #[serde(default)]
+    pub ornament_rate: f32,
+    /// Blue-note rate [0,1]: how often a melody tone landing on the major
+    /// third or the leading tone (scale degrees 3 and 7) is flattened by a
+    /// semitone — coloring the line WITHOUT touching the harmony
+    /// underneath, which stays major/dominant throughout. The mechanism
+    /// that distinguishes this from every prior ornament: appoggiaturas
+    /// and cuts both ADD a note; a blue note ALTERS one that's already
+    /// there. 0 (the default) = never. The reusable habit Blues teaches
+    /// the engine: deliberate melody/harmony scale MISMATCH as an
+    /// expressive device, reusable by Jazz Ballad later.
+    #[serde(default)]
+    pub blue_note_rate: f32,
+    /// Opt-in (2026-07-24, Motif Foundry Phase 1): when true,
+    /// [`crate::hook::HookCell::generate_with`] draws its hook from
+    /// [`crate::motif_foundry`]'s procedural generator -- biased toward
+    /// this DNA's own measured `hook_contours`/`hook_rhythms` character
+    /// via `motif_foundry::config_for_dna` -- instead of the
+    /// hand-authored `hook_contours`/`hook_rhythms` pools above. Default
+    /// false, and no style preset in this crate sets it yet: which
+    /// styles (if any) adopt procedural generation is a listening-test
+    /// decision, not made here.
+    #[serde(default)]
+    pub use_procedural_foundry: bool,
 }
 
 /// Texture and ornament policies — the "how is this piece allowed to
@@ -166,6 +370,15 @@ pub struct TextureSpec {
     /// remembered theme... can it make a theme worth injuring?"
     #[serde(default = "default_true")]
     pub hook_cell: bool,
+    /// The DECEPTIVE FIRST CLOSE: the piece's first full cadence resolves
+    /// V→vi instead of V→I — closure promised, then denied — so the final
+    /// authentic cadence lands as something EARNED rather than routine.
+    /// The harmonic member of the expectation family (the erosion elegy's
+    /// false recovery is the same grammar in form). Off by default; on for
+    /// styles whose drama wants it (Classical/Nocturne/Cinematic/Tango) —
+    /// a lullaby should never deny closure.
+    #[serde(default)]
+    pub deceptive_close: bool,
     /// A subtle new instrumental color at the final return — sparse
     /// chord-top sparkles an octave up on a contrasting timbre. The
     /// listening review: "the palette stays fairly constant... imagine if
@@ -173,6 +386,100 @@ pub struct TextureSpec {
     /// subconsciously feels 'we're somewhere different now.'"
     #[serde(default = "default_true")]
     pub return_color: bool,
+    /// A sustained tonic-fifth PEDAL replaces the walking bass for the
+    /// whole piece — the bagpipe/hurdy-gurdy drone under a Celtic tune.
+    /// Deliberately independent of the chord above it (the harmony still
+    /// moves; the drone doesn't), which is the entire point: the drone is
+    /// the fixed ground a modal melody floats over, not a bass line that
+    /// follows the progression. Off by default; the reusable habit Celtic
+    /// teaches the engine — a genuinely static pedal texture, reusable by
+    /// Nordic's open intervals and Ambient's near-stillness later.
+    #[serde(default)]
+    pub drone: bool,
+    /// PARALLEL PLANING: in the contrast (B/C) section, the harmony stops
+    /// following functional root motion and instead RIDES the melody's
+    /// own contour — the same chord shape, struck fresh at every melody
+    /// note, shifted by the exact interval the tune just moved. The
+    /// harmony no longer resolves anywhere; it's entirely defined by
+    /// where the melody happens to be standing right now. "Color over
+    /// function," the Impressionist habit — reusable by any future style
+    /// that wants harmony untethered from cadential logic. Off by
+    /// default.
+    #[serde(default)]
+    pub planing: bool,
+    /// SUSPENSION rate [0,1]: how often a bar-to-bar chord change gets a
+    /// classical suspension instead of striking cleanly — one harmony
+    /// voice is tied over into the new chord (a prepared dissonance
+    /// against the new bass/harmony), then resolves DOWN BY STEP a beat
+    /// or two later. Candidates are found by real voice-leading (a tone
+    /// in the outgoing chord sitting a diatonic step above a tone in the
+    /// incoming one), not randomly placed. The Sacred Choral habit:
+    /// harmony-voice suspension, distinct from every prior ornament
+    /// (appoggiatura/cut/blue-note all live in the MELODY voice; this is
+    /// the first one that lives in the harmony) — reusable by any future
+    /// polyphonic/chorale-adjacent style. 0 (the default) = never.
+    #[serde(default)]
+    pub suspension_rate: f32,
+    /// ADDITIVE PROCESS: in the theme (A/ReturnA) sections, replace the
+    /// standard developed melody entirely with a Glass-style additive-
+    /// then-subtractive process — the piece's own hook cell repeated with
+    /// one more note each time until the full cell sounds, then one fewer
+    /// each time back down to one. The Minimalism habit: the FIRST pass
+    /// that wholesale replaces a voice within a section rather than
+    /// adding to or altering what's already there. Off by default.
+    #[serde(default)]
+    pub additive_process: bool,
+    /// SEVENTH CHORDS: extend the existing dominant-only 7th coloring
+    /// (which was always safe — a superset of the triad, never clashing
+    /// with the melody's triad-based snapping) to EVERY chord, not just
+    /// the cadential one. The Jazz Ballad habit: real extended harmony —
+    /// maj7/min7/dom7 throughout — as an opt-in style choice, reusable by
+    /// any future jazz-adjacent style (bebop, big band). Off by default.
+    #[serde(default)]
+    pub seventh_chords: bool,
+    /// HARMONIC SEQUENCE: replace the B section's chord-by-chord
+    /// progression (except each phrase's cadential tail) with a real
+    /// descending-fifths circle sequence — the quintessential Baroque
+    /// development device (I-IV-vii°-iii-vi-ii-V-I). The Baroque Dance
+    /// Suite habit: the first pass to rewrite a section's harmonic PLAN
+    /// itself (upstream of chord realization) rather than decorate or
+    /// substitute individual realized chords — reusable by any future
+    /// style wanting a real sequence episode (Classical, Cinematic, Prog
+    /// Rock). Off by default.
+    #[serde(default)]
+    pub harmonic_sequence: bool,
+    /// HARMONIC STASIS: when a voice (Harmony or Bass) repeats the exact
+    /// same pitch across two consecutive chord onsets, tie the notes into
+    /// one longer sustained note instead of re-striking. The Ambient
+    /// habit: repetition becomes duration — the mechanism that turns a
+    /// static progression into a genuine drone rather than a re-attacked
+    /// block chord. Reusable by any future drone/soundscape/pad style.
+    /// Off by default.
+    #[serde(default)]
+    pub harmonic_stasis: bool,
+    /// ROLL ORNAMENTS: replace the single-grace "cut" (Celtic's habit,
+    /// `apply_grace_ornaments`) with a full five-note ORNAMENT CHAIN —
+    /// main, upper cut, main, lower cut, main — filling exactly the
+    /// original note's duration. The Irish Traditional habit: not one
+    /// grace note but a genuine chain of them, reusable by any future
+    /// style wanting a denser, more virtuosic decoration than a single
+    /// cut. Mutually exclusive with the plain cut pass (a note gets one
+    /// or the other, never both). Off by default.
+    #[serde(default)]
+    pub roll_ornaments: bool,
+    /// FULL DRONE: an escalation beyond the plain `drone` flag above —
+    /// Celtic's `drone` replaces only the walking BASS with a tonic-fifth
+    /// pedal while Harmony still moves through a real chord progression
+    /// above it. This flag replaces Harmony TOO, with a static tonic-
+    /// fifth-octave pad tied by `apply_harmonic_stasis` into one
+    /// continuous sustain for the whole piece. The Hindustani-inspired
+    /// habit: no chord progression exists at all, so "tension without
+    /// modulation" is a structural guarantee, not a mood — there is
+    /// nothing TO modulate. Implies `drone` internally (calls
+    /// `apply_drone_pedal` itself); setting both is redundant, not wrong.
+    /// Off by default.
+    #[serde(default)]
+    pub full_drone: bool,
 }
 
 fn default_swing() -> f32 {
@@ -224,6 +531,27 @@ pub struct CompositionSpec {
     pub accompaniment_pool: Vec<Accompaniment>,
     /// Forms the seed picks from (non-empty).
     pub form_pool: Vec<FormKind>,
+    /// The style's melodic DNA (empty = the classic shared hook pools).
+    #[serde(default)]
+    pub melody: MelodicDna,
+    /// The style's phrase rhetoric (default = classic shared behavior).
+    #[serde(default)]
+    pub rhetoric: PhraseRhetoric,
+    /// The style's development grammar (default = classic shared behavior).
+    #[serde(default)]
+    pub development: DevelopmentDna,
+    /// Meters the PREMISE layer may choose between per candidate (empty =
+    /// the style's meter is fixed — e.g. the waltz IS 3/4). When the
+    /// premise picks a meter differing from `meter`, it ADAPTS the motif
+    /// banks exactly (see `premise::adapt_template_to_meter`) so the
+    /// premise spec still satisfies the bank invariant.
+    #[serde(default)]
+    pub meter_pool: Vec<u8>,
+    /// Modal centers the PREMISE layer may choose between per candidate
+    /// (empty = the style's mode is fixed — its identity, e.g. tango's
+    /// harmonic minor). Entries use the same rules as `mode`.
+    #[serde(default)]
+    pub mode_pool: Vec<Option<crate::scale::Mode>>,
     /// Instrument-name triples (melody, harmony, bass) the seed picks from.
     /// Names are resolved by the renderer; unrecognized names fall back to
     /// its defaults LOUDLY, never silently.
@@ -368,6 +696,11 @@ impl CompositionSpec {
         match &self.progression {
             ProgressionSpec::Grammar => Progression::generate(bars, seed),
             ProgressionSpec::Archetype(degrees) => {
+                let cycled: Vec<i32> = (0..bars).map(|i| degrees[i % degrees.len()]).collect();
+                Progression::new(cycled)
+            }
+            ProgressionSpec::ArchetypePool(pool) => {
+                let degrees = &pool[(seed as usize) % pool.len()];
                 let cycled: Vec<i32> = (0..bars).map(|i| degrees[i % degrees.len()]).collect();
                 Progression::new(cycled)
             }

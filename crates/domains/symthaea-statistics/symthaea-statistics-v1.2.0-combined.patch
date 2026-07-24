@@ -1,0 +1,4633 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 4ee4abc..3f1cf59 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,19 @@
+ # Changelog
+ 
++## 1.2.0
++
++- Added deterministic linear quantile regression through check-loss ADMM.
++- Added asymmetric least-squares expectile regression.
++- Added gamma log-link regression with deviance-based dispersion and coefficient uncertainty.
++- Added heteroskedastic Gaussian location-scale regression with separate mean and log-variance predictors.
++- Added profile-maximum-likelihood random-intercept mixed-effects regression with BLUPs and ICC.
++- Added exact beta-binomial and normal-mean Bayes factors, posterior model probabilities, and WAIC.
++- Added validated weighted graphs, connectivity summaries, shortest hops, clustering, and transitivity.
++- Added weighted PageRank, closeness, harmonic closeness, and normalized Brandes betweenness.
++- Added degree assortativity, weighted modularity, network correlation, and deterministic QAP-style permutation tests.
++- Added pinball, expectile, interval/Winkler, and Gaussian CRPS scoring rules.
++- Added independent SciPy/statsmodels/NetworkX references and adversarial v1.2 contracts.
++
+ ## 1.1.0
+ 
+ - Added multivariate energy distance and seeded equality-in-distribution tests.
+diff --git a/Cargo.toml b/Cargo.toml
+index 0b23afc..b5399e9 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,6 +1,6 @@
+ [package]
+ name = "symthaea-statistics"
+-version = "1.1.0"
++version = "1.2.0"
+ edition = "2024"
+ rust-version = "1.85"
+ license = "AGPL-3.0-or-later"
+diff --git a/MIGRATION_1_2.md b/MIGRATION_1_2.md
+new file mode 100644
+index 0000000..dd0adb5
+--- /dev/null
++++ b/MIGRATION_1_2.md
+@@ -0,0 +1,65 @@
++# Migrating from v1.1 to v1.2
++
++v1.2 is additive. The stable v1 `prelude`, `API_LEVEL = 1`, error variants, and
++existing v1.1 APIs remain unchanged.
++
++## Conditional distribution models
++
++Mean-only OLS remains appropriate when the conditional center and variance are
++the complete estimand. Use the new modules when that assumption is too narrow:
++
++- `quantile_regression` fits conditional quantiles by deterministic ADMM.
++- `expectile_regression` fits asymmetric least-squares expectiles.
++- `gamma_regression` models positive, right-skewed outcomes through a log link.
++- `location_scale` fits separate mean and log-variance predictor surfaces.
++- `mixed_effects` fits one Gaussian random intercept per observed group.
++
++These models expose convergence settings and reject rank-deficient or
++unsupported designs. Quantile/expectile coefficients are not interchangeable
++with conditional-mean coefficients.
++
++## Bayesian model comparison
++
++`bayesian_model_comparison` adds:
++
++- exact beta-binomial versus point-null Bayes factors,
++- known-variance normal-mean Bayes factors,
++- posterior model probabilities from log evidence and explicit model priors,
++- WAIC from a draw-major matrix of pointwise log likelihoods.
++
++WAIC requires at least two posterior draws and pointwise likelihood values. It
++is not computed from aggregate likelihoods.
++
++## Weighted networks
++
++Construct a `WeightedGraph` from a finite, non-negative square adjacency matrix.
++Undirected inputs must be symmetric within a caller-declared tolerance. Self
++loops are deliberately rejected in v1.2.
++
++- `network` provides connectivity, density, clustering, transitivity, and hops.
++- `network_centrality` provides degree/strength, closeness, PageRank, and
++  unweighted Brandes betweenness.
++- `network_inference` provides modularity, assortativity, matrix correlation,
++  and seeded QAP-style label permutations.
++
++Edge weights are strengths. Shortest hops and betweenness treat an edge as
++present when its weight is positive; they do not reinterpret strength as a
++metric distance.
++
++## Distributional scoring
++
++Use `distributional_scoring` to evaluate held-out distribution forecasts:
++
++- pinball loss for quantiles,
++- asymmetric squared loss for expectiles,
++- empirical quantile coverage,
++- Winkler interval scores and coverage,
++- Gaussian CRPS.
++
++Training data should not be reused as if it were held-out scoring data.
++
++## Verification
++
++Run the ordinary Rust lane with `./scripts/verify.sh` and independently
++regenerate the v1.2 Python references with
++`./scripts/verify_v1_2_references.sh`.
+diff --git a/NUMERICAL_SCOPE.md b/NUMERICAL_SCOPE.md
+index 28d2601..bb7b168 100644
+--- a/NUMERICAL_SCOPE.md
++++ b/NUMERICAL_SCOPE.md
+@@ -175,3 +175,38 @@ The test suite includes committed reference vectors generated independently with
+ - Multiclass top-label ECE/MCE depend on equal-width bins and can hide class-conditional miscalibration. Proper scoring rules and class-specific inspection should accompany them.
+ - Sidak/Hochberg require independence or suitable positive dependence for their advertised family-wise guarantees. Benjamini-Yekutieli is valid under arbitrary dependence but conservative. Storey q-values condition on a caller-declared lambda and its estimated null fraction.
+ - Pairwise distance and kernel matrices are bounded at 25,000,000 elements; larger requests fail with `ComputationTooLarge`.
++
++## v1.2 distributional and network scope
++
++- Linear quantile regression minimizes the Koenker-Bassett check loss through a
++  deterministic ADMM solver. It reports optimization residuals but does not
++  fabricate coefficient standard errors; bootstrap or asymptotic uncertainty
++  must be selected explicitly by the caller.
++- Expectile regression uses asymmetric least-squares IRLS. Expectiles are
++  tail-sensitive conditional location functionals and are not probabilities or
++  quantiles.
++- Gamma regression uses a log link and the gamma variance function. Dispersion
++  is estimated from deviance over residual degrees of freedom; shape is its
++  reciprocal. Outcomes must be finite and strictly positive.
++- Gaussian location-scale regression alternates inverse-variance weighted mean
++  fitting with Fisher scoring for a log-linear variance. The reported scale
++  covariance is the expected-information approximation under the fitted
++  Gaussian model.
++- Random-intercept regression profiles the ratio of random-intercept to
++  residual variance under Gaussian compound symmetry. v1.2 supports one random
++  intercept, not random slopes, crossed effects, REML, or non-Gaussian outcomes.
++- Beta-binomial and known-variance normal Bayes factors depend on the declared
++  priors. WAIC uses the sample variance of pointwise log likelihood across
++  posterior draws and is unreliable when posterior tails or influential
++  observations invalidate its asymptotic approximation.
++- Weighted-network inputs are dense, finite, non-negative adjacency matrices.
++  Undirected graphs must be symmetric and self loops are rejected. Weights are
++  treated as strengths for PageRank and modularity, while hop, clustering, and
++  Brandes diagnostics use positive-edge topology.
++- Network label-permutation tests preserve each graph's topology and permute
++  node correspondence. Their interpretation requires exchangeable labels under
++  the null; spatial, temporal, or design constraints must be encoded outside
++  the generic QAP-style procedure.
++- Pinball, expectile, interval, and CRPS values are comparative proper or
++  task-specific scores. Their magnitude depends on the outcome scale and should
++  be reported against meaningful baselines on held-out observations.
+diff --git a/README.md b/README.md
+index d1ff1e1..45ff8cc 100644
+--- a/README.md
++++ b/README.md
+@@ -19,18 +19,20 @@ The crate is designed around fourteen rules:
+ 13. **Finite-sample claims use finite-sample procedures.** Exact binomial and hypergeometric evidence is not silently replaced by asymptotic normal approximations.
+ 14. **Version-one imports are deliberately curated.** The `prelude` is the conservative compatibility anchor; specialized APIs remain available from domain modules.
+ 
+-## v1.1 depth release
++## v1.2 distributional and relational release
+ 
+-v1.1 extends the stable v1 contract into nonlinear and hierarchical evidence:
+-energy distance, distance correlation, Gaussian-kernel MMD, Euclidean PERMANOVA,
+-Kruskal-Wallis/Dunn inference, generalized-DL meta-regression, OAS covariance
+-shrinkage, bounded-memory online quantiles, normal-inverse-gamma updating, and
+-multiclass probability diagnostics. The v1 prelude remains deliberately
+-unchanged; the new APIs are available from their domain modules and crate root.
++v1.2 extends the stable v1 contract beyond conditional means. It adds linear
++quantile and expectile regression, gamma log-link regression, joint Gaussian
++location-scale modeling, and random-intercept mixed effects. Bayesian comparison
++now includes exact conjugate Bayes factors, posterior model probabilities, and
++WAIC from pointwise posterior log-likelihood draws.
+ 
+-Randomized tests are deterministic under an explicit seed and use add-one
+-Monte Carlo p-values. Pairwise distance/kernel methods reject computations above
+-the documented quadratic-work bound instead of risking uncontrolled allocation.
++The release also introduces a validated dense weighted-network layer with
++connectivity summaries, clustering, PageRank, closeness, Brandes betweenness,
++modularity, assortativity, and seeded QAP-style comparison. Proper scoring rules
++cover quantile, expectile, interval, and Gaussian distribution forecasts. The
++stable v1 prelude remains unchanged; specialized v1.2 APIs are available from
++the crate root and their domain modules.
+ 
+ 
+ ## Included layers
+@@ -63,16 +65,16 @@ the documented quadratic-work bound instead of risking uncontrolled allocation.
+ ### Modeling, Bayesian analysis, and decisions
+ 
+ - Simple and QR-based multiple OLS with coefficient and prediction uncertainty
+-- Binary and multinomial logistic, Poisson, zero-inflated/hurdle Poisson, and fixed-dispersion negative-binomial models with checked optimization, optional ridge regularization, deviance, AIC, and BIC
++- Binary and multinomial logistic, Poisson, zero-inflated/hurdle Poisson, fixed-dispersion negative-binomial, gamma log-link, quantile, expectile, Gaussian location-scale, and random-intercept mixed models with checked optimization and explicit diagnostics
+ - Ridge, lasso/elastic-net, and Huber regression; HC0-HC3, one-way cluster-robust, and Newey-West covariance inference
+ - Kaplan-Meier and Nelson-Aalen estimation, Aalen-Johansen cumulative incidence, log-rank comparison, and Cox proportional-hazards regression
+ - Covariate balance, randomized difference-in-means, inverse-probability weighting, cross-fit-ready AIPW, difference-in-differences, and deterministic propensity matching
+ - Fixed/random-effects meta-analysis and one-/two-sample TOST equivalence tests
+ - Beta-binomial, gamma-Poisson, and normal-known-variance conjugate models plus empirical-Bayes grouped-rate and normal-means shrinkage, deterministic Bayesian bootstrap posteriors, and Rubin multiple-imputation pooling
+-- Likelihood-ratio tests, AIC/AICc/BIC, and Akaike weights
++- Likelihood-ratio tests, AIC/AICc/BIC, Akaike weights, exact conjugate Bayes factors, posterior model probabilities, and WAIC
+ - Bernoulli sequential probability-ratio tests
+ - Time-uniform confidence sequences for bounded means
+-- Binary/multiclass classification, finite Markov chains, discrete hidden Markov filtering/smoothing/Viterbi decoding, Gaussian mixtures, rank-normalized MCMC diagnostics, agreement/reliability, circular and compositional statistics, weighted isotonic calibration, split-conformal prediction, ROC/precision-recall discrimination, explicit threshold policy, entropy/divergence measures, KDE/DKW bands, ACF/PACF, local-level Kalman filtering/smoothing, Durbin-Watson, Ljung-Box, Jarque-Bera, runs tests, conditional autoregression, EWMA, and CUSUM
++- Binary/multiclass classification, finite Markov chains, discrete hidden Markov filtering/smoothing/Viterbi decoding, Gaussian mixtures, weighted-network summaries and centrality, rank-normalized MCMC diagnostics, agreement/reliability, circular and compositional statistics, weighted isotonic calibration, split-conformal prediction, ROC/precision-recall discrimination, distributional scoring, explicit threshold policy, entropy/divergence measures, KDE/DKW bands, ACF/PACF, local-level Kalman filtering/smoothing, Durbin-Watson, Ljung-Box, Jarque-Bera, runs tests, conditional autoregression, EWMA, and CUSUM
+ - Checked normal/exponential maximum-likelihood and beta/gamma moment fitting
+ - Missingness-pattern audits, deterministic single imputation, Rubin pooling, delta-method and deterministic Gaussian Monte Carlo propagation, design-based survey totals/means, paired binary tests, and simple/Holt exponential smoothing
+ 
+@@ -104,6 +106,6 @@ Run:
+ ./scripts/verify.sh
+ ```
+ 
+-The verification lane checks formatting, Clippy with warnings denied, every target, doctests, documentation, metadata, and package construction. The repository contains **423 unit/integration tests**.
++The verification lane checks formatting, Clippy with warnings denied, every target, doctests, documentation, metadata, and package construction. The repository contains **493 unit/integration tests**.
+ 
+-See [NUMERICAL_SCOPE.md](NUMERICAL_SCOPE.md) for exact claims and limitations, [MIGRATION_1_0.md](MIGRATION_1_0.md) for adoption guidance, and [VALIDATION_V1_0.md](VALIDATION_V1_0.md) for the v1.0 evidence record.
++See [NUMERICAL_SCOPE.md](NUMERICAL_SCOPE.md) for exact claims and limitations, [MIGRATION_1_2.md](MIGRATION_1_2.md) for v1.2 adoption guidance, and [VALIDATION_V1_2.md](VALIDATION_V1_2.md) for the release evidence record.
+diff --git a/VALIDATION_V1_2.md b/VALIDATION_V1_2.md
+new file mode 100644
+index 0000000..e4574e6
+--- /dev/null
++++ b/VALIDATION_V1_2.md
+@@ -0,0 +1,67 @@
++# v1.2 validation record
++
++This record describes the checks performed on the `symthaea-statistics` v1.2
++release candidate in the artifact environment.
++
++## Source surface
++
++- 118 public modules plus one private model-matrix module
++- 633 resolved root exports
++- 120 Rust source files and 24 integration-test files
++- 493 `#[test]` functions present in source and integration tests
++- no `unsafe` token outside the crate-level prohibition
++- no production `unwrap`, `expect`, `panic!`, or `unreachable!` surface
++- every declared module has a matching source file and every module file is declared
++- every item in the stable v1 prelude resolves through the root export surface
++- `API_LEVEL = 1` and `NUMERICAL_CONTRACT = "validated-v1"` remain unchanged
++
++## Syntax and repository checks
++
++- all 144 Rust source and integration-test files parse without tree-sitter error nodes
++- `git diff --check` passes
++- the independent v1.2 reference generator reproduces its committed JSON byte-for-byte
++- the stable-prelude compatibility integration tests are present
++
++## Independent numerical landmarks
++
++The retained generator uses NumPy, SciPy, statsmodels, scikit-learn, and
++NetworkX to record independent values for:
++
++- median quantile-regression coefficients and check-loss objective
++- asymmetric intercept-only expectiles
++- gamma log-link coefficients, deviance, and deviance dispersion
++- joint Gaussian mean and log-variance coefficients
++- Gaussian random-intercept fixed effects, residual variance, group variance,
++  and maximum likelihood
++- exact beta-binomial Bayes factors
++- WAIC pointwise and aggregate components
++- weighted PageRank, closeness, Brandes betweenness, and planted-partition
++  modularity
++- Gaussian continuous ranked probability score
++
++The Rust integration vectors bind those values with explicit numerical
++tolerances. Seeded network permutations and optimization APIs also carry
++reproducibility and adversarial contract tests.
++
++## Resource and contract hardening
++
++The v1.2 layer rejects rank-deficient conditional models, non-positive gamma
++outcomes, invalid quantile/expectile levels, ragged pointwise likelihood draws,
++integer evidence counts above exact `f64` representation, non-finite network
++row strength, negative weights, self loops, asymmetric undirected inputs,
++invalid PageRank settings, mismatched community assignments, unreplicated
++random-intercept designs, and reversed forecast intervals.
++
++Network topology and weight semantics are explicit: weights are strengths for
++PageRank and modularity, while hop, clustering, and Brandes methods use positive
++edge presence. QAP-style tests require explicit seeds and add-one Monte Carlo
++p-values.
++
++## Unavailable checks
++
++The environment contains Rustup launchers but no installed Rust toolchain and
++cannot resolve an outbound toolchain download. Therefore Cargo compilation,
++execution of the 493 Rust tests, Clippy, rustfmt, rustdoc, and `cargo package`
++were not performed here. `scripts/verify.sh` remains the authoritative Rust
++1.85+ verification lane, and `scripts/verify_v1_2_references.sh` is the separate
++Python reference-regeneration lane.
+diff --git a/scripts/verify_v1_2_references.sh b/scripts/verify_v1_2_references.sh
+new file mode 100755
+index 0000000..1604b03
+--- /dev/null
++++ b/scripts/verify_v1_2_references.sh
+@@ -0,0 +1,9 @@
++#!/usr/bin/env sh
++set -eu
++root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
++temporary=$(mktemp)
++trap 'rm -f "$temporary"' EXIT
++cp "$root/validation/v1_2_reference_results.json" "$temporary"
++python3 "$root/validation/generate_v1_2_references.py" >/dev/null
++cmp "$temporary" "$root/validation/v1_2_reference_results.json"
++printf '%s\n' 'v1.2 independent reference values match the committed snapshot'
+diff --git a/src/bayesian_model_comparison.rs b/src/bayesian_model_comparison.rs
+new file mode 100644
+index 0000000..6cb0aff
+--- /dev/null
++++ b/src/bayesian_model_comparison.rs
+@@ -0,0 +1,345 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Bayesian model comparison from exact conjugate evidence and posterior draws.
++
++use crate::error::{StatsResult, StatisticsError};
++use crate::special::ln_gamma;
++
++const MAX_EXACT_INTEGER_F64: u64 = 1_u64 << 53;
++
++/// Exact two-model evidence comparison.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct BayesFactorComparison {
++    pub log_bayes_factor_10: f64,
++    pub bayes_factor_10: f64,
++    pub prior_probability_alternative: f64,
++    pub posterior_probability_alternative: f64,
++}
++
++/// Widely applicable information criterion computed from pointwise posterior draws.
++#[derive(Debug, Clone, PartialEq)]
++pub struct WaicEstimate {
++    pub log_pointwise_predictive_density: f64,
++    pub effective_parameters: f64,
++    pub elpd_waic: f64,
++    pub waic: f64,
++    pub standard_error: f64,
++    pub pointwise_elpd: Vec<f64>,
++}
++
++fn ln_beta(alpha: f64, beta: f64) -> f64 {
++    ln_gamma(alpha) + ln_gamma(beta) - ln_gamma(alpha + beta)
++}
++
++fn validate_prior_probability(value: f64) -> StatsResult<()> {
++    if value.is_finite() && (0.0..1.0).contains(&value) {
++        Ok(())
++    } else {
++        Err(StatisticsError::InvalidProbability { value })
++    }
++}
++
++fn comparison_from_log_bayes_factor(
++    log_bayes_factor_10: f64,
++    prior_probability_alternative: f64,
++) -> StatsResult<BayesFactorComparison> {
++    validate_prior_probability(prior_probability_alternative)?;
++    if !log_bayes_factor_10.is_finite() {
++        return Err(StatisticsError::NumericalOverflow {
++            operation: "Bayes factor",
++        });
++    }
++    let log_prior_odds =
++        prior_probability_alternative.ln() - (1.0 - prior_probability_alternative).ln();
++    let log_posterior_odds = log_prior_odds + log_bayes_factor_10;
++    let posterior_probability_alternative = if log_posterior_odds >= 0.0 {
++        1.0 / (1.0 + (-log_posterior_odds).exp())
++    } else {
++        let odds = log_posterior_odds.exp();
++        odds / (1.0 + odds)
++    };
++    Ok(BayesFactorComparison {
++        log_bayes_factor_10,
++        bayes_factor_10: log_bayes_factor_10.exp(),
++        prior_probability_alternative,
++        posterior_probability_alternative,
++    })
++}
++
++/// Compare a point Bernoulli null against a beta-binomial alternative.
++///
++/// `BF10` favors the beta-prior alternative over the point null.
++pub fn try_beta_binomial_bayes_factor(
++    successes: u64,
++    trials: u64,
++    null_probability: f64,
++    prior_alpha: f64,
++    prior_beta: f64,
++    prior_probability_alternative: f64,
++) -> StatsResult<BayesFactorComparison> {
++    if successes > trials {
++        return Err(StatisticsError::InvalidCount { successes, trials });
++    }
++    if trials > MAX_EXACT_INTEGER_F64 {
++        return Err(StatisticsError::CountTooLarge {
++            value: trials as u128,
++            maximum: MAX_EXACT_INTEGER_F64 as u128,
++        });
++    }
++    if !null_probability.is_finite() || !(0.0..1.0).contains(&null_probability) {
++        return Err(StatisticsError::InvalidProbability {
++            value: null_probability,
++        });
++    }
++    for (name, value) in [
++        ("beta prior alpha", prior_alpha),
++        ("beta prior beta", prior_beta),
++    ] {
++        if !value.is_finite() || value <= 0.0 {
++            return Err(StatisticsError::NonPositiveValue { name, value });
++        }
++    }
++    let failures = trials - successes;
++    let successes_f = successes as f64;
++    let failures_f = failures as f64;
++    let log_alternative = ln_beta(prior_alpha + successes_f, prior_beta + failures_f)
++        - ln_beta(prior_alpha, prior_beta);
++    let log_null = successes_f * null_probability.ln()
++        + failures_f * (1.0 - null_probability).ln();
++    comparison_from_log_bayes_factor(
++        log_alternative - log_null,
++        prior_probability_alternative,
++    )
++}
++
++fn normal_log_density(value: f64, mean: f64, variance: f64) -> f64 {
++    -0.5
++        * ((2.0 * std::f64::consts::PI * variance).ln()
++            + (value - mean) * (value - mean) / variance)
++}
++
++/// Compare a point normal-mean null against a normal prior alternative.
++///
++/// The observation variance is known. The Bayes factor is computed from the
++/// sufficient statistic `sample_mean`, for which nuisance within-sample terms
++/// cancel exactly between models.
++pub fn try_normal_mean_bayes_factor(
++    sample_mean: f64,
++    sample_size: usize,
++    known_standard_deviation: f64,
++    null_mean: f64,
++    prior_mean: f64,
++    prior_standard_deviation: f64,
++    prior_probability_alternative: f64,
++) -> StatsResult<BayesFactorComparison> {
++    for (index, value) in [sample_mean, null_mean, prior_mean].into_iter().enumerate() {
++        if !value.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value });
++        }
++    }
++    if sample_size == 0 {
++        return Err(StatisticsError::EmptySample);
++    }
++    for (name, value) in [
++        ("known standard deviation", known_standard_deviation),
++        ("normal prior standard deviation", prior_standard_deviation),
++    ] {
++        if !value.is_finite() || value <= 0.0 {
++            return Err(StatisticsError::NonPositiveValue { name, value });
++        }
++    }
++    let null_variance = known_standard_deviation * known_standard_deviation / sample_size as f64;
++    let alternative_variance =
++        null_variance + prior_standard_deviation * prior_standard_deviation;
++    let log_bayes_factor_10 = normal_log_density(sample_mean, prior_mean, alternative_variance)
++        - normal_log_density(sample_mean, null_mean, null_variance);
++    comparison_from_log_bayes_factor(
++        log_bayes_factor_10,
++        prior_probability_alternative,
++    )
++}
++
++fn log_mean_exp(values: &[f64]) -> f64 {
++    let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
++    maximum
++        + (values
++            .iter()
++            .map(|value| (value - maximum).exp())
++            .sum::<f64>()
++            / values.len() as f64)
++            .ln()
++}
++
++fn sample_variance(values: &[f64]) -> f64 {
++    if values.len() < 2 {
++        return 0.0;
++    }
++    let mean = values.iter().sum::<f64>() / values.len() as f64;
++    values
++        .iter()
++        .map(|value| (value - mean) * (value - mean))
++        .sum::<f64>()
++        / (values.len() - 1) as f64
++}
++
++/// Compute WAIC from a draw-major matrix of pointwise log likelihoods.
++///
++/// Each outer row is one posterior draw and each inner column is one observed
++/// data point. At least two draws are required to estimate the variance term.
++pub fn try_waic(log_likelihood_draws: &[Vec<f64>]) -> StatsResult<WaicEstimate> {
++    if log_likelihood_draws.len() < 2 {
++        return Err(StatisticsError::InsufficientSamples {
++            required: 2,
++            actual: log_likelihood_draws.len(),
++        });
++    }
++    let observations = log_likelihood_draws[0].len();
++    if observations == 0 {
++        return Err(StatisticsError::EmptySample);
++    }
++    for (draw, row) in log_likelihood_draws.iter().enumerate() {
++        if row.len() != observations {
++            return Err(StatisticsError::DimensionMismatch {
++                context: "WAIC pointwise log likelihood",
++                expected: observations,
++                actual: row.len(),
++            });
++        }
++        for (observation, &value) in row.iter().enumerate() {
++            if !value.is_finite() {
++                return Err(StatisticsError::NonFiniteInput {
++                    index: draw * observations + observation,
++                    value,
++                });
++            }
++        }
++    }
++
++    let mut lppd = 0.0;
++    let mut effective_parameters = 0.0;
++    let mut pointwise_elpd = Vec::with_capacity(observations);
++    let mut values = vec![0.0; log_likelihood_draws.len()];
++    for observation in 0..observations {
++        for (draw, row) in log_likelihood_draws.iter().enumerate() {
++            values[draw] = row[observation];
++        }
++        let point_lppd = log_mean_exp(&values);
++        let penalty = sample_variance(&values);
++        lppd += point_lppd;
++        effective_parameters += penalty;
++        pointwise_elpd.push(point_lppd - penalty);
++    }
++    let elpd_waic = pointwise_elpd.iter().sum::<f64>();
++    let waic = -2.0 * elpd_waic;
++    let pointwise_deviance = pointwise_elpd
++        .iter()
++        .map(|value| -2.0 * value)
++        .collect::<Vec<_>>();
++    let standard_error = (observations as f64 * sample_variance(&pointwise_deviance)).sqrt();
++    if !waic.is_finite() || !standard_error.is_finite() {
++        return Err(StatisticsError::NumericalOverflow {
++            operation: "WAIC",
++        });
++    }
++    Ok(WaicEstimate {
++        log_pointwise_predictive_density: lppd,
++        effective_parameters,
++        elpd_waic,
++        waic,
++        standard_error,
++        pointwise_elpd,
++    })
++}
++
++/// Normalize log model evidence values into posterior model probabilities.
++pub fn try_posterior_model_probabilities(
++    log_evidence: &[f64],
++    prior_probabilities: &[f64],
++) -> StatsResult<Vec<f64>> {
++    if log_evidence.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    if log_evidence.len() != prior_probabilities.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: log_evidence.len(),
++            right: prior_probabilities.len(),
++        });
++    }
++    let mut log_weights = Vec::with_capacity(log_evidence.len());
++    let mut prior_sum = 0.0;
++    for index in 0..log_evidence.len() {
++        let evidence = log_evidence[index];
++        let prior = prior_probabilities[index];
++        if !evidence.is_finite() {
++            return Err(StatisticsError::NonFiniteInput {
++                index,
++                value: evidence,
++            });
++        }
++        if !prior.is_finite() || prior < 0.0 {
++            return Err(StatisticsError::InvalidProbability { value: prior });
++        }
++        prior_sum += prior;
++        log_weights.push(if prior == 0.0 {
++            f64::NEG_INFINITY
++        } else {
++            evidence + prior.ln()
++        });
++    }
++    if (prior_sum - 1.0).abs() > 1.0e-10 {
++        return Err(StatisticsError::InvalidProbabilityMass { sum: prior_sum });
++    }
++    let maximum = log_weights.iter().copied().fold(f64::NEG_INFINITY, f64::max);
++    if !maximum.is_finite() {
++        return Err(StatisticsError::DegenerateSample {
++            reason: "at least one model must have positive prior probability",
++        });
++    }
++    let denominator = log_weights
++        .iter()
++        .map(|value| (value - maximum).exp())
++        .sum::<f64>();
++    Ok(log_weights
++        .iter()
++        .map(|value| (value - maximum).exp() / denominator)
++        .collect())
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn beta_binomial_evidence_favors_fair_coin_for_balanced_data() {
++        let comparison = try_beta_binomial_bayes_factor(10, 20, 0.5, 1.0, 1.0, 0.5).unwrap();
++        assert!(comparison.bayes_factor_10 < 1.0);
++        assert!(comparison.posterior_probability_alternative < 0.5);
++    }
++
++    #[test]
++    fn normal_mean_evidence_favors_shifted_alternative() {
++        let comparison = try_normal_mean_bayes_factor(2.0, 25, 1.0, 0.0, 0.0, 1.0, 0.5).unwrap();
++        assert!(comparison.bayes_factor_10 > 100.0);
++    }
++
++    #[test]
++    fn waic_is_finite_and_pointwise() {
++        let draws = vec![
++            vec![-1.0, -2.0, -0.5],
++            vec![-1.1, -1.8, -0.6],
++            vec![-0.9, -2.2, -0.4],
++        ];
++        let estimate = try_waic(&draws).unwrap();
++        assert_eq!(estimate.pointwise_elpd.len(), 3);
++        assert!(estimate.waic.is_finite());
++        assert!(estimate.effective_parameters > 0.0);
++    }
++
++    #[test]
++    fn model_probabilities_normalize() {
++        let probabilities = try_posterior_model_probabilities(&[-3.0, -1.0], &[0.5, 0.5]).unwrap();
++        assert!((probabilities.iter().sum::<f64>() - 1.0).abs() < 1.0e-12);
++        assert!(probabilities[1] > probabilities[0]);
++    }
++}
+diff --git a/src/distributional_scoring.rs b/src/distributional_scoring.rs
+new file mode 100644
+index 0000000..6f312b3
+--- /dev/null
++++ b/src/distributional_scoring.rs
+@@ -0,0 +1,269 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Proper and task-specific scoring rules for distributional predictions.
++
++use crate::distributions::{normal_cdf, normal_pdf};
++use crate::error::{StatsResult, StatisticsError};
++
++/// Aggregated interval forecast diagnostics.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct IntervalForecastScore {
++    pub coverage: f64,
++    pub mean_width: f64,
++    pub mean_interval_score: f64,
++    pub nominal_coverage: f64,
++}
++
++fn validate_equal_finite(left: &[f64], right: &[f64]) -> StatsResult<()> {
++    if left.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    if left.len() != right.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: left.len(),
++            right: right.len(),
++        });
++    }
++    for (index, &value) in left.iter().chain(right).enumerate() {
++        if !value.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value });
++        }
++    }
++    Ok(())
++}
++
++/// Mean quantile/check loss. Lower is better.
++pub fn try_pinball_loss(
++    observations: &[f64],
++    predicted_quantiles: &[f64],
++    quantile: f64,
++) -> StatsResult<f64> {
++    validate_equal_finite(observations, predicted_quantiles)?;
++    if !quantile.is_finite() || !(0.0..1.0).contains(&quantile) {
++        return Err(StatisticsError::InvalidProbability { value: quantile });
++    }
++    let value = observations
++        .iter()
++        .zip(predicted_quantiles)
++        .map(|(&observed, &predicted)| {
++            let residual = observed - predicted;
++            if residual >= 0.0 {
++                quantile * residual
++            } else {
++                (quantile - 1.0) * residual
++            }
++        })
++        .sum::<f64>()
++        / observations.len() as f64;
++    if value.is_finite() {
++        Ok(value)
++    } else {
++        Err(StatisticsError::NumericalOverflow {
++            operation: "pinball loss",
++        })
++    }
++}
++
++/// Mean asymmetric squared expectile loss. Lower is better.
++pub fn try_expectile_loss(
++    observations: &[f64],
++    predicted_expectiles: &[f64],
++    expectile: f64,
++) -> StatsResult<f64> {
++    validate_equal_finite(observations, predicted_expectiles)?;
++    if !expectile.is_finite() || !(0.0..1.0).contains(&expectile) {
++        return Err(StatisticsError::InvalidProbability { value: expectile });
++    }
++    let value = observations
++        .iter()
++        .zip(predicted_expectiles)
++        .map(|(&observed, &predicted)| {
++            let residual = observed - predicted;
++            let weight = if residual >= 0.0 {
++                expectile
++            } else {
++                1.0 - expectile
++            };
++            weight * residual * residual
++        })
++        .sum::<f64>()
++        / observations.len() as f64;
++    if value.is_finite() {
++        Ok(value)
++    } else {
++        Err(StatisticsError::NumericalOverflow {
++            operation: "expectile loss",
++        })
++    }
++}
++
++/// Empirical coverage of predicted conditional quantiles.
++pub fn try_quantile_coverage(
++    observations: &[f64],
++    predicted_quantiles: &[f64],
++) -> StatsResult<f64> {
++    validate_equal_finite(observations, predicted_quantiles)?;
++    Ok(observations
++        .iter()
++        .zip(predicted_quantiles)
++        .filter(|(observed, predicted)| observed <= predicted)
++        .count() as f64
++        / observations.len() as f64)
++}
++
++/// Winkler interval score and coverage diagnostics for central intervals.
++pub fn try_interval_forecast_score(
++    observations: &[f64],
++    lower: &[f64],
++    upper: &[f64],
++    nominal_coverage: f64,
++) -> StatsResult<IntervalForecastScore> {
++    if observations.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    if lower.len() != observations.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: lower.len(),
++            right: observations.len(),
++        });
++    }
++    if upper.len() != observations.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: upper.len(),
++            right: observations.len(),
++        });
++    }
++    if !nominal_coverage.is_finite() || !(0.0..1.0).contains(&nominal_coverage) {
++        return Err(StatisticsError::InvalidProbability {
++            value: nominal_coverage,
++        });
++    }
++    let alpha = 1.0 - nominal_coverage;
++    let mut covered = 0_usize;
++    let mut width_sum = 0.0;
++    let mut score_sum = 0.0;
++    for index in 0..observations.len() {
++        let observed = observations[index];
++        let low = lower[index];
++        let high = upper[index];
++        for value in [observed, low, high] {
++            if !value.is_finite() {
++                return Err(StatisticsError::NonFiniteInput { index, value });
++            }
++        }
++        if low > high {
++            return Err(StatisticsError::DegenerateSample {
++                reason: "prediction interval lower bound exceeds upper bound",
++            });
++        }
++        let width = high - low;
++        width_sum += width;
++        let mut score = width;
++        if observed < low {
++            score += 2.0 / alpha * (low - observed);
++        } else if observed > high {
++            score += 2.0 / alpha * (observed - high);
++        } else {
++            covered += 1;
++        }
++        score_sum += score;
++    }
++    if !score_sum.is_finite() || !width_sum.is_finite() {
++        return Err(StatisticsError::NumericalOverflow {
++            operation: "interval forecast score",
++        });
++    }
++    Ok(IntervalForecastScore {
++        coverage: covered as f64 / observations.len() as f64,
++        mean_width: width_sum / observations.len() as f64,
++        mean_interval_score: score_sum / observations.len() as f64,
++        nominal_coverage,
++    })
++}
++
++/// Mean continuous ranked probability score for Gaussian forecasts.
++pub fn try_normal_crps(
++    observations: &[f64],
++    means: &[f64],
++    standard_deviations: &[f64],
++) -> StatsResult<f64> {
++    if observations.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    if means.len() != observations.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: means.len(),
++            right: observations.len(),
++        });
++    }
++    if standard_deviations.len() != observations.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: standard_deviations.len(),
++            right: observations.len(),
++        });
++    }
++    let mut score = 0.0;
++    for index in 0..observations.len() {
++        let observed = observations[index];
++        let mean = means[index];
++        let standard_deviation = standard_deviations[index];
++        if !observed.is_finite() {
++            return Err(StatisticsError::NonFiniteInput {
++                index,
++                value: observed,
++            });
++        }
++        if !mean.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value: mean });
++        }
++        if !standard_deviation.is_finite() || standard_deviation <= 0.0 {
++            return Err(StatisticsError::InvalidScale {
++                value: standard_deviation,
++            });
++        }
++        let z = (observed - mean) / standard_deviation;
++        score += standard_deviation
++            * (z * (2.0 * normal_cdf(z) - 1.0)
++                + 2.0 * normal_pdf(z)
++                - 1.0 / std::f64::consts::PI.sqrt());
++    }
++    score /= observations.len() as f64;
++    if score.is_finite() {
++        Ok(score)
++    } else {
++        Err(StatisticsError::NumericalOverflow {
++            operation: "Gaussian CRPS",
++        })
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn perfect_median_predictions_have_zero_pinball_loss() {
++        assert_eq!(
++            try_pinball_loss(&[1.0, 2.0, 3.0], &[1.0, 2.0, 3.0], 0.5).unwrap(),
++            0.0
++        );
++    }
++
++    #[test]
++    fn interval_score_penalizes_misses() {
++        let covered = try_interval_forecast_score(&[0.0], &[-1.0], &[1.0], 0.9).unwrap();
++        let missed = try_interval_forecast_score(&[3.0], &[-1.0], &[1.0], 0.9).unwrap();
++        assert!(missed.mean_interval_score > covered.mean_interval_score);
++        assert_eq!(covered.coverage, 1.0);
++        assert_eq!(missed.coverage, 0.0);
++    }
++
++    #[test]
++    fn gaussian_crps_is_small_at_the_mean() {
++        let centered = try_normal_crps(&[0.0], &[0.0], &[1.0]).unwrap();
++        let displaced = try_normal_crps(&[3.0], &[0.0], &[1.0]).unwrap();
++        assert!(centered < displaced);
++        assert!((centered - 0.23369497725510913).abs() < 1.0e-12);
++    }
++}
+diff --git a/src/expectile_regression.rs b/src/expectile_regression.rs
+new file mode 100644
+index 0000000..e933de1
+--- /dev/null
++++ b/src/expectile_regression.rs
+@@ -0,0 +1,228 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Linear expectile regression through asymmetric least squares.
++
++use crate::error::{StatsResult, StatisticsError};
++use crate::linalg::try_solve_spd;
++use crate::model_matrix::{try_design_matrix, try_feature_vector};
++use crate::qr::QrDecomposition;
++
++/// Configuration for linear expectile regression.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct ExpectileRegressionOptions {
++    /// Expectile level in `(0, 1)`.
++    pub expectile: f64,
++    pub include_intercept: bool,
++    pub max_iterations: usize,
++    pub tolerance: f64,
++    /// Non-negative diagonal stabilization added to non-intercept coefficients.
++    pub ridge: f64,
++}
++
++impl Default for ExpectileRegressionOptions {
++    fn default() -> Self {
++        Self {
++            expectile: 0.5,
++            include_intercept: true,
++            max_iterations: 200,
++            tolerance: 1.0e-10,
++            ridge: 0.0,
++        }
++    }
++}
++
++/// Fitted asymmetric least-squares model.
++#[derive(Debug, Clone, PartialEq)]
++pub struct ExpectileRegressionFit {
++    pub coefficients: Vec<f64>,
++    pub expectile: f64,
++    pub n: usize,
++    pub predictor_count: usize,
++    pub include_intercept: bool,
++    pub asymmetric_loss: f64,
++    pub iterations: usize,
++}
++
++impl ExpectileRegressionFit {
++    pub fn try_predict(&self, predictors: &[f64]) -> StatsResult<f64> {
++        let features = try_feature_vector(
++            predictors,
++            self.predictor_count,
++            self.include_intercept,
++        )?;
++        let mut value = 0.0;
++        for (&feature, &coefficient) in features.iter().zip(&self.coefficients) {
++            value = feature.mul_add(coefficient, value);
++        }
++        if value.is_finite() {
++            Ok(value)
++        } else {
++            Err(StatisticsError::NumericalOverflow {
++                operation: "expectile regression prediction",
++            })
++        }
++    }
++}
++
++fn validate_options(options: ExpectileRegressionOptions) -> StatsResult<()> {
++    if !options.expectile.is_finite() || !(0.0..1.0).contains(&options.expectile) {
++        return Err(StatisticsError::InvalidProbability {
++            value: options.expectile,
++        });
++    }
++    if options.max_iterations == 0 {
++        return Err(StatisticsError::InvalidIterations { iterations: 0 });
++    }
++    if !options.tolerance.is_finite() || options.tolerance <= 0.0 {
++        return Err(StatisticsError::NonPositiveValue {
++            name: "expectile regression tolerance",
++            value: options.tolerance,
++        });
++    }
++    if !options.ridge.is_finite() || options.ridge < 0.0 {
++        return Err(StatisticsError::NegativeValue {
++            name: "expectile regression ridge",
++            value: options.ridge,
++        });
++    }
++    Ok(())
++}
++
++/// Fit a linear expectile model.
++pub fn try_expectile_regression(
++    predictors: &[Vec<f64>],
++    outcomes: &[f64],
++    options: ExpectileRegressionOptions,
++) -> StatsResult<ExpectileRegressionFit> {
++    validate_options(options)?;
++    if outcomes.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    for (index, &value) in outcomes.iter().enumerate() {
++        if !value.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value });
++        }
++    }
++    let design = try_design_matrix(predictors, outcomes.len(), options.include_intercept)?;
++    if outcomes.len() < design.columns() {
++        return Err(StatisticsError::InsufficientSamples {
++            required: design.columns(),
++            actual: outcomes.len(),
++        });
++    }
++    let factor = QrDecomposition::try_factor(&design)?;
++    let mut coefficients = factor.try_solve_least_squares(outcomes)?;
++
++    for iteration in 1..=options.max_iterations {
++        let fitted = design.try_mul_vector(&coefficients)?;
++        let weights = outcomes
++            .iter()
++            .zip(&fitted)
++            .map(|(&observed, &estimate)| {
++                if observed >= estimate {
++                    options.expectile
++                } else {
++                    1.0 - options.expectile
++                }
++            })
++            .collect::<Vec<_>>();
++        let mut gram = design.try_weighted_gram(&weights)?;
++        for index in 0..gram.rows() {
++            if !(options.include_intercept && index == 0) {
++                let updated = gram.try_get(index, index)? + options.ridge;
++                if !updated.is_finite() {
++                    return Err(StatisticsError::NumericalOverflow {
++                        operation: "expectile ridge stabilization",
++                    });
++                }
++                // The indices are known valid from the loop bounds.
++                gram.set(index, index, updated);
++            }
++        }
++        let rhs = design.try_weighted_transpose_mul_vector(&weights, outcomes)?;
++        let updated = try_solve_spd(&gram, &rhs)?;
++        let maximum_change = updated
++            .iter()
++            .zip(&coefficients)
++            .map(|(&next, &previous)| (next - previous).abs())
++            .fold(0.0_f64, f64::max);
++        coefficients = updated;
++        if maximum_change <= options.tolerance {
++            let fitted = design.try_mul_vector(&coefficients)?;
++            let asymmetric_loss = outcomes
++                .iter()
++                .zip(&fitted)
++                .map(|(&observed, &estimate)| {
++                    let residual = observed - estimate;
++                    let weight = if residual >= 0.0 {
++                        options.expectile
++                    } else {
++                        1.0 - options.expectile
++                    };
++                    weight * residual * residual
++                })
++                .sum::<f64>();
++            if !asymmetric_loss.is_finite() {
++                return Err(StatisticsError::NumericalOverflow {
++                    operation: "expectile regression loss",
++                });
++            }
++            return Ok(ExpectileRegressionFit {
++                coefficients,
++                expectile: options.expectile,
++                n: outcomes.len(),
++                predictor_count: design.columns() - usize::from(options.include_intercept),
++                include_intercept: options.include_intercept,
++                asymmetric_loss,
++                iterations: iteration,
++            });
++        }
++    }
++    Err(StatisticsError::NonConvergence {
++        function: "expectile regression IRLS",
++        iterations: options.max_iterations,
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn half_expectile_matches_ordinary_least_squares_line() {
++        let x = (0..8).map(|value| vec![value as f64]).collect::<Vec<_>>();
++        let y = x
++            .iter()
++            .map(|row| 1.5 + 2.25 * row[0])
++            .collect::<Vec<_>>();
++        let fit = try_expectile_regression(&x, &y, Default::default()).unwrap();
++        assert!((fit.coefficients[0] - 1.5).abs() < 1.0e-10);
++        assert!((fit.coefficients[1] - 2.25).abs() < 1.0e-10);
++    }
++
++    #[test]
++    fn upper_expectile_moves_toward_large_observations() {
++        let x: Vec<Vec<f64>> = Vec::new();
++        let y = [0.0, 0.0, 0.0, 1.0, 2.0, 10.0];
++        let low = try_expectile_regression(
++            &x,
++            &y,
++            ExpectileRegressionOptions {
++                expectile: 0.2,
++                ..Default::default()
++            },
++        )
++        .unwrap();
++        let high = try_expectile_regression(
++            &x,
++            &y,
++            ExpectileRegressionOptions {
++                expectile: 0.8,
++                ..Default::default()
++            },
++        )
++        .unwrap();
++        assert!(high.coefficients[0] > low.coefficients[0]);
++    }
++}
+diff --git a/src/gamma_regression.rs b/src/gamma_regression.rs
+new file mode 100644
+index 0000000..c5cdff7
+--- /dev/null
++++ b/src/gamma_regression.rs
+@@ -0,0 +1,311 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Gamma generalized linear regression with a log link.
++
++use crate::descriptive::try_mean;
++use crate::distributions::{normal_sf, try_normal_quantile};
++use crate::error::{StatsResult, StatisticsError};
++use crate::inference::Interval;
++use crate::linalg::CholeskyFactor;
++use crate::model_matrix::{try_design_matrix, try_feature_vector};
++use crate::special::ln_gamma;
++
++/// Controls for gamma-regression fitting.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct GammaRegressionOptions {
++    pub include_intercept: bool,
++    pub ridge: f64,
++    pub penalize_intercept: bool,
++    pub maximum_iterations: usize,
++    pub tolerance: f64,
++    pub confidence: f64,
++}
++
++impl Default for GammaRegressionOptions {
++    fn default() -> Self {
++        Self {
++            include_intercept: true,
++            ridge: 0.0,
++            penalize_intercept: false,
++            maximum_iterations: 200,
++            tolerance: 1.0e-9,
++            confidence: 0.95,
++        }
++    }
++}
++
++/// Fitted gamma log-link model.
++#[derive(Debug, Clone, PartialEq)]
++pub struct GammaRegressionFit {
++    pub coefficients: Vec<f64>,
++    pub standard_errors: Vec<f64>,
++    pub z_statistics: Vec<f64>,
++    pub p_values_two_sided: Vec<f64>,
++    pub confidence_intervals: Vec<Interval>,
++    pub dispersion: f64,
++    pub shape: f64,
++    pub n: usize,
++    pub predictor_count: usize,
++    pub include_intercept: bool,
++    pub iterations: usize,
++    pub deviance: f64,
++    pub null_deviance: f64,
++    pub log_likelihood: f64,
++    pub aic: f64,
++    pub bic: f64,
++}
++
++impl GammaRegressionFit {
++    pub fn try_log_mean(&self, predictors: &[f64]) -> StatsResult<f64> {
++        let features = try_feature_vector(
++            predictors,
++            self.predictor_count,
++            self.include_intercept,
++        )?;
++        let value = features
++            .iter()
++            .zip(&self.coefficients)
++            .fold(0.0, |sum, (&feature, &coefficient)| {
++                feature.mul_add(coefficient, sum)
++            });
++        if value.is_finite() {
++            Ok(value)
++        } else {
++            Err(StatisticsError::NumericalOverflow {
++                operation: "gamma regression linear predictor",
++            })
++        }
++    }
++
++    pub fn try_mean(&self, predictors: &[f64]) -> StatsResult<f64> {
++        let value = self.try_log_mean(predictors)?.exp();
++        if value.is_finite() {
++            Ok(value)
++        } else {
++            Err(StatisticsError::NumericalOverflow {
++                operation: "gamma regression predicted mean",
++            })
++        }
++    }
++}
++
++fn validate_options(options: GammaRegressionOptions) -> StatsResult<()> {
++    if !options.ridge.is_finite() || options.ridge < 0.0 {
++        return Err(StatisticsError::NegativeValue {
++            name: "gamma ridge penalty",
++            value: options.ridge,
++        });
++    }
++    if options.maximum_iterations == 0 {
++        return Err(StatisticsError::InvalidIterations { iterations: 0 });
++    }
++    if !options.tolerance.is_finite() || options.tolerance <= 0.0 {
++        return Err(StatisticsError::NonPositiveValue {
++            name: "gamma convergence tolerance",
++            value: options.tolerance,
++        });
++    }
++    if !options.confidence.is_finite() || !(0.0..1.0).contains(&options.confidence) {
++        return Err(StatisticsError::InvalidProbability {
++            value: options.confidence,
++        });
++    }
++    Ok(())
++}
++
++fn gamma_deviance(outcomes: &[f64], means: &[f64]) -> f64 {
++    2.0 * outcomes
++        .iter()
++        .zip(means)
++        .map(|(&outcome, &mean)| (outcome - mean) / mean - (outcome / mean).ln())
++        .sum::<f64>()
++}
++
++fn gamma_log_likelihood(outcomes: &[f64], means: &[f64], shape: f64) -> f64 {
++    outcomes
++        .iter()
++        .zip(means)
++        .map(|(&outcome, &mean)| {
++            let rate = shape / mean;
++            shape * rate.ln() - ln_gamma(shape) + (shape - 1.0) * outcome.ln()
++                - rate * outcome
++        })
++        .sum()
++}
++
++/// Fit a gamma GLM with log-linked conditional means.
++pub fn try_gamma_regression(
++    predictors: &[Vec<f64>],
++    outcomes: &[f64],
++    options: GammaRegressionOptions,
++) -> StatsResult<GammaRegressionFit> {
++    validate_options(options)?;
++    if outcomes.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    for (index, &value) in outcomes.iter().enumerate() {
++        if !value.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value });
++        }
++        if value <= 0.0 {
++            return Err(StatisticsError::NonPositiveValue {
++                name: "gamma outcome",
++                value,
++            });
++        }
++    }
++    let design = try_design_matrix(predictors, outcomes.len(), options.include_intercept)?;
++    let parameter_count = design.columns();
++    if outcomes.len() <= parameter_count {
++        return Err(StatisticsError::InsufficientSamples {
++            required: parameter_count + 1,
++            actual: outcomes.len(),
++        });
++    }
++    let mean = try_mean(outcomes)?;
++    let mut coefficients = vec![0.0; parameter_count];
++    if options.include_intercept {
++        coefficients[0] = mean.ln();
++    }
++    let unit_weights = vec![1.0; outcomes.len()];
++    let mut information = design.try_weighted_gram(&unit_weights)?;
++    for index in 0..parameter_count {
++        let is_intercept = options.include_intercept && index == 0;
++        if options.ridge > 0.0 && (options.penalize_intercept || !is_intercept) {
++            information.set(index, index, information.get(index, index) + options.ridge);
++        }
++    }
++    let factor = CholeskyFactor::try_factor(&information)?;
++    let mut iterations = 0;
++    for iteration in 1..=options.maximum_iterations {
++        iterations = iteration;
++        let eta = design.try_mul_vector(&coefficients)?;
++        let means = eta
++            .iter()
++            .map(|&value| value.clamp(-40.0, 40.0).exp())
++            .collect::<Vec<_>>();
++        let working = eta
++            .iter()
++            .zip(outcomes)
++            .zip(&means)
++            .map(|((&linear, &outcome), &current_mean)| {
++                linear + (outcome - current_mean) / current_mean
++            })
++            .collect::<Vec<_>>();
++        let rhs = design.try_weighted_transpose_mul_vector(&unit_weights, &working)?;
++        let next = factor.try_solve(&rhs)?;
++        let maximum_change = next
++            .iter()
++            .zip(&coefficients)
++            .map(|(&new, &old)| (new - old).abs())
++            .fold(0.0_f64, f64::max);
++        let scale = next.iter().map(|value| value.abs()).fold(0.0_f64, f64::max);
++        coefficients = next;
++        if maximum_change <= options.tolerance * (1.0 + scale) {
++            break;
++        }
++        if iteration == options.maximum_iterations {
++            return Err(StatisticsError::NonConvergence {
++                function: "gamma regression IRLS",
++                iterations,
++            });
++        }
++    }
++
++    let eta = design.try_mul_vector(&coefficients)?;
++    let means = eta
++        .iter()
++        .map(|&value| value.clamp(-40.0, 40.0).exp())
++        .collect::<Vec<_>>();
++    let deviance = gamma_deviance(outcomes, &means);
++    let null_means = vec![mean; outcomes.len()];
++    let null_deviance = gamma_deviance(outcomes, &null_means);
++    let residual_df = outcomes.len() - parameter_count;
++    let dispersion = (deviance / residual_df as f64).max(f64::MIN_POSITIVE);
++    let shape = 1.0 / dispersion;
++    if !shape.is_finite() {
++        return Err(StatisticsError::NumericalOverflow {
++            operation: "gamma regression shape",
++        });
++    }
++    let covariance_basis = factor.try_inverse()?;
++    let critical = try_normal_quantile(0.5 + options.confidence / 2.0)?;
++    let mut standard_errors = Vec::with_capacity(parameter_count);
++    let mut z_statistics = Vec::with_capacity(parameter_count);
++    let mut p_values_two_sided = Vec::with_capacity(parameter_count);
++    let mut confidence_intervals = Vec::with_capacity(parameter_count);
++    for (index, &coefficient) in coefficients.iter().enumerate() {
++        let standard_error = (dispersion * covariance_basis.get(index, index))
++            .max(0.0)
++            .sqrt();
++        let z = if standard_error == 0.0 {
++            if coefficient == 0.0 { 0.0 } else { coefficient.signum() * f64::INFINITY }
++        } else {
++            coefficient / standard_error
++        };
++        standard_errors.push(standard_error);
++        z_statistics.push(z);
++        p_values_two_sided.push((2.0 * normal_sf(z.abs())).clamp(0.0, 1.0));
++        let half_width = critical * standard_error;
++        confidence_intervals.push(Interval {
++            low: coefficient - half_width,
++            high: coefficient + half_width,
++        });
++    }
++    let log_likelihood = gamma_log_likelihood(outcomes, &means, shape);
++    if !log_likelihood.is_finite() || !deviance.is_finite() {
++        return Err(StatisticsError::NumericalOverflow {
++            operation: "gamma regression likelihood",
++        });
++    }
++    let estimated_parameters = (parameter_count + 1) as f64;
++    let n = outcomes.len() as f64;
++    Ok(GammaRegressionFit {
++        coefficients,
++        standard_errors,
++        z_statistics,
++        p_values_two_sided,
++        confidence_intervals,
++        dispersion,
++        shape,
++        n: outcomes.len(),
++        predictor_count: parameter_count - usize::from(options.include_intercept),
++        include_intercept: options.include_intercept,
++        iterations,
++        deviance,
++        null_deviance,
++        log_likelihood,
++        aic: 2.0 * estimated_parameters - 2.0 * log_likelihood,
++        bic: estimated_parameters * n.ln() - 2.0 * log_likelihood,
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn gamma_fit_recovers_multiplicative_trend() {
++        let predictors = (0..12)
++            .map(|index| vec![index as f64 / 4.0])
++            .collect::<Vec<_>>();
++        let outcomes = predictors
++            .iter()
++            .enumerate()
++            .map(|(index, row)| (1.0 + 0.03 * (index as f64 - 5.5)) * (1.2 + 0.45 * row[0]).exp())
++            .collect::<Vec<_>>();
++        let fit = try_gamma_regression(&predictors, &outcomes, Default::default()).unwrap();
++        assert!(fit.coefficients[1] > 0.50 && fit.coefficients[1] < 0.65);
++        assert!(fit.try_mean(&[2.0]).unwrap() > fit.try_mean(&[0.5]).unwrap());
++        assert!(fit.deviance < fit.null_deviance);
++    }
++
++    #[test]
++    fn rejects_zero_outcomes() {
++        assert!(matches!(
++            try_gamma_regression(&[], &[1.0, 0.0], Default::default()),
++            Err(StatisticsError::NonPositiveValue { .. })
++        ));
++    }
++}
+diff --git a/src/lib.rs b/src/lib.rs
+index d862189..f4bec23 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -28,22 +28,23 @@
+ //!   bootstrap, permutation, assignment, and exact-or-Monte-Carlo randomization
+ //! - [`nonparametric`], [`paired_nonparametric`], [`rank_groups`] — tied ranks, Spearman association, Mann-Whitney U, sign, Wilcoxon, Friedman, Kruskal-Wallis, and Dunn inference
+ //! - [`linalg`], [`qr`], [`regression`], [`measurement_error`], [`multiple_regression`], [`ridge`], [`glm`], [`multinomial_logistic`],
+-//!   [`count_regression`], [`robust_regression`], [`robust_covariance`],
+-//!   [`dependent_covariance`], [`regression_diagnostics`] — checked solvers, OLS/ridge,
+-//!   logistic, Poisson, and negative-binomial IRLS, elastic-net/Huber models, diagnostics, and sandwich inference
++//!   [`count_regression`], [`quantile_regression`], [`expectile_regression`], [`gamma_regression`],
++//!   [`location_scale`], [`mixed_effects`], [`robust_regression`], [`robust_covariance`],
++//!   [`dependent_covariance`], [`regression_diagnostics`] — checked solvers, mean/quantile/expectile/location-scale models,
++//!   generalized outcomes, longitudinal random intercepts, diagnostics, and sandwich inference
+ //! - [`effect_size`], [`power`], [`model_selection`], [`sequential`] — effect
+ //!   interpretation, prospective design, model comparison, and optional-stopping-safe evidence
+-//! - [`bayes`], [`bayesian_bootstrap`], [`conjugate`], [`normal_inverse_gamma`], [`multiple_imputation`], [`uncertainty`], [`classification`], [`multiclass`], [`multiclass_calibration`], [`calibration`], [`isotonic`],
++//! - [`bayes`], [`bayesian_bootstrap`], [`bayesian_model_comparison`], [`conjugate`], [`normal_inverse_gamma`], [`multiple_imputation`], [`uncertainty`], [`classification`], [`multiclass`], [`multiclass_calibration`], [`calibration`], [`isotonic`],
+ //!   [`conformal`] — stable updating, closed-form posteriors, calibration, and
+ //!   held-out distribution-free predictive uncertainty
+-//! - [`pca`], [`hotelling`], [`multivariate_normal`], [`covariance_shrinkage`], [`distance_statistics`], [`kernel_tests`], [`permanova`], [`markov`], [`hidden_markov`], [`mixture`], [`mcmc`], [`time_series`], [`state_space`], [`residual_diagnostics`], [`autoregression`],
+-//!   [`process_control`] — dimension reduction, residual checks, forecasting, and change detection
++//! - [`pca`], [`hotelling`], [`multivariate_normal`], [`covariance_shrinkage`], [`distance_statistics`], [`kernel_tests`], [`permanova`], [`network`], [`network_centrality`], [`network_inference`], [`markov`], [`hidden_markov`], [`mixture`], [`mcmc`], [`time_series`], [`state_space`], [`residual_diagnostics`], [`autoregression`],
++//!   [`process_control`] — multivariate geometry, network structure, latent state, forecasting, and change detection
+ //! - [`survival`], [`competing_risks`], [`logrank`], [`cox`] — product-limit/cumulative-hazard curves, competing incidence, curve comparison,
+ //!   and proportional-hazards regression
+ //! - [`causal`], [`doubly_robust`], [`difference_in_differences`], [`matching`],
+ //!   [`meta_analysis`], [`meta_regression`], [`equivalence`] — explicit treatment-effect assumptions,
+ //!   evidence synthesis, and practical equivalence
+-//! - [`predictive`], [`cross_validation`], [`decision`] — predictive scoring,
++//! - [`predictive`], [`distributional_scoring`], [`cross_validation`], [`decision`] — predictive and distributional scoring,
+ //!   deterministic validation splits, discrimination curves, and threshold policy
+ //! - [`fitting`], [`empirical_bayes`], [`jackknife`] — distribution estimation, shrinkage, and influence diagnostics
+ //! - [`survey`], [`paired_categorical`], [`agreement`], [`reliability`], [`circular`], [`exponential_smoothing`] — design-based sampling, measurement reproducibility, angular evidence, and level/trend forecasting
+@@ -74,6 +75,7 @@ pub mod anova;
+ pub mod autoregression;
+ pub mod bayes;
+ pub mod bayesian_bootstrap;
++pub mod bayesian_model_comparison;
+ pub mod beta_binomial;
+ pub mod block_bootstrap;
+ pub mod calibration;
+@@ -96,6 +98,7 @@ pub mod dependent_covariance;
+ pub mod decision;
+ pub mod data_quality;
+ pub mod distributions;
++pub mod distributional_scoring;
+ pub mod distance_statistics;
+ pub mod difference_in_differences;
+ pub mod doubly_robust;
+@@ -105,6 +108,7 @@ pub mod elastic_net;
+ pub mod experimental_design;
+ pub mod extreme_value;
+ pub mod exponential_smoothing;
++pub mod expectile_regression;
+ pub mod equivalence;
+ pub mod exact_proportion;
+ pub mod effect_size;
+@@ -115,6 +119,7 @@ pub mod hidden_markov;
+ pub mod hotelling;
+ pub mod glm;
+ pub mod goodness_of_fit;
++pub mod gamma_regression;
+ pub mod fitting;
+ pub mod inference;
+ pub mod information;
+@@ -123,6 +128,7 @@ pub mod jackknife;
+ pub mod kernel_tests;
+ pub mod linalg;
+ pub mod logrank;
++pub mod location_scale;
+ pub mod markov;
+ mod model_matrix;
+ pub mod model_selection;
+@@ -132,6 +138,7 @@ pub mod matching;
+ pub mod mcmc;
+ pub mod measurement_error;
+ pub mod missing_data;
++pub mod mixed_effects;
+ pub mod mixture;
+ pub mod multiple_regression;
+ pub mod multiple_testing;
+@@ -143,6 +150,9 @@ pub mod multiclass_calibration;
+ pub mod multinomial;
+ pub mod multinomial_logistic;
+ pub mod negative_binomial_regression;
++pub mod network;
++pub mod network_centrality;
++pub mod network_inference;
+ pub mod nonparametric;
+ pub mod normal_inverse_gamma;
+ pub mod online_quantile;
+@@ -150,6 +160,7 @@ pub mod proportion;
+ pub mod prelude;
+ pub mod qr;
+ pub mod quasi_monte_carlo;
++pub mod quantile_regression;
+ pub mod rank_robust;
+ pub mod rank_groups;
+ pub mod process_control;
+@@ -185,6 +196,10 @@ pub use agreement::{
+ };
+ pub use autoregression::{AutoregressiveFit, try_autoregression};
+ pub use anova::{OneWayAnova, one_way_anova, try_one_way_anova};
++pub use bayesian_model_comparison::{
++    BayesFactorComparison, WaicEstimate, try_beta_binomial_bayes_factor,
++    try_normal_mean_bayes_factor, try_posterior_model_probabilities, try_waic,
++};
+ pub use bayesian_bootstrap::{BayesianBootstrapResult, try_bayesian_bootstrap, try_bayesian_bootstrap_mean};
+ pub use bayes::{
+     logistic, logit, posterior, posterior_from_log_likelihood_ratio, posterior_negative,
+@@ -324,6 +339,9 @@ pub use hypergeometric::{
+     try_hypergeometric_pmf, try_hypergeometric_sf,
+ };
+ pub use histogram::FixedHistogram;
++pub use gamma_regression::{
++    GammaRegressionFit, GammaRegressionOptions, try_gamma_regression,
++};
+ pub use goodness_of_fit::{
+     ContinuousGoodnessOfFit, MonteCarloGoodnessOfFit,
+     try_continuous_goodness_of_fit, try_monte_carlo_goodness_of_fit,
+@@ -332,6 +350,9 @@ pub use hidden_markov::{
+     HiddenMarkovFilter, HiddenMarkovModel, HiddenMarkovSmoother, ViterbiPath,
+ };
+ pub use hotelling::{HotellingTest, try_one_sample_hotelling, try_two_sample_hotelling};
++pub use expectile_regression::{
++    ExpectileRegressionFit, ExpectileRegressionOptions, try_expectile_regression,
++};
+ pub use fitting::{
+     DistributionFit, try_fit_beta_moments, try_fit_exponential, try_fit_gamma_moments,
+     try_fit_normal,
+@@ -339,6 +360,10 @@ pub use fitting::{
+ pub use glm::{
+     LogisticFit, LogisticRegressionOptions, try_logistic_regression,
+ };
++pub use distributional_scoring::{
++    IntervalForecastScore, try_expectile_loss, try_interval_forecast_score,
++    try_normal_crps, try_pinball_loss, try_quantile_coverage,
++};
+ pub use distributions::{
+     beta_cdf, beta_log_pdf, beta_pdf, beta_quantile, beta_sf,
+     binomial_cdf, binomial_log_pmf, binomial_pmf, binomial_sf, chi_square_cdf,
+@@ -362,6 +387,10 @@ pub use distributions::{
+     try_poisson_sf, try_students_t_cdf, try_students_t_log_pdf, try_students_t_pdf,
+     try_students_t_quantile, try_students_t_sf, try_students_t_two_sided_p,
+ };
++pub use location_scale::{
++    GaussianLocationScaleFit, LocationScaleOptions, try_gaussian_location_scale,
++    try_location_scale_wald,
++};
+ pub use logrank::{LogRankTest, try_log_rank_test};
+ pub use markov::MarkovChain;
+ pub use linalg::{CholeskyFactor, DenseMatrix, try_inverse_spd, try_solve_spd};
+@@ -405,6 +434,10 @@ pub use resampling::{
+ 
+ pub use matching::{MatchedPair, MatchingResult, try_propensity_matching};
+ pub use mixture::{GaussianMixture1D, GaussianMixtureOptions, try_gaussian_mixture_1d};
++pub use mixed_effects::{
++    GroupRandomIntercept, RandomInterceptFit, RandomInterceptOptions,
++    try_random_intercept_model,
++};
+ pub use missing_data::{
+     CompleteCases, ImputationStrategy, ImputedData, MissingDataAudit, MissingPattern,
+     try_audit_missing, try_complete_cases, try_impute_numeric,
+@@ -418,6 +451,15 @@ pub use model_selection::{
+     try_information_criteria, try_likelihood_ratio_test,
+ };
+ pub use multiple_regression::{MultipleLinearFit, try_multiple_linear_regression};
++pub use network::{NetworkSummary, WeightedGraph};
++pub use network_centrality::{
++    NetworkCentrality, PageRankOptions, try_betweenness_centrality,
++    try_closeness_centrality, try_network_centrality, try_pagerank,
++};
++pub use network_inference::{
++    NetworkPermutationTest, try_degree_assortativity, try_network_correlation,
++    try_network_modularity, try_network_permutation_test,
++};
+ pub use negative_binomial_regression::{
+     NegativeBinomialFit, NegativeBinomialRegressionOptions,
+     try_negative_binomial_regression,
+@@ -477,6 +519,9 @@ pub use qr::{QrDecomposition, try_solve_least_squares};
+ pub use quasi_monte_carlo::{
+     QuasiMonteCarloEstimate, try_halton_points, try_randomized_qmc_integrate,
+ };
++pub use quantile_regression::{
++    QuantileRegressionFit, QuantileRegressionOptions, try_quantile_regression,
++};
+ pub use rank_groups::{DunnComparison, KruskalWallis, try_kruskal_wallis};
+ pub use rank_robust::{
+     KendallTauB, TheilSenFit, try_kendall_tau_b, try_theil_sen_regression,
+diff --git a/src/location_scale.rs b/src/location_scale.rs
+new file mode 100644
+index 0000000..934febd
+--- /dev/null
++++ b/src/location_scale.rs
+@@ -0,0 +1,464 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Heteroskedastic Gaussian location-scale regression.
++//!
++//! The conditional mean is linear and the conditional variance is log-linear.
++//! Alternating Fisher scoring retains both predictor surfaces explicitly.
++
++use crate::distributions::{normal_sf, try_normal_quantile};
++use crate::error::{StatsResult, StatisticsError};
++use crate::inference::Interval;
++use crate::linalg::{CholeskyFactor, DenseMatrix};
++use crate::model_matrix::{try_design_matrix, try_feature_vector};
++use crate::qr::QrDecomposition;
++
++/// Controls for Gaussian location-scale fitting.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct LocationScaleOptions {
++    pub include_mean_intercept: bool,
++    pub include_scale_intercept: bool,
++    pub mean_ridge: f64,
++    pub scale_ridge: f64,
++    pub maximum_iterations: usize,
++    pub tolerance: f64,
++    pub confidence: f64,
++}
++
++impl Default for LocationScaleOptions {
++    fn default() -> Self {
++        Self {
++            include_mean_intercept: true,
++            include_scale_intercept: true,
++            mean_ridge: 0.0,
++            scale_ridge: 0.0,
++            maximum_iterations: 200,
++            tolerance: 1.0e-8,
++            confidence: 0.95,
++        }
++    }
++}
++
++/// Fitted heteroskedastic Gaussian model.
++#[derive(Debug, Clone, PartialEq)]
++pub struct GaussianLocationScaleFit {
++    pub mean_coefficients: Vec<f64>,
++    pub mean_standard_errors: Vec<f64>,
++    pub scale_coefficients: Vec<f64>,
++    pub scale_standard_errors: Vec<f64>,
++    pub mean_predictor_count: usize,
++    pub scale_predictor_count: usize,
++    pub include_mean_intercept: bool,
++    pub include_scale_intercept: bool,
++    pub n: usize,
++    pub iterations: usize,
++    pub log_likelihood: f64,
++    pub aic: f64,
++    pub bic: f64,
++    pub confidence: f64,
++}
++
++impl GaussianLocationScaleFit {
++    pub fn try_mean(&self, predictors: &[f64]) -> StatsResult<f64> {
++        let features = try_feature_vector(
++            predictors,
++            self.mean_predictor_count,
++            self.include_mean_intercept,
++        )?;
++        checked_dot(&features, &self.mean_coefficients, "location prediction")
++    }
++
++    pub fn try_log_variance(&self, predictors: &[f64]) -> StatsResult<f64> {
++        let features = try_feature_vector(
++            predictors,
++            self.scale_predictor_count,
++            self.include_scale_intercept,
++        )?;
++        checked_dot(&features, &self.scale_coefficients, "scale prediction")
++    }
++
++    pub fn try_variance(&self, predictors: &[f64]) -> StatsResult<f64> {
++        let value = self.try_log_variance(predictors)?.exp();
++        if value.is_finite() {
++            Ok(value)
++        } else {
++            Err(StatisticsError::NumericalOverflow {
++                operation: "location-scale predicted variance",
++            })
++        }
++    }
++
++    /// Conditional interval for one future Gaussian observation.
++    pub fn try_prediction_interval(
++        &self,
++        mean_predictors: &[f64],
++        scale_predictors: &[f64],
++        confidence: f64,
++    ) -> StatsResult<Interval> {
++        if !confidence.is_finite() || !(0.0..1.0).contains(&confidence) {
++            return Err(StatisticsError::InvalidProbability { value: confidence });
++        }
++        let mean = self.try_mean(mean_predictors)?;
++        let standard_deviation = self.try_variance(scale_predictors)?.sqrt();
++        let critical = try_normal_quantile(0.5 + confidence / 2.0)?;
++        Ok(Interval {
++            low: mean - critical * standard_deviation,
++            high: mean + critical * standard_deviation,
++        })
++    }
++}
++
++fn checked_dot(left: &[f64], right: &[f64], operation: &'static str) -> StatsResult<f64> {
++    let value = left
++        .iter()
++        .zip(right)
++        .fold(0.0, |sum, (&a, &b)| a.mul_add(b, sum));
++    if value.is_finite() {
++        Ok(value)
++    } else {
++        Err(StatisticsError::NumericalOverflow { operation })
++    }
++}
++
++fn validate_options(options: LocationScaleOptions) -> StatsResult<()> {
++    for (name, value) in [
++        ("location-scale mean ridge", options.mean_ridge),
++        ("location-scale scale ridge", options.scale_ridge),
++    ] {
++        if !value.is_finite() || value < 0.0 {
++            return Err(StatisticsError::NegativeValue { name, value });
++        }
++    }
++    if options.maximum_iterations == 0 {
++        return Err(StatisticsError::InvalidIterations { iterations: 0 });
++    }
++    if !options.tolerance.is_finite() || options.tolerance <= 0.0 {
++        return Err(StatisticsError::NonPositiveValue {
++            name: "location-scale convergence tolerance",
++            value: options.tolerance,
++        });
++    }
++    if !options.confidence.is_finite() || !(0.0..1.0).contains(&options.confidence) {
++        return Err(StatisticsError::InvalidProbability {
++            value: options.confidence,
++        });
++    }
++    Ok(())
++}
++
++fn add_ridge(
++    matrix: &mut DenseMatrix,
++    ridge: f64,
++    include_intercept: bool,
++) -> StatsResult<()> {
++    if ridge == 0.0 {
++        return Ok(());
++    }
++    for index in 0..matrix.rows() {
++        if !(include_intercept && index == 0) {
++            let value = matrix.get(index, index) + ridge;
++            if !value.is_finite() {
++                return Err(StatisticsError::NumericalOverflow {
++                    operation: "location-scale ridge stabilization",
++                });
++            }
++            matrix.set(index, index, value);
++        }
++    }
++    Ok(())
++}
++
++fn log_likelihood(
++    outcomes: &[f64],
++    means: &[f64],
++    log_variances: &[f64],
++) -> StatsResult<f64> {
++    let mut value = 0.0;
++    for index in 0..outcomes.len() {
++        let residual = outcomes[index] - means[index];
++        let variance = log_variances[index].clamp(-40.0, 40.0).exp();
++        value += -0.5
++            * ((2.0 * std::f64::consts::PI).ln()
++                + log_variances[index]
++                + residual * residual / variance);
++    }
++    if value.is_finite() {
++        Ok(value)
++    } else {
++        Err(StatisticsError::NumericalOverflow {
++            operation: "location-scale log likelihood",
++        })
++    }
++}
++
++/// Fit a Gaussian model with separate linear mean and log-variance predictors.
++pub fn try_gaussian_location_scale(
++    mean_predictors: &[Vec<f64>],
++    scale_predictors: &[Vec<f64>],
++    outcomes: &[f64],
++    options: LocationScaleOptions,
++) -> StatsResult<GaussianLocationScaleFit> {
++    validate_options(options)?;
++    if outcomes.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    for (index, &value) in outcomes.iter().enumerate() {
++        if !value.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value });
++        }
++    }
++    let mean_design = try_design_matrix(
++        mean_predictors,
++        outcomes.len(),
++        options.include_mean_intercept,
++    )?;
++    let scale_design = try_design_matrix(
++        scale_predictors,
++        outcomes.len(),
++        options.include_scale_intercept,
++    )?;
++    let total_parameters = mean_design.columns() + scale_design.columns();
++    if outcomes.len() <= total_parameters {
++        return Err(StatisticsError::InsufficientSamples {
++            required: total_parameters + 1,
++            actual: outcomes.len(),
++        });
++    }
++
++    let mean_factor = QrDecomposition::try_factor(&mean_design)?;
++    let mut mean_coefficients = mean_factor.try_solve_least_squares(outcomes)?;
++    let initial_means = mean_design.try_mul_vector(&mean_coefficients)?;
++    let initial_variance = outcomes
++        .iter()
++        .zip(&initial_means)
++        .map(|(&observed, &estimate)| (observed - estimate).powi(2))
++        .sum::<f64>()
++        / outcomes.len() as f64;
++    if !initial_variance.is_finite() || initial_variance <= f64::MIN_POSITIVE {
++        return Err(StatisticsError::DegenerateSample {
++            reason: "location-scale regression requires residual variation",
++        });
++    }
++    let mut scale_coefficients = vec![0.0; scale_design.columns()];
++    if options.include_scale_intercept {
++        scale_coefficients[0] = initial_variance.ln();
++    }
++    let unit_weights = vec![1.0; outcomes.len()];
++    let mut scale_information = scale_design.try_weighted_gram(&unit_weights)?;
++    add_ridge(
++        &mut scale_information,
++        options.scale_ridge,
++        options.include_scale_intercept,
++    )?;
++    let scale_factor = CholeskyFactor::try_factor(&scale_information)?;
++    let mut iterations = 0;
++
++    for iteration in 1..=options.maximum_iterations {
++        iterations = iteration;
++        let previous_mean = mean_coefficients.clone();
++        let previous_scale = scale_coefficients.clone();
++
++        let log_variances = scale_design.try_mul_vector(&scale_coefficients)?;
++        let weights = log_variances
++            .iter()
++            .map(|&value| (-value.clamp(-40.0, 40.0)).exp())
++            .collect::<Vec<_>>();
++        let mut mean_information = mean_design.try_weighted_gram(&weights)?;
++        add_ridge(
++            &mut mean_information,
++            options.mean_ridge,
++            options.include_mean_intercept,
++        )?;
++        let mean_rhs = mean_design.try_weighted_transpose_mul_vector(&weights, outcomes)?;
++        mean_coefficients = CholeskyFactor::try_factor(&mean_information)?.try_solve(&mean_rhs)?;
++
++        let means = mean_design.try_mul_vector(&mean_coefficients)?;
++        let log_variances = scale_design.try_mul_vector(&scale_coefficients)?;
++        let score_response = outcomes
++            .iter()
++            .zip(&means)
++            .zip(&log_variances)
++            .map(|((&observed, &estimate), &log_variance)| {
++                let residual = observed - estimate;
++                residual * residual / log_variance.clamp(-40.0, 40.0).exp() - 1.0
++            })
++            .collect::<Vec<_>>();
++        let score = scale_design.try_transpose_mul_vector(&score_response)?;
++        let delta = scale_factor.try_solve(&score)?;
++        let current_log_likelihood = log_likelihood(outcomes, &means, &log_variances)?;
++        let mut step = 1.0;
++        let mut accepted = false;
++        while step >= 1.0 / 1024.0 {
++            let candidate = scale_coefficients
++                .iter()
++                .zip(&delta)
++                .map(|(&coefficient, &change)| coefficient + step * change)
++                .collect::<Vec<_>>();
++            let candidate_log_variances = scale_design.try_mul_vector(&candidate)?;
++            let candidate_log_likelihood =
++                log_likelihood(outcomes, &means, &candidate_log_variances)?;
++            if candidate_log_likelihood >= current_log_likelihood - 1.0e-12 {
++                scale_coefficients = candidate;
++                accepted = true;
++                break;
++            }
++            step *= 0.5;
++        }
++        if !accepted {
++            return Err(StatisticsError::NonConvergence {
++                function: "location-scale Fisher scoring line search",
++                iterations: iteration,
++            });
++        }
++
++        let mean_change = mean_coefficients
++            .iter()
++            .zip(&previous_mean)
++            .map(|(&new, &old)| (new - old).abs())
++            .fold(0.0_f64, f64::max);
++        let scale_change = scale_coefficients
++            .iter()
++            .zip(&previous_scale)
++            .map(|(&new, &old)| (new - old).abs())
++            .fold(0.0_f64, f64::max);
++        let coefficient_scale = mean_coefficients
++            .iter()
++            .chain(&scale_coefficients)
++            .map(|value| value.abs())
++            .fold(0.0_f64, f64::max);
++        if mean_change.max(scale_change) <= options.tolerance * (1.0 + coefficient_scale) {
++            break;
++        }
++        if iteration == options.maximum_iterations {
++            return Err(StatisticsError::NonConvergence {
++                function: "Gaussian location-scale regression",
++                iterations,
++            });
++        }
++    }
++
++    let means = mean_design.try_mul_vector(&mean_coefficients)?;
++    let log_variances = scale_design.try_mul_vector(&scale_coefficients)?;
++    let weights = log_variances
++        .iter()
++        .map(|&value| (-value.clamp(-40.0, 40.0)).exp())
++        .collect::<Vec<_>>();
++    let mut mean_information = mean_design.try_weighted_gram(&weights)?;
++    add_ridge(
++        &mut mean_information,
++        options.mean_ridge,
++        options.include_mean_intercept,
++    )?;
++    let mean_covariance = CholeskyFactor::try_factor(&mean_information)?.try_inverse()?;
++    let scale_covariance_basis = scale_factor.try_inverse()?;
++    let mean_standard_errors = (0..mean_covariance.rows())
++        .map(|index| mean_covariance.get(index, index).max(0.0).sqrt())
++        .collect::<Vec<_>>();
++    let scale_standard_errors = (0..scale_covariance_basis.rows())
++        .map(|index| (2.0 * scale_covariance_basis.get(index, index)).max(0.0).sqrt())
++        .collect::<Vec<_>>();
++    let log_likelihood = log_likelihood(outcomes, &means, &log_variances)?;
++    let n = outcomes.len() as f64;
++    let parameters = total_parameters as f64;
++
++    Ok(GaussianLocationScaleFit {
++        mean_coefficients,
++        mean_standard_errors,
++        scale_coefficients,
++        scale_standard_errors,
++        mean_predictor_count: mean_design.columns()
++            - usize::from(options.include_mean_intercept),
++        scale_predictor_count: scale_design.columns()
++            - usize::from(options.include_scale_intercept),
++        include_mean_intercept: options.include_mean_intercept,
++        include_scale_intercept: options.include_scale_intercept,
++        n: outcomes.len(),
++        iterations,
++        log_likelihood,
++        aic: 2.0 * parameters - 2.0 * log_likelihood,
++        bic: parameters * n.ln() - 2.0 * log_likelihood,
++        confidence: options.confidence,
++    })
++}
++
++/// Wald z statistics and p-values for a coefficient vector.
++pub fn try_location_scale_wald(
++    coefficients: &[f64],
++    standard_errors: &[f64],
++) -> StatsResult<Vec<(f64, f64)>> {
++    if coefficients.len() != standard_errors.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: coefficients.len(),
++            right: standard_errors.len(),
++        });
++    }
++    coefficients
++        .iter()
++        .zip(standard_errors)
++        .enumerate()
++        .map(|(index, (&coefficient, &standard_error))| {
++            if !coefficient.is_finite() {
++                return Err(StatisticsError::NonFiniteInput {
++                    index,
++                    value: coefficient,
++                });
++            }
++            if !standard_error.is_finite() || standard_error < 0.0 {
++                return Err(StatisticsError::NegativeValue {
++                    name: "location-scale standard error",
++                    value: standard_error,
++                });
++            }
++            let z = if standard_error == 0.0 {
++                if coefficient == 0.0 { 0.0 } else { coefficient.signum() * f64::INFINITY }
++            } else {
++                coefficient / standard_error
++            };
++            Ok((z, (2.0 * normal_sf(z.abs())).clamp(0.0, 1.0)))
++        })
++        .collect()
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn detects_increasing_conditional_variance() {
++        let mean_x = (0..30)
++            .map(|index| vec![index as f64 / 10.0])
++            .collect::<Vec<_>>();
++        let scale_x = mean_x.clone();
++        let outcomes = mean_x
++            .iter()
++            .enumerate()
++            .map(|(index, row)| {
++                let sign = if index % 2 == 0 { -1.0 } else { 1.0 };
++                2.0 + 0.5 * row[0] + sign * (0.2 + 0.15 * row[0])
++            })
++            .collect::<Vec<_>>();
++        let fit = try_gaussian_location_scale(
++            &mean_x,
++            &scale_x,
++            &outcomes,
++            LocationScaleOptions {
++                scale_ridge: 1.0e-8,
++                ..Default::default()
++            },
++        )
++        .unwrap();
++        assert!(fit.mean_coefficients[1] > 0.45 && fit.mean_coefficients[1] < 0.55);
++        assert!(fit.scale_coefficients[1] > 0.0);
++        assert!(fit.try_variance(&[2.5]).unwrap() > fit.try_variance(&[0.2]).unwrap());
++    }
++
++    #[test]
++    fn rejects_perfect_fit_without_variation() {
++        let x = (0..8).map(|index| vec![index as f64]).collect::<Vec<_>>();
++        let y = x.iter().map(|row| 1.0 + 2.0 * row[0]).collect::<Vec<_>>();
++        assert!(matches!(
++            try_gaussian_location_scale(&x, &x, &y, Default::default()),
++            Err(StatisticsError::DegenerateSample { .. })
++        ));
++    }
++}
+diff --git a/src/mixed_effects.rs b/src/mixed_effects.rs
+new file mode 100644
+index 0000000..e3f1823
+--- /dev/null
++++ b/src/mixed_effects.rs
+@@ -0,0 +1,474 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Gaussian random-intercept mixed-effects regression.
++//!
++//! Variance components are estimated by bounded profile maximum likelihood.
++//! The covariance structure is explicit compound symmetry within each group.
++
++use std::collections::BTreeMap;
++
++use crate::distributions::{normal_sf, try_normal_quantile};
++use crate::error::{StatsResult, StatisticsError};
++use crate::inference::Interval;
++use crate::linalg::{CholeskyFactor, DenseMatrix};
++use crate::model_matrix::{try_design_matrix, try_feature_vector};
++
++/// Controls for random-intercept mixed-effects fitting.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct RandomInterceptOptions {
++    pub include_intercept: bool,
++    pub confidence: f64,
++    /// Largest profiled ratio `random_intercept_variance / residual_variance`.
++    pub maximum_variance_ratio: f64,
++    /// Number of logarithmically spaced profile points before local refinement.
++    pub profile_points: usize,
++    pub tolerance: f64,
++}
++
++impl Default for RandomInterceptOptions {
++    fn default() -> Self {
++        Self {
++            include_intercept: true,
++            confidence: 0.95,
++            maximum_variance_ratio: 1.0e6,
++            profile_points: 121,
++            tolerance: 1.0e-9,
++        }
++    }
++}
++
++/// Estimated random intercept for one observed group.
++#[derive(Debug, Clone, PartialEq)]
++pub struct GroupRandomIntercept {
++    pub group: usize,
++    pub observations: usize,
++    pub estimate: f64,
++    pub posterior_variance: f64,
++}
++
++/// Fitted Gaussian random-intercept model.
++#[derive(Debug, Clone, PartialEq)]
++pub struct RandomInterceptFit {
++    pub coefficients: Vec<f64>,
++    pub standard_errors: Vec<f64>,
++    pub z_statistics: Vec<f64>,
++    pub p_values_two_sided: Vec<f64>,
++    pub confidence_intervals: Vec<Interval>,
++    pub residual_variance: f64,
++    pub random_intercept_variance: f64,
++    pub intraclass_correlation: f64,
++    pub variance_ratio: f64,
++    pub random_intercepts: Vec<GroupRandomIntercept>,
++    pub log_likelihood: f64,
++    pub aic: f64,
++    pub bic: f64,
++    pub n: usize,
++    pub group_count: usize,
++    pub predictor_count: usize,
++    pub include_intercept: bool,
++}
++
++impl RandomInterceptFit {
++    /// Fixed-effect prediction for a previously unseen group.
++    pub fn try_predict_population(&self, predictors: &[f64]) -> StatsResult<f64> {
++        let features = try_feature_vector(
++            predictors,
++            self.predictor_count,
++            self.include_intercept,
++        )?;
++        checked_dot(&features, &self.coefficients, "mixed-effects prediction")
++    }
++
++    /// Conditional prediction for an observed group.
++    pub fn try_predict_group(&self, predictors: &[f64], group: usize) -> StatsResult<f64> {
++        let fixed = self.try_predict_population(predictors)?;
++        let random = self
++            .random_intercepts
++            .iter()
++            .find(|effect| effect.group == group)
++            .map_or(0.0, |effect| effect.estimate);
++        let value = fixed + random;
++        if value.is_finite() {
++            Ok(value)
++        } else {
++            Err(StatisticsError::NumericalOverflow {
++                operation: "mixed-effects conditional prediction",
++            })
++        }
++    }
++}
++
++#[derive(Debug, Clone)]
++struct ProfileFit {
++    coefficients: Vec<f64>,
++    covariance_basis: DenseMatrix,
++    residual_variance: f64,
++    log_likelihood: f64,
++    variance_ratio: f64,
++}
++
++fn checked_dot(left: &[f64], right: &[f64], operation: &'static str) -> StatsResult<f64> {
++    let value = left
++        .iter()
++        .zip(right)
++        .fold(0.0, |sum, (&a, &b)| a.mul_add(b, sum));
++    if value.is_finite() {
++        Ok(value)
++    } else {
++        Err(StatisticsError::NumericalOverflow { operation })
++    }
++}
++
++fn validate_options(options: RandomInterceptOptions) -> StatsResult<()> {
++    if !options.confidence.is_finite() || !(0.0..1.0).contains(&options.confidence) {
++        return Err(StatisticsError::InvalidProbability {
++            value: options.confidence,
++        });
++    }
++    if !options.maximum_variance_ratio.is_finite() || options.maximum_variance_ratio <= 0.0 {
++        return Err(StatisticsError::InvalidScale {
++            value: options.maximum_variance_ratio,
++        });
++    }
++    if options.profile_points < 5 {
++        return Err(StatisticsError::InsufficientSamples {
++            required: 5,
++            actual: options.profile_points,
++        });
++    }
++    if !options.tolerance.is_finite() || options.tolerance <= 0.0 {
++        return Err(StatisticsError::NonPositiveValue {
++            name: "mixed-effects profile tolerance",
++            value: options.tolerance,
++        });
++    }
++    Ok(())
++}
++
++fn group_rows(groups: &[usize]) -> Vec<(usize, Vec<usize>)> {
++    let mut map = BTreeMap::<usize, Vec<usize>>::new();
++    for (row, &group) in groups.iter().enumerate() {
++        map.entry(group).or_default().push(row);
++    }
++    map.into_iter().collect()
++}
++
++fn try_profile_fit(
++    design: &DenseMatrix,
++    outcomes: &[f64],
++    grouped_rows: &[(usize, Vec<usize>)],
++    variance_ratio: f64,
++) -> StatsResult<ProfileFit> {
++    if !variance_ratio.is_finite() || variance_ratio < 0.0 {
++        return Err(StatisticsError::NegativeValue {
++            name: "mixed-effects variance ratio",
++            value: variance_ratio,
++        });
++    }
++    let parameters = design.columns();
++    let mut information = DenseMatrix::zeros(parameters, parameters)?;
++    let mut rhs = vec![0.0; parameters];
++    let mut log_determinant = 0.0;
++
++    for (_, rows) in grouped_rows {
++        let group_size = rows.len() as f64;
++        let shrink = variance_ratio / (1.0 + group_size * variance_ratio);
++        let mut sums = vec![0.0; parameters];
++        let mut outcome_sum = 0.0;
++        for &row in rows {
++            outcome_sum += outcomes[row];
++            for (column, sum) in sums.iter_mut().enumerate() {
++                *sum += design.get(row, column);
++            }
++        }
++        for left in 0..parameters {
++            let mut xy = 0.0;
++            for &row in rows {
++                xy = design.get(row, left).mul_add(outcomes[row], xy);
++            }
++            rhs[left] += xy - shrink * sums[left] * outcome_sum;
++            for right in 0..=left {
++                let mut xx = 0.0;
++                for &row in rows {
++                    xx = design.get(row, left).mul_add(design.get(row, right), xx);
++                }
++                let value = information.get(left, right)
++                    + xx
++                    - shrink * sums[left] * sums[right];
++                if !value.is_finite() {
++                    return Err(StatisticsError::NumericalOverflow {
++                        operation: "mixed-effects profile information",
++                    });
++                }
++                information.set(left, right, value);
++                information.set(right, left, value);
++            }
++        }
++        log_determinant += (1.0 + group_size * variance_ratio).ln();
++    }
++    let factor = CholeskyFactor::try_factor(&information)?;
++    if factor.diagonal_ratio() > 1.0e10 {
++        return Err(StatisticsError::SingularMatrix {
++            reason: "mixed-effects design is too ill-conditioned",
++        });
++    }
++    let coefficients = factor.try_solve(&rhs)?;
++    let fitted = design.try_mul_vector(&coefficients)?;
++    let residuals = outcomes
++        .iter()
++        .zip(&fitted)
++        .map(|(&observed, &estimate)| observed - estimate)
++        .collect::<Vec<_>>();
++    let mut quadratic = 0.0;
++    for (_, rows) in grouped_rows {
++        let group_size = rows.len() as f64;
++        let shrink = variance_ratio / (1.0 + group_size * variance_ratio);
++        let mut sum = 0.0;
++        let mut sum_squares = 0.0;
++        for &row in rows {
++            sum += residuals[row];
++            sum_squares += residuals[row] * residuals[row];
++        }
++        quadratic += sum_squares - shrink * sum * sum;
++    }
++    if !quadratic.is_finite() || quadratic <= f64::MIN_POSITIVE {
++        return Err(StatisticsError::DegenerateSample {
++            reason: "mixed-effects model requires residual variation",
++        });
++    }
++    let n = outcomes.len() as f64;
++    let residual_variance = quadratic / n;
++    let log_likelihood = -0.5
++        * (n * ((2.0 * std::f64::consts::PI).ln() + 1.0 + residual_variance.ln())
++            + log_determinant);
++    if !log_likelihood.is_finite() {
++        return Err(StatisticsError::NumericalOverflow {
++            operation: "mixed-effects profile likelihood",
++        });
++    }
++    Ok(ProfileFit {
++        coefficients,
++        covariance_basis: factor.try_inverse()?,
++        residual_variance,
++        log_likelihood,
++        variance_ratio,
++    })
++}
++
++/// Fit a Gaussian random-intercept model by profile maximum likelihood.
++pub fn try_random_intercept_model(
++    predictors: &[Vec<f64>],
++    outcomes: &[f64],
++    groups: &[usize],
++    options: RandomInterceptOptions,
++) -> StatsResult<RandomInterceptFit> {
++    validate_options(options)?;
++    if outcomes.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    if groups.len() != outcomes.len() {
++        return Err(StatisticsError::LengthMismatch {
++            left: groups.len(),
++            right: outcomes.len(),
++        });
++    }
++    for (index, &value) in outcomes.iter().enumerate() {
++        if !value.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value });
++        }
++    }
++    let grouped_rows = group_rows(groups);
++    if grouped_rows.len() < 2 {
++        return Err(StatisticsError::InsufficientSamples {
++            required: 2,
++            actual: grouped_rows.len(),
++        });
++    }
++    if !grouped_rows.iter().any(|(_, rows)| rows.len() > 1) {
++        return Err(StatisticsError::DegenerateSample {
++            reason: "random-intercept variance requires at least one repeated group",
++        });
++    }
++    let design = try_design_matrix(predictors, outcomes.len(), options.include_intercept)?;
++    if outcomes.len() <= design.columns() + 1 {
++        return Err(StatisticsError::InsufficientSamples {
++            required: design.columns() + 2,
++            actual: outcomes.len(),
++        });
++    }
++
++    let mut best = try_profile_fit(&design, outcomes, &grouped_rows, 0.0)?;
++    let minimum_ratio = (options.maximum_variance_ratio * 1.0e-12).max(1.0e-12);
++    let lower_log = minimum_ratio.ln();
++    let upper_log = options.maximum_variance_ratio.ln();
++    let step = (upper_log - lower_log) / (options.profile_points - 1) as f64;
++    let mut values = Vec::with_capacity(options.profile_points);
++    for index in 0..options.profile_points {
++        let log_ratio = lower_log + index as f64 * step;
++        let candidate = try_profile_fit(&design, outcomes, &grouped_rows, log_ratio.exp())?;
++        if candidate.log_likelihood > best.log_likelihood {
++            best = candidate.clone();
++        }
++        values.push(candidate);
++    }
++
++    let best_grid_index = values
++        .iter()
++        .enumerate()
++        .max_by(|(_, left), (_, right)| left.log_likelihood.total_cmp(&right.log_likelihood))
++        .map(|(index, _)| index)
++        .unwrap_or(0);
++    if best_grid_index > 0 && best_grid_index + 1 < values.len() {
++        let mut left = lower_log + (best_grid_index - 1) as f64 * step;
++        let mut right = lower_log + (best_grid_index + 1) as f64 * step;
++        let golden = (5.0_f64.sqrt() - 1.0) / 2.0;
++        let mut first = right - golden * (right - left);
++        let mut second = left + golden * (right - left);
++        let mut first_fit = try_profile_fit(&design, outcomes, &grouped_rows, first.exp())?;
++        let mut second_fit = try_profile_fit(&design, outcomes, &grouped_rows, second.exp())?;
++        for _ in 0..96 {
++            if (right - left).abs() <= options.tolerance * (1.0 + right.abs()) {
++                break;
++            }
++            if first_fit.log_likelihood < second_fit.log_likelihood {
++                left = first;
++                first = second;
++                first_fit = second_fit;
++                second = left + golden * (right - left);
++                second_fit = try_profile_fit(&design, outcomes, &grouped_rows, second.exp())?;
++            } else {
++                right = second;
++                second = first;
++                second_fit = first_fit;
++                first = right - golden * (right - left);
++                first_fit = try_profile_fit(&design, outcomes, &grouped_rows, first.exp())?;
++            }
++        }
++        for candidate in [first_fit, second_fit] {
++            if candidate.log_likelihood > best.log_likelihood {
++                best = candidate;
++            }
++        }
++    }
++
++    let random_intercept_variance = best.variance_ratio * best.residual_variance;
++    let total_variance = random_intercept_variance + best.residual_variance;
++    let intraclass_correlation = if total_variance == 0.0 {
++        0.0
++    } else {
++        random_intercept_variance / total_variance
++    };
++    let fitted = design.try_mul_vector(&best.coefficients)?;
++    let residuals = outcomes
++        .iter()
++        .zip(&fitted)
++        .map(|(&observed, &estimate)| observed - estimate)
++        .collect::<Vec<_>>();
++    let random_intercepts = grouped_rows
++        .iter()
++        .map(|(group, rows)| {
++            let size = rows.len() as f64;
++            let sum = rows.iter().map(|&row| residuals[row]).sum::<f64>();
++            let denominator = 1.0 + size * best.variance_ratio;
++            GroupRandomIntercept {
++                group: *group,
++                observations: rows.len(),
++                estimate: best.variance_ratio / denominator * sum,
++                posterior_variance: random_intercept_variance / denominator,
++            }
++        })
++        .collect::<Vec<_>>();
++
++    let critical = try_normal_quantile(0.5 + options.confidence / 2.0)?;
++    let mut standard_errors = Vec::with_capacity(best.coefficients.len());
++    let mut z_statistics = Vec::with_capacity(best.coefficients.len());
++    let mut p_values_two_sided = Vec::with_capacity(best.coefficients.len());
++    let mut confidence_intervals = Vec::with_capacity(best.coefficients.len());
++    for (index, &coefficient) in best.coefficients.iter().enumerate() {
++        let standard_error = (best.residual_variance * best.covariance_basis.get(index, index))
++            .max(0.0)
++            .sqrt();
++        let z = if standard_error == 0.0 {
++            if coefficient == 0.0 { 0.0 } else { coefficient.signum() * f64::INFINITY }
++        } else {
++            coefficient / standard_error
++        };
++        standard_errors.push(standard_error);
++        z_statistics.push(z);
++        p_values_two_sided.push((2.0 * normal_sf(z.abs())).clamp(0.0, 1.0));
++        confidence_intervals.push(Interval {
++            low: coefficient - critical * standard_error,
++            high: coefficient + critical * standard_error,
++        });
++    }
++    let parameter_count = best.coefficients.len() + 2;
++    let n = outcomes.len() as f64;
++    Ok(RandomInterceptFit {
++        coefficients: best.coefficients,
++        standard_errors,
++        z_statistics,
++        p_values_two_sided,
++        confidence_intervals,
++        residual_variance: best.residual_variance,
++        random_intercept_variance,
++        intraclass_correlation,
++        variance_ratio: best.variance_ratio,
++        random_intercepts,
++        log_likelihood: best.log_likelihood,
++        aic: 2.0 * parameter_count as f64 - 2.0 * best.log_likelihood,
++        bic: parameter_count as f64 * n.ln() - 2.0 * best.log_likelihood,
++        n: outcomes.len(),
++        group_count: grouped_rows.len(),
++        predictor_count: design.columns() - usize::from(options.include_intercept),
++        include_intercept: options.include_intercept,
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn recovers_fixed_slope_and_group_variation() {
++        let mut predictors = Vec::new();
++        let mut outcomes = Vec::new();
++        let mut groups = Vec::new();
++        let offsets = [-1.5, -0.5, 0.75, 1.5];
++        for (group, &offset) in offsets.iter().enumerate() {
++            for time in 0..6 {
++                let x = time as f64;
++                predictors.push(vec![x]);
++                let noise = [0.04, -0.03, 0.01, -0.02, 0.03, -0.01][time]
++                    * if group % 2 == 0 { 1.0 } else { -1.0 };
++                outcomes.push(2.0 + 0.8 * x + offset + noise);
++                groups.push(group);
++            }
++        }
++        let fit = try_random_intercept_model(
++            &predictors,
++            &outcomes,
++            &groups,
++            RandomInterceptOptions::default(),
++        )
++        .unwrap();
++        assert!((fit.coefficients[1] - 0.8).abs() < 0.05);
++        assert!(fit.random_intercept_variance > fit.residual_variance);
++        assert!(fit.intraclass_correlation > 0.5);
++        assert!(fit.try_predict_group(&[2.0], 3).unwrap() > fit.try_predict_group(&[2.0], 0).unwrap());
++    }
++
++    #[test]
++    fn rejects_unreplicated_groups() {
++        let predictors = vec![vec![0.0], vec![1.0], vec![2.0]];
++        assert!(matches!(
++            try_random_intercept_model(
++                &predictors,
++                &[1.0, 2.0, 3.0],
++                &[0, 1, 2],
++                Default::default()
++            ),
++            Err(StatisticsError::DegenerateSample { .. })
++        ));
++    }
++}
+diff --git a/src/network.rs b/src/network.rs
+new file mode 100644
+index 0000000..4ccf1bd
+--- /dev/null
++++ b/src/network.rs
+@@ -0,0 +1,378 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Validated weighted graph summaries and connectivity diagnostics.
++
++use std::collections::VecDeque;
++
++use crate::error::{StatsResult, StatisticsError};
++
++/// Dense non-negative weighted graph.
++#[derive(Debug, Clone, PartialEq)]
++pub struct WeightedGraph {
++    nodes: usize,
++    directed: bool,
++    adjacency: Vec<f64>,
++}
++
++/// Structural summary of a validated graph.
++#[derive(Debug, Clone, PartialEq)]
++pub struct NetworkSummary {
++    pub nodes: usize,
++    pub edges: usize,
++    pub directed: bool,
++    pub density: f64,
++    pub isolates: usize,
++    pub weak_components: usize,
++    pub largest_component: usize,
++    pub mean_out_degree: f64,
++    pub mean_out_strength: f64,
++    pub global_transitivity: f64,
++    pub average_local_clustering: f64,
++}
++
++impl WeightedGraph {
++    /// Construct a graph from a square adjacency matrix.
++    ///
++    /// Weights must be finite and non-negative. Self loops are rejected. For an
++    /// undirected graph, opposite entries must agree within `symmetry_tolerance`.
++    pub fn try_from_adjacency(
++        adjacency: &[Vec<f64>],
++        directed: bool,
++        symmetry_tolerance: f64,
++    ) -> StatsResult<Self> {
++        if adjacency.is_empty() {
++            return Err(StatisticsError::EmptySample);
++        }
++        if !symmetry_tolerance.is_finite() || symmetry_tolerance < 0.0 {
++            return Err(StatisticsError::NegativeValue {
++                name: "network symmetry tolerance",
++                value: symmetry_tolerance,
++            });
++        }
++        let nodes = adjacency.len();
++        let capacity = nodes
++            .checked_mul(nodes)
++            .ok_or(StatisticsError::NumericalOverflow {
++                operation: "network adjacency size",
++            })?;
++        let mut data = Vec::with_capacity(capacity);
++        for (row, values) in adjacency.iter().enumerate() {
++            if values.len() != nodes {
++                return Err(StatisticsError::InvalidShape {
++                    rows: nodes,
++                    columns: values.len(),
++                });
++            }
++            let mut row_sum = 0.0_f64;
++            for (column, &value) in values.iter().enumerate() {
++                if !value.is_finite() {
++                    return Err(StatisticsError::NonFiniteInput {
++                        index: row * nodes + column,
++                        value,
++                    });
++                }
++                if value < 0.0 {
++                    return Err(StatisticsError::NegativeValue {
++                        name: "network edge weight",
++                        value,
++                    });
++                }
++                if row == column && value != 0.0 {
++                    return Err(StatisticsError::DegenerateSample {
++                        reason: "network self loops are not supported",
++                    });
++                }
++                row_sum += value;
++                if !row_sum.is_finite() {
++                    return Err(StatisticsError::NumericalOverflow {
++                        operation: "network row strength",
++                    });
++                }
++                data.push(value);
++            }
++        }
++        if !directed {
++            for row in 0..nodes {
++                for column in 0..row {
++                    let left = data[row * nodes + column];
++                    let right = data[column * nodes + row];
++                    let scale = left.abs().max(right.abs()).max(1.0);
++                    if (left - right).abs() > symmetry_tolerance * scale {
++                        return Err(StatisticsError::DegenerateSample {
++                            reason: "undirected adjacency matrix is not symmetric",
++                        });
++                    }
++                }
++            }
++        }
++        Ok(Self {
++            nodes,
++            directed,
++            adjacency: data,
++        })
++    }
++
++    pub fn node_count(&self) -> usize {
++        self.nodes
++    }
++
++    pub fn is_directed(&self) -> bool {
++        self.directed
++    }
++
++    pub fn try_weight(&self, from: usize, to: usize) -> StatsResult<f64> {
++        if from >= self.nodes || to >= self.nodes {
++            return Err(StatisticsError::DimensionMismatch {
++                context: "network node index",
++                expected: self.nodes,
++                actual: from.max(to).saturating_add(1),
++            });
++        }
++        Ok(self.weight(from, to))
++    }
++
++    pub(crate) fn weight(&self, from: usize, to: usize) -> f64 {
++        self.adjacency[from * self.nodes + to]
++    }
++
++    pub(crate) fn adjacent_weak(&self, left: usize, right: usize) -> bool {
++        self.weight(left, right) > 0.0 || self.weight(right, left) > 0.0
++    }
++
++    pub(crate) fn outgoing_neighbors_unchecked(&self, node: usize) -> Vec<usize> {
++        (0..self.nodes)
++            .filter(|&target| self.weight(node, target) > 0.0)
++            .collect()
++    }
++
++    pub fn try_outgoing_neighbors(&self, node: usize) -> StatsResult<Vec<usize>> {
++        if node >= self.nodes {
++            return Err(StatisticsError::DimensionMismatch {
++                context: "network node index",
++                expected: self.nodes,
++                actual: node.saturating_add(1),
++            });
++        }
++        Ok(self.outgoing_neighbors_unchecked(node))
++    }
++
++    pub fn edge_count(&self) -> usize {
++        if self.directed {
++            (0..self.nodes)
++                .flat_map(|row| (0..self.nodes).map(move |column| (row, column)))
++                .filter(|&(row, column)| row != column && self.weight(row, column) > 0.0)
++                .count()
++        } else {
++            (0..self.nodes)
++                .flat_map(|row| (row + 1..self.nodes).map(move |column| (row, column)))
++                .filter(|&(row, column)| self.weight(row, column) > 0.0)
++                .count()
++        }
++    }
++
++    pub fn density(&self) -> f64 {
++        if self.nodes < 2 {
++            return 0.0;
++        }
++        let possible = if self.directed {
++            self.nodes * (self.nodes - 1)
++        } else {
++            self.nodes * (self.nodes - 1) / 2
++        };
++        self.edge_count() as f64 / possible as f64
++    }
++
++    pub fn out_degrees(&self) -> Vec<usize> {
++        (0..self.nodes)
++            .map(|node| self.outgoing_neighbors_unchecked(node).len())
++            .collect()
++    }
++
++    pub fn out_strengths(&self) -> Vec<f64> {
++        (0..self.nodes)
++            .map(|node| {
++                (0..self.nodes)
++                    .map(|target| self.weight(node, target))
++                    .sum::<f64>()
++            })
++            .collect()
++    }
++
++    /// Weakly connected components. Directed edges are symmetrized for this diagnostic.
++    pub fn weak_components(&self) -> Vec<Vec<usize>> {
++        let mut visited = vec![false; self.nodes];
++        let mut components = Vec::new();
++        for start in 0..self.nodes {
++            if visited[start] {
++                continue;
++            }
++            let mut queue = VecDeque::from([start]);
++            visited[start] = true;
++            let mut component = Vec::new();
++            while let Some(node) = queue.pop_front() {
++                component.push(node);
++                for neighbor in 0..self.nodes {
++                    if !visited[neighbor] && self.adjacent_weak(node, neighbor) {
++                        visited[neighbor] = true;
++                        queue.push_back(neighbor);
++                    }
++                }
++            }
++            components.push(component);
++        }
++        components
++    }
++
++    /// Unweighted outward shortest-path lengths from one node.
++    pub fn try_shortest_hops(&self, source: usize) -> StatsResult<Vec<Option<usize>>> {
++        if source >= self.nodes {
++            return Err(StatisticsError::DimensionMismatch {
++                context: "network source node",
++                expected: self.nodes,
++                actual: source.saturating_add(1),
++            });
++        }
++        let mut distances = vec![None; self.nodes];
++        distances[source] = Some(0);
++        let mut queue = VecDeque::from([source]);
++        while let Some(node) = queue.pop_front() {
++            let distance = distances[node].unwrap_or(0);
++            for neighbor in self.outgoing_neighbors_unchecked(node) {
++                if distances[neighbor].is_none() {
++                    distances[neighbor] = Some(distance + 1);
++                    queue.push_back(neighbor);
++                }
++            }
++        }
++        Ok(distances)
++    }
++
++    fn weak_neighbors(&self, node: usize) -> Vec<usize> {
++        (0..self.nodes)
++            .filter(|&neighbor| neighbor != node && self.adjacent_weak(node, neighbor))
++            .collect()
++    }
++
++    pub fn local_clustering_coefficients(&self) -> Vec<f64> {
++        (0..self.nodes)
++            .map(|node| {
++                let neighbors = self.weak_neighbors(node);
++                if neighbors.len() < 2 {
++                    return 0.0;
++                }
++                let mut links = 0_usize;
++                for left in 0..neighbors.len() {
++                    for right in left + 1..neighbors.len() {
++                        if self.adjacent_weak(neighbors[left], neighbors[right]) {
++                            links += 1;
++                        }
++                    }
++                }
++                let possible = neighbors.len() * (neighbors.len() - 1) / 2;
++                links as f64 / possible as f64
++            })
++            .collect()
++    }
++
++    pub fn global_transitivity(&self) -> f64 {
++        let mut closed = 0_usize;
++        let mut triples = 0_usize;
++        for node in 0..self.nodes {
++            let neighbors = self.weak_neighbors(node);
++            triples += neighbors.len().saturating_mul(neighbors.len().saturating_sub(1)) / 2;
++            for left in 0..neighbors.len() {
++                for right in left + 1..neighbors.len() {
++                    if self.adjacent_weak(neighbors[left], neighbors[right]) {
++                        closed += 1;
++                    }
++                }
++            }
++        }
++        if triples == 0 {
++            0.0
++        } else {
++            closed as f64 / triples as f64
++        }
++    }
++
++    pub fn summary(&self) -> NetworkSummary {
++        let degrees = self.out_degrees();
++        let strengths = self.out_strengths();
++        let components = self.weak_components();
++        let local = self.local_clustering_coefficients();
++        NetworkSummary {
++            nodes: self.nodes,
++            edges: self.edge_count(),
++            directed: self.directed,
++            density: self.density(),
++            isolates: (0..self.nodes)
++                .filter(|&node| self.weak_neighbors(node).is_empty())
++                .count(),
++            weak_components: components.len(),
++            largest_component: components.iter().map(Vec::len).max().unwrap_or(0),
++            mean_out_degree: degrees
++                .iter()
++                .map(|&degree| degree as f64 / self.nodes as f64)
++                .sum(),
++            mean_out_strength: strengths
++                .iter()
++                .map(|&strength| strength / self.nodes as f64)
++                .sum(),
++            global_transitivity: self.global_transitivity(),
++            average_local_clustering: local.iter().sum::<f64>() / self.nodes as f64,
++        }
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn triangle_is_connected_and_fully_clustered() {
++        let graph = WeightedGraph::try_from_adjacency(
++            &[
++                vec![0.0, 1.0, 1.0],
++                vec![1.0, 0.0, 1.0],
++                vec![1.0, 1.0, 0.0],
++            ],
++            false,
++            1.0e-12,
++        )
++        .unwrap();
++        let summary = graph.summary();
++        assert_eq!(summary.edges, 3);
++        assert_eq!(summary.weak_components, 1);
++        assert!((summary.density - 1.0).abs() < 1.0e-12);
++        assert!((summary.global_transitivity - 1.0).abs() < 1.0e-12);
++    }
++
++    #[test]
++    fn shortest_hops_preserve_unreachable_nodes() {
++        let graph = WeightedGraph::try_from_adjacency(
++            &[
++                vec![0.0, 1.0, 0.0, 0.0],
++                vec![0.0, 0.0, 1.0, 0.0],
++                vec![0.0, 0.0, 0.0, 0.0],
++                vec![0.0, 0.0, 0.0, 0.0],
++            ],
++            true,
++            0.0,
++        )
++        .unwrap();
++        assert_eq!(graph.try_shortest_hops(0).unwrap(), vec![Some(0), Some(1), Some(2), None]);
++    }
++
++    #[test]
++    fn rejects_asymmetric_undirected_input() {
++        assert!(matches!(
++            WeightedGraph::try_from_adjacency(
++                &[vec![0.0, 1.0], vec![0.0, 0.0]],
++                false,
++                1.0e-12
++            ),
++            Err(StatisticsError::DegenerateSample { .. })
++        ));
++    }
++}
+diff --git a/src/network_centrality.rs b/src/network_centrality.rs
+new file mode 100644
+index 0000000..016b6d8
+--- /dev/null
++++ b/src/network_centrality.rs
+@@ -0,0 +1,281 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Deterministic centrality diagnostics for validated weighted graphs.
++
++use std::collections::VecDeque;
++
++use crate::error::{StatsResult, StatisticsError};
++use crate::network::WeightedGraph;
++
++const MAX_BRANDES_STATES: u128 = 50_000_000;
++
++/// Controls for weighted PageRank.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct PageRankOptions {
++    pub damping: f64,
++    pub maximum_iterations: usize,
++    pub tolerance: f64,
++}
++
++impl Default for PageRankOptions {
++    fn default() -> Self {
++        Self {
++            damping: 0.85,
++            maximum_iterations: 500,
++            tolerance: 1.0e-12,
++        }
++    }
++}
++
++/// Node-wise network centrality measures.
++#[derive(Debug, Clone, PartialEq)]
++pub struct NetworkCentrality {
++    pub degree: Vec<f64>,
++    pub strength: Vec<f64>,
++    pub closeness: Vec<f64>,
++    pub harmonic_closeness: Vec<f64>,
++    pub betweenness: Vec<f64>,
++    pub pagerank: Vec<f64>,
++}
++
++fn validate_pagerank_options(options: PageRankOptions) -> StatsResult<()> {
++    if !options.damping.is_finite() || !(0.0..1.0).contains(&options.damping) {
++        return Err(StatisticsError::InvalidProbability {
++            value: options.damping,
++        });
++    }
++    if options.maximum_iterations == 0 {
++        return Err(StatisticsError::InvalidIterations { iterations: 0 });
++    }
++    if !options.tolerance.is_finite() || options.tolerance <= 0.0 {
++        return Err(StatisticsError::NonPositiveValue {
++            name: "PageRank tolerance",
++            value: options.tolerance,
++        });
++    }
++    Ok(())
++}
++
++/// Weighted PageRank with uniform teleportation and dangling-node redistribution.
++pub fn try_pagerank(graph: &WeightedGraph, options: PageRankOptions) -> StatsResult<Vec<f64>> {
++    validate_pagerank_options(options)?;
++    let nodes = graph.node_count();
++    let mut ranks = vec![1.0 / nodes as f64; nodes];
++    let strengths = graph.out_strengths();
++    let teleport = (1.0 - options.damping) / nodes as f64;
++    for iteration in 1..=options.maximum_iterations {
++        let dangling_mass = ranks
++            .iter()
++            .zip(&strengths)
++            .filter(|(_, strength)| **strength == 0.0)
++            .map(|(&rank, _)| rank)
++            .sum::<f64>();
++        let mut next = vec![teleport + options.damping * dangling_mass / nodes as f64; nodes];
++        for source in 0..nodes {
++            if strengths[source] == 0.0 {
++                continue;
++            }
++            let scale = options.damping * ranks[source] / strengths[source];
++            for (target, value) in next.iter_mut().enumerate() {
++                let weight = graph.weight(source, target);
++                if weight > 0.0 {
++                    *value += scale * weight;
++                }
++            }
++        }
++        let total = next.iter().sum::<f64>();
++        if !total.is_finite() || total <= 0.0 {
++            return Err(StatisticsError::NumericalOverflow {
++                operation: "PageRank normalization",
++            });
++        }
++        for value in &mut next {
++            *value /= total;
++        }
++        let difference = next
++            .iter()
++            .zip(&ranks)
++            .map(|(&new, &old)| (new - old).abs())
++            .sum::<f64>();
++        ranks = next;
++        if difference <= options.tolerance {
++            return Ok(ranks);
++        }
++        if iteration == options.maximum_iterations {
++            return Err(StatisticsError::NonConvergence {
++                function: "PageRank",
++                iterations,
++            });
++        }
++    }
++    Err(StatisticsError::NonConvergence {
++        function: "PageRank",
++        iterations: options.maximum_iterations,
++    })
++}
++
++/// Standard and harmonic outward closeness centrality.
++pub fn try_closeness_centrality(graph: &WeightedGraph) -> StatsResult<(Vec<f64>, Vec<f64>)> {
++    let nodes = graph.node_count();
++    let mut closeness = Vec::with_capacity(nodes);
++    let mut harmonic = Vec::with_capacity(nodes);
++    for source in 0..nodes {
++        let distances = graph.try_shortest_hops(source)?;
++        let reachable = distances.iter().filter(|distance| distance.is_some()).count();
++        let distance_sum = distances
++            .iter()
++            .filter_map(|distance| *distance)
++            .sum::<usize>();
++        let standard = if reachable <= 1 || distance_sum == 0 || nodes <= 1 {
++            0.0
++        } else {
++            let reachable_without_source = (reachable - 1) as f64;
++            reachable_without_source / distance_sum as f64
++                * reachable_without_source / (nodes - 1) as f64
++        };
++        let harmonic_value = if nodes <= 1 {
++            0.0
++        } else {
++            distances
++                .iter()
++                .filter_map(|distance| *distance)
++                .filter(|&distance| distance > 0)
++                .map(|distance| 1.0 / distance as f64)
++                .sum::<f64>()
++                / (nodes - 1) as f64
++        };
++        closeness.push(standard);
++        harmonic.push(harmonic_value);
++    }
++    Ok((closeness, harmonic))
++}
++
++/// Normalized unweighted Brandes betweenness centrality.
++pub fn try_betweenness_centrality(graph: &WeightedGraph) -> StatsResult<Vec<f64>> {
++    let nodes = graph.node_count();
++    let edges = graph.edge_count();
++    let states = (nodes as u128).saturating_mul(edges.max(1) as u128);
++    if states > MAX_BRANDES_STATES {
++        return Err(StatisticsError::ComputationTooLarge {
++            states,
++            maximum: MAX_BRANDES_STATES,
++        });
++    }
++    let mut centrality = vec![0.0; nodes];
++    for source in 0..nodes {
++        let mut stack = Vec::with_capacity(nodes);
++        let mut predecessors = vec![Vec::<usize>::new(); nodes];
++        let mut paths = vec![0.0; nodes];
++        paths[source] = 1.0;
++        let mut distance = vec![usize::MAX; nodes];
++        distance[source] = 0;
++        let mut queue = VecDeque::from([source]);
++        while let Some(vertex) = queue.pop_front() {
++            stack.push(vertex);
++            for neighbor in graph.outgoing_neighbors_unchecked(vertex) {
++                if distance[neighbor] == usize::MAX {
++                    distance[neighbor] = distance[vertex] + 1;
++                    queue.push_back(neighbor);
++                }
++                if distance[neighbor] == distance[vertex] + 1 {
++                    paths[neighbor] += paths[vertex];
++                    predecessors[neighbor].push(vertex);
++                }
++            }
++        }
++        let mut dependency = vec![0.0; nodes];
++        while let Some(vertex) = stack.pop() {
++            if paths[vertex] > 0.0 {
++                for &predecessor in &predecessors[vertex] {
++                    dependency[predecessor] += paths[predecessor] / paths[vertex]
++                        * (1.0 + dependency[vertex]);
++                }
++            }
++            if vertex != source {
++                centrality[vertex] += dependency[vertex];
++            }
++        }
++    }
++    if !graph.is_directed() {
++        for value in &mut centrality {
++            *value *= 0.5;
++        }
++    }
++    if nodes > 2 {
++        let denominator = if graph.is_directed() {
++            ((nodes - 1) * (nodes - 2)) as f64
++        } else {
++            ((nodes - 1) * (nodes - 2)) as f64 / 2.0
++        };
++        for value in &mut centrality {
++            *value /= denominator;
++        }
++    } else {
++        centrality.fill(0.0);
++    }
++    Ok(centrality)
++}
++
++/// Compute the primary node-wise centrality families in one pass-oriented API.
++pub fn try_network_centrality(
++    graph: &WeightedGraph,
++    pagerank_options: PageRankOptions,
++) -> StatsResult<NetworkCentrality> {
++    let nodes = graph.node_count();
++    let degrees = graph.out_degrees();
++    let degree = if nodes <= 1 {
++        vec![0.0; nodes]
++    } else {
++        degrees
++            .iter()
++            .map(|&value| value as f64 / (nodes - 1) as f64)
++            .collect()
++    };
++    let strength = graph.out_strengths();
++    let (closeness, harmonic_closeness) = try_closeness_centrality(graph)?;
++    Ok(NetworkCentrality {
++        degree,
++        strength,
++        closeness,
++        harmonic_closeness,
++        betweenness: try_betweenness_centrality(graph)?,
++        pagerank: try_pagerank(graph, pagerank_options)?,
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn star_graph() -> WeightedGraph {
++        WeightedGraph::try_from_adjacency(
++            &[
++                vec![0.0, 1.0, 1.0, 1.0, 1.0],
++                vec![1.0, 0.0, 0.0, 0.0, 0.0],
++                vec![1.0, 0.0, 0.0, 0.0, 0.0],
++                vec![1.0, 0.0, 0.0, 0.0, 0.0],
++                vec![1.0, 0.0, 0.0, 0.0, 0.0],
++            ],
++            false,
++            0.0,
++        )
++        .unwrap()
++    }
++
++    #[test]
++    fn star_center_dominates_centrality() {
++        let centrality = try_network_centrality(&star_graph(), Default::default()).unwrap();
++        assert!(centrality.degree[0] > centrality.degree[1]);
++        assert!(centrality.betweenness[0] > 0.99);
++        assert!(centrality.closeness[0] > centrality.closeness[1]);
++        assert!(centrality.pagerank[0] > centrality.pagerank[1]);
++    }
++
++    #[test]
++    fn pagerank_is_normalized() {
++        let ranks = try_pagerank(&star_graph(), Default::default()).unwrap();
++        assert!((ranks.iter().sum::<f64>() - 1.0).abs() < 1.0e-12);
++        assert!(ranks.iter().all(|value| *value >= 0.0));
++    }
++}
+diff --git a/src/network_inference.rs b/src/network_inference.rs
+new file mode 100644
+index 0000000..c236b34
+--- /dev/null
++++ b/src/network_inference.rs
+@@ -0,0 +1,273 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Community, assortativity, and label-permutation inference for networks.
++
++use crate::descriptive::try_correlation;
++use crate::error::{StatsResult, StatisticsError};
++use crate::network::WeightedGraph;
++use crate::sampling::shuffled_indices;
++
++/// Deterministic node-label permutation test comparing two networks.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct NetworkPermutationTest {
++    pub observed_correlation: f64,
++    pub p_value_two_sided: f64,
++    pub permutations: usize,
++    pub extreme_permutations: usize,
++    pub seed: u64,
++}
++
++fn validate_compatible(left: &WeightedGraph, right: &WeightedGraph) -> StatsResult<()> {
++    if left.node_count() != right.node_count() {
++        return Err(StatisticsError::DimensionMismatch {
++            context: "network comparison node count",
++            expected: left.node_count(),
++            actual: right.node_count(),
++        });
++    }
++    if left.is_directed() != right.is_directed() {
++        return Err(StatisticsError::IncompatibleAccumulators {
++            reason: "network comparison requires matching directedness",
++        });
++    }
++    Ok(())
++}
++
++fn edge_vectors(
++    left: &WeightedGraph,
++    right: &WeightedGraph,
++    permutation: Option<&[usize]>,
++) -> (Vec<f64>, Vec<f64>) {
++    let nodes = left.node_count();
++    let mut left_values = Vec::new();
++    let mut right_values = Vec::new();
++    if left.is_directed() {
++        for row in 0..nodes {
++            for column in 0..nodes {
++                if row == column {
++                    continue;
++                }
++                left_values.push(left.weight(row, column));
++                let mapped_row = permutation.map_or(row, |map| map[row]);
++                let mapped_column = permutation.map_or(column, |map| map[column]);
++                right_values.push(right.weight(mapped_row, mapped_column));
++            }
++        }
++    } else {
++        for row in 0..nodes {
++            for column in row + 1..nodes {
++                left_values.push(left.weight(row, column));
++                let mapped_row = permutation.map_or(row, |map| map[row]);
++                let mapped_column = permutation.map_or(column, |map| map[column]);
++                right_values.push(right.weight(mapped_row, mapped_column));
++            }
++        }
++    }
++    (left_values, right_values)
++}
++
++/// Pearson correlation between corresponding off-diagonal edge weights.
++pub fn try_network_correlation(
++    left: &WeightedGraph,
++    right: &WeightedGraph,
++) -> StatsResult<f64> {
++    validate_compatible(left, right)?;
++    if left.node_count() < 3 {
++        return Err(StatisticsError::InsufficientSamples {
++            required: 3,
++            actual: left.node_count(),
++        });
++    }
++    let (left_values, right_values) = edge_vectors(left, right, None);
++    try_correlation(&left_values, &right_values)
++}
++
++/// QAP-style node-label permutation test for network correlation.
++pub fn try_network_permutation_test(
++    left: &WeightedGraph,
++    right: &WeightedGraph,
++    permutations: usize,
++    seed: u64,
++) -> StatsResult<NetworkPermutationTest> {
++    validate_compatible(left, right)?;
++    if permutations == 0 {
++        return Err(StatisticsError::InvalidIterations { iterations: 0 });
++    }
++    if left.node_count() < 3 {
++        return Err(StatisticsError::InsufficientSamples {
++            required: 3,
++            actual: left.node_count(),
++        });
++    }
++    let observed_correlation = try_network_correlation(left, right)?;
++    let (left_values, _) = edge_vectors(left, right, None);
++    let mut extreme = 0_usize;
++    for iteration in 0..permutations {
++        let permutation = shuffled_indices(
++            left.node_count(),
++            seed.wrapping_add(iteration as u64),
++        )?;
++        let (_, permuted_values) = edge_vectors(left, right, Some(&permutation));
++        let correlation = try_correlation(&left_values, &permuted_values)?;
++        if correlation.abs() >= observed_correlation.abs() - 1.0e-15 {
++            extreme += 1;
++        }
++    }
++    Ok(NetworkPermutationTest {
++        observed_correlation,
++        p_value_two_sided: (extreme + 1) as f64 / (permutations + 1) as f64,
++        permutations,
++        extreme_permutations: extreme,
++        seed,
++    })
++}
++
++/// Degree assortativity across observed edges.
++pub fn try_degree_assortativity(graph: &WeightedGraph) -> StatsResult<f64> {
++    let degrees = graph.out_degrees();
++    let nodes = graph.node_count();
++    let mut sources = Vec::new();
++    let mut targets = Vec::new();
++    if graph.is_directed() {
++        for source in 0..nodes {
++            for target in 0..nodes {
++                if graph.weight(source, target) > 0.0 {
++                    sources.push(degrees[source] as f64);
++                    targets.push(degrees[target] as f64);
++                }
++            }
++        }
++    } else {
++        for source in 0..nodes {
++            for target in source + 1..nodes {
++                if graph.weight(source, target) > 0.0 {
++                    sources.push(degrees[source] as f64);
++                    targets.push(degrees[target] as f64);
++                    sources.push(degrees[target] as f64);
++                    targets.push(degrees[source] as f64);
++                }
++            }
++        }
++    }
++    if sources.len() < 2 {
++        return Err(StatisticsError::InsufficientSamples {
++            required: 2,
++            actual: sources.len(),
++        });
++    }
++    try_correlation(&sources, &targets)
++}
++
++/// Weighted Newman-Girvan modularity for a supplied community assignment.
++pub fn try_network_modularity(
++    graph: &WeightedGraph,
++    communities: &[usize],
++    resolution: f64,
++) -> StatsResult<f64> {
++    if communities.len() != graph.node_count() {
++        return Err(StatisticsError::DimensionMismatch {
++            context: "network community assignment",
++            expected: graph.node_count(),
++            actual: communities.len(),
++        });
++    }
++    if !resolution.is_finite() || resolution < 0.0 {
++        return Err(StatisticsError::NegativeValue {
++            name: "network modularity resolution",
++            value: resolution,
++        });
++    }
++    let nodes = graph.node_count();
++    let out_strength = graph.out_strengths();
++    if graph.is_directed() {
++        let mut in_strength = vec![0.0; nodes];
++        for source in 0..nodes {
++            for (target, value) in in_strength.iter_mut().enumerate() {
++                *value += graph.weight(source, target);
++            }
++        }
++        let total = out_strength.iter().sum::<f64>();
++        if !total.is_finite() {
++            return Err(StatisticsError::NumericalOverflow {
++                operation: "directed network total strength",
++            });
++        }
++        if total == 0.0 {
++            return Ok(0.0);
++        }
++        let mut sum = 0.0;
++        for source in 0..nodes {
++            for target in 0..nodes {
++                if communities[source] == communities[target] {
++                    sum += graph.weight(source, target)
++                        - resolution * out_strength[source] * in_strength[target] / total;
++                }
++            }
++        }
++        Ok(sum / total)
++    } else {
++        let total_twice = out_strength.iter().sum::<f64>();
++        if !total_twice.is_finite() {
++            return Err(StatisticsError::NumericalOverflow {
++                operation: "undirected network total strength",
++            });
++        }
++        if total_twice == 0.0 {
++            return Ok(0.0);
++        }
++        let mut sum = 0.0;
++        for source in 0..nodes {
++            for target in 0..nodes {
++                if communities[source] == communities[target] {
++                    sum += graph.weight(source, target)
++                        - resolution * out_strength[source] * out_strength[target] / total_twice;
++                }
++            }
++        }
++        Ok(sum / total_twice)
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn two_cliques() -> WeightedGraph {
++        WeightedGraph::try_from_adjacency(
++            &[
++                vec![0.0, 1.0, 1.0, 0.0, 0.0, 0.0],
++                vec![1.0, 0.0, 1.0, 0.0, 0.0, 0.0],
++                vec![1.0, 1.0, 0.0, 0.1, 0.0, 0.0],
++                vec![0.0, 0.0, 0.1, 0.0, 1.0, 1.0],
++                vec![0.0, 0.0, 0.0, 1.0, 0.0, 1.0],
++                vec![0.0, 0.0, 0.0, 1.0, 1.0, 0.0],
++            ],
++            false,
++            0.0,
++        )
++        .unwrap()
++    }
++
++    #[test]
++    fn planted_partition_has_positive_modularity() {
++        let graph = two_cliques();
++        let modularity = try_network_modularity(&graph, &[0, 0, 0, 1, 1, 1], 1.0).unwrap();
++        assert!(modularity > 0.45);
++    }
++
++    #[test]
++    fn identical_networks_have_unit_correlation() {
++        let graph = two_cliques();
++        assert!((try_network_correlation(&graph, &graph).unwrap() - 1.0).abs() < 1.0e-12);
++    }
++
++    #[test]
++    fn permutation_test_is_reproducible() {
++        let graph = two_cliques();
++        let first = try_network_permutation_test(&graph, &graph, 99, 42).unwrap();
++        let second = try_network_permutation_test(&graph, &graph, 99, 42).unwrap();
++        assert_eq!(first, second);
++        assert!(first.p_value_two_sided < 0.25);
++    }
++}
+diff --git a/src/quantile_regression.rs b/src/quantile_regression.rs
+new file mode 100644
+index 0000000..6df251e
+--- /dev/null
++++ b/src/quantile_regression.rs
+@@ -0,0 +1,297 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++//! Linear quantile regression through deterministic ADMM.
++//!
++//! The solver minimizes the Koenker-Bassett check loss without introducing a
++//! linear-programming dependency. The reported coefficients describe a
++//! conditional quantile, not a conditional mean.
++
++use crate::error::{StatsResult, StatisticsError};
++use crate::linalg::DenseMatrix;
++use crate::model_matrix::{try_design_matrix, try_feature_vector};
++use crate::qr::QrDecomposition;
++
++/// Configuration for deterministic linear quantile regression.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct QuantileRegressionOptions {
++    /// Conditional quantile in the open interval `(0, 1)`.
++    pub quantile: f64,
++    /// Whether to prepend an intercept column.
++    pub include_intercept: bool,
++    /// ADMM augmented-Lagrangian penalty.
++    pub penalty: f64,
++    /// Maximum number of ADMM iterations.
++    pub max_iterations: usize,
++    /// Absolute primal and dual residual tolerance.
++    pub tolerance: f64,
++}
++
++impl Default for QuantileRegressionOptions {
++    fn default() -> Self {
++        Self {
++            quantile: 0.5,
++            include_intercept: true,
++            penalty: 1.0,
++            max_iterations: 2_000,
++            tolerance: 1.0e-8,
++        }
++    }
++}
++
++/// Fitted linear conditional-quantile model.
++#[derive(Debug, Clone, PartialEq)]
++pub struct QuantileRegressionFit {
++    pub coefficients: Vec<f64>,
++    pub quantile: f64,
++    pub n: usize,
++    pub predictor_count: usize,
++    pub include_intercept: bool,
++    pub objective: f64,
++    pub iterations: usize,
++    pub primal_residual: f64,
++    pub dual_residual: f64,
++}
++
++impl QuantileRegressionFit {
++    /// Predict the fitted conditional quantile.
++    pub fn try_predict(&self, predictors: &[f64]) -> StatsResult<f64> {
++        let features = try_feature_vector(
++            predictors,
++            self.predictor_count,
++            self.include_intercept,
++        )?;
++        checked_dot(&features, &self.coefficients, "quantile regression prediction")
++    }
++}
++
++fn checked_dot(left: &[f64], right: &[f64], operation: &'static str) -> StatsResult<f64> {
++    let mut sum = 0.0;
++    for (&a, &b) in left.iter().zip(right) {
++        sum = a.mul_add(b, sum);
++    }
++    if sum.is_finite() {
++        Ok(sum)
++    } else {
++        Err(StatisticsError::NumericalOverflow { operation })
++    }
++}
++
++fn check_loss(residual: f64, quantile: f64) -> f64 {
++    if residual >= 0.0 {
++        quantile * residual
++    } else {
++        (quantile - 1.0) * residual
++    }
++}
++
++fn validate_options(options: QuantileRegressionOptions) -> StatsResult<()> {
++    if !options.quantile.is_finite() || !(0.0..1.0).contains(&options.quantile) {
++        return Err(StatisticsError::InvalidProbability {
++            value: options.quantile,
++        });
++    }
++    if !options.penalty.is_finite() || options.penalty <= 0.0 {
++        return Err(StatisticsError::InvalidScale {
++            value: options.penalty,
++        });
++    }
++    if options.max_iterations == 0 {
++        return Err(StatisticsError::InvalidIterations { iterations: 0 });
++    }
++    if !options.tolerance.is_finite() || options.tolerance <= 0.0 {
++        return Err(StatisticsError::NonPositiveValue {
++            name: "quantile regression tolerance",
++            value: options.tolerance,
++        });
++    }
++    Ok(())
++}
++
++fn vector_norm(values: &[f64]) -> f64 {
++    values.iter().map(|value| value * value).sum::<f64>().sqrt()
++}
++
++/// Fit a linear conditional-quantile model.
++///
++/// The ADMM iterates are deterministic for fixed inputs. A rank-deficient
++/// design is rejected before optimization begins.
++pub fn try_quantile_regression(
++    predictors: &[Vec<f64>],
++    outcomes: &[f64],
++    options: QuantileRegressionOptions,
++) -> StatsResult<QuantileRegressionFit> {
++    validate_options(options)?;
++    if outcomes.is_empty() {
++        return Err(StatisticsError::EmptySample);
++    }
++    for (index, &value) in outcomes.iter().enumerate() {
++        if !value.is_finite() {
++            return Err(StatisticsError::NonFiniteInput { index, value });
++        }
++    }
++
++    let design = try_design_matrix(predictors, outcomes.len(), options.include_intercept)?;
++    if outcomes.len() < design.columns() {
++        return Err(StatisticsError::InsufficientSamples {
++            required: design.columns(),
++            actual: outcomes.len(),
++        });
++    }
++    let factor = QrDecomposition::try_factor(&design)?;
++    if factor.diagonal_ratio() > 1.0e10 {
++        return Err(StatisticsError::SingularMatrix {
++            reason: "quantile-regression design is too ill-conditioned",
++        });
++    }
++
++    let mut coefficients = factor.try_solve_least_squares(outcomes)?;
++    let mut fitted = design.try_mul_vector(&coefficients)?;
++    let mut residual = outcomes
++        .iter()
++        .zip(&fitted)
++        .map(|(&observed, &estimate)| observed - estimate)
++        .collect::<Vec<_>>();
++    let mut dual = vec![0.0; outcomes.len()];
++    let mut primal_residual = f64::INFINITY;
++    let mut dual_residual = f64::INFINITY;
++
++    for iteration in 1..=options.max_iterations {
++        let target = outcomes
++            .iter()
++            .zip(&residual)
++            .zip(&dual)
++            .map(|((&observed, &current_residual), &dual_value)| {
++                observed - current_residual + dual_value
++            })
++            .collect::<Vec<_>>();
++        coefficients = factor.try_solve_least_squares(&target)?;
++        fitted = design.try_mul_vector(&coefficients)?;
++
++        let previous_residual = residual.clone();
++        let positive_threshold = options.quantile / options.penalty;
++        let negative_threshold = (1.0 - options.quantile) / options.penalty;
++        for index in 0..outcomes.len() {
++            let value = outcomes[index] - fitted[index] + dual[index];
++            residual[index] = if value > positive_threshold {
++                value - positive_threshold
++            } else if value < -negative_threshold {
++                value + negative_threshold
++            } else {
++                0.0
++            };
++        }
++
++        let mut primal = vec![0.0; outcomes.len()];
++        let mut dual_change = vec![0.0; outcomes.len()];
++        for index in 0..outcomes.len() {
++            primal[index] = outcomes[index] - fitted[index] - residual[index];
++            dual[index] += primal[index];
++            dual_change[index] = options.penalty * (residual[index] - previous_residual[index]);
++            if !dual[index].is_finite() {
++                return Err(StatisticsError::NumericalOverflow {
++                    operation: "quantile regression ADMM dual update",
++                });
++            }
++        }
++        primal_residual = vector_norm(&primal);
++        dual_residual = vector_norm(&dual_change);
++        if !primal_residual.is_finite() || !dual_residual.is_finite() {
++            return Err(StatisticsError::NumericalOverflow {
++                operation: "quantile regression ADMM residual",
++            });
++        }
++        let scaled_tolerance = options.tolerance * (outcomes.len() as f64).sqrt().max(1.0);
++        if primal_residual <= scaled_tolerance && dual_residual <= scaled_tolerance {
++            let objective = outcomes
++                .iter()
++                .zip(&fitted)
++                .map(|(&observed, &estimate)| check_loss(observed - estimate, options.quantile))
++                .sum::<f64>();
++            if !objective.is_finite() {
++                return Err(StatisticsError::NumericalOverflow {
++                    operation: "quantile regression objective",
++                });
++            }
++            return Ok(QuantileRegressionFit {
++                coefficients,
++                quantile: options.quantile,
++                n: outcomes.len(),
++                predictor_count: design.columns() - usize::from(options.include_intercept),
++                include_intercept: options.include_intercept,
++                objective,
++                iterations: iteration,
++                primal_residual,
++                dual_residual,
++            });
++        }
++    }
++
++    Err(StatisticsError::NonConvergence {
++        function: "quantile regression ADMM",
++        iterations: options.max_iterations,
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn median_regression_recovers_line_with_outlier() {
++        let predictors = (0..9).map(|x| vec![x as f64]).collect::<Vec<_>>();
++        let mut outcomes = predictors
++            .iter()
++            .map(|row| 2.0 + 3.0 * row[0])
++            .collect::<Vec<_>>();
++        outcomes[8] += 100.0;
++        let fit = try_quantile_regression(
++            &predictors,
++            &outcomes,
++            QuantileRegressionOptions::default(),
++        )
++        .unwrap();
++        assert!((fit.coefficients[0] - 2.0).abs() < 1.0e-5);
++        assert!((fit.coefficients[1] - 3.0).abs() < 1.0e-5);
++    }
++
++    #[test]
++    fn upper_quantile_exceeds_lower_quantile() {
++        let predictors: Vec<Vec<f64>> = Vec::new();
++        let outcomes = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
++        let lower = try_quantile_regression(
++            &predictors,
++            &outcomes,
++            QuantileRegressionOptions {
++                quantile: 0.25,
++                ..Default::default()
++            },
++        )
++        .unwrap();
++        let upper = try_quantile_regression(
++            &predictors,
++            &outcomes,
++            QuantileRegressionOptions {
++                quantile: 0.75,
++                ..Default::default()
++            },
++        )
++        .unwrap();
++        assert!(upper.coefficients[0] > lower.coefficients[0]);
++    }
++
++    #[test]
++    fn rejects_boundary_quantile() {
++        assert!(matches!(
++            try_quantile_regression(
++                &[],
++                &[1.0, 2.0],
++                QuantileRegressionOptions {
++                    quantile: 1.0,
++                    ..Default::default()
++                }
++            ),
++            Err(StatisticsError::InvalidProbability { .. })
++        ));
++    }
++}
+diff --git a/tests/v1_2_adversarial.rs b/tests/v1_2_adversarial.rs
+new file mode 100644
+index 0000000..5727853
+--- /dev/null
++++ b/tests/v1_2_adversarial.rs
+@@ -0,0 +1,159 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++use symthaea_statistics::{
++    ExpectileRegressionOptions, GammaRegressionOptions, LocationScaleOptions,
++    PageRankOptions, QuantileRegressionOptions, RandomInterceptOptions,
++    StatisticsError, WeightedGraph, try_beta_binomial_bayes_factor,
++    try_expectile_regression, try_gamma_regression, try_gaussian_location_scale,
++    try_interval_forecast_score, try_network_modularity,
++    try_network_permutation_test, try_pagerank, try_quantile_regression,
++    try_random_intercept_model, try_waic,
++};
++
++#[test]
++fn distributional_models_reject_invalid_domains() {
++    assert!(matches!(
++        try_quantile_regression(
++            &[],
++            &[1.0, 2.0],
++            QuantileRegressionOptions {
++                quantile: 0.0,
++                ..Default::default()
++            }
++        ),
++        Err(StatisticsError::InvalidProbability { .. })
++    ));
++    assert!(matches!(
++        try_expectile_regression(
++            &[],
++            &[1.0, 2.0],
++            ExpectileRegressionOptions {
++                expectile: f64::NAN,
++                ..Default::default()
++            }
++        ),
++        Err(StatisticsError::InvalidProbability { .. })
++    ));
++    assert!(matches!(
++        try_gamma_regression(&[], &[1.0, 0.0], GammaRegressionOptions::default()),
++        Err(StatisticsError::NonPositiveValue { .. })
++    ));
++}
++
++#[test]
++fn location_scale_and_mixed_shapes_fail_closed() {
++    assert!(matches!(
++        try_gaussian_location_scale(
++            &[vec![1.0], vec![2.0]],
++            &[vec![1.0]],
++            &[1.0, 2.0],
++            LocationScaleOptions::default()
++        ),
++        Err(StatisticsError::LengthMismatch { .. })
++    ));
++    assert!(matches!(
++        try_random_intercept_model(
++            &[vec![0.0], vec![1.0]],
++            &[1.0, 2.0],
++            &[0],
++            RandomInterceptOptions::default()
++        ),
++        Err(StatisticsError::LengthMismatch { .. })
++    ));
++    assert!(matches!(
++        try_random_intercept_model(
++            &[vec![0.0], vec![1.0], vec![2.0]],
++            &[1.0, 2.0, 3.0],
++            &[0, 1, 2],
++            RandomInterceptOptions::default()
++        ),
++        Err(StatisticsError::DegenerateSample { .. })
++    ));
++}
++
++#[test]
++fn bayesian_comparison_rejects_inexact_counts_and_ragged_draws() {
++    assert!(matches!(
++        try_beta_binomial_bayes_factor(
++            1,
++            (1_u64 << 53) + 1,
++            0.5,
++            1.0,
++            1.0,
++            0.5
++        ),
++        Err(StatisticsError::CountTooLarge { .. })
++    ));
++    assert!(matches!(
++        try_waic(&[vec![-1.0, -2.0], vec![-1.0]]),
++        Err(StatisticsError::DimensionMismatch { .. })
++    ));
++}
++
++#[test]
++fn network_validation_rejects_ambiguous_graphs() {
++    assert!(matches!(
++        WeightedGraph::try_from_adjacency(
++            &[vec![0.0, -1.0], vec![-1.0, 0.0]],
++            false,
++            0.0
++        ),
++        Err(StatisticsError::NegativeValue { .. })
++    ));
++    assert!(matches!(
++        WeightedGraph::try_from_adjacency(
++            &[vec![1.0, 0.0], vec![0.0, 0.0]],
++            false,
++            0.0
++        ),
++        Err(StatisticsError::DegenerateSample { .. })
++    ));
++    assert!(matches!(
++        WeightedGraph::try_from_adjacency(
++            &[vec![0.0, 1.0], vec![0.0, 0.0]],
++            false,
++            0.0
++        ),
++        Err(StatisticsError::DegenerateSample { .. })
++    ));
++}
++
++#[test]
++fn network_inference_is_seeded_and_configuration_checked() {
++    let graph = WeightedGraph::try_from_adjacency(
++        &[
++            vec![0.0, 1.0, 0.2],
++            vec![1.0, 0.0, 0.5],
++            vec![0.2, 0.5, 0.0],
++        ],
++        false,
++        0.0,
++    )
++    .unwrap();
++    assert!(matches!(
++        try_pagerank(
++            &graph,
++            PageRankOptions {
++                damping: 1.0,
++                ..Default::default()
++            }
++        ),
++        Err(StatisticsError::InvalidProbability { .. })
++    ));
++    let first = try_network_permutation_test(&graph, &graph, 31, 91).unwrap();
++    let second = try_network_permutation_test(&graph, &graph, 31, 91).unwrap();
++    assert_eq!(first, second);
++    assert!(matches!(
++        try_network_modularity(&graph, &[0, 1], 1.0),
++        Err(StatisticsError::DimensionMismatch { .. })
++    ));
++}
++
++#[test]
++fn interval_scores_reject_reversed_bounds() {
++    assert!(matches!(
++        try_interval_forecast_score(&[0.0], &[1.0], &[-1.0], 0.9),
++        Err(StatisticsError::DegenerateSample { .. })
++    ));
++}
+diff --git a/tests/v1_2_api.rs b/tests/v1_2_api.rs
+new file mode 100644
+index 0000000..33cffc4
+--- /dev/null
++++ b/tests/v1_2_api.rs
+@@ -0,0 +1,20 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++use symthaea_statistics::{API_LEVEL, NUMERICAL_CONTRACT, VERSION};
++
++#[test]
++fn v1_compatibility_markers_remain_stable() {
++    assert_eq!(API_LEVEL, 1);
++    assert_eq!(NUMERICAL_CONTRACT, "validated-v1");
++    assert_eq!(VERSION, "1.2.0");
++}
++
++#[test]
++fn stable_prelude_remains_usable() {
++    use symthaea_statistics::prelude::*;
++
++    assert_eq!(try_mean(&[1.0, 2.0, 3.0]).unwrap(), 2.0);
++    let interval = try_clopper_pearson_interval(3, 10, 0.95).unwrap();
++    assert!(interval.low < 0.3 && interval.high > 0.3);
++}
+diff --git a/tests/v1_2_reference_vectors.rs b/tests/v1_2_reference_vectors.rs
+new file mode 100644
+index 0000000..7a9a7fd
+--- /dev/null
++++ b/tests/v1_2_reference_vectors.rs
+@@ -0,0 +1,205 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++use symthaea_statistics::{
++    ExpectileRegressionOptions, GammaRegressionOptions, LocationScaleOptions,
++    PageRankOptions, QuantileRegressionOptions, RandomInterceptOptions, WeightedGraph,
++    try_beta_binomial_bayes_factor, try_betweenness_centrality,
++    try_closeness_centrality, try_expectile_regression, try_gamma_regression,
++    try_gaussian_location_scale, try_network_modularity, try_normal_crps,
++    try_pagerank, try_quantile_regression, try_random_intercept_model, try_waic,
++};
++
++fn close(actual: f64, expected: f64, tolerance: f64) {
++    assert!(
++        (actual - expected).abs() <= tolerance,
++        "actual={actual}, expected={expected}, tolerance={tolerance}"
++    );
++}
++
++#[test]
++fn distributional_regression_references_match() {
++    let predictors = (0..9).map(|value| vec![value as f64]).collect::<Vec<_>>();
++    let mut outcomes = predictors
++        .iter()
++        .map(|row| 2.0 + 3.0 * row[0])
++        .collect::<Vec<_>>();
++    outcomes[8] += 100.0;
++    let quantile = try_quantile_regression(
++        &predictors,
++        &outcomes,
++        QuantileRegressionOptions::default(),
++    )
++    .unwrap();
++    close(quantile.coefficients[0], 1.999_999_750_000_022_2, 2.0e-5);
++    close(quantile.coefficients[1], 3.000_000_107_142_853, 2.0e-5);
++    close(quantile.objective, 50.000_000_624_999_98, 2.0e-4);
++
++    let values = [0.0, 0.0, 0.0, 1.0, 2.0, 10.0];
++    let low = try_expectile_regression(
++        &[],
++        &values,
++        ExpectileRegressionOptions {
++            expectile: 0.2,
++            ..Default::default()
++        },
++    )
++    .unwrap();
++    let high = try_expectile_regression(
++        &[],
++        &values,
++        ExpectileRegressionOptions {
++            expectile: 0.8,
++            ..Default::default()
++        },
++    )
++    .unwrap();
++    close(low.coefficients[0], 0.866_666_666_666_666_5, 2.0e-12);
++    close(high.coefficients[0], 4.777_777_777_777_778, 2.0e-12);
++
++    let gamma_predictors = (0..12)
++        .map(|index| vec![index as f64 / 4.0])
++        .collect::<Vec<_>>();
++    let gamma_outcomes = gamma_predictors
++        .iter()
++        .enumerate()
++        .map(|(index, row)| {
++            (1.0 + 0.03 * (index as f64 - 5.5)) * (1.2 + 0.45 * row[0]).exp()
++        })
++        .collect::<Vec<_>>();
++    let gamma = try_gamma_regression(
++        &gamma_predictors,
++        &gamma_outcomes,
++        GammaRegressionOptions::default(),
++    )
++    .unwrap();
++    close(gamma.coefficients[0], 1.028_532_550_988_774_2, 2.0e-8);
++    close(gamma.coefficients[1], 0.570_774_172_083_108_5, 2.0e-8);
++    close(gamma.deviance, 0.000_278_446_991_325_946_47, 2.0e-12);
++    close(gamma.dispersion, 2.784_469_913_259_464_8e-5, 2.0e-12);
++}
++
++#[test]
++fn location_scale_and_mixed_effect_references_match() {
++    let predictors = (0..30)
++        .map(|index| vec![index as f64 / 10.0])
++        .collect::<Vec<_>>();
++    let outcomes = predictors
++        .iter()
++        .enumerate()
++        .map(|(index, row)| {
++            2.0 + 0.5 * row[0]
++                + if index % 2 == 0 {
++                    -(0.2 + 0.15 * row[0])
++                } else {
++                    0.2 + 0.15 * row[0]
++                }
++        })
++        .collect::<Vec<_>>();
++    let location_scale = try_gaussian_location_scale(
++        &predictors,
++        &predictors,
++        &outcomes,
++        LocationScaleOptions::default(),
++    )
++    .unwrap();
++    close(location_scale.mean_coefficients[0], 1.973_253_154_124_676, 2.0e-7);
++    close(location_scale.mean_coefficients[1], 0.523_114_634_980_925_1, 2.0e-7);
++    close(location_scale.scale_coefficients[0], -2.962_786_125_664_741, 3.0e-7);
++    close(location_scale.scale_coefficients[1], 0.766_636_609_128_163_4, 3.0e-7);
++    close(location_scale.log_likelihood, -14.800_710_367_012_256, 3.0e-10);
++
++    let mut mixed_predictors = Vec::new();
++    let mut mixed_outcomes = Vec::new();
++    let mut groups = Vec::new();
++    let offsets = [-1.5, -0.5, 0.75, 1.5];
++    let base_noise = [0.04, -0.03, 0.01, -0.02, 0.03, -0.01];
++    for (group, &offset) in offsets.iter().enumerate() {
++        for time in 0..6 {
++            let noise = base_noise[time] * if group % 2 == 0 { 1.0 } else { -1.0 };
++            mixed_predictors.push(vec![time as f64]);
++            mixed_outcomes.push(2.0 + 0.8 * time as f64 + offset + noise);
++            groups.push(group);
++        }
++    }
++    let mixed = try_random_intercept_model(
++        &mixed_predictors,
++        &mixed_outcomes,
++        &groups,
++        RandomInterceptOptions::default(),
++    )
++    .unwrap();
++    close(mixed.coefficients[0], 2.062_5, 2.0e-10);
++    close(mixed.coefficients[1], 0.8, 2.0e-10);
++    close(mixed.residual_variance, 0.000_786_666_495_610_581, 3.0e-8);
++    close(mixed.random_intercept_variance, 1.321_183_519_918_554, 3.0e-4);
++    close(mixed.log_likelihood, 33.281_763_578_074_83, 3.0e-7);
++}
++
++#[test]
++fn Bayesian_and_network_references_match() {
++    let comparison =
++        try_beta_binomial_bayes_factor(10, 20, 0.5, 1.0, 1.0, 0.5).unwrap();
++    close(comparison.log_bayes_factor_10, -1.308_370_141_126_971_5, 2.0e-13);
++    close(comparison.bayes_factor_10, 0.270_260_183_572_877, 2.0e-13);
++
++    let waic = try_waic(&[
++        vec![-1.0, -2.0, -0.5],
++        vec![-1.1, -1.8, -0.6],
++        vec![-0.9, -2.2, -0.4],
++    ])
++    .unwrap();
++    close(waic.log_pointwise_predictive_density, -3.480_049_736_921_640_3, 2.0e-13);
++    close(waic.effective_parameters, 0.060_000_000_000_000_026, 2.0e-14);
++    close(waic.waic, 7.080_099_473_843_28, 2.0e-13);
++    close(waic.standard_error, 2.683_658_098_455_959, 2.0e-13);
++
++    let star = WeightedGraph::try_from_adjacency(
++        &[
++            vec![0.0, 1.0, 1.0, 1.0, 1.0],
++            vec![1.0, 0.0, 0.0, 0.0, 0.0],
++            vec![1.0, 0.0, 0.0, 0.0, 0.0],
++            vec![1.0, 0.0, 0.0, 0.0, 0.0],
++            vec![1.0, 0.0, 0.0, 0.0, 0.0],
++        ],
++        false,
++        0.0,
++    )
++    .unwrap();
++    let pagerank = try_pagerank(&star, PageRankOptions::default()).unwrap();
++    close(pagerank[0], 0.475_675_675_674_661_1, 3.0e-12);
++    close(pagerank[1], 0.131_081_081_081_334_73, 3.0e-12);
++    let betweenness = try_betweenness_centrality(&star).unwrap();
++    close(betweenness[0], 1.0, 1.0e-15);
++    let (closeness, _) = try_closeness_centrality(&star).unwrap();
++    close(closeness[0], 1.0, 1.0e-15);
++    close(closeness[1], 0.571_428_571_428_571_4, 1.0e-15);
++
++    let communities = WeightedGraph::try_from_adjacency(
++        &[
++            vec![0.0, 1.0, 1.0, 0.0, 0.0, 0.0],
++            vec![1.0, 0.0, 1.0, 0.0, 0.0, 0.0],
++            vec![1.0, 1.0, 0.0, 0.1, 0.0, 0.0],
++            vec![0.0, 0.0, 0.1, 0.0, 1.0, 1.0],
++            vec![0.0, 0.0, 0.0, 1.0, 0.0, 1.0],
++            vec![0.0, 0.0, 0.0, 1.0, 1.0, 0.0],
++        ],
++        false,
++        0.0,
++    )
++    .unwrap();
++    close(
++        try_network_modularity(&communities, &[0, 0, 0, 1, 1, 1], 1.0).unwrap(),
++        0.483_606_557_377_049_3,
++        2.0e-13,
++    );
++}
++
++#[test]
++fn distributional_score_reference_matches() {
++    close(
++        try_normal_crps(&[0.0], &[0.0], &[1.0]).unwrap(),
++        0.233_694_977_255_109_13,
++        2.0e-15,
++    );
++}
+diff --git a/validation/generate_v1_2_references.py b/validation/generate_v1_2_references.py
+new file mode 100644
+index 0000000..07cd5b2
+--- /dev/null
++++ b/validation/generate_v1_2_references.py
+@@ -0,0 +1,253 @@
++#!/usr/bin/env python3
++"""Generate independent v1.2 reference values with scientific Python libraries."""
++from __future__ import annotations
++
++import json
++import math
++import warnings
++from pathlib import Path
++
++import networkx as nx
++import numpy as np
++import scipy
++from scipy import optimize, stats
++from scipy.special import betaln
++import sklearn
++import statsmodels
++import statsmodels.api as sm
++
++
++def asymmetric_expectile(values: np.ndarray, level: float) -> float:
++    design = np.ones((len(values), 1))
++    coefficient = np.linalg.lstsq(design, values, rcond=None)[0]
++    for _ in range(10_000):
++        residual = values - design @ coefficient
++        weights = np.where(residual >= 0.0, level, 1.0 - level)
++        next_coefficient = np.linalg.solve(
++            design.T @ (weights[:, None] * design),
++            design.T @ (weights * values),
++        )
++        if np.max(np.abs(next_coefficient - coefficient)) <= 1.0e-14:
++            return float(next_coefficient[0])
++        coefficient = next_coefficient
++    raise RuntimeError("expectile reference did not converge")
++
++
++def location_scale_reference(x: np.ndarray, y: np.ndarray) -> dict[str, object]:
++    design = sm.add_constant(x)
++    initial_mean = np.linalg.lstsq(design, y, rcond=None)[0]
++    residual_variance = np.mean((y - design @ initial_mean) ** 2)
++
++    def negative_log_likelihood(parameters: np.ndarray) -> float:
++        mean_coefficient = parameters[:2]
++        scale_coefficient = parameters[2:]
++        mean = design @ mean_coefficient
++        log_variance = design @ scale_coefficient
++        return float(
++            0.5
++            * np.sum(
++                np.log(2.0 * np.pi)
++                + log_variance
++                + (y - mean) ** 2 * np.exp(-log_variance)
++            )
++        )
++
++    result = optimize.minimize(
++        negative_log_likelihood,
++        np.r_[initial_mean, math.log(residual_variance), 0.0],
++        method="BFGS",
++        options={"gtol": 1.0e-10, "maxiter": 10_000},
++    )
++    return {
++        "mean_coefficients": result.x[:2].tolist(),
++        "scale_coefficients": result.x[2:].tolist(),
++        "log_likelihood": float(-result.fun),
++    }
++
++
++def waic(draws: np.ndarray) -> dict[str, float | list[float]]:
++    maximum = np.max(draws, axis=0)
++    lppd_point = maximum + np.log(np.mean(np.exp(draws - maximum), axis=0))
++    penalty = np.var(draws, axis=0, ddof=1)
++    pointwise = lppd_point - penalty
++    deviance = -2.0 * pointwise
++    return {
++        "lppd": float(np.sum(lppd_point)),
++        "effective_parameters": float(np.sum(penalty)),
++        "elpd": float(np.sum(pointwise)),
++        "waic": float(-2.0 * np.sum(pointwise)),
++        "standard_error": float(np.sqrt(len(pointwise) * np.var(deviance, ddof=1))),
++        "pointwise_elpd": pointwise.tolist(),
++    }
++
++
++def main() -> None:
++    output: dict[str, object] = {
++        "versions": {
++            "networkx": nx.__version__,
++            "numpy": np.__version__,
++            "scipy": scipy.__version__,
++            "sklearn": sklearn.__version__,
++            "statsmodels": statsmodels.__version__,
++        }
++    }
++
++    quantile_x = np.arange(9, dtype=float)
++    quantile_y = 2.0 + 3.0 * quantile_x
++    quantile_y[-1] += 100.0
++    quantile_design = sm.add_constant(quantile_x)
++    quantile_fit = sm.QuantReg(quantile_y, quantile_design).fit(
++        q=0.5, max_iter=10_000, p_tol=1.0e-12
++    )
++    quantile_residual = quantile_y - quantile_design @ quantile_fit.params
++    output["quantile_regression"] = {
++        "coefficients": quantile_fit.params.tolist(),
++        "objective": float(
++            np.sum(
++                np.where(
++                    quantile_residual >= 0.0,
++                    0.5 * quantile_residual,
++                    -0.5 * quantile_residual,
++                )
++            )
++        ),
++    }
++
++    expectile_values = np.array([0.0, 0.0, 0.0, 1.0, 2.0, 10.0])
++    output["expectile_regression"] = {
++        "level_0_2": asymmetric_expectile(expectile_values, 0.2),
++        "level_0_8": asymmetric_expectile(expectile_values, 0.8),
++    }
++
++    gamma_x = np.arange(12, dtype=float) / 4.0
++    gamma_design = sm.add_constant(gamma_x)
++    gamma_y = np.array(
++        [
++            (1.0 + 0.03 * (index - 5.5))
++            * math.exp(1.2 + 0.45 * gamma_x[index])
++            for index in range(12)
++        ]
++    )
++    gamma_fit = sm.GLM(
++        gamma_y,
++        gamma_design,
++        family=sm.families.Gamma(sm.families.links.Log()),
++    ).fit()
++    output["gamma_regression"] = {
++        "coefficients": gamma_fit.params.tolist(),
++        "deviance": float(gamma_fit.deviance),
++        "dispersion_deviance": float(gamma_fit.deviance / gamma_fit.df_resid),
++    }
++
++    location_x = np.arange(30, dtype=float) / 10.0
++    location_y = np.array(
++        [
++            2.0
++            + 0.5 * location_x[index]
++            + (-1.0 if index % 2 == 0 else 1.0)
++            * (0.2 + 0.15 * location_x[index])
++            for index in range(30)
++        ]
++    )
++    output["location_scale"] = location_scale_reference(location_x, location_y)
++
++    mixed_predictor: list[float] = []
++    mixed_outcome: list[float] = []
++    mixed_groups: list[int] = []
++    offsets = [-1.5, -0.5, 0.75, 1.5]
++    base_noise = [0.04, -0.03, 0.01, -0.02, 0.03, -0.01]
++    for group, offset in enumerate(offsets):
++        for time in range(6):
++            noise = base_noise[time] * (1.0 if group % 2 == 0 else -1.0)
++            mixed_predictor.append(float(time))
++            mixed_outcome.append(2.0 + 0.8 * time + offset + noise)
++            mixed_groups.append(group)
++    with warnings.catch_warnings():
++        warnings.simplefilter("ignore")
++        mixed_fit = sm.MixedLM(
++            mixed_outcome,
++            sm.add_constant(mixed_predictor),
++            groups=mixed_groups,
++        ).fit(reml=False, method="lbfgs", disp=False)
++    output["random_intercept"] = {
++        "coefficients": mixed_fit.fe_params.tolist(),
++        "residual_variance": float(mixed_fit.scale),
++        "random_intercept_variance": float(np.asarray(mixed_fit.cov_re)[0, 0]),
++        "log_likelihood": float(mixed_fit.llf),
++    }
++
++    log_bayes_factor = float(betaln(11.0, 11.0) - betaln(1.0, 1.0) - 20.0 * math.log(0.5))
++    output["bayes_factor"] = {
++        "beta_binomial_log_bf": log_bayes_factor,
++        "beta_binomial_bf": math.exp(log_bayes_factor),
++    }
++    draws = np.array(
++        [
++            [-1.0, -2.0, -0.5],
++            [-1.1, -1.8, -0.6],
++            [-0.9, -2.2, -0.4],
++        ]
++    )
++    output["waic"] = waic(draws)
++
++    star_adjacency = np.array(
++        [
++            [0.0, 1.0, 1.0, 1.0, 1.0],
++            [1.0, 0.0, 0.0, 0.0, 0.0],
++            [1.0, 0.0, 0.0, 0.0, 0.0],
++            [1.0, 0.0, 0.0, 0.0, 0.0],
++            [1.0, 0.0, 0.0, 0.0, 0.0],
++        ]
++    )
++    star = nx.from_numpy_array(star_adjacency)
++    output["star_network"] = {
++        "pagerank": [
++            float(value)
++            for _, value in sorted(
++                nx.pagerank(star, alpha=0.85, tol=1.0e-12, max_iter=500).items()
++            )
++        ],
++        "betweenness": [
++            float(value)
++            for _, value in sorted(nx.betweenness_centrality(star).items())
++        ],
++        "closeness": [
++            float(value) for _, value in sorted(nx.closeness_centrality(star).items())
++        ],
++    }
++
++    community_adjacency = np.array(
++        [
++            [0.0, 1.0, 1.0, 0.0, 0.0, 0.0],
++            [1.0, 0.0, 1.0, 0.0, 0.0, 0.0],
++            [1.0, 1.0, 0.0, 0.1, 0.0, 0.0],
++            [0.0, 0.0, 0.1, 0.0, 1.0, 1.0],
++            [0.0, 0.0, 0.0, 1.0, 0.0, 1.0],
++            [0.0, 0.0, 0.0, 1.0, 1.0, 0.0],
++        ]
++    )
++    community_graph = nx.from_numpy_array(community_adjacency)
++    output["network_modularity"] = {
++        "planted_partition": float(
++            nx.algorithms.community.quality.modularity(
++                community_graph,
++                [{0, 1, 2}, {3, 4, 5}],
++                weight="weight",
++                resolution=1.0,
++            )
++        )
++    }
++
++    output["distributional_scoring"] = {
++        "standard_normal_crps_at_mean": float(
++            2.0 * stats.norm.pdf(0.0) - 1.0 / math.sqrt(math.pi)
++        )
++    }
++
++    destination = Path(__file__).with_name("v1_2_reference_results.json")
++    destination.write_text(json.dumps(output, indent=2, sort_keys=True) + "\n")
++    print(destination)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/validation/v1_2_reference_results.json b/validation/v1_2_reference_results.json
+new file mode 100644
+index 0000000..f053201
+--- /dev/null
++++ b/validation/v1_2_reference_results.json
+@@ -0,0 +1,93 @@
++{
++  "bayes_factor": {
++    "beta_binomial_bf": 0.270260183572877,
++    "beta_binomial_log_bf": -1.3083701411269715
++  },
++  "distributional_scoring": {
++    "standard_normal_crps_at_mean": 0.23369497725510913
++  },
++  "expectile_regression": {
++    "level_0_2": 0.8666666666666665,
++    "level_0_8": 4.777777777777778
++  },
++  "gamma_regression": {
++    "coefficients": [
++      1.0285325509887742,
++      0.5707741720831085
++    ],
++    "deviance": 0.00027844699132594647,
++    "dispersion_deviance": 2.7844699132594648e-05
++  },
++  "location_scale": {
++    "log_likelihood": -14.800710367012256,
++    "mean_coefficients": [
++      1.973253154124676,
++      0.5231146349809251
++    ],
++    "scale_coefficients": [
++      -2.9627861256647408,
++      0.7666366091281634
++    ]
++  },
++  "network_modularity": {
++    "planted_partition": 0.4836065573770493
++  },
++  "quantile_regression": {
++    "coefficients": [
++      1.9999997500000222,
++      3.000000107142853
++    ],
++    "objective": 50.00000062499998
++  },
++  "random_intercept": {
++    "coefficients": [
++      2.0625000000057265,
++      0.8
++    ],
++    "log_likelihood": 33.281758506927815,
++    "random_intercept_variance": 1.3184698798003311,
++    "residual_variance": 0.0007869904091227202
++  },
++  "star_network": {
++    "betweenness": [
++      1.0,
++      0.0,
++      0.0,
++      0.0,
++      0.0
++    ],
++    "closeness": [
++      1.0,
++      0.5714285714285714,
++      0.5714285714285714,
++      0.5714285714285714,
++      0.5714285714285714
++    ],
++    "pagerank": [
++      0.4756756756746611,
++      0.13108108108133473,
++      0.13108108108133473,
++      0.13108108108133473,
++      0.13108108108133473
++    ]
++  },
++  "versions": {
++    "networkx": "3.6.1",
++    "numpy": "2.3.5",
++    "scipy": "1.17.0",
++    "sklearn": "1.8.0",
++    "statsmodels": "0.14.6"
++  },
++  "waic": {
++    "effective_parameters": 0.060000000000000026,
++    "elpd": -3.54004973692164,
++    "lppd": -3.4800497369216403,
++    "pointwise_elpd": [
++      -1.0066694404388656,
++      -2.026710856043909,
++      -0.5066694404388656
++    ],
++    "standard_error": 2.683658098455959,
++    "waic": 7.08009947384328
++  }
++}

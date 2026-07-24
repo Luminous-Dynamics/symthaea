@@ -1,0 +1,20 @@
+{
+  "stewardship_id": "REPLACE_STEWARDSHIP_ID",
+  "authority_root_sha256": "REPLACE_SYNTHESIS_SHA256",
+  "files": [],
+  "locations": [],
+  "recovery_drill": {
+    "drill_id": "REPLACE_DRILL_ID",
+    "source_location_uri": "https://replace.invalid/archive",
+    "restored_root_sha256": "REPLACE_FILES_ROOT_SHA256",
+    "verifier_id": "REPLACE_VERIFIER_ID",
+    "independent_verifier": true,
+    "commands_sha256": "REPLACE_64_HEX",
+    "completed_at_utc": "REPLACE_RFC3339",
+    "succeeded": true,
+    "evidence_sha256": "REPLACE_64_HEX"
+  },
+  "retention_years": 10,
+  "license_identifier": "AGPL-3.0-or-later",
+  "created_at_utc": "REPLACE_RFC3339"
+}

@@ -117,6 +117,8 @@ pub use stats::*;
 pub mod builder;
 pub use builder::*;
 
+pub mod platform_registry;
+
 // ── Private submodules ──────────────────────────────────────────────────────
 mod training;
 use training::AsyncTrainerHandle;
@@ -182,6 +184,9 @@ pub(crate) mod substrate_manager;
 pub(crate) mod support_manager;
 pub(crate) mod vision_sensory_manager;
 pub use substrate_manager::SubstrateTransitionRecord;
+/// Shared CLS threshold-evolution harness (Tier 1.2). See module docs.
+#[cfg(feature = "neuroevolution")]
+pub mod cls_evolution_harness;
 pub mod observability;
 #[cfg(feature = "safety-agents")]
 pub mod safety_supervisor;
@@ -238,6 +243,12 @@ pub use managers::network_service_bridge::{
 };
 pub use managers::swarm_manager::{SwarmEvent, SwarmTelemetry};
 pub use subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput, output_flags};
+
+// Public telemetry view of the creative pipeline (artwork scores,
+// observer-ΔΨ verdicts) — the module itself stays pub(crate); external
+// drivers observe via `CognitiveLoopService::creative_telemetry()`.
+#[cfg(feature = "creative")]
+pub use creative_bridge::CreativeTelemetry;
 
 #[cfg(feature = "advanced-manufacturing")]
 pub use managers::fabrication_manager::{
@@ -392,6 +403,19 @@ pub struct CognitiveLoopService {
     /// Temporal network (CfC or HdcLtcUnified)
     temporal_network: TemporalNetwork,
 
+    /// Rolling pre-step evolution-state backups (cap 2), captured each cycle
+    /// BEFORE the planning-phase CfC step. front() is the state at the end of
+    /// cycle t−2 — the temporally correct starting state for the per-cycle
+    /// (enc_{t−1} → enc_t) training pair (2026-07-17 sequence-prediction fix;
+    /// see HdcLtcBridge::train_step's history note).
+    train_history_snapshots: VecDeque<temporal_network::TemporalStateBackup>,
+
+    /// EXPERIMENT CONTROL latch: when true, the CfC training gate never fires
+    /// (the `frozen` arm of Predictive Compression C1). Unlike the adaptive
+    /// `pause_learning` (recomputed every cycle), this is set once by
+    /// [`Self::freeze_cfc_training`] and never touched by the loop itself.
+    training_frozen: bool,
+
     /// Experience buffer for replay
     buffer: VecDeque<Experience>,
 
@@ -426,6 +450,17 @@ pub struct CognitiveLoopService {
     /// Async voice synthesis: sends text to background thread, retrieves audio.
     /// None when voice synthesis is not configured.
     pub(crate) voice_synthesis: Option<voice_channel::VoiceSynthesisChannel>,
+
+    /// Completed voice audio drained by the cycle (after its metrics were fed
+    /// to the voice feedback bridge), awaiting pickup via `drain_voice_audio()`.
+    /// Bounded at `voice_channel::VOICE_AUDIO_BUFFER_CAP` (oldest dropped).
+    pub(crate) voice_audio_buffer: VecDeque<voice_channel::VoiceResponse>,
+
+    /// Self-hearing (voice plan LF5): her own most-recent utterance, encoded
+    /// through the native acoustic ear on the synthesis thread. Blended into
+    /// the next perception as a self-generated auditory modality, then taken.
+    #[cfg(feature = "voice-stt")]
+    pub(crate) pending_self_voice_hv: Option<symthaea_core::hdc::ContinuousHV>,
 
     /// Async LLM language: sends consciousness state to Gemma 4 for translation.
     /// None when LLM language is not configured. BrocaLite fills in immediately;
@@ -610,6 +645,14 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "voice-stt-live")]
     pub(crate) stt_capture: Option<crate::perception::MicCaptureHandle>,
 
+    /// Live phone-screen capture handle. When `Some`, the perception phase
+    /// drains the freshest captured frame each cycle into the vision buffer
+    /// (explicitly injected frames — e.g. art-observer viewing windows —
+    /// take precedence). Opt-in: call `start_phone_capture()` after
+    /// construction.
+    #[cfg(feature = "phone")]
+    pub(crate) phone_capture: Option<crate::perception::PhoneCaptureHandle>,
+
     /// Optional IMU fusion module. When `Some`, the perception phase
     /// fuses `latest_imu_reading` into an auxiliary sensory HV and bundles
     /// it into the input encoding alongside STT/radio. Opt-in.
@@ -710,9 +753,6 @@ pub struct CognitiveLoopService {
     /// Substrate independence manager: consolidates feasibility, validation overlay,
     /// speed/scale modulation, and telemetry into a single cohesive struct.
     pub(super) substrate_manager: substrate_manager::SubstrateManager,
-
-    /// Metabolic conductor for Mk0 hardware coordination.
-    pub(crate) metabolic_conductor: Option<crate::embodiment::MetabolicConductor>,
 
     pub(crate) threshold_overrides: threshold_overrides::ThresholdOverrides,
     #[cfg(feature = "jepa")]
@@ -1050,6 +1090,29 @@ impl CognitiveLoopService {
     /// Inject explicit FEP priors (Passport Route).
     pub fn inject_priors(&mut self, mean: Vec<f64>, precision: Vec<f64>) {
         self.fep.agent.inject_priors(mean, precision);
+    }
+
+    /// EXPERIMENT CONTROL: permanently disable CfC weight updates for this
+    /// service instance (the `frozen` arm of Predictive Compression C1 —
+    /// docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md). State still
+    /// evolves; only the training gate is latched off. Not a production path.
+    pub fn freeze_cfc_training(&mut self) {
+        self.training_frozen = true;
+    }
+
+    /// EXPERIMENT CONTROL: reset the temporal network's evolving state.
+    ///
+    /// On the default HdcLtc backend, `inject` is a documented RESET (internal
+    /// state cannot be reconstructed from the small projected vector) — which
+    /// is exactly what a memoryless control arm needs: calling this every
+    /// cycle yields a state-free twin at matched weights and inputs. Used by
+    /// the Predictive Compression Program C1 harness
+    /// (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md). Not a production
+    /// path.
+    pub fn reset_temporal_state(&mut self) {
+        let dim = self.config.cfc_config.input_dim;
+        let zeros = ndarray::Array1::<f32>::zeros(dim);
+        let _ = self.temporal_network.inject(&zeros);
     }
 }
 

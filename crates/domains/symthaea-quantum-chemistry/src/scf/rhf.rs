@@ -24,14 +24,14 @@
 
 use crate::basis::BasisSet;
 use crate::constants::{MAX_SCF_ITERATIONS, SCF_DENSITY_THRESHOLD, SCF_ENERGY_THRESHOLD};
-use crate::integrals::eri::compute_eri_tensor;
+use crate::integrals::eri::{compute_eri_tensor, compute_schwarz_bounds};
 use crate::integrals::kinetic::kinetic_matrix;
 use crate::integrals::nuclear::nuclear_matrix;
 use crate::integrals::overlap::overlap_matrix;
 use crate::molecule::Molecule;
 use crate::scf::density::{build_density_matrix, density_rms_change};
 use crate::scf::diis::Diis;
-use crate::scf::fock::{build_fock_matrix, electronic_energy};
+use crate::scf::fock::{build_fock_matrix, build_fock_matrix_direct, electronic_energy};
 use crate::scf::generalized_eigen::{canonical_orthogonalization, solve_generalized_eigen};
 
 /// Configuration for the RHF solver.
@@ -45,6 +45,15 @@ pub struct RhfConfig {
     pub density_convergence: f64,
     /// Use DIIS convergence acceleration
     pub use_diis: bool,
+    /// Use direct SCF (Phase Q3, 2026-07-16): compute each Fock-matrix ERI
+    /// on demand instead of caching a dense `n^4` tensor. Trades memory
+    /// (`O(n^4)` -> `O(n^2)`) for extra computation (each unique integral
+    /// gets recomputed up to 8x instead of cached once). Default `false` --
+    /// this is an opt-in alternative, not a replacement; existing
+    /// performance for small systems is unaffected. See `scf::fock`'s
+    /// module doc and `eri_computed`/`eri_screened`'s doc comments below
+    /// for what changes when this is `true`.
+    pub direct: bool,
 }
 
 impl Default for RhfConfig {
@@ -54,6 +63,7 @@ impl Default for RhfConfig {
             energy_convergence: SCF_ENERGY_THRESHOLD,
             density_convergence: SCF_DENSITY_THRESHOLD,
             use_diis: true,
+            direct: false,
         }
     }
 }
@@ -81,18 +91,39 @@ pub struct RhfResult {
     pub n_independent: usize,
     /// Number of occupied orbitals
     pub n_occupied: usize,
-    /// Number of ERIs computed (vs screened)
+    /// Number of ERIs computed (vs screened). Only meaningful for
+    /// `config.direct = false` (the dense-tensor path); always 0 when
+    /// `direct = true`, since that path never counts a single upfront
+    /// tensor build (it recomputes integrals per Fock build instead).
     pub eri_computed: usize,
-    /// Number of ERIs screened out
+    /// Number of ERIs screened out. Same `direct = true` caveat as
+    /// `eri_computed`.
     pub eri_screened: usize,
 }
 
 /// Run a Restricted Hartree-Fock calculation.
+///
+/// Panics if `molecule.multiplicity != 1` (Phase Q0, 2026-07-16). RHF is
+/// fundamentally a closed-shell method -- doubly occupying `n_electrons()/2`
+/// spatial orbitals is only physically correct for a singlet. Before this
+/// check, an open-shell molecule (e.g. triplet O2, any radical) would
+/// silently receive a plausible-looking but wrong closed-shell energy
+/// instead of an error; `multiplicity` was otherwise decorative (unused
+/// anywhere else in this crate). UHF now exists for open-shell systems
+/// (`scf::uhf::unrestricted_hartree_fock`, Phase Q2, 2026-07-16); ROHF is
+/// still not implemented.
 pub fn restricted_hartree_fock(
     molecule: &Molecule,
     basis: &BasisSet,
     config: &RhfConfig,
 ) -> RhfResult {
+    assert_eq!(
+        molecule.multiplicity, 1,
+        "restricted_hartree_fock only supports closed-shell (multiplicity=1) molecules; \
+         got multiplicity={}. Use unrestricted_hartree_fock (scf::uhf) for open-shell \
+         systems; ROHF is not yet implemented.",
+        molecule.multiplicity
+    );
     let n = basis.n_basis();
     let n_occ = molecule.n_occupied();
     let v_nn = molecule.nuclear_repulsion_energy();
@@ -108,8 +139,25 @@ pub fn restricted_hartree_fock(
         h_core[i] = t_mat[i] + v_mat[i];
     }
 
-    // Step 2: Two-electron integrals with Schwarz prescreening
-    let (eri, eri_computed, eri_screened) = compute_eri_tensor(&basis.functions);
+    // Step 2: Two-electron integrals -- dense-tensor (default) or direct
+    // (Phase Q3, 2026-07-16) mode, see `RhfConfig::direct`'s doc comment.
+    let (eri, eri_computed, eri_screened) = if config.direct {
+        (Vec::new(), 0, 0)
+    } else {
+        compute_eri_tensor(&basis.functions)
+    };
+    let schwarz = if config.direct {
+        compute_schwarz_bounds(&basis.functions)
+    } else {
+        Vec::new()
+    };
+    let build_fock = |h_core: &[f64], density: &[f64]| -> Vec<f64> {
+        if config.direct {
+            build_fock_matrix_direct(h_core, density, &basis.functions, &schwarz, n)
+        } else {
+            build_fock_matrix(h_core, density, &eri, n)
+        }
+    };
 
     // Step 3: Canonical orthogonalization
     let (x_mat, n_ind, _n_disc) = canonical_orthogonalization(&s_mat, n);
@@ -134,7 +182,7 @@ pub fn restricted_hartree_fock(
         n_iterations = iter + 1;
 
         // 5a: Build Fock matrix
-        let mut fock = build_fock_matrix(&h_core, &density, &eri, n);
+        let mut fock = build_fock(&h_core, &density);
 
         // 5b: DIIS extrapolation
         if let Some(ref mut diis_engine) = diis {
@@ -166,7 +214,7 @@ pub fn restricted_hartree_fock(
     }
 
     // Final energy
-    let fock_final = build_fock_matrix(&h_core, &density, &eri, n);
+    let fock_final = build_fock(&h_core, &density);
     let e_elec = electronic_energy(&density, &h_core, &fock_final, n);
 
     RhfResult {
@@ -190,6 +238,22 @@ mod tests {
     use super::*;
     use crate::basis::BasisSetProvider;
     use crate::basis::sto3g::Sto3g;
+
+    #[test]
+    #[should_panic(expected = "only supports closed-shell (multiplicity=1)")]
+    fn test_open_shell_molecule_is_rejected_not_silently_wrong() {
+        // Phase Q0 (2026-07-16): before this guard, a triplet O2 (or any
+        // multiplicity != 1 molecule) would silently receive a
+        // plausible-looking but physically wrong closed-shell RHF energy
+        // instead of an error -- `multiplicity` was otherwise decorative
+        // (unused anywhere in the crate). Uses a single oxygen atom with
+        // multiplicity=3 (a real, simple open-shell case) rather than
+        // building a full O2 molecule, since only the guard is under test.
+        let mol = Molecule::with_charge(vec![crate::molecule::Atom::new(8, 0.0, 0.0, 0.0)], 0, 3);
+        let basis = Sto3g::build(&mol);
+        let config = RhfConfig::default();
+        let _ = restricted_hartree_fock(&mol, &basis, &config);
+    }
 
     #[test]
     fn test_heh_plus_sto3g() {
@@ -310,5 +374,62 @@ mod tests {
         // Total should be reasonable for 7 basis functions
         let total = result.eri_computed + result.eri_screened;
         assert!(total > 0);
+    }
+
+    #[test]
+    fn test_direct_mode_matches_dense_mode_end_to_end_water() {
+        // Phase Q3 (2026-07-16): the real end-to-end correctness proof for
+        // direct SCF -- running the FULL converged calculation with
+        // direct=true must give the same energy as direct=false, not just
+        // a single Fock-matrix identity (already checked in scf::fock's
+        // tests). No external reference needed: both paths compute the
+        // exact same physics.
+        let mol = Molecule::water();
+        let basis = Sto3g::build(&mol);
+
+        let dense = restricted_hartree_fock(&mol, &basis, &RhfConfig::default());
+        let direct = restricted_hartree_fock(
+            &mol,
+            &basis,
+            &RhfConfig {
+                direct: true,
+                ..Default::default()
+            },
+        );
+
+        assert!(dense.converged && direct.converged);
+        assert!(
+            (dense.total_energy - direct.total_energy).abs() < 1e-8,
+            "dense={:.10} direct={:.10} should match",
+            dense.total_energy,
+            direct.total_energy
+        );
+        // direct mode doesn't build a dense tensor, so these stay 0.
+        assert_eq!(direct.eri_computed, 0);
+        assert_eq!(direct.eri_screened, 0);
+    }
+
+    #[test]
+    fn test_direct_mode_matches_dense_mode_end_to_end_heh_plus() {
+        let mol = Molecule::heh_plus();
+        let basis = Sto3g::build(&mol);
+
+        let dense = restricted_hartree_fock(&mol, &basis, &RhfConfig::default());
+        let direct = restricted_hartree_fock(
+            &mol,
+            &basis,
+            &RhfConfig {
+                direct: true,
+                ..Default::default()
+            },
+        );
+
+        assert!(dense.converged && direct.converged);
+        assert!(
+            (dense.total_energy - direct.total_energy).abs() < 1e-8,
+            "dense={:.10} direct={:.10} should match",
+            dense.total_energy,
+            direct.total_energy
+        );
     }
 }

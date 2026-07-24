@@ -90,6 +90,7 @@ impl Transform {
 /// - Joints 1-3: shoulder (pitch, roll, pitch)
 /// - Joint 4: elbow (pitch)
 /// - Joints 5-7: wrist (pitch, roll, pitch)
+#[derive(Debug, Clone)]
 pub struct ManipulatorKinematics {
     /// DH parameters for each of the 7 joints.
     pub dh_params: Vec<DHParams>,
@@ -176,9 +177,10 @@ impl ManipulatorKinematics {
     ///
     /// Uses central finite differences with step size epsilon.
     pub fn jacobian(&self, q: &[f64], epsilon: f64) -> Vec<Vec<f64>> {
+        assert_eq!(q.len(), self.num_joints());
+        assert!(epsilon.is_finite() && epsilon > 0.0);
         let n = self.num_joints();
         let mut jac = vec![vec![0.0; n]; 6]; // 6 rows (3 position + 3 orientation)
-        let base_pos = self.end_effector_position(q);
         let base_rot = self.forward(q).rotation();
 
         for j in 0..n {
@@ -195,13 +197,22 @@ impl ManipulatorKinematics {
                 jac[i][j] = (pos_plus[i] - pos_minus[i]) / (2.0 * epsilon);
             }
 
-            // Orientation Jacobian (rows 3-5) — approximate from rotation difference
+            // Orientation Jacobian (rows 3-5). For a rotation matrix R,
+            // omega^ = R_dot R^T. Use the skew-symmetric part of that
+            // matrix so the finite-difference estimate remains a valid
+            // angular-velocity vector.
             let rot_plus = self.forward(&q_plus).rotation();
             let rot_minus = self.forward(&q_minus).rotation();
-            // Use skew-symmetric part of R_plus × R_minus^T for angular velocity
-            jac[3][j] = (rot_plus[2][1] - rot_minus[2][1]) / (2.0 * epsilon);
-            jac[4][j] = (rot_plus[0][2] - rot_minus[0][2]) / (2.0 * epsilon);
-            jac[5][j] = (rot_plus[1][0] - rot_minus[1][0]) / (2.0 * epsilon);
+            let mut r_dot = [[0.0f64; 3]; 3];
+            for row in 0..3 {
+                for col in 0..3 {
+                    r_dot[row][col] = (rot_plus[row][col] - rot_minus[row][col]) / (2.0 * epsilon);
+                }
+            }
+            let omega_hat = mul_3x3_transpose(&r_dot, &base_rot);
+            jac[3][j] = 0.5 * (omega_hat[2][1] - omega_hat[1][2]);
+            jac[4][j] = 0.5 * (omega_hat[0][2] - omega_hat[2][0]);
+            jac[5][j] = 0.5 * (omega_hat[1][0] - omega_hat[0][1]);
         }
 
         jac
@@ -222,7 +233,28 @@ impl ManipulatorKinematics {
         tolerance: f64,
     ) -> Option<Vec<f64>> {
         let n = self.num_joints();
+        if q0.len() != n
+            || !target_pos.iter().all(|v| v.is_finite())
+            || !q0.iter().all(|v| v.is_finite())
+            || !lambda.is_finite()
+            || lambda <= 0.0
+            || !tolerance.is_finite()
+            || tolerance <= 0.0
+            || max_iter == 0
+        {
+            return None;
+        }
         let mut q = q0.to_vec();
+        // Callers historically use an all-zero seed, but Panda joint 4 does
+        // not include zero. Starting exactly on that hard stop creates a
+        // singular, one-sided search. Re-seed only out-of-range joints at
+        // the center of their legal interval; preserve all valid caller
+        // coordinates unchanged.
+        for joint in 0..n {
+            if q[joint] < self.joint_limits[joint][0] || q[joint] > self.joint_limits[joint][1] {
+                q[joint] = 0.5 * (self.joint_limits[joint][0] + self.joint_limits[joint][1]);
+            }
+        }
 
         for _iter in 0..max_iter {
             let current_pos = self.end_effector_position(&q);
@@ -241,16 +273,19 @@ impl ManipulatorKinematics {
             let full_jac = self.jacobian(&q, 1e-6);
             let jac: Vec<Vec<f64>> = full_jac[..3].to_vec(); // Position only
 
-            // DLS: dq = J^T (J J^T + λ² I)^{-1} dx
-            // For 3×N with N>3, this is underdetermined → use pseudoinverse
-            // Simplified: dq_j = Σ_i J[i][j] * dx[i] / (Σ_k J[i][k]² + λ²)
+            // True DLS: dq = J^T (J J^T + λ² I)^-1 dx.
+            // Solving the coupled 3x3 task-space system matters: normalizing
+            // each Jacobian row independently is not a pseudoinverse and
+            // fails when Cartesian axes are coupled.
+            let gram = position_gram_matrix(&jac, n);
+            let mut regularized = gram;
+            for axis in 0..3 {
+                regularized[axis][axis] += lambda * lambda;
+            }
+            let task_step = solve_3x3(regularized, dx)?;
             let mut dq = vec![0.0; n];
-            for i in 0..3 {
-                let row_norm_sq: f64 = jac[i].iter().map(|v| v * v).sum();
-                let scale = 1.0 / (row_norm_sq + lambda * lambda);
-                for j in 0..n {
-                    dq[j] += jac[i][j] * dx[i] * scale;
-                }
+            for joint in 0..n {
+                dq[joint] = (0..3).map(|axis| jac[axis][joint] * task_step[axis]).sum();
             }
 
             // Apply joint update with step size limiting
@@ -272,11 +307,24 @@ impl ManipulatorKinematics {
         None // Failed to converge
     }
 
+    /// Yoshikawa-style translational manipulability measure:
+    /// `sqrt(det(J_pos J_pos^T))`. Zero indicates a translational
+    /// singularity; larger values indicate more isotropic task-space motion.
+    pub fn position_manipulability(&self, q: &[f64]) -> Option<f64> {
+        if q.len() != self.num_joints() || !q.iter().all(|v| v.is_finite()) {
+            return None;
+        }
+        let jac = self.jacobian(q, 1e-6);
+        let gram = position_gram_matrix(&jac, self.num_joints());
+        Some(determinant_3x3(&gram).max(0.0).sqrt())
+    }
+
     /// Check if joint angles are within limits.
     pub fn within_limits(&self, q: &[f64]) -> bool {
-        q.iter()
-            .zip(&self.joint_limits)
-            .all(|(&angle, limits)| angle >= limits[0] && angle <= limits[1])
+        q.len() == self.num_joints()
+            && q.iter().zip(&self.joint_limits).all(|(&angle, limits)| {
+                angle.is_finite() && angle >= limits[0] && angle <= limits[1]
+            })
     }
 
     /// Map a Cartesian end-effector force to the equivalent per-joint
@@ -297,6 +345,76 @@ impl ManipulatorKinematics {
         }
         tau
     }
+}
+
+fn position_gram_matrix(jacobian: &[Vec<f64>], joints: usize) -> [[f64; 3]; 3] {
+    let mut gram = [[0.0f64; 3]; 3];
+    for row in 0..3 {
+        for col in 0..3 {
+            gram[row][col] = (0..joints)
+                .map(|joint| jacobian[row][joint] * jacobian[col][joint])
+                .sum();
+        }
+    }
+    gram
+}
+
+fn determinant_3x3(matrix: &[[f64; 3]; 3]) -> f64 {
+    matrix[0][0] * (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1])
+        - matrix[0][1] * (matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0])
+        + matrix[0][2] * (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0])
+}
+
+/// Gaussian elimination with partial pivoting for a 3x3 system.
+fn solve_3x3(matrix: [[f64; 3]; 3], rhs: [f64; 3]) -> Option<[f64; 3]> {
+    let mut augmented = [[0.0f64; 4]; 3];
+    for row in 0..3 {
+        augmented[row][..3].copy_from_slice(&matrix[row]);
+        augmented[row][3] = rhs[row];
+    }
+
+    for pivot in 0..3 {
+        let best_row = (pivot..3).max_by(|&a, &b| {
+            augmented[a][pivot]
+                .abs()
+                .partial_cmp(&augmented[b][pivot].abs())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })?;
+        if augmented[best_row][pivot].abs() < 1e-12 {
+            return None;
+        }
+        if best_row != pivot {
+            augmented.swap(best_row, pivot);
+        }
+
+        let divisor = augmented[pivot][pivot];
+        for col in pivot..4 {
+            augmented[pivot][col] /= divisor;
+        }
+
+        for row in 0..3 {
+            if row == pivot {
+                continue;
+            }
+            let factor = augmented[row][pivot];
+            for col in pivot..4 {
+                augmented[row][col] -= factor * augmented[pivot][col];
+            }
+        }
+    }
+
+    let solution = [augmented[0][3], augmented[1][3], augmented[2][3]];
+    solution.iter().all(|v| v.is_finite()).then_some(solution)
+}
+
+fn mul_3x3_transpose(left: &[[f64; 3]; 3], right: &[[f64; 3]; 3]) -> [[f64; 3]; 3] {
+    let mut result = [[0.0f64; 3]; 3];
+    for row in 0..3 {
+        for col in 0..3 {
+            result[row][col] = (0..3).map(|k| left[row][k] * right[col][k]).sum();
+        }
+    }
+    result
 }
 
 impl Default for ManipulatorKinematics {
@@ -439,6 +557,37 @@ mod tests {
 
         let q_invalid = vec![10.0; 7]; // Way out of range
         assert!(!kin.within_limits(&q_invalid));
+        assert!(!kin.within_limits(&[0.0]));
+        assert!(!kin.within_limits(&[f64::NAN; 7]));
+    }
+
+    #[test]
+    fn dls_solver_handles_coupled_axes() {
+        let matrix = [[4.0, 1.0, 0.5], [1.0, 3.0, 0.25], [0.5, 0.25, 2.0]];
+        let rhs = [1.0, -2.0, 0.5];
+        let solution = solve_3x3(matrix, rhs).unwrap();
+        for row in 0..3 {
+            let reconstructed: f64 = (0..3).map(|col| matrix[row][col] * solution[col]).sum();
+            assert!((reconstructed - rhs[row]).abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn manipulability_is_finite_and_nonnegative() {
+        let kin = ManipulatorKinematics::default_7dof();
+        let q = vec![0.1, 0.2, 0.0, -1.0, 0.0, 1.0, 0.0];
+        let measure = kin.position_manipulability(&q).unwrap();
+        assert!(measure.is_finite());
+        assert!(measure >= 0.0);
+    }
+
+    #[test]
+    fn ik_rejects_invalid_solver_parameters() {
+        let kin = ManipulatorKinematics::default_7dof();
+        let target = [0.3, 0.0, 0.5];
+        assert!(kin.ik_dls(&target, &[0.0; 6], 0.1, 100, 0.01).is_none());
+        assert!(kin.ik_dls(&target, &[0.0; 7], 0.0, 100, 0.01).is_none());
+        assert!(kin.ik_dls(&target, &[0.0; 7], 0.1, 0, 0.01).is_none());
     }
 
     #[test]

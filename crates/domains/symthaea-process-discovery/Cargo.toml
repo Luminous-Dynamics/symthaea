@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-process-discovery"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Generate -> verify -> select search over chemical reaction candidates, with a pluggable ScopePolicy guardrail. Phase 1 of CHEMICAL_PROCESS_DISCOVERY_PLAN_2026-07-12.md: never auto-applies a candidate, always human-reviewed via a written certificate."
+
+[dependencies]
+symthaea-organic-chemistry = { path = "../symthaea-organic-chemistry" }
+symthaea-materials = { path = "../symthaea-materials" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { version = "0.13", features = ["blocking", "rustls"], default-features = false }
+sha2 = "0.10"
+wait-timeout = "0.2"
+
+[dev-dependencies]
+proptest = { workspace = true }

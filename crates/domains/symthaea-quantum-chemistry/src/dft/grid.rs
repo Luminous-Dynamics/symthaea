@@ -235,40 +235,84 @@ fn lebedev_26() -> Vec<(f64, f64, f64, f64)> {
     pts
 }
 
-/// 50-point Lebedev grid (approximate — uses icosahedral + refinement).
+/// 50-point Lebedev grid: genuine Lebedev-Laikov degree-11 quadrature
+/// (Phase Q5c, 2026-07-17 -- this used to be an icosahedral-vertex
+/// approximation, not the real published rule, disclosed as such in this
+/// doc comment; now fixed).
+///
+/// Source: Burkardt, "Sphere Lebedev Rule" dataset (Florida State
+/// University), the standard public-domain republication of Lebedev &
+/// Laikov's original tables. Raw fetched data vendored at
+/// `dft/lebedev_reference/lebedev_011.txt` for provenance. Verified during
+/// planning: weights sum to 1 (~1e-15), and the shared a1/a2/a3 orbit
+/// weights and geometry (`s = 1/√2`, `t = 1/√3`) exactly match this crate's
+/// own already-correct `lebedev_26()` -- those two orbits are reused
+/// unchanged; only the 24-point `(±p,±p,±q)` orbit is new.
 fn lebedev_50() -> Vec<(f64, f64, f64, f64)> {
-    // Use the 26-point grid doubled with midpoint refinements
-    // For a true Lebedev-50, one needs the published tabulated points.
-    // This approximation uses 26 + 24 additional points.
-    let mut pts = lebedev_26();
+    let mut pts = Vec::with_capacity(50);
 
-    // Add 24 more points at intermediate positions
-    let w = 1.0 / 50.0; // Uniform weight for extra points
-    let a = 0.5257_311_121; // Golden ratio related
-    let b = 0.8506_508_084;
-
+    // a1: 6 axis points (same geometry as lebedev_6/lebedev_26)
+    let a1 = 0.012_698_412_698_413;
     for &(x, y, z) in &[
-        (0.0, a, b),
-        (0.0, a, -b),
-        (0.0, -a, b),
-        (0.0, -a, -b),
-        (a, b, 0.0),
-        (a, -b, 0.0),
-        (-a, b, 0.0),
-        (-a, -b, 0.0),
-        (b, 0.0, a),
-        (b, 0.0, -a),
-        (-b, 0.0, a),
-        (-b, 0.0, -a),
+        (1.0, 0.0, 0.0),
+        (-1.0, 0.0, 0.0),
+        (0.0, 1.0, 0.0),
+        (0.0, -1.0, 0.0),
+        (0.0, 0.0, 1.0),
+        (0.0, 0.0, -1.0),
     ] {
-        pts.push((x, y, z, w));
-        pts.push((-x, -y, -z, w)); // Inversion partner
+        pts.push((x, y, z, a1));
     }
 
-    // Renormalize weights to sum to 1
-    let total_w: f64 = pts.iter().map(|p| p.3).sum();
-    for p in &mut pts {
-        p.3 /= total_w;
+    // a2: 12 edge points (same s=1/sqrt(2) as lebedev_26)
+    let a2 = 0.022_574_955_908_289;
+    let s = 1.0 / 2.0_f64.sqrt();
+    for &(x, y, z) in &[
+        (s, s, 0.0),
+        (s, -s, 0.0),
+        (-s, s, 0.0),
+        (-s, -s, 0.0),
+        (s, 0.0, s),
+        (s, 0.0, -s),
+        (-s, 0.0, s),
+        (-s, 0.0, -s),
+        (0.0, s, s),
+        (0.0, s, -s),
+        (0.0, -s, s),
+        (0.0, -s, -s),
+    ] {
+        pts.push((x, y, z, a2));
+    }
+
+    // a3: 8 body-diagonal points (same t=1/sqrt(3) as lebedev_26)
+    let a3 = 0.021_093_750_000_000;
+    let t = 1.0 / 3.0_f64.sqrt();
+    for &(x, y, z) in &[
+        (t, t, t),
+        (t, t, -t),
+        (t, -t, t),
+        (t, -t, -t),
+        (-t, t, t),
+        (-t, t, -t),
+        (-t, -t, t),
+        (-t, -t, -t),
+    ] {
+        pts.push((x, y, z, a3));
+    }
+
+    // b: 24 new (p,p,q)-type points -- q placed in each of the 3
+    // coordinate slots, all 8 sign combinations per placement.
+    let b = 0.020_173_335_537_919;
+    let p = 0.301_511_344_577_764;
+    let q = 0.904_534_033_733_291;
+    for &sq in &[1.0, -1.0] {
+        for &sp1 in &[1.0, -1.0] {
+            for &sp2 in &[1.0, -1.0] {
+                pts.push((sp1 * p, sp2 * p, sq * q, b));
+                pts.push((sp1 * p, sq * q, sp2 * p, b));
+                pts.push((sq * q, sp1 * p, sp2 * p, b));
+            }
+        }
     }
 
     pts
@@ -315,5 +359,104 @@ mod tests {
             w1
         );
         assert!((w0 + w1 - 1.0).abs() < 1e-10, "Partition sums to 1");
+    }
+
+    // ── Phase Q5c (2026-07-17): self-derived mathematical identities for
+    // the angular Lebedev grids -- no external reference number needed
+    // beyond the already-independently-verified weights themselves. Applied
+    // to all three grids: lebedev_50 is the fix under test, lebedev_6/26
+    // get the same checks as bonus regression coverage they didn't have
+    // before (expected to already pass -- confirmed rather than assumed).
+
+    fn check_lebedev_identities(pts: &[(f64, f64, f64, f64)], label: &str) {
+        // 1. Weight sum = 1.
+        let sum_w: f64 = pts.iter().map(|p| p.3).sum();
+        assert!(
+            (sum_w - 1.0).abs() < 1e-10,
+            "{label}: weights sum to {sum_w}, expected 1"
+        );
+
+        // 2. Points lie on the unit sphere.
+        for &(x, y, z, _) in pts {
+            let r2 = x * x + y * y + z * z;
+            assert!(
+                (r2 - 1.0).abs() < 1e-10,
+                "{label}: point ({x},{y},{z}) has r^2={r2}, expected 1"
+            );
+        }
+
+        // 3. Odd-parity monomials vanish exactly (symmetry-guaranteed: the
+        // grid is closed under sign-flip of any coordinate and under axis
+        // permutation, so any monomial odd in at least one coordinate must
+        // integrate to zero regardless of quadrature order).
+        type Monomial = fn(f64, f64, f64) -> f64;
+        let odd_monomials: &[(&str, Monomial)] = &[
+            ("x", |x, _, _| x),
+            ("y", |_, y, _| y),
+            ("z", |_, _, z| z),
+            ("xyz", |x, y, z| x * y * z),
+            ("x^3", |x, _, _| x.powi(3)),
+            ("x^2*y", |x, y, _| x * x * y),
+            ("x^5", |x, _, _| x.powi(5)),
+            ("x^3*y^2", |x, y, _| x.powi(3) * y * y),
+            ("x^7", |x, _, _| x.powi(7)),
+            ("x^9", |x, _, _| x.powi(9)),
+        ];
+        for &(name, f) in odd_monomials {
+            let integral: f64 = pts.iter().map(|&(x, y, z, w)| w * f(x, y, z)).sum();
+            assert!(
+                integral.abs() < 1e-10,
+                "{label}: odd monomial {name} integrated to {integral}, expected 0"
+            );
+        }
+
+        // 4. Quartic moment identity: x^2+y^2+z^2=1 pointwise on the unit
+        // sphere, so squaring and integrating gives
+        // E[x^4]+E[y^4]+E[z^4] + 2*(E[x^2y^2]+E[x^2z^2]+E[y^2z^2]) = E[1] = 1
+        // exactly -- a real constraint any degree->=4-exact rule must
+        // satisfy, derived here, not looked up.
+        let e_x4: f64 = pts.iter().map(|&(x, _, _, w)| w * x.powi(4)).sum();
+        let e_y4: f64 = pts.iter().map(|&(_, y, _, w)| w * y.powi(4)).sum();
+        let e_z4: f64 = pts.iter().map(|&(_, _, z, w)| w * z.powi(4)).sum();
+        let e_x2y2: f64 = pts.iter().map(|&(x, y, _, w)| w * x * x * y * y).sum();
+        let e_x2z2: f64 = pts.iter().map(|&(x, _, z, w)| w * x * x * z * z).sum();
+        let e_y2z2: f64 = pts.iter().map(|&(_, y, z, w)| w * y * y * z * z).sum();
+        let quartic_identity = e_x4 + e_y4 + e_z4 + 2.0 * (e_x2y2 + e_x2z2 + e_y2z2);
+        assert!(
+            (quartic_identity - 1.0).abs() < 1e-10,
+            "{label}: quartic identity = {quartic_identity}, expected 1"
+        );
+    }
+
+    #[test]
+    fn test_lebedev_6_identities() {
+        check_lebedev_identities(&lebedev_6(), "lebedev_6");
+    }
+
+    #[test]
+    fn test_lebedev_26_identities() {
+        check_lebedev_identities(&lebedev_26(), "lebedev_26");
+    }
+
+    #[test]
+    fn test_lebedev_50_identities() {
+        let pts = lebedev_50();
+        assert_eq!(pts.len(), 50, "lebedev_50 should have exactly 50 points");
+        check_lebedev_identities(&pts, "lebedev_50");
+    }
+
+    #[test]
+    fn test_lebedev_50_no_duplicate_points() {
+        // Confirms the (p,p,q) orbit's sign/position loop produces 24
+        // genuinely distinct points, not accidental overlaps.
+        let pts = lebedev_50();
+        for i in 0..pts.len() {
+            for j in (i + 1)..pts.len() {
+                let (x1, y1, z1, _) = pts[i];
+                let (x2, y2, z2, _) = pts[j];
+                let d2 = (x1 - x2).powi(2) + (y1 - y2).powi(2) + (z1 - z2).powi(2);
+                assert!(d2 > 1e-12, "duplicate points at indices {i} and {j}");
+            }
+        }
     }
 }

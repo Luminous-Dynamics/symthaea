@@ -10,6 +10,8 @@
 //!
 //! Enabled via `--features symthaea-backend`.
 
+use std::collections::VecDeque;
+
 use symthaea::mind::{ContinuousMind, MindConfig};
 use symthaea_core::hdc::ContinuousHV;
 
@@ -46,6 +48,14 @@ impl Default for WmConfig {
 pub struct WorkingMemory {
     mind: ContinuousMind,
     decay_rate: f32,
+    /// Per-item rehearsal-boost multiplier, aligned index-for-index with
+    /// `working_memory_ticks_slice()`. `ContinuousMind` doesn't expose a
+    /// per-item mutable activation store (activation is derived purely
+    /// from arrival tick), so this tracks boosts externally and is kept
+    /// in sync via `sync_boost()` — safe because eviction/insertion here
+    /// is strict FIFO (oldest evicted first, newest appended at the back),
+    /// matching `working_memory_ticks_slice()`'s ordering.
+    boost: VecDeque<f32>,
 }
 
 impl WorkingMemory {
@@ -61,6 +71,18 @@ impl WorkingMemory {
         Self {
             mind,
             decay_rate: config.decay_rate,
+            boost: VecDeque::new(),
+        }
+    }
+
+    /// Realign `boost` with the current WM contents after a size change.
+    fn sync_boost(&mut self) {
+        let len = self.mind.working_memory_ticks_slice().len();
+        while self.boost.len() > len {
+            self.boost.pop_front();
+        }
+        while self.boost.len() < len {
+            self.boost.push_back(1.0);
         }
     }
 
@@ -71,6 +93,7 @@ impl WorkingMemory {
     pub fn perceive(&mut self, hv: ContinuousHV) {
         self.mind.perceive(hv);
         let _ = self.mind.tick();
+        self.sync_boost();
     }
 
     /// Advance one tick via `ContinuousMind::tick()`.
@@ -81,6 +104,7 @@ impl WorkingMemory {
     /// - Social coherence processing (if enabled)
     pub fn tick(&mut self) {
         let _ = self.mind.tick();
+        self.sync_boost();
     }
 
     /// Get current working memory contents.
@@ -88,19 +112,35 @@ impl WorkingMemory {
         self.mind.working_memory()
     }
 
-    /// Get activation levels for each item, computed from arrival ticks.
+    /// Get activation levels for each item, computed from arrival ticks
+    /// and any accumulated rehearsal boost.
     ///
-    /// `activation = decay_rate^(current_tick - arrival_tick)`
+    /// `activation = decay_rate^(current_tick - arrival_tick) * boost`
     pub fn activations(&self) -> Vec<f32> {
         let current = self.mind.state().tick;
         self.mind
             .working_memory_ticks_slice()
             .iter()
-            .map(|&arrival| {
+            .zip(self.boost.iter().chain(std::iter::repeat(&1.0)))
+            .map(|(&arrival, &boost)| {
                 let age = current.saturating_sub(arrival) as f32;
-                self.decay_rate.powf(age)
+                self.decay_rate.powf(age) * boost
             })
             .collect()
+    }
+
+    /// Boost activation of the item at `index` by a multiplicative factor.
+    ///
+    /// Models covert rehearsal: items rehearsed more frequently maintain
+    /// higher activation (Rundus, 1971). Factor > 1.0 boosts, < 1.0
+    /// attenuates. Boost is floored at 0.0 but not upper-clamped, allowing
+    /// rehearsal to build supra-threshold traces that survive subsequent
+    /// decay. Mirrors `wm::lightweight::WorkingMemory::boost_activation`.
+    pub fn boost_activation(&mut self, index: usize, factor: f32) {
+        self.sync_boost();
+        if let Some(b) = self.boost.get_mut(index) {
+            *b = (*b * factor).max(0.0);
+        }
     }
 
     /// Compute the maximum activation-weighted similarity to `probe`.

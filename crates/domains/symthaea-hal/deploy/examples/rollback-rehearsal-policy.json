@@ -1,0 +1,14 @@
+{
+  "required_scenarios": [
+    "PowerLossDuringStaging",
+    "CandidateBootFailure",
+    "StartupAdmissionFailure",
+    "HealthWindowFailure",
+    "SupervisorLoss",
+    "TrialBudgetExhaustion"
+  ],
+  "minimum_trials_per_scenario": 3,
+  "maximum_recovery_latency_ms": 30000,
+  "maximum_age_ms": 2592000000,
+  "require_output_disable_evidence": true
+}

@@ -11,7 +11,7 @@ use crate::api::ws::DemoCycleData;
 use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
 #[cfg(feature = "vision-manifold")]
-use symthaea_vision_manifold::{CameraManifold, VisionConfig};
+use symthaea_vision_manifold::MockCameraSource;
 
 /// Demo runner that wraps a CognitiveLoopService.
 pub struct DemoRunner {
@@ -21,10 +21,11 @@ pub struct DemoRunner {
     /// When true, sensitive vector fields are zeroed before sending over WebSocket.
     /// Scalar aggregates (consciousness_level, mesh_health_score, etc.) are kept.
     pub redact_telemetry: bool,
-    /// Optional vision manifold for visual input processing.
+    /// Optional camera source whose frames are injected into the cognitive
+    /// loop's internal VisionBridge each cycle.
     #[cfg(feature = "vision-manifold")]
-    vision: Option<CameraManifold>,
-    /// Whether to run vision manifold each cycle.
+    vision: Option<MockCameraSource>,
+    /// Whether to inject a camera frame each cycle.
     #[cfg(feature = "vision-manifold")]
     pub vision_enabled: bool,
     /// Optional mesh daemon orchestrator (spawned edge consciousness kernel).
@@ -87,11 +88,27 @@ impl DemoRunner {
         }
     }
 
-    /// Enable the vision manifold with a mock camera source.
+    /// Enable vision: a mock camera source generates frames that are
+    /// injected into the loop's internal VisionBridge each cycle.
+    ///
+    /// The source is always created at the loop's configured frame
+    /// dimensions — the VisionBridge encodes at `vision_frame_width` ×
+    /// `vision_frame_height`, so frames of any other size would be
+    /// reinterpreted incorrectly.
     #[cfg(feature = "vision-manifold")]
     pub fn enable_vision(&mut self, width: u32, height: u32) {
-        let cfg = VisionConfig::default();
-        self.vision = Some(CameraManifold::with_mock(cfg, width, height));
+        let cw = self.service.config().vision_frame_width;
+        let ch = self.service.config().vision_frame_height;
+        if width != cw || height != ch {
+            tracing::warn!(
+                requested_w = width,
+                requested_h = height,
+                config_w = cw,
+                config_h = ch,
+                "enable_vision: ignoring requested dimensions, using loop-configured frame size"
+            );
+        }
+        self.vision = Some(MockCameraSource::new(cw, ch));
         self.vision_enabled = true;
     }
 
@@ -99,6 +116,21 @@ impl DemoRunner {
     #[cfg(feature = "vision-manifold")]
     pub fn disable_vision(&mut self) {
         self.vision_enabled = false;
+    }
+
+    /// Enable live phone-screen vision: real Pixel pixels (via ADB) flow
+    /// into the loop's VisionBridge each cycle. Mutually exclusive with the
+    /// mock camera — explicit frames always win over the ambient phone feed,
+    /// so leave `vision_enabled` off when using the phone.
+    #[cfg(feature = "phone")]
+    pub fn enable_phone_vision(&mut self, serial: &str) -> anyhow::Result<()> {
+        self.service.start_phone_capture(serial)
+    }
+
+    /// Stop live phone-screen vision.
+    #[cfg(feature = "phone")]
+    pub fn disable_phone_vision(&mut self) {
+        self.service.stop_phone_capture();
     }
 
     /// Enable Iroh P2P swarm and spawn inbound accept loop.
@@ -180,17 +212,21 @@ impl DemoRunner {
     pub fn run_cycle(&mut self) -> DemoCycleData {
         self.cycle_count += 1;
 
-        // Inject camera frame into cognitive loop's internal VisionBridge.
-        // The frame is processed during cycle() through the perception phase.
+        // Inject the camera's actual frame into the cognitive loop's internal
+        // VisionBridge; it is processed during cycle() in the perception phase.
+        // (Until 2026-07-15 this ticked a private CameraManifold — feeding a
+        // second, redundant manifold — and then injected a CONSTANT gray frame
+        // into the loop, so the loop never saw the camera's pixels at all.)
         #[cfg(feature = "vision-manifold")]
         if self.vision_enabled {
             if let Some(ref mut cam) = self.vision {
-                let _ = cam.tick(); // advance mock camera for frame sequencing
+                // RGB: the loop's VisionBridge uses VisionConfig::default(),
+                // where enable_color = true → the perception phase reads the
+                // buffer as 3-channel.
+                if let Ok(frame) = cam.next_frame_rgb() {
+                    self.service.inject_vision_frame(frame.pixels);
+                }
             }
-            let w = self.service.config().vision_frame_width;
-            let h = self.service.config().vision_frame_height;
-            let mock_frame = vec![128u8; (w * h) as usize];
-            self.service.inject_vision_frame(mock_frame);
         }
 
         let result = self.service.cycle(&self.current_input);
@@ -446,8 +482,10 @@ impl DemoRunner {
             self.current_input = "consciousness emerges from integrated information".to_string();
         }
         #[cfg(feature = "vision-manifold")]
-        if let Some(ref mut cam) = self.vision {
-            cam.reset();
+        if self.vision.is_some() {
+            let cw = self.service.config().vision_frame_width;
+            let ch = self.service.config().vision_frame_height;
+            self.vision = Some(MockCameraSource::new(cw, ch));
         }
     }
 }

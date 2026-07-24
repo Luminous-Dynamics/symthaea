@@ -1,0 +1,6 @@
+{
+  "to": "ProtocolFrozen",
+  "actor_id": "REPLACE_ACTOR_ID",
+  "authority_sha256": "REPLACE_64_HEX",
+  "recorded_at_utc": "REPLACE_RFC3339"
+}

@@ -225,11 +225,32 @@ impl MultiObjectiveEvolution {
             .cloned()
             .collect();
 
-        next_generation.extend(frontier_members);
+        next_generation.extend(frontier_members.clone());
 
-        // Fill rest with offspring
+        // Fill rest with offspring.
+        //
+        // `select_from_frontier` matches a tournament-picked frontier profile
+        // back to a population member via a float tolerance check on
+        // `composite` (`(a - b).abs() < 0.0001`). If `composite` is NaN for
+        // every frontier member — which happens because `dominates()` uses
+        // `>=`/`>` comparisons that are always false against NaN, so a
+        // NaN-scored candidate can never be dominated and always survives
+        // onto the frontier — that match fails unconditionally (NaN - NaN =
+        // NaN, and NaN < 0.0001 is false). `select_from_frontier` then
+        // returns `None` on every call, neither branch below ever pushes to
+        // `next_generation`, and this loop spun forever (root cause of a 24h+
+        // 97%-CPU hang found 2026-07-08 via `exp_loop_ablation.rs`'s "empty
+        // input" regime — a degenerate/near-zero HDC encoding for `""` input
+        // is the most likely NaN source upstream in profile computation).
+        //
+        // `stall_limit` guarantees forward progress regardless of whether the
+        // NaN ever gets fixed at the source: after this many consecutive
+        // non-productive iterations, clone an existing member directly
+        // instead of routing through the frontier-match, which cannot fail.
+        let stall_limit = self.config.population_size.max(8) * 4;
+        let mut stalled = 0usize;
         while next_generation.len() < self.config.population_size {
-            if rand::random::<f64>() < self.config.crossover_rate {
+            let pushed = if rand::random::<f64>() < self.config.crossover_rate {
                 // Crossover from frontier members
                 let parent1 = self.select_from_frontier(frontier);
                 let parent2 = self.select_from_frontier(frontier);
@@ -242,6 +263,9 @@ impl MultiObjectiveEvolution {
                     );
                     let child = PrimitiveWithProfile::from_primitive(child_primitive);
                     next_generation.push(child);
+                    true
+                } else {
+                    false
                 }
             } else {
                 // Mutation
@@ -251,7 +275,34 @@ impl MultiObjectiveEvolution {
                         .mutate(self.config.mutation_rate, self.generation + 1);
                     let child = PrimitiveWithProfile::from_primitive(child_primitive);
                     next_generation.push(child);
+                    true
+                } else {
+                    false
                 }
+            };
+
+            if pushed {
+                stalled = 0;
+                continue;
+            }
+            stalled += 1;
+            if stalled < stall_limit {
+                continue;
+            }
+
+            // Forced-progress fallback: clone directly, bypassing the
+            // NaN-fragile frontier match.
+            if let Some(fallback) = frontier_members.first().or_else(|| self.population.first()) {
+                next_generation.push(fallback.clone());
+                stalled = 0;
+            } else {
+                // No members anywhere to fall back to — nothing more this
+                // generation can produce. `evolve()` already handles an
+                // under-sized/empty population via `find_highest_phi()`'s
+                // `None` branch (`anyhow::bail!`), so returning early here
+                // with a short `next_generation` is a safe degradation, not
+                // a new failure mode.
+                break;
             }
         }
 
@@ -378,5 +429,76 @@ mod tests {
 
         let evolution = MultiObjectiveEvolution::new(config);
         assert!(evolution.is_ok());
+    }
+
+    /// Regression test for the 2026-07-08 24h+ hang (`""`-input regime of
+    /// `exp_loop_ablation.rs`): an all-NaN-composite population must not
+    /// spin forever in `evolve_generation`. Before the fix, this test would
+    /// never return.
+    #[test]
+    fn test_evolve_generation_terminates_on_nan_profiles() {
+        use crate::consciousness::epistemic_tiers::EpistemicCoordinate;
+        use crate::consciousness::primitives::primitive_evolution::CandidatePrimitive;
+        use symthaea_core::hdc::binary_hv::BinaryHV;
+
+        let config = EvolutionConfig {
+            tier: PrimitiveTier::Physical,
+            population_size: 10,
+            num_generations: 1,
+            mutation_rate: 0.2,
+            crossover_rate: 0.5,
+            elitism_count: 2,
+            fitness_tasks: vec![],
+            convergence_threshold: 0.01,
+            phi_weight: 0.4,
+            harmonic_weight: 0.3,
+            epistemic_weight: 0.3,
+        };
+        let mut evolution = MultiObjectiveEvolution::new(config).unwrap();
+
+        // Every profile field is NaN — reproduces the degenerate-encoding
+        // scenario that made `dominates()` (all `>=`/`>` comparisons, always
+        // false against NaN) put every candidate on the Pareto frontier while
+        // `select_from_frontier`'s float-tolerance match against those NaN
+        // composites can never succeed.
+        let nan_profile = ConsciousnessProfile {
+            phi: f64::NAN,
+            gradient_magnitude: f64::NAN,
+            entropy: f64::NAN,
+            complexity: f64::NAN,
+            coherence: f64::NAN,
+            composite: f64::NAN,
+        };
+        evolution.population = (0..10)
+            .map(|i| {
+                let primitive = CandidatePrimitive {
+                    name: format!("nan_{i}"),
+                    tier: PrimitiveTier::Physical,
+                    definition: String::new(),
+                    fitness: f64::NAN,
+                    encoding: BinaryHV::random(i as u64),
+                    epistemic_coordinate: EpistemicCoordinate::default(),
+                    harmonic_alignment: 0.0,
+                };
+                PrimitiveWithProfile::new(primitive, nan_profile.clone())
+            })
+            .collect();
+
+        let profiles: Vec<ConsciousnessProfile> = evolution
+            .population
+            .iter()
+            .map(|p| p.profile.clone())
+            .collect();
+        let frontier = ParetoFrontier::from_population(profiles);
+        assert!(
+            !frontier.profiles.is_empty(),
+            "NaN profiles are expected to be un-dominated and survive onto the frontier"
+        );
+
+        // Bounded by the test harness's own timeout, not by the function
+        // under test — before the fix this call never returns.
+        let result = evolution.evolve_generation(&frontier);
+        assert!(result.is_ok());
+        assert_eq!(evolution.population.len(), 10);
     }
 }

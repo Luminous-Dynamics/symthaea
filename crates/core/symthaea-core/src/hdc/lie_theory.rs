@@ -315,6 +315,83 @@ pub fn gl2_real() -> LieAlgebra {
     }
 }
 
+/// so(n): n×n skew-symmetric matrices for general n ≥ 2 — infinitesimal rotations
+/// in n-dimensional space. Basis: `L_{pq}` for `0 ≤ p < q < n`, the elementary
+/// rotation generator in the (p,q) coordinate plane (+1 at (p,q), -1 at (q,p),
+/// zero elsewhere). Dimension = n(n-1)/2. `so_n(3)` is the same algebra as
+/// [`so3`] (isomorphic, not identical basis ordering — Lx/Ly/Lz there vs.
+/// L_{01}/L_{02}/L_{12} here).
+///
+/// Structure constants are computed directly from the matrix commutator
+/// `[L_i, L_j] = L_i L_j - L_j L_i` and projected onto the basis via the
+/// Frobenius inner product (the `L_{pq}` are pairwise orthogonal under it,
+/// each with norm² = 2, so the projection is exact) — computed, not
+/// hand-derived, so this is correct by construction for any n.
+pub fn so_n(n: usize) -> LieAlgebra {
+    assert!(n >= 2, "so(n) requires n >= 2");
+
+    let mut basis: Vec<Vec<Vec<f64>>> = Vec::new();
+    for p in 0..n {
+        for q in (p + 1)..n {
+            let mut m = vec![vec![0.0; n]; n];
+            m[p][q] = 1.0;
+            m[q][p] = -1.0;
+            basis.push(m);
+        }
+    }
+    let d = basis.len();
+
+    let mat_mul_n = |a: &[Vec<f64>], b: &[Vec<f64>]| -> Vec<Vec<f64>> {
+        let mut out = vec![vec![0.0; n]; n];
+        for i in 0..n {
+            for j in 0..n {
+                let mut s = 0.0;
+                for k in 0..n {
+                    s += a[i][k] * b[k][j];
+                }
+                out[i][j] = s;
+            }
+        }
+        out
+    };
+    let frobenius_n = |a: &[Vec<f64>], b: &[Vec<f64>]| -> f64 {
+        let mut s = 0.0;
+        for i in 0..n {
+            for j in 0..n {
+                s += a[i][j] * b[i][j];
+            }
+        }
+        s
+    };
+
+    let mut sc = vec![vec![vec![0.0; d]; d]; d];
+    for i in 0..d {
+        for j in 0..d {
+            let ab = mat_mul_n(&basis[i], &basis[j]);
+            let ba = mat_mul_n(&basis[j], &basis[i]);
+            let mut comm = vec![vec![0.0; n]; n];
+            for r in 0..n {
+                for c in 0..n {
+                    comm[r][c] = ab[r][c] - ba[r][c];
+                }
+            }
+            for k in 0..d {
+                let norm_sq = frobenius_n(&basis[k], &basis[k]);
+                if norm_sq > 1e-12 {
+                    sc[i][j][k] = frobenius_n(&comm, &basis[k]) / norm_sq;
+                }
+            }
+        }
+    }
+
+    LieAlgebra {
+        name: "so(n)",
+        dimension: d,
+        basis,
+        structure_constants: sc,
+    }
+}
+
 fn mat2x2_comm(a: &[Vec<f64>], b: &[Vec<f64>]) -> Vec<Vec<f64>> {
     // [A,B] = AB - BA for 2×2
     let ab = mat2x2_mul(a, b);
@@ -928,6 +1005,47 @@ mod tests {
     fn test_gl2_jacobi_identity() {
         let alg = gl2_real();
         assert!(alg.check_jacobi_identity());
+    }
+
+    #[test]
+    fn test_so_n_dimension() {
+        assert_eq!(so_n(2).dimension, 1);
+        assert_eq!(so_n(3).dimension, 3);
+        assert_eq!(so_n(4).dimension, 6);
+        assert_eq!(so_n(5).dimension, 10);
+    }
+
+    #[test]
+    fn test_so_n_jacobi_identity() {
+        for n in 2..=5 {
+            assert!(so_n(n).check_jacobi_identity(), "so({}) failed Jacobi", n);
+        }
+    }
+
+    #[test]
+    fn test_so_n_is_semisimple_for_n_geq_3() {
+        // so(2) is abelian (1-dimensional), so(n>=3) is semisimple.
+        assert!(!so_n(2).is_semisimple());
+        assert!(so_n(3).is_semisimple());
+        assert!(so_n(4).is_semisimple());
+    }
+
+    #[test]
+    fn test_so_n_basis_matrices_are_antisymmetric() {
+        let alg = so_n(4);
+        for m in &alg.basis {
+            let n = m.len();
+            for i in 0..n {
+                for j in 0..n {
+                    assert!(
+                        close(m[i][j], -m[j][i], 1e-12),
+                        "so(4) generator not antisymmetric at ({},{})",
+                        i,
+                        j
+                    );
+                }
+            }
+        }
     }
 
     // ─── Exponential map ─────────────────────────────────────────────────────

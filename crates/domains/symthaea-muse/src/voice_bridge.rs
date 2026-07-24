@@ -73,21 +73,19 @@ impl MuseVoiceBridge {
             self.select_phrase(state)
         };
 
-        // Always use Kokoro when available (feature-gated).
-        // The consciousness level drives speed, not engine selection.
-        // (Dual engine crossfade is a future feature.)
-        let engine = symthaea_voice::VoiceEngine::Kokoro;
-
-        // Map consciousness to prosody
-        let prosody = symthaea_voice::VoiceProsody {
+        // Formant synthesis via symthaea-vocal-tract's speech module.
+        // (The old symthaea_voice "Kokoro" engine selection always fell back
+        // to formant in practice — the crate's Kokoro never ran — so this is
+        // behavior-preserving. Kokoro lives in the root crate's
+        // voice::kokoro_engine if a neural voice is ever wanted here.)
+        let prosody = symthaea_vocal_tract::speech::VoiceProsody {
             arousal: state.arousal,
             valence: state.valence,
             consciousness: state.consciousness_level,
             serotonin: state.serotonin,
         };
 
-        // Generate speech with consciousness-selected engine
-        let audio = symthaea_voice::speak_with_engine(phrase, &prosody, self.sample_rate, engine);
+        let audio = symthaea_vocal_tract::speech::speak(phrase, &prosody, self.sample_rate);
 
         // Add to buffer
         self.speech_buffer.extend(audio.iter());

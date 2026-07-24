@@ -210,6 +210,75 @@ impl Period {
         }
     }
 
+    /// Grammar-aware cousin of [`Self::parallel_in`]. Functional harmony
+    /// (or any archetype with no detectable natural close) keeps today's
+    /// forced Half→Authentic (V–I) question/answer shape unchanged. Every
+    /// other declared [`HarmonicSyntax`](crate::grammar::HarmonicSyntax) —
+    /// `BluesChorus`/`JazzTurnaround`/`GroundCycle`/`SongLoop`/
+    /// `SpectralStasis`/`NarrativeLeitmotif`/etc. — is cyclical or
+    /// vamp-based rather than tonal question-and-answer, so when the
+    /// archetype's own final two scale degrees already form a recognizable
+    /// [`Cadence`] (via [`Cadence::detect`]), BOTH halves close on that same
+    /// natural cadence, unmodified, instead of being overwritten with a
+    /// borrowed V–I rhetoric that doesn't belong to the style.
+    pub fn parallel_in_for_grammar(
+        motif: &Motif,
+        progression: &[i32],
+        meter: f64,
+        dominant: i32,
+        harmony: crate::grammar::HarmonicSyntax,
+    ) -> Self {
+        if harmony == crate::grammar::HarmonicSyntax::Functional {
+            return Self::parallel_in(motif, progression, meter, dominant);
+        }
+        let n = progression.len();
+        let natural = (n >= 2)
+            .then(|| Cadence::detect(progression[n - 2], progression[n - 1]))
+            .flatten();
+        match natural {
+            Some(cadence) => Period {
+                antecedent: Phrase::build(motif, progression, cadence, meter),
+                consequent: Phrase::build(motif, progression, cadence, meter),
+            },
+            None => Self::parallel_in(motif, progression, meter, dominant),
+        }
+    }
+
+    /// [`Self::parallel_in_for_grammar`], but each half uses SENTENCE
+    /// structure ([`Phrase::build_sentence`]) — the sentence-flavored
+    /// counterpart of [`Self::parallel_sentence_in`].
+    pub fn parallel_sentence_in_for_grammar(
+        motif: &Motif,
+        progression: &[i32],
+        meter: f64,
+        dominant: i32,
+        harmony: crate::grammar::HarmonicSyntax,
+    ) -> Self {
+        if harmony == crate::grammar::HarmonicSyntax::Functional {
+            return Self::parallel_sentence_in(motif, progression, meter, dominant);
+        }
+        let n = progression.len();
+        let natural = (n >= 2)
+            .then(|| Cadence::detect(progression[n - 2], progression[n - 1]))
+            .flatten();
+        match natural {
+            Some(cadence) => Period {
+                antecedent: Phrase::build_sentence(motif, progression, cadence, meter),
+                consequent: Phrase::build_sentence(motif, progression, cadence, meter),
+            },
+            None => Self::parallel_sentence_in(motif, progression, meter, dominant),
+        }
+    }
+
+    /// Total duration of antecedent plus consequent.
+    ///
+    /// This is exact because both phrase durations are rational. Form planners
+    /// use it to place section boundaries and prospective obligations before
+    /// any audio realization occurs.
+    pub fn total_duration(&self) -> Duration {
+        self.antecedent.total_duration() + self.consequent.total_duration()
+    }
+
     /// The whole period as one line (antecedent then consequent).
     pub fn line(&self) -> Motif {
         self.antecedent.line.then(&self.consequent.line)
@@ -441,6 +510,85 @@ mod tests {
     }
 
     #[test]
+    fn functional_harmony_for_grammar_matches_plain_parallel_in() {
+        // HarmonicSyntax::Functional must be byte-identical to today's
+        // forced-cadence behavior (the no-regression contract for
+        // PeriodSentence-mapped families).
+        let prog = [1, 4, 5, 1];
+        let forced = Period::parallel_in(&germ(), &prog, 4.0, 5);
+        let graded = Period::parallel_in_for_grammar(
+            &germ(),
+            &prog,
+            4.0,
+            5,
+            crate::grammar::HarmonicSyntax::Functional,
+        );
+        assert_eq!(forced, graded);
+    }
+
+    #[test]
+    fn non_functional_syntax_honors_a_detectable_natural_cadence() {
+        // [.., 4, 1] is a real Plagal close (Cadence::detect(4, 1) ==
+        // Plagal) — a non-Functional family must NOT overwrite it with a
+        // forced V-I Authentic close the way `parallel_in` would.
+        let prog = [1, 6, 4, 1];
+        let period = Period::parallel_in_for_grammar(
+            &germ(),
+            &prog,
+            4.0,
+            5,
+            crate::grammar::HarmonicSyntax::BluesChorus,
+        );
+        assert_eq!(period.antecedent.progression, prog);
+        assert_eq!(period.consequent.progression, prog);
+        assert_eq!(period.antecedent.cadence, Cadence::Plagal);
+        assert_eq!(period.consequent.cadence, Cadence::Plagal);
+        // Contrast: the same progression under Functional harmony still
+        // gets forced to V-I.
+        let forced = Period::parallel_in_for_grammar(
+            &germ(),
+            &prog,
+            4.0,
+            5,
+            crate::grammar::HarmonicSyntax::Functional,
+        );
+        assert_eq!(forced.consequent.cadence, Cadence::Authentic);
+        assert_ne!(forced.consequent.progression, prog);
+    }
+
+    #[test]
+    fn non_functional_syntax_falls_back_when_no_cadence_is_detectable() {
+        // [.., 3, 2] forms no recognized cadence (Cadence::detect(3, 2) ==
+        // None) — the honest fallback keeps today's forced V-I close rather
+        // than inventing new "no cadence" semantics.
+        let prog = [1, 6, 3, 2];
+        assert_eq!(Cadence::detect(3, 2), None);
+        let period = Period::parallel_in_for_grammar(
+            &germ(),
+            &prog,
+            4.0,
+            5,
+            crate::grammar::HarmonicSyntax::BluesChorus,
+        );
+        let forced = Period::parallel_in(&germ(), &prog, 4.0, 5);
+        assert_eq!(period, forced);
+    }
+
+    #[test]
+    fn sentence_variant_of_grammar_aware_cadence_matches_period_semantics() {
+        let prog = [1, 6, 4, 1];
+        let sentence = Period::parallel_sentence_in_for_grammar(
+            &germ(),
+            &prog,
+            4.0,
+            5,
+            crate::grammar::HarmonicSyntax::JazzTurnaround,
+        );
+        assert_eq!(sentence.antecedent.cadence, Cadence::Plagal);
+        assert_eq!(sentence.antecedent.progression, prog);
+    }
+
+    #[test]
     fn parallel_period_is_question_then_answer() {
         let period = Period::parallel(&germ(), &[1, 4, 5, 1], 4.0);
 
@@ -615,5 +763,40 @@ mod tests {
         let realized = phrase.render(key, 4);
         assert_eq!(realized.len(), phrase.line.len());
         assert!(realized.iter().all(|(p, _)| p.is_some())); // no rests in this germ
+    }
+
+    #[test]
+    fn clip14_chord_tone_snapping_hypothesis() {
+        // Real-clip diagnostic (2026-07-24): confirms by direct code call
+        // (not hand math) that clip 14's minor-second cluster comes from
+        // nearest_chord_tone snapping a strong-beat degree DOWN to the
+        // tonic, landing it a semitone from the immediately-following
+        // unsnapped weak-beat degree. chord_root=1 (March's progression's
+        // first chord); raw hook degrees were [2, 0, -2, -5], onsets
+        // [0.0, 1.0, 1.5, 2.0] in a 4/4 bar -- onsets 0.0 and 2.0 are
+        // strong beats (is_strong_beat), 1.0/1.5 are weak and stay raw.
+        assert_eq!(
+            nearest_chord_tone(2, 1),
+            1,
+            "strong-beat degree 2 snaps to the tonic"
+        );
+        assert_eq!(
+            nearest_chord_tone(-5, 1),
+            -6,
+            "strong-beat degree -5 snaps to the tonic an octave down"
+        );
+        // Post-snap sequence: [1 (snapped), 0 (raw), -2 (raw), -6 (snapped)].
+        // The first interval (1 -> 0) is a genuine minor second in
+        // HarmonicMinor -- confirmed via the crate's own real Scale
+        // accessor, not a hand-rolled offset table.
+        let key = Key::minor(PitchClass::C).scale(); // Tonality::Minor -> HarmonicMinor
+        let p1 = key.degree_pitch(1, 4);
+        let p0 = key.degree_pitch(0, 4);
+        let interval = p0.midi() as i32 - p1.midi() as i32;
+        assert_eq!(
+            interval, -1,
+            "snapped degree 1 -> raw degree 0 is a real minor second in HarmonicMinor, \
+             confirming the chord-tone-snapping hypothesis"
+        );
     }
 }

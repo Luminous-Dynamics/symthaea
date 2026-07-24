@@ -188,8 +188,9 @@ pub struct PartnershipState {
 
 /// Serializable state for pause/resume persistence.
 ///
-/// Only stores relational state (partnership, trajectory) and configuration.
-/// The mind and language cores are ephemeral and rebuilt on resume.
+/// Stores relational state (partnership, trajectory), the user-state-inference
+/// snapshot, and configuration. The mind and language cores are ephemeral and
+/// rebuilt on resume.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct PersistedState {
     pub(super) hdc_dim: usize,
@@ -201,4 +202,9 @@ pub(super) struct PersistedState {
     /// Path to the consciousness database (if configured).
     #[serde(default)]
     pub(super) database_path: Option<String>,
+    /// Snapshot of Phase 6.5's text/behavior-driven user-state inference
+    /// (frustration, cognitive load, experience, engagement). `None` for
+    /// state files written before this field existed.
+    #[serde(default)]
+    pub(super) user_state: Option<crate::user_state_inference::UserState>,
 }

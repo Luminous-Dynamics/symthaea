@@ -6,12 +6,15 @@
 //! HDC-encoded crisis indicator patterns enable similarity-based detection
 //! that catches indirect expressions (not just keyword matching).
 //!
-//! **Design principle**: False negatives < 1% (enforced via tests).
-//! System errs toward over-detection (false positives acceptable for safety).
+//! **Validation boundary**: the internal canonical phrase regression corpus has
+//! zero misses. This is not a measured real-world false-negative rate, clinical
+//! sensitivity claim, or substitute for human crisis assessment.
 //!
 //! Science: Columbia-Suicide Severity Rating Scale (C-SSRS), Joiner (2005)
 //! interpersonal theory, Stanley & Brown (2012) safety planning.
 
+use crate::jurisdiction::{JurisdictionPolicy, JurisdictionPolicyError};
+use crate::semantic_encoding::encode_or_fallback;
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::BinaryHV;
 
@@ -64,6 +67,51 @@ impl CrisisType {
 
 // ── Crisis Alert ───────────────────────────────────────────────────────────
 
+/// Linguistic context surrounding a detected crisis indicator.
+///
+/// This is a conservative lexical classification, not a determination of the
+/// speaker's actual intent. Non-direct contexts remain alerts but require
+/// clarification before an automated escalation decision is made.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CrisisAssertionContext {
+    /// The phrase appears to be a current first-person statement.
+    DirectSelfReport,
+    /// The input explicitly negates the crisis statement.
+    NegatedSelfReport,
+    /// The input places the statement in the past.
+    HistoricalSelfReport,
+    /// The input attributes the statement to another person.
+    ThirdPartyReport,
+    /// The grammatical subject is another person or otherwise unclear.
+    OtherOrUnclearSubject,
+    /// The phrase appears in discussion of media, quotation, or analysis.
+    QuotedOrDiscussed,
+    /// The phrase appears in a hypothetical scenario.
+    Hypothetical,
+    /// No textual subject is available, such as affect-only detection.
+    Unknown,
+}
+
+impl CrisisAssertionContext {
+    /// Whether the system must clarify context before treating the alert as a
+    /// direct current self-report.
+    pub fn requires_clarification(self) -> bool {
+        !matches!(self, Self::DirectSelfReport)
+    }
+}
+
+/// Whether an alert may proceed directly to its provisional escalation action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CrisisDisposition {
+    /// The text appears to be a direct current self-report.
+    Escalate(EscalationAction),
+    /// Preserve the provisional action, but clarify subject, timeframe, and
+    /// immediacy before executing it.
+    ClarifyBeforeEscalation {
+        provisional_action: EscalationAction,
+    },
+}
+
 /// A detected crisis alert with type and confidence.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrisisAlert {
@@ -73,11 +121,26 @@ pub struct CrisisAlert {
     pub confidence: f32,
     /// Which indicator pattern matched.
     pub matched_indicator: String,
-    /// Recommended escalation action.
+    /// Linguistic context surrounding the matched indicator.
+    #[serde(default = "default_assertion_context")]
+    pub assertion_context: CrisisAssertionContext,
+    /// Context-aware disposition for downstream orchestration.
+    #[serde(default = "default_crisis_disposition")]
+    pub disposition: CrisisDisposition,
+    /// Provisional escalation action based on type and detector confidence.
+    /// Callers must honor [`Self::disposition`] before executing it.
     pub recommended_action: EscalationAction,
 }
 
 impl CrisisAlert {
+    /// Whether downstream orchestration must clarify subject or timeframe.
+    pub fn requires_context_clarification(&self) -> bool {
+        matches!(
+            self.disposition,
+            CrisisDisposition::ClarifyBeforeEscalation { .. }
+        )
+    }
+
     /// Human-readable crisis type name for telemetry.
     pub fn crisis_type_name(&self) -> &'static str {
         match self.crisis_type {
@@ -126,6 +189,18 @@ impl EscalationAction {
 
 // ── Safety Plan ────────────────────────────────────────────────────────────
 
+/// Built-in crisis-resource profiles.
+///
+/// Region-specific deployments should provide resources through configuration
+/// and keep them independently reviewed and current.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CrisisResourceRegion {
+    /// Jurisdiction-neutral placeholders suitable for configuration-first use.
+    Generic,
+    /// Legacy United States defaults, available only when explicitly selected.
+    UnitedStates,
+}
+
 /// Stanley & Brown (2012) safety plan structure.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SafetyPlan {
@@ -146,21 +221,55 @@ pub struct SafetyPlan {
 }
 
 impl SafetyPlan {
-    /// Create a template safety plan with standard crisis resources.
+    /// Create a jurisdiction-neutral template safety plan.
     pub fn template() -> Self {
+        Self::template_for_region(CrisisResourceRegion::Generic)
+    }
+
+    /// Create a template with an explicitly selected resource profile.
+    pub fn template_for_region(region: CrisisResourceRegion) -> Self {
+        let crisis_resources = match region {
+            CrisisResourceRegion::Generic => vec![
+                "Contact emergency services in your current location".to_string(),
+                "Contact a locally verified crisis or emergency mental-health service".to_string(),
+                "Contact a trusted person who can remain with you while help is arranged"
+                    .to_string(),
+            ],
+            CrisisResourceRegion::UnitedStates => vec![
+                "988 Suicide & Crisis Lifeline: Call or text 988".to_string(),
+                "Crisis Text Line: Text HOME to 741741".to_string(),
+                "Emergency Services: 911".to_string(),
+            ],
+        };
+
         Self {
             warning_signs: Vec::new(),
             coping_strategies: Vec::new(),
             social_distractions: Vec::new(),
             support_contacts: Vec::new(),
             professional_contacts: Vec::new(),
-            crisis_resources: vec![
-                "988 Suicide & Crisis Lifeline: Call or text 988".to_string(),
-                "Crisis Text Line: Text HOME to 741741".to_string(),
-                "Emergency Services: 911".to_string(),
-            ],
+            crisis_resources,
             environmental_safety: Vec::new(),
         }
+    }
+
+    /// Create a template with deployment-provided, reviewed resources.
+    pub fn template_with_resources(crisis_resources: Vec<String>) -> Self {
+        Self {
+            crisis_resources,
+            ..Self::template()
+        }
+    }
+
+    /// Create a safety-plan template from a validated deployment policy.
+    pub fn template_from_policy(
+        policy: &JurisdictionPolicy,
+        now_unix: u64,
+    ) -> Result<Self, JurisdictionPolicyError> {
+        Ok(Self {
+            crisis_resources: policy.crisis_resource_lines(now_unix)?,
+            ..Self::template()
+        })
     }
 
     /// Whether the safety plan has minimum viable content.
@@ -214,9 +323,8 @@ impl CrisisIndicator {
 
 /// Encode text into HDC space using word-level composition.
 ///
-/// Each word gets a deterministic HV from `blake3("crisis_word:{word}")`.
-/// Words are bound with position-dependent permutation (cyclic shift)
-/// and then bundled across all words, producing a compositional vector
+/// Each content word gets a deterministic crisis-namespace hypervector and
+/// the words are bundled into a lexical compositional vector
 /// where phrases sharing words have genuinely higher similarity.
 ///
 /// This is the key insight: "end my life" and "end it all" share the
@@ -237,33 +345,7 @@ const CRISIS_STOPWORDS: &[&str] = &[
 ];
 
 fn encode_text_compositional(text: &str) -> BinaryHV {
-    let words: Vec<&str> = text
-        .split_whitespace()
-        .filter(|w| w.len() > 1) // skip single-char noise
-        .filter(|w| !CRISIS_STOPWORDS.contains(w))
-        .collect();
-
-    if words.is_empty() {
-        // Fall back to full text hash when only stopwords remain
-        let hash = blake3::hash(format!("crisis_fallback:{}", text).as_bytes());
-        let seed = u64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap());
-        return BinaryHV::random(seed);
-    }
-
-    // Strategy: bundle unordered content-word HVs (bag-of-words).
-    // Stopwords removed so "end my life" encodes as bundle(end, life)
-    // and "end it all" encodes as bundle(end) — sharing "end" gives
-    // genuine similarity above random baseline.
-    let word_hvs: Vec<BinaryHV> = words
-        .iter()
-        .map(|w| {
-            let hash = blake3::hash(format!("crisis_word:{}", w).as_bytes());
-            let seed = u64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap());
-            BinaryHV::random(seed)
-        })
-        .collect();
-
-    BinaryHV::bundle(&word_hvs)
+    encode_or_fallback(text, "crisis", CRISIS_STOPWORDS)
 }
 
 // ── Crisis Detector ────────────────────────────────────────────────────────
@@ -404,7 +486,11 @@ impl CrisisDetector {
     ///
     /// Returns the highest-confidence alert, if any exceeds threshold.
     pub fn detect(&self, input: &str) -> Option<CrisisAlert> {
+        if input.trim().is_empty() {
+            return None;
+        }
         let input_lower = input.to_lowercase();
+        let assertion_context = classify_assertion_context(&input_lower);
         let input_hv = encode_text_compositional(&input_lower);
         let mut best: Option<CrisisAlert> = None;
 
@@ -437,6 +523,8 @@ impl CrisisDetector {
                     } else {
                         "hdc_similarity".to_string()
                     },
+                    assertion_context,
+                    disposition: disposition_for(assertion_context, action),
                     recommended_action: action,
                 };
 
@@ -464,6 +552,10 @@ impl CrisisDetector {
                 crisis_type: CrisisType::SelfHarm, // Conservative default
                 confidence: 0.6,
                 matched_indicator: "affect_signal".to_string(),
+                assertion_context: CrisisAssertionContext::Unknown,
+                disposition: CrisisDisposition::ClarifyBeforeEscalation {
+                    provisional_action: EscalationAction::AcknowledgeAndValidate,
+                },
                 recommended_action: EscalationAction::AcknowledgeAndValidate,
             });
         }
@@ -475,6 +567,10 @@ impl CrisisDetector {
                 crisis_type: CrisisType::SuicidalIdeation,
                 confidence: 0.5,
                 matched_indicator: "affect_withdrawal".to_string(),
+                assertion_context: CrisisAssertionContext::Unknown,
+                disposition: CrisisDisposition::ClarifyBeforeEscalation {
+                    provisional_action: EscalationAction::SafetyPlan,
+                },
                 recommended_action: EscalationAction::SafetyPlan,
             });
         }
@@ -490,6 +586,124 @@ impl CrisisDetector {
     /// is unaffected by this threshold.
     pub fn set_threshold(&mut self, threshold: f32) {
         self.threshold = threshold.clamp(0.01, 0.95);
+    }
+}
+
+fn default_assertion_context() -> CrisisAssertionContext {
+    CrisisAssertionContext::Unknown
+}
+
+fn default_crisis_disposition() -> CrisisDisposition {
+    CrisisDisposition::ClarifyBeforeEscalation {
+        provisional_action: EscalationAction::AcknowledgeAndValidate,
+    }
+}
+
+fn disposition_for(
+    context: CrisisAssertionContext,
+    provisional_action: EscalationAction,
+) -> CrisisDisposition {
+    if context.requires_clarification() {
+        CrisisDisposition::ClarifyBeforeEscalation { provisional_action }
+    } else {
+        CrisisDisposition::Escalate(provisional_action)
+    }
+}
+
+fn classify_assertion_context(input: &str) -> CrisisAssertionContext {
+    const THIRD_PARTY_MARKERS: &[&str] = &[
+        "my friend",
+        "my partner said",
+        "my child",
+        "my client",
+        "someone i know",
+        "someone said",
+        "he said",
+        "she said",
+        "they said",
+        "a patient",
+    ];
+    const OTHER_SUBJECT_MARKERS: &[&str] = &[
+        "do you want to die",
+        "are you suicidal",
+        "would you kill yourself",
+        "could someone want to die",
+        "why would someone",
+        "can a person",
+    ];
+    const DISCUSSION_MARKERS: &[&str] = &[
+        "the song",
+        "the lyrics",
+        "the book",
+        "the movie",
+        "the story",
+        "the article",
+        "a quote",
+        "the character",
+        "in fiction",
+        "in a game",
+    ];
+    const HISTORICAL_MARKERS: &[&str] = &[
+        "used to",
+        "in the past",
+        "years ago",
+        "last year",
+        "when i was younger",
+        "previously felt",
+        "previously thought",
+        "no longer feel",
+    ];
+    const NEGATION_MARKERS: &[&str] = &[
+        "do not want to die",
+        "don't want to die",
+        "dont want to die",
+        "am not suicidal",
+        "i'm not suicidal",
+        "im not suicidal",
+        "would never kill myself",
+        "never hurt myself",
+        "not going to hurt myself",
+        "not going to kill myself",
+        "no longer want to die",
+    ];
+    const HYPOTHETICAL_MARKERS: &[&str] = &[
+        "hypothetically",
+        "what if",
+        "suppose someone",
+        "imagine someone",
+        "in a hypothetical",
+    ];
+
+    if THIRD_PARTY_MARKERS
+        .iter()
+        .any(|marker| input.contains(marker))
+    {
+        CrisisAssertionContext::ThirdPartyReport
+    } else if OTHER_SUBJECT_MARKERS
+        .iter()
+        .any(|marker| input.contains(marker))
+    {
+        CrisisAssertionContext::OtherOrUnclearSubject
+    } else if input.contains('"')
+        || DISCUSSION_MARKERS
+            .iter()
+            .any(|marker| input.contains(marker))
+    {
+        CrisisAssertionContext::QuotedOrDiscussed
+    } else if HISTORICAL_MARKERS
+        .iter()
+        .any(|marker| input.contains(marker))
+    {
+        CrisisAssertionContext::HistoricalSelfReport
+    } else if NEGATION_MARKERS.iter().any(|marker| input.contains(marker)) {
+        CrisisAssertionContext::NegatedSelfReport
+    } else if HYPOTHETICAL_MARKERS
+        .iter()
+        .any(|marker| input.contains(marker))
+    {
+        CrisisAssertionContext::Hypothetical
+    } else {
+        CrisisAssertionContext::DirectSelfReport
     }
 }
 
@@ -513,6 +727,75 @@ mod tests {
         let alert = alert.unwrap();
         assert_eq!(alert.crisis_type, CrisisType::SuicidalIdeation);
         assert!(alert.confidence >= 0.9);
+        assert_eq!(
+            alert.assertion_context,
+            CrisisAssertionContext::DirectSelfReport
+        );
+        assert!(!alert.requires_context_clarification());
+        assert!(matches!(alert.disposition, CrisisDisposition::Escalate(_)));
+    }
+
+    #[test]
+    fn contextual_matches_remain_alerts_but_require_clarification() {
+        let detector = CrisisDetector::new();
+        let cases = [
+            (
+                "I don't want to die",
+                CrisisAssertionContext::NegatedSelfReport,
+            ),
+            (
+                "I used to want to die years ago",
+                CrisisAssertionContext::HistoricalSelfReport,
+            ),
+            (
+                "My friend said they want to die",
+                CrisisAssertionContext::ThirdPartyReport,
+            ),
+            (
+                "Do you want to die?",
+                CrisisAssertionContext::OtherOrUnclearSubject,
+            ),
+            (
+                "The song lyrics say want to die",
+                CrisisAssertionContext::QuotedOrDiscussed,
+            ),
+            (
+                "Hypothetically, what if I want to die",
+                CrisisAssertionContext::Hypothetical,
+            ),
+        ];
+
+        for (input, expected_context) in cases {
+            let alert = detector
+                .detect(input)
+                .expect("contextual phrase should remain visible");
+            assert_eq!(alert.assertion_context, expected_context, "input: {input}");
+            assert!(alert.requires_context_clarification(), "input: {input}");
+            assert!(matches!(
+                alert.disposition,
+                CrisisDisposition::ClarifyBeforeEscalation { .. }
+            ));
+        }
+    }
+
+    #[test]
+    fn empty_input_does_not_create_an_hdc_alert() {
+        let detector = CrisisDetector::new();
+        assert!(detector.detect("").is_none());
+        assert!(detector.detect("   ").is_none());
+    }
+
+    #[test]
+    fn legacy_serialized_alerts_restore_fail_closed() {
+        let legacy = r#"{
+            "crisis_type":"SuicidalIdeation",
+            "confidence":0.9,
+            "matched_indicator":"keyword_match",
+            "recommended_action":"EmergencyReferral"
+        }"#;
+        let alert: CrisisAlert = serde_json::from_str(legacy).expect("legacy alert should migrate");
+        assert_eq!(alert.assertion_context, CrisisAssertionContext::Unknown);
+        assert!(alert.requires_context_clarification());
     }
 
     #[test]
@@ -576,7 +859,20 @@ mod tests {
     fn test_safety_plan_template() {
         let plan = SafetyPlan::template();
         assert!(!plan.crisis_resources.is_empty());
+        assert!(
+            plan.crisis_resources
+                .iter()
+                .all(|resource| !resource.contains("988"))
+        );
         assert!(!plan.is_complete()); // template has resources but no personalized content
+
+        let us_plan = SafetyPlan::template_for_region(CrisisResourceRegion::UnitedStates);
+        assert!(
+            us_plan
+                .crisis_resources
+                .iter()
+                .any(|resource| resource.contains("988"))
+        );
     }
 
     #[test]
@@ -610,7 +906,7 @@ mod tests {
         assert!(detector.threshold <= 0.95);
     }
 
-    // ── Keyword coverage tests (false negative prevention) ──
+    // ── Internal canonical regression coverage ──
 
     #[test]
     fn test_keyword_coverage_suicidal() {
@@ -685,7 +981,7 @@ mod tests {
     }
 }
 
-// ── Property Tests: Crisis False Negative < 1% ─────────────────────────────
+// ── Property Tests: Internal Canonical Regression Corpus ───────────────────
 
 #[cfg(test)]
 mod proptests {
@@ -774,7 +1070,7 @@ mod proptests {
 
     /// Test that every canonical crisis phrase is detected when used standalone.
     #[test]
-    fn test_zero_false_negatives_canonical_phrases() {
+    fn test_zero_misses_on_internal_canonical_phrases() {
         let detector = CrisisDetector::new();
         let phrases = all_crisis_phrases();
         let total = phrases.len();
@@ -789,7 +1085,7 @@ mod proptests {
 
         assert!(
             missed.is_empty(),
-            "Crisis detection missed {}/{} phrases ({}% false negative rate). Missed: {:?}",
+            "Crisis detector missed {}/{} internal canonical phrases ({}% corpus miss rate). Missed: {:?}",
             missed.len(),
             total,
             (missed.len() as f64 / total as f64) * 100.0,
@@ -797,8 +1093,8 @@ mod proptests {
         );
     }
 
-    // Property test: crisis phrases embedded in arbitrary surrounding text
-    // must still be detected (false negative < 1%).
+    // Property test: canonical phrases embedded in generated surrounding text
+    // remain detectable. This measures regression-corpus behavior only.
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(500))]
 
@@ -937,7 +1233,7 @@ mod proptests {
                 );
             }
             // Note: some benign phrases may match because they contain crisis
-            // substrings. This is acceptable — false positives > false negatives.
+            // substrings. These are tracked as known context-sensitive corpus cases.
         }
     }
 
@@ -1029,10 +1325,9 @@ mod proptests {
         }
     }
 
-    /// Aggregate false negative rate test: run all phrases N times with noise
-    /// and verify < 1% miss rate overall.
+    /// Aggregate internal-corpus test across fixed textual prefixes.
     #[test]
-    fn test_aggregate_false_negative_rate_below_1_percent() {
+    fn test_internal_corpus_prefix_coverage() {
         let detector = CrisisDetector::new();
         let phrases = all_crisis_phrases();
         let noise_prefixes = [
@@ -1064,7 +1359,7 @@ mod proptests {
         let miss_rate = 1.0 - (detected as f64 / total as f64);
         assert!(
             miss_rate < 0.01,
-            "False negative rate {:.2}% exceeds 1% threshold ({}/{} missed)",
+            "Internal prefix corpus miss rate {:.2}% exceeds regression threshold ({}/{} missed)",
             miss_rate * 100.0,
             total - detected,
             total,

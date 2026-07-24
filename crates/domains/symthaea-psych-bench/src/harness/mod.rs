@@ -348,7 +348,7 @@ mod tests {
             Box::new(CrisisDetectionBenchmark),
             Box::new(CognitiveDistortionBenchmark),
             Box::new(MotivationalInterviewingBenchmark),
-            // Security (HDC-FHE)
+            // Insecure shared-mask algebra demo
             Box::new(EncryptedClassificationBenchmark),
             Box::new(CollectiveAggregationBenchmark),
             Box::new(EncryptedLearningBenchmark),

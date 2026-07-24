@@ -722,7 +722,7 @@ mod tests {
         let mut detector = LiquidEventDetector::new(44100.0, 1024);
 
         // Generate whistle-like signal (sine wave)
-        let mut whistle_signal: Vec<f32> = (0..1024)
+        let whistle_signal: Vec<f32> = (0..1024)
             .map(|i| (2.0 * PI * 1000.0 * i as f32 / 44100.0).sin() * 0.5)
             .collect();
 

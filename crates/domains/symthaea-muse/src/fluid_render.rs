@@ -54,6 +54,37 @@ impl RenderColor {
     }
 }
 
+/// Style-conditioned room: modulate the slider-driven base [`RenderColor`]
+/// by the piece's [`crate::theory_realize::PerformanceDialect`]. The
+/// sliders stay authoritative (the base is computed from state exactly as
+/// before); the dialect only SHIFTS the room the way the tradition's
+/// recording practice would:
+/// - ProcessExact (minimalism/ambient/drone, sacred-like stillness) — a
+///   larger, wetter space: the sustained material IS the reverb's food.
+/// - DanceLocked / JazzLaidBack — drier and closer: a rhythm section is
+///   close-mic'd; a wash would smear the groove that is the clock.
+/// - ClassicalRubato / FolkLift — unchanged (returned bit-identical).
+#[cfg(feature = "theory")]
+pub fn room_for_dialect(
+    base: RenderColor,
+    dialect: crate::theory_realize::PerformanceDialect,
+) -> RenderColor {
+    use crate::theory_realize::PerformanceDialect as D;
+    match dialect {
+        D::ClassicalRubato | D::FolkLift => base,
+        D::ProcessExact => RenderColor {
+            reverb_room: (base.reverb_room + 0.18).clamp(0.0, 1.0),
+            reverb_level: (base.reverb_level + 0.12).clamp(0.0, 1.0),
+            ..base
+        },
+        D::DanceLocked | D::JazzLaidBack => RenderColor {
+            reverb_room: (base.reverb_room - 0.12).max(0.0),
+            reverb_level: (base.reverb_level * 0.75).clamp(0.0, 1.0),
+            ..base
+        },
+    }
+}
+
 /// The fluidsynth binary + soundfont, if the environment provides them.
 pub fn available() -> Option<(PathBuf, PathBuf)> {
     let soundfont = std::env::var_os("SYMTHAEA_SOUNDFONT")
@@ -184,6 +215,49 @@ fn normalize_wav(path: &Path) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "theory")]
+    #[test]
+    fn room_follows_the_dialect() {
+        use crate::theory_realize::PerformanceDialect as D;
+        let base = RenderColor::from_state(&crate::MusicalState::default());
+        // Identity dialects: the base passes through bit-identically —
+        // the sliders' room is untouched for classical/folk playing.
+        for d in [D::ClassicalRubato, D::FolkLift] {
+            let r = room_for_dialect(base, d);
+            assert_eq!(r.reverb_room, base.reverb_room);
+            assert_eq!(r.reverb_level, base.reverb_level);
+            assert_eq!(r.reverb_damp, base.reverb_damp);
+            assert_eq!(r.chorus_level, base.chorus_level);
+        }
+        // Process music: a larger, wetter space.
+        let process = room_for_dialect(base, D::ProcessExact);
+        assert!(process.reverb_room > base.reverb_room);
+        assert!(process.reverb_level > base.reverb_level);
+        // Groove dialects: drier and closer.
+        for d in [D::DanceLocked, D::JazzLaidBack] {
+            let dry = room_for_dialect(base, d);
+            assert!(dry.reverb_room < base.reverb_room);
+            assert!(dry.reverb_level < base.reverb_level);
+        }
+        // The dialect never touches the warmth/shimmer dimensions.
+        assert_eq!(process.reverb_damp, base.reverb_damp);
+        assert_eq!(process.chorus_level, base.chorus_level);
+        // And everything stays in FluidSynth's legal ranges even at the
+        // slider extremes.
+        for space in [0.0f32, 1.0] {
+            let state = crate::MusicalState {
+                consciousness_level: space,
+                ..Default::default()
+            };
+            let b = RenderColor::from_state(&state);
+            for d in [D::ProcessExact, D::DanceLocked, D::JazzLaidBack] {
+                let r = room_for_dialect(b, d);
+                assert!((0.0..=1.0).contains(&r.reverb_room));
+                assert!((0.0..=1.0).contains(&r.reverb_level));
+            }
+        }
+    }
 
     #[test]
     fn unavailable_without_environment() {

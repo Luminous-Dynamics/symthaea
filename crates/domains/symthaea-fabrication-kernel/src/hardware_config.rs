@@ -9,8 +9,30 @@
 //! environment variables, JSON, or constructed programmatically.
 
 use crate::cincinnati_live::CincinnatiMonitorConfig;
-use crate::printer_control::{MockPrinter, MoonrakerClient, OctoPrintClient, PrinterApi};
+use crate::printer_control::{MockPrinter, PrinterApi};
 use serde::{Deserialize, Serialize};
+use std::fmt;
+
+/// Configuration-time failures that prevent construction of a trustworthy
+/// printer backend.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HardwareConfigError {
+    /// The selected backend is represented in configuration but has no live
+    /// transport implementation in this crate snapshot.
+    LiveBackendUnavailable(&'static str),
+}
+
+impl fmt::Display for HardwareConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LiveBackendUnavailable(name) => {
+                write!(f, "live printer backend unavailable: {name}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for HardwareConfigError {}
 
 // ---------------------------------------------------------------------------
 // Printer backend
@@ -215,25 +237,25 @@ impl HardwareConfig {
         }
     }
 
-    /// Factory method: create a boxed [`PrinterApi`] from the current config.
+    /// Construct a printer backend from the current configuration.
     ///
-    /// In simulation mode, always returns a [`MockPrinter`] regardless of the
-    /// configured backend.
-    pub fn create_printer(&self) -> Box<dyn PrinterApi> {
-        if self.simulation_mode {
-            return Box::new(MockPrinter::new());
+    /// Simulation and explicit mock configurations are operational. Live
+    /// backends fail at configuration time until their authenticated transports
+    /// exist; they are never allowed to masquerade as connected devices.
+    pub fn create_printer(&self) -> Result<Box<dyn PrinterApi>, HardwareConfigError> {
+        if self.simulation_mode || matches!(&self.printer.backend, PrinterBackend::Mock) {
+            return Ok(Box::new(MockPrinter::new()));
         }
         match &self.printer.backend {
-            PrinterBackend::Mock => Box::new(MockPrinter::new()),
-            PrinterBackend::OctoPrint { url } => {
-                let key = self.printer.api_key.as_deref().unwrap_or("");
-                Box::new(OctoPrintClient::new(url.as_str(), key))
+            PrinterBackend::Mock => Ok(Box::new(MockPrinter::new())),
+            PrinterBackend::OctoPrint { .. } => {
+                Err(HardwareConfigError::LiveBackendUnavailable("OctoPrint"))
             }
-            PrinterBackend::Moonraker { url } => Box::new(MoonrakerClient::new(url.as_str())),
-            PrinterBackend::Custom { url } => {
-                // Custom backends fall back to OctoPrint protocol for now.
-                let key = self.printer.api_key.as_deref().unwrap_or("");
-                Box::new(OctoPrintClient::new(url.as_str(), key))
+            PrinterBackend::Moonraker { .. } => {
+                Err(HardwareConfigError::LiveBackendUnavailable("Moonraker"))
+            }
+            PrinterBackend::Custom { .. } => {
+                Err(HardwareConfigError::LiveBackendUnavailable("Custom HTTP"))
             }
         }
     }
@@ -357,7 +379,7 @@ mod tests {
     #[test]
     fn create_printer_mock() {
         let config = HardwareConfig::default();
-        let printer = config.create_printer();
+        let printer = config.create_printer().unwrap();
         assert_eq!(printer.name(), "MockPrinter");
     }
 
@@ -373,8 +395,14 @@ mod tests {
             simulation_mode: false,
             ..Default::default()
         };
-        let printer = config.create_printer();
-        assert_eq!(printer.name(), "OctoPrint");
+        let err = match config.create_printer() {
+            Ok(_) => panic!("live OctoPrint config must fail closed"),
+            Err(err) => err,
+        };
+        assert_eq!(
+            err,
+            HardwareConfigError::LiveBackendUnavailable("OctoPrint")
+        );
     }
 
     #[test]
@@ -499,7 +527,7 @@ mod tests {
             ..Default::default()
         };
         // Even with Moonraker configured, simulation mode returns MockPrinter.
-        let printer = config.create_printer();
+        let printer = config.create_printer().unwrap();
         assert_eq!(printer.name(), "MockPrinter");
     }
 }

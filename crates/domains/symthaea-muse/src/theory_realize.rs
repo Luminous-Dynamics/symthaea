@@ -28,6 +28,153 @@ use crate::{AudioData, Composition, MuseConfig, MusicalState, Note};
 use symthaea_music_theory::score::{Emphasis, VoiceRole as TheoryRole};
 use symthaea_music_theory::{MusicalIntent, Score as TheoryScore, Style};
 
+/// Per-style-family PERFORMANCE INTERPRETATION — how a tradition's player
+/// treats the clock, not what notes they play. Until this existed, ONE
+/// classical-piano-derived performer interpreted every tradition: the same
+/// rubato constants, the same humanize jitter, the same MAESTRO piano
+/// expressive blend for a tango, a drone piece, and a nocturne alike.
+///
+/// v1 is deliberately a CONSTANTS TABLE, not a new model and not a spec
+/// field: each variant is a set of scale factors applied to the existing
+/// performance machinery ([`Rubato::from_score`]'s structural pauses,
+/// [`crate::performance::humanize_score_note`]'s timing SD, and
+/// [`apply_expressive_model`]'s blend). [`PerformanceDialect::ClassicalRubato`]
+/// is the identity — every factor exactly 1.0 — so any render that derives
+/// it is bit-identical to the pre-dialect behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PerformanceDialect {
+    /// The historical behavior, exactly: full structural rubato, the
+    /// standard Φ-scaled jitter, the full 0.7 MAESTRO expressive blend.
+    /// All scale factors are 1.0 — the identity dialect.
+    #[default]
+    ClassicalRubato,
+    /// Groove styles (tango, son montuno, flamenco, backbeat pop): the
+    /// GROOVE is the clock. Structural rubato scaled way down (0.25x),
+    /// timing jitter tightened (0.6x), expressive-model shaping reduced
+    /// (0.4x) — a dance band does not breathe between phrases, it locks.
+    DanceLocked,
+    /// Process music (minimalism, ambient, drone): the piece is a process,
+    /// not an utterance. Rubato nearly eliminated (0.1x), jitter tightened
+    /// (0.4x), and NO expressive-model accent shaping at all (0.0x) — a
+    /// pulse that leaned into climaxes would stop being a pulse.
+    ProcessExact,
+    /// Folk/celtic/irish session playing: the breath between phrases is
+    /// kept (breath/climax 1.0x) but the big cadential ritardando is
+    /// reduced (0.6x — a reel drives through its cadences), and jitter is
+    /// slightly LOOSER (1.2x): session looseness, not concert precision.
+    FolkLift,
+    /// Blues/jazz: laid-back time. Jitter up (1.3x), phrase-final rubato
+    /// and the expressive blend both kept — a jazz ballad leans harder
+    /// into time than a classical player, never less.
+    JazzLaidBack,
+}
+
+impl PerformanceDialect {
+    /// Scale on the phrase-start breath (base 0.10 beats of held time).
+    pub(crate) fn breath_scale(self) -> f64 {
+        match self {
+            PerformanceDialect::ClassicalRubato
+            | PerformanceDialect::FolkLift
+            | PerformanceDialect::JazzLaidBack => 1.0,
+            PerformanceDialect::DanceLocked => 0.25,
+            PerformanceDialect::ProcessExact => 0.1,
+        }
+    }
+
+    /// Scale on the climax agogic dwell (base 0.18 beats).
+    pub(crate) fn climax_scale(self) -> f64 {
+        match self {
+            PerformanceDialect::ClassicalRubato
+            | PerformanceDialect::FolkLift
+            | PerformanceDialect::JazzLaidBack => 1.0,
+            PerformanceDialect::DanceLocked => 0.25,
+            PerformanceDialect::ProcessExact => 0.1,
+        }
+    }
+
+    /// Scale on the cadential ritardando (base 0.35 interior / 0.9 final).
+    pub(crate) fn cadence_scale(self) -> f64 {
+        match self {
+            PerformanceDialect::ClassicalRubato | PerformanceDialect::JazzLaidBack => 1.0,
+            PerformanceDialect::FolkLift => 0.6,
+            PerformanceDialect::DanceLocked => 0.25,
+            PerformanceDialect::ProcessExact => 0.1,
+        }
+    }
+
+    /// Scale on the humanize TIMING jitter SD (base 7-22ms, Φ-scaled).
+    pub(crate) fn jitter_scale(self) -> f32 {
+        match self {
+            PerformanceDialect::ClassicalRubato => 1.0,
+            PerformanceDialect::DanceLocked => 0.6,
+            PerformanceDialect::ProcessExact => 0.4,
+            PerformanceDialect::FolkLift => 1.2,
+            PerformanceDialect::JazzLaidBack => 1.3,
+        }
+    }
+
+    /// Scale on the MAESTRO expressive-model blend (base 0.7). 0.0 means
+    /// the model is skipped entirely (no accent shaping, no learned
+    /// articulation) — the ProcessExact posture.
+    pub(crate) fn expressive_blend_scale(self) -> f32 {
+        match self {
+            PerformanceDialect::ClassicalRubato
+            | PerformanceDialect::FolkLift
+            | PerformanceDialect::JazzLaidBack => 1.0,
+            PerformanceDialect::DanceLocked => 0.4,
+            PerformanceDialect::ProcessExact => 0.0,
+        }
+    }
+}
+
+/// Derive the performance dialect from the spec's own family markers.
+///
+/// A v1 HEURISTIC, pending the real grammar-interface work: the spec has no
+/// explicit dialect field yet, so this keys off the properties that already
+/// encode family identity — texture process flags, rhythm-cell
+/// accompaniments, swing, seventh chords, drone/ornament habits. Checked in
+/// priority order (a process piece with a pulse is still a process piece;
+/// a groove with a drone is still a groove):
+///
+/// 1. `harmonic_stasis`/`full_drone`/`additive_process` → [`PerformanceDialect::ProcessExact`]
+/// 2. a rhythm-cell accompaniment (Habanera/Montuno/BossaComp/CompasGait/
+///    Shuffle), non-straight swing, or a full backbeat kit → groove: with a
+///    jazz marker (Shuffle, swing ≠ 0.5, or `seventh_chords`) →
+///    [`PerformanceDialect::JazzLaidBack`], else [`PerformanceDialect::DanceLocked`]
+/// 3. `roll_ornaments` or `drone` → [`PerformanceDialect::FolkLift`]
+/// 4. everything else → [`PerformanceDialect::ClassicalRubato`] (the identity)
+///
+/// Known v1 limits (documented, not hidden): March reads as ClassicalRubato
+/// (no spec property marks its clock-insistence), and plain Folk/ModalFolk
+/// read as ClassicalRubato (their specs carry none of the folk habit flags
+/// — only Celtic's drone and Irish's rolls are visible at the spec level).
+pub fn dialect_for_spec(spec: &symthaea_music_theory::CompositionSpec) -> PerformanceDialect {
+    use symthaea_music_theory::Accompaniment as A;
+    use symthaea_music_theory::DrumPolicy;
+    let t = &spec.texture;
+    if t.harmonic_stasis || t.full_drone || t.additive_process {
+        return PerformanceDialect::ProcessExact;
+    }
+    let has_shuffle = spec.accompaniment_pool.contains(&A::Shuffle);
+    let has_groove_cell = has_shuffle
+        || spec
+            .accompaniment_pool
+            .iter()
+            .any(|a| matches!(a, A::Habanera | A::Montuno | A::BossaComp | A::CompasGait));
+    let swung = (t.swing - 0.5).abs() > 1e-6;
+    if has_groove_cell || swung || t.drums == DrumPolicy::Backbeat {
+        return if has_shuffle || swung || t.seventh_chords {
+            PerformanceDialect::JazzLaidBack
+        } else {
+            PerformanceDialect::DanceLocked
+        };
+    }
+    if t.roll_ornaments || t.drone {
+        return PerformanceDialect::FolkLift;
+    }
+    PerformanceDialect::ClassicalRubato
+}
+
 /// The (melody, harmony, bass) instrument ensemble for a given [`Style`],
 /// chosen from a small per-style POOL by `seed` rather than a single fixed
 /// tuple. Deliberately real acoustic instruments (see `instruments.rs`'s
@@ -42,6 +189,11 @@ pub(crate) fn instruments_for(style: Style, seed: u64) -> (Instrument, Instrumen
             (Instrument::Violin, Instrument::Piano, Instrument::Cello),
             (Instrument::Flute, Instrument::Piano, Instrument::Cello),
             (Instrument::Violin, Instrument::Harp, Instrument::Cello),
+            // Viola instead of violin: the same string-trio identity, a
+            // warmer/darker lead register (Fletcher & Rossing's "viola
+            // problem" — a body genuinely too small for its pitch range —
+            // is exactly the character that distinguishes it here).
+            (Instrument::Viola, Instrument::Piano, Instrument::Cello),
         ],
         // Open, acoustic, folk-song-flavored: always plucked harmony/bass
         // (Karplus-Strong), but the lead voice varies.
@@ -57,6 +209,15 @@ pub(crate) fn instruments_for(style: Style, seed: u64) -> (Instrument, Instrumen
                 Instrument::UprightBass,
             ),
             (Instrument::Flute, Instrument::Koto, Instrument::UprightBass),
+            // Old-time/bluegrass color: banjo's bright plucked decay as
+            // the harmony voice, genuinely idiomatic for this style's
+            // "open, acoustic, folk-song" identity in a way guitar/harp/
+            // koto don't cover.
+            (
+                Instrument::Clarinet,
+                Instrument::Banjo,
+                Instrument::UprightBass,
+            ),
         ],
         // Sweeping and dramatic: a soaring lead over a sustained pad,
         // grounded by cello.
@@ -64,6 +225,20 @@ pub(crate) fn instruments_for(style: Style, seed: u64) -> (Instrument, Instrumen
             (Instrument::Violin, Instrument::Organ, Instrument::Cello),
             (Instrument::Trumpet, Instrument::Organ, Instrument::Cello),
             (Instrument::Violin, Instrument::Pad, Instrument::Cello),
+            // The epic-orchestral variant: horn call over chorusing
+            // strings, tuba anchoring the low end — the John Williams
+            // register this style's "sweeping and dramatic" doc comment
+            // describes but the existing entries (a solo violin/trumpet
+            // over one pad) don't yet reach.
+            (
+                Instrument::FrenchHorn,
+                Instrument::StringEnsemble,
+                Instrument::Tuba,
+            ),
+            // The intimate-cinematic variant: duduk's narrow-dynamic,
+            // breathy sustained character — a texture no other style uses
+            // — over a pad, cello grounding it.
+            (Instrument::Duduk, Instrument::Pad, Instrument::Cello),
         ],
         // Bright and bouncy: a reedy/brassy lead, an FM or plucked
         // harmony, plucked guitar bass throughout.
@@ -83,14 +258,38 @@ pub(crate) fn instruments_for(style: Style, seed: u64) -> (Instrument, Instrumen
                 Instrument::Kalimba,
                 Instrument::AcousticGuitar,
             ),
+            // Xylophone's brighter, drier, much faster-decaying mallet
+            // character as the lead itself — distinct from Marimba/
+            // Kalimba's existing role as harmony/accompaniment voices.
+            (
+                Instrument::Xylophone,
+                Instrument::ElectricPiano,
+                Instrument::AcousticGuitar,
+            ),
         ],
         // The spec-first styles: palettes mirror their preset specs.
         Style::Nocturne => &[
             (Instrument::Clarinet, Instrument::Piano, Instrument::Cello),
             (Instrument::Flute, Instrument::Piano, Instrument::Cello),
+            // Bassoon as the bass voice: a darker, more intimate register
+            // than cello for the same lyrical wind-chamber texture —
+            // genuinely idiomatic (bassoon-as-bass-voice is standard wind-
+            // ensemble practice), not a forced substitution.
+            (Instrument::Clarinet, Instrument::Piano, Instrument::Bassoon),
         ],
-        Style::March => &[(Instrument::Trumpet, Instrument::Organ, Instrument::Cello)],
-        Style::Lullaby => &[(Instrument::Flute, Instrument::Kalimba, Instrument::Cello)],
+        Style::March => &[
+            (Instrument::Trumpet, Instrument::Organ, Instrument::Cello),
+            // The brass-band variant: trombone's own bugle-call register
+            // over a tuba anchor — March's "rhythmic insistence" identity
+            // played by the family that actually marches.
+            (Instrument::Trombone, Instrument::Organ, Instrument::Tuba),
+        ],
+        Style::Lullaby => &[
+            (Instrument::Flute, Instrument::Kalimba, Instrument::Cello),
+            // The literal music-box sound — a genuinely new FM timbre for
+            // a style whose whole identity is a bedtime music box.
+            (Instrument::Flute, Instrument::MusicBox, Instrument::Cello),
+        ],
         Style::ModalFolk => &[(
             Instrument::Flute,
             Instrument::Marimba,
@@ -101,6 +300,206 @@ pub(crate) fn instruments_for(style: Style, seed: u64) -> (Instrument, Instrumen
         // empty in a fugue score — the middle voice arrives as the
         // counter-melody, defaulting to clarinet via `contrast_counter`).
         Style::Fugue => &[(Instrument::Organ, Instrument::Piano, Instrument::Cello)],
+        // The ground must be UNMISTAKABLE: cello carries it; a reedy lead
+        // varies above. (Harmony slot empty, as in the fugue.)
+        Style::Passacaglia => &[(Instrument::Clarinet, Instrument::Organ, Instrument::Cello)],
+        // Violin lead over piano habanera and a plucked anchor.
+        Style::Tango => &[
+            (
+                Instrument::Violin,
+                Instrument::Piano,
+                Instrument::UprightBass,
+            ),
+            // The bandoneon stand-in: accordion is tango's own harmony
+            // voice (no GM bandoneon exists; this is the nearest real
+            // free-reed cousin), replacing the piano habanera comp.
+            (
+                Instrument::Violin,
+                Instrument::Accordion,
+                Instrument::UprightBass,
+            ),
+        ],
+        // The jig's own palette: fiddle or whistle over harp/guitar, cello
+        // standing in for the tonic-fifth drone (a real bagpipe/hurdy-
+        // gurdy drone has no close GM equivalent, so the sustained low
+        // string carries it).
+        Style::Celtic => &[
+            (Instrument::Violin, Instrument::Harp, Instrument::Cello),
+            (
+                Instrument::Flute,
+                Instrument::AcousticGuitar,
+                Instrument::Cello,
+            ),
+        ],
+        // A reedy lead over electric piano's comping, upright bass
+        // walking/shuffling underneath.
+        Style::Blues => &[
+            (
+                Instrument::Saxophone,
+                Instrument::ElectricPiano,
+                Instrument::UprightBass,
+            ),
+            (
+                Instrument::Clarinet,
+                Instrument::Piano,
+                Instrument::UprightBass,
+            ),
+        ],
+        // Piano or flute over rippling harp, cello grounding the wash.
+        Style::Impressionism => &[
+            (Instrument::Piano, Instrument::Harp, Instrument::Cello),
+            (Instrument::Flute, Instrument::Harp, Instrument::Cello),
+            // Oboe's plaintive, reedy tone over the same rippling harp
+            // wash — a French-woodwind color this style's harmonic
+            // atmosphere is written for.
+            (Instrument::Oboe, Instrument::Harp, Instrument::Cello),
+        ],
+        // The organ carries every voice, as a real hymn realization does;
+        // bell stands in for a second manual/stop color.
+        Style::SacredChoral => &[
+            (Instrument::Organ, Instrument::Organ, Instrument::Cello),
+            (Instrument::Organ, Instrument::Bell, Instrument::Cello),
+            // Real choir voices, finally: two distinct vowel colors
+            // (Aah lead, Ooh harmony — darker/more covered) instead of
+            // organ standing in for the choir it's meant to accompany.
+            (
+                Instrument::ChoirAah,
+                Instrument::ChoirOoh,
+                Instrument::Cello,
+            ),
+        ],
+        // Mallet/keys pulse — the Glass/Reich ensemble palette.
+        Style::Minimalism => &[
+            (
+                Instrument::Marimba,
+                Instrument::ElectricPiano,
+                Instrument::UprightBass,
+            ),
+            // Vibraphone's shimmering, longer-ringing pulse — the other
+            // half of the Glass/Reich mallet palette Marimba alone
+            // doesn't cover.
+            (
+                Instrument::Vibraphone,
+                Instrument::Marimba,
+                Instrument::UprightBass,
+            ),
+            (
+                Instrument::Piano,
+                Instrument::Marimba,
+                Instrument::UprightBass,
+            ),
+        ],
+        // The torch-song trio: a reedy lead over piano/electric piano,
+        // upright bass grounding it.
+        Style::JazzBallad => &[
+            (
+                Instrument::Saxophone,
+                Instrument::Piano,
+                Instrument::UprightBass,
+            ),
+            (
+                Instrument::Clarinet,
+                Instrument::ElectricPiano,
+                Instrument::UprightBass,
+            ),
+        ],
+        // The trio-sonata continuo: violin lead, organ realizing the
+        // harmony, cello grounding the bass line.
+        Style::BaroqueSuite => &[
+            (Instrument::Violin, Instrument::Organ, Instrument::Cello),
+            // The actual period continuo instrument: this style's own
+            // design docs call for "broken-chord continuo," and
+            // harpsichord — not organ — is what that historically means.
+            (
+                Instrument::Violin,
+                Instrument::Harpsichord,
+                Instrument::Cello,
+            ),
+        ],
+        // The prog rhythm section: an angular synth lead over electric
+        // piano, upright bass grounding it.
+        Style::ProgFolk => &[
+            (
+                Instrument::SawLead,
+                Instrument::ElectricPiano,
+                Instrument::UprightBass,
+            ),
+            // A rock/fusion variant: electric bass replacing the upright,
+            // matching this style's synth-lead rhythm section rather than
+            // an acoustic jazz one.
+            (
+                Instrument::SawLead,
+                Instrument::ElectricPiano,
+                Instrument::ElectricBass,
+            ),
+        ],
+        // A soundscape: two pad voices framing a sparse bell.
+        Style::Ambient => &[
+            (Instrument::Pad, Instrument::Bell, Instrument::Pad),
+            // Celesta's delicate, slow-decaying bell-like color as the
+            // sparse center voice — a second stillness timbre distinct
+            // from Bell's brighter attack.
+            (Instrument::Pad, Instrument::Celesta, Instrument::Pad),
+        ],
+        // The classical trio: violin carrying both subjects, piano
+        // realizing the Alberti-figured harmony, cello grounding it.
+        Style::Sonata => &[(Instrument::Violin, Instrument::Piano, Instrument::Cello)],
+        // Soprano/alto/bass: flute carries the top line, organ substitutes
+        // for the choir's inner voice, cello grounds it.
+        Style::RenaissancePolyphony => &[(Instrument::Flute, Instrument::Organ, Instrument::Cello)],
+        // The son montuno trio: a horn line, piano voicing the montuno
+        // stabs (the real instrument for the pattern's name), upright
+        // bass walking the tumbao.
+        Style::AfroCuban => &[(
+            Instrument::Saxophone,
+            Instrument::Piano,
+            Instrument::UprightBass,
+        )],
+        // The Andalusian trio: oud carries the cante's Moorish-inflected
+        // melisma (a plucked, sustained-decay voice no other style has
+        // used yet), acoustic guitar realizes the compás's rasgueado
+        // stabs, cello grounds the anchor.
+        Style::Flamenco => &[(
+            Instrument::Oud,
+            Instrument::AcousticGuitar,
+            Instrument::Cello,
+        )],
+        // The Getz/Jobim trio: saxophone carries the relaxed lead (bossa's
+        // most famous non-Brazilian voice), acoustic guitar realizes the
+        // floating comp, upright bass holds and anticipates.
+        Style::BossaNova => &[(
+            Instrument::Saxophone,
+            Instrument::AcousticGuitar,
+            Instrument::UprightBass,
+        )],
+        // Theme A's voice: bowed strings over a harp pit-reduction and
+        // cello grounding. Theme B's own instrument (the "second
+        // character") comes from `contrast_counter(melody, bass)` below,
+        // which resolves to Clarinet for this (Violin, _, Cello) pair —
+        // a genuinely different reed voice, not an override needed.
+        Style::Opera => &[(Instrument::Violin, Instrument::Harp, Instrument::Cello)],
+        // A real session trio — flute over guitar and upright bass —
+        // distinct from Celtic's fiddle/harp/cello soundtrack cast.
+        Style::IrishTraditional => &[
+            (
+                Instrument::Flute,
+                Instrument::AcousticGuitar,
+                Instrument::UprightBass,
+            ),
+            // Mandolin lead: a real session instrument in its own right,
+            // its fast decay well suited to reel/jig ornament rolls.
+            (
+                Instrument::Mandolin,
+                Instrument::AcousticGuitar,
+                Instrument::UprightBass,
+            ),
+        ],
+        // Sitar's engine debut — the quintessential Hindustani lead voice
+        // — over a sustained pad standing in for the tanpura's continuous
+        // drone, upright bass carrying the pulsing tonic/fifth pedal.
+        Style::HindustaniInspired => {
+            &[(Instrument::Sitar, Instrument::Pad, Instrument::UprightBass)]
+        }
     };
     pool[(seed % pool.len() as u64) as usize]
 }
@@ -276,6 +675,26 @@ fn drum_hits(
     hits
 }
 
+/// The style-gated drum hits on the FULL performed timeline (swing ∘
+/// rubato — the same clock [`performance_voices`] uses), for consumers
+/// outside the audio renderer. MIDI export needs this: the audio path
+/// builds its `Timeline` privately inside `realize_core`, and without a
+/// shared entry point the exported `.mid` carried no percussion at all.
+pub(crate) fn performance_drum_hits(
+    score: &TheoryScore,
+    spec: &symthaea_music_theory::CompositionSpec,
+    state: &MusicalState,
+    seed: u64,
+) -> Vec<DrumHit> {
+    // The SAME dialect-scaled rubato as the pitched voices — a drum grid
+    // on the unscaled map would drift against a DanceLocked ensemble.
+    let timeline = Timeline {
+        rubato: Rubato::from_score_with_dialect(score, dialect_for_spec(spec)),
+        swing: spec.texture.swing as f64,
+    };
+    drum_hits(score, spec.texture.drums, &timeline, state, seed)
+}
+
 /// Mix a drum track into the rendered stereo frames. Drums stay DRY (no
 /// reverb — they're added after the ensemble render) and punchy: kick/snare
 /// anchored center, hats slightly right, modest level (accompaniment, not a
@@ -322,8 +741,13 @@ fn expressive_model() -> &'static crate::expressive::ExpressiveModel {
 fn apply_expressive_model(
     beat_notes: &mut [(f64, Note)],
     theory_notes: &[symthaea_music_theory::score::ScoreNote],
+    blend_scale: f32,
 ) {
-    if beat_notes.len() < 3 || theory_notes.len() != beat_notes.len() {
+    // Dialect gate: 0.0 (ProcessExact) skips the model entirely — no
+    // accent shaping, no learned articulation. 1.0 is the exact historical
+    // path (0.7 * 1.0 == 0.7 bit-exactly; the articulation branch below
+    // keeps the historical assignment rather than a lerp through it).
+    if blend_scale <= 0.0 || beat_notes.len() < 3 || theory_notes.len() != beat_notes.len() {
         return;
     }
     let model = expressive_model();
@@ -344,16 +768,24 @@ fn apply_expressive_model(
         );
         let (velocity_dev, articulation) = model.predict(&features);
         // Blend at 0.7: full-strength learned accents on top of structural
-        // dynamics read slightly overdone against non-piano timbres.
+        // dynamics read slightly overdone against non-piano timbres. The
+        // dialect's blend_scale multiplies that base blend.
         let ioi_secs = beat_notes[i + 1].1.start_time - beat_notes[i].1.start_time;
         let note = &mut beat_notes[i].1;
-        note.velocity = (note.velocity + 0.7 * velocity_dev).clamp(0.05, 1.0);
+        note.velocity = (note.velocity + 0.7 * blend_scale * velocity_dev).clamp(0.05, 1.0);
         // Symbolic articulation wins over learned articulation: when the
         // COMPOSER wrote a real gap (phrase breath, staccato — sounded
         // length well short of the slot), the model must not legato over
-        // it. Otherwise the learned duration/IOI ratio applies.
+        // it. Otherwise the learned duration/IOI ratio applies — at full
+        // blend via the exact historical assignment (bit-identical), at a
+        // reduced blend as a lerp from the written duration toward it.
         if ioi_secs > 0.02 && note.duration / ioi_secs >= 0.85 {
-            note.duration = (ioi_secs * articulation).max(0.02);
+            let learned = (ioi_secs * articulation).max(0.02);
+            note.duration = if blend_scale >= 1.0 {
+                learned
+            } else {
+                (note.duration + blend_scale * (learned - note.duration)).max(0.02)
+            };
         }
     }
 }
@@ -467,8 +899,17 @@ struct Rubato {
 }
 
 impl Rubato {
-    /// Build the rubato map from the melody's structural emphases.
+    /// Build the rubato map from the melody's structural emphases, with
+    /// the classical (identity) dialect — the historical behavior.
     fn from_score(score: &TheoryScore) -> Self {
+        Self::from_score_with_dialect(score, PerformanceDialect::ClassicalRubato)
+    }
+
+    /// Build the rubato map from the melody's structural emphases, scaled
+    /// by the performance dialect. With [`PerformanceDialect::ClassicalRubato`]
+    /// every scale is exactly 1.0, so the events are bit-identical to the
+    /// pre-dialect map.
+    fn from_score_with_dialect(score: &TheoryScore, dialect: PerformanceDialect) -> Self {
         let spb = 60.0 / score.tempo_bpm as f64;
         let mut events = Vec::new();
         let melody = score.voice(TheoryRole::Melody);
@@ -478,13 +919,13 @@ impl Rubato {
             let end = (n.onset + n.duration).beats();
             match n.emphasis {
                 // A breath BEFORE a new phrase begins.
-                Emphasis::PhraseStart => events.push((onset, 0.10 * spb)),
+                Emphasis::PhraseStart => events.push((onset, 0.10 * spb * dialect.breath_scale())),
                 // Dwell ON the climax (agogic accent) — pause just after it.
-                Emphasis::Climax => events.push((end, 0.18 * spb)),
+                Emphasis::Climax => events.push((end, 0.18 * spb * dialect.climax_scale())),
                 // Ritardando INTO a cadence; the final cadence relaxes more.
                 Emphasis::Cadential => {
                     let amount = if i == last_idx { 0.9 } else { 0.35 };
-                    events.push((end, amount * spb));
+                    events.push((end, amount * spb * dialect.cadence_scale()));
                 }
                 Emphasis::Normal => {}
             }
@@ -530,19 +971,47 @@ pub fn realize_styled(
     state: &MusicalState,
     sample_rate: u32,
 ) -> Composition {
-    let spec_texture = style.spec().texture;
+    let spec = style.spec();
     let (melody, harmony, bass) = instruments_for(style, seed);
     let counter = contrast_counter(melody, bass);
     realize_core(
         score,
         (melody, harmony, bass, counter),
-        spec_texture.drums,
-        spec_texture.swing as f64,
+        &spec,
         seed,
         state,
         sample_rate,
-        spec_texture.return_color,
     )
+}
+
+/// Compose (via music theory) and return ONLY the performed melody voice's
+/// notes — expressive timing (rubato, swing, dynamic accents, the learned
+/// articulation model), but no harmony/bass/counter-melody, and no audio
+/// rendering.
+///
+/// Built for [`crate::singing_bridge::sing`], which needs a single vocal
+/// line, not a full arrangement: [`compose`](crate::compose)'s own
+/// `Composition.notes` mixes the melody with bass + harmony-pad notes into
+/// one flat `Vec<Note>` (see `generate_chord_accompaniment`), so feeding
+/// that straight into a lyric-per-note binder would try to sing the
+/// accompaniment too. This reuses the exact same performed-melody voice
+/// [`realize_styled`] mixes into its audio — same rubato, same dynamic
+/// accents, same climax lean — just without the other three voices or the
+/// final render. See `SYMTHAEA_SINGING_PLAN_2026-07-18.md` Phase 1.
+pub fn compose_and_perform_melody(
+    intent: &MusicalIntent,
+    style: Style,
+    state: &MusicalState,
+) -> Vec<Note> {
+    let score = symthaea_music_theory::compose_styled(intent, style);
+    let spec = style.spec();
+    let (melody, harmony, bass) = instruments_for(style, intent.seed);
+    let counter = contrast_counter(melody, bass);
+    performance_voices(&score, (melody, harmony, bass, counter), &spec, state)
+        .into_iter()
+        .find(|pv| pv.name == "Melody")
+        .map(|pv| pv.notes)
+        .unwrap_or_default()
 }
 
 /// A performed voice as the outside world may see it — the notes exactly
@@ -566,20 +1035,14 @@ pub fn perform_with_spec(
     state: &MusicalState,
 ) -> Vec<PerformedVoice> {
     let ensemble = resolve_spec_ensemble(spec, seed);
-    performance_voices(
-        score,
-        ensemble,
-        spec.texture.swing as f64,
-        state,
-        spec.texture.return_color,
-    )
-    .into_iter()
-    .map(|pv| PerformedVoice {
-        name: pv.name.to_string(),
-        instrument: format!("{:?}", pv.instrument),
-        notes: pv.notes,
-    })
-    .collect()
+    performance_voices(score, ensemble, spec, state)
+        .into_iter()
+        .map(|pv| PerformedVoice {
+            name: pv.name.to_string(),
+            instrument: format!("{:?}", pv.instrument),
+            notes: pv.notes,
+        })
+        .collect()
 }
 
 /// Resolve a spec's instrument names into the four performed voices
@@ -631,12 +1094,10 @@ pub fn realize_with_spec(
     realize_core(
         score,
         resolve_spec_ensemble(spec, seed),
-        spec.texture.drums,
-        spec.texture.swing as f64,
+        spec,
         seed,
         state,
         sample_rate,
-        spec.texture.return_color,
     )
 }
 
@@ -670,18 +1131,39 @@ pub(crate) struct PerformanceVoice {
 }
 
 /// Build every performed voice for a score: the four theory roles, the
-/// climax doubling voice, and (when `return_color` is on and a counter
-/// exists) the return-color sparkle. Empty voices (e.g. no counter-melody
-/// in this form) are skipped.
+/// climax doubling voice, and (when the spec's `return_color` is on and a
+/// counter exists) the return-color sparkle. Empty voices (e.g. no
+/// counter-melody in this form) are skipped. Swing, return-color, and the
+/// [`PerformanceDialect`] all come from the spec (see [`dialect_for_spec`]).
 pub(crate) fn performance_voices(
+    score: &TheoryScore,
+    ensemble: (Instrument, Instrument, Instrument, Instrument),
+    spec: &symthaea_music_theory::CompositionSpec,
+    state: &MusicalState,
+) -> Vec<PerformanceVoice> {
+    performance_voices_with_dialect(
+        score,
+        ensemble,
+        spec.texture.swing as f64,
+        state,
+        spec.texture.return_color,
+        dialect_for_spec(spec),
+    )
+}
+
+/// [`performance_voices`] with the dialect made explicit — the testable
+/// seam (comparative tests force two dialects onto one score) and the
+/// escape hatch for callers without a full spec.
+pub(crate) fn performance_voices_with_dialect(
     score: &TheoryScore,
     ensemble: (Instrument, Instrument, Instrument, Instrument),
     swing: f64,
     state: &MusicalState,
     return_color: bool,
+    dialect: PerformanceDialect,
 ) -> Vec<PerformanceVoice> {
     let timeline = Timeline {
-        rubato: Rubato::from_score(score),
+        rubato: Rubato::from_score_with_dialect(score, dialect),
         swing,
     };
     let (melody_instrument, harmony_instrument, bass_instrument, counter_instrument) = ensemble;
@@ -776,7 +1258,11 @@ pub(crate) fn performance_voices(
         //    lands as one gesture and its strum roll survives intact.
         let is_melody = muse_role == VoiceRole::Lead;
         if is_melody {
-            apply_expressive_model(&mut beat_notes, &score.voice(theory_role));
+            apply_expressive_model(
+                &mut beat_notes,
+                &score.voice(theory_role),
+                dialect.expressive_blend_scale(),
+            );
             apply_phrase_position_articulation(&mut beat_notes, &score.voice(theory_role));
         }
         // Strum applies to the CHORDAL accompaniment only — the counter-
@@ -804,6 +1290,7 @@ pub(crate) fn performance_voices(
                 humanize_seed(voice_tag, *onset),
                 state.consciousness_level,
                 legato,
+                dialect.jitter_scale(),
             );
         }
         let notes: Vec<Note> = beat_notes.into_iter().map(|(_, n)| n).collect();
@@ -873,6 +1360,7 @@ pub(crate) fn performance_voices(
                         humanize_seed(3, onset),
                         state.consciousness_level,
                         true,
+                        dialect.jitter_scale(),
                     );
                     // Re-assert the shimmer cap AFTER humanize's velocity
                     // jitter — the ceiling is a guarantee, not a suggestion.
@@ -972,25 +1460,23 @@ pub(crate) fn performance_voices(
     voices
 }
 
-#[allow(clippy::too_many_arguments)]
 fn realize_core(
     score: &TheoryScore,
     ensemble: (Instrument, Instrument, Instrument, Instrument),
-    drum_policy: symthaea_music_theory::DrumPolicy,
-    swing: f64,
+    spec: &symthaea_music_theory::CompositionSpec,
     seed: u64,
     state: &MusicalState,
     sample_rate: u32,
-    return_color: bool,
 ) -> Composition {
+    let swing = spec.texture.swing as f64;
     // Same beat→seconds map as performance_voices builds internally —
-    // Rubato::from_score is deterministic, so the drum track and total
-    // length stay sample-locked to the performed voices.
+    // Rubato::from_score_with_dialect is deterministic, so the drum track
+    // and total length stay sample-locked to the performed voices.
     let timeline = Timeline {
-        rubato: Rubato::from_score(score),
+        rubato: Rubato::from_score_with_dialect(score, dialect_for_spec(spec)),
         swing,
     };
-    let voices: Vec<Voice> = performance_voices(score, ensemble, swing, state, return_color)
+    let voices: Vec<Voice> = performance_voices(score, ensemble, spec, state)
         .into_iter()
         .map(|pv| {
             let (lo, hi) = pv.notes.iter().fold((f32::MAX, 0.0f32), |(lo, hi), n| {
@@ -1035,7 +1521,7 @@ fn realize_core(
     // Style-gated drum track (see `drum_hits`): mixed in dry after the
     // ensemble render (so drums stay punchy, outside the reverb) and before
     // mastering (so the limiter keeps combined peaks safe).
-    let drums = drum_hits(score, drum_policy, &timeline, state, seed);
+    let drums = drum_hits(score, spec.texture.drums, &timeline, state, seed);
     if let (AudioData::StereoF32(frames), false) = (&mut audio, drums.is_empty()) {
         mix_drums(frames, &drums, sample_rate, state);
     }
@@ -1101,6 +1587,141 @@ pub fn compose_and_realize_styled(
 mod tests {
     use super::*;
     use symthaea_music_theory::pitch::PitchClass;
+
+    #[test]
+    fn dialect_derivation_maps_every_style_preset() {
+        use PerformanceDialect as D;
+        // The complete v1 derivation table over all 29 style presets —
+        // exercised against the REAL specs, so a preset change that moves
+        // a style's family markers shows up here, not in a listening test.
+        let cases = [
+            (Style::Classical, D::ClassicalRubato),
+            (Style::Waltz, D::ClassicalRubato),
+            // v1 limit, documented on `dialect_for_spec`: plain Folk and
+            // ModalFolk carry none of the spec-visible folk habit flags.
+            (Style::Folk, D::ClassicalRubato),
+            (Style::Cinematic, D::ClassicalRubato),
+            (Style::Playful, D::DanceLocked), // full backbeat kit
+            (Style::Nocturne, D::ClassicalRubato),
+            (Style::March, D::ClassicalRubato), // v1 limit: no clock marker
+            (Style::Lullaby, D::ClassicalRubato),
+            (Style::ModalFolk, D::ClassicalRubato),
+            (Style::Fugue, D::ClassicalRubato),
+            (Style::Passacaglia, D::ClassicalRubato),
+            (Style::Tango, D::DanceLocked),  // Habanera rhythm cell
+            (Style::Celtic, D::FolkLift),    // tonic-fifth drone
+            (Style::Blues, D::JazzLaidBack), // Shuffle cell + swung eighths
+            (Style::Impressionism, D::ClassicalRubato),
+            (Style::SacredChoral, D::ClassicalRubato),
+            (Style::Minimalism, D::ProcessExact), // additive process
+            (Style::JazzBallad, D::JazzLaidBack), // swing 0.58 + 7th chords
+            (Style::BaroqueSuite, D::ClassicalRubato), // straight-swing dance
+            (Style::ProgFolk, D::DanceLocked),    // backbeat kit
+            (Style::Ambient, D::ProcessExact),    // harmonic stasis
+            (Style::Sonata, D::ClassicalRubato),
+            (Style::RenaissancePolyphony, D::ClassicalRubato),
+            (Style::AfroCuban, D::DanceLocked), // Montuno rhythm cell
+            (Style::Flamenco, D::DanceLocked),  // CompasGait rhythm cell
+            (Style::BossaNova, D::JazzLaidBack), // BossaComp + 7th chords
+            (Style::Opera, D::ClassicalRubato),
+            (Style::IrishTraditional, D::FolkLift), // roll ornaments
+            (Style::HindustaniInspired, D::ProcessExact), // full drone
+        ];
+        for (style, expected) in cases {
+            assert_eq!(
+                dialect_for_spec(&style.spec()),
+                expected,
+                "{style:?} must derive {expected:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn classical_dialect_is_the_exact_identity() {
+        // Every scale factor exactly 1.0 — the guarantee that a render
+        // deriving ClassicalRubato is bit-identical to pre-dialect output.
+        let d = PerformanceDialect::ClassicalRubato;
+        assert_eq!(d.breath_scale(), 1.0);
+        assert_eq!(d.climax_scale(), 1.0);
+        assert_eq!(d.cadence_scale(), 1.0);
+        assert_eq!(d.jitter_scale(), 1.0);
+        assert_eq!(d.expressive_blend_scale(), 1.0);
+        assert_eq!(PerformanceDialect::default(), d);
+        // The dialected rubato map degenerates to the plain constructor's
+        // map exactly (same events, same seconds-per-beat).
+        let score = symthaea_music_theory::compose(&MusicalIntent::default());
+        let plain = Rubato::from_score(&score);
+        let dialected = Rubato::from_score_with_dialect(&score, d);
+        assert_eq!(plain.events, dialected.events);
+        assert_eq!(plain.spb, dialected.spb);
+        // And the spec-driven entry point renders note-for-note identical
+        // to the explicit ClassicalRubato path for a classical spec.
+        let spec = Style::Classical.spec();
+        let intent = MusicalIntent::default();
+        let score = symthaea_music_theory::compose_with_spec(&intent, &spec);
+        let state = MusicalState::default();
+        let ensemble = resolve_spec_ensemble(&spec, intent.seed);
+        let via_spec = performance_voices(&score, ensemble, &spec, &state);
+        let explicit = performance_voices_with_dialect(
+            &score,
+            ensemble,
+            spec.texture.swing as f64,
+            &state,
+            spec.texture.return_color,
+            d,
+        );
+        assert_eq!(via_spec.len(), explicit.len());
+        for (a, b) in via_spec.iter().zip(&explicit) {
+            assert_eq!(a.name, b.name);
+            assert_eq!(a.notes.len(), b.notes.len(), "{}", a.name);
+            for (x, y) in a.notes.iter().zip(&b.notes) {
+                assert_eq!(x.start_time, y.start_time);
+                assert_eq!(x.duration, y.duration);
+                assert_eq!(x.velocity, y.velocity);
+            }
+        }
+    }
+
+    #[test]
+    fn dance_locked_hugs_the_straight_grid_tighter_than_classical() {
+        // Same score, same ensemble, same state — only the dialect
+        // differs. The groove dialect's melody must deviate LESS from the
+        // straight metronome grid than the classical one (its rubato is
+        // scaled 0.25x and its jitter 0.6x), and the process dialect less
+        // still (0.1x / 0.4x).
+        let score = symthaea_music_theory::compose(&MusicalIntent::default());
+        let state = MusicalState::default();
+        let ensemble = (
+            Instrument::Violin,
+            Instrument::Piano,
+            Instrument::Cello,
+            Instrument::Clarinet,
+        );
+        let spb = 60.0 / score.tempo_bpm;
+        let grid_deviation = |dialect: PerformanceDialect| -> f32 {
+            let voices =
+                performance_voices_with_dialect(&score, ensemble, 0.5, &state, false, dialect);
+            let melody = voices.iter().find(|v| v.name == "Melody").unwrap();
+            let theory = score.voice(TheoryRole::Melody);
+            assert_eq!(theory.len(), melody.notes.len());
+            theory
+                .iter()
+                .zip(&melody.notes)
+                .map(|(t, n)| (n.start_time - t.onset.beats() as f32 * spb).abs())
+                .sum()
+        };
+        let classical = grid_deviation(PerformanceDialect::ClassicalRubato);
+        let dance = grid_deviation(PerformanceDialect::DanceLocked);
+        let process = grid_deviation(PerformanceDialect::ProcessExact);
+        assert!(
+            dance < classical,
+            "DanceLocked ({dance:.3}s) must hug the grid tighter than ClassicalRubato ({classical:.3}s)"
+        );
+        assert!(
+            process < dance,
+            "ProcessExact ({process:.3}s) must hug the grid tighter than DanceLocked ({dance:.3}s)"
+        );
+    }
 
     #[test]
     fn midi_reference_pitches() {
@@ -1233,7 +1854,7 @@ mod tests {
                     section_intensity: 1.0,
                 });
             }
-            let voices = performance_voices(
+            let voices = performance_voices_with_dialect(
                 &score,
                 (
                     Instrument::Violin,
@@ -1244,6 +1865,7 @@ mod tests {
                 0.5,
                 &MusicalState::default(),
                 false,
+                PerformanceDialect::ClassicalRubato,
             );
             voices
                 .into_iter()
@@ -1357,7 +1979,7 @@ mod tests {
         // doubler's velocity is capped at 0.5 (≈ MIDI 64), which also
         // selects the SOFT recorded dynamic layer.
         let score = symthaea_music_theory::compose(&MusicalIntent::default());
-        let voices = performance_voices(
+        let voices = performance_voices_with_dialect(
             &score,
             (
                 Instrument::Violin,
@@ -1368,6 +1990,7 @@ mod tests {
             0.5,
             &MusicalState::default(),
             false,
+            PerformanceDialect::ClassicalRubato,
         );
         let doubling = voices
             .iter()
@@ -1413,7 +2036,7 @@ mod tests {
         // started adding its own notes — a count can't name whose they
         // are; the voice name can).
         let score = symthaea_music_theory::compose(&MusicalIntent::default());
-        let voices = performance_voices(
+        let voices = performance_voices_with_dialect(
             &score,
             (
                 Instrument::Violin,
@@ -1424,6 +2047,7 @@ mod tests {
             0.5,
             &MusicalState::default(),
             false,
+            PerformanceDialect::ClassicalRubato,
         );
         let peak_notes_in_melody = score
             .voice(symthaea_music_theory::score::VoiceRole::Melody)
@@ -1499,7 +2123,7 @@ mod tests {
             })
             .collect();
         let before: Vec<Note> = beat_notes.iter().map(|(_, n)| *n).collect();
-        apply_expressive_model(&mut beat_notes, &theory);
+        apply_expressive_model(&mut beat_notes, &theory, 1.0);
         // Edges untouched (no melodic context on one side).
         assert_eq!(beat_notes[0].1.velocity, before[0].velocity);
         assert_eq!(beat_notes[4].1.duration, before[4].duration);
@@ -1553,13 +2177,33 @@ mod tests {
         // comparison must hold the composition fixed to isolate the
         // performance-layer time map this test is about.
         spec.texture.damage = 0.0;
+        // Dialect HELD CONSTANT: `dialect_for_spec` also reads swing (a
+        // swung spec is a jazz marker), so without a stronger marker the
+        // two arms would derive DIFFERENT performers (ClassicalRubato vs
+        // JazzLaidBack) whose differing jitter scales can legitimately
+        // move a note earlier. A Shuffle rhythm cell pins BOTH arms to
+        // JazzLaidBack, restoring the all-else-equal comparison.
+        spec.accompaniment_pool = vec![symthaea_music_theory::Accompaniment::Shuffle];
+        // Return Color OFF: the sparkle voice groups harmony notes into
+        // chord-onsets by an ABSOLUTE-SECONDS threshold (`0.05s`) and
+        // gates inclusion on a real-time `min_gap` — both read the
+        // performed timeline, so swing can legitimately shift which
+        // groups qualify and change the sparkle voice's NOTE COUNT. A
+        // fourth swing-sensitive parameter beyond damage/dialect that
+        // this all-else-equal comparison must also pin, or the total
+        // flattened note count (this test's own invariant) can differ
+        // between arms for a reason that has nothing to do with the
+        // off-beat timing claim being tested.
+        spec.texture.return_color = false;
         let intent = MusicalIntent {
             arousal: 0.9, // busy tier → eighth notes
             ..Default::default()
         };
         let state = MusicalState::default();
+        assert_eq!(dialect_for_spec(&spec), PerformanceDialect::JazzLaidBack);
         let straight = compose_and_realize_spec(&intent, &spec, &state, 44100);
         spec.texture.swing = 2.0 / 3.0;
+        assert_eq!(dialect_for_spec(&spec), PerformanceDialect::JazzLaidBack);
         let swung = compose_and_realize_spec(&intent, &spec, &state, 44100);
         assert_eq!(straight.notes.len(), swung.notes.len());
         let mut checked_offbeat = 0;
@@ -1874,5 +2518,116 @@ mod tests {
         } else {
             panic!("expected stereo output");
         }
+    }
+
+    #[test]
+    fn compose_and_perform_melody_produces_a_nonempty_melody_only_line() {
+        let notes = compose_and_perform_melody(
+            &MusicalIntent::default(),
+            Style::Classical,
+            &MusicalState::default(),
+        );
+        assert!(
+            !notes.is_empty(),
+            "a default intent must produce at least one melody note"
+        );
+        assert!(
+            notes
+                .iter()
+                .all(|n| n.frequency.is_finite() && n.frequency > 0.0),
+            "every melody note must have a positive, finite pitch"
+        );
+        assert!(
+            notes.iter().all(|n| n.duration > 0.0),
+            "every melody note must have a positive duration"
+        );
+
+        // The melody-only line must be shorter than the SAME score's total
+        // notes across all four voices (Melody+Harmony+Bass+CounterMelody)
+        // -- proof this genuinely excludes the accompaniment rather than
+        // accidentally returning everything. (Comparing against a
+        // DIFFERENT composer's output -- e.g. muse's own compose(), a
+        // separate, much simpler melody generator with its own note-density
+        // defaults -- is not a meaningful invariant: that composer can
+        // legitimately produce more or fewer notes than this one for
+        // unrelated reasons. The correct control is the same Score this
+        // function itself composed internally.)
+        let score =
+            symthaea_music_theory::compose_styled(&MusicalIntent::default(), Style::Classical);
+        assert!(
+            notes.len() < score.notes.len(),
+            "melody-only ({}) should be a strict subset of the same score's \
+             total notes across all voices ({}) -- accompaniment must be excluded",
+            notes.len(),
+            score.notes.len()
+        );
+    }
+
+    #[test]
+    fn compose_and_perform_melody_is_deterministic_for_the_same_intent_and_seed() {
+        let intent = MusicalIntent {
+            seed: 42,
+            ..MusicalIntent::default()
+        };
+        let a = compose_and_perform_melody(&intent, Style::Folk, &MusicalState::default());
+        let b = compose_and_perform_melody(&intent, Style::Folk, &MusicalState::default());
+        assert_eq!(
+            a.len(),
+            b.len(),
+            "same intent+seed must produce the same note count"
+        );
+        for (na, nb) in a.iter().zip(b.iter()) {
+            assert_eq!(na.frequency, nb.frequency);
+            assert_eq!(na.start_time, nb.start_time);
+            assert_eq!(na.duration, nb.duration);
+        }
+    }
+
+    #[test]
+    fn compose_and_perform_melody_reflects_contrasting_valence_arousal() {
+        // Not a claim about WHICH direction pitch/tempo should move -- just
+        // that a materially different consciousness state produces a
+        // materially different melody, not the same tune every time
+        // regardless of state (the exact failure mode /sing had before this
+        // function existed: a fixed hardcoded arc).
+        let calm = MusicalIntent {
+            valence: -0.8,
+            arousal: 0.1,
+            seed: 7,
+            ..MusicalIntent::default()
+        };
+        let excited = MusicalIntent {
+            valence: 0.8,
+            arousal: 0.9,
+            seed: 7,
+            ..MusicalIntent::default()
+        };
+        let notes_calm =
+            compose_and_perform_melody(&calm, Style::Classical, &MusicalState::default());
+        let notes_excited =
+            compose_and_perform_melody(&excited, Style::Classical, &MusicalState::default());
+        assert!(!notes_calm.is_empty() && !notes_excited.is_empty());
+
+        // Deliberately NOT a claim about which specific property changes
+        // (count, pitch, or timing) -- symthaea-music-theory's composer.rs
+        // varies rhythm-bank choice, phrase archetype (period vs sentence),
+        // AND tempo by arousal, any of which alone is sufficient evidence
+        // the state genuinely reached the composer. Requiring a SPECIFIC
+        // property (e.g. note count) to differ is over-constrained: two
+        // structurally different phrases can legitimately land on the same
+        // note count by coincidence for a given seed. The only thing that
+        // would indicate a real bug is the two states producing a
+        // byte-identical melody.
+        let identical = notes_calm.len() == notes_excited.len()
+            && notes_calm.iter().zip(notes_excited.iter()).all(|(a, b)| {
+                a.frequency == b.frequency
+                    && a.start_time == b.start_time
+                    && a.duration == b.duration
+            });
+        assert!(
+            !identical,
+            "contrasting valence/arousal (calm vs excited) must produce a materially \
+             different melody -- got a byte-identical note sequence for both states"
+        );
     }
 }

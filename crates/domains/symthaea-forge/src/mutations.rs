@@ -338,6 +338,88 @@ impl MutationOperator for NumericLiteralPerturb {
     }
 }
 
+/// Swaps `&&`/`||` in a boolean expression. Like [`ArithmeticOperatorSwap`],
+/// expected to compile far more often than it stays correct -- flipping
+/// short-circuit AND to OR (or back) is exactly the kind of boundary-logic
+/// question (e.g. "should this guard require both conditions or either
+/// one?") a search loop should be free to try and have rejected by the
+/// correctness gate.
+pub struct BooleanOperatorSwap;
+
+struct CountBoolean(usize);
+impl<'ast> Visit<'ast> for CountBoolean {
+    fn visit_expr_binary(&mut self, node: &'ast ExprBinary) {
+        if boolean_swap_for(&node.op).is_some() {
+            self.0 += 1;
+        }
+        syn::visit::visit_expr_binary(self, node);
+    }
+}
+
+struct ApplyBooleanAt {
+    target_index: usize,
+    seen: usize,
+    applied: Option<MutationDescription>,
+}
+impl VisitMut for ApplyBooleanAt {
+    fn visit_expr_binary_mut(&mut self, node: &mut ExprBinary) {
+        if let Some(new_op) = boolean_swap_for(&node.op) {
+            if self.seen == self.target_index && self.applied.is_none() {
+                let before = bool_op_str(&node.op);
+                let after = bool_op_str(&new_op);
+                node.op = new_op;
+                self.applied = Some(MutationDescription {
+                    operator: "BooleanOperatorSwap",
+                    detail: format!("{before} -> {after}"),
+                });
+            }
+            self.seen += 1;
+        }
+        syn::visit_mut::visit_expr_binary_mut(self, node);
+    }
+}
+
+fn boolean_swap_for(op: &BinOp) -> Option<BinOp> {
+    match op {
+        BinOp::And(t) => Some(BinOp::Or(syn::token::OrOr(t.spans[0]))),
+        BinOp::Or(t) => Some(BinOp::And(syn::token::AndAnd(t.spans[0]))),
+        _ => None,
+    }
+}
+
+fn bool_op_str(op: &BinOp) -> &'static str {
+    match op {
+        BinOp::And(_) => "&&",
+        BinOp::Or(_) => "||",
+        _ => "?",
+    }
+}
+
+impl MutationOperator for BooleanOperatorSwap {
+    fn name(&self) -> &'static str {
+        "BooleanOperatorSwap"
+    }
+    fn count_sites(&self, body: &syn::Block) -> usize {
+        let mut counter = CountBoolean(0);
+        counter.visit_block(body);
+        counter.0
+    }
+    fn apply_at(
+        &self,
+        body: &mut syn::Block,
+        site_index: usize,
+        _rng: &mut dyn RngCore,
+    ) -> Option<MutationDescription> {
+        let mut applier = ApplyBooleanAt {
+            target_index: site_index,
+            seen: 0,
+            applied: None,
+        };
+        applier.visit_block_mut(body);
+        applier.applied
+    }
+}
+
 /// Picks one random operator and one random eligible site among all
 /// registered operators, applies it, and returns the description -- or
 /// `None` if no operator has any eligible site in this function body.
@@ -351,6 +433,7 @@ impl Default for Mutator {
             operators: vec![
                 Box::new(ComparisonOperatorSwap),
                 Box::new(ArithmeticOperatorSwap),
+                Box::new(BooleanOperatorSwap),
                 Box::new(NumericLiteralPerturb { max_fraction: 0.1 }),
             ],
         }
@@ -451,6 +534,26 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(1);
         let desc = op.apply_at(&mut body, 0, &mut rng).unwrap();
         assert_eq!(desc.detail, "+ -> -");
+    }
+
+    #[test]
+    fn boolean_swap_counts_and_applies() {
+        let mut body = parse_fn_body("fn f(a: bool, b: bool) -> bool { a && b }");
+        let op = BooleanOperatorSwap;
+        assert_eq!(op.count_sites(&body), 1);
+        let mut rng = StdRng::seed_from_u64(1);
+        let desc = op.apply_at(&mut body, 0, &mut rng).unwrap();
+        assert_eq!(desc.operator, "BooleanOperatorSwap");
+        assert_eq!(desc.detail, "&& -> ||");
+        let regenerated = quote::quote!(#body).to_string();
+        assert!(regenerated.contains("||"));
+    }
+
+    #[test]
+    fn boolean_swap_ignores_non_boolean_binops() {
+        let body = parse_fn_body("fn f(x: i32, y: i32) -> bool { x < y }");
+        let op = BooleanOperatorSwap;
+        assert_eq!(op.count_sites(&body), 0);
     }
 
     #[test]

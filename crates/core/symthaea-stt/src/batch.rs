@@ -1004,6 +1004,7 @@ mod tests {
         // Test with current directory (may or may not have audio)
         let files = find_audio_files(Path::new("."), &["wav", "flac"]);
         // Just verify it doesn't panic
-        assert!(files.len() >= 0);
+        // Just verify it doesn't panic (files.len() >= 0 is always true for usize)
+        let _ = files;
     }
 }

@@ -3,18 +3,23 @@
 
 //! Haptic Co-Assembly — Cooperative Robotic Fabrication.
 //!
-//! Allows multiple 64-DOF manipulators to synchronize their
+//! Allows multiple 7-DOF manipulators to synchronize their
 //! proprioceptive manifolds to perform high-precision assembly
 //! with zero systemic surprise.
 
 use serde::{Deserialize, Serialize};
 use symthaea_swarm::HapticPulseMsg;
-use symtropy_physics::body::BodyHandle;
+#[cfg(feature = "symtropy")]
+pub type AssemblyBodyHandle = symtropy_physics::body::BodyHandle;
+
+#[cfg(not(feature = "symtropy"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AssemblyBodyHandle(pub usize);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssemblyTask {
     pub task_id: String,
-    pub target_component: BodyHandle,
+    pub target_component: AssemblyBodyHandle,
     pub precision_threshold: f64,
 }
 

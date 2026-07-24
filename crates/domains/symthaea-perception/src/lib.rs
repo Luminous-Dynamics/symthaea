@@ -2,6 +2,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//
+// ── STATUS: ARCHIVED (workspace-excluded) 2026-07-16 ────────────────────────
+// Vision review P2.2 (VISION_PROJECTION_REVIEW_2026-07-15.md): this crate is
+// a real SigLIP-SO400M / Moondream2 / ocrs ONNX stack with graceful
+// degradation, but it has ZERO active consumers — its only reference is
+// symthaea-foveation's non-default `perception` feature, which nothing in the
+// workspace enables, and it duplicates the main crate's live src/perception/
+// modules. Excluded from the workspace so builds stop compiling a dead
+// island. TO ADOPT: enable foveation's `perception` feature from the main
+// crate's `foveation` gate (RealVentralPipeline gets a live SigLIP ventral
+// stream), dedup against src/perception/, and delete this banner.
 #![allow(clippy::needless_range_loop)]
 #![allow(clippy::new_without_default)]
 #![allow(clippy::derivable_impls)]

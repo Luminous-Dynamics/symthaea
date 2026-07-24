@@ -56,7 +56,7 @@ pub struct DebugAmygdala(pub AmygdalaInterlock);
 impl std::fmt::Debug for DebugAmygdala {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AmygdalaInterlock")
-            .field("status", &self.0.status)
+            .field("status", &self.0.status())
             .finish()
     }
 }
@@ -362,7 +362,11 @@ impl EngineeringManager {
         for request in &concept.simulation_requests {
             if let Ok(result) = self.registry.run(request) {
                 if result.converged {
-                    let sensation = encoder.encode_result(&result);
+                    // encode_result is fallible upstream now — a failed encoding
+                    // means no sensation this pass, not a crash.
+                    let Ok(sensation) = encoder.encode_result(&result) else {
+                        continue;
+                    };
                     if let Some(goal_hv) = &self.last_goal_hv {
                         let episode = Episode::new(
                             goal_hv.clone(),
@@ -526,7 +530,11 @@ impl EngineeringManager {
         if let Some(ref goal_hv) = self.last_goal_hv {
             let state_msg = SwarmStateMsg {
                 node_id,
-                platform_type: symtropy_robotics_bridge_core::platform::PlatformType::Humanoid, // Default for engineering nodes
+                // SwarmStateMsg::platform_type is a validated wire-format String
+                // (bounded by MAX_IDENTIFIER_BYTES), not the PlatformType enum.
+                platform_type: symtropy_robotics_bridge_core::platform::PlatformType::Humanoid
+                    .name()
+                    .to_string(), // Default for engineering nodes
                 local_phi: self.surprise_monitor.current_surprise, // Proxy for local integration
                 consciousness_hv: self
                     .last_sensation

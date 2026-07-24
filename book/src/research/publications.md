@@ -41,8 +41,8 @@
 
 | Benchmark | Source | Result |
 |-----------|--------|--------|
-| Hendrycks ETHICS | External (Hendrycks et al., 2021) | 94.5% on 4 domains (2K samples) |
-| ARC-AGI | External (Chollet, 2019) | 100% 2-AFC, 4% strict |
+| Hendrycks ETHICS | External (Hendrycks et al., 2021) | 56.2% on 4 domains (2K samples); 94.5% figure RETRACTED as leakage-inflated (2026-07-15) |
+| ARC-AGI | External (Chollet, 2019) | 4% strict; 100% 2-AFC RETRACTED as random-distractor artifact (2026-07-18, see `book/src/research/validation.md`) |
 | Sleep-EDF | External (PhysioNet) | 70-80% 5-class on real clinical EEG |
 | DMC Humanoid | External (DeepMind Control) | Competitive with SAC/TD3/D4PG |
 

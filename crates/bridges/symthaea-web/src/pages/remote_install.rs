@@ -10,6 +10,7 @@
 //! This panel connects to the local relay and asks it to SSH into the target.
 
 use leptos::prelude::*;
+use std::net::IpAddr;
 use wasm_bindgen::JsCast;
 
 use crate::components::glass_panel::GlassPanel;
@@ -100,7 +101,6 @@ pub struct RelayResponse {
 pub enum RelayState {
     Disconnected,
     Connecting,
-    Connected,
     Probing,
     Ready, // Hardware probed, disks discovered
     Installing,
@@ -143,6 +143,300 @@ pub struct DiskInfo {
     pub model: String,
     pub transport: String,
     pub partitions: Vec<PartitionInfo>,
+}
+
+const MAX_RELAY_MESSAGE_BYTES: usize = 1024 * 1024;
+const MAX_DISKS: usize = 64;
+const MAX_PARTITIONS_PER_DISK: usize = 128;
+const MAX_DEVICE_NAME_BYTES: usize = 64;
+
+fn relay_message_allowed(state: &RelayState, msg_type: &str) -> bool {
+    match msg_type {
+        "connected" => matches!(state, RelayState::Connecting),
+        "hardware_probe" | "disks" => matches!(state, RelayState::Probing),
+        "progress" | "output" | "exit" => {
+            matches!(state, RelayState::Installing | RelayState::Reconnecting(_))
+        }
+        _ => true,
+    }
+}
+
+fn bounded_text(value: &str, max_chars: usize) -> String {
+    value.chars().take(max_chars).collect()
+}
+
+fn parse_size(value: Option<&serde_json::Value>) -> Result<u64, String> {
+    match value {
+        Some(value) if value.is_u64() => value.as_u64().ok_or_else(|| "invalid size".into()),
+        Some(value) => value
+            .as_str()
+            .ok_or_else(|| "size must be an integer or decimal string".to_string())?
+            .parse::<u64>()
+            .map_err(|_| "invalid decimal size".to_string()),
+        None => Err("missing size".into()),
+    }
+}
+
+fn parse_device_name(value: Option<&serde_json::Value>) -> Result<String, String> {
+    let name = value
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "missing device name".to_string())?;
+    let valid = !name.is_empty()
+        && name.len() <= MAX_DEVICE_NAME_BYTES
+        && !name.starts_with('.')
+        && !name.contains("..")
+        && name
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_' | b'.'));
+    if !valid {
+        return Err(format!("unsafe device name: {name:?}"));
+    }
+    Ok(name.to_string())
+}
+
+fn parse_disk_list(data: &str) -> Result<Vec<DiskInfo>, String> {
+    let disks: Vec<serde_json::Value> =
+        serde_json::from_str(data).map_err(|e| format!("invalid disk response: {e}"))?;
+    if disks.is_empty() {
+        return Err("relay reported no installable disks".into());
+    }
+    if disks.len() > MAX_DISKS {
+        return Err(format!("relay reported more than {MAX_DISKS} disks"));
+    }
+
+    disks
+        .into_iter()
+        .map(|disk| {
+            let name = parse_device_name(disk.get("name"))?;
+            let size_bytes = parse_size(disk.get("size"))?;
+            if size_bytes == 0 {
+                return Err(format!("disk {name:?} has zero size"));
+            }
+
+            let children = disk
+                .get("children")
+                .and_then(serde_json::Value::as_array)
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+            if children.len() > MAX_PARTITIONS_PER_DISK {
+                return Err(format!(
+                    "disk {name:?} has more than {MAX_PARTITIONS_PER_DISK} partitions"
+                ));
+            }
+            let partitions = children
+                .iter()
+                .map(|child| {
+                    let mount = child
+                        .get("mountpoint")
+                        .or_else(|| child.get("mountpoints"))
+                        .and_then(|value| {
+                            value.as_str().or_else(|| {
+                                value
+                                    .as_array()
+                                    .and_then(|mounts| mounts.first())
+                                    .and_then(serde_json::Value::as_str)
+                            })
+                        })
+                        .unwrap_or_default();
+                    Ok(PartitionInfo {
+                        name: parse_device_name(child.get("name"))?,
+                        size_bytes: parse_size(child.get("size"))?,
+                        fs_type: bounded_text(
+                            child
+                                .get("fstype")
+                                .and_then(serde_json::Value::as_str)
+                                .unwrap_or_default(),
+                            32,
+                        ),
+                        label: bounded_text(
+                            child
+                                .get("label")
+                                .and_then(serde_json::Value::as_str)
+                                .unwrap_or_default(),
+                            256,
+                        ),
+                        mount: bounded_text(mount, 1024),
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+
+            Ok(DiskInfo {
+                name,
+                size_bytes,
+                model: bounded_text(
+                    disk.get("model")
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or("Unknown"),
+                    256,
+                ),
+                transport: bounded_text(
+                    disk.get("transport")
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or("unknown"),
+                    32,
+                ),
+                partitions,
+            })
+        })
+        .collect()
+}
+
+fn normalize_target_address(value: &str) -> Result<String, String> {
+    let address = value.trim();
+    if address.is_empty() || address.len() > 253 || address != value {
+        return Err("target address must be a non-empty host or IP address".into());
+    }
+
+    let ip_text = address
+        .strip_prefix('[')
+        .and_then(|value| value.strip_suffix(']'))
+        .unwrap_or(address);
+    if let Ok(ip) = ip_text.parse::<IpAddr>() {
+        return Ok(match ip {
+            IpAddr::V4(ip) => ip.to_string(),
+            IpAddr::V6(ip) => format!("[{ip}]"),
+        });
+    }
+
+    let valid_hostname = address.split('.').all(|label| {
+        !label.is_empty()
+            && label.len() <= 63
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+            && label
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+    });
+    if !valid_hostname {
+        return Err("target address contains invalid hostname characters".into());
+    }
+    Ok(address.to_ascii_lowercase())
+}
+
+fn validate_relay_url(value: &str) -> Result<(), String> {
+    if value.is_empty()
+        || value.len() > 2048
+        || value.bytes().any(|byte| byte.is_ascii_whitespace())
+    {
+        return Err("relay URL is invalid".into());
+    }
+    if let Some(rest) = value.strip_prefix("wss://") {
+        let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+        if !authority.is_empty() && !rest.contains('@') {
+            return Ok(());
+        }
+    }
+    if let Some(rest) = value.strip_prefix("ws://") {
+        let authority = rest.split('/').next().unwrap_or_default();
+        let loopback = authority == "localhost"
+            || authority.starts_with("localhost:")
+            || authority == "127.0.0.1"
+            || authority.starts_with("127.0.0.1:")
+            || authority == "[::1]"
+            || authority.starts_with("[::1]:");
+        if loopback && !rest.contains('@') {
+            return Ok(());
+        }
+    }
+    Err("relay URL must use wss:// (ws:// is allowed only for loopback)".into())
+}
+
+fn optional_string(
+    value: Option<&serde_json::Value>,
+    field: &str,
+    max_bytes: usize,
+) -> Result<String, String> {
+    match value {
+        None | Some(serde_json::Value::Null) => Ok(String::new()),
+        Some(serde_json::Value::String(value)) if value.len() <= max_bytes => Ok(value.clone()),
+        Some(serde_json::Value::String(_)) => Err(format!("{field} exceeds {max_bytes} bytes")),
+        Some(_) => Err(format!("{field} must be a string")),
+    }
+}
+
+fn optional_bool(value: Option<&serde_json::Value>, field: &str) -> Result<bool, String> {
+    match value {
+        None | Some(serde_json::Value::Null) => Ok(false),
+        Some(serde_json::Value::Bool(value)) => Ok(*value),
+        Some(_) => Err(format!("{field} must be a boolean")),
+    }
+}
+
+fn parse_hardware_probe(data: &str) -> Result<RemoteHardware, String> {
+    let data: serde_json::Value = serde_json::from_str(data)
+        .map_err(|error| format!("invalid hardware response: {error}"))?;
+    let object = data
+        .as_object()
+        .ok_or_else(|| "hardware response must be an object".to_string())?;
+    let arch = optional_string(object.get("arch"), "arch", 32)?;
+    if arch.is_empty()
+        || !arch
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    {
+        return Err("hardware response has an invalid or missing architecture".into());
+    }
+
+    let mut hardware = RemoteHardware {
+        arch,
+        tpm2: optional_bool(object.get("tpm2_available"), "tpm2_available")?,
+        secure_boot: optional_bool(object.get("secure_boot"), "secure_boot")?,
+        setup_mode: optional_bool(object.get("setup_mode"), "setup_mode")?,
+        efi: optional_bool(object.get("efi_available"), "efi_available")?,
+        ..RemoteHardware::default()
+    };
+
+    if let Some(gpu) = object.get("gpu") {
+        let gpu = gpu
+            .as_object()
+            .ok_or_else(|| "gpu must be an object".to_string())?;
+        hardware.gpu_vendor = optional_string(gpu.get("vendor"), "gpu.vendor", 128)?;
+        hardware.gpu_model = optional_string(gpu.get("model"), "gpu.model", 256)?;
+        hardware.gpu_hybrid = optional_bool(gpu.get("hybrid"), "gpu.hybrid")?;
+    }
+    if let Some(wifi) = object.get("wifi") {
+        let wifi = wifi
+            .as_object()
+            .ok_or_else(|| "wifi must be an object".to_string())?;
+        hardware.wifi_available = optional_bool(wifi.get("available"), "wifi.available")?;
+        hardware.wifi_interface = optional_string(wifi.get("interface"), "wifi.interface", 64)?;
+    }
+    if let Some(safety) = object.get("safety") {
+        let safety = safety
+            .as_object()
+            .ok_or_else(|| "safety must be an object".to_string())?;
+        hardware.safety_level = optional_string(safety.get("level"), "safety.level", 32)?;
+        hardware.safety_message = optional_string(safety.get("message"), "safety.message", 1024)?;
+    }
+    if let Some(oses) = object.get("detected_os") {
+        let oses = oses
+            .as_array()
+            .ok_or_else(|| "detected_os must be an array".to_string())?;
+        if oses.len() > 32 {
+            return Err("detected_os contains more than 32 entries".into());
+        }
+        hardware.detected_os = oses
+            .iter()
+            .map(|os| {
+                let os = os
+                    .as_object()
+                    .ok_or_else(|| "detected_os entries must be objects".to_string())?;
+                let name = optional_string(os.get("name"), "detected_os.name", 128)?;
+                if name.is_empty() {
+                    return Err("detected_os names cannot be empty".into());
+                }
+                Ok(name)
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+    }
+    if let Some(chromebook) = object.get("chromebook") {
+        let chromebook = chromebook
+            .as_object()
+            .ok_or_else(|| "chromebook must be an object".to_string())?;
+        hardware.chromebook = optional_bool(chromebook.get("detected"), "chromebook.detected")?;
+    }
+
+    Ok(hardware)
 }
 
 impl DiskInfo {
@@ -335,6 +629,7 @@ pub fn RemoteInstallPanel(
     let remote_hw = RwSignal::new(RemoteHardware::default());
     let disks = RwSignal::new(Vec::<DiskInfo>::new());
     let selected_disk = RwSignal::new(String::new());
+    let disk_confirmation = RwSignal::new(String::new());
     let reconnect_attempts = RwSignal::new(0u32);
 
     // Backup state (Tier 1: pre-install full backup)
@@ -384,6 +679,7 @@ pub fn RemoteInstallPanel(
     let (ssh_host, set_ssh_host) = signal("127.0.0.1".to_string());
     let (ssh_port, set_ssh_port) = signal("22".to_string());
     let (ssh_user, set_ssh_user) = signal("root".to_string());
+    let auto_connect_from_pairing = RwSignal::new(false);
 
     // Auto-fill from URL params (QR code pairing from ISO's show-relay-url.service).
     // URL format: install.nixforhumanity.org/?target=192.168.1.5&token=abc123
@@ -391,22 +687,49 @@ pub fn RemoteInstallPanel(
         if let Ok(search) = window.location().search() {
             let params = web_sys::UrlSearchParams::new_with_str(&search).ok();
             if let Some(params) = params {
-                if let Some(target) = params.get("target") {
+                let pairing_target = params.get("target").filter(|value| !value.is_empty());
+                let pairing_token = params.get("token").filter(|value| !value.is_empty());
+
+                if let Some(target) = pairing_target.as_ref() {
                     if !target.is_empty() {
                         set_target_addr.set(target.clone());
-                        save_to_storage("si_target_addr", &target);
+                        save_to_storage("si_target_addr", target);
                     }
                 }
-                if let Some(token) = params.get("token") {
+                if let Some(token) = pairing_token.as_ref() {
                     if !token.is_empty() {
                         set_relay_token.set(token.clone());
-                        save_to_session("si_relay_token", &token);
+                        save_to_session("si_relay_token", token);
                     }
                 }
                 // Auto-connect if both target and token provided via QR
-                if params.get("target").is_some() && params.get("token").is_some() {
-                    // Signal auto-connect (handled by effect below)
+                if pairing_target.is_some() && pairing_token.is_some() {
+                    auto_connect_from_pairing.set(true);
                     relay_state.set(RelayState::Connecting);
+                }
+
+                // Credentials in a query string otherwise persist in browser
+                // history and can be copied or sent as a referrer. Preserve any
+                // unrelated parameters while removing the pairing material.
+                if pairing_target.is_some() || pairing_token.is_some() {
+                    params.delete("target");
+                    params.delete("token");
+                    let mut clean_url = window.location().pathname().unwrap_or_default();
+                    let remaining = String::from(params.to_string());
+                    if !remaining.is_empty() {
+                        clean_url.push('?');
+                        clean_url.push_str(&remaining);
+                    }
+                    if let Ok(fragment) = window.location().hash() {
+                        clean_url.push_str(&fragment);
+                    }
+                    if let Ok(history) = window.history() {
+                        let _ = history.replace_state_with_url(
+                            &wasm_bindgen::JsValue::NULL,
+                            "",
+                            Some(&clean_url),
+                        );
+                    }
                 }
             }
         }
@@ -450,13 +773,14 @@ pub fn RemoteInstallPanel(
 
     // ── Connect to relay ──
     let connect_inner = move |is_reconnect: bool| {
-        let addr = target_addr.get();
-        if addr.trim().is_empty() {
-            relay_state.set(RelayState::Failed(
-                "Enter the target machine's IP address".into(),
-            ));
-            return;
-        }
+        let addr = match normalize_target_address(&target_addr.get()) {
+            Ok(address) => address,
+            Err(error) => {
+                relay_state.set(RelayState::Failed(error.clone()));
+                set_install_log.update(|log| log.push(format!("Connection rejected: {error}")));
+                return;
+            }
+        };
         save_to_storage("si_target_addr", &addr);
 
         // Auto-construct relay URL from target address (ISO runs relay on port 8094)
@@ -465,24 +789,44 @@ pub fn RemoteInstallPanel(
         } else {
             format!("wss://{}:8094", addr)
         };
+        if let Err(error) = validate_relay_url(&url) {
+            relay_state.set(RelayState::Failed(error.clone()));
+            set_install_log.update(|log| log.push(format!("Connection rejected: {error}")));
+            return;
+        }
         save_to_storage("si_relay_url", &url);
         let token = relay_token.get();
-        if token.is_empty() {
+        if token.is_empty() || token.len() > 1024 || token.trim() != token {
             relay_state.set(RelayState::Failed(
-                "Auth token is required. Copy it from the relay's console output.".into(),
+                "A valid auth token is required. Copy it exactly from the relay console.".into(),
             ));
             set_install_log.update(|l| {
                 l.push(
-                    "Error: Auth token is required. Copy it from the relay's console output."
+                    "Error: A valid auth token is required. Copy it exactly from the relay console."
                         .into(),
                 )
             });
             return;
         }
+        let password = ssh_password.get();
+        if !is_reconnect && (password.is_empty() || password.len() > 1024) {
+            relay_state.set(RelayState::Failed(
+                "Enter the one-time password shown on the target console.".into(),
+            ));
+            return;
+        }
         save_to_session("si_relay_token", &token);
         // SSH connects to localhost on the ISO (relay bridges to local sshd)
         let target_host = ssh_host.get();
-        let target_port: u16 = ssh_port.get().parse().unwrap_or(22);
+        let target_port = match ssh_port.get().parse::<u16>() {
+            Ok(port) if port > 0 => port,
+            _ => {
+                relay_state.set(RelayState::Failed(
+                    "SSH port must be an integer from 1 to 65535.".into(),
+                ));
+                return;
+            }
+        };
 
         if !is_reconnect {
             relay_state.set(RelayState::Connecting);
@@ -512,7 +856,6 @@ pub fn RemoteInstallPanel(
         let ws_for_open = ws.clone();
         let token_clone = token.clone();
         let user = ssh_user.get();
-        let password = ssh_password.get();
         let target_host_clone = target_host.clone();
         let onopen = wasm_bindgen::closure::Closure::<dyn Fn()>::new(move || {
             // Always auth first
@@ -552,8 +895,18 @@ pub fn RemoteInstallPanel(
                 let Some(text) = e.data().as_string() else {
                     return;
                 };
+                if text.len() > MAX_RELAY_MESSAGE_BYTES {
+                    disks.set(Vec::new());
+                    selected_disk.set(String::new());
+                    disk_confirmation.set(String::new());
+                    relay_state.set(RelayState::Failed(
+                        "Relay message exceeded the 1 MiB safety limit".into(),
+                    ));
+                    return;
+                }
                 // Parse as typed RelayResponse first, fall back to Value for complex nested data
                 let Ok(msg) = serde_json::from_str::<serde_json::Value>(&text) else {
+                    relay_state.set(RelayState::Failed("Relay sent malformed JSON".into()));
                     return;
                 };
                 let typed: Option<RelayResponse> = serde_json::from_str(&text).ok();
@@ -561,6 +914,9 @@ pub fn RemoteInstallPanel(
                     .as_ref()
                     .map(|t| t.msg_type.as_str())
                     .unwrap_or(msg.get("type").and_then(|v| v.as_str()).unwrap_or(""));
+                if !relay_message_allowed(&relay_state.get(), msg_type) {
+                    return;
+                }
 
                 match msg_type {
                     "connected" => {
@@ -574,89 +930,29 @@ pub fn RemoteInstallPanel(
                     }
 
                     "hardware_probe" => {
-                        if let Some(data_str) = msg.get("data").and_then(|v| v.as_str()) {
-                            if let Ok(data) = serde_json::from_str::<serde_json::Value>(data_str) {
-                                // Parse hardware
-                                let mut hw = RemoteHardware::default();
-                                if let Some(gpu) = data.get("gpu") {
-                                    hw.gpu_vendor = gpu
-                                        .get("vendor")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("")
-                                        .into();
-                                    hw.gpu_model = gpu
-                                        .get("model")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("")
-                                        .into();
-                                    hw.gpu_hybrid = gpu
-                                        .get("hybrid")
-                                        .and_then(|v| v.as_bool())
-                                        .unwrap_or(false);
-                                }
-                                hw.tpm2 = data
-                                    .get("tpm2_available")
-                                    .and_then(|v| v.as_bool())
-                                    .unwrap_or(false);
-                                hw.secure_boot = data
-                                    .get("secure_boot")
-                                    .and_then(|v| v.as_bool())
-                                    .unwrap_or(false);
-                                hw.setup_mode = data
-                                    .get("setup_mode")
-                                    .and_then(|v| v.as_bool())
-                                    .unwrap_or(false);
-                                hw.efi = data
-                                    .get("efi_available")
-                                    .and_then(|v| v.as_bool())
-                                    .unwrap_or(false);
-                                hw.arch = data
-                                    .get("arch")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("x86_64")
-                                    .into();
-                                if let Some(wifi) = data.get("wifi") {
-                                    hw.wifi_available = wifi
-                                        .get("available")
-                                        .and_then(|v| v.as_bool())
-                                        .unwrap_or(false);
-                                    hw.wifi_interface = wifi
-                                        .get("interface")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("")
-                                        .into();
-                                }
-                                if let Some(safety) = data.get("safety") {
-                                    hw.safety_level = safety
-                                        .get("level")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("clear")
-                                        .into();
-                                    hw.safety_message = safety
-                                        .get("message")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("")
-                                        .into();
-                                }
-                                if let Some(oses) =
-                                    data.get("detected_os").and_then(|v| v.as_array())
-                                {
-                                    hw.detected_os = oses
-                                        .iter()
-                                        .filter_map(|o| {
-                                            o.get("name").and_then(|v| v.as_str()).map(String::from)
-                                        })
-                                        .collect();
-                                }
-                                if let Some(cb) = data.get("chromebook") {
-                                    hw.chromebook = cb
-                                        .get("detected")
-                                        .and_then(|v| v.as_bool())
-                                        .unwrap_or(false);
-                                }
-                                remote_hw.set(hw);
+                        let parsed = msg
+                            .get("data")
+                            .and_then(serde_json::Value::as_str)
+                            .ok_or_else(|| "hardware response omitted its data field".to_string())
+                            .and_then(parse_hardware_probe);
+                        let hardware = match parsed {
+                            Ok(hardware) => hardware,
+                            Err(error) => {
+                                remote_hw.set(RemoteHardware::default());
+                                disks.set(Vec::new());
+                                selected_disk.set(String::new());
+                                disk_confirmation.set(String::new());
+                                relay_state.set(RelayState::Failed(format!(
+                                    "Hardware probe failed: {error}"
+                                )));
+                                set_install_log.update(|log| {
+                                    log.push(format!("Hardware probe rejected: {error}"))
+                                });
+                                persist_log_force();
+                                return;
                             }
-                        }
+                        };
+                        remote_hw.set(hardware);
                         set_install_log
                             .update(|l| l.push("Hardware probed. Discovering disks...".into()));
                         persist_log();
@@ -666,111 +962,33 @@ pub fn RemoteInstallPanel(
                     }
 
                     "disks" => {
-                        if let Some(data_str) = msg.get("data").and_then(|v| v.as_str()) {
-                            if let Ok(arr) =
-                                serde_json::from_str::<Vec<serde_json::Value>>(data_str)
-                            {
-                                let disk_list: Vec<DiskInfo> = arr
-                                    .iter()
-                                    .filter_map(|d| {
-                                        let name = d.get("name")?.as_str()?.to_string();
-                                        // size may be string or number (lsblk -b returns numbers)
-                                        let size_bytes = match d.get("size") {
-                                            Some(v) if v.is_u64() => v.as_u64().unwrap_or(0),
-                                            Some(v) => v
-                                                .as_str()
-                                                .unwrap_or("0")
-                                                .parse::<u64>()
-                                                .unwrap_or(0),
-                                            None => 0,
-                                        };
-                                        let model = d
-                                            .get("model")
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("Unknown")
-                                            .to_string();
-                                        let transport = d
-                                            .get("transport")
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("unknown")
-                                            .to_string();
-                                        // Parse partition children from lsblk JSON
-                                        let partitions = d
-                                            .get("children")
-                                            .and_then(|c| c.as_array())
-                                            .map(|children| {
-                                                children
-                                                    .iter()
-                                                    .filter_map(|child| {
-                                                        let pname = child
-                                                            .get("name")?
-                                                            .as_str()?
-                                                            .to_string();
-                                                        let psize = match child.get("size") {
-                                                            Some(v) if v.is_u64() => {
-                                                                v.as_u64().unwrap_or(0)
-                                                            }
-                                                            Some(v) => v
-                                                                .as_str()
-                                                                .unwrap_or("0")
-                                                                .parse::<u64>()
-                                                                .unwrap_or(0),
-                                                            None => 0,
-                                                        };
-                                                        let fs_type = child
-                                                            .get("fstype")
-                                                            .and_then(|v| v.as_str())
-                                                            .unwrap_or("")
-                                                            .to_string();
-                                                        let label = child
-                                                            .get("label")
-                                                            .and_then(|v| v.as_str())
-                                                            .unwrap_or("")
-                                                            .to_string();
-                                                        let mount = child
-                                                            .get("mountpoint")
-                                                            .or_else(|| child.get("mountpoints"))
-                                                            .and_then(|v| {
-                                                                if let Some(s) = v.as_str() {
-                                                                    Some(s.to_string())
-                                                                } else if let Some(arr) =
-                                                                    v.as_array()
-                                                                {
-                                                                    arr.first()
-                                                                        .and_then(|m| m.as_str())
-                                                                        .map(String::from)
-                                                                } else {
-                                                                    None
-                                                                }
-                                                            })
-                                                            .unwrap_or_default();
-                                                        Some(PartitionInfo {
-                                                            name: pname,
-                                                            size_bytes: psize,
-                                                            fs_type,
-                                                            label,
-                                                            mount,
-                                                        })
-                                                    })
-                                                    .collect::<Vec<_>>()
-                                            })
-                                            .unwrap_or_default();
-                                        Some(DiskInfo {
-                                            name,
-                                            size_bytes,
-                                            model,
-                                            transport,
-                                            partitions,
-                                        })
-                                    })
-                                    .collect();
-
-                                if disk_list.len() == 1 {
-                                    selected_disk.set(disk_list[0].name.clone());
-                                }
-                                disks.set(disk_list);
+                        let parsed = msg
+                            .get("data")
+                            .and_then(serde_json::Value::as_str)
+                            .ok_or_else(|| "disk response omitted its data field".to_string())
+                            .and_then(parse_disk_list);
+                        let disk_list = match parsed {
+                            Ok(disks) => disks,
+                            Err(error) => {
+                                disks.set(Vec::new());
+                                selected_disk.set(String::new());
+                                disk_confirmation.set(String::new());
+                                relay_state.set(RelayState::Failed(format!(
+                                    "Disk discovery failed: {error}"
+                                )));
+                                set_install_log.update(|log| {
+                                    log.push(format!("Disk discovery rejected: {error}"))
+                                });
+                                persist_log_force();
+                                return;
                             }
-                        }
+                        };
+
+                        // Never preselect a destructive target, even if the
+                        // relay reports only one disk.
+                        selected_disk.set(String::new());
+                        disk_confirmation.set(String::new());
+                        disks.set(disk_list);
                         relay_state.set(RelayState::Ready);
                         set_install_log.update(|l| l.push("Ready to install.".into()));
                         persist_log();
@@ -778,10 +996,19 @@ pub fn RemoteInstallPanel(
 
                     "progress" => {
                         let t = typed.as_ref();
-                        let stage = t.and_then(|t| t.stage.clone()).unwrap_or_default();
-                        let pct = t.and_then(|t| t.percentage).unwrap_or(0) as u32;
-                        let phase = t.and_then(|t| t.phase.clone()).unwrap_or_default();
-                        let message = t.and_then(|t| t.message.clone()).unwrap_or_default();
+                        let stage = bounded_text(
+                            t.and_then(|t| t.stage.as_deref()).unwrap_or_default(),
+                            256,
+                        );
+                        let pct = t.and_then(|t| t.percentage).unwrap_or(0).min(100) as u32;
+                        let phase = bounded_text(
+                            t.and_then(|t| t.phase.as_deref()).unwrap_or_default(),
+                            128,
+                        );
+                        let message = bounded_text(
+                            t.and_then(|t| t.message.as_deref()).unwrap_or_default(),
+                            1024,
+                        );
                         progress.set(InstallProgress {
                             stage: stage.clone(),
                             percentage: pct,
@@ -800,7 +1027,7 @@ pub fn RemoteInstallPanel(
                         if let Some(line) = line_opt {
                             if !line.trim().is_empty() {
                                 set_install_log.update(|l| {
-                                    l.push(line.to_string());
+                                    l.push(bounded_text(line, 4096));
                                     // Cap at 1000 lines to prevent memory exhaustion from relay flooding
                                     if l.len() > 1000 {
                                         l.drain(..200);
@@ -948,7 +1175,7 @@ pub fn RemoteInstallPanel(
                 }
             } else {
                 relay_state.set(RelayState::Failed(
-                    "WebSocket connection failed. Is ssh-relay running locally (ws://127.0.0.1:8091)?"
+                    "WebSocket connection failed. Check the relay address and console output."
                         .into(),
                 ));
             }
@@ -1006,170 +1233,39 @@ pub fn RemoteInstallPanel(
         store_ws(&ws);
     };
 
-    // Public connect entry point (fresh connection, not reconnect)
+    // Public connect entry point. A persisted in-progress marker selects the
+    // status-only resume flow rather than issuing a second install connection.
     let connect = move || {
+        let is_resume = previous_install_in_progress.get();
         reconnect_attempts.set(0);
-        // Dismiss resume banner when user explicitly connects
-        previous_install_in_progress.set(false);
-        connect_inner(false);
+        connect_inner(is_resume);
     };
 
     // ── Auto-connect from URL params (QR code flow) ──
     Effect::new(move |_| {
-        if let Some(window) = web_sys::window() {
-            if let Ok(search) = window.location().search() {
-                if search.contains("target=") {
-                    let params = web_sys::UrlSearchParams::new_with_str(&search).ok();
-                    if let Some(params) = params {
-                        if let Some(target) = params.get("target") {
-                            set_target_addr.set(target);
-                        }
-                        if let Some(token) = params.get("token") {
-                            set_relay_token.set(token);
-                        }
-                        // Auto-connect after a short delay
-                        let cb = wasm_bindgen::closure::Closure::<dyn Fn()>::new(move || {
-                            connect();
-                        });
-                        let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
-                            cb.as_ref().unchecked_ref(),
-                            500,
-                        );
-                        cb.forget();
-                    }
-                }
+        if auto_connect_from_pairing.get() {
+            auto_connect_from_pairing.set(false);
+            if let Some(window) = web_sys::window() {
+                let cb = wasm_bindgen::closure::Closure::<dyn Fn()>::new(move || {
+                    connect();
+                });
+                let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
+                    cb.as_ref().unchecked_ref(),
+                    500,
+                );
+                cb.forget();
             }
-        }
-    });
-
-    // ── Auto-discover target on local network ──
-    let scanning_network = RwSignal::new(false);
-    let scan_result = RwSignal::new(Option::<String>::None);
-
-    let start_scan = move || {
-        // Don't scan if already connected or have URL params
-        if relay_state.get() == RelayState::Connected {
-            return;
-        }
-        if let Some(window) = web_sys::window() {
-            if let Ok(search) = window.location().search() {
-                if search.contains("target=") {
-                    return;
-                }
-            }
-        }
-
-        scanning_network.set(true);
-        scan_result.set(None);
-
-        // Scan common private subnets (most home/office networks)
-        // Only scan first 20 IPs per subnet, staggered in batches of 10
-        let prefixes = ["192.168.1", "192.168.0", "10.0.0"];
-        let mut ip_list_parts = Vec::new();
-        for prefix in prefixes {
-            for host in 1..=20u16 {
-                ip_list_parts.push(format!("\"{}:8094\"", format!("{}.{}", prefix, host)));
-            }
-        }
-        let ip_list_js = ip_list_parts.join(",");
-
-        // Single JS eval that batches 10 connections at a time with 200ms stagger
-        let scan_js = format!(
-            r#"
-            (function() {{
-                var ips = [{ips}];
-                var batch = 0;
-                function scanBatch() {{
-                    var start = batch * 10;
-                    var end = Math.min(start + 10, ips.length);
-                    for (var i = start; i < end; i++) {{
-                        try {{
-                            var addr = ips[i];
-                            var ws = new WebSocket("wss://" + addr);
-                            var timer = setTimeout(function() {{ ws.close(); }}, 1500);
-                            ws.onopen = function() {{
-                                ws.send(JSON.stringify({{action:"auth",token:"sovereign"}}));
-                            }};
-                            ws.onmessage = (function(a, t) {{
-                                return function(ev) {{
-                                    clearTimeout(t);
-                                    try {{
-                                        var msg = JSON.parse(ev.data);
-                                        if (msg.type === "authed") {{
-                                            window.__sovereign_discovered = a.split(":")[0];
-                                        }}
-                                    }} catch(e) {{}}
-                                    ws.close();
-                                }};
-                            }})(addr, timer);
-                            ws.onerror = (function(t) {{
-                                return function() {{ clearTimeout(t); ws.close(); }};
-                            }})(timer);
-                        }} catch(e) {{}}
-                    }}
-                    batch++;
-                    if (batch * 10 < ips.length) {{
-                        setTimeout(scanBatch, 200);
-                    }}
-                }}
-                scanBatch();
-            }})()
-            "#,
-            ips = ip_list_js
-        );
-        // Function::new_no_args instead of eval() for safety (matches
-        // install.rs's detect_timezone() convention) -- no untrusted data
-        // flows into `scan_js` today (only hardcoded IP prefixes/ports),
-        // but eval() has no such guarantee for any future change to this
-        // function, whereas Function() at least keeps execution out of the
-        // calling scope.
-        let scan_fn = js_sys::Function::new_no_args(&scan_js);
-        let _ = scan_fn.call0(&wasm_bindgen::JsValue::NULL);
-
-        // Poll for discovery result
-        let cb = wasm_bindgen::closure::Closure::<dyn Fn()>::new(move || {
-            let window = web_sys::window().unwrap();
-            if let Ok(val) = js_sys::Reflect::get(&window, &"__sovereign_discovered".into()) {
-                if let Some(ip) = val.as_string() {
-                    if !ip.is_empty() {
-                        scan_result.set(Some(ip.clone()));
-                        set_target_addr.set(ip);
-                        scanning_network.set(false);
-                        // Clean up
-                        let _ = js_sys::Reflect::delete_property(
-                            &window,
-                            &"__sovereign_discovered".into(),
-                        );
-                        return;
-                    }
-                }
-            }
-            // Keep polling for 10 seconds
-            scanning_network.set(false);
-        });
-        let window = web_sys::window().unwrap();
-        let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
-            cb.as_ref().unchecked_ref(),
-            5000,
-        );
-        cb.forget();
-    };
-
-    // Auto-scan on mount (only if no URL params and not resuming)
-    Effect::new(move |_| {
-        let _ = relay_state.get(); // subscribe
-        if relay_state.get() == RelayState::Disconnected
-            && !previous_install_in_progress.get()
-            && target_addr.get() == "sovereign-inoculation.local"
-        {
-            start_scan();
         }
     });
 
     // ── Start install ──
     let start_install = move || {
         let disk = selected_disk.get();
-        if disk.is_empty() {
+        if relay_state.get() != RelayState::Ready
+            || disk.is_empty()
+            || disk_confirmation.get().trim() != disk
+            || !disks.get().iter().any(|candidate| candidate.name == disk)
+        {
             return;
         }
 
@@ -1212,6 +1308,7 @@ pub fn RemoteInstallPanel(
             "user_password": user_password.get(),
         });
         send_msg(&msg);
+        user_password.set(String::new());
     };
 
     // Auto-detect removed: previous design probed a relay running on the target ISO via mDNS.
@@ -1237,29 +1334,8 @@ pub fn RemoteInstallPanel(
                         <p class="section-desc">
                             "Boot the target machine from the "
                             <a href="https://github.com/Luminous-Dynamics/nixforhumanity/releases" target="_blank">"NixForHumanity USB"</a>
-                            ". We'll try to find it on your network automatically."
+                            ", then enter the address, one-time password, and per-run relay token shown on its console."
                         </p>
-
-                        // Network scan status
-                        {move || scanning_network.get().then(|| view! {
-                            <div class="auto-detect-banner">
-                                <div class="spinner"></div>
-                                <span>"Scanning your network for NixOS targets..."</span>
-                            </div>
-                        })}
-                        {move || scan_result.get().map(|ip| view! {
-                            <div class="auto-detect-banner" style="background: rgba(126, 200, 160, 0.1); border-color: rgba(126, 200, 160, 0.3);">
-                                <span>{format!("Found NixOS target at {}", ip)}</span>
-                                <button class="btn-primary btn-sm" style="margin-left: auto;"
-                                    on:click=move |_| connect()
-                                >"Connect"</button>
-                            </div>
-                        })}
-                        {move || (!scanning_network.get() && scan_result.get().is_none() && relay_state.get() == RelayState::Disconnected).then(|| view! {
-                            <button class="btn-secondary btn-sm" style="margin-bottom: 0.5rem;"
-                                on:click=move |_| start_scan()
-                            >"Scan Network"</button>
-                        })}
                         <div class="connect-form">
                             <div class="field" style="flex: 2;">
                                 <label class="field-label">"Target Address"</label>
@@ -1274,7 +1350,7 @@ pub fn RemoteInstallPanel(
                                 <label class="field-label">"Password"</label>
                                 <input type="password" class="field-input"
                                     aria-label="Target machine password"
-                                    placeholder="sovereign"
+                                    placeholder="Shown on target console"
                                     prop:value=ssh_password
                                     on:input=move |ev| {
                                         // In-memory only -- see the signal's
@@ -1282,6 +1358,16 @@ pub fn RemoteInstallPanel(
                                         // never persisted to sessionStorage.
                                         set_ssh_password.set(event_target_value(&ev));
                                     }
+                                />
+                            </div>
+                            <div class="field">
+                                <label class="field-label">"Relay Token"</label>
+                                <input type="password" class="field-input"
+                                    aria-label="Per-run relay authentication token"
+                                    autocomplete="off"
+                                    placeholder="Shown on relay console"
+                                    prop:value=relay_token
+                                    on:input=move |ev| set_relay_token.set(event_target_value(&ev))
                                 />
                             </div>
                         </div>
@@ -1296,17 +1382,9 @@ pub fn RemoteInstallPanel(
                                 <div class="field">
                                     <label class="field-label">"Relay URL (override)"</label>
                                     <input type="text" class="field-input"
-                                        placeholder="auto: ws://<target>:8094"
+                                        placeholder="auto: wss://<target>:8094"
                                         prop:value=relay_url
                                         on:input=move |ev| set_relay_url.set(event_target_value(&ev))
-                                    />
-                                </div>
-                                <div class="field">
-                                    <label class="field-label">"Auth Token (from relay console)"</label>
-                                    <input type="text" class="field-input"
-                                        placeholder="Paste token from relay startup output"
-                                        prop:value=relay_token
-                                        on:input=move |ev| set_relay_token.set(event_target_value(&ev))
                                     />
                                 </div>
                                 <div class="field">
@@ -1440,7 +1518,10 @@ pub fn RemoteInstallPanel(
                                                 prop:checked=move || selected_disk.get() == name2
                                                 on:change={
                                                     let n = d.name.clone();
-                                                    move |_| selected_disk.set(n.clone())
+                                                    move |_| {
+                                                        selected_disk.set(n.clone());
+                                                        disk_confirmation.set(String::new());
+                                                    }
                                                 }
                                             />
                                             <span class="disk-option-label">{disk_label}</span>
@@ -1519,10 +1600,25 @@ pub fn RemoteInstallPanel(
                             view! {
                                 <div class="install-confirm">
                                     <p class="install-warning">
-                                        "This will ERASE ALL DATA on "<strong>{selected_disk.get()}</strong>
-                                        ". Make sure you have backups."
+                                        "This will modify partitions on "<strong>{selected_disk.get()}</strong>
+                                        " and can cause permanent data loss. Make sure you have backups."
                                     </p>
-                                    <button class="btn-danger" on:click=move |_| start_install()>
+                                    <label class="field-label" for="disk-confirmation">
+                                        "Type the exact disk identifier to confirm: "
+                                        <code>{selected_disk.get()}</code>
+                                    </label>
+                                    <input id="disk-confirmation" type="text" class="field-input"
+                                        autocomplete="off"
+                                        prop:value=disk_confirmation
+                                        on:input=move |ev| disk_confirmation.set(event_target_value(&ev))
+                                    />
+                                    <button class="btn-danger"
+                                        prop:disabled=move || {
+                                            let selected = selected_disk.get();
+                                            selected.is_empty() || disk_confirmation.get().trim() != selected
+                                        }
+                                        on:click=move |_| start_install()
+                                    >
                                         "Install NixOS Now"
                                     </button>
                                 </div>
@@ -1640,5 +1736,84 @@ pub fn RemoteInstallPanel(
                 })
             }}
         </GlassPanel>
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn destructive_relay_messages_require_install_state() {
+        assert!(!relay_message_allowed(&RelayState::Ready, "exit"));
+        assert!(!relay_message_allowed(&RelayState::Probing, "progress"));
+        assert!(relay_message_allowed(&RelayState::Installing, "exit"));
+        assert!(relay_message_allowed(
+            &RelayState::Reconnecting(1),
+            "progress"
+        ));
+    }
+
+    #[test]
+    fn disk_parser_rejects_unsafe_or_incomplete_targets() {
+        assert!(parse_disk_list(r#"[{"name":"../sda","size":1024}]"#).is_err());
+        assert!(parse_disk_list(r#"[{"name":"sda"}]"#).is_err());
+        assert!(parse_disk_list("[]").is_err());
+    }
+
+    #[test]
+    fn disk_parser_accepts_lsblk_number_and_string_sizes() {
+        let disks = parse_disk_list(
+            r#"[{"name":"nvme0n1","size":"1000000","model":"Test","children":[{"name":"nvme0n1p1","size":500000,"fstype":"vfat"}]}]"#,
+        )
+        .unwrap();
+        assert_eq!(disks.len(), 1);
+        assert_eq!(disks[0].name, "nvme0n1");
+        assert_eq!(disks[0].partitions[0].size_bytes, 500_000);
+    }
+
+    #[test]
+    fn target_addresses_are_normalized_without_accepting_url_syntax() {
+        assert_eq!(
+            normalize_target_address("192.168.1.2").unwrap(),
+            "192.168.1.2"
+        );
+        assert_eq!(
+            normalize_target_address("HOST.local").unwrap(),
+            "host.local"
+        );
+        assert_eq!(
+            normalize_target_address("2001:db8::1").unwrap(),
+            "[2001:db8::1]"
+        );
+        assert!(normalize_target_address("host/path").is_err());
+        assert!(normalize_target_address("user@host").is_err());
+        assert!(normalize_target_address(" host ").is_err());
+    }
+
+    #[test]
+    fn relay_urls_require_transport_security_off_loopback() {
+        assert!(validate_relay_url("wss://relay.example:8094").is_ok());
+        assert!(validate_relay_url("ws://127.0.0.1:8094").is_ok());
+        assert!(validate_relay_url("ws://[::1]:8094").is_ok());
+        assert!(validate_relay_url("ws://192.168.1.2:8094").is_err());
+        assert!(validate_relay_url("https://relay.example").is_err());
+        assert!(validate_relay_url("wss://user@relay.example").is_err());
+        assert!(validate_relay_url("wss:///missing-host").is_err());
+    }
+
+    #[test]
+    fn hardware_probe_requires_typed_bounded_evidence() {
+        let hardware = parse_hardware_probe(
+            r#"{"arch":"x86_64","tpm2_available":true,"detected_os":[{"name":"NixOS"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(hardware.arch, "x86_64");
+        assert!(hardware.tpm2);
+        assert_eq!(hardware.detected_os, vec!["NixOS"]);
+
+        assert!(parse_hardware_probe(r#"{"tpm2_available":true}"#).is_err());
+        assert!(parse_hardware_probe(r#"{"arch":"x86_64","secure_boot":"yes"}"#).is_err());
+        assert!(parse_hardware_probe(r#"{"arch":"../../bin/sh"}"#).is_err());
     }
 }

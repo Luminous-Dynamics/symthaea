@@ -20,12 +20,21 @@ use crate::hdc::ContinuousHV;
 /// - Yellow (0.3–0.6): reduced speed/force
 /// - Orange (0.1–0.3): retreat to safe pose
 /// - Red (< 0.1): emergency stop, power cut
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize,
+)]
 pub enum MotorSafetyLevel {
+    #[default]
     Green,
     Yellow,
     Orange,
     Red,
+}
+
+impl std::fmt::Display for MotorSafetyLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
 }
 
 impl MotorSafetyLevel {
@@ -99,7 +108,11 @@ pub struct EmbodimentTelemetry {
     pub total_steps: u64,
     pub control_effort: f32,
     pub prediction_error: f32,
-    pub safety_level: String,
+    /// Typed since 2026-07-12 (robotics plan Tier 2.2) — was a `format!("{:?}", ..)`
+    /// String; every producer already held a real `MotorSafetyLevel`, the string was
+    /// pure stringly-typed loss. `Display` (added alongside) still renders "Green" etc.
+    /// for any consumer that wants the old wire format (e.g. the Mycelix bridge).
+    pub safety_level: MotorSafetyLevel,
     pub platform: String,
     pub num_actuators: usize,
     /// Human-readable epistemic grounding level (e.g. "Sensorimotor", "Temporal", "Social").
@@ -506,13 +519,16 @@ impl MoralGateInput {
 /// Factory + metadata for a robotics platform.
 ///
 /// Each platform crate exports a `pub struct XPlugin;` implementing this trait.
-/// The cognitive loop's constructor collects all enabled plugins into a
-/// `PlatformRegistry` and dispatches bridge creation by `EmbodimentPlatform`.
+/// The main crate's `cognitive_loop::platform_registry::build_platform_registry()`
+/// collects all feature-enabled plugins into a [`PlatformRegistry`], and
+/// `switch_embodiment` dispatches bridge creation through it — the ONLY
+/// construction path (before 2026-07-12 it was a hand-written match and this
+/// plugin system was dead code).
 ///
 /// This reduces "add a platform" to 3 steps:
 /// 1. Add variant to `EmbodimentPlatform`
 /// 2. Add feature flag + optional dep to Cargo.toml
-/// 3. Register the plugin in the constructor's `build_registry()`
+/// 3. Register the plugin in `build_platform_registry()`
 pub trait PlatformPlugin: Send + Sync {
     /// Which platform this plugin provides.
     fn platform(&self) -> EmbodimentPlatform;

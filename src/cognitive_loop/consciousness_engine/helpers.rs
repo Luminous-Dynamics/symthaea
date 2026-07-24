@@ -158,9 +158,9 @@ impl ConsciousnessEngine {
     pub(super) fn compute_unified(
         &self,
         spectral_mip_phi: Option<f64>,
-        multimodal_phi: f64,
-        equation_v2: f64,
-        pipeline: f64,
+        multimodal_phi: Option<f64>,
+        equation_v2: Option<f64>,
+        pipeline: Option<f64>,
     ) -> f64 {
         // Normalize spectral phi from [0, ∞) to [0, 1] via shifted sigmoid
         let spectral_norm = spectral_mip_phi
@@ -170,11 +170,30 @@ impl ConsciousnessEngine {
 
         let w = &self.cache.weights;
 
-        // Weighted consensus using dynamic weights
-        let unified = w.spectral * spectral_norm
-            + w.equation * equation_v2
-            + w.pipeline * pipeline
-            + w.multimodal * multimodal_phi;
+        // Weighted consensus over PRESENT systems only, renormalized.
+        //
+        // HONESTY FIX (2026-07-15): three of the four systems are `None` at the
+        // production construction site (constructor.rs). They used to enter this
+        // sum as 0.0 at full weight, silently deflating unified consciousness —
+        // the "consensus" was really `w.spectral × spectral_norm` mislabeled.
+        // Absent systems now drop out of both numerator and denominator; the
+        // value is a true consensus of whatever systems actually ran.
+        // (docs/PHI_SIGNAL_TRACE_2026-07-15.md symptom 1.)
+        let mut num = w.spectral * spectral_norm;
+        let mut den = w.spectral;
+        if let Some(v) = equation_v2 {
+            num += w.equation * v;
+            den += w.equation;
+        }
+        if let Some(v) = pipeline {
+            num += w.pipeline * v;
+            den += w.pipeline;
+        }
+        if let Some(v) = multimodal_phi {
+            num += w.multimodal * v;
+            den += w.multimodal;
+        }
+        let unified = if den > 0.0 { num / den } else { 0.0 };
 
         // Consciousness floor: prevent total consciousness death.
         // Even with all subsystems at zero, the temporal continuity of the

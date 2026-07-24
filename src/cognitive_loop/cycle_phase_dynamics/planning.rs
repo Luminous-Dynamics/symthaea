@@ -303,6 +303,16 @@ impl CognitiveLoopService {
             * tau_cpg
             * phi_tau_factor;
         let _t_core = Instant::now();
+        // Capture the pre-step evolution state (end of cycle t−1) into the
+        // rolling training-history queue; front() is then end-of-(t−2), the
+        // temporally correct start for this cycle's (enc_{t−1} → enc_t)
+        // training pair. Cap 2 — older states are no longer needed.
+        if let Some(backup) = self.temporal_network.save_evolution_state() {
+            if self.train_history_snapshots.len() >= 2 {
+                self.train_history_snapshots.pop_front();
+            }
+            self.train_history_snapshots.push_back(backup);
+        }
         if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
             tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");
         }
@@ -378,6 +388,12 @@ impl CognitiveLoopService {
         // 5. Get multi-scale predictions
         let _t_core = Instant::now();
         let (prediction, raw_predictions) = self.get_multi_scale_prediction(&input_array);
+
+        // Retain the shortest-horizon raw prediction for the bits-saved
+        // diagnostics (Predictive Compression Program P0) — the registered C1
+        // metric uses this, not the multi-horizon average. None on the
+        // fallback paths that return no per-horizon predictions.
+        let prediction_first_horizon = raw_predictions.first().map(|p| p.to_vec());
 
         // 5a. JEPA: parallel latent-space prediction alongside CfC.
         // Uses the CfC input as "current state" and the multi-scale prediction
@@ -580,6 +596,7 @@ impl CognitiveLoopService {
             delta_t,
             output,
             prediction,
+            prediction_first_horizon,
             prediction_coherence,
             epistemic_uncertainty,
             aleatoric_uncertainty,

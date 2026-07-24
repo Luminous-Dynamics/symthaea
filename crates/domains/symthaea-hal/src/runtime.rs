@@ -61,6 +61,8 @@ pub struct RuntimeTelemetry {
 pub struct HealthStatus {
     /// All registered sensors report available.
     pub sensors_ok: bool,
+    /// Servo PWM boards completed initialization.
+    pub servos_initialized: bool,
     /// Servo output is enabled.
     pub servos_enabled: bool,
     /// Interlock has not tripped.
@@ -78,10 +80,11 @@ pub struct HealthStatus {
 impl HealthStatus {
     /// Whether the system is ready for operation.
     ///
-    /// True when: all sensors OK, servos enabled, interlock OK,
-    /// no e-stop, tick rate OK, and no degraded sensors.
+    /// True when: all sensors OK, PWM boards initialized, servos enabled,
+    /// interlock OK, no e-stop, tick rate OK, and no degraded sensors.
     pub fn is_ready(&self) -> bool {
         self.sensors_ok
+            && self.servos_initialized
             && self.servos_enabled
             && self.interlock_ok
             && !self.estop_active
@@ -230,14 +233,15 @@ impl CurrentMonitor {
             joint_index,
             current_field_index,
             consecutive_nones: 0,
-            max_consecutive_nones: 50,
+            max_consecutive_nones: 1,
             warned: false,
         }
     }
 
-    /// Set the threshold for consecutive `None` reads before marking degraded.
+    /// Set the number of consecutive missing samples tolerated before the
+    /// interlock trips. The fail-closed default is one missing sample.
     pub fn with_max_consecutive_nones(mut self, max: u64) -> Self {
-        self.max_consecutive_nones = max;
+        self.max_consecutive_nones = max.max(1);
         self
     }
 
@@ -291,14 +295,15 @@ impl AngleMonitor {
             joint_index,
             angle_field_index,
             consecutive_nones: 0,
-            max_consecutive_nones: 50,
+            max_consecutive_nones: 1,
             warned: false,
         }
     }
 
-    /// Set the threshold for consecutive `None` reads before marking degraded.
+    /// Set the number of consecutive missing samples tolerated before the
+    /// interlock trips. The fail-closed default is one missing sample.
     pub fn with_max_consecutive_nones(mut self, max: u64) -> Self {
-        self.max_consecutive_nones = max;
+        self.max_consecutive_nones = max.max(1);
         self
     }
 
@@ -399,6 +404,37 @@ impl<I: I2c> HalRuntime<I> {
         }
     }
 
+    fn validated_tick_period(&self) -> HalResult<Duration> {
+        if !self.tick_hz.is_finite() || self.tick_hz <= 0.0 {
+            return Err(HalError::Safety(format!(
+                "tick rate must be finite and positive, got {}",
+                self.tick_hz
+            )));
+        }
+        if let Some(interval) = self.telemetry_log_interval_secs
+            && (!interval.is_finite() || interval <= 0.0)
+        {
+            return Err(HalError::Safety(format!(
+                "telemetry log interval must be finite and positive, got {interval}"
+            )));
+        }
+
+        let period_secs = 1.0 / self.tick_hz;
+        let period = Duration::try_from_secs_f64(period_secs).map_err(|error| {
+            HalError::Safety(format!(
+                "tick rate {} Hz produces an invalid period: {error:?}",
+                self.tick_hz
+            ))
+        })?;
+        if period.is_zero() {
+            return Err(HalError::Safety(format!(
+                "tick rate {} Hz exceeds the runtime clock resolution",
+                self.tick_hz
+            )));
+        }
+        Ok(period)
+    }
+
     /// Emit telemetry log if the configured interval has elapsed.
     fn maybe_log_telemetry(&mut self) {
         if let Some(interval) = self.telemetry_log_interval_secs {
@@ -425,10 +461,21 @@ impl<I: I2c> HalRuntime<I> {
     /// 3. Filter through safety interlock
     /// 4. Apply to servos
     ///
-    /// The callback receives one `Option<Vec<f32>>` per sensor. `None` means
-    /// the sensor had no data this tick. Sensor indexing is stable (matches
-    /// `add_sensor()` order).
+    /// Any error path immediately attempts to disable both PWM boards before
+    /// the error is returned to the caller.
     pub fn tick<F>(&mut self, callback: F) -> HalResult<()>
+    where
+        F: FnOnce(&[Option<Vec<f32>>]) -> HumanoidCommand,
+    {
+        let result = self.tick_inner(callback);
+        if result.is_err() {
+            self.finish_with_shutdown(result)
+        } else {
+            result
+        }
+    }
+
+    fn tick_inner<F>(&mut self, callback: F) -> HalResult<()>
     where
         F: FnOnce(&[Option<Vec<f32>>]) -> HumanoidCommand,
     {
@@ -442,48 +489,82 @@ impl<I: I2c> HalRuntime<I> {
             return Err(HalError::EStop);
         }
 
-        // 0b. Read current monitors → check overcurrent
+        // 0b. Read current monitors → check overcurrent. Missing fields are
+        // configuration faults; sustained missing samples are fail-stop.
         for mon in &mut self.current_monitors {
-            if let Some(values) = mon.sensor.read_raw() {
-                mon.consecutive_nones = 0;
-                mon.warned = false;
-                if let Some(&amps) = values.get(mon.current_field_index) {
+            match mon.sensor.read_raw() {
+                Some(values) => {
+                    let Some(&amps) = values.get(mon.current_field_index) else {
+                        return Err(self.interlock.trip_safety(format!(
+                            "current sensor '{}' returned {} fields; index {} is required",
+                            mon.sensor.name(),
+                            values.len(),
+                            mon.current_field_index
+                        )));
+                    };
+                    mon.consecutive_nones = 0;
+                    mon.warned = false;
                     self.interlock.check_current(mon.joint_index, amps)?;
                 }
-            } else {
-                mon.consecutive_nones += 1;
-                if mon.consecutive_nones == mon.max_consecutive_nones && !mon.warned {
-                    warn!(
-                        sensor = mon.sensor.name(),
-                        joint = mon.joint_index,
-                        consecutive_nones = mon.consecutive_nones,
-                        "current sensor degraded — no data for {} consecutive reads",
-                        mon.consecutive_nones
-                    );
-                    mon.warned = true;
+                None => {
+                    mon.consecutive_nones = mon.consecutive_nones.saturating_add(1);
+                    if mon.consecutive_nones >= mon.max_consecutive_nones {
+                        mon.warned = true;
+                        return Err(self.interlock.trip_safety(format!(
+                            "current sensor '{}' unavailable for {} consecutive reads",
+                            mon.sensor.name(),
+                            mon.consecutive_nones
+                        )));
+                    }
+                    if !mon.warned {
+                        warn!(
+                            sensor = mon.sensor.name(),
+                            joint = mon.joint_index,
+                            consecutive_nones = mon.consecutive_nones,
+                            "current sensor sample unavailable"
+                        );
+                        mon.warned = true;
+                    }
                 }
             }
         }
 
-        // 0c. Read angle monitors → check angle bounds
+        // 0c. Read angle monitors → check angle bounds. Missing fields are
+        // configuration faults; sustained missing samples are fail-stop.
         for mon in &mut self.angle_monitors {
-            if let Some(values) = mon.sensor.read_raw() {
-                mon.consecutive_nones = 0;
-                mon.warned = false;
-                if let Some(&deg) = values.get(mon.angle_field_index) {
+            match mon.sensor.read_raw() {
+                Some(values) => {
+                    let Some(&deg) = values.get(mon.angle_field_index) else {
+                        return Err(self.interlock.trip_safety(format!(
+                            "angle sensor '{}' returned {} fields; index {} is required",
+                            mon.sensor.name(),
+                            values.len(),
+                            mon.angle_field_index
+                        )));
+                    };
+                    mon.consecutive_nones = 0;
+                    mon.warned = false;
                     self.interlock.check_angle(mon.joint_index, deg)?;
                 }
-            } else {
-                mon.consecutive_nones += 1;
-                if mon.consecutive_nones == mon.max_consecutive_nones && !mon.warned {
-                    warn!(
-                        sensor = mon.sensor.name(),
-                        joint = mon.joint_index,
-                        consecutive_nones = mon.consecutive_nones,
-                        "angle sensor degraded — no data for {} consecutive reads",
-                        mon.consecutive_nones
-                    );
-                    mon.warned = true;
+                None => {
+                    mon.consecutive_nones = mon.consecutive_nones.saturating_add(1);
+                    if mon.consecutive_nones >= mon.max_consecutive_nones {
+                        mon.warned = true;
+                        return Err(self.interlock.trip_safety(format!(
+                            "angle sensor '{}' unavailable for {} consecutive reads",
+                            mon.sensor.name(),
+                            mon.consecutive_nones
+                        )));
+                    }
+                    if !mon.warned {
+                        warn!(
+                            sensor = mon.sensor.name(),
+                            joint = mon.joint_index,
+                            consecutive_nones = mon.consecutive_nones,
+                            "angle sensor sample unavailable"
+                        );
+                        mon.warned = true;
+                    }
                 }
             }
         }
@@ -513,6 +594,18 @@ impl<I: I2c> HalRuntime<I> {
         Ok(())
     }
 
+    fn finish_with_shutdown<T>(&mut self, result: HalResult<T>) -> HalResult<T> {
+        let shutdown = self.servo.disable();
+        match (result, shutdown) {
+            (Ok(value), Ok(())) => Ok(value),
+            (Err(run_error), Ok(())) => Err(run_error),
+            (Ok(_), Err(shutdown_error)) => Err(shutdown_error),
+            (Err(run_error), Err(shutdown_error)) => Err(HalError::Safety(format!(
+                "runtime failed: {run_error}; emergency shutdown also failed: {shutdown_error}"
+            ))),
+        }
+    }
+
     /// Run a blocking loop at the configured tick rate.
     ///
     /// Exits when:
@@ -526,36 +619,32 @@ impl<I: I2c> HalRuntime<I> {
     where
         F: FnMut(&[Option<Vec<f32>>]) -> HumanoidCommand,
     {
-        let period = Duration::from_secs_f64(1.0 / self.tick_hz);
+        let period = match self.validated_tick_period() {
+            Ok(period) => period,
+            Err(error) => return self.finish_with_shutdown(Err(error)),
+        };
         info!(hz = self.tick_hz, "HAL runtime starting");
 
-        loop {
+        let result = loop {
             let tick_start = Instant::now();
 
-            // Check max ticks
             if let Some(max) = max_ticks
                 && self.tick_count >= max
             {
                 debug!(ticks = self.tick_count, "max ticks reached");
-                return Ok(self.tick_count);
+                break Ok(self.tick_count);
             }
 
-            // Check e-stop before tick
             if self.interlock.is_estopped() {
                 warn!("runtime stopping: e-stop active");
-                return Err(HalError::EStop);
+                break Err(HalError::EStop);
             }
 
-            // Execute tick
-            match self.tick(&mut callback) {
-                Ok(()) => {}
-                Err(e) => {
-                    warn!(error = %e, ticks = self.tick_count, "runtime stopping on error");
-                    return Err(e);
-                }
+            if let Err(e) = self.tick(&mut callback) {
+                warn!(error = %e, ticks = self.tick_count, "runtime stopping on error");
+                break Err(e);
             }
 
-            // Sleep for remaining time in period
             let elapsed = tick_start.elapsed();
             if elapsed < period {
                 std::thread::sleep(period - elapsed);
@@ -564,7 +653,9 @@ impl<I: I2c> HalRuntime<I> {
             }
 
             self.maybe_log_telemetry();
-        }
+        };
+
+        self.finish_with_shutdown(result)
     }
 
     /// Get the total tick count.
@@ -634,9 +725,19 @@ impl<I: I2c> HalRuntime<I> {
         }
 
         // Servos
+        let servos_initialized = self.servo.is_initialized();
+        if !servos_initialized {
+            issues.push("servo PWM boards not initialized".to_string());
+        }
         let servos_enabled = self.servo.is_enabled();
         if !servos_enabled {
             issues.push("servos not enabled".to_string());
+        }
+        // `enable()` deliberately clears `shutdown_verified` (you can't be both
+        // running and verified-off at once), so this is only a real issue when
+        // the servo is in neither state — not enabled AND not verified off.
+        if !servos_enabled && !self.servo.shutdown_verified() {
+            issues.push("servo shutdown state is unverified".to_string());
         }
 
         // Interlock
@@ -654,20 +755,25 @@ impl<I: I2c> HalRuntime<I> {
             issues.push("e-stop active".to_string());
         }
 
-        // Tick rate (±20% tolerance, skip if <2 ticks)
+        // Tick rate (±20% tolerance, skip measurement if <2 ticks).
         let t = self.telemetry.snapshot(self.tick_count);
-        let tick_rate_ok = if self.tick_count < 2 {
-            true
-        } else {
-            let ratio = t.actual_hz / self.tick_hz;
-            let ok = (0.8..=1.2).contains(&ratio);
-            if !ok {
-                issues.push(format!(
-                    "tick rate {:.1} Hz outside ±20% of target {:.1} Hz",
-                    t.actual_hz, self.tick_hz
-                ));
+        let tick_rate_ok = match self.validated_tick_period() {
+            Err(error) => {
+                issues.push(format!("invalid runtime timing configuration: {error}"));
+                false
             }
-            ok
+            Ok(_) if self.tick_count < 2 => true,
+            Ok(_) => {
+                let ratio = t.actual_hz / self.tick_hz;
+                let ok = ratio.is_finite() && (0.8..=1.2).contains(&ratio);
+                if !ok {
+                    issues.push(format!(
+                        "tick rate {:.1} Hz outside ±20% of target {:.1} Hz",
+                        t.actual_hz, self.tick_hz
+                    ));
+                }
+                ok
+            }
         };
 
         // Degraded sensors
@@ -682,6 +788,7 @@ impl<I: I2c> HalRuntime<I> {
 
         HealthStatus {
             sensors_ok,
+            servos_initialized,
             servos_enabled,
             interlock_ok,
             estop_active,
@@ -715,13 +822,21 @@ impl<I: I2c> HalRuntime<I> {
         use std::sync::Arc;
         use std::sync::atomic::{AtomicBool, Ordering};
 
+        let period = match self.validated_tick_period() {
+            Ok(period) => period,
+            Err(error) => return self.finish_with_shutdown(Err(error)),
+        };
+
         let shutdown = Arc::new(AtomicBool::new(false));
         let shutdown_clone = Arc::clone(&shutdown);
-        let _ = ctrlc::set_handler(move || {
+        if let Err(error) = ctrlc::set_handler(move || {
             shutdown_clone.store(true, Ordering::SeqCst);
-        });
+        }) {
+            return self.finish_with_shutdown(Err(HalError::Safety(format!(
+                "failed to install shutdown handler: {error}"
+            ))));
+        }
 
-        let period = Duration::from_secs_f64(1.0 / self.tick_hz);
         info!(
             hz = self.tick_hz,
             "HAL runtime starting (with signal handler)"
@@ -770,9 +885,7 @@ impl<I: I2c> HalRuntime<I> {
             self.maybe_log_telemetry();
         };
 
-        // Always disable servos on exit
-        let _ = self.servo.disable();
-        result
+        self.finish_with_shutdown(result)
     }
 }
 
@@ -897,7 +1010,7 @@ mod tests {
         let cal = CalibrationProfile::default_21();
         let mut servo = ServoOutput::new(bus0, bus1, cal);
         servo.init(50.0).unwrap();
-        servo.enable();
+        servo.enable().unwrap();
         let interlock = SafetyInterlock::new();
         HalRuntime::new(servo, interlock)
     }
@@ -958,6 +1071,8 @@ mod tests {
             .run(Some(5), |_readings| HumanoidCommand::zero())
             .unwrap();
         assert_eq!(count, 5);
+        assert!(!rt.servo().is_enabled());
+        assert!(rt.servo().shutdown_verified());
     }
 
     #[test]
@@ -968,6 +1083,8 @@ mod tests {
 
         let result = rt.run(Some(100), |_| HumanoidCommand::zero());
         assert!(result.is_err());
+        assert!(!rt.servo().is_enabled());
+        assert!(rt.servo().shutdown_verified());
     }
 
     #[test]
@@ -1025,6 +1142,25 @@ mod tests {
         assert!(rt.tick_count() < 100);
     }
 
+    #[test]
+    fn test_invalid_tick_rate_fails_closed() {
+        let mut rt = make_runtime();
+        rt.set_tick_hz(0.0);
+        assert!(rt.run(Some(1), |_| HumanoidCommand::zero()).is_err());
+        assert!(!rt.servo().is_enabled());
+        assert!(rt.servo().shutdown_verified());
+        assert!(!rt.health().tick_rate_ok);
+    }
+
+    #[test]
+    fn test_invalid_telemetry_interval_fails_closed() {
+        let mut rt = make_runtime();
+        rt.set_telemetry_log_interval(f64::NAN);
+        assert!(rt.run(Some(1), |_| HumanoidCommand::zero()).is_err());
+        assert!(!rt.servo().is_enabled());
+        assert!(!rt.health().tick_rate_ok);
+    }
+
     // ── Current monitor tests ──────────────────────────────────────────
 
     #[test]
@@ -1044,15 +1180,41 @@ mod tests {
         rt.add_current_monitor(CurrentMonitor::new(Box::new(sensor), 0, 0));
         let result = rt.tick(|_| HumanoidCommand::zero());
         assert!(matches!(result, Err(HalError::Overcurrent { .. })));
+        assert!(!rt.servo().is_enabled());
+        assert!(rt.servo().shutdown_verified());
     }
 
     #[test]
-    fn test_current_monitor_no_data() {
+    fn test_current_monitor_no_data_fails_closed_by_default() {
         let mut rt = make_runtime();
-        // Empty sensor → read_raw returns None → no error
         let sensor = MockHalSensor::new("ina219", vec![]);
         rt.add_current_monitor(CurrentMonitor::new(Box::new(sensor), 0, 0));
+        assert!(rt.tick(|_| HumanoidCommand::zero()).is_err());
+        assert!(rt.interlock().is_tripped());
+        assert!(!rt.servo().is_enabled());
+    }
+
+    #[test]
+    fn test_current_monitor_missing_field_trips() {
+        let mut rt = make_runtime();
+        let sensor = MockHalSensor::new("ina219", vec![vec![1.0]]);
+        rt.add_current_monitor(CurrentMonitor::new(Box::new(sensor), 0, 1));
+        assert!(rt.tick(|_| HumanoidCommand::zero()).is_err());
+        assert!(rt.interlock().is_tripped());
+        assert!(!rt.servo().is_enabled());
+    }
+
+    #[test]
+    fn test_current_monitor_degradation_is_fail_stop() {
+        let mut rt = make_runtime();
+        let sensor = MockHalSensor::new("ina219", vec![]);
+        rt.add_current_monitor(
+            CurrentMonitor::new(Box::new(sensor), 0, 0).with_max_consecutive_nones(2),
+        );
         rt.tick(|_| HumanoidCommand::zero()).unwrap();
+        assert!(rt.tick(|_| HumanoidCommand::zero()).is_err());
+        assert!(rt.interlock().is_tripped());
+        assert!(!rt.servo().is_enabled());
     }
 
     #[test]
@@ -1224,6 +1386,16 @@ mod tests {
     }
 
     #[test]
+    fn test_angle_monitor_missing_field_trips() {
+        let mut rt = make_runtime();
+        let sensor = MockHalSensor::new("encoder", vec![vec![0.0]]);
+        rt.add_angle_monitor(AngleMonitor::new(Box::new(sensor), 0, 2));
+        assert!(rt.tick(|_| HumanoidCommand::zero()).is_err());
+        assert!(rt.interlock().is_tripped());
+        assert!(!rt.servo().is_enabled());
+    }
+
+    #[test]
     fn test_angle_monitor_out_of_bounds() {
         let mut rt = make_runtime();
         // 95° exceeds the ±90° default limit
@@ -1244,11 +1416,13 @@ mod tests {
     }
 
     #[test]
-    fn test_angle_monitor_no_data() {
+    fn test_angle_monitor_no_data_fails_closed_by_default() {
         let mut rt = make_runtime();
         let sensor = MockHalSensor::new("angle", vec![]);
         rt.add_angle_monitor(AngleMonitor::new(Box::new(sensor), 0, 0));
-        rt.tick(|_| HumanoidCommand::zero()).unwrap();
+        assert!(rt.tick(|_| HumanoidCommand::zero()).is_err());
+        assert!(rt.interlock().is_tripped());
+        assert!(!rt.servo().is_enabled());
     }
 
     #[test]
@@ -1351,7 +1525,7 @@ mod tests {
         let cal = CalibrationProfile::default_21();
         let mut servo = ServoOutput::new(bus0, bus1, cal);
         servo.init(50.0).unwrap();
-        servo.enable();
+        servo.enable().unwrap();
         servo
     }
 
@@ -1481,10 +1655,11 @@ mod tests {
         let mon = CurrentMonitor::new(Box::new(sensor), 0, 0).with_max_consecutive_nones(3);
         rt.add_current_monitor(mon);
 
-        // Tick 4 times — threshold is 3, so degraded after 3 Nones
-        for _ in 0..4 {
+        // Two misses are tolerated; the third is fail-stop.
+        for _ in 0..2 {
             rt.tick(|_| HumanoidCommand::zero()).unwrap();
         }
+        assert!(rt.tick(|_| HumanoidCommand::zero()).is_err());
         let degraded = rt.degraded_sensors();
         assert_eq!(degraded.len(), 1);
         assert_eq!(degraded[0].0, "ina219");
@@ -1499,9 +1674,10 @@ mod tests {
         let mon = AngleMonitor::new(Box::new(sensor), 0, 0).with_max_consecutive_nones(3);
         rt.add_angle_monitor(mon);
 
-        for _ in 0..4 {
+        for _ in 0..2 {
             rt.tick(|_| HumanoidCommand::zero()).unwrap();
         }
+        assert!(rt.tick(|_| HumanoidCommand::zero()).is_err());
         let degraded = rt.degraded_sensors();
         assert_eq!(degraded.len(), 1);
         assert_eq!(degraded[0].0, "angle_imu");
@@ -1545,7 +1721,7 @@ mod tests {
     fn test_degradation_default_threshold() {
         let sensor = MockHalSensor::new("ina219", vec![]);
         let mon = CurrentMonitor::new(Box::new(sensor), 0, 0);
-        assert_eq!(mon.max_consecutive_nones, 50);
+        assert_eq!(mon.max_consecutive_nones, 1);
         assert!(!mon.is_degraded());
         assert_eq!(mon.consecutive_nones(), 0);
     }
@@ -1576,8 +1752,9 @@ mod tests {
         let rt = HalRuntime::new(servo, SafetyInterlock::new());
         let h = rt.health();
         assert!(!h.is_ready());
+        assert!(!h.servos_initialized);
         assert!(!h.servos_enabled);
-        assert!(h.issues.iter().any(|i| i.contains("servos")));
+        assert!(h.issues.iter().any(|i| i.contains("servo PWM")));
     }
 
     #[test]
@@ -1621,6 +1798,7 @@ mod tests {
         let json = serde_json::to_string(&h).unwrap();
         let h2: HealthStatus = serde_json::from_str(&json).unwrap();
         assert_eq!(h.sensors_ok, h2.sensors_ok);
+        assert_eq!(h.servos_initialized, h2.servos_initialized);
         assert_eq!(h.servos_enabled, h2.servos_enabled);
         assert_eq!(h.degraded_count, h2.degraded_count);
     }

@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Cetacean Scorer - HDC-based Language Model for Whale Vocalizations
+//! Cetacean Scorer - HDC-based Acoustic Pattern Scorer for Whale Vocalizations
 //!
 //! This module applies the "articulatory feature" paradigm to cetacean communication,
 //! treating whale sounds as having their own "phonological" structure.
@@ -40,11 +40,11 @@ use std::path::Path;
 /// Manner of cetacean articulation (production mechanism)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CetaceanManner {
-    /// Click - impulsive, transient sound (echolocation, codas)
+    /// Click - impulsive, transient sound
     Click,
-    /// Whistle - tonal, sustained sound (social communication)
+    /// Whistle - tonal, sustained sound
     Whistle,
-    /// Burst - broadband, noisy sound (excitement, aggression)
+    /// Burst - broadband, noisy sound
     Burst,
 }
 

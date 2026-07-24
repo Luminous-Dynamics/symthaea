@@ -13,7 +13,7 @@ pub const NUM_ACTUATORS: usize = 21;
 
 /// Number of state channels for HDC encoding (DMC21 default).
 /// For other morphologies, use `HumanoidMorphology::num_channels()`.
-pub const NUM_STATE_CHANNELS: usize = 67;
+pub const NUM_STATE_CHANNELS: usize = 72;
 
 /// Joint names matching the dm_control humanoid MJCF (DMC21).
 /// For other morphologies, use `HumanoidMorphology::joint_names()`.
@@ -41,6 +41,77 @@ pub const JOINT_NAMES: [&str; NUM_ACTUATORS] = [
     "left_elbow",
 ];
 
+/// A structural or numerical violation in a humanoid observation frame.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StateValidationError {
+    JointAngleCount { expected: usize, actual: usize },
+    JointVelocityCount { expected: usize, actual: usize },
+    ExtremityChannelCount { expected: usize, actual: usize },
+    NonFiniteValue,
+    NegativeTimestamp,
+}
+
+/// Physical interpretation advertised by an embodiment backend.
+///
+/// A command must never silently change meaning between simulation and hardware.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ActuationMode {
+    /// Unitless command in [-1, 1], scaled by a backend torque limit.
+    NormalizedTorque,
+    /// Torque in newton-metres.
+    TorqueNewtonMetres,
+    /// Unitless position target in [-1, 1], mapped through joint calibration.
+    NormalizedPosition,
+    /// Absolute joint position target in radians.
+    PositionTargetRadians,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EmbodimentCapabilities {
+    pub backend_name: String,
+    pub morphology: HumanoidMorphology,
+    pub actuator_count: usize,
+    pub observation_schema_id: String,
+    pub actuation_mode: ActuationMode,
+    pub privileged_truth_available: bool,
+    pub command_deadlines_enforced: bool,
+}
+
+impl EmbodimentCapabilities {
+    pub fn validate_for_morphology(&self, expected: HumanoidMorphology) -> Result<(), String> {
+        if self.morphology != expected {
+            return Err(format!(
+                "backend {} exposes {:?}, expected {:?}",
+                self.backend_name, self.morphology, expected
+            ));
+        }
+        if self.actuator_count != expected.num_actuators() {
+            return Err(format!(
+                "backend {} exposes {} actuators, expected {}",
+                self.backend_name,
+                self.actuator_count,
+                expected.num_actuators()
+            ));
+        }
+        if self.observation_schema_id != expected.schema_id() {
+            return Err(format!(
+                "backend {} exposes schema {}, expected {}",
+                self.backend_name,
+                self.observation_schema_id,
+                expected.schema_id()
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommandValidationError {
+    ActuatorCount { expected: usize, actual: usize },
+    NonFiniteValue { index: usize },
+    NormalizedValueOutOfRange { index: usize },
+}
+
 /// Full humanoid state: proprioceptive + computed features.
 ///
 /// Joint arrays are dynamically sized to support different morphologies.
@@ -50,6 +121,11 @@ pub struct HumanoidState {
     // ── Proprioceptive ──
     /// Root body height (qpos[2], z excluding global x/y).
     pub root_height: f64,
+    /// Privileged root position in world coordinates. This is deliberately
+    /// excluded from `to_channels()` so policy observations remain translation
+    /// invariant while evaluators and recovery controllers can reason about
+    /// support geometry.
+    pub root_position: [f64; 3],
     /// Root orientation quaternion [w, x, y, z] (qpos[3..7]).
     pub root_quaternion: [f64; 4],
     /// Joint angles for all actuated joints. Length = morphology.num_actuators().
@@ -78,38 +154,47 @@ pub struct HumanoidState {
 }
 
 impl HumanoidState {
-    /// Pack all 67 state channels into an f32 array for HDC encoding.
+    /// Neutral (all-zero pose, upright orientation) state sized for the given
+    /// morphology's actuator/extremity counts — a standing baseline for tests
+    /// and callers that don't care about a specific pose.
+    pub fn default_for(morphology: HumanoidMorphology) -> Self {
+        let num_actuators = morphology.num_actuators();
+        let num_extremities = morphology.num_extremity_channels();
+        Self {
+            root_height: 0.0,
+            root_position: [0.0; 3],
+            root_quaternion: [1.0, 0.0, 0.0, 0.0],
+            joint_angles: vec![0.0; num_actuators],
+            root_linear_velocity: [0.0; 3],
+            root_angular_velocity: [0.0; 3],
+            joint_velocities: vec![0.0; num_actuators],
+            head_height: 0.0,
+            torso_vertical: [0.0, 0.0, 1.0],
+            extremities: vec![0.0; num_extremities],
+            com_velocity: [0.0; 3],
+            timestamp: 0.0,
+        }
+    }
+
+    /// Pack the translation-invariant observation channels into the stable
+    /// schema order used by the encoder. `root_position` is privileged state
+    /// and is intentionally not encoded.
     ///
-    /// Channel layout (67D total):
-    /// [0]       root_height
-    /// [1..5]    root_quaternion
-    /// [5..26]   joint_angles
-    /// [26..29]  root_linear_velocity
-    /// [29..32]  root_angular_velocity
-    /// [32..53]  joint_velocities
-    /// [53]      head_height
-    /// [54..57]  torso_vertical
-    /// [57..69]  extremities -- wait, 57+12=69, but we have 67 channels
-    /// Actually let me recount:
-    /// [0]       root_height          = 1
-    /// [1..5]    root_quaternion       = 4  (total: 5)
-    /// [5..26]   joint_angles          = 21 (total: 26)
-    /// [26..29]  root_linear_velocity  = 3  (total: 29)
-    /// [29..32]  root_angular_velocity = 3  (total: 32)
-    /// [32..53]  joint_velocities      = 21 (total: 53)
-    /// [53]      head_height           = 1  (total: 54)
-    /// [54..57]  torso_vertical        = 3  (total: 57)
-    /// [57..69]  extremities           = 12 -- this would be 69, exceeding 67
-    /// Fix: extremities should be reduced or we need to drop some features.
-    /// The plan says ~67D. Let me recalculate:
-    /// 1 + 4 + 21 + 3 + 3 + 21 + 1 + 3 + 12 + 3 = 72. That's more than 67.
-    /// Wait -- plan says root_height excludes x/y from qpos, so no x/y position.
-    /// Let me recount from the plan:
-    ///   Proprioceptive: root_height(1) + root_quat(4) + joint_angles(21) +
-    ///     root_lin_vel(3) + root_ang_vel(3) + joint_vel(21) = 53
-    ///   Computed: head_height(1) + torso_vertical(3) + extremities(12) + com_vel(3) = 19
-    ///   Total: 53 + 19 = 72. Plan says "~67D" but lists 72.
-    /// For fidelity to dm_control, keep all 72 channels.
+    /// DMC21 layout (72D total):
+    /// - root height: 1
+    /// - root quaternion: 4
+    /// - joint angles: 21
+    /// - root linear velocity: 3
+    /// - root angular velocity: 3
+    /// - joint velocities: 21
+    /// - head height: 1
+    /// - torso vertical: 3
+    /// - extremity positions: 12
+    /// - center-of-mass velocity: 3
+    ///
+    /// Extended morphologies retain the same ordering while increasing the joint
+    /// and extremity sections. Use [`HumanoidMorphology::num_observation_channels`]
+    /// instead of hard-coding offsets.
     pub fn to_channels(&self) -> Vec<f32> {
         let mut channels = Vec::with_capacity(self.num_channels());
 
@@ -165,6 +250,58 @@ impl HumanoidState {
         self.joint_angles.len()
     }
 
+    /// Validate this frame against a morphology before it enters the controller,
+    /// replay buffer, reward function, or hardware boundary.
+    pub fn validate_for(&self, morphology: HumanoidMorphology) -> Result<(), StateValidationError> {
+        let expected_joints = morphology.num_actuators();
+        if self.joint_angles.len() != expected_joints {
+            return Err(StateValidationError::JointAngleCount {
+                expected: expected_joints,
+                actual: self.joint_angles.len(),
+            });
+        }
+        if self.joint_velocities.len() != expected_joints {
+            return Err(StateValidationError::JointVelocityCount {
+                expected: expected_joints,
+                actual: self.joint_velocities.len(),
+            });
+        }
+
+        let expected_extremities = morphology.num_extremity_channels();
+        if self.extremities.len() != expected_extremities {
+            return Err(StateValidationError::ExtremityChannelCount {
+                expected: expected_extremities,
+                actual: self.extremities.len(),
+            });
+        }
+
+        let finite = self.root_height.is_finite()
+            && self.root_position.iter().all(|value| value.is_finite())
+            && self.root_quaternion.iter().all(|value| value.is_finite())
+            && self.joint_angles.iter().all(|value| value.is_finite())
+            && self
+                .root_linear_velocity
+                .iter()
+                .all(|value| value.is_finite())
+            && self
+                .root_angular_velocity
+                .iter()
+                .all(|value| value.is_finite())
+            && self.joint_velocities.iter().all(|value| value.is_finite())
+            && self.head_height.is_finite()
+            && self.torso_vertical.iter().all(|value| value.is_finite())
+            && self.extremities.iter().all(|value| value.is_finite())
+            && self.com_velocity.iter().all(|value| value.is_finite())
+            && self.timestamp.is_finite();
+        if !finite {
+            return Err(StateValidationError::NonFiniteValue);
+        }
+        if self.timestamp < 0.0 {
+            return Err(StateValidationError::NegativeTimestamp);
+        }
+        Ok(())
+    }
+
     /// Construct a default upright standing state (DMC21: 21 joints).
     pub fn standing() -> Self {
         Self::standing_for(HumanoidMorphology::Dmc21)
@@ -173,9 +310,10 @@ impl HumanoidState {
     /// Construct a standing state for a specific morphology.
     pub fn standing_for(morphology: HumanoidMorphology) -> Self {
         let n = morphology.num_actuators();
-        let n_extremities = if n > 21 { 18 } else { 12 }; // Extra hand centroids for dexterous
+        let n_extremities = morphology.num_extremity_channels();
         Self {
             root_height: 1.3,
+            root_position: [0.0, 0.0, 1.3],
             root_quaternion: [1.0, 0.0, 0.0, 0.0],
             joint_angles: vec![0.0; n],
             root_linear_velocity: [0.0; 3],
@@ -208,6 +346,7 @@ impl HumanoidState {
 
         Self {
             root_height: qpos[2],
+            root_position: [qpos[0], qpos[1], qpos[2]],
             root_quaternion: [qpos[3], qpos[4], qpos[5], qpos[6]],
             joint_angles,
             root_linear_velocity: [qvel[0], qvel[1], qvel[2]],
@@ -280,6 +419,34 @@ impl HumanoidCommand {
         self.torques.len()
     }
 
+    /// Validate the frame against backend capabilities before actuation.
+    pub fn validate_for(
+        &self,
+        expected_actuators: usize,
+        mode: ActuationMode,
+    ) -> Result<(), CommandValidationError> {
+        if self.torques.len() != expected_actuators {
+            return Err(CommandValidationError::ActuatorCount {
+                expected: expected_actuators,
+                actual: self.torques.len(),
+            });
+        }
+
+        for (index, value) in self.torques.iter().copied().enumerate() {
+            if !value.is_finite() {
+                return Err(CommandValidationError::NonFiniteValue { index });
+            }
+            if matches!(
+                mode,
+                ActuationMode::NormalizedTorque | ActuationMode::NormalizedPosition
+            ) && !(-1.0..=1.0).contains(&value)
+            {
+                return Err(CommandValidationError::NormalizedValueOutOfRange { index });
+            }
+        }
+        Ok(())
+    }
+
     /// Clamp all torques to [-1, 1].
     pub fn clamped(self) -> Self {
         let torques: Vec<f32> = self
@@ -325,7 +492,9 @@ pub enum HumanoidTask {
     Walk,
     /// Run forward at ~10 m/s.
     Run,
-    /// Extend arm toward target object (requires Dexterous53+).
+    /// Extend an arm toward a target object. Available to all morphologies
+    /// with the canonical shoulder/elbow chain; wrist-enabled bodies can refine
+    /// end-effector orientation.
     Reach,
     /// Reach + close fingers around object (requires Dexterous53+).
     Grasp,
@@ -341,9 +510,9 @@ impl HumanoidTask {
         }
     }
 
-    /// Whether this task requires a dexterous morphology (Dexterous53+).
+    /// Whether this task requires independently actuated fingers.
     pub fn requires_dexterous(&self) -> bool {
-        matches!(self, HumanoidTask::Reach | HumanoidTask::Grasp)
+        matches!(self, HumanoidTask::Grasp)
     }
 }
 
@@ -372,10 +541,90 @@ pub struct HumanoidTelemetry {
     pub learning_rate: f32,
     /// Mean absolute torque.
     pub control_effort: f32,
+    /// Learned residual authority after stability and uncertainty gating.
+    #[serde(default)]
+    pub residual_authority: f32,
+    /// Mean magnitude of deterministic balance correction.
+    #[serde(default)]
+    pub balance_effort: f32,
+    /// Deterministic recovery mode selected from capture-point stability.
+    #[serde(default)]
+    pub recovery_mode: crate::recovery::RecoveryMode,
+    /// Signed capture-point margin to the support polygon in meters.
+    #[serde(default)]
+    pub capture_margin_m: f64,
+    /// Mean magnitude of capture/protective recovery correction.
+    #[serde(default)]
+    pub recovery_effort: f32,
+    /// Predictive recovery footstep target, when one is active.
+    #[serde(default)]
+    pub planned_footstep_world_m: Option<[f64; 3]>,
+    /// Terrain-shaped swing apex, when a recovery step is active.
+    #[serde(default)]
+    pub planned_swing_apex_world_m: Option<[f64; 3]>,
+    /// Minimum confidence of terrain samples along the swing path.
+    #[serde(default)]
+    pub terrain_confidence: f64,
+    /// Selected vertical foot clearance above the support surface.
+    #[serde(default)]
+    pub terrain_clearance_m: f64,
+    /// Number of active whole-body projected dynamics constraints.
+    #[serde(default)]
+    pub whole_body_active_constraints: usize,
+    /// Maximum normalized joint-range utilization.
+    #[serde(default)]
+    pub whole_body_joint_utilization: f64,
+    /// Residual whole-body torso objective error.
+    #[serde(default)]
+    pub whole_body_objective_residual: f64,
+    /// Whether the whole-body allocation was finite and feasible.
+    #[serde(default = "default_true")]
+    pub whole_body_feasible: bool,
+    /// Sparse inverse-dynamics solver iterations used this step.
+    #[serde(default)]
+    pub inverse_dynamics_iterations: usize,
+    /// Maximum remaining inverse-dynamics constraint violation.
+    #[serde(default)]
+    pub inverse_dynamics_max_violation: f64,
+    /// Whether inverse dynamics used its deterministic fallback allocator.
+    #[serde(default)]
+    pub inverse_dynamics_fallback: bool,
+    /// Protective fall/get-up phase active at this step.
+    #[serde(default)]
+    pub fall_protection_phase: crate::fall_protection::FallProtectionPhase,
+    /// Estimated body orientation used by the protective controller.
+    #[serde(default)]
+    pub fall_orientation: crate::fall_protection::FallOrientation,
+    /// Mean bounded authority used by the protective controller.
+    #[serde(default)]
+    pub protective_effort: f32,
+    /// Progress through the deterministic get-up sequence.
+    #[serde(default)]
+    pub get_up_progress: f64,
+    /// Total measured or modeled vertical ground reaction force.
+    #[serde(default)]
+    pub total_normal_force_n: f64,
+    /// Force-weighted center of pressure, when available.
+    #[serde(default)]
+    pub center_of_pressure_world_m: Option<[f64; 2]>,
+    /// Estimated bilateral support phase.
+    #[serde(default = "default_support_phase")]
+    pub support_phase: crate::hierarchical::SupportPhase,
+    /// Contact source confidence and freshness gate used by control.
+    #[serde(default)]
+    pub contact_trust: f32,
     /// Current right foot z-height.
     pub r_foot_z: f64,
     /// Current left foot z-height.
     pub l_foot_z: f64,
+}
+
+fn default_support_phase() -> crate::hierarchical::SupportPhase {
+    crate::hierarchical::SupportPhase::DoubleSupport
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Configuration for the humanoid training system.
@@ -411,8 +660,12 @@ pub struct HumanoidConfig {
     pub replay_count: usize,
     /// Enable cosine annealing LR schedule.
     pub enable_lr_schedule: bool,
-    /// Enable early termination on fall.
+    /// Enable early termination on unrecoverable fall.
     pub early_termination: bool,
+    /// Attempt bounded protective falling and deterministic get-up before an
+    /// episode is terminated.
+    #[serde(default = "default_true")]
+    pub enable_fall_recovery: bool,
     /// Current task.
     pub task: HumanoidTask,
     /// Target speed override (None = use task default).
@@ -440,7 +693,67 @@ pub struct HumanoidConfig {
     pub object_position: [f64; 3],
     /// Which hand to use for Reach/Grasp tasks.
     pub reach_hand: crate::morphology::HandSide,
+    /// Fuse delayed/noisy proprioception before encoding and control.
+    #[serde(default = "default_true")]
+    pub enable_state_estimation: bool,
+    /// Route every policy command through the deterministic safety projector.
+    #[serde(default = "default_true")]
+    pub enable_safety_projection: bool,
+    /// Enable gradient updates inside the recurrent HDC-LTC network. Disabled by
+    /// default because the current core API cannot serialize learned recurrent
+    /// parameters. Head-only learning is fully checkpointable and reproducible.
+    #[serde(default)]
+    pub enable_recurrent_learning: bool,
+    /// Permit rollback of only the output projection. This is coherent only when
+    /// recurrent learning is disabled; validation and training enforce that rule.
+    #[serde(default)]
+    pub enable_head_only_rollback: bool,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum HumanoidConfigError {
+    NonFiniteOrNonPositive(&'static str),
+    CognitiveRateExceedsPhysicsRate,
+    ZeroSizedNetwork,
+    InvalidLearningRate,
+    InvalidLevelCount,
+    EmptyTrainingSchedule,
+    InvalidTrainingDivider,
+    ReplayRequestedWithoutBuffer,
+    DexterousTaskRequiresDexterousMorphology,
+    NonFiniteObjectPosition,
+}
+
+impl std::fmt::Display for HumanoidConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NonFiniteOrNonPositive(field) => write!(f, "{field} must be finite and positive"),
+            Self::CognitiveRateExceedsPhysicsRate => {
+                write!(f, "cognitive_hz must not exceed physics_hz")
+            }
+            Self::ZeroSizedNetwork => {
+                write!(f, "network_layers and neurons_per_layer must be non-zero")
+            }
+            Self::InvalidLearningRate => {
+                write!(f, "learning_rate must be finite and in [1e-6, 0.1]")
+            }
+            Self::InvalidLevelCount => write!(f, "num_levels must be at least 2"),
+            Self::EmptyTrainingSchedule => {
+                write!(f, "num_episodes and steps_per_episode must be non-zero")
+            }
+            Self::InvalidTrainingDivider => write!(f, "train_every must be non-zero"),
+            Self::ReplayRequestedWithoutBuffer => {
+                write!(f, "replay_count requires a non-zero replay_buffer_size")
+            }
+            Self::DexterousTaskRequiresDexterousMorphology => {
+                write!(f, "Grasp requires Dexterous53 or FullSpine morphology")
+            }
+            Self::NonFiniteObjectPosition => write!(f, "object_position must be finite"),
+        }
+    }
+}
+
+impl std::error::Error for HumanoidConfigError {}
 
 impl Default for HumanoidConfig {
     fn default() -> Self {
@@ -461,6 +774,7 @@ impl Default for HumanoidConfig {
             replay_count: 3,
             enable_lr_schedule: true,
             early_termination: true,
+            enable_fall_recovery: true,
             task: HumanoidTask::Stand,
             target_speed: None,
             adaptive_curriculum: true,
@@ -474,11 +788,58 @@ impl Default for HumanoidConfig {
             terrain_variation: false,
             object_position: [0.3, -0.2, 1.0],
             reach_hand: crate::morphology::HandSide::Right,
+            enable_state_estimation: true,
+            enable_safety_projection: true,
+            enable_recurrent_learning: false,
+            enable_head_only_rollback: false,
         }
     }
 }
 
 impl HumanoidConfig {
+    /// Validate scientific and runtime invariants before constructing a trainer.
+    pub fn validate(&self) -> Result<(), HumanoidConfigError> {
+        if !self.physics_hz.is_finite() || self.physics_hz <= 0.0 {
+            return Err(HumanoidConfigError::NonFiniteOrNonPositive("physics_hz"));
+        }
+        if !self.cognitive_hz.is_finite() || self.cognitive_hz <= 0.0 {
+            return Err(HumanoidConfigError::NonFiniteOrNonPositive("cognitive_hz"));
+        }
+        if self.cognitive_hz > self.physics_hz {
+            return Err(HumanoidConfigError::CognitiveRateExceedsPhysicsRate);
+        }
+        if self.network_layers == 0 || self.neurons_per_layer == 0 {
+            return Err(HumanoidConfigError::ZeroSizedNetwork);
+        }
+        if !self.learning_rate.is_finite() || !(1.0e-6..=0.1).contains(&self.learning_rate) {
+            return Err(HumanoidConfigError::InvalidLearningRate);
+        }
+        if self.num_levels < 2 {
+            return Err(HumanoidConfigError::InvalidLevelCount);
+        }
+        if self.num_episodes == 0 || self.steps_per_episode == 0 {
+            return Err(HumanoidConfigError::EmptyTrainingSchedule);
+        }
+        if self.train_every == 0 {
+            return Err(HumanoidConfigError::InvalidTrainingDivider);
+        }
+        if self.replay_count > 0 && self.replay_buffer_size == 0 {
+            return Err(HumanoidConfigError::ReplayRequestedWithoutBuffer);
+        }
+        if self.task.requires_dexterous()
+            && !matches!(
+                self.morphology,
+                HumanoidMorphology::Dexterous53 | HumanoidMorphology::FullSpine
+            )
+        {
+            return Err(HumanoidConfigError::DexterousTaskRequiresDexterousMorphology);
+        }
+        if self.object_position.iter().any(|value| !value.is_finite()) {
+            return Err(HumanoidConfigError::NonFiniteObjectPosition);
+        }
+        Ok(())
+    }
+
     /// Physics timestep in seconds.
     pub fn physics_dt(&self) -> f64 {
         1.0 / self.physics_hz
@@ -714,7 +1075,7 @@ pub fn pd_running_baseline(
 /// Compute PD reaching baseline: standing posture + arm IK toward target object.
 ///
 /// Drives shoulder/elbow toward the object position using simplified 2-link IK.
-/// Only available for Dexterous53+ morphologies.
+/// Available to every morphology containing the canonical shoulder/elbow chain.
 pub fn pd_reaching_baseline(
     state: &HumanoidState,
     gains: &HumanoidPdGains,
@@ -841,12 +1202,62 @@ mod tests {
     }
 
     #[test]
+    fn test_state_schema_matches_morphology() {
+        for morphology in [
+            HumanoidMorphology::Dmc21,
+            HumanoidMorphology::Dexterous53,
+            HumanoidMorphology::WithNeckWrist,
+            HumanoidMorphology::FullSpine,
+        ] {
+            let state = HumanoidState::standing_for(morphology);
+            assert_eq!(state.num_channels(), morphology.num_observation_channels());
+            assert_eq!(
+                state.to_channels().len(),
+                morphology.num_observation_channels()
+            );
+            assert_eq!(state.validate_for(morphology), Ok(()));
+        }
+    }
+
+    #[test]
+    fn test_state_validation_rejects_non_finite_values() {
+        let mut state = HumanoidState::standing();
+        state.joint_angles[0] = f64::NAN;
+        assert_eq!(
+            state.validate_for(HumanoidMorphology::Dmc21),
+            Err(StateValidationError::NonFiniteValue)
+        );
+    }
+
+    #[test]
     fn test_humanoid_command_zero() {
         let cmd = HumanoidCommand::zero();
         for &t in &cmd.torques {
             assert!(t.abs() < 1e-10);
         }
         assert!(cmd.control_effort() < 1e-10);
+    }
+
+    #[test]
+    fn test_command_validation_rejects_non_finite_values() {
+        let mut cmd = HumanoidCommand::zero();
+        cmd.torques[3] = f32::NAN;
+        assert_eq!(
+            cmd.validate_for(NUM_ACTUATORS, ActuationMode::NormalizedTorque),
+            Err(CommandValidationError::NonFiniteValue { index: 3 })
+        );
+    }
+
+    #[test]
+    fn test_command_validation_rejects_wrong_morphology() {
+        let cmd = HumanoidCommand::zero_for(20);
+        assert_eq!(
+            cmd.validate_for(NUM_ACTUATORS, ActuationMode::NormalizedTorque),
+            Err(CommandValidationError::ActuatorCount {
+                expected: NUM_ACTUATORS,
+                actual: 20,
+            })
+        );
     }
 
     #[test]
@@ -888,6 +1299,26 @@ mod tests {
         assert!((config.physics_dt() - 0.025).abs() < 1e-10);
         assert_eq!(config.cognitive_interval(), 4); // 40/10
         assert!((config.effective_target_speed() - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn reach_allows_wrist_morphology_but_grasp_requires_fingers() {
+        let reach = HumanoidConfig {
+            morphology: HumanoidMorphology::WithNeckWrist,
+            task: HumanoidTask::Reach,
+            ..HumanoidConfig::default()
+        };
+        assert!(reach.validate().is_ok());
+
+        let grasp = HumanoidConfig {
+            morphology: HumanoidMorphology::WithNeckWrist,
+            task: HumanoidTask::Grasp,
+            ..HumanoidConfig::default()
+        };
+        assert_eq!(
+            grasp.validate(),
+            Err(HumanoidConfigError::DexterousTaskRequiresDexterousMorphology)
+        );
     }
 
     #[test]
@@ -1104,5 +1535,24 @@ mod tests {
         let cmd = HumanoidCommand::zero_for(53);
         assert_eq!(cmd.torques.len(), 53);
         assert!(cmd.torques.iter().all(|&t| t == 0.0));
+    }
+
+    #[test]
+    fn standing_pose_is_inside_dmc_joint_limits() {
+        let state = HumanoidState::standing();
+        for (angle, [low, high]) in state
+            .joint_angles
+            .iter()
+            .zip(HumanoidMorphology::Dmc21.joint_limits())
+        {
+            assert!((low..=high).contains(angle));
+        }
+    }
+
+    #[test]
+    fn knee_flexion_sign_matches_bundled_mujoco_model() {
+        let limits = HumanoidMorphology::Dmc21.joint_limits();
+        assert!(limits[6][0] < 0.0 && limits[6][1] >= 0.0);
+        assert!(limits[12][0] < 0.0 && limits[12][1] >= 0.0);
     }
 }

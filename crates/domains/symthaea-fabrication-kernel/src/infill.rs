@@ -9,6 +9,7 @@
 
 use crate::slicer::{Contour, Point2, Segment2, SliceLayer};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 // ── Configuration ────────────────────────────────────────────────────────
 
@@ -41,6 +42,41 @@ impl Default for InfillConfig {
             density: 0.2,
             angle_degrees: 45.0,
         }
+    }
+}
+
+/// Invalid infill input rejected by the fail-closed API.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum InfillError {
+    InvalidDensity,
+    InvalidAngle,
+    InvalidNozzleDiameter,
+}
+
+impl fmt::Display for InfillError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidDensity => write!(f, "infill density must be finite and in (0, 1]"),
+            Self::InvalidAngle => write!(f, "infill angle must be finite"),
+            Self::InvalidNozzleDiameter => {
+                write!(f, "nozzle diameter must be finite and positive")
+            }
+        }
+    }
+}
+
+impl std::error::Error for InfillError {}
+
+impl InfillConfig {
+    /// Validate all values without clamping or coercion.
+    pub fn validate_strict(&self) -> Result<(), InfillError> {
+        if !self.density.is_finite() || self.density <= 0.0 || self.density > 1.0 {
+            return Err(InfillError::InvalidDensity);
+        }
+        if !self.angle_degrees.is_finite() {
+            return Err(InfillError::InvalidAngle);
+        }
+        Ok(())
     }
 }
 
@@ -212,6 +248,113 @@ fn collect_edges(layer: &SliceLayer) -> Vec<(Point2, Point2)> {
     edges
 }
 
+/// Test whether a point lies in printable layer material using the even-odd
+/// rule across every outer, hole, and nested-island contour.
+pub fn point_in_layer_material(layer: &SliceLayer, point: Point2) -> bool {
+    layer
+        .outer_contours
+        .iter()
+        .chain(layer.inner_contours.iter())
+        .fold(false, |inside, contour| {
+            if contour.contains_point(point) {
+                !inside
+            } else {
+                inside
+            }
+        })
+}
+
+fn point_in_edges_material(edges: &[(Point2, Point2)], point: Point2) -> bool {
+    let mut inside = false;
+    for &(a, b) in edges {
+        if ((a.y > point.y) != (b.y > point.y))
+            && (point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x)
+        {
+            inside = !inside;
+        }
+    }
+    inside
+}
+
+fn segment_edge_intersection_parameter(
+    start: Point2,
+    end: Point2,
+    edge_start: Point2,
+    edge_end: Point2,
+) -> Option<f32> {
+    let seg_dx = end.x - start.x;
+    let seg_dy = end.y - start.y;
+    let edge_dx = edge_end.x - edge_start.x;
+    let edge_dy = edge_end.y - edge_start.y;
+    let denominator = seg_dx * edge_dy - seg_dy * edge_dx;
+    if denominator.abs() < 1.0e-10 {
+        return None;
+    }
+    let t = ((edge_start.x - start.x) * edge_dy - (edge_start.y - start.y) * edge_dx) / denominator;
+    let u = ((edge_start.x - start.x) * seg_dy - (edge_start.y - start.y) * seg_dx) / denominator;
+    if (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u) {
+        Some(t)
+    } else {
+        None
+    }
+}
+
+fn clip_segment_to_edges(
+    segment: Segment2,
+    edges: &[(Point2, Point2)],
+    minimum_length: f32,
+) -> Vec<Segment2> {
+    let dx = segment.end.x - segment.start.x;
+    let dy = segment.end.y - segment.start.y;
+    if dx * dx + dy * dy < minimum_length * minimum_length {
+        return Vec::new();
+    }
+
+    let mut parameters = vec![0.0f32, 1.0f32];
+    for &(edge_start, edge_end) in edges {
+        if let Some(t) =
+            segment_edge_intersection_parameter(segment.start, segment.end, edge_start, edge_end)
+        {
+            parameters.push(t);
+        }
+    }
+    parameters.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    parameters.dedup_by(|a, b| (*a - *b).abs() < 1.0e-7);
+
+    let mut clipped = Vec::new();
+    for interval in parameters.windows(2) {
+        let midpoint_t = (interval[0] + interval[1]) * 0.5;
+        let midpoint = Point2::new(
+            segment.start.x + midpoint_t * dx,
+            segment.start.y + midpoint_t * dy,
+        );
+        if !point_in_edges_material(edges, midpoint) {
+            continue;
+        }
+        let start = Point2::new(
+            segment.start.x + interval[0] * dx,
+            segment.start.y + interval[0] * dy,
+        );
+        let end = Point2::new(
+            segment.start.x + interval[1] * dx,
+            segment.start.y + interval[1] * dy,
+        );
+        if start.dist(end) >= minimum_length {
+            clipped.push(Segment2 { start, end });
+        }
+    }
+    clipped
+}
+
+/// Clip an arbitrary segment to printable material in a layer.
+///
+/// Returned segments never cross hole interiors according to the even-odd
+/// contour rule. This is shared by rectilinear, grid, and honeycomb infill.
+pub fn clip_segment_to_layer(layer: &SliceLayer, segment: Segment2) -> Vec<Segment2> {
+    let edges = collect_edges(layer);
+    clip_segment_to_edges(segment, &edges, 1.0e-4)
+}
+
 /// Compute the bounding box of all contours in a layer.
 fn layer_bounding_box(layer: &SliceLayer) -> Option<(Point2, Point2)> {
     let mut min_x = f32::MAX;
@@ -243,7 +386,6 @@ fn layer_bounding_box(layer: &SliceLayer) -> Option<(Point2, Point2)> {
 
 /// Generate infill at a specific angle (internal workhorse).
 fn generate_infill_at_angle(
-    _layer: &SliceLayer,
     edges: &[(Point2, Point2)],
     bb_min: Point2,
     bb_max: Point2,
@@ -260,45 +402,37 @@ fn generate_infill_at_angle(
         Point2::new(bb_min.x, bb_max.y),
     ];
 
-    let mut proj_min = f32::MAX;
-    let mut proj_max = f32::MIN;
-    for c in &corners {
-        let proj = -sin_a * c.x + cos_a * c.y;
-        proj_min = proj_min.min(proj);
-        proj_max = proj_max.max(proj);
+    let mut normal_min = f32::MAX;
+    let mut normal_max = f32::MIN;
+    let mut tangent_min = f32::MAX;
+    let mut tangent_max = f32::MIN;
+    for corner in &corners {
+        let normal = -sin_a * corner.x + cos_a * corner.y;
+        let tangent = cos_a * corner.x + sin_a * corner.y;
+        normal_min = normal_min.min(normal);
+        normal_max = normal_max.max(normal);
+        tangent_min = tangent_min.min(tangent);
+        tangent_max = tangent_max.max(tangent);
     }
 
     let mut result = Vec::new();
-    let mut d = proj_min + spacing * 0.5;
-    while d < proj_max {
-        let mut intersections = Vec::new();
-        for &(a, b) in edges {
-            let pa = -sin_a * a.x + cos_a * a.y;
-            let pb = -sin_a * b.x + cos_a * b.y;
-            let dp = pb - pa;
-            if dp.abs() < 1e-10 {
-                continue;
-            }
-            let s = (d - pa) / dp;
-            if !(0.0..=1.0).contains(&s) {
-                continue;
-            }
-            let ix = a.x + s * (b.x - a.x);
-            let iy = a.y + s * (b.y - a.y);
-            let t = cos_a * ix + sin_a * iy;
-            intersections.push((t, Point2::new(ix, iy)));
-        }
-        intersections.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-        let mut i = 0;
-        while i + 1 < intersections.len() {
-            let start = intersections[i].1;
-            let end = intersections[i + 1].1;
-            if start.dist(end) > 1e-4 {
-                result.push(Segment2 { start, end });
-            }
-            i += 2;
-        }
-        d += spacing;
+    let mut normal = normal_min + spacing * 0.5;
+    while normal < normal_max {
+        // Inverse rotation from tangent/normal coordinates back to XY.
+        let start = Point2::new(
+            cos_a * tangent_min - sin_a * normal,
+            sin_a * tangent_min + cos_a * normal,
+        );
+        let end = Point2::new(
+            cos_a * tangent_max - sin_a * normal,
+            sin_a * tangent_max + cos_a * normal,
+        );
+        result.extend(clip_segment_to_edges(
+            Segment2 { start, end },
+            edges,
+            1.0e-4,
+        ));
+        normal += spacing;
     }
     result
 }
@@ -389,59 +523,11 @@ fn generate_honeycomb_infill(
                 let a = vertices[i];
                 let b = vertices[j];
 
-                // Clip this hex edge against the contour using even-odd intersections.
-                // Find all t values where the segment (a→b) intersects any contour edge.
-                let seg_dx = b.x - a.x;
-                let seg_dy = b.y - a.y;
-                let seg_len_sq = seg_dx * seg_dx + seg_dy * seg_dy;
-                if seg_len_sq < 1e-10 {
-                    continue;
-                }
-
-                let mut t_values: Vec<f32> = vec![0.0, 1.0];
-                for &(ea, eb) in edges {
-                    // Intersection of segment a→b with edge ea→eb.
-                    let e_dx = eb.x - ea.x;
-                    let e_dy = eb.y - ea.y;
-                    let denom = seg_dx * e_dy - seg_dy * e_dx;
-                    if denom.abs() < 1e-10 {
-                        continue;
-                    }
-                    let t = ((ea.x - a.x) * e_dy - (ea.y - a.y) * e_dx) / denom;
-                    let u = ((ea.x - a.x) * seg_dy - (ea.y - a.y) * seg_dx) / denom;
-                    if (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u) {
-                        t_values.push(t);
-                    }
-                }
-                t_values.sort_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal));
-                t_values.dedup_by(|x, y| (*x - *y).abs() < 1e-8);
-
-                // Emit segments whose midpoints are inside the contour(s).
-                for w in t_values.windows(2) {
-                    let t_mid = (w[0] + w[1]) * 0.5;
-                    let mid = Point2::new(a.x + t_mid * seg_dx, a.y + t_mid * seg_dy);
-
-                    // Even-odd test: count crossings from mid toward +X across all edges.
-                    let mut inside = false;
-                    for &(ea, eb) in edges {
-                        if ((ea.y > mid.y) != (eb.y > mid.y))
-                            && (mid.x < (eb.x - ea.x) * (mid.y - ea.y) / (eb.y - ea.y) + ea.x)
-                        {
-                            inside = !inside;
-                        }
-                    }
-
-                    if inside {
-                        let seg_start = Point2::new(a.x + w[0] * seg_dx, a.y + w[0] * seg_dy);
-                        let seg_end = Point2::new(a.x + w[1] * seg_dx, a.y + w[1] * seg_dy);
-                        if seg_start.dist(seg_end) > 1e-4 {
-                            result.push(Segment2 {
-                                start: seg_start,
-                                end: seg_end,
-                            });
-                        }
-                    }
-                }
+                result.extend(clip_segment_to_edges(
+                    Segment2 { start: a, end: b },
+                    edges,
+                    1.0e-4,
+                ));
             }
             cy += row_stride * 2.0;
         }
@@ -450,6 +536,34 @@ fn generate_honeycomb_infill(
     }
 
     result
+}
+
+/// Generate infill after strict validation of the configuration and nozzle.
+pub fn try_generate_infill(
+    layer: &SliceLayer,
+    config: &InfillConfig,
+    nozzle_diameter: f32,
+) -> Result<Vec<Segment2>, InfillError> {
+    try_generate_infill_for_layer(layer, config, nozzle_diameter, None)
+}
+
+/// Generate layer-aware infill after strict validation.
+pub fn try_generate_infill_for_layer(
+    layer: &SliceLayer,
+    config: &InfillConfig,
+    nozzle_diameter: f32,
+    layer_index: Option<usize>,
+) -> Result<Vec<Segment2>, InfillError> {
+    config.validate_strict()?;
+    if !nozzle_diameter.is_finite() || nozzle_diameter <= 0.0 {
+        return Err(InfillError::InvalidNozzleDiameter);
+    }
+    Ok(generate_infill_for_layer(
+        layer,
+        config,
+        nozzle_diameter,
+        layer_index,
+    ))
 }
 
 /// Generate infill line segments for a sliced layer.
@@ -508,14 +622,13 @@ pub fn generate_infill_for_layer(
     // Generate pattern.
     match config.pattern {
         InfillPattern::Rectilinear => {
-            generate_infill_at_angle(layer, &edges, bb_min, bb_max, angle_rad, spacing)
+            generate_infill_at_angle(&edges, bb_min, bb_max, angle_rad, spacing)
         }
         InfillPattern::Grid => {
-            let mut segs =
-                generate_infill_at_angle(layer, &edges, bb_min, bb_max, angle_rad, spacing);
+            let mut segs = generate_infill_at_angle(&edges, bb_min, bb_max, angle_rad, spacing);
             let perp = angle_rad + std::f32::consts::FRAC_PI_2;
             segs.extend(generate_infill_at_angle(
-                layer, &edges, bb_min, bb_max, perp, spacing,
+                &edges, bb_min, bb_max, perp, spacing,
             ));
             segs
         }
@@ -573,6 +686,21 @@ mod tests {
             }],
             infill_lines: vec![],
         }
+    }
+
+    #[test]
+    fn strict_infill_rejects_invalid_density() {
+        let config = InfillConfig {
+            density: 1.5,
+            ..Default::default()
+        };
+        assert_eq!(config.validate_strict(), Err(InfillError::InvalidDensity));
+    }
+
+    #[test]
+    fn strict_infill_rejects_invalid_nozzle() {
+        let result = try_generate_infill(&square_layer(10.0), &InfillConfig::default(), 0.0);
+        assert!(matches!(result, Err(InfillError::InvalidNozzleDiameter)));
     }
 
     // ── contains_point ──────────────────────────────────────────────
@@ -664,21 +792,27 @@ mod tests {
         let lines = generate_infill(&layer, &config, 0.4);
         assert!(!lines.is_empty());
 
-        // Note: hole clipping is not yet implemented — inner contours are
-        // stored but generate_infill does not clip lines against them.
-        // Once clipping is added, hole layers should produce *more* segments
-        // (split lines) than solid layers of the same size.
         let solid = square_layer(10.0);
         let solid_lines = generate_infill(&solid, &config, 0.4);
         assert!(
-            !solid_lines.is_empty(),
-            "solid layer should also produce lines"
+            lines.len() > solid_lines.len(),
+            "hole crossings should split lines"
         );
-        // Verify the hole layer actually has a hole (inner contour).
-        assert!(
-            !layer.inner_contours.is_empty(),
-            "hole_layer should have inner contours"
-        );
+
+        let hole = &layer.inner_contours[0];
+        for segment in &lines {
+            let midpoint = Point2::new(
+                (segment.start.x + segment.end.x) * 0.5,
+                (segment.start.y + segment.end.y) * 0.5,
+            );
+            assert!(
+                !hole.contains_point(midpoint),
+                "infill midpoint {midpoint:?} entered the hole"
+            );
+        }
+        let material_length: f32 = lines.iter().map(Segment2::length).sum();
+        let solid_length: f32 = solid_lines.iter().map(Segment2::length).sum();
+        assert!(material_length < solid_length);
     }
 
     #[test]
@@ -952,8 +1086,17 @@ mod tests {
             !solid_lines.is_empty(),
             "honeycomb on solid should produce segments"
         );
-        // Note: hole clipping is not yet implemented — once added,
-        // the hole layer should produce fewer segments than solid.
+        let hole = &layer.inner_contours[0];
+        for segment in &lines {
+            let midpoint = Point2::new(
+                (segment.start.x + segment.end.x) * 0.5,
+                (segment.start.y + segment.end.y) * 0.5,
+            );
+            assert!(!hole.contains_point(midpoint));
+        }
+        let material_length: f32 = lines.iter().map(Segment2::length).sum();
+        let solid_length: f32 = solid_lines.iter().map(Segment2::length).sum();
+        assert!(material_length < solid_length);
     }
 
     #[test]

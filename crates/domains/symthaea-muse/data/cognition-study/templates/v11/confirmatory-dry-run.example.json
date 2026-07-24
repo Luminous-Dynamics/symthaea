@@ -1,0 +1,20 @@
+{
+  "synthetic_fixture_manifest_sha256": "REPLACE_WITH_64_HEX",
+  "artifact_bundle_sha256": "REPLACE_WITH_64_HEX",
+  "runner_package_set_sha256": "REPLACE_WITH_64_HEX",
+  "session_log_set_sha256": "REPLACE_WITH_64_HEX",
+  "compiled_dataset_sha256": "REPLACE_WITH_64_HEX",
+  "rust_analysis_sha256": "REPLACE_WITH_64_HEX",
+  "independent_analysis_sha256": "REPLACE_WITH_64_HEX",
+  "analysis_crosscheck_sha256": "REPLACE_WITH_64_HEX",
+  "policy_budget_evidence_sha256": "REPLACE_WITH_64_HEX",
+  "failure_injection_report_sha256": "REPLACE_WITH_64_HEX",
+  "release_root_sha256": "REPLACE_WITH_64_HEX",
+  "synthetic_data_only": true,
+  "all_pipeline_stages_succeeded": true,
+  "independent_analysis_agreed": true,
+  "equal_policy_budgets_verified": true,
+  "corruption_was_detected": true,
+  "no_real_participant_data": true,
+  "dry_run_sha256": ""
+}

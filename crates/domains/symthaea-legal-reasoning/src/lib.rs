@@ -1,38 +1,58 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+#![forbid(unsafe_code)]
+
 //! # symthaea-legal-reasoning
 //!
-//! The formal, testable core of law — deontic logic, defeasible rules, and
-//! Hohfeldian jural relations. Third of the "hard" knowledge domains
-//! (`symthaea/HARD_DOMAINS_PLAN_2026-07-07.md`), hooking into the governance/civic
-//! clusters and the `EthicsEngine`.
+//! A deterministic, dependency-free legal-reasoning microkernel: deontic
+//! status, locally stratified defaults, Hohfeldian relations, explanation
+//! traces, validated identifiers, and legal context.
 //!
-//! Pure `std`, zero dependencies, no `symthaea-core` link.
-//!
-//! **Scope note:** this engine *applies and checks* rules — norm consistency,
-//! default-with-exception derivation, jural correlativity. It does NOT interpret
-//! statutes, reason by analogy to precedent, or decide what the law *should* be;
-//! those interpretive parts of law stay out of scope.
-//!
-//! ## Scope
-//!
-//! - [`deontic`]: obligation/permission/prohibition + norm-set consistency.
-//! - [`defeasible`]: defaults with exceptions, forward-chained to a fixpoint.
-//! - [`hohfeld`]: the eight jural positions with correlatives and opposites.
-//!
-//! ## Example
-//!
-//! ```
-//! use symthaea_legal_reasoning::deontic::{Norm, is_consistent};
-//! let norms = vec![Norm::Obligatory("testify".into()), Norm::Forbidden("testify".into())];
-//! assert!(!is_consistent(&norms)); // can't be both required and forbidden
-//! ```
+//! The crate applies already-formalized rules. It does not interpret statutes,
+//! reason by analogy to precedent, infer facts from evidence, or decide what
+//! the law should be.
 
+pub mod conflict;
+pub mod context;
 pub mod defeasible;
 pub mod deontic;
+pub mod evidence;
 pub mod hohfeld;
+pub mod lifecycle;
+pub mod model;
+pub mod priority;
+pub mod rules;
+pub mod transition;
+pub mod validation;
 
-pub use defeasible::{Rule, derive, entails};
-pub use deontic::{Norm, is_consistent, is_permitted};
-pub use hohfeld::Jural;
+pub use conflict::{DefeatBasis, LegalStatus, LiteralResolution, RuleDefeat, resolve_literal};
+pub use context::{
+    Contextual, LegalContext, LegalDate, TemporalDimensions, TemporalError, TemporalOverlap,
+    TemporalRevision, TemporalScope, governing_revisions, unique_governing_revision,
+};
+pub use defeasible::{
+    BlockedRule, Derivation, DerivationError, DerivationStep, Rule, derive, entails,
+    try_derive, try_derive_with_trace, try_entails, try_why_not,
+};
+pub use deontic::{
+    DeonticProposition, Modality, Norm, NormAssessment, PermissionStatus, StructuredNorm,
+    assess_act, assess_proposition, conflicting_acts, conflicting_propositions, is_consistent,
+    is_permitted, permission_status, proposition_permission_status,
+};
+pub use evidence::{CanonicalEvidence, EvidenceEnvelope, EvidenceManifest};
+pub use hohfeld::{Jural, JuralRelation, contradictory_relations};
+pub use lifecycle::{
+    ActionEvent, LifecycleAssessment, LifecycleError, NormEvent, NormState, TimedNorm,
+    WaiverEvent, assess_lifecycle,
+};
+pub use model::{
+    ActionId, Atom, AuthorityId, DocumentId, EventId, IdentifierError, JurisdictionId, Literal,
+    PartyId, ProvisionId, QueryId, RevisionId, RuleId, RulePackId, SemanticProfileId, SourceRef,
+};
+pub use priority::{PriorityBasis, PriorityError, Superiority, SuperiorityGraph};
+pub use rules::{FormalRule, RuleKind, RulePack, RulePackError};
+pub use transition::{
+    LegalPositionState, PowerExercise, TransitionError, TransitionRecord, exercise_power,
+};
+pub use validation::{Severity, ValidationIssue, ValidationReport, validate_rule_pack};

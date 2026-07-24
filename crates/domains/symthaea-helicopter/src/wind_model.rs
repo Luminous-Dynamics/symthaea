@@ -29,7 +29,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Wind model configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WindConfig {
     /// Steady wind velocity [x, y, z] in m/s (world frame).
     pub steady_wind: [f64; 3],
@@ -93,6 +93,8 @@ pub struct WindModel {
     config: WindConfig,
     /// Current gust velocity (filtered noise).
     gust_state: [f64; 3],
+    /// Seed used when replaying an episode.
+    initial_seed: u64,
     /// Simple PRNG state for deterministic gusts.
     rng_state: u64,
 }
@@ -100,11 +102,7 @@ pub struct WindModel {
 impl WindModel {
     /// Create a new wind model from config.
     pub fn new(config: WindConfig) -> Self {
-        Self {
-            config,
-            gust_state: [0.0; 3],
-            rng_state: 12345,
-        }
+        Self::with_seed(config, 12345)
     }
 
     /// Create with default (no wind).
@@ -114,9 +112,16 @@ impl WindModel {
 
     /// Create with a specific seed for deterministic replay.
     pub fn with_seed(config: WindConfig, seed: u64) -> Self {
+        // xorshift64 has an absorbing all-zero state.
+        let seed = if seed == 0 {
+            0x9E37_79B9_7F4A_7C15
+        } else {
+            seed
+        };
         Self {
             config,
             gust_state: [0.0; 3],
+            initial_seed: seed,
             rng_state: seed,
         }
     }
@@ -206,8 +211,14 @@ impl WindModel {
         }
     }
 
-    /// Reset gust state (for new episodes).
+    /// Reset gusts and rewind the PRNG for exact episode replay.
     pub fn reset(&mut self) {
+        self.gust_state = [0.0; 3];
+        self.rng_state = self.initial_seed;
+    }
+
+    /// Clear only the filter state while continuing the random stream.
+    pub fn reset_gust_state(&mut self) {
         self.gust_state = [0.0; 3];
     }
 
@@ -384,6 +395,28 @@ mod tests {
         assert!(wind.gust_state.iter().any(|&v| v != 0.0));
         wind.reset();
         assert_eq!(wind.gust_state, [0.0; 3]);
+    }
+
+    #[test]
+    fn test_reset_replays_seeded_gust_sequence() {
+        let config = WindConfig {
+            gust_intensity: 5.0,
+            ..Default::default()
+        };
+        let mut wind = WindModel::with_seed(config, 42);
+        let first = wind.wind_velocity_step(0.01);
+        for _ in 0..20 {
+            wind.wind_velocity_step(0.01);
+        }
+        wind.reset();
+        assert_eq!(wind.wind_velocity_step(0.01), first);
+    }
+
+    #[test]
+    fn test_zero_seed_is_not_absorbing() {
+        let mut wind = WindModel::with_seed(WindConfig::moderate_wind(), 0);
+        let first = wind.wind_velocity_step(0.01);
+        assert!(first.iter().any(|v| v.is_finite() && *v != 0.0));
     }
 
     #[test]

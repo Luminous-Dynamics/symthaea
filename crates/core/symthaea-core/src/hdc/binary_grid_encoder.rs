@@ -108,6 +108,71 @@ impl BinaryGridEncoder {
         &self.color_hvs[idx]
     }
 
+    /// Decode the color at a single cell from a (possibly bundled) grid HV.
+    ///
+    /// Standard VSA "cleanup memory" retrieval: unbind the cell's row/col
+    /// keys from the grid HV — `grid_hv ⊕ row_hv[r] ⊕ col_hv[c]` — which
+    /// recovers a noisy version of that cell's color HV (noisy because the
+    /// grid HV is a majority-vote bundle over every cell, not a single
+    /// binding), then cleans it up via nearest-neighbor against the color
+    /// codebook. Ties (or an empty codebook) resolve to color 0.
+    pub fn decode_cell(&self, grid_hv: &BinaryHV, row: usize, col: usize) -> usize {
+        let unbound = grid_hv.bind(&self.row_hvs[row]).bind(&self.col_hvs[col]);
+        self.color_hvs
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (i, unbound.similarity(c)))
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(i, _)| i)
+            .unwrap_or(0)
+    }
+
+    /// Decode a full `rows`×`cols` grid from a grid HV via per-cell cleanup.
+    ///
+    /// This is genuinely lossy: majority-vote bundling degrades as the
+    /// number of cells grows, so per-cell decode accuracy falls with grid
+    /// size — this is the honest mechanism behind "strict" (pixel-perfect)
+    /// scoring being much harder than 2-AFC similarity scoring.
+    pub fn decode_grid(&self, grid_hv: &BinaryHV, rows: usize, cols: usize) -> Vec<Vec<u8>> {
+        (0..rows)
+            .map(|r| {
+                (0..cols)
+                    .map(|c| self.decode_cell(grid_hv, r, c) as u8)
+                    .collect()
+            })
+            .collect()
+    }
+
+    /// Fraction of cells where `predicted` and `actual` agree.
+    /// Grids are compared cell-by-cell up to the smaller of the two shapes;
+    /// mismatched dimensions count every extra cell as wrong.
+    pub fn grid_accuracy(predicted: &[Vec<u8>], actual: &[Vec<u8>]) -> f32 {
+        let rows = predicted.len().max(actual.len());
+        let mut total = 0usize;
+        let mut correct = 0usize;
+        for r in 0..rows {
+            let p_row = predicted.get(r).map(Vec::as_slice).unwrap_or(&[]);
+            let a_row = actual.get(r).map(Vec::as_slice).unwrap_or(&[]);
+            let cols = p_row.len().max(a_row.len());
+            for c in 0..cols {
+                total += 1;
+                if p_row.get(c) == a_row.get(c) {
+                    correct += 1;
+                }
+            }
+        }
+        if total == 0 {
+            1.0
+        } else {
+            correct as f32 / total as f32
+        }
+    }
+
+    /// Whether `predicted` and `actual` match exactly, cell for cell.
+    pub fn grid_exact_match(predicted: &[Vec<u8>], actual: &[Vec<u8>]) -> bool {
+        predicted == actual
+    }
+
     // ========================================================================
     // Rule Discovery (Program Synthesis)
     // ========================================================================
@@ -464,5 +529,70 @@ mod tests {
             "Abductive inference should recover input: sim={}",
             sim
         );
+    }
+
+    #[test]
+    fn test_decode_grid_recovers_small_grid() {
+        // Small grid, few cells -> majority-vote bundling noise is low ->
+        // decode should recover most/all cells correctly.
+        let enc = BinaryGridEncoder::new(3, 3, 6, 777);
+        let grid = vec![vec![0, 1, 2], vec![3, 0, 1], vec![2, 3, 0]];
+        let hv = enc.encode_grid(&grid);
+        let decoded = enc.decode_grid(&hv, 3, 3);
+        let acc = BinaryGridEncoder::grid_accuracy(&decoded, &grid);
+        assert!(
+            acc > 0.8,
+            "Small-grid decode accuracy should be high, got {}",
+            acc
+        );
+    }
+
+    #[test]
+    fn test_decode_accuracy_degrades_with_grid_size() {
+        // More cells bundled together -> more majority-vote noise -> lower
+        // per-cell decode accuracy. This is the honest mechanism behind
+        // "strict scoring is much harder than 2-AFC" claims.
+        let small_enc = BinaryGridEncoder::new(3, 3, 6, 42);
+        let small_grid = vec![vec![1, 2, 3], vec![4, 5, 0], vec![1, 2, 3]];
+        let small_hv = small_enc.encode_grid(&small_grid);
+        let small_acc =
+            BinaryGridEncoder::grid_accuracy(&small_enc.decode_grid(&small_hv, 3, 3), &small_grid);
+
+        let big_enc = BinaryGridEncoder::new(15, 15, 6, 42);
+        let big_grid: Vec<Vec<u8>> = (0..15)
+            .map(|r| (0..15).map(|c| ((r * 15 + c) % 6) as u8).collect())
+            .collect();
+        let big_hv = big_enc.encode_grid(&big_grid);
+        let big_acc =
+            BinaryGridEncoder::grid_accuracy(&big_enc.decode_grid(&big_hv, 15, 15), &big_grid);
+
+        assert!(
+            small_acc >= big_acc,
+            "Decode accuracy should not improve with more cells: small={}, big={}",
+            small_acc,
+            big_acc
+        );
+    }
+
+    #[test]
+    fn test_grid_accuracy_identical() {
+        let grid = sample_grid();
+        assert_eq!(BinaryGridEncoder::grid_accuracy(&grid, &grid), 1.0);
+    }
+
+    #[test]
+    fn test_grid_accuracy_partial() {
+        let a = vec![vec![0u8, 1], vec![2, 3]];
+        let b = vec![vec![0u8, 1], vec![9, 3]]; // 1 of 4 cells differ
+        assert!((BinaryGridEncoder::grid_accuracy(&a, &b) - 0.75).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_grid_exact_match() {
+        let grid = sample_grid();
+        assert!(BinaryGridEncoder::grid_exact_match(&grid, &grid));
+        let mut other = grid.clone();
+        other[0][0] = 9;
+        assert!(!BinaryGridEncoder::grid_exact_match(&grid, &other));
     }
 }

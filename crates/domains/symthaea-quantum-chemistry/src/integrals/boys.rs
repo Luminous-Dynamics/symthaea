@@ -16,8 +16,19 @@ use crate::constants::SQRT_PI;
 
 /// Compute the Boys function F_n(x) for given order n and argument x.
 ///
-/// Uses Taylor series for x < 25, asymptotic form for x ≥ 25.
-/// Downward recursion from F_0 is used for higher orders.
+/// Uses a cancellation-free series for x < 25, asymptotic form for x ≥ 25.
+///
+/// A prior version of this function computed F_0 then used *upward*
+/// recursion (F_{n+1}(x) = ((2n+1)F_n(x) - exp(-x)) / (2x)) to get higher
+/// orders. That direction is textbook-unstable (Helgaker, Jorgensen & Olsen,
+/// *Molecular Electronic-Structure Theory*, ch. 9): each step subtracts two
+/// nearly-equal quantities and divides by 2x, amplifying rounding error
+/// every iteration. It stayed unnoticed because the existing tests only ever
+/// checked orders up to n=3 at x=0 or n=2 at a single moderate x -- a real
+/// molecule combining two second-row p-block atoms with close orbital
+/// exponents (verified: any carbon+nitrogen molecule, e.g. HCN/HNC) needs
+/// higher orders at small x and drove it to ~1e24 Hartree. See
+/// `symthaea/CHEMICAL_PROCESS_DISCOVERY_PLAN_2026-07-12.md` Phase 0 log.
 pub fn boys_function(n: u32, x: f64) -> f64 {
     if x < 1e-14 {
         // F_n(0) = 1/(2n+1)
@@ -26,33 +37,32 @@ pub fn boys_function(n: u32, x: f64) -> f64 {
 
     if x >= 25.0 {
         // Asymptotic: F_n(x) ≈ (2n-1)!! / 2^(n+1) * sqrt(π/x^(2n+1))
-        // More precisely: F_n(x) ≈ (2n)! / (2^(2n+1) * n!) * sqrt(π / x^(2n+1))
-        // Simplified: F_n(x) ≈ double_factorial(2n-1) / 2^(n+1) * sqrt(π) / x^(n+0.5)
         return asymptotic_boys(n, x);
     }
 
-    // For moderate x, compute F_0(x) then use upward recursion.
-    // F_0(x) = sqrt(π/x) * erf(sqrt(x)) / 2
-    let f0 = f0_boys(x);
-
-    if n == 0 {
-        return f0;
-    }
-
-    // Upward recursion: F_{n+1}(x) = ((2n+1) * F_n(x) - exp(-x)) / (2x)
-    let exp_neg_x = (-x).exp();
-    let mut fn_val = f0;
-    for k in 0..n {
-        fn_val = ((2 * k + 1) as f64 * fn_val - exp_neg_x) / (2.0 * x);
-    }
-
-    fn_val
+    boys_series_stable(n, x)
 }
 
-/// F_0(x) = sqrt(π/(4x)) * erf(sqrt(x))
-fn f0_boys(x: f64) -> f64 {
-    let sqrt_x = x.sqrt();
-    SQRT_PI / (2.0 * sqrt_x) * erf_approx(sqrt_x)
+/// F_n(x) via the incomplete-gamma series
+/// F_n(x) = (e^-x / 2) * sum_{k=0}^inf x^k / [s(s+1)...(s+k)], with s = n + 1/2.
+///
+/// Every term is positive for x, s > 0, so unlike upward recursion this has
+/// no cancellation at any order or argument in the covered range -- the
+/// standard robust way to evaluate F_n directly, without going through F_0.
+fn boys_series_stable(n: u32, x: f64) -> f64 {
+    let s = n as f64 + 0.5;
+    let mut term = 1.0 / s;
+    let mut sum = term;
+    let mut k = 0u32;
+    loop {
+        k += 1;
+        term *= x / (s + k as f64);
+        sum += term;
+        if term < sum * 1e-16 || k > 500 {
+            break;
+        }
+    }
+    0.5 * (-x).exp() * sum
 }
 
 /// Asymptotic form for large x.
@@ -64,29 +74,6 @@ fn asymptotic_boys(n: u32, x: f64) -> f64 {
     }
     // (2n-1)!! * sqrt(π) / (2^(n+1) * x^(n+0.5))
     dbl_fact * SQRT_PI / (2.0_f64.powi(n as i32 + 1) * x.powf(n as f64 + 0.5))
-}
-
-/// Approximation to the error function erf(x).
-/// Abramowitz & Stegun 7.1.26, max error ≈ 1.5e-7.
-fn erf_approx(x: f64) -> f64 {
-    if x < 0.0 {
-        return -erf_approx(-x);
-    }
-
-    let p = 0.327_591_1;
-    let a1 = 0.254_829_592;
-    let a2 = -0.284_496_736;
-    let a3 = 1.421_413_741;
-    let a4 = -1.453_152_027;
-    let a5 = 1.061_405_429;
-
-    let t = 1.0 / (1.0 + p * x);
-    let t2 = t * t;
-    let t3 = t2 * t;
-    let t4 = t3 * t;
-    let t5 = t4 * t;
-
-    1.0 - (a1 * t + a2 * t2 + a3 * t3 + a4 * t4 + a5 * t5) * (-x * x).exp()
 }
 
 #[cfg(test)]
@@ -172,5 +159,35 @@ mod tests {
         let f1 = boys_function(1, x);
         let f2 = boys_function(2, x);
         assert!(f0 > f1 && f1 > f2);
+    }
+
+    /// Regression test for the upward-recursion instability found 2026-07-12
+    /// via `symthaea/CHEMICAL_PROCESS_DISCOVERY_PLAN_2026-07-12.md` Phase 0
+    /// (HCN/HNC RHF diverging to ~1e24 Hartree). F_n(x) has a closed-form
+    /// bound -- 0 < F_n(x) <= F_n(0) = 1/(2n+1) -- for every n, x >= 0. The
+    /// old tests never checked orders above n=3 or x below 0.5, which is
+    /// exactly where the unstable upward recursion blew up; this sweeps a
+    /// wide grid of both so a future regression can't hide in an untested
+    /// corner again.
+    #[test]
+    fn test_boys_bounded_and_monotonic_wide_sweep() {
+        for n in 0..=8u32 {
+            let f_at_zero = 1.0 / (2 * n + 1) as f64;
+            let mut prev = f_at_zero;
+            for &x in &[
+                0.001, 0.01, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 20.0, 24.9, 25.0, 50.0, 100.0,
+            ] {
+                let f = boys_function(n, x);
+                assert!(
+                    f > 0.0 && f <= f_at_zero + 1e-12,
+                    "F_{n}({x}) = {f} out of bounds (0, {f_at_zero}]"
+                );
+                assert!(
+                    f <= prev + 1e-12,
+                    "F_{n}(x) not monotonically decreasing: F_{n}({x})={f} > previous={prev}"
+                );
+                prev = f;
+            }
+        }
     }
 }

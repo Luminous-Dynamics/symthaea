@@ -34,6 +34,17 @@ enum MidiEventType {
     Tempo(u32),            // microseconds per beat
     TimeSignature(u8, u8), // numerator, denominator power of 2
     ProgramChange(u8),     // GM instrument number
+    ControlChange { controller: u8, value: u8 },
+}
+
+/// CC7 value for a renderer volume gain in [0, 1].
+fn cc_volume(volume: f32) -> u8 {
+    (volume * 127.0).round().clamp(0.0, 127.0) as u8
+}
+
+/// CC10 value for a renderer pan in [-1, 1] (64 = center).
+fn cc_pan(pan: f32) -> u8 {
+    (((pan + 1.0) * 0.5) * 127.0).round().clamp(0.0, 127.0) as u8
 }
 
 /// MIDI track with events.
@@ -214,13 +225,7 @@ pub fn export_performance_midi(
     output_path: &Path,
 ) -> Result<(), String> {
     let ensemble = crate::theory_realize::resolve_spec_ensemble(spec, seed);
-    let voices = crate::theory_realize::performance_voices(
-        score,
-        ensemble,
-        spec.texture.swing as f64,
-        state,
-        spec.texture.return_color,
-    );
+    let voices = crate::theory_realize::performance_voices(score, ensemble, spec, state);
     let usec_per_beat = (60_000_000.0 / score.tempo_bpm) as u32;
     let tempo_track = Track {
         name: "Tempo".into(),
@@ -243,11 +248,35 @@ pub fn export_performance_midi(
         // At most 5 performed voices — channels stay safely below the GM
         // drum channel (9).
         let channel = idx as u8;
-        let mut events = vec![MidiEvent {
-            tick: 0,
-            channel,
-            event_type: MidiEventType::ProgramChange(voice.instrument.gm_program()),
-        }];
+        // The renderer's designed mix balance (melody 1.0 / harmony 0.5 /
+        // bass 0.85…) and stereo stage (`pan_for_role`) used to be computed
+        // and then DISCARDED here — every voice rendered at the GM default
+        // volume, dead center. CC7/CC10 at tick 0 carry them across the
+        // MIDI boundary so FluidSynth (and any DAW) hears the same balance
+        // the native renderer mixes.
+        let mut events = vec![
+            MidiEvent {
+                tick: 0,
+                channel,
+                event_type: MidiEventType::ProgramChange(voice.instrument.gm_program()),
+            },
+            MidiEvent {
+                tick: 0,
+                channel,
+                event_type: MidiEventType::ControlChange {
+                    controller: 7,
+                    value: cc_volume(voice.volume),
+                },
+            },
+            MidiEvent {
+                tick: 0,
+                channel,
+                event_type: MidiEventType::ControlChange {
+                    controller: 10,
+                    value: cc_pan(voice.pan),
+                },
+            },
+        ];
         for n in &voice.notes {
             let on = secs_to_ticks(n.start_time, score.tempo_bpm);
             let off = secs_to_ticks(n.start_time + n.duration, score.tempo_bpm).max(on + 1);
@@ -273,7 +302,99 @@ pub fn export_performance_midi(
             events,
         });
     }
+
+    // The style-gated drum track, on the SAME performed timeline as the
+    // pitched voices. The native renderer has had these since the Tier-2
+    // percussion wave; the MIDI export silently dropped them — so under
+    // FluidSynth (the live Studio default) NO style had any percussion at
+    // all. Styles whose `DrumPolicy` is `None` (Classical, Waltz…) still
+    // honestly get no drum track.
+    let drums = crate::theory_realize::performance_drum_hits(score, spec, state, seed);
+    if !drums.is_empty() {
+        let mut events = vec![MidiEvent {
+            tick: 0,
+            channel: 9,
+            // Accompaniment level, not a drum feature — mirrors the native
+            // path's modest 0.35 mix gain rather than the GM default (100),
+            // which would put the kit level with the melody.
+            event_type: MidiEventType::ControlChange {
+                controller: 7,
+                value: 80,
+            },
+        }];
+        for hit in &drums {
+            let tick = secs_to_ticks(hit.time, score.tempo_bpm);
+            let note = hit.drum.gm_note();
+            events.push(MidiEvent {
+                tick,
+                channel: 9,
+                event_type: MidiEventType::NoteOn {
+                    note,
+                    velocity: (hit.velocity * 127.0).clamp(1.0, 127.0) as u8,
+                },
+            });
+            // Percussion is one-shot: a short fixed gate is standard.
+            events.push(MidiEvent {
+                tick: tick + 120,
+                channel: 9,
+                event_type: MidiEventType::NoteOff { note },
+            });
+        }
+        events.sort_by_key(|e| e.tick);
+        tracks.push(Track {
+            name: "Drums".into(),
+            channel: 9,
+            events,
+        });
+    }
     write_midi_file(output_path, &tracks)
+}
+
+/// A short single-instrument preview phrase (a one-octave major scale up
+/// to a held tonic) as a Standard MIDI File — entirely decoupled from
+/// `Score`/`CompositionSpec`, so an instrument picker can be auditioned
+/// without composing anything. Used by the Studio's instrument-preview
+/// endpoint.
+pub fn export_preview_midi(
+    instrument: crate::instruments::Instrument,
+    output_path: &Path,
+) -> Result<(), String> {
+    const TEMPO_BPM: f32 = 100.0;
+    const NOTE_DUR: f32 = 0.32;
+    const C4: f32 = 261.6256;
+    // Major-scale semitone offsets up to the octave, then a held tonic
+    // an octave above — agility and sustain color both come through.
+    let semitones = [0, 2, 4, 5, 7, 9, 11, 12];
+    let mut notes = Vec::new();
+    let mut t = 0.0f32;
+    for &s in &semitones {
+        notes.push(Note {
+            frequency: C4 * 2f32.powf(s as f32 / 12.0),
+            start_time: t,
+            duration: NOTE_DUR * 0.9,
+            velocity: 0.75,
+        });
+        t += NOTE_DUR;
+    }
+    notes.push(Note {
+        frequency: C4 * 2.0,
+        start_time: t,
+        duration: 1.2,
+        velocity: 0.7,
+    });
+
+    let note_refs: Vec<&Note> = notes.iter().collect();
+    let track = notes_to_track("Preview", 0, instrument.gm_program(), &note_refs, TEMPO_BPM);
+    let tempo_track = Track {
+        name: "Tempo".into(),
+        channel: 0,
+        events: vec![MidiEvent {
+            tick: 0,
+            channel: 0,
+            event_type: MidiEventType::Tempo((60_000_000.0 / TEMPO_BPM) as u32),
+        }],
+    };
+    write_midi_file(output_path, &[tempo_track, track])
 }
 
 /// The clean-grid SYMBOLIC export — see the doc block above
@@ -476,6 +597,11 @@ fn encode_track(track: &Track) -> Vec<u8> {
                 data.push(0xC0 | (event.channel & 0x0F));
                 data.push(*program & 0x7F);
             }
+            MidiEventType::ControlChange { controller, value } => {
+                data.push(0xB0 | (event.channel & 0x0F));
+                data.push(*controller & 0x7F);
+                data.push(*value & 0x7F);
+            }
         }
     }
 
@@ -523,6 +649,41 @@ mod tests {
     #[test]
     fn freq_to_midi_a4() {
         assert_eq!(freq_to_midi(440.0), 69);
+    }
+
+    #[test]
+    fn preview_midi_round_trips_and_uses_the_instruments_gm_program() {
+        let path = std::env::temp_dir().join(format!(
+            "muse_preview_export_test_{}.mid",
+            std::process::id()
+        ));
+        export_preview_midi(crate::instruments::Instrument::Violin, &path).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        let smf = midly::Smf::parse(&bytes).expect("exported file must be valid SMF");
+        // Tempo track + the single preview track.
+        assert_eq!(smf.tracks.len(), 2);
+        let program = smf.tracks[1].iter().find_map(|e| match &e.kind {
+            midly::TrackEventKind::Midi {
+                message: midly::MidiMessage::ProgramChange { program },
+                ..
+            } => Some(program.as_int()),
+            _ => None,
+        });
+        assert_eq!(
+            program,
+            Some(crate::instruments::Instrument::Violin.gm_program())
+        );
+        // 8 scale notes + 1 held tonic = 9 NoteOn events.
+        let note_ons = smf.tracks[1]
+            .iter()
+            .filter(|e| {
+                matches!(&e.kind,
+                    midly::TrackEventKind::Midi { message: midly::MidiMessage::NoteOn { vel, .. }, .. }
+                        if vel.as_int() > 0)
+            })
+            .count();
+        assert_eq!(note_ons, 9);
+        let _ = std::fs::remove_file(&path);
     }
 
     #[cfg(feature = "theory")]
@@ -617,6 +778,96 @@ mod tests {
             later > 0,
             "a swung export must move off-beat onsets later than straight"
         );
+    }
+
+    #[cfg(feature = "theory")]
+    #[test]
+    fn performance_export_carries_mix_balance_and_pan_cc() {
+        use symthaea_music_theory::{MusicalIntent, Style};
+        let intent = MusicalIntent::default();
+        let spec = Style::Classical.spec();
+        let score = symthaea_music_theory::compose_with_spec(&intent, &spec);
+        let path =
+            std::env::temp_dir().join(format!("muse_perf_export_cc_{}.mid", std::process::id()));
+        export_performance_midi(&score, &spec, 0, &crate::MusicalState::default(), &path).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        let smf = midly::Smf::parse(&bytes).expect("valid SMF");
+        // Collect (track name → [(controller, value)]).
+        let mut ccs: std::collections::HashMap<String, Vec<(u8, u8)>> = Default::default();
+        for track in &smf.tracks {
+            let mut name = String::new();
+            let mut list = Vec::new();
+            for e in track {
+                match &e.kind {
+                    midly::TrackEventKind::Meta(midly::MetaMessage::TrackName(n)) => {
+                        name = String::from_utf8_lossy(n).into_owned();
+                    }
+                    midly::TrackEventKind::Midi {
+                        message: midly::MidiMessage::Controller { controller, value },
+                        ..
+                    } => list.push((controller.as_int(), value.as_int())),
+                    _ => {}
+                }
+            }
+            if !name.is_empty() {
+                ccs.insert(name, list);
+            }
+        }
+        // The renderer's designed balance must survive the MIDI boundary:
+        // melody full volume panned slightly right, harmony at half volume
+        // panned left, bass anchored center at 0.85.
+        let melody = &ccs["Melody"];
+        assert!(melody.contains(&(7, cc_volume(1.0))), "{melody:?}");
+        assert!(melody.contains(&(10, cc_pan(0.25))), "{melody:?}");
+        let harmony = &ccs["Harmony"];
+        assert!(harmony.contains(&(7, cc_volume(0.5))), "{harmony:?}");
+        assert!(harmony.contains(&(10, cc_pan(-0.4))), "{harmony:?}");
+        let bass = &ccs["Bass"];
+        assert!(bass.contains(&(7, cc_volume(0.85))), "{bass:?}");
+        assert!(bass.contains(&(10, cc_pan(0.0))), "{bass:?}");
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[cfg(feature = "theory")]
+    #[test]
+    fn performance_export_writes_style_drums_only_for_drum_styles() {
+        use symthaea_music_theory::{MusicalIntent, Style};
+        let intent = MusicalIntent::default();
+        let channel9_note_ons = |style: Style, tag: &str| -> Vec<u8> {
+            let spec = style.spec();
+            let score = symthaea_music_theory::compose_with_spec(&intent, &spec);
+            let path = std::env::temp_dir().join(format!(
+                "muse_perf_export_drums_{tag}_{}.mid",
+                std::process::id()
+            ));
+            export_performance_midi(&score, &spec, 0, &crate::MusicalState::default(), &path)
+                .unwrap();
+            let bytes = std::fs::read(&path).unwrap();
+            let smf = midly::Smf::parse(&bytes).expect("valid SMF");
+            let keys: Vec<u8> = smf
+                .tracks
+                .iter()
+                .flatten()
+                .filter_map(|e| match &e.kind {
+                    midly::TrackEventKind::Midi {
+                        channel,
+                        message: midly::MidiMessage::NoteOn { key, vel },
+                    } if channel.as_int() == 9 && vel.as_int() > 0 => Some(key.as_int()),
+                    _ => None,
+                })
+                .collect();
+            std::fs::remove_file(&path).ok();
+            keys
+        };
+        // Playful's Backbeat policy must reach the exported MIDI as a real
+        // channel-9 kit (kick 36, snare 38, hats 42)...
+        let playful = channel9_note_ons(Style::Playful, "playful");
+        assert!(playful.contains(&36), "kick missing: {playful:?}");
+        assert!(playful.contains(&38), "snare missing: {playful:?}");
+        assert!(playful.contains(&42), "hats missing: {playful:?}");
+        // ...while Classical's DrumPolicy::None honestly stays kit-free.
+        let classical = channel9_note_ons(Style::Classical, "classical");
+        assert!(classical.is_empty(), "unexpected drums: {classical:?}");
     }
 
     #[test]

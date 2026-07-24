@@ -1,6 +1,6 @@
 use crate::controller::QuadrupedController;
 use crate::encoder::QuadrupedHdcEncoder;
-use crate::simulator::{QuadrupedPhysicsSimulator, SimpleQuadrupedSimulator};
+use crate::simulator::{QuadrupedBackend, QuadrupedPhysicsSimulator, SimpleQuadrupedSimulator};
 use crate::types::{GaitType, NUM_ACTUATORS, QuadrupedCommand, QuadrupedConfig};
 pub use symthaea_core::embodiment::{
     EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
@@ -19,7 +19,7 @@ pub enum QuadrupedFallbackStage {
 
 pub struct QuadrupedEmbodiment {
     ctrl: QuadrupedController,
-    sim: SimpleQuadrupedSimulator,
+    sim: QuadrupedBackend,
     enc: QuadrupedHdcEncoder,
     last_p: Option<ContinuousHV>,
     steps: usize,
@@ -34,10 +34,25 @@ pub struct QuadrupedEmbodiment {
 }
 impl QuadrupedEmbodiment {
     pub fn new(g: &GenesisSeed) -> Self {
+        Self::with_backend(g, QuadrupedBackend::Simple(SimpleQuadrupedSimulator::new()))
+    }
+
+    /// Construct with the real rigid-body physics backend (GJK/EPA contact
+    /// via `symtropy-physics`) instead of the default scripted CPG-PD model.
+    /// No gait scheduling — the network's torques are the only input.
+    #[cfg(feature = "symtropy")]
+    pub fn new_symtropy(g: &GenesisSeed) -> Self {
+        Self::with_backend(
+            g,
+            QuadrupedBackend::Symtropy(crate::symtropy_sim::SymtropyQuadrupedSimulator::new()),
+        )
+    }
+
+    fn with_backend(g: &GenesisSeed, sim: QuadrupedBackend) -> Self {
         let c = QuadrupedConfig::default();
         Self {
             ctrl: QuadrupedController::new(g, &c),
-            sim: SimpleQuadrupedSimulator::new(),
+            sim,
             enc: QuadrupedHdcEncoder::new(g, 32),
             last_p: None,
             steps: 0,
@@ -176,7 +191,7 @@ impl QuadrupedEmbodiment {
             total_steps: self.steps as u64,
             control_effort: self.effort,
             prediction_error: self.pe,
-            safety_level: format!("{:?}", self.safety),
+            safety_level: self.safety,
             platform: "quadruped".to_string(),
             num_actuators: NUM_ACTUATORS,
             epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
@@ -449,5 +464,39 @@ mod tests {
         assert!(!b.safe_fallback_active());
         b.step(&hv, 0.005, 0.05); // Red
         assert!(b.safe_fallback_active());
+    }
+
+    #[cfg(feature = "symtropy")]
+    #[test]
+    fn test_symtropy_backend_is_actually_driven() {
+        // Robotics plan 2026-07-10 Tier 4.4: SymtropyQuadrupedSimulator
+        // existed and implemented the trait but nothing ever constructed
+        // one through the embodiment bridge. Confirm it now does, and that
+        // stepping it actually evolves real rigid-body state (not just
+        // constructs successfully).
+        let mut b = QuadrupedEmbodiment::new_symtropy(&GenesisSeed::from_phrase("symtropy-t"));
+        let hv = ContinuousHV::random(16384, 42);
+        let z0 = b.sim.state().base_position[2];
+        for _ in 0..200 {
+            let r = b.step(&hv, 0.005, 0.7);
+            assert!(r.success, "symtropy backend must stay finite");
+        }
+        let z1 = b.sim.state().base_position[2];
+        assert_ne!(
+            z0, z1,
+            "symtropy backend must actually evolve under gravity/contact, not sit frozen"
+        );
+    }
+
+    #[cfg(feature = "symtropy")]
+    #[test]
+    fn test_symtropy_backend_safety_gating_still_applies() {
+        // The Phi->safety gate composes above the backend choice — Red
+        // SitDown must still engage on the real-physics backend.
+        let mut b = QuadrupedEmbodiment::new_symtropy(&GenesisSeed::from_phrase("symtropy-t2"));
+        let hv = ContinuousHV::random(16384, 42);
+        let r = b.step(&hv, 0.005, 0.05); // Red
+        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+        assert_eq!(b.fallback_stage(), QuadrupedFallbackStage::SitDown);
     }
 }

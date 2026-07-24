@@ -43,6 +43,13 @@ impl PhysicsCallback<3> for ConsciousnessQuadrupedCallback {
     }
     fn on_collision(&mut self, _event: &CollisionEvent<3>) {}
     fn record_dissipation(&mut self, _energy: f64) {}
+    // No-op like record_dissipation above: QuadrupedState has no energy
+    // accounting field yet, so there's nowhere honest to put this without
+    // inventing an unread accumulator. Added because PhysicsCallback grew
+    // this as a required method upstream — this crate's `symtropy` feature
+    // had never actually been compiled, so the gap went undetected until
+    // robotics plan 2026-07-10 Tier 4.4 wired the backend in for real.
+    fn record_work(&mut self, _body: BodyHandle, _work_joules: f64) {}
 }
 
 /// Symtropy-physics quadruped with 4 articulated legs and terrain contact.

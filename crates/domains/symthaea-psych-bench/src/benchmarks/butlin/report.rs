@@ -23,6 +23,12 @@ pub struct RuntimeConsciousnessData {
     pub emergence_ratio: f64,
     /// Number of detected clusters.
     pub num_clusters: usize,
+    /// Real, mechanism-specific behavioral measurements from
+    /// `ablation::measure_indicator` — the same probes the ablation matrix
+    /// uses to prove a mechanism load-bearing. When present, these replace
+    /// the structural-Phi-sigmoid proxy for the indicators they cover.
+    #[serde(default)]
+    pub behavioral: Option<BehavioralIndicatorSignals>,
 }
 
 impl RuntimeConsciousnessData {
@@ -42,8 +48,70 @@ impl RuntimeConsciousnessData {
             bottleneck_score,
             emergence_ratio,
             num_clusters,
+            behavioral: None,
         }
     }
+
+    /// Attach real behavioral measurements (see `ablation::measure_indicator`).
+    pub fn with_behavioral(mut self, behavioral: BehavioralIndicatorSignals) -> Self {
+        self.behavioral = Some(behavioral);
+        self
+    }
+}
+
+/// Real, mechanism-specific measurements for the 11 indicators the ablation
+/// matrix already validates as load-bearing (or honestly not, for indicators
+/// blocked on known separate bugs — see field docs) (see
+/// `ablation::run_ablation_matrix`'s per-row causal effects). All fields are
+/// the same probes `ablation::measure_indicator` computes, run here against
+/// a live (non-ablated) service rather than a baseline-vs-ablated pair.
+///
+/// GWT-1 and IIT-1 are deliberately not fields here — GWT-1 is derived from
+/// the other fields' aggregate in `indicators.rs`, and IIT-1's "is Phi
+/// sensitive to ablation" claim can only be tested via a baseline-vs-ablated
+/// comparison (see `ablation_specs`'s `disable_gwt_for_iit1` row), not a
+/// single live snapshot, so it keeps using the structural-Phi proxy for live
+/// scoring.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct BehavioralIndicatorSignals {
+    /// RPT-1: input-discrimination / temporal-coherence proxy (0-1).
+    pub rpt1_temporal_coherence: f64,
+    /// RPT-2: fraction of cycles with active cross-modal binding (0-1).
+    pub rpt2_binding_activity: f64,
+    /// GWT-2: fraction of cycles with a non-empty, bounded GWT coalition (0-1).
+    pub gwt2_bounded_coalition: f64,
+    /// GWT-3: fraction of cycles with an active GWT broadcast (0-1).
+    pub gwt3_broadcast_activity: f64,
+    /// GWT-4: mean deviation of phi_attention_weight from neutral (0-1).
+    pub gwt4_state_dependent_attention: f64,
+    /// HOT-1: variance-based signal for whether prediction_error actually
+    /// differentiates across inputs (0-1) — honestly near-zero while PE is
+    /// frozen (see memory/symthaea_prediction_error_frozen_investigation.md).
+    pub hot1_prediction_differentiation: f64,
+    /// HOT-2: metacognitive monitoring accuracy (0-1).
+    pub hot2_meta_cognitive_accuracy: f64,
+    /// HOT-3: effective learning rate actually applied this cycle (raw units;
+    /// treated as a presence signal — see `indicators.rs`'s use site). Same
+    /// underlying signal as PP-1, different Butlin theoretical claim.
+    pub hot3_effective_lr: f64,
+    /// PP-1: effective learning rate actually applied this cycle (raw units;
+    /// treated as a presence signal — see `indicators.rs`'s use site).
+    pub pp1_effective_lr: f64,
+    /// PP-2: fraction of cycles with active hierarchical free-energy
+    /// computation (0-1) — a module-engagement proxy, coarser than a true
+    /// per-tau-level error trace (not currently surfaced on CycleMetadata).
+    pub pp2_hierarchical_activity: f64,
+    /// AST-1: attention-schema focus signal (0-1, non-zero fallback per
+    /// `ablation::extract_indicator_score`).
+    pub ast1_attention_focus: f64,
+    /// HOT-4: fraction of near-zero output dimensions, averaged over several
+    /// distinct inputs (0-1). Needs no cognitive-loop ablation at all — see
+    /// `live_runner::CognitiveLoopBenchmarkRunner::measure_hot4_sparse_smooth_coding`.
+    pub hot4_sparsity: f64,
+    /// HOT-4: fraction of perturbation steps for which output dissimilarity
+    /// grows non-decreasingly with perturbation size (0-1) — a genuinely
+    /// smooth code shouldn't respond discontinuously to small changes.
+    pub hot4_smoothness: f64,
 }
 
 /// Status of a consciousness indicator.

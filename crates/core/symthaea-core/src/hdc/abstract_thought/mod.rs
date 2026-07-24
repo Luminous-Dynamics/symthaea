@@ -1071,7 +1071,8 @@ mod tests {
             fitness: 0.001 + 0.001 * complexity as f64,
             status: ConjectureStatus::FormallyVerified { proof_steps: 5 },
             confidence: 0.95,
-            macro_promotion_tier: crate::hdc::conjecture_engine::MacroPromotionTier::Formal,
+            macro_promotion_tier:
+                crate::hdc::conjecture_engine::MacroPromotionTier::FastTrackVerified,
             eml_compiled: None,
             eml_metrics: None,
             eml_verified_real: None,
@@ -1342,7 +1343,7 @@ mod tests {
 
         let metrics = engine.macro_pool_metrics().expect("metrics available");
         assert_eq!(metrics.total_operators, 2);
-        assert_eq!(metrics.formal_operators, 2);
+        assert_eq!(metrics.fast_track_operators, 2);
         assert_eq!(metrics.recurrent_operators, 0);
         assert_eq!(metrics.used_operators, 0);
         assert_eq!(metrics.total_promoted, 2);

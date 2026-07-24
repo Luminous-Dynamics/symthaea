@@ -21,8 +21,8 @@ use std::sync::Mutex;
 use symthaea_humanoid::types::{HumanoidCommand, NUM_ACTUATORS};
 use tracing::debug;
 
-use crate::calibration::CalibrationProfile;
-use crate::error::HalResult;
+use crate::calibration::{CalibrationProfile, JointCalibration};
+use crate::error::{HalError, HalResult};
 use crate::pca9685::{CHANNELS, Pca9685};
 
 // ============================================================================
@@ -46,8 +46,12 @@ pub struct ServoOutput<I> {
     last_pulses: [u16; NUM_ACTUATORS],
     /// Maximum change in µs per update cycle.
     slew_rate_us: u16,
+    /// Whether both PWM boards completed initialization.
+    initialized: bool,
     /// Whether servo output is enabled.
     enabled: bool,
+    /// Whether the most recent shutdown was confirmed on both PWM boards.
+    shutdown_verified: bool,
 }
 
 impl<I: I2c> ServoOutput<I> {
@@ -56,14 +60,20 @@ impl<I: I2c> ServoOutput<I> {
     /// - `bus0`: I2C bus for board 0 (address 0x40, joints 0–15)
     /// - `bus1`: I2C bus for board 1 (address 0x41, joints 16–20)
     pub fn new(bus0: I, bus1: I, calibration: CalibrationProfile) -> Self {
-        let center = calibration.joints[0].center_pulse_us();
+        let center = calibration
+            .joints
+            .first()
+            .map(JointCalibration::center_pulse_us)
+            .unwrap_or(1500);
         Self {
             board0: Pca9685::new(bus0, 0x40),
             board1: Pca9685::new(bus1, 0x41),
             calibration,
             last_pulses: [center; NUM_ACTUATORS],
             slew_rate_us: DEFAULT_SLEW_RATE_US,
+            initialized: false,
             enabled: false,
+            shutdown_verified: true,
         }
     }
 
@@ -79,30 +89,116 @@ impl<I: I2c> ServoOutput<I> {
 
     /// Initialize both PCA9685 boards at the given PWM frequency (typically 50 Hz).
     pub fn init(&mut self, frequency_hz: f64) -> HalResult<()> {
-        self.board0.init(frequency_hz)?;
-        self.board1.init(frequency_hz)?;
-        debug!("servo output initialized at {}Hz", frequency_hz);
+        self.calibration.validate()?;
+        if !frequency_hz.is_finite() || frequency_hz <= 0.0 {
+            return Err(HalError::Safety(format!(
+                "invalid servo PWM frequency: {frequency_hz}"
+            )));
+        }
+        let period_us = 1_000_000.0 / frequency_hz;
+        for (index, joint) in self.calibration.joints.iter().enumerate() {
+            if joint.pulse_max_us as f64 >= period_us {
+                return Err(HalError::Calibration(format!(
+                    "joint {index} ({}) pulse max {} µs does not fit PWM period {:.1} µs",
+                    joint.name, joint.pulse_max_us, period_us
+                )));
+            }
+        }
+
+        self.initialized = false;
+        self.enabled = false;
+        self.shutdown_verified = false;
+
+        let init_result = (|| -> HalResult<()> {
+            self.board0.init(frequency_hz)?;
+            self.board1.init(frequency_hz)?;
+            self.board0.all_off()?;
+            self.board1.all_off()?;
+            Ok(())
+        })();
+
+        if let Err(init_error) = init_result {
+            let board0 = self.board0.all_off();
+            let board1 = self.board1.all_off();
+            self.shutdown_verified = board0.is_ok() && board1.is_ok();
+            return match (board0, board1) {
+                (Ok(()), Ok(())) => Err(init_error),
+                (Err(shutdown_error), Ok(())) | (Ok(()), Err(shutdown_error)) => {
+                    Err(HalError::Safety(format!(
+                        "servo initialization failed: {init_error}; shutdown failed: {shutdown_error}"
+                    )))
+                }
+                (Err(e0), Err(e1)) => Err(HalError::Safety(format!(
+                    "servo initialization failed: {init_error}; both shutdowns failed: board0={e0}; board1={e1}"
+                ))),
+            };
+        }
+
+        self.initialized = true;
+        self.shutdown_verified = true;
+        debug!(
+            "servo output initialized and verified off at {}Hz",
+            frequency_hz
+        );
         Ok(())
     }
 
     /// Enable servo output (allows `apply()` to write to hardware).
-    pub fn enable(&mut self) {
+    pub fn enable(&mut self) -> HalResult<()> {
+        if !self.initialized {
+            return Err(HalError::Safety(
+                "servo output cannot be enabled before initialization".to_string(),
+            ));
+        }
+        if !self.shutdown_verified {
+            return Err(HalError::Safety(
+                "servo output cannot be enabled from an unverified shutdown state".to_string(),
+            ));
+        }
+        self.calibration.validate()?;
         self.enabled = true;
+        self.shutdown_verified = false;
         debug!("servo output enabled");
+        Ok(())
     }
 
     /// Disable servo output and turn off all channels.
+    ///
+    /// Both boards are attempted even if the first write fails. A failed
+    /// shutdown is recorded as unverified so health reporting cannot mistake
+    /// a requested shutdown for confirmed de-energization.
     pub fn disable(&mut self) -> HalResult<()> {
+        let board0 = self.board0.all_off();
+        let board1 = self.board1.all_off();
         self.enabled = false;
-        self.board0.all_off()?;
-        self.board1.all_off()?;
-        debug!("servo output disabled");
-        Ok(())
+        self.shutdown_verified = board0.is_ok() && board1.is_ok();
+
+        match (board0, board1) {
+            (Ok(()), Ok(())) => {
+                debug!("servo output disabled");
+                Ok(())
+            }
+            (Err(e), Ok(())) => Err(e),
+            (Ok(()), Err(e)) => Err(e),
+            (Err(e0), Err(e1)) => Err(crate::error::HalError::Safety(format!(
+                "failed to disable both PWM boards: board0={e0}; board1={e1}"
+            ))),
+        }
+    }
+
+    /// Whether both PWM boards completed initialization.
+    pub fn is_initialized(&self) -> bool {
+        self.initialized
     }
 
     /// Whether output is currently enabled.
     pub fn is_enabled(&self) -> bool {
         self.enabled
+    }
+
+    /// Whether both PWM boards confirmed the most recent all-off request.
+    pub fn shutdown_verified(&self) -> bool {
+        self.shutdown_verified
     }
 
     /// Set the maximum slew rate (µs per update tick).
@@ -111,8 +207,15 @@ impl<I: I2c> ServoOutput<I> {
     }
 
     /// Set the calibration profile.
-    pub fn set_calibration(&mut self, cal: CalibrationProfile) {
+    pub fn set_calibration(&mut self, cal: CalibrationProfile) -> HalResult<()> {
+        if self.enabled {
+            return Err(HalError::Safety(
+                "cannot replace calibration while servo output is enabled".to_string(),
+            ));
+        }
+        cal.validate()?;
         self.calibration = cal;
+        Ok(())
     }
 
     /// Apply a `HumanoidCommand` to the servos.
@@ -125,22 +228,20 @@ impl<I: I2c> ServoOutput<I> {
         }
 
         // 1. Convert torques → target pulse widths
-        let targets = self.calibration.torques_to_pulses(&command.torques);
+        let targets = self.calibration.torques_to_pulses(&command.torques)?;
 
         // 2. Slew-rate limiting
         let mut pulses = [0u16; NUM_ACTUATORS];
         for i in 0..NUM_ACTUATORS {
             pulses[i] = slew_limit(self.last_pulses[i], targets[i], self.slew_rate_us);
         }
-        self.last_pulses = pulses;
+        // 3. Write one coherent transaction per board. Commit the shadow state
+        // only for hardware writes that actually succeeded.
+        self.board0.set_pulse_batch(0, &pulses[..CHANNELS])?;
+        self.last_pulses[..CHANNELS].copy_from_slice(&pulses[..CHANNELS]);
 
-        // 3. Write to board 0 (joints 0–15)
-        let board0_pulses: Vec<u16> = pulses[..CHANNELS].to_vec();
-        self.board0.set_pulse_batch(0, &board0_pulses)?;
-
-        // 4. Write to board 1 (joints 16–20, mapped to channels 0–4)
-        let board1_pulses: Vec<u16> = pulses[CHANNELS..].to_vec();
-        self.board1.set_pulse_batch(0, &board1_pulses)?;
+        self.board1.set_pulse_batch(0, &pulses[CHANNELS..])?;
+        self.last_pulses[CHANNELS..].copy_from_slice(&pulses[CHANNELS..]);
 
         Ok(())
     }
@@ -166,11 +267,13 @@ impl<I: I2c> ServoOutput<I> {
         &self.calibration
     }
 
-    /// Read back the OFF counts for all 21 servo channels across both boards.
+    /// Read the PWM OFF registers for all 21 channels across both boards.
     ///
-    /// Returns an array of 21 OFF counts (12-bit). This is a diagnostic
-    /// operation (21 I2C reads), not intended for per-tick use.
-    pub fn read_positions(&mut self) -> HalResult<[u16; NUM_ACTUATORS]> {
+    /// This confirms only what the PCA9685 latched. It does **not** measure
+    /// physical servo or joint position; encoder or potentiometer feedback is
+    /// required for that claim. This performs 21 I2C reads and is not intended
+    /// for per-tick use.
+    pub fn read_pwm_registers(&mut self) -> HalResult<[u16; NUM_ACTUATORS]> {
         let mut counts = [0u16; NUM_ACTUATORS];
         for (i, count) in counts.iter_mut().enumerate().take(CHANNELS) {
             let (_on, off) = self.board0.read_channel(i as u8)?;
@@ -183,13 +286,12 @@ impl<I: I2c> ServoOutput<I> {
         Ok(counts)
     }
 
-    /// Compare last commanded pulses against actual readback from PCA9685.
+    /// Compare commanded pulses against PCA9685 register readback.
     ///
-    /// Returns a list of mismatches: `(joint_index, commanded_pulse_us, actual_off_count)`.
-    /// An empty vector means all positions match. This is a diagnostic
-    /// operation (21 I2C reads), not intended for per-tick use.
-    pub fn verify_positions(&mut self) -> HalResult<Vec<(usize, u16, u16)>> {
-        let actual = self.read_positions()?;
+    /// Returns `(joint_index, commanded_pulse_us, latched_off_count)` entries.
+    /// An empty vector proves register agreement only, not physical motion.
+    pub fn verify_pwm_latch(&mut self) -> HalResult<Vec<(usize, u16, u16)>> {
+        let actual = self.read_pwm_registers()?;
         let period_us = self.board0.period_us();
         let mut mismatches = Vec::new();
         for (i, &pulse) in self.last_pulses.iter().enumerate() {
@@ -200,6 +302,18 @@ impl<I: I2c> ServoOutput<I> {
             }
         }
         Ok(mismatches)
+    }
+
+    /// Backward-compatible alias for [`Self::read_pwm_registers`].
+    #[deprecated(note = "PCA9685 readback is not physical position; use read_pwm_registers")]
+    pub fn read_positions(&mut self) -> HalResult<[u16; NUM_ACTUATORS]> {
+        self.read_pwm_registers()
+    }
+
+    /// Backward-compatible alias for [`Self::verify_pwm_latch`].
+    #[deprecated(note = "PCA9685 readback verifies only the PWM latch; use verify_pwm_latch")]
+    pub fn verify_positions(&mut self) -> HalResult<Vec<(usize, u16, u16)>> {
+        self.verify_pwm_latch()
     }
 }
 
@@ -213,14 +327,20 @@ impl<'a, I: I2c> ServoOutput<RefCellDevice<'a, I>> {
     /// Both PCA9685 boards use the same bus wrapped in a `RefCell`.
     /// This is the simplest approach when all access happens on one thread.
     pub fn new_shared(bus: &'a RefCell<I>, calibration: CalibrationProfile) -> Self {
-        let center = calibration.joints[0].center_pulse_us();
+        let center = calibration
+            .joints
+            .first()
+            .map(JointCalibration::center_pulse_us)
+            .unwrap_or(1500);
         Self {
             board0: Pca9685::new(RefCellDevice::new(bus), 0x40),
             board1: Pca9685::new(RefCellDevice::new(bus), 0x41),
             calibration,
             last_pulses: [center; NUM_ACTUATORS],
             slew_rate_us: DEFAULT_SLEW_RATE_US,
+            initialized: false,
             enabled: false,
+            shutdown_verified: true,
         }
     }
 }
@@ -231,14 +351,20 @@ impl<'a, I: I2c + Send> ServoOutput<MutexDevice<'a, I>> {
     /// Both PCA9685 boards use the same bus wrapped in a `std::sync::Mutex`.
     /// Use this when sensor reads and servo writes happen on different threads.
     pub fn new_shared_mutex(bus: &'a Mutex<I>, calibration: CalibrationProfile) -> Self {
-        let center = calibration.joints[0].center_pulse_us();
+        let center = calibration
+            .joints
+            .first()
+            .map(JointCalibration::center_pulse_us)
+            .unwrap_or(1500);
         Self {
             board0: Pca9685::new(MutexDevice::new(bus), 0x40),
             board1: Pca9685::new(MutexDevice::new(bus), 0x41),
             calibration,
             last_pulses: [center; NUM_ACTUATORS],
             slew_rate_us: DEFAULT_SLEW_RATE_US,
+            initialized: false,
             enabled: false,
+            shutdown_verified: true,
         }
     }
 }
@@ -291,11 +417,31 @@ mod tests {
     }
 
     #[test]
+    fn test_servo_enable_requires_initialization() {
+        let mut servo = make_servo();
+        assert!(servo.enable().is_err());
+        assert!(!servo.is_enabled());
+    }
+
+    #[test]
+    fn test_calibration_cannot_change_while_enabled() {
+        let mut servo = make_servo();
+        servo.init(50.0).unwrap();
+        servo.enable().unwrap();
+        assert!(
+            servo
+                .set_calibration(CalibrationProfile::default_21())
+                .is_err()
+        );
+    }
+
+    #[test]
     fn test_servo_enable_apply() {
         let mut servo = make_servo();
         servo.init(50.0).unwrap();
-        servo.enable();
+        servo.enable().unwrap();
         assert!(servo.is_enabled());
+        assert!(!servo.shutdown_verified());
 
         let cmd = HumanoidCommand::zero();
         servo.apply(&cmd).unwrap();
@@ -310,9 +456,10 @@ mod tests {
     fn test_servo_disable_turns_off() {
         let mut servo = make_servo();
         servo.init(50.0).unwrap();
-        servo.enable();
+        servo.enable().unwrap();
         servo.disable().unwrap();
         assert!(!servo.is_enabled());
+        assert!(servo.shutdown_verified());
     }
 
     #[test]
@@ -331,7 +478,7 @@ mod tests {
     fn test_servo_slew_rate_applied() {
         let mut servo = make_servo();
         servo.init(50.0).unwrap();
-        servo.enable();
+        servo.enable().unwrap();
         servo.set_slew_rate(50); // very slow
 
         // Command full +1 → target 2500, but slew from 1500 limits to 1550
@@ -351,7 +498,7 @@ mod tests {
         let cal = CalibrationProfile::default_21();
         let mut servo = ServoOutput::new_shared(&bus, cal);
         servo.init(50.0).unwrap();
-        servo.enable();
+        servo.enable().unwrap();
         let cmd = HumanoidCommand::zero();
         servo.apply(&cmd).unwrap();
         for &p in servo.last_pulses() {
@@ -365,7 +512,7 @@ mod tests {
         let cal = CalibrationProfile::default_21();
         let mut servo = ServoOutput::new_shared_mutex(&bus, cal);
         servo.init(50.0).unwrap();
-        servo.enable();
+        servo.enable().unwrap();
         let cmd = HumanoidCommand::zero();
         servo.apply(&cmd).unwrap();
         for &p in servo.last_pulses() {
@@ -376,18 +523,18 @@ mod tests {
     // ── Position readback tests ──────────────────────────────────────
 
     #[test]
-    fn test_read_positions_returns_21_elements() {
+    fn test_read_pwm_registers_returns_21_elements() {
         let mut servo = make_servo();
         servo.init(50.0).unwrap();
-        let positions = servo.read_positions().unwrap();
+        let positions = servo.read_pwm_registers().unwrap();
         assert_eq!(positions.len(), NUM_ACTUATORS);
     }
 
     #[test]
-    fn test_verify_positions_detects_mismatches() {
+    fn test_verify_pwm_latch_detects_mismatches() {
         let mut servo = make_servo();
         servo.init(50.0).unwrap();
-        servo.enable();
+        servo.enable().unwrap();
 
         // Apply zero command → last_pulses = 1500
         let cmd = HumanoidCommand::zero();
@@ -395,7 +542,7 @@ mod tests {
         assert_eq!(servo.last_pulses()[0], 1500);
 
         // Mock returns 0 for all reads → mismatch with commanded 1500
-        let mismatches = servo.verify_positions().unwrap();
+        let mismatches = servo.verify_pwm_latch().unwrap();
         // 1500µs at 50Hz → count ≈ 307, mock returns 0
         assert!(!mismatches.is_empty(), "should detect mismatches");
         // All 21 joints should mismatch (all commanded 1500, all read 0)
@@ -408,7 +555,7 @@ mod tests {
     fn test_center_all() {
         let mut servo = make_servo();
         servo.init(50.0).unwrap();
-        servo.enable();
+        servo.enable().unwrap();
 
         // Move away from center first
         let mut cmd = HumanoidCommand::zero();

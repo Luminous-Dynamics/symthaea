@@ -5,6 +5,7 @@
 use crate::controller::{ControllerWeights, ManipulatorController};
 use crate::encoder::ManipulatorHdcEncoder;
 use crate::fep_agent::ActiveInferenceManipulatorAgent;
+use crate::sensorimotor::{ControllerInputSchema, SensorimotorInputBinder};
 use crate::simulator::{ManipulatorPhysicsSimulator, SimpleManipulatorSimulator};
 use crate::types::{ManipulatorConfig, NUM_JOINTS};
 use symthaea_core::genesis::GenesisSeed;
@@ -26,6 +27,8 @@ pub struct EpisodeMetrics {
 pub struct ManipulatorTrainer {
     controller: ManipulatorController,
     encoder: ManipulatorHdcEncoder,
+    sensorimotor_input: SensorimotorInputBinder,
+    neutral_thought: ContinuousHV,
     fep: ActiveInferenceManipulatorAgent,
     simulator: SimpleManipulatorSimulator,
     config: ManipulatorConfig,
@@ -34,9 +37,12 @@ pub struct ManipulatorTrainer {
 impl ManipulatorTrainer {
     pub fn new(config: ManipulatorConfig) -> Self {
         let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let neutral_thought = intent_hv(&genesis, "hold_stable");
         Self {
             controller: ManipulatorController::new(&genesis, &config),
             encoder: ManipulatorHdcEncoder::new(&genesis, 32),
+            sensorimotor_input: SensorimotorInputBinder::new(&genesis),
+            neutral_thought,
             fep: ActiveInferenceManipulatorAgent::new(),
             simulator: SimpleManipulatorSimulator::new(),
             config,
@@ -52,7 +58,10 @@ impl ManipulatorTrainer {
         let mut loss_sum = 0.0f32;
 
         for step in 0..self.config.steps_per_episode {
-            let hv = self.encoder.encode(self.simulator.state());
+            let body_hv = self.encoder.encode(self.simulator.state());
+            let hv = self
+                .sensorimotor_input
+                .fuse(&self.neutral_thought, &body_hv);
             if step % self.config.cognitive_interval == 0 {
                 let fep = self.fep.tick(self.simulator.state());
                 tau_factor = fep.tau_factor;
@@ -85,7 +94,9 @@ impl ManipulatorTrainer {
     /// (`ManipulatorEmbodiment::install_weights`). Closes the trainer-island
     /// gap: before this, trained weights could never leave the trainer.
     pub fn export_weights(&self) -> ControllerWeights {
-        self.controller.export_weights()
+        self.controller
+            .export_weights()
+            .with_input_schema(ControllerInputSchema::SensorimotorBoundV1)
     }
 }
 
@@ -100,22 +111,25 @@ pub fn intent_hv(genesis: &GenesisSeed, intent: &str) -> ContinuousHV {
 }
 
 /// Intent-conditioned curriculum: teach opposing intent thoughts opposing
-/// base-joint torque patterns, through the SAME input path the shipped
-/// bridge uses (`forward(thought_hv, ..)`).
+/// base-joint torque patterns through the same role-bound sensorimotor input
+/// path used by the shipped bridge.
 ///
-/// This is deliberately different from `ManipulatorTrainer`, whose input is
-/// the *encoded body state* (a proprioceptive reflex — thought-independent
-/// by construction). The cognition-ablation experiment (2026-07-08) showed
-/// that with genesis-random weights, opposite intents produce zero task-axis
-/// separation through the bridge; these weights are what make thought an
-/// actual control signal. The controller is reset before each intent block
-/// so training features match the bridge's from-reset serving distribution.
+/// Both this curriculum and `ManipulatorTrainer` now bind thought and body
+/// state into the `SensorimotorBoundV1` schema. The cognition-ablation
+/// experiment (2026-07-08) showed that with genesis-random weights, opposite
+/// intents produce zero task-axis separation through the bridge; these
+/// weights make thought an actual control signal without discarding
+/// proprioception. The controller is reset before each intent block so
+/// training features match the bridge's from-reset serving distribution.
 ///
 /// Returns weights mapping `intent_hv(genesis, "reach_left")` to positive
 /// base-joint torque and `"reach_right"` to negative.
 pub fn train_intent_weights(config: &ManipulatorConfig, epochs: usize) -> ControllerWeights {
     let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
     let mut controller = ManipulatorController::new(&genesis, config);
+    let mut encoder = ManipulatorHdcEncoder::new(&genesis, 32);
+    let binder = SensorimotorInputBinder::new(&genesis);
+    let home_body = encoder.encode(&crate::types::ManipulatorState::home());
     let dt = config.physics_dt() as f32;
 
     let left = intent_hv(&genesis, "reach_left");
@@ -127,15 +141,18 @@ pub fn train_intent_weights(config: &ManipulatorConfig, epochs: usize) -> Contro
 
     const SETTLE_STEPS: usize = 10;
     for _ in 0..epochs {
-        for (hv, target) in [(&left, &target_left), (&right, &target_right)] {
+        for (thought, target) in [(&left, &target_left), (&right, &target_right)] {
+            let hv = binder.fuse(thought, &home_body);
             controller.reset();
             for _ in 0..SETTLE_STEPS {
-                controller.forward(hv, dt);
+                controller.forward(&hv, dt);
                 controller.train_step(target);
             }
         }
     }
-    controller.export_weights()
+    controller
+        .export_weights()
+        .with_input_schema(ControllerInputSchema::SensorimotorBoundV1)
 }
 
 #[cfg(test)]
@@ -170,6 +187,14 @@ mod tests {
         assert!(
             last < first,
             "imitation loss must decrease with training: first {first:.5} -> last {last:.5}"
+        );
+    }
+    #[test]
+    fn exported_training_weights_declare_sensorimotor_schema() {
+        let trainer = ManipulatorTrainer::new(ManipulatorConfig::default());
+        assert_eq!(
+            trainer.export_weights().input_schema,
+            ControllerInputSchema::SensorimotorBoundV1
         );
     }
 }

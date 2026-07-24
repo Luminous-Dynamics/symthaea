@@ -6,9 +6,13 @@
 //! **Honesty note:** This benchmark uses procedurally generated grid tasks.
 //! It tests how HDC encoding degrades under input corruption — a property
 //! of the high-dimensional distributed representation, not of reasoning.
-//! The 2-AFC scoring uses random BinaryHV distractors (chance = ~50%),
-//! which is a lenient baseline. The z-scores reflect encoding noise
-//! tolerance, not robust reasoning under uncertainty.
+//! **FIXED (2026-07-18)**: the 2-AFC scoring used to use random BinaryHV
+//! distractors (chance = ~50%) — see `arc_dataset.rs`'s retraction note for
+//! why that's a discriminability artifact, not a fair baseline (on real
+//! ARC-AGI data it measured 99.0% vs. 13.8-67.8% under fair distractors). Now
+//! uses `arc_dataset::fair_distractor_grid` (a generic wrong transform of the
+//! test input) instead. The z-scores still reflect encoding noise tolerance,
+//! not robust reasoning under uncertainty.
 //!
 //! Tests graceful degradation of HDC grid encoding under input corruption.
 //! Corrupts varying fractions of cells in test input grids and measures
@@ -27,12 +31,12 @@
 //! - accuracy_0pct: ~0.80 (SD~0.12) — clean baseline
 //! - accuracy_50pct: ~0.55 (SD~0.15) — heavily corrupted
 
+use crate::benchmarks::reasoning::arc_dataset::fair_distractor_grid;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
-use symthaea_core::hdc::BinaryHV;
 use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
 
@@ -195,6 +199,12 @@ impl ArcNoiseBenchmark {
                 let test_output = apply_transform(&test_input, tt, task_param, num_colors);
                 let test_out_hv = encoder.encode_grid(&test_output);
 
+                // 2-AFC distractor: fair (equally structured), not random noise.
+                // Built once per task since it doesn't depend on the noise level.
+                let distractor_grid = fair_distractor_grid(&test_input, &test_output)
+                    .unwrap_or_else(|| test_input.clone());
+                let distractor = encoder.encode_grid(&distractor_grid);
+
                 for (level_idx, &noise_frac) in NOISE_LEVELS.iter().enumerate() {
                     xor_shift(&mut rng);
                     let corrupted_input = if noise_frac > 0.0 {
@@ -210,9 +220,6 @@ impl ArcNoiseBenchmark {
                     sim_per_level[level_idx] += pred_sim;
                     sim_count[level_idx] += 1;
 
-                    // 2-AFC vs random distractor
-                    xor_shift(&mut rng);
-                    let distractor = BinaryHV::random(rng);
                     let dist_sim = predicted.similarity(&distractor) as f64;
 
                     total_per_level[level_idx] += 1;
@@ -345,8 +352,8 @@ impl PsychBenchmark for ArcNoiseBenchmark {
         result.notes.push(
             "SYNTHETIC: Uses procedural grid transforms, not Chollet's real ARC. \
              Tests HDC noise tolerance (graceful degradation under corruption), not \
-             robust reasoning. 2-AFC uses random BinaryHV distractors (chance ~50%), \
-             a lenient baseline. Z-scores reflect encoding noise tolerance."
+             robust reasoning. 2-AFC uses a fair (equally structured) distractor, not \
+             random noise (fixed 2026-07-18). Z-scores reflect encoding noise tolerance."
                 .to_string(),
         );
         result.elapsed_ms = start.elapsed().as_millis() as u64;

@@ -3,9 +3,8 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Triangle mesh generation from CSG trees
 //!
-//! Tessellates geometric primitives into triangle meshes and resolves
-//! CSG operations via mesh merging (union) or placeholder pass-through
-//! (subtract/intersect — full CSG mesh boolean is future work).
+//! Tessellates geometric primitives into triangle meshes and resolves closed
+//! solid CSG operations through the BSP backend.
 
 use crate::bsp;
 use crate::csg::{BooleanOp, CSGNode, Primitive, Transform3D};
@@ -17,6 +16,50 @@ pub struct TriangleMesh {
     pub vertices: Vec<[f32; 3]>,
     pub normals: Vec<[f32; 3]>,
     pub indices: Vec<[u32; 3]>,
+}
+
+/// Controls curved primitive tessellation. Geometry coordinates are millimetres.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct TessellationPolicy {
+    /// Maximum radial sagitta error for curved primitive facets, in millimetres.
+    pub max_chord_error_mm: f32,
+    /// Lower bound for a complete circular sweep.
+    pub min_segments: usize,
+    /// Upper bound preventing unbounded mesh growth.
+    pub max_segments: usize,
+}
+
+impl Default for TessellationPolicy {
+    fn default() -> Self {
+        Self {
+            max_chord_error_mm: 0.01,
+            min_segments: 12,
+            max_segments: 256,
+        }
+    }
+}
+
+impl TessellationPolicy {
+    fn circular_segments(self, radius_mm: f32) -> usize {
+        let min_segments = self.min_segments.max(3);
+        let max_segments = self.max_segments.max(min_segments);
+        if !radius_mm.is_finite() || radius_mm <= 0.0 {
+            return min_segments;
+        }
+        let error = if self.max_chord_error_mm.is_finite() {
+            self.max_chord_error_mm.max(f32::EPSILON)
+        } else {
+            0.01
+        };
+        if error >= radius_mm {
+            return min_segments;
+        }
+        let angle = (1.0 - error / radius_mm).clamp(-1.0, 1.0).acos();
+        if !angle.is_finite() || angle <= f32::EPSILON {
+            return max_segments;
+        }
+        ((std::f32::consts::PI / angle).ceil() as usize).clamp(min_segments, max_segments)
+    }
 }
 
 impl TriangleMesh {
@@ -32,7 +75,7 @@ impl TriangleMesh {
         self.indices.len()
     }
 
-    /// Merge another mesh into this one (for CSG union approximation)
+    /// Append another mesh as an additional disconnected shell.
     pub fn merge(&mut self, other: &TriangleMesh) {
         let offset = self.vertices.len() as u32;
         self.vertices.extend_from_slice(&other.vertices);
@@ -43,49 +86,58 @@ impl TriangleMesh {
         }
     }
 
-    /// Apply a transform to all vertices and normals
+    /// Apply an affine transform to all vertices and normals.
+    ///
+    /// Normals use the inverse-transpose transform so non-uniform scaling does
+    /// not silently corrupt lighting or validation. Reflections also reverse
+    /// triangle winding to preserve outward orientation.
     pub fn apply_transform(&mut self, transform: &Transform3D) {
         for v in &mut self.vertices {
             *v = transform.apply(*v);
         }
-        // For normals, we should use the inverse transpose of the rotation,
-        // but for uniform scaling this simplification works
-        let normal_transform = Transform3D {
-            scale: [1.0, 1.0, 1.0], // Don't scale normals
-            rotate: transform.rotate,
-            translate: [0.0, 0.0, 0.0], // Don't translate normals
-        };
         for n in &mut self.normals {
-            *n = normal_transform.apply(*n);
-            // Renormalize
-            let len = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
-            if len > 1e-10 {
-                n[0] /= len;
-                n[1] /= len;
-                n[2] /= len;
+            *n = transform.apply_normal(*n).unwrap_or([0.0, 0.0, 0.0]);
+        }
+        if transform.reverses_orientation() {
+            for tri in &mut self.indices {
+                tri.swap(1, 2);
             }
         }
     }
 }
 
-/// Resolve a CSG tree into a triangle mesh
+/// Resolve a CSG tree into a triangle mesh using the default adaptive policy.
 pub fn resolve_to_mesh(node: &CSGNode) -> TriangleMesh {
+    resolve_to_mesh_with_policy(node, TessellationPolicy::default())
+}
+
+/// Resolve a CSG tree using an explicit bounded tessellation policy.
+pub fn resolve_to_mesh_with_policy(node: &CSGNode, policy: TessellationPolicy) -> TriangleMesh {
+    resolve_with_scale(node, policy, [1.0, 1.0, 1.0])
+}
+
+fn resolve_with_scale(
+    node: &CSGNode,
+    policy: TessellationPolicy,
+    inherited_scale: [f32; 3],
+) -> TriangleMesh {
     match node {
-        CSGNode::Primitive(prim) => tessellate_primitive(*prim),
+        CSGNode::Primitive(primitive) => tessellate_primitive(*primitive, policy, inherited_scale),
         CSGNode::Transform { node, transform } => {
-            let mut mesh = resolve_to_mesh(node);
+            let detail_scale = [
+                inherited_scale[0] * transform.scale[0].abs(),
+                inherited_scale[1] * transform.scale[1].abs(),
+                inherited_scale[2] * transform.scale[2].abs(),
+            ];
+            let mut mesh = resolve_with_scale(node, policy, detail_scale);
             mesh.apply_transform(transform);
             mesh
         }
         CSGNode::Boolean { op, left, right } => {
-            let left_mesh = resolve_to_mesh(left);
-            let right_mesh = resolve_to_mesh(right);
+            let left_mesh = resolve_with_scale(left, policy, inherited_scale);
+            let right_mesh = resolve_with_scale(right, policy, inherited_scale);
             match op {
-                BooleanOp::Union => {
-                    let mut result = left_mesh;
-                    result.merge(&right_mesh);
-                    result
-                }
+                BooleanOp::Union => bsp::csg_union(&left_mesh, &right_mesh),
                 BooleanOp::Subtract => bsp::csg_subtract(&left_mesh, &right_mesh),
                 BooleanOp::Intersect => bsp::csg_intersect(&left_mesh, &right_mesh),
             }
@@ -93,14 +145,27 @@ pub fn resolve_to_mesh(node: &CSGNode) -> TriangleMesh {
     }
 }
 
-/// Tessellate a primitive into triangles
-fn tessellate_primitive(prim: Primitive) -> TriangleMesh {
-    match prim {
+/// Tessellate a primitive into triangles at its effective world-space scale.
+fn tessellate_primitive(
+    primitive: Primitive,
+    policy: TessellationPolicy,
+    scale: [f32; 3],
+) -> TriangleMesh {
+    let radial_scale = scale[0].max(scale[1]).max(f32::EPSILON);
+    let maximum_scale = radial_scale.max(scale[2]).max(f32::EPSILON);
+    match primitive {
         Primitive::Cube => tessellate_cube(),
-        Primitive::Cylinder => tessellate_cylinder(24),
-        Primitive::Sphere => tessellate_sphere(16, 12),
-        Primitive::Cone => tessellate_cone(24),
-        Primitive::Torus => tessellate_torus(24, 12),
+        Primitive::Cylinder => tessellate_cylinder(policy.circular_segments(0.5 * radial_scale)),
+        Primitive::Sphere => {
+            let longitude = policy.circular_segments(0.5 * maximum_scale);
+            tessellate_sphere(longitude, (longitude / 2).max(6))
+        }
+        Primitive::Cone => tessellate_cone(policy.circular_segments(0.5 * radial_scale)),
+        Primitive::Torus => {
+            let major = policy.circular_segments(0.7 * radial_scale);
+            let minor = policy.circular_segments(0.2 * maximum_scale);
+            tessellate_torus(major, minor)
+        }
     }
 }
 
@@ -266,32 +331,61 @@ fn tessellate_cylinder(segments: usize) -> TriangleMesh {
 }
 
 fn tessellate_sphere(lon_segments: usize, lat_segments: usize) -> TriangleMesh {
+    let lon_segments = lon_segments.max(3);
+    let lat_segments = lat_segments.max(3);
     let mut vertices = Vec::new();
     let mut normals = Vec::new();
     let mut indices = Vec::new();
-    let r = 0.5f32;
+    let radius = 0.5f32;
 
-    for lat in 0..=lat_segments {
-        let theta = (lat as f32) / (lat_segments as f32) * std::f32::consts::PI;
-        let (st, ct) = theta.sin_cos();
-        for lon in 0..=lon_segments {
-            let phi = (lon as f32) / (lon_segments as f32) * std::f32::consts::TAU;
-            let (sp, cp) = phi.sin_cos();
-            let nx = st * cp;
-            let ny = st * sp;
-            let nz = ct;
-            vertices.push([r * nx, r * ny, r * nz]);
-            normals.push([nx, ny, nz]);
+    let top = vertices.len() as u32;
+    vertices.push([0.0, 0.0, radius]);
+    normals.push([0.0, 0.0, 1.0]);
+
+    for latitude in 1..lat_segments {
+        let theta = latitude as f32 / lat_segments as f32 * std::f32::consts::PI;
+        let (sin_theta, cos_theta) = theta.sin_cos();
+        for longitude in 0..lon_segments {
+            let phi = longitude as f32 / lon_segments as f32 * std::f32::consts::TAU;
+            let (sin_phi, cos_phi) = phi.sin_cos();
+            let normal = [sin_theta * cos_phi, sin_theta * sin_phi, cos_theta];
+            vertices.push([radius * normal[0], radius * normal[1], radius * normal[2]]);
+            normals.push(normal);
         }
     }
 
-    for lat in 0..lat_segments {
-        for lon in 0..lon_segments {
-            let a = (lat * (lon_segments + 1) + lon) as u32;
-            let b = a + (lon_segments + 1) as u32;
-            indices.push([a, b, a + 1]);
-            indices.push([a + 1, b, b + 1]);
+    let bottom = vertices.len() as u32;
+    vertices.push([0.0, 0.0, -radius]);
+    normals.push([0.0, 0.0, -1.0]);
+
+    let first_ring = 1u32;
+    for longitude in 0..lon_segments {
+        let next = (longitude + 1) % lon_segments;
+        indices.push([top, first_ring + longitude as u32, first_ring + next as u32]);
+    }
+
+    for latitude in 0..lat_segments - 2 {
+        let current_ring = first_ring + (latitude * lon_segments) as u32;
+        let next_ring = current_ring + lon_segments as u32;
+        for longitude in 0..lon_segments {
+            let next = (longitude + 1) % lon_segments;
+            let a = current_ring + longitude as u32;
+            let b = current_ring + next as u32;
+            let c = next_ring + longitude as u32;
+            let d = next_ring + next as u32;
+            indices.push([a, c, b]);
+            indices.push([b, c, d]);
         }
+    }
+
+    let last_ring = first_ring + ((lat_segments - 2) * lon_segments) as u32;
+    for longitude in 0..lon_segments {
+        let next = (longitude + 1) % lon_segments;
+        indices.push([
+            bottom,
+            last_ring + next as u32,
+            last_ring + longitude as u32,
+        ]);
     }
 
     TriangleMesh {
@@ -444,11 +538,35 @@ mod tests {
 
     #[test]
     fn test_resolve_union() {
-        let tree = CSGNode::cube().union(CSGNode::sphere());
+        let tree = CSGNode::cube().union(CSGNode::cube().translate(0.25, 0.25, 0.25));
         let mesh = resolve_to_mesh(&tree);
-        let cube_tris = tessellate_cube().triangle_count();
-        let sphere_tris = tessellate_sphere(16, 12).triangle_count();
-        assert_eq!(mesh.triangle_count(), cube_tris + sphere_tris);
+        let volume = crate::validate::compute_signed_volume(&mesh).abs();
+        assert!((volume - 1.578_125).abs() < 1.0e-3);
+    }
+
+    #[test]
+    fn non_uniform_scale_uses_inverse_transpose_normals() {
+        let inv_sqrt_two = 1.0 / 2.0_f32.sqrt();
+        let mut mesh = TriangleMesh {
+            vertices: vec![[0.0, 0.0, 0.0]],
+            normals: vec![[inv_sqrt_two, inv_sqrt_two, 0.0]],
+            indices: vec![],
+        };
+        mesh.apply_transform(&Transform3D {
+            scale: [2.0, 1.0, 1.0],
+            ..Default::default()
+        });
+        let normal = mesh.normals[0];
+        assert!((normal[0] - 0.447_213_6).abs() < 1.0e-5);
+        assert!((normal[1] - 0.894_427_2).abs() < 1.0e-5);
+    }
+
+    #[test]
+    fn reflection_preserves_positive_solid_orientation() {
+        let mesh = resolve_to_mesh(&CSGNode::cube().scale(-1.0, 1.0, 1.0));
+        let report = crate::validate::validate_mesh(&mesh);
+        assert!(report.inconsistent_normals.is_empty());
+        assert!((report.signed_volume - 1.0).abs() < 1.0e-5);
     }
 
     #[test]

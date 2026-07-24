@@ -54,7 +54,8 @@ impl ConsciousnessEngine {
         // ═══════════════════════════════════════════════════════════════════
         let t = Instant::now();
         // Push every 2 cycles — halves per-cycle overhead while maintaining ~24 samples
-        // in the window before first compute.
+        // in the window before first compute. `input.hdv` is the state-bound HV
+        // (stimulus ⊗ temporal state) — see its field doc for why.
         if input.cycle % 2 == 0 {
             self.spectral_mip_finder.push(input.hdv); // ContinuousHV
         }
@@ -179,8 +180,15 @@ impl ConsciousnessEngine {
         // LAYER 2: Multi-modal integration — cross-modal Phi
         // Every 13 cycles (co-prime)
         // ═══════════════════════════════════════════════════════════════════
+        // ABSENT vs ZERO (2026-07-15): the three optional systems below
+        // (multimodal, equation v2, pipeline) are `None` at the production
+        // construction site. They now report `None` ("absent") instead of 0.0
+        // so compute_unified can renormalize over present systems — previously
+        // three absent systems contributed 0.0 at full weight, silently
+        // deflating unified consciousness (docs/PHI_SIGNAL_TRACE_2026-07-15.md
+        // symptom 1). Telemetry keeps 0.0 for absent (documented on the field).
         let t = Instant::now();
-        let multimodal_phi = if let Some(ref mut mmi) = self.multi_modal_integrator {
+        let multimodal_phi: Option<f64> = if let Some(ref mut mmi) = self.multi_modal_integrator {
             if input.cycle % 13 == 0 && input.cycle > 0 {
                 let visual_input =
                     ModalInput::new(Modality::Visual, *input.hv16, input.coherence as f64);
@@ -191,25 +199,27 @@ impl ConsciousnessEngine {
                 );
                 let result = mmi.integrate(&[visual_input, temporal_input]);
                 self.cache.last_multimodal_phi = result.integrated_phi;
-                result.integrated_phi
+                Some(result.integrated_phi)
             } else {
-                self.cache.last_multimodal_phi
+                Some(self.cache.last_multimodal_phi)
             }
         } else {
-            0.0
+            None
         };
         let multimodal_us = t.elapsed().as_micros() as u64;
 
         // Multimodal feedback: strong integration → learning precision
         // Science: Ghazanfar & Schroeder (2006)
-        if multimodal_phi > super::super::thresholds::MULTIMODAL_PHI_THRESHOLD {
-            let phi_conf = (multimodal_phi - super::super::thresholds::MULTIMODAL_PHI_THRESHOLD)
-                * super::super::thresholds::MULTIMODAL_CONFIDENCE_SCALE;
-            confidence_delta += phi_conf as f32;
-            let phi_lr = 1.0
-                + (multimodal_phi - super::super::thresholds::MULTIMODAL_PHI_THRESHOLD)
-                    * super::super::thresholds::MULTIMODAL_LR_SCALE;
-            subsystem_lr_factor *= phi_lr as f32;
+        if let Some(mm_phi) = multimodal_phi {
+            if mm_phi > super::super::thresholds::MULTIMODAL_PHI_THRESHOLD {
+                let phi_conf = (mm_phi - super::super::thresholds::MULTIMODAL_PHI_THRESHOLD)
+                    * super::super::thresholds::MULTIMODAL_CONFIDENCE_SCALE;
+                confidence_delta += phi_conf as f32;
+                let phi_lr = 1.0
+                    + (mm_phi - super::super::thresholds::MULTIMODAL_PHI_THRESHOLD)
+                        * super::super::thresholds::MULTIMODAL_LR_SCALE;
+                subsystem_lr_factor *= phi_lr as f32;
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -376,30 +386,29 @@ impl ConsciousnessEngine {
                     self.cache.last_binding_coherence =
                         *result.core_breakdown.get(&crate::consciousness::consciousness_equation_v2::CoreComponent::Binding).unwrap_or(&0.0);
                 }
-                result.consciousness
+                Some(result.consciousness)
             } else {
-                self.cache.last_equation_v2_consciousness
+                Some(self.cache.last_equation_v2_consciousness)
             }
         } else {
-            0.0
+            None
         };
         let equation_v2_us = t.elapsed().as_micros() as u64;
 
         // Equation V2 feedback: high consciousness → confidence + consolidation
         // Science: Tononi (2004), Baars (1988), Dehaene (2014)
-        if equation_v2_consciousness > super::super::thresholds::EQ_V2_HIGH_THRESHOLD {
-            let boost = (equation_v2_consciousness
-                - super::super::thresholds::EQ_V2_HIGH_THRESHOLD)
-                * super::super::thresholds::EQ_V2_CONFIDENCE_SCALE;
-            confidence_delta += boost as f32;
-            episodic_consolidation_boost = Some(
-                (equation_v2_consciousness - super::super::thresholds::EQ_V2_HIGH_THRESHOLD)
-                    * super::super::thresholds::EQ_V2_CONSOLIDATION_SCALE,
-            );
-        } else if equation_v2_consciousness > 0.0
-            && equation_v2_consciousness < super::super::thresholds::EQ_V2_LOW_THRESHOLD
-        {
-            exploration_delta += super::super::thresholds::EQ_V2_EXPLORATION_NUDGE;
+        if let Some(eq_v2) = equation_v2_consciousness {
+            if eq_v2 > super::super::thresholds::EQ_V2_HIGH_THRESHOLD {
+                let boost = (eq_v2 - super::super::thresholds::EQ_V2_HIGH_THRESHOLD)
+                    * super::super::thresholds::EQ_V2_CONFIDENCE_SCALE;
+                confidence_delta += boost as f32;
+                episodic_consolidation_boost = Some(
+                    (eq_v2 - super::super::thresholds::EQ_V2_HIGH_THRESHOLD)
+                        * super::super::thresholds::EQ_V2_CONSOLIDATION_SCALE,
+                );
+            } else if eq_v2 > 0.0 && eq_v2 < super::super::thresholds::EQ_V2_LOW_THRESHOLD {
+                exploration_delta += super::super::thresholds::EQ_V2_EXPLORATION_NUDGE;
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -418,38 +427,41 @@ impl ConsciousnessEngine {
                 -1.0
             };
         }
-        let pipeline_consciousness =
+        let pipeline_consciousness: Option<f64> =
             if let Some(ref mut pipeline) = self.unified_consciousness_pipeline {
                 if input.cycle % 97 == 0 && input.cycle > 0 {
                     // Full process with oscillatory binding
                     match pipeline.process(&sensory_buf) {
                         Ok(moment) => {
                             self.cache.last_pipeline_consciousness = moment.consciousness;
-                            moment.consciousness
+                            Some(moment.consciousness)
                         }
-                        Err(_) => self.cache.last_pipeline_consciousness,
+                        Err(_) => Some(self.cache.last_pipeline_consciousness),
                     }
                 } else {
                     // Lightweight advance: HDC + LTC + state (no binding)
                     if let Ok(c) = pipeline.advance(&sensory_buf) {
                         self.cache.last_pipeline_consciousness = c;
                     }
-                    self.cache.last_pipeline_consciousness
+                    Some(self.cache.last_pipeline_consciousness)
                 }
             } else {
-                0.0
+                // Pipeline never constructed in production (constructor.rs passes
+                // None) — report absence, don't fabricate a 0.0 measurement.
+                None
             };
         self.sensory_buffer = sensory_buf;
         let pipeline_us = t.elapsed().as_micros() as u64;
 
         // Pipeline feedback: high consciousness → learning coherence
         // Science: Dehaene (2011) — global workspace broadcasts learning signals
-        if pipeline_consciousness > super::super::thresholds::PIPELINE_CONSCIOUSNESS_THRESHOLD {
-            let pipeline_lr_scale = 1.0
-                + (pipeline_consciousness
-                    - super::super::thresholds::PIPELINE_CONSCIOUSNESS_THRESHOLD)
-                    * super::super::thresholds::PIPELINE_LR_SCALE;
-            lr_factor *= pipeline_lr_scale as f32;
+        if let Some(pipe_c) = pipeline_consciousness {
+            if pipe_c > super::super::thresholds::PIPELINE_CONSCIOUSNESS_THRESHOLD {
+                let pipeline_lr_scale = 1.0
+                    + (pipe_c - super::super::thresholds::PIPELINE_CONSCIOUSNESS_THRESHOLD)
+                        * super::super::thresholds::PIPELINE_LR_SCALE;
+                lr_factor *= pipeline_lr_scale as f32;
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -565,9 +577,12 @@ impl ConsciousnessEngine {
             spectral_mip_phi,
             hierarchical_mip_phi: self.cache.last_hierarchical_mip_phi,
             structural_phi: self.cache.last_structural_phi.clone(),
-            multimodal_phi,
-            equation_v2_consciousness,
-            pipeline_consciousness,
+            // Telemetry convention: 0.0 = subsystem absent/never constructed
+            // (see the field docs in types.rs). Absence no longer deflates
+            // unified_consciousness — compute_unified renormalizes.
+            multimodal_phi: multimodal_phi.unwrap_or(0.0),
+            equation_v2_consciousness: equation_v2_consciousness.unwrap_or(0.0),
+            pipeline_consciousness: pipeline_consciousness.unwrap_or(0.0),
             limiting_component: self.cache.last_limiting_component,
             unified_consciousness,
             sigma: self.cache.last_sigma,

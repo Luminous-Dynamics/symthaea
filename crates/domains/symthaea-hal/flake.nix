@@ -45,12 +45,17 @@
             # linux-embedded-hal uses libi2c
           ];
 
-          doCheck = false;  # Tests run in CI
+          # Run tests whenever the build platform can execute the target.
+          # Cross packages remain build-only and are exercised by target CI/HIL.
+          doCheck = pkgs.stdenv.buildPlatform.canExecute pkgs.stdenv.hostPlatform;
+          cargoTestFlags = [
+            "--features" (builtins.concatStringsSep "," features)
+          ];
 
           meta = with pkgs.lib; {
             description = "Hardware abstraction layer for Symthaea humanoid robot";
             homepage = "https://luminousdynamics.org";
-            license = licenses.mit;
+            license = licenses.agpl3Plus;
           };
         };
     in

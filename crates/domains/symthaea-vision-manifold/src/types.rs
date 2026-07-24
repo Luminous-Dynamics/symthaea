@@ -10,6 +10,19 @@ use serde::{Deserialize, Serialize};
 pub struct VisionConfig {
     /// HDC dimension (default: 16,384).
     pub hdc_dim: usize,
+    /// Allow the manifold to dilate ITSELF to Ultra (65,536 dims) via the
+    /// FEP ExplorationTrigger action (default: false).
+    /// Post-Ultra machinery can allocate multiple gigabytes, so automatic
+    /// dilation is opt-in until the full pipeline has explicit memory bounds.
+    #[serde(default = "default_allow_auto_dilation")]
+    pub allow_auto_dilation: bool,
+    /// Maximum projected allocation for all HDC vectors after dilation.
+    ///
+    /// The estimate is conservative and covers every hypervector owned by the
+    /// live manifold and its enabled subsystems. Dilation is rejected before
+    /// mutation when the projected footprint exceeds this budget. Default: 1 GiB.
+    #[serde(default = "default_max_dilation_bytes")]
+    pub max_dilation_bytes: u64,
     /// Patch size in pixels (default: 8).
     pub patch_size: usize,
     /// Number of quantization levels for pixel features (default: 32).
@@ -126,52 +139,110 @@ impl VisionConfig {
         if self.hdc_dim == 0 || self.hdc_dim < 256 {
             return Err(format!("hdc_dim must be >= 256, got {}", self.hdc_dim));
         }
+        if self.max_dilation_bytes == 0 {
+            return Err("max_dilation_bytes must be > 0".to_string());
+        }
         if self.patch_size == 0 || self.patch_size > 64 {
             return Err(format!(
                 "patch_size must be in [1, 64], got {}",
                 self.patch_size
             ));
         }
-        if self.tau_base <= 0.001 || self.tau_base >= 100.0 {
+        if self.num_levels < 2 {
+            return Err(format!("num_levels must be >= 2, got {}", self.num_levels));
+        }
+        if !self.tau_base.is_finite() || self.tau_base <= 0.001 || self.tau_base >= 100.0 {
             return Err(format!(
-                "tau_base must be in (0.001, 100.0), got {}",
+                "tau_base must be finite and in (0.001, 100.0), got {}",
                 self.tau_base
             ));
         }
-        if self.surprise_threshold <= 0.0 || self.surprise_threshold > 1.0 {
+        if !self.surprise_threshold.is_finite()
+            || self.surprise_threshold <= 0.0
+            || self.surprise_threshold > 1.0
+        {
             return Err(format!(
-                "surprise_threshold must be in (0.0, 1.0], got {}",
+                "surprise_threshold must be finite and in (0.0, 1.0], got {}",
                 self.surprise_threshold
             ));
         }
-        if self.surprise_decay <= 0.0 || self.surprise_decay >= 1.0 {
+        if !self.surprise_decay.is_finite()
+            || self.surprise_decay <= 0.0
+            || self.surprise_decay >= 1.0
+        {
             return Err(format!(
-                "surprise_decay must be in (0.0, 1.0), got {}",
+                "surprise_decay must be finite and in (0.0, 1.0), got {}",
                 self.surprise_decay
             ));
         }
-        if self.training.error_threshold <= 0.0 || self.training.error_threshold > 1.0 {
+        if !self.training.error_threshold.is_finite()
+            || self.training.error_threshold <= 0.0
+            || self.training.error_threshold > 1.0
+        {
             return Err(format!(
-                "training.error_threshold must be in (0.0, 1.0], got {}",
+                "training.error_threshold must be finite and in (0.0, 1.0], got {}",
                 self.training.error_threshold
             ));
         }
-        if self.input_blend < 0.1 || self.input_blend > 0.9 {
+        if !self.input_blend.is_finite() || self.input_blend < 0.1 || self.input_blend > 0.9 {
             return Err(format!(
-                "input_blend must be in [0.1, 0.9], got {}",
+                "input_blend must be finite and in [0.1, 0.9], got {}",
                 self.input_blend
             ));
         }
-        if self.training.learning_rate <= 0.0 || self.training.learning_rate > 1.0 {
+        if !self.learning.contrastive_lr.is_finite()
+            || !(0.0..=1.0).contains(&self.learning.contrastive_lr)
+        {
             return Err(format!(
-                "training.learning_rate must be in (0.0, 1.0], got {}",
+                "learning.contrastive_lr must be finite and in [0.0, 1.0], got {}",
+                self.learning.contrastive_lr
+            ));
+        }
+        if !self.multi_scale.fine_weight.is_finite()
+            || !(0.0..=1.0).contains(&self.multi_scale.fine_weight)
+        {
+            return Err(format!(
+                "multi_scale.fine_weight must be finite and in [0.0, 1.0], got {}",
+                self.multi_scale.fine_weight
+            ));
+        }
+        if !self.training.learning_rate.is_finite()
+            || self.training.learning_rate <= 0.0
+            || self.training.learning_rate > 1.0
+        {
+            return Err(format!(
+                "training.learning_rate must be finite and in (0.0, 1.0], got {}",
                 self.training.learning_rate
             ));
         }
-        if self.training.grad_clip <= 0.0 {
+        if !self.training.weight_lr_scale.is_finite() || self.training.weight_lr_scale < 0.0 {
             return Err(format!(
-                "training.grad_clip must be > 0.0, got {}",
+                "training.weight_lr_scale must be finite and >= 0.0, got {}",
+                self.training.weight_lr_scale
+            ));
+        }
+        if !self.training.tau_lr_scale.is_finite() || self.training.tau_lr_scale < 0.0 {
+            return Err(format!(
+                "training.tau_lr_scale must be finite and >= 0.0, got {}",
+                self.training.tau_lr_scale
+            ));
+        }
+        if !self.training.grad_clip.is_finite() || self.training.grad_clip <= 0.0 {
+            return Err(format!(
+                "training.grad_clip must be finite and > 0.0, got {}",
                 self.training.grad_clip
+            ));
+        }
+        if !self.training.spsa_epsilon.is_finite() || self.training.spsa_epsilon <= 0.0 {
+            return Err(format!(
+                "training.spsa_epsilon must be finite and > 0.0, got {}",
+                self.training.spsa_epsilon
+            ));
+        }
+        if !self.training.spsa_c.is_finite() || self.training.spsa_c <= 0.0 {
+            return Err(format!(
+                "training.spsa_c must be finite and > 0.0, got {}",
+                self.training.spsa_c
             ));
         }
         if self.num_features < 3 || self.num_features > 20 {
@@ -188,14 +259,42 @@ impl VisionConfig {
                 return Err("multi_scale.scales must all be > 0".to_string());
             }
         }
+        let mut unique_scales = self.multi_scale.scales.clone();
+        unique_scales.sort_unstable();
+        unique_scales.dedup();
+        if unique_scales.len() != self.multi_scale.scales.len() {
+            return Err("multi_scale.scales must not contain duplicates".to_string());
+        }
+        if self
+            .multi_scale
+            .scales
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
+        {
+            return Err(
+                "multi_scale.scales must be strictly increasing from fine to coarse".to_string(),
+            );
+        }
         Ok(())
     }
+}
+
+/// Serde default for [`VisionConfig::allow_auto_dilation`]. Automatic
+/// dilation is intentionally fail-safe because Ultra can exceed memory budgets.
+fn default_allow_auto_dilation() -> bool {
+    false
+}
+
+fn default_max_dilation_bytes() -> u64 {
+    1024 * 1024 * 1024
 }
 
 impl Default for VisionConfig {
     fn default() -> Self {
         Self {
             hdc_dim: symthaea_core::hdc::HDC_DIMENSION,
+            allow_auto_dilation: false,
+            max_dilation_bytes: default_max_dilation_bytes(),
             patch_size: 8,
             num_levels: 32,
             num_features: 5,
@@ -314,8 +413,9 @@ pub struct PatchGrid {
 
 impl PatchGrid {
     pub fn new(frame_width: u32, frame_height: u32, patch_size: usize) -> Self {
-        let cols = frame_width as usize / patch_size.max(1);
-        let rows = frame_height as usize / patch_size.max(1);
+        let patch_size = patch_size.max(1);
+        let cols = (frame_width as usize).div_ceil(patch_size);
+        let rows = (frame_height as usize).div_ceil(patch_size);
         Self {
             cols,
             rows,
@@ -485,11 +585,175 @@ pub struct SalientRegion {
     pub pixel_h: usize,
 }
 
+/// Conservative preflight report for a holographic dilation request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DilationEstimate {
+    pub current_dim: usize,
+    pub target_dim: usize,
+    /// Number of independently stored HDC-sized vectors projected after dilation.
+    pub hdc_vectors: usize,
+    /// Projected bytes for those vectors (`vectors × target_dim × sizeof(f32)`).
+    pub projected_bytes: u64,
+    /// Non-HDC bytes retained across dilation, including persisted scene rasters.
+    pub persistent_bytes: u64,
+    /// Combined projected HDC and retained non-HDC footprint.
+    pub total_projected_bytes: u64,
+    /// Configured allocation ceiling.
+    pub budget_bytes: u64,
+}
+
+impl DilationEstimate {
+    pub fn fits_budget(self) -> bool {
+        self.total_projected_bytes <= self.budget_bytes
+    }
+}
+
+/// Current serialized manifold checkpoint schema.
+pub const MANIFOLD_STATE_SCHEMA_VERSION: u32 = 9;
+
+fn legacy_manifold_state_schema_version() -> u32 {
+    1
+}
+
+/// Serializable accumulated spatial surprise state.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct SurpriseMapState {
+    pub values: Vec<f32>,
+    pub decay: f32,
+    pub threshold: f32,
+    pub cols: usize,
+    pub rows: usize,
+    pub patch_size: usize,
+    pub frame_width: u32,
+    pub frame_height: u32,
+}
+
+/// Current serialized delayed-horizon evaluator schema.
+pub const DELAYED_HORIZON_EVALUATOR_STATE_SCHEMA_VERSION: u32 = 3;
+
+fn default_delayed_horizon_max_lateness_factor() -> f32 {
+    4.0
+}
+
+/// Serializable pending forecast awaiting a later observation.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PendingHorizonForecastState {
+    pub horizon_index: usize,
+    pub due_time: f64,
+    pub predicted: Vec<f32>,
+    pub persistence: Vec<f32>,
+}
+
+/// Serializable aggregate evidence for one delayed horizon.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct HorizonAccumulatorState {
+    pub prediction_error_sum: f64,
+    /// Sum of squared prediction errors for dispersion estimates.
+    #[serde(default)]
+    pub prediction_error_sq_sum: f64,
+    pub persistence_error_sum: f64,
+    /// Sum of squared persistence errors for dispersion estimates.
+    #[serde(default)]
+    pub persistence_error_sq_sum: f64,
+    pub lateness_sum: f64,
+    pub samples: u64,
+    /// Forecasts not issued because the bounded pending queue was full.
+    pub dropped_forecasts: u64,
+    /// Matured forecasts discarded because the observation arrived too late
+    /// to represent the requested horizon faithfully.
+    #[serde(default)]
+    pub expired_forecasts: u64,
+}
+
+/// Serializable delayed-horizon evaluator, including pending forecasts.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct DelayedHorizonEvaluatorState {
+    pub schema_version: u32,
+    pub horizons: Vec<f32>,
+    pub labels: Vec<String>,
+    pub elapsed_seconds: f64,
+    pub hdc_dim: Option<usize>,
+    pub pending: Vec<PendingHorizonForecastState>,
+    pub accumulators: Vec<HorizonAccumulatorState>,
+    pub max_pending_per_horizon: usize,
+    /// Maximum accepted lateness as a multiple of each requested horizon.
+    #[serde(default = "default_delayed_horizon_max_lateness_factor")]
+    pub max_lateness_factor: f32,
+}
+
+/// Serializable predictive-coding hierarchy state.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PredictiveHierarchyState {
+    pub prediction_weight: Vec<f32>,
+    pub last_coarse_hv: Option<Vec<f32>>,
+    pub last_fine_hv: Option<Vec<f32>>,
+    pub prediction_error: f32,
+    pub error_ema: f32,
+    pub baseline_error_ema: f32,
+    pub relative_skill_ema: f32,
+    pub prediction_count: u64,
+    pub ema_decay: f32,
+    pub learning_rate: f32,
+    /// Per-scale motion history for the internal multi-scale encoders.
+    pub scale_prev_patch_lum: Vec<Vec<f32>>,
+}
+
+/// Serializable temporal prediction context for one sensor modality.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct ModalityTemporalContextState {
+    pub modality: VisualModality,
+    pub last_prediction: Option<Vec<f32>>,
+    pub last_frame_hv: Option<Vec<f32>>,
+    pub last_patch_hvs: Vec<Vec<f32>>,
+    pub temporal_patch_hvs: Vec<Vec<f32>>,
+    pub prev_patch_lum: Vec<f32>,
+    /// Accumulated spatial surprise belonging to this modality. Older
+    /// checkpoints omit it and resume with a clean attention map.
+    #[serde(default)]
+    pub surprise_state: Option<SurpriseMapState>,
+    pub prediction_error: f32,
+    pub error_ema: f32,
+    /// Modality-specific variational belief mean. Schema-6 checkpoints require it.
+    #[serde(default)]
+    pub fep_belief_mean: Vec<f64>,
+    /// Last free-energy metrics computed for this modality.
+    #[serde(default)]
+    pub last_fep: FepMetrics,
+    /// Pending and accumulated delayed-forecast evidence for this modality.
+    #[serde(default)]
+    pub horizon_evaluator: Option<DelayedHorizonEvaluatorState>,
+    /// Modality-local object tracks and tracker policy.
+    #[serde(default)]
+    pub object_memory: Option<ObjectMemoryState>,
+    /// Monotonic allocator belonging to this modality's object namespace.
+    #[serde(default)]
+    pub next_track_id: u64,
+    /// Cached segmentation hypotheses for stable-scene rebinding.
+    #[serde(default)]
+    pub last_object_hypotheses: Vec<ObjectHypothesisState>,
+    /// Modality-local bounded attentional workspace.
+    #[serde(default)]
+    pub working_memory: Option<VisualWorkingMemoryState>,
+    /// Whether relational scene-graph reasoning is enabled for this modality.
+    #[serde(default)]
+    pub scene_graph_enabled: bool,
+}
+
+/// Serializable cached object hypothesis used when stable scenes skip reclustering.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct ObjectHypothesisState {
+    pub patch_indices: Vec<usize>,
+    pub centroid_row: usize,
+    pub centroid_col: usize,
+    pub hv: Vec<f32>,
+    pub saliency: f32,
+}
+
 /// Serializable snapshot of the manifold's learned state.
 ///
 /// Captures everything needed to resume from a trained checkpoint:
-/// weight_hv, tau_base, feature_weights, training step count, error_ema,
-/// prediction_error, frame_count, and optionally scene memory.
+/// Learned parameters plus the live temporal, optimizer, sensory, and scene-memory
+/// context needed to resume without a cold-start discontinuity.
 ///
 /// # Example: round-trip checkpoint/resume
 ///
@@ -499,10 +763,13 @@ pub struct SalientRegion {
 /// // ... persist to disk ...
 /// let loaded: ManifoldState = serde_json::from_str(&json).unwrap();
 /// manifold2.load_state(&loaded).unwrap();
-/// // manifold2 now has the same learned weights, tau, error_ema, and frame count
+/// // manifold2 now has the same learned and live checkpoint state
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ManifoldState {
+    /// Checkpoint schema version. Missing values deserialize as legacy schema 1.
+    #[serde(default = "legacy_manifold_state_schema_version")]
+    pub schema_version: u32,
     /// Learned CfC weight hypervector.
     pub weight_hv: Vec<f32>,
     /// Learned time constant.
@@ -515,12 +782,53 @@ pub struct ManifoldState {
     pub hdc_dim: usize,
     /// Number of base features.
     pub num_features: usize,
+    /// Schema-3 semantic configuration fingerprint. These fields distinguish
+    /// manifolds that may share an HDC dimension but encode different evidence.
+    #[serde(default)]
+    pub config_patch_size: usize,
+    #[serde(default)]
+    pub config_num_levels: usize,
+    #[serde(default)]
+    pub config_total_features: usize,
+    #[serde(default)]
+    pub config_input_blend: f32,
+    #[serde(default)]
+    pub config_enable_motion: bool,
+    #[serde(default)]
+    pub config_enable_color: bool,
+    #[serde(default)]
+    pub config_enable_opponent_color: bool,
+    #[serde(default)]
+    pub config_enable_depth: bool,
+    #[serde(default)]
+    pub config_enable_temporal_binding: bool,
+    #[serde(default)]
+    pub config_enable_object_binding: bool,
+    #[serde(default)]
+    pub config_multi_scale_scales: Vec<usize>,
     /// Exponential moving average of prediction error (for adaptive training trigger).
     #[serde(default)]
     pub error_ema: f32,
     /// Current prediction error state.
     #[serde(default)]
     pub prediction_error: f32,
+    /// Live state quality and active-inference metrics.
+    #[serde(default)]
+    pub coherence: f32,
+    #[serde(default)]
+    pub last_fep: FepMetrics,
+    /// Active modality's variational belief mean.
+    #[serde(default)]
+    pub fep_belief_mean: Vec<f64>,
+    /// Runtime scene-memory admission and dampening policy.
+    #[serde(default)]
+    pub scene_store_coherence_threshold: f32,
+    #[serde(default)]
+    pub scene_store_error_threshold: f32,
+    #[serde(default)]
+    pub scene_dampen_factor: f32,
+    #[serde(default)]
+    pub last_dilation_cycle: u64,
     /// Frame count to resume numbering.
     #[serde(default)]
     pub frame_count: u64,
@@ -530,10 +838,168 @@ pub struct ManifoldState {
     /// Scene memory snapshot (if any).
     #[serde(default)]
     pub scene_memory: Option<SceneMemoryState>,
+    /// Object permanence tracks and tracker policy.
+    #[serde(default)]
+    pub object_memory: Option<ObjectMemoryState>,
+    /// Bounded visual working-memory slots.
+    #[serde(default)]
+    pub working_memory: Option<VisualWorkingMemoryState>,
+    /// Monotonic track ID allocator.
+    #[serde(default)]
+    pub next_track_id: u64,
+    /// Live CfC manifold state.
+    #[serde(default)]
+    pub state_hv: Option<Vec<f32>>,
+    /// Prediction cached for the next observation.
+    #[serde(default)]
+    pub last_prediction: Option<Vec<f32>>,
+    /// Previous encoded frame used by online training.
+    #[serde(default)]
+    pub last_frame_hv: Option<Vec<f32>>,
+    /// Previous per-patch HVs used by temporal surprise and binding.
+    #[serde(default)]
+    pub last_patch_hvs: Vec<Vec<f32>>,
+    /// Optimizer moments, RNG state, and exact training step count.
+    #[serde(default)]
+    pub trainer_state: Option<TrainerState>,
+    /// Whether online learning was frozen at checkpoint time.
+    #[serde(default)]
+    pub learning_frozen: bool,
+    /// Last raw observation used by scene decoding and replay.
+    #[serde(default)]
+    pub last_observed_frame: Option<Vec<u8>>,
+    #[serde(default)]
+    pub last_frame_width: u32,
+    #[serde(default)]
+    pub last_frame_height: u32,
+    #[serde(default)]
+    pub last_frame_channels: usize,
+    /// Modality of the last raw observation.
+    #[serde(default)]
+    pub last_frame_modality: VisualModality,
+    /// Accumulated surprise values and live persistence policy.
+    #[serde(default)]
+    pub surprise_state: Option<SurpriseMapState>,
+    /// Predictive hierarchy weights, calibration, and per-scale temporal history.
+    #[serde(default)]
+    pub predictive_state: Option<PredictiveHierarchyState>,
+    /// Temporally bound per-patch representations for the active modality.
+    #[serde(default)]
+    pub temporal_patch_hvs: Vec<Vec<f32>>,
+    /// Sensor modality associated with the active temporal context.
+    #[serde(default)]
+    pub active_modality: VisualModality,
+    /// Inactive modality-specific prediction and motion histories.
+    #[serde(default)]
+    pub modality_contexts: Vec<ModalityTemporalContextState>,
+    /// Delayed forecast evidence for the active modality.
+    #[serde(default)]
+    pub horizon_evaluator: Option<DelayedHorizonEvaluatorState>,
+    /// Cached object hypotheses reused across stable-scene frames.
+    #[serde(default)]
+    pub last_object_hypotheses: Vec<ObjectHypothesisState>,
+    /// Last motion saliency and directional vectors.
+    #[serde(default)]
+    pub motion_saliency: Vec<f32>,
+    #[serde(default)]
+    pub last_motion_vectors: Vec<[f32; 2]>,
+    /// Last stereo depth evidence.
+    #[serde(default)]
+    pub stereo_depth_map: Vec<f32>,
+    /// Confidence for each stereo depth estimate.
+    #[serde(default)]
+    pub stereo_confidence_map: Vec<f32>,
+    /// Winning disparity in pixels for each patch.
+    #[serde(default)]
+    pub stereo_disparity_map: Vec<usize>,
+    /// Whether the derived visual scene graph was enabled.
+    #[serde(default)]
+    pub scene_graph_enabled: bool,
+    /// Last one-step imagined state and divergence score.
+    #[serde(default)]
+    pub last_imagination: Option<Vec<f32>>,
+    #[serde(default)]
+    pub imagination_surprise: f32,
+    /// Latest goal/intent vector and cached geodesic path.
+    #[serde(default)]
+    pub last_intent_hv: Option<Vec<f32>>,
+    #[serde(default)]
+    pub last_geodesic: Vec<Vec<f32>>,
+}
+
+/// Serializable Adam optimizer state.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct AdamStateSnapshot {
+    pub m: Vec<f32>,
+    pub v: Vec<f32>,
+    pub t: u32,
+    pub beta1: f32,
+    pub beta2: f32,
+    pub eps: f32,
+}
+
+/// Serializable temporal trainer state.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct TrainerState {
+    pub weight_adam: AdamStateSnapshot,
+    pub tau_adam: AdamStateSnapshot,
+    pub rng_state: u64,
+    pub total_steps: u64,
+    pub input_blend: f32,
+}
+
+/// Sensor modality associated with a persisted visual frame.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VisualModality {
+    /// Legacy checkpoints or callers that did not provide modality metadata.
+    #[default]
+    Unknown,
+    /// Visible-light grayscale/RGB/RGBA observation.
+    Visible,
+    /// Visible observation augmented by an external per-patch depth sensor.
+    SensorDepth,
+    /// Left-camera observation augmented by stereo disparity evidence.
+    Stereo,
+    /// Pre-encoded multispectral observation without a single pixel raster.
+    MultiSpectral,
+}
+
+/// Geometry and modality contract for one persisted scene frame.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SceneFrameMetadata {
+    pub width: u32,
+    pub height: u32,
+    pub channels: usize,
+    #[serde(default)]
+    pub modality: VisualModality,
+}
+
+impl SceneFrameMetadata {
+    /// Expected tightly packed byte length, or `None` on invalid/overflowing geometry.
+    pub fn expected_len(self) -> Option<usize> {
+        if self.width == 0 || self.height == 0 || !matches!(self.channels, 1 | 3 | 4) {
+            return None;
+        }
+        (self.width as usize)
+            .checked_mul(self.height as usize)?
+            .checked_mul(self.channels)
+    }
+
+    /// Whether this raster can be blended with another frame without reinterpretation.
+    pub fn is_pixel_compatible_with(self, other: Self) -> bool {
+        self.width == other.width
+            && self.height == other.height
+            && self.channels == other.channels
+            && self.modality == other.modality
+    }
+}
+
+fn default_scene_pixel_budget_bytes() -> usize {
+    64 * 1024 * 1024
 }
 
 /// Serializable snapshot of scene memory landmarks.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct SceneMemoryState {
     /// Stored landmarks: (hv_values, stored_at_frame).
     pub landmarks: Vec<(Vec<f32>, u64)>,
@@ -541,6 +1007,76 @@ pub struct SceneMemoryState {
     pub capacity: usize,
     /// Recognition similarity threshold.
     pub threshold: f32,
+    /// Maximum bytes retained for raw landmark rasters.
+    #[serde(default = "default_scene_pixel_budget_bytes")]
+    pub pixel_budget_bytes: usize,
+    /// Accounted raw raster bytes at checkpoint time.
+    #[serde(default)]
+    pub retained_pixel_bytes: usize,
+    /// Raw frames parallel to `landmarks`; empty entries are valid for
+    /// checkpoints created before frame persistence was added.
+    #[serde(default)]
+    pub raw_frames: Vec<Vec<u8>>,
+    /// Geometry and modality parallel to `landmarks`. Missing metadata denotes
+    /// a legacy checkpoint and is treated conservatively during pixel replay.
+    #[serde(default)]
+    pub frame_metadata: Vec<SceneFrameMetadata>,
+    /// Object-level episodes evicted from visual working memory. These are kept
+    /// separate from scene landmarks so object identity cannot contaminate
+    /// whole-scene recognition or mental-movie decoding.
+    #[serde(default)]
+    pub object_episodes: Vec<(Vec<f32>, u64)>,
+}
+
+/// Serializable snapshot of one tracked visual object.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct TrackedObjectState {
+    pub track_id: u64,
+    pub appearance_hv: Vec<f32>,
+    pub identity_hv: Vec<f32>,
+    pub centroid_row: usize,
+    pub centroid_col: usize,
+    /// Smoothed centroid velocity in grid cells per observed frame.
+    #[serde(default)]
+    pub velocity_row: f32,
+    #[serde(default)]
+    pub velocity_col: f32,
+    pub last_seen_frame: u64,
+    pub track_length: u64,
+}
+
+/// Serializable snapshot of object permanence memory.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct ObjectMemoryState {
+    pub tracks: Vec<TrackedObjectState>,
+    pub capacity: usize,
+    pub match_threshold: f32,
+    pub max_absence_frames: u64,
+    #[serde(default = "default_object_match_distance")]
+    pub max_match_distance: usize,
+}
+
+fn default_object_match_distance() -> usize {
+    4
+}
+
+/// Serializable snapshot of one visual working-memory slot.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct WorkingMemorySlotState {
+    pub track_id: u64,
+    pub hv: Vec<f32>,
+    pub saliency: f32,
+    pub centroid_row: usize,
+    pub centroid_col: usize,
+    pub entered_at_frame: u64,
+}
+
+/// Serializable snapshot of bounded visual working memory.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct VisualWorkingMemoryState {
+    pub slots: Vec<WorkingMemorySlotState>,
+    pub capacity: usize,
+    pub decay_rate: f32,
 }
 
 /// Result of a scene recognition query against stored landmarks.
@@ -664,7 +1200,7 @@ pub struct ScaleHealth {
 ///
 /// Science: Friston (2010). Free energy (F) = Complexity - Accuracy.
 /// Minimizing F is equivalent to maximizing the evidence for the system's world model.
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct FepMetrics {
     /// Variational Free Energy (surprise).
     pub free_energy: f32,
@@ -684,6 +1220,7 @@ mod tests {
         let cfg = VisionConfig::default();
         assert_eq!(cfg.hdc_dim, 16_384);
         assert_eq!(cfg.patch_size, 8);
+        assert!(!cfg.allow_auto_dilation);
         assert_eq!(cfg.num_levels, 32);
         assert!(cfg.enable_motion);
         assert!(cfg.enable_color);
@@ -710,6 +1247,12 @@ mod tests {
         cfg.patch_size = 0;
         assert!(cfg.validate().unwrap_err().contains("patch_size"));
         cfg.patch_size = 8;
+
+        cfg.num_levels = 0;
+        assert!(cfg.validate().unwrap_err().contains("num_levels"));
+        cfg.num_levels = 1;
+        assert!(cfg.validate().unwrap_err().contains("num_levels"));
+        cfg.num_levels = 32;
 
         cfg.tau_base = 0.0;
         assert!(cfg.validate().unwrap_err().contains("tau_base"));
@@ -748,6 +1291,57 @@ mod tests {
     }
 
     #[test]
+    fn test_config_validate_rejects_non_finite_and_invalid_nested_values() {
+        let mut cfg = VisionConfig::default();
+
+        cfg.tau_base = f32::NAN;
+        assert!(cfg.validate().unwrap_err().contains("tau_base"));
+        cfg.tau_base = 0.5;
+
+        cfg.surprise_threshold = f32::INFINITY;
+        assert!(cfg.validate().unwrap_err().contains("surprise_threshold"));
+        cfg.surprise_threshold = 0.3;
+
+        cfg.surprise_decay = f32::NAN;
+        assert!(cfg.validate().unwrap_err().contains("surprise_decay"));
+        cfg.surprise_decay = 0.9;
+
+        cfg.input_blend = f32::NAN;
+        assert!(cfg.validate().unwrap_err().contains("input_blend"));
+        cfg.input_blend = 0.7;
+
+        cfg.learning.contrastive_lr = f32::NAN;
+        assert!(cfg.validate().unwrap_err().contains("contrastive_lr"));
+        cfg.learning.contrastive_lr = 0.01;
+
+        cfg.multi_scale.fine_weight = 1.1;
+        assert!(cfg.validate().unwrap_err().contains("fine_weight"));
+        cfg.multi_scale.fine_weight = 0.6;
+
+        cfg.training.weight_lr_scale = f32::NAN;
+        assert!(cfg.validate().unwrap_err().contains("weight_lr_scale"));
+        cfg.training.weight_lr_scale = 1.0;
+
+        cfg.training.tau_lr_scale = -0.1;
+        assert!(cfg.validate().unwrap_err().contains("tau_lr_scale"));
+        cfg.training.tau_lr_scale = 0.1;
+
+        cfg.training.spsa_epsilon = 0.0;
+        assert!(cfg.validate().unwrap_err().contains("spsa_epsilon"));
+        cfg.training.spsa_epsilon = 0.01;
+
+        cfg.training.spsa_c = f32::INFINITY;
+        assert!(cfg.validate().unwrap_err().contains("spsa_c"));
+        cfg.training.spsa_c = 0.1;
+
+        cfg.multi_scale.scales = vec![8, 8];
+        assert!(cfg.validate().unwrap_err().contains("duplicates"));
+
+        cfg.multi_scale.scales = vec![32, 8];
+        assert!(cfg.validate().unwrap_err().contains("strictly increasing"));
+    }
+
+    #[test]
     fn test_total_features_combinations() {
         let mut cfg = VisionConfig::default();
         assert_eq!(cfg.total_features(), 11); // 5 base + 2 motion + 2 color + 2 opponent
@@ -778,11 +1372,20 @@ mod tests {
     }
 
     #[test]
-    fn test_patch_grid_truncates() {
-        // 65x65 with patch_size=8 → 8 cols, 8 rows (last pixel row/col unused)
+    fn test_patch_grid_covers_partial_edges() {
+        // 65x65 with patch_size=8 needs a ninth partial row and column.
         let grid = PatchGrid::new(65, 65, 8);
-        assert_eq!(grid.cols, 8);
-        assert_eq!(grid.rows, 8);
+        assert_eq!(grid.cols, 9);
+        assert_eq!(grid.rows, 9);
+        assert_eq!(grid.num_patches(), 81);
+    }
+
+    #[test]
+    fn test_patch_grid_keeps_subpatch_frames() {
+        let grid = PatchGrid::new(3, 5, 8);
+        assert_eq!(grid.cols, 1);
+        assert_eq!(grid.rows, 1);
+        assert_eq!(grid.num_patches(), 1);
     }
 
     #[test]
@@ -809,5 +1412,27 @@ mod tests {
         assert_eq!(salient.len(), 2);
         assert_eq!(salient[0], (0, 1, 0.5));
         assert_eq!(salient[1], (1, 1, 0.8));
+    }
+
+    #[test]
+    fn test_manifold_state_deserializes_legacy_checkpoint() {
+        let json = r#"{
+            "weight_hv":[0.0,0.0],
+            "tau_base":0.5,
+            "feature_weights":[],
+            "training_steps":3,
+            "hdc_dim":2,
+            "num_features":5,
+            "error_ema":0.1,
+            "prediction_error":0.2,
+            "frame_count":4,
+            "prev_patch_lum":null,
+            "scene_memory":null
+        }"#;
+        let state: ManifoldState = serde_json::from_str(json).expect("legacy checkpoint");
+        assert_eq!(state.schema_version, 1);
+        assert!(state.state_hv.is_none());
+        assert!(state.trainer_state.is_none());
+        assert!(state.last_patch_hvs.is_empty());
     }
 }

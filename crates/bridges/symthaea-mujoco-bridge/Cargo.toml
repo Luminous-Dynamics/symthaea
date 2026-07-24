@@ -14,5 +14,4 @@ categories = ["simulation", "science"]
 [dependencies]
 symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
 symthaea-humanoid = { path = "../../domains/symthaea-humanoid" }
-mujoco-rs = { version = "4.0.1", features = ["auto-download-mujoco"] }
 

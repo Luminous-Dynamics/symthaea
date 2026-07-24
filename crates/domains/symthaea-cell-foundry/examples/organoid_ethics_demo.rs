@@ -47,7 +47,7 @@ fn main() {
         };
 
         let metrics = pipeline.digital_organoid().metrics();
-        let assessment = framework.assess(metrics, snapshot.lfp.as_ref());
+        let assessment = framework.assess_at(metrics, snapshot.lfp.as_ref(), snapshot.day as u64);
 
         if assessment.current_tier != prev_tier {
             println!(

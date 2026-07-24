@@ -4,9 +4,21 @@
 //!
 //! Sources:
 //! - Piano: Fletcher & Rossing, *Physics of Musical Instruments* (1998)
-//! - Violin: Saunders (1937), Schelleng (1973), Cremer (1984)
+//! - Violin/Viola/timpani: Saunders (1937), Schelleng (1973), Cremer (1984),
+//!   Fletcher & Rossing (1998, Ch. 15 winds, Ch. 17 membranes)
+//! - Oboe/Bassoon/French Horn: Benade, *Fundamentals of Musical Acoustics*
+//!   (1976); Fletcher & Rossing (1998, Ch. 15)
+//! - Voice: Sundberg, *The Science of the Singing Voice* (1987)
+//! - Mallet percussion (Vibraphone/Celesta): Rossing, *Science of Percussion
+//!   Instruments* (2000)
 //! - DX7 FM: Chowning (1973), Yamaha DX7 manual (1983)
 //! - Karplus-Strong: Karplus & Strong (1983), Jaffe & Smith (1983)
+//!
+//! Not every new table below is independently measured — several (Viola,
+//! Accordion, String Ensemble, Electric Bass) are honestly labeled
+//! "DERIVED, NOT MEASURED": built from this file's own measured tables with
+//! a documented, physically-motivated modification, per this crate's
+//! transparency principle of marking estimates as estimates.
 //!
 //! All data is from peer-reviewed acoustic measurements (scientific facts,
 //! not copyrightable). DX7 patents expired in early 2000s.
@@ -85,6 +97,196 @@ pub const PIANO_INHARMONICITY: [f32; 8] = [
     0.00012, 0.00008, 0.00006, 0.00004, 0.00003, 0.00010, 0.00040, 0.00150,
 ];
 
+/// Viola partial amplitudes — DERIVED, NOT MEASURED. No independently
+/// published viola spectrum was available to cite directly, so this is the
+/// element-wise average of this file's own measured VIOLIN and CELLO
+/// tables, reflecting the viola's well-documented acoustic compromise (a
+/// body too small for its pitch range relative to the rest of the violin
+/// family, giving it tonal character between the two — Fletcher & Rossing
+/// 1998 discuss this "viola problem" directly).
+pub const VIOLA: [f32; 16] = [
+    1.000, 0.500, 0.365, 0.250, 0.225, 0.165, 0.155, 0.110, 0.110, 0.090, 0.085, 0.070, 0.063,
+    0.053, 0.045, 0.038,
+];
+
+/// Oboe partial amplitudes: strong 2nd harmonic and a broad formant across
+/// partials 2-5, characteristic of the conical double-reed bore (Fletcher &
+/// Rossing 1998 Ch. 15 "Double reed instruments"; Benade 1976).
+pub const OBOE: [f32; 16] = [
+    1.000, 0.950, 0.900, 0.750, 0.650, 0.500, 0.380, 0.280, 0.200, 0.150, 0.110, 0.080, 0.060,
+    0.045, 0.032, 0.022,
+];
+
+/// Bassoon partial amplitudes: formant emphasis around partials 2-4 (the
+/// conical double-reed bore's characteristic "bassoon formant", ~440-500 Hz;
+/// Fletcher & Rossing 1998 Ch. 15).
+pub const BASSOON: [f32; 16] = [
+    1.000, 0.700, 0.850, 0.900, 0.750, 0.550, 0.400, 0.280, 0.200, 0.140, 0.100, 0.070, 0.050,
+    0.035, 0.025, 0.018,
+];
+
+/// French Horn partial amplitudes: a dark, rapidly-decaying spectrum from
+/// its long conical bore and flared bell — much less upper-harmonic energy
+/// than the cylindrical-bore trumpet at comparable dynamics (Benade 1976).
+pub const FRENCH_HORN: [f32; 16] = [
+    1.000, 0.650, 0.450, 0.300, 0.200, 0.130, 0.085, 0.055, 0.035, 0.022, 0.014, 0.009, 0.006,
+    0.004, 0.003, 0.002,
+];
+
+/// Accordion partial amplitudes — DERIVED, NOT MEASURED. No independently
+/// published accordion spectrum was available to cite directly, so this is
+/// built from this file's own measured ORGAN table (both are free-reed/pipe
+/// aerophones with a similar odd-emphasis decay); partials 2-6 are boosted
+/// slightly relative to ORGAN since accordion reeds carry more upper-harmonic
+/// buzz than a pipe rank.
+pub const ACCORDION: [f32; 16] = [
+    1.000, 0.550, 0.320, 0.180, 0.110, 0.070, 0.045, 0.030, 0.020, 0.013, 0.009, 0.006, 0.004,
+    0.003, 0.002, 0.001,
+];
+
+/// Choir "ah" vowel partial amplitudes: a formant hump across partials 2-4
+/// (approximating the F1/F2 region of the open "ah" vowel) plus a smaller
+/// secondary hump around partials 7-8 approximating the trained-voice
+/// "singer's formant" (Sundberg, *The Science of the Singing Voice*, 1987).
+/// A generic vowel-shape approximation, not a per-fundamental measured
+/// table (real formant frequencies don't scale with a sung note the way
+/// harmonic partials do).
+pub const CHOIR_AAH: [f32; 16] = [
+    1.000, 0.600, 0.500, 0.550, 0.450, 0.320, 0.220, 0.260, 0.200, 0.130, 0.080, 0.100, 0.060,
+    0.035, 0.020, 0.012,
+];
+
+/// String Ensemble (tutti bowed strings) partial amplitudes — DERIVED, NOT
+/// MEASURED. Built from this file's own measured VIOLIN table: ensemble
+/// chorusing (many individually-detuned bowed voices) smears the sharp
+/// per-partial decay of a solo instrument into a flatter envelope, so the
+/// falloff here is gentler than VIOLIN's own.
+pub const STRING_ENSEMBLE: [f32; 16] = [
+    1.000, 0.560, 0.430, 0.320, 0.310, 0.230, 0.230, 0.160, 0.170, 0.120, 0.130, 0.090, 0.100,
+    0.070, 0.075, 0.055,
+];
+
+/// Electric Bass partial amplitudes — DERIVED, NOT MEASURED. Built from
+/// this file's own measured CELLO table (the same reuse pattern already
+/// used for [`Instrument::UprightBass`]) with a `1.08^h` brightening tilt
+/// applied per partial `h`, approximating the extra upper-harmonic energy a
+/// magnetic pickup and steel round-wound strings add over a bowed/plucked
+/// acoustic bass. This table only backs the additive-synthesis fallback
+/// path — the audible synthesis is Karplus-Strong (see
+/// [`Instrument::ks_params`]).
+pub const ELECTRIC_BASS: [f32; 16] = [
+    1.000, 0.518, 0.408, 0.340, 0.272, 0.264, 0.206, 0.206, 0.167, 0.200, 0.151, 0.187, 0.126,
+    0.163, 0.103, 0.143,
+];
+
+/// Timpani partial-INDEX amplitudes. Real kettledrums are membrane
+/// instruments whose prominent modes sit at non-harmonic ratios of roughly
+/// 1.00, 1.50, 1.99, 2.29, 2.65, 2.92, 3.16, 3.50x the fundamental (Fletcher
+/// & Rossing 1998 Ch. 17, circular-membrane normal modes
+/// 01/11/21/02/31/12/41/22). This additive-synthesis engine only supports
+/// harmonic partial positions, so — rather than fabricate a false harmonic
+/// table — this maps each real mode's energy onto its NEAREST integer
+/// partial index, concentrating amplitude in the first 3-4 partials the way
+/// the real modes do. This is a genuine simplification of a non-harmonic
+/// spectrum, not a claim that the rendered timbre is acoustically exact.
+pub const TIMPANI: [f32; 16] = [
+    1.000, 0.850, 0.700, 0.500, 0.300, 0.150, 0.070, 0.030, 0.015, 0.008, 0.004, 0.002, 0.001,
+    0.000, 0.000, 0.000,
+];
+
+// ─── Wave 2: Baroque/Brass/World/Percussion Additions ──────────────────────
+
+/// Harpsichord partial amplitudes: a plucked string (quill against string,
+/// not a hammer) excited near the string's end, which — unlike the piano's
+/// hammer strike nearer the middle — drives a much richer, more slowly
+/// decaying series of upper harmonics, giving the instrument's characteristic
+/// bright, thin, slightly "buzzy" timbre (Fletcher & Rossing 1998 Ch. 12,
+/// "Harpsichords, Clavichords, and Virginals"). This table only backs the
+/// additive-synthesis fallback path — the audible synthesis is
+/// Karplus-Strong (see [`Instrument::ks_params`]), following the same
+/// dual-path precedent already established for [`Instrument::ElectricBass`].
+/// A real plucked-string spectrum also carries comb-filter nulls from the
+/// fixed plucking point that a smooth 16-partial table cannot represent;
+/// this is a physically-motivated simplification of the well-documented
+/// general character (bright, slow high-partial rolloff), not a claim of
+/// exact per-partial measurement.
+pub const HARPSICHORD: [f32; 16] = [
+    1.000, 0.850, 0.720, 0.640, 0.560, 0.500, 0.450, 0.400, 0.350, 0.310, 0.270, 0.230, 0.195,
+    0.165, 0.135, 0.110,
+];
+
+/// Tuba partial amplitudes: the darkest, least upper-partial-rich member of
+/// the brass family — its long, wide conical bore and low playing register
+/// give it noticeably fewer strong upper harmonics even than the already-dark
+/// French Horn at comparable dynamics (Benade, *Fundamentals of Musical
+/// Acoustics*, 1976, brass-family bore/formant discussion).
+pub const TUBA: [f32; 16] = [
+    1.000, 0.450, 0.220, 0.100, 0.045, 0.020, 0.009, 0.004, 0.002, 0.001, 0.000, 0.000, 0.000,
+    0.000, 0.000, 0.000,
+];
+
+/// Trombone partial amplitudes — DERIVED, NOT independently MEASURED. No
+/// standalone published trombone partial table was available to cite
+/// directly, so this is built from this file's own measured TRUMPET table
+/// (both are predominantly cylindrical-bore brass, giving a similarly bright
+/// spectrum with a formant emphasis across partials 3-6 — Benade 1976), with
+/// every partial attenuated slightly to reflect the trombone's larger bore
+/// diameter giving a marginally mellower tone than the trumpet at comparable
+/// dynamics.
+pub const TROMBONE: [f32; 16] = [
+    1.000, 0.660, 0.560, 0.680, 0.750, 0.600, 0.470, 0.360, 0.250, 0.170, 0.115, 0.078, 0.052,
+    0.038, 0.026, 0.017,
+];
+
+/// Duduk partial amplitudes — DERIVED, NOT independently MEASURED. No
+/// standalone published duduk partial table was available to cite directly.
+/// Built from this file's own measured CLARINET table (both are cylindrical
+/// double/single-reed-driven bores with the characteristic odd-harmonic
+/// emphasis of a closed-open pipe — Fletcher & Rossing 1998 Ch. 15), but
+/// damped far more heavily: the duduk's oversized apricot-wood double reed
+/// and low blowing pressure are well documented (ethnomusicological/acoustic
+/// descriptions of the instrument) to give an unusually narrow, breathy,
+/// near-sinusoidal-with-buzz spectrum concentrated almost entirely in the
+/// first few partials, quite unlike the clarinet's comparatively bright
+/// upper odd harmonics.
+pub const DUDUK: [f32; 16] = [
+    1.000, 0.030, 0.380, 0.014, 0.170, 0.007, 0.065, 0.003, 0.025, 0.001, 0.008, 0.000, 0.000,
+    0.000, 0.000, 0.000,
+];
+
+/// Choir "oo" vowel partial amplitudes — DERIVED, NOT MEASURED. Built by
+/// modifying this file's own [`CHOIR_AAH`] table: the "oo" vowel's first and
+/// second formants sit substantially lower than "ah"'s (Sundberg, *The
+/// Science of the Singing Voice*, 1987), so the formant hump here is shifted
+/// earlier (weight concentrated in partials 1-2 rather than 2-4) and the
+/// overall spectrum darkened/rolled off faster, giving the covered, rounded
+/// character choral practice associates with "oo" versus the more open
+/// "ah". The small secondary "singer's formant" hump around partials 7-8 is
+/// kept, per the same Sundberg 1987 source used for CHOIR_AAH.
+pub const CHOIR_OOH: [f32; 16] = [
+    1.000, 0.680, 0.380, 0.280, 0.170, 0.100, 0.065, 0.085, 0.055, 0.032, 0.018, 0.023, 0.013,
+    0.008, 0.004, 0.002,
+];
+
+/// Xylophone partial-INDEX amplitudes. Real xylophone bars are free-free
+/// bars whose undercut tuning targets a first overtone near 3x the
+/// fundamental (an octave and a fifth above) — a brighter, LOWER overtone
+/// ratio than the marimba's 4x (two octaves), and the bars carry no
+/// resonator tubes, so overtone energy is not reinforced/sustained the way
+/// a marimba's is (Rossing, *Science of Percussion Instruments*, 2000,
+/// mallet-percussion bar-tuning discussion). Like [`TIMPANI`], the real
+/// overtone is not exactly harmonic; this maps it onto its nearest integer
+/// partial index (the 3rd) rather than fabricate a false harmonic table,
+/// concentrating remaining energy in the fundamental and decaying very
+/// quickly thereafter — brighter, drier, and much shorter-lived than the
+/// marimba/vibraphone tables this crate already fallback-shares via
+/// `PIANO_FF`. This table only backs the additive-synthesis fallback path —
+/// the audible synthesis is FM (see [`Instrument::fm_params`]).
+pub const XYLOPHONE: [f32; 16] = [
+    1.000, 0.200, 0.550, 0.080, 0.030, 0.010, 0.004, 0.002, 0.001, 0.000, 0.000, 0.000, 0.000,
+    0.000, 0.000, 0.000,
+];
+
 // ─── Instrument Enum ────────────────────────────────────────────────────────
 
 /// Available instrument timbres.
@@ -112,6 +314,26 @@ pub enum Instrument {
     Oud,
     Ney,
     UprightBass,
+    Viola,
+    Oboe,
+    FrenchHorn,
+    Bassoon,
+    Accordion,
+    Mandolin,
+    Banjo,
+    Vibraphone,
+    Celesta,
+    ChoirAah,
+    StringEnsemble,
+    ElectricBass,
+    Timpani,
+    MusicBox,
+    Harpsichord,
+    Tuba,
+    Trombone,
+    Duduk,
+    ChoirOoh,
+    Xylophone,
 }
 
 impl Instrument {
@@ -129,7 +351,27 @@ impl Instrument {
             Self::Saxophone => &SAXOPHONE,
             Self::Sitar => &SITAR,
             Self::SawLead => &SAW_LEAD,
-            _ => &PIANO_FF, // ElectricPiano, Bell, Guitar, Harp, Koto, Oud, Marimba, Kalimba
+            Self::Viola => &VIOLA,
+            Self::Oboe => &OBOE,
+            Self::Bassoon => &BASSOON,
+            Self::FrenchHorn => &FRENCH_HORN,
+            Self::Accordion => &ACCORDION,
+            Self::ChoirAah => &CHOIR_AAH,
+            Self::StringEnsemble => &STRING_ENSEMBLE,
+            Self::ElectricBass => &ELECTRIC_BASS,
+            Self::Timpani => &TIMPANI,
+            Self::Harpsichord => &HARPSICHORD,
+            Self::Tuba => &TUBA,
+            Self::Trombone => &TROMBONE,
+            Self::Duduk => &DUDUK,
+            Self::ChoirOoh => &CHOIR_OOH,
+            Self::Xylophone => &XYLOPHONE,
+            // ElectricPiano, Bell, Guitar, Harp, Koto, Oud, Marimba, Kalimba,
+            // Mandolin, Banjo, Vibraphone, Celesta, MusicBox: all KS/FM
+            // instruments — this fallback only backs the additive path if
+            // one of them is ever routed through it (see uses_karplus_strong
+            // / uses_fm).
+            _ => &PIANO_FF,
         }
     }
 
@@ -182,6 +424,17 @@ impl Instrument {
                 | Self::Ney
                 | Self::Pad
                 | Self::SawLead
+                | Self::Viola
+                | Self::Oboe
+                | Self::Bassoon
+                | Self::FrenchHorn
+                | Self::Accordion
+                | Self::ChoirAah
+                | Self::StringEnsemble
+                | Self::Tuba
+                | Self::Trombone
+                | Self::Duduk
+                | Self::ChoirOoh
         )
     }
 
@@ -192,11 +445,32 @@ impl Instrument {
     /// relative to the note's own level and deliberately subtle.
     pub fn attack_noise(&self) -> (f32, f32) {
         match self {
-            Self::Violin | Self::Cello => (0.10, 0.06), // bow bite
-            Self::Flute | Self::Ney => (0.12, 0.04),    // breath chiff
-            Self::Clarinet | Self::Saxophone | Self::Trumpet => (0.06, 0.03), // reed/lip start
+            Self::Violin | Self::Cello | Self::Viola | Self::StringEnsemble => (0.10, 0.06), // bow bite
+            // Duduk's oversized reed and low blowing pressure give it a
+            // softer, breathier onset than a Western reed instrument — more
+            // like an edge-blown flute's chiff than a crisp reed start, so it
+            // joins Flute/Ney/ChoirAah/ChoirOoh here rather than the
+            // clarinet/oboe/sax reed group below.
+            Self::Flute | Self::Ney | Self::ChoirAah | Self::ChoirOoh | Self::Duduk => {
+                (0.12, 0.04) // breath chiff
+            }
+            Self::Clarinet
+            | Self::Saxophone
+            | Self::Trumpet
+            | Self::Oboe
+            | Self::Bassoon
+            | Self::FrenchHorn
+            | Self::Tuba
+            | Self::Trombone => {
+                (0.06, 0.03) // reed/lip start (buzz onset for the brass pair)
+            }
             Self::Piano | Self::PianoPP => (0.05, 0.008), // hammer click
-            Self::Organ => (0.04, 0.02),                // pipe speech/chiff
+            Self::Organ | Self::Accordion => (0.04, 0.02), // pipe speech/chiff
+            Self::Timpani => (0.15, 0.015),               // mallet strike transient
+            // Wood bar struck with a hard mallet: a brief, bright transient —
+            // sharper and much shorter than Timpani's membrane strike (no
+            // skin compliance to round off the attack).
+            Self::Xylophone => (0.12, 0.006),
             _ => (0.0, 0.0),
         }
     }
@@ -210,9 +484,27 @@ impl Instrument {
     /// player-controlled vibrato, so they honestly get `None`.
     pub fn vibrato(&self) -> Option<(f32, f32, f32)> {
         match self {
-            Self::Violin | Self::Cello => Some((5.5, 0.007, 0.20)),
+            Self::Violin
+            | Self::Cello
+            | Self::Viola
+            | Self::StringEnsemble
+            | Self::ChoirAah
+            | Self::ChoirOoh => Some((5.5, 0.007, 0.20)),
             Self::Flute | Self::Ney => Some((5.0, 0.004, 0.25)),
-            Self::Clarinet | Self::Saxophone | Self::Trumpet => Some((4.5, 0.003, 0.30)),
+            Self::Clarinet
+            | Self::Saxophone
+            | Self::Trumpet
+            | Self::Oboe
+            | Self::Bassoon
+            | Self::FrenchHorn
+            | Self::Tuba
+            | Self::Trombone => Some((4.5, 0.003, 0.30)),
+            // Duduk's expressive wide-pitch vibrato is a hallmark of its
+            // performance practice (a stylistic/ethnomusicological
+            // observation, not a peer-reviewed acoustic measurement like the
+            // depths above) — noticeably deeper and quicker-onset than the
+            // Western winds' subtler vibrato.
+            Self::Duduk => Some((4.0, 0.006, 0.15)),
             _ => None,
         }
     }
@@ -261,14 +553,42 @@ impl Instrument {
             "oud" => Self::Oud,
             "ney" => Self::Ney,
             "upright_bass" => Self::UprightBass,
+            "viola" => Self::Viola,
+            "oboe" => Self::Oboe,
+            "french_horn" => Self::FrenchHorn,
+            "bassoon" => Self::Bassoon,
+            "accordion" => Self::Accordion,
+            "mandolin" => Self::Mandolin,
+            "banjo" => Self::Banjo,
+            "vibraphone" => Self::Vibraphone,
+            "celesta" => Self::Celesta,
+            "choir_aah" => Self::ChoirAah,
+            "string_ensemble" => Self::StringEnsemble,
+            "electric_bass" => Self::ElectricBass,
+            "timpani" => Self::Timpani,
+            "music_box" => Self::MusicBox,
+            "harpsichord" => Self::Harpsichord,
+            "tuba" => Self::Tuba,
+            "trombone" => Self::Trombone,
+            "duduk" => Self::Duduk,
+            "choir_ooh" => Self::ChoirOoh,
+            "xylophone" => Self::Xylophone,
             _ => return None,
         })
     }
 
     /// General MIDI program number (0-based) for exporting this instrument
     /// to a Standard MIDI File. Instruments without an exact GM equivalent
-    /// map to the closest family member (Oud → nylon guitar, Ney → pan
+    /// map to the closest family member (Oud → steel guitar, Ney → pan
     /// flute) so a DAW's default GM bank renders something reasonable.
+    ///
+    /// Collision rule: two DIFFERENT muse instruments must not share one GM
+    /// program when a style pairs them in the same ensemble — Oud used to
+    /// map to 24 alongside AcousticGuitar, so Flamenco's signature oud lead
+    /// rendered as its own accompaniment's nylon guitar, erasing the
+    /// style's timbral identity on the FluidSynth path. (PianoPP → 0 is
+    /// deliberate, not a collision: GM carries soft-piano dynamics through
+    /// velocity, and no ensemble pairs Piano with PianoPP.)
     pub fn gm_program(&self) -> u8 {
         match self {
             Self::Piano | Self::PianoPP => 0, // Acoustic Grand Piano
@@ -276,8 +596,9 @@ impl Instrument {
             Self::Marimba => 12,
             Self::Bell => 14, // Tubular Bells
             Self::Organ => 19,
-            Self::AcousticGuitar | Self::Oud => 24, // Nylon Guitar
-            Self::UprightBass => 32,                // Acoustic Bass
+            Self::AcousticGuitar => 24, // Nylon Guitar
+            Self::Oud => 25,            // Steel Guitar — nearest DISTINCT plucked timbre
+            Self::UprightBass => 32,    // Acoustic Bass
             Self::Violin => 40,
             Self::Cello => 42,
             Self::Harp => 46,
@@ -291,6 +612,38 @@ impl Instrument {
             Self::Sitar => 104,
             Self::Koto => 107,
             Self::Kalimba => 108,
+            Self::Viola => 41,
+            Self::Oboe => 68,
+            Self::Bassoon => 70,
+            Self::FrenchHorn => 60,
+            Self::Accordion => 21,
+            // GM has no dedicated mandolin program. Mapped honestly to the
+            // nearest UNUSED plucked-string family (Shamisen) rather than
+            // reusing AcousticGuitar (24), Oud (25), or Banjo (105) — a folk
+            // ensemble may pair mandolin with any of those, so it needs its
+            // own distinct DAW-rendered timbre too.
+            Self::Mandolin => 106,
+            Self::Banjo => 105,
+            Self::Vibraphone => 11,
+            Self::Celesta => 8,
+            Self::ChoirAah => 52, // Choir Aahs
+            Self::StringEnsemble => 48,
+            Self::ElectricBass => 33, // Electric Bass (finger)
+            Self::Timpani => 47,
+            Self::MusicBox => 10,
+            Self::Harpsichord => 6, // Harpsichord — GM's own dedicated program
+            Self::Tuba => 58,
+            Self::Trombone => 57,
+            // GM has no dedicated duduk program (no Armenian/Caucasian
+            // double-reed folk instrument exists in the standard bank).
+            // Mapped honestly to the nearest UNUSED reed-aerophone family
+            // slot — Shanai (111, an Indian double-reed folk instrument) —
+            // rather than reusing Oboe/Bassoon/Clarinet's already-assigned
+            // Western-reed programs, which would collide when a Cinematic
+            // or Hindustani-Inspired ensemble pairs duduk with any of them.
+            Self::Duduk => 111,   // Shanai — nearest unused reed-aerophone family
+            Self::ChoirOoh => 53, // Voice Oohs — distinct from ChoirAah's 52 Choir Aahs
+            Self::Xylophone => 13, // distinct from Marimba(12)/Vibraphone(11)/Bell(14)
         }
     }
 
@@ -298,7 +651,15 @@ impl Instrument {
     pub fn uses_karplus_strong(&self) -> bool {
         matches!(
             self,
-            Self::AcousticGuitar | Self::Harp | Self::Koto | Self::Oud | Self::UprightBass
+            Self::AcousticGuitar
+                | Self::Harp
+                | Self::Koto
+                | Self::Oud
+                | Self::UprightBass
+                | Self::Mandolin
+                | Self::Banjo
+                | Self::ElectricBass
+                | Self::Harpsichord
         )
     }
 
@@ -306,7 +667,14 @@ impl Instrument {
     pub fn uses_fm(&self) -> bool {
         matches!(
             self,
-            Self::ElectricPiano | Self::Bell | Self::Marimba | Self::Kalimba
+            Self::ElectricPiano
+                | Self::Bell
+                | Self::Marimba
+                | Self::Kalimba
+                | Self::Vibraphone
+                | Self::Celesta
+                | Self::MusicBox
+                | Self::Xylophone
         )
     }
 
@@ -318,6 +686,20 @@ impl Instrument {
             Self::Koto => (0.994, 0.55, 0.008),
             Self::Oud => (0.997, 0.35, 0.002),
             Self::UprightBass => (0.998, 0.30, 0.001),
+            // Shorter scale + doubled courses give a brighter pluck than a
+            // guitar's.
+            Self::Mandolin => (0.997, 0.55, 0.004),
+            // Skin drumhead resonator radiates highs efficiently and decays
+            // faster than a wood-bodied guitar/mandolin.
+            Self::Banjo => (0.993, 0.60, 0.002),
+            // Solid body + magnetic pickup: brighter than the upright's
+            // gut/synthetic strings, similarly long-sustaining.
+            Self::ElectricBass => (0.998, 0.50, 0.001),
+            // Quilled pluck against thin metal strings: brighter than any
+            // other KS voice in this file (high brightness coefficient) and
+            // decays a bit faster than the nylon-strung guitar/harp (no
+            // continued excitation once the jack releases the string).
+            Self::Harpsichord => (0.995, 0.65, 0.004),
             _ => (0.996, 0.42, 0.000),
         }
     }
@@ -329,6 +711,26 @@ impl Instrument {
             Self::Bell => (1.0, 3.5, 2.5, 3.0),
             Self::Marimba => (1.0, 4.0, 1.0, 30.0),
             Self::Kalimba => (1.0, 5.17, 1.2, 8.0),
+            // Mallet-percussion bars are deliberately tuned so the first
+            // overtone lands near 4x the fundamental (Rossing, *Science of
+            // Percussion Instruments*, 2000); the vibraphone's tube
+            // resonators and damper give it a much slower decay than the
+            // dry marimba (rate 30.0 above).
+            Self::Vibraphone => (1.0, 3.93, 1.0, 8.0),
+            // Steel plates over resonator boxes: a softer, less
+            // bell-like inharmonicity than Bell's plate/tube, decaying
+            // faster than Bell but slower than the dry Marimba/Kalimba —
+            // not a measured/published DX7 patch, a physically-motivated
+            // approximation in the same spirit as this file's other ratios.
+            Self::Celesta => (1.0, 2.4, 1.5, 6.0),
+            // Small steel comb tines: brighter/higher than Kalimba's larger
+            // tines and decay faster (less mass to ring).
+            Self::MusicBox => (1.0, 6.27, 1.3, 14.0),
+            // Wood bars undercut-tuned so the first overtone sits near 3x
+            // the fundamental (Rossing 2000) — a lower, brighter-sounding
+            // ratio than the marimba's 4x above — with no resonator tubes,
+            // so the fastest decay rate in this file's mallet family.
+            Self::Xylophone => (1.0, 3.0, 1.3, 45.0),
             _ => (1.0, 1.0, 0.3, 10.0),
         }
     }
@@ -346,11 +748,23 @@ impl Instrument {
     pub fn default_adsr(&self) -> (f32, f32, f32, f32) {
         match self {
             Self::Piano | Self::PianoPP => (0.005, 0.3, 0.3, 0.4),
-            Self::Violin | Self::Cello => (0.05, 0.1, 0.85, 0.3),
-            Self::Flute | Self::Clarinet | Self::Trumpet | Self::Saxophone | Self::Ney => {
-                (0.03, 0.05, 0.9, 0.15)
+            Self::Violin | Self::Cello | Self::Viola | Self::StringEnsemble => {
+                (0.05, 0.1, 0.85, 0.3)
             }
-            Self::Organ | Self::Pad => (0.3, 0.1, 0.95, 0.8),
+            Self::Flute
+            | Self::Clarinet
+            | Self::Trumpet
+            | Self::Saxophone
+            | Self::Ney
+            | Self::Oboe
+            | Self::Bassoon
+            | Self::FrenchHorn
+            | Self::Tuba
+            | Self::Trombone
+            | Self::Duduk => (0.03, 0.05, 0.9, 0.15),
+            Self::Organ | Self::Pad | Self::Accordion | Self::ChoirAah | Self::ChoirOoh => {
+                (0.3, 0.1, 0.95, 0.8)
+            }
             Self::Sitar | Self::SawLead => (0.01, 0.2, 0.6, 0.3),
             // Struck/plucked/FM families: a percussive fallback (their real
             // envelope normally comes from the KS/FM path, not this one).
@@ -362,7 +776,16 @@ impl Instrument {
             | Self::Koto
             | Self::Kalimba
             | Self::Oud
-            | Self::UprightBass => (0.002, 0.3, 0.2, 0.5),
+            | Self::UprightBass
+            | Self::Mandolin
+            | Self::Banjo
+            | Self::Vibraphone
+            | Self::Celesta
+            | Self::ElectricBass
+            | Self::Timpani
+            | Self::MusicBox
+            | Self::Harpsichord
+            | Self::Xylophone => (0.002, 0.3, 0.2, 0.5),
         }
     }
 }
@@ -782,6 +1205,187 @@ pub fn select_progression(state: &MusicalState) -> Vec<ProgressionChord> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gm_programs_distinct_within_shared_ensembles() {
+        // Flamenco pairs oud (lead) with acoustic guitar (accompaniment):
+        // if they share a GM program, the style's timbral identity is
+        // erased on the soundfont render path.
+        assert_ne!(
+            Instrument::Oud.gm_program(),
+            Instrument::AcousticGuitar.gm_program()
+        );
+    }
+
+    #[test]
+    fn gm_programs_unique_across_all_variants_except_documented_piano_pp_share() {
+        use std::collections::HashSet;
+        // PianoPP intentionally shares Piano's GM program (see gm_program's
+        // own doc comment: GM carries soft-piano dynamics through velocity,
+        // and no ensemble pairs Piano with PianoPP) — every OTHER variant
+        // must get a genuinely distinct program, or two instruments that
+        // co-occur in a style ensemble would render as the same GM patch.
+        let all = [
+            Instrument::Piano,
+            Instrument::Violin,
+            Instrument::Cello,
+            Instrument::Flute,
+            Instrument::Organ,
+            Instrument::ElectricPiano,
+            Instrument::Bell,
+            Instrument::AcousticGuitar,
+            Instrument::Harp,
+            Instrument::Pad,
+            Instrument::Clarinet,
+            Instrument::Trumpet,
+            Instrument::Saxophone,
+            Instrument::Marimba,
+            Instrument::Sitar,
+            Instrument::Kalimba,
+            Instrument::SawLead,
+            Instrument::Koto,
+            Instrument::Oud,
+            Instrument::Ney,
+            Instrument::UprightBass,
+            Instrument::Viola,
+            Instrument::Oboe,
+            Instrument::FrenchHorn,
+            Instrument::Bassoon,
+            Instrument::Accordion,
+            Instrument::Mandolin,
+            Instrument::Banjo,
+            Instrument::Vibraphone,
+            Instrument::Celesta,
+            Instrument::ChoirAah,
+            Instrument::StringEnsemble,
+            Instrument::ElectricBass,
+            Instrument::Timpani,
+            Instrument::MusicBox,
+            Instrument::Harpsichord,
+            Instrument::Tuba,
+            Instrument::Trombone,
+            Instrument::Duduk,
+            Instrument::ChoirOoh,
+            Instrument::Xylophone,
+        ];
+        let mut seen = HashSet::new();
+        for inst in all {
+            let program = inst.gm_program();
+            assert!(
+                seen.insert(program),
+                "duplicate GM program {program} for {inst:?} — collides with an earlier instrument"
+            );
+        }
+        assert_eq!(
+            Instrument::PianoPP.gm_program(),
+            Instrument::Piano.gm_program(),
+            "PianoPP intentionally shares Piano's GM program"
+        );
+    }
+
+    #[test]
+    fn from_name_round_trips_the_new_instruments() {
+        let pairs = [
+            ("viola", Instrument::Viola),
+            ("oboe", Instrument::Oboe),
+            ("french_horn", Instrument::FrenchHorn),
+            ("bassoon", Instrument::Bassoon),
+            ("accordion", Instrument::Accordion),
+            ("mandolin", Instrument::Mandolin),
+            ("banjo", Instrument::Banjo),
+            ("vibraphone", Instrument::Vibraphone),
+            ("celesta", Instrument::Celesta),
+            ("choir_aah", Instrument::ChoirAah),
+            ("string_ensemble", Instrument::StringEnsemble),
+            ("electric_bass", Instrument::ElectricBass),
+            ("timpani", Instrument::Timpani),
+            ("music_box", Instrument::MusicBox),
+            ("harpsichord", Instrument::Harpsichord),
+            ("tuba", Instrument::Tuba),
+            ("trombone", Instrument::Trombone),
+            ("duduk", Instrument::Duduk),
+            ("choir_ooh", Instrument::ChoirOoh),
+            ("xylophone", Instrument::Xylophone),
+        ];
+        for (name, expected) in pairs {
+            assert_eq!(
+                Instrument::from_name(name),
+                Some(expected),
+                "from_name({name:?}) should round-trip to {expected:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn new_additive_instrument_partials_are_well_formed() {
+        // 15 instruments now get dedicated additive-path tables: the
+        // original 9 (below) plus wave 2's 4 sustaining wind/voice additions
+        // (Tuba, Trombone, Duduk, ChoirOoh) and 2 KS/FM instruments given a
+        // dedicated fallback-backing table following the ElectricBass
+        // precedent (Harpsichord, Xylophone). The remaining KS/FM
+        // instruments (Mandolin, Banjo, Vibraphone, Celesta, MusicBox, and
+        // the rest of the original KS/FM roster) use KS/FM synthesis and —
+        // per this crate's own established pattern (see
+        // Bell/Marimba/Guitar/Harp/Koto/Oud/Kalimba) — fall through to the
+        // PIANO_FF additive-path fallback rather than getting a dedicated
+        // table.
+        let tables: [(&str, &[f32; 16]); 15] = [
+            ("VIOLA", &VIOLA),
+            ("OBOE", &OBOE),
+            ("BASSOON", &BASSOON),
+            ("FRENCH_HORN", &FRENCH_HORN),
+            ("ACCORDION", &ACCORDION),
+            ("CHOIR_AAH", &CHOIR_AAH),
+            ("STRING_ENSEMBLE", &STRING_ENSEMBLE),
+            ("ELECTRIC_BASS", &ELECTRIC_BASS),
+            ("TIMPANI", &TIMPANI),
+            ("HARPSICHORD", &HARPSICHORD),
+            ("TUBA", &TUBA),
+            ("TROMBONE", &TROMBONE),
+            ("DUDUK", &DUDUK),
+            ("CHOIR_OOH", &CHOIR_OOH),
+            ("XYLOPHONE", &XYLOPHONE),
+        ];
+        for (name, table) in tables {
+            assert_eq!(table.len(), 16, "{name} must have 16 partials");
+            assert!(
+                (table[0] - 1.0).abs() < 0.01,
+                "{name} fundamental should be 1.0, got {}",
+                table[0]
+            );
+            assert!(
+                table.iter().all(|&x| x <= table[0] + 1e-6),
+                "{name} fundamental should be the strongest partial (no documented exception among these 15)"
+            );
+        }
+    }
+
+    #[test]
+    fn wave2_instruments_classify_correctly() {
+        // Harpsichord: plucked, Karplus-Strong, does NOT sustain.
+        assert!(Instrument::Harpsichord.uses_karplus_strong());
+        assert!(!Instrument::Harpsichord.sustains());
+        // Tuba/Trombone/Duduk: sustaining winds/brass.
+        assert!(Instrument::Tuba.sustains());
+        assert!(Instrument::Trombone.sustains());
+        assert!(Instrument::Duduk.sustains());
+        // Brass gets a buzz-onset attack noise; Duduk gets a breath chiff.
+        assert!(Instrument::Tuba.attack_noise().0 > 0.0);
+        assert!(Instrument::Trombone.attack_noise().0 > 0.0);
+        assert!(Instrument::Duduk.attack_noise().0 > 0.0);
+        // ChoirOoh: pairs with ChoirAah, also sustains, also has vibrato.
+        assert!(Instrument::ChoirOoh.sustains());
+        assert!(Instrument::ChoirOoh.vibrato().is_some());
+        // Xylophone: struck, FM, does NOT sustain, has a sharp attack
+        // transient distinct from Timpani's membrane strike.
+        assert!(Instrument::Xylophone.uses_fm());
+        assert!(!Instrument::Xylophone.sustains());
+        assert!(Instrument::Xylophone.attack_noise().0 > 0.0);
+        assert_ne!(
+            Instrument::Xylophone.attack_noise(),
+            Instrument::Timpani.attack_noise()
+        );
+    }
 
     #[test]
     fn piano_partials_decay() {

@@ -39,12 +39,17 @@ pub mod antimeme;
 pub mod defense;
 pub mod meme;
 pub mod propagation;
+pub mod ruleset;
 pub mod swarm;
 
 pub use antimeme::{AntiMeme, AntiMemeField};
-pub use defense::{GuardianPosture, MemeticImmuneSystem, MemeticTelemetry, ScreenOutcome};
+pub use defense::{
+    AllowlistMode, FilteredItem, GuardianPosture, MemeticImmuneSystem, MemeticTelemetry,
+    ScreenOutcome, WardConfig,
+};
 pub use meme::Meme;
 pub use propagation::{
     BeliefSpread, OutbreakStats, Population, Rng, adoption_probability, resonance_gain,
 };
+pub use ruleset::{Ruleset, RulesetEntry};
 pub use swarm::{MemeSwarm, SwarmOutcome};

@@ -139,6 +139,16 @@ impl SymthaeaQualityPlugin {
 
     /// Compute weight adjustment for a single quality score.
     fn adjustment_for(&self, q: &QualityScore) -> Option<ParticipantWeightAdjustment> {
+        // Rule 0: malformed/non-finite evidence must fail closed. In particular,
+        // NaN compares false against every threshold below.
+        if q.validate().is_err() {
+            return Some(ParticipantWeightAdjustment {
+                weight_multiplier: 0.0,
+                veto: true,
+                source: "symthaea_quality_invalid".into(),
+            });
+        }
+
         // Rule 1: Severe anomaly -> veto (if configured)
         if self.config.veto_severe && matches!(q.severity, ConsciousAnomalySeverity::Severe) {
             return Some(ParticipantWeightAdjustment {
@@ -193,7 +203,6 @@ impl SymthaeaQualityPlugin {
         }
 
         // Rule 6: High confidence + positive connectivity gain -> boost
-        // Uses best_phi from C-Vector for richer signal
         if q.epistemic_confidence > 0.7
             && q.spectral.connectivity_gain > self.config.connectivity_gain_boost_threshold
         {
@@ -220,19 +229,30 @@ impl ByzantinePlugin for SymthaeaQualityPlugin {
         let mut weights = ExternalWeightMap::new();
 
         for update in updates {
-            if let Some(quality) = self.quality_scores.get(&update.participant_id) {
-                if let Some(adj) = self.adjustment_for(quality) {
-                    if adj.veto {
-                        self.total_vetoed += 1;
-                    } else if adj.weight_multiplier > 1.0 {
-                        self.total_boosted += 1;
-                    } else if adj.weight_multiplier < 1.0 {
-                        self.total_dampened += 1;
-                    }
-                    weights.insert(update.participant_id.clone(), vec![adj]);
+            let adjustment = match self.quality_scores.get(&update.participant_id) {
+                Some(quality) => self.adjustment_for(quality),
+                None => Some(ParticipantWeightAdjustment {
+                    weight_multiplier: 0.0,
+                    veto: true,
+                    source: "symthaea_quality_missing".into(),
+                }),
+            };
+
+            if let Some(adj) = adjustment {
+                if adj.veto {
+                    self.total_vetoed += 1;
+                } else if adj.weight_multiplier > 1.0 {
+                    self.total_boosted += 1;
+                } else if adj.weight_multiplier < 1.0 {
+                    self.total_dampened += 1;
                 }
+                weights.insert(update.participant_id.clone(), vec![adj]);
             }
         }
+
+        // Scores are round-scoped. Consuming them prevents an old successful
+        // assessment from authorizing a participant in a later round.
+        self.quality_scores.clear();
 
         weights
     }
@@ -408,6 +428,7 @@ mod tests {
         let mut plugin = SymthaeaQualityPlugin::new();
         let mut q = good_quality();
         q.epistemic_confidence = 0.5;
+        q.spectral.connectivity_after = 0.41;
         q.spectral.connectivity_gain = 0.01;
 
         let mut scores = HashMap::new();
@@ -424,12 +445,38 @@ mod tests {
     }
 
     #[test]
-    fn test_missing_score_no_adjustment() {
+    fn test_missing_score_is_vetoed() {
         let mut plugin = SymthaeaQualityPlugin::new();
         let updates = vec![make_update("unknown")];
         let weights = plugin.analyze(&updates);
 
-        assert!(weights.is_empty());
+        assert!(weights["unknown"][0].veto);
+        assert_eq!(weights["unknown"][0].source, "symthaea_quality_missing");
+    }
+
+    #[test]
+    fn test_non_finite_score_is_vetoed() {
+        let mut plugin = SymthaeaQualityPlugin::new();
+        let mut quality = good_quality();
+        quality.epistemic_confidence = f32::NAN;
+        plugin.set_score("nan-node".to_string(), quality);
+
+        let weights = plugin.analyze(&[make_update("nan-node")]);
+
+        assert!(weights["nan-node"][0].veto);
+        assert_eq!(weights["nan-node"][0].source, "symthaea_quality_invalid");
+    }
+
+    #[test]
+    fn test_scores_are_consumed_after_analysis() {
+        let mut plugin = SymthaeaQualityPlugin::new();
+        plugin.set_score("node".to_string(), good_quality());
+
+        let _ = plugin.analyze(&[make_update("node")]);
+        let second = plugin.analyze(&[make_update("node")]);
+
+        assert!(second["node"][0].veto);
+        assert_eq!(second["node"][0].source, "symthaea_quality_missing");
     }
 
     #[test]
@@ -585,6 +632,7 @@ mod tests {
             epistemic_confidence: Some(0.6),
         };
         q.epistemic_confidence = 0.6;
+        q.spectral.connectivity_after = 0.41;
         q.spectral.connectivity_gain = 0.01; // below boost threshold
 
         let mut scores = HashMap::new();

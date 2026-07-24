@@ -15,6 +15,7 @@ pub mod arc_noise;
 pub mod arc_rsa;
 pub mod arc_scaling;
 pub mod arc_staircase;
+pub mod arc_strict;
 
 pub use arc_abductive::ArcAbductiveBenchmark;
 pub use arc_algebra::ArcAlgebraBenchmark;
@@ -27,3 +28,4 @@ pub use arc_noise::ArcNoiseBenchmark;
 pub use arc_rsa::ArcRsaBenchmark;
 pub use arc_scaling::ArcScalingBenchmark;
 pub use arc_staircase::ArcStaircaseBenchmark;
+pub use arc_strict::ArcStrictBenchmark;

@@ -179,6 +179,43 @@ pub fn to_channels(raster: &Raster, channels: u8) -> Option<Vec<u8>> {
     }
 }
 
+/// Scramble a packed pixel buffer in place: Fisher–Yates over pixel
+/// positions (channel groups stay intact), seeded deterministically.
+///
+/// This is the CONTROL condition for the observer-ΔΨ A/B: the scrambled
+/// frame has exactly the artwork's color/luminance histogram but zero
+/// composition, so a Δψ difference between the two arms isolates response
+/// to *structure*. Uses an inline splitmix64 PRNG (no dependency, fully
+/// deterministic for a given seed).
+///
+/// `channels` must be 1 or 3 and `frame.len()` a multiple of it; violations
+/// leave the frame untouched (a wrong-shape control would be a silent lie).
+pub fn scramble_pixels(frame: &mut [u8], channels: u8, seed: u64) {
+    let ch = channels as usize;
+    if !(ch == 1 || ch == 3) || frame.is_empty() || frame.len() % ch != 0 {
+        return;
+    }
+    let n = frame.len() / ch;
+
+    let mut state = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut next = move || {
+        state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    };
+
+    for i in (1..n).rev() {
+        let j = (next() % (i as u64 + 1)) as usize;
+        if i != j {
+            for c in 0..ch {
+                frame.swap(i * ch + c, j * ch + c);
+            }
+        }
+    }
+}
+
 /// Perceptual features measured from rendered pixels.
 #[derive(Debug, Clone)]
 pub struct RenderPercept {
@@ -416,6 +453,40 @@ mod tests {
     #[test]
     fn invalid_svg_errors() {
         assert!(rasterize_svg("not svg at all", 64).is_err());
+    }
+
+    #[test]
+    fn scramble_preserves_histogram_destroys_order() {
+        // RGB frame with a distinctive gradient: scrambling must keep the
+        // exact multiset of pixels while changing their arrangement.
+        let mut frame: Vec<u8> = (0..64u32 * 3).map(|i| (i % 251) as u8).collect();
+        let original = frame.clone();
+        scramble_pixels(&mut frame, 3, 42);
+        assert_ne!(frame, original, "scramble must change pixel order");
+
+        let mut sorted_pixels = |buf: &[u8]| {
+            let mut px: Vec<[u8; 3]> = buf.chunks_exact(3).map(|c| [c[0], c[1], c[2]]).collect();
+            px.sort_unstable();
+            px
+        };
+        assert_eq!(
+            sorted_pixels(&frame),
+            sorted_pixels(&original),
+            "scramble must preserve the exact pixel multiset"
+        );
+
+        // Deterministic per seed; different seeds differ.
+        let mut again = original.clone();
+        scramble_pixels(&mut again, 3, 42);
+        assert_eq!(again, frame, "same seed must reproduce the same shuffle");
+        let mut other = original.clone();
+        scramble_pixels(&mut other, 3, 43);
+        assert_ne!(other, frame, "different seeds should differ");
+
+        // Wrong shape is left untouched, never mangled.
+        let mut odd = vec![1u8, 2, 3, 4];
+        scramble_pixels(&mut odd, 3, 7);
+        assert_eq!(odd, vec![1, 2, 3, 4]);
     }
 
     #[test]

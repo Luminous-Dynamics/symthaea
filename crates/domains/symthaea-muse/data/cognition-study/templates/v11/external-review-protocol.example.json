@@ -1,0 +1,52 @@
+{
+  "protocol_version": "symthaea-muse-external-review-protocol-v1",
+  "study_operations_release_sha256": "REPLACE_WITH_64_HEX",
+  "opened_at_utc": "2026-08-01T00:00:00Z",
+  "response_deadline_utc": "2026-09-01T00:00:00Z",
+  "required_roles": [
+    "QuantitativeMethods",
+    "MusicTheoryAndComposition",
+    "HumanSubjectsAndUx",
+    "ReproducibilityEngineering"
+  ],
+  "minimum_reviewers_by_role": {
+    "QuantitativeMethods": 1,
+    "MusicTheoryAndComposition": 1,
+    "HumanSubjectsAndUx": 1,
+    "ReproducibilityEngineering": 1
+  },
+  "questions": [
+    {
+      "question_id": "quant-primary-inference",
+      "role": "QuantitativeMethods",
+      "prompt": "Does the frozen primary analysis identify the declared estimand with valid clustered uncertainty and multiplicity control?",
+      "required_evidence_roles": ["methodology", "analysis-plan", "independent-analysis"],
+      "blocking_if_unanswered": true
+    },
+    {
+      "question_id": "music-construct-validity",
+      "role": "MusicTheoryAndComposition",
+      "prompt": "Do the listener and structural endpoints measure musically meaningful return quality without collapsing theory validity into preference?",
+      "required_evidence_roles": ["theory-validation", "artifact-samples", "listener-instrument"],
+      "blocking_if_unanswered": true
+    },
+    {
+      "question_id": "human-participant-burden",
+      "role": "HumanSubjectsAndUx",
+      "prompt": "Are consent, listening burden, compensation, privacy, exclusion, withdrawal, and deletion procedures appropriate and testable?",
+      "required_evidence_roles": ["consent", "privacy", "runner-protocol", "recruitment"],
+      "blocking_if_unanswered": true
+    },
+    {
+      "question_id": "repro-release-rerun",
+      "role": "ReproducibilityEngineering",
+      "prompt": "Can an independent environment reproduce the frozen artifacts, evidence pipeline, primary analysis, and release root?",
+      "required_evidence_roles": ["source", "flake-lock", "toolchain", "release-root"],
+      "blocking_if_unanswered": true
+    }
+  ],
+  "reviewers": [],
+  "preregistration_uri": "REPLACE_WITH_EXTERNAL_URI",
+  "preregistration_receipt_sha256": "REPLACE_WITH_64_HEX",
+  "protocol_sha256": ""
+}

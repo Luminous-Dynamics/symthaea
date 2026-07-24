@@ -1041,12 +1041,34 @@ impl CognitiveLoopService {
                 phi: phi_input,
                 broadcast: broadcast_input,
                 working_memory,
-                attention: ctx.peak_attention as f64,
+                // Unit fix (2026-07-22, probe_cl_calibration finding, same bug class as
+                // the 2026-07-18 embodiment fix): `ctx.peak_attention` is
+                // PredictiveEncoder's raw attention-weight magnitude, clamped to
+                // [min_attention, max_attention] = [0.1, 3.0] (predictive_encoder.rs),
+                // NOT a normalized [0,1] score like the other 6 `ConsciousnessInputs`
+                // fields. Feeding it raw both skewed the softmin bottleneck comparison
+                // (which assumes all 7 factors share a [0,1] scale) and inflated
+                // `compute_weighted_sum`'s numerator — measured live (probe_cl_calibration,
+                // "alarming" regime, 300 cycles): mean weighted_sum 1.1057 > 1.0,
+                // consciousness_level pinned at the Green safety tier for all 300 cycles
+                // with zero transitions. Clamp to [0,1]: values above 1.0 (elevated but
+                // not literally maximal attention) saturate to "fully attended" rather
+                // than silently inflating downstream sums.
+                attention: (ctx.peak_attention as f64).clamp(0.0, 1.0),
                 // CfC is recurrent from cycle 1 — starting at 0 is dishonest and
                 // crushes the softmin (τ=0.1). Floor at 0.3, ramp to 1.0 over 100 cycles.
                 // Science: Elman (1990) — recurrent networks have temporal integration from t=0.
                 recurrence: (0.3 + 0.7 * self.stats.total_cycles.min(100) as f64 / 100.0),
-                embodiment: late.body_psi_modulation, // virtual body provides embodiment
+                // Unit fix (2026-07-18, probe_cl_calibration finding): body_psi_modulation
+                // is a MULTIPLICATIVE scale factor in [0.5, 1.5] (virtual_body.rs:200,
+                // "scales consciousness Phi"), not a normalized [0,1] score like the other
+                // six MCE inputs. Feeding it raw inflated compute_weighted_sum's numerator
+                // (measured mean weighted_sum 1.1567 > 1.0 in the "alarming" regime — the
+                // equation's weights sum to 1.0 assuming every Ci ∈ [0,1]), which pushed
+                // consciousness_level toward its clamp ceiling faster than the equation's
+                // softmin/sigmoid bottleneck design intends. Remap linearly: 0.5→0.0 (no
+                // embodied coherence), 1.0→0.5 (neutral), 1.5→1.0 (full embodied coherence).
+                embodiment: ((late.body_psi_modulation - 0.5) / 1.0).clamp(0.0, 1.0),
                 // Knowledge: prediction confidence + meta-cognitive accuracy + prediction
                 // coherence. Floor at 0.2: even with no predictions, the system has
                 // SOME knowledge. Multiple sources prevent softmin death spiral.

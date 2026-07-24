@@ -3,8 +3,8 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Encrypted Binding Benchmark
 //!
-//! Tests that the homomorphic XOR bind operation preserves role-filler structure
-//! under encryption — decrypted homomorphic bind equals plaintext bind exactly.
+//! Tests that XOR-mask cancellation preserves role-filler structure. The fact
+//! that the plaintext relation emerges directly is leakage, not FHE security.
 //!
 //! ## Protocol
 //!
@@ -51,12 +51,12 @@ pub struct EncryptedBindingBenchmark;
 
 impl PsychBenchmark for EncryptedBindingBenchmark {
     fn name(&self) -> &str {
-        "Security::EncryptedBinding"
+        "InsecureAlgebraDemo::EncryptedBinding"
     }
 
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
-            paradigm: "Homomorphic Binding Preservation",
+            paradigm: "XOR Mask-Cancellation Leakage",
             citation: "Plate, T. A. (2003). Holographic Reduced Representations. CSLI Publications.",
             year: 2003,
             doi: None,

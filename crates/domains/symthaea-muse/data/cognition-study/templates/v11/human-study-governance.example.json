@@ -1,0 +1,16 @@
+{
+  "consent_document_sha256": "REPLACE_WITH_64_HEX",
+  "participant_instructions_sha256": "REPLACE_WITH_64_HEX",
+  "privacy_notice_sha256": "REPLACE_WITH_64_HEX",
+  "retention_policy_sha256": "REPLACE_WITH_64_HEX",
+  "recruitment_plan_sha256": "REPLACE_WITH_64_HEX",
+  "compensation_plan_sha256": "REPLACE_WITH_64_HEX",
+  "ethics_determination": "REPLACE_WITH_REVIEWED_DETERMINATION",
+  "ethics_reviewer_id": "REPLACE_WITH_REVIEWER_ID",
+  "ethics_receipt_uri": "REPLACE_WITH_EXTERNAL_URI",
+  "ethics_receipt_sha256": "REPLACE_WITH_64_HEX",
+  "raw_contact_data_excluded_from_study_evidence": true,
+  "participant_withdrawal_tested": true,
+  "deletion_workflow_tested": true,
+  "governance_sha256": ""
+}

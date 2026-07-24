@@ -1,0 +1,58 @@
+{
+  "source_revision": "REPLACE_WITH_GIT_SHA",
+  "source_tree_sha256": "REPLACE_WITH_64_HEX",
+  "flake_lock_sha256": "REPLACE_WITH_64_HEX",
+  "rustc_version": "rustc VERSION VERBOSE OUTPUT",
+  "cargo_version": "cargo VERSION",
+  "nix_version": "nix VERSION",
+  "target_triple": "x86_64-unknown-linux-gnu",
+  "targets": [
+    {
+      "target": "symthaea-music-theory",
+      "command_sha256": "REPLACE_WITH_64_HEX",
+      "log_sha256": "REPLACE_WITH_64_HEX",
+      "tests_passed": 373,
+      "tests_ignored": 0,
+      "succeeded": true
+    },
+    {
+      "target": "symthaea-fep",
+      "command_sha256": "REPLACE_WITH_64_HEX",
+      "log_sha256": "REPLACE_WITH_64_HEX",
+      "tests_passed": 168,
+      "tests_ignored": 0,
+      "succeeded": true
+    },
+    {
+      "target": "symthaea-muse-lib",
+      "command_sha256": "REPLACE_WITH_64_HEX",
+      "log_sha256": "REPLACE_WITH_64_HEX",
+      "tests_passed": 626,
+      "tests_ignored": 3,
+      "succeeded": true
+    },
+    {
+      "target": "cognitive-study-bin",
+      "command_sha256": "REPLACE_WITH_64_HEX",
+      "log_sha256": "REPLACE_WITH_64_HEX",
+      "tests_passed": 0,
+      "tests_ignored": 0,
+      "succeeded": true
+    },
+    {
+      "target": "muse-studio-bin",
+      "command_sha256": "REPLACE_WITH_64_HEX",
+      "log_sha256": "REPLACE_WITH_64_HEX",
+      "tests_passed": 2,
+      "tests_ignored": 0,
+      "succeeded": true
+    }
+  ],
+  "ignored_tests": [],
+  "cargo_fmt_passed": true,
+  "cargo_clippy_all_targets_all_features_passed": true,
+  "release_build_passed": true,
+  "workspace_tree_clean": true,
+  "evidence_uri": "REPLACE_WITH_EXTERNAL_URI",
+  "evidence_sha256": ""
+}

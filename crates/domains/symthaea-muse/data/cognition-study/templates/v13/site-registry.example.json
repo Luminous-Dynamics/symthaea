@@ -1,0 +1,26 @@
+{
+  "registry_version": "symthaea-muse-replication-site-registry-v1",
+  "replication_id": "REPLACE_REPLICATION_ID",
+  "protocol_sha256": "REPLACE_64_HEX",
+  "sites": [
+    {
+      "site_id": "site-a",
+      "organization_id": "organization-a",
+      "country_code": "ZA",
+      "site_status": "Registered",
+      "principal_investigator_id": "site-a-pi",
+      "data_custodian_id": "site-a-custodian",
+      "analyst_id": "site-a-analyst",
+      "contact_commitment_sha256": "REPLACE_64_HEX",
+      "conflict_of_interest_declaration": "REPLACE_DECLARATION",
+      "independent_of_source_authors": true,
+      "governance_approval_uri": "https://replace.invalid/approval",
+      "governance_approval_sha256": "REPLACE_64_HEX",
+      "environment_capability_sha256": "REPLACE_64_HEX",
+      "local_protocol_sha256": "REPLACE_64_HEX",
+      "registration_receipt_sha256": "REPLACE_64_HEX"
+    }
+  ],
+  "frozen_at_utc": "REPLACE_RFC3339",
+  "registry_sha256": ""
+}

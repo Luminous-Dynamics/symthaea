@@ -4,93 +4,337 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Muse Studio</title>
-<style>
-  :root {
-    --bg: #16130f; --panel: #201b15; --ink: #e8dfd2; --dim: #a3968a;
-    --amber: #d9a05b; --amber-soft: #8a6a44; --green: #7ba05b;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: radial-gradient(ellipse at 20% -10%, #241e16, var(--bg) 60%);
-    color: var(--ink); font: 15px/1.55 Georgia, 'Times New Roman', serif;
-    min-height: 100vh; padding: 2.5rem 1.5rem;
-  }
-  main { max-width: 60rem; margin: 0 auto; }
-  h1 { font-weight: normal; font-size: 1.7rem; letter-spacing: 0.06em; margin: 0 0 0.2rem; }
-  h1 em { color: var(--amber); font-style: normal; }
-  .sub { color: var(--dim); margin: 0 0 2rem; font-size: 0.95rem; }
-  form {
-    background: var(--panel); border: 1px solid #322a1f;
-    border-radius: 14px; padding: 1.4rem 1.6rem; display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1rem 1.6rem;
-  }
-  label { display: block; font-size: 0.85rem; color: var(--dim); margin-bottom: 0.25rem; }
-  input[type=range] { width: 100%; accent-color: var(--amber); }
-  select, input[type=number], input[type=text] {
-    width: 100%; background: #17130e; color: var(--ink); border: 1px solid #3a3226;
-    border-radius: 8px; padding: 0.45rem 0.6rem; font: inherit;
-  }
-  .prompt-row { grid-column: 1 / -1; }
-  .actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 1rem; }
-  button {
-    background: var(--amber); color: #221a10; border: none; border-radius: 999px;
-    padding: 0.6rem 1.6rem; font: inherit; font-size: 1rem; cursor: pointer;
-  }
-  button:disabled { background: var(--amber-soft); cursor: wait; }
-  #note { color: var(--dim); font-size: 0.85rem; }
-  #candidates { margin-top: 2rem; display: grid; gap: 1rem; }
-  .card {
-    background: var(--panel); border: 1px solid #322a1f; border-radius: 14px;
-    padding: 1rem 1.3rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.9rem;
-  }
-  .card .who { min-width: 9rem; }
-  .card .seed { font-size: 1.05rem; }
-  .card .sim { color: var(--green); font-size: 0.85rem; }
-  .card audio { flex: 1 1 16rem; height: 2.2rem; }
-  .card a {
-    color: var(--amber); text-decoration: none; border: 1px solid var(--amber-soft);
-    border-radius: 999px; padding: 0.3rem 0.9rem; font-size: 0.85rem; white-space: nowrap;
-  }
-  .badge { font-size: 0.78rem; color: var(--dim); }
-  .roll {
-    flex: 1 1 100%; height: 130px; width: 100%; display: block;
-    background: #14100c; border: 1px solid #2b241a; border-radius: 10px;
-    cursor: pointer;
-  }
-  .legend { flex: 1 1 100%; font-size: 0.72rem; color: var(--dim); margin-top: -0.4rem; }
-  .legend b { font-weight: normal; }
-  footer { margin-top: 3rem; color: var(--dim); font-size: 0.8rem; }
-</style>
+<link rel="stylesheet" href="/assets/muse-studio.css">
+
 </head>
 <body>
-<main>
-  <h1><em>Muse</em> Studio</h1>
-  <p class="sub">Describe a feeling; take away a score you own. Every candidate is a genuinely
-  different composition — the MIDI is yours to edit in any DAW, with no scraped-data strings attached.</p>
+<header class="app-header">
+  <div class="brand-lockup" aria-label="Muse by Symthaea">
+    <span class="brand-mark" aria-hidden="true">Φ</span>
+    <span><strong>Muse</strong><small>by Symthaea</small></span>
+  </div>
+  <nav class="mode-nav" aria-label="Muse modes">
+    <button type="button" id="tabListen"><strong>Listen</strong><small>Immerse</small></button>
+    <button type="button" id="tabStudio" class="active"><strong>Create</strong><small>Compose</small></button>
+    <button type="button" id="tabResearch"><strong>Research</strong><small>Understand</small></button>
+  </nav>
+  <div class="header-now-playing" aria-live="polite">
+    <span class="header-now-icon" aria-hidden="true">◉</span>
+    <span class="header-now-copy"><small>Now playing</small><strong id="headerNowTitle">Nothing yet</strong><span id="headerNowMeta">Compose or begin a journey</span></span>
+  </div>
+  <div class="header-actions">
+    <button type="button" id="globalPlay" class="icon-button" title="Play or pause" aria-label="Play or pause">▶</button>
+    <button type="button" id="tabLiked" class="icon-button" title="Library" aria-label="Open library">♡</button>
+  </div>
+</header>
+<main class="app-main">
 
-  <form id="form">
+  <section id="listenView" class="mode-page" aria-labelledby="listenPageTitle">
+    <div class="mode-heading">
+      <div><span class="eyebrow">Listen mode</span><h1 id="listenPageTitle">Hear the piece as a living journey.</h1></div>
+      <div class="journey-controls">
+        <label for="journeyKind">Journey</label>
+        <select id="journeyKind">
+          <option value="resonance">Resonance</option>
+          <option value="discovery">Discovery</option>
+          <option value="contrast">Contrast</option>
+        </select>
+      </div>
+    </div>
+    <div class="listen-layout">
+      <aside class="listen-piece-rail" aria-label="Current piece">
+        <span class="panel-kicker">Current piece</span>
+        <div class="piece-sigil" aria-hidden="true"><span></span></div>
+        <h2 id="listenTitle">—</h2>
+        <p id="listenTraits" class="muted"></p>
+        <p id="listenWhy" class="piece-premise"></p>
+        <div class="piece-actions">
+          <button type="button" id="listenLove" class="primary-action">Add to Library</button>
+          <button type="button" id="openInCreate" class="secondary-action">Open in Create</button>
+        </div>
+        <div class="rail-divider"></div>
+        <span class="panel-kicker">Next in journey</span>
+        <div class="next-piece-card">
+          <div class="next-piece-art" aria-hidden="true"></div>
+          <div><strong id="nextJourneyTitle">Composing…</strong><span id="nextJourneyRelation">A related piece will appear here</span></div>
+        </div>
+      </aside>
+
+      <section class="listen-hero" aria-label="Journey visualizer">
+        <div class="visualizer-toolbar">
+          <div class="segmented-control" id="vizModes" aria-label="Visualization mode">
+            <button type="button" class="chip sel" data-mode="hybrid">Hybrid</button>
+            <button type="button" class="chip" data-mode="form">Form</button>
+            <button type="button" class="chip" data-mode="score">Score</button>
+            <button type="button" class="chip" data-mode="compare">Compare</button>
+            <button type="button" class="chip" data-mode="resonance">Resonance</button>
+            <button type="button" class="chip" data-mode="motifs">Motifs</button>
+            <button type="button" class="chip" data-mode="harmony">Harmony</button>
+            <button type="button" class="chip" data-mode="orchestration">Orchestration</button>
+          </div>
+          <button type="button" id="whyThisPiece" class="text-action">Why this piece?</button>
+        </div>
+        <div id="vizWrap">
+          <canvas id="viz" tabindex="0" aria-label="Interactive musical journey. Click the center to play or pause; click the outer ring to seek."></canvas>
+          <div class="viz-center-label" aria-hidden="true"><span id="vizSectionLabel">Ready</span><small id="vizTimeLabel">0:00</small></div>
+          <div id="listenState" role="status"></div>
+        </div>
+        <div id="sectionLegend" class="section-legend" aria-label="Composition sections"></div>
+        <div class="style-journey">
+          <span>Style palette</span>
+          <div class="chips" id="styleChips"></div>
+        </div>
+        <div class="listen-transport">
+          <button type="button" id="listenShuffle" class="icon-button" aria-label="Shuffle style palette">↝</button>
+          <button type="button" id="listenPrevious" class="icon-button" aria-label="Previous piece" disabled>◀</button>
+          <button type="button" id="listenPlay" class="transport-play" aria-label="Play or pause">▶</button>
+          <button type="button" id="listenNext" class="icon-button" aria-label="Next piece">▶</button>
+          <span id="listenProgress">0:00 / 0:00</span>
+          <span class="transport-spacer"></span>
+          <a id="listenDownloadWav" href="#" download class="download-link">WAV</a>
+          <a id="listenDownloadMidi" href="#" download class="download-link">MIDI</a>
+        </div>
+      </section>
+
+      <aside class="listen-context-rail" aria-label="Piece context">
+        <article class="context-card">
+          <span class="panel-kicker">Structural activity</span>
+          <canvas id="emotionArc" aria-label="Derived structural energy over time"></canvas>
+          <p class="data-note">Uses the score-derived resonance proxy when available, otherwise performed density. It is not an objective emotional reading.</p>
+        </article>
+        <article class="context-card current-moment-card" aria-live="polite">
+          <span class="panel-kicker">Current moment</span>
+          <dl class="moment-grid">
+            <div><dt>Motif</dt><dd id="momentMotif">Not emitted</dd></div>
+            <div><dt>Sonority</dt><dd id="momentHarmony">Not emitted</dd></div>
+            <div><dt>Cadence</dt><dd id="momentCadence">—</dd></div>
+            <div><dt>Voices</dt><dd id="momentVoices">Not emitted</dd></div>
+          </dl>
+          <p id="momentEvidence" class="data-note">Select or play a piece to inspect evidence at this moment.</p>
+        </article>
+        <article class="context-card">
+          <span class="panel-kicker">Identity snapshot</span>
+          <dl class="identity-grid">
+            <div><dt>Style</dt><dd id="identityStyle">—</dd></div>
+            <div><dt>Form</dt><dd id="identityForm">—</dd></div>
+            <div><dt>Section</dt><dd id="identitySection">—</dd></div>
+            <div><dt>Grammar</dt><dd id="identityGrammar">—</dd></div>
+            <div><dt>Meter</dt><dd id="identityMeter">—</dd></div>
+            <div><dt>Renderer</dt><dd id="identityRenderer">—</dd></div>
+          </dl>
+        </article>
+        <article class="context-card">
+          <span class="panel-kicker">Voice blend</span>
+          <div id="voiceBlend" class="voice-blend"><p class="muted">Available after the performed score loads.</p></div>
+        </article>
+        <details class="context-card why-card" id="whyPanel">
+          <summary>Grounded explanation</summary>
+          <div id="whyEvidence" class="why-evidence"></div>
+        </details>
+      </aside>
+    </div>
+    <audio id="listenAudio" preload="metadata"></audio>
+  </section>
+
+  <section id="likedView" class="mode-page">
+    <div style="display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
+      <h2 style="margin:0;font-weight:normal;font-size:1.3rem;color:var(--amber);letter-spacing:0.04em">Liked Songs</h2>
+      <span class="badge">every ♥ keeper, with the actual audio you heard — not a recomposed guess</span>
+    </div>
+    <div id="likedEmpty" style="display:none">Nothing kept yet — ♥ a piece from Discover or Listen and it shows up here.</div>
+    <div id="likedGrid"></div>
+  </section>
+
+  <section id="researchView" class="mode-page" aria-labelledby="researchPageTitle">
+    <div class="mode-heading research-heading">
+      <div><span class="eyebrow">Research mode</span><h1 id="researchPageTitle">Inspect evidence without interrupting playback.</h1></div>
+      <div class="research-actions">
+        <label for="analysisProfile">Analysis profile</label>
+        <select id="analysisProfile"><option>Guided</option><option>Composer</option><option>Deep Dive</option></select>
+        <button type="button" id="researchOpenListen" class="secondary-action compact">Open in Listen</button>
+        <button type="button" id="researchOpenCreate" class="secondary-action compact">Open in Create</button>
+      </div>
+    </div>
+    <div id="researchEmpty" class="empty-state">
+      <strong>Select a current piece in Listen or Create.</strong>
+      <span>Research only displays evidence emitted by the composition and performance pipeline; unavailable analysis stays visibly unavailable.</span>
+    </div>
+    <div id="researchWorkspace" class="research-workspace" hidden>
+      <header class="research-piece-bar">
+        <div class="research-sigil" aria-hidden="true"></div>
+        <div class="research-piece-title"><span class="panel-kicker">Current piece</span><strong id="researchTitle">—</strong><span id="researchMeta">—</span></div>
+        <nav class="research-tabs" aria-label="Research views">
+          <button type="button" class="active" data-research-view="overview">Overview</button>
+          <button type="button" data-research-view="performance">Performance</button>
+          <button type="button" data-research-view="motifs">Motifs</button>
+          <button type="button" data-research-view="harmony">Harmony</button>
+          <button type="button" data-research-view="orchestration">Orchestration</button>
+          <button type="button" data-research-view="identity">Identity</button>
+          <button type="button" data-research-view="provenance">Provenance</button>
+        </nav>
+      </header>
+
+      <div class="research-body" data-active-view="overview">
+        <aside class="research-structure">
+          <article class="research-card" data-research-panel="overview performance motifs harmony orchestration identity provenance">
+            <span class="panel-kicker">Observed structure</span>
+            <dl class="research-facts">
+              <div><dt>Style</dt><dd id="researchStyle">—</dd></div>
+              <div><dt>Identity grammar</dt><dd id="researchGrammar">—</dd></div>
+              <div><dt>Form</dt><dd id="researchForm">—</dd></div>
+              <div><dt>Meter</dt><dd id="researchMeter">—</dd></div>
+              <div><dt>Duration</dt><dd id="researchDuration">—</dd></div>
+              <div><dt>Sections</dt><dd id="researchSectionCount">—</dd></div>
+              <div><dt>Phrases</dt><dd id="researchPhraseCount">—</dd></div>
+              <div><dt>Symbolic notes</dt><dd id="researchSymbolicCount">—</dd></div>
+            </dl>
+            <p class="research-disclosure">Form, sections, phrases, and notes are observed from the score bundle. Motif matches and structural activity are bounded inferences; sonorities, cadence markers, and assigned voices remain score-side observations with explicit limitations.</p>
+          </article>
+          <article class="research-card" data-research-panel="overview identity">
+            <span class="panel-kicker">Identity evidence</span>
+            <div id="researchIdentity" class="research-identity"></div>
+          </article>
+          <article class="research-card" data-research-panel="provenance">
+            <span class="panel-kicker">Artifact lineage</span>
+            <div class="artifact-chain" aria-label="Recipe to exported artifacts">
+              <span>Recipe</span><i>→</i><span>Score</span><i>→</i><span>Performance</span><i>→</i><span>Audio</span>
+            </div>
+            <p class="research-disclosure">Exact reproducibility depends on the renderer and recorded environment hashes.</p>
+          </article>
+        </aside>
+
+        <section class="research-canvas-column">
+          <article class="research-card research-timeline-card" data-research-panel="overview performance motifs harmony orchestration">
+            <div class="card-heading"><div><span class="panel-kicker">Composition and performance</span><h2>Grounded musical timeline</h2></div><span class="evidence-badge">Symbolic score + rendered performance</span></div>
+            <canvas id="researchTimeline" tabindex="0" aria-label="Score sections, symbolic notes, and performed notes over time. Click to seek."></canvas>
+            <div id="researchTimelineLegend" class="timeline-legend"></div>
+          </article>
+          <article class="research-card evidence-workspace" data-research-panel="motifs">
+            <div class="card-heading"><div><span class="panel-kicker">Motif evidence</span><h2>Occurrences and transformations</h2></div><span id="motifEvidenceBadge" class="evidence-badge">Not emitted</span></div>
+            <canvas id="researchMotifMap" class="evidence-canvas" tabindex="0" aria-label="Motif occurrences across the composition. Click to seek."></canvas>
+            <div id="researchMotifSummary" class="evidence-summary"></div>
+          </article>
+          <article class="research-card evidence-workspace" data-research-panel="harmony">
+            <div class="card-heading"><div><span class="panel-kicker">Harmony evidence</span><h2>Pitch-class sonorities and marked arrivals</h2></div><span id="harmonyEvidenceBadge" class="evidence-badge">Not emitted</span></div>
+            <canvas id="researchHarmonyPath" class="evidence-canvas" tabindex="0" aria-label="Score-side pitch-class regions and cadence markers. Click to seek."></canvas>
+            <div id="researchHarmonySummary" class="evidence-summary"></div>
+          </article>
+          <article class="research-card evidence-workspace" data-research-panel="orchestration">
+            <div class="card-heading"><div><span class="panel-kicker">Orchestration evidence</span><h2>Assigned symbolic voices by section</h2></div><span id="orchestrationEvidenceBadge" class="evidence-badge">Not emitted</span></div>
+            <canvas id="researchOrchestrationMap" class="evidence-canvas" tabindex="0" aria-label="Composition-side voice activity by section. Click to seek."></canvas>
+            <div id="researchOrchestrationSummary" class="evidence-summary"></div>
+          </article>
+          <div class="research-card-grid">
+            <article class="research-card" data-research-panel="overview performance">
+              <span class="panel-kicker">Derived measurements</span>
+              <div id="researchMetrics" class="metric-stack"></div>
+              <p class="research-disclosure">Musical integration is score analysis, not a consciousness claim. Values are descriptive and version-dependent.</p>
+            </article>
+            <article class="research-card" data-research-panel="overview identity">
+              <span class="panel-kicker">Interpretation</span>
+              <div id="researchInsights" class="research-insights"></div>
+            </article>
+            <article class="research-card" data-research-panel="provenance">
+              <span class="panel-kicker">Reproducibility record</span>
+              <dl id="researchProvenance" class="provenance-grid"></dl>
+              <div class="research-downloads">
+                <a id="researchMidi" href="#" download>MIDI</a>
+                <a id="researchWav" href="#" download>WAV</a>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <aside class="research-inspector">
+          <article class="research-card inspector-card" data-research-panel="overview performance motifs harmony orchestration identity provenance">
+            <span class="panel-kicker">Explanation inspector</span>
+            <h2 id="inspectorMoment">No moment selected</h2>
+            <div class="inspector-section"><strong>Observation</strong><p id="inspectorObservation">Click the timeline or start playback to inspect the current performed moment.</p></div>
+            <div class="inspector-section"><strong>Interpretation</strong><p id="inspectorInterpretation">Interpretive claims remain separate from measured events.</p></div>
+            <div class="inspector-section"><strong>Evidence</strong><p id="inspectorEvidence">No event selected.</p></div>
+          </article>
+          <article class="research-card availability-card" data-research-panel="overview performance motifs harmony orchestration identity provenance">
+            <span class="panel-kicker">Analysis availability</span>
+            <ul id="analysisAvailability"></ul>
+            <div id="researchBundleWarnings" class="bundle-warning-list" hidden></div>
+          </article>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section id="studioView" class="mode-page">
+  <div class="mode-heading create-heading">
+    <div><span class="eyebrow">Create mode</span><h1>Describe the piece; choose the identity worth developing.</h1></div>
+    <p class="mode-description">Create generates candidates. Semantic Preserve / Change editing belongs in Studio once a candidate is chosen.</p>
+  </div>
+  <div class="hero-prompt-row">
+    <input type="text" id="heroPrompt" class="hero-prompt" autocomplete="off"
+      placeholder="a gentle nostalgic waltz for a rainy evening">
+    <button type="button" id="heroCompose" class="hero-compose-btn">Compose</button>
+  </div>
+  <div class="badge hero-hint">optional — ranks candidates by CLAP similarity; leave it blank
+    and Muse composes from today's discovery or whatever you've tweaked below</div>
+  <div style="display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap;margin-bottom:0.6rem">
+    <h2 id="discoveryTitle" style="margin:0;font-weight:normal;font-size:1.3rem;color:var(--amber);letter-spacing:0.04em"></h2>
+    <button type="button" id="surprise"
+      style="background:none;border:1px solid var(--amber-soft);color:var(--amber);border-radius:999px;padding:0.3rem 1rem;font-size:0.85rem;cursor:pointer">
+      Surprise me</button>
+    <span class="badge">discover first — tweak after you pick</span>
+  </div>
+
+  <details id="tweakDrawer" open style="margin-bottom:1rem">
+    <summary style="cursor:pointer;color:var(--dim);font-size:0.95rem;padding:0.3rem 0">
+      Compose <span class="badge">— click to collapse once you like what you hear</span></summary>
+    <div style="display:flex;align-items:baseline;gap:0.8rem;flex-wrap:wrap;margin:0.6rem 0 1rem">
+      <span class="chips" id="composeMode" style="margin-top:0">
+        <button type="button" class="chip sel" data-mode="artist">Guided</button>
+        <button type="button" class="chip" data-mode="studio">Composer</button>
+        <button type="button" class="chip" data-mode="research">Advanced</button>
+      </span>
+      <span class="badge" id="modeHint"></span>
+    </div>
+  <form id="form" data-mode="artist">
     <div>
       <label>Style</label>
       <select name="style">
         <option>Classical</option><option>Waltz</option><option>Folk</option>
         <option>Cinematic</option><option>Playful</option><option>Nocturne</option>
         <option>March</option><option>Lullaby</option><option>ModalFolk</option>
-        <option>Fugue</option>
+        <option>Fugue</option><option>Passacaglia</option><option>Tango</option>
+        <option>Celtic</option><option>Blues</option><option>Impressionism</option>
+        <option>SacredChoral</option><option>Minimalism</option>
+        <option>JazzBallad</option><option>BaroqueSuite</option>
+        <option>ProgFolk</option><option>Ambient</option>
+        <option>Sonata</option><option>RenaissancePolyphony</option>
+        <option>AfroCuban</option><option>Flamenco</option>
+        <option>BossaNova</option><option>Opera</option>
+        <option>IrishTraditional</option><option>HindustaniInspired</option>
+      </select>
+    </div>
+    <div data-tier="studio">
+      <label>Identity grammar <span class="badge">how the ideas live over time</span></label>
+      <select name="grammar">
+        <option>Auto</option>
+        <option>Memory</option>
+        <option>Persistence</option>
+        <option>Lineage</option>
+        <option>Erosion</option>
       </select>
     </div>
     <div>
-      <label>Mood <span class="badge">dark ↔ bright</span></label>
+      <label>Mood <span class="dial-word" id="moodWord">—</span></label>
       <input type="range" name="valence" min="-1" max="1" step="0.05" value="0.3">
     </div>
-    <div>
-      <label>Arousal <span class="badge">calm ↔ excited</span></label>
+    <div data-tier="studio">
+      <label>Arousal <span class="dial-word" id="arousalWord">—</span></label>
       <input type="range" name="arousal" min="0" max="1" step="0.05" value="0.5">
     </div>
     <div>
-      <label>Energy <span class="badge">soft ↔ full</span></label>
+      <label>Energy <span class="dial-word" id="energyWord">—</span></label>
       <input type="range" name="energy" min="0" max="1" step="0.05" value="0.6">
     </div>
-    <div>
+    <div data-tier="studio">
       <label>Key</label>
       <select name="tonic">
         <option value="0">C</option><option value="1">C♯/D♭</option>
@@ -105,36 +349,74 @@
       <label>Bars per phrase</label>
       <input type="number" name="bars" min="2" max="16" value="4">
     </div>
-    <div>
+    <div data-tier="studio">
       <label>Candidates</label>
       <input type="number" name="n_candidates" min="1" max="12" value="4">
     </div>
-    <div>
+    <div data-tier="studio">
       <label>Base seed</label>
       <input type="number" name="base_seed" min="0" value="0">
     </div>
-    <div class="prompt-row">
-      <label>Describe it in words <span class="badge">(optional — ranks candidates by CLAP similarity)</span></label>
-      <input type="text" name="prompt" placeholder="a gentle nostalgic waltz for a rainy evening">
-    </div>
-    <div class="prompt-row">
+    <div class="prompt-row" data-tier="research">
       <details>
         <summary style="cursor:pointer;color:var(--dim);font-size:0.85rem">
-          Consciousness state (drives the RENDERING: timbre, filter movement, reverb, precision)
+          Creative state (drives the RENDERING: timbre, filter movement, reverb, precision)
         </summary>
+        <div style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-wrap:wrap">
+          <button type="button" class="preset-btn" data-preset="dreaming">Dreaming</button>
+          <button type="button" class="preset-btn" data-preset="storytelling">Storytelling</button>
+          <button type="button" class="preset-btn" data-preset="flow">Flow</button>
+        </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:0.8rem;margin-top:0.6rem">
-          <div><label>Dopamine <span class="badge">brightness/shimmer</span></label>
+          <div><label>Wonder <span class="badge">shimmer/brightness</span></label>
             <input type="range" name="dopamine" min="0" max="1" step="0.05" value="0.5"></div>
-          <div><label>Serotonin <span class="badge">warmth/sub-weight</span></label>
+          <div><label>Warmth <span class="badge">sub-weight/softness</span></label>
             <input type="range" name="serotonin" min="0" max="1" step="0.05" value="0.5"></div>
-          <div><label>Noradrenaline <span class="badge">urgency/tightness</span></label>
+          <div><label>Urgency <span class="badge">tightness/drive</span></label>
             <input type="range" name="noradrenaline" min="0" max="1" step="0.05" value="0.3"></div>
-          <div><label>Consciousness <span class="badge">precision/space</span></label>
+          <div><label>Focus <span class="badge">precision/space</span></label>
             <input type="range" name="consciousness" min="0" max="1" step="0.05" value="0.5"></div>
         </div>
       </details>
     </div>
-    <div class="prompt-row">
+    <div class="prompt-row" data-tier="research">
+      <details>
+        <summary style="cursor:pointer;color:var(--dim);font-size:0.85rem">
+          Voices: pick each part's instrument (optional — leave any on Auto to let the style choose)
+        </summary>
+        <div style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-wrap:wrap">
+          <button type="button" id="randomizeEnsemble" class="preset-btn">Randomize Ensemble</button>
+          <button type="button" id="keepMelodyChangeInstruments" class="preset-btn">Keep Melody, Change Instruments</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:0.8rem;margin-top:0.6rem">
+          <div><label>Melody</label>
+            <div style="display:flex;gap:0.4rem">
+              <select id="voiceMelody" style="flex:1"></select>
+              <button type="button" class="preview-btn" data-voice="melody" title="preview this instrument">▶</button>
+            </div>
+          </div>
+          <div><label>Harmony</label>
+            <div style="display:flex;gap:0.4rem">
+              <select id="voiceHarmony" style="flex:1"></select>
+              <button type="button" class="preview-btn" data-voice="harmony" title="preview this instrument">▶</button>
+            </div>
+          </div>
+          <div><label>Bass</label>
+            <div style="display:flex;gap:0.4rem">
+              <select id="voiceBass" style="flex:1"></select>
+              <button type="button" class="preview-btn" data-voice="bass" title="preview this instrument">▶</button>
+            </div>
+          </div>
+          <div><label>Counter-melody <span class="badge">defaults to a contrasting timbre</span></label>
+            <div style="display:flex;gap:0.4rem">
+              <select id="voiceCounter" style="flex:1"></select>
+              <button type="button" class="preview-btn" data-voice="counter" title="preview this instrument">▶</button>
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+    <div class="prompt-row" data-tier="research">
       <details>
         <summary style="cursor:pointer;color:var(--dim);font-size:0.85rem">
           Advanced: edit the style spec (motifs, progression, forms, textures, ensembles — complete control)
@@ -161,193 +443,16 @@
       <span id="note"></span>
     </div>
   </form>
+  </details>
 
+  <div id="loading"><div class="orb"></div><div id="loadingPhrase"></div></div>
   <div id="candidates"></div>
+  </section><!-- /studioView -->
 
   <footer>Symbolic composition · CC0 instrument samples · MAESTRO-fitted expression ·
   everything rendered locally on this machine.</footer>
 </main>
-<script>
-const form = document.getElementById('form');
-const specBox = document.getElementById('spec');
-let seedStride = 1;
-document.getElementById('loadSpec').addEventListener('click', async () => {
-  const style = new FormData(form).get('style');
-  const res = await fetch('/api/spec/' + style);
-  specBox.value = await res.text();
-});
-const savedSel = document.getElementById('savedSpecs');
-async function refreshSaved() {
-  const names = await (await fetch('/api/specs')).json();
-  savedSel.innerHTML = '<option value="">saved specs…</option>' +
-    names.map(n => `<option>${n}</option>`).join('');
-}
-refreshSaved();
-savedSel.addEventListener('change', async () => {
-  if (!savedSel.value) return;
-  const res = await fetch('/api/specs/' + savedSel.value);
-  specBox.value = await res.text();
-  document.getElementById('specName').value = savedSel.value;
-});
-document.getElementById('saveSpec').addEventListener('click', async () => {
-  const name = document.getElementById('specName').value.trim();
-  if (!name || !specBox.value.trim()) { note.textContent = 'name + spec JSON required to save'; return; }
-  let spec;
-  try { spec = JSON.parse(specBox.value); }
-  catch (e) { note.textContent = 'spec is not valid JSON: ' + e.message; return; }
-  const res = await fetch('/api/specs', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({name, spec})
-  });
-  note.textContent = res.ok ? `saved “${name}”` : await res.text();
-  refreshSaved();
-});
-const go = document.getElementById('go');
-const note = document.getElementById('note');
-const list = document.getElementById('candidates');
+<script src="/assets/muse-studio.js" defer></script>
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const f = new FormData(form);
-  const body = {
-    style: f.get('style'),
-    valence: parseFloat(f.get('valence')),
-    arousal: parseFloat(f.get('arousal')),
-    energy: parseFloat(f.get('energy')),
-    tonic: parseInt(f.get('tonic')),
-    bars: parseInt(f.get('bars')),
-    n_candidates: parseInt(f.get('n_candidates')),
-    base_seed: parseInt(f.get('base_seed')),
-    seed_stride: seedStride,
-    dopamine: parseFloat(f.get('dopamine')),
-    serotonin: parseFloat(f.get('serotonin')),
-    noradrenaline: parseFloat(f.get('noradrenaline')),
-    consciousness: parseFloat(f.get('consciousness')),
-    prompt: f.get('prompt') || ''
-  };
-  seedStride = 1; // one-shot: More-like-this sets it, plain Compose resets
-  if (specBox.value.trim()) {
-    try { body.spec = JSON.parse(specBox.value); }
-    catch (e) { note.textContent = 'spec is not valid JSON: ' + e.message; return; }
-  }
-  go.disabled = true;
-  note.textContent = 'composing… (each candidate is a full piece; give it a moment)';
-  list.innerHTML = '';
-  try {
-    const res = await fetch('/api/compose', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
-    note.textContent = data.ranking_note +
-      (data.sampled_instruments ? ' · sampled instruments' : ' · synthesis (set SYMTHAEA_VCSL_DIR for samples)');
-    for (const c of data.candidates) {
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.innerHTML = `
-        <div class="who">
-          <div class="seed">seed ${c.seed}</div>
-          <div class="sim">${c.similarity != null ? 'match ' + c.similarity.toFixed(3) : ''}</div>
-          <div class="badge">${c.duration_secs.toFixed(0)}s</div>
-        </div>
-        <audio controls preload="none" src="/api/audio/${c.id}"></audio>
-        <a href="/api/midi/${c.id}" download>MIDI</a>
-        <a href="/api/audio/${c.id}" download="muse_seed${c.seed}.wav">WAV</a>
-        <a href="#" data-seed="${c.seed}" class="more">More like this</a>
-        <a href="#" data-id="${c.id}" class="keep" title="mark as a keeper — feeds Muse's taste">♡ keep</a>
-        <span class="badge">${c.renderer === 'fluidsynth' ? 'soundfont render' : 'native render'} · Φ ${c.phi.toFixed(2)}</span>
-        <canvas class="roll" title="click to seek"></canvas>
-        <div class="legend"></div>`;
-      card.querySelector('.keep').addEventListener('click', async (ev) => {
-        ev.preventDefault();
-        const el = ev.target;
-        const res = await fetch('/api/keeper/' + el.dataset.id, { method: 'POST' });
-        if (res.ok) { el.textContent = '♥ kept'; el.style.color = 'var(--green)'; }
-      });
-      card.querySelector('.more').addEventListener('click', (ev) => {
-        ev.preventDefault();
-        form.querySelector('[name=base_seed]').value = ev.target.dataset.seed;
-        seedStride = 6; // holds form/accompaniment/motif, varies the rest
-        form.requestSubmit();
-      });
-      list.appendChild(card);
-      pianoRoll(card.querySelector('.roll'), card.querySelector('.legend'),
-                card.querySelector('audio'), c.id);
-    }
-  } catch (err) {
-    note.textContent = 'error: ' + err.message;
-  } finally {
-    go.disabled = false;
-  }
-});
-
-// ── Piano-roll: the performed notes, per voice, with a playhead ─────────
-const VOICE_COLORS = {
-  Melody:   '#d9a05b',
-  Doubling: 'rgba(217,160,91,0.45)',
-  Harmony:  '#7a6d5c',
-  Bass:     '#7ba05b',
-  Counter:  '#6f9bbf',
-};
-async function pianoRoll(canvas, legend, audio, id) {
-  let voices;
-  try { voices = await (await fetch('/api/notes/' + id)).json(); }
-  catch { canvas.remove(); legend.remove(); return; }
-  const midiOf = f => 69 + 12 * Math.log2(f / 440);
-  let tMax = 0, mLo = 127, mHi = 0;
-  for (const v of voices) for (const n of v.notes) {
-    tMax = Math.max(tMax, n.start_time + n.duration);
-    const m = midiOf(n.frequency);
-    mLo = Math.min(mLo, m); mHi = Math.max(mHi, m);
-  }
-  if (!tMax) { canvas.remove(); legend.remove(); return; }
-  mLo -= 2; mHi += 2;
-  const dpr = window.devicePixelRatio || 1;
-  const W = canvas.clientWidth * dpr, H = canvas.clientHeight * dpr;
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  const x = t => t / tMax * W;
-  const y = m => H - (m - mLo) / (mHi - mLo) * H;
-  const noteH = Math.max(2 * dpr, H / (mHi - mLo) * 0.85);
-  // Draw once to an offscreen copy; the playhead redraws over it.
-  function drawNotes() {
-    ctx.clearRect(0, 0, W, H);
-    for (const v of voices) {
-      ctx.fillStyle = VOICE_COLORS[v.name] || '#999';
-      for (const n of v.notes) {
-        ctx.globalAlpha = 0.35 + 0.6 * Math.min(1, n.velocity);
-        ctx.fillRect(x(n.start_time), y(midiOf(n.frequency)) - noteH / 2,
-                     Math.max(1.5 * dpr, x(n.duration)), noteH);
-      }
-    }
-    ctx.globalAlpha = 1;
-  }
-  drawNotes();
-  const base = ctx.getImageData(0, 0, W, H);
-  legend.innerHTML = voices.map(v =>
-    `<b style="color:${VOICE_COLORS[v.name] || '#999'}">■</b> ${v.name} · ${v.instrument}`
-  ).join('  ');
-  let raf;
-  function playhead() {
-    ctx.putImageData(base, 0, 0);
-    if (audio.duration) {
-      const px = audio.currentTime / audio.duration * W;
-      ctx.fillStyle = 'rgba(232,223,210,0.85)';
-      ctx.fillRect(px, 0, 1.5 * dpr, H);
-    }
-    if (!audio.paused && !audio.ended) raf = requestAnimationFrame(playhead);
-  }
-  audio.addEventListener('play', () => { cancelAnimationFrame(raf); playhead(); });
-  audio.addEventListener('pause', () => cancelAnimationFrame(raf));
-  audio.addEventListener('seeked', playhead);
-  canvas.addEventListener('click', ev => {
-    if (!audio.duration) { audio.play(); return; }
-    const r = canvas.getBoundingClientRect();
-    audio.currentTime = (ev.clientX - r.left) / r.width * audio.duration;
-    playhead();
-  });
-}
-</script>
 </body>
 </html>

@@ -3,16 +3,17 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Collective Aggregation Benchmark
 //!
-//! Measures the fidelity of privacy-preserving collective wisdom aggregation
-//! via homomorphic bundling of encrypted hypervectors.
+//! Measures shared-mask majority-bundling fidelity. This is an insecure algebra
+//! demonstration: pairwise relationships leak and every threshold share
+//! reveals the mask.
 //!
 //! ## Protocol
 //!
 //! ```text
-//! 1. Coordinator generates session mask, splits into (k,n) threshold shares
+//! 1. Coordinator generates a session mask and broken compatibility records
 //! 2. Each of n peers encrypts their wisdom vector: enc(wisdom_i, mask)
 //! 3. CollectiveWisdomPool bundles encrypted contributions
-//! 4. k peers cooperate to recover the mask
+//! 4. one record suffices to recover the mask (the vulnerability under test)
 //! 5. Decrypt the aggregate → collective wisdom
 //! ```
 //!
@@ -33,8 +34,8 @@
 //!
 //! - `aggregation_fidelity`: Similarity between decrypted aggregate and plaintext bundle
 //! - `classification_preservation`: Accuracy of classifying with aggregate vs plaintext bundle
-//! - `threshold_recovery_exact`: Whether k-of-n shares recover the mask bit-exactly
-//! - `peer_privacy`: Similarity between individual contribution and aggregate (should be low)
+//! - `broken_share_recovery_exact`: Whether the broken share payload recovers the mask
+//! - `peer_similarity`: Similarity between individual contribution and aggregate
 //!
 //! ## References
 //!
@@ -53,7 +54,7 @@ use symthaea_core::hdc::hdc_fhe::{CollectiveWisdomPool, EncryptedHV};
 /// Number of peers contributing to the collective.
 const NUM_PEERS: usize = 7;
 
-/// Threshold for mask recovery (k-of-n). Must be odd for deterministic majority vote.
+/// Historical `k` parameter; it is not a security threshold.
 const THRESHOLD_K: usize = 3;
 
 /// Number of classes for classification test.
@@ -66,12 +67,12 @@ pub struct CollectiveAggregationBenchmark;
 
 impl PsychBenchmark for CollectiveAggregationBenchmark {
     fn name(&self) -> &str {
-        "Security::CollectiveAggregation"
+        "InsecureAlgebraDemo::CollectiveAggregation"
     }
 
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
-            paradigm: "Threshold Homomorphic Aggregation",
+            paradigm: "Insecure Shared-Mask Aggregation Algebra",
             citation: "Shamir, A. (1979). How to share a secret. Communications of the ACM, 22(11), 612-613.",
             year: 1979,
             doi: Some("10.1145/359168.359176"),
@@ -92,7 +93,7 @@ impl PsychBenchmark for CollectiveAggregationBenchmark {
         for trial in 0..trials {
             let trial_seed = seed.wrapping_add(trial as u64 * 6271);
 
-            // Generate collective mask and threshold shares
+            // Generate a collective mask and broken compatibility records.
             let mask = BinaryHV::random(trial_seed.wrapping_add(10_000));
             let shares = HdcThresholdSharing::split(
                 &mask,
@@ -218,8 +219,7 @@ impl PsychBenchmark for CollectiveAggregationBenchmark {
             let classification_pres = agg_correct as f64 / (pt_correct.max(1)) as f64;
             classification_samples.push(classification_pres.min(1.0));
 
-            // --- Metric 4: Peer privacy ---
-            // Individual encrypted contributions should not be recoverable from aggregate
+            // --- Metric 4: individual-to-aggregate similarity (not privacy) ---
             let mut privacy_sum = 0.0f64;
             for wisdom in &peer_wisdoms {
                 // Similarity between individual wisdom and decrypted aggregate
@@ -228,8 +228,6 @@ impl PsychBenchmark for CollectiveAggregationBenchmark {
                 privacy_sum += sim;
             }
             let avg_individual_sim = privacy_sum / NUM_PEERS as f64;
-            // Privacy metric: 1.0 - normalized similarity (higher = more private)
-            // With n peers, expected similarity to any one ≈ 1/n contribution
             privacy_samples.push(avg_individual_sim);
 
             aggregate_time_ns.push(agg_elapsed.as_nanos() as f64);
@@ -245,11 +243,11 @@ impl PsychBenchmark for CollectiveAggregationBenchmark {
             MetricValue::from_samples(&classification_samples),
         );
         metrics.insert(
-            "threshold_recovery_exact".to_string(),
+            "broken_share_recovery_exact".to_string(),
             MetricValue::from_samples(&threshold_exact_samples),
         );
         metrics.insert(
-            "peer_privacy".to_string(),
+            "peer_similarity".to_string(),
             MetricValue::from_samples(&privacy_samples),
         );
         metrics.insert(
@@ -300,7 +298,7 @@ mod tests {
         };
         let result = CollectiveAggregationBenchmark.run(&config);
 
-        let exact = result.metrics.get("threshold_recovery_exact").unwrap();
+        let exact = result.metrics.get("broken_share_recovery_exact").unwrap();
         assert_eq!(
             exact.mean, 1.0,
             "Threshold recovery must be bit-exact (XOR secret sharing)"

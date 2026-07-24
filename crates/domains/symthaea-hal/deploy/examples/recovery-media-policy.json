@@ -1,0 +1,13 @@
+{
+  "minimum_authority_epoch": 1,
+  "maximum_manifest_lifetime_ms": 31536000000,
+  "require_physical_write_protection": true,
+  "required_paths": [
+    "boot/bootloader.bin",
+    "images/rootfs.img",
+    "manifests/source-release.json",
+    "tools/hal-recovery"
+  ],
+  "maximum_file_count": 4096,
+  "maximum_total_bytes": 34359738368
+}

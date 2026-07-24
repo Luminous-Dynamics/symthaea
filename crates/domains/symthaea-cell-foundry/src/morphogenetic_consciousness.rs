@@ -165,6 +165,9 @@ impl OrganoidCell {
 pub struct MorphogeneticField {
     /// Cell population.
     pub cells: Vec<OrganoidCell>,
+    /// Maximum population allowed during proliferation.
+    #[serde(default = "default_max_cells")]
+    pub max_cells: usize,
     /// Per-cell activator concentration.
     pub activator: Vec<f32>,
     /// Per-cell inhibitor concentration.
@@ -215,10 +218,20 @@ fn default_rng() -> StdRng {
     StdRng::seed_from_u64(0)
 }
 
+fn default_max_cells() -> usize {
+    MAX_CELLS
+}
+
 impl MorphogeneticField {
     /// Create a new field with `num_cells` progenitor cells placed randomly
     /// inside a unit sphere.
     pub fn new(num_cells: usize, seed: u64) -> Self {
+        Self::with_max_cells(num_cells, MAX_CELLS, seed)
+    }
+
+    /// Create a field with an explicit proliferation cap.
+    pub fn with_max_cells(num_cells: usize, max_cells: usize, seed: u64) -> Self {
+        let max_cells = max_cells.max(num_cells);
         let mut rng = StdRng::seed_from_u64(seed);
         let cells: Vec<OrganoidCell> = (0..num_cells)
             .map(|_| OrganoidCell::new_random(&mut rng))
@@ -238,6 +251,7 @@ impl MorphogeneticField {
         let bioelectric = BioelectricState::new(n, seed);
         Self {
             cells,
+            max_cells,
             activator,
             inhibitor,
             consciousness_potential,
@@ -464,11 +478,11 @@ impl MorphogeneticField {
         }
     }
 
-    /// Proliferate: progenitors divide, producing new cells (capped at
-    /// `MAX_CELLS`).
+    /// Proliferate: progenitors divide, producing new cells up to the
+    /// configured population cap.
     pub fn proliferate(&mut self) {
         let n = self.cells.len();
-        if n >= MAX_CELLS {
+        if n >= self.max_cells {
             return;
         }
         let mut new_cells: Vec<OrganoidCell> = Vec::new();
@@ -491,7 +505,7 @@ impl MorphogeneticField {
                 }
                 new_cells.push(daughter);
                 parent_indices.push(i);
-                if n + new_cells.len() >= MAX_CELLS {
+                if n + new_cells.len() >= self.max_cells {
                     break;
                 }
             }
@@ -701,8 +715,13 @@ pub struct NeuralOrganoid {
 impl NeuralOrganoid {
     /// Create a new organoid with `num_cells` progenitor cells.
     pub fn new(num_cells: usize, seed: u64) -> Self {
+        Self::with_max_cells(num_cells, MAX_CELLS, seed)
+    }
+
+    /// Create an organoid with an explicit proliferation cap.
+    pub fn with_max_cells(num_cells: usize, max_cells: usize, seed: u64) -> Self {
         Self {
-            field: MorphogeneticField::new(num_cells, seed),
+            field: MorphogeneticField::with_max_cells(num_cells, max_cells, seed),
             developmental_day: 0,
             phi_history: VecDeque::with_capacity(PHI_HISTORY_CAP),
             spontaneous_activity_hz: 0.0,
@@ -726,6 +745,12 @@ impl NeuralOrganoid {
     /// reaction-diffusion step → compute phi (neural + basal) → update stage
     /// → check ethics.
     pub fn advance_day(&mut self) {
+        self.advance_day_with_substeps(10);
+    }
+
+    /// Advance one developmental day with an explicit number of chemical
+    /// reaction-diffusion substeps.
+    pub fn advance_day_with_substeps(&mut self, reaction_diffusion_substeps: u32) {
         // If the experiment is halted, do nothing.
         if matches!(
             self.ethics_status,
@@ -788,7 +813,7 @@ impl NeuralOrganoid {
         self.apply_positional_homing();
 
         // 5. Run several sub-steps of reaction-diffusion per day.
-        for _ in 0..10 {
+        for _ in 0..reaction_diffusion_substeps {
             self.field.step_reaction_diffusion(0.1);
         }
 
@@ -937,6 +962,26 @@ impl NeuralOrganoid {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn explicit_max_cells_caps_morphogenetic_proliferation() {
+        let mut organoid = NeuralOrganoid::with_max_cells(50, 55, 91);
+        for _ in 0..100 {
+            organoid.advance_day();
+        }
+        assert!(organoid.field.cells.len() <= 55);
+        assert_eq!(organoid.field.max_cells, 55);
+    }
+
+    #[test]
+    fn configurable_reaction_diffusion_substeps_change_field_evolution() {
+        let mut zero = NeuralOrganoid::new(30, 1234);
+        let mut ten = NeuralOrganoid::new(30, 1234);
+        zero.advance_day_with_substeps(0);
+        ten.advance_day_with_substeps(10);
+        assert_ne!(zero.field.activator, ten.field.activator);
+        assert_ne!(zero.field.inhibitor, ten.field.inhibitor);
+    }
 
     #[test]
     fn undifferentiated_cells_have_zero_consciousness_potential() {

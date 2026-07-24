@@ -12,11 +12,44 @@
 //! Scope and honesty:
 //! - Two CC0 libraries, each covering what it actually contains: VCSL
 //!   (piano → Steinway B, harp, recorder-as-ney, tenor sax, pipe organ,
-//!   glockenspiel, balafon, mbira) and VSCO2 Community Edition
+//!   glockenspiel, balafon, mbira, vibraphone) and VSCO2 Community Edition
 //!   (`data/samples/vsco2-ce`) for the orchestral LEADS — solo violin,
-//!   cello section, flute, clarinet, trumpet. Guitar/koto/oud stay on
-//!   Karplus-Strong (their physical model is genuinely good) — no fake
-//!   mappings.
+//!   viola section, cello section, flute, oboe, clarinet, bassoon, trumpet,
+//!   french horn. Guitar/koto/oud stay on Karplus-Strong (their physical
+//!   model is genuinely good) — no fake mappings.
+//! - The new orchestral instruments (Viola/Oboe/Bassoon/French Horn/
+//!   Vibraphone) were verified against the actual on-disk library layout
+//!   before mapping, not guessed: `Strings/Viola Section/susvib`,
+//!   `Woodwinds/Oboe/Sus`, `Woodwinds/Bassoon/sus`, `Brass/F Horn/sus` (all
+//!   VSCO2-CE), and `Idiophones/Struck Idiophones/Vibraphone/Hard Mallets`
+//!   (VCSL) all genuinely exist and use the same `NOTE_v#` filename
+//!   convention this module already parses. Timpani was investigated too
+//!   and deliberately NOT mapped: both libraries ship real timpani hits
+//!   (`Membranophones/Struck Membranophones/Timpani 1/Hit` in VCSL,
+//!   `Percussion/Timpani` in VSCO2-CE), but every filename encodes a DRUM
+//!   NUMBER (`Timpani1_Hit_v2_rr1_Sum.wav`), not a scientific pitch — this
+//!   module's [`parse_note_token`] has nothing to parse there, so a real
+//!   mapping isn't honestly possible without a second, drum-number-aware
+//!   indexing scheme this module doesn't have. `Instrument::Timpani`
+//!   therefore stays synthesis-only.
+//! - The wave-2 additions (Harpsichord, Tuba, Trombone, Duduk, ChoirOoh,
+//!   Xylophone) are ALSO deliberately left unmapped, for a different reason
+//!   than Timpani's: at the time these were added, neither
+//!   `data/samples/vcsl` nor `data/samples/vsco2-ce` existed on disk in the
+//!   development environment at all, so nothing could be verified — and
+//!   unlike the Viola/Oboe/Bassoon/French Horn/Vibraphone additions above
+//!   (each checked against a real on-disk path before mapping), this
+//!   module's own doc comments don't already establish that any of these
+//!   six exist in either library. VCSL is broadly reported to include a
+//!   real harpsichord and a range of world/ethnic instruments, and
+//!   VSCO2-CE's brass section is reported to include tuba and trombone, but
+//!   guessing an exact subdirectory path with no way to confirm it would
+//!   risk a confidently-asserted mapping that silently never indexes (wrong
+//!   path -> `InstrumentBank::index` returns `None`) or, worse, quietly
+//!   indexes the wrong content. Per the Timpani precedent, an honest
+//!   "not mapped" beats a guessed mapping — these six stay synthesis-only
+//!   until someone can verify the real directory layout on a machine that
+//!   has these libraries checked out.
 //! - Opt-in: nothing loads unless [`init`] is called or `SYMTHAEA_VCSL_DIR`
 //!   is set. When inactive, rendering is bit-identical to before this module
 //!   existed.
@@ -69,9 +102,13 @@ fn sample_subdir(instrument: Instrument) -> Option<(SampleSource, &'static str)>
             "Aerophones/Edge-blown Aerophones/Baroque Alto Recorder/Sustain",
         )),
         Instrument::Violin => Some((Vsco2, "Strings/Solo Violin/Arco Vib")),
+        Instrument::Viola => Some((Vsco2, "Strings/Viola Section/susvib")),
         Instrument::Cello => Some((Vsco2, "Strings/Cello Section/susvib")),
         Instrument::Clarinet => Some((Vsco2, "Woodwinds/Clarinet/susLong")),
+        Instrument::Oboe => Some((Vsco2, "Woodwinds/Oboe/Sus")),
+        Instrument::Bassoon => Some((Vsco2, "Woodwinds/Bassoon/sus")),
         Instrument::Trumpet => Some((Vsco2, "Brass/Trumpet/susvib")),
+        Instrument::FrenchHorn => Some((Vsco2, "Brass/F Horn/sus")),
         Instrument::Saxophone => Some((Vcsl, "Aerophones/Reed Aerophones/Tenor Saxophone/Vibrato")),
         Instrument::Organ => Some((Vcsl, "Aerophones/Edge-blown Aerophones/Pipe Organ/Loud")),
         Instrument::Bell => Some((Vcsl, "Idiophones/Struck Idiophones/Glockenspiel")),
@@ -80,6 +117,9 @@ fn sample_subdir(instrument: Instrument) -> Option<(SampleSource, &'static str)>
             "Idiophones/Struck Idiophones/Balafon/Traditional Mallet",
         )),
         Instrument::Kalimba => Some((Vcsl, "Idiophones/Plucked Idiophones/Kalimba, Kenya")),
+        Instrument::Vibraphone => {
+            Some((Vcsl, "Idiophones/Struck Idiophones/Vibraphone/Hard Mallets"))
+        }
         _ => None,
     }
 }
@@ -91,10 +131,14 @@ fn staccato_subdir(instrument: Instrument) -> Option<(SampleSource, &'static str
     use SampleSource::*;
     match instrument {
         Instrument::Violin => Some((Vsco2, "Strings/Solo Violin/spic")),
+        Instrument::Viola => Some((Vsco2, "Strings/Viola Section/spic")),
         Instrument::Cello => Some((Vsco2, "Strings/Cello Section/spic")),
         Instrument::Flute => Some((Vsco2, "Woodwinds/Flute/stac")),
         Instrument::Clarinet => Some((Vsco2, "Woodwinds/Clarinet/stac")),
+        Instrument::Oboe => Some((Vsco2, "Woodwinds/Oboe/Stacc")),
+        Instrument::Bassoon => Some((Vsco2, "Woodwinds/Bassoon/stac")),
         Instrument::Trumpet => Some((Vsco2, "Brass/Trumpet/stac")),
+        Instrument::FrenchHorn => Some((Vsco2, "Brass/F Horn/stac")),
         _ => None,
     }
 }
@@ -378,14 +422,19 @@ impl VcslLibrary {
             Instrument::Flute,
             Instrument::Ney,
             Instrument::Violin,
+            Instrument::Viola,
             Instrument::Cello,
             Instrument::Clarinet,
+            Instrument::Oboe,
+            Instrument::Bassoon,
             Instrument::Trumpet,
+            Instrument::FrenchHorn,
             Instrument::Saxophone,
             Instrument::Organ,
             Instrument::Bell,
             Instrument::Marimba,
             Instrument::Kalimba,
+            Instrument::Vibraphone,
         ] {
             if let Some((source, sub)) = sample_subdir(instrument) {
                 let base = match source {
@@ -545,10 +594,14 @@ mod tests {
         };
         for instrument in [
             Instrument::Violin,
+            Instrument::Viola,
             Instrument::Cello,
             Instrument::Flute,
             Instrument::Clarinet,
+            Instrument::Oboe,
+            Instrument::Bassoon,
             Instrument::Trumpet,
+            Instrument::FrenchHorn,
         ] {
             assert!(
                 lib.bank(instrument).is_some(),
@@ -564,6 +617,74 @@ mod tests {
         assert!((s.midi as f32 - 69.0).abs() <= 7.0);
         assert!(!s.frames.is_empty());
         assert!(s.frames.iter().all(|x| x.is_finite()));
+        // A viola A3 must also pick and decode real audio (susvib bank).
+        let v = lib
+            .bank(Instrument::Viola)
+            .unwrap()
+            .pick(57.0, 0.8, 1)
+            .expect("viola near A3");
+        assert!((v.midi as f32 - 57.0).abs() <= 7.0);
+        assert!(!v.frames.is_empty());
+        assert!(v.frames.iter().all(|x| x.is_finite()));
+    }
+
+    #[test]
+    fn vibraphone_indexes_from_vcsl_when_present() {
+        let Some(lib) = local_library() else {
+            eprintln!("VCSL not on disk — skipping");
+            return;
+        };
+        let Some(bank) = lib.bank(Instrument::Vibraphone) else {
+            eprintln!("Vibraphone bank not indexed — skipping");
+            return;
+        };
+        let s = bank.pick(69.0, 0.8, 1).expect("vibraphone near A4");
+        assert!(!s.frames.is_empty());
+        assert!(s.frames.iter().all(|x| x.is_finite()));
+    }
+
+    #[test]
+    fn timpani_deliberately_has_no_bank_despite_real_samples_on_disk() {
+        // Both libraries genuinely ship timpani hits, but their filenames
+        // encode a drum number (Timpani1/2/3...), not a scientific pitch —
+        // this module's note parser has nothing to extract, so mapping
+        // Timpani here would be dishonest. See the module doc comment.
+        let Some(lib) = local_library() else {
+            eprintln!("VCSL not on disk — skipping");
+            return;
+        };
+        assert!(lib.bank(Instrument::Timpani).is_none());
+    }
+
+    #[test]
+    fn wave2_instruments_deliberately_have_no_bank_pending_disk_verification() {
+        // Harpsichord/Tuba/Trombone/Duduk/ChoirOoh/Xylophone were added
+        // while neither `data/samples/vcsl` nor `data/samples/vsco2-ce`
+        // existed on disk in this environment, and this module's own doc
+        // comments didn't already establish real subdirectories for any of
+        // them (unlike the Viola/Oboe/Bassoon/French Horn/Vibraphone
+        // additions, which WERE verified before mapping) — so, per the
+        // Timpani precedent, they stay unmapped rather than guessed. This
+        // test still runs (and would still pass) if the library later
+        // appears on disk, since these instruments simply aren't in
+        // `sample_subdir`/`staccato_subdir` at all.
+        let Some(lib) = local_library() else {
+            eprintln!("VCSL not on disk — skipping");
+            return;
+        };
+        for instrument in [
+            Instrument::Harpsichord,
+            Instrument::Tuba,
+            Instrument::Trombone,
+            Instrument::Duduk,
+            Instrument::ChoirOoh,
+            Instrument::Xylophone,
+        ] {
+            assert!(
+                lib.bank(instrument).is_none(),
+                "{instrument:?} deliberately unmapped pending real on-disk verification"
+            );
+        }
     }
 
     #[test]
@@ -579,10 +700,14 @@ mod tests {
         };
         for instrument in [
             Instrument::Violin,
+            Instrument::Viola,
             Instrument::Cello,
             Instrument::Flute,
             Instrument::Clarinet,
+            Instrument::Oboe,
+            Instrument::Bassoon,
             Instrument::Trumpet,
+            Instrument::FrenchHorn,
         ] {
             let bank = lib
                 .staccato_bank(instrument)

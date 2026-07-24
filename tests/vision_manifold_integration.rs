@@ -229,17 +229,16 @@ mod vision_cognitive_integration {
             .vision
             .as_ref()
             .expect("vision telemetry should be Some");
-        assert!(vt.vision_active);
         assert!(vt.prediction_error.is_finite());
         assert!(vt.manifold_coherence.is_finite());
         assert!(vt.attention_entropy.is_finite());
         assert!(vt.frame_sequence > 0);
     }
 
-    // ── Test 9: Config-enabled vision path without frame (gray fallback) ──
+    // ── Test 9: Config-enabled vision path without frame idles (no synthetic percept) ──
 
     #[test]
-    fn test_config_enabled_vision_gray_fallback() {
+    fn test_config_enabled_vision_idles_without_frame() {
         let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
             genesis_phrase: Some(GENESIS.to_string()),
             async_training: false,
@@ -253,14 +252,20 @@ mod vision_cognitive_integration {
 
         let result = service.cycle("no frame");
         assert!(
-            result.metadata.vision.is_some(),
-            "vision telemetry should be populated even without explicit frame injection"
+            result.metadata.vision.is_none(),
+            "no injected frame → the vision manifold idles; an empty buffer must not be \
+             perceived as a maximal-surprise synthetic frame (root semantics behind the \
+             2026-07-11 Ultra-dilation OOM)"
         );
     }
 
     // ── Test 10: Cross-manifold predictor Hebbian learning converges ──
 
     #[test]
+    // P0.5 RESOLVED 2026-07-16: this test was the reproducer that led
+    // heaptrack to the real balloon — an unbounded motif-replay drain in
+    // creative_bridge's Music arm (137GB Vec), NOT vision-manifold FEP
+    // machinery. Green since the bounded-drain fix.
     fn test_cross_manifold_predictor_learning_convergence() {
         let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
             genesis_phrase: Some(GENESIS.to_string()),
@@ -270,6 +275,13 @@ mod vision_cognitive_integration {
             enable_cross_manifold_predictor: true,
             vision_frame_width: 64,
             vision_frame_height: 64,
+            // This test is about Hebbian predictor convergence, not dilation.
+            // With auto-dilation on (the default), early-scene novelty dilates
+            // the manifold to Ultra (65,536 dims) and the run dies in the
+            // known post-Ultra memory balloon (P0.5 in
+            // VISION_PROJECTION_REVIEW_2026-07-15.md); dilation behavior has
+            // its own dedicated suite (holographic_dilation_tests).
+            enable_vision_auto_dilation: false,
             ..Default::default()
         })
         .expect("Failed to create service");
@@ -281,8 +293,10 @@ mod vision_cognitive_integration {
         for _ in 0..50 {
             service.inject_vision_frame(frame.clone());
             let result = service.cycle("consistent input for learning");
-            if let Some(ref vt) = result.metadata.vision {
-                errors.push(vt.cross_manifold_prediction_error);
+            if result.metadata.vision.is_some() {
+                if let Some(e) = service.cross_manifold_prediction_error() {
+                    errors.push(e);
+                }
             }
         }
 
@@ -310,6 +324,9 @@ mod vision_cognitive_integration {
     // ── Test 11: ACh modulates scene memory thresholds ────────────────
 
     #[test]
+    // P0.5 RESOLVED 2026-07-16: former OOM reproducer (see the note on
+    // test_cross_manifold_predictor_learning_convergence). Green since the
+    // creative_bridge bounded-drain fix.
     fn test_ach_modulated_scene_memory_thresholds() {
         // Run two services: one with high ACh, one with low ACh
         // Verify they produce different scene recognition behavior.
@@ -408,7 +425,6 @@ mod vision_cognitive_integration {
         let result = service.cycle("timing check");
         let vt = result.metadata.vision.expect("vision should be active");
 
-        assert!(vt.vision_active);
         // After warmup, encode + evolve should take measurable time
         assert!(
             vt.encode_time_us > 0 || vt.evolve_time_us > 0,
@@ -526,10 +542,6 @@ mod vision_cognitive_integration {
                 .as_ref()
                 .expect("vision telemetry should be present");
 
-            assert!(
-                vt.vision_active,
-                "Vision should remain active across cycles"
-            );
             assert!(
                 vt.prediction_error.is_finite(),
                 "Prediction error must be finite after goal signal wiring"

@@ -1,18 +1,19 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # HDC-FHE Collective Intelligence Demo
+//! # Quarantined Shared-Mask HDC Algebra Demo
 //!
-//! Demonstrates privacy-preserving collective reasoning using
-//! hyperdimensional homomorphic encryption — zero overhead, perfect secrecy.
+//! **INSECURE EXPERIMENT:** retained under its historical filename for
+//! compatibility. This is not FHE, secure aggregation, threshold sharing, or
+//! a privacy protocol. Reusing a mask exposes pairwise XOR and distance.
 //!
-//! ## What This Proves
+//! ## What This Demonstrates
 //!
-//! 1. **Perfect secrecy**: Encrypted vectors reveal zero information (OTP)
-//! 2. **Distance preservation**: sim(enc(A,M), enc(B,M)) = sim(A,B) — exactly
+//! 1. A fresh, uniformly random, one-use XOR mask has OTP algebra
+//! 2. **Leakage under reuse**: sim(enc(A,M), enc(B,M)) = sim(A,B) — exactly
 //! 3. **Homomorphic binding**: Operations on encrypted data produce correct results
-//! 4. **Collective aggregation**: Multiple peers aggregate without revealing individuals
-//! 5. **Threshold recovery**: k-of-n mask sharing enables cooperative decryption
+//! 4. Shared-mask majority aggregation as a non-private algebra experiment
+//! 5. Why the historical share format fails threshold privacy
 //!
 //! ## Run
 //!
@@ -26,7 +27,7 @@ use symthaea_core::hdc::hdc_fhe::{CollectiveWisdomPool, EncryptedHV, generate_co
 
 fn main() {
     println!("\n╔══════════════════════════════════════════════════════════════╗");
-    println!("║    Symthaea HDC-FHE: Privacy-Preserving Collective Mind    ║");
+    println!("║  INSECURE DEMO: Shared-Mask HDC Algebra (Not FHE/Privacy) ║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     // ═══════════════════════════════════════════════════════════════════
@@ -99,10 +100,10 @@ fn main() {
     println!("  Exact match: {bind_match} (XOR distributes over XOR)\n");
 
     // ═══════════════════════════════════════════════════════════════════
-    // PART 3: CROSS-SESSION PRIVACY
+    // PART 3: DIFFERENT-MASK DECORRELATION
     // ═══════════════════════════════════════════════════════════════════
 
-    println!("━━━ Part 3: Cross-Session Privacy ━━━\n");
+    println!("━━━ Part 3: Different-Mask Decorrelation (Not a Security Test) ━━━\n");
 
     let same_thought = BinaryHV::random(777);
     let mask_session_1 = BinaryHV::random(100);
@@ -114,14 +115,7 @@ fn main() {
     // Same thought, different sessions
     let cross_sim = enc_s1.encrypted_similarity(&enc_s2);
     println!("  Same thought, different masks: sim = {cross_sim:.4} (should be ~0.5)");
-    println!(
-        "  Privacy: {} (adversary learns nothing across sessions)\n",
-        if (cross_sim - 0.5).abs() < 0.05 {
-            "PROTECTED"
-        } else {
-            "LEAK!"
-        }
-    );
+    println!("  Observation only: different deterministic masks decorrelate this sample\n");
 
     // ═══════════════════════════════════════════════════════════════════
     // PART 4: COLLECTIVE WISDOM AGGREGATION
@@ -175,10 +169,10 @@ fn main() {
     println!();
 
     // ═══════════════════════════════════════════════════════════════════
-    // PART 5: THRESHOLD SECRET SHARING
+    // PART 5: BROKEN THRESHOLD-SHARING ATTACK
     // ═══════════════════════════════════════════════════════════════════
 
-    println!("━━━ Part 5: Threshold Recovery (3-of-5) ━━━\n");
+    println!("━━━ Part 5: One Share Defeats Claimed 3-of-5 Threshold ━━━\n");
 
     let (mask_full, shares) = generate_collective_mask(3, 5, 12345);
 
@@ -186,29 +180,17 @@ fn main() {
     let secret_wisdom = BinaryHV::random(9999);
     let encrypted_wisdom = EncryptedHV::encrypt(&secret_wisdom, &mask_full);
 
-    // Try 2-of-5 (should fail — insufficient shares)
-    let mask_2_of_5 = HdcThresholdSharing::recover(&shares[..2]);
-    let decrypt_attempt_2 = encrypted_wisdom.decrypt(&mask_2_of_5);
-    let sim_2 = decrypt_attempt_2.similarity(&secret_wisdom);
-    println!("  2-of-5 shares → similarity to truth: {sim_2:.4} (should be ~0.5 = failure)");
-
-    // Try 3-of-5 (should succeed — meets threshold)
-    let mask_3_of_5 = HdcThresholdSharing::recover(&shares[..3]);
-    let decrypt_attempt_3 = encrypted_wisdom.decrypt(&mask_3_of_5);
-    let sim_3 = decrypt_attempt_3.similarity(&secret_wisdom);
-    println!("  3-of-5 shares → similarity to truth: {sim_3:.4} (should be 1.0 = success)");
-
-    // Try 5-of-5 (should also succeed)
-    let mask_5_of_5 = HdcThresholdSharing::recover(&shares);
-    let decrypt_attempt_5 = encrypted_wisdom.decrypt(&mask_5_of_5);
-    let sim_5 = decrypt_attempt_5.similarity(&secret_wisdom);
-    println!("  5-of-5 shares → similarity to truth: {sim_5:.4} (should be 1.0 = success)");
+    let mask_from_one_share = HdcThresholdSharing::recover(&shares[..1]);
+    let decrypt_attempt = encrypted_wisdom.decrypt(&mask_from_one_share);
+    let similarity = decrypt_attempt.similarity(&secret_wisdom);
+    println!("  1-of-5 shares → similarity to truth: {similarity:.4}");
+    println!("  ATTACK CONFIRMED: one share recovers the mask despite k=3");
 
     // ═══════════════════════════════════════════════════════════════════
-    // PART 6: PERFORMANCE COMPARISON
+    // PART 6: ALGEBRA COST COMPARISON
     // ═══════════════════════════════════════════════════════════════════
 
-    println!("\n━━━ Part 6: Performance vs Lattice FHE ━━━\n");
+    println!("\n━━━ Part 6: Plain XOR vs Wrapped XOR Cost (Not an FHE Comparison) ━━━\n");
 
     let n_ops = 10_000;
     let hv_a = BinaryHV::random(1);
@@ -243,18 +225,18 @@ fn main() {
     println!("\n╔══════════════════════════════════════════════════════════════╗");
     println!("║                        Summary                             ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║  OTP encryption:        Perfect secrecy (Shannon 1949)     ║");
+    println!("║  One-use XOR algebra:   Round-trip demonstrated           ║");
     println!("║  Similarity preserved:  Exactly (XOR is isometry)          ║");
     println!("║  Homomorphic binding:   Exact (XOR distributes over XOR)   ║");
     println!(
         "║  Collective aggregation: >{:.0}% fidelity (5 peers)         ║",
         fidelity * 100.0
     );
-    println!("║  Threshold recovery:    3-of-5 shares required             ║");
-    println!("║  Overhead vs plaintext: {overhead:.1}× (vs ~10,000× for CKKS)     ║");
-    println!("║  Cross-session privacy: No leakage across mask rotations   ║");
+    println!("║  Threshold privacy:     BROKEN — one share recovers mask   ║");
+    println!("║  Wrapped XOR overhead:  {overhead:.1}× vs direct XOR              ║");
+    println!("║  Shared-mask privacy:   BROKEN — pairwise distances leak   ║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
-    println!("Consciousness can reason collectively without surrendering privacy.");
-    println!("The HDC algebra makes this free — not fast, FREE.\n");
+    println!("This example demonstrates HDC algebra and its security failures.");
+    println!("It must not be used as an encryption or privacy protocol.\n");
 }

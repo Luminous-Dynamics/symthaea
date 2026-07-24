@@ -2,8 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Singing bridge: binds Symthaea's music engine (`symthaea-muse`) to its
-//! speech engine (`symthaea-voice` + `symthaea-vocal-tract`) so lyrics can be
-//! **sung** to a melody, instead of merely spoken.
+//! speech engine (`symthaea-vocal-tract`, incl. its `speech` module) so
+//! lyrics can be **sung** to a melody, instead of merely spoken.
+//!
+//! (2026-07-15: the `symthaea-voice` crate referenced below was retired; its
+//! `g2p`/`formants` moved verbatim into `symthaea_vocal_tract::speech`, which
+//! also removed the dependency-cycle concern discussed in "Dependency
+//! direction" — muse now needs only `symthaea-vocal-tract`.)
 //!
 //! ## Why this exists (2026-07-06 art/culture review, Phase 3.1)
 //!
@@ -22,31 +27,37 @@
 //! either:
 //! - **What is said** (vowel/consonant shape) still comes from the existing
 //!   phoneme→formant-target table,
-//!   [`symthaea_voice::formants::formant_target_pub`]
-//!   (`symthaea-voice/src/formants.rs:99`) — reused verbatim, not
-//!   reimplemented.
+//!   [`symthaea_vocal_tract::speech::formants::formant_target_pub`] — reused
+//!   verbatim, not reimplemented.
 //! - **What pitch it's said at** comes from [`Note::frequency`] instead of
 //!   from prosody. This is the actual "singing" behavior: today's speech
 //!   path always *couples* F0 to prosody; this module *decouples* F0 from
 //!   prosody and *couples* it to melody instead.
 //!
-//! ## Simplification: monosyllabic-per-note
+//! ## Syllabification (2026-07-18, SYMTHAEA_SINGING_PLAN Phase 2)
 //!
-//! Symthaea has no syllabifier (nothing in `symthaea-voice::g2p` splits a
-//! word into syllables — CMUdict lookups and the letter-fallback path both
-//! return one flat phoneme sequence per *word*). [`sing`] therefore treats
-//! each whitespace-separated **word** in the lyrics as one "syllable" bound
-//! to exactly one melody note. Multi-syllable words are *not* split across
-//! notes, and real melisma (one syllable sustained/ornamented across
-//! multiple notes) is out of scope. See [`sing`]'s doc comment for the
-//! length-mismatch policy this simplification implies, and the module-level
-//! TODO below for the natural follow-up work.
+//! `symthaea_vocal_tract::speech::g2p::text_to_phonemes` returns one flat
+//! phoneme sequence per *word* (CMUdict lookups and the letter-fallback path
+//! both do this — neither has ever split a word into syllables). [`sing`]
+//! turns that per-word sequence into one or more syllables via
+//! [`syllabify`]: a **maximal-onset** split at each vowel nucleus
+//! (`Phoneme::is_vowel`) — intervening consonant clusters between two
+//! vowels become the ONSET of the following syllable rather than the coda
+//! of the preceding one (the standard textbook rule; no phonotactic
+//! legality checking beyond that — a deliberate, stated simplification, not
+//! a claim of linguistic completeness). A word with N vowels produces N
+//! syllables, each bound to its own melody note; a word with zero vowels
+//! (a degenerate G2P result) stays one syllable, matching the old
+//! monosyllabic-per-note behavior exactly for words that genuinely only
+//! have one vowel. [`sing`]'s existing length-mismatch policy (sustain the
+//! last vowel / drop excess trailing syllables) is unchanged, now operating
+//! on the flattened per-syllable sequence across ALL words rather than
+//! per-word.
 //!
-//! **Future extension**: a real syllabifier (e.g. sonority-sequencing over
-//! the existing `Phoneme::is_vowel` flags) would let a single word span
-//! multiple notes and would let `render_sung_frames` model true melisma
-//! (ornamenting a single vowel across a run of notes) rather than the
-//! coarser "hold the last syllable's vowel" fallback used here.
+//! **Still out of scope**: real melisma (ornamenting a single syllable's
+//! vowel across a run of held notes, as opposed to one syllable per note)
+//! and any cross-syllable stress-driven note-weighting — both natural
+//! follow-ups once this lands.
 //!
 //! ## Dependency direction
 //!
@@ -65,9 +76,9 @@
 //! it, so this new edge (`muse -> vocal-tract`) is acyclic.
 
 use crate::Note;
+use symthaea_vocal_tract::speech::formants::formant_target_pub;
+use symthaea_vocal_tract::speech::g2p::{self, Phoneme};
 use symthaea_vocal_tract::types::FormantFrame;
-use symthaea_voice::formants::formant_target_pub;
-use symthaea_voice::g2p::{self, Phoneme};
 
 /// Linear F0 attack/release ramp at each syllable's pitch boundary, in
 /// milliseconds. Prevents a discontinuous step in fundamental frequency
@@ -77,26 +88,77 @@ use symthaea_voice::g2p::{self, Phoneme};
 /// vocal-tract pipeline) to avoid a hard digital click.
 pub const F0_RAMP_MS: f32 = 15.0;
 
+/// Vibrato rate in Hz (typical human vocal vibrato: 4.5-6.5 Hz).
+///
+/// Added 2026-07-18 (SYMTHAEA_SINGING_PLAN Phase 4, reprioritized from
+/// "polish" to "likely intelligibility fix"): before this, `f0` was
+/// perfectly flat for the sustained portion of every note
+/// (`target_f0 * ramp`, no variation once past the attack ramp) — a
+/// dead-steady pitch held for hundreds of milliseconds is the acoustic
+/// signature of a synthesized tone, not a voice. `examples/
+/// singing_intelligibility_gate.rs` found Whisper transcribing sung
+/// lyrics as a literal `🎵` (musical-note) glyph — the same caption
+/// convention YouTube transcribers use for background music — while the
+/// SAME `FormantVocoder` speaking (not singing) the same lyrics with
+/// natural prosodic F0 movement scores 98.6% WER
+/// (`VOICE_ROUNDTRIP_BASELINE_LTC_2026-07-16.json`). That comparison
+/// isolates flat F0, not the vocoder or the ASR, as the most likely
+/// cause — vibrato is the direct, minimal fix for it.
+pub const VIBRATO_RATE_HZ: f32 = 5.5;
+
+/// Vibrato extent in cents (1/100 semitone) from center pitch — i.e. the
+/// modulation swings `target_f0` by ±`VIBRATO_DEPTH_CENTS`. 30 cents
+/// (~1.7% frequency deviation) is a moderate, natural extent (trained
+/// singers commonly sit in the 25-50 cent range; wider reads as
+/// exaggerated/operatic).
+pub const VIBRATO_DEPTH_CENTS: f32 = 30.0;
+
 /// One syllable of lyrics bound to one musical note.
 ///
-/// Simplification: monosyllabic-per-note (see module docs). `phonemes` is
-/// the *entire* word's phoneme sequence — there is no syllabifier — and
-/// `note` is the single melody note this whole word is sung on.
+/// `phonemes` is one syllable's worth of phonemes as produced by
+/// [`syllabify`] (a whole word's phonemes if that word is monosyllabic, a
+/// slice of them otherwise); `note` is the melody note this syllable is
+/// sung on.
 #[derive(Debug, Clone)]
 pub struct SungSyllable {
-    /// Phoneme sequence for this "syllable" (in practice: one whole word).
+    /// Phoneme sequence for this syllable.
     pub phonemes: Vec<Phoneme>,
     /// The melody note this syllable is sung on.
     pub note: Note,
 }
 
-/// Grapheme-to-phoneme the `lyrics` and align them 1:1 with `melody`,
-/// producing a sequence of sung syllables.
+/// Count how many syllables [`sing`] will produce for `lyrics`, without
+/// requiring a melody. Callers that compose a melody separately (e.g. via
+/// `symthaea-muse::theory_realize::compose_and_perform_melody`) can use this
+/// to size the melody to the lyrics — an over-long composed melody relative
+/// to the syllable count means [`sing`]'s sustain-last-vowel policy stretches
+/// the FINAL syllable's vowel across most of the extra notes, which in
+/// practice produces mostly-one-held-vowel audio (found via
+/// `examples/singing_intelligibility_gate.rs`, SYMTHAEA_SINGING_PLAN Phase 3:
+/// a 3-syllable phrase sung to a 22-note melody spent ~85% of its duration on
+/// one sustained vowel and Whisper transcribed pure hallucinated filler).
+pub fn syllable_count(lyrics: &str) -> usize {
+    lyrics
+        .split_whitespace()
+        .map(|word| {
+            let phonemes: Vec<Phoneme> = g2p::text_to_phonemes(word)
+                .into_iter()
+                .filter(|p| p.ipa != " ")
+                .collect();
+            syllabify(&phonemes).len()
+        })
+        .sum()
+}
+
+/// Grapheme-to-phoneme the `lyrics`, syllabify each word (see [`syllabify`]),
+/// and align the resulting per-syllable sequence 1:1 with `melody`.
 ///
 /// # Alignment policy
 ///
-/// - `lyrics.split_whitespace()` words are treated as "syllables" (see
-///   module docs — there is no real syllabifier yet).
+/// - Each word is split into one syllable per vowel nucleus via
+///   [`syllabify`] (see module docs), then all words' syllables are
+///   flattened in order into a single sequence, one syllable per melody
+///   note.
 /// - **Fewer syllables than notes**: the *last* syllable's vowel is held
 ///   across the remaining notes. This mirrors how singing actually works —
 ///   a singer sustains a vowel across held notes rather than re-articulating
@@ -113,11 +175,12 @@ pub fn sing(lyrics: &str, melody: &[Note]) -> Vec<SungSyllable> {
 
     let mut syllables: Vec<Vec<Phoneme>> = words
         .iter()
-        .map(|word| {
-            g2p::text_to_phonemes(word)
+        .flat_map(|word| {
+            let phonemes: Vec<Phoneme> = g2p::text_to_phonemes(word)
                 .into_iter()
                 .filter(|p| p.ipa != " ")
-                .collect::<Vec<_>>()
+                .collect();
+            syllabify(&phonemes)
         })
         .collect();
 
@@ -132,10 +195,10 @@ pub fn sing(lyrics: &str, melody: &[Note]) -> Vec<SungSyllable> {
         syllables.truncate(melody.len());
     }
 
-    let last_syllable = syllables
-        .last()
-        .cloned()
-        .expect("words is non-empty, so syllables (same length, pre-truncate) is non-empty");
+    let last_syllable = syllables.last().cloned().expect(
+        "words is non-empty, and syllabify() always returns at least one syllable per word, \
+         so syllables (pre-truncate) is non-empty",
+    );
 
     let mut out = Vec::with_capacity(melody.len());
     for (i, note) in melody.iter().enumerate() {
@@ -150,6 +213,64 @@ pub fn sing(lyrics: &str, melody: &[Note]) -> Vec<SungSyllable> {
         });
     }
     out
+}
+
+/// Split one word's flat phoneme sequence into per-syllable groups via the
+/// **maximal-onset rule**: a syllable boundary falls right after each vowel
+/// nucleus, so every consonant between two vowels becomes part of the
+/// FOLLOWING syllable's onset rather than the preceding syllable's coda.
+/// Word-initial consonants (before the first vowel) belong to the first
+/// syllable; word-final consonants (after the last vowel) belong to the
+/// last syllable.
+///
+/// A word with zero vowels (a degenerate G2P result — e.g. a bare consonant
+/// cluster from the letter-fallback path) is returned as a single
+/// consonant-only "syllable", matching the old monosyllabic-per-note
+/// fallback exactly. A word with exactly one vowel also returns a single
+/// syllable — byte-identical to the pre-syllabifier behavior for every
+/// genuinely monosyllabic word (e.g. "la", "ah", "one").
+///
+/// Deliberately does NOT check onset-cluster phonotactic legality (e.g.
+/// English disallows onsets like /tl/) — pure maximal-onset splitting, a
+/// stated simplification, not a claim of linguistic completeness. See
+/// module docs.
+///
+/// Never panics; an empty `phonemes` slice returns an empty `Vec`.
+fn syllabify(phonemes: &[Phoneme]) -> Vec<Vec<Phoneme>> {
+    if phonemes.is_empty() {
+        return Vec::new();
+    }
+
+    let vowel_indices: Vec<usize> = phonemes
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| p.is_vowel)
+        .map(|(i, _)| i)
+        .collect();
+
+    if vowel_indices.is_empty() {
+        // No vowel nucleus to split around -- the whole word is one
+        // consonant-only "syllable" (matches the old fallback).
+        return vec![phonemes.to_vec()];
+    }
+
+    let mut syllables = Vec::with_capacity(vowel_indices.len());
+    let mut start = 0;
+    for (k, &vowel_idx) in vowel_indices.iter().enumerate() {
+        let end = if k + 1 < vowel_indices.len() {
+            // Maximal onset: this syllable ends right after its own vowel,
+            // so every consonant up to (not including) the NEXT vowel
+            // becomes that next syllable's onset.
+            vowel_idx + 1
+        } else {
+            // Last syllable: absorb all remaining phonemes, including any
+            // word-final coda consonants after the last vowel.
+            phonemes.len()
+        };
+        syllables.push(phonemes[start..end].to_vec());
+        start = end;
+    }
+    syllables
 }
 
 /// Build a held-vowel-only phoneme sequence from a syllable, used by [`sing`]
@@ -175,11 +296,15 @@ fn is_voiced_phoneme(phoneme: &Phoneme) -> bool {
 
 /// Render `syllables` into a `FormantFrame` sequence at `frame_rate_hz`.
 ///
-/// For each syllable, its phonemes are evenly divided across the syllable's
-/// note's time span (`note.start_time` .. `note.start_time + note.duration`).
-/// Formant targets (F1/F2/F3 + manner of articulation) come from the
+/// For each syllable, its phonemes are timed within the syllable's note's
+/// time span (`note.start_time` .. `note.start_time + note.duration`) —
+/// consonants get their natural brief duration (same formula the speaking
+/// path uses) and the vowel absorbs whatever time remains, rather than
+/// evenly splitting the note across every phoneme (2026-07-18,
+/// SYMTHAEA_SINGING_PLAN Phase 5). Formant targets (F1/F2/F3 + manner of
+/// articulation) come from the
 /// existing phoneme→formant table,
-/// [`symthaea_voice::formants::formant_target_pub`], reused unchanged. `f0`
+/// [`symthaea_vocal_tract::speech::formants::formant_target_pub`], reused unchanged. `f0`
 /// tracks `note.frequency` — this is the actual "singing" behavior — with a
 /// short linear ramp ([`F0_RAMP_MS`]) at the attack (start of syllable) and
 /// release (end of syllable) so pitch doesn't step discontinuously between
@@ -211,13 +336,45 @@ pub fn render_sung_frames(syllables: &[SungSyllable], frame_rate_hz: f32) -> Vec
         let target_f0 = note.frequency.max(0.0);
         let level = note.velocity.clamp(0.0, 1.0);
 
-        let n_phonemes = syllable.phonemes.len() as f32;
-        let per_phoneme_dur = note.duration.max(0.0) / n_phonemes;
+        // Per-phoneme durations: brief, natural consonants (same formula as
+        // the speaking path, which scores 98.6% WER -- `(base_duration_ms *
+        // 0.8).max(40.0)` ms) with the VOWEL absorbing the note's remaining
+        // time, instead of evenly splitting the note across every phoneme
+        // including consonants (which held e.g. a consonant like "h" for
+        // 100s of ms on a typical note -- 3-6x longer than natural, in
+        // speech OR singing). See SYMTHAEA_SINGING_PLAN_2026-07-18.md
+        // Phase 5.
+        let vowel_idx = syllable.phonemes.iter().position(|p| p.is_vowel);
+        let phoneme_durs: Vec<f32> = if let Some(vi) = vowel_idx {
+            const CONSONANT_FLOOR_MS: f32 = 40.0;
+            const VOWEL_FLOOR_SECS: f32 = 0.06;
+            let mut durs = vec![0.0f32; syllable.phonemes.len()];
+            let mut consonant_total = 0.0f32;
+            for (i, p) in syllable.phonemes.iter().enumerate() {
+                if i != vi {
+                    let d = (p.base_duration_ms * 0.8).max(CONSONANT_FLOOR_MS) / 1000.0;
+                    durs[i] = d;
+                    consonant_total += d;
+                }
+            }
+            durs[vi] = (note.duration.max(0.0) - consonant_total).max(VOWEL_FLOOR_SECS);
+            durs
+        } else {
+            // No vowel nucleus (a degenerate all-consonant syllable) --
+            // fall back to the even split; there's no vowel to anchor a
+            // natural timing shape on.
+            let n_phonemes = syllable.phonemes.len() as f32;
+            let per = note.duration.max(0.0) / n_phonemes;
+            vec![per; syllable.phonemes.len()]
+        };
 
+        let mut ph_offset = 0.0f32;
         for (pi, phoneme) in syllable.phonemes.iter().enumerate() {
             let (f1, f2, f3, source) = formant_target_pub(phoneme.ipa);
-            let ph_start = note_start + per_phoneme_dur * pi as f32;
-            let n_frames = ((per_phoneme_dur / frame_dt).round() as usize).max(1);
+            let this_dur = phoneme_durs[pi];
+            let ph_start = note_start + ph_offset;
+            ph_offset += this_dur;
+            let n_frames = ((this_dur / frame_dt).round() as usize).max(1);
             let voiced = is_voiced_phoneme(phoneme);
 
             for frame_idx in 0..n_frames {
@@ -239,6 +396,18 @@ pub fn render_sung_frames(syllables: &[SungSyllable], frame_rate_hz: f32) -> Vec
                 };
                 let ramp = attack.min(release).clamp(0.0, 1.0);
 
+                // Vibrato: a sinusoidal cents-scale F0 modulation, gated by
+                // the SAME ramp envelope as attack/release (so it's near-
+                // zero right at a note's edges and full depth mid-note --
+                // a natural "grows in, fades out" vibrato shape, not a
+                // discontinuous on/off switch). Absolute time `t` (not
+                // time-since-note-start) keeps the LFO phase continuous
+                // across the whole utterance, avoiding any click at note
+                // boundaries. See VIBRATO_RATE_HZ/VIBRATO_DEPTH_CENTS docs.
+                let vibrato_cents =
+                    VIBRATO_DEPTH_CENTS * (2.0 * std::f32::consts::PI * VIBRATO_RATE_HZ * t).sin();
+                let vibrato_ratio = 2.0_f32.powf((vibrato_cents * ramp) / 1200.0);
+
                 frames.push(FormantFrame {
                     f1,
                     f2,
@@ -246,7 +415,7 @@ pub fn render_sung_frames(syllables: &[SungSyllable], frame_rate_hz: f32) -> Vec
                     b1: 60.0,
                     b2: 90.0,
                     b3: 150.0,
-                    f0: target_f0 * ramp,
+                    f0: target_f0 * ramp * vibrato_ratio,
                     energy: level * ramp,
                     voicing: if voiced { level * ramp } else { 0.0 },
                     time: t,
@@ -275,7 +444,7 @@ mod tests {
     }
 
     #[test]
-    fn monosyllabic_lyric_tracks_melody_f0() {
+    fn monosyllabic_lyric_tracks_melody_f0_within_vibrato_envelope() {
         let melody = [
             note(440.0, 0.0, 0.5, 0.8),
             note(880.0, 0.5, 0.5, 0.8),
@@ -294,8 +463,11 @@ mod tests {
         let frames = render_sung_frames(&syllables, 200.0);
         assert!(!frames.is_empty());
 
-        // Away from the ramp regions, f0 must track the note's frequency
-        // exactly (ramp == 1.0 there).
+        // Away from the ramp regions, f0 must stay within the vibrato
+        // envelope around the note's target frequency -- vibrato means it
+        // deliberately no longer equals the target exactly, just
+        // oscillates near it (see VIBRATO_DEPTH_CENTS).
+        let max_ratio = 2.0_f32.powf(VIBRATO_DEPTH_CENTS / 1200.0);
         for m in &melody {
             let mid_time = m.start_time + m.duration / 2.0;
             let closest = frames
@@ -307,13 +479,44 @@ mod tests {
                         .unwrap()
                 })
                 .expect("frames non-empty");
+            let ratio = closest.f0 / m.frequency;
             assert!(
-                (closest.f0 - m.frequency).abs() < 0.01,
-                "mid-note f0 {} should equal note frequency {} away from ramp regions",
+                ratio <= max_ratio + 1e-4 && ratio >= 1.0 / max_ratio - 1e-4,
+                "mid-note f0 {} should stay within the vibrato envelope of note \
+                 frequency {} (ratio {ratio}, envelope [{}, {}])",
                 closest.f0,
-                m.frequency
+                m.frequency,
+                1.0 / max_ratio,
+                max_ratio
             );
         }
+    }
+
+    #[test]
+    fn vibrato_produces_genuine_f0_variation_within_a_sustained_note() {
+        // A single long note (well past the attack/release ramps) should
+        // show real F0 movement, not a dead-flat pitch -- the whole point
+        // of adding vibrato.
+        let melody = [note(440.0, 0.0, 1.0, 0.8)];
+        let syllables = sing("ah", &melody);
+        let frames = render_sung_frames(&syllables, 200.0);
+        let sustained: Vec<f32> = frames
+            .iter()
+            .filter(|f| f.time > 0.1 && f.time < 0.9)
+            .map(|f| f.f0)
+            .collect();
+        assert!(
+            sustained.len() > 10,
+            "need enough sustained-region frames to observe variation, got {}",
+            sustained.len()
+        );
+        let min_f0 = sustained.iter().cloned().fold(f32::MAX, f32::min);
+        let max_f0 = sustained.iter().cloned().fold(f32::MIN, f32::max);
+        assert!(
+            max_f0 - min_f0 > 1.0,
+            "vibrato should produce measurable F0 variation within a sustained \
+             note (got range {min_f0} to {max_f0})"
+        );
     }
 
     #[test]
@@ -403,5 +606,205 @@ mod tests {
         assert!(sing("", &[note(440.0, 0.0, 1.0, 0.8)]).is_empty());
         assert!(sing("hello", &[]).is_empty());
         assert!(render_sung_frames(&[], 200.0).is_empty());
+    }
+
+    fn phoneme(ipa: &'static str, is_vowel: bool) -> Phoneme {
+        Phoneme {
+            ipa,
+            is_vowel,
+            stress: 0,
+            base_duration_ms: 100.0,
+        }
+    }
+
+    #[test]
+    fn syllabify_empty_input_is_empty() {
+        assert!(syllabify(&[]).is_empty());
+    }
+
+    #[test]
+    fn syllable_count_matches_hand_verified_values() {
+        // "hello" has a real dict entry with 2 vowels (h,ɛ,l,oʊ -- see
+        // sing_splits_a_real_multi_syllable_dict_word_across_two_notes);
+        // "world" has a real dict entry with 1 vowel (w,ɜː,l,d). All other
+        // words here go through the letter-fallback path and are confirmed
+        // single-vowel elsewhere in this test module (monosyllabic_lyric_
+        // tracks_melody_f0, fewer_syllables_than_notes_sustains_last_vowel).
+        assert_eq!(syllable_count("hello world"), 3);
+        assert_eq!(syllable_count("hello"), 2);
+        assert_eq!(syllable_count("world"), 1);
+        assert_eq!(syllable_count("la la la"), 3);
+        assert_eq!(syllable_count("ah"), 1);
+    }
+
+    #[test]
+    fn syllable_count_sized_melody_leaves_no_note_unused_by_a_real_syllable() {
+        // The property syllable_count exists to guarantee: giving sing() a
+        // melody with EXACTLY syllable_count(lyrics) notes should consume
+        // every note with a genuine (non-repeated) syllable -- no note
+        // beyond the first should carry the SAME phoneme sequence as its
+        // predecessor (which is what the sustain-last-vowel fallback would
+        // produce if the melody had MORE notes than syllables).
+        let lyrics = "hello world";
+        let n = syllable_count(lyrics);
+        assert_eq!(n, 3);
+        let melody: Vec<Note> = (0..n)
+            .map(|i| note(440.0 + i as f32 * 50.0, i as f32 * 0.3, 0.3, 0.8))
+            .collect();
+        let syllables = sing(lyrics, &melody);
+        assert_eq!(syllables.len(), n);
+        for pair in syllables.windows(2) {
+            let a: Vec<&str> = pair[0].phonemes.iter().map(|p| p.ipa).collect();
+            let b: Vec<&str> = pair[1].phonemes.iter().map(|p| p.ipa).collect();
+            assert_ne!(
+                a, b,
+                "consecutive syllables must differ when the melody is sized \
+                 to the real syllable count -- identical phonemes would mean \
+                 one of them is an unwanted sustain-repeat, not a real syllable"
+            );
+        }
+    }
+
+    #[test]
+    fn syllable_count_empty_lyrics_is_zero() {
+        assert_eq!(syllable_count(""), 0);
+    }
+
+    #[test]
+    fn syllabify_zero_vowels_is_one_consonant_only_syllable() {
+        let phonemes = vec![phoneme("s", false), phoneme("t", false)];
+        let syllables = syllabify(&phonemes);
+        assert_eq!(syllables.len(), 1);
+        assert_eq!(syllables[0].len(), 2);
+    }
+
+    #[test]
+    fn syllabify_single_vowel_is_one_syllable() {
+        // "ah": æ(vowel), h(consonant) -- matches the real letter-fallback
+        // output for the existing fewer_syllables_than_notes_sustains_last_vowel
+        // test, confirming this case is unaffected by the syllabifier.
+        let phonemes = vec![phoneme("æ", true), phoneme("h", false)];
+        let syllables = syllabify(&phonemes);
+        assert_eq!(syllables.len(), 1);
+        assert_eq!(syllables[0].len(), 2);
+    }
+
+    #[test]
+    fn syllabify_applies_maximal_onset_between_two_vowels() {
+        // Synthetic "h-ɛ-l-oʊ" (the real dict entry for "hello"): the
+        // consonant between the two vowels ('l') must land in the SECOND
+        // syllable's onset, not the first syllable's coda.
+        let phonemes = vec![
+            phoneme("h", false),
+            phoneme("ɛ", true),
+            phoneme("l", false),
+            phoneme("oʊ", true),
+        ];
+        let syllables = syllabify(&phonemes);
+        assert_eq!(syllables.len(), 2, "two vowel nuclei -> two syllables");
+        assert_eq!(
+            syllables[0].iter().map(|p| p.ipa).collect::<Vec<_>>(),
+            vec!["h", "ɛ"],
+            "first syllable keeps its own onset + vowel, nothing more"
+        );
+        assert_eq!(
+            syllables[1].iter().map(|p| p.ipa).collect::<Vec<_>>(),
+            vec!["l", "oʊ"],
+            "the intervocalic consonant 'l' must move to the SECOND \
+             syllable's onset (maximal onset), not stay in the first \
+             syllable's coda"
+        );
+    }
+
+    #[test]
+    fn syllabify_handles_a_word_initial_cluster_and_final_coda() {
+        // Synthetic 3-consonant-onset + vowel + 2-consonant-coda, single
+        // vowel: word-initial consonants belong to the (only) syllable's
+        // onset, word-final consonants belong to its coda -- no splitting
+        // happens since there's only one vowel nucleus.
+        let phonemes = vec![
+            phoneme("s", false),
+            phoneme("t", false),
+            phoneme("ɹ", false),
+            phoneme("iː", true),
+            phoneme("m", false),
+            phoneme("z", false),
+        ];
+        let syllables = syllabify(&phonemes);
+        assert_eq!(syllables.len(), 1);
+        assert_eq!(
+            syllables[0].len(),
+            6,
+            "all 6 phonemes stay in the one syllable"
+        );
+    }
+
+    #[test]
+    fn sing_splits_a_real_multi_syllable_dict_word_across_two_notes() {
+        // "hello" has a real dict entry (h, ɛ, l, oʊ) with two vowels --
+        // before the syllabifier, this whole word bound to exactly ONE
+        // note; now it must span two, each carrying its own syllable's
+        // phonemes and each tracking its own note's pitch.
+        let melody = [note(300.0, 0.0, 0.4, 0.8), note(500.0, 0.4, 0.4, 0.8)];
+        let syllables = sing("hello", &melody);
+        assert_eq!(
+            syllables.len(),
+            2,
+            "\"hello\" (2 vowels) sung to 2 notes should use BOTH notes for \
+             its own two syllables, not sustain a single word-syllable"
+        );
+        assert_eq!(syllables[0].note.frequency, 300.0);
+        assert_eq!(syllables[1].note.frequency, 500.0);
+        assert_ne!(
+            syllables[0]
+                .phonemes
+                .iter()
+                .map(|p| p.ipa)
+                .collect::<Vec<_>>(),
+            syllables[1]
+                .phonemes
+                .iter()
+                .map(|p| p.ipa)
+                .collect::<Vec<_>>(),
+            "the two syllables should carry genuinely different phonemes \
+             (\"he\" vs \"llo\"), not the same word repeated"
+        );
+
+        let frames = render_sung_frames(&syllables, 200.0);
+        assert!(!frames.is_empty());
+        assert!(frames.iter().all(|f| f.f0.is_finite()));
+    }
+
+    #[test]
+    fn render_sung_frames_gives_consonants_brief_natural_duration_not_an_even_split() {
+        // A long note (1.0s) with a 2-phoneme syllable (consonant "h" +
+        // vowel "ɛ") -- the OLD even-split behavior would hold "h" for
+        // 0.5s (half the note); the new behavior should hold it for its
+        // natural short duration and let the vowel absorb the rest.
+        let syllable = SungSyllable {
+            phonemes: vec![phoneme("h", false), phoneme("ɛ", true)],
+            note: note(440.0, 0.0, 1.0, 0.8),
+        };
+        let frames = render_sung_frames(&[syllable], 200.0);
+        assert!(!frames.is_empty());
+
+        let (h_f1, _, _, _) = formant_target_pub("h");
+        let consonant_frames = frames.iter().filter(|f| f.f1 == h_f1).count();
+        let consonant_secs = consonant_frames as f32 / 200.0;
+        // The phoneme() test helper sets base_duration_ms = 100.0, so the
+        // natural consonant duration is (100.0 * 0.8).max(40.0) / 1000.0
+        // = 0.08s (16 frames at 200Hz). Allow slack for frame rounding.
+        assert!(
+            consonant_secs < 0.15,
+            "consonant should occupy well under 150ms of a 1.0s note \
+             (natural duration ~80ms), got {consonant_secs}s -- the old \
+             even-split behavior would have given it 0.5s"
+        );
+
+        let vowel_secs = (frames.len() - consonant_frames) as f32 / 200.0;
+        assert!(
+            vowel_secs > 0.8,
+            "the vowel should absorb most of the note's 1.0s duration, got {vowel_secs}s"
+        );
     }
 }

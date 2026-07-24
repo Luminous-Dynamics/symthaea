@@ -1,13 +1,14 @@
 [package]
 name = "symthaea-hdc-store"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
-description = "Zero-copy mmap'd BinaryHV storage with persistent LSH index"
+description = "Zero-copy mmap'd BinaryHV storage with snapshot-accelerated LSH search"
 license = "AGPL-3.0-or-later"
 
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
 memmap2 = "0.9"
+fs2 = "0.4"
 thiserror = "2"
 
 [dev-dependencies]

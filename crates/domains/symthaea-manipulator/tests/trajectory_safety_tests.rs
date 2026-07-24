@@ -12,8 +12,9 @@
 //! - Long-horizon stability
 //! - Human proximity zone interactions with safety levels
 
+use symthaea_manipulator::embodiment::MotorSafetyLevel;
 use symthaea_manipulator::kinematics::ManipulatorKinematics;
-use symthaea_manipulator::workspace_safety::{ManipulatorSafetyLevel, WorkspaceBoundary};
+use symthaea_manipulator::workspace_safety::{ManipulatorSafetyLimits, WorkspaceBoundary};
 // ManipulatorState available if needed
 use symthaea_manipulator::simulator::{ManipulatorPhysicsSimulator, SimpleManipulatorSimulator};
 
@@ -164,7 +165,7 @@ fn test_trajectory_continuity() {
 #[test]
 fn test_clearance_decreases_toward_boundary() {
     let boundary = WorkspaceBoundary::default();
-    let safety = ManipulatorSafetyLevel::Green;
+    let safety = MotorSafetyLevel::Green;
 
     // Points at increasing radius
     let clearances: Vec<f64> = (1..=8)
@@ -192,7 +193,7 @@ fn test_clearance_negative_outside_boundary() {
     let boundary = WorkspaceBoundary::default();
 
     // Well outside workspace
-    let c = boundary.clearance(&[2.0, 0.0, 0.3], ManipulatorSafetyLevel::Green);
+    let c = boundary.clearance(&[2.0, 0.0, 0.3], MotorSafetyLevel::Green);
     assert!(
         c < 0.0,
         "Clearance outside workspace should be negative: {c}"
@@ -207,9 +208,9 @@ fn test_clearance_with_human_zone() {
     };
 
     // Near human
-    let near = boundary.clearance(&[0.3, 0.0, 0.3], ManipulatorSafetyLevel::Green);
+    let near = boundary.clearance(&[0.3, 0.0, 0.3], MotorSafetyLevel::Green);
     // Far from human
-    let far = boundary.clearance(&[0.0, 0.5, 0.3], ManipulatorSafetyLevel::Green);
+    let far = boundary.clearance(&[0.0, 0.5, 0.3], MotorSafetyLevel::Green);
 
     assert!(
         near < far,
@@ -220,7 +221,7 @@ fn test_clearance_with_human_zone() {
 #[test]
 fn test_clearance_min_height_contribution() {
     let boundary = WorkspaceBoundary::default();
-    let safety = ManipulatorSafetyLevel::Green;
+    let safety = MotorSafetyLevel::Green;
 
     // Just above min height (0.05m)
     let low = boundary.clearance(&[0.3, 0.0, 0.06], safety);
@@ -237,50 +238,37 @@ fn test_clearance_min_height_contribution() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]
-fn test_safety_level_torque_gain_ordering() {
-    let gains: Vec<f32> = [
-        ManipulatorSafetyLevel::Green,
-        ManipulatorSafetyLevel::Yellow,
-        ManipulatorSafetyLevel::Orange,
-        ManipulatorSafetyLevel::Red,
+fn test_safety_level_torque_cap_ordering() {
+    let caps: Vec<f32> = [
+        MotorSafetyLevel::Green,
+        MotorSafetyLevel::Yellow,
+        MotorSafetyLevel::Orange,
+        MotorSafetyLevel::Red,
     ]
     .iter()
-    .map(|l| l.torque_gain())
+    .map(|level| ManipulatorSafetyLimits::for_level(*level).normalized_torque_cap)
     .collect();
 
-    // Gains should be monotonically decreasing
-    for i in 1..gains.len() {
+    for i in 1..caps.len() {
         assert!(
-            gains[i] <= gains[i - 1],
-            "Torque gain should decrease with safety level: {:?}={} > {:?}={}",
-            i,
-            gains[i],
-            i - 1,
-            gains[i - 1]
+            caps[i] <= caps[i - 1],
+            "Torque cap should decrease with safety level: {caps:?}"
         );
     }
-    assert_eq!(gains[3], 0.0, "Red should have zero gain");
+    assert_eq!(caps[3], 0.0, "Red nominal torque cap should be zero");
 }
 
 #[test]
-fn test_workspace_fraction_ordering() {
-    let fractions: Vec<f64> = [
-        ManipulatorSafetyLevel::Green,
-        ManipulatorSafetyLevel::Yellow,
-        ManipulatorSafetyLevel::Orange,
-        ManipulatorSafetyLevel::Red,
-    ]
-    .iter()
-    .map(|l| l.workspace_fraction())
-    .collect();
+fn test_workspace_and_retreat_policy() {
+    let green = ManipulatorSafetyLimits::for_level(MotorSafetyLevel::Green);
+    let yellow = ManipulatorSafetyLimits::for_level(MotorSafetyLevel::Yellow);
+    let orange = ManipulatorSafetyLimits::for_level(MotorSafetyLevel::Orange);
+    let red = ManipulatorSafetyLimits::for_level(MotorSafetyLevel::Red);
 
-    for i in 1..fractions.len() {
-        assert!(
-            fractions[i] <= fractions[i - 1],
-            "Workspace fraction should decrease: {:?}",
-            fractions
-        );
-    }
+    assert!(yellow.workspace_fraction < green.workspace_fraction);
+    assert!(orange.retreat_required);
+    assert!(!red.retreat_required);
+    assert_eq!(red.normalized_torque_cap, 0.0);
 }
 
 #[test]
@@ -288,25 +276,26 @@ fn test_position_inside_green_but_outside_yellow() {
     let boundary = WorkspaceBoundary::default();
     // Position near max reach (0.855m): inside Green (100%) but outside Yellow (80% = 0.684m)
     let pos: [f64; 3] = [0.7, 0.0, 0.3];
-    let radius = (pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]).sqrt();
-
     assert!(
-        boundary.is_within(&pos, ManipulatorSafetyLevel::Green),
+        boundary.is_within(&pos, MotorSafetyLevel::Green),
         "Should be inside Green workspace"
     );
     assert!(
-        !boundary.is_within(&pos, ManipulatorSafetyLevel::Yellow),
+        !boundary.is_within(&pos, MotorSafetyLevel::Yellow),
         "Should be outside Yellow workspace (80%)"
     );
 }
 
 #[test]
-fn test_orange_red_workspace_zero() {
+fn test_orange_and_red_keep_physical_workspace_geometry() {
     let boundary = WorkspaceBoundary::default();
-    // Any position should be outside Orange/Red workspace (fraction = 0)
     let center = [0.0, 0.0, 0.3];
-    assert!(!boundary.is_within(&center, ManipulatorSafetyLevel::Orange));
-    assert!(!boundary.is_within(&center, ManipulatorSafetyLevel::Red));
+
+    // Retreat/hold is a command policy, not a claim that physical space
+    // ceases to exist. The final-authority supervisor handles those modes.
+    assert!(boundary.is_within(&center, MotorSafetyLevel::Orange));
+    assert!(boundary.is_within(&center, MotorSafetyLevel::Red));
+    assert!(ManipulatorSafetyLimits::for_level(MotorSafetyLevel::Orange).retreat_required);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -324,11 +313,11 @@ fn test_multiple_human_zones() {
     };
 
     // Near human 1
-    assert!(!boundary.is_within(&[0.25, 0.0, 0.3], ManipulatorSafetyLevel::Green));
+    assert!(!boundary.is_within(&[0.25, 0.0, 0.3], MotorSafetyLevel::Green));
     // Near human 2
-    assert!(!boundary.is_within(&[-0.25, 0.0, 0.3], ManipulatorSafetyLevel::Green));
+    assert!(!boundary.is_within(&[-0.25, 0.0, 0.3], MotorSafetyLevel::Green));
     // Between both humans (should be safe)
-    assert!(boundary.is_within(&[0.0, 0.0, 0.3], ManipulatorSafetyLevel::Green));
+    assert!(boundary.is_within(&[0.0, 0.0, 0.3], MotorSafetyLevel::Green));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

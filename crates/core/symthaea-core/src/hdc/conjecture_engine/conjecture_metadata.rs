@@ -158,11 +158,6 @@ pub(crate) fn clear_eml_metadata_cache() {
     EML_METADATA_CACHE.write().clear();
 }
 
-#[cfg(test)]
-pub(crate) fn eml_metadata_cache_size() -> usize {
-    EML_METADATA_CACHE.read().len()
-}
-
 /// Beta-distribution confidence tracker for conjectures.
 #[derive(Debug, Clone)]
 pub struct BayesianConfidence {
@@ -243,10 +238,11 @@ impl ConjectureEngine {
 
             if all_match && checked > 10 {
                 confidence.record_success(3.0);
-                conjecture.status = ConjectureStatus::FormallyVerified {
-                    proof_steps: checked,
+                conjecture.status = ConjectureStatus::BoundedChecked {
+                    checked_points: checked,
+                    max_n,
                 };
-                elevate_macro_promotion_tier(conjecture, MacroPromotionTier::Formal);
+                elevate_macro_promotion_tier(conjecture, MacroPromotionTier::RecurrentNumerical);
             }
 
             conjecture.confidence = confidence.mean();

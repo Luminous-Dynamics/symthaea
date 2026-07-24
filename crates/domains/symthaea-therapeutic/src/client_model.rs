@@ -4,15 +4,18 @@
 //! Client psychological state tracking.
 //!
 //! Maintains a longitudinal model of the client's psychological state including
-//! current affect, RDoC dimensional profile, diagnostic hypotheses, presenting
-//! concerns, and CBT/narrative formulation elements.
+//! current affect, RDoC dimensional profile, presenting concerns, and
+//! CBT/narrative formulation elements. Named diagnostic hypotheses are an
+//! explicit research-only feature and are absent from default builds.
 //!
 //! Science: Persons (2008) case formulation, Beck (1979) cognitive model,
 //! Borsboom (2017) network theory, Fried & Nesse (2015) symptom specificity.
 
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use symthaea_clinical::{DiagnosticProfile, RDocDomain, RDocProfile, SymptomProfile};
+#[cfg(feature = "experimental-diagnostic-hypotheses")]
+use symthaea_clinical::DiagnosticProfile;
+use symthaea_clinical::{RDocDomain, RDocProfile, SymptomProfile};
 use symthaea_core::hdc::BinaryHV;
 
 /// Maximum number of affect snapshots retained in trajectory.
@@ -94,7 +97,8 @@ pub struct ClientModel {
     pub current_affect: CoreAffectSnapshot,
     /// Dimensional RDoC profile.
     pub rdoc_profile: RDocProfile,
-    /// Active diagnostic hypotheses (ranked by confidence).
+    /// Research-only named diagnostic hypotheses (ranked by confidence).
+    #[cfg(feature = "experimental-diagnostic-hypotheses")]
     pub diagnostic_hypotheses: Vec<DiagnosticProfile>,
     /// Presenting concerns as HDC-encoded vectors.
     #[serde(skip)]
@@ -131,6 +135,7 @@ impl ClientModel {
         Self {
             current_affect: CoreAffectSnapshot::neutral(0),
             rdoc_profile: RDocProfile::default(),
+            #[cfg(feature = "experimental-diagnostic-hypotheses")]
             diagnostic_hypotheses: Vec::new(),
             presenting_concerns: Vec::new(),
             affect_trajectory: VecDeque::new(),
@@ -209,7 +214,8 @@ impl ClientModel {
         self.rdoc_profile.set_score(domain, score);
     }
 
-    /// Add a diagnostic hypothesis.
+    /// Add a named diagnostic hypothesis to the research-only model surface.
+    #[cfg(feature = "experimental-diagnostic-hypotheses")]
     pub fn add_hypothesis(&mut self, profile: DiagnosticProfile) {
         self.diagnostic_hypotheses.push(profile);
         // Keep sorted by confidence (descending)
@@ -225,9 +231,18 @@ impl ClientModel {
         self.session_count += 1;
     }
 
-    /// Clinical severity from RDoC profile.
-    pub fn clinical_severity(&self) -> f32 {
+    /// Continuous RDoC burden index reported by the dimensional profile.
+    ///
+    /// This is a model-derived tracking value, not a diagnosis or administered
+    /// clinical assessment.
+    pub fn rdoc_burden_index(&self) -> f32 {
         self.rdoc_profile.clinical_severity()
+    }
+
+    /// Compatibility alias for [`Self::rdoc_burden_index`].
+    #[deprecated(note = "use rdoc_burden_index; this value is not clinical severity")]
+    pub fn clinical_severity(&self) -> f32 {
+        self.rdoc_burden_index()
     }
 
     /// Update RDoC profile from sustained affect patterns.
@@ -281,197 +296,199 @@ impl ClientModel {
         );
     }
 
-    // ── Outcome Measurement ─────────────────────────────────────────────
+    // ── Model-Inferred Outcome Tracking ─────────────────────────────────
 
-    /// PHQ-9 analogue score (0–27): depression severity from affect trajectory.
+    /// Model-inferred negative-affect burden in the range 0.0–1.0.
     ///
-    /// Maps sustained negative valence, low positive valence, arousal dysregulation,
-    /// and functional impairment to the PHQ-9 scale. NOT a clinical instrument —
-    /// this is a computational analogue for tracking treatment progress.
-    ///
-    /// Scoring: 0-4 minimal, 5-9 mild, 10-14 moderate, 15-19 moderately severe, 20-27 severe.
-    ///
-    /// Science: Kroenke, Spitzer & Williams (2001). The PHQ-9: validity of a brief
-    /// depression severity measure. *Journal of General Internal Medicine*, 16(9), 606-613.
-    pub fn phq9_analogue(&self) -> f32 {
+    /// Returns `None` until at least ten affect observations are available.
+    /// The value is derived from affect and RDoC state; no questionnaire was
+    /// administered and no diagnostic interpretation is valid.
+    pub fn negative_affect_burden(&self) -> Option<f32> {
         if self.affect_trajectory.len() < 10 {
-            return 0.0; // Insufficient data
+            return None;
         }
 
         let window = self.affect_trajectory.len().min(50);
         let recent: Vec<&CoreAffectSnapshot> =
             self.affect_trajectory.iter().rev().take(window).collect();
 
-        // PHQ-9 domains mapped to computational signals:
-        // 1. Little interest/pleasure → low positive valence (anhedonia)
         let mean_pos = recent.iter().map(|a| a.valence.max(0.0)).sum::<f32>() / window as f32;
-        let anhedonia = (1.0 - mean_pos * 2.0).clamp(0.0, 1.0); // 0=engaged, 1=anhedonic
+        let reduced_positive_affect = (1.0 - mean_pos * 2.0).clamp(0.0, 1.0);
 
-        // 2. Feeling down/depressed → sustained negative valence
         let mean_neg = recent.iter().map(|a| (-a.valence).max(0.0)).sum::<f32>() / window as f32;
-        let depressed_mood = mean_neg.clamp(0.0, 1.0);
+        let sustained_negative_affect = mean_neg.clamp(0.0, 1.0);
 
-        // 3. Sleep disturbance → arousal dysregulation (proxy)
         let arousal_variance = {
             let mean_arousal = recent.iter().map(|a| a.arousal).sum::<f32>() / window as f32;
-            let var = recent
+            let variance = recent
                 .iter()
                 .map(|a| (a.arousal - mean_arousal).powi(2))
                 .sum::<f32>()
                 / window as f32;
-            var.sqrt()
+            variance.sqrt()
         };
-        let sleep_disturbance = (arousal_variance * 4.0).clamp(0.0, 1.0);
+        let arousal_instability = (arousal_variance * 4.0).clamp(0.0, 1.0);
 
-        // 4. Fatigue → low arousal (sustained)
         let mean_arousal = recent.iter().map(|a| a.arousal).sum::<f32>() / window as f32;
-        let fatigue = ((0.5 - mean_arousal).max(0.0) * 3.0).clamp(0.0, 1.0);
+        let low_activation = ((0.5 - mean_arousal).max(0.0) * 3.0).clamp(0.0, 1.0);
+        let cognitive_burden = self.rdoc_profile.score(RDocDomain::CognitiveSystems);
+        let activation_extremity = ((mean_arousal - 0.5).abs() * 2.5).clamp(0.0, 1.0);
 
-        // 5. Poor concentration → from RDoC CognitiveSystems
-        let cognitive_impairment = self.rdoc_profile.score(RDocDomain::CognitiveSystems);
+        let negative_valence = self.rdoc_profile.score(RDocDomain::NegativeValence);
+        let social_processes = self.rdoc_profile.score(RDocDomain::SocialProcesses);
+        let social_negative_burden =
+            ((negative_valence + (1.0 - social_processes)) * 0.5).clamp(0.0, 1.0);
 
-        // 6. Psychomotor → extreme arousal (too high OR too low)
-        let psychomotor = ((mean_arousal - 0.5).abs() * 2.5).clamp(0.0, 1.0);
-
-        // 7. Worthlessness → RDoC NegativeValence + low social
-        let neg_val = self.rdoc_profile.score(RDocDomain::NegativeValence);
-        let social = self.rdoc_profile.score(RDocDomain::SocialProcesses);
-        let worthlessness = ((neg_val + (1.0 - social)) * 0.5).clamp(0.0, 1.0);
-
-        // 8-9. Suicidal ideation → risk level
-        let suicidal = match self.risk_level {
+        let safety_concern = match self.risk_level {
             RiskLevel::None | RiskLevel::Low => 0.0,
             RiskLevel::Moderate => 0.33,
             RiskLevel::High => 0.67,
             RiskLevel::Critical => 1.0,
         };
 
-        // Each domain scored 0-3 (PHQ-9 Likert), sum across 9 items → 0-27
-        let items = [
-            anhedonia,
-            depressed_mood,
-            sleep_disturbance,
-            fatigue,
-            cognitive_impairment,
-            psychomotor,
-            worthlessness,
-            suicidal,
-            // 9th item: overall functional impairment (mean distress)
+        let dimensions = [
+            reduced_positive_affect,
+            sustained_negative_affect,
+            arousal_instability,
+            low_activation,
+            cognitive_burden,
+            activation_extremity,
+            social_negative_burden,
+            safety_concern,
             self.distress(),
         ];
-        items.iter().map(|d| d * 3.0).sum::<f32>().clamp(0.0, 27.0)
+        Some((dimensions.iter().sum::<f32>() / dimensions.len() as f32).clamp(0.0, 1.0))
     }
 
-    /// GAD-7 analogue score (0–21): anxiety severity from affect trajectory.
+    /// Model-inferred anxious-activation burden in the range 0.0–1.0.
     ///
-    /// Maps sustained high arousal, arousal dysregulation, and RDoC negative valence
-    /// to the GAD-7 scale. NOT a clinical instrument — computational analogue.
-    ///
-    /// Scoring: 0-4 minimal, 5-9 mild, 10-14 moderate, 15-21 severe.
-    ///
-    /// Science: Spitzer, Kroenke, Williams & Löwe (2006). A brief measure for
-    /// assessing generalized anxiety disorder. *Archives of Internal Medicine*, 166(10), 1092-1097.
-    pub fn gad7_analogue(&self) -> f32 {
+    /// Returns `None` until at least ten affect observations are available.
+    pub fn anxious_activation_burden(&self) -> Option<f32> {
         if self.affect_trajectory.len() < 10 {
-            return 0.0;
+            return None;
         }
 
         let window = self.affect_trajectory.len().min(50);
         let recent: Vec<&CoreAffectSnapshot> =
             self.affect_trajectory.iter().rev().take(window).collect();
 
-        // GAD-7 domains:
-        // 1. Feeling nervous/anxious → high arousal + negative valence
         let mean_arousal = recent.iter().map(|a| a.arousal).sum::<f32>() / window as f32;
         let mean_neg = recent.iter().map(|a| (-a.valence).max(0.0)).sum::<f32>() / window as f32;
-        let nervous = ((mean_arousal - 0.5).max(0.0) * 2.0 * 0.5 + mean_neg * 0.5).clamp(0.0, 1.0);
+        let activated_negative_affect =
+            (((mean_arousal - 0.5).max(0.0) * 2.0) * 0.5 + mean_neg * 0.5).clamp(0.0, 1.0);
 
-        // 2. Not being able to stop worrying → RDoC NegativeValence persistence
-        let neg_val = self.rdoc_profile.score(RDocDomain::NegativeValence);
-        let worry = neg_val.clamp(0.0, 1.0);
+        let negative_valence = self.rdoc_profile.score(RDocDomain::NegativeValence);
+        let persistent_negative_affect = negative_valence.clamp(0.0, 1.0);
+        let combined_activation =
+            (activated_negative_affect * 0.7 + persistent_negative_affect * 0.3).clamp(0.0, 1.0);
+        let regulatory_burden = self
+            .rdoc_profile
+            .score(RDocDomain::ArousalRegulatory)
+            .clamp(0.0, 1.0);
+        let restlessness = ((mean_arousal - 0.6).max(0.0) * 3.0).clamp(0.0, 1.0);
 
-        // 3. Worrying too much → arousal + negative valence combined
-        let excessive_worry = (nervous * 0.7 + worry * 0.3).clamp(0.0, 1.0);
-
-        // 4. Trouble relaxing → arousal dysregulation
-        let arousal_dysreg = self.rdoc_profile.score(RDocDomain::ArousalRegulatory);
-        let trouble_relaxing = arousal_dysreg.clamp(0.0, 1.0);
-
-        // 5. Restlessness → high arousal sustained
-        let restless = ((mean_arousal - 0.6).max(0.0) * 3.0).clamp(0.0, 1.0);
-
-        // 6. Easily annoyed/irritable → high arousal + negative valence + arousal variance
-        let arousal_var = {
-            let var = recent
+        let arousal_variability = {
+            let variance = recent
                 .iter()
                 .map(|a| (a.arousal - mean_arousal).powi(2))
                 .sum::<f32>()
                 / window as f32;
-            var.sqrt()
+            variance.sqrt()
         };
-        let irritable = (mean_neg * 0.4 + arousal_var * 2.0 * 0.3 + restless * 0.3).clamp(0.0, 1.0);
+        let irritability_proxy =
+            (mean_neg * 0.4 + arousal_variability * 2.0 * 0.3 + restlessness * 0.3).clamp(0.0, 1.0);
+        let fear_burden = (negative_valence * 0.6 + mean_neg * 0.4).clamp(0.0, 1.0);
 
-        // 7. Feeling afraid → RDoC NegativeValence (fear component)
-        let afraid = (neg_val * 0.6 + mean_neg * 0.4).clamp(0.0, 1.0);
-
-        let items = [
-            nervous,
-            worry,
-            excessive_worry,
-            trouble_relaxing,
-            restless,
-            irritable,
-            afraid,
+        let dimensions = [
+            activated_negative_affect,
+            persistent_negative_affect,
+            combined_activation,
+            regulatory_burden,
+            restlessness,
+            irritability_proxy,
+            fear_burden,
         ];
-        items.iter().map(|d| d * 3.0).sum::<f32>().clamp(0.0, 21.0)
+        Some((dimensions.iter().sum::<f32>() / dimensions.len() as f32).clamp(0.0, 1.0))
     }
 
-    /// Outcome Rating Scale analogue (0-40): overall functioning.
+    /// Model-inferred functional wellbeing in the range 0.0–1.0.
     ///
-    /// Maps positive valence, low distress, social engagement, and arousal
-    /// regulation to a composite functioning score. Higher = better.
-    ///
-    /// Science: Miller, Duncan, Brown, Sparks & Claud (2003). The Outcome Rating
-    /// Scale: A preliminary study of the reliability, validity, and feasibility.
-    /// *Journal of Brief Therapy*, 2(2), 91-100.
-    pub fn ors_analogue(&self) -> f32 {
+    /// Returns `None` until at least ten affect observations are available.
+    pub fn functional_wellbeing(&self) -> Option<f32> {
         if self.affect_trajectory.len() < 10 {
-            return 20.0; // Neutral midpoint
+            return None;
         }
 
         let window = self.affect_trajectory.len().min(50);
         let recent: Vec<&CoreAffectSnapshot> =
             self.affect_trajectory.iter().rev().take(window).collect();
-
-        // ORS 4 domains (each 0-10):
-        // 1. Individual wellbeing → valence
         let mean_valence = recent.iter().map(|a| a.valence).sum::<f32>() / window as f32;
-        let individual = ((mean_valence + 1.0) / 2.0 * 10.0).clamp(0.0, 10.0);
 
-        // 2. Interpersonal → RDoC SocialProcesses
-        let social = self.rdoc_profile.score(RDocDomain::SocialProcesses);
-        let interpersonal = (social * 10.0).clamp(0.0, 10.0);
+        let individual_wellbeing = ((mean_valence + 1.0) / 2.0).clamp(0.0, 1.0);
+        let interpersonal_resources = self
+            .rdoc_profile
+            .score(RDocDomain::SocialProcesses)
+            .clamp(0.0, 1.0);
+        let role_functioning = (1.0 - self.distress()).clamp(0.0, 1.0);
+        let positive_valence = self.rdoc_profile.score(RDocDomain::PositiveValence);
+        let overall_wellbeing =
+            (positive_valence * 0.5 + (1.0 - self.distress()) * 0.5).clamp(0.0, 1.0);
 
-        // 3. Social role → inverse of distress + arousal regulation
-        let distress = self.distress();
-        let social_role = ((1.0 - distress) * 10.0).clamp(0.0, 10.0);
-
-        // 4. Overall → composite of above
-        let pos_valence = self.rdoc_profile.score(RDocDomain::PositiveValence);
-        let overall = ((pos_valence * 0.5 + (1.0 - distress) * 0.5) * 10.0).clamp(0.0, 10.0);
-
-        individual + interpersonal + social_role + overall
+        Some(
+            ((individual_wellbeing
+                + interpersonal_resources
+                + role_functioning
+                + overall_wellbeing)
+                / 4.0)
+                .clamp(0.0, 1.0),
+        )
     }
 
-    /// Therapeutic outcome summary combining all analogue measures.
-    ///
-    /// Returns (phq9, gad7, ors, trend) where trend is computed from
-    /// comparing current vs earlier window means.
+    /// Return outcome metrics with explicit model provenance and instrument status.
+    pub fn inferred_outcome_metrics(&self) -> InferredOutcomeMetrics {
+        InferredOutcomeMetrics {
+            negative_affect_burden: self.negative_affect_burden(),
+            anxious_activation_burden: self.anxious_activation_burden(),
+            functional_wellbeing: self.functional_wellbeing(),
+            affect_trend: self.affect_trend(),
+            observations_available: self.affect_trajectory.len(),
+            observations_used: self.affect_trajectory.len().min(50),
+            cycles_observed: self.cycle_count,
+            sessions: self.session_count,
+            source: OutcomeMetricSource::ModelInferenceFromAffectAndRDoc,
+            instrument_status: InstrumentAdministrationStatus::NotAdministered,
+        }
+    }
+
+    /// Compatibility-only mapping onto the PHQ-9 numerical range.
+    #[cfg(feature = "legacy-clinical-scale-analogues")]
+    #[deprecated(note = "not a PHQ-9; use negative_affect_burden")]
+    pub fn phq9_analogue(&self) -> f32 {
+        self.negative_affect_burden().unwrap_or(0.0) * 27.0
+    }
+
+    /// Compatibility-only mapping onto the GAD-7 numerical range.
+    #[cfg(feature = "legacy-clinical-scale-analogues")]
+    #[deprecated(note = "not a GAD-7; use anxious_activation_burden")]
+    pub fn gad7_analogue(&self) -> f32 {
+        self.anxious_activation_burden().unwrap_or(0.0) * 21.0
+    }
+
+    /// Compatibility-only mapping onto the ORS numerical range.
+    #[cfg(feature = "legacy-clinical-scale-analogues")]
+    #[deprecated(note = "not an ORS administration; use functional_wellbeing")]
+    pub fn ors_analogue(&self) -> f32 {
+        self.functional_wellbeing().unwrap_or(0.5) * 40.0
+    }
+
+    /// Compatibility-only summary using clinical-instrument-like ranges.
+    #[cfg(feature = "legacy-clinical-scale-analogues")]
+    #[deprecated(note = "use inferred_outcome_metrics with explicit provenance")]
     pub fn outcome_summary(&self) -> OutcomeSummary {
         OutcomeSummary {
-            phq9: self.phq9_analogue(),
-            gad7: self.gad7_analogue(),
-            ors: self.ors_analogue(),
+            phq9: self.negative_affect_burden().unwrap_or(0.0) * 27.0,
+            gad7: self.anxious_activation_burden().unwrap_or(0.0) * 21.0,
+            ors: self.functional_wellbeing().unwrap_or(0.5) * 40.0,
             affect_trend: self.affect_trend(),
             cycles_observed: self.cycle_count,
             sessions: self.session_count,
@@ -479,18 +496,59 @@ impl ClientModel {
     }
 }
 
-/// Therapeutic outcome summary.
+/// Provenance of values in [`InferredOutcomeMetrics`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum OutcomeMetricSource {
+    /// Derived from the internal affect trajectory and RDoC dimensional state.
+    ModelInferenceFromAffectAndRDoc,
+}
+
+/// Whether a validated questionnaire was actually administered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum InstrumentAdministrationStatus {
+    /// No questionnaire was administered; values are model-derived only.
+    NotAdministered,
+}
+
+/// Neutral, normalized outcome-tracking metrics with explicit provenance.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct InferredOutcomeMetrics {
+    /// Model-derived negative-affect burden (0.0–1.0), or `None` if insufficient data.
+    pub negative_affect_burden: Option<f32>,
+    /// Model-derived anxious activation (0.0–1.0), or `None` if insufficient data.
+    pub anxious_activation_burden: Option<f32>,
+    /// Model-derived functional wellbeing (0.0–1.0), or `None` if insufficient data.
+    pub functional_wellbeing: Option<f32>,
+    /// Affect trend (positive = improving).
+    pub affect_trend: f32,
+    /// Total affect observations currently retained.
+    pub observations_available: usize,
+    /// Number of observations used by the bounded calculation window.
+    pub observations_used: usize,
+    /// Cycles observed.
+    pub cycles_observed: u64,
+    /// Sessions completed.
+    pub sessions: u32,
+    /// How these values were produced.
+    pub source: OutcomeMetricSource,
+    /// Explicit statement that no named questionnaire produced these values.
+    pub instrument_status: InstrumentAdministrationStatus,
+}
+
+/// Legacy clinical-scale-like outcome summary.
+#[cfg(feature = "legacy-clinical-scale-analogues")]
+#[deprecated(note = "use InferredOutcomeMetrics")]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct OutcomeSummary {
-    /// PHQ-9 analogue (0-27). Lower = better. <5 minimal, 5-9 mild, 10-14 moderate.
+    /// Compatibility-only PHQ-9-range mapping; not an administered PHQ-9.
     pub phq9: f32,
-    /// GAD-7 analogue (0-21). Lower = better. <5 minimal, 5-9 mild, 10-14 moderate.
+    /// Compatibility-only GAD-7-range mapping; not an administered GAD-7.
     pub gad7: f32,
-    /// ORS analogue (0-40). Higher = better. <25 clinical concern, >25 adequate functioning.
+    /// Compatibility-only ORS-range mapping; not an administered ORS.
     pub ors: f32,
     /// Affect trend (positive = improving).
     pub affect_trend: f32,
-    /// Cycles observed (data quality indicator).
+    /// Cycles observed.
     pub cycles_observed: u64,
     /// Sessions completed.
     pub sessions: u32,
@@ -507,6 +565,7 @@ impl Default for ClientModel {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "experimental-diagnostic-hypotheses")]
     use symthaea_clinical::{DiagnosticCategory, Severity};
 
     #[test]
@@ -568,6 +627,7 @@ mod tests {
         assert!(client.affect_trend() > 0.0);
     }
 
+    #[cfg(feature = "experimental-diagnostic-hypotheses")]
     #[test]
     fn test_add_hypothesis_sorted() {
         let mut client = ClientModel::new();
@@ -649,8 +709,53 @@ mod tests {
         );
     }
 
-    // ── Outcome Measure Tests ──────────────────────────────────────────
+    // ── Model-Inferred Outcome Tests ───────────────────────────────────
 
+    #[test]
+    fn inferred_metrics_report_insufficient_data_as_missing() {
+        let mut client = ClientModel::new();
+        for i in 0..5 {
+            client.update_affect(CoreAffectSnapshot::new(-0.9, 0.9, i));
+        }
+        let metrics = client.inferred_outcome_metrics();
+        assert_eq!(metrics.negative_affect_burden, None);
+        assert_eq!(metrics.anxious_activation_burden, None);
+        assert_eq!(metrics.functional_wellbeing, None);
+        assert_eq!(
+            metrics.instrument_status,
+            InstrumentAdministrationStatus::NotAdministered
+        );
+        assert_eq!(
+            metrics.source,
+            OutcomeMetricSource::ModelInferenceFromAffectAndRDoc
+        );
+    }
+
+    #[test]
+    fn inferred_metrics_are_normalized_and_explicitly_not_instruments() {
+        let mut client = ClientModel::new();
+        for i in 0..50 {
+            client.update_affect(CoreAffectSnapshot::new(-0.4, 0.7, i));
+        }
+        let metrics = client.inferred_outcome_metrics();
+        for value in [
+            metrics.negative_affect_burden,
+            metrics.anxious_activation_burden,
+            metrics.functional_wellbeing,
+        ] {
+            let value = value.expect("sufficient observations should produce a value");
+            assert!((0.0..=1.0).contains(&value));
+        }
+        assert_eq!(metrics.observations_used, 50);
+        assert_eq!(
+            metrics.instrument_status,
+            InstrumentAdministrationStatus::NotAdministered
+        );
+    }
+
+    // ── Legacy Clinical-Scale Compatibility Tests ───────────────────────
+
+    #[cfg(feature = "legacy-clinical-scale-analogues")]
     #[test]
     fn test_phq9_minimal_for_positive_affect() {
         let mut client = ClientModel::new();
@@ -665,6 +770,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "legacy-clinical-scale-analogues")]
     #[test]
     fn test_phq9_elevated_for_depressed_affect() {
         let mut client = ClientModel::new();
@@ -679,6 +785,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "legacy-clinical-scale-analogues")]
     #[test]
     fn test_phq9_range() {
         let mut client = ClientModel::new();
@@ -694,6 +801,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "legacy-clinical-scale-analogues")]
     #[test]
     fn test_phq9_insufficient_data() {
         let mut client = ClientModel::new();
@@ -703,6 +811,7 @@ mod tests {
         assert_eq!(client.phq9_analogue(), 0.0, "Insufficient data returns 0");
     }
 
+    #[cfg(feature = "legacy-clinical-scale-analogues")]
     #[test]
     fn test_gad7_minimal_for_calm_affect() {
         let mut client = ClientModel::new();
@@ -717,6 +826,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "legacy-clinical-scale-analogues")]
     #[test]
     fn test_gad7_elevated_for_anxious_affect() {
         let mut client = ClientModel::new();
@@ -732,6 +842,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "legacy-clinical-scale-analogues")]
     #[test]
     fn test_gad7_range() {
         let mut client = ClientModel::new();
@@ -748,6 +859,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "legacy-clinical-scale-analogues")]
     #[test]
     fn test_ors_high_for_positive_functioning() {
         let mut client = ClientModel::new();
@@ -764,6 +876,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "legacy-clinical-scale-analogues")]
     #[test]
     fn test_ors_low_for_impaired_functioning() {
         let mut client = ClientModel::new();
@@ -779,6 +892,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "legacy-clinical-scale-analogues")]
     #[test]
     fn test_outcome_summary() {
         let mut client = ClientModel::new();

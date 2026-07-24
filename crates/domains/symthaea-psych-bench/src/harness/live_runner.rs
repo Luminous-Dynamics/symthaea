@@ -193,20 +193,148 @@ impl CognitiveLoopBenchmarkRunner {
         let hv = ContinuousHV::random(dim, 0xBEEF_CAFE);
         let result = self.service.cycle_with_hv(&hv);
         let md = &result.metadata;
-        if md.structural_micro_phi > 0.0 || md.structural_macro_phi > 0.0 {
+        if md.structural.structural_micro_phi > 0.0 || md.structural.structural_macro_phi > 0.0 {
             Some(
                 crate::benchmarks::butlin::report::RuntimeConsciousnessData::from_structural(
-                    md.structural_micro_phi,
-                    md.structural_meso_phi,
-                    md.structural_macro_phi,
-                    md.structural_bottleneck,
-                    md.structural_emergence_ratio,
-                    md.structural_num_clusters,
+                    md.structural.structural_micro_phi,
+                    md.structural.structural_meso_phi,
+                    md.structural.structural_macro_phi,
+                    md.structural.structural_bottleneck,
+                    md.structural.structural_emergence_ratio,
+                    md.structural.structural_num_clusters,
                 ),
             )
         } else {
             None
         }
+    }
+
+    /// Measure the 11 real, mechanism-specific behavioral signals available
+    /// via `ablation::measure_indicator` (RPT-1, RPT-2, GWT-2, GWT-3, GWT-4,
+    /// HOT-1, HOT-2, HOT-3, PP-1, PP-2, AST-1), by reusing that same probe
+    /// code against this runner's own (non-ablated) service. GWT-1 and IIT-1
+    /// aren't measured here — see `report::BehavioralIndicatorSignals`'s doc
+    /// comment for why. HOT-4 needs no cognitive loop at all — see
+    /// `measure_hot4_sparse_smooth_coding`.
+    ///
+    /// `num_cycles` is passed straight through to `measure_indicator`, which
+    /// discards its own first 20 cycles as warmup — same as the ablation
+    /// matrix's default of 200.
+    pub fn snapshot_behavioral_indicators(
+        &mut self,
+        num_cycles: usize,
+    ) -> crate::benchmarks::butlin::report::BehavioralIndicatorSignals {
+        use crate::benchmarks::butlin::ablation::measure_indicator;
+        // Computed first: measure_hot4_sparse_smooth_coding takes &mut self
+        // (not just &mut self.service), so it can't be interleaved with the
+        // self.service-borrowing fields below in the same struct literal.
+        let hot4 = self.measure_hot4_sparse_smooth_coding(5);
+        crate::benchmarks::butlin::report::BehavioralIndicatorSignals {
+            rpt1_temporal_coherence: measure_indicator(&mut self.service, "RPT-1", num_cycles),
+            rpt2_binding_activity: measure_indicator(&mut self.service, "RPT-2", num_cycles),
+            gwt2_bounded_coalition: measure_indicator(&mut self.service, "GWT-2", num_cycles),
+            gwt3_broadcast_activity: measure_indicator(&mut self.service, "GWT-3", num_cycles),
+            gwt4_state_dependent_attention: measure_indicator(
+                &mut self.service,
+                "GWT-4",
+                num_cycles,
+            ),
+            hot1_prediction_differentiation: measure_indicator(
+                &mut self.service,
+                "HOT-1",
+                num_cycles,
+            ),
+            hot2_meta_cognitive_accuracy: measure_indicator(&mut self.service, "HOT-2", num_cycles),
+            hot3_effective_lr: measure_indicator(&mut self.service, "HOT-3", num_cycles),
+            pp1_effective_lr: measure_indicator(&mut self.service, "PP-1", num_cycles),
+            pp2_hierarchical_activity: measure_indicator(&mut self.service, "PP-2", num_cycles),
+            ast1_attention_focus: measure_indicator(&mut self.service, "AST-1", num_cycles),
+            hot4_sparsity: hot4.0,
+            hot4_smoothness: hot4.1,
+        }
+    }
+
+    /// HOT-4 ("sparse and smooth neural coding"): unlike the other 11
+    /// indicators, this needs no cognitive loop at all — sparsity and
+    /// smoothness are properties of the encoded representations themselves.
+    ///
+    /// Sparsity: fraction of output dimensions with magnitude below 5% of
+    /// the vector's own max magnitude, averaged over `num_samples` distinct
+    /// inputs. Smoothness: correlation between input-perturbation magnitude
+    /// and output dissimilarity — a genuinely smooth code should have
+    /// small perturbations produce small (not discontinuous) output changes.
+    /// Returns `(sparsity, smoothness)`, both in `[0, 1]`.
+    pub fn measure_hot4_sparse_smooth_coding(&mut self, num_samples: usize) -> (f64, f64) {
+        let dim = self.service.state_dim();
+        let base_inputs = [
+            "The quick brown fox jumps over the lazy dog",
+            "A neural network learns to predict sequences",
+            "Consciousness emerges from integrated information",
+            "Working memory maintains active representations",
+            "Prediction errors drive learning and adaptation",
+        ];
+
+        // Sparsity: average fraction of near-zero dimensions across samples.
+        let mut sparsity_sum = 0.0;
+        for i in 0..num_samples {
+            let input = base_inputs[i % base_inputs.len()];
+            let result = self.service.cycle(input);
+            let max_mag = result.output.iter().fold(0.0f32, |m, &v| m.max(v.abs()));
+            if max_mag <= 0.0 {
+                continue;
+            }
+            let threshold = max_mag * 0.05;
+            let near_zero = result
+                .output
+                .iter()
+                .filter(|&&v| v.abs() < threshold)
+                .count();
+            sparsity_sum += near_zero as f64 / dim.max(1) as f64;
+        }
+        let sparsity = sparsity_sum / num_samples.max(1) as f64;
+
+        // Smoothness: perturb one input by growing amounts of injected noise
+        // and check that output dissimilarity grows monotonically-ish with
+        // perturbation size, rather than jumping discontinuously.
+        let base_hv = ContinuousHV::random(dim, 0x5A17_C0DE);
+        let base_result = self.service.cycle_with_hv(&base_hv);
+        let perturbation_levels: [f32; 5] = [0.05, 0.15, 0.30, 0.50, 0.75];
+        let mut prev_dissimilarity = 0.0;
+        let mut monotonic_steps = 0u32;
+        for (i, &level) in perturbation_levels.iter().enumerate() {
+            let noise = ContinuousHV::random(dim, 0x5A17_C0DE + i as u64 + 1);
+            let perturbed =
+                ContinuousHV::weighted_bundle(&[&base_hv, &noise], &[1.0 - level, level]);
+            let result = self.service.cycle_with_hv(&perturbed);
+            let sim = symthaea_core::math::cosine_similarity_f64(
+                &base_result
+                    .output
+                    .iter()
+                    .map(|&v| v as f64)
+                    .collect::<Vec<_>>(),
+                &result.output.iter().map(|&v| v as f64).collect::<Vec<_>>(),
+            );
+            let dissimilarity = 1.0 - sim;
+            if dissimilarity >= prev_dissimilarity - 0.05 {
+                monotonic_steps += 1;
+            }
+            prev_dissimilarity = dissimilarity;
+        }
+        let smoothness = monotonic_steps as f64 / perturbation_levels.len() as f64;
+
+        (sparsity.clamp(0.0, 1.0), smoothness.clamp(0.0, 1.0))
+    }
+
+    /// Snapshot both structural Phi and the real behavioral signals into a
+    /// single `RuntimeConsciousnessData`, for callers that want the full
+    /// (non-proxy) picture in one call.
+    pub fn snapshot_full_runtime_consciousness(
+        &mut self,
+        num_cycles: usize,
+    ) -> Option<crate::benchmarks::butlin::report::RuntimeConsciousnessData> {
+        let behavioral = self.snapshot_behavioral_indicators(num_cycles);
+        self.snapshot_runtime_consciousness()
+            .map(|rt| rt.with_behavioral(behavioral))
     }
 
     /// Run a benchmark through the cognitive loop.
@@ -353,7 +481,11 @@ fn cosine_f32_vec(a: &[f32], b: &[f32]) -> f64 {
         norm_b += bi * bi;
     }
     let denom = (norm_a * norm_b).sqrt();
-    if denom > 1e-10 { dot / denom } else { 0.0 }
+    if denom > 1e-10 {
+        dot / denom
+    } else {
+        0.0
+    }
 }
 
 // ──── LoopDrivable implementations for 6 benchmarks ────

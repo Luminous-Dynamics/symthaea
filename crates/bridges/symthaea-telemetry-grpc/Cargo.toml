@@ -2,11 +2,13 @@
 name = "symthaea-telemetry-grpc"
 version = "0.1.0"
 edition = "2024"
+license = "AGPL-3.0-or-later"
 
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-phi-oracle = { path = "../../domains/symthaea-phi-oracle" }
 symthaea-fep = { path = "../../core/symthaea-fep" }
+symthaea-consciousness-equation = { path = "../../domains/symthaea-consciousness-equation" }
 tonic = "0.12"
 prost = "0.13"
 tokio = { version = "1", features = ["full"] }

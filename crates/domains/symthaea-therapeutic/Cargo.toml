@@ -11,6 +11,17 @@ homepage = "https://luminousdynamics.org"
 keywords = ["consciousness", "therapeutic", "psychology", "safety", "alliance"]
 categories = ["science", "algorithms"]
 
+[features]
+default = []
+# Research-only APIs are excluded from normal builds. They must never drive
+# diagnosis, prescribing, crisis decisions, or autonomous interventions.
+experimental-computational-psychiatry = []
+experimental-consciousness-protocols = []
+# Named diagnostic hypotheses and mappings onto clinical-instrument scales are
+# compatibility-only research surfaces and are excluded from default builds.
+experimental-diagnostic-hypotheses = []
+legacy-clinical-scale-analogues = []
+
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-clinical = { path = "../symthaea-clinical" }

@@ -1,0 +1,29 @@
+# Series 34 patch order
+
+1. `0001-audit-freeze-cycle-two-resumption-scenario.patch-plan.md`
+2. `0002-test-add-qualified-cycle-two-closure-baseline.patch-plan.md`
+3. `0003-refactor-generalize-trust-segment-successor-identity.patch-plan.md`
+4. `0004-feat-extend-segment-ledger-for-successor-genesis.patch-plan.md`
+5. `0005-feat-add-cycle-two-resumption-policy-context.patch-plan.md`
+6. `0006-feat-implement-cycle-two-resumption-plan.patch-plan.md`
+7. `0007-feat-add-cycle-two-resumption-statements.patch-plan.md`
+8. `0008-feat-implement-cycle-two-dual-quorum-resumption.patch-plan.md`
+9. `0009-feat-require-fresh-post-cycle-two-publisher-delegation.patch-plan.md`
+10. `0010-feat-require-fresh-successor-segment-allowance.patch-plan.md`
+11. `0011-refactor-extend-transition-gate-for-successor-resumption.patch-plan.md`
+12. `0012-feat-extend-reference-store-for-successor-first-mutation.patch-plan.md`
+13. `0013-feat-implement-successor-first-mutation-receipt.patch-plan.md`
+14. `0014-feat-commit-successor-first-publication-atomically.patch-plan.md`
+15. `0015-security-prevent-cross-cycle-double-first-mutation.patch-plan.md`
+16. `0016-feat-enforce-global-ordinal-continuity-through-cycle-two.patch-plan.md`
+17. `0017-feat-add-cross-cycle-operating-state-audit.patch-plan.md`
+18. `0018-feat-register-cycle-two-resumption-schema-prefix.patch-plan.md`
+19. `0019-feat-add-external-verifier-cycle-two-resumption-roles.patch-plan.md`
+20. `0020-feat-add-cycle-two-resumption-plan-cli.patch-plan.md`
+21. `0021-feat-add-successor-first-publication-cli.patch-plan.md`
+22. `0022-test-run-positive-cycle-two-closure-to-publication.patch-plan.md`
+23. `0023-test-run-cross-cycle-resumption-replay-and-staleness-corpus.patch-plan.md`
+24. `0024-test-run-successor-race-crash-and-rollback-matrix.patch-plan.md`
+25. `0025-feat-freeze-independent-cycle-two-resumption-vectors.patch-plan.md`
+26. `0026-ci-add-cycle-two-resumption-qualification-lanes.patch-plan.md`
+27. `0027-docs-publish-series-34-cycle-two-resumption-report.patch-plan.md`

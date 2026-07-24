@@ -2,12 +2,21 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Symthaea Speech-to-Text Library
+//! Symthaea Acoustic Perception Library (historically "STT")
 //!
-//! A neuromorphic speech recognition system built on:
+//! A neuromorphic acoustic encoding system built on:
 //! - **HDC (Hyperdimensional Computing)**: Efficient, interpretable representations
 //! - **LTC (Liquid Time-Constant)**: Adaptive temporal dynamics
 //! - **Modern Hopfield Networks**: Exponential-capacity associative memory
+//!
+//! # Honest capability note (2026-07-15 — see README.md)
+//!
+//! Word-level transcription through this crate is **not viable**: the committed
+//! `eval_report.json` measures WER 473% / 0 words correct, and five recognition
+//! architectures topped out at 19% frame-level phoneme accuracy. What IS real:
+//! fast acoustic→HV encoding (RTF 0.07), prosody/paralinguistic features, acoustic
+//! unit discovery, and bioacoustics. For transcription, use the Whisper worker via
+//! `symthaea-communication` and treat this crate as the *paralinguistic ear*.
 //!
 //! # Architecture
 //!
@@ -65,6 +74,7 @@ pub mod batch;
 pub mod bootstrap;
 pub mod cetacean_classifier;
 pub mod cetacean_scorer;
+pub mod communication_adapter;
 pub mod crystal_reservoir;
 pub mod discovery;
 pub mod dtw_align;

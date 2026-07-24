@@ -201,10 +201,33 @@ pub struct OrganoidMetrics {
     pub ethics_status: EthicsStatus,
 }
 
-/// Simulated local field potential recording.
+impl OrganoidMetrics {
+    /// Graph/activity/maturity integration proxy historically stored in
+    /// `phi_estimate`. This is not an implementation of IIT Phi.
+    pub fn network_integration_proxy(&self) -> f64 {
+        self.phi_estimate
+    }
+}
+
+/// Scientific status of a simulated output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ScientificOutputStatus {
+    /// A deterministic model-derived proxy, not a direct measurement.
+    SimulatedProxy,
+    /// A heuristic developmental prior assigned by the model.
+    HeuristicPrior,
+}
+
+/// Simulated spatial electrode snapshot.
+///
+/// `samples` are simultaneous per-neuron spatial contributions, not a temporal
+/// voltage recording. Frequency-band fields are developmental priors derived
+/// from firing rate and stage, not FFT/PSD measurements. The historical type
+/// name is retained for source compatibility.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LocalFieldPotential {
-    /// Raw LFP signal samples (one per neuron contribution).
+    /// Simultaneous spatial electrode contributions, one per neuron.
+    /// These are not temporal samples.
     pub samples: Vec<f32>,
     /// Power in delta band (0.5-4 Hz).
     pub delta_power: f32,
@@ -216,6 +239,18 @@ pub struct LocalFieldPotential {
     pub beta_power: f32,
     /// Power in gamma band (30-100 Hz).
     pub gamma_power: f32,
+}
+
+impl LocalFieldPotential {
+    /// Scientific status of the spatial samples.
+    pub const fn sample_status(&self) -> ScientificOutputStatus {
+        ScientificOutputStatus::SimulatedProxy
+    }
+
+    /// Scientific status of the frequency-band values.
+    pub const fn band_power_status(&self) -> ScientificOutputStatus {
+        ScientificOutputStatus::HeuristicPrior
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -240,6 +275,14 @@ pub struct DigitalOrganoid {
 impl DigitalOrganoid {
     /// Create a new digital organoid seeded with `initial_stem_cells` stem cells.
     pub fn new(initial_stem_cells: usize, seed: u64) -> Self {
+        Self::with_max_cells(initial_stem_cells, 10_000, seed)
+    }
+
+    /// Create a digital organoid with an explicit proliferation cap.
+    ///
+    /// The effective cap is never lower than the initial population.
+    pub fn with_max_cells(initial_stem_cells: usize, max_cells: usize, seed: u64) -> Self {
+        let max_cells = max_cells.max(initial_stem_cells);
         let mut rng = StdRng::seed_from_u64(seed);
         let mut cells = Vec::with_capacity(initial_stem_cells);
         for i in 0..initial_stem_cells {
@@ -284,7 +327,7 @@ impl DigitalOrganoid {
             phi_history: vec![0.0],
             metrics,
             ethics: EthicsStatus::PreConscious,
-            max_cells: 10_000,
+            max_cells,
             rng,
             next_id,
             halted: false,
@@ -319,6 +362,11 @@ impl DigitalOrganoid {
 
     pub fn synapses(&self) -> &[Synapse] {
         &self.synapses
+    }
+
+    /// Configured proliferation cap.
+    pub fn max_cells(&self) -> usize {
+        self.max_cells
     }
 
     /// Terminate the organoid with a stated reason.
@@ -363,8 +411,8 @@ impl DigitalOrganoid {
         // 7. Synaptic pruning
         self.prune_synapses();
 
-        // 8. Compute Phi
-        let phi = self.compute_phi();
+        // 8. Compute the graph/activity/maturity integration proxy.
+        let phi = self.compute_network_integration_proxy();
         self.phi_history.push(phi);
 
         // 9. Ethics check
@@ -389,8 +437,11 @@ impl DigitalOrganoid {
         history
     }
 
-    /// Generate a simulated local field potential recording.
-    pub fn generate_lfp(&self) -> LocalFieldPotential {
+    /// Generate a simulated spatial electrode snapshot.
+    ///
+    /// This is not a temporal LFP trace; see [`LocalFieldPotential`] for the
+    /// provenance of its samples and band-power priors.
+    pub fn generate_spatial_electrode_snapshot(&self) -> LocalFieldPotential {
         // Virtual electrode at origin
         let electrode = [0.0f32; 3];
         let neurons: Vec<&OrganoidCell> = self
@@ -446,7 +497,18 @@ impl DigitalOrganoid {
         }
     }
 
-    /// Estimate integrated information (Phi) from the current network state.
+    /// Historical compatibility wrapper. Prefer
+    /// [`Self::generate_spatial_electrode_snapshot`].
+    #[deprecated(
+        since = "0.1.0",
+        note = "this output is a spatial proxy with heuristic band priors, not a temporal LFP"
+    )]
+    pub fn generate_lfp(&self) -> LocalFieldPotential {
+        self.generate_spatial_electrode_snapshot()
+    }
+
+    /// Estimate a graph/activity/maturity integration proxy from the current
+    /// network state. This is not an implementation of IIT Phi.
     ///
     /// Uses a graph-theoretic proxy combining three components:
     ///
@@ -461,8 +523,8 @@ impl DigitalOrganoid {
     /// 3. **Synapse maturity**: average maturity weights how established the
     ///    connectivity is (immature synapses contribute less integration).
     ///
-    /// Formula: `Phi = integration * activity * maturity`, bounded to [0, 1].
-    pub fn compute_phi(&self) -> f64 {
+    /// Formula: `proxy = integration * activity * maturity`, bounded to [0, 1].
+    pub fn compute_network_integration_proxy(&self) -> f64 {
         let neurons: Vec<&OrganoidCell> = self
             .cells
             .iter()
@@ -546,6 +608,16 @@ impl DigitalOrganoid {
         // expectation for an in-silico organoid).
 
         (min_integration * activity * mean_maturity * 0.8).clamp(0.0, 1.0)
+    }
+
+    /// Historical compatibility wrapper. Prefer
+    /// [`Self::compute_network_integration_proxy`].
+    #[deprecated(
+        since = "0.1.0",
+        note = "the current calculation is a graph/activity/maturity proxy, not IIT Phi"
+    )]
+    pub fn compute_phi(&self) -> f64 {
+        self.compute_network_integration_proxy()
     }
 
     // ---- private helpers ----
@@ -922,6 +994,39 @@ mod tests {
     use super::*;
 
     #[test]
+    fn scientific_output_status_is_explicit() {
+        let organoid = DigitalOrganoid::new(10, 1);
+        let snapshot = organoid.generate_spatial_electrode_snapshot();
+        assert_eq!(
+            snapshot.sample_status(),
+            ScientificOutputStatus::SimulatedProxy
+        );
+        assert_eq!(
+            snapshot.band_power_status(),
+            ScientificOutputStatus::HeuristicPrior
+        );
+        assert_eq!(
+            organoid.metrics().network_integration_proxy(),
+            organoid.metrics().phi_estimate
+        );
+    }
+
+    #[test]
+    fn explicit_max_cells_caps_proliferation() {
+        let mut organoid = DigitalOrganoid::with_max_cells(50, 55, 17);
+        organoid.run_to_day(100);
+        assert!(organoid.metrics().cell_count <= 55);
+        assert_eq!(organoid.max_cells(), 55);
+    }
+
+    #[test]
+    fn max_cells_never_drops_below_initial_population() {
+        let organoid = DigitalOrganoid::with_max_cells(50, 10, 17);
+        assert_eq!(organoid.max_cells(), 50);
+        assert_eq!(organoid.metrics().cell_count, 50);
+    }
+
+    #[test]
     fn new_organoid_starts_at_day_zero_with_stem_cells() {
         let org = DigitalOrganoid::new(50, 42);
         assert_eq!(org.day(), 0);
@@ -1050,7 +1155,7 @@ mod tests {
     fn lfp_generation_produces_valid_signal() {
         let mut org = DigitalOrganoid::new(100, 42);
         org.run_to_day(60);
-        let lfp = org.generate_lfp();
+        let lfp = org.generate_spatial_electrode_snapshot();
         assert!(!lfp.samples.is_empty(), "LFP should have samples");
         // Power should be non-negative
         assert!(lfp.delta_power >= 0.0);

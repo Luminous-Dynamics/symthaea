@@ -580,7 +580,8 @@ fn test_e2e_cvector_attestation_governance_compatibility() {
     );
 
     // Step 3: Create attestation — should include C-Vector
-    let attestation = create_consciousness_attestation_data(&quality, "did:mycelix:test-agent", 42);
+    let attestation =
+        create_consciousness_attestation_data(&quality, "did:mycelix:test-agent", 42).unwrap();
 
     // Consciousness level should equal composite
     let composite = cv.composite();
@@ -628,8 +629,8 @@ fn test_e2e_cvector_attestation_governance_compatibility() {
     );
 
     // Step 7: Verify sign message is deterministic (governance verification depends on this)
-    let msg1 = attestation.sign_message();
-    let msg2 = attestation.sign_message();
+    let msg1 = attestation.sign_message().unwrap();
+    let msg2 = attestation.sign_message().unwrap();
     assert_eq!(msg1, msg2, "sign_message must be deterministic");
 }
 

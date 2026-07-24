@@ -128,6 +128,9 @@ pub(super) struct PerceptionPhaseResult {
 pub(super) struct DynCore {
     pub(super) output: Vec<f32>,
     pub(super) prediction: Vec<f32>,
+    /// Shortest-horizon raw prediction (bits-saved diagnostics only; None on
+    /// fallback/degenerate prediction paths).
+    pub(super) prediction_first_horizon: Option<Vec<f32>>,
     pub(super) prediction_error: f32,
     pub(super) coherence: f32,
     pub(super) unified_psi: f64,

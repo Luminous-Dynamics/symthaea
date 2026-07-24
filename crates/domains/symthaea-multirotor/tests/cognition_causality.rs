@@ -15,6 +15,7 @@
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_multirotor::embodiment::FlightEmbodiment;
+use symthaea_multirotor::simulator::PhysicsSimulator;
 use symthaea_multirotor::training::{intent_hv, train_intent_controller};
 use symthaea_multirotor::types::FlightConfig;
 

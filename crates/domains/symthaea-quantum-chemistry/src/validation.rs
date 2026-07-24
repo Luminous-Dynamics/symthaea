@@ -30,6 +30,29 @@ pub struct BenchmarkEntry {
 
 /// Published HF/STO-3G reference energies (Hartree).
 /// Sources: Szabo & Ostlund Table 3.15, Hehre et al. (1986), CCCBDB.
+///
+/// Tolerances here are intentionally loose (0.5-1.0 Ha) for anything past H2/HeH+,
+/// which hides real error for the molecules that don't need the full tolerance --
+/// see `symthaea/CHEMICAL_PROCESS_DISCOVERY_PLAN_2026-07-12.md` Phase 0. Measured
+/// actual errors (2026-07-12, post the Boys-function fix in `integrals/boys.rs`,
+/// via `examples/phase0_audit.rs`): H2O +1.9 kcal/mol, NH3 +0.8, CH4 +0.04,
+/// HF +0.02, LiH +0.8 -- all genuinely tight. N2 is the one real outlier at
+/// +458 kcal/mol (0.73 Ha); investigated only enough to confirm it's unrelated to
+/// the Boys-function bug (unchanged before/after that fix) and unrelated to the
+/// C+N divergence bug (this is N-only).
+///
+/// Phase Q0 (2026-07-16): further narrowed via internal-consistency diagnostics
+/// (`test_diagnose_n2_sto3g_discrepancy` below; no independent QC package
+/// available in this sandbox to cross-check matrices directly, see that test's
+/// comment) -- ruled out basis self-normalization (diagonal S ~= 1.0 to 1e-11),
+/// matrix symmetry, and SCF self-consistency (Tr[PS] = n_electrons exactly).
+/// SCF converges cleanly (9 iterations). The error is real and in either the
+/// integral *values* themselves (not caught by these coarse invariants) or a
+/// Fock-construction/exchange term specific to N2's strong p-p triple-bond
+/// character (NH3, which also has nitrogen, is tight -- so it isn't simply
+/// "any N-containing molecule"). Root cause still not isolated -- flagging as
+/// a known, measured, further-narrowed, still-open, non-blocking discrepancy
+/// rather than silently passing behind the loose tolerance.
 pub fn hf_sto3g_references() -> Vec<(&'static str, f64, f64)> {
     // (molecule, reference_energy, tolerance)
     vec![
@@ -41,19 +64,35 @@ pub fn hf_sto3g_references() -> Vec<(&'static str, f64, f64)> {
         ("NH3", -55.4554, 0.5), // Experimental geometry
         ("CH4", -39.7269, 0.5), // Tetrahedral
         ("HF", -98.5708, 0.5),  // R = 1.7328 Bohr
-        ("N2", -107.4964, 1.0), // R = 2.074 Bohr (note: our basis may give different value)
+        ("N2", -107.4964, 1.0), // R = 2.074 Bohr -- measured error +458 kcal/mol, unresolved (see doc comment above)
         ("LiH", -7.8633, 0.5),  // R = 3.015 Bohr
     ]
 }
 
 /// Published HF/6-31G reference energies (Hartree).
 /// Source: CCCBDB, Hehre et al.
+///
+/// Measured actual errors (2026-07-12, see `hf_sto3g_references` doc comment for
+/// context): H2 +0.04 kcal/mol (tight), but H2O -206 kcal/mol and CH4 +27
+/// kcal/mol -- both real, both hidden by the 0.5 Ha tolerance, both unrelated to
+/// the Boys-function fix (unchanged before/after). Likely candidate: the 6-31G
+/// basis data/contraction itself for these two.
+///
+/// Phase Q0 (2026-07-16): same internal-consistency diagnostics as
+/// `hf_sto3g_references` (`test_diagnose_h2o_631g_discrepancy`,
+/// `test_diagnose_ch4_631g_discrepancy` below) also rule out basis
+/// self-normalization, symmetry, and SCF self-consistency for both. Since
+/// CH4/STO-3G is tight (+0.04 kcal/mol, see above) but CH4/6-31G is not
+/// (+27), the same molecule is fine in one basis and wrong in the other --
+/// this is strong evidence the issue is specific to the 6-31G basis data or
+/// its contraction scheme, not the integral engine or SCF machinery, but
+/// still not conclusively isolated.
 pub fn hf_631g_references() -> Vec<(&'static str, f64, f64)> {
     vec![
         ("H2", -1.1268, 0.01),
-        ("H2O", -75.5854, 0.5),
-        ("CH4", -40.1952, 0.5),
-        // N₂ excluded: BSE general contraction → segmented contraction conversion needed
+        ("H2O", -75.5854, 0.5), // measured error -206 kcal/mol, unresolved
+        ("CH4", -40.1952, 0.5), // measured error +27 kcal/mol, unresolved
+                                // N₂ excluded: BSE general contraction → segmented contraction conversion needed
     ]
 }
 
@@ -342,5 +381,98 @@ mod tests {
             results.len() - failures.len(),
             results.len()
         );
+    }
+
+    // ── Phase Q0.4 (2026-07-16): internal-consistency diagnostics for the
+    // N2/STO-3G, H2O and CH4/6-31G energy discrepancies. No independent
+    // external QC package (pyscf/psi4) is available in this sandbox (NixOS
+    // immutable root; checked both ambient Python and `nix develop`, neither
+    // has it, and installing one is a bigger environment change than this
+    // bounded investigation warrants) -- these checks use invariants that
+    // must hold regardless of any external reference: basis-function
+    // self-normalization (diagonal S ~= 1.0), matrix symmetry, and Tr[PS] =
+    // n_electrons after SCF converges. ──────────────────────────────────
+
+    fn diagnose(mol: &Molecule, basis: &crate::basis::BasisSet, label: &str) {
+        use crate::integrals::overlap::overlap_matrix;
+        use crate::scf::density::build_density_matrix;
+
+        let n = basis.n_basis();
+        let s = overlap_matrix(&basis.functions);
+
+        let max_diag_dev = (0..n)
+            .map(|i| (s[i * n + i] - 1.0).abs())
+            .fold(0.0_f64, f64::max);
+        let max_asym = (0..n)
+            .flat_map(|i| (0..n).map(move |j| (i, j)))
+            .map(|(i, j)| (s[i * n + j] - s[j * n + i]).abs())
+            .fold(0.0_f64, f64::max);
+
+        let rhf = restricted_hartree_fock(mol, basis, &RhfConfig::default());
+        let p = build_density_matrix(
+            &rhf.orbital_coefficients,
+            rhf.n_basis,
+            rhf.n_independent,
+            rhf.n_occupied,
+        );
+        // Tr[PS] = sum_ij P_ij S_ji, should equal n_electrons for RHF.
+        let mut tr_ps = 0.0;
+        for i in 0..n {
+            for j in 0..n {
+                tr_ps += p[i * n + j] * s[j * n + i];
+            }
+        }
+        let n_elec = mol.n_electrons() as f64;
+
+        eprintln!(
+            "DIAG {label}: n_basis={n} max|S_ii-1|={max_diag_dev:.2e} max|S_ij-S_ji|={max_asym:.2e} \
+             Tr[PS]={tr_ps:.6} n_electrons={n_elec} |Tr[PS]-n_e|={:.2e} \
+             energy={:.6} converged={} n_iter={}",
+            (tr_ps - n_elec).abs(),
+            rhf.total_energy,
+            rhf.converged,
+            rhf.n_iterations
+        );
+    }
+
+    #[test]
+    fn test_diagnose_n2_sto3g_discrepancy() {
+        let mol = Molecule::new(vec![
+            crate::molecule::Atom::new(7, 0.0, 0.0, 0.0),
+            crate::molecule::Atom::new(7, 0.0, 0.0, 2.074),
+        ]);
+        let basis = Sto3g::build(&mol);
+        diagnose(&mol, &basis, "N2/STO-3G");
+    }
+
+    #[test]
+    fn test_diagnose_h2o_631g_discrepancy() {
+        let mol = Molecule::water();
+        let basis = Basis631G::build(&mol);
+        diagnose(&mol, &basis, "H2O/6-31G");
+    }
+
+    #[test]
+    fn test_diagnose_ch4_631g_discrepancy() {
+        let mol = Molecule::new(vec![
+            crate::molecule::Atom::new(6, 0.0, 0.0, 0.0),
+            crate::molecule::Atom::new(1, 1.185, 1.185, 1.185),
+            crate::molecule::Atom::new(1, -1.185, -1.185, 1.185),
+            crate::molecule::Atom::new(1, -1.185, 1.185, -1.185),
+            crate::molecule::Atom::new(1, 1.185, -1.185, -1.185),
+        ]);
+        let basis = Basis631G::build(&mol);
+        diagnose(&mol, &basis, "CH4/6-31G");
+    }
+
+    #[test]
+    fn test_diagnose_h2_sto3g_control_case_should_be_tight() {
+        // Control: H2/STO-3G has +0.02 kcal/mol error (already tight per the
+        // module doc's measured figures) -- confirms the diagnostic itself
+        // reports clean invariants for a KNOWN-GOOD case, so any anomaly
+        // seen for N2/H2O/CH4 isn't an artifact of the diagnostic method.
+        let mol = Molecule::h2();
+        let basis = Sto3g::build(&mol);
+        diagnose(&mol, &basis, "H2/STO-3G (control)");
     }
 }

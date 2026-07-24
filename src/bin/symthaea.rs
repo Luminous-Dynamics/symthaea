@@ -138,6 +138,18 @@ struct Args {
     #[cfg(feature = "voice-tts")]
     #[arg(long, default_value = "0")]
     voice_id: u8,
+
+    /// STT worker program (JSONL provider contract, e.g. the Whisper worker:
+    /// communication/worker/run_whisper_nixos.sh). Enables the voice_transcribe
+    /// request — the semantic-ear lane: audio → Whisper → Symthaea::process().
+    #[cfg(feature = "voice-tts")]
+    #[arg(long)]
+    stt_worker: Option<std::path::PathBuf>,
+
+    /// Extra arguments passed to the STT worker program (space-separated).
+    #[cfg(feature = "voice-tts")]
+    #[arg(long, default_value = "")]
+    stt_worker_args: String,
 }
 
 /// Shell context for IntelliSense requests
@@ -223,6 +235,18 @@ enum Request {
     /// Voice conversation turn (listen → process → speak)
     #[serde(rename = "voice_turn")]
     VoiceTurn,
+
+    /// Transcribe a WAV file via the configured STT worker (Whisper lane),
+    /// feed the transcript to cognition, and speak the response if voice
+    /// output is enabled.
+    #[serde(rename = "voice_transcribe")]
+    VoiceTranscribe {
+        /// Path to a mono WAV file (16 kHz recommended for Whisper).
+        audio_path: String,
+        /// Expected language hint (e.g. "en"); optional.
+        #[serde(default)]
+        language: Option<String>,
+    },
 
     /// Get voice status
     #[serde(rename = "voice_status")]
@@ -344,6 +368,64 @@ fn default_audit_limit() -> usize {
     50
 }
 
+/// Load a WAV file as mono f32 samples (+ sample rate). Multi-channel input
+/// is averaged down to mono; integer formats are normalized to [-1, 1].
+#[cfg(feature = "voice-tts")]
+fn load_wav_mono_f32(path: &str) -> anyhow::Result<(Vec<f32>, u32)> {
+    let mut reader = hound::WavReader::open(path)?;
+    let spec = reader.spec();
+    let channels = spec.channels.max(1) as usize;
+
+    let interleaved: Vec<f32> = match spec.sample_format {
+        hound::SampleFormat::Float => reader.samples::<f32>().collect::<Result<_, _>>()?,
+        hound::SampleFormat::Int => {
+            let scale = 1.0 / (1i64 << (spec.bits_per_sample - 1)) as f32;
+            reader
+                .samples::<i32>()
+                .map(|s| s.map(|v| v as f32 * scale))
+                .collect::<Result<_, _>>()?
+        }
+    };
+
+    let mono: Vec<f32> = if channels == 1 {
+        interleaved
+    } else {
+        interleaved
+            .chunks(channels)
+            .map(|frame| frame.iter().sum::<f32>() / channels as f32)
+            .collect()
+    };
+
+    Ok((mono, spec.sample_rate))
+}
+
+/// Linear resampler — WAV files handed to `voice_transcribe` may arrive at
+/// any native rate (e.g. Kokoro output at 24kHz), but Whisper's feature
+/// extractor hard-requires exactly 16kHz input and errors otherwise. Found
+/// live 2026-07-17 (LF3 full-duplex verification): the round-trip WER
+/// harness already resamples before transcribing, but this service path did
+/// not, so `voice_transcribe` failed on any non-16kHz WAV.
+#[cfg(feature = "voice-tts")]
+fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
+    if from_rate == to_rate || input.is_empty() {
+        return input.to_vec();
+    }
+    let ratio = to_rate as f64 / from_rate as f64;
+    let output_len = ((input.len() as f64) * ratio).round().max(1.0) as usize;
+    (0..output_len)
+        .map(|i| {
+            let src = i as f64 / ratio;
+            let idx = src as usize;
+            let frac = (src - idx as f64) as f32;
+            match (input.get(idx), input.get(idx + 1)) {
+                (Some(&a), Some(&b)) => a * (1.0 - frac) + b * frac,
+                (Some(&a), None) => a,
+                _ => 0.0,
+            }
+        })
+        .collect()
+}
+
 fn request_name(request: &Request) -> &'static str {
     match request {
         Request::Query { .. } => "query",
@@ -358,6 +440,7 @@ fn request_name(request: &Request) -> &'static str {
         Request::Speak { .. } => "speak",
         Request::Listen => "listen",
         Request::VoiceTurn => "voice_turn",
+        Request::VoiceTranscribe { .. } => "voice_transcribe",
         Request::VoiceStatus => "voice_status",
         Request::IntelliSense { .. } => "intellisense",
         Request::ValidateCommand { .. } => "validate_command",
@@ -371,6 +454,63 @@ fn request_name(request: &Request) -> &'static str {
 }
 
 /// Response to client
+/// Wire form of [`symthaea::CreativeArtifact`]: WAV bytes are base64'd for
+/// JSON transport; SVG travels as text.
+#[derive(Debug, Serialize)]
+#[serde(tag = "kind")]
+enum CreativeArtifactWire {
+    #[serde(rename = "svg")]
+    Svg {
+        svg: String,
+        aesthetic_composite: f32,
+    },
+    #[serde(rename = "music_wav")]
+    MusicWav {
+        /// base64 of complete RIFF/WAVE bytes.
+        wav_b64: String,
+        duration_secs: f32,
+        aesthetic_composite: f32,
+    },
+}
+
+impl From<&symthaea::CreativeArtifact> for CreativeArtifactWire {
+    fn from(artifact: &symthaea::CreativeArtifact) -> Self {
+        match artifact {
+            symthaea::CreativeArtifact::Svg {
+                svg,
+                aesthetic_composite,
+            } => Self::Svg {
+                svg: svg.clone(),
+                aesthetic_composite: *aesthetic_composite,
+            },
+            symthaea::CreativeArtifact::MusicWav {
+                wav_bytes,
+                duration_secs,
+                aesthetic_composite,
+            } => {
+                #[cfg(feature = "api_module")]
+                let wav_b64 = {
+                    use base64::Engine as _;
+                    base64::engine::general_purpose::STANDARD.encode(wav_bytes)
+                };
+                // Without api_module there is no base64 dep; the service
+                // binary always builds with it in practice (--http), but
+                // keep the non-api_module build honest rather than broken.
+                #[cfg(not(feature = "api_module"))]
+                let wav_b64 = {
+                    let _ = wav_bytes;
+                    String::new()
+                };
+                Self::MusicWav {
+                    wav_b64,
+                    duration_secs: *duration_secs,
+                    aesthetic_composite: *aesthetic_composite,
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
 #[allow(clippy::enum_variant_names)]
@@ -385,6 +525,12 @@ enum Response {
         phi_dyad: f64,
         steps_to_emergence: usize,
         processing_time_ms: u64,
+        /// Creative artifact generated when the input expressed art intent
+        /// (facade Phase 8.5, feature `creative`). Additive and absent when
+        /// no artifact was produced — this field previously had zero
+        /// consumers anywhere (VISION_PROJECTION_REVIEW_2026-07-15.md P1.3).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        creative_artifact: Option<CreativeArtifactWire>,
     },
 
     /// Status response
@@ -679,6 +825,84 @@ struct ServiceState {
     voice: Mutex<Option<VoiceConversation>>,
     #[cfg(feature = "voice-tts")]
     voice_enabled: bool,
+    /// STT worker (Whisper JSONL provider) — the semantic-ear lane.
+    /// None unless --stt-worker was passed.
+    #[cfg(feature = "voice-tts")]
+    stt_provider: Mutex<Option<symthaea_communication::human::LocalJsonlProvider>>,
+    /// Broadcasts the experience bridge's cycle telemetry after each query
+    /// that actually drove a cycle (SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md
+    /// Phase 2). Always constructed — a send with zero subscribers is a
+    /// cheap no-op, so there is no need to gate this on whether --http
+    /// was actually passed.
+    #[cfg(feature = "api_module")]
+    telemetry_tx: tokio::sync::broadcast::Sender<LiveTelemetry>,
+}
+
+/// Payload for `/v1/ws/live`: cycle metadata plus the projection exits that
+/// previously dead-ended inside `CycleResult` with zero consumers — the live
+/// cognitive self-portrait (`canvas_svg`) and the imagination decode
+/// (`mental_movie`). See VISION_PROJECTION_REVIEW_2026-07-15.md P1.2.
+#[cfg(feature = "api_module")]
+#[derive(Clone, serde::Serialize)]
+struct LiveTelemetry {
+    /// Flattened so the wire JSON keeps `CycleMetadata`'s flat key layout —
+    /// pre-existing consumers (symthaea-ui `Vitals::from_json`) parse
+    /// top-level keys and must keep working; the projection fields below are
+    /// additive keys beside them.
+    #[serde(flatten)]
+    metadata: symthaea::cognitive_loop::CycleMetadata,
+    /// Live cognitive self-portrait (animated SVG), when the canvas ticked
+    /// this turn. Feature `canvas`; absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    canvas_svg: Option<String>,
+    /// Geodesic mental-simulation frames, when imagination fired this turn.
+    /// Feature `vision-manifold`; absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mental_movie: Option<MentalMovieWire>,
+}
+
+/// Wire form of `MentalMovie`: raw frames base64-encoded, HDC trajectory
+/// dropped (16,384-D vectors are diagnostic data, not display data).
+#[cfg(feature = "api_module")]
+#[derive(Clone, serde::Serialize)]
+struct MentalMovieWire {
+    width: u32,
+    height: u32,
+    channels: usize,
+    semantic_coherence: f32,
+    /// Each entry is one frame: base64 of `width*height*channels` raw bytes.
+    frames_b64: Vec<String>,
+}
+
+#[cfg(feature = "api_module")]
+impl LiveTelemetry {
+    fn from_cycle(cycle: &symthaea::cognitive_loop::CycleResult) -> Self {
+        #[cfg(feature = "vision-manifold")]
+        let mental_movie = cycle.mental_movie.as_ref().map(|m| {
+            use base64::Engine as _;
+            let engine = base64::engine::general_purpose::STANDARD;
+            MentalMovieWire {
+                width: m.width,
+                height: m.height,
+                channels: m.channels,
+                semantic_coherence: m.semantic_coherence,
+                frames_b64: m.frames.iter().map(|f| engine.encode(f)).collect(),
+            }
+        });
+        #[cfg(not(feature = "vision-manifold"))]
+        let mental_movie = None;
+
+        #[cfg(feature = "canvas")]
+        let canvas_svg = cycle.canvas_svg.clone();
+        #[cfg(not(feature = "canvas"))]
+        let canvas_svg = None;
+
+        Self {
+            metadata: cycle.metadata.clone(),
+            canvas_svg,
+            mental_movie,
+        }
+    }
 }
 
 #[derive(Clone, Default)]
@@ -825,6 +1049,8 @@ impl ServiceState {
         experience_bridge: bool,
         #[cfg(feature = "voice-tts")] voice_enabled: bool,
         #[cfg(feature = "voice-tts")] voice_id: u8,
+        #[cfg(feature = "voice-tts")] stt_worker: Option<PathBuf>,
+        #[cfg(feature = "voice-tts")] stt_worker_args: String,
     ) -> Result<Self> {
         // Try to resume from state file if it exists
         let mut symthaea = if let Some(ref path) = state_file {
@@ -903,6 +1129,31 @@ impl ServiceState {
             None
         };
 
+        // Spawn the STT worker (Whisper lane) if configured. The provider
+        // keeps the worker process alive across requests (model loads once).
+        #[cfg(feature = "voice-tts")]
+        let stt_provider = if let Some(ref worker) = stt_worker {
+            use symthaea_communication::human::{LocalJsonlProvider, WorkerPolicy};
+            let args: Vec<String> = stt_worker_args
+                .split_whitespace()
+                .map(str::to_string)
+                .collect();
+            match WorkerPolicy::allow_one(worker)
+                .and_then(|policy| LocalJsonlProvider::spawn("service-stt", worker, &args, policy))
+            {
+                Ok(provider) => {
+                    info!("STT worker ready: {}", worker.display());
+                    Some(provider)
+                }
+                Err(e) => {
+                    warn!("Failed to start STT worker {}: {}", worker.display(), e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         Ok(Self {
             symthaea: Mutex::new(symthaea),
             audit_log: AuditLog::new(audit_log_path, 256),
@@ -915,6 +1166,13 @@ impl ServiceState {
             voice: Mutex::new(voice),
             #[cfg(feature = "voice-tts")]
             voice_enabled,
+            #[cfg(feature = "voice-tts")]
+            stt_provider: Mutex::new(stt_provider),
+            // Capacity 16 — telemetry is a "latest state" feed; a slow
+            // subscriber should drop stale cycles, not backpressure the
+            // query path.
+            #[cfg(feature = "api_module")]
+            telemetry_tx: tokio::sync::broadcast::channel(16).0,
         })
     }
 
@@ -950,6 +1208,16 @@ impl ServiceState {
                     Ok(response) => {
                         let intro = symthaea.introspect();
                         let partnership = symthaea.partnership_state();
+
+                        // Phase 2 (SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md):
+                        // if the experience bridge cycled this turn, publish
+                        // its telemetry. `send` errors only when there are
+                        // zero subscribers — expected and harmless.
+                        #[cfg(feature = "api_module")]
+                        if let Some(cycle) = symthaea.last_bridge_cycle() {
+                            let _ = self.telemetry_tx.send(LiveTelemetry::from_cycle(cycle));
+                        }
+
                         Response::QueryResponse {
                             content: response.content,
                             confidence: response.confidence,
@@ -958,6 +1226,10 @@ impl ServiceState {
                             phi_dyad: partnership.phi_dyad,
                             steps_to_emergence: response.steps_to_emergence,
                             processing_time_ms: start.elapsed().as_millis() as u64,
+                            creative_artifact: response
+                                .creative_artifact
+                                .as_ref()
+                                .map(CreativeArtifactWire::from),
                         }
                     }
                     Err(e) => Response::Error {
@@ -1223,13 +1495,116 @@ impl ServiceState {
                 }
             }
 
+            Request::VoiceTranscribe {
+                audio_path,
+                language,
+            } => {
+                #[cfg(feature = "voice-tts")]
+                {
+                    // 1. Load the WAV file (mono-ize, convert to f32), then
+                    //    resample to 16kHz — Whisper hard-requires it and
+                    //    the source WAV may be at any native rate.
+                    const WHISPER_SAMPLE_RATE: u32 = 16_000;
+                    let (samples, sample_rate) = match load_wav_mono_f32(&audio_path) {
+                        Ok((samples, rate)) => (
+                            resample_linear(&samples, rate, WHISPER_SAMPLE_RATE),
+                            WHISPER_SAMPLE_RATE,
+                        ),
+                        Err(e) => {
+                            return Response::Error {
+                                message: format!("Failed to load {audio_path}: {e}"),
+                            };
+                        }
+                    };
+
+                    // 2. Transcribe through the STT JSONL worker (Whisper lane).
+                    let user_said = {
+                        let mut provider = self.stt_provider.lock().await;
+                        let Some(ref mut provider) = *provider else {
+                            return Response::Error {
+                                message: "No STT worker configured (start the service with \
+                                          --stt-worker <path>)"
+                                    .into(),
+                            };
+                        };
+                        match symthaea::voice::transcribe_samples(
+                            provider,
+                            samples,
+                            sample_rate,
+                            language.as_deref(),
+                        ) {
+                            Ok(preserved) => preserved.original,
+                            Err(e) => {
+                                return Response::Error {
+                                    message: format!("Transcription failed: {e}"),
+                                };
+                            }
+                        }
+                    };
+
+                    if user_said.trim().is_empty() {
+                        return Response::Error {
+                            message: "Transcription produced no text".into(),
+                        };
+                    }
+
+                    // 3. Feed the transcript to cognition (the semantic ear
+                    //    finally reaching Symthaea::process()).
+                    let start = Instant::now();
+                    let (assistant_said, phi) = {
+                        let mut symthaea = self.symthaea.lock().await;
+                        match symthaea.process(&user_said).await {
+                            Ok(response) => {
+                                let intro = symthaea.introspect();
+                                (response.content, intro.consciousness_level)
+                            }
+                            Err(e) => {
+                                return Response::Error {
+                                    message: format!("Processing error: {e}"),
+                                };
+                            }
+                        }
+                    };
+
+                    // 4. Speak the reply if voice output is enabled.
+                    {
+                        let mut voice = self.voice.lock().await;
+                        if let Some(ref mut voice) = *voice
+                            && let Err(e) = voice.speak(&assistant_said)
+                        {
+                            warn!("TTS error (continuing): {}", e);
+                        }
+                    }
+
+                    self.record_audit("voice_transcribe", &audio_path, &user_said);
+
+                    Response::VoiceTurnResponse {
+                        user_said,
+                        assistant_said,
+                        phi,
+                        processing_time_ms: start.elapsed().as_millis() as u64,
+                    }
+                }
+                #[cfg(not(feature = "voice-tts"))]
+                {
+                    let _ = (audio_path, language);
+                    Response::Error {
+                        message: "Voice feature not compiled (build with --features voice-tts)"
+                            .into(),
+                    }
+                }
+            }
+
             Request::VoiceStatus => {
                 #[cfg(feature = "voice-tts")]
                 {
                     let voice = self.voice.lock().await;
+                    // stt_ready reflects the actual transcription lane (the
+                    // Whisper worker), not TTS session presence.
+                    let stt_ready = self.stt_provider.lock().await.is_some();
                     Response::VoiceStatusResponse {
                         enabled: self.voice_enabled,
-                        stt_ready: voice.is_some(),
+                        stt_ready,
                         tts_ready: voice.is_some(),
                         voice_id: voice.as_ref().map(|_| 0).unwrap_or(0),
                     }
@@ -2143,6 +2518,71 @@ async fn http_service_endpoint(
     }
 }
 
+/// `GET /v1/ws/live` (Phase 2 of SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md).
+/// Streams the experience bridge's cycle telemetry as it happens — one
+/// message per query that actually drove a cycle, not a synthetic clock.
+/// Wire type is `LiveTelemetry`: the raw `CycleMetadata` plus the
+/// projection exits (`canvas_svg` self-portrait, base64 `mental_movie`
+/// frames) that previously had zero consumers. It is deliberately not the
+/// demo binary's curated `DemoCycleData`: producing that richer projection
+/// needs several live `CognitiveLoopService` accessors (swarm/mesh/bath
+/// tracker/ethics-topology state) that `demo_runner.rs` currently builds
+/// inline rather than through a reusable function — factoring that out is
+/// deliberately left as a follow-up rather than done as a byproduct of
+/// this gateway, since it touches a large, actively-developed mapping.
+#[cfg(feature = "api_module")]
+async fn http_ws_live(
+    axum::extract::State(ctx): axum::extract::State<HttpGatewayCtx>,
+    headers: axum::http::HeaderMap,
+    ws: axum::extract::ws::WebSocketUpgrade,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+
+    // The WS handshake is a plain HTTP GET before the protocol switches,
+    // so the same bearer check as /v1/service applies here — non-browser
+    // WS clients can set the header on the handshake request.
+    if let Some(expected) = ctx.security.bearer_token.as_deref() {
+        let provided = headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(parse_bearer_token);
+        if provided.as_deref() != Some(expected) {
+            return (
+                axum::http::StatusCode::UNAUTHORIZED,
+                service_auth_error_message(),
+            )
+                .into_response();
+        }
+    }
+
+    let rx = ctx.state.telemetry_tx.subscribe();
+    ws.on_upgrade(move |socket| telemetry_ws_loop(socket, rx))
+}
+
+#[cfg(feature = "api_module")]
+async fn telemetry_ws_loop(
+    mut socket: axum::extract::ws::WebSocket,
+    mut rx: tokio::sync::broadcast::Receiver<LiveTelemetry>,
+) {
+    use axum::extract::ws::Message;
+    loop {
+        match rx.recv().await {
+            Ok(telemetry) => {
+                let Ok(payload) = serde_json::to_string(&telemetry) else {
+                    continue;
+                };
+                if socket.send(Message::Text(payload.into())).await.is_err() {
+                    break; // client disconnected
+                }
+            }
+            // A lagging subscriber missed some cycles — telemetry is a
+            // "latest state" feed, so skip forward rather than disconnect.
+            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+        }
+    }
+}
+
 /// Build the HTTP gateway router (Phase 1 of
 /// SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md). One route carries the whole
 /// existing wire protocol, so auth, protocol versioning, size limits, and
@@ -2151,12 +2591,14 @@ async fn http_service_endpoint(
 fn build_http_router(state: Arc<ServiceState>, security: ServiceSecurity) -> axum::Router {
     use axum::routing::{get, post};
     let ctx = HttpGatewayCtx { state, security };
-    axum::Router::new()
+    let router = axum::Router::new()
         .route("/v1/service", post(http_service_endpoint))
         .route("/health", get(http_health))
         .route("/v1/health", get(http_health))
-        .route("/metrics", get(http_metrics))
-        .with_state(ctx)
+        .route("/metrics", get(http_metrics));
+    #[cfg(feature = "api_module")]
+    let router = router.route("/v1/ws/live", get(http_ws_live));
+    router.with_state(ctx)
 }
 
 async fn serve_http(
@@ -2217,6 +2659,10 @@ mod protocol_tests {
                 false,
                 #[cfg(feature = "voice-tts")]
                 0,
+                #[cfg(feature = "voice-tts")]
+                None,
+                #[cfg(feature = "voice-tts")]
+                String::new(),
             )
             .await
             .expect("service state"),
@@ -2574,6 +3020,49 @@ mod protocol_tests {
             .expect("status response");
         assert_eq!(response.status(), axum::http::StatusCode::OK);
     }
+
+    #[cfg(feature = "api_module")]
+    #[tokio::test]
+    async fn telemetry_broadcasts_after_a_bridge_driven_query() {
+        let state = test_state(false).await;
+
+        // No experience bridge yet — a query must not publish telemetry.
+        let mut rx_before = state.telemetry_tx.subscribe();
+        let _ = process_json(
+            json!({"type": "query", "content": "no bridge yet"}),
+            state.clone(),
+            test_security(None),
+        )
+        .await;
+        assert!(
+            rx_before.try_recv().is_err(),
+            "no telemetry should publish before the bridge is enabled"
+        );
+
+        // Enable the bridge, then a query must publish exactly one cycle.
+        {
+            let mut symthaea = state.symthaea.lock().await;
+            symthaea
+                .enable_experience_bridge(None)
+                .expect("in-memory experience bridge must construct cleanly");
+        }
+        let mut rx = state.telemetry_tx.subscribe();
+        let _ = process_json(
+            json!({"type": "query", "content": "bridge is live now"}),
+            state.clone(),
+            test_security(None),
+        )
+        .await;
+
+        let metadata = tokio::time::timeout(Duration::from_secs(10), rx.recv())
+            .await
+            .expect("telemetry received within timeout")
+            .expect("telemetry channel open");
+        // CycleMetadata isn't PartialEq; a successful, type-checked receive
+        // off the broadcast channel is the assertion — confirms the wire
+        // path from bridge cycle to subscriber, not any specific value.
+        let _ = serde_json::to_value(&metadata).expect("CycleMetadata serializes");
+    }
 }
 
 /// Background consciousness loop
@@ -2711,6 +3200,10 @@ async fn main() -> Result<()> {
             args.voice,
             #[cfg(feature = "voice-tts")]
             args.voice_id,
+            #[cfg(feature = "voice-tts")]
+            args.stt_worker.clone(),
+            #[cfg(feature = "voice-tts")]
+            args.stt_worker_args.clone(),
         )
         .await
         .context("Failed to initialize service state")?,

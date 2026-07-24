@@ -21,6 +21,7 @@ chrono = { workspace = true }
 serde_json = { workspace = true }
 symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
 symthaea-telemetry-grpc = { path = "../symthaea-telemetry-grpc" }
+symthaea-consciousness-equation = { path = "../../domains/symthaea-consciousness-equation" }
 tokio = { workspace = true }
 
 # Note: rclrs and other ROS2 crates require a ROS2 environment (Humble/Iron/Jazzy)

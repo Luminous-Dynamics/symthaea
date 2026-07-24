@@ -9,10 +9,20 @@
 use crate::constants::ANGSTROM_TO_BOHR;
 use serde::{Deserialize, Serialize};
 
-/// Element symbols indexed by atomic number (1-based)
+/// Element symbols indexed by atomic number (1-based). Covers all 118
+/// confirmed real elements (Phase Q1, 2026-07-16 -- previously stopped at
+/// Z=20/Ca, inconsistent with `basis::sto3g::Sto3g`'s real Z=1-54 coverage
+/// since Phase A.8). Generated from the same vendored periodic-table data
+/// as `element_data.rs`; see that module's doc comment for sourcing.
 const ELEMENT_SYMBOLS: &[&str] = &[
     "", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S",
-    "Cl", "Ar", "K", "Ca",
+    "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge",
+    "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd",
+    "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd",
+    "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg",
+    "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm",
+    "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr", "Rf", "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn",
+    "Nh", "Fl", "Mc", "Lv", "Ts", "Og",
 ];
 
 /// An atom: nuclear charge + position in 3D space.
@@ -93,12 +103,30 @@ impl Molecule {
     }
 
     /// Total number of electrons.
+    ///
+    /// Panics if `charge` exceeds the total nuclear charge (Phase Q0,
+    /// 2026-07-16) -- previously `(nuclear_charge - self.charge) as usize`
+    /// silently wrapped a negative result into a huge bogus electron count
+    /// instead of erroring, for any molecule with an invalid charge.
     pub fn n_electrons(&self) -> usize {
         let nuclear_charge: i32 = self.atoms.iter().map(|a| a.atomic_number as i32).sum();
-        (nuclear_charge - self.charge) as usize
+        let n = nuclear_charge - self.charge;
+        assert!(
+            n >= 0,
+            "invalid molecule: charge {} exceeds total nuclear charge {} (would give a negative electron count)",
+            self.charge,
+            nuclear_charge
+        );
+        n as usize
     }
 
     /// Number of occupied orbitals (RHF: n_electrons / 2).
+    ///
+    /// This is only physically meaningful for closed-shell (`multiplicity ==
+    /// 1`) systems -- `restricted_hartree_fock` enforces that separately
+    /// (Phase Q0, 2026-07-16) rather than this accessor, since other,
+    /// non-RHF-specific callers may legitimately want the raw
+    /// `n_electrons() / 2` value.
     pub fn n_occupied(&self) -> usize {
         self.n_electrons() / 2
     }
@@ -174,7 +202,10 @@ impl Molecule {
     }
 }
 
-/// Convert element symbol to atomic number.
+/// Convert element symbol to atomic number. Covers all 118 confirmed
+/// real elements (Phase Q1, 2026-07-16 -- previously stopped at Z=18/Ar).
+/// Generated from the same vendored periodic-table data as
+/// `element_data.rs`.
 fn symbol_to_z(symbol: &str) -> Option<u8> {
     match symbol.to_uppercase().as_str() {
         "H" => Some(1),
@@ -195,6 +226,106 @@ fn symbol_to_z(symbol: &str) -> Option<u8> {
         "S" => Some(16),
         "CL" => Some(17),
         "AR" => Some(18),
+        "K" => Some(19),
+        "CA" => Some(20),
+        "SC" => Some(21),
+        "TI" => Some(22),
+        "V" => Some(23),
+        "CR" => Some(24),
+        "MN" => Some(25),
+        "FE" => Some(26),
+        "CO" => Some(27),
+        "NI" => Some(28),
+        "CU" => Some(29),
+        "ZN" => Some(30),
+        "GA" => Some(31),
+        "GE" => Some(32),
+        "AS" => Some(33),
+        "SE" => Some(34),
+        "BR" => Some(35),
+        "KR" => Some(36),
+        "RB" => Some(37),
+        "SR" => Some(38),
+        "Y" => Some(39),
+        "ZR" => Some(40),
+        "NB" => Some(41),
+        "MO" => Some(42),
+        "TC" => Some(43),
+        "RU" => Some(44),
+        "RH" => Some(45),
+        "PD" => Some(46),
+        "AG" => Some(47),
+        "CD" => Some(48),
+        "IN" => Some(49),
+        "SN" => Some(50),
+        "SB" => Some(51),
+        "TE" => Some(52),
+        "I" => Some(53),
+        "XE" => Some(54),
+        "CS" => Some(55),
+        "BA" => Some(56),
+        "LA" => Some(57),
+        "CE" => Some(58),
+        "PR" => Some(59),
+        "ND" => Some(60),
+        "PM" => Some(61),
+        "SM" => Some(62),
+        "EU" => Some(63),
+        "GD" => Some(64),
+        "TB" => Some(65),
+        "DY" => Some(66),
+        "HO" => Some(67),
+        "ER" => Some(68),
+        "TM" => Some(69),
+        "YB" => Some(70),
+        "LU" => Some(71),
+        "HF" => Some(72),
+        "TA" => Some(73),
+        "W" => Some(74),
+        "RE" => Some(75),
+        "OS" => Some(76),
+        "IR" => Some(77),
+        "PT" => Some(78),
+        "AU" => Some(79),
+        "HG" => Some(80),
+        "TL" => Some(81),
+        "PB" => Some(82),
+        "BI" => Some(83),
+        "PO" => Some(84),
+        "AT" => Some(85),
+        "RN" => Some(86),
+        "FR" => Some(87),
+        "RA" => Some(88),
+        "AC" => Some(89),
+        "TH" => Some(90),
+        "PA" => Some(91),
+        "U" => Some(92),
+        "NP" => Some(93),
+        "PU" => Some(94),
+        "AM" => Some(95),
+        "CM" => Some(96),
+        "BK" => Some(97),
+        "CF" => Some(98),
+        "ES" => Some(99),
+        "FM" => Some(100),
+        "MD" => Some(101),
+        "NO" => Some(102),
+        "LR" => Some(103),
+        "RF" => Some(104),
+        "DB" => Some(105),
+        "SG" => Some(106),
+        "BH" => Some(107),
+        "HS" => Some(108),
+        "MT" => Some(109),
+        "DS" => Some(110),
+        "RG" => Some(111),
+        "CN" => Some(112),
+        "NH" => Some(113),
+        "FL" => Some(114),
+        "MC" => Some(115),
+        "LV" => Some(116),
+        "TS" => Some(117),
+        "OG" => Some(118),
         _ => None,
     }
 }
@@ -288,6 +419,16 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "invalid molecule: charge")]
+    fn test_n_electrons_panics_on_charge_exceeding_nuclear_charge() {
+        // Phase Q0 (2026-07-16): a +5 charge on a single H atom (nuclear
+        // charge 1) previously silently wrapped to a huge bogus electron
+        // count via `(1 - 5) as usize`; now panics instead.
+        let m = Molecule::with_charge(vec![Atom::new(1, 0.0, 0.0, 0.0)], 5, 1);
+        let _ = m.n_electrons();
+    }
+
+    #[test]
     fn test_h2_nuclear_repulsion() {
         let h2 = Molecule::h2();
         let v_nn = h2.nuclear_repulsion_energy();
@@ -304,5 +445,22 @@ mod tests {
         // 0.74 Angstrom → Bohr
         let r = mol.atoms[0].distance_to(&mol.atoms[1]);
         assert!((r - 0.74 * ANGSTROM_TO_BOHR).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_element_symbols_and_symbol_to_z_round_trip_all_118() {
+        // Phase Q1 (2026-07-16): both tables previously stopped at Z=20/18;
+        // now cover all 118 confirmed real elements. Round-trip every one
+        // through Atom::symbol() -> symbol_to_z() -> back to Z.
+        for z in 1u8..=118 {
+            let atom = Atom::new(z, 0.0, 0.0, 0.0);
+            let symbol = atom.symbol();
+            assert_ne!(symbol, "??", "Z={z} returned the out-of-range fallback");
+            let round_tripped = symbol_to_z(symbol)
+                .unwrap_or_else(|| panic!("symbol_to_z couldn't parse back {symbol} (Z={z})"));
+            assert_eq!(round_tripped, z, "round-trip mismatch for Z={z} ({symbol})");
+        }
+        // Z=0 and Z=119 are genuinely out of range.
+        assert_eq!(symbol_to_z("Uue"), None);
     }
 }

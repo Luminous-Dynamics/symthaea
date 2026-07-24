@@ -393,6 +393,48 @@ impl ContinuousMind {
                 }
             }
         }
+
+        // ── Epistemic Attenuation (neural-bridge feature) ─────────────────
+        // FEP rationale: uncertain percepts carry higher prediction error, which
+        // should manifest as increased cognitive load (free-energy expenditure)
+        // and a dampened Phi estimate rather than falsely confident integration.
+        //
+        // The dampening is soft: below a confidence threshold of 0.85 the Phi
+        // estimate is linearly attenuated toward 0.5 (neither high nor low
+        // consciousness). This avoids cliff-edge suppression while still making
+        // the system more conservative when the perception pathway reports doubt.
+        //
+        // Science: Friston (2010) — free energy is minimised by either updating
+        // beliefs *or* increasing precision weighting on sensory signals; low
+        // confidence means we are far from minimising free energy and the system
+        // should reflect that thermodynamically.
+        #[cfg(feature = "neural-bridge")]
+        {
+            let confidence = self.state.perception_confidence;
+            if confidence < 0.85 {
+                // Attenuation factor: 1.0 at confidence=0.85, 0.0 at confidence=0.0
+                let attenuation = confidence / 0.85;
+                // Blend current Phi toward 0.5 (epistemic midpoint)
+                self.state.consciousness_level = (self.state.consciousness_level
+                    * attenuation as f64
+                    + 0.5 * (1.0 - attenuation as f64))
+                    .clamp(0.0, 1.0);
+
+                // Raise cognitive load proportional to perception uncertainty:
+                // more uncertainty → more free energy spent resolving the ambiguity.
+                let extra_load = self.state.perception_uncertainty * 0.25;
+                self.state.cognitive_load =
+                    (self.state.cognitive_load + extra_load as f64).clamp(0.0, 1.0);
+
+                tracing::trace!(
+                    perception_confidence = %confidence,
+                    perception_uncertainty = %self.state.perception_uncertainty,
+                    consciousness_level = %self.state.consciousness_level,
+                    cognitive_load = %self.state.cognitive_load,
+                    "Epistemic attenuation applied to consciousness update"
+                );
+            }
+        }
     }
 
     /// Generate output if consciousness is above threshold.
@@ -798,22 +840,96 @@ impl ContinuousMind {
                 continue;
             }
 
-            // MAC verification (Item 1): reject if key is set and MAC doesn't match
-            if let Some(ref key) = self.mesh_auth_key {
-                let pkt_bytes = packet.to_bytes();
-                if !crate::swarm::mesh::verify_packet_mac(&pkt_bytes, key) {
-                    self.mesh_stats.packets_auth_failed += 1;
-                    continue;
+            // MAC verification (Item 1): reject if key is set and MAC doesn't match (Hybrid policy)
+            let is_critical = packet.urgency == crate::swarm::mesh::MeshUrgency::Critical
+                || packet.payload_type == crate::swarm::mesh::PayloadType::MoralTopology;
+
+            let mut auth_verified = false;
+            let mut auth_key_present = false;
+
+            #[cfg(feature = "mesh-key-exchange")]
+            if let Some(ref store) = self.mesh_peer_keys {
+                if let Some(key) = store.peer_auth_key(&packet.source_id) {
+                    auth_key_present = true;
+                    let pkt_bytes = packet.to_bytes();
+                    if crate::swarm::mesh::verify_packet_mac(&pkt_bytes, key) {
+                        auth_verified = true;
+                    }
                 }
+            }
+
+            if !auth_key_present {
+                if let Some(ref key) = self.mesh_auth_key {
+                    auth_key_present = true;
+                    let pkt_bytes = packet.to_bytes();
+                    if crate::swarm::mesh::verify_packet_mac(&pkt_bytes, key) {
+                        auth_verified = true;
+                    }
+                }
+            }
+
+            if auth_key_present {
+                if !auth_verified {
+                    self.mesh_stats.packets_auth_failed += 1;
+                    if is_critical {
+                        tracing::warn!(
+                            target: "symthaea::mind::mesh",
+                            source = ?packet.source_id,
+                            payload = ?packet.payload_type,
+                            "Authentication failed for safety-critical packet. Fail-closed: dropping packet."
+                        );
+                        continue;
+                    } else {
+                        tracing::trace!(
+                            target: "symthaea::mind::mesh",
+                            source = ?packet.source_id,
+                            payload = ?packet.payload_type,
+                            "Authentication failed for telemetry packet. Fail-open: passing as untrusted."
+                        );
+                    }
+                }
+            } else if is_critical {
+                self.mesh_stats.packets_auth_failed += 1;
+                tracing::warn!(
+                    target: "symthaea::mind::mesh",
+                    source = ?packet.source_id,
+                    payload = ?packet.payload_type,
+                    "No authentication key available for safety-critical packet. Fail-closed: dropping packet."
+                );
+                continue;
+            } else {
+                tracing::trace!(
+                    target: "symthaea::mind::mesh",
+                    source = ?packet.source_id,
+                    payload = ?packet.payload_type,
+                    "No authentication key available for telemetry packet. Fail-open: passing as unauthenticated."
+                );
             }
 
             // TTL forwarding (Item 4): rebroadcast with decremented TTL
             if packet.ttl > 1 {
                 let mut fwd = packet.clone();
                 fwd.ttl -= 1;
-                self.mesh_outbox
-                    .push(crate::swarm::mesh::MeshOutbound { packet: fwd });
-                self.mesh_stats.packets_forwarded += 1;
+                if self.mesh_auth_key.is_some() {
+                    // TTL is authenticated, so a forwarding node must issue a
+                    // fresh group-key tag after decrementing it.
+                    self.sign_mesh_packet(&mut fwd);
+                    self.mesh_outbox
+                        .push(crate::swarm::mesh::MeshOutbound { packet: fwd });
+                    self.mesh_stats.packets_forwarded += 1;
+                } else if auth_key_present {
+                    // A peer-specific authenticated packet cannot be mutated
+                    // and forwarded under the original sender's identity.
+                    tracing::trace!(
+                        target: "symthaea::mind::mesh",
+                        source = ?packet.source_id,
+                        "Not forwarding authenticated packet without a configured group forwarding key."
+                    );
+                } else {
+                    self.mesh_outbox
+                        .push(crate::swarm::mesh::MeshOutbound { packet: fwd });
+                    self.mesh_stats.packets_forwarded += 1;
+                }
             }
 
             // Partition recovery (Item 5): replay buffer to newly-discovered peers

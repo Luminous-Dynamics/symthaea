@@ -267,7 +267,7 @@ fn all_benchmarks() -> Vec<Box<dyn PsychBenchmark + Send + Sync>> {
         Box::new(ConstraintPuzzlesBenchmark),
         Box::new(ProofConstructionBenchmark),
         Box::new(DefiniteIntegralsBenchmark),
-        // Security (HDC-FHE) (6)
+        // Insecure shared-mask algebra demo (6)
         Box::new(EncryptedClassificationBenchmark),
         Box::new(CollectiveAggregationBenchmark),
         Box::new(EncryptedLearningBenchmark),

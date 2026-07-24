@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "drill_id": "quarterly-recovery-drill-2026-q3",
+  "deployment_id": "robot-fleet-production",
+  "fleet_id": "symthaea-humanoid-fleet",
+  "authority_epoch": 42,
+  "scenarios": [
+    "AuthorityLoss",
+    "DeviceIdentityRotation",
+    "EvidenceArchiveRestore",
+    "ControllerFailover",
+    "NetworkPartition",
+    "CandidateRollback",
+    "RecoveryMediaBoot",
+    "FleetReattestation"
+  ],
+  "recovery_objective_policy_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "environment_manifest_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "planned_start_unix_time_ms": 1782864000000,
+  "planned_end_unix_time_ms": 1782950400000,
+  "production_motion_prohibited": true
+}

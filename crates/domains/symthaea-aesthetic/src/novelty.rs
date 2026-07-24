@@ -81,7 +81,12 @@ impl Default for NoveltyTracker {
 
 /// Extract the 4D profile from an AestheticScore.
 fn score_to_profile(score: &AestheticScore) -> [f32; 4] {
-    [score.order, score.complexity, score.harmony, score.birkhoff]
+    [
+        finite_unit(score.order),
+        finite_unit(score.complexity),
+        finite_unit(score.harmony),
+        finite_unit(score.birkhoff),
+    ]
 }
 
 /// Compute novelty as average Euclidean distance from history centroid,
@@ -138,85 +143,206 @@ fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + (-x * 2.0).exp())
 }
 
-/// A simple linear aesthetic preference model trained from gallery history.
+/// Provenance for a preference observation.
 ///
-/// Learns which combinations of (order, complexity, harmony, birkhoff)
-/// the system has historically rated highest, enabling personalized taste.
+/// Source counts remain separate so dashboards and evidence bundles can
+/// distinguish grounded human taste from synthetic or self-critic labels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PreferenceSource {
+    Human,
+    Population,
+    Analyst,
+    SelfCritic,
+}
+
+impl PreferenceSource {
+    fn index(self) -> usize {
+        match self {
+            Self::Human => 0,
+            Self::Population => 1,
+            Self::Analyst => 2,
+            Self::SelfCritic => 3,
+        }
+    }
+}
+
+/// Explicit target used to train aesthetic preference rather than re-learning
+/// the crate's own hand-authored composite formula.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct PreferenceObservation {
+    /// Aesthetic evidence being judged.
+    pub score: AestheticScore,
+    /// Observed preference in [0, 1].
+    pub target: f32,
+    /// Reliability or agreement weight in [0, 1].
+    pub confidence: f32,
+    /// Origin of the judgement.
+    pub source: PreferenceSource,
+}
+
+impl PreferenceObservation {
+    pub fn human(score: AestheticScore, target: f32, confidence: f32) -> Self {
+        Self {
+            score,
+            target: finite_unit(target),
+            confidence: finite_unit(confidence),
+            source: PreferenceSource::Human,
+        }
+    }
+}
+
+/// Online logistic preference model over the aesthetic evidence profile.
+///
+/// The model accepts explicit absolute labels and pairwise comparisons. It no
+/// longer silently trains against `score.composite`, which only teaches the
+/// model to imitate the formula it was meant to evaluate independently.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TasteModel {
-    /// Learned weights for each dimension.
+    /// Signed learned coefficients for order, complexity, harmony, and Birkhoff.
     weights: [f32; 4],
-    /// Bias term.
+    /// Bias term in logit space.
     bias: f32,
-    /// Number of training examples seen.
+    /// Number of observations seen.
     examples_seen: usize,
     /// Learning rate.
     lr: f32,
+    /// Counts by [`PreferenceSource`] for auditability.
+    #[serde(default)]
+    source_counts: [usize; 4],
 }
 
 impl TasteModel {
     pub fn new() -> Self {
         Self {
-            // Start with equal weights (neutral preference)
-            weights: [0.25, 0.25, 0.25, 0.25],
+            weights: [0.0; 4],
             bias: 0.0,
             examples_seen: 0,
-            lr: 0.01,
+            lr: 0.05,
+            source_counts: [0; 4],
         }
     }
 
-    /// Train on a single example: (score, actual composite).
+    /// Train from an explicit preference observation using online logistic
+    /// regression. Non-finite inputs are treated as zero evidence.
+    pub fn train_observation(&mut self, observation: PreferenceObservation) {
+        let profile = centered_profile(&observation.score);
+        let target = finite_unit(observation.target);
+        let confidence = finite_unit(observation.confidence);
+        let predicted = self.predict_centered(&profile);
+        let error = target - predicted;
+        let step = self.lr * confidence * error;
+
+        for (weight, feature) in self.weights.iter_mut().zip(profile) {
+            *weight = (*weight + step * feature).clamp(-8.0, 8.0);
+        }
+        self.bias = (self.bias + step).clamp(-8.0, 8.0);
+        self.examples_seen = self.examples_seen.saturating_add(1);
+        let index = observation.source.index();
+        self.source_counts[index] = self.source_counts[index].saturating_add(1);
+    }
+
+    /// Train a Bradley-Terry-style pairwise preference: `preferred` should be
+    /// ranked above `rejected`.
+    pub fn train_pairwise(
+        &mut self,
+        preferred: &AestheticScore,
+        rejected: &AestheticScore,
+        confidence: f32,
+        source: PreferenceSource,
+    ) {
+        let preferred = centered_profile(preferred);
+        let rejected = centered_profile(rejected);
+        let difference: [f32; 4] = std::array::from_fn(|index| preferred[index] - rejected[index]);
+        let logit: f32 = self
+            .weights
+            .iter()
+            .zip(difference)
+            .map(|(weight, feature)| weight * feature)
+            .sum();
+        let predicted = logistic(logit);
+        let step = self.lr * finite_unit(confidence) * (1.0 - predicted);
+
+        for (weight, feature) in self.weights.iter_mut().zip(difference) {
+            *weight = (*weight + step * feature).clamp(-8.0, 8.0);
+        }
+        self.examples_seen = self.examples_seen.saturating_add(1);
+        let index = source.index();
+        self.source_counts[index] = self.source_counts[index].saturating_add(1);
+    }
+
+    /// Legacy formula-imitation path retained for source compatibility.
     ///
-    /// Uses simple online gradient descent to learn which dimensions
-    /// best predict the composite score.
+    /// Prefer [`Self::train_observation`] or [`Self::train_pairwise`]. This
+    /// method records the source as `SelfCritic` so synthetic training cannot be
+    /// mistaken for grounded human evidence.
+    #[deprecated(note = "use train_observation or train_pairwise with explicit labels")]
     pub fn train(&mut self, score: &AestheticScore) {
-        let profile = score_to_profile(score);
-        let predicted = self.predict_raw(&profile);
-        let error = score.composite - predicted;
-
-        // Gradient descent
-        for (w, &p) in self.weights.iter_mut().zip(profile.iter()) {
-            *w += self.lr * error * p;
-        }
-        self.bias += self.lr * error;
-
-        // Keep weights non-negative and normalized
-        for w in &mut self.weights {
-            *w = w.max(0.0);
-        }
-        let sum: f32 = self.weights.iter().sum();
-        if sum > 0.01 {
-            for w in &mut self.weights {
-                *w /= sum;
-            }
-        }
-
-        self.examples_seen += 1;
+        self.train_observation(PreferenceObservation {
+            score: *score,
+            target: finite_unit(score.composite),
+            confidence: 1.0,
+            source: PreferenceSource::SelfCritic,
+        });
     }
 
-    /// Predict aesthetic quality from a score's profile.
+    /// Predict aesthetic preference from a score's evidence profile.
     pub fn predict(&self, score: &AestheticScore) -> f32 {
-        let profile = score_to_profile(score);
-        self.predict_raw(&profile).clamp(0.0, 1.0)
+        self.predict_centered(&centered_profile(score))
     }
 
-    fn predict_raw(&self, profile: &[f32; 4]) -> f32 {
-        let mut sum = self.bias;
-        for (&w, &p) in self.weights.iter().zip(profile.iter()) {
-            sum += w * p;
-        }
-        sum
+    fn predict_centered(&self, profile: &[f32; 4]) -> f32 {
+        let logit = self.bias
+            + self
+                .weights
+                .iter()
+                .zip(profile.iter())
+                .map(|(weight, feature)| weight * feature)
+                .sum::<f32>();
+        logistic(logit)
     }
 
-    /// Current learned weights (for introspection).
+    /// Current signed learned coefficients (for introspection).
     pub fn weights(&self) -> &[f32; 4] {
         &self.weights
+    }
+
+    /// Normalized absolute feature importance in [0, 1], summing to one when
+    /// at least one coefficient is non-zero.
+    pub fn feature_importance(&self) -> [f32; 4] {
+        let magnitude: f32 = self.weights.iter().map(|weight| weight.abs()).sum();
+        if magnitude <= f32::EPSILON {
+            [0.0; 4]
+        } else {
+            std::array::from_fn(|index| self.weights[index].abs() / magnitude)
+        }
     }
 
     /// How many examples the model has been trained on.
     pub fn examples_seen(&self) -> usize {
         self.examples_seen
     }
+
+    /// Number of observations received from a particular provenance class.
+    pub fn source_count(&self, source: PreferenceSource) -> usize {
+        self.source_counts[source.index()]
+    }
+}
+
+fn centered_profile(score: &AestheticScore) -> [f32; 4] {
+    let profile = score_to_profile(score);
+    std::array::from_fn(|index| finite_unit(profile[index]) - 0.5)
+}
+
+fn finite_unit(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
+fn logistic(value: f32) -> f32 {
+    1.0 / (1.0 + (-value.clamp(-20.0, 20.0)).exp())
 }
 
 impl Default for TasteModel {
@@ -287,29 +413,40 @@ mod tests {
     }
 
     #[test]
-    fn taste_model_learns() {
+    fn taste_model_learns_from_explicit_human_labels() {
         let mut model = TasteModel::new();
+        let high = make_score(0.3, 0.5, 0.9, 0.0);
+        let low = make_score(0.3, 0.5, 0.1, 1.0);
 
-        // Train on scores where high harmony = high composite
-        for _ in 0..100 {
-            model.train(&make_score(0.3, 0.5, 0.9, 0.8));
-            model.train(&make_score(0.3, 0.5, 0.1, 0.2));
+        for _ in 0..150 {
+            model.train_observation(PreferenceObservation::human(high, 0.95, 1.0));
+            model.train_observation(PreferenceObservation::human(low, 0.05, 1.0));
         }
 
-        // Model should predict higher for high-harmony scores
-        let high_h = model.predict(&make_score(0.3, 0.5, 0.9, 0.0));
-        let low_h = model.predict(&make_score(0.3, 0.5, 0.1, 0.0));
-        assert!(high_h > low_h, "high harmony {high_h} should > low {low_h}");
+        assert!(model.predict(&high) > model.predict(&low));
+        assert_eq!(model.source_count(PreferenceSource::Human), 300);
+        assert_eq!(model.source_count(PreferenceSource::SelfCritic), 0);
     }
 
     #[test]
-    fn taste_model_weights_normalized() {
+    fn pairwise_training_learns_ranking_without_absolute_scores() {
         let mut model = TasteModel::new();
-        for _ in 0..50 {
-            model.train(&make_score(0.7, 0.3, 0.8, 0.7));
+        let preferred = make_score(0.8, 0.5, 0.8, 0.0);
+        let rejected = make_score(0.2, 0.5, 0.2, 1.0);
+        for _ in 0..100 {
+            model.train_pairwise(&preferred, &rejected, 1.0, PreferenceSource::Human);
         }
-        let sum: f32 = model.weights().iter().sum();
-        assert!((sum - 1.0).abs() < 0.01, "weights sum = {sum}");
+        assert!(model.predict(&preferred) > model.predict(&rejected));
+    }
+
+    #[test]
+    fn feature_importance_is_normalized() {
+        let mut model = TasteModel::new();
+        let preferred = make_score(0.9, 0.2, 0.8, 0.0);
+        let rejected = make_score(0.1, 0.8, 0.2, 1.0);
+        model.train_pairwise(&preferred, &rejected, 1.0, PreferenceSource::Population);
+        let sum: f32 = model.feature_importance().iter().sum();
+        assert!((sum - 1.0).abs() < 0.01, "importance sum = {sum}");
     }
 
     #[test]

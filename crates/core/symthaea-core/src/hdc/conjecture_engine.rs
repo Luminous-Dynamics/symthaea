@@ -37,14 +37,24 @@ use parking_lot::RwLock;
 
 #[path = "conjecture_engine/autonomous.rs"]
 mod autonomous;
+#[path = "conjecture_engine/cfc_smoothing.rs"]
+mod cfc_smoothing;
 #[path = "conjecture_engine/conjecture_metadata.rs"]
 mod conjecture_metadata;
+#[path = "conjecture_engine/continuity.rs"]
+mod continuity;
 #[path = "conjecture_engine/dynamics.rs"]
 mod dynamics;
+#[path = "conjecture_engine/experiment_selection.rs"]
+mod experiment_selection;
 #[path = "conjecture_engine/expressions.rs"]
 mod expressions;
+#[path = "conjecture_engine/flux_discovery.rs"]
+mod flux_discovery;
 #[path = "conjecture_engine/gp_support.rs"]
 mod gp_support;
+#[path = "conjecture_engine/iit_coupling.rs"]
+mod iit_coupling;
 #[path = "conjecture_engine/observers.rs"]
 mod observers;
 #[path = "conjecture_engine/regressor.rs"]
@@ -58,16 +68,51 @@ mod symbolic;
 #[path = "conjecture_engine/verification.rs"]
 mod verification;
 pub use autonomous::*;
+/// CfC-style closed-form smoothing for noisy/irregular observations. See
+/// `cfc_smoothing.rs` module docs.
+pub use cfc_smoothing::{CfcSmoother, NaiveEmaSmoother};
 pub use conjecture_metadata::*;
+/// Stage B: discrete continuity-equation (local Noether current) checking.
+/// See `continuity.rs` module docs.
+pub use continuity::{
+    ShapeCalibration, discrete_continuity_residual, discrete_continuity_residual_with_flow,
+    gauge_fix_flux, shape_calibrated_residual,
+};
 pub use dynamics::observe_gr_correction;
 use dynamics::*;
+/// FEP-flavored active experiment selection. See
+/// `experiment_selection.rs` module docs.
+pub use experiment_selection::{epistemic_value, select_most_informative_experiment};
 pub use expressions::*;
+/// Stage B M2: constrained flux discovery given a known density. See
+/// `flux_discovery.rs` module docs.
+pub use flux_discovery::{
+    DedupMode, DedupRunMetrics, FactorizedFluxResult, FluxDiscoveryResult, GenerationSnapshot,
+    JointDiscoveryResult, ShapedFluxResult, behavioral_fingerprint, discover_flux_factorized,
+    discover_flux_factorized_shaped, discover_flux_factorized_with_dedup,
+    discover_flux_factorized_with_snapshots, discover_flux_given_density,
+    discover_flux_given_density_seeded, discover_joint_density_and_flux, hdc_fingerprint,
+    hdc_probe_basis, quantize_fingerprint, random_density_motif_expr, random_fpu_flux_motif_expr,
+    random_motif_expr, vector_similarity,
+};
 use gp_support::{
     SpecializationBudget, collect_constants, compute_mse, contains_structural_match,
-    count_prior_subtrees, crossover, expr_uses_only_vars, fd_gradient, fingerprint_expr,
-    gram_schmidt, lie_derivative_variance, macro_usage_key, optimize_constants,
-    orthogonal_fraction, seed_macro_variants, specialize_seed_constants,
+    count_prior_subtrees, crossover, expr_uses_only_vars, fingerprint_expr, gram_schmidt,
+    macro_usage_key, optimize_constants, orthogonal_fraction, seed_macro_variants,
+    specialize_seed_constants,
 };
+/// The exact fitness primitives the autonomous-invariant GP search uses
+/// internally, exposed for external crates that want to score candidates
+/// (or benchmark the fitness function itself, e.g. under noisy trajectory
+/// data) against the same metric the real search optimizes.
+pub use gp_support::{
+    fd_gradient, gradient_informativeness_fraction, is_informatively_conserved,
+    lie_derivative_variance,
+};
+/// IIT falsifiable-prediction test: does coupling hypothesis memory into
+/// experiment selection track measurable integration (Φ)? See
+/// `iit_coupling.rs` module docs.
+pub use iit_coupling::{TrialResult, run_trial};
 pub use observers::*;
 pub use regressor::*;
 pub use reporting::*;
@@ -138,16 +183,23 @@ impl ObservedSequence {
 // CONJECTURE STATUS
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Lifecycle of a conjecture from proposed to verified/refuted.
+/// Evidence level for a conjecture. Variants deliberately distinguish
+/// observation, finite checks, solver-assisted sample checks, and proof.
 #[derive(Debug, Clone)]
 pub enum ConjectureStatus {
     /// Formula fits training data (not yet validated)
     Proposed,
     /// Fits held-out test data within tolerance
     NumericallyTested { test_mse: f64 },
+    /// Checked against every available observation in a finite integer range.
+    /// This is not induction and does not establish values absent from the data.
+    BoundedChecked { checked_points: usize, max_n: usize },
+    /// An SMT solver checked the formula at fixed observed inputs only.
+    /// This is not a universally quantified solver proof.
+    SmtSamplesChecked { checked_points: usize },
     /// Symbolic identity verified (e.g., derivative matches)
     SymbolicallyChecked,
-    /// Formal proof found by Z3/TacticProver
+    /// A universally quantified or proof-producing formal argument succeeded.
     FormallyVerified { proof_steps: usize },
     /// Counterexample found
     Refuted { counterexample: f64 },
@@ -161,7 +213,9 @@ pub enum MacroPromotionTier {
     /// May contribute only through recurrence across independent sources.
     RecurrentNumerical,
     /// May contribute through recurrence and fast-track singleton promotion.
-    Formal,
+    /// This policy tier can be reached by symbolic or formal evidence and is
+    /// therefore intentionally not itself called "formal".
+    FastTrackVerified,
 }
 
 impl MacroPromotionTier {
@@ -170,7 +224,7 @@ impl MacroPromotionTier {
     }
 
     pub fn allows_fast_track(self) -> bool {
-        matches!(self, Self::Formal)
+        matches!(self, Self::FastTrackVerified)
     }
 }
 
@@ -305,7 +359,7 @@ impl ConjectureEngine {
 
     /// Run one cycle of abstract thought: encode discoveries, cluster, promote grammar, find functors.
     ///
-    /// Call after `generate_conjectures()` and `verify_numerical()`/`verify_formal()`.
+    /// Call after `generate_conjectures()` and the desired evidence checks.
     /// Requires a `PrimitiveSystem` for HDC encoding of conjecture formulas.
     #[cfg(feature = "abstract_thought")]
     pub fn reflect(&mut self, primitives: &super::primitive_system::PrimitiveSystem) {
@@ -384,7 +438,7 @@ impl ConjectureEngine {
     ///
     /// For each invariant, status is assigned based on whether it was
     /// symbolically proven via the chain-rule path:
-    /// - `symbolically_proven == true` → `ConjectureStatus::FormallyVerified`
+    /// - `symbolically_proven == true` → `ConjectureStatus::SymbolicallyChecked`
     ///   (eligible for fast-track macro promotion)
     /// - else → `ConjectureStatus::NumericallyTested` with `test_mse = variance`
     ///   and `MacroPromotionTier::Quarantined`, so unproven trajectory fits
@@ -403,7 +457,7 @@ impl ConjectureEngine {
         for inv in invariants {
             let fitness = inv.variance + self.config.lambda * inv.complexity as f64;
             let status = if inv.symbolically_proven {
-                ConjectureStatus::FormallyVerified { proof_steps: 0 }
+                ConjectureStatus::SymbolicallyChecked
             } else {
                 ConjectureStatus::NumericallyTested {
                     test_mse: inv.variance,
@@ -420,7 +474,7 @@ impl ConjectureEngine {
                 status,
                 confidence: if inv.symbolically_proven { 0.99 } else { 0.6 },
                 macro_promotion_tier: if inv.symbolically_proven {
-                    MacroPromotionTier::Formal
+                    MacroPromotionTier::FastTrackVerified
                 } else {
                     MacroPromotionTier::Quarantined
                 },
@@ -1051,15 +1105,10 @@ mod tests {
     }
 
     #[test]
-    fn test_verify_numerical_upgrades_exact_fit_to_formal() {
-        // Session 15: verify_numerical must upgrade conjectures with
-        // MSE ≈ 0 on BOTH train and test to FormallyVerified/Formal. This
-        // is what lets AbstractThought::reflect extract subtrees from a
-        // single-source exact numerical fit (e.g. distance-kernel) via
-        // the fast-track promotion path. Without this upgrade, the
-        // observed sequence would have to contain >=100 points for
-        // verify_formal to certify it — which the compounding benchmark
-        // can't afford.
+    fn test_verify_numerical_keeps_exact_fit_numerical() {
+        // An exact fit on finite train and test samples is strong numerical
+        // evidence, but it is not a theorem and must not enter the formal
+        // singleton fast-track path.
         let mut engine = ConjectureEngine::with_config(RegressorConfig {
             population_size: 120,
             generations: 40,
@@ -1090,15 +1139,15 @@ mod tests {
             best.formula_str
         );
         assert!(
-            matches!(best.status, ConjectureStatus::FormallyVerified { .. }),
-            "exact fit should upgrade to FormallyVerified; got status={:?}, formula={}",
+            matches!(best.status, ConjectureStatus::NumericallyTested { .. }),
+            "exact fit on samples should remain NumericallyTested; got status={:?}, formula={}",
             best.status,
             best.formula_str
         );
         assert_eq!(
             best.macro_promotion_tier,
-            MacroPromotionTier::Formal,
-            "exact fit should upgrade tier to Formal; got {:?}, formula={}",
+            MacroPromotionTier::RecurrentNumerical,
+            "exact fit should remain recurrent numerical evidence; got {:?}, formula={}",
             best.macro_promotion_tier,
             best.formula_str
         );
@@ -1323,9 +1372,9 @@ mod tests {
         );
     }
 
-    /// Test formal verification: triangular number formula should pass bounded induction.
+    /// Triangular-number formulas can be checked against finite known data.
     #[test]
-    fn test_formal_verification_triangular() {
+    fn test_bounded_data_check_triangular() {
         let mut engine = ConjectureEngine::with_config(RegressorConfig {
             population_size: 200,
             generations: 80,
@@ -1347,9 +1396,9 @@ mod tests {
 
         engine.generate_conjectures(3);
         engine.verify_numerical();
-        engine.verify_formal(200);
+        engine.verify_bounded(200);
 
-        eprintln!("\n=== Formal Verification Results ===");
+        eprintln!("\n=== Bounded Data Check Results ===");
         for c in &engine.conjectures {
             eprintln!(
                 "  {} ≈ {} | status={:?} | confidence={:.2}",
@@ -1357,16 +1406,12 @@ mod tests {
             );
         }
 
-        // At least one conjecture should be formally verified
+        // Finite checks must never produce the formal-proof status.
         let any_verified = engine
             .conjectures
             .iter()
             .any(|c| matches!(c.status, ConjectureStatus::FormallyVerified { .. }));
-        // It's OK if none are formally verified (the regressor might find a
-        // formula that's close but not exact for all 200 values)
-        if any_verified {
-            eprintln!("  >>> FORMALLY VERIFIED conjecture found!");
-        }
+        assert!(!any_verified, "bounded data checks are not formal proofs");
     }
 
     /// THE GCT SCALING EXPERIMENT — potentially novel mathematics.
@@ -1932,6 +1977,19 @@ mod tests {
 
     #[test]
     fn test_attach_eml_metadata_cache_keys_by_formula_structure() {
+        // Deliberately does NOT assert on the cache's total size (previously did, via a now-
+        // removed `eml_metadata_cache_size()` test helper). `EML_METADATA_CACHE` is a
+        // process-wide global (a crate-level `Lazy<RwLock<...>>`, shared by every test in
+        // this binary), and Rust's default test harness runs tests concurrently across
+        // threads -- a concurrently-running sibling test that also calls `attach_eml_metadata`
+        // on some unrelated formula can insert into the same cache between this test's
+        // insertions and a size check, making an exact-size assertion flaky (confirmed: this
+        // test failed under `cargo test`'s default parallel execution but passed 153/153
+        // under `--test-threads=1`, every time). The behavioral assertions below (comparing
+        // `first`'s and `second`'s applied EML metadata field-by-field) test the actual
+        // property this test is named for -- "cache keys by formula structure," i.e. two
+        // conjectures sharing a formula get identical computed results -- without depending
+        // on the cache's global size being isolated from other tests.
         clear_eml_metadata_cache();
 
         let formula = Expr::BinOp(
@@ -1961,7 +2019,6 @@ mod tests {
             eml_verified_constructive_real: None,
         };
         attach_eml_metadata(&mut first);
-        assert_eq!(eml_metadata_cache_size(), 1);
 
         let mut second = Conjecture {
             formula,
@@ -1985,7 +2042,6 @@ mod tests {
         };
         attach_eml_metadata(&mut second);
 
-        assert_eq!(eml_metadata_cache_size(), 1);
         assert_eq!(first.eml_compiled, second.eml_compiled);
         assert_eq!(first.eml_metrics, second.eml_metrics);
         assert_eq!(first.eml_verified_real, second.eml_verified_real);
@@ -2016,7 +2072,7 @@ mod tests {
             fitness: 0.0,
             status: ConjectureStatus::Proposed,
             confidence: 1.0,
-            macro_promotion_tier: MacroPromotionTier::Formal,
+            macro_promotion_tier: MacroPromotionTier::FastTrackVerified,
             eml_compiled: None,
             eml_metrics: None,
             eml_verified_real: None,
@@ -2584,7 +2640,7 @@ mod tests {
         // Run full pipeline
         engine.generate_conjectures(2);
         engine.verify_numerical();
-        engine.verify_formal(200);
+        engine.verify_bounded(200);
 
         eprintln!("\n═══ COMPREHENSIVE DISCOVERY RESULTS ═══\n");
         let sources = [
@@ -2623,6 +2679,7 @@ mod tests {
                 matches!(
                     c.status,
                     ConjectureStatus::NumericallyTested { .. }
+                        | ConjectureStatus::BoundedChecked { .. }
                         | ConjectureStatus::FormallyVerified { .. }
                 )
             })
@@ -2870,7 +2927,7 @@ mod tests {
 
         engine.generate_conjectures(3);
         engine.verify_numerical();
-        engine.verify_formal(50);
+        engine.verify_bounded(50);
 
         eprintln!("\n═══ PHYSICS VALIDATION COMBINED ═══\n");
         let sources = ["hydrogen_E(n)", "qho_E(n)", "kepler_T(r)"];
@@ -3192,7 +3249,7 @@ mod tests {
     // THE COMPLETE LOOP: Observe → Discover → Prove
     // ═══════════════════════════════════════════════════════════════════
 
-    /// Test the full closed loop: discover n² from data, then Z3-prove it.
+    /// Test the full closed loop: discover n², then Z3-check observed samples.
     #[test]
     fn test_observe_discover_prove_loop() {
         eprintln!("\n═══ CLOSED LOOP: OBSERVE → DISCOVER → PROVE ═══\n");
@@ -3217,7 +3274,7 @@ mod tests {
         // DISCOVER: GP finds formula
         engine.generate_conjectures(3);
         engine.verify_numerical();
-        engine.verify_formal(200);
+        engine.verify_bounded(200);
 
         eprintln!("  Phase 1 — Discovery:");
         for c in engine.conjectures.iter().take(3) {
@@ -3227,15 +3284,15 @@ mod tests {
             );
         }
 
-        // PROVE: Z3 formally verifies
-        engine.auto_prove_via_z3();
+        // CHECK: Z3 checks each fixed observed input.
+        engine.check_samples_via_z3();
 
-        eprintln!("\n  Phase 2 — After Z3 auto-proof:");
+        eprintln!("\n  Phase 2 — After Z3 sample checks:");
         let mut any_proved = false;
         for c in &engine.conjectures {
-            if matches!(c.status, ConjectureStatus::FormallyVerified { .. }) {
+            if matches!(c.status, ConjectureStatus::SmtSamplesChecked { .. }) {
                 eprintln!(
-                    "    >>> FORMALLY PROVED: {} ≈ {} (confidence={:.2})",
+                    "    >>> SMT-SAMPLE CHECKED: {} ≈ {} (confidence={:.2})",
                     c.source, c.formula_str, c.confidence
                 );
                 any_proved = true;
@@ -3243,7 +3300,7 @@ mod tests {
         }
 
         if any_proved {
-            eprintln!("\n  >>> CLOSED LOOP COMPLETE: Observe → Discover → Prove <<<");
+            eprintln!("\n  >>> LOOP COMPLETE: Observe → Discover → Check Samples <<<");
         } else {
             eprintln!("\n  Z3 not available or formulas not suitable for SMT proof");
         }
@@ -3826,7 +3883,7 @@ mod tests {
             canonical: crate::hdc::abstract_thought::expr_canonical_string(&one_d),
             template: one_d.clone(),
             arity: 1,
-            promotion_tier: MacroPromotionTier::Formal,
+            promotion_tier: MacroPromotionTier::FastTrackVerified,
             source_conjectures: vec![0],
             parent_formulas: vec![format!("{}", one_d)],
             vars_used: crate::hdc::abstract_thought::expr_variables(&one_d),
@@ -3841,7 +3898,7 @@ mod tests {
             canonical: crate::hdc::abstract_thought::expr_canonical_string(&multivar),
             template: multivar,
             arity: 0,
-            promotion_tier: MacroPromotionTier::Formal,
+            promotion_tier: MacroPromotionTier::FastTrackVerified,
             source_conjectures: vec![1],
             parent_formulas: vec!["((vy * x) - (vx * y))".into()],
             vars_used: vec!["vx".into(), "vy".into(), "x".into(), "y".into()],
@@ -3891,7 +3948,7 @@ mod tests {
             canonical: crate::hdc::abstract_thought::expr_canonical_string(&one_d),
             template: one_d.clone(),
             arity: 1,
-            promotion_tier: MacroPromotionTier::Formal,
+            promotion_tier: MacroPromotionTier::FastTrackVerified,
             source_conjectures: vec![0],
             parent_formulas: vec![format!("{}", one_d)],
             vars_used: crate::hdc::abstract_thought::expr_variables(&one_d),
@@ -3906,7 +3963,7 @@ mod tests {
             canonical: crate::hdc::abstract_thought::expr_canonical_string(&multivar),
             template: multivar.clone(),
             arity: 0,
-            promotion_tier: MacroPromotionTier::Formal,
+            promotion_tier: MacroPromotionTier::FastTrackVerified,
             source_conjectures: vec![1],
             parent_formulas: vec![format!("{}", multivar)],
             vars_used: crate::hdc::abstract_thought::expr_variables(&multivar),
@@ -3948,7 +4005,7 @@ mod tests {
             fitness: 0.0,
             status: ConjectureStatus::FormallyVerified { proof_steps: 5 },
             confidence: 0.99,
-            macro_promotion_tier: MacroPromotionTier::Formal,
+            macro_promotion_tier: MacroPromotionTier::FastTrackVerified,
             eml_compiled: None,
             eml_metrics: None,
             eml_verified_real: None,
@@ -4001,7 +4058,7 @@ mod tests {
             canonical: crate::hdc::abstract_thought::expr_canonical_string(&compatible_macro),
             template: compatible_macro.clone(),
             arity: 0,
-            promotion_tier: MacroPromotionTier::Formal,
+            promotion_tier: MacroPromotionTier::FastTrackVerified,
             source_conjectures: vec![0],
             parent_formulas: vec![format!("{}", compatible_macro)],
             vars_used: crate::hdc::abstract_thought::expr_variables(&compatible_macro),
@@ -4016,7 +4073,7 @@ mod tests {
             canonical: crate::hdc::abstract_thought::expr_canonical_string(&incompatible_macro),
             template: incompatible_macro.clone(),
             arity: 1,
-            promotion_tier: MacroPromotionTier::Formal,
+            promotion_tier: MacroPromotionTier::FastTrackVerified,
             source_conjectures: vec![1],
             parent_formulas: vec![format!("{}", incompatible_macro)],
             vars_used: crate::hdc::abstract_thought::expr_variables(&incompatible_macro),
@@ -4176,7 +4233,7 @@ mod tests {
                 canonical: crate::hdc::abstract_thought::expr_canonical_string(&ang_mom),
                 template: ang_mom.clone(),
                 arity: 0,
-                promotion_tier: MacroPromotionTier::Formal,
+                promotion_tier: MacroPromotionTier::FastTrackVerified,
                 source_conjectures: vec![],
                 parent_formulas: vec![format!("{}", ang_mom)],
                 vars_used: crate::hdc::abstract_thought::expr_variables(&ang_mom),
@@ -4269,7 +4326,7 @@ mod tests {
             canonical: crate::hdc::abstract_thought::expr_canonical_string(&template),
             template: template.clone(),
             arity: 1,
-            promotion_tier: MacroPromotionTier::Formal,
+            promotion_tier: MacroPromotionTier::FastTrackVerified,
             source_conjectures: vec![0],
             parent_formulas: vec![format!("{}", template)],
             vars_used: vec!["n".into()],
@@ -4282,7 +4339,7 @@ mod tests {
 
         let metrics = engine.macro_pool_metrics().expect("metrics available");
         assert_eq!(metrics.total_operators, 1);
-        assert_eq!(metrics.formal_operators, 1);
+        assert_eq!(metrics.fast_track_operators, 1);
         assert_eq!(metrics.used_operators, 1);
         assert_eq!(metrics.signature_stats.len(), 1);
         assert_eq!(metrics.signature_stats[0].signature, "n");
@@ -4313,7 +4370,7 @@ mod tests {
                 canonical: crate::hdc::abstract_thought::expr_canonical_string(&template),
                 template,
                 arity: 1,
-                promotion_tier: MacroPromotionTier::Formal,
+                promotion_tier: MacroPromotionTier::FastTrackVerified,
                 source_conjectures: vec![0],
                 parent_formulas: vec!["(n ^ 2)".into()],
                 vars_used: vec!["n".into()],
@@ -4370,7 +4427,7 @@ mod tests {
                 canonical: crate::hdc::abstract_thought::expr_canonical_string(&template),
                 template,
                 arity: 1,
-                promotion_tier: MacroPromotionTier::Formal,
+                promotion_tier: MacroPromotionTier::FastTrackVerified,
                 source_conjectures: vec![0],
                 parent_formulas: vec!["(n ^ 2)".into()],
                 vars_used: vec!["n".into()],
@@ -5491,19 +5548,19 @@ mod tests {
         }
     }
 
-    /// Smoke test: run auto_prove_via_z3 on triangular numbers.
+    /// Smoke test: run fixed-input SMT checks on triangular numbers.
     ///
     /// Data: T(n) = n(n+1)/2 for n in 1..=10. The GP should find this exact
-    /// closed form via the existing template library. Then Z3 should confirm
-    /// the identity holds across all observed data points.
+    /// closed form via the existing template library. Then Z3 should check the
+    /// identity at all observed data points.
     ///
     /// This test passes whether or not Z3 is installed:
     /// - If Z3 is available, we assert at least one conjecture becomes
-    ///   FormallyVerified.
+    ///   SmtSamplesChecked.
     /// - If Z3 is missing, we just assert the engine didn't crash and the
     ///   warning was printed (via the eprintln in auto_prove_via_z3).
     #[test]
-    fn test_auto_prove_via_z3_smoke() {
+    fn test_check_samples_via_z3_smoke() {
         let mut engine = ConjectureEngine::with_config(RegressorConfig {
             population_size: 200,
             generations: 80,
@@ -5526,10 +5583,10 @@ mod tests {
 
         engine.generate_conjectures(3);
         engine.verify_numerical();
-        engine.auto_prove_via_z3();
+        engine.check_samples_via_z3();
 
         let z3_available = detect_z3_path().is_some();
-        eprintln!("\n═══ Z3 AUTO-PROOF SMOKE TEST ═══");
+        eprintln!("\n═══ Z3 FIXED-SAMPLE CHECK SMOKE TEST ═══");
         eprintln!("  Z3 available: {}", z3_available);
 
         for c in engine.conjectures.iter().take(5) {
@@ -5541,18 +5598,21 @@ mod tests {
 
         if z3_available {
             // When Z3 is present, at least one conjecture should be
-            // formally verified (assuming the GP found a correct formula).
+            // checked at its samples (assuming the GP found a correct formula).
             let num_proven = engine
                 .conjectures
                 .iter()
-                .filter(|c| matches!(c.status, ConjectureStatus::FormallyVerified { .. }))
+                .filter(|c| matches!(c.status, ConjectureStatus::SmtSamplesChecked { .. }))
                 .count();
-            eprintln!("  Formally verified: {}", num_proven);
-            // Soft assertion: we expect at least one proven, but the GP is
+            eprintln!("  SMT-sample checked: {}", num_proven);
+            // Soft assertion: we expect at least one checked result, but the GP is
             // stochastic so we don't force it. The contract is only: "z3
             // gets called, doesn't crash, and can succeed on some run."
             if num_proven > 0 {
-                eprintln!("  ✓ Z3 successfully proved {} conjecture(s)", num_proven);
+                eprintln!(
+                    "  ✓ Z3 checked {} conjecture(s) at fixed samples",
+                    num_proven
+                );
             } else {
                 eprintln!(
                     "  ⚠ Z3 ran but didn't promote any conjecture this run \
@@ -6209,7 +6269,7 @@ mod tests {
             fitness: 0.0,
             status: ConjectureStatus::FormallyVerified { proof_steps: 3 },
             confidence: 0.99,
-            macro_promotion_tier: MacroPromotionTier::Formal,
+            macro_promotion_tier: MacroPromotionTier::FastTrackVerified,
             eml_compiled: None,
             eml_metrics: None,
             eml_verified_real: None,
@@ -6243,7 +6303,7 @@ mod tests {
             fitness: 0.0,
             status: ConjectureStatus::Proposed,
             confidence: 0.8,
-            macro_promotion_tier: MacroPromotionTier::Formal,
+            macro_promotion_tier: MacroPromotionTier::FastTrackVerified,
             eml_compiled: None,
             eml_metrics: None,
             eml_verified_real: None,
@@ -6277,7 +6337,7 @@ mod tests {
             fitness: 0.0,
             status: ConjectureStatus::Proposed,
             confidence: 0.8,
-            macro_promotion_tier: MacroPromotionTier::Formal,
+            macro_promotion_tier: MacroPromotionTier::FastTrackVerified,
             eml_compiled: None,
             eml_metrics: None,
             eml_verified_real: None,
@@ -6675,6 +6735,92 @@ mod tests {
         assert!(
             l_var.is_finite() && l_var < 1e-2,
             "angular momentum should pass with small Lie variance; got {l_var:e}"
+        );
+
+        // The informativeness safeguard: a genuine invariant should be
+        // broadly tested (informative gradient at most samples), not just
+        // pass the raw variance check.
+        let l_frac = gradient_informativeness_fraction(&ang_mom, &trajectory, &var_names);
+        assert!(
+            l_frac >= 0.5,
+            "angular momentum's gradient should be informative at most samples; got {l_frac}"
+        );
+        assert!(
+            is_informatively_conserved(&ang_mom, rhs, &trajectory, &var_names, 1e-2),
+            "angular momentum should pass the combined informativeness-guarded check"
+        );
+    }
+
+    /// Regression for the informativeness safeguard itself: a degenerate
+    /// high-power monomial of a single variable, evaluated on a trajectory
+    /// where that variable spends most of its time near zero (only
+    /// reaching its peak briefly), games plain `lie_derivative_variance`
+    /// the same way `(u2/3)^9` did against the PDE Stage A wave-energy
+    /// discovery (see `pde_wave_stage_a.rs`): a few large-gradient samples
+    /// near the peak pull the mean above the absolute floor while most
+    /// samples carry near-zero gradient, so numerator and denominator
+    /// cancel together and the raw ratio can look small without the
+    /// candidate being conserved at all (it manifestly isn't -- a harmonic
+    /// oscillator's 9th power of position is not a conserved quantity).
+    /// `is_informatively_conserved` must reject it even where the raw
+    /// variance alone might not.
+    #[test]
+    fn test_informativeness_guard_flags_degenerate_monomial() {
+        // Undamped harmonic oscillator: x(t) = cos(t), v(t) = -sin(t).
+        fn sho_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+            let (x, v) = (s[0], s[1]);
+            vec![v, -x]
+        }
+        let trajectory: Vec<Vec<f64>> = (0..200)
+            .map(|i| {
+                let t = i as f64 * 0.05;
+                vec![t.cos(), -t.sin()]
+            })
+            .collect();
+        let var_names = ["x", "v"];
+
+        // (x/3)^9 -- steep, single-variable, not a conserved quantity of
+        // this system (only x^2 + v^2 is).
+        let degenerate = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::BinOp(
+                BinOp::Div,
+                Box::new(Expr::Var("x".into())),
+                Box::new(Expr::Const(3.0)),
+            )),
+            Box::new(Expr::Const(9.0)),
+        );
+
+        let frac = gradient_informativeness_fraction(&degenerate, &trajectory, &var_names);
+        assert!(
+            frac < 0.5,
+            "degenerate monomial's gradient should be informative at a minority of samples \
+             (concentrated near the trajectory's peak); got {frac}"
+        );
+        assert!(
+            !is_informatively_conserved(&degenerate, sho_rhs, &trajectory, &var_names, 1e-2),
+            "degenerate monomial must be rejected by the combined informativeness-guarded check \
+             even if its raw variance alone happens to read low"
+        );
+
+        // True invariant on the same trajectory/system: x^2 + v^2. Should
+        // pass both the raw variance check and the informativeness guard.
+        let true_energy = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("x".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("v".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        assert!(
+            is_informatively_conserved(&true_energy, sho_rhs, &trajectory, &var_names, 1e-2),
+            "x^2+v^2 is the genuine conserved quantity and must pass"
         );
     }
 }

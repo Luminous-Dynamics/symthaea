@@ -1446,7 +1446,11 @@ impl MycelixBridge {
                 lon: status.lon,
                 alt: status.alt,
                 consciousness_level,
-                safety_level: telemetry.safety_level.clone(),
+                // SubmitRoboticsTelemetry's wire contract is String
+                // ("Green"/"Yellow"/"Orange"/"Red"); EmbodimentTelemetry's
+                // safety_level became a real MotorSafetyLevel 2026-07-12 —
+                // Display renders the identical strings.
+                safety_level: telemetry.safety_level.to_string(),
                 mission_progress: status.mission_progress,
                 fuel_level: status.fuel_level,
                 platform: telemetry.platform.clone(),
@@ -3216,7 +3220,7 @@ mod tests {
     #[cfg(feature = "mycelix")]
     #[test]
     fn test_robotics_telemetry_dispatch_gating() {
-        use symthaea_core::embodiment::EmbodimentTelemetry;
+        use symthaea_core::embodiment::{EmbodimentTelemetry, MotorSafetyLevel};
         let mut bridge = MycelixBridge::new("robotics-test");
         let (tx, rx) = MycelixBridge::create_governance_channel();
         bridge.set_governance_dispatch_tx(tx);
@@ -3225,7 +3229,7 @@ mod tests {
             total_steps: 100,
             control_effort: 0.4,
             prediction_error: 0.05,
-            safety_level: "Green".to_string(),
+            safety_level: MotorSafetyLevel::Green,
             platform: "quadruped".to_string(),
             num_actuators: 12,
             epistemic_grounding: "sensorimotor".to_string(),

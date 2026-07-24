@@ -9,6 +9,10 @@
 //! The agent chooses its own actions based on prediction error,
 //! consciousness level, and free energy minimization.
 //!
+//!
+//! WARNING: This is a raw CDP exploration harness. It bypasses
+//! `BrowserExecutor` and must not be treated as production safety evidence.
+//!
 //! Prerequisites: Chrome on :9222, Praxis on :8107
 //!
 //! Usage: cargo run -p symthaea-browser --example praxis_conscious

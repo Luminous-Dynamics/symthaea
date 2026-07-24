@@ -269,6 +269,18 @@ fn main() {
     println!();
 
     // ── CfC ──
+    /// Pipeline Φ telemetry uses 0.0 to mean "subsystem never constructed"
+    /// (UnifiedConsciousnessPipeline is None at the production construction
+    /// site — constructor.rs). Printing "0.0000" here used to read like a
+    /// measurement; say what it actually is.
+    fn fmt_pipeline_phi(v: f64) -> String {
+        if v == 0.0 {
+            "absent (pipeline not constructed — dormant subsystem)".to_string()
+        } else {
+            format!("{v:.4}")
+        }
+    }
+
     println!("[1/2] Collecting runtime data (CfC)...");
     let cfc = collect_runtime(TemporalBackend::CfC);
     println!(
@@ -276,8 +288,10 @@ fn main() {
         cfc.micro_phi, cfc.meso_phi, cfc.macro_phi
     );
     println!(
-        "  Consciousness: {:.4}, Pipeline Phi: {:.4}, Coherence: {:.4}",
-        cfc.consciousness_level, cfc.pipeline_phi, cfc.coherence
+        "  Consciousness: {:.4}, Pipeline Phi: {}, Coherence: {:.4}",
+        cfc.consciousness_level,
+        fmt_pipeline_phi(cfc.pipeline_phi),
+        cfc.coherence
     );
     println!(
         "  AST: fatigue={:.4} pred_acc={:.4}",
@@ -294,8 +308,10 @@ fn main() {
         hcfc.micro_phi, hcfc.meso_phi, hcfc.macro_phi
     );
     println!(
-        "  Consciousness: {:.4}, Pipeline Phi: {:.4}, Coherence: {:.4}",
-        hcfc.consciousness_level, hcfc.pipeline_phi, hcfc.coherence
+        "  Consciousness: {:.4}, Pipeline Phi: {}, Coherence: {:.4}",
+        hcfc.consciousness_level,
+        fmt_pipeline_phi(hcfc.pipeline_phi),
+        hcfc.coherence
     );
     println!(
         "  AST: fatigue={:.4} pred_acc={:.4}",

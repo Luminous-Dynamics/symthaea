@@ -210,6 +210,49 @@ pub fn expanding_square_waypoints(
     waypoints
 }
 
+/// Route-validation failure before mission execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RouteValidationError {
+    EmptyRoute,
+    NonFiniteWaypoint,
+    TerrainUnavailable,
+    BelowMinimumClearance,
+    OutsideGeofence,
+}
+
+/// Validate every waypoint against local terrain and the authorized flight
+/// volume before control authority is granted.
+pub fn validate_waypoint_route<T: crate::terrain_safety::TerrainProvider>(
+    origin: &GeoPoint,
+    waypoints: &[GeoPoint],
+    terrain: &T,
+    geofence: &crate::terrain_safety::AxisAlignedGeofence,
+    minimum_clearance_m: f64,
+) -> Result<(), RouteValidationError> {
+    if waypoints.is_empty() {
+        return Err(RouteValidationError::EmptyRoute);
+    }
+    if !minimum_clearance_m.is_finite() || minimum_clearance_m < 0.0 {
+        return Err(RouteValidationError::NonFiniteWaypoint);
+    }
+    for waypoint in waypoints {
+        if !waypoint.lat.is_finite() || !waypoint.lon.is_finite() || !waypoint.alt.is_finite() {
+            return Err(RouteValidationError::NonFiniteWaypoint);
+        }
+        let local = waypoint.to_local_meters(origin);
+        if !geofence.contains(local) {
+            return Err(RouteValidationError::OutsideGeofence);
+        }
+        let ground = terrain
+            .elevation_m(local[0], local[1])
+            .ok_or(RouteValidationError::TerrainUnavailable)?;
+        if local[2] - ground < minimum_clearance_m {
+            return Err(RouteValidationError::BelowMinimumClearance);
+        }
+    }
+    Ok(())
+}
+
 // ── Mission Execution ────────────────────────────────────────────────────────
 
 /// Mission execution state.
@@ -304,12 +347,23 @@ pub fn run_grid_search<S: HelicopterPhysicsSimulator>(
             current_wp += 1;
         }
 
-        // Encode and control
-        let hv = encoder.encode(sim.state());
-        let cmd = controller.forward(&hv, dt as f32);
+        // Explicit target-conditioned guidance. The learned controller is
+        // retained as a bounded residual rather than being asked to infer an
+        // unseen waypoint from vehicle state alone.
+        let reference = crate::guidance::FlightReference::hold(local, 0.0);
+        let guidance = crate::guidance::position_hold_command(
+            sim.state(),
+            &reference,
+            &crate::guidance::GuidanceConfig::default(),
+        );
+        let hv = encoder.encode_with_dt(sim.state(), dt);
+        let learned = controller.forward(&hv, dt as f32);
+        let cmd = guidance.blend(learned, 0.10);
         effort_sum += cmd.control_effort();
 
-        // Track distance
+        sim.step(&cmd, dt);
+
+        // Track distance after integration.
         let pos = sim.state().position;
         let step_dist = ((pos[0] - prev_pos[0]).powi(2)
             + (pos[1] - prev_pos[1]).powi(2)
@@ -317,8 +371,6 @@ pub fn run_grid_search<S: HelicopterPhysicsSimulator>(
         .sqrt();
         metrics.distance_covered += step_dist;
         prev_pos = pos;
-
-        sim.step(&cmd, dt);
         metrics.steps = step + 1;
     }
 
@@ -475,6 +527,42 @@ mod tests {
         assert!(!m.success);
         assert_eq!(m.steps, 0);
         assert_eq!(m.distance_covered, 0.0);
+    }
+
+    #[test]
+    fn route_validation_rejects_low_or_outside_waypoints() {
+        use crate::terrain_safety::{AxisAlignedGeofence, FlatTerrain};
+        let origin = GeoPoint {
+            lat: 0.0,
+            lon: 0.0,
+            alt: 0.0,
+        };
+        let fence = AxisAlignedGeofence {
+            min_east_m: -100.0,
+            max_east_m: 100.0,
+            min_north_m: -100.0,
+            max_north_m: 100.0,
+            min_altitude_m: 0.0,
+            max_altitude_m: 100.0,
+        };
+        let low = [GeoPoint {
+            lat: 0.0,
+            lon: 0.0,
+            alt: 5.0,
+        }];
+        assert_eq!(
+            validate_waypoint_route(&origin, &low, &FlatTerrain::default(), &fence, 15.0),
+            Err(RouteValidationError::BelowMinimumClearance)
+        );
+        let outside = [GeoPoint {
+            lat: 0.0,
+            lon: 1_000.0 / 111_320.0,
+            alt: 20.0,
+        }];
+        assert_eq!(
+            validate_waypoint_route(&origin, &outside, &FlatTerrain::default(), &fence, 15.0),
+            Err(RouteValidationError::OutsideGeofence)
+        );
     }
 
     #[test]

@@ -40,7 +40,7 @@
 | **synthesis/** | 7 | 2,985 | Program synthesis |
 | **databases/** | 8 | 2,726 | Storage backends |
 | **gui_bridge/** | 5 | 2,521 | GUI integration |
-| **voice/** | 7 | 1,823 | TTS/STT |
+| **voice/** | 25 | ~18,000 | TTS: formant vocoder, vocal tract, prosody, singing/rap (STT lives in `crates/core/symthaea-stt`) |
 | **web_research/** | 7 | 1,709 | Web queries |
 | **action/** | 2 | 1,330 | Action execution |
 | **nix_verification/** | 4 | 1,227 | NixOS validation |
@@ -186,7 +186,7 @@ This consolidation ensures a single source of truth for HDC operations shared ac
 | **language/** | 33K | NLU, NLG, conversation | `NLUPipeline`, `Frame`, `Intent` |
 | **shell/** | 7K | REPL interface | `ShellState`, `Command` |
 | **perception/** | 5K | Vision, multimodal | `SemanticVision`, `ImageEmbed` |
-| **voice/** | 2K | TTS/STT | `KokoroTTS`, `WhisperSTT` |
+| **voice/** | 18K | TTS (formant/vocal-tract synthesis, prosody) | `VoiceOrchestrator`, `FormantVocoder`, `ReplVoiceOutput`, `KokoroEngine` (experimental) |
 
 ### Support Systems (22K LOC)
 

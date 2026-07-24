@@ -166,6 +166,56 @@ impl QuadrupedPhysicsSimulator for SimpleQuadrupedSimulator {
     }
 }
 
+/// Runtime-selectable physics backend for `QuadrupedEmbodiment`.
+///
+/// `Simple` is the default, scripted CPG-PD spinal model (see module doc).
+/// `Symtropy` (feature `symtropy`) is a real rigid-body simulation — GJK/EPA
+/// contact via `symtropy-physics`, no CPG (the network's commanded torques
+/// are the only input; there is no gait scheduler to select). Previously
+/// `SymtropyQuadrupedSimulator` implemented this trait but nothing ever
+/// constructed one through the embodiment bridge — robotics plan
+/// 2026-07-10 Tier 4.4.
+pub enum QuadrupedBackend {
+    Simple(SimpleQuadrupedSimulator),
+    #[cfg(feature = "symtropy")]
+    Symtropy(crate::symtropy_sim::SymtropyQuadrupedSimulator),
+}
+
+impl QuadrupedBackend {
+    /// Set the gait — meaningful only for the `Simple` backend's CPG. A
+    /// no-op on `Symtropy`: it has no gait scheduler to honor, so silently
+    /// dropping the call is the honest behavior, not a missing feature.
+    pub fn set_gait(&mut self, gait: GaitType) {
+        if let QuadrupedBackend::Simple(s) = self {
+            s.set_gait(gait);
+        }
+    }
+}
+
+impl QuadrupedPhysicsSimulator for QuadrupedBackend {
+    fn step(&mut self, cmd: &QuadrupedCommand, dt: f64) {
+        match self {
+            QuadrupedBackend::Simple(s) => s.step(cmd, dt),
+            #[cfg(feature = "symtropy")]
+            QuadrupedBackend::Symtropy(s) => s.step(cmd, dt),
+        }
+    }
+    fn state(&self) -> &QuadrupedState {
+        match self {
+            QuadrupedBackend::Simple(s) => s.state(),
+            #[cfg(feature = "symtropy")]
+            QuadrupedBackend::Symtropy(s) => s.state(),
+        }
+    }
+    fn reset(&mut self) {
+        match self {
+            QuadrupedBackend::Simple(s) => s.reset(),
+            #[cfg(feature = "symtropy")]
+            QuadrupedBackend::Symtropy(s) => s.reset(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

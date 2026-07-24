@@ -152,6 +152,27 @@ pub struct Form {
     pub sections: Vec<Section>,
 }
 
+/// Extra per-piece context threaded into [`Form::ternary`]/[`Form::rondo`]/
+/// [`Form::variations`] so their sections can honor a style's own declared
+/// grammar instead of always falling back to generic classical functional
+/// harmony. `None` (every pre-existing internal and test caller) preserves
+/// today's exact behavior byte-for-byte.
+///
+/// Bundled into one struct rather than two independent `Option`s so the two
+/// facts stay in sync: a `HarmonicSyntax` without the `spec` that declared
+/// it (or vice versa) isn't a state this API can represent.
+#[derive(Clone, Copy)]
+pub struct FormGrammarContext<'a> {
+    /// Drives cadence resolution (see [`crate::phrase::Period::parallel_in_for_grammar`]).
+    pub harmony: crate::grammar::HarmonicSyntax,
+    /// The style's own progression source — [`Form::ternary`]/[`Form::rondo`]'s
+    /// contrasting B/C sections use THIS (with a section-specific seed) to
+    /// generate their "fresh" progression instead of the generic classical
+    /// functional grammar, so a 12-bar-blues piece's departure section stays
+    /// in blues harmony instead of borrowing Classical's.
+    pub spec: &'a crate::spec::CompositionSpec,
+}
+
 impl Form {
     /// Build a ternary (ABA) form:
     ///
@@ -182,16 +203,24 @@ impl Form {
         meter: f64,
         seed: u64,
         use_sentence: bool,
+        grammar: Option<FormGrammarContext>,
     ) -> Self {
+        let bars = progression.degrees.len().max(1);
         // Each section cadences in ITS OWN key's grammar: a modal home key
         // closes ♭VII→i (see `Key::cadence_dominant_degree`) while its
-        // functional B key keeps V→I.
+        // functional B key keeps V→I — unless `grammar` declares a
+        // non-functional syntax, in which case the archetype's own natural
+        // close is honored instead (see `Period::parallel_in_for_grammar`).
+        let harmony = grammar.map(|g| g.harmony);
         let build = |m: &Motif, prog: &[i32], key: Key| {
             let dominant = key.cadence_dominant_degree();
-            if use_sentence {
-                Period::parallel_sentence_in(m, prog, meter, dominant)
-            } else {
-                Period::parallel_in(m, prog, meter, dominant)
+            match (use_sentence, harmony) {
+                (true, Some(h)) => {
+                    Period::parallel_sentence_in_for_grammar(m, prog, meter, dominant, h)
+                }
+                (true, None) => Period::parallel_sentence_in(m, prog, meter, dominant),
+                (false, Some(h)) => Period::parallel_in_for_grammar(m, prog, meter, dominant, h),
+                (false, None) => Period::parallel_in(m, prog, meter, dominant),
             }
         };
 
@@ -200,8 +229,15 @@ impl Form {
         let b_key = home_key.relative();
         let pivot = motif.notes.iter().find_map(|x| x.degree).unwrap_or(1);
         let b_motif = contrasting_transform(motif, pivot, seed);
-        let b_progression =
-            Progression::generate(progression.degrees.len().max(1), seed ^ 0x5EC7_104B);
+        // The B section's "fresh" progression: a style with its own declared
+        // harmonic vocabulary (the common case — see `FormGrammarContext`'s
+        // doc) generates it from THAT vocabulary instead of borrowing
+        // generic classical functional harmony, so the departure section
+        // still sounds like the same piece.
+        let b_progression = match grammar {
+            Some(g) => g.spec.progression(bars, seed ^ 0x5EC7_104B),
+            None => Progression::generate(bars, seed ^ 0x5EC7_104B),
+        };
         let b_period = build(&b_motif, &b_progression.degrees, b_key);
 
         Form {
@@ -255,14 +291,19 @@ impl Form {
         meter: f64,
         seed: u64,
         use_sentence: bool,
+        grammar: Option<FormGrammarContext>,
     ) -> Self {
         // Per-section cadence grammar, exactly as in `ternary`.
+        let harmony = grammar.map(|g| g.harmony);
         let build = |m: &Motif, prog: &[i32], key: Key| {
             let dominant = key.cadence_dominant_degree();
-            if use_sentence {
-                Period::parallel_sentence_in(m, prog, meter, dominant)
-            } else {
-                Period::parallel_in(m, prog, meter, dominant)
+            match (use_sentence, harmony) {
+                (true, Some(h)) => {
+                    Period::parallel_sentence_in_for_grammar(m, prog, meter, dominant, h)
+                }
+                (true, None) => Period::parallel_sentence_in(m, prog, meter, dominant),
+                (false, Some(h)) => Period::parallel_in_for_grammar(m, prog, meter, dominant, h),
+                (false, None) => Period::parallel_in(m, prog, meter, dominant),
             }
         };
         let bars = progression.degrees.len().max(1);
@@ -276,12 +317,20 @@ impl Form {
         // the two episodes are never transformed identically.
         let c_choice = (b_choice + 1) % 3;
         let b_motif = contrasting_transform(motif, pivot, b_choice);
-        let b_progression = Progression::generate(bars, seed ^ 0x5EC7_104B);
+        // Same "honor the style's own vocabulary" reasoning as `ternary`'s B
+        // section — see `FormGrammarContext`'s doc comment.
+        let b_progression = match grammar {
+            Some(g) => g.spec.progression(bars, seed ^ 0x5EC7_104B),
+            None => Progression::generate(bars, seed ^ 0x5EC7_104B),
+        };
         let b_period = build(&b_motif, &b_progression.degrees, b_key);
 
         let c_key = home_key.parallel();
         let c_motif = contrasting_transform(motif, pivot, c_choice);
-        let c_progression = Progression::generate(bars, seed ^ 0xC0DA_15E5);
+        let c_progression = match grammar {
+            Some(g) => g.spec.progression(bars, seed ^ 0xC0DA_15E5),
+            None => Progression::generate(bars, seed ^ 0xC0DA_15E5),
+        };
         let c_period = build(&c_motif, &c_progression.degrees, c_key);
 
         Form {
@@ -348,14 +397,23 @@ impl Form {
         meter: f64,
         seed: u64,
         use_sentence: bool,
+        grammar: Option<FormGrammarContext>,
     ) -> Self {
-        // Per-section cadence grammar, exactly as in `ternary`/`rondo`.
+        // Per-section cadence grammar, exactly as in `ternary`/`rondo`. No
+        // B/C progression regeneration here (unlike `ternary`/`rondo`) — by
+        // design EVERY variations section keeps the theme's own progression
+        // (see this fn's doc comment), so there is no "fresh" progression
+        // for `grammar.spec` to influence.
+        let harmony = grammar.map(|g| g.harmony);
         let build = |m: &Motif, prog: &[i32], key: Key| {
             let dominant = key.cadence_dominant_degree();
-            if use_sentence {
-                Period::parallel_sentence_in(m, prog, meter, dominant)
-            } else {
-                Period::parallel_in(m, prog, meter, dominant)
+            match (use_sentence, harmony) {
+                (true, Some(h)) => {
+                    Period::parallel_sentence_in_for_grammar(m, prog, meter, dominant, h)
+                }
+                (true, None) => Period::parallel_sentence_in(m, prog, meter, dominant),
+                (false, Some(h)) => Period::parallel_in_for_grammar(m, prog, meter, dominant, h),
+                (false, None) => Period::parallel_in(m, prog, meter, dominant),
             }
         };
         let prog = &progression.degrees;
@@ -526,7 +584,7 @@ mod tests {
     fn ternary_form_has_three_sections_in_order() {
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic();
-        let form = Form::ternary(&germ(), key, &prog, 4.0, 1, false);
+        let form = Form::ternary(&germ(), key, &prog, 4.0, 1, false, None);
         assert_eq!(form.sections.len(), 3);
         assert_eq!(form.sections[0].role, SectionRole::A);
         assert_eq!(form.sections[1].role, SectionRole::B);
@@ -537,7 +595,7 @@ mod tests {
     fn b_section_modulates_to_the_relative_key() {
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic();
-        let form = Form::ternary(&germ(), key, &prog, 4.0, 1, false);
+        let form = Form::ternary(&germ(), key, &prog, 4.0, 1, false, None);
         assert_eq!(form.sections[0].key, key);
         assert_eq!(form.sections[1].key, key.relative()); // A minor
         assert_eq!(form.sections[2].key, key); // back home
@@ -549,7 +607,7 @@ mod tests {
         // sameness IS the "return" a listener perceives.
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic();
-        let form = Form::ternary(&germ(), key, &prog, 4.0, 1, false);
+        let form = Form::ternary(&germ(), key, &prog, 4.0, 1, false, None);
         assert_eq!(form.sections[0].period, form.sections[2].period);
     }
 
@@ -559,7 +617,7 @@ mod tests {
         // (different key AND a transformed/inverted motif).
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic();
-        let form = Form::ternary(&germ(), key, &prog, 4.0, 1, false);
+        let form = Form::ternary(&germ(), key, &prog, 4.0, 1, false, None);
         assert_ne!(form.sections[0].period, form.sections[1].period);
     }
 
@@ -567,8 +625,8 @@ mod tests {
     fn ternary_is_deterministic() {
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic();
-        let a = Form::ternary(&germ(), key, &prog, 4.0, 7, true);
-        let b = Form::ternary(&germ(), key, &prog, 4.0, 7, true);
+        let a = Form::ternary(&germ(), key, &prog, 4.0, 7, true, None);
+        let b = Form::ternary(&germ(), key, &prog, 4.0, 7, true, None);
         assert_eq!(a, b);
     }
 
@@ -576,7 +634,7 @@ mod tests {
     fn total_duration_sums_all_sections() {
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic(); // 4 bars
-        let form = Form::ternary(&germ(), key, &prog, 4.0, 1, false);
+        let form = Form::ternary(&germ(), key, &prog, 4.0, 1, false, None);
         // Each section is a period: antecedent (4 bars) + consequent (4 bars)
         // = 8 bars = 32 beats; three sections = 96 beats.
         assert_eq!(form.total_duration(), Duration::new(96, 1));
@@ -587,7 +645,7 @@ mod tests {
         // Minor -> relative major direction, exercised end-to-end.
         let key = Key::minor(PitchClass::A);
         let prog = Progression::authentic();
-        let form = Form::ternary(&germ(), key, &prog, 4.0, 3, false);
+        let form = Form::ternary(&germ(), key, &prog, 4.0, 3, false, None);
         assert_eq!(form.sections[1].key, Key::major(PitchClass::C));
         // Sanity: no section is empty.
         for s in &form.sections {
@@ -600,7 +658,7 @@ mod tests {
     fn rondo_has_five_sections_in_abaca_order() {
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic();
-        let form = Form::rondo(&germ(), key, &prog, 4.0, 1, false);
+        let form = Form::rondo(&germ(), key, &prog, 4.0, 1, false, None);
         assert_eq!(form.sections.len(), 5);
         assert_eq!(form.sections[0].role, SectionRole::A);
         assert_eq!(form.sections[1].role, SectionRole::B);
@@ -613,7 +671,7 @@ mod tests {
     fn rondo_b_is_relative_key_and_c_is_parallel_key() {
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic();
-        let form = Form::rondo(&germ(), key, &prog, 4.0, 1, false);
+        let form = Form::rondo(&germ(), key, &prog, 4.0, 1, false, None);
         assert_eq!(form.sections[0].key, key);
         assert_eq!(form.sections[1].key, key.relative()); // A minor
         assert_eq!(form.sections[2].key, key);
@@ -625,7 +683,7 @@ mod tests {
     fn rondo_both_returns_are_identical_to_a() {
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic();
-        let form = Form::rondo(&germ(), key, &prog, 4.0, 1, false);
+        let form = Form::rondo(&germ(), key, &prog, 4.0, 1, false, None);
         assert_eq!(form.sections[0].period, form.sections[2].period);
         assert_eq!(form.sections[0].period, form.sections[4].period);
     }
@@ -634,7 +692,7 @@ mod tests {
     fn rondo_c_contrasts_with_both_a_and_b() {
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic();
-        let form = Form::rondo(&germ(), key, &prog, 4.0, 1, false);
+        let form = Form::rondo(&germ(), key, &prog, 4.0, 1, false, None);
         assert_ne!(form.sections[0].period, form.sections[3].period);
         assert_ne!(form.sections[1].period, form.sections[3].period);
     }
@@ -643,8 +701,8 @@ mod tests {
     fn rondo_is_deterministic() {
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic();
-        let a = Form::rondo(&germ(), key, &prog, 4.0, 7, true);
-        let b = Form::rondo(&germ(), key, &prog, 4.0, 7, true);
+        let a = Form::rondo(&germ(), key, &prog, 4.0, 7, true, None);
+        let b = Form::rondo(&germ(), key, &prog, 4.0, 7, true, None);
         assert_eq!(a, b);
     }
 
@@ -652,7 +710,7 @@ mod tests {
     fn variations_has_four_sections_theme_minore_figuration_return() {
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic();
-        let form = Form::variations(&germ(), key, &prog, 4.0, 1, false);
+        let form = Form::variations(&germ(), key, &prog, 4.0, 1, false, None);
         assert_eq!(form.sections.len(), 4);
         assert_eq!(form.sections[0].role, SectionRole::A);
         assert_eq!(form.sections[1].role, SectionRole::B);
@@ -673,7 +731,7 @@ mod tests {
         // actually carries, identically re-carried by every variation.
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic();
-        let form = Form::variations(&germ(), key, &prog, 4.0, 5, false);
+        let form = Form::variations(&germ(), key, &prog, 4.0, 5, false, None);
         let theme = form.sections[0].period.clone();
         for s in &form.sections {
             assert_eq!(
@@ -688,7 +746,7 @@ mod tests {
             );
         }
         // Contrast with rondo on the same inputs: its episodes DO move.
-        let rondo = Form::rondo(&germ(), key, &prog, 4.0, 5, false);
+        let rondo = Form::rondo(&germ(), key, &prog, 4.0, 5, false, None);
         assert_ne!(
             rondo.sections[1].period.antecedent.progression,
             rondo.sections[0].period.antecedent.progression
@@ -699,7 +757,7 @@ mod tests {
     fn variations_minore_is_the_parallel_key_and_the_rest_stay_home() {
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic();
-        let form = Form::variations(&germ(), key, &prog, 4.0, 1, false);
+        let form = Form::variations(&germ(), key, &prog, 4.0, 1, false, None);
         assert_eq!(form.sections[0].key, key);
         assert_eq!(form.sections[1].key, key.parallel()); // C minor
         assert_eq!(form.sections[2].key, key); // figuration back home
@@ -712,7 +770,7 @@ mod tests {
         // machinery's "finally complete" treatment depends on it.
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic();
-        let form = Form::variations(&germ(), key, &prog, 4.0, 9, true);
+        let form = Form::variations(&germ(), key, &prog, 4.0, 9, true, None);
         assert_eq!(form.sections[0].period, form.sections[3].period);
     }
 
@@ -720,7 +778,7 @@ mod tests {
     fn variations_middle_sections_both_differ_from_the_theme() {
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic();
-        let form = Form::variations(&germ(), key, &prog, 4.0, 2, false);
+        let form = Form::variations(&germ(), key, &prog, 4.0, 2, false, None);
         assert_ne!(form.sections[0].period, form.sections[1].period);
         assert_ne!(form.sections[0].period, form.sections[2].period);
         assert_ne!(form.sections[1].period, form.sections[2].period);
@@ -730,9 +788,101 @@ mod tests {
     fn variations_is_deterministic() {
         let key = Key::minor(PitchClass::A);
         let prog = Progression::authentic();
-        let a = Form::variations(&germ(), key, &prog, 4.0, 7, true);
-        let b = Form::variations(&germ(), key, &prog, 4.0, 7, true);
+        let a = Form::variations(&germ(), key, &prog, 4.0, 7, true, None);
+        let b = Form::variations(&germ(), key, &prog, 4.0, 7, true, None);
         assert_eq!(a, b);
+    }
+
+    /// Normalize a raw progression degree (which may be any integer, e.g.
+    /// octave-shifted or zero-based) to 1..=7.
+    fn norm_degree(d: i32) -> i32 {
+        let r = d.rem_euclid(7);
+        if r == 0 { 7 } else { r }
+    }
+
+    #[test]
+    fn ternary_b_section_honors_the_styles_own_progression_when_grammar_context_given() {
+        // Real production data: Blues's 12-bar chorus (I-I-I-I/IV-IV-I-I/
+        // V-IV-I-I) uses ONLY degrees {1,4,5} -- unlike Classical's
+        // functional grammar, which freely visits 2/3/6/7 too. Without a
+        // grammar context, the B section is generated by the generic
+        // classical grammar and can land on those foreign degrees; with a
+        // grammar context, it must stay inside the style's own vocabulary.
+        let spec = crate::style::Style::Blues.spec();
+        let key = Key::major(PitchClass::C);
+        let prog = spec.progression(12, 1);
+        let grammar = FormGrammarContext {
+            harmony: crate::grammar::HarmonicSyntax::BluesChorus,
+            spec: &spec,
+        };
+        for seed in 0..12u64 {
+            let form = Form::ternary(&germ(), key, &prog, 4.0, seed, false, Some(grammar));
+            let b_section = &form.sections[1];
+            for phrase in [&b_section.period.antecedent, &b_section.period.consequent] {
+                for &d in &phrase.progression {
+                    assert!(
+                        [1, 4, 5].contains(&norm_degree(d)),
+                        "B section degree {d} (seed {seed}) escaped Blues's own \
+                         {{1,4,5}} vocabulary -- the grammar context isn't being honored"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn rondo_b_and_c_sections_honor_the_styles_own_progression_when_grammar_context_given() {
+        let spec = crate::style::Style::Blues.spec();
+        let key = Key::major(PitchClass::C);
+        let prog = spec.progression(12, 1);
+        let grammar = FormGrammarContext {
+            harmony: crate::grammar::HarmonicSyntax::BluesChorus,
+            spec: &spec,
+        };
+        for seed in 0..12u64 {
+            let form = Form::rondo(&germ(), key, &prog, 4.0, seed, false, Some(grammar));
+            for role_idx in [1, 3] {
+                // B, then C
+                let section = &form.sections[role_idx];
+                for phrase in [&section.period.antecedent, &section.period.consequent] {
+                    for &d in &phrase.progression {
+                        assert!(
+                            [1, 4, 5].contains(&norm_degree(d)),
+                            "section {role_idx} degree {d} (seed {seed}) escaped \
+                             Blues's own {{1,4,5}} vocabulary"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn ternary_without_grammar_context_keeps_the_plain_classical_generator() {
+        // No-regression contract: `grammar: None` must still use the free
+        // classical functional grammar (able to visit degrees outside a
+        // narrow style vocabulary), NOT silently start respecting the A
+        // section's own degree set the way `Some(grammar)` now does. Same
+        // progression as the Blues archetype test above, on purpose: this
+        // proves the difference is `grammar`'s presence, not the input.
+        let key = Key::major(PitchClass::C);
+        let prog = Progression::new(vec![1, 1, 1, 1, 4, 4, 1, 1, 5, 4, 1, 1]);
+        let escaped = (0..40u64).any(|seed| {
+            let form = Form::ternary(&germ(), key, &prog, 4.0, seed, false, None);
+            form.sections[1]
+                .period
+                .antecedent
+                .progression
+                .iter()
+                .chain(&form.sections[1].period.consequent.progression)
+                .any(|&d| ![1, 4, 5].contains(&norm_degree(d)))
+        });
+        assert!(
+            escaped,
+            "expected at least one seed's B section (grammar=None) to visit a \
+             degree outside {{1,4,5}} -- the free classical generator should be \
+             unconstrained by the A section's own narrower vocabulary"
+        );
     }
 
     #[test]
@@ -810,7 +960,7 @@ mod tests {
     fn variations_total_duration_sums_all_four_sections() {
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic(); // 4 bars
-        let form = Form::variations(&germ(), key, &prog, 4.0, 1, false);
+        let form = Form::variations(&germ(), key, &prog, 4.0, 1, false, None);
         // Each section: antecedent (4 bars) + consequent (4 bars) = 32
         // beats; four sections = 128 beats.
         assert_eq!(form.total_duration(), Duration::new(128, 1));
@@ -820,7 +970,7 @@ mod tests {
     fn rondo_total_duration_sums_all_five_sections() {
         let key = Key::major(PitchClass::C);
         let prog = Progression::authentic(); // 4 bars
-        let form = Form::rondo(&germ(), key, &prog, 4.0, 1, false);
+        let form = Form::rondo(&germ(), key, &prog, 4.0, 1, false, None);
         // Each section is a period: antecedent (4 bars) + consequent (4
         // bars) = 8 bars = 32 beats; five sections = 160 beats.
         assert_eq!(form.total_duration(), Duration::new(160, 1));

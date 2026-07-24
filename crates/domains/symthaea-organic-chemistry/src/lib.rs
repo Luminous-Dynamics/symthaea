@@ -24,8 +24,10 @@
 //! - Cheminformatics: H-bond donors/acceptors, Lipinski Rule-of-Five
 //!   drug-likeness (logP omitted).
 //!
-//! Not yet: stereochemistry, isotopes, disconnected structures, logP, reaction
-//! mechanisms / retrosynthesis (the intended next direction).
+//! Stereochemistry SMILES syntax (`@`/`@@`/`/`/`\`) is tolerated -- parsed
+//! and discarded, not modelled (Phase A.6, 2026-07-16; see `smiles.rs`'s
+//! module doc for why). Not yet: isotopes, disconnected structures, logP,
+//! reaction mechanisms / retrosynthesis (the intended next direction).
 //!
 //! ## Example
 //!
@@ -129,10 +131,13 @@ mod integration_tests {
 
     #[test]
     fn unsupported_feature_errors_cleanly() {
-        // Stereochemistry is out of scope and must error, not mis-parse.
-        assert!(Molecule::from_smiles("F/C=C/F").is_err());
-        // Disconnected structures out of scope.
-        assert!(Molecule::from_smiles("[Na+].[Cl-]").is_err());
+        // Phase A.6 (2026-07-16): stereochemistry syntax is now tolerated
+        // (parsed, geometric information discarded), not rejected -- see
+        // smiles.rs's module doc and its own dedicated tests for why. This
+        // test now covers what's still genuinely out of scope.
+        assert!(Molecule::from_smiles("F/C=C/F").is_ok());
+        // Disconnected structures remain out of scope.
+        assert!(Molecule::from_smiles("CC.CC").is_err());
     }
 
     #[test]

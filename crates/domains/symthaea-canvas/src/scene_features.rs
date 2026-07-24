@@ -136,7 +136,7 @@ impl Affine {
     /// Compose with a node's transform: the result applies `t` first, then
     /// `self` (parent-then-child ordering of the scene walk).
     fn then(&self, t: &Transform) -> Self {
-        let scale = if t.scale == 0.0 { 1.0 } else { t.scale };
+        let scale = t.scale;
         let (tx, ty) = self.apply((t.translate_x, t.translate_y));
         Self {
             tx,
@@ -551,6 +551,18 @@ mod tests {
         let d_circles = extract_scene_features(&circles).kind_diversity();
         let d_mixed = extract_scene_features(&mixed).kind_diversity();
         assert!(d_mixed > d_circles, "mixed {d_mixed} > circles {d_circles}");
+    }
+
+    #[test]
+    fn zero_scale_is_not_treated_as_identity() {
+        let scene = SceneNode::group(None)
+            .with_transform(Transform {
+                scale: 0.0,
+                ..Transform::identity()
+            })
+            .with_child(SceneNode::circle(10.0, 10.0, 5.0));
+        let features = extract_scene_features(&scene);
+        assert_eq!(features.element_count, 0);
     }
 
     #[test]

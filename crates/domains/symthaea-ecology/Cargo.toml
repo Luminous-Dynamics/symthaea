@@ -3,8 +3,7 @@ name = "symthaea-ecology"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-description = "Analytic population-ecology layer for Symthaea: logistic growth, the Lotka-Volterra predator-prey ODEs (equilibrium, conserved quantity, RK4 integration), and competitive Lotka-Volterra coexistence. The closed-form/ODE counterpart to symthaea-alife's agent-based emergent sim. Pure-std, ground-truth-checked."
+description = "Pure-std analytic ecology: demography, epidemics, succession, diversity, resources, trophic accounting, spatial persistence, interactions, and environmental replay."
 
-# Pure-std (only the sibling pure-std numerical crate), no symthaea-core link.
+# Pure std, zero dependencies, no symthaea-core link.
 [dependencies]
-symthaea-numerical = { path = "../symthaea-numerical" }

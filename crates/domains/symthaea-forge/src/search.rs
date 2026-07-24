@@ -118,6 +118,14 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
     let mut stats = SearchStats::default();
     let mut best: Option<ForgeCertificate> = None;
     let mut current_best_score = baseline_score;
+    // Every generation-winning mutation accepted so far, in order. Elitism
+    // means each generation mutates the PREVIOUS generation's winner, so a
+    // generation-2 candidate's after_source reflects generation 1's
+    // accepted mutation too, compounded with its own -- this history is
+    // what lets the certificate say so honestly instead of labeling a
+    // 2-mutation diff with only the latest mutation's description (a real
+    // gap found the hard way on the first live chi_squared_test campaign).
+    let mut mutation_history: Vec<crate::certificate::MutationRecord> = Vec::new();
 
     for generation in 0..config.generations {
         let mut generation_winner: Option<(String, ForgeCertificate)> = None;
@@ -195,6 +203,12 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 let after_source =
                     extract_function_source(&candidate_source, &config.target_function)
                         .unwrap_or_default();
+                let mut candidate_history = mutation_history.clone();
+                candidate_history.push(crate::certificate::MutationRecord {
+                    generation,
+                    operator: mutation.operator.to_string(),
+                    detail: mutation.detail.clone(),
+                });
                 let cert = ForgeCertificate {
                     generated_at_unix_ms: now_millis(),
                     target_file: config.target_file.clone(),
@@ -204,6 +218,7 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                     generation,
                     mutation_operator: mutation.operator.to_string(),
                     mutation_detail: mutation.detail.clone(),
+                    mutation_history: candidate_history,
                     gates: gates.iter().map(gate_result_to_evidence).collect(),
                     benchmark: benchmark_evidence,
                     before_source,
@@ -227,6 +242,7 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 current_best_score = Some(b.candidate_score);
             }
             current_best_source = source;
+            mutation_history = cert.mutation_history.clone();
             best = Some(cert);
         }
     }

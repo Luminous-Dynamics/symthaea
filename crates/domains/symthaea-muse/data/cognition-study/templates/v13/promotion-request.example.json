@@ -1,0 +1,11 @@
+{
+  "release_id": "REPLACE_RELEASE_ID",
+  "semantic_version": "1.0.0",
+  "target_stage": "StableResearchRelease",
+  "security_review_sha256": "REPLACE_64_HEX",
+  "frozen_public_claim_sha256": "REPLACE_64_HEX",
+  "support_policy_sha256": "REPLACE_64_HEX",
+  "support_until_utc": "REPLACE_RFC3339",
+  "public_release_uri": "https://replace.invalid/stable-research-release",
+  "requested_at_utc": "REPLACE_RFC3339"
+}

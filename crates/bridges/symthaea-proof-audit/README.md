@@ -44,6 +44,7 @@ use symthaea_proof_audit::{gate, GateInput, AxiomPolicy};
 
 let report = gate(&GateInput {
     print_axioms_output: "'thm' depends on axioms: [propext, Quot.sound]",
+    expected_theorem: "thm",
     proved_statement: "a + b = b + a",
     expected_statement: "a + b = b + a",
     policy: &AxiomPolicy::constitutional(),

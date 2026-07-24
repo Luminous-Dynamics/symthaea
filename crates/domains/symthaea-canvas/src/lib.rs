@@ -23,17 +23,20 @@ pub mod geometry;
 pub mod scene_features;
 pub mod scene_graph;
 pub mod svg_renderer;
+pub mod validation;
 
 use serde::{Deserialize, Serialize};
 
 // Re-exports
 pub use aesthetic_engine::{AestheticEngine, AestheticState};
 pub use aesthetic_score::aesthetic_score;
+pub use animation::{FrameContext, MotionPreference};
 pub use color::{Color, Palette};
 pub use geometry::build_scene;
 pub use scene_features::{SceneFeatures, extract_scene_features};
 pub use scene_graph::SceneNode;
-pub use svg_renderer::render_svg;
+pub use svg_renderer::{SvgRenderOptions, render_svg, render_svg_with_options};
+pub use validation::{SnapshotLimits, SnapshotSanitization};
 
 /// Lightweight snapshot of cognitive state, decoupled from CycleMetadata.
 ///
@@ -127,11 +130,24 @@ impl CognitiveSnapshot {
 /// Convenience function that runs the entire canvas pipeline.
 /// For stateful usage (EMA smoothing), use `AestheticEngine` directly.
 pub fn render_snapshot(snap: &CognitiveSnapshot) -> (String, AestheticState) {
+    let frame = FrameContext::from_cycle_count(snap.cycle_count);
+    render_snapshot_frame(snap, frame)
+}
+
+/// Full pipeline on an explicit monotonic frame timeline.
+pub fn render_snapshot_frame(
+    snap: &CognitiveSnapshot,
+    frame: FrameContext,
+) -> (String, AestheticState) {
     let mut engine = AestheticEngine::new();
-    let mut state = engine.process(snap);
+    let mut state = engine.process_frame(snap, frame);
     let scene = build_scene(&state);
     state.aesthetic_score = aesthetic_score(&state, &scene);
-    let svg = render_svg(&scene, snap.consciousness_level);
+    let svg = render_svg_with_options(
+        &scene,
+        snap.consciousness_level,
+        SvgRenderOptions::from_frame(frame),
+    );
     (svg, state)
 }
 

@@ -1,0 +1,28 @@
+{
+  "protocol_version": "symthaea-muse-replication-protocol-v1",
+  "replication_id": "REPLACE_REPLICATION_ID",
+  "source_study_id": "REPLACE_SOURCE_STUDY_ID",
+  "source_final_release_sha256": "REPLACE_64_HEX",
+  "replication_kind": "Direct",
+  "primary_endpoint": {
+    "endpoint_id": "REPLACE_PRIMARY_ENDPOINT",
+    "outcome_scale": "paired ordinal preference",
+    "favorable_direction": "Higher",
+    "practical_margin": 0.05,
+    "alpha": 0.05,
+    "confidence_level": 0.95
+  },
+  "required_site_count": 2,
+  "minimum_independent_organizations": 2,
+  "participant_target_per_site": 48,
+  "family_target_per_site": 24,
+  "analysis_plan_sha256": "REPLACE_64_HEX",
+  "artifact_generation_plan_sha256": "REPLACE_64_HEX",
+  "randomization_commitment_sha256": "REPLACE_64_HEX",
+  "preregistration_uri": "https://replace.invalid/preregistration",
+  "preregistration_receipt_sha256": "REPLACE_64_HEX",
+  "allowed_deviations": ["local consent wording"],
+  "prohibited_deviations": ["analysis plan", "blinding", "policy arms", "primary endpoint"],
+  "frozen_at_utc": "REPLACE_RFC3339",
+  "protocol_sha256": ""
+}

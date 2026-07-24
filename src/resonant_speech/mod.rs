@@ -154,7 +154,12 @@ impl UserState {
             confidence: inferred.confidence,
             experience: inferred.experience,
             context: inferred.context,
-            is_rushed: inferred.idle_time_secs < 0.5 && inferred.interaction_count > 5,
+            // `idle_time_secs < 0.5` alone was an unrealistic threshold for
+            // turn-based chat (a single round trip typically exceeds it), so
+            // it could almost never fire; explicit urgency language is a
+            // direct signal, kept alongside a looser idle-time fallback.
+            is_rushed: inferred.urgent_language
+                || (inferred.idle_time_secs < 5.0 && inferred.interaction_count > 5),
             is_learning: inferred.context == ContextKind::Help
                 || inferred.context == ContextKind::Exploration,
             // Trust starts high and degrades with frustration

@@ -71,14 +71,30 @@ impl CognitiveLoopService {
                 .temporal_network
                 .predict_forward(input, self.config.cfc_config.delta_t)
                 .map(|arr| arr.to_vec())
-                .unwrap_or_else(|_| vec![0.0; self.config.cfc_config.input_dim]);
+                .unwrap_or_else(|e| {
+                    tracing::warn!(err = %e, cycle = self.stats.total_cycles,
+                        "predict_forward failed (no horizons) — substituting zero prediction, PE will saturate");
+                    vec![0.0; self.config.cfc_config.input_dim]
+                });
             return (pred, Vec::new());
         }
 
-        // Save hidden state before prediction — predict_forward calls forward()
-        // which advances the network state. Without save/restore, 3 prediction
-        // calls corrupt the temporal dynamics (4 state advances per cycle instead of 1).
-        let saved_state = self.temporal_network.read_state().ok();
+        // Predictions must not perturb live temporal state.
+        //
+        // HdcLtc (the default backend): predict_forward is PURE — it snapshots
+        // and restores internal neuron state itself, so no bookkeeping here.
+        // Classic CfC: predict_forward advances state, so save/restore via
+        // read_state/inject (a true restore on that backend).
+        //
+        // HISTORY: this dance used to run unconditionally — but on HdcLtc,
+        // read_state captures only the small projected output and inject RESETS
+        // the network, so the "restore" wiped the temporal state every cycle
+        // (the liquid brain was memoryless). See docs/PHI_SIGNAL_TRACE_2026-07-15.md.
+        let saved_state = if self.temporal_network.prediction_is_pure() {
+            None
+        } else {
+            self.temporal_network.read_state().ok()
+        };
 
         // Collect predictions at multiple time horizons
         let mut predictions: Vec<Array1<f32>> = Vec::with_capacity(horizons.len());
@@ -100,6 +116,13 @@ impl CognitiveLoopService {
         }
 
         if predictions.is_empty() {
+            // Every horizon's predict_forward failed. A zero vector here makes the
+            // encoder's PE saturate at the 1.0 sentinel — say so instead of hiding it.
+            tracing::warn!(
+                cycle = self.stats.total_cycles,
+                horizons = horizons.len(),
+                "all predict_forward horizons failed — substituting zero prediction, PE will saturate"
+            );
             return (vec![0.0; self.config.cfc_config.input_dim], Vec::new());
         }
 
@@ -316,6 +339,12 @@ impl CognitiveLoopService {
         let delta_t = self.config.cfc_config.delta_t;
         let lr = self.config.cfc_config.learning_rate;
 
+        // Replay deliberately resets state per experience for clean training —
+        // but the LIVE cognitive state must survive consolidation. Snapshot it
+        // now and restore after (previously it was silently destroyed every
+        // consolidation; see docs/PHI_SIGNAL_TRACE_2026-07-15.md).
+        let live_state = self.temporal_network.save_evolution_state();
+
         for exp in experiences.iter().take(replay_count) {
             if let Some(ref next_state) = exp.next_state {
                 // Reset CfC state for clean replay by injecting zeros
@@ -332,6 +361,10 @@ impl CognitiveLoopService {
                     total_loss += loss;
                 }
             }
+        }
+
+        if let Some(ref backup) = live_state {
+            self.temporal_network.restore_evolution_state(backup);
         }
 
         self.is_consolidating = false;

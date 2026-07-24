@@ -16,7 +16,7 @@
 
 use symthaea_core::hdc::ContinuousHV;
 
-use crate::types::{TrainingConfig, TrainingMethod};
+use crate::types::{AdamStateSnapshot, TrainerState, TrainingConfig, TrainingMethod};
 
 /// Adam optimizer state for a single HV parameter.
 pub struct AdamState {
@@ -42,7 +42,7 @@ impl AdamState {
 
     /// Apply one Adam step, returning the update delta (not yet scaled by lr).
     pub fn step(&mut self, gradient: &[f32], grad_clip: f32) -> Vec<f32> {
-        self.t += 1;
+        self.t = self.t.saturating_add(1);
         let t = self.t as f32;
         let mut delta = vec![0.0f32; gradient.len()];
 
@@ -67,6 +67,34 @@ impl AdamState {
         delta
     }
 
+    fn save_state(&self) -> AdamStateSnapshot {
+        AdamStateSnapshot {
+            m: self.m.clone(),
+            v: self.v.clone(),
+            t: self.t,
+            beta1: self.beta1,
+            beta2: self.beta2,
+            eps: self.eps,
+        }
+    }
+
+    fn load_state(&mut self, state: &AdamStateSnapshot, expected_dim: usize) -> Result<(), String> {
+        if state.m.len() != expected_dim || state.v.len() != expected_dim {
+            return Err(format!(
+                "Adam state dimension mismatch: m={}, v={}, expected={expected_dim}",
+                state.m.len(),
+                state.v.len()
+            ));
+        }
+        self.m = state.m.clone();
+        self.v = state.v.clone();
+        self.t = state.t;
+        self.beta1 = state.beta1;
+        self.beta2 = state.beta2;
+        self.eps = state.eps;
+        Ok(())
+    }
+
     /// Perform 'Holographic Dilation' - scale internal momentum buffers.
     pub fn dilate(&mut self, target_dim: usize) {
         if self.m.len() == target_dim {
@@ -76,10 +104,19 @@ impl AdamState {
         // We use the same segment-based bundling for momentum buffers
         // to maintain semantic alignment of the learned gradients.
         let m_hv = ContinuousHV::from_values(self.m.clone()).dilate(target_dim);
-        let v_hv = ContinuousHV::from_values(self.v.clone()).dilate(target_dim);
+        // Adam's second moment is a variance-like quantity and must remain
+        // non-negative. Dilate its square root, then square the result instead
+        // of treating the raw second moment as a signed semantic HV.
+        let v_root =
+            ContinuousHV::from_values(self.v.iter().map(|value| value.max(0.0).sqrt()).collect())
+                .dilate(target_dim);
 
         self.m = m_hv.values;
-        self.v = v_hv.values;
+        self.v = v_root
+            .values
+            .into_iter()
+            .map(|value| value * value)
+            .collect();
     }
 }
 
@@ -90,6 +127,9 @@ pub struct ManifoldTrainer {
     tau_adam: AdamState,
     rng_state: u64,
     total_steps: u64,
+    /// Observation weight used by the manifold equilibrium. The trainable
+    /// weight contribution is `1.0 - input_blend`.
+    input_blend: f32,
 }
 
 impl ManifoldTrainer {
@@ -100,13 +140,57 @@ impl ManifoldTrainer {
             tau_adam: AdamState::new(1),
             rng_state: 0xCAFE_BABE_1337_DEAD,
             total_steps: 0,
+            input_blend: 0.7,
         }
+    }
+
+    pub(crate) fn hdc_vector_count(&self) -> usize {
+        // Adam stores one first- and one second-moment vector for weight_hv.
+        2
     }
 
     /// Perform 'Holographic Dilation' - scale internal components.
     pub fn dilate(&mut self, target_dim: usize) {
         self.weight_adam.dilate(target_dim);
         // tau_adam is scalar (dim 1), no dilation needed
+    }
+
+    /// Keep the trainer's derivative model aligned with the manifold's
+    /// equilibrium blend.
+    pub fn set_input_blend(&mut self, input_blend: f32) {
+        let _ = self.set_input_blend_checked(input_blend);
+    }
+
+    /// Checked equilibrium-blend update used by runtime policy changes.
+    pub fn set_input_blend_checked(&mut self, input_blend: f32) -> Result<(), String> {
+        if !input_blend.is_finite() || !(0.0..=1.0).contains(&input_blend) {
+            return Err(format!(
+                "input blend must be finite and in [0, 1], got {input_blend}"
+            ));
+        }
+        self.input_blend = input_blend;
+        Ok(())
+    }
+
+    /// Recover the forward-pass equilibrium from `state`, `predicted`, and the
+    /// closed-form gate. This avoids rebuilding it from the supervision target.
+    fn equilibrium_from_prediction(
+        state: &ContinuousHV,
+        predicted: &ContinuousHV,
+        sigma: f32,
+    ) -> ContinuousHV {
+        if sigma <= 1e-8 {
+            return state.clone();
+        }
+
+        let one_minus_sigma = 1.0 - sigma;
+        let values = state
+            .as_slice()
+            .iter()
+            .zip(predicted.as_slice().iter())
+            .map(|(&state_i, &predicted_i)| (predicted_i - one_minus_sigma * state_i) / sigma)
+            .collect();
+        ContinuousHV::from_vec(values)
     }
 
     /// Compute BPTT gradient for weight_hv and tau through the CfC closed-form.
@@ -116,7 +200,7 @@ impl ManifoldTrainer {
     /// Chain rule:
     /// - `∂loss/∂W = ∂loss/∂pred · ∂pred/∂x_inf · ∂x_inf/∂W`
     /// - `∂pred/∂x_inf = sigma` (gating factor)
-    /// - `∂x_inf/∂W = 0.3 * (1 - x_inf²) ⊗ state` (from tanh derivative)
+    /// - `∂x_inf/∂W = (1-input_blend) * (1 - x_inf²) ⊗ state`
     pub fn bptt_step(
         &mut self,
         weight_hv: &ContinuousHV,
@@ -148,18 +232,19 @@ impl ManifoldTrainer {
         // ∂pred/∂x_inf = sigma (gating factor)
         let sigma = 1.0 - (-dt / tau_base.max(0.001)).exp();
 
-        // Compute x_inf for the tanh derivative
-        let state_influence = weight_hv.bind(state);
-        let x_inf = ContinuousHV::weighted_bundle(&[actual, &state_influence], &[0.7, 0.3]).tanh();
+        // Recover the equilibrium that actually produced `predicted`. Rebuilding
+        // x_inf from `actual` leaks the supervision target into the derivative
+        // and is not the gradient of the forward computation.
+        let x_inf = Self::equilibrium_from_prediction(state, predicted, sigma);
         let x_inf_slice = x_inf.as_slice();
         let state_slice = state.as_slice();
+        let state_blend = 1.0 - self.input_blend;
 
-        // ∂x_inf/∂W = 0.3 * (1 - x_inf²) ⊗ state
+        // ∂x_inf/∂W = state_blend * (1 - x_inf²) ⊗ state
         let mut grad_weight = vec![0.0f32; dim];
         for i in 0..dim {
             let dtanh = 1.0 - x_inf_slice[i] * x_inf_slice[i];
-            // Full chain: dloss/dpred * sigma * 0.3 * dtanh * state
-            grad_weight[i] = dloss_dpred[i] * sigma * 0.3 * dtanh * state_slice[i];
+            grad_weight[i] = dloss_dpred[i] * sigma * state_blend * dtanh * state_slice[i];
         }
 
         // ∂loss/∂tau: ∂sigma/∂tau = -(dt/tau²) · exp(-dt/tau)
@@ -240,6 +325,7 @@ impl ManifoldTrainer {
             actual_next,
             tau_base,
             dt,
+            self.input_blend,
         );
         let loss_minus = Self::evaluate_loss(
             &ContinuousHV::from_vec(w_minus),
@@ -248,6 +334,7 @@ impl ManifoldTrainer {
             actual_next,
             tau_base,
             dt,
+            self.input_blend,
         );
 
         // SPSA gradient estimate
@@ -276,6 +363,7 @@ impl ManifoldTrainer {
             actual_next,
             tau_base + tau_pert,
             dt,
+            self.input_blend,
         );
         let tau_loss_minus = Self::evaluate_loss(
             weight_hv,
@@ -284,6 +372,7 @@ impl ManifoldTrainer {
             actual_next,
             tau_base - tau_pert,
             dt,
+            self.input_blend,
         );
         let tau_grad = (tau_loss_plus - tau_loss_minus) / (2.0 * tau_pert);
         let tau_delta = self.tau_adam.step(&[tau_grad], self.config.grad_clip);
@@ -322,10 +411,20 @@ impl ManifoldTrainer {
                 self.spsa_step(weight_hv, state, input, actual_next, tau_base, dt)
             }
             TrainingMethod::BpttWithSpsaFallback => {
+                // BPTT updates Adam moments while constructing its candidate step.
+                // Preserve those moments so rejecting the candidate does not make
+                // one observation count twice in optimizer time.
+                let weight_before = self.weight_adam.save_state();
+                let tau_before = self.tau_adam.save_state();
                 let result = self.bptt_step(weight_hv, state, predicted, actual_next, tau_base, dt);
-                // If BPTT gradient is near-zero or NaN, fall back to SPSA
                 let grad_norm = result.weight_update.norm();
                 if grad_norm < 1e-10 || !grad_norm.is_finite() {
+                    self.weight_adam
+                        .load_state(&weight_before, weight_hv.dim())
+                        .expect("saved weight optimizer state must restore");
+                    self.tau_adam
+                        .load_state(&tau_before, 1)
+                        .expect("saved tau optimizer state must restore");
                     self.spsa_step(weight_hv, state, input, actual_next, tau_base, dt)
                 } else {
                     result
@@ -342,14 +441,104 @@ impl ManifoldTrainer {
         actual_next: &ContinuousHV,
         tau_base: f32,
         dt: f32,
+        input_blend: f32,
     ) -> f32 {
         let state_influence = weight_hv.bind(state);
-        let x_inf = ContinuousHV::weighted_bundle(&[input, &state_influence], &[0.7, 0.3]).tanh();
+        let x_inf = ContinuousHV::weighted_bundle(
+            &[input, &state_influence],
+            &[input_blend, 1.0 - input_blend],
+        )
+        .tanh();
         let sigma = 1.0 - (-dt / tau_base.max(0.001)).exp();
         // predicted = state + sigma * (x_inf - state) = (1-sigma)*state + sigma*x_inf
         let mut predicted = state.clone();
         predicted.lerp_in_place(&x_inf, 1.0 - sigma, sigma);
         1.0 - predicted.similarity(actual_next).clamp(-1.0, 1.0)
+    }
+
+    /// Snapshot optimizer and stochastic state for exact checkpoint resume.
+    pub fn save_state(&self) -> TrainerState {
+        TrainerState {
+            weight_adam: self.weight_adam.save_state(),
+            tau_adam: self.tau_adam.save_state(),
+            rng_state: self.rng_state,
+            total_steps: self.total_steps,
+            input_blend: self.input_blend,
+        }
+    }
+
+    /// Validate a serialized trainer state without mutating this trainer.
+    pub fn validate_state(state: &TrainerState, hdc_dim: usize) -> Result<(), String> {
+        fn validate_adam(
+            name: &str,
+            state: &AdamStateSnapshot,
+            expected_dim: usize,
+        ) -> Result<(), String> {
+            if state.m.len() != expected_dim || state.v.len() != expected_dim {
+                return Err(format!(
+                    "trainer {name} Adam dimension mismatch: m={}, v={}, expected={expected_dim}",
+                    state.m.len(),
+                    state.v.len()
+                ));
+            }
+            if state.m.iter().any(|value| !value.is_finite()) {
+                return Err(format!("trainer {name} Adam first moment is non-finite"));
+            }
+            if state
+                .v
+                .iter()
+                .any(|value| !value.is_finite() || *value < 0.0)
+            {
+                return Err(format!(
+                    "trainer {name} Adam second moment must be finite and non-negative"
+                ));
+            }
+            if !state.beta1.is_finite() || !(0.0..1.0).contains(&state.beta1) {
+                return Err(format!(
+                    "trainer {name} Adam beta1 must be finite and in [0,1), got {}",
+                    state.beta1
+                ));
+            }
+            if !state.beta2.is_finite() || !(0.0..1.0).contains(&state.beta2) {
+                return Err(format!(
+                    "trainer {name} Adam beta2 must be finite and in [0,1), got {}",
+                    state.beta2
+                ));
+            }
+            if !state.eps.is_finite() || state.eps <= 0.0 {
+                return Err(format!(
+                    "trainer {name} Adam epsilon must be finite and positive, got {}",
+                    state.eps
+                ));
+            }
+            Ok(())
+        }
+
+        validate_adam("weight", &state.weight_adam, hdc_dim)?;
+        validate_adam("tau", &state.tau_adam, 1)?;
+        if !state.input_blend.is_finite() || !(0.0..=1.0).contains(&state.input_blend) {
+            return Err(format!(
+                "trainer input blend must be finite and in [0,1], got {}",
+                state.input_blend
+            ));
+        }
+        Ok(())
+    }
+
+    /// Restore optimizer moments, RNG, and step counters.
+    pub fn load_state(&mut self, state: &TrainerState, hdc_dim: usize) -> Result<(), String> {
+        Self::validate_state(state, hdc_dim)?;
+        self.weight_adam.load_state(&state.weight_adam, hdc_dim)?;
+        self.tau_adam.load_state(&state.tau_adam, 1)?;
+        self.rng_state = state.rng_state;
+        self.total_steps = state.total_steps;
+        self.input_blend = state.input_blend;
+        Ok(())
+    }
+
+    /// Restore only the legacy training-step count from older checkpoints.
+    pub fn set_total_steps(&mut self, total_steps: u64) {
+        self.total_steps = total_steps;
     }
 
     pub fn total_steps(&self) -> u64 {
@@ -381,6 +570,53 @@ mod tests {
     use crate::types::TrainingConfig;
 
     #[test]
+    fn test_fallback_restores_rejected_bptt_optimizer_moments() {
+        let cfg = TrainingConfig::default();
+        let dim = 64;
+        let mut trainer = ManifoldTrainer::new(&cfg, dim);
+        let weight = ContinuousHV::random(dim, 1);
+        let state = ContinuousHV::random(dim, 2);
+        let input = ContinuousHV::random(dim, 3);
+        let predicted = ContinuousHV::random(dim, 4);
+        let actual = predicted.clone();
+
+        trainer.train_step(&weight, &state, &input, &predicted, &actual, 0.5, 0.03);
+        let saved = trainer.save_state();
+        assert_eq!(saved.total_steps, 1);
+        assert_eq!(saved.weight_adam.t, 1);
+        assert_eq!(saved.tau_adam.t, 1);
+    }
+
+    #[test]
+    fn test_dilated_second_moments_remain_valid() {
+        let cfg = TrainingConfig::default();
+        let mut trainer = ManifoldTrainer::new(&cfg, 32);
+        let gradient = vec![0.25; 32];
+        let _ = trainer.weight_adam.step(&gradient, 1.0);
+        trainer.dilate(64);
+        let state = trainer.save_state();
+        assert!(state.weight_adam.v.iter().all(|value| *value >= 0.0));
+        ManifoldTrainer::validate_state(&state, 64).unwrap();
+    }
+
+    #[test]
+    fn test_trainer_checkpoint_numeric_rejection_is_atomic() {
+        let cfg = TrainingConfig::default();
+        let dim = 32;
+        let mut trainer = ManifoldTrainer::new(&cfg, dim);
+        let before = trainer.save_state();
+        let mut malformed = before.clone();
+        malformed.weight_adam.v[0] = -1.0;
+        assert!(trainer.load_state(&malformed, dim).is_err());
+        assert_eq!(trainer.save_state(), before);
+
+        malformed = before.clone();
+        malformed.input_blend = f32::NAN;
+        assert!(trainer.load_state(&malformed, dim).is_err());
+        assert_eq!(trainer.save_state(), before);
+    }
+
+    #[test]
     fn test_adam_state_construction() {
         let adam = AdamState::new(100);
         assert_eq!(adam.m.len(), 100);
@@ -396,6 +632,21 @@ mod tests {
         for &d in &delta {
             assert!(d.is_finite(), "Adam delta should be finite");
         }
+    }
+
+    #[test]
+    fn test_equilibrium_recovery_uses_forward_prediction() {
+        let state = ContinuousHV::random(256, 10);
+        let equilibrium = ContinuousHV::random(256, 20).tanh();
+        let sigma = 0.25;
+        let mut predicted = state.clone();
+        predicted.lerp_in_place(&equilibrium, 1.0 - sigma, sigma);
+
+        let recovered = ManifoldTrainer::equilibrium_from_prediction(&state, &predicted, sigma);
+        assert!(
+            recovered.similarity(&equilibrium) > 0.999,
+            "the analytical gradient must recover the forward equilibrium"
+        );
     }
 
     #[test]
@@ -514,7 +765,7 @@ mod tests {
         let inp = ContinuousHV::random(dim, 3);
         let actual = ContinuousHV::random(dim, 4);
 
-        let loss = ManifoldTrainer::evaluate_loss(&w, &s, &inp, &actual, 0.5, 0.033);
+        let loss = ManifoldTrainer::evaluate_loss(&w, &s, &inp, &actual, 0.5, 0.033, 0.7);
         assert!(
             loss >= 0.0 && loss <= 2.0,
             "Loss should be in [0, 2], got {loss}"
@@ -656,6 +907,31 @@ mod tests {
     }
 
     #[test]
+    fn test_trainer_state_roundtrip_preserves_optimizer_and_rng() {
+        let cfg = TrainingConfig {
+            method: TrainingMethod::Spsa,
+            ..Default::default()
+        };
+        let dim = 128;
+        let mut trainer = ManifoldTrainer::new(&cfg, dim);
+
+        let weight = ContinuousHV::random(dim, 10);
+        let state = ContinuousHV::random(dim, 20);
+        let input = ContinuousHV::random(dim, 30);
+        let predicted = ContinuousHV::random(dim, 40);
+        let actual = ContinuousHV::random(dim, 50);
+        let _ = trainer.train_step(&weight, &state, &input, &predicted, &actual, 0.5, 0.033);
+
+        let saved = trainer.save_state();
+        let mut restored = ManifoldTrainer::new(&cfg, dim);
+        restored
+            .load_state(&saved, dim)
+            .expect("trainer checkpoint should restore");
+
+        assert_eq!(restored.save_state(), saved);
+    }
+
+    #[test]
     fn test_adam_bias_correction_at_step_1() {
         let mut adam = AdamState::new(4);
         let grad = vec![0.1, -0.2, 0.3, -0.4];
@@ -722,5 +998,15 @@ mod tests {
             tau_base >= 0.01 && tau_base <= 10.0,
             "Tau should remain bounded after 200 steps: tau={tau_base}"
         );
+    }
+
+    #[test]
+    fn checked_input_blend_rejects_invalid_values_atomically() {
+        let cfg = TrainingConfig::default();
+        let mut trainer = ManifoldTrainer::new(&cfg, 32);
+        trainer.set_input_blend_checked(0.4).unwrap();
+        assert!(trainer.set_input_blend_checked(f32::NAN).is_err());
+        assert!(trainer.set_input_blend_checked(1.1).is_err());
+        assert!((trainer.input_blend - 0.4).abs() < 1e-6);
     }
 }

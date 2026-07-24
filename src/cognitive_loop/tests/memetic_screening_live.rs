@@ -101,4 +101,156 @@ fn memetic_firewall_rejects_vaccinated_pathogen_live() {
          (pattern_count {threats_before} -> {})",
         service.threat_memory.pattern_count()
     );
+
+    // Warded Node Phase 2 (transparency): the rejection is also visible in
+    // the guardian-facing audit log, and its meme_id correlates with the
+    // content's created_at (2_000, as sent above) — a guardian can see WHAT
+    // was blocked, not just that something was.
+    let log = service.memetic_filtered_log(10);
+    assert_eq!(service.memetic_filtered_log_len(), 1);
+    assert_eq!(log.len(), 1, "audit log must contain the rejection");
+    assert_eq!(
+        log[0].meme_id, 2_000,
+        "audit log entry must correlate with the rejected content's id"
+    );
+}
+
+/// Warded Node design Phase 1 (`WARDED_NODE_DESIGN_2026-07-11.md`): a
+/// `WardConfig` with `posture_floor = Red` suppresses ALL uptake in the live
+/// loop — even perfectly benign content carrying zero pathogen match — proving
+/// the floor overrides whatever posture the loop would otherwise derive (here,
+/// Green after a normal warmup). This is the property a guardian relies on: a
+/// warded node cannot be talked into a looser posture by its own state.
+#[test]
+fn ward_config_red_floor_suppresses_benign_uptake_live() {
+    use symthaea_memetics::{GuardianPosture, WardConfig};
+
+    // Control: an otherwise-identical unwarded node admits benign content.
+    let mut baseline = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let base_tx = baseline.swarm_event_sender();
+    for _ in 0..20 {
+        let _ = baseline.cycle("we are learning to trust each other");
+    }
+    base_tx
+        .send(announced("peer-benign-control", 3, [0x11; 32], 3_000))
+        .expect("swarm_event_tx receiver lives inside the loop");
+    let _ = baseline.cycle("control input");
+    assert!(
+        baseline.memetic_telemetry().accepted > 0,
+        "control (no ward floor) should admit benign content, telemetry={:?}",
+        baseline.memetic_telemetry()
+    );
+
+    // Warded node: identical setup, but a Red posture floor is set.
+    let mut warded = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let ward_tx = warded.swarm_event_sender();
+    warded.set_ward_config(WardConfig {
+        posture_floor: Some(GuardianPosture::Red),
+        ..Default::default()
+    });
+    assert_eq!(
+        warded.ward_config().posture_floor,
+        Some(GuardianPosture::Red)
+    );
+    for _ in 0..20 {
+        let _ = warded.cycle("we are learning to trust each other");
+    }
+
+    ward_tx
+        .send(announced("peer-benign-warded", 3, [0x11; 32], 3_000))
+        .expect("swarm_event_tx receiver lives inside the loop");
+    let _ = warded.cycle("warded input");
+
+    let after = warded.memetic_telemetry();
+    assert_eq!(
+        after.accepted, 0,
+        "a Red posture floor must admit NOTHING, even benign non-pathogen \
+         content; telemetry={after:?}"
+    );
+    assert!(
+        after.rejected > 0,
+        "the same content the control admitted must be rejected under the \
+         Red floor; telemetry={after:?}"
+    );
+}
+
+/// Warded Node design Phase 3 (Layer B, allowlist-first receive): an
+/// `AllowlistOnly` node rejects content from a total stranger — no local
+/// trust data at all — even though the content is perfectly benign, and the
+/// denial is visible in the guardian-facing audit log (closing the Phase 2/3
+/// transparency gap). This is the fail-closed property `AllowlistMode` is
+/// for; it holds with or without `mesh-trust` compiled in (a stranger's
+/// score is `0.0` either way), so this test only needs `social-fabric`.
+#[test]
+fn ward_config_allowlist_only_rejects_untrusted_stranger_live() {
+    use symthaea_memetics::{AllowlistMode, WardConfig};
+
+    let mut warded = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let tx = warded.swarm_event_sender();
+    warded.set_ward_config(WardConfig {
+        posture_floor: None,
+        allowlist_mode: AllowlistMode::AllowlistOnly { min_trust: 0.5 },
+    });
+    for _ in 0..20 {
+        let _ = warded.cycle("we are learning to trust each other");
+    }
+
+    tx.send(announced("peer-stranger", 5, [0x22; 32], 5_000))
+        .expect("swarm_event_tx receiver lives inside the loop");
+    let _ = warded.cycle("stranger input");
+
+    let after = warded.memetic_telemetry();
+    assert_eq!(
+        after.accepted, 0,
+        "AllowlistOnly must reject a total stranger's benign content; telemetry={after:?}"
+    );
+    assert_eq!(
+        after.seen, 0,
+        "the allowlist gate rejects BEFORE screen() runs, so its seen/\
+         rejected counters must be untouched; telemetry={after:?}"
+    );
+
+    // But the guardian-facing audit log DOES see it.
+    let log = warded.memetic_filtered_log(10);
+    assert_eq!(warded.memetic_filtered_log_len(), 1);
+    assert_eq!(log.len(), 1, "the gate denial must land in the audit log");
+    assert_eq!(log[0].meme_id, 5_000);
+    assert_eq!(log[0].reason, "allowlist gate: peer trust below threshold");
+}
+
+/// Warded Node design Phase 5a (ruleset import): a guardian's `Ruleset`,
+/// bulk-imported via `vaccinate_ruleset`, actually protects a running node —
+/// content matching one of its entries is rejected exactly like a directly
+/// `vaccinate_meme`'d pathogen, proving the bulk path isn't just bookkeeping.
+#[test]
+fn ward_ruleset_import_protects_the_live_loop() {
+    use symthaea_memetics::Ruleset;
+
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let tx = service.swarm_event_sender();
+    for _ in 0..20 {
+        let _ = service.cycle("we are learning to trust each other");
+    }
+
+    // The loop reconstructs the incoming embedding via from_truncated_bytes,
+    // so build the ruleset entry against that same reconstruction.
+    let pathogen_bytes = [0x7Fu8; 32];
+    let pathogen_embedding = BinaryHV::from_truncated_bytes(&pathogen_bytes);
+    let ruleset = Ruleset::new("family-safety-baseline", "2026.07.11", "test-fixture")
+        .with_entry(pathogen_embedding, "known-bad pattern imported in bulk");
+
+    let applied = service.vaccinate_ruleset(&ruleset);
+    assert_eq!(applied, 1);
+
+    let before = service.memetic_telemetry().rejected;
+    tx.send(announced("peer-ruleset-pathogen", 6, pathogen_bytes, 6_000))
+        .expect("swarm_event_tx receiver lives inside the loop");
+    let _ = service.cycle("input after ruleset import");
+
+    let after = service.memetic_telemetry();
+    assert!(
+        after.rejected > before,
+        "content matching a bulk-imported ruleset entry must be rejected \
+         in the live loop; telemetry={after:?}"
+    );
 }

@@ -11,8 +11,10 @@ pub mod diis;
 pub mod fock;
 pub mod generalized_eigen;
 pub mod rhf;
+pub mod uhf;
 
 pub use generalized_eigen::{
     GeneralizedEigenResult, canonical_orthogonalization, solve_generalized_eigen,
 };
 pub use rhf::{RhfConfig, RhfResult, restricted_hartree_fock};
+pub use uhf::{UhfConfig, UhfResult, unrestricted_hartree_fock};

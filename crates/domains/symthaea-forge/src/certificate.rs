@@ -32,6 +32,23 @@ pub struct BenchmarkEvidence {
     pub improvement_fraction: f64,
 }
 
+/// One accepted mutation in a candidate's lineage. A winning candidate from
+/// generation N carries the full chain of every generation-winning mutation
+/// from 0..=N, not just its own -- `search.rs`'s elitism means each
+/// generation mutates the *previous* generation's winner, so a generation-2
+/// certificate's `after_source` reflects TWO compounded mutations, not one.
+/// (Found the hard way: a first real search campaign against
+/// `chi_squared_test` produced a certificate labeled with a single
+/// `ArithmeticOperatorSwap`, but the before/after diff silently also
+/// contained an earlier generation's separate accepted mutation -- see
+/// `DISCOVERY_AND_SELF_IMPROVEMENT_PLAN_2026-07-06.md` Tier 2 status.)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MutationRecord {
+    pub generation: usize,
+    pub operator: String,
+    pub detail: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForgeCertificate {
     pub generated_at_unix_ms: u128,
@@ -40,12 +57,23 @@ pub struct ForgeCertificate {
     pub package: String,
     pub git_sha: Option<String>,
     pub generation: usize,
+    /// Convenience fields mirroring the LAST entry of `mutation_history` --
+    /// kept for simple display, but never read these alone to understand
+    /// what changed if `mutation_history.len() > 1`.
     pub mutation_operator: String,
     pub mutation_detail: String,
+    /// Every generation-winning mutation from generation 0 up to and
+    /// including this candidate's own, in order. Length 1 means
+    /// `before_source`/`after_source` differ by exactly this one mutation;
+    /// length > 1 means they differ by all of them compounded.
+    pub mutation_history: Vec<MutationRecord>,
     pub gates: Vec<GateEvidence>,
     pub benchmark: Option<BenchmarkEvidence>,
     /// Full before/after source of the *containing function only* (not the
     /// whole file) so a human can read the diff without opening the repo.
+    /// `before_source` is always the pristine original; `after_source`
+    /// reflects the full `mutation_history` applied in order, not just the
+    /// latest entry.
     pub before_source: String,
     pub after_source: String,
 }
@@ -60,7 +88,8 @@ impl ForgeCertificate {
     }
 
     /// A short human-readable summary, suitable for a terminal or a
-    /// `report.md` header.
+    /// `report.md` header. Explicitly flags when the diff reflects more
+    /// than one compounded mutation, since that's easy to miss.
     pub fn summary(&self) -> String {
         let bench_line = match &self.benchmark {
             Some(b) => format!(
@@ -72,8 +101,17 @@ impl ForgeCertificate {
             ),
             None => "benchmark: not run".to_string(),
         };
+        let lineage_note = if self.mutation_history.len() > 1 {
+            format!(
+                "  ⚠ this diff compounds {} mutations across generations 0-{} -- see mutation_history, not just the line below\n",
+                self.mutation_history.len(),
+                self.generation
+            )
+        } else {
+            String::new()
+        };
         format!(
-            "[{status}] {op} on {func} in {file}\n  {detail}\n  {bench_line}",
+            "[{status}] {op} on {func} in {file}\n{lineage_note}  {detail}\n  {bench_line}",
             status = if self.all_gates_passed() {
                 "PASS"
             } else {
@@ -116,6 +154,11 @@ mod tests {
             generation: 2,
             mutation_operator: "NumericLiteralPerturb".to_string(),
             mutation_detail: "0.9999 -> 0.9995".to_string(),
+            mutation_history: vec![MutationRecord {
+                generation: 2,
+                operator: "NumericLiteralPerturb".to_string(),
+                detail: "0.9999 -> 0.9995".to_string(),
+            }],
             gates: vec![
                 GateEvidence {
                     gate: "compile".to_string(),
@@ -163,6 +206,25 @@ mod tests {
         let s = cert.summary();
         assert!(s.contains("PASS"));
         assert!(s.contains("10.00%") || s.contains("+10.00%"));
+    }
+
+    #[test]
+    fn summary_warns_when_multiple_mutations_are_compounded() {
+        let mut cert = sample_certificate(true);
+        assert!(
+            !cert.summary().contains("compounds"),
+            "a single-mutation history should not trigger the warning"
+        );
+        cert.mutation_history.push(MutationRecord {
+            generation: 1,
+            operator: "ArithmeticOperatorSwap".to_string(),
+            detail: "- -> +".to_string(),
+        });
+        let s = cert.summary();
+        assert!(
+            s.contains("compounds 2 mutations"),
+            "a multi-entry history must warn a reviewer it's not just the labeled mutation, got: {s}"
+        );
     }
 
     #[test]

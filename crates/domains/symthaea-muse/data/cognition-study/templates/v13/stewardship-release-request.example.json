@@ -1,0 +1,8 @@
+{
+  "revision_governance_policy_sha256": "REPLACE_64_HEX",
+  "security_review_sha256": "REPLACE_64_HEX",
+  "source_revision": "REPLACE_GIT_REVISION",
+  "workspace_tree_sha256": "REPLACE_64_HEX",
+  "public_release_uri": "https://replace.invalid/v13-release",
+  "released_at_utc": "REPLACE_RFC3339"
+}

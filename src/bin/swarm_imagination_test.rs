@@ -34,11 +34,13 @@ fn main() {
         // --- PHASE 1: Simulate Node A in Crisis ---
         println!("💥 Simulating shock event for Node A...");
         let shock_frame = vec![255u8; 64 * 64 * 3]; // Stark white shock
-        node_a.inject_vision_frame(shock_frame);
         node_a.set_vision_free_energy_override(0.9); // Extreme surprise
 
-        // Artificially overload Node A's metabolism by running cycles
+        // Artificially overload Node A's metabolism by running cycles.
+        // Frames are consumed per cycle (retina semantics), so re-inject
+        // the shock frame each cycle rather than relying on a lingering buffer.
         for _ in 0..10 {
+            node_a.inject_vision_frame(shock_frame.clone());
             let _ = node_a.cycle("load-pump");
         }
         println!(

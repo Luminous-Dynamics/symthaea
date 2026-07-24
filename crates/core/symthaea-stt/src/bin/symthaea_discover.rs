@@ -14,8 +14,8 @@
 //! # Discover units in bird songs
 //! symthaea-discover --input bird_calls.wav --species avian
 //!
-//! # Unknown/alien signals (most flexible)
-//! symthaea-discover --input unknown_signal.wav --species xenolinguistic
+//! # Unknown signals (most flexible; performs clustering, not translation)
+//! symthaea-discover --input unknown_signal.wav --species unknown
 //!
 //! # With visual grounding
 //! symthaea-discover --input primate_calls.wav \
@@ -41,7 +41,7 @@ use std::time::Instant;
 #[command(name = "symthaea-discover")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(author = "Luminous Dynamics")]
-#[command(about = "Unsupervised Acoustic Unit Discovery - The Universal Translator")]
+#[command(about = "Experimental unsupervised acoustic unit discovery")]
 #[command(long_about = r#"
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                   SYMTHAEA DISCOVERY PROTOCOL                          ║
@@ -65,7 +65,7 @@ struct Cli {
     output: PathBuf,
 
     /// Species/signal type (affects default parameters)
-    #[arg(short, long, value_enum, default_value = "xenolinguistic")]
+    #[arg(short, long, value_enum, default_value = "unknown")]
     species: Species,
 
     /// Similarity threshold for clustering (0.0-1.0)
@@ -106,7 +106,8 @@ enum Species {
     /// Apes, monkeys (50ms - 3s, complex calls)
     Primate,
     /// Unknown signals (most flexible parameters)
-    Xenolinguistic,
+    #[value(alias = "xenolinguistic")]
+    Unknown,
     /// Human speech (for comparison)
     Human,
 }
@@ -251,7 +252,7 @@ impl DiscoveryConfig {
                 min_segment_ms: 20.0,
                 max_segment_ms: 300.0,
             },
-            Species::Xenolinguistic => Self {
+            Species::Unknown => Self {
                 similarity_threshold: 0.55,
                 min_instances: 2,
                 max_units: 500,
@@ -655,7 +656,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Species::Avian => BIRD,
             Species::Primate => MONKEY,
             Species::Human => EAR,
-            Species::Xenolinguistic => ALIEN,
+            Species::Unknown => ALIEN,
         };
 
         println!("  {}Species profile: {:?}", species_emoji, cli.species);
@@ -885,7 +886,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("    Longer calls may be territorial or mating");
                 println!("    Context (visual log) is crucial for meaning");
             }
-            Species::Xenolinguistic => {
+            Species::Unknown => {
                 println!("  {}Interpretation hint:", DNA);
                 println!("    Unknown signal structure - no prior assumptions");
                 println!("    Look for repeated patterns and transitions");

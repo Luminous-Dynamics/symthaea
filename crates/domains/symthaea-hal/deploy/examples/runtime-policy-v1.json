@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "deployment_id": "robot-01",
+  "policy_generation": 1,
+  "authority_epoch": 1,
+  "previous_policy_digest": null,
+  "maximum_command_queue_dwell_ms": 25,
+  "command_rate_window_ms": 1000,
+  "maximum_commands_per_window": 500,
+  "maximum_command_sequence_jump": 10000,
+  "maximum_presence_absences": 1,
+  "maximum_sensor_age_ms": 50,
+  "watchdog_timeout_ms": 100,
+  "maximum_monotonic_gap_ms": 250,
+  "required_supervisor_successes": 2,
+  "reason": "production baseline; seal with hal authority tooling",
+  "policy_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+}

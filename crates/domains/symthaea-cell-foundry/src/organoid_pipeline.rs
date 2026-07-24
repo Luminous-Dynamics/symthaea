@@ -141,8 +141,10 @@ pub struct OrganoidPipeline {
 impl OrganoidPipeline {
     /// Create a new pipeline from the given configuration.
     pub fn new(config: OrganoidPipelineConfig) -> Self {
-        let digital = DigitalOrganoid::new(config.initial_cells, config.seed);
-        let morphogenetic = NeuralOrganoid::new(config.initial_cells, config.seed);
+        let digital =
+            DigitalOrganoid::with_max_cells(config.initial_cells, config.max_cells, config.seed);
+        let morphogenetic =
+            NeuralOrganoid::with_max_cells(config.initial_cells, config.max_cells, config.seed);
         Self {
             config,
             digital,
@@ -172,8 +174,10 @@ impl OrganoidPipeline {
             return None;
         }
 
-        // Advance the morphogenetic model (Direction E).
-        self.morphogenetic.advance_day();
+        // Advance the morphogenetic model (Direction E) at the configured
+        // reaction-diffusion temporal resolution.
+        self.morphogenetic
+            .advance_day_with_substeps(self.config.morphogenetic_steps_per_day);
 
         // Advance the digital organoid model (Direction K).
         let metrics = match self.digital.advance_day() {
@@ -187,7 +191,7 @@ impl OrganoidPipeline {
 
         // Compute the LFP if enabled.
         let lfp = if self.config.enable_lfp_recording {
-            Some(self.digital.generate_lfp())
+            Some(self.digital.generate_spatial_electrode_snapshot())
         } else {
             None
         };
@@ -197,7 +201,7 @@ impl OrganoidPipeline {
         // with the cell_count also sourced from the digital organoid.
         let neuron_fraction = metrics.neural_fraction;
 
-        let phi = metrics.phi_estimate;
+        let phi = metrics.network_integration_proxy();
         if phi > self.peak_phi {
             self.peak_phi = phi;
         }
@@ -219,13 +223,13 @@ impl OrganoidPipeline {
         if phi >= self.config.ethics_phi_threshold {
             self.halted = true;
             self.halt_reason = Some(format!(
-                "Phi ({:.4}) exceeded ethics threshold ({:.4}) on day {}",
+                "Network integration proxy ({:.4}) exceeded ethics threshold ({:.4}) on day {}",
                 phi,
                 self.config.ethics_phi_threshold,
                 self.digital.day()
             ));
             self.digital.terminate(&format!(
-                "Ethics halt: Phi {:.4} >= {:.4}",
+                "Ethics halt: integration proxy {:.4} >= {:.4}",
                 phi, self.config.ethics_phi_threshold
             ));
         }
@@ -238,7 +242,7 @@ impl OrganoidPipeline {
         self.digital.stage()
     }
 
-    /// Get the current Phi estimate from the digital organoid.
+    /// Get the current network integration proxy from the digital organoid.
     pub fn current_phi(&self) -> f64 {
         self.digital.phi_history().last().copied().unwrap_or(0.0)
     }
@@ -253,17 +257,36 @@ impl OrganoidPipeline {
         &self.day_snapshots
     }
 
-    /// Generate a consciousness emergence curve: (day, phi) pairs.
-    pub fn phi_curve(&self) -> Vec<(u32, f64)> {
+    /// Generate the graph/activity/maturity integration-proxy curve.
+    pub fn integration_proxy_curve(&self) -> Vec<(u32, f64)> {
         self.day_snapshots.iter().map(|s| (s.day, s.phi)).collect()
     }
 
-    /// Find the first day when Phi exceeded the given threshold.
-    pub fn consciousness_onset_day(&self, threshold: f64) -> Option<u32> {
+    /// Historical compatibility wrapper for [`Self::integration_proxy_curve`].
+    #[deprecated(
+        since = "0.1.0",
+        note = "the value is a network integration proxy, not IIT Phi"
+    )]
+    pub fn phi_curve(&self) -> Vec<(u32, f64)> {
+        self.integration_proxy_curve()
+    }
+
+    /// Find the first day when the integration proxy reached a threshold.
+    pub fn integration_proxy_threshold_day(&self, threshold: f64) -> Option<u32> {
         self.day_snapshots
             .iter()
             .find(|s| s.phi >= threshold)
             .map(|s| s.day)
+    }
+
+    /// Historical compatibility wrapper for
+    /// [`Self::integration_proxy_threshold_day`].
+    #[deprecated(
+        since = "0.1.0",
+        note = "threshold crossing is not evidence of consciousness onset"
+    )]
+    pub fn consciousness_onset_day(&self, threshold: f64) -> Option<u32> {
+        self.integration_proxy_threshold_day(threshold)
     }
 
     /// Get a reference to the underlying digital organoid.
@@ -413,14 +436,14 @@ mod tests {
         pipeline.run();
 
         // Onset at threshold 0.0 should be the first day with any Phi > 0.
-        let onset_zero = pipeline.consciousness_onset_day(0.0);
+        let onset_zero = pipeline.integration_proxy_threshold_day(0.0);
         // If there's any trajectory at all, day 1+ should have phi >= 0.0.
         if !pipeline.trajectory().is_empty() {
             assert!(onset_zero.is_some());
         }
 
         // Onset at impossibly high threshold should be None.
-        let onset_high = pipeline.consciousness_onset_day(999.0);
+        let onset_high = pipeline.integration_proxy_threshold_day(999.0);
         assert!(onset_high.is_none());
     }
 
@@ -490,6 +513,22 @@ mod tests {
     }
 
     #[test]
+    fn integration_proxy_api_uses_epistemically_bounded_names() {
+        let mut pipeline = OrganoidPipeline::new(OrganoidPipelineConfig {
+            initial_cells: 30,
+            target_day: 5,
+            ethics_phi_threshold: 10.0,
+            ..Default::default()
+        });
+        pipeline.run();
+        assert_eq!(
+            pipeline.integration_proxy_curve().len(),
+            pipeline.trajectory().len()
+        );
+        assert_eq!(pipeline.integration_proxy_threshold_day(999.0), None);
+    }
+
+    #[test]
     fn phi_curve_has_correct_length() {
         let config = OrganoidPipelineConfig {
             initial_cells: 30,
@@ -501,7 +540,7 @@ mod tests {
         let mut pipeline = OrganoidPipeline::new(config);
         pipeline.run();
 
-        let curve = pipeline.phi_curve();
+        let curve = pipeline.integration_proxy_curve();
         assert_eq!(curve.len(), pipeline.trajectory().len());
         // Each entry should have day > 0.
         for (day, _phi) in &curve {
@@ -526,6 +565,50 @@ mod tests {
             assert!(pipeline.is_halted());
             assert!(result.halt_reason.is_some());
         }
+    }
+
+    #[test]
+    fn max_cells_config_applies_to_both_models() {
+        let config = OrganoidPipelineConfig {
+            initial_cells: 50,
+            max_cells: 55,
+            target_day: 100,
+            seed: 2026,
+            ethics_phi_threshold: 10.0,
+            ..Default::default()
+        };
+        let mut pipeline = OrganoidPipeline::new(config);
+        let result = pipeline.run();
+        assert!(result.cell_count <= 55);
+        assert!(pipeline.morphogenetic_organoid().field.cells.len() <= 55);
+        assert_eq!(pipeline.digital_organoid().max_cells(), 55);
+        assert_eq!(pipeline.morphogenetic_organoid().field.max_cells, 55);
+    }
+
+    #[test]
+    fn morphogenetic_steps_per_day_changes_field_trajectory() {
+        let mut zero = OrganoidPipeline::new(OrganoidPipelineConfig {
+            initial_cells: 30,
+            target_day: 1,
+            seed: 909,
+            ethics_phi_threshold: 10.0,
+            morphogenetic_steps_per_day: 0,
+            ..Default::default()
+        });
+        let mut ten = OrganoidPipeline::new(OrganoidPipelineConfig {
+            initial_cells: 30,
+            target_day: 1,
+            seed: 909,
+            ethics_phi_threshold: 10.0,
+            morphogenetic_steps_per_day: 10,
+            ..Default::default()
+        });
+        zero.step();
+        ten.step();
+        assert_ne!(
+            zero.morphogenetic_organoid().field.activator,
+            ten.morphogenetic_organoid().field.activator
+        );
     }
 
     #[test]

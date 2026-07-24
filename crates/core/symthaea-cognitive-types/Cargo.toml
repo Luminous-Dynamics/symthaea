@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-cognitive-types"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Pure data types for CognitiveLoopService cycle telemetry (CycleMetadata's component structs + CycleUrgency), extracted so editing telemetry field lists doesn't force a full symthaea rebuild."
+
+[dependencies]
+serde = { workspace = true }
+symthaea-types = { path = "../symthaea-types" }
+
+[features]
+epistemic = []
+therapeutic = []
+
+[dev-dependencies]
+serde_json = { workspace = true }

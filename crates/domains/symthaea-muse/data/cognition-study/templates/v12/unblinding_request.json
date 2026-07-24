@@ -1,0 +1,18 @@
+{
+  "key_reveal_file_sha256": "REPLACE_64_HEX",
+  "unblinded_at_utc": "REPLACE_RFC3339",
+  "authorizations": [
+    {
+      "role": "EvidenceCustodian",
+      "signer_id": "REPLACE",
+      "authorization_sha256": "REPLACE_64_HEX",
+      "signed_at_utc": "REPLACE_RFC3339"
+    },
+    {
+      "role": "IndependentWitness",
+      "signer_id": "REPLACE_DISTINCT",
+      "authorization_sha256": "REPLACE_64_HEX",
+      "signed_at_utc": "REPLACE_RFC3339"
+    }
+  ]
+}

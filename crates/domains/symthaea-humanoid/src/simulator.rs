@@ -3,12 +3,124 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Physics simulator trait and implementations for humanoid.
 
-use crate::types::{HumanoidCommand, HumanoidState, NUM_ACTUATORS};
+use crate::contact::ContactFrame;
+use crate::dynamics::{ReducedOrderRigidBodyModel, RigidBodyDynamicsSnapshot};
+use crate::floating_base::{FLOATING_BASE_DOF, FloatingBaseDynamicsSnapshot};
+use crate::full_dynamics::{
+    DynamicsProvenance, FullRigidBodyDynamicsSnapshot, SpatialContactJacobian,
+};
+use crate::multi_contact::MultiContactFrame;
+use crate::terrain::TerrainSample;
+use crate::types::{
+    ActuationMode, EmbodimentCapabilities, HumanoidCommand, HumanoidState, NUM_ACTUATORS,
+};
 
-/// Trait for humanoid physics simulation backends.
+/// Trait for humanoid physics and embodiment backends.
+///
+/// `observation()` is what the policy is permitted to see. `true_state()` is
+/// privileged simulator truth for rewards, termination, and scientific
+/// evaluation. Hardware implementations may return the same estimated frame for
+/// both, but simulated sensor delay/noise must not contaminate ground truth.
 pub trait HumanoidPhysicsSimulator {
+    /// Morphology physically exposed by this backend.
+    fn morphology(&self) -> crate::morphology::HumanoidMorphology {
+        crate::morphology::HumanoidMorphology::Dmc21
+    }
+
+    /// Human-readable stable backend name for manifests and diagnostics.
+    fn backend_name(&self) -> &'static str {
+        "humanoid-backend"
+    }
+
+    /// Physical interpretation of values accepted by `step()`.
+    fn actuation_mode(&self) -> ActuationMode {
+        ActuationMode::NormalizedTorque
+    }
+
+    fn capabilities(&self) -> EmbodimentCapabilities {
+        let morphology = self.morphology();
+        EmbodimentCapabilities {
+            backend_name: self.backend_name().to_string(),
+            morphology,
+            actuator_count: morphology.num_actuators(),
+            observation_schema_id: morphology.schema_id().to_string(),
+            actuation_mode: self.actuation_mode(),
+            privileged_truth_available: true,
+            command_deadlines_enforced: false,
+        }
+    }
+
     fn step(&mut self, cmd: &HumanoidCommand, dt: f64);
+
+    /// Backward-compatible alias for the policy observation.
     fn state(&self) -> &HumanoidState;
+
+    fn observation(&self) -> &HumanoidState {
+        self.state()
+    }
+
+    fn true_state(&self) -> &HumanoidState {
+        self.state()
+    }
+
+    fn contact_frame(&self) -> ContactFrame {
+        ContactFrame::estimated_from_state(self.true_state(), 0.05)
+    }
+
+    /// Privileged multi-contact truth. Backends with hand, knee, or forearm
+    /// contacts should override this rather than encoding those contacts as
+    /// foot-force anomalies.
+    fn multi_contact_frame(&self) -> MultiContactFrame {
+        MultiContactFrame::from_feet(&self.contact_frame())
+    }
+
+    /// Dynamics linearization used by model-based whole-body control. MuJoCo
+    /// and hardware backends may override this with solver- or identification-
+    /// derived matrices. The default remains an explicitly labeled reduced model.
+    fn dynamics_snapshot(&self) -> Option<RigidBodyDynamicsSnapshot> {
+        let contacts = self.contact_frame();
+        ReducedOrderRigidBodyModel::new(self.morphology()).linearize(self.true_state(), &contacts)
+    }
+
+    /// Full mass-matrix, centroidal, and spatial-contact model. MuJoCo should
+    /// override this with solver-derived values; the default adapter is marked
+    /// reduced-order in its fidelity field.
+    fn full_dynamics_snapshot(&self) -> Option<FullRigidBodyDynamicsSnapshot> {
+        FullRigidBodyDynamicsSnapshot::from_reduced(&self.dynamics_snapshot()?)
+    }
+
+    /// Floating-base dynamics retain the six unactuated root equations. Only
+    /// solver- or identification-backed embodiments should override this.
+    fn floating_base_dynamics_snapshot(&self) -> Option<FloatingBaseDynamicsSnapshot> {
+        None
+    }
+
+    /// Independent numerical oracle for the current generalized state.  A
+    /// backend should only override this when the oracle is produced by a
+    /// genuinely separate implementation, recorded simulator build, or finite-
+    /// difference harness rather than by cloning the candidate snapshot.
+    fn floating_base_oracle_snapshot(&self) -> Option<FloatingBaseDynamicsSnapshot> {
+        None
+    }
+
+    /// Compare the live solver extraction with its independent oracle. Missing
+    /// evidence is reported as unavailable instead of being treated as a pass.
+    fn floating_base_oracle_report(
+        &self,
+        tolerances: crate::dynamics_oracle::DynamicsOracleTolerances,
+    ) -> Option<crate::dynamics_oracle::DynamicsOracleReport> {
+        let candidate = self.floating_base_dynamics_snapshot()?;
+        let oracle = self.floating_base_oracle_snapshot()?;
+        Some(crate::dynamics_oracle::compare_floating_base_dynamics(
+            &candidate, &oracle, tolerances,
+        ))
+    }
+
+    /// Privileged support-surface query for terrain-aware swing planning.
+    fn terrain_sample(&self, _world_xy_m: [f64; 2]) -> TerrainSample {
+        TerrainSample::flat()
+    }
+
     fn reset(&mut self);
     fn reset_with_perturbation(&mut self, perturbation: f64, seed: u64);
     fn apply_external_force(&mut self, force: [f64; 3]);
@@ -398,6 +510,7 @@ pub struct SimpleHumanoidSimulator {
     root_tilt: [f64; 2],
     /// Root tilt angular velocity [sagittal, coronal] (rad/s).
     root_tilt_vel: [f64; 2],
+    last_contact_forces: [[f64; 3]; 2],
 }
 
 impl SimpleHumanoidSimulator {
@@ -431,6 +544,7 @@ impl SimpleHumanoidSimulator {
             gravity_scale: 1.0,
             root_tilt: [0.0; 2],
             root_tilt_vel: [0.0; 2],
+            last_contact_forces: [[0.0; 3]; 2],
         }
     }
 
@@ -547,6 +661,14 @@ impl Default for SimpleHumanoidSimulator {
 }
 
 impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
+    fn morphology(&self) -> crate::morphology::HumanoidMorphology {
+        self.morphology
+    }
+
+    fn backend_name(&self) -> &'static str {
+        "symthaea-simple-humanoid"
+    }
+
     fn step(&mut self, cmd: &HumanoidCommand, dt: f64) {
         let cmd = if self.actuator_noise.enabled {
             self.actuator_noise.apply(cmd)
@@ -719,6 +841,7 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
         self.state.root_height += self.state.root_linear_velocity[2] * dt;
         self.state.root_height = 0.3 * self.state.root_height + 0.7 * kinematic_height;
 
+        self.last_contact_forces = [[0.0; 3]; 2];
         if self.ground_contact.enabled {
             let compliance_scale = if self.terrain.enabled {
                 1.0 - self.terrain.compliance.min(0.99)
@@ -740,11 +863,13 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
             ];
 
             let r_forces = contact.apply(r_foot_z_raw, self.state.root_linear_velocity[2], h_vel);
+            self.last_contact_forces[0] = r_forces;
             self.state.root_linear_velocity[0] += r_forces[0] / self.body.total_mass * dt;
             self.state.root_linear_velocity[1] += r_forces[1] / self.body.total_mass * dt;
             self.state.root_linear_velocity[2] += r_forces[2] / self.body.total_mass * dt;
 
             let l_forces = contact.apply(l_foot_z_raw, self.state.root_linear_velocity[2], h_vel);
+            self.last_contact_forces[1] = l_forces;
             self.state.root_linear_velocity[0] += l_forces[0] / self.body.total_mass * dt;
             self.state.root_linear_velocity[1] += l_forces[1] / self.body.total_mass * dt;
             self.state.root_linear_velocity[2] += l_forces[2] / self.body.total_mass * dt;
@@ -765,6 +890,7 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
             }
         }
 
+        self.state.root_position[2] = self.state.root_height;
         self.state.head_height = self.state.root_height
             + self.body.segment_lengths[SEG_TORSO] * 0.5 * uprightness
             + self.body.segment_lengths[SEG_HEAD] * uprightness;
@@ -841,6 +967,9 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
             (forward_accel + pushoff_accel + self.external_force[0] / self.body.total_mass) * dt;
         self.state.root_linear_velocity[1] +=
             (lateral_accel + self.external_force[1] / self.body.total_mass) * dt;
+        self.state.root_position[0] += self.state.root_linear_velocity[0] * dt;
+        self.state.root_position[1] += self.state.root_linear_velocity[1] * dt;
+        self.state.root_position[2] = self.state.root_height;
 
         let speed = (self.state.root_linear_velocity[0].powi(2)
             + self.state.root_linear_velocity[1].powi(2))
@@ -887,8 +1016,8 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
         };
         let arm_reach = self.body.segment_lengths[SEG_UPPER_ARM] * r_shoulder.sin().abs()
             + self.body.segment_lengths[SEG_FOREARM] * (r_shoulder + r_elbow).sin().abs();
-        self.state.extremities[0] = arm_reach * 0.3;
-        self.state.extremities[1] = -0.17;
+        self.state.extremities[0] = self.state.root_position[0] + arm_reach * 0.3;
+        self.state.extremities[1] = self.state.root_position[1] - 0.17;
         self.state.extremities[2] = arm_base_z - arm_reach * 0.5;
 
         let l_shoulder = if self.state.joint_angles.len() > 18 {
@@ -903,18 +1032,18 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
         };
         let l_arm_reach = self.body.segment_lengths[SEG_UPPER_ARM] * l_shoulder.sin().abs()
             + self.body.segment_lengths[SEG_FOREARM] * (l_shoulder + l_elbow).sin().abs();
-        self.state.extremities[3] = l_arm_reach * 0.3;
-        self.state.extremities[4] = 0.17;
+        self.state.extremities[3] = self.state.root_position[0] + l_arm_reach * 0.3;
+        self.state.extremities[4] = self.state.root_position[1] + 0.17;
         self.state.extremities[5] = arm_base_z - l_arm_reach * 0.5;
 
         let r_foot_z = (root_h - right_leg_len).max(0.0);
-        self.state.extremities[6] = r_hip_y.sin() * 0.1;
-        self.state.extremities[7] = -0.1;
+        self.state.extremities[6] = self.state.root_position[0] + r_hip_y.sin() * 0.1;
+        self.state.extremities[7] = self.state.root_position[1] - 0.1;
         self.state.extremities[8] = r_foot_z;
 
         let l_foot_z = (root_h - left_leg_len).max(0.0);
-        self.state.extremities[9] = l_hip_y.sin() * 0.1;
-        self.state.extremities[10] = 0.1;
+        self.state.extremities[9] = self.state.root_position[0] + l_hip_y.sin() * 0.1;
+        self.state.extremities[10] = self.state.root_position[1] + 0.1;
         self.state.extremities[11] = l_foot_z;
 
         if self.morphology.num_actuators() > 21 && self.state.extremities.len() >= 18 {
@@ -961,6 +1090,10 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
     }
 
     fn state(&self) -> &HumanoidState {
+        self.observation()
+    }
+
+    fn observation(&self) -> &HumanoidState {
         if self.observation_noise.enabled {
             &self.observed_state
         } else if self.jitter.enabled {
@@ -970,9 +1103,47 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
         }
     }
 
+    fn true_state(&self) -> &HumanoidState {
+        &self.state
+    }
+
+    fn contact_frame(&self) -> ContactFrame {
+        if self.ground_contact.enabled {
+            ContactFrame::from_ground_reaction_forces(
+                &self.state,
+                self.last_contact_forces[0],
+                self.last_contact_forces[1],
+            )
+        } else {
+            ContactFrame::estimated_from_state(&self.state, 0.05)
+        }
+    }
+
+    fn terrain_sample(&self, world_xy_m: [f64; 2]) -> TerrainSample {
+        if !self.terrain.enabled {
+            return TerrainSample::flat();
+        }
+        let tx = self.terrain.slope_x.tan();
+        let ty = self.terrain.slope_y.tan();
+        let normal_norm = (tx * tx + ty * ty + 1.0).sqrt().max(1.0e-12);
+        TerrainSample {
+            height_m: tx * world_xy_m[0] + ty * world_xy_m[1],
+            normal_world: [-tx / normal_norm, -ty / normal_norm, 1.0 / normal_norm],
+            friction: self.ground_contact.friction.max(0.0),
+            compliance: self.terrain.compliance.max(0.0),
+            confidence: 1.0,
+            height_std_m: 0.0,
+            normal_std_rad: 0.0,
+            friction_std: 0.0,
+            age_s: 0.0,
+            source: crate::terrain::TerrainEvidenceSource::SimulatorTruth,
+        }
+    }
+
     fn reset(&mut self) {
         self.state = HumanoidState::standing_for(self.morphology);
         self.external_force = [0.0; 3];
+        self.last_contact_forces = [[0.0; 3]; 2];
         self.body = self.baseline_body.clone();
         self.jitter.reset(&self.state, 0);
         self.actuator_noise.reset(0);
@@ -988,6 +1159,7 @@ impl HumanoidPhysicsSimulator for SimpleHumanoidSimulator {
     fn reset_with_perturbation(&mut self, perturbation: f64, seed: u64) {
         self.state = HumanoidState::standing_for(self.morphology);
         self.external_force = [0.0; 3];
+        self.last_contact_forces = [[0.0; 3]; 2];
 
         if self.domain_rand.enabled {
             self.body = self
@@ -1071,19 +1243,22 @@ fn normalize_quat(q: [f64; 4]) -> [f64; 4] {
 use mujoco_rs::prelude::*;
 
 #[cfg(feature = "mujoco")]
-const HUMANOID_NQ: usize = 28;
-
-#[cfg(feature = "mujoco")]
 pub struct MuJoCoHumanoidSimulator {
     model: std::sync::Arc<MjModel>,
     data: MjData<std::sync::Arc<MjModel>>,
     state: HumanoidState,
     body_ids: HumanoidBodyIds,
+    support_sites: Vec<NamedSiteId>,
     external_force: [f64; 3],
+    morphology: crate::morphology::HumanoidMorphology,
+    cached_floating_base_dynamics: Option<FloatingBaseDynamicsSnapshot>,
+    cached_full_dynamics: Option<FullRigidBodyDynamicsSnapshot>,
+    floating_base_oracle: Option<FloatingBaseDynamicsSnapshot>,
 }
 
 #[cfg(feature = "mujoco")]
 struct HumanoidBodyIds {
+    pelvis: usize,
     torso: usize,
     head: usize,
     right_hand: usize,
@@ -1093,12 +1268,27 @@ struct HumanoidBodyIds {
 }
 
 #[cfg(feature = "mujoco")]
+#[derive(Debug, Clone)]
+struct NamedSiteId {
+    name: String,
+    id: usize,
+}
+
+#[cfg(feature = "mujoco")]
 impl MuJoCoHumanoidSimulator {
     pub fn from_xml(xml: &str) -> anyhow::Result<Self> {
+        Self::from_xml_for_morphology(xml, crate::morphology::HumanoidMorphology::Dmc21)
+    }
+
+    pub fn from_xml_for_morphology(
+        xml: &str,
+        morphology: crate::morphology::HumanoidMorphology,
+    ) -> anyhow::Result<Self> {
         let model = std::sync::Arc::new(MjModel::from_xml_string(xml)?);
         let data = MjData::new(std::sync::Arc::clone(&model));
 
         let body_ids = HumanoidBodyIds {
+            pelvis: Self::find_body_id(&model, "pelvis"),
             torso: Self::find_body_id(&model, "torso"),
             head: Self::find_body_id(&model, "head"),
             right_hand: Self::find_body_id_or(&model, "right_hand", 3),
@@ -1107,16 +1297,56 @@ impl MuJoCoHumanoidSimulator {
             left_foot: Self::find_body_id_or(&model, "left_foot", 6),
         };
 
-        let state = HumanoidState::standing();
+        let expected_nq = 7 + morphology.num_actuators();
+        let expected_nv = 6 + morphology.num_actuators();
+        let actual_nq = model.ffi().nq as usize;
+        let actual_nv = model.ffi().nv as usize;
+        if actual_nq != expected_nq || actual_nv != expected_nv {
+            anyhow::bail!(
+                "MuJoCo model dimensions do not match {:?}: nq={} (expected {}), nv={} (expected {})",
+                morphology,
+                actual_nq,
+                expected_nq,
+                actual_nv,
+                expected_nv,
+            );
+        }
+
+        let support_sites = [
+            "r_foot_site",
+            "l_foot_site",
+            "r_hand_site",
+            "l_hand_site",
+            "r_knee_site",
+            "l_knee_site",
+            "r_forearm_site",
+            "l_forearm_site",
+        ]
+        .into_iter()
+        .filter_map(|name| {
+            Self::find_site_id(&model, name).map(|id| NamedSiteId {
+                name: name.to_string(),
+                id,
+            })
+        })
+        .collect();
+
+        let state = HumanoidState::standing_for(morphology);
         let mut sim = Self {
             model,
             data,
             state,
             body_ids,
+            support_sites,
             external_force: [0.0; 3],
+            morphology,
+            cached_floating_base_dynamics: None,
+            cached_full_dynamics: None,
+            floating_base_oracle: None,
         };
         sim.data.forward();
         sim.extract_state();
+        sim.refresh_dynamics_cache();
         Ok(sim)
     }
 
@@ -1135,7 +1365,7 @@ impl MuJoCoHumanoidSimulator {
         morphology: crate::morphology::HumanoidMorphology,
     ) -> anyhow::Result<Self> {
         let xml = morphology.to_mjcf();
-        Self::from_xml(&xml)
+        Self::from_xml_for_morphology(&xml, morphology)
     }
 
     fn find_body_id(model: &MjModel, name: &str) -> usize {
@@ -1147,6 +1377,11 @@ impl MuJoCoHumanoidSimulator {
     fn find_body_id_or(model: &MjModel, name: &str, fallback: usize) -> usize {
         let id = model.name_to_id(MjtObj::mjOBJ_BODY, name);
         if id >= 0 { id as usize } else { fallback }
+    }
+
+    fn find_site_id(model: &MjModel, name: &str) -> Option<usize> {
+        let id = model.name_to_id(MjtObj::mjOBJ_SITE, name);
+        (id >= 0).then_some(id as usize)
     }
 
     fn extract_state(&mut self) {
@@ -1164,9 +1399,25 @@ impl MuJoCoHumanoidSimulator {
         let lh = xpos[self.body_ids.left_hand];
         let rf = xpos[self.body_ids.right_foot];
         let lf = xpos[self.body_ids.left_foot];
-        let extremities = [
+        let mut extremities = vec![
             rh[0], rh[1], rh[2], lh[0], lh[1], lh[2], rf[0], rf[1], rf[2], lf[0], lf[1], lf[2],
         ];
+
+        if self.morphology.num_extremity_channels() >= 18 {
+            let joint_angles = &qpos[7..7 + self.morphology.num_actuators()];
+            let right = crate::morphology::compute_hand_centroid(
+                [rh[0], rh[1], rh[2]],
+                joint_angles.get(21..37).unwrap_or(&[]),
+                [1.0, 0.0, 0.0],
+            );
+            let left = crate::morphology::compute_hand_centroid(
+                [lh[0], lh[1], lh[2]],
+                joint_angles.get(37..53).unwrap_or(&[]),
+                [1.0, 0.0, 0.0],
+            );
+            extremities.extend_from_slice(&right);
+            extremities.extend_from_slice(&left);
+        }
 
         let com_velocity = [qvel[0], qvel[1], qvel[2]];
 
@@ -1179,6 +1430,135 @@ impl MuJoCoHumanoidSimulator {
             com_velocity,
             t,
         );
+    }
+
+    fn refresh_dynamics_cache(&mut self) {
+        self.cached_floating_base_dynamics = self.extract_floating_base_dynamics();
+        self.cached_full_dynamics = self
+            .cached_floating_base_dynamics
+            .as_ref()
+            .and_then(FloatingBaseDynamicsSnapshot::actuated_projection);
+    }
+
+    fn extract_floating_base_dynamics(&mut self) -> Option<FloatingBaseDynamicsSnapshot> {
+        let nv = self.model.ffi().nv as usize;
+        let expected_nv = FLOATING_BASE_DOF + self.morphology.num_actuators();
+        if nv != expected_nv {
+            return None;
+        }
+
+        let mut mass_matrix = vec![0.0f64; nv * nv];
+        // MuJoCo stores the articulated inertia in sparse qM form. mj_fullM is
+        // the authoritative expansion at the current generalized position.
+        unsafe {
+            mujoco_rs::mujoco_c::mj_fullM(
+                self.model.ffi(),
+                self.data.ffi(),
+                mass_matrix.as_mut_ptr(),
+            );
+        }
+        let bias_force =
+            unsafe { std::slice::from_raw_parts(self.data.ffi().qfrc_bias, nv).to_vec() };
+
+        let total_mass_kg = self.model.body_mass().iter().copied().sum::<f64>();
+        let gravity_world_mps2 = self.model.ffi().opt.gravity;
+        let subtree_com_jacobian = self.data.jac_subtree_com(self.body_ids.pelvis);
+        let angular_momentum_matrix = self.data.angmom_mat(self.body_ids.pelvis);
+        if subtree_com_jacobian.len() != 3 * nv || angular_momentum_matrix.len() != 3 * nv {
+            return None;
+        }
+        let mut centroidal_momentum_matrix = vec![0.0; 6 * nv];
+        centroidal_momentum_matrix[..3 * nv].copy_from_slice(&angular_momentum_matrix);
+        for index in 0..3 * nv {
+            centroidal_momentum_matrix[3 * nv + index] =
+                total_mass_kg * subtree_com_jacobian[index];
+        }
+
+        let contacts = self
+            .support_sites
+            .iter()
+            .filter_map(|site| {
+                let (linear, angular) = self.data.jac_site(true, true, site.id);
+                if linear.len() != 3 * nv || angular.len() != 3 * nv {
+                    return None;
+                }
+                Some(SpatialContactJacobian {
+                    site_id: site.name.clone(),
+                    rows: std::array::from_fn(|row| {
+                        let source = if row < 3 { &angular } else { &linear };
+                        let source_row = row % 3;
+                        source[source_row * nv..(source_row + 1) * nv].to_vec()
+                    }),
+                    confidence: 1.0,
+                })
+            })
+            .collect::<Vec<_>>();
+        if contacts.len() < 2 {
+            return None;
+        }
+
+        let snapshot = FloatingBaseDynamicsSnapshot {
+            morphology: self.morphology,
+            sampled_at_s: self.data.time(),
+            total_mass_kg,
+            gravity_world_mps2,
+            generalized_velocity_count: nv,
+            mass_matrix,
+            bias_force,
+            actuator_velocity_indices: (FLOATING_BASE_DOF..nv).collect(),
+            torque_limits_nm: self.morphology.joint_torque_scales(),
+            centroidal_momentum_matrix,
+            contacts,
+            provenance: DynamicsProvenance::mujoco_solver_with_morphology_limits(),
+            model_id: format!(
+                "mujoco-solver:{}:nv{}:floating-base-v1",
+                self.morphology.schema_id(),
+                nv
+            ),
+        };
+        snapshot.validate().then_some(snapshot)
+    }
+
+    /// Install an independently produced dynamics oracle for numerical
+    /// comparisons at the current generalized-coordinate ordering. Recorded
+    /// oracles should come from a separate MuJoCo build, finite-difference
+    /// harness, or another rigid-body engine rather than this extractor.
+    pub fn install_floating_base_oracle(
+        &mut self,
+        oracle: FloatingBaseDynamicsSnapshot,
+    ) -> anyhow::Result<()> {
+        if !oracle.validate() {
+            anyhow::bail!("floating-base oracle failed structural validation");
+        }
+        if oracle.morphology != self.morphology
+            || oracle.generalized_velocity_count != self.model.ffi().nv as usize
+        {
+            anyhow::bail!(
+                "floating-base oracle does not match {:?} generalized coordinates",
+                self.morphology
+            );
+        }
+        if let Some(candidate) = self.cached_floating_base_dynamics.as_ref() {
+            let candidate_sites = candidate
+                .contacts
+                .iter()
+                .map(|contact| contact.site_id.as_str())
+                .collect::<Vec<_>>();
+            let oracle_sites = oracle
+                .contacts
+                .iter()
+                .map(|contact| contact.site_id.as_str())
+                .collect::<Vec<_>>();
+            if candidate_sites != oracle_sites {
+                anyhow::bail!("floating-base oracle contact-site ordering differs");
+            }
+        }
+        self.floating_base_oracle = Some(oracle);
+        Ok(())
+    }
+
+    pub fn clear_floating_base_oracle(&mut self) {
+        self.floating_base_oracle = None;
     }
 
     pub fn body_mass(&self) -> f64 {
@@ -1215,26 +1595,106 @@ impl MuJoCoHumanoidSimulator {
     pub fn data_mut(&mut self) -> &mut MjData<std::sync::Arc<MjModel>> {
         &mut self.data
     }
+
+    /// Install an exact generalized state for independently generated oracle
+    /// snapshots. The free-joint quaternion must already be normalized; this
+    /// method never silently repairs malformed oracle inputs.
+    pub fn set_generalized_state(
+        &mut self,
+        generalized_position: &[f64],
+        generalized_velocity: &[f64],
+    ) -> anyhow::Result<()> {
+        let expected_nq = self.model.ffi().nq as usize;
+        let expected_nv = self.model.ffi().nv as usize;
+        if generalized_position.len() != expected_nq
+            || generalized_velocity.len() != expected_nv
+            || generalized_position.iter().any(|value| !value.is_finite())
+            || generalized_velocity.iter().any(|value| !value.is_finite())
+        {
+            anyhow::bail!(
+                "invalid MuJoCo generalized state: nq={} (expected {}), nv={} (expected {})",
+                generalized_position.len(),
+                expected_nq,
+                generalized_velocity.len(),
+                expected_nv,
+            );
+        }
+        let quaternion_norm_squared = generalized_position[3..7]
+            .iter()
+            .map(|value| value * value)
+            .sum::<f64>();
+        if (quaternion_norm_squared - 1.0).abs() > 1.0e-6 {
+            anyhow::bail!("MuJoCo free-joint quaternion is not unit normalized");
+        }
+        self.data.qpos_mut().copy_from_slice(generalized_position);
+        self.data.qvel_mut().copy_from_slice(generalized_velocity);
+        self.data.forward();
+        self.extract_state();
+        self.refresh_dynamics_cache();
+        Ok(())
+    }
 }
 
 #[cfg(feature = "mujoco")]
 impl HumanoidPhysicsSimulator for MuJoCoHumanoidSimulator {
+    fn morphology(&self) -> crate::morphology::HumanoidMorphology {
+        self.morphology
+    }
+
+    fn backend_name(&self) -> &'static str {
+        "mujoco-humanoid"
+    }
+
+    fn actuation_mode(&self) -> ActuationMode {
+        // Both the bundled model and generated morphology MJCF use MuJoCo
+        // position actuators. Values written to ctrl are radians, not torque.
+        ActuationMode::PositionTargetRadians
+    }
+
     fn step(&mut self, cmd: &HumanoidCommand, _dt: f64) {
         self.write_ctrl(cmd);
         self.apply_xfrc();
         self.data.step();
         self.extract_state();
+        self.refresh_dynamics_cache();
         self.clear_xfrc();
     }
 
     fn state(&self) -> &HumanoidState {
         &self.state
     }
+
+    fn full_dynamics_snapshot(&self) -> Option<FullRigidBodyDynamicsSnapshot> {
+        self.cached_full_dynamics.clone()
+    }
+
+    fn floating_base_dynamics_snapshot(&self) -> Option<FloatingBaseDynamicsSnapshot> {
+        self.cached_floating_base_dynamics.clone()
+    }
+
+    fn floating_base_oracle_snapshot(&self) -> Option<FloatingBaseDynamicsSnapshot> {
+        self.floating_base_oracle.clone()
+    }
+
+    fn contact_frame(&self) -> ContactFrame {
+        let wrenches = self.data.cfrc_ext();
+        let right = wrenches
+            .get(self.body_ids.right_foot)
+            .copied()
+            .unwrap_or([0.0; 6]);
+        let left = wrenches
+            .get(self.body_ids.left_foot)
+            .copied()
+            .unwrap_or([0.0; 6]);
+        ContactFrame::from_solver_wrenches(&self.state, right, left)
+    }
+
     fn reset(&mut self) {
         self.data.reset();
         self.data.forward();
         self.external_force = [0.0; 3];
         self.extract_state();
+        self.refresh_dynamics_cache();
     }
 
     fn reset_with_perturbation(&mut self, perturbation: f64, seed: u64) {
@@ -1250,11 +1710,13 @@ impl HumanoidPhysicsSimulator for MuJoCoHumanoidSimulator {
         };
 
         let qpos = self.data.qpos_mut();
-        for i in 7..HUMANOID_NQ {
-            qpos[i] += perturbation * next_f64() * 0.05;
+        let nq = 7 + self.morphology.num_actuators();
+        for value in qpos.iter_mut().take(nq).skip(7) {
+            *value += perturbation * next_f64() * 0.05;
         }
         self.data.forward();
         self.extract_state();
+        self.refresh_dynamics_cache();
     }
 
     fn apply_external_force(&mut self, force: [f64; 3]) {
@@ -1390,6 +1852,38 @@ mod tests {
             "corrective ankle torque must reduce tilt: active {:.3} vs passive {:.3}",
             active.root_tilt()[0],
             passive.root_tilt()[0]
+        );
+    }
+
+    #[cfg(feature = "mujoco")]
+    #[test]
+    fn generated_mujoco_exposes_solver_derived_floating_base_dynamics() {
+        let morphology = crate::morphology::HumanoidMorphology::Dmc21;
+        let sim = MuJoCoHumanoidSimulator::for_morphology(morphology).unwrap();
+        let floating = sim.floating_base_dynamics_snapshot().unwrap();
+        assert!(floating.validate());
+        assert_eq!(
+            floating.generalized_velocity_count,
+            crate::floating_base::FLOATING_BASE_DOF + morphology.num_actuators()
+        );
+        assert!(floating.contacts.len() >= 8);
+        assert!(
+            floating
+                .contacts
+                .iter()
+                .any(|contact| contact.site_id == "r_foot_site")
+        );
+        assert!(
+            floating
+                .contacts
+                .iter()
+                .any(|contact| contact.site_id == "l_hand_site")
+        );
+        let projected = sim.full_dynamics_snapshot().unwrap();
+        assert!(projected.validate());
+        assert_eq!(
+            projected.fidelity,
+            crate::full_dynamics::DynamicsFidelity::SolverDerived
         );
     }
 }

@@ -31,19 +31,18 @@
 //!   tradition formation groundwork: what persists is what scored well, not
 //!   everything.
 //!
-//! **This is NOT yet cross-agent culture.** Two things are still required
-//! for that, both deliberately *not* done in this pass:
+//! **Cross-agent culture status:**
 //!
-//! 1. **A live mesh-send call.** `ContentAnnounce::encode()`
-//!    (`src/swarm/mesh/content_packet.rs`) has zero callers anywhere in the
-//!    codebase — nothing has ever pushed a `ContentAnnounce` onto the
-//!    outbound mesh queue. The wiring pattern already exists for other
-//!    payload types — see `Mind::emit_affective()` at `src/mind/tick.rs:1209`,
-//!    which builds a `WisdomPacket`, signs it (`self.sign_mesh_packet`), and
-//!    pushes `crate::swarm::mesh::MeshOutbound { packet }` onto
-//!    `self.mesh_outbox` — but an equivalent `emit_content_announce()` does
-//!    not exist and this pass does not add one.
-//! 2. **The mesh-authentication sign-off.** Mesh packets have no real
+//! 1. **The live mesh-send call EXISTS as of 2026-07-09** (this note
+//!    previously said `ContentAnnounce::encode()` had zero callers — stale):
+//!    the creative phase in `src/cognitive_loop/cycle_phase_dynamics/mod.rs`
+//!    (feature `social-fabric`) publishes shared artifacts as
+//!    `ContentAnnounce` packets onto the mesh outbound channel; live test:
+//!    `src/cognitive_loop/tests/creative_mesh_sharing.rs`. Caveat: the
+//!    artifact's HDC "embedding" is a blake3 content-hash fingerprint, not a
+//!    semantic embedding — Hamming similarity between artifacts is noise
+//!    (see VISION_PROJECTION_REVIEW_2026-07-15.md, improvement #8).
+//! 2. **The mesh-authentication sign-off is still open.** Mesh packets have no real
 //!    peer-identity authentication today (flagged in
 //!    `symthaea_improvement_plan_july2026`, cross-session memory note).
 //!    Broadcasting self-authored art to real peers before that gap is

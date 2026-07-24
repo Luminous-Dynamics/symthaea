@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "policy_id": "production-post-compromise-v1",
+  "maximum_containment_time_ms": 300000,
+  "maximum_authority_recovery_time_ms": 3600000,
+  "maximum_device_rejoin_time_ms": 86400000,
+  "maximum_evidence_loss_window_ms": 1000,
+  "require_zero_unaccounted_commands": true
+}

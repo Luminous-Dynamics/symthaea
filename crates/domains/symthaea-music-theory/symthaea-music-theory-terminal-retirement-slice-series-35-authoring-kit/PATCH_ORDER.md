@@ -1,0 +1,34 @@
+# Series 35 patch order
+
+1. `0001-audit-freeze-terminal-retirement-scenario.patch-plan.md`
+2. `0002-test-add-qualified-active-lineage-baseline.patch-plan.md`
+3. `0003-refactor-add-terminal-retirement-identities.patch-plan.md`
+4. `0004-feat-add-verifier-owned-trust-exhaustion-policy.patch-plan.md`
+5. `0005-feat-implement-trust-exhaustion-report.patch-plan.md`
+6. `0006-feat-implement-terminal-retirement-plan.patch-plan.md`
+7. `0007-feat-add-multi-role-retirement-statements.patch-plan.md`
+8. `0008-feat-implement-multi-role-retirement-authorization.patch-plan.md`
+9. `0009-feat-implement-planned-and-committed-retirement-receipts.patch-plan.md`
+10. `0010-refactor-extend-transition-gate-for-retirement.patch-plan.md`
+11. `0011-feat-extend-reference-store-for-terminal-transition.patch-plan.md`
+12. `0012-feat-commit-terminal-retirement-atomically.patch-plan.md`
+13. `0013-security-terminally-revoke-all-delegations-and-allowances.patch-plan.md`
+14. `0014-security-freeze-authority-and-witness-rotation.patch-plan.md`
+15. `0015-security-block-every-authoritative-mutation-path.patch-plan.md`
+16. `0016-feat-implement-archive-only-operating-mode.patch-plan.md`
+17. `0017-feat-implement-terminal-catalog-checkpoint.patch-plan.md`
+18. `0018-feat-implement-archive-custody-ledger.patch-plan.md`
+19. `0019-feat-implement-successor-handoff-with-discontinuity.patch-plan.md`
+20. `0020-feat-implement-public-retirement-disclosure-package.patch-plan.md`
+21. `0021-feat-add-terminal-observer-statements.patch-plan.md`
+22. `0022-feat-register-terminal-retirement-schema-prefix.patch-plan.md`
+23. `0023-feat-add-shell-free-external-verifier-retirement-roles.patch-plan.md`
+24. `0024-feat-add-trust-exhaustion-and-retirement-plan-cli.patch-plan.md`
+25. `0025-feat-add-terminal-retirement-and-archive-cli.patch-plan.md`
+26. `0026-test-run-positive-active-lineage-to-archive-only.patch-plan.md`
+27. `0027-test-run-retirement-policy-replay-and-staleness-corpus.patch-plan.md`
+28. `0028-test-run-retirement-race-crash-and-post-blocking-matrix.patch-plan.md`
+29. `0029-test-run-archive-successor-privacy-and-observer-corpus.patch-plan.md`
+30. `0030-feat-freeze-independent-terminal-retirement-vectors.patch-plan.md`
+31. `0031-ci-add-terminal-retirement-qualification-lanes.patch-plan.md`
+32. `0032-docs-publish-series-35-terminal-retirement-report.patch-plan.md`

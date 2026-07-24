@@ -8,6 +8,8 @@
 //! (nearest_peer_distance, peer_relative_speed, mesh_brake_density, mesh_confidence)
 //! in the ego vehicle's body frame.
 
+use std::collections::VecDeque;
+
 use crate::road::Road;
 use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
 use crate::types::{MeshSignal, VehicleCommand, VehicleState, pd_cruise_baseline_with_road};
@@ -23,7 +25,9 @@ pub struct SwarmConfig {
     pub road: Road,
     /// Target cruising speed (m/s).
     pub target_speed: f64,
-    /// Simulated mesh radio latency (s). Currently informational.
+    /// Simulated mesh radio latency (s). Physically enforced: the ego sees
+    /// each peer's broadcast state from `mesh_latency` seconds ago, not its
+    /// live state (V2V was previously omniscient/instant).
     pub mesh_latency: f64,
     /// Confidence decay rate per meter of distance.
     pub confidence_decay_per_meter: f64,
@@ -63,12 +67,34 @@ pub struct PeerVehicle {
     pub id: u64,
     /// Whether this peer is currently hard-braking (scenario trigger).
     pub is_braking: bool,
+    /// Ring of (sim_time, state) broadcast snapshots — what the radio has
+    /// sent so far. The ego reads from this with `mesh_latency` delay.
+    history: VecDeque<(f64, VehicleState)>,
+}
+
+impl PeerVehicle {
+    /// The peer state as seen over the mesh at `now`: the newest snapshot
+    /// that is at least `latency` old. Before any snapshot is old enough
+    /// (start-up), the oldest available one is used — a radio that has
+    /// broadcast anything reports its earliest frame, never the live state.
+    fn broadcast_state(&self, now: f64, latency: f64) -> &VehicleState {
+        let cutoff = now - latency;
+        self.history
+            .iter()
+            .rev()
+            .find(|(t, _)| *t <= cutoff)
+            .or_else(|| self.history.front())
+            .map(|(_, s)| s)
+            .unwrap_or_else(|| self.sim.state())
+    }
 }
 
 /// Swarm simulator managing N peer vehicles.
 pub struct SwarmSimulator {
     config: SwarmConfig,
     peers: Vec<PeerVehicle>,
+    /// Accumulated simulation time (s) — drives the latency buffer.
+    sim_time: f64,
 }
 
 impl SwarmSimulator {
@@ -82,14 +108,24 @@ impl SwarmSimulator {
             let s = (i as f64 + 1.0) * config.initial_spacing;
             let (x, y, heading) = config.road.position_at(s);
             sim.set_position(x, y, heading);
+            // Seed the broadcast history with the initial state so the
+            // mesh is never empty at t=0.
+            let initial = sim.state().clone();
+            let mut history = VecDeque::new();
+            history.push_back((0.0, initial));
             peers.push(PeerVehicle {
                 sim,
                 id: i as u64 + 1,
                 is_braking: false,
+                history,
             });
         }
 
-        Self { config, peers }
+        Self {
+            config,
+            peers,
+            sim_time: 0.0,
+        }
     }
 
     /// Number of peers.
@@ -119,6 +155,22 @@ impl SwarmSimulator {
 
             peer.sim.step(&cmd, dt);
         }
+
+        // Record this step's broadcasts and drop frames nobody can still
+        // receive (older than the latency window, plus one frame of slack).
+        self.sim_time += dt;
+        let prune_before = self.sim_time - self.config.mesh_latency - 2.0 * dt;
+        for peer in &mut self.peers {
+            peer.history
+                .push_back((self.sim_time, peer.sim.state().clone()));
+            while peer
+                .history
+                .front()
+                .is_some_and(|(t, _)| *t < prune_before && peer.history.len() > 1)
+            {
+                peer.history.pop_front();
+            }
+        }
     }
 
     /// Force a peer to start hard-braking (for scenario testing).
@@ -136,11 +188,14 @@ impl SwarmSimulator {
     }
 
     /// Compute mesh signals from all peers relative to the ego vehicle.
+    ///
+    /// Peer states are read through the latency buffer — the ego sees each
+    /// peer's broadcast from `mesh_latency` seconds ago, not its live state.
     pub fn mesh_signals(&self, ego_state: &VehicleState) -> Vec<MeshSignal> {
         self.peers
             .iter()
             .map(|peer| {
-                let ps = peer.sim.state();
+                let ps = peer.broadcast_state(self.sim_time, self.config.mesh_latency);
                 let dx = ps.position_x - ego_state.position_x;
                 let dy = ps.position_y - ego_state.position_y;
                 let dist = (dx * dx + dy * dy).sqrt();
@@ -285,6 +340,63 @@ mod tests {
             ego.mesh_brake_density > 0.4,
             "Should have ~50% braking: {}",
             ego.mesh_brake_density
+        );
+    }
+
+    #[test]
+    fn test_mesh_latency_delays_brake_propagation() {
+        // A peer that starts braking must NOT be visible as braking over
+        // the mesh until mesh_latency has elapsed — V2V used to read live
+        // peer state (omniscient/instant).
+        let mut config = SwarmConfig::convoy_straight(1);
+        config.mesh_latency = 0.5;
+        let mut swarm = SwarmSimulator::new(config);
+        let ego = VehicleState::cruising(13.4);
+        let dt = 0.005;
+
+        // Build some pre-braking history.
+        for _ in 0..10 {
+            swarm.step(dt);
+        }
+        swarm.trigger_lead_brake(0);
+        // 0.05 s after braking starts: live state brakes, mesh must not
+        // see it yet (delayed view is 0.5 s old).
+        for _ in 0..10 {
+            swarm.step(dt);
+        }
+        assert!(
+            swarm.peers()[0].sim.state().brake_pressure > 0.3,
+            "precondition: live peer must actually be braking"
+        );
+        let signals = swarm.mesh_signals(&ego);
+        assert!(
+            !signals[0].peer_braking,
+            "mesh must not see the brake before mesh_latency elapses"
+        );
+
+        // 0.65 s after braking starts: the delayed view now includes it.
+        for _ in 0..120 {
+            swarm.step(dt);
+        }
+        let signals = swarm.mesh_signals(&ego);
+        assert!(
+            signals[0].peer_braking,
+            "mesh must see the brake after mesh_latency elapses"
+        );
+    }
+
+    #[test]
+    fn test_zero_mesh_latency_is_live() {
+        let mut config = SwarmConfig::convoy_straight(1);
+        config.mesh_latency = 0.0;
+        let mut swarm = SwarmSimulator::new(config);
+        let ego = VehicleState::cruising(13.4);
+        swarm.trigger_lead_brake(0);
+        swarm.step(0.005);
+        let signals = swarm.mesh_signals(&ego);
+        assert!(
+            signals[0].peer_braking,
+            "zero latency must behave like the old live read"
         );
     }
 

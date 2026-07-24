@@ -20,8 +20,8 @@ fn arb_wisdom_packet() -> impl Strategy<Value = WisdomPacket> {
         arb_urgency(),
         any::<u32>(), // timestamp_s
         arb_payload_type(),
-        any::<u8>(), // auth_mac
-        1u8..=10,    // ttl
+        any::<[u8; 32]>(), // auth_mac
+        1u8..=10,          // ttl
     )
         .prop_map(|(sid, seq, phi, urg, ts, pt, mac, ttl)| {
             let phi = if phi.is_nan() || phi.is_infinite() {

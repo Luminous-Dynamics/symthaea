@@ -14,7 +14,7 @@
 //! ```
 
 use embedded_hal::i2c::I2c;
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::error::{HalError, HalResult, i2c_error_detail};
 
@@ -28,7 +28,6 @@ mod reg {
     #[allow(dead_code)]
     pub const MODE2: u8 = 0x01;
     pub const LED0_ON_L: u8 = 0x06;
-    pub const ALL_LED_OFF_L: u8 = 0xFC;
     pub const ALL_LED_OFF_H: u8 = 0xFD;
     pub const PRE_SCALE: u8 = 0xFE;
 }
@@ -59,6 +58,8 @@ pub struct Pca9685<I> {
     address: u8,
     /// Current prescale value (determines PWM frequency).
     prescale: u8,
+    /// Whether initialization completed successfully.
+    initialized: bool,
 }
 
 impl<I: I2c> Pca9685<I> {
@@ -68,6 +69,7 @@ impl<I: I2c> Pca9685<I> {
             bus,
             address,
             prescale: 0,
+            initialized: false,
         }
     }
 
@@ -75,9 +77,26 @@ impl<I: I2c> Pca9685<I> {
     ///
     /// Standard servo frequency is 50 Hz. Call this before setting any channels.
     pub fn init(&mut self, frequency_hz: f64) -> HalResult<()> {
-        // Calculate prescale: prescale = round(osc_clock / (4096 * freq)) - 1
-        let prescale_val = ((OSC_CLOCK / (4096.0 * frequency_hz)).round() as u8).saturating_sub(1);
-        self.prescale = prescale_val;
+        if !frequency_hz.is_finite() || frequency_hz <= 0.0 {
+            return Err(HalError::Pca9685 {
+                address: self.address,
+                detail: format!("invalid PWM frequency: {frequency_hz}"),
+            });
+        }
+
+        // Calculate prescale: prescale = round(osc_clock / (4096 * freq)) - 1.
+        // The PCA9685 datasheet permits prescale values 3..=255.
+        let prescale_f = (OSC_CLOCK / (4096.0 * frequency_hz)).round() - 1.0;
+        if !(3.0..=255.0).contains(&prescale_f) {
+            return Err(HalError::Pca9685 {
+                address: self.address,
+                detail: format!(
+                    "PWM frequency {frequency_hz} Hz produces invalid prescale {prescale_f}"
+                ),
+            });
+        }
+        let prescale_val = prescale_f as u8;
+        self.initialized = false;
 
         debug!(
             address = format!("0x{:02X}", self.address),
@@ -103,15 +122,24 @@ impl<I: I2c> Pca9685<I> {
         // 5. Restart
         self.write_reg(reg::MODE1, mode1::AI | mode1::RESTART)?;
 
+        self.prescale = prescale_val;
+        self.initialized = true;
         Ok(())
     }
 
     /// Set a single channel's PWM on/off counts (12-bit each, 0–4095).
     pub fn set_channel(&mut self, channel: u8, on: u16, off: u16) -> HalResult<()> {
+        self.require_initialized()?;
         if channel >= CHANNELS as u8 {
             return Err(HalError::Pca9685 {
                 address: self.address,
                 detail: format!("channel {} out of range (0–15)", channel),
+            });
+        }
+        if on > 0x0FFF || off > 0x0FFF {
+            return Err(HalError::Pca9685 {
+                address: self.address,
+                detail: format!("PWM counts must be 12-bit values: on={on}, off={off}"),
             });
         }
 
@@ -130,29 +158,56 @@ impl<I: I2c> Pca9685<I> {
     ///
     /// Converts µs → 12-bit count based on the current frequency.
     pub fn set_pulse_us(&mut self, channel: u8, pulse_us: u16) -> HalResult<()> {
-        let period_us = self.period_us();
-        let count = ((pulse_us as f64 / period_us) * 4096.0).round() as u16;
-        let count = count.min(4095);
+        self.require_initialized()?;
+        if channel >= CHANNELS as u8 {
+            return Err(HalError::Pca9685 {
+                address: self.address,
+                detail: format!("channel {} out of range (0–15)", channel),
+            });
+        }
+        let count = self.pulse_to_count(pulse_us)?;
         self.set_channel(channel, 0, count)
     }
 
     /// Batch-write pulse widths (µs) to consecutive channels starting at `first`.
     pub fn set_pulse_batch(&mut self, first: u8, pulses_us: &[u16]) -> HalResult<()> {
-        for (i, &pulse) in pulses_us.iter().enumerate() {
-            let ch = first + i as u8;
-            if ch >= CHANNELS as u8 {
-                warn!(channel = ch, "batch write skipping out-of-range channel");
-                break;
-            }
-            self.set_pulse_us(ch, pulse)?;
+        self.require_initialized()?;
+        if pulses_us.is_empty() {
+            return Ok(());
         }
-        Ok(())
+        let end = first as usize + pulses_us.len();
+        if first as usize >= CHANNELS || end > CHANNELS {
+            return Err(HalError::Pca9685 {
+                address: self.address,
+                detail: format!(
+                    "batch channels {}..{} exceed valid range 0..{}",
+                    first,
+                    end.saturating_sub(1),
+                    CHANNELS - 1
+                ),
+            });
+        }
+
+        // MODE1 auto-increment lets the entire board update in one I2C write.
+        // Stack storage avoids allocation in the control loop.
+        let mut data = [0u8; 1 + CHANNELS * 4];
+        data[0] = reg::LED0_ON_L + 4 * first;
+        for (index, &pulse_us) in pulses_us.iter().enumerate() {
+            let count = self.pulse_to_count(pulse_us)?;
+            let offset = 1 + index * 4;
+            data[offset] = 0;
+            data[offset + 1] = 0;
+            data[offset + 2] = (count & 0xFF) as u8;
+            data[offset + 3] = ((count >> 8) & 0x0F) as u8;
+        }
+        self.write_bytes(&data[..1 + pulses_us.len() * 4])
     }
 
     /// Turn all channels off (emergency / init).
     pub fn all_off(&mut self) -> HalResult<()> {
-        // Set ALL_LED_OFF_H bit 4 (full-off) for all channels.
-        self.write_bytes(&[reg::ALL_LED_OFF_L, 0x00])?;
+        // Setting ALL_LED_OFF_H bit 4 is sufficient to force every output low.
+        // Keep this as one register write so shutdown cannot be split between
+        // two I2C transactions.
         self.write_bytes(&[reg::ALL_LED_OFF_H, 0x10])?;
         debug!(
             address = format!("0x{:02X}", self.address),
@@ -184,6 +239,7 @@ impl<I: I2c> Pca9685<I> {
     ///
     /// This is a diagnostic operation (I2C read per channel), not for per-tick use.
     pub fn read_channel(&mut self, channel: u8) -> HalResult<(u16, u16)> {
+        self.require_initialized()?;
         if channel >= CHANNELS as u8 {
             return Err(HalError::Pca9685 {
                 address: self.address,
@@ -209,6 +265,37 @@ impl<I: I2c> Pca9685<I> {
     }
 
     // ── Internal helpers ─────────────────────────────────────────────
+
+    fn require_initialized(&self) -> HalResult<()> {
+        if self.initialized {
+            Ok(())
+        } else {
+            Err(HalError::Pca9685 {
+                address: self.address,
+                detail: "device must be initialized before channel writes".to_string(),
+            })
+        }
+    }
+
+    fn pulse_to_count(&self, pulse_us: u16) -> HalResult<u16> {
+        let period_us = self.period_us();
+        if pulse_us == 0 || pulse_us as f64 >= period_us {
+            return Err(HalError::Pca9685 {
+                address: self.address,
+                detail: format!(
+                    "pulse width {pulse_us} µs must be positive and less than period {period_us:.1} µs"
+                ),
+            });
+        }
+        let count = ((pulse_us as f64 / period_us) * 4096.0).round();
+        if count >= 4096.0 {
+            return Err(HalError::Pca9685 {
+                address: self.address,
+                detail: format!("pulse width {pulse_us} µs rounds to full-period PWM"),
+            });
+        }
+        Ok(count as u16)
+    }
 
     fn write_reg(&mut self, reg: u8, value: u8) -> HalResult<()> {
         self.write_bytes(&[reg, value])
@@ -256,10 +343,25 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_frequency_rejected() {
+        let mut pca = Pca9685::new(MockI2cBus::new(), 0x40);
+        assert!(pca.init(f64::NAN).is_err());
+        assert!(pca.init(0.0).is_err());
+        assert!(pca.init(100_000.0).is_err());
+    }
+
+    #[test]
+    fn test_channel_write_requires_initialization() {
+        let mut pca = Pca9685::new(MockI2cBus::new(), 0x40);
+        assert!(pca.set_pulse_us(0, 1500).is_err());
+    }
+
+    #[test]
     fn test_set_channel_records_write() {
         let bus = MockI2cBus::new();
         let mut pca = Pca9685::new(bus, 0x40);
         pca.prescale = 121; // pretend initialized
+        pca.initialized = true;
 
         pca.set_channel(0, 0, 307).unwrap();
 
@@ -272,8 +374,20 @@ mod tests {
     fn test_set_channel_out_of_range() {
         let bus = MockI2cBus::new();
         let mut pca = Pca9685::new(bus, 0x40);
+        pca.prescale = 121;
+        pca.initialized = true;
         let result = pca.set_channel(16, 0, 100);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_set_channel_rejects_non_12_bit_counts() {
+        let mut pca = Pca9685::new(MockI2cBus::new(), 0x40);
+        pca.prescale = 121;
+        pca.initialized = true;
+        assert!(pca.set_channel(0, 4096, 0).is_err());
+        assert!(pca.set_channel(0, 0, 4096).is_err());
+        assert_eq!(pca.bus.transaction_count(), 0);
     }
 
     #[test]
@@ -281,6 +395,7 @@ mod tests {
         let bus = MockI2cBus::new();
         let mut pca = Pca9685::new(bus, 0x40);
         pca.prescale = 121;
+        pca.initialized = true;
 
         // At 50Hz, period = 20000µs. 1500µs → count = 1500/20000 * 4096 ≈ 307
         pca.set_pulse_us(0, 1500).unwrap();
@@ -291,10 +406,32 @@ mod tests {
         let bus = MockI2cBus::new();
         let mut pca = Pca9685::new(bus, 0x40);
         pca.prescale = 121;
+        pca.initialized = true;
 
         pca.set_pulse_batch(0, &[500, 1500, 2500]).unwrap();
-        // 3 channels written
-        assert!(pca.bus.transaction_count() >= 3);
+        // All three channels are committed in one auto-increment transaction.
+        assert_eq!(pca.bus.transaction_count(), 1);
+        let I2cTransaction::Write { data, .. } = &pca.bus.transactions()[0] else {
+            panic!("expected a write transaction");
+        };
+        assert_eq!(data.len(), 1 + 3 * 4);
+    }
+
+    #[test]
+    fn test_batch_rejects_partial_out_of_range_write() {
+        let mut pca = Pca9685::new(MockI2cBus::new(), 0x40);
+        pca.prescale = 121;
+        pca.initialized = true;
+        assert!(pca.set_pulse_batch(15, &[1000, 1100]).is_err());
+        assert_eq!(pca.bus.transaction_count(), 0);
+    }
+
+    #[test]
+    fn test_pulse_must_fit_pwm_period() {
+        let mut pca = Pca9685::new(MockI2cBus::new(), 0x40);
+        pca.prescale = 3;
+        pca.initialized = true;
+        assert!(pca.set_pulse_us(0, 1000).is_err());
     }
 
     #[test]
@@ -302,7 +439,11 @@ mod tests {
         let bus = MockI2cBus::new();
         let mut pca = Pca9685::new(bus, 0x40);
         pca.all_off().unwrap();
-        assert!(pca.bus.transaction_count() >= 2);
+        assert_eq!(pca.bus.transaction_count(), 1);
+        let I2cTransaction::Write { data, .. } = &pca.bus.transactions()[0] else {
+            panic!("expected a write transaction");
+        };
+        assert_eq!(data, &[reg::ALL_LED_OFF_H, 0x10]);
     }
 
     #[test]
@@ -350,6 +491,7 @@ mod tests {
         // Pre-load 4-byte response: ON_L=0x33, ON_H=0x01, OFF_L=0x44, OFF_H=0x02
         let bus = MockI2cBus::new().with_responses(vec![vec![0x33, 0x01, 0x44, 0x02]]);
         let mut pca = Pca9685::new(bus, 0x40);
+        pca.initialized = true;
         let (on, off) = pca.read_channel(0).unwrap();
         assert_eq!(on, 0x0133);
         assert_eq!(off, 0x0244);
@@ -359,6 +501,7 @@ mod tests {
     fn test_read_channel_out_of_range() {
         let bus = MockI2cBus::new();
         let mut pca = Pca9685::new(bus, 0x40);
+        pca.initialized = true;
         let result = pca.read_channel(16);
         assert!(result.is_err());
     }
@@ -368,6 +511,7 @@ mod tests {
         // Channel 5 → base = LED0_ON_L + 4*5 = 0x06 + 20 = 0x1A
         let bus = MockI2cBus::new().with_responses(vec![vec![0, 0, 0, 0]]);
         let mut pca = Pca9685::new(bus, 0x40);
+        pca.initialized = true;
         pca.read_channel(5).unwrap();
         // Verify the write portion sent the correct register
         let txns = pca.bus.transactions();
@@ -390,6 +534,7 @@ mod proptests {
             let bus = MockI2cBus::new();
             let mut pca = Pca9685::new(bus, 0x40);
             pca.prescale = 121; // 50 Hz
+            pca.initialized = true;
             prop_assert!(pca.set_pulse_us(ch, pulse).is_ok());
         }
 
@@ -398,6 +543,7 @@ mod proptests {
             let bus = MockI2cBus::new();
             let mut pca = Pca9685::new(bus, 0x40);
             pca.prescale = 121;
+            pca.initialized = true;
             // set_pulse_us calls set_channel which checks bounds
             prop_assert!(pca.set_pulse_us(ch, 1500).is_err());
         }

@@ -29,6 +29,7 @@
 //! - Dehaene & Changeux (2011) — *Experimental and theoretical approaches to
 //!   conscious processing* (GWT workspace exclusion = repression)
 
+use crate::semantic_encoding::encode_therapeutic_text;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use symthaea_core::hdc::BinaryHV;
@@ -45,6 +46,10 @@ use symthaea_core::hdc::BinaryHV;
 ///    content related to this fragment)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShadowFragment {
+    /// Stable identifier used by persistence and dream-queue references.
+    #[serde(default)]
+    pub fragment_id: u64,
+
     /// Text/content that was excluded from the narrative.
     pub content: String,
 
@@ -97,15 +102,11 @@ impl ShadowFragment {
         emotional_arousal: f32,
         prediction_error: f32,
     ) -> Self {
-        let encoding = if content.is_empty() {
-            None
-        } else {
-            let hash = blake3::hash(content.as_bytes());
-            let seed = u64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap());
-            Some(BinaryHV::random(seed))
-        };
+        let encoding = encode_therapeutic_text(content);
+        let fragment_id = stable_fragment_id(content, cycle, 0);
 
         Self {
+            fragment_id,
             content: content.to_string(),
             first_detected_cycle: cycle,
             last_active_cycle: cycle,
@@ -215,12 +216,19 @@ pub struct ShadowTelemetry {
 /// Config thresholds are NOT included — they come from defaults on restore.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShadowSnapshot {
-    /// Active shadow fragments (HDC encodings will be None after deserialization).
+    /// Snapshot schema version. Version 2 introduced stable fragment IDs.
+    #[serde(default)]
+    pub version: u16,
+    /// Active shadow fragments (HDC encodings are rebuilt on restore).
     pub fragments: Vec<ShadowFragment>,
     /// Rolling pressure history for trend computation.
     pub pressure_history: Vec<f32>,
-    /// Dream queue indices.
-    pub dream_queue: Vec<usize>,
+    /// Stable fragment IDs queued for dream processing.
+    #[serde(default)]
+    pub dream_queue_fragment_ids: Vec<u64>,
+    /// Legacy version-1 queue indices, accepted only for migration.
+    #[serde(default, rename = "dream_queue", skip_serializing_if = "Vec::is_empty")]
+    pub legacy_dream_queue_indices: Vec<usize>,
 }
 
 // ── Shadow Detector ──────────────────────────────────────────────────────
@@ -265,8 +273,8 @@ pub struct ShadowDetector {
     /// against descriptions of others.
     projection_similarity_threshold: f32,
 
-    /// Dream queue: indices of fragments to feed to the dream engine.
-    dream_queue: VecDeque<usize>,
+    /// Dream queue: stable fragment IDs to feed to the dream engine.
+    dream_queue: VecDeque<u64>,
 
     /// Maximum dream queue depth.
     dream_queue_max: usize,
@@ -345,15 +353,16 @@ impl ShadowDetector {
             return vec![];
         }
 
-        let input_hash = blake3::hash(input_text.as_bytes());
-        let input_seed = u64::from_le_bytes(input_hash.as_bytes()[..8].try_into().unwrap());
-        let input_hv = BinaryHV::random(input_seed);
+        let Some(input_hv) = encode_therapeutic_text(input_text) else {
+            return vec![];
+        };
 
         let mut projections = Vec::new();
         for (i, frag) in self.fragments.iter().enumerate() {
             let sim = frag.similarity_to(&input_hv);
             if sim > self.projection_similarity_threshold {
                 projections.push(ProjectionEvent {
+                    shadow_fragment_id: frag.fragment_id,
                     shadow_fragment_index: i,
                     shadow_content: frag.content.clone(),
                     similarity: sim,
@@ -370,32 +379,64 @@ impl ShadowDetector {
     /// The dream engine will generate counterfactuals: "what if this shadow
     /// content were integrated rather than repressed?"
     pub fn next_dream_fragment(&mut self) -> Option<DreamShadowInput> {
-        let idx = self.dream_queue.pop_front()?;
-        let frag = self.fragments.get_mut(idx)?;
-        frag.queued_for_dream = false;
+        while let Some(fragment_id) = self.dream_queue.pop_front() {
+            let Some(idx) = self
+                .fragments
+                .iter()
+                .position(|fragment| fragment.fragment_id == fragment_id)
+            else {
+                continue;
+            };
+            let frag = &mut self.fragments[idx];
+            frag.queued_for_dream = false;
 
-        Some(DreamShadowInput {
-            fragment_index: idx,
-            content: frag.content.clone(),
-            emotional_valence: frag.emotional_valence,
-            emotional_arousal: frag.emotional_arousal,
-            shadow_pressure: frag.pressure(),
-            // Dream state vector: [valence, arousal, pressure, duration_normalized]
-            state_vector: vec![
-                frag.emotional_valence,
-                frag.emotional_arousal,
-                frag.pressure().min(10.0) / 10.0, // normalize to [0,1]
-                (frag.recurrence_count as f32).min(50.0) / 50.0,
-            ],
-            // Dream action vector: [integration_attempt, exploration, containment]
-            action_vector: vec![1.0, 0.5, 0.3],
-        })
+            return Some(DreamShadowInput {
+                fragment_id,
+                fragment_index: idx,
+                content: frag.content.clone(),
+                emotional_valence: frag.emotional_valence,
+                emotional_arousal: frag.emotional_arousal,
+                shadow_pressure: frag.pressure(),
+                // Dream state vector: [valence, arousal, pressure, duration_normalized]
+                state_vector: vec![
+                    frag.emotional_valence,
+                    frag.emotional_arousal,
+                    frag.pressure().min(10.0) / 10.0, // normalize to [0,1]
+                    (frag.recurrence_count as f32).min(50.0) / 50.0,
+                ],
+                // Dream action vector: [integration_attempt, exploration, containment]
+                action_vector: vec![1.0, 0.5, 0.3],
+            });
+        }
+        None
     }
 
-    /// Record dream results back to the shadow fragment.
-    pub fn record_dream_result(&mut self, fragment_index: usize, phi_improvement: f32) {
-        if let Some(frag) = self.fragments.get_mut(fragment_index) {
+    /// Record dream results using the fragment's stable identifier.
+    pub fn record_dream_result_by_id(&mut self, fragment_id: u64, phi_improvement: f32) -> bool {
+        if let Some(frag) = self
+            .fragments
+            .iter_mut()
+            .find(|fragment| fragment.fragment_id == fragment_id)
+        {
             frag.record_dream_result(phi_improvement);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Record dream results by transient vector index.
+    ///
+    /// Prefer [`Self::record_dream_result_by_id`]; indices can change when
+    /// fragments are evicted or compacted.
+    #[deprecated(note = "use record_dream_result_by_id with DreamShadowInput::fragment_id")]
+    pub fn record_dream_result(&mut self, fragment_index: usize, phi_improvement: f32) {
+        if let Some(fragment_id) = self
+            .fragments
+            .get(fragment_index)
+            .map(|fragment| fragment.fragment_id)
+        {
+            let _ = self.record_dream_result_by_id(fragment_id, phi_improvement);
         }
     }
 
@@ -431,25 +472,74 @@ impl ShadowDetector {
     /// persisted — they come from the detector's defaults on restore.
     pub fn snapshot(&self) -> ShadowSnapshot {
         ShadowSnapshot {
+            version: 2,
             fragments: self.fragments.clone(),
             pressure_history: self.pressure_history.iter().copied().collect(),
-            dream_queue: self.dream_queue.iter().copied().collect(),
+            dream_queue_fragment_ids: self.dream_queue.iter().copied().collect(),
+            legacy_dream_queue_indices: Vec::new(),
         }
     }
 
     /// Restore shadow state from a persisted snapshot.
     ///
-    /// Replaces current fragments, pressure history, and dream queue.
-    /// HDC encodings will be `None` after restore (serde(skip)) — they
-    /// get regenerated on next `process()` call when content matches.
+    /// Rebuilds skipped HDC encodings, migrates legacy index queues to stable
+    /// fragment IDs, removes stale queue entries, and synchronizes each
+    /// fragment's `queued_for_dream` flag.
     pub fn restore(&mut self, snapshot: ShadowSnapshot) {
-        self.fragments = snapshot.fragments;
-        self.pressure_history = VecDeque::from(snapshot.pressure_history);
+        let ShadowSnapshot {
+            version: _,
+            mut fragments,
+            pressure_history,
+            dream_queue_fragment_ids,
+            legacy_dream_queue_indices,
+        } = snapshot;
+
+        let mut assigned_ids = std::collections::HashSet::new();
+        for (ordinal, fragment) in fragments.iter_mut().enumerate() {
+            fragment.encoding = encode_therapeutic_text(&fragment.content);
+            if fragment.fragment_id == 0 || !assigned_ids.insert(fragment.fragment_id) {
+                let mut salt = ordinal as u64;
+                loop {
+                    let candidate =
+                        stable_fragment_id(&fragment.content, fragment.first_detected_cycle, salt);
+                    if assigned_ids.insert(candidate) {
+                        fragment.fragment_id = candidate;
+                        break;
+                    }
+                    salt = salt.saturating_add(1);
+                }
+            }
+            fragment.queued_for_dream = false;
+        }
+
+        let requested_ids: Vec<u64> = if dream_queue_fragment_ids.is_empty() {
+            legacy_dream_queue_indices
+                .into_iter()
+                .filter_map(|index| fragments.get(index).map(|fragment| fragment.fragment_id))
+                .collect()
+        } else {
+            dream_queue_fragment_ids
+        };
+
+        let mut seen_queue_ids = std::collections::HashSet::new();
+        let queue_ids: Vec<u64> = requested_ids
+            .into_iter()
+            .filter(|fragment_id| assigned_ids.contains(fragment_id))
+            .filter(|fragment_id| seen_queue_ids.insert(*fragment_id))
+            .take(self.dream_queue_max)
+            .collect();
+
+        for fragment in &mut fragments {
+            fragment.queued_for_dream = queue_ids.contains(&fragment.fragment_id);
+        }
+
+        self.fragments = fragments;
+        self.pressure_history = VecDeque::from(pressure_history);
         let max = self.pressure_history_max;
         while self.pressure_history.len() > max {
             self.pressure_history.pop_front();
         }
-        self.dream_queue = VecDeque::from(snapshot.dream_queue);
+        self.dream_queue = VecDeque::from(queue_ids);
     }
 
     // ── Private ──────────────────────────────────────────────────────────
@@ -463,9 +553,9 @@ impl ShadowDetector {
         arousal: f32,
         input_text: &str,
     ) {
-        let input_hash = blake3::hash(input_text.as_bytes());
-        let input_seed = u64::from_le_bytes(input_hash.as_bytes()[..8].try_into().unwrap());
-        let input_hv = BinaryHV::random(input_seed);
+        let Some(input_hv) = encode_therapeutic_text(input_text) else {
+            return;
+        };
 
         // Try to find a matching existing fragment
         let mut best_match: Option<(usize, f32)> = None;
@@ -511,28 +601,46 @@ impl ShadowDetector {
 
     /// Update the dream queue with highest-pressure, unprocessed fragments.
     fn update_dream_queue(&mut self) {
-        // Clear stale entries
-        self.dream_queue.retain(|&idx| idx < self.fragments.len());
-
-        // Find high-pressure fragments not yet queued
-        let mut candidates: Vec<(usize, f32)> = self
+        // Clear stale entries by stable identity, not transient vector index.
+        let valid_fragment_ids: std::collections::HashSet<u64> = self
             .fragments
             .iter()
-            .enumerate()
-            .filter(|(_, f)| !f.queued_for_dream && f.pressure() > 1.0)
-            .map(|(i, f)| (i, f.pressure()))
+            .map(|fragment| fragment.fragment_id)
+            .collect();
+        self.dream_queue
+            .retain(|fragment_id| valid_fragment_ids.contains(fragment_id));
+
+        // Synchronize flags before selecting new candidates.
+        let queued_fragment_ids: std::collections::HashSet<u64> =
+            self.dream_queue.iter().copied().collect();
+        for fragment in &mut self.fragments {
+            fragment.queued_for_dream = queued_fragment_ids.contains(&fragment.fragment_id);
+        }
+
+        // Find high-pressure fragments not yet queued.
+        let mut candidates: Vec<(u64, f32)> = self
+            .fragments
+            .iter()
+            .filter(|fragment| !fragment.queued_for_dream && fragment.pressure() > 1.0)
+            .map(|fragment| (fragment.fragment_id, fragment.pressure()))
             .collect();
 
         // Sort by pressure descending
         candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        for (idx, _) in candidates {
+        for (fragment_id, _) in candidates {
             if self.dream_queue.len() >= self.dream_queue_max {
                 break;
             }
-            if !self.dream_queue.contains(&idx) {
-                self.dream_queue.push_back(idx);
-                self.fragments[idx].queued_for_dream = true;
+            if !self.dream_queue.contains(&fragment_id) {
+                self.dream_queue.push_back(fragment_id);
+                if let Some(fragment) = self
+                    .fragments
+                    .iter_mut()
+                    .find(|fragment| fragment.fragment_id == fragment_id)
+                {
+                    fragment.queued_for_dream = true;
+                }
             }
         }
     }
@@ -608,7 +716,9 @@ impl Default for ShadowDetector {
 /// their own shadow content, suggesting possible projection onto others.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectionEvent {
-    /// Index of the shadow fragment being projected.
+    /// Stable identifier of the shadow fragment being projected.
+    pub shadow_fragment_id: u64,
+    /// Current vector index, retained for local inspection only.
     pub shadow_fragment_index: usize,
     /// Content of the shadow fragment.
     pub shadow_content: String,
@@ -621,7 +731,9 @@ pub struct ProjectionEvent {
 /// Input for the dream engine to process shadow content.
 #[derive(Debug, Clone)]
 pub struct DreamShadowInput {
-    /// Index into the shadow detector's fragment list.
+    /// Stable identifier used when recording dream results.
+    pub fragment_id: u64,
+    /// Current index into the detector's fragment list (diagnostic only).
     pub fragment_index: usize,
     /// Text content of the shadow fragment.
     pub content: String,
@@ -635,6 +747,22 @@ pub struct DreamShadowInput {
     pub state_vector: Vec<f32>,
     /// Action vector for dream engine [integration, exploration, containment].
     pub action_vector: Vec<f32>,
+}
+
+fn stable_fragment_id(content: &str, cycle: u64, salt: u64) -> u64 {
+    let hash = blake3::hash(
+        format!(
+            "shadow_fragment:{cycle}:{salt}:{}",
+            content.trim().to_lowercase()
+        )
+        .as_bytes(),
+    );
+    let mut id = u64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap());
+    // Zero is reserved for snapshots created before stable IDs existed.
+    if id == 0 {
+        id = 1;
+    }
+    id
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────
@@ -800,6 +928,7 @@ mod tests {
         let input = dream_input.unwrap();
         assert_eq!(input.state_vector.len(), 4);
         assert_eq!(input.action_vector.len(), 3);
+        assert_ne!(input.fragment_id, 0);
         assert!(input.shadow_pressure > 0.0);
     }
 
@@ -811,7 +940,8 @@ mod tests {
             detector.process(i * 11, 0.5, -0.9, 0.8, "hidden rage", 0.1);
         }
 
-        detector.record_dream_result(0, 0.15);
+        let fragment_id = detector.fragments()[0].fragment_id;
+        assert!(detector.record_dream_result_by_id(fragment_id, 0.15));
         assert!((detector.fragments()[0].dream_phi_improvement - 0.15).abs() < 0.001,);
         assert_eq!(detector.fragments()[0].dream_processing_count, 1);
     }
@@ -950,6 +1080,58 @@ mod tests {
 
         assert_eq!(det2.fragment_count(), pre_count);
         assert!((det2.total_pressure() - pre_pressure).abs() < 0.01);
+        assert!(
+            det2.fragments()
+                .iter()
+                .all(|fragment| fragment.fragment_id != 0)
+        );
+        assert!(
+            det2.fragments()
+                .iter()
+                .all(|fragment| fragment.encoding.is_some())
+        );
+
+        let before_recurrence = det2.fragments()[0].recurrence_count;
+        det2.process(200, 0.5, -0.8, 0.7, "recurring painful content again", 0.1);
+        assert_eq!(det2.fragment_count(), pre_count);
+        assert!(det2.fragments()[0].recurrence_count > before_recurrence);
+    }
+
+    #[test]
+    fn test_legacy_snapshot_queue_indices_migrate_to_fragment_ids() {
+        let fragment = ShadowFragment::new("legacy queued content", 10, -0.8, 0.7, 0.5);
+        let snapshot = ShadowSnapshot {
+            version: 0,
+            fragments: vec![fragment],
+            pressure_history: vec![1.0],
+            dream_queue_fragment_ids: Vec::new(),
+            legacy_dream_queue_indices: vec![0],
+        };
+
+        let mut detector = ShadowDetector::new();
+        detector.restore(snapshot);
+        let dream_input = detector
+            .next_dream_fragment()
+            .expect("legacy queue should migrate");
+        assert_eq!(dream_input.content, "legacy queued content");
+        assert_eq!(dream_input.fragment_id, detector.fragments()[0].fragment_id);
+    }
+
+    #[test]
+    fn stable_dream_queue_survives_vector_reordering() {
+        let mut detector = ShadowDetector::new();
+        let first = ShadowFragment::new("first shadow", 1, -0.8, 0.7, 0.5);
+        let second = ShadowFragment::new("second shadow", 2, -0.8, 0.7, 0.5);
+        let second_id = second.fragment_id;
+        detector.fragments = vec![first, second];
+        detector.dream_queue.push_back(second_id);
+        detector.fragments.swap_remove(0);
+
+        let input = detector
+            .next_dream_fragment()
+            .expect("stable ID should survive swap_remove");
+        assert_eq!(input.fragment_id, second_id);
+        assert_eq!(input.content, "second shadow");
     }
 
     #[test]

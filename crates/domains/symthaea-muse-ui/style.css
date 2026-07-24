@@ -1,0 +1,1146 @@
+/* Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/*
+ * Palette carried over verbatim from symthaea-muse/studio/index.html so the
+ * new Leptos surfaces read as the same product, not a redesign. Typography
+ * and texture are a deliberate design pass on top of it: a candlelit-study
+ * mood — warm, textured, unhurried — matching the "living instrument, not
+ * a dashboard" standing direction. Display type reaches for Playfair
+ * Display where a system has it (an elegant, editorial serif with real
+ * character in its titling), falling back through other refined serifs
+ * rather than a bundled webfont — no network fetch, no Nix derivation for
+ * font files, same tradeoff the rest of this app already makes for
+ * offline-first behavior.
+ */
+
+:root {
+    --bg: #16130f;
+    --panel: #201b15;
+    --ink: #e8dfd2;
+    --dim: #a3968a;
+    --amber: #d9a05b;
+    --amber-soft: #8a6a44;
+    --green: #7ba05b;
+    --border: #322a1f;
+    --display-font:
+        "Playfair Display", "Iowan Old Style", "Palatino Linotype", Palatino,
+        Georgia, "Times New Roman", serif;
+    --body-font: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --shadow-warm: 0 10px 30px -12px rgba(0, 0, 0, 0.55);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+/* A faint grain over the whole page — the difference between a flat
+   digital rectangle and something with a hint of material texture,
+   candlelight instead of a monitor. Cheap: one tiled SVG turbulence
+   pattern, no image asset, no network fetch. */
+body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+        radial-gradient(ellipse at 20% -10%, #241e16, var(--bg) 60%);
+    color: var(--ink);
+    font: 15px/1.55 var(--body-font);
+    position: relative;
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+a {
+    color: var(--amber);
+}
+
+.app-shell {
+    position: relative;
+    z-index: 1;
+}
+
+h1,
+h2,
+h3,
+.listen-title-name,
+.current-form-name,
+.player-title {
+    font-family: var(--display-font);
+}
+
+.global-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    padding: 0.25rem 0 1.25rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.brand-lockup {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    flex: 0 0 auto;
+}
+
+.brand-mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    border: 1px solid var(--amber-soft);
+    border-radius: 50%;
+    font-family: var(--display-font);
+    font-size: 1.15rem;
+    color: var(--amber);
+}
+
+.brand-lockup h1 {
+    font-family: var(--display-font);
+    font-weight: 400;
+    font-size: 1.35rem;
+    margin: 0;
+    letter-spacing: 0.01em;
+    line-height: 1.1;
+}
+
+.brand-lockup p {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--dim);
+    letter-spacing: 0.02em;
+}
+
+.header-now-playing {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.78rem;
+    color: var(--dim);
+}
+
+.header-now-playing span {
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.65rem;
+}
+
+.header-now-playing strong {
+    font-family: var(--display-font);
+    font-weight: 400;
+    font-size: 1rem;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mode-nav {
+    display: flex;
+    gap: 0.15rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.3rem;
+    flex: 0 0 auto;
+}
+
+.mode-nav a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.15;
+    text-decoration: none;
+    color: var(--dim);
+    padding: 0.35rem 0.9rem;
+    border-radius: 999px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.mode-nav a span {
+    font-size: 0.85rem;
+}
+
+.mode-nav a small {
+    font-size: 0.62rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    opacity: 0.75;
+}
+
+.mode-nav a.active {
+    background: var(--amber);
+    color: #221a10;
+}
+
+.mode-nav a:hover:not(.active) {
+    color: var(--ink);
+}
+
+.page-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+}
+
+.panel h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1.05rem;
+    font-weight: 400;
+    color: var(--amber);
+}
+
+.muted {
+    color: var(--dim);
+    font-size: 0.9rem;
+}
+
+.status-line {
+    font-size: 0.85rem;
+    color: var(--dim);
+}
+
+.status-line.ok {
+    color: var(--green);
+}
+
+.status-line.error {
+    color: #c97b6a;
+}
+
+.stub-list {
+    list-style: none;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.stub-list li::before {
+    content: "\2022  ";
+    color: var(--amber-soft);
+}
+
+/* ── Listen Mode ────────────────────────────────────────────────────── */
+
+.listen-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 0;
+    overflow: hidden;
+}
+
+.listen-canvas-wrap {
+    position: relative;
+    width: 100%;
+    /* Bigger than before — the piece's name now lives on this stage
+       (`.listen-title-overlay`), so the stage itself needed more room. */
+    height: clamp(440px, 52vw, 620px);
+    background: radial-gradient(ellipse at 50% 62%, #241e16, #16130f 78%);
+}
+
+.listen-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: pointer;
+}
+
+/* The piece's identity, living inside the hero box itself rather than
+   below it — the Listen visualizer is the piece's stage, so its name
+   belongs on that stage. Centered and clear of both corner badges'
+   ~3.5rem height so a long title never collides with them. */
+.listen-title-overlay {
+    position: absolute;
+    top: 4.75rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    text-align: center;
+    max-width: min(80%, 34rem);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.listen-title-kicker {
+    font-size: 0.65rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--dim);
+}
+
+.listen-title-name {
+    margin: 0;
+    font-size: clamp(1.6rem, 3.4vw, 2.4rem);
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.15;
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55);
+}
+
+.listen-title-meta {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--dim);
+}
+
+/* The Listen hero's own mode selector (Radial/Still — the whole-piece
+   map's experience), independent of the player bar's Bar/Wave timeline
+   toggle (`.timeline-mode-icons`). Bottom-right of the canvas so it never
+   competes with the title overlay or the section/form badges. */
+.listen-mode-selector {
+    position: absolute;
+    bottom: 1rem;
+    right: 1rem;
+    display: flex;
+    gap: 0.15rem;
+    padding: 0.25rem;
+    background: rgba(22, 19, 15, 0.55);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+}
+
+.listen-mode-btn.sel {
+    color: var(--amber);
+    background: rgba(217, 160, 91, 0.14);
+}
+
+/* Top-left, not top-right — reading order puts it where the eye lands
+   first, alongside the piece title below rather than competing with
+   transport controls that live bottom-right elsewhere in the layout. */
+.current-section-badge {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.5rem 0.9rem;
+    background: rgba(22, 19, 15, 0.72);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    pointer-events: none;
+    max-width: 60%;
+}
+
+.current-section-kicker {
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dim);
+}
+
+.current-section-role {
+    font-size: 1.1rem;
+    color: var(--amber);
+    line-height: 1.1;
+}
+
+.current-section-detail {
+    font-size: 0.75rem;
+    color: var(--dim);
+}
+
+/* Top-right, mirroring the current-section badge's top-left placement —
+   two distinct facts (WHEN in the piece vs. WHAT shape the whole piece
+   is) deliberately don't compete for the same corner. */
+.current-form-badge {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.9rem;
+    background: rgba(22, 19, 15, 0.72);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    pointer-events: none;
+}
+
+.current-form-dot {
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 12px currentColor;
+}
+
+.current-form-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.current-form-name {
+    font-size: 0.95rem;
+    color: var(--ink);
+    text-transform: capitalize;
+}
+
+.why-this-piece-details summary {
+    cursor: pointer;
+    color: var(--amber);
+    font-size: 0.85rem;
+    list-style: none;
+}
+
+.why-this-piece-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.why-this-piece-details summary::before {
+    content: "▸ ";
+}
+
+.why-this-piece-details[open] summary::before {
+    content: "▾ ";
+}
+
+.listen-info {
+    padding: 0 1.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.why-this-piece {
+    color: var(--ink);
+    opacity: 0.85;
+    margin: 0;
+}
+
+.muted.small {
+    font-size: 0.8rem;
+}
+
+.listen-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.listen-actions button,
+.listen-actions .link-btn {
+    background: none;
+    border: 1px solid var(--amber-soft);
+    color: var(--amber);
+    border-radius: 999px;
+    padding: 0.45rem 1rem;
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.listen-actions button:hover,
+.listen-actions .link-btn:hover {
+    background: var(--amber-soft);
+}
+
+.heart-btn.kept {
+    background: var(--amber);
+    color: #221a10;
+    border-color: var(--amber);
+}
+
+.viz-mode-chips {
+    display: flex;
+    gap: 0.4rem;
+}
+
+/* Which JourneyPolicy (Resonance/Discovery/Contrast) future prefetches
+   use. All three currently compose identically (see
+   MUSE_JOURNEY_WIRING_PLAN_2026-07-24.md §3) -- the selector is honestly
+   real (it changes journey.rs's live state), the selection just doesn't
+   change outcomes yet. */
+.journey-policy-selector {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.journey-policy-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    border-radius: 999px;
+    padding: 0.3rem 0.8rem;
+    font: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.journey-policy-btn:hover {
+    border-color: var(--amber-soft);
+    color: var(--amber);
+}
+
+.journey-policy-btn.sel {
+    color: var(--amber);
+    background: rgba(217, 160, 91, 0.14);
+    border-color: var(--amber-soft);
+}
+
+.chip {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    border-radius: 999px;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.chip.sel {
+    border-color: var(--amber-soft);
+    color: var(--amber);
+}
+
+/* ── Research Mode ──────────────────────────────────────────────────── */
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    row-gap: 0.5rem;
+    column-gap: 1rem;
+    margin: 1rem 0;
+}
+
+.metric-grid dt {
+    color: var(--dim);
+    font-size: 0.85rem;
+}
+
+.metric-grid dd {
+    margin: 0;
+    color: var(--ink);
+}
+
+.score-view {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.score-canvas {
+    width: 100%;
+    height: 200px;
+    display: block;
+    background: #17130e;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.legend {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--dim);
+}
+
+.legend-item {
+    margin-right: 0.75rem;
+}
+
+/* ── Create Mode ────────────────────────────────────────────────────── */
+
+.compose-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    align-items: end;
+    margin-top: 1rem;
+}
+
+.compose-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--dim);
+}
+
+.compose-form .prompt-label {
+    grid-column: 1 / -1;
+}
+
+.compose-form select,
+.compose-form input[type="text"] {
+    background: #17130e;
+    color: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem;
+    font: inherit;
+}
+
+.compose-form input[type="range"] {
+    accent-color: var(--amber);
+}
+
+.compose-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-self: center;
+}
+
+.compose-form button[type="submit"] {
+    background: var(--amber);
+    color: #221a10;
+    border: none;
+    border-radius: 999px;
+    padding: 0.6rem 1.5rem;
+    font: inherit;
+    cursor: pointer;
+}
+
+.compose-form button[type="submit"]:disabled {
+    background: var(--amber-soft);
+    cursor: wait;
+}
+
+.compose-actions button[type="button"] {
+    background: none;
+    border: 1px solid var(--amber-soft);
+    color: var(--amber);
+    border-radius: 999px;
+    padding: 0.6rem 1.2rem;
+    font: inherit;
+    cursor: pointer;
+}
+
+.compose-actions button[type="button"]:disabled {
+    color: var(--dim);
+    cursor: wait;
+}
+
+.liked-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.liked-header h2 {
+    margin: 0;
+}
+
+.liked-header button {
+    background: none;
+    border: 1px solid var(--amber-soft);
+    color: var(--amber);
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.candidate-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+}
+
+.candidate-card {
+    background: #17130e;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.candidate-card h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--ink);
+}
+
+.candidate-card audio {
+    width: 100%;
+}
+
+.candidate-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.candidate-actions button,
+.candidate-actions .link-btn {
+    background: none;
+    border: 1px solid var(--amber-soft);
+    color: var(--amber);
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.atlas-canvas {
+    width: 100%;
+    height: 480px;
+    display: block;
+    background: #17130e;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 0.75rem;
+}
+
+.atlas-inspector {
+    background: #17130e;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-top: 0.75rem;
+}
+
+.atlas-inspector h3 {
+    margin: 0 0 0.35rem;
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--ink);
+}
+
+.atlas-lens-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.6rem;
+}
+
+.atlas-lens-row label {
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+
+.atlas-why-nearby {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+.atlas-why-nearby h4 {
+    margin: 0 0 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--ink);
+}
+
+.atlas-why-nearby ul {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+
+.atlas-why-nearby li {
+    margin-bottom: 0.15rem;
+}
+
+/* ── Research: evidence views (motif/sonority/cadence/orchestration/
+   structural-activity) ── */
+.evidence-view h3 {
+    margin: 1.2rem 0 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 400;
+    letter-spacing: 0.03em;
+    color: var(--amber);
+    text-transform: uppercase;
+}
+
+.evidence-view h3:first-of-type {
+    margin-top: 0;
+}
+
+.evidence-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.85rem;
+}
+
+.evidence-list > li {
+    margin-bottom: 0.5rem;
+}
+
+.evidence-sublist {
+    margin: 0.3rem 0 0;
+    padding-left: 1.1rem;
+    font-size: 0.78rem;
+    color: var(--dim);
+}
+
+.evidence-sublist li {
+    margin-bottom: 0.2rem;
+}
+
+.indent {
+    margin-left: 1.1rem;
+}
+
+.badge-note {
+    margin-left: 0.4rem;
+    font-size: 0.72rem;
+    color: var(--dim);
+}
+
+.evidence-badge {
+    display: inline-block;
+    margin-left: 0.4rem;
+    padding: 0.05rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    border: 1px solid var(--border);
+    cursor: help;
+}
+
+.evidence-observed {
+    color: var(--green);
+    border-color: var(--green);
+}
+
+.evidence-reconstructed {
+    color: var(--amber);
+    border-color: var(--amber-soft);
+}
+
+.evidence-inferred {
+    color: var(--dim);
+    border-color: var(--border);
+}
+
+.evidence-warnings {
+    margin: 0 0 1rem;
+    padding-left: 1.1rem;
+    font-size: 0.8rem;
+    color: var(--dim);
+    font-style: italic;
+}
+
+.evidence-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+.evidence-table th,
+.evidence-table td {
+    text-align: left;
+    padding: 0.3rem 0.6rem 0.3rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.resonance-chart .chart-legend {
+    margin-top: 0.3rem;
+    font-size: 0.75rem;
+    color: var(--dim);
+}
+
+/* ── Persistent player bar ──────────────────────────────────────────── */
+
+/* Room at the bottom of the page so the fixed bar never covers content;
+   the bar itself only actually shows (`translateY`) once a piece exists. */
+body {
+    padding-bottom: 5.5rem;
+}
+
+.player-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.6rem 1.25rem;
+    background: rgba(22, 19, 15, 0.92);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--border);
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+}
+
+.player-bar.visible {
+    transform: translateY(0);
+}
+
+/* Mini visualizer + mode toggle, deliberately the FIRST thing in the bar
+   (reading order = visual order, left to right) so switching modes is a
+   left-hand action right where the eye already lands, not buried after
+   the transport controls on the right. */
+.player-viz-corner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 0 0 auto;
+}
+
+.player-mini-viz {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: block;
+    background: #17130e;
+    border: 1px solid var(--border);
+}
+
+/* The player bar's OWN timeline-display toggle (Bar/Wave) — controls only
+   the progress-wave strip next to it, not the Listen hero's mode (that
+   selector lives inside the hero canvas itself, see
+   `.listen-mode-selector`). */
+.timeline-mode-icons {
+    display: flex;
+    gap: 0.15rem;
+}
+
+.timeline-mode-btn.sel {
+    color: var(--amber);
+    background: rgba(217, 160, 91, 0.14);
+}
+
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 50%;
+    color: var(--dim);
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+}
+
+.icon-btn:hover {
+    color: var(--ink);
+    background: rgba(232, 223, 210, 0.08);
+}
+
+.icon-btn.heart-btn.kept {
+    color: var(--amber);
+}
+
+.player-progress {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+}
+
+.player-wave-track {
+    position: relative;
+    flex: 1 1 auto;
+    height: 2.4rem;
+}
+
+.player-wave {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+    border-radius: 6px;
+}
+
+.player-range {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+    appearance: none;
+}
+
+/* Larger and color-matched to the wave/timeline it sits beside, split
+   into two complementary tones from the current piece's own palette
+   (elapsed / total) rather than one flat dim color — the same idea as
+   the play button's palette-tinted glow just below. `--time-a`/
+   `--time-b` are set inline per-render from `palette::palette_for`. */
+.player-time {
+    flex: 0 0 auto;
+    font-size: 1.05rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+.player-time-elapsed {
+    color: var(--time-a);
+    animation: player-time-pulse 3.2s ease-in-out infinite alternate;
+}
+
+.player-time-sep {
+    color: var(--dim);
+    margin: 0 0.3rem;
+    opacity: 0.6;
+}
+
+.player-time-total {
+    color: var(--time-b);
+    opacity: 0.85;
+}
+
+@keyframes player-time-pulse {
+    from {
+        opacity: 0.75;
+        text-shadow: none;
+    }
+    to {
+        opacity: 1;
+        text-shadow: 0 0 10px var(--time-a);
+    }
+}
+
+.player-identity {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.player-dot {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.player-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.player-title {
+    font-size: 0.9rem;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.player-sub {
+    font-size: 0.75rem;
+    color: var(--dim);
+}
+
+.player-transport {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    flex: 0 0 auto;
+}
+
+/* The "lava lamp" glow: a slow crossfade between the piece's own two
+   palette colors (`--lava-a`/`--lava-b`, set inline) rather than a fixed
+   highlight — ties the one button the user presses most back into the
+   same per-style color language as the dot/wave/mini-viz. */
+.play-btn {
+    width: 2.4rem;
+    height: 2.4rem;
+    background: var(--lava-a);
+    color: #17130e;
+    animation: player-play-lava 6s ease-in-out infinite alternate;
+}
+
+.play-btn:hover {
+    color: #17130e;
+}
+
+@keyframes player-play-lava {
+    from {
+        background: var(--lava-a);
+    }
+    to {
+        background: var(--lava-b);
+    }
+}
+
+.player-secondary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 0 0 auto;
+}
+
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--dim);
+}
+
+.volume-control input[type="range"] {
+    width: 4.5rem;
+    accent-color: var(--amber);
+}
+
+.renderer-select {
+    background: #17130e;
+    color: var(--dim);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.renderer-select:hover {
+    color: var(--ink);
+}
+
+@media (max-width: 720px) {
+    .player-bar {
+        flex-wrap: wrap;
+        padding: 0.6rem 0.85rem;
+    }
+    .player-identity {
+        order: 1;
+        flex: 1 1 100%;
+    }
+}

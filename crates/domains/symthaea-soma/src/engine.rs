@@ -183,11 +183,10 @@ impl SomaEngine {
             );
         }
 
-        // Derive and set session encryption key from sensor context
-        if !self.sensor_bridge.privacy_mode() && !self.holon_bridge.has_session_key() {
-            let key = self.sensor_bridge.derive_context_key();
-            self.holon_bridge.set_session_key(key);
-        }
+        // Do not install deterministic sensor context as an encryption key.
+        // Quantized sensor readings are enumerable, not secret entropy. A future
+        // transport may bind this context into a standard KDF only after an
+        // authenticated key exchange establishes an independent secret.
 
         // BLE mesh → oxytocin nudges (gated by privacy + wake)
         if !self.sensor_bridge.privacy_mode() && !wake.skip_topology() {

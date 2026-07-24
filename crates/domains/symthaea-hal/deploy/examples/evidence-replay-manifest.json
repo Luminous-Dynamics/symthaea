@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "replay_id": "incident-2026-07-replay-1",
+  "incident_id": "incident-2026-07",
+  "source_release_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "toolchain_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "configuration_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "inputs": [
+    {
+      "sequence": 1,
+      "artifact_class": "fault-ledger",
+      "artifact_id": "device-001",
+      "artifact_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "expectations": [
+    {
+      "output_name": "forensic-timeline",
+      "output_domain": "forensic-timeline-v1",
+      "expected_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "maximum_runtime_ms": 60000,
+  "maximum_output_bytes": 67108864,
+  "created_unix_time_ms": 1782864000000
+}

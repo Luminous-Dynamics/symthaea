@@ -575,6 +575,9 @@ impl PluginRegistry {
             super::thermofluids_plugin::ThermofluidsDomainPlugin,
         ));
         registry.register(Box::new(super::structural_plugin::StructuralDomainPlugin));
+        registry.register(Box::new(
+            super::grid_physics_plugin::GridPhysicsDomainPlugin,
+        ));
         registry.register(Box::new(super::optics_plugin::OpticsDomainPlugin));
         registry.register(Box::new(
             super::earth_system_plugin::EarthSystemDomainPlugin,
@@ -588,6 +591,9 @@ impl PluginRegistry {
         ));
         registry.register(Box::new(super::modal_plugin::ModalDomainPlugin));
         registry.register(Box::new(super::statistics_plugin::StatisticsDomainPlugin));
+        registry.register(Box::new(
+            super::information_theory_plugin::InformationTheoryDomainPlugin,
+        ));
         registry.register(Box::new(
             super::social_choice_plugin::SocialChoiceDomainPlugin,
         ));

@@ -1,0 +1,7 @@
+{
+  "maximum_bundle_age_ms": 900000,
+  "require_passing_admission": true,
+  "require_passing_rollout_health": true,
+  "minimum_recovery_media_manifests": 2,
+  "maximum_inventory_devices": 10000
+}

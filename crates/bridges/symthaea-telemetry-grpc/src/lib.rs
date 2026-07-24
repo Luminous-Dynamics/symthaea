@@ -112,6 +112,7 @@ mod tests {
             embodiment_level: 0.0,
             self_awareness: 0.0,
             topological_unity: 1.0,
+            motor_command: "NoOp".to_string(),
         };
 
         broadcaster.broadcast(frame);

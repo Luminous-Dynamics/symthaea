@@ -31,7 +31,8 @@ impl ManipulatorState {
                 0.0,
             ],
             joint_velocities: [0.0; NUM_JOINTS],
-            end_effector_position: [0.3, 0.0, 0.5],
+            // Derived from the default DH chain at the ready-pose angles.
+            end_effector_position: [0.5545, 0.0, 0.6245],
             end_effector_force: [0.0; 3],
             gripper_opening: 1.0,
         }
@@ -57,7 +58,10 @@ impl ManipulatorState {
 
     pub fn is_finite(&self) -> bool {
         self.joint_angles.iter().all(|v| v.is_finite())
+            && self.joint_velocities.iter().all(|v| v.is_finite())
             && self.end_effector_position.iter().all(|v| v.is_finite())
+            && self.end_effector_force.iter().all(|v| v.is_finite())
+            && self.gripper_opening.is_finite()
     }
 
     /// Domain-specific bounds check for physically plausible arm state.
@@ -89,16 +93,57 @@ impl ManipulatorCommand {
 
     pub fn clamped(mut self) -> Self {
         for t in &mut self.joint_torques {
-            *t = t.clamp(-1.0, 1.0);
+            *t = if t.is_finite() {
+                t.clamp(-1.0, 1.0)
+            } else {
+                0.0
+            };
         }
-        self.gripper = self.gripper.clamp(0.0, 1.0);
+        self.gripper = if self.gripper.is_finite() {
+            self.gripper.clamp(0.0, 1.0)
+        } else {
+            0.5
+        };
         self
+    }
+
+    pub fn is_finite(&self) -> bool {
+        self.joint_torques.iter().all(|v| v.is_finite()) && self.gripper.is_finite()
     }
 
     pub fn control_effort(&self) -> f32 {
         self.joint_torques.iter().map(|t| t.abs()).sum::<f32>() / NUM_JOINTS as f32
     }
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ManipulatorConfigError {
+    NonFiniteLearningRate,
+    NonPositiveLearningRate,
+    EmptyNetwork,
+    NonFinitePhysicsRate,
+    NonPositivePhysicsRate,
+    ZeroCognitiveInterval,
+    ZeroEpisodeLength,
+}
+
+impl std::fmt::Display for ManipulatorConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use ManipulatorConfigError::*;
+        let message = match self {
+            NonFiniteLearningRate => "learning_rate must be finite",
+            NonPositiveLearningRate => "learning_rate must be greater than zero",
+            EmptyNetwork => "network_layers and neurons_per_layer must be non-zero",
+            NonFinitePhysicsRate => "physics_hz must be finite",
+            NonPositivePhysicsRate => "physics_hz must be greater than zero",
+            ZeroCognitiveInterval => "cognitive_interval must be non-zero",
+            ZeroEpisodeLength => "steps_per_episode must be non-zero",
+        };
+        f.write_str(message)
+    }
+}
+
+impl std::error::Error for ManipulatorConfigError {}
 
 /// Configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,7 +158,33 @@ pub struct ManipulatorConfig {
 }
 
 impl ManipulatorConfig {
+    pub fn validate(&self) -> Result<(), ManipulatorConfigError> {
+        if !self.learning_rate.is_finite() {
+            return Err(ManipulatorConfigError::NonFiniteLearningRate);
+        }
+        if self.learning_rate <= 0.0 {
+            return Err(ManipulatorConfigError::NonPositiveLearningRate);
+        }
+        if self.network_layers == 0 || self.neurons_per_layer == 0 {
+            return Err(ManipulatorConfigError::EmptyNetwork);
+        }
+        if !self.physics_hz.is_finite() {
+            return Err(ManipulatorConfigError::NonFinitePhysicsRate);
+        }
+        if self.physics_hz <= 0.0 {
+            return Err(ManipulatorConfigError::NonPositivePhysicsRate);
+        }
+        if self.cognitive_interval == 0 {
+            return Err(ManipulatorConfigError::ZeroCognitiveInterval);
+        }
+        if self.steps_per_episode == 0 {
+            return Err(ManipulatorConfigError::ZeroEpisodeLength);
+        }
+        Ok(())
+    }
+
     pub fn physics_dt(&self) -> f64 {
+        debug_assert!(self.validate().is_ok());
         1.0 / self.physics_hz
     }
 }
@@ -164,5 +235,32 @@ mod tests {
         let clamped = cmd.clamped();
         assert!(clamped.joint_torques.iter().all(|&t| t <= 1.0));
         assert!(clamped.gripper <= 1.0);
+    }
+
+    #[test]
+    fn non_finite_state_is_rejected() {
+        let mut state = ManipulatorState::home();
+        state.joint_velocities[0] = f64::NAN;
+        assert!(!state.is_finite());
+
+        let mut state = ManipulatorState::home();
+        state.end_effector_force[1] = f64::INFINITY;
+        assert!(!state.is_finite());
+    }
+
+    #[test]
+    fn non_finite_command_is_sanitized() {
+        let mut cmd = ManipulatorCommand::zero();
+        cmd.joint_torques[2] = f32::NAN;
+        cmd.gripper = f32::INFINITY;
+        let cmd = cmd.clamped();
+        assert!(cmd.is_finite());
+        assert_eq!(cmd.joint_torques[2], 0.0);
+        assert_eq!(cmd.gripper, 0.5);
+    }
+
+    #[test]
+    fn default_config_is_valid() {
+        assert!(ManipulatorConfig::default().validate().is_ok());
     }
 }

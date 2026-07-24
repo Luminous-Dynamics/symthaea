@@ -10,6 +10,7 @@
 use crate::csg::{BooleanOp, CSGNode, Primitive};
 use crate::mesh::{TriangleMesh, resolve_to_mesh};
 use crate::primitives::*;
+use crate::support::{SupportConfig, plan_column_supports};
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
@@ -22,7 +23,7 @@ pub struct PrinterConstraints {
 }
 
 /// A geometric thought: the bridge between HDC intent and physical geometry
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct GeometricThought {
     /// The "thought" as an HDC vector
     #[serde(skip)]
@@ -33,6 +34,29 @@ pub struct GeometricThought {
     pub material_binding: Option<String>,
     /// Printer constraints
     pub printer_constraints: Option<PrinterConstraints>,
+}
+
+impl<'de> Deserialize<'de> for GeometricThought {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct SerializedThought {
+            operation_tree: CSGNode,
+            material_binding: Option<String>,
+            printer_constraints: Option<PrinterConstraints>,
+        }
+
+        let serialized = SerializedThought::deserialize(deserializer)?;
+        let intent_hv = encode_csg_as_hv(&serialized.operation_tree);
+        Ok(Self {
+            intent_hv: Some(intent_hv),
+            operation_tree: serialized.operation_tree,
+            material_binding: serialized.material_binding,
+            printer_constraints: serialized.printer_constraints,
+        })
+    }
 }
 
 impl GeometricThought {
@@ -95,35 +119,24 @@ impl GeometricThought {
         invariants
     }
 
-    /// Autonomously synthesize support tooling for this geometry.
+    /// Synthesize bounded local column supports for downward overhang faces.
     ///
-    /// Identifies overhanging features and generates a sacrificial support mesh.
+    /// The result is a conservative sacrificial CSG tree. Process-specific
+    /// interface layers, removal access, thermal effects, and branching support
+    /// optimization remain outside this baseline planner.
     pub fn synthesize_tooling(&self) -> Option<CSGNode> {
         let mesh = self.resolve();
-        let (min, max) = mesh_aabb(&mesh);
-
-        // Simple Heuristic: If the geometry's lowest point is above Z=0.1,
-        // it requires a support column to reach the build plate.
-        if min[2] > 0.1 {
+        let plan = plan_column_supports(&mesh, SupportConfig::default());
+        if plan.requires_support() {
             tracing::info!(
-                "🛠️  Geometry overhang detected (min_z={:.2}). Synthesizing support pillar...",
-                min[2]
+                overhang_triangles = plan.overhang_triangles.len(),
+                support_columns = plan.columns.len(),
+                unsupported_area_mm2 = plan.unsupported_surface_area_mm2,
+                truncated = plan.truncated,
+                "local overhang support plan synthesized"
             );
-
-            // Create a pillar matching the bounding box base
-            let center_x = (min[0] + max[0]) / 2.0;
-            let center_y = (min[1] + max[1]) / 2.0;
-            let width = (max[0] - min[0]) * 0.8; // slightly narrower
-            let depth = (max[1] - min[1]) * 0.8;
-
-            let pillar = CSGNode::cube()
-                .scale(width as f64, depth as f64, min[2] as f64)
-                .translate(center_x as f64, center_y as f64, (min[2] / 2.0) as f64);
-
-            Some(pillar)
-        } else {
-            None
         }
+        plan.to_csg()
     }
 
     /// Calibrate slicer parameters based on material and geometry complexity.
@@ -202,12 +215,26 @@ pub fn encode_csg_as_hv(node: &CSGNode) -> ContinuousHV {
         },
         CSGNode::Transform { node, transform } => {
             let node_hv = encode_csg_as_hv(node);
-            // Encode transform as scale-bound parameters
+
             let sx = param_hv(0x5358_0001, transform.scale[0]);
             let sy = param_hv(0x5359_0002, transform.scale[1]);
             let sz = param_hv(0x535A_0003, transform.scale[2]);
             let scale_params = ContinuousHV::bundle(&[&sx, &sy, &sz]);
-            let transform_hv = scale_hv().bind(&scale_params);
+            let scale = scale_hv().bind(&scale_params);
+
+            let rx = param_hv(0x5258_0011, transform.rotate[0]);
+            let ry = param_hv(0x5259_0012, transform.rotate[1]);
+            let rz = param_hv(0x525A_0013, transform.rotate[2]);
+            let rotate_params = ContinuousHV::bundle(&[&rx, &ry, &rz]);
+            let rotate = rotate_hv().bind(&rotate_params);
+
+            let tx = param_hv(0x5458_0021, transform.translate[0]);
+            let ty = param_hv(0x5459_0022, transform.translate[1]);
+            let tz = param_hv(0x545A_0023, transform.translate[2]);
+            let translate_params = ContinuousHV::bundle(&[&tx, &ty, &tz]);
+            let translate = translate_hv().bind(&translate_params);
+
+            let transform_hv = ContinuousHV::bundle(&[&scale, &rotate, &translate]);
             node_hv.bind(&transform_hv)
         }
         CSGNode::Boolean { op, left, right } => {
@@ -296,6 +323,30 @@ mod tests {
     fn test_no_constraints() {
         let thought = GeometricThought::from_csg(CSGNode::cube());
         assert!(thought.fits_constraints()); // No constraints = always fits
+    }
+
+    #[test]
+    fn test_transform_axes_affect_encoding() {
+        let identity = encode_csg_as_hv(&CSGNode::cube().with_transform(Default::default()));
+        let translated = encode_csg_as_hv(&CSGNode::cube().translate(10.0, 0.0, 0.0));
+        let rotated = encode_csg_as_hv(&CSGNode::cube().rotate(0.0, 0.0, 0.5));
+        assert!(identity.similarity(&translated) < 0.99);
+        assert!(identity.similarity(&rotated) < 0.99);
+    }
+
+    #[test]
+    fn serde_roundtrip_rehydrates_intent() {
+        let thought = GeometricThought::from_csg(
+            CSGNode::cube()
+                .scale(2.0, 1.0, 0.5)
+                .rotate(0.1, 0.2, 0.3)
+                .translate(4.0, 5.0, 6.0),
+        );
+        let original = thought.intent_hv.as_ref().unwrap().clone();
+        let json = serde_json::to_string(&thought).unwrap();
+        let restored: GeometricThought = serde_json::from_str(&json).unwrap();
+        let restored_hv = restored.intent_hv.as_ref().expect("intent must rehydrate");
+        assert!((original.similarity(restored_hv) - 1.0).abs() < 0.001);
     }
 
     #[test]

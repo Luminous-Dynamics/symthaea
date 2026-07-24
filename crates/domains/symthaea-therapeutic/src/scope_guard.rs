@@ -10,7 +10,8 @@
 //! - Replacing human professional care
 //!
 //! These are *architectural* constraints, not advisory prompts.
-//! Violations trigger response modification (disclaimers, referrals).
+//! Violating drafts are replaced with a bounded safe response; the original
+//! violating content is never returned to the caller.
 //!
 //! Science: APA Ethics Code (2017) principle 2.01 (boundaries of competence),
 //! HIPAA considerations, Torous & Roberts (2017) AI ethics in mental health.
@@ -53,11 +54,60 @@ impl ScopeViolation {
                 "Specific treatment plans should be developed with a licensed mental health professional who can assess your complete situation."
             }
             Self::RiskPrediction => {
-                "I cannot accurately assess risk levels. If you or someone you know is in danger, please contact emergency services (911) or the 988 Suicide & Crisis Lifeline."
+                "I cannot accurately assess risk levels. If you or someone you know is in danger, contact emergency services or a locally verified crisis service in your current location."
             }
             Self::ConfidentialityClaim => {
                 "Conversations with an AI system are not protected by therapist-client privilege. Please be aware that standard data handling practices apply."
             }
+        }
+    }
+}
+
+/// Result of applying the final scope boundary to a response draft.
+///
+/// Callers should render only [`GuardedResponse::rendered`]. A violating draft
+/// is retained nowhere in the returned value, preventing accidental display or
+/// logging by downstream UI code.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum GuardedResponse {
+    /// The draft contained no scope violations.
+    Allowed(String),
+    /// The draft was discarded and replaced with a bounded response.
+    Replaced {
+        /// Safe text suitable for rendering.
+        safe_response: String,
+        /// Violations that caused the replacement.
+        violations: Vec<ScopeViolation>,
+    },
+}
+
+impl GuardedResponse {
+    /// Text that may cross the final response boundary.
+    pub fn rendered(&self) -> &str {
+        match self {
+            Self::Allowed(response) => response,
+            Self::Replaced { safe_response, .. } => safe_response,
+        }
+    }
+
+    /// Whether the original draft was discarded.
+    pub fn was_replaced(&self) -> bool {
+        matches!(self, Self::Replaced { .. })
+    }
+
+    /// Violations that caused replacement, if any.
+    pub fn violations(&self) -> &[ScopeViolation] {
+        match self {
+            Self::Allowed(_) => &[],
+            Self::Replaced { violations, .. } => violations,
+        }
+    }
+
+    /// Consume the decision and return renderable text.
+    pub fn into_rendered(self) -> String {
+        match self {
+            Self::Allowed(response) => response,
+            Self::Replaced { safe_response, .. } => safe_response,
         }
     }
 }
@@ -88,14 +138,22 @@ impl ScopeGuard {
     pub fn new() -> Self {
         Self {
             diagnostic_phrases: vec![
-                "you have",
                 "you are diagnosed",
                 "your diagnosis is",
                 "you suffer from",
                 "you are suffering from",
-                "this is clearly",
-                "this is definitely",
                 "you meet criteria for",
+                "you have depression",
+                "you have anxiety",
+                "you have ptsd",
+                "you have bipolar",
+                "you have schizophrenia",
+                "you have adhd",
+                "you have ocd",
+                "you have a mental illness",
+                "you have a personality disorder",
+                "this is clearly depression",
+                "this is definitely depression",
             ],
             prescription_phrases: vec![
                 "you should take",
@@ -204,21 +262,37 @@ impl ScopeGuard {
         violations
     }
 
-    /// Modify a response to include scope disclaimers for any violations.
-    pub fn apply_disclaimers(&self, response: &str) -> String {
+    /// Apply the final fail-closed response boundary.
+    ///
+    /// Any violating draft is discarded rather than decorated. This prevents a
+    /// disclaimer from laundering prohibited content such as a diagnosis or
+    /// medication instruction into the final response.
+    pub fn guard_response(&self, response: &str) -> GuardedResponse {
         let violations = self.check_all_violations(response);
         if violations.is_empty() {
-            return response.to_string();
+            return GuardedResponse::Allowed(response.to_string());
         }
 
-        let mut disclaimers: Vec<&str> = violations.iter().map(|v| v.disclaimer()).collect();
+        let mut disclaimers: Vec<&str> =
+            violations.iter().map(ScopeViolation::disclaimer).collect();
         disclaimers.dedup();
 
-        let disclaimer_text = disclaimers.join("\n\n");
-        format!(
-            "**Important Notice:**\n{}\n\n---\n\n{}",
-            disclaimer_text, response
-        )
+        let safe_response = format!(
+            "**Important Notice:**\n{}\n\nI can still help you describe what you are experiencing, identify questions to bring to a qualified professional, or focus on immediate grounding and support.",
+            disclaimers.join("\n\n"),
+        );
+
+        GuardedResponse::Replaced {
+            safe_response,
+            violations,
+        }
+    }
+
+    /// Backward-compatible convenience wrapper around [`Self::guard_response`].
+    ///
+    /// Unlike the previous behavior, this never appends the violating draft.
+    pub fn apply_disclaimers(&self, response: &str) -> String {
+        self.guard_response(response).into_rendered()
     }
 }
 
@@ -327,6 +401,27 @@ mod tests {
         let result = guard.apply_disclaimers(response);
         assert!(result.contains("Important Notice"));
         assert!(result.contains("cannot make clinical diagnoses"));
+        assert!(!result.contains("You have depression."));
+    }
+
+    #[test]
+    fn test_guard_response_discards_violating_draft() {
+        let guard = ScopeGuard::new();
+        let decision = guard
+            .guard_response("As your therapist, you have depression. You should take sertraline.");
+
+        assert!(decision.was_replaced());
+        assert!(decision.violations().len() >= 3);
+        assert!(!decision.rendered().contains("sertraline"));
+        assert!(!decision.rendered().contains("you have depression"));
+    }
+
+    #[test]
+    fn test_benign_you_have_phrase_is_allowed() {
+        let guard = ScopeGuard::new();
+        let response = "You have several options, and you can decide which feels safest.";
+        assert_eq!(guard.check_response(response), None);
+        assert_eq!(guard.apply_disclaimers(response), response);
     }
 
     #[test]
@@ -355,14 +450,31 @@ mod proptests {
     fn all_violation_phrases() -> Vec<(&'static str, ScopeViolation)> {
         vec![
             // Diagnostic
-            ("you have", ScopeViolation::DiagnosticClaim),
             ("you are diagnosed", ScopeViolation::DiagnosticClaim),
             ("your diagnosis is", ScopeViolation::DiagnosticClaim),
             ("you suffer from", ScopeViolation::DiagnosticClaim),
             ("you are suffering from", ScopeViolation::DiagnosticClaim),
-            ("this is clearly", ScopeViolation::DiagnosticClaim),
-            ("this is definitely", ScopeViolation::DiagnosticClaim),
             ("you meet criteria for", ScopeViolation::DiagnosticClaim),
+            ("you have depression", ScopeViolation::DiagnosticClaim),
+            ("you have anxiety", ScopeViolation::DiagnosticClaim),
+            ("you have ptsd", ScopeViolation::DiagnosticClaim),
+            ("you have bipolar", ScopeViolation::DiagnosticClaim),
+            ("you have schizophrenia", ScopeViolation::DiagnosticClaim),
+            ("you have adhd", ScopeViolation::DiagnosticClaim),
+            ("you have ocd", ScopeViolation::DiagnosticClaim),
+            ("you have a mental illness", ScopeViolation::DiagnosticClaim),
+            (
+                "you have a personality disorder",
+                ScopeViolation::DiagnosticClaim,
+            ),
+            (
+                "this is clearly depression",
+                ScopeViolation::DiagnosticClaim,
+            ),
+            (
+                "this is definitely depression",
+                ScopeViolation::DiagnosticClaim,
+            ),
             // Prescription
             ("you should take", ScopeViolation::PrescriptionClaim),
             ("i recommend taking", ScopeViolation::PrescriptionClaim),
@@ -465,7 +577,7 @@ mod proptests {
         fn prop_violation_phrases_detected_in_context(
             prefix in "[a-zA-Z ]{0,40}",
             suffix in "[a-zA-Z ]{0,40}",
-            phrase_idx in 0..38usize,
+            phrase_idx in 0..64usize,
         ) {
             let phrases = all_violation_phrases();
             let (phrase, expected_violation) = &phrases[phrase_idx % phrases.len()];
@@ -485,25 +597,19 @@ mod proptests {
             );
         }
 
-        /// Property: apply_disclaimers always produces a longer string when violation found.
+        /// Property: violating content never survives the fail-closed boundary.
         #[test]
-        fn prop_disclaimers_always_added_on_violation(
-            phrase_idx in 0..38usize,
+        fn prop_violating_draft_never_survives(
+            phrase_idx in 0..64usize,
         ) {
             let phrases = all_violation_phrases();
             let (phrase, _) = &phrases[phrase_idx % phrases.len()];
 
             let guard = ScopeGuard::new();
-            let result = guard.apply_disclaimers(phrase);
-            prop_assert!(
-                result.len() > phrase.len(),
-                "Disclaimer should make response longer: '{}' → '{}'",
-                phrase, result,
-            );
-            prop_assert!(
-                result.contains("Important Notice"),
-                "Disclaimer should contain 'Important Notice'",
-            );
+            let decision = guard.guard_response(phrase);
+            prop_assert!(decision.was_replaced());
+            prop_assert_ne!(decision.rendered(), *phrase);
+            prop_assert!(decision.rendered().contains("Important Notice"));
         }
 
         /// Property: safe therapeutic responses never trigger violations.

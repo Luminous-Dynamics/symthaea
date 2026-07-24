@@ -1500,13 +1500,23 @@ impl CognitiveLoopService {
 
     /// Drain completed voice audio from the background synthesis thread.
     ///
-    /// Returns audio samples generated from previous cycles' text output.
+    /// Returns audio samples generated from previous cycles' text output —
+    /// both responses the cycle already collected (after feeding their quality
+    /// metrics to the voice feedback bridge) and any still sitting in the
+    /// channel (whose metrics are fed here for the same reason).
     /// Non-blocking — returns empty vec if no audio is ready.
-    pub fn drain_voice_audio(&self) -> Vec<super::super::voice_channel::VoiceResponse> {
-        self.voice_synthesis
+    pub fn drain_voice_audio(&mut self) -> Vec<super::super::voice_channel::VoiceResponse> {
+        let mut responses: Vec<_> = self.voice_audio_buffer.drain(..).collect();
+        let fresh = self
+            .voice_synthesis
             .as_ref()
             .map(|vs| vs.drain_responses())
-            .unwrap_or_default()
+            .unwrap_or_default();
+        for resp in fresh {
+            self.update_voice_feedback(resp.metrics.clone());
+            responses.push(resp);
+        }
+        responses
     }
 
     /// Enable async LLM language: spawns a background thread that sends

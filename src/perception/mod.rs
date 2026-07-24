@@ -33,6 +33,13 @@ pub mod audio_stream;
 #[cfg(feature = "voice-stt-live")]
 pub use audio_stream::{MicCaptureConfig, MicCaptureHandle};
 
+// Live phone-screen capture → vision frames for the loop's VisionBridge
+// (feature-gated, opt-in). Background thread; loop never blocks on ADB.
+#[cfg(feature = "phone")]
+pub mod phone_stream;
+#[cfg(feature = "phone")]
+pub use phone_stream::{PhoneCaptureConfig, PhoneCaptureHandle};
+
 // Physical-sensor fusion → ContinuousHV (feature-gated).
 // Each sensor subtype is independently gated under `sensor-fusion`.
 #[cfg(feature = "sensor-fusion")]
@@ -170,30 +177,15 @@ pub use modern_embeddings::{
     project_to_hv16,
 };
 
-// Multi-modal integration (conditionally compiled)
-#[cfg(feature = "full_perception")]
-pub mod multi_modal;
-#[cfg(feature = "full_perception")]
-pub mod semantic_vision;
-#[cfg(feature = "full_perception")]
-pub mod visual_cortex;
-
-#[cfg(feature = "full_perception")]
-pub use multi_modal::{
-    ModalityType, MultiModalConfig, MultiModalIntegrator, MultiModalPerception, PerceptionInput,
-};
-#[cfg(feature = "full_perception")]
-pub use semantic_vision::{
-    ImageCaption, ImageEmbedding, OcrSystem, SemanticVision, VisionConfig, VisualFeatures,
-};
-#[cfg(feature = "full_perception")]
-pub use visual_cortex::{FeatureExtractionResult, VisualCortex, VisualCortexConfig};
-
-#[cfg(feature = "full_perception")]
-pub mod conscious_perception;
-
-#[cfg(feature = "full_perception")]
-pub mod resilience;
+// DELETED 2026-07-16 (vision review P2.3): the `full_perception` byte-hash
+// stratum — visual_cortex.rs (random-filter "hierarchical vision"),
+// semantic_vision.rs (byte-histogram "embeddings" + fabricated captions with
+// 0.9-1.0 confidence over hash noise), multi_modal.rs, and their only
+// dependents conscious_perception.rs + resilience.rs. The feature was an
+// orphan (nothing enabled it except --all-features) and every "vision"
+// computation in it was confidence theater. Real replacements already exist:
+// visual_features.rs (real CV below), the vision-manifold encoder, and the
+// archived symthaea-perception crate's SigLIP stack (adopt path, review P2.2).
 
 // Ported from crates/symthaea-perception (2026-02-06)
 // Code semantic analysis (syn-based Rust parsing, project structure analysis)

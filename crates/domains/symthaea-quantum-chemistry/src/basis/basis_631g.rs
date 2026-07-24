@@ -159,6 +159,20 @@ fn shells_for_element(z: u8) -> Vec<ShellData631G> {
     }
 }
 
+impl Basis631G {
+    /// Non-panicking capability query: does this provider have real 6-31G
+    /// data for element `z`? (Phase Q1, 2026-07-16.) Only H/C/N/O -- this
+    /// crate's 6-31G coverage was deliberately NOT widened alongside
+    /// STO-3G's Phase A.8 extension, since the H2O/CH4 6-31G energy
+    /// discrepancy (Phase Q0) is real, unresolved, and specific to this
+    /// basis's data/contraction scheme; extending coverage before that's
+    /// understood risks propagating an unknown bug into more elements. See
+    /// `QUANTUM_CHEMISTRY_COMPLETENESS_ROADMAP_2026-07-16.md`'s Q5 entry.
+    pub fn supports_element(z: u8) -> bool {
+        matches!(z, 1 | 6 | 7 | 8)
+    }
+}
+
 impl BasisSetProvider for Basis631G {
     fn name() -> &'static str {
         "6-31G"
@@ -272,5 +286,21 @@ mod tests {
             "H2O HF/6-31G = {:.4}, expected < -75.0",
             e_631g
         );
+    }
+
+    #[test]
+    fn test_supports_element_agrees_with_shells_for_element_boundary() {
+        // Phase Q1 (2026-07-16): H/C/N/O supported, everything else isn't --
+        // must agree with what shells_for_element actually does.
+        for z in [1u8, 6, 7, 8] {
+            assert!(Basis631G::supports_element(z), "Z={z} should be supported");
+            let _ = shells_for_element(z); // must not panic
+        }
+        for z in [2u8, 9, 17, 54] {
+            assert!(
+                !Basis631G::supports_element(z),
+                "Z={z} should not be supported"
+            );
+        }
     }
 }

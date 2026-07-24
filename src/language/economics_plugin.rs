@@ -110,7 +110,7 @@ impl DomainPlugin for EconomicsDomainPlugin {
         if flows.len() < 2 {
             return None;
         }
-        let value = npv(rate, &flows);
+        let value = npv(rate, &flows).ok()?;
         Some(ComputedResult {
             answer: format!("NPV at {:.1}% of {:?} is {value:.2}.", rate * 100.0, flows),
             cube: EpistemicCube {

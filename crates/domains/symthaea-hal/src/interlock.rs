@@ -42,6 +42,52 @@ pub struct SafetyConfig {
     pub prediction_error_threshold: f32,
 }
 
+impl SafetyConfig {
+    /// Validate all limits before they are trusted by the interlock.
+    pub fn validate(&self) -> HalResult<()> {
+        if self.watchdog_timeout_ms == 0 {
+            return Err(HalError::Safety(
+                "watchdog timeout must be greater than zero".to_string(),
+            ));
+        }
+        for i in 0..NUM_ACTUATORS {
+            let torque = self.max_torque[i];
+            if !torque.is_finite() || !(0.0..=1.0).contains(&torque) {
+                return Err(HalError::Safety(format!(
+                    "invalid max torque for joint {i}: {torque}"
+                )));
+            }
+            let angle = self.max_angle_deg[i];
+            if !angle.is_finite() || angle <= 0.0 {
+                return Err(HalError::Safety(format!(
+                    "invalid angle limit for joint {i}: {angle}"
+                )));
+            }
+            let current = self.max_current_a[i];
+            if !current.is_finite() || current <= 0.0 {
+                return Err(HalError::Safety(format!(
+                    "invalid current limit for joint {i}: {current}"
+                )));
+            }
+        }
+        if !self.prediction_error_gain.is_finite()
+            || !(0.0..=1.0).contains(&self.prediction_error_gain)
+        {
+            return Err(HalError::Safety(format!(
+                "invalid prediction error gain: {}",
+                self.prediction_error_gain
+            )));
+        }
+        if !self.prediction_error_threshold.is_finite() || self.prediction_error_threshold < 0.0 {
+            return Err(HalError::Safety(format!(
+                "invalid prediction error threshold: {}",
+                self.prediction_error_threshold
+            )));
+        }
+        Ok(())
+    }
+}
+
 impl Default for SafetyConfig {
     fn default() -> Self {
         Self {
@@ -119,6 +165,16 @@ impl SafetyInterlock {
         self.prediction_error = error;
     }
 
+    /// Latch an externally detected safety fault.
+    ///
+    /// Runtime monitor layers use this when sensor shape, freshness, or other
+    /// evidence is insufficient to continue actuation safely.
+    pub fn trip_safety(&mut self, reason: impl Into<String>) -> HalError {
+        let reason = reason.into();
+        self.trip(&reason);
+        HalError::Safety(reason)
+    }
+
     /// Whether the interlock has tripped.
     pub fn is_tripped(&self) -> bool {
         self.tripped
@@ -162,7 +218,39 @@ impl SafetyInterlock {
             )));
         }
 
-        // 3. Watchdog check
+        // 3. Validate configuration and command shape before arithmetic.
+        if let Err(e) = self.config.validate() {
+            self.trip("invalid safety configuration");
+            return Err(e);
+        }
+        if !self.prediction_error.is_finite() {
+            self.trip("non-finite prediction error");
+            return Err(HalError::Safety(
+                "prediction error must be finite".to_string(),
+            ));
+        }
+        if command.torques.len() != NUM_ACTUATORS {
+            self.trip("command actuator count does not match this interlock");
+            return Err(HalError::Safety(format!(
+                "command has {} torques but this interlock requires exactly {}",
+                command.torques.len(),
+                NUM_ACTUATORS
+            )));
+        }
+        if let Some((index, value)) = command
+            .torques
+            .iter()
+            .copied()
+            .enumerate()
+            .find(|(_, value)| !value.is_finite())
+        {
+            self.trip("command contains non-finite torque");
+            return Err(HalError::Safety(format!(
+                "non-finite torque for joint {index}: {value}"
+            )));
+        }
+
+        // 4. Watchdog check
         let elapsed = self.last_command_time.elapsed().as_millis() as u64;
         if elapsed > self.config.watchdog_timeout_ms {
             self.trip("watchdog timeout");
@@ -172,37 +260,21 @@ impl SafetyInterlock {
             });
         }
 
-        // 4. Apply torque limits and prediction error gain reduction
+        // 5. Apply torque limits and prediction error gain reduction
         let gain = if self.prediction_error > self.config.prediction_error_threshold {
             self.config.prediction_error_gain
         } else {
             1.0
         };
 
-        // This interlock's per-joint limits (`self.config.max_torque`) are a
-        // fixed-size [f32; NUM_ACTUATORS] array, so it has no defined safety
-        // bound for any actuator beyond NUM_ACTUATORS. A command built for a
-        // larger morphology (Dexterous53/FullSpine) must be refused rather
-        // than silently clamping only the first NUM_ACTUATORS and passing
-        // the rest through unbounded.
-        if command.torques.len() > NUM_ACTUATORS {
-            self.trip("command has more actuators than this interlock's torque limits cover");
-            return Err(HalError::Safety(format!(
-                "command has {} torques but this interlock only has safety limits for {} \
-                 actuators (morphology mismatch) -- refusing to pass unclamped torques through",
-                command.torques.len(),
-                NUM_ACTUATORS,
-            )));
-        }
-
         let mut safe = command.clone();
-        for i in 0..NUM_ACTUATORS.min(safe.torques.len()) {
+        for i in 0..NUM_ACTUATORS {
             safe.torques[i] =
                 safe.torques[i].clamp(-self.config.max_torque[i], self.config.max_torque[i]);
             safe.torques[i] *= gain;
         }
 
-        // 5. Update watchdog timestamp
+        // 6. Update watchdog timestamp
         self.last_command_time = Instant::now();
 
         Ok(safe)
@@ -213,9 +285,25 @@ impl SafetyInterlock {
     /// Call this with actual current measurements if available.
     pub fn check_current(&mut self, joint: usize, amps: f32) -> HalResult<()> {
         if joint >= NUM_ACTUATORS {
-            return Ok(());
+            self.trip("current measurement references an unknown joint");
+            return Err(HalError::Safety(format!(
+                "current measurement joint index {joint} is out of range"
+            )));
         }
-        if amps > self.config.max_current_a[joint] {
+        if !amps.is_finite() {
+            self.trip("non-finite current measurement");
+            return Err(HalError::Safety(format!(
+                "non-finite current measurement for joint {joint}"
+            )));
+        }
+        let limit = self.config.max_current_a[joint];
+        if !limit.is_finite() || limit <= 0.0 {
+            self.trip("invalid current limit");
+            return Err(HalError::Safety(format!(
+                "invalid current limit for joint {joint}: {limit}"
+            )));
+        }
+        if amps.abs() > limit {
             self.trip(&format!(
                 "overcurrent on joint {} ({})",
                 joint, JOINT_NAMES[joint]
@@ -223,8 +311,8 @@ impl SafetyInterlock {
             return Err(HalError::Overcurrent {
                 joint,
                 name: JOINT_NAMES[joint],
-                amps,
-                limit: self.config.max_current_a[joint],
+                amps: amps.abs(),
+                limit,
             });
         }
         Ok(())
@@ -233,9 +321,24 @@ impl SafetyInterlock {
     /// Check a measured joint angle against bounds.
     pub fn check_angle(&mut self, joint: usize, angle_deg: f32) -> HalResult<()> {
         if joint >= NUM_ACTUATORS {
-            return Ok(());
+            self.trip("angle measurement references an unknown joint");
+            return Err(HalError::Safety(format!(
+                "angle measurement joint index {joint} is out of range"
+            )));
+        }
+        if !angle_deg.is_finite() {
+            self.trip("non-finite angle measurement");
+            return Err(HalError::Safety(format!(
+                "non-finite angle measurement for joint {joint}"
+            )));
         }
         let limit = self.config.max_angle_deg[joint];
+        if !limit.is_finite() || limit <= 0.0 {
+            self.trip("invalid angle limit");
+            return Err(HalError::Safety(format!(
+                "invalid angle limit for joint {joint}: {limit}"
+            )));
+        }
         if angle_deg.abs() > limit {
             self.trip(&format!(
                 "angle bounds on joint {} ({})",
@@ -420,6 +523,44 @@ mod tests {
         let result = interlock.check_angle(0, 95.0); // limit is 90°
         assert!(result.is_err());
         assert!(interlock.is_tripped());
+    }
+
+    #[test]
+    fn test_short_command_rejected() {
+        let mut interlock = SafetyInterlock::new();
+        let mut cmd = HumanoidCommand::zero();
+        cmd.torques.pop();
+        assert!(interlock.filter_command(&cmd).is_err());
+        assert!(interlock.is_tripped());
+    }
+
+    #[test]
+    fn test_non_finite_command_rejected() {
+        let mut interlock = SafetyInterlock::new();
+        let mut cmd = HumanoidCommand::zero();
+        cmd.torques[0] = f32::NAN;
+        assert!(interlock.filter_command(&cmd).is_err());
+        assert!(interlock.is_tripped());
+    }
+
+    #[test]
+    fn test_non_finite_measurements_trip() {
+        let mut current = SafetyInterlock::new();
+        assert!(current.check_current(0, f32::NAN).is_err());
+        assert!(current.is_tripped());
+
+        let mut angle = SafetyInterlock::new();
+        assert!(angle.check_angle(0, f32::INFINITY).is_err());
+        assert!(angle.is_tripped());
+    }
+
+    #[test]
+    fn test_negative_current_magnitude_trips() {
+        let mut interlock = SafetyInterlock::new();
+        assert!(matches!(
+            interlock.check_current(0, -3.0),
+            Err(HalError::Overcurrent { .. })
+        ));
     }
 
     #[test]

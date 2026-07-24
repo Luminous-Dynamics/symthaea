@@ -31,6 +31,10 @@ pub mod fep_agent;
 pub mod kinematics;
 pub mod kitchen_scenario;
 pub mod perturbations;
+pub mod plugin;
+pub mod predictor;
+pub mod safety_supervisor;
+pub mod sensorimotor;
 pub mod simulator;
 #[cfg(feature = "symtropy")]
 pub mod symtropy_sim;

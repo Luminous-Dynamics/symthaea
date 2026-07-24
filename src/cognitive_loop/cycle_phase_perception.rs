@@ -121,6 +121,14 @@ impl CognitiveLoopService {
             }
         }
 
+        // Self-hearing (voice plan LF5): her own most-recent utterance,
+        // heard through the same acoustic ear as the world. Speaking becomes
+        // a perceived event.
+        #[cfg(feature = "voice-stt")]
+        if let Some(self_voice) = self.pending_self_voice_hv.take() {
+            aux_sensor_hvs.push(crate::hdc::BinaryHV::from_bipolar(&self_voice.values));
+        }
+
         #[cfg(feature = "mesh")]
         if let Some(radio_hv) = self.spectrum_manager.perception_hv() {
             aux_sensor_hvs.push(radio_hv);
@@ -131,15 +139,6 @@ impl CognitiveLoopService {
         {
             let imu_chv = fusion.fuse(reading);
             aux_sensor_hvs.push(crate::hdc::BinaryHV::from_bipolar(&imu_chv.values));
-        }
-
-        // Feel Metabolic Stress
-        if let Some(ref mut conductor) = self.metabolic_conductor {
-            let _homeostasis = conductor.tick();
-            let stress_hv = conductor.encode_metabolic_stress();
-            if stress_hv.as_slice().iter().any(|&v| v != 0.0) {
-                aux_sensor_hvs.push(stress_hv.to_binary(0.0));
-            }
         }
 
         if !aux_sensor_hvs.is_empty() {
@@ -190,14 +189,41 @@ impl CognitiveLoopService {
         #[cfg(feature = "vision-manifold")]
         let mut scene_recognized = false;
 
+        // Live phone-screen capture: fill the vision buffer with the
+        // freshest phone frame, but only when nothing was explicitly
+        // injected this cycle — injected frames (art-observer viewing
+        // windows, tests, dev bins) take precedence over the ambient camera.
+        #[cfg(feature = "phone")]
+        if self
+            .sensorimotor
+            .vision_sensory
+            .vision_frame_buffer
+            .is_none()
+        {
+            if let Some(ref phone) = self.phone_capture {
+                if let Some(frame) = phone.drain_latest() {
+                    self.sensorimotor.vision_sensory.vision_frame_buffer = Some(frame);
+                }
+            }
+        }
+
+        // Consume-per-cycle retina semantics: a frame is processed exactly
+        // once, on the cycle it was injected; no frame → the manifold idles
+        // this cycle. The previous behavior processed the buffer's contents
+        // (or an EMPTY slice) every cycle, which (a) made a camera-less loop
+        // perceive a maximal-surprise "black world" each cycle — the root
+        // semantics behind the 2026-07-11 Ultra-dilation OOM; the
+        // allow_auto_dilation gate only treated the symptom — and (b) let
+        // the last injected frame (e.g. an art-observer artwork) linger and
+        // be re-perceived forever after its viewing window ended.
         #[cfg(feature = "vision-manifold")]
-        if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
-            let pixels = self
-                .sensorimotor
-                .vision_sensory
-                .vision_frame_buffer
-                .as_deref()
-                .unwrap_or(&[]);
+        let vision_frame = self.sensorimotor.vision_sensory.vision_frame_buffer.take();
+
+        #[cfg(feature = "vision-manifold")]
+        if let (Some(bridge), Some(pixels)) = (
+            self.sensorimotor.vision_sensory.vision_bridge.as_mut(),
+            vision_frame.as_deref(),
+        ) {
             let w = self.config.vision_frame_width;
             let h = self.config.vision_frame_height;
             let channels = if bridge.manifold().encoder().config().enable_color {
@@ -223,7 +249,20 @@ impl CognitiveLoopService {
             vision_horizon_errors = manifold.evaluate_horizons().errors;
             scene_recognized = telemetry.scene_recognition_similarity > 0.0;
 
-            if current_cycle >= last_change + super::thresholds::VISION_DILATION_COOLDOWN {
+            // Gated by enable_vision_auto_dilation: Ultra is 65,536 dims and
+            // the post-Ultra machinery has an unresolved multi-GB blow-up —
+            // a camera-less loop (empty buffer → max surprise) OOMed within
+            // ~80 cycles every time (kernel oom_reaper, found 2026-07-11 by
+            // the observer-ΔΨ probe). The manifold's own internal FEP
+            // ExplorationTrigger dilation is gated at the source via
+            // VisionConfig::allow_auto_dilation (threaded from this same
+            // flag in the constructor) — do NOT clamp back with
+            // dilate(Standard) here: dilate() at 65k is itself part of the
+            // blow-up (a clamping attempt moved the OOM to the first clamp
+            // event).
+            if self.config.enable_vision_auto_dilation
+                && current_cycle >= last_change + super::thresholds::VISION_DILATION_COOLDOWN
+            {
                 let target = if vision_mean_surprise
                     > super::thresholds::VISION_SURPRISE_DILATION_THRESHOLD
                 {
@@ -267,18 +306,39 @@ impl CognitiveLoopService {
 
         // Cross-manifold predictor
         #[cfg(feature = "vision-manifold")]
-        let cross_manifold_prediction_error =
-            if let Some(ref mut pred) = self.sensorimotor.vision_sensory.cross_manifold_predictor {
-                if let Some(ref vis_hv) = visual_hv {
+        let cross_manifold_prediction_error = if let Some(ref mut pred) =
+            self.sensorimotor.vision_sensory.cross_manifold_predictor
+        {
+            if let Some(ref vis_hv) = visual_hv {
+                // Guard, not assert: after holographic dilation the
+                // manifold emits HVs above the predictor's dimension, and
+                // `ContinuousHV::bind` hard-asserts equal dims — this
+                // panicked the ENTIRE cycle on any vision loop with the
+                // predictor enabled once dilation fired (third instance
+                // of the post-dilation dim-mismatch family, after the
+                // Phase 1.5 blend and art-observer cases; found
+                // 2026-07-15 when the never-registered
+                // vision_manifold_integration test target first ran).
+                // The predictor's own dilate() can't follow: its dim must
+                // also match the 16,384-dim cognitive side it observes.
+                // Skip prediction this cycle, keep the last error.
+                if vis_hv.as_slice().len() == pred.dim() {
                     let vis_chv = symthaea_core::hdc::ContinuousHV::from_slice(vis_hv.as_slice());
                     let _predicted = pred.predict_cognitive(&vis_chv);
-                    pred.prediction_error()
                 } else {
-                    0.0
+                    tracing::debug!(
+                        vision_dim = vis_hv.as_slice().len(),
+                        predictor_dim = pred.dim(),
+                        "vision HV dim mismatch (post-dilation) — skipping cross-manifold prediction this cycle"
+                    );
                 }
+                pred.prediction_error()
             } else {
                 0.0
-            };
+            }
+        } else {
+            0.0
+        };
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 1.1: Surprise and Exploration
@@ -315,15 +375,43 @@ impl CognitiveLoopService {
                         let w = self.config.vision_frame_width;
                         let h = self.config.vision_frame_height;
                         let frame_count = bridge.frame_count();
-                        let fb = symthaea_foveation::FrameBuffer {
-                            pixels: vec![128u8; (w * h) as usize],
-                            width: w,
-                            height: h,
-                            channels: 1,
-                            frame_id: frame_count,
-                            timestamp_us: frame_count * 20_000,
-                        };
-                        fov.on_frame(fb);
+                        // Feed the frame actually perceived this cycle (as
+                        // luma), not a fabricated input. (Until 2026-07-15
+                        // this handed foveation a CONSTANT gray frame every
+                        // cycle — same bug class as demo_runner's gray
+                        // injection.) No frame this cycle → no on_frame;
+                        // tick/drain below still run so pending dispatches
+                        // complete.
+                        if let Some(pixels) = vision_frame.as_deref() {
+                            let channels = if bridge.manifold().encoder().config().enable_color {
+                                3
+                            } else {
+                                1
+                            };
+                            let mut luma: Vec<u8> = if channels == 3 {
+                                pixels
+                                    .chunks_exact(3)
+                                    .map(|p| {
+                                        (0.299 * p[0] as f32
+                                            + 0.587 * p[1] as f32
+                                            + 0.114 * p[2] as f32)
+                                            as u8
+                                    })
+                                    .collect()
+                            } else {
+                                pixels.to_vec()
+                            };
+                            luma.resize((w * h) as usize, 0);
+                            let fb = symthaea_foveation::FrameBuffer {
+                                pixels: luma,
+                                width: w,
+                                height: h,
+                                channels: 1,
+                                frame_id: frame_count,
+                                timestamp_us: frame_count * 20_000,
+                            };
+                            fov.on_frame(fb);
+                        }
 
                         let regions = bridge.salient_regions();
                         let motion = bridge.manifold().motion_vectors();
@@ -376,15 +464,34 @@ impl CognitiveLoopService {
         {
             let mut vision_hvs = Vec::new();
             if let Some(ref vis_hv) = visual_hv {
-                vision_hvs.push(symthaea_core::hdc::BinaryHV::from_bipolar(
-                    vis_hv.as_slice(),
-                ));
+                // Guard, not assert: after holographic dilation the manifold
+                // emits HVs above BinaryHV::DIM, and `from_bipolar` hard-
+                // asserts the dimension — this panicked the ENTIRE cycle a
+                // few cycles into any run where dilation fired (latent since
+                // the blend landed; first actually executed by the
+                // art_observer_live tests, where an empty frame buffer's max
+                // surprise triggers Ultra dilation immediately). Bundling
+                // requires equal dims, so a dilated frame simply can't join
+                // this cycle's blend — skip it rather than crash cognition.
+                if vis_hv.as_slice().len() == symthaea_core::hdc::BinaryHV::DIM {
+                    vision_hvs.push(symthaea_core::hdc::BinaryHV::from_bipolar(
+                        vis_hv.as_slice(),
+                    ));
+                } else {
+                    tracing::debug!(
+                        vision_dim = vis_hv.as_slice().len(),
+                        cognitive_dim = symthaea_core::hdc::BinaryHV::DIM,
+                        "vision HV dim mismatch (post-dilation) — skipping blend this cycle"
+                    );
+                }
             }
             #[cfg(feature = "foveation")]
             for fov_res in &fov_results {
-                vision_hvs.push(symthaea_core::hdc::BinaryHV::from_bipolar(
-                    fov_res.semantic_hv.as_slice(),
-                ));
+                if fov_res.semantic_hv.as_slice().len() == symthaea_core::hdc::BinaryHV::DIM {
+                    vision_hvs.push(symthaea_core::hdc::BinaryHV::from_bipolar(
+                        fov_res.semantic_hv.as_slice(),
+                    ));
+                }
             }
             if !vision_hvs.is_empty() {
                 vision_hvs.insert(0, encoding_res.hv16_cached);

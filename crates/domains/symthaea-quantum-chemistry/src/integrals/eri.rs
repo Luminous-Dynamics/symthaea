@@ -185,17 +185,15 @@ pub fn eri_contracted(
     result
 }
 
-/// Compute the full ERI tensor with Schwarz prescreening.
+/// Compute Schwarz screening bounds: sqrt((ij|ij)) for every basis-function
+/// pair, used to skip negligible integrals without computing them.
 ///
-/// Returns a flat array indexed as eri[i*n³ + j*n² + k*n + l].
-/// Also returns the number of integrals actually computed (vs. screened out).
-pub fn compute_eri_tensor(basis: &[ContractedGaussian]) -> (Vec<f64>, usize, usize) {
+/// Factored out of `compute_eri_tensor` (Phase Q3, 2026-07-16) so the
+/// direct-SCF Fock builders (`scf::fock::build_fock_matrix_direct` /
+/// `build_uhf_fock_matrices_direct`) can reuse it without duplicating this
+/// O(n^2) diagonal-integral loop.
+pub fn compute_schwarz_bounds(basis: &[ContractedGaussian]) -> Vec<f64> {
     let n = basis.len();
-    let n2 = n * n;
-    let n3 = n2 * n;
-    let mut eri = vec![0.0; n * n * n * n];
-
-    // Step 1: Compute Schwarz bounds — diagonal (ij|ij) for all pairs
     let mut schwarz = vec![0.0_f64; n * n];
     for i in 0..n {
         for j in i..n {
@@ -205,6 +203,27 @@ pub fn compute_eri_tensor(basis: &[ContractedGaussian]) -> (Vec<f64>, usize, usi
             schwarz[j * n + i] = bound;
         }
     }
+    schwarz
+}
+
+/// Compute the full ERI tensor with Schwarz prescreening.
+///
+/// Returns a flat array indexed as eri[i*n³ + j*n² + k*n + l].
+/// Also returns the number of integrals actually computed (vs. screened out).
+///
+/// This is the "conventional" (cache-then-read) SCF mode: `n^4` memory, fast
+/// repeated reads. For large basis sets where that memory is impractical,
+/// see the "direct" mode (`scf::fock::build_fock_matrix_direct` and
+/// `RhfConfig::direct` / `UhfConfig::direct`, Phase Q3, 2026-07-16), which
+/// recomputes integrals on demand instead of caching them.
+pub fn compute_eri_tensor(basis: &[ContractedGaussian]) -> (Vec<f64>, usize, usize) {
+    let n = basis.len();
+    let n2 = n * n;
+    let n3 = n2 * n;
+    let mut eri = vec![0.0; n * n * n * n];
+
+    // Step 1: Compute Schwarz bounds — diagonal (ij|ij) for all pairs
+    let schwarz = compute_schwarz_bounds(basis);
 
     let threshold = INTEGRAL_SCREENING_THRESHOLD;
     let mut computed = 0_usize;
@@ -324,5 +343,34 @@ mod tests {
         // For a small basis, not many will be screened, but the machinery should work
         // The important thing is that computed + screened = total unique pairs
         assert!(computed > 0, "Should compute at least some integrals");
+    }
+
+    #[test]
+    fn test_schwarz_bounds_are_diagonal_sqrt() {
+        // Phase Q3 (2026-07-16): compute_schwarz_bounds must give exactly
+        // the same values compute_eri_tensor's internal Schwarz computation
+        // used to compute inline, before being factored out.
+        let h2 = Molecule::h2();
+        let basis = Sto3g::build(&h2);
+        let n = basis.n_basis();
+        let bounds = compute_schwarz_bounds(&basis.functions);
+        assert_eq!(bounds.len(), n * n);
+        for i in 0..n {
+            for j in 0..n {
+                let diag = eri_contracted(
+                    &basis.functions[i],
+                    &basis.functions[j],
+                    &basis.functions[i],
+                    &basis.functions[j],
+                );
+                let expected = diag.abs().sqrt();
+                assert!(
+                    (bounds[i * n + j] - expected).abs() < 1e-14,
+                    "bounds[{i},{j}]={} expected {}",
+                    bounds[i * n + j],
+                    expected
+                );
+            }
+        }
     }
 }

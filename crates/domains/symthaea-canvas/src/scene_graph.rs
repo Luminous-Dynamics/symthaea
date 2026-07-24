@@ -72,12 +72,18 @@ pub enum FilterType {
 }
 
 /// 2D affine transform.
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Transform {
     pub translate_x: f32,
     pub translate_y: f32,
     pub rotate_deg: f32,
     pub scale: f32,
+}
+
+impl Default for Transform {
+    fn default() -> Self {
+        Self::identity()
+    }
 }
 
 impl Transform {
@@ -91,26 +97,49 @@ impl Transform {
     }
 
     pub fn is_identity(&self) -> bool {
-        self.translate_x == 0.0
+        self.translate_x.is_finite()
+            && self.translate_y.is_finite()
+            && self.rotate_deg.is_finite()
+            && self.scale.is_finite()
+            && self.translate_x == 0.0
             && self.translate_y == 0.0
             && self.rotate_deg == 0.0
             && (self.scale - 1.0).abs() < 1e-6
     }
 
-    /// Emit SVG transform attribute value.
+    /// Emit a finite SVG transform attribute value. Non-finite translations
+    /// and rotations fall back to zero; a non-finite scale falls back to one.
     pub fn to_svg(&self) -> String {
+        let tx = if self.translate_x.is_finite() {
+            self.translate_x
+        } else {
+            0.0
+        };
+        let ty = if self.translate_y.is_finite() {
+            self.translate_y
+        } else {
+            0.0
+        };
+        let rotation = if self.rotate_deg.is_finite() {
+            self.rotate_deg
+        } else {
+            0.0
+        };
+        let scale = if self.scale.is_finite() {
+            self.scale
+        } else {
+            1.0
+        };
+
         let mut parts = Vec::new();
-        if self.translate_x != 0.0 || self.translate_y != 0.0 {
-            parts.push(format!(
-                "translate({:.1},{:.1})",
-                self.translate_x, self.translate_y
-            ));
+        if tx != 0.0 || ty != 0.0 {
+            parts.push(format!("translate({tx:.1},{ty:.1})"));
         }
-        if self.rotate_deg != 0.0 {
-            parts.push(format!("rotate({:.1})", self.rotate_deg));
+        if rotation != 0.0 {
+            parts.push(format!("rotate({rotation:.1})"));
         }
-        if (self.scale - 1.0).abs() > 1e-6 {
-            parts.push(format!("scale({:.3})", self.scale));
+        if (scale - 1.0).abs() > 1e-6 {
+            parts.push(format!("scale({scale:.3})"));
         }
         parts.join(" ")
     }
@@ -238,6 +267,13 @@ mod tests {
             .with_child(SceneNode::circle(0.0, 0.0, 10.0))
             .with_child(SceneNode::group(None).with_child(SceneNode::circle(5.0, 5.0, 3.0)));
         assert_eq!(tree.node_count(), 4);
+    }
+
+    #[test]
+    fn transform_default_is_identity() {
+        let t = Transform::default();
+        assert!(t.is_identity());
+        assert_eq!(t.scale, 1.0);
     }
 
     #[test]

@@ -1542,6 +1542,59 @@ mod tests {
         assert!(!result.reject, "Fair die should not be rejected");
     }
 
+    #[test]
+    fn test_chi_squared_rejects_a_clearly_loaded_die() {
+        // Positive control for test_chi_squared's negative control above --
+        // a die landing on face 1 nearly all the time must be rejected as
+        // non-uniform, and p_value must land on the correct side of alpha
+        // by more than a hair (added alongside symthaea-forge's Tier 2.1
+        // widened operator search, which needs a real oracle in both
+        // directions, not just "doesn't false-positive on fair data").
+        let observed = vec![580.0, 4.0, 4.0, 4.0, 4.0, 4.0];
+        let expected = vec![100.0, 100.0, 100.0, 100.0, 100.0, 100.0];
+        let result = chi_squared_test(&observed, &expected, 0.05);
+        assert!(result.reject, "A heavily loaded die must be rejected");
+        assert!(
+            result.p_value < 0.001,
+            "p_value should be far below alpha for this strongly non-uniform sample, got {}",
+            result.p_value
+        );
+        assert!(result.test_statistic > 100.0);
+    }
+
+    #[test]
+    fn test_chi_squared_matches_a_hand_computed_golden_reference() {
+        // Added after symthaea-forge's first real search campaign against
+        // this function produced a "PASS + 8.26% faster" candidate that
+        // was actually a genuine correctness bug slipping through: it
+        // changed `df = n - 1` to `df = n + 1` AND flipped the sign in the
+        // Wilson-Hilferty term from `1.0 - 2.0/(9.0*df)` to
+        // `1.0 + 2.0/(9.0*df)` -- both wrong, both compiled, both passed
+        // test_chi_squared and test_chi_squared_rejects_a_clearly_loaded_die
+        // (neither of those two tests happened to be sensitive enough to
+        // this specific pair of formula errors). The human-review gate
+        // caught it (the certificate was never applied), but the real fix
+        // is a tighter oracle, not just relying on review every time.
+        //
+        // Golden values below are independently computed in Python (not
+        // derived from this file) for chi2=0 exactly (observed==expected,
+        // n=4, so df=3): z = (0/3)^(1/3) - (1 - 2/(9*3)); z_scaled =
+        // z / sqrt(2/(9*3)); p = 1 - normal_cdf(z_scaled).
+        // Correct answer: p_value ~= 0.999666. The df=n+1/sign-flipped
+        // mutant instead computes p_value ~= 1.000000 for this exact
+        // input -- distinguishable well outside floating-point noise.
+        let observed = vec![10.0, 10.0, 10.0, 10.0];
+        let expected = vec![10.0, 10.0, 10.0, 10.0];
+        let result = chi_squared_test(&observed, &expected, 0.05);
+        assert_eq!(result.test_statistic, 0.0);
+        assert!(
+            (result.p_value - 0.999666).abs() < 1e-4,
+            "expected p_value ~= 0.999666 for this golden chi2=0, df=3 case, got {} \
+             (a wrong degrees-of-freedom or Wilson-Hilferty sign error would land near 1.0)",
+            result.p_value
+        );
+    }
+
     // ── Bayesian inference ───────────────────────────────────────────────
 
     #[test]

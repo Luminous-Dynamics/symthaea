@@ -8,6 +8,7 @@
 //! tempo. muse chooses tuning, timbre, expressive micro-timing, and rendering.
 
 use crate::harmony::Key;
+use crate::meter::TimeSignature;
 use crate::pitch::Pitch;
 use crate::rhythm::Duration;
 use serde::{Deserialize, Serialize};
@@ -108,6 +109,14 @@ impl Score {
         let mut v = self.notes.clone();
         v.sort_by(|a, b| a.onset.beats().partial_cmp(&b.onset.beats()).unwrap());
         v
+    }
+
+    /// Interpret the legacy `meter` field as a quarter-note denominator.
+    ///
+    /// New code that needs compound or additive meter should carry an explicit
+    /// [`TimeSignature`] alongside the score until the score schema migrates.
+    pub fn time_signature(&self) -> TimeSignature {
+        TimeSignature::quarter_note_meter(self.meter)
     }
 
     /// Total duration in seconds at this score's tempo.

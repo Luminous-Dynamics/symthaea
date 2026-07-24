@@ -114,8 +114,10 @@ impl HelicopterState {
     /// Approximate uprightness: z-component of body "up" vector via quaternion.
     /// 1.0 = perfectly upright, 0.0 = horizontal, -1.0 = inverted.
     pub fn uprightness(&self) -> f64 {
-        let [w, x, y, _z] = self.quaternion;
-        1.0 - 2.0 * (x * x + y * y) + 2.0 * w * w - 1.0 // Simplification; full rotation matrix z column
+        let [_w, x, y, _z] = self.quaternion;
+        // Dot product between world-up and the body z-axis. For a normalized
+        // w-first quaternion this is the (3,3) rotation-matrix element.
+        (1.0 - 2.0 * (x * x + y * y)).clamp(-1.0, 1.0)
     }
 
     /// Euler angles (roll, pitch, yaw) from quaternion.
@@ -146,7 +148,7 @@ impl HelicopterState {
             quaternion: [1.0, 0.0, 0.0, 0.0],
             linear_velocity: [0.0; 3],
             angular_velocity: [0.0; 3],
-            main_rotor_rpm: 3500.0, // Typical hover RPM
+            main_rotor_rpm: 3300.0, // 60% of the default 5500 RPM maximum
             tail_rotor_rpm: 2000.0,
             collective_pitch: 0.15, // ~9 degrees for hover
             cyclic_lon_feedback: 0.0,
@@ -177,6 +179,9 @@ impl HelicopterState {
             && self.angular_velocity.iter().all(|v| v.is_finite())
             && self.main_rotor_rpm.is_finite()
             && self.tail_rotor_rpm.is_finite()
+            && self.collective_pitch.is_finite()
+            && self.cyclic_lon_feedback.is_finite()
+            && self.cyclic_lat_feedback.is_finite()
     }
 }
 
@@ -191,7 +196,7 @@ impl HelicopterState {
 /// - `pedal`: tail rotor / yaw control [-1.0, 1.0]
 /// - `thrust`: main rotor RPM command [0.0, 1.0] (fraction of max RPM)
 /// - `tail_rotor`: tail rotor RPM command [0.0, 1.0]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct HelicopterCommand {
     pub collective: f32,
     pub cyclic_lon: f32,
@@ -267,6 +272,21 @@ impl HelicopterCommand {
         }
     }
 
+    /// Blend a deterministic backbone command with a bounded adaptive output.
+    pub fn blend(self, other: Self, other_weight: f32) -> Self {
+        let w = other_weight.clamp(0.0, 1.0);
+        let a = 1.0 - w;
+        Self {
+            collective: a * self.collective + w * other.collective,
+            cyclic_lon: a * self.cyclic_lon + w * other.cyclic_lon,
+            cyclic_lat: a * self.cyclic_lat + w * other.cyclic_lat,
+            pedal: a * self.pedal + w * other.pedal,
+            thrust: a * self.thrust + w * other.thrust,
+            tail_rotor: a * self.tail_rotor + w * other.tail_rotor,
+        }
+        .clamped()
+    }
+
     /// Mean absolute control effort (0.0–1.0).
     pub fn control_effort(&self) -> f32 {
         (self.collective.abs()
@@ -337,6 +357,34 @@ impl Default for HelicopterConfig {
 }
 
 impl HelicopterConfig {
+    /// Validate values that participate in divisions, loop cadence, and noise.
+    /// Invalid runtime configuration is rejected before it can create NaNs,
+    /// zero-frequency control loops, or unbounded episode allocation.
+    pub fn validate(&self) -> Result<(), String> {
+        if !self.physics_hz.is_finite() || self.physics_hz <= 0.0 {
+            return Err("physics_hz must be finite and > 0".to_string());
+        }
+        if self.cognitive_interval == 0 {
+            return Err("cognitive_interval must be > 0".to_string());
+        }
+        if self.network_layers == 0 || self.neurons_per_layer == 0 {
+            return Err("network dimensions must be > 0".to_string());
+        }
+        if self.steps_per_episode == 0 || self.num_episodes == 0 {
+            return Err("training episode counts must be > 0".to_string());
+        }
+        if !self.learning_rate.is_finite() || self.learning_rate < 0.0 {
+            return Err("learning_rate must be finite and >= 0".to_string());
+        }
+        if !self.actuator_noise_std.is_finite() || self.actuator_noise_std < 0.0 {
+            return Err("actuator_noise_std must be finite and >= 0".to_string());
+        }
+        if !self.observation_noise_std.is_finite() || self.observation_noise_std < 0.0 {
+            return Err("observation_noise_std must be finite and >= 0".to_string());
+        }
+        Ok(())
+    }
+
     /// Physics timestep in seconds.
     pub fn physics_dt(&self) -> f64 {
         1.0 / self.physics_hz
@@ -443,6 +491,14 @@ mod tests {
     }
 
     #[test]
+    fn test_command_blend_endpoints() {
+        let hover = HelicopterCommand::hover();
+        let zero = HelicopterCommand::zero();
+        assert_eq!(hover.blend(zero, 0.0).thrust, hover.thrust);
+        assert_eq!(hover.blend(zero, 1.0).thrust, 0.0);
+    }
+
+    #[test]
     fn test_command_from_raw() {
         let raw = [0.3, 0.0, 0.0, 0.0, 0.6, 0.5];
         let cmd = HelicopterCommand::from_raw(&raw);
@@ -505,6 +561,36 @@ mod tests {
         let json = serde_json::to_string(&config).unwrap();
         let restored: HelicopterConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.physics_hz, config.physics_hz);
+    }
+
+    #[test]
+    fn test_uprightness_has_documented_range() {
+        let upright = HelicopterState::hover(20.0);
+        assert!((upright.uprightness() - 1.0).abs() < 1e-12);
+
+        let mut inverted = upright.clone();
+        inverted.quaternion = [0.0, 1.0, 0.0, 0.0];
+        assert!((inverted.uprightness() + 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_is_finite_checks_feedback_channels() {
+        let mut state = HelicopterState::hover(20.0);
+        state.collective_pitch = f64::NAN;
+        assert!(!state.is_finite());
+        state.collective_pitch = 0.0;
+        state.cyclic_lon_feedback = f64::INFINITY;
+        assert!(!state.is_finite());
+    }
+
+    #[test]
+    fn test_config_validation_rejects_zero_cadence() {
+        let mut config = HelicopterConfig::default();
+        config.cognitive_interval = 0;
+        assert!(config.validate().is_err());
+        config.cognitive_interval = 1;
+        config.physics_hz = 0.0;
+        assert!(config.validate().is_err());
     }
 
     #[test]

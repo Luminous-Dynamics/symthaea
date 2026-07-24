@@ -1,15 +1,16 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Basic ISO 10303-21 STEP file parser
+//! Bounded, line-oriented ISO 10303-21 STEP subset parser.
 //!
-//! Parses a minimal subset of the STEP physical file format: CARTESIAN_POINT,
-//! B_SPLINE_CURVE_WITH_KNOTS, and B_SPLINE_SURFACE_WITH_KNOTS entities.
-//! Unknown entities are preserved as opaque `Unknown` variants for
-//! forward-compatible handling.
+//! Recognizes direct numeric `CARTESIAN_POINT`, `B_SPLINE_CURVE_WITH_KNOTS`,
+//! and `B_SPLINE_SURFACE_WITH_KNOTS` payloads. It is not a general STEP
+//! topology/B-Rep importer and does not resolve production CAD entity graphs.
+//! Unknown entities are preserved as opaque variants for inspection.
 
 use crate::mesh::TriangleMesh;
 use crate::nurbs::{NurbsCurve, NurbsSurface};
+use std::collections::HashSet;
 use std::fmt;
 
 // ---------------------------------------------------------------------------
@@ -25,6 +26,11 @@ pub enum StepParseError {
     UnsupportedEntity(String),
     /// An entity references an ID that does not exist.
     ReferenceError(usize),
+    /// A configured parser work or allocation limit was exceeded.
+    ResourceLimit {
+        resource: &'static str,
+        limit: usize,
+    },
 }
 
 impl fmt::Display for StepParseError {
@@ -36,6 +42,9 @@ impl fmt::Display for StepParseError {
             }
             StepParseError::ReferenceError(id) => {
                 write!(f, "STEP reference error: entity #{} not found", id)
+            }
+            StepParseError::ResourceLimit { resource, limit } => {
+                write!(f, "STEP resource limit exceeded: {} > {}", resource, limit)
             }
         }
     }
@@ -76,19 +85,72 @@ pub struct StepFile {
     pub entities: Vec<(usize, StepEntity)>,
 }
 
+/// Bounded parser profile protecting callers from untrusted STEP payloads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StepParseLimits {
+    pub max_input_bytes: usize,
+    pub max_lines: usize,
+    pub max_line_bytes: usize,
+    pub max_entities: usize,
+    pub max_parenthesis_depth: usize,
+}
+
+impl Default for StepParseLimits {
+    fn default() -> Self {
+        Self {
+            max_input_bytes: 64 * 1024 * 1024,
+            max_lines: 1_000_000,
+            max_line_bytes: 4 * 1024 * 1024,
+            max_entities: 250_000,
+            max_parenthesis_depth: 64,
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Parsing
 // ---------------------------------------------------------------------------
 
-/// Parse a STEP (ISO 10303-21) physical file from a string.
+/// Parse the fabrication kernel's bounded, line-oriented STEP subset.
 ///
-/// The parser locates the `DATA;` section and processes `#N = TYPE(params);`
-/// lines. Entities before `DATA;` and after `ENDSEC;` are ignored.
-pub fn parse_step(input: &str) -> Result<StepFile, StepParseError> {
+/// The parser locates the `DATA;` section and processes one-line
+/// `#N = TYPE(params);` records. It currently recognizes direct numeric
+/// `CARTESIAN_POINT`, `B_SPLINE_CURVE_WITH_KNOTS`, and
+/// `B_SPLINE_SURFACE_WITH_KNOTS` payloads; ordinary `#N` control-point
+/// references and complete CAD B-Rep topology are outside this profile.
+pub fn parse_step_subset(input: &str) -> Result<StepFile, StepParseError> {
+    parse_step_subset_with_limits(input, StepParseLimits::default())
+}
+
+/// Parse the bounded STEP subset with explicit resource limits.
+pub fn parse_step_subset_with_limits(
+    input: &str,
+    limits: StepParseLimits,
+) -> Result<StepFile, StepParseError> {
+    if input.len() > limits.max_input_bytes {
+        return Err(StepParseError::ResourceLimit {
+            resource: "input bytes",
+            limit: limits.max_input_bytes,
+        });
+    }
+
     let mut entities = Vec::new();
+    let mut entity_ids = HashSet::new();
     let mut in_data = false;
 
-    for line in input.lines() {
+    for (line_index, line) in input.lines().enumerate() {
+        if line_index >= limits.max_lines {
+            return Err(StepParseError::ResourceLimit {
+                resource: "lines",
+                limit: limits.max_lines,
+            });
+        }
+        if line.len() > limits.max_line_bytes {
+            return Err(StepParseError::ResourceLimit {
+                resource: "line bytes",
+                limit: limits.max_line_bytes,
+            });
+        }
         let trimmed = line.trim();
 
         if trimmed == "DATA;" {
@@ -101,22 +163,73 @@ pub fn parse_step(input: &str) -> Result<StepFile, StepParseError> {
             }
             continue;
         }
-        if !in_data {
+        if !in_data || !trimmed.starts_with('#') {
             continue;
         }
-
-        // Expect lines of the form: #N = TYPE(params);
-        if !trimmed.starts_with('#') {
-            continue;
+        if entities.len() >= limits.max_entities {
+            return Err(StepParseError::ResourceLimit {
+                resource: "entities",
+                limit: limits.max_entities,
+            });
         }
+        validate_parenthesis_depth(trimmed, limits.max_parenthesis_depth)?;
 
-        let entity = parse_entity_line(trimmed)?;
-        if let Some(e) = entity {
-            entities.push(e);
+        if let Some((id, entity)) = parse_entity_line(trimmed)? {
+            if !entity_ids.insert(id) {
+                return Err(StepParseError::InvalidFormat(format!(
+                    "duplicate entity id #{}",
+                    id
+                )));
+            }
+            entities.push((id, entity));
         }
     }
 
     Ok(StepFile { entities })
+}
+
+fn validate_parenthesis_depth(line: &str, maximum: usize) -> Result<(), StepParseError> {
+    let mut depth = 0usize;
+    for character in line.chars() {
+        match character {
+            '(' => {
+                depth = depth.checked_add(1).ok_or(StepParseError::ResourceLimit {
+                    resource: "parenthesis depth",
+                    limit: maximum,
+                })?;
+                if depth > maximum {
+                    return Err(StepParseError::ResourceLimit {
+                        resource: "parenthesis depth",
+                        limit: maximum,
+                    });
+                }
+            }
+            ')' => {
+                if depth == 0 {
+                    return Err(StepParseError::InvalidFormat(
+                        "unbalanced closing parenthesis".into(),
+                    ));
+                }
+                depth -= 1;
+            }
+            _ => {}
+        }
+    }
+    if depth != 0 {
+        return Err(StepParseError::InvalidFormat(
+            "unbalanced opening parenthesis".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Compatibility alias for [`parse_step_subset`].
+#[deprecated(
+    since = "0.6.0",
+    note = "use parse_step_subset to acknowledge the intentionally bounded parser profile"
+)]
+pub fn parse_step(input: &str) -> Result<StepFile, StepParseError> {
+    parse_step_subset(input)
 }
 
 /// Parse a single `#N = TYPE(params);` line.
@@ -455,15 +568,79 @@ ENDSEC;
 END-ISO-10303-21;";
 
     #[test]
+    fn explicit_limits_reject_oversized_input() {
+        let result = parse_step_subset_with_limits(
+            MINIMAL_STEP,
+            StepParseLimits {
+                max_input_bytes: 8,
+                ..StepParseLimits::default()
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(StepParseError::ResourceLimit {
+                resource: "input bytes",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn explicit_limits_reject_excess_entities() {
+        let input = "DATA;\n#1 = CARTESIAN_POINT('',(0.,0.,0.));\n#2 = CARTESIAN_POINT('',(1.,0.,0.));\nENDSEC;";
+        let result = parse_step_subset_with_limits(
+            input,
+            StepParseLimits {
+                max_entities: 1,
+                ..StepParseLimits::default()
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(StepParseError::ResourceLimit {
+                resource: "entities",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn duplicate_entity_ids_are_rejected() {
+        let input = "DATA;\n#1 = CARTESIAN_POINT('',(0.,0.,0.));\n#1 = CARTESIAN_POINT('',(1.,0.,0.));\nENDSEC;";
+        assert!(
+            matches!(parse_step_subset(input), Err(StepParseError::InvalidFormat(message)) if message.contains("duplicate"))
+        );
+    }
+
+    #[test]
+    fn excessive_parenthesis_depth_is_rejected() {
+        let input = "DATA;\n#1 = FOOBAR((((1))));\nENDSEC;";
+        let result = parse_step_subset_with_limits(
+            input,
+            StepParseLimits {
+                max_parenthesis_depth: 2,
+                ..StepParseLimits::default()
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(StepParseError::ResourceLimit {
+                resource: "parenthesis depth",
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn parse_empty() {
         let input = "ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;";
-        let step = parse_step(input).unwrap();
+        let step = parse_step_subset(input).unwrap();
         assert!(step.entities.is_empty());
     }
 
     #[test]
     fn parse_cartesian_point() {
-        let step = parse_step(MINIMAL_STEP).unwrap();
+        let step = parse_step_subset(MINIMAL_STEP).unwrap();
         let pt = step.entity_by_id(1).unwrap();
         match pt {
             StepEntity::CartesianPoint(coords) => {
@@ -488,7 +665,7 @@ END-ISO-10303-21;";
 DATA;
 #10 = B_SPLINE_CURVE_WITH_KNOTS(1, ((0.0,0.0,0.0),(1.0,0.0,0.0)), .UNSPECIFIED., .F., .F., (2,2), (0.0, 1.0), .UNSPECIFIED.);
 ENDSEC;";
-        let step = parse_step(input).unwrap();
+        let step = parse_step_subset(input).unwrap();
         assert_eq!(step.entities.len(), 1);
         match &step.entities[0].1 {
             StepEntity::BSplineCurve {
@@ -509,7 +686,7 @@ ENDSEC;";
 DATA;
 #20 = B_SPLINE_SURFACE_WITH_KNOTS(1, 1, ((0.0,0.0,0.0),(1.0,0.0,0.0)), .UNSPECIFIED., .F., .F., .F., (2,2), (2,2), (0.0,1.0), (0.0,1.0), .UNSPECIFIED.);
 ENDSEC;";
-        let step = parse_step(input).unwrap();
+        let step = parse_step_subset(input).unwrap();
         assert_eq!(step.entities.len(), 1);
         match &step.entities[0].1 {
             StepEntity::BSplineSurface {
@@ -525,7 +702,7 @@ ENDSEC;";
     #[test]
     fn unknown_entity() {
         let input = "DATA;\n#5 = FOOBAR('test', 42);\nENDSEC;";
-        let step = parse_step(input).unwrap();
+        let step = parse_step_subset(input).unwrap();
         assert_eq!(step.entities.len(), 1);
         match &step.entities[0].1 {
             StepEntity::Unknown {
@@ -542,13 +719,13 @@ ENDSEC;";
     #[test]
     fn invalid_format() {
         let input = "DATA;\n#bad_line\nENDSEC;";
-        let result = parse_step(input);
+        let result = parse_step_subset(input);
         assert!(result.is_err());
     }
 
     #[test]
     fn entity_by_id() {
-        let step = parse_step(MINIMAL_STEP).unwrap();
+        let step = parse_step_subset(MINIMAL_STEP).unwrap();
         assert!(step.entity_by_id(1).is_some());
         assert!(step.entity_by_id(2).is_some());
         assert!(step.entity_by_id(3).is_some()); // LINE -> Unknown
@@ -561,7 +738,7 @@ ENDSEC;";
 DATA;
 #20 = B_SPLINE_SURFACE_WITH_KNOTS(1, 1, ((0.0,0.0,0.0),(1.0,0.0,0.0)), .UNSPECIFIED., .F., .F., .F., (2,2), (2,2), (0.0,1.0), (0.0,1.0), .UNSPECIFIED.);
 ENDSEC;";
-        let step = parse_step(input).unwrap();
+        let step = parse_step_subset(input).unwrap();
         let surfaces = step.to_nurbs_surfaces();
         assert!(!surfaces.is_empty());
         let mesh = step.to_triangle_mesh(4, 4);
@@ -574,7 +751,7 @@ ENDSEC;";
 DATA;
 #10 = B_SPLINE_CURVE_WITH_KNOTS(1, ((0.0,0.0,0.0),(5.0,5.0,0.0)), .UNSPECIFIED., .F., .F., (2,2), (0.0, 1.0), .UNSPECIFIED.);
 ENDSEC;";
-        let step = parse_step(input).unwrap();
+        let step = parse_step_subset(input).unwrap();
         let curves = step.to_nurbs_curves();
         assert_eq!(curves.len(), 1);
         assert_eq!(curves[0].degree, 1);
@@ -613,7 +790,7 @@ DATA;
 ENDSEC;
 END-ISO-10303-21;";
 
-        let step_file = parse_step(step_input).expect("STEP parse must succeed");
+        let step_file = parse_step_subset(step_input).expect("STEP parse must succeed");
         assert_eq!(
             step_file.entities.len(),
             6,

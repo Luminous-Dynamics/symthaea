@@ -24,6 +24,7 @@
 //! timbral transitions) minimize surprise while maintaining creativity
 //! via epistemic value (information-seeking) and novelty bonuses.
 
+use serde::{Deserialize, Serialize};
 use symthaea_fep::Observation;
 use symthaea_fep::TemporalDifferenceLearningConfig;
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig};
@@ -32,7 +33,7 @@ use crate::MusicalState;
 use crate::audio_feedback::AudioFeatures;
 
 /// Musical action types (mapped to ActiveInferenceAgent's action indices).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MusicAction {
     /// Follow current chord progression (maintain harmonic context).
     FollowHarmony = 0,
@@ -68,7 +69,7 @@ impl MusicAction {
 }
 
 /// Result of one FEP music inference cycle.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicInferenceResult {
     /// Selected musical action.
     pub action: MusicAction,
@@ -88,6 +89,17 @@ pub struct MusicInferenceResult {
     pub prior_precision: f64,
 }
 
+/// Compact evidence that the temporal FEP path committed actions and updated
+/// its transition learner rather than merely sampling isolated proposals.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MusicInferenceLearningStats {
+    pub committed_actions: u64,
+    pub td_total_updates: u64,
+    pub td_transition_history_size: usize,
+    pub td_average_error: f64,
+    pub td_average_prediction_accuracy: f64,
+}
+
 /// FEP-driven musical inference engine.
 ///
 /// Wraps `ActiveInferenceAgent` with music-specific observation encoding,
@@ -100,11 +112,28 @@ pub struct MusicalInferenceEngine {
     last_result: Option<MusicInferenceResult>,
     /// Preferred observation (musical goals: consonance, stability, etc.)
     preferred_obs: Vec<f64>,
+    goal_precision: f64,
+    committed_actions: u64,
 }
 
 impl MusicalInferenceEngine {
-    /// Create a new musical inference engine.
+    /// Create a new musical inference engine with the historical fixed FEP RNG
+    /// sequence. Existing callers retain byte-for-byte action sampling behavior.
     pub fn new() -> Self {
+        Self::build(None)
+    }
+
+    /// Create a musical inference engine whose stochastic action sampler is
+    /// explicitly seeded by the caller.
+    ///
+    /// This is the constructor required by reproducible experiments. It leaves
+    /// the deterministic generative-model initialization unchanged and only
+    /// replaces the agent's action-selection RNG state.
+    pub fn new_with_seed(seed: u64) -> Self {
+        Self::build(Some(seed))
+    }
+
+    fn build(rng_seed: Option<u64>) -> Self {
         let config = ActiveInferenceAgentConfig {
             state_dim: 16,  // 16D hidden musical state
             obs_dim: 6,     // 6 audio features
@@ -122,13 +151,23 @@ impl MusicalInferenceEngine {
             },
         };
 
+        let mut agent = ActiveInferenceAgent::new(config);
+        if let Some(seed) = rng_seed {
+            agent.set_rng_seed(seed);
+        }
+        // Preferred observations: moderate brightness and rhythmic complexity,
+        // strong consonance/stability, moderate energy, and low noise.
+        let preferred_obs = vec![0.6, 0.5, 0.7, 0.6, 0.4, 0.2];
+        let goal_precision = 2.0;
+        agent.set_goals(preferred_obs.clone(), goal_precision);
+
         Self {
-            agent: ActiveInferenceAgent::new(config),
+            agent,
             cycle_count: 0,
             last_result: None,
-            // Preferred observations: moderate consonance, moderate rhythm,
-            // melodic coherence, timbral consistency, moderate energy, low noise
-            preferred_obs: vec![0.6, 0.5, 0.7, 0.6, 0.4, 0.2],
+            preferred_obs,
+            goal_precision,
+            committed_actions: 0,
         }
     }
 
@@ -138,6 +177,23 @@ impl MusicalInferenceEngine {
     /// from the feedback encoder. Returns the selected musical action and
     /// precision dynamics.
     pub fn infer(&mut self, features: &AudioFeatures) -> MusicInferenceResult {
+        self.infer_internal(features, false)
+    }
+
+    /// Run one inference cycle and commit the selected action to the FEP agent.
+    ///
+    /// Committing records the action as the cause of the next observation, so
+    /// subsequent perception cycles can perform temporal-difference updates.
+    /// Legacy `infer` callers remain proposal-only for backward compatibility.
+    pub fn infer_and_commit(&mut self, features: &AudioFeatures) -> MusicInferenceResult {
+        self.infer_internal(features, true)
+    }
+
+    fn infer_internal(
+        &mut self,
+        features: &AudioFeatures,
+        commit_action: bool,
+    ) -> MusicInferenceResult {
         // 1. Construct observation from audio features
         let obs = Observation::new(
             vec![
@@ -157,6 +213,10 @@ impl MusicalInferenceEngine {
 
         // 3. Action selection: minimize expected free energy
         let action_result = self.agent.select_action();
+        if commit_action {
+            let _ = self.agent.act(action_result.action);
+            self.committed_actions += 1;
+        }
 
         // 4. Build result from FEP components
         let free_energy = perception.free_energy.surprise;
@@ -254,11 +314,28 @@ impl MusicalInferenceEngine {
         self.cycle_count
     }
 
-    /// Set emotion anchor from consciousness state (prevents FEP drift).
-    pub fn set_emotion_anchor(&mut self, _state: &crate::MusicalState) {
-        // Emotion anchoring: constrain the FEP agent to the intended mood.
-        // Full implementation requires EmotionAnchor struct (added by linter).
-        // For now: update preferred observations based on emotional target.
+    /// Set a bounded, inspectable FEP goal from the declared musical state.
+    pub fn set_emotion_anchor(&mut self, state: &crate::MusicalState) {
+        let (preferences, precision) = Self::emotion_goal(state);
+        self.set_preferences_with_precision(preferences, precision);
+    }
+
+    /// Deterministic six-channel goal used by the symbolic temporal session.
+    pub fn emotion_goal(state: &crate::MusicalState) -> (Vec<f64>, f64) {
+        let valence = f64::from(state.valence.clamp(-1.0, 1.0));
+        let arousal = f64::from(state.arousal.clamp(0.0, 1.0));
+        let prediction_error = f64::from(state.prediction_error.clamp(0.0, 1.0));
+        let consciousness = f64::from(state.consciousness_level.clamp(0.0, 1.0));
+        let preferences = vec![
+            (0.50 + 0.15 * valence).clamp(0.0, 1.0),
+            (0.30 + 0.45 * arousal).clamp(0.0, 1.0),
+            (0.78 - 0.28 * prediction_error).clamp(0.0, 1.0),
+            (0.78 - 0.35 * arousal).clamp(0.0, 1.0),
+            (0.20 + 0.65 * arousal).clamp(0.0, 1.0),
+            (0.08 + 0.22 * prediction_error).clamp(0.0, 1.0),
+        ];
+        let precision = (1.5 + 1.5 * consciousness).clamp(0.5, 4.0);
+        (preferences, precision)
     }
 
     /// Current free energy (lower = better model of own output).
@@ -274,7 +351,49 @@ impl MusicalInferenceEngine {
     /// The agent will try to produce audio features that match these preferences.
     /// This allows different "musical personalities" or optimization targets.
     pub fn set_preferences(&mut self, prefs: Vec<f64>) {
+        self.set_preferences_with_precision(prefs, self.goal_precision);
+    }
+
+    /// Set validated FEP goals and the confidence placed on them.
+    pub fn set_preferences_with_precision(&mut self, prefs: Vec<f64>, precision: f64) {
+        if prefs.len() != 6
+            || prefs.iter().any(|value| !value.is_finite())
+            || !precision.is_finite()
+            || precision <= 0.0
+        {
+            return;
+        }
+        let prefs: Vec<f64> = prefs
+            .into_iter()
+            .map(|value| value.clamp(0.0, 1.0))
+            .collect();
+        let precision = precision.clamp(0.1, 10.0);
+        self.agent.set_goals(prefs.clone(), precision);
         self.preferred_obs = prefs;
+        self.goal_precision = precision;
+    }
+
+    pub fn goal_preferences(&self) -> &[f64] {
+        &self.preferred_obs
+    }
+
+    pub fn goal_precision(&self) -> f64 {
+        self.goal_precision
+    }
+
+    pub fn learning_stats(&self) -> MusicInferenceLearningStats {
+        let stats = self.agent.td_stats();
+        MusicInferenceLearningStats {
+            committed_actions: self.committed_actions,
+            td_total_updates: stats.as_ref().map_or(0, |value| value.total_updates),
+            td_transition_history_size: stats
+                .as_ref()
+                .map_or(0, |value| value.transition_history_size),
+            td_average_error: stats.as_ref().map_or(0.0, |value| value.avg_td_error),
+            td_average_prediction_accuracy: stats
+                .as_ref()
+                .map_or(0.0, |value| value.avg_prediction_accuracy),
+        }
     }
 }
 
@@ -298,6 +417,44 @@ mod tests {
         assert!(result.free_energy.is_finite());
         assert!(result.prediction_error >= 0.0);
         assert!(result.sensory_precision > 0.0);
+    }
+
+    #[test]
+    fn committed_inference_produces_temporal_learning_evidence() {
+        let mut engine = MusicalInferenceEngine::new_with_seed(17);
+        let features = AudioFeatures {
+            spectral_centroid: 0.4,
+            spectral_flux: 0.2,
+            rhythm_entropy: 0.3,
+            harmonic_tension: 0.15,
+            rms_energy: 0.5,
+            zero_crossing_rate: 0.1,
+        };
+
+        let _ = engine.infer_and_commit(&features);
+        let _ = engine.infer_and_commit(&features);
+        let stats = engine.learning_stats();
+        assert_eq!(stats.committed_actions, 2);
+        assert_eq!(stats.td_transition_history_size, 1);
+        assert!(stats.td_total_updates > 0);
+        assert!(stats.td_average_error.is_finite());
+    }
+
+    #[test]
+    fn emotion_anchor_installs_bounded_fep_goals() {
+        let mut engine = MusicalInferenceEngine::new();
+        let state = MusicalState {
+            valence: 0.8,
+            arousal: 0.9,
+            prediction_error: 0.4,
+            consciousness_level: 0.75,
+            ..MusicalState::default()
+        };
+        engine.set_emotion_anchor(&state);
+        let (expected, precision) = MusicalInferenceEngine::emotion_goal(&state);
+        assert_eq!(engine.goal_preferences(), expected.as_slice());
+        assert_eq!(engine.goal_precision(), precision);
+        assert!(expected.iter().all(|value| (0.0..=1.0).contains(value)));
     }
 
     #[test]

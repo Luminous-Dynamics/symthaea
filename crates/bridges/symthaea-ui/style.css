@@ -1,0 +1,246 @@
+/* Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/*
+ * Living-organism aesthetic, not a dashboard grid (standing project rule).
+ * The orb is the one thing that should feel alive: its pulse rate maps to
+ * thermodynamic load and its hue maps to affective valence, both driven
+ * live from src/app.rs — everything else is quiet, legible readout text.
+ */
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% -10%, #14141c 0%, #0a0a0f 60%, #060608 100%);
+    color: #e8e6f0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.shell {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.shell-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.shell-header h1 {
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    font-size: 1.4rem;
+    margin: 0;
+    opacity: 0.9;
+}
+
+.gateway-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    opacity: 0.75;
+}
+
+.gateway-row input {
+    background: transparent;
+    border: 1px solid #33333f;
+    border-radius: 6px;
+    color: inherit;
+    padding: 0.25rem 0.5rem;
+    font-family: monospace;
+    width: 15rem;
+}
+
+.daemon-status {
+    flex-basis: 100%;
+    font-size: 0.7rem;
+    font-family: monospace;
+    opacity: 0.4;
+}
+
+.dot {
+    display: inline-block;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+}
+
+.dot-live {
+    background: #6fe0a8;
+    box-shadow: 0 0 6px #6fe0a8;
+}
+
+.dot-dark {
+    background: #55505f;
+}
+
+.vitals {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 2rem 1rem;
+    border-radius: 20px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
+}
+
+.orb-wrap {
+    width: 8rem;
+    height: 8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.orb {
+    width: 6rem;
+    height: 6rem;
+    border-radius: 50%;
+    filter: blur(0.5px);
+    animation-name: breathe;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+}
+
+@keyframes breathe {
+    0% {
+        transform: scale(0.92);
+        opacity: 0.75;
+    }
+    50% {
+        transform: scale(1.06);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(0.92);
+        opacity: 0.75;
+    }
+}
+
+.readouts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 0.6rem 1.5rem;
+    width: 100%;
+    margin: 0;
+}
+
+.readouts div {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px dotted #26262f;
+    padding-bottom: 0.25rem;
+}
+
+.readouts dt {
+    opacity: 0.55;
+    font-size: 0.78rem;
+    font-weight: 400;
+}
+
+.readouts dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+}
+
+.vitals-note {
+    font-size: 0.72rem;
+    opacity: 0.45;
+    text-align: center;
+    max-width: 34rem;
+    line-height: 1.4;
+    margin: 0;
+}
+
+.converse {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.transcript {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-height: 6rem;
+}
+
+.turn {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    max-width: 32rem;
+    padding: 0.6rem 0.9rem;
+    border-radius: 14px;
+    line-height: 1.45;
+}
+
+.turn-you {
+    align-self: flex-end;
+    background: #1c1c2a;
+}
+
+.turn-symthaea {
+    align-self: flex-start;
+    background: rgba(140, 120, 255, 0.1);
+    border: 1px solid rgba(140, 120, 255, 0.18);
+}
+
+.turn-role {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.5;
+}
+
+.error {
+    color: #e77;
+    font-size: 0.85rem;
+}
+
+.composer {
+    display: flex;
+    gap: 0.6rem;
+}
+
+.composer input {
+    flex: 1;
+    background: #14141c;
+    border: 1px solid #2a2a36;
+    border-radius: 999px;
+    padding: 0.7rem 1.1rem;
+    color: inherit;
+    font-size: 0.95rem;
+}
+
+.composer input:focus {
+    outline: none;
+    border-color: #7a6ce0;
+}
+
+.composer button {
+    border: none;
+    border-radius: 999px;
+    padding: 0.7rem 1.4rem;
+    background: #6a5cd8;
+    color: white;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.composer button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}

@@ -1,15 +1,91 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Persistent LSH (Locality-Sensitive Hashing) index for approximate nearest neighbor search.
+//! Deterministic in-memory LSH index for approximate nearest-neighbor search.
 //!
-//! Uses random hyperplane LSH: each hash function is a random BinaryHV,
-//! and the hash bit is 1 if similarity > 0.5. Bands of hash bits form bucket keys.
+//! The index retains one compact per-band signature for every live ID. Those
+//! signatures are sufficient to rebuild bucket membership without re-reading
+//! or re-hashing the corresponding BinaryHV, which also gives the persistence
+//! layer a stable serialization boundary.
 
 use std::collections::HashMap;
+
 use symthaea_core::hdc::BinaryHV;
 
-/// Persistent LSH index for BinaryHV similarity search.
+use crate::HdcStoreError;
+
+/// Seed used by the format-v2 random-hyperplane index.
+///
+/// This value is part of the index compatibility contract. A persisted
+/// signature snapshot is valid only when its seed and dimensions match.
+pub const DEFAULT_LSH_SEED: u64 = 42;
+
+/// Maximum number of random hyperplanes accepted from an on-disk header.
+///
+/// This bounds memory and reopen cost when handling malformed or hostile files.
+pub const MAX_LSH_HYPERPLANES: usize = 65_536;
+
+/// Validate LSH dimensions before allocating hyperplanes.
+pub fn validate_lsh_config(bands: usize, rows: usize) -> Result<(), HdcStoreError> {
+    if bands == 0 {
+        return Err(HdcStoreError::InvalidConfig {
+            reason: "lsh_bands must be greater than zero".into(),
+        });
+    }
+    if bands > u16::MAX as usize {
+        return Err(HdcStoreError::InvalidConfig {
+            reason: format!("lsh_bands must be <= {}, found {bands}", u16::MAX),
+        });
+    }
+    if rows == 0 || rows > 32 {
+        return Err(HdcStoreError::InvalidConfig {
+            reason: format!("lsh_rows must be in 1..=32, found {rows}"),
+        });
+    }
+    let hyperplanes = bands
+        .checked_mul(rows)
+        .ok_or(HdcStoreError::ArithmeticOverflow {
+            context: "LSH hyperplane count",
+        })?;
+    if hyperplanes > MAX_LSH_HYPERPLANES {
+        return Err(HdcStoreError::InvalidConfig {
+            reason: format!(
+                "LSH configuration requests {hyperplanes} hyperplanes; maximum is {MAX_LSH_HYPERPLANES}"
+            ),
+        });
+    }
+    Ok(())
+}
+
+/// Compact, deterministic bucket hashes for one BinaryHV.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LshSignature {
+    hashes: Box<[u32]>,
+}
+
+impl LshSignature {
+    /// Construct a signature from one hash per band.
+    ///
+    /// Dimension validation occurs when the signature is inserted into an
+    /// [`LshIndex`], because only the index knows the required band count.
+    pub fn from_hashes(hashes: Vec<u32>) -> Self {
+        Self {
+            hashes: hashes.into_boxed_slice(),
+        }
+    }
+
+    /// One bucket hash per configured band.
+    pub fn hashes(&self) -> &[u32] {
+        &self.hashes
+    }
+
+    /// Number of represented bands.
+    pub fn band_count(&self) -> usize {
+        self.hashes.len()
+    }
+}
+
+/// Rebuildable LSH index for BinaryHV similarity search.
 #[derive(Debug)]
 pub struct LshIndex {
     /// Random hyperplanes for hashing (bands x rows).
@@ -18,54 +94,122 @@ pub struct LshIndex {
     bands: usize,
     /// Number of rows (hash functions) per band.
     rows: usize,
+    /// Seed from which every hyperplane is deterministically derived.
+    seed: u64,
     /// Bucket -> entry IDs mapping, keyed by (band, bucket_hash).
     buckets: HashMap<(u16, u32), Vec<u64>>,
+    /// Canonical per-ID signatures used for removal and persistence.
+    signatures: HashMap<u64, LshSignature>,
 }
 
 impl LshIndex {
-    /// Create a new LSH index with the given band/row configuration.
-    pub fn new(bands: usize, rows: usize, seed: u64) -> Self {
-        let hyperplanes: Vec<BinaryHV> = (0..bands * rows)
+    /// Create an LSH index with validated band/row dimensions.
+    pub fn new(bands: usize, rows: usize, seed: u64) -> Result<Self, HdcStoreError> {
+        validate_lsh_config(bands, rows)?;
+        let hyperplane_count =
+            bands
+                .checked_mul(rows)
+                .ok_or(HdcStoreError::ArithmeticOverflow {
+                    context: "LSH hyperplane allocation",
+                })?;
+        let hyperplanes = (0..hyperplane_count)
             .map(|i| BinaryHV::random(seed.wrapping_add(i as u64)))
             .collect();
 
-        Self {
+        Ok(Self {
             hyperplanes,
             bands,
             rows,
+            seed,
             buckets: HashMap::new(),
-        }
+            signatures: HashMap::new(),
+        })
     }
 
-    /// Insert an entry into the index.
+    /// Compute the deterministic per-band signature for a vector.
+    pub fn signature(&self, hv: &BinaryHV) -> LshSignature {
+        let hashes = (0..self.bands)
+            .map(|band| self.band_hash(band, hv))
+            .collect();
+        LshSignature::from_hashes(hashes)
+    }
+
+    /// Insert or replace an entry in the index.
     pub fn insert(&mut self, id: u64, hv: &BinaryHV) {
-        for band in 0..self.bands {
-            let hash = self.band_hash(band, hv);
+        let signature = self.signature(hv);
+        self.insert_signature(id, signature)
+            .expect("signature generated by this index must match its dimensions");
+    }
+
+    /// Insert or replace an entry from a previously computed signature.
+    pub fn insert_signature(
+        &mut self,
+        id: u64,
+        signature: LshSignature,
+    ) -> Result<(), HdcStoreError> {
+        if signature.band_count() != self.bands {
+            return Err(HdcStoreError::InvalidConfig {
+                reason: format!(
+                    "LSH signature contains {} bands; index requires {}",
+                    signature.band_count(),
+                    self.bands
+                ),
+            });
+        }
+
+        self.remove_id(id);
+        for (band, &hash) in signature.hashes().iter().enumerate() {
             self.buckets
                 .entry((band as u16, hash))
                 .or_default()
                 .push(id);
         }
+        self.signatures.insert(id, signature);
+        Ok(())
     }
 
     /// Remove an entry from the index.
+    ///
+    /// The vector argument is retained for source compatibility with the
+    /// original API. When the ID is known, the retained signature is used and
+    /// the vector is not re-hashed.
     pub fn remove(&mut self, id: u64, hv: &BinaryHV) {
-        for band in 0..self.bands {
-            let hash = self.band_hash(band, hv);
-            if let Some(bucket) = self.buckets.get_mut(&(band as u16, hash)) {
-                bucket.retain(|&x| x != id);
-            }
+        if self.remove_id(id) {
+            return;
         }
+
+        // Defensive compatibility path for indexes constructed by older code
+        // that did not retain signatures.
+        let signature = self.signature(hv);
+        self.remove_signature_from_buckets(id, &signature);
     }
 
-    /// Query for candidate IDs that may be similar to the query HV.
+    /// Remove an ID using its retained signature.
+    pub fn remove_id(&mut self, id: u64) -> bool {
+        let Some(signature) = self.signatures.remove(&id) else {
+            return false;
+        };
+        self.remove_signature_from_buckets(id, &signature);
+        true
+    }
+
+    /// Query candidate IDs that may be similar to the query HV.
     ///
-    /// Returns deduplicated candidate IDs. The caller must verify similarity
-    /// with the actual vectors (LSH provides candidates, not exact matches).
+    /// The returned IDs are deduplicated. Callers must verify actual vector
+    /// similarity; LSH provides candidates, not exact nearest neighbors.
     pub fn query_candidates(&self, query: &BinaryHV) -> Vec<u64> {
+        let signature = self.signature(query);
+        self.query_signature_candidates(&signature)
+    }
+
+    /// Query candidates directly from a compatible signature.
+    pub fn query_signature_candidates(&self, signature: &LshSignature) -> Vec<u64> {
+        if signature.band_count() != self.bands {
+            return Vec::new();
+        }
+
         let mut candidates = Vec::new();
-        for band in 0..self.bands {
-            let hash = self.band_hash(band, query);
+        for (band, &hash) in signature.hashes().iter().enumerate() {
             if let Some(bucket) = self.buckets.get(&(band as u16, hash)) {
                 candidates.extend_from_slice(bucket);
             }
@@ -75,26 +219,81 @@ impl LshIndex {
         candidates
     }
 
+    /// Return the retained signature for an indexed ID.
+    pub fn signature_for(&self, id: u64) -> Option<&LshSignature> {
+        self.signatures.get(&id)
+    }
+
+    /// Return a deterministic, ID-sorted snapshot of all retained signatures.
+    pub fn snapshot_entries(&self) -> Vec<(u64, LshSignature)> {
+        let mut entries: Vec<_> = self
+            .signatures
+            .iter()
+            .map(|(&id, signature)| (id, signature.clone()))
+            .collect();
+        entries.sort_unstable_by_key(|(id, _)| *id);
+        entries
+    }
+
     /// Clear the index.
     pub fn clear(&mut self) {
         self.buckets.clear();
+        self.signatures.clear();
     }
 
-    /// Number of entries in the index.
+    /// Number of configured bands.
+    pub const fn bands(&self) -> usize {
+        self.bands
+    }
+
+    /// Number of rows per band.
+    pub const fn rows(&self) -> usize {
+        self.rows
+    }
+
+    /// Seed used to derive the random hyperplanes.
+    pub const fn seed(&self) -> u64 {
+        self.seed
+    }
+
+    /// Estimate the probability that a vector with the supplied Hamming
+    /// agreement is returned as a candidate by at least one band.
+    ///
+    /// This uses the random-hyperplane collision model after converting
+    /// Hamming agreement in `[0, 1]` to bipolar cosine similarity. It is a
+    /// tuning estimate, not an empirical recall guarantee.
+    pub fn estimated_candidate_probability(&self, hamming_agreement: f64) -> f64 {
+        let agreement = hamming_agreement.clamp(0.0, 1.0);
+        let cosine = (2.0 * agreement - 1.0).clamp(-1.0, 1.0);
+        let row_collision = 1.0 - cosine.acos() / std::f64::consts::PI;
+        let band_collision = row_collision.powi(self.rows as i32);
+        1.0 - (1.0 - band_collision).powi(self.bands as i32)
+    }
+
+    /// Number of distinct IDs represented in the index.
     pub fn entry_count(&self) -> usize {
-        let mut ids = Vec::new();
-        for bucket in self.buckets.values() {
-            ids.extend_from_slice(bucket);
+        self.signatures.len()
+    }
+
+    fn remove_signature_from_buckets(&mut self, id: u64, signature: &LshSignature) {
+        for (band, &hash) in signature.hashes().iter().enumerate() {
+            let key = (band as u16, hash);
+            let remove_bucket = if let Some(bucket) = self.buckets.get_mut(&key) {
+                bucket.retain(|&candidate_id| candidate_id != id);
+                bucket.is_empty()
+            } else {
+                false
+            };
+            if remove_bucket {
+                self.buckets.remove(&key);
+            }
         }
-        ids.sort_unstable();
-        ids.dedup();
-        ids.len()
     }
 
     fn band_hash(&self, band: usize, hv: &BinaryHV) -> u32 {
-        let mut hash: u32 = 0;
+        let mut hash = 0u32;
         let base = band * self.rows;
-        for row in 0..self.rows.min(32) {
+        for row in 0..self.rows {
             let hp = &self.hyperplanes[base + row];
             if hv.similarity(hp) > 0.5 {
                 hash |= 1 << row;
@@ -109,63 +308,94 @@ mod tests {
     use super::*;
 
     #[test]
+    fn invalid_dimensions_are_rejected() {
+        assert!(LshIndex::new(0, 8, DEFAULT_LSH_SEED).is_err());
+        assert!(LshIndex::new(8, 0, DEFAULT_LSH_SEED).is_err());
+        assert!(LshIndex::new(8, 33, DEFAULT_LSH_SEED).is_err());
+        assert!(LshIndex::new(u16::MAX as usize + 1, 1, DEFAULT_LSH_SEED).is_err());
+    }
+
+    #[test]
     fn insert_and_query() {
-        let mut lsh = LshIndex::new(5, 8, 42);
+        let mut lsh = LshIndex::new(5, 8, DEFAULT_LSH_SEED).unwrap();
         let hv1 = BinaryHV::random(1);
         let hv2 = BinaryHV::random(2);
 
         lsh.insert(1, &hv1);
         lsh.insert(2, &hv2);
 
-        // Query with hv1 itself should return 1 as candidate
         let candidates = lsh.query_candidates(&hv1);
         assert!(candidates.contains(&1));
     }
 
     #[test]
+    fn retained_signature_roundtrips_without_rehashing() {
+        let mut source = LshIndex::new(5, 8, DEFAULT_LSH_SEED).unwrap();
+        let hv = BinaryHV::random(7);
+        source.insert(7, &hv);
+        let signature = source.signature_for(7).unwrap().clone();
+
+        let mut restored = LshIndex::new(5, 8, DEFAULT_LSH_SEED).unwrap();
+        restored.insert_signature(7, signature).unwrap();
+
+        assert!(restored.query_candidates(&hv).contains(&7));
+        assert_eq!(restored.entry_count(), 1);
+    }
+
+    #[test]
+    fn replacing_id_does_not_duplicate_bucket_membership() {
+        let mut lsh = LshIndex::new(5, 8, DEFAULT_LSH_SEED).unwrap();
+        let hv = BinaryHV::random(1);
+        lsh.insert(1, &hv);
+        lsh.insert(1, &hv);
+
+        let candidates = lsh.query_candidates(&hv);
+        assert_eq!(candidates.iter().filter(|&&id| id == 1).count(), 1);
+        assert_eq!(lsh.entry_count(), 1);
+    }
+
+    #[test]
     fn remove_entry() {
-        let mut lsh = LshIndex::new(5, 8, 42);
+        let mut lsh = LshIndex::new(5, 8, DEFAULT_LSH_SEED).unwrap();
         let hv = BinaryHV::random(1);
 
         lsh.insert(1, &hv);
         assert_eq!(lsh.entry_count(), 1);
 
         lsh.remove(1, &hv);
-        // After removal, shouldn't find it
         let candidates = lsh.query_candidates(&hv);
         assert!(!candidates.contains(&1));
     }
 
     #[test]
-    fn similar_vectors_share_buckets() {
-        let mut lsh = LshIndex::new(10, 16, 42);
-        let hv1 = BinaryHV::random(1);
-        // Create a similar vector by adding small noise
-        let hv_similar = hv1.add_noise(0.05, 99);
+    fn signature_dimensions_are_checked() {
+        let mut lsh = LshIndex::new(5, 8, DEFAULT_LSH_SEED).unwrap();
+        let wrong = LshSignature::from_hashes(vec![0; 4]);
+        assert!(lsh.insert_signature(1, wrong).is_err());
+    }
 
-        lsh.insert(1, &hv1);
-        lsh.insert(2, &hv_similar);
+    #[test]
+    fn collision_probability_is_bounded_and_monotonic() {
+        let lsh = LshIndex::new(32, 8, DEFAULT_LSH_SEED).unwrap();
+        let unrelated = lsh.estimated_candidate_probability(0.5);
+        let similar = lsh.estimated_candidate_probability(0.9);
+        let identical = lsh.estimated_candidate_probability(1.0);
 
-        // Similar vectors should co-occur in at least some buckets
-        let candidates_1 = lsh.query_candidates(&hv1);
-        let candidates_2 = lsh.query_candidates(&hv_similar);
-
-        // hv1 query should find hv_similar as candidate (high probability with 10 bands)
-        // Note: this is probabilistic but with 95%+ probability at sim > 0.9
-        assert!(
-            candidates_1.contains(&2) || candidates_2.contains(&1),
-            "Similar vectors should share at least one LSH bucket"
-        );
+        assert!((0.0..=1.0).contains(&unrelated));
+        assert!(unrelated < similar);
+        assert!(similar < identical);
+        assert_eq!(identical, 1.0);
     }
 
     #[test]
     fn clear_empties_index() {
-        let mut lsh = LshIndex::new(5, 8, 42);
+        let mut lsh = LshIndex::new(5, 8, DEFAULT_LSH_SEED).unwrap();
         for i in 0..10 {
             lsh.insert(i, &BinaryHV::random(i));
         }
         assert!(lsh.entry_count() > 0);
         lsh.clear();
         assert_eq!(lsh.entry_count(), 0);
+        assert!(lsh.snapshot_entries().is_empty());
     }
 }

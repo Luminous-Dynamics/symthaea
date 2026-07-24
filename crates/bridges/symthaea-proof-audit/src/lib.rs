@@ -41,6 +41,7 @@
 //!
 //! let report = gate(&GateInput {
 //!     print_axioms_output: "'thm' depends on axioms: [propext, Quot.sound]",
+//!     expected_theorem: "thm",
 //!     proved_statement: "a + b = b + a",
 //!     expected_statement: "a + b = b + a",
 //!     policy: &AxiomPolicy::constitutional(),
@@ -52,7 +53,7 @@ pub mod axioms;
 pub mod policy;
 pub mod spec;
 
-pub use axioms::{AxiomReport, is_classical, is_sorry};
+pub use axioms::{AxiomParseError, AxiomReport, is_classical, is_sorry};
 pub use policy::{AuditVerdict, AxiomPolicy, Violation, audit};
 pub use spec::{normalize_statement, source_contains_sorry, statement_matches};
 
@@ -60,6 +61,8 @@ pub use spec::{normalize_statement, source_contains_sorry, statement_matches};
 pub struct GateInput<'a> {
     /// Raw output of `#print axioms <name>` from Lean.
     pub print_axioms_output: &'a str,
+    /// Exact theorem name expected in the Lean report.
+    pub expected_theorem: &'a str,
     /// The statement the proof actually established.
     pub proved_statement: &'a str,
     /// The pinned/intended statement (the spec).
@@ -73,24 +76,43 @@ pub struct GateInput<'a> {
 pub struct GateReport {
     pub audit: AuditVerdict,
     pub spec_conforms: bool,
+    /// Why the external Lean evidence could not be authenticated, if applicable.
+    pub evidence_error: Option<String>,
 }
 
 impl GateReport {
     /// Accepted iff the axiom audit is clean *and* the proved statement matches
     /// the pinned spec.
     pub fn accepted(&self) -> bool {
-        self.audit.is_clean() && self.spec_conforms
+        self.evidence_error.is_none() && self.audit.is_clean() && self.spec_conforms
     }
 }
 
 /// Run the full provenance + spec-conformance gate on one proof.
 pub fn gate(input: &GateInput) -> GateReport {
-    let report = AxiomReport::parse(input.print_axioms_output);
+    let (report, evidence_error) = match AxiomReport::parse(input.print_axioms_output) {
+        Ok(report) if report.theorem == input.expected_theorem => (report, None),
+        Ok(report) => {
+            let error = format!(
+                "Lean reported theorem '{}', expected '{}'",
+                report.theorem, input.expected_theorem
+            );
+            (report, Some(error))
+        }
+        Err(error) => (
+            AxiomReport {
+                theorem: String::new(),
+                axioms: Vec::new(),
+            },
+            Some(error.to_string()),
+        ),
+    };
     let audit = audit(&report, input.policy);
     let spec_conforms = statement_matches(input.proved_statement, input.expected_statement);
     GateReport {
         audit,
         spec_conforms,
+        evidence_error,
     }
 }
 
@@ -102,6 +124,7 @@ mod integration_tests {
     fn accepts_clean_conforming_proof() {
         let r = gate(&GateInput {
             print_axioms_output: "'gate_add_comm' depends on axioms: [propext, Quot.sound]",
+            expected_theorem: "gate_add_comm",
             proved_statement: "a + b = b + a",
             expected_statement: "a + b = b + a",
             policy: &AxiomPolicy::constitutional(),
@@ -114,6 +137,7 @@ mod integration_tests {
         // Generator smuggled in an ad-hoc axiom to force the checker green.
         let r = gate(&GateInput {
             print_axioms_output: "'thm' depends on axioms: [propext, MyConvenientAxiom]",
+            expected_theorem: "thm",
             proved_statement: "P x",
             expected_statement: "P x",
             policy: &AxiomPolicy::classical(),
@@ -129,6 +153,7 @@ mod integration_tests {
     fn rejects_sorry_even_with_matching_spec() {
         let r = gate(&GateInput {
             print_axioms_output: "'thm' depends on axioms: [sorryAx]",
+            expected_theorem: "thm",
             proved_statement: "hard_theorem",
             expected_statement: "hard_theorem",
             policy: &AxiomPolicy::classical(),
@@ -143,6 +168,7 @@ mod integration_tests {
         // vacuous-truth trap that axiom auditing alone cannot catch.
         let r = gate(&GateInput {
             print_axioms_output: "'thm' does not depend on any axioms",
+            expected_theorem: "thm",
             proved_statement: "True",
             expected_statement: "forall n, n + 0 = n",
             policy: &AxiomPolicy::constitutional(),
@@ -150,5 +176,28 @@ mod integration_tests {
         assert!(r.audit.is_clean());
         assert!(!r.spec_conforms);
         assert!(!r.accepted());
+    }
+
+    #[test]
+    fn rejects_missing_report_and_wrong_theorem() {
+        let missing = gate(&GateInput {
+            print_axioms_output: "Lean compilation failed",
+            expected_theorem: "thm",
+            proved_statement: "P",
+            expected_statement: "P",
+            policy: &AxiomPolicy::constitutional(),
+        });
+        assert!(!missing.accepted());
+        assert!(missing.evidence_error.is_some());
+
+        let wrong = gate(&GateInput {
+            print_axioms_output: "'other' does not depend on any axioms",
+            expected_theorem: "thm",
+            proved_statement: "P",
+            expected_statement: "P",
+            policy: &AxiomPolicy::constitutional(),
+        });
+        assert!(!wrong.accepted());
+        assert!(wrong.evidence_error.is_some());
     }
 }

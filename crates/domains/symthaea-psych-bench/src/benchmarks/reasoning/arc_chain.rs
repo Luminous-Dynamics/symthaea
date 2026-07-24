@@ -6,8 +6,12 @@
 //! **Honesty note:** This benchmark uses procedurally generated grid tasks.
 //! It tests how well HDC XOR binding preserves signal through multi-step
 //! compositions, not whether the system can discover or reason about
-//! compositional rules. The 2-AFC scoring uses random BinaryHV distractors
-//! (chance = ~50%), which is a lenient baseline. The z-scores reflect
+//! compositional rules. **FIXED (2026-07-18)**: the 2-AFC scoring used to use
+//! random BinaryHV distractors (chance = ~50%) — see `arc_dataset.rs`'s
+//! retraction note for why that's a discriminability artifact, not a fair
+//! baseline (on real ARC-AGI data it measured 99.0% vs. 13.8-67.8% under fair
+//! distractors). Now uses `arc_dataset::fair_distractor_grid` (a generic
+//! wrong transform of the test input) instead. The z-scores still reflect
 //! encoding capacity limits, not compositional reasoning ability.
 //!
 //! Tests whether HDC rule algebra supports chaining 3+ sequential transforms.
@@ -24,12 +28,12 @@
 //! - chain_4_accuracy: ~0.38 (SD~0.20) — 4-step composition
 //! - chain_degradation: ~0.09 (SD~0.05) — accuracy drop per added step
 
+use crate::benchmarks::reasoning::arc_dataset::fair_distractor_grid;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
-use symthaea_core::hdc::BinaryHV;
 use symthaea_core::hdc::binary_grid_encoder::BinaryGridEncoder;
 use symthaea_core::hdc::grid_encoder::GridEncoder;
 
@@ -208,9 +212,11 @@ impl ArcChainBenchmark {
                     sim_by_length[group_idx] += pred_sim;
                     sim_count_by_length[group_idx] += 1;
 
-                    // 2-AFC: predicted vs random distractor
+                    // 2-AFC: predicted vs a fair (equally structured) distractor
                     xor_shift(&mut rng);
-                    let distractor = BinaryHV::random(rng);
+                    let distractor_grid = fair_distractor_grid(&test_input, &test_output)
+                        .unwrap_or_else(|| test_input.clone());
+                    let distractor = encoder.encode_grid(&distractor_grid);
                     let dist_sim = predicted.similarity(&distractor) as f64;
 
                     total_by_length[group_idx] += 1;
@@ -366,9 +372,9 @@ impl PsychBenchmark for ArcChainBenchmark {
         }
         result.notes.push(
             "SYNTHETIC: Uses procedural grid transforms, not Chollet's real ARC. \
-             Tests HDC capacity under multi-step composition. 2-AFC uses random \
-             BinaryHV distractors (chance ~50%), a lenient baseline. Z-scores \
-             reflect encoding capacity, not compositional reasoning."
+             Tests HDC capacity under multi-step composition. 2-AFC uses a fair \
+             (equally structured) distractor, not random noise (fixed 2026-07-18). \
+             Z-scores reflect encoding capacity, not compositional reasoning."
                 .to_string(),
         );
         result.elapsed_ms = start.elapsed().as_millis() as u64;

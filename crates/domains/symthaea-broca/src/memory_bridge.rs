@@ -11,7 +11,14 @@ use symthaea_core::hdc::ContinuousHV;
 use symthaea_hdc_store::store::HdcStore;
 
 /// Bridge between Broca and the long-term HDC store.
-#[derive(Clone)]
+///
+/// Not `Clone`: `HdcStore` is a zero-copy mmap with an exclusive advisory
+/// file lock ("one exclusive mutable opener") — cloning it would violate the
+/// store's single-writer invariant. The old `#[derive(Clone)]` here only ever
+/// compiled against a since-changed on-disk `symthaea-hdc-store` (that crate
+/// is referenced by committed Cargo.tomls but has NO git history — a
+/// never-committed-crate repo-integrity gap, found 2026-07-16 when a
+/// workspace build first exercised this path).
 pub struct MemoryBridge {
     pub store: HdcStore,
     /// Number of past experiences to retrieve and blend.

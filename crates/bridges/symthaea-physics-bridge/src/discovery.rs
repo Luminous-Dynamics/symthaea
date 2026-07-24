@@ -6,9 +6,10 @@
 //! When Symthaea's physics simulation produces a prediction, this module
 //! packages it as a DeSci-compatible epistemic claim with LEM classification:
 //!
-//! - **E-axis**: Simulation confidence → E0 (speculation) through E4 (reproducible)
-//! - **N-axis**: Based on equation catalog coverage → N0 (personal) through N3 (axiomatic)
-//! - **M-axis**: Based on physical timescale → M0 (ephemeral) through M3 (foundational)
+//! - **E-axis**: A local simulation result supports at most E1 unless replay,
+//!   integrity, or independent-reproduction evidence is supplied
+//! - **N-axis**: Catalog similarity supports at most N1 structural analogy
+//! - **M-axis**: Defaults to M0 because this API receives no durability evidence
 //!
 //! This enables the Mycelix DeSci protocol to track, fact-check, and market
 //! physics predictions alongside human scientific claims.
@@ -23,7 +24,7 @@ pub struct PhysicsDiscovery {
     pub description: String,
     /// The physics domain this prediction relates to
     pub domain: PhysicsDomain,
-    /// Simulation confidence (0.0-1.0) — how certain is the prediction?
+    /// Sanitized simulation confidence (0.0-1.0), not an evidence tier.
     pub simulation_confidence: f64,
     /// Nearest known equation (from catalog search)
     pub nearest_analog: Option<String>,
@@ -43,7 +44,7 @@ pub struct PhysicsDiscovery {
 /// (which is a separate non-Symthaea workspace).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct LEMClassification {
-    /// E-axis: 0=Null, 1=Testimonial, 2=PrivatelyVerifiable, 3=CryptographicallyProven, 4=PubliclyReproducible
+    /// E-axis: 0=Null, 1=Testimonial, 2=PrivatelyVerifiable, 3=CryptographicallyVerifiable, 4=PubliclyReproduced
     pub empirical: u8,
     /// N-axis: 0=Personal, 1=Communal, 2=Network, 3=Axiomatic
     pub normative: u8,
@@ -57,9 +58,9 @@ impl LEMClassification {
         match self.empirical {
             0 => "E0: Null (unverifiable)",
             1 => "E1: Testimonial (simulation output)",
-            2 => "E2: Privately Verifiable (reproducible simulation)",
-            3 => "E3: Cryptographically Proven (hash-committed)",
-            4 => "E4: Publicly Reproducible (open source + data)",
+            2 => "E2: Privately Verifiable (replay evidence available)",
+            3 => "E3: Cryptographically Verifiable (integrity-protected evidence)",
+            4 => "E4: Publicly Reproduced (independent replication)",
             _ => "Unknown",
         }
     }
@@ -68,9 +69,9 @@ impl LEMClassification {
     pub fn normative_label(&self) -> &'static str {
         match self.normative {
             0 => "N0: Personal (single simulation)",
-            1 => "N1: Communal (peer-reviewed simulation)",
-            2 => "N2: Network (replicated by independent code)",
-            3 => "N3: Axiomatic (mathematical proof)",
+            1 => "N1: Communal (catalogued structural analogue)",
+            2 => "N2: Network (explicit network consensus)",
+            3 => "N3: Axiomatic (formally derived)",
             _ => "Unknown",
         }
     }
@@ -78,53 +79,48 @@ impl LEMClassification {
 
 /// Classify a physics prediction into a DeSci discovery claim.
 ///
-/// Uses the catalog search results and simulation metadata to determine
-/// the appropriate LEM Cube classification.
+/// This API has only a reported confidence score and equation-catalog search.
+/// It deliberately does not infer replayability, cryptographic verification,
+/// public reproduction, consensus, proof, or durability from those proxies.
 pub fn classify_prediction(
     description: &str,
     domain: PhysicsDomain,
     simulation_confidence: f64,
     catalog_results: &[SearchResult],
-    is_open_source: bool,
+    _is_open_source: bool,
 ) -> PhysicsDiscovery {
-    let (nearest, similarity) = catalog_results
+    let (nearest, raw_similarity) = catalog_results
         .first()
         .map(|r| (Some(r.name.clone()), r.score as f64))
         .unwrap_or((None, 0.0));
+    let simulation_confidence = if simulation_confidence.is_finite() {
+        simulation_confidence.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let similarity = if raw_similarity.is_finite() {
+        raw_similarity.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
 
-    // E-axis: simulation confidence + reproducibility
-    let empirical = if is_open_source && simulation_confidence > 0.8 {
-        4 // E4: Publicly reproducible (open code + high confidence)
-    } else if simulation_confidence > 0.6 {
-        2 // E2: Privately verifiable (simulation reproducible with same code)
-    } else if simulation_confidence > 0.3 {
-        1 // E1: Testimonial (simulation ran, but low confidence)
+    // A local simulation report is testimonial. Open source availability and
+    // a high self-reported score are not evidence that anyone replayed it.
+    let empirical = if simulation_confidence > 0.3 {
+        1 // E1: local simulation output
     } else {
         0 // E0: Null (speculative)
     };
 
-    // N-axis: based on catalog coverage (known physics = higher authority)
-    let normative = if similarity > 0.9 {
-        3 // N3: Axiomatic (matches known physics exactly)
-    } else if similarity > 0.6 {
-        2 // N2: Network (well-supported by known equations)
-    } else if similarity > 0.3 {
+    // Similarity to a catalogued expression is an analogy, not consensus or proof.
+    let normative = if similarity > 0.3 {
         1 // N1: Communal (some structural analog exists)
     } else {
         0 // N0: Personal (no known analog — speculative)
     };
 
-    // M-axis: physics domain determines permanence
-    let materiality = match domain {
-        PhysicsDomain::GeneralRelativity
-        | PhysicsDomain::QuantumMechanics
-        | PhysicsDomain::QuantumFieldTheory => 3, // Foundational
-        PhysicsDomain::NuclearPhysics
-        | PhysicsDomain::Electromagnetism
-        | PhysicsDomain::StatisticalMechanics => 2, // Persistent
-        PhysicsDomain::FluidDynamics | PhysicsDomain::Thermodynamics | PhysicsDomain::Optics => 1, // Temporal
-        _ => 0, // Ephemeral (modified gravity, speculative)
-    };
+    // Domain identity does not say how durably this particular claim is recorded.
+    let materiality = 0;
 
     let is_novel = similarity < 0.5;
 
@@ -214,8 +210,9 @@ mod tests {
             &results,
             true,
         );
-        assert_eq!(d.lem.empirical, 4); // E4: publicly reproducible
-        assert_eq!(d.lem.normative, 3); // N3: axiomatic (exact match)
+        assert_eq!(d.lem.empirical, 1); // E1: local simulation output
+        assert_eq!(d.lem.normative, 1); // N1: catalogued structural analogy
+        assert_eq!(d.lem.materiality, 0); // no durability evidence supplied
         assert!(!d.is_novel);
     }
 
@@ -246,7 +243,7 @@ mod tests {
         ]);
         let d = classify_lazar_gravity_a(&results);
         assert_eq!(d.lem.empirical, 0); // E0: zero confidence
-        assert_eq!(d.lem.normative, 2); // N2: 0.60 ≥ 0.6 threshold (structural analog in known physics)
+        assert_eq!(d.lem.normative, 1); // N1: structural analog in catalog
         assert_eq!(d.lem.materiality, 0); // M0: modified gravity = ephemeral
         assert!(!d.is_novel); // 0.60 > 0.5 threshold
     }
@@ -256,10 +253,10 @@ mod tests {
         let results = mock_results(&[("Waveguide Dispersion", 0.915, PhysicsDomain::Optics)]);
         let d = classify_arts_parts_waveguide(&results);
         assert_eq!(d.lem.empirical, 0); // E0: 0.15 confidence < 0.3
-        assert_eq!(d.lem.normative, 3); // N3: 0.915 ≈ axiomatic (it IS a waveguide)
-        assert_eq!(d.lem.materiality, 1); // M1: optics = temporal
+        assert_eq!(d.lem.normative, 1); // N1: strong structural analogy is still not proof
+        assert_eq!(d.lem.materiality, 0); // no durability evidence supplied
         assert!(!d.is_novel); // 0.915 >> 0.5
-        // Key insight: the PHYSICS is known (N3), but the CLAIM is unverified (E0)
+        // The physics analogy can be strong while the sample claim remains unverified.
     }
 
     #[test]
@@ -268,5 +265,37 @@ mod tests {
         let d = classify_prediction("test", PhysicsDomain::NuclearPhysics, 0.5, &results, false);
         assert!(d.tags.contains(&"NuclearPhysics".to_string()));
         assert!(d.tags.contains(&"novel-prediction".to_string())); // 0.3 < 0.5
+    }
+
+    #[test]
+    fn open_source_and_confidence_do_not_imply_reproduction() {
+        let d = classify_prediction(
+            "unreproduced local run",
+            PhysicsDomain::Optics,
+            1.0,
+            &[],
+            true,
+        );
+
+        assert_eq!(d.lem.empirical, 1);
+        assert_eq!(d.lem.normative, 0);
+        assert_eq!(d.lem.materiality, 0);
+    }
+
+    #[test]
+    fn non_finite_scores_fail_closed() {
+        let results = mock_results(&[("invalid", f64::NAN, PhysicsDomain::Optics)]);
+        let d = classify_prediction(
+            "invalid scores",
+            PhysicsDomain::Optics,
+            f64::NAN,
+            &results,
+            true,
+        );
+
+        assert_eq!(d.simulation_confidence, 0.0);
+        assert_eq!(d.analog_similarity, 0.0);
+        assert_eq!(d.lem.empirical, 0);
+        assert_eq!(d.lem.normative, 0);
     }
 }

@@ -44,7 +44,13 @@ pub(crate) fn macro_usage_key(expr: &Expr) -> String {
     }
 }
 
-pub(crate) fn lie_derivative_variance(
+/// Variance of the Lie derivative of `expr` along the flow `rhs`, normalized
+/// by mean squared gradient magnitude — the canonical fitness metric used by
+/// the autonomous-invariant GP search (lower = more conserved). Exposed
+/// (not `pub(crate)`) so external crates can reuse the exact same scoring
+/// function the real search uses, e.g. for noise-robustness benchmarking
+/// against the true fitness landscape rather than an approximation of it.
+pub fn lie_derivative_variance(
     expr: &Expr,
     rhs: fn(&[f64], f64) -> Vec<f64>,
     trajectory: &[Vec<f64>],
@@ -84,7 +90,8 @@ pub(crate) fn lie_derivative_variance(
     mean_lie_sq / mean_grad_sq
 }
 
-pub(crate) fn fd_gradient(expr: &Expr, state: &[f64], var_names: &[&str]) -> Vec<f64> {
+/// Central-difference gradient of `expr` at `state` w.r.t. `var_names`.
+pub fn fd_gradient(expr: &Expr, state: &[f64], var_names: &[&str]) -> Vec<f64> {
     const EPS: f64 = 1e-5;
     let mut grad = Vec::with_capacity(var_names.len());
     for i in 0..var_names.len() {
@@ -107,6 +114,76 @@ pub(crate) fn fd_gradient(expr: &Expr, state: &[f64], var_names: &[&str]) -> Vec
         grad.push((f_plus - f_minus) / (2.0 * EPS));
     }
     grad
+}
+
+/// Fraction of `trajectory` samples where `expr`'s gradient magnitude clears
+/// a threshold relative to the trajectory's own peak gradient magnitude.
+///
+/// [`lie_derivative_variance`] normalizes by the *mean* squared gradient,
+/// which a degenerate high-power monomial of a single variable can game: if
+/// the variable only leaves its near-zero neighborhood at a handful of
+/// trajectory samples, those few samples' large gradient can pull the mean
+/// above the absolute floor while the bulk of samples carry a near-zero
+/// gradient. The Lie derivative at those near-zero-gradient samples is also
+/// near zero (it's built from the same gradient), so numerator and
+/// denominator cancel together and the ratio reports "conserved" without the
+/// candidate having been meaningfully tested against the dynamics at most
+/// points on the trajectory. This function exposes that imbalance directly
+/// so callers can gate on it, without changing `lie_derivative_variance`
+/// itself (which stays the exact scoring function used during GP
+/// evolution — this is a separate, additive acceptance check).
+pub fn gradient_informativeness_fraction(
+    expr: &Expr,
+    trajectory: &[Vec<f64>],
+    var_names: &[&str],
+) -> f64 {
+    if trajectory.is_empty() {
+        return 0.0;
+    }
+    let grad_sq_vals: Vec<f64> = trajectory
+        .iter()
+        .map(|state| {
+            fd_gradient(expr, state, var_names)
+                .iter()
+                .map(|g| g * g)
+                .sum::<f64>()
+        })
+        .collect();
+    let max_grad_sq = grad_sq_vals.iter().cloned().fold(0.0_f64, f64::max);
+    if max_grad_sq <= 0.0 || !max_grad_sq.is_finite() {
+        return 0.0;
+    }
+    // 1% of the trajectory's own peak -- relative, not absolute, so it
+    // applies regardless of the candidate's overall scale.
+    const INFORMATIVE_RELATIVE_FLOOR: f64 = 0.01;
+    let informative = grad_sq_vals
+        .iter()
+        .filter(|&&g| g >= INFORMATIVE_RELATIVE_FLOOR * max_grad_sq)
+        .count();
+    informative as f64 / grad_sq_vals.len() as f64
+}
+
+/// Combined acceptance check: `expr` must have low Lie-derivative variance
+/// (near-conserved, `< variance_threshold`) *and* a majority of trajectory
+/// samples must carry a non-degenerate gradient (see
+/// [`gradient_informativeness_fraction`]), so the near-zero variance
+/// reflects genuine conservation tested broadly across the trajectory
+/// rather than a handful of large-gradient samples masking a mostly-untested
+/// near-flat candidate. Intended as a post-hoc filter on GP search results,
+/// not a replacement for the fitness function used during evolution.
+pub fn is_informatively_conserved(
+    expr: &Expr,
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    trajectory: &[Vec<f64>],
+    var_names: &[&str],
+    variance_threshold: f64,
+) -> bool {
+    let variance = lie_derivative_variance(expr, rhs, trajectory, var_names);
+    if !variance.is_finite() || variance >= variance_threshold {
+        return false;
+    }
+    const MIN_INFORMATIVE_FRACTION: f64 = 0.5;
+    gradient_informativeness_fraction(expr, trajectory, var_names) >= MIN_INFORMATIVE_FRACTION
 }
 
 pub(crate) fn gram_schmidt(vectors: &[Vec<f64>]) -> Vec<Vec<f64>> {

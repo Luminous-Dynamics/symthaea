@@ -150,6 +150,348 @@ pub enum DispatchCommand {
         /// Platform-specific serialized telemetry bytes (opaque to the zome).
         platform_specific: Vec<u8>,
     },
+    /// Publish a memetic-pathogen ruleset to the `identity` role's
+    /// `ruleset_registry` zome (`WARDED_NODE_DESIGN_2026-07-11.md` Phase 5b:
+    /// federated marketplace, no canonical publisher — the zome itself
+    /// structurally has no "canonical" concept, and this command doesn't
+    /// either). `publisher` is deliberately absent: the zome sets it from
+    /// the calling agent's own `agent_info()`, so it can never be forged by
+    /// supplying someone else's identity here.
+    PublishRuleset {
+        correlation_id: u64,
+        name: String,
+        version: String,
+        source: String,
+        entries: Vec<RulesetEntryPayload>,
+    },
+    /// Fetch every published ruleset (the "browse the marketplace" call —
+    /// deliberately unfiltered; the caller decides who to trust, this call
+    /// doesn't pre-judge).
+    GetAllRulesets {
+        correlation_id: u64,
+        limit: u32,
+    },
+    /// Fetch every ruleset a specific publisher has ever published.
+    GetRulesetsByPublisher {
+        correlation_id: u64,
+        /// Raw `AgentPubKey` bytes (this crate doesn't depend on
+        /// `holo_hash`/`holochain_client` — see module docs — so publisher
+        /// identity crosses this boundary as opaque bytes, same convention
+        /// as `asset_hash`/`order_hash` above).
+        publisher: Vec<u8>,
+    },
+}
+
+/// One pathogen signature within a ruleset — mirrors
+/// `ruleset_registry_integrity::RulesetEntryRecord` /
+/// `symthaea_memetics::RulesetEntry`. Deliberately a separate, duplicated
+/// type (not an import) — see this file's "Types mirrored from
+/// mycelix_bridge.rs" note above: this crate avoids depending on either
+/// `symthaea-memetics` or the Mycelix zome crates, to keep the dependency
+/// graph one-directional (cognitive loop → this bridge → transport).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RulesetEntryPayload {
+    pub signature: Vec<u8>,
+    pub description: String,
+}
+
+const HOLOCHAIN_HASH_BYTES: usize = 39;
+const MAX_PLATFORM_SPECIFIC_BYTES: usize = 64 * 1024;
+const MAX_RULESET_ENTRIES: usize = 1024;
+const MAX_RULESET_SIGNATURE_BYTES: usize = 64 * 1024;
+const MAX_RULESET_FETCH_LIMIT: u32 = 1000;
+const MAX_RULESET_RESPONSE_BYTES: usize = 64 * 1024 * 1024;
+
+fn require_text(name: &str, value: &str, max_bytes: usize) -> Result<(), String> {
+    if value.trim().is_empty() {
+        return Err(format!("{name} cannot be empty"));
+    }
+    if value.len() > max_bytes {
+        return Err(format!("{name} exceeds {max_bytes} bytes"));
+    }
+    Ok(())
+}
+
+fn require_optional_text(name: &str, value: &str, max_bytes: usize) -> Result<(), String> {
+    if value.len() > max_bytes {
+        return Err(format!("{name} exceeds {max_bytes} bytes"));
+    }
+    Ok(())
+}
+
+fn require_unit_interval(name: &str, value: f64) -> Result<(), String> {
+    if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+        return Err(format!("{name} must be a finite value in [0, 1]"));
+    }
+    Ok(())
+}
+
+fn require_hash(name: &str, value: &[u8]) -> Result<(), String> {
+    if value.len() != HOLOCHAIN_HASH_BYTES {
+        return Err(format!(
+            "{name} must contain exactly {HOLOCHAIN_HASH_BYTES} raw Holochain hash bytes"
+        ));
+    }
+    Ok(())
+}
+
+fn encode_msgpack<T: Serialize>(value: &T) -> Result<Vec<u8>, String> {
+    rmp_serde::to_vec(value).map_err(|error| format!("failed to encode conductor payload: {error}"))
+}
+
+fn validate_ruleset_entry(entry: &RulesetEntryPayload) -> Result<(), String> {
+    if entry.signature.is_empty() || entry.signature.len() > MAX_RULESET_SIGNATURE_BYTES {
+        return Err(format!(
+            "ruleset signatures must contain 1 to {MAX_RULESET_SIGNATURE_BYTES} bytes"
+        ));
+    }
+    require_text("ruleset entry description", &entry.description, 4096)
+}
+
+impl DispatchCommand {
+    /// Correlation id used for logging and rejection outcomes.
+    pub fn correlation_id(&self) -> u64 {
+        match self {
+            Self::SubmitProposal { correlation_id, .. }
+            | Self::CastVote { correlation_id, .. }
+            | Self::EvaluateAsset { correlation_id, .. }
+            | Self::DeclareCrisis { correlation_id, .. }
+            | Self::SubmitRoboticsTelemetry { correlation_id, .. }
+            | Self::PublishRuleset { correlation_id, .. }
+            | Self::GetAllRulesets { correlation_id, .. }
+            | Self::GetRulesetsByPublisher { correlation_id, .. } => *correlation_id,
+            Self::QueryActiveProposals => 0,
+        }
+    }
+
+    /// Validate a command before serialization or any conductor call.
+    pub fn validate(&self) -> Result<(), String> {
+        if !matches!(self, Self::QueryActiveProposals) && self.correlation_id() == 0 {
+            return Err("correlation_id must be non-zero".into());
+        }
+
+        match self {
+            Self::SubmitProposal {
+                description,
+                proposer_did,
+                consciousness_phi,
+                meta_awareness,
+                coherence,
+                care_activation,
+                alignment_score,
+                ..
+            } => {
+                require_text("description", description, 4096)?;
+                require_text("proposer_did", proposer_did, 256)?;
+                require_unit_interval("consciousness_phi", *consciousness_phi)?;
+                require_unit_interval("meta_awareness", *meta_awareness)?;
+                require_unit_interval("coherence", *coherence)?;
+                require_unit_interval("care_activation", *care_activation)?;
+                require_unit_interval("alignment_score", *alignment_score)
+            }
+            Self::CastVote {
+                proposal_id,
+                voter_did,
+                rationale,
+                consciousness_phi,
+                meta_awareness,
+                coherence,
+                care_activation,
+                ..
+            } => {
+                require_text("proposal_id", proposal_id, 512)?;
+                require_text("voter_did", voter_did, 256)?;
+                require_optional_text("rationale", rationale, 4096)?;
+                require_unit_interval("consciousness_phi", *consciousness_phi)?;
+                require_unit_interval("meta_awareness", *meta_awareness)?;
+                require_unit_interval("coherence", *coherence)?;
+                require_unit_interval("care_activation", *care_activation)
+            }
+            Self::QueryActiveProposals => Ok(()),
+            Self::EvaluateAsset {
+                project_id,
+                phi_score,
+                harmony_alignment,
+                per_harmony_scores,
+                care_activation,
+                meta_awareness,
+                ..
+            } => {
+                require_text("project_id", project_id, 256)?;
+                require_text("per_harmony_scores", per_harmony_scores, 16 * 1024)?;
+                require_unit_interval("phi_score", *phi_score)?;
+                require_unit_interval("harmony_alignment", *harmony_alignment)?;
+                require_unit_interval("care_activation", *care_activation)?;
+                require_unit_interval("meta_awareness", *meta_awareness)
+            }
+            Self::DeclareCrisis {
+                severity,
+                crisis_type,
+                description,
+                confidence,
+                ..
+            } => {
+                if !(1..=5).contains(severity) {
+                    return Err("severity must be in [1, 5]".into());
+                }
+                require_text("crisis_type", crisis_type, 128)?;
+                require_text("description", description, 4096)?;
+                require_unit_interval("confidence", *confidence)
+            }
+            Self::SubmitRoboticsTelemetry {
+                asset_hash,
+                order_hash,
+                lat,
+                lon,
+                alt,
+                consciousness_level,
+                safety_level,
+                mission_progress,
+                fuel_level,
+                platform,
+                platform_specific,
+                ..
+            } => {
+                require_hash("asset_hash", asset_hash)?;
+                require_hash("order_hash", order_hash)?;
+                if !lat.is_finite() || !(-90.0..=90.0).contains(lat) {
+                    return Err("lat must be a finite WGS84 latitude".into());
+                }
+                if !lon.is_finite() || !(-180.0..=180.0).contains(lon) {
+                    return Err("lon must be a finite WGS84 longitude".into());
+                }
+                if !alt.is_finite() {
+                    return Err("alt must be finite".into());
+                }
+                require_unit_interval("consciousness_level", *consciousness_level)?;
+                require_unit_interval("mission_progress", *mission_progress)?;
+                require_unit_interval("fuel_level", *fuel_level)?;
+                if !matches!(safety_level.as_str(), "Green" | "Yellow" | "Orange" | "Red") {
+                    return Err("safety_level must be Green, Yellow, Orange, or Red".into());
+                }
+                require_text("platform", platform, u8::MAX as usize)?;
+                if platform_specific.len() > MAX_PLATFORM_SPECIFIC_BYTES {
+                    return Err(format!(
+                        "platform_specific exceeds {MAX_PLATFORM_SPECIFIC_BYTES} bytes"
+                    ));
+                }
+                Ok(())
+            }
+            Self::PublishRuleset {
+                name,
+                version,
+                source,
+                entries,
+                ..
+            } => {
+                require_text("ruleset name", name, 256)?;
+                require_text("ruleset version", version, 64)?;
+                require_text("ruleset source", source, 4096)?;
+                if entries.len() > MAX_RULESET_ENTRIES {
+                    return Err(format!(
+                        "ruleset contains more than {MAX_RULESET_ENTRIES} entries"
+                    ));
+                }
+                for entry in entries {
+                    validate_ruleset_entry(entry)?;
+                }
+                Ok(())
+            }
+            Self::GetAllRulesets { limit, .. } => {
+                if *limit == 0 || *limit > MAX_RULESET_FETCH_LIMIT {
+                    return Err(format!(
+                        "ruleset fetch limit must be in [1, {MAX_RULESET_FETCH_LIMIT}]"
+                    ));
+                }
+                Ok(())
+            }
+            Self::GetRulesetsByPublisher { publisher, .. } => require_hash("publisher", publisher),
+        }
+    }
+
+    fn rejection(&self, reason: String) -> DispatchOutcome {
+        let correlation_id = self.correlation_id();
+        match self {
+            Self::SubmitProposal { .. }
+            | Self::EvaluateAsset { .. }
+            | Self::DeclareCrisis { .. }
+            | Self::QueryActiveProposals => DispatchOutcome::ProposalRejected {
+                correlation_id,
+                reason,
+            },
+            Self::CastVote { .. } => DispatchOutcome::VoteRejected {
+                correlation_id,
+                reason,
+            },
+            Self::SubmitRoboticsTelemetry { .. } => DispatchOutcome::TelemetryRejected {
+                correlation_id,
+                reason,
+            },
+            Self::PublishRuleset { .. } => DispatchOutcome::RulesetPublishRejected {
+                correlation_id,
+                reason,
+            },
+            Self::GetAllRulesets { .. } | Self::GetRulesetsByPublisher { .. } => {
+                DispatchOutcome::RulesetFetchFailed {
+                    correlation_id,
+                    reason,
+                }
+            }
+        }
+    }
+}
+
+/// One published ruleset as returned by `GetAllRulesets`/
+/// `GetRulesetsByPublisher` — mirrors
+/// `ruleset_registry_integrity::RulesetRecord`. The `ConductorTransport`
+/// implementation is responsible for unwrapping the Holochain `Record`
+/// envelope and re-serializing just this shape (see `dispatch()`'s
+/// `GetAllRulesets` arm doc comment for why that boundary is drawn there).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RulesetPayload {
+    pub publisher: Vec<u8>,
+    pub name: String,
+    pub version: String,
+    pub source: String,
+    pub entries: Vec<RulesetEntryPayload>,
+}
+
+fn decode_ruleset_response(
+    response: &[u8],
+    max_rulesets: usize,
+    expected_publisher: Option<&[u8]>,
+) -> Result<Vec<RulesetPayload>, String> {
+    if response.len() > MAX_RULESET_RESPONSE_BYTES {
+        return Err(format!(
+            "response exceeds the {MAX_RULESET_RESPONSE_BYTES} byte safety limit"
+        ));
+    }
+    let rulesets: Vec<RulesetPayload> =
+        rmp_serde::from_slice(response).map_err(|error| format!("malformed response: {error}"))?;
+    if rulesets.len() > max_rulesets {
+        return Err(format!(
+            "response contains {} rulesets, exceeding the requested limit of {max_rulesets}",
+            rulesets.len()
+        ));
+    }
+    for ruleset in &rulesets {
+        require_hash("ruleset publisher", &ruleset.publisher)?;
+        if expected_publisher.is_some_and(|publisher| publisher != ruleset.publisher.as_slice()) {
+            return Err("response contains a ruleset from a different publisher".into());
+        }
+        require_text("ruleset name", &ruleset.name, 256)?;
+        require_text("ruleset version", &ruleset.version, 64)?;
+        require_text("ruleset source", &ruleset.source, 4096)?;
+        if ruleset.entries.len() > MAX_RULESET_ENTRIES {
+            return Err(format!(
+                "returned ruleset contains more than {MAX_RULESET_ENTRIES} entries"
+            ));
+        }
+        for entry in &ruleset.entries {
+            validate_ruleset_entry(entry)?;
+        }
+    }
+    Ok(rulesets)
 }
 
 /// Outcome received back from the conductor.
@@ -180,6 +522,22 @@ pub enum DispatchOutcome {
         action_hash: Option<String>,
     },
     TelemetryRejected {
+        correlation_id: u64,
+        reason: String,
+    },
+    RulesetPublished {
+        correlation_id: u64,
+        action_hash: Option<String>,
+    },
+    RulesetPublishRejected {
+        correlation_id: u64,
+        reason: String,
+    },
+    RulesetsFetched {
+        correlation_id: u64,
+        rulesets: Vec<RulesetPayload>,
+    },
+    RulesetFetchFailed {
         correlation_id: u64,
         reason: String,
     },
@@ -276,7 +634,11 @@ pub struct GovernanceDispatcher<T: ConductorTransport> {
     transport: T,
     /// Governance DNA role name in the unified hApp.
     governance_role: String,
+    /// Hard wall-clock limit around each complete dispatch operation.
+    call_timeout: Duration,
 }
+
+const DEFAULT_CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
 impl<T: ConductorTransport> GovernanceDispatcher<T> {
     /// Create a new dispatcher targeting the governance role.
@@ -285,6 +647,7 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
             transport,
             // Matches `mycelix-workspace/happs/happ.yaml` role name.
             governance_role: "governance".to_string(),
+            call_timeout: DEFAULT_CALL_TIMEOUT,
         }
     }
 
@@ -293,11 +656,46 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
         Self {
             transport,
             governance_role: role.into(),
+            call_timeout: DEFAULT_CALL_TIMEOUT,
         }
     }
 
-    /// Dispatch a single command, returning the outcome.
+    /// Override the hard wall-clock limit for each dispatch operation.
+    pub fn with_call_timeout(mut self, call_timeout: Duration) -> Self {
+        self.call_timeout = if call_timeout.is_zero() {
+            Duration::from_millis(1)
+        } else {
+            call_timeout
+        };
+        self
+    }
+
+    /// Dispatch a single command within the configured wall-clock limit.
     pub async fn dispatch(&mut self, cmd: DispatchCommand) -> DispatchOutcome {
+        let correlation_id = cmd.correlation_id();
+        match tokio::time::timeout(self.call_timeout, self.dispatch_inner(cmd)).await {
+            Ok(outcome) => outcome,
+            Err(_) => {
+                warn!(
+                    correlation_id,
+                    timeout_ms = %self.call_timeout.as_millis(),
+                    "Conductor dispatch timed out"
+                );
+                DispatchOutcome::Timeout { correlation_id }
+            }
+        }
+    }
+
+    async fn dispatch_inner(&mut self, cmd: DispatchCommand) -> DispatchOutcome {
+        if let Err(reason) = cmd.validate() {
+            warn!(
+                correlation_id = cmd.correlation_id(),
+                %reason,
+                "Rejected invalid conductor command"
+            );
+            return cmd.rejection(reason);
+        }
+
         match cmd {
             DispatchCommand::SubmitProposal {
                 correlation_id,
@@ -346,7 +744,15 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                     "updated": now_micros,
                     "version": 1,
                 });
-                let payload_bytes = rmp_serde::to_vec(&payload).unwrap_or_default();
+                let payload_bytes = match encode_msgpack(&payload) {
+                    Ok(payload) => payload,
+                    Err(reason) => {
+                        return DispatchOutcome::ProposalRejected {
+                            correlation_id,
+                            reason,
+                        };
+                    }
+                };
 
                 match self
                     .transport
@@ -407,7 +813,15 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                     "choice": if approve { "For" } else { "Against" },
                     "reason": reason,
                 });
-                let payload_bytes = rmp_serde::to_vec(&payload).unwrap_or_default();
+                let payload_bytes = match encode_msgpack(&payload) {
+                    Ok(payload) => payload,
+                    Err(reason) => {
+                        return DispatchOutcome::VoteRejected {
+                            correlation_id,
+                            reason,
+                        };
+                    }
+                };
 
                 match self
                     .transport
@@ -433,7 +847,15 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
             }
 
             DispatchCommand::QueryActiveProposals => {
-                let payload_bytes = rmp_serde::to_vec(&()).unwrap_or_default();
+                let payload_bytes = match encode_msgpack(&()) {
+                    Ok(payload) => payload,
+                    Err(reason) => {
+                        return DispatchOutcome::ProposalRejected {
+                            correlation_id: 0,
+                            reason,
+                        };
+                    }
+                };
                 match self
                     .transport
                     .call_zome(
@@ -474,7 +896,15 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                     "meta_awareness": meta_awareness,
                     "assessment_cycle": 0,
                 });
-                let payload_bytes = rmp_serde::to_vec(&payload).unwrap_or_default();
+                let payload_bytes = match encode_msgpack(&payload) {
+                    Ok(payload) => payload,
+                    Err(reason) => {
+                        return DispatchOutcome::ProposalRejected {
+                            correlation_id,
+                            reason,
+                        };
+                    }
+                };
 
                 match self
                     .transport
@@ -544,7 +974,15 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                     "estimated_affected": 0,
                     "coordination_lead": null,
                 });
-                let payload_bytes = rmp_serde::to_vec(&payload).unwrap_or_default();
+                let payload_bytes = match encode_msgpack(&payload) {
+                    Ok(payload) => payload,
+                    Err(reason) => {
+                        return DispatchOutcome::ProposalRejected {
+                            correlation_id,
+                            reason,
+                        };
+                    }
+                };
 
                 match self
                     .transport
@@ -593,7 +1031,7 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                 // opaque-bytes field retains a minimal, self-describing header.
                 // Format: [len(u8) | platform_utf8 | caller_bytes]
                 let mut tagged = Vec::with_capacity(1 + platform.len() + platform_specific.len());
-                let plen = platform.len().min(255) as u8;
+                let plen = platform.len() as u8;
                 tagged.push(plen);
                 tagged.extend_from_slice(&platform.as_bytes()[..plen as usize]);
                 tagged.extend_from_slice(&platform_specific);
@@ -610,7 +1048,15 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                     "fuel_level": fuel_level,
                     "platform_specific": tagged,
                 });
-                let payload_bytes = rmp_serde::to_vec(&payload).unwrap_or_default();
+                let payload_bytes = match encode_msgpack(&payload) {
+                    Ok(payload) => payload,
+                    Err(reason) => {
+                        return DispatchOutcome::TelemetryRejected {
+                            correlation_id,
+                            reason,
+                        };
+                    }
+                };
 
                 match self
                     .transport
@@ -649,73 +1095,204 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                     }
                 }
             }
+
+            DispatchCommand::PublishRuleset {
+                correlation_id,
+                name,
+                version,
+                source,
+                entries,
+            } => {
+                // Mirrors ruleset_registry's PublishRulesetInput exactly
+                // (publisher is deliberately absent — the zome derives it
+                // from agent_info(), see the enum variant's doc comment).
+                let payload = serde_json::json!({
+                    "name": name,
+                    "version": version,
+                    "source": source,
+                    "entries": entries
+                        .iter()
+                        .map(|e| serde_json::json!({
+                            "signature": e.signature,
+                            "description": e.description,
+                        }))
+                        .collect::<Vec<_>>(),
+                });
+                let payload_bytes = match encode_msgpack(&payload) {
+                    Ok(payload) => payload,
+                    Err(reason) => {
+                        return DispatchOutcome::RulesetPublishRejected {
+                            correlation_id,
+                            reason,
+                        };
+                    }
+                };
+
+                match self
+                    .transport
+                    .call_zome(
+                        "identity",
+                        "ruleset_registry",
+                        "publish_ruleset",
+                        payload_bytes,
+                    )
+                    .await
+                {
+                    Ok(result) => {
+                        let action_hash = String::from_utf8(result).ok();
+                        info!(correlation_id, %name, entry_count = entries.len(), "Ruleset published to Mycelix identity DHT");
+                        DispatchOutcome::RulesetPublished {
+                            correlation_id,
+                            action_hash,
+                        }
+                    }
+                    Err(reason) => {
+                        warn!(correlation_id, %name, %reason, "Ruleset publish rejected by conductor");
+                        DispatchOutcome::RulesetPublishRejected {
+                            correlation_id,
+                            reason,
+                        }
+                    }
+                }
+            }
+
+            DispatchCommand::GetAllRulesets {
+                correlation_id,
+                limit,
+            } => {
+                let payload_bytes = match encode_msgpack(&limit) {
+                    Ok(payload) => payload,
+                    Err(reason) => {
+                        return DispatchOutcome::RulesetFetchFailed {
+                            correlation_id,
+                            reason,
+                        };
+                    }
+                };
+
+                match self
+                    .transport
+                    .call_zome(
+                        "identity",
+                        "ruleset_registry",
+                        "get_all_rulesets",
+                        payload_bytes,
+                    )
+                    .await
+                {
+                    // The transport is expected to have already unwrapped
+                    // Holochain's Record envelope and re-serialized just the
+                    // RulesetRecord shape (see RulesetPayload's doc comment)
+                    // — this dispatcher stays free of Holochain-native types.
+                    Ok(result) => match decode_ruleset_response(&result, limit as usize, None) {
+                        Ok(rulesets) => {
+                            info!(
+                                correlation_id,
+                                count = rulesets.len(),
+                                "Fetched rulesets from Mycelix identity DHT"
+                            );
+                            DispatchOutcome::RulesetsFetched {
+                                correlation_id,
+                                rulesets,
+                            }
+                        }
+                        Err(reason) => {
+                            warn!(correlation_id, %reason, "Ruleset fetch response rejected");
+                            DispatchOutcome::RulesetFetchFailed {
+                                correlation_id,
+                                reason,
+                            }
+                        }
+                    },
+                    Err(reason) => {
+                        warn!(correlation_id, %reason, "Ruleset fetch rejected by conductor");
+                        DispatchOutcome::RulesetFetchFailed {
+                            correlation_id,
+                            reason,
+                        }
+                    }
+                }
+            }
+
+            DispatchCommand::GetRulesetsByPublisher {
+                correlation_id,
+                publisher,
+            } => {
+                let payload_bytes = match encode_msgpack(&publisher) {
+                    Ok(payload) => payload,
+                    Err(reason) => {
+                        return DispatchOutcome::RulesetFetchFailed {
+                            correlation_id,
+                            reason,
+                        };
+                    }
+                };
+
+                match self
+                    .transport
+                    .call_zome(
+                        "identity",
+                        "ruleset_registry",
+                        "get_rulesets_by_publisher",
+                        payload_bytes,
+                    )
+                    .await
+                {
+                    Ok(result) => match decode_ruleset_response(
+                        &result,
+                        MAX_RULESET_FETCH_LIMIT as usize,
+                        Some(&publisher),
+                    ) {
+                        Ok(rulesets) => {
+                            info!(
+                                correlation_id,
+                                count = rulesets.len(),
+                                "Fetched publisher's rulesets from Mycelix identity DHT"
+                            );
+                            DispatchOutcome::RulesetsFetched {
+                                correlation_id,
+                                rulesets,
+                            }
+                        }
+                        Err(reason) => {
+                            warn!(correlation_id, %reason, "Ruleset fetch response rejected");
+                            DispatchOutcome::RulesetFetchFailed {
+                                correlation_id,
+                                reason,
+                            }
+                        }
+                    },
+                    Err(reason) => {
+                        warn!(correlation_id, %reason, "Ruleset fetch rejected by conductor");
+                        DispatchOutcome::RulesetFetchFailed {
+                            correlation_id,
+                            reason,
+                        }
+                    }
+                }
+            }
         }
     }
 
     /// Run the dispatch loop, draining commands from the receiver.
     ///
     /// Sends outcomes back through the `outcome_tx` channel.
-    /// Tracks pending commands and injects timeout events after 30s.
+    /// Every command is bounded by the dispatcher's configured call timeout.
     pub async fn run_dispatch_loop(
         mut self,
         rx: std::sync::mpsc::Receiver<DispatchCommand>,
         outcome_tx: tokio::sync::mpsc::Sender<DispatchOutcome>,
     ) {
         info!("Governance dispatch loop started");
-        let timeout_duration = Duration::from_secs(30);
-        let mut pending: Vec<(u64, std::time::Instant)> = Vec::new();
 
         loop {
             while let Ok(cmd) = rx.try_recv() {
-                let corr_id = match &cmd {
-                    DispatchCommand::SubmitProposal { correlation_id, .. }
-                    | DispatchCommand::CastVote { correlation_id, .. }
-                    | DispatchCommand::EvaluateAsset { correlation_id, .. }
-                    | DispatchCommand::DeclareCrisis { correlation_id, .. }
-                    | DispatchCommand::SubmitRoboticsTelemetry { correlation_id, .. } => {
-                        *correlation_id
-                    }
-                    DispatchCommand::QueryActiveProposals => 0,
-                };
-                if corr_id > 0 {
-                    pending.push((corr_id, std::time::Instant::now()));
-                }
-
                 let outcome = self.dispatch(cmd).await;
-                let responded_id = match &outcome {
-                    DispatchOutcome::ProposalAccepted { correlation_id, .. }
-                    | DispatchOutcome::ProposalRejected { correlation_id, .. }
-                    | DispatchOutcome::VoteAccepted { correlation_id, .. }
-                    | DispatchOutcome::VoteRejected { correlation_id, .. }
-                    | DispatchOutcome::TelemetryAccepted { correlation_id, .. }
-                    | DispatchOutcome::TelemetryRejected { correlation_id, .. }
-                    | DispatchOutcome::Timeout { correlation_id } => *correlation_id,
-                };
-                pending.retain(|(id, _)| *id != responded_id);
-
                 if outcome_tx.send(outcome).await.is_err() {
                     warn!("Outcome channel closed, stopping dispatch loop");
                     return;
                 }
             }
-
-            // Check for timeouts
-            let now = std::time::Instant::now();
-            let timed_out: Vec<u64> = pending
-                .iter()
-                .filter(|(_, sent_at)| now.duration_since(*sent_at) > timeout_duration)
-                .map(|(id, _)| *id)
-                .collect();
-
-            for corr_id in &timed_out {
-                warn!(correlation_id = corr_id, "Dispatch command timed out (30s)");
-                let _ = outcome_tx
-                    .send(DispatchOutcome::Timeout {
-                        correlation_id: *corr_id,
-                    })
-                    .await;
-            }
-            pending.retain(|(id, _)| !timed_out.contains(id));
 
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
@@ -815,6 +1392,49 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn hung_transport_produces_real_timeout_outcome() {
+        struct HangingTransport;
+        #[async_trait::async_trait]
+        impl ConductorTransport for HangingTransport {
+            async fn call_zome(
+                &mut self,
+                _: &str,
+                _: &str,
+                _: &str,
+                _: Vec<u8>,
+            ) -> Result<Vec<u8>, String> {
+                std::future::pending().await
+            }
+            fn is_connected(&self) -> bool {
+                true
+            }
+        }
+
+        let mut dispatcher = GovernanceDispatcher::new(HangingTransport)
+            .with_call_timeout(Duration::from_millis(20));
+        let command = DispatchCommand::SubmitProposal {
+            correlation_id: 101,
+            description: "timeout test".into(),
+            proposer_did: "did:mycelix:test".into(),
+            consciousness_phi: 0.5,
+            meta_awareness: 0.5,
+            coherence: 0.5,
+            care_activation: 0.5,
+            alignment_score: 0.5,
+        };
+        let started = std::time::Instant::now();
+        let outcome = dispatcher.dispatch(command).await;
+
+        assert!(matches!(
+            outcome,
+            DispatchOutcome::Timeout {
+                correlation_id: 101
+            }
+        ));
+        assert!(started.elapsed() < Duration::from_secs(1));
+    }
+
+    #[tokio::test]
     async fn mock_dispatcher_cast_vote() {
         let mut dispatcher = GovernanceDispatcher::new(MockTransport);
 
@@ -840,7 +1460,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn dispatch_loop_timeout_detection() {
+    async fn dispatch_loop_forwards_immediate_rejection() {
         let (cmd_tx, cmd_rx) = std::sync::mpsc::sync_channel(10);
         let (outcome_tx, mut outcome_rx) = tokio::sync::mpsc::channel(10);
 
@@ -909,8 +1529,8 @@ mod tests {
 
         let cmd = DispatchCommand::SubmitRoboticsTelemetry {
             correlation_id: 4242,
-            asset_hash: vec![0x84, 0x21, 0x24, 0x00],
-            order_hash: vec![0x84, 0x21, 0x24, 0x01],
+            asset_hash: vec![0x84; HOLOCHAIN_HASH_BYTES],
+            order_hash: vec![0x21; HOLOCHAIN_HASH_BYTES],
             lat: 40.7128,
             lon: -74.0060,
             alt: 1200.0,
@@ -931,12 +1551,76 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn invalid_commands_are_rejected_before_transport() {
+        struct PanicTransport;
+        #[async_trait::async_trait]
+        impl ConductorTransport for PanicTransport {
+            async fn call_zome(
+                &mut self,
+                _: &str,
+                _: &str,
+                _: &str,
+                _: Vec<u8>,
+            ) -> Result<Vec<u8>, String> {
+                panic!("invalid commands must not reach the conductor transport")
+            }
+            fn is_connected(&self) -> bool {
+                true
+            }
+        }
+
+        let mut dispatcher = GovernanceDispatcher::new(PanicTransport);
+        let proposal = DispatchCommand::SubmitProposal {
+            correlation_id: 1,
+            description: "invalid score".into(),
+            proposer_did: "did:mycelix:test".into(),
+            consciousness_phi: f64::NAN,
+            meta_awareness: 0.5,
+            coherence: 0.5,
+            care_activation: 0.5,
+            alignment_score: 0.5,
+        };
+        assert!(matches!(
+            dispatcher.dispatch(proposal).await,
+            DispatchOutcome::ProposalRejected { .. }
+        ));
+
+        let telemetry = DispatchCommand::SubmitRoboticsTelemetry {
+            correlation_id: 2,
+            asset_hash: vec![0; 4],
+            order_hash: vec![0; HOLOCHAIN_HASH_BYTES],
+            lat: 0.0,
+            lon: 0.0,
+            alt: 0.0,
+            consciousness_level: 0.5,
+            safety_level: "Green".into(),
+            mission_progress: 0.5,
+            fuel_level: 0.5,
+            platform: "rover".into(),
+            platform_specific: vec![],
+        };
+        assert!(matches!(
+            dispatcher.dispatch(telemetry).await,
+            DispatchOutcome::TelemetryRejected { .. }
+        ));
+
+        let fetch = DispatchCommand::GetAllRulesets {
+            correlation_id: 3,
+            limit: 0,
+        };
+        assert!(matches!(
+            dispatcher.dispatch(fetch).await,
+            DispatchOutcome::RulesetFetchFailed { .. }
+        ));
+    }
+
     #[test]
     fn telemetry_command_serde_roundtrip() {
         let cmd = DispatchCommand::SubmitRoboticsTelemetry {
             correlation_id: 7,
-            asset_hash: vec![1, 2, 3],
-            order_hash: vec![4, 5, 6],
+            asset_hash: vec![1; HOLOCHAIN_HASH_BYTES],
+            order_hash: vec![2; HOLOCHAIN_HASH_BYTES],
             lat: 1.5,
             lon: -2.5,
             alt: 100.0,
@@ -959,6 +1643,218 @@ mod tests {
                 assert_eq!(platform, "helicopter");
             }
             _ => panic!("wrong variant"),
+        }
+    }
+
+    // ── Ruleset registry commands (Warded Node design Phase 5b) ──
+
+    #[test]
+    fn publish_ruleset_command_serde_roundtrip() {
+        let cmd = DispatchCommand::PublishRuleset {
+            correlation_id: 55,
+            name: "family-safety-baseline".into(),
+            version: "2026.07.11".into(),
+            source: "test-fixture".into(),
+            entries: vec![RulesetEntryPayload {
+                signature: vec![0u8; 2048],
+                description: "known pattern".into(),
+            }],
+        };
+        let json = serde_json::to_string(&cmd).unwrap();
+        let decoded: DispatchCommand = serde_json::from_str(&json).unwrap();
+        match decoded {
+            DispatchCommand::PublishRuleset {
+                correlation_id,
+                name,
+                entries,
+                ..
+            } => {
+                assert_eq!(correlation_id, 55);
+                assert_eq!(name, "family-safety-baseline");
+                assert_eq!(entries.len(), 1);
+                assert_eq!(entries[0].signature.len(), 2048);
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn ruleset_payload_msgpack_roundtrip() {
+        // Proves RulesetPayload survives the SAME wire format (rmp_serde)
+        // dispatch() actually uses for fetch responses, not just JSON.
+        let payload = vec![RulesetPayload {
+            publisher: vec![1; HOLOCHAIN_HASH_BYTES],
+            name: "n".into(),
+            version: "v".into(),
+            source: "s".into(),
+            entries: vec![RulesetEntryPayload {
+                signature: vec![7u8; 16],
+                description: "d".into(),
+            }],
+        }];
+        let bytes = rmp_serde::to_vec(&payload).unwrap();
+        let decoded: Vec<RulesetPayload> = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.len(), 1);
+        assert_eq!(decoded[0].name, "n");
+        assert_eq!(decoded[0].entries[0].signature, vec![7u8; 16]);
+    }
+
+    #[tokio::test]
+    async fn mock_dispatcher_publish_ruleset() {
+        let mut dispatcher = GovernanceDispatcher::new(MockTransport);
+        let cmd = DispatchCommand::PublishRuleset {
+            correlation_id: 300,
+            name: "test-ruleset".into(),
+            version: "1.0".into(),
+            source: "test".into(),
+            entries: vec![],
+        };
+        let outcome = dispatcher.dispatch(cmd).await;
+        match outcome {
+            DispatchOutcome::RulesetPublished { correlation_id, .. } => {
+                assert_eq!(correlation_id, 300);
+            }
+            _ => panic!("Expected RulesetPublished, got {:?}", outcome),
+        }
+    }
+
+    #[tokio::test]
+    async fn mock_dispatcher_get_all_rulesets_malformed_response() {
+        // MockTransport returns Ok(vec![]) — empty bytes are not valid
+        // msgpack for Vec<RulesetPayload>, so this must fail GRACEFULLY
+        // (RulesetFetchFailed), not panic or silently return an empty Vec
+        // that looks indistinguishable from "no rulesets published yet".
+        let mut dispatcher = GovernanceDispatcher::new(MockTransport);
+        let cmd = DispatchCommand::GetAllRulesets {
+            correlation_id: 400,
+            limit: 50,
+        };
+        let outcome = dispatcher.dispatch(cmd).await;
+        match outcome {
+            DispatchOutcome::RulesetFetchFailed { correlation_id, .. } => {
+                assert_eq!(correlation_id, 400);
+            }
+            _ => panic!(
+                "Expected RulesetFetchFailed for a malformed response, got {:?}",
+                outcome
+            ),
+        }
+    }
+
+    #[tokio::test]
+    async fn mock_dispatcher_get_all_rulesets_success() {
+        // A transport that returns a real msgpack-encoded Vec<RulesetPayload>,
+        // proving the successful-parse path end to end.
+        struct RulesetTransport;
+        #[async_trait::async_trait]
+        impl ConductorTransport for RulesetTransport {
+            async fn call_zome(
+                &mut self,
+                role_name: &str,
+                zome_name: &str,
+                fn_name: &str,
+                _payload: Vec<u8>,
+            ) -> Result<Vec<u8>, String> {
+                assert_eq!(role_name, "identity");
+                assert_eq!(zome_name, "ruleset_registry");
+                assert_eq!(fn_name, "get_all_rulesets");
+                let rulesets = vec![RulesetPayload {
+                    publisher: vec![9; HOLOCHAIN_HASH_BYTES],
+                    name: "family-safety-baseline".into(),
+                    version: "1.0".into(),
+                    source: "nonprofit".into(),
+                    entries: vec![RulesetEntryPayload {
+                        signature: vec![1u8; 32],
+                        description: "known bad pattern".into(),
+                    }],
+                }];
+                Ok(rmp_serde::to_vec(&rulesets).unwrap())
+            }
+            fn is_connected(&self) -> bool {
+                true
+            }
+        }
+
+        let mut dispatcher = GovernanceDispatcher::new(RulesetTransport);
+        let cmd = DispatchCommand::GetAllRulesets {
+            correlation_id: 500,
+            limit: 10,
+        };
+        let outcome = dispatcher.dispatch(cmd).await;
+        match outcome {
+            DispatchOutcome::RulesetsFetched {
+                correlation_id,
+                rulesets,
+            } => {
+                assert_eq!(correlation_id, 500);
+                assert_eq!(rulesets.len(), 1);
+                assert_eq!(rulesets[0].name, "family-safety-baseline");
+                assert_eq!(rulesets[0].entries[0].signature.len(), 32);
+            }
+            _ => panic!("Expected RulesetsFetched, got {:?}", outcome),
+        }
+    }
+
+    #[test]
+    fn ruleset_response_is_count_bounded_and_publisher_bound() {
+        let ruleset = RulesetPayload {
+            publisher: vec![1; HOLOCHAIN_HASH_BYTES],
+            name: "bounded".into(),
+            version: "1.0".into(),
+            source: "test".into(),
+            entries: vec![RulesetEntryPayload {
+                signature: vec![7; 32],
+                description: "known pattern".into(),
+            }],
+        };
+
+        let two = rmp_serde::to_vec(&vec![ruleset.clone(), ruleset.clone()]).unwrap();
+        assert!(decode_ruleset_response(&two, 1, None).is_err());
+
+        let one = rmp_serde::to_vec(&vec![ruleset]).unwrap();
+        let different_publisher = vec![2; HOLOCHAIN_HASH_BYTES];
+        assert!(decode_ruleset_response(&one, 1, Some(&different_publisher)).is_err());
+    }
+
+    #[tokio::test]
+    async fn mock_dispatcher_get_rulesets_by_publisher_targets_correct_zome_call() {
+        struct AssertingTransport;
+        #[async_trait::async_trait]
+        impl ConductorTransport for AssertingTransport {
+            async fn call_zome(
+                &mut self,
+                role_name: &str,
+                zome_name: &str,
+                fn_name: &str,
+                payload: Vec<u8>,
+            ) -> Result<Vec<u8>, String> {
+                assert_eq!(role_name, "identity");
+                assert_eq!(zome_name, "ruleset_registry");
+                assert_eq!(fn_name, "get_rulesets_by_publisher");
+                let decoded: Vec<u8> = rmp_serde::from_slice(&payload).unwrap();
+                assert_eq!(decoded, vec![4; HOLOCHAIN_HASH_BYTES]);
+                Ok(rmp_serde::to_vec(&Vec::<RulesetPayload>::new()).unwrap())
+            }
+            fn is_connected(&self) -> bool {
+                true
+            }
+        }
+
+        let mut dispatcher = GovernanceDispatcher::new(AssertingTransport);
+        let cmd = DispatchCommand::GetRulesetsByPublisher {
+            correlation_id: 600,
+            publisher: vec![4; HOLOCHAIN_HASH_BYTES],
+        };
+        let outcome = dispatcher.dispatch(cmd).await;
+        match outcome {
+            DispatchOutcome::RulesetsFetched {
+                correlation_id,
+                rulesets,
+            } => {
+                assert_eq!(correlation_id, 600);
+                assert!(rulesets.is_empty());
+            }
+            _ => panic!("Expected RulesetsFetched, got {:?}", outcome),
         }
     }
 }

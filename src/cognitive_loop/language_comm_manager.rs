@@ -31,6 +31,13 @@ pub struct LanguageAndCommunicationManager {
     /// Source tier that produced `last_broca_text`: "broca_lite", "broca", or "llm".
     pub last_language_source: Option<String>,
 
+    /// Evidence-qualified output from any provider using the common communication contract.
+    /// Legacy generators continue to populate `last_broca_text`; they are not silently
+    /// upgraded to an evidence-backed capability claim.
+    pub last_qualified_language_output: Option<
+        symthaea_communication::CommunicationResult<symthaea_communication::human::PreservedText>,
+    >,
+
     /// User state inference for adaptive response generation.
     pub user_state: Option<crate::user_state_inference::UserStateInference>,
     /// Code channels injected by CodingAgent for Broca's CodeGate.
@@ -56,5 +63,23 @@ impl LanguageAndCommunicationManager {
         // Clear pending text (Broca manager preserves learned weights).
         self.last_broca_text = None;
         self.last_language_source = None;
+        self.last_qualified_language_output = None;
+    }
+
+    pub fn record_qualified_output(
+        &mut self,
+        output: symthaea_communication::CommunicationResult<
+            symthaea_communication::human::PreservedText,
+        >,
+    ) -> Result<(), symthaea_communication::CommunicationError> {
+        output.validate(symthaea_communication::CapabilityLevel::Dialogue)?;
+        output
+            .value
+            .validate()
+            .map_err(symthaea_communication::CommunicationError::InvalidResult)?;
+        self.last_broca_text = Some(output.value.original.clone());
+        self.last_language_source = Some(output.provenance.provider.clone());
+        self.last_qualified_language_output = Some(output);
+        Ok(())
     }
 }

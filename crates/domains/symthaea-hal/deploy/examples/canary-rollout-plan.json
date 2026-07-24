@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "fleet_id": "production-fleet",
+  "rollout_id": "replace-with-signed-rollout-id",
+  "update_generation": 1,
+  "update_plan_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "assignment_salt": "replace-with-reviewed-public-random-salt",
+  "issued_unix_time_ms": 1,
+  "expires_unix_time_ms": 2,
+  "stages": [
+    {
+      "stage_name": "fixture-canary",
+      "cumulative_basis_points": 100,
+      "minimum_devices": 2,
+      "minimum_health_window_ms": 3600000,
+      "maximum_fault_rate_ppm": 0,
+      "maximum_deadline_miss_rate_ppm": 10,
+      "require_rollback_rehearsal": true,
+      "require_human_review": true
+    },
+    {
+      "stage_name": "limited-production",
+      "cumulative_basis_points": 1000,
+      "minimum_devices": 10,
+      "minimum_health_window_ms": 21600000,
+      "maximum_fault_rate_ppm": 0,
+      "maximum_deadline_miss_rate_ppm": 50,
+      "require_rollback_rehearsal": true,
+      "require_human_review": true
+    },
+    {
+      "stage_name": "full-fleet",
+      "cumulative_basis_points": 10000,
+      "minimum_devices": 25,
+      "minimum_health_window_ms": 86400000,
+      "maximum_fault_rate_ppm": 1,
+      "maximum_deadline_miss_rate_ppm": 100,
+      "require_rollback_rehearsal": true,
+      "require_human_review": true
+    }
+  ],
+  "plan_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+}

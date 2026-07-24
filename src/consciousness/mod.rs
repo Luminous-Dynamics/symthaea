@@ -185,8 +185,10 @@ pub use symthaea_field_dynamics as consciousness_field_dynamics;
 pub use symthaea_hodge as hodge_laplacian;
 pub use symthaea_narrative_self as narrative_self;
 pub use symthaea_phi_search as phi_architecture_search;
-#[cfg(feature = "sensorimotor")]
-pub use symthaea_sensorimotor as sensorimotor_contingencies;
+// symthaea-sensorimotor crate DELETED 2026-07-16 (vision review P2.1): it was
+// a drifted, zero-consumer duplicate of the live implementation at
+// crate::hdc::sensorimotor_contingencies (symthaea-core) — this re-export was
+// its only reference and nothing used the alias path.
 
 // ============================================================================
 // Genesis Pipeline re-exports (feature-gated)

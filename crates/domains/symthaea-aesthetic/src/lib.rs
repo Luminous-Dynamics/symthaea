@@ -3,38 +3,52 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # symthaea-aesthetic
 //!
-//! Modality-independent aesthetic evaluation and feedback for Symthaea's creative systems.
+//! Auditable, modality-independent aesthetic evidence and feedback for Symthaea's
+//! creative systems.
 //!
-//! Provides the "beauty signal" — a composite aesthetic score that feeds back into
-//! the neuromodulator bath, driving the consciousness-aware creative loop.
+//! The crate does not treat one scalar as a universal definition of beauty. It
+//! keeps artifact measurements, context alignment, novelty, learned preference,
+//! policy utility, and uncertainty separate until an explicit policy combines them.
 //!
 //! # Architecture
 //!
 //! ```text
-//! Artifact → AestheticEvaluator → AestheticScore → AestheticFeedback → NeuromodulatorBath
+//! Artifact -> modality analyzer -> ExtractionReport -> ArtifactEvidence
+//! ArtifactEvidence + context + novelty + preference -> AestheticAssessment
+//! AestheticAssessment -> explanation / release evidence / bounded feedback
+//! PreferenceStudyLedger -> held-out calibration -> evidence manifest + release gate
+//! Registered extractor + report + assessment -> evaluation envelope -> operational gate
+//! API + schemas + registry + extractor -> contract snapshot
+//! Pipeline output + contract snapshot -> portable receipt + self-verifying archive
+//! Archive + audit + benchmark + integration profile -> adoption certification
+//! Telemetry -> drift / robustness / replay / SLO evidence -> accountable deployment
 //! ```
 //!
-//! The evaluator trait is modality-independent: visual art, music, and poetry each
-//! implement it for their respective artifact types. The feedback conversion is shared.
+//! The legacy [`AestheticEvaluator`] and [`AestheticScore`] APIs remain available.
+//! New integrations should prefer [`prelude`], [`EvidenceExtractor`],
+//! [`ExtractionReport`], and [`AestheticAssessment`] so measurement support,
+//! compatibility, and policy provenance remain visible.
 //!
-//! # Theoretical Foundations
+//! # Theoretical priors
 //!
-//! - **Birkhoff (1933)**: Aesthetic measure M = O/C (order / complexity)
-//! - **Shannon (1948)**: Information-theoretic complexity via entropy
-//! - **Livio (2002)**: Golden ratio and Fibonacci aesthetics
-//! - **Berlyne (1971)**: Arousal potential — optimal complexity for aesthetic pleasure
+//! Birkhoff, Shannon, golden-ratio, and Berlyne-inspired metrics are exposed as
+//! testable priors. They are not represented as universally validated laws of
+//! human aesthetic preference.
 
 #![deny(unsafe_code)]
 
 pub mod birkhoff;
+pub mod diagnostics;
 pub mod feedback;
 pub mod golden;
+pub mod harmony;
 pub mod information;
 pub mod novelty;
 pub mod session;
 pub mod synesthesia;
 pub mod valence_arousal;
 
+pub use harmony::{HarmonyEvidenceLedger, HarmonyEvidenceSource};
 pub use valence_arousal::{MusicalParams, ValenceArousal, from_core_affect, lerp_va};
 
 use serde::{Deserialize, Serialize};
@@ -80,16 +94,15 @@ pub struct AestheticScore {
     /// The classical beauty metric.
     pub birkhoff: f32,
 
-    /// Weighted composite of all dimensions.
-    /// Default weighting: 0.25 × birkhoff + 0.20 × harmony + 0.20 × surprise
-    ///                   + 0.20 × information_balance + 0.15 × golden_ratio
+    /// Novelty-aware utility: 80% intrinsic evidence and 20% surprise.
+    /// Use [`Self::intrinsic_composite`] when updating quality expectations.
     pub composite: f32,
 }
 
 impl AestheticScore {
     /// Create a score with all dimensions set to the same value.
     pub fn uniform(value: f32) -> Self {
-        let v = value.clamp(0.0, 1.0);
+        let v = sanitize_unit(value);
         Self {
             order: v,
             complexity: v,
@@ -105,22 +118,68 @@ impl AestheticScore {
         Self::uniform(0.0)
     }
 
-    /// Compute the composite score from individual dimensions.
-    ///
-    /// Weights: birkhoff=0.30, harmony=0.25, surprise=0.20, order=0.15, complexity_balance=0.10
-    /// where complexity_balance = 1.0 - |complexity - 0.5| * 2 (peaks at medium complexity,
-    /// per Berlyne's arousal theory).
-    pub fn compute_composite(&mut self) {
-        // Berlyne: moderate complexity is most pleasing
-        let complexity_balance = 1.0 - (self.complexity - 0.5).abs() * 2.0;
-        let complexity_balance = complexity_balance.clamp(0.0, 1.0);
+    /// Berlyne-style preference for moderate complexity.
+    pub fn complexity_balance(&self) -> f32 {
+        let complexity = sanitize_unit(self.complexity);
+        (1.0 - (complexity - 0.5).abs() * 2.0).clamp(0.0, 1.0)
+    }
 
-        self.composite = (0.30 * self.birkhoff
-            + 0.25 * self.harmony
-            + 0.20 * self.surprise
-            + 0.15 * self.order
-            + 0.10 * complexity_balance)
-            .clamp(0.0, 1.0);
+    /// Score the artifact's intrinsic evidence without novelty or history.
+    ///
+    /// The weights are the legacy non-surprise weights renormalized to sum to
+    /// one. This creates a stable expectation target: a work cannot raise its
+    /// own baseline merely by being unexpected.
+    pub fn intrinsic_composite(&self) -> f32 {
+        (0.375 * sanitize_unit(self.birkhoff)
+            + 0.3125 * sanitize_unit(self.harmony)
+            + 0.1875 * sanitize_unit(self.order)
+            + 0.125 * self.complexity_balance())
+        .clamp(0.0, 1.0)
+    }
+
+    /// Absolute prediction error against an intrinsic-score expectation.
+    pub fn surprise_against(&self, expectation: f32) -> f32 {
+        (self.intrinsic_composite() - sanitize_unit(expectation))
+            .abs()
+            .clamp(0.0, 1.0)
+    }
+
+    /// Return a copy with a resolved surprise term and recomputed composite.
+    pub fn with_surprise(mut self, surprise: f32) -> Self {
+        self.surprise = sanitize_unit(surprise);
+        self.compute_composite();
+        self
+    }
+
+    /// Compute the novelty-aware utility score from intrinsic evidence and a
+    /// separately supplied surprise term.
+    ///
+    /// Intrinsic evidence contributes 80%; surprise contributes 20%. Keeping
+    /// the intrinsic score available separately prevents circular expectation
+    /// updates while retaining the original public weighting.
+    pub fn compute_composite(&mut self) {
+        self.order = sanitize_unit(self.order);
+        self.complexity = sanitize_unit(self.complexity);
+        self.surprise = sanitize_unit(self.surprise);
+        self.harmony = sanitize_unit(self.harmony);
+        self.birkhoff = sanitize_unit(self.birkhoff);
+        self.composite = (0.80 * self.intrinsic_composite() + 0.20 * self.surprise).clamp(0.0, 1.0);
+    }
+}
+
+fn sanitize_unit(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
+fn sanitize_signed(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(-1.0, 1.0)
+    } else {
+        0.0
     }
 }
 
@@ -192,6 +251,83 @@ pub struct AestheticConfig {
     pub reward_threshold: f32,
 }
 
+/// Validation failure for [`AestheticConfig`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AestheticConfigError {
+    NonFinite(&'static str),
+    OutOfRange(&'static str),
+}
+
+impl std::fmt::Display for AestheticConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NonFinite(field) => write!(f, "{field} must be finite"),
+            Self::OutOfRange(field) => write!(f, "{field} is outside its supported range"),
+        }
+    }
+}
+
+impl std::error::Error for AestheticConfigError {}
+
+impl AestheticConfig {
+    /// Validate feedback dynamics before constructing a tracker.
+    pub fn validate(&self) -> Result<(), AestheticConfigError> {
+        for (name, value) in [
+            ("ema_alpha", self.ema_alpha),
+            ("dopamine_scale", self.dopamine_scale),
+            ("serotonin_scale", self.serotonin_scale),
+            ("surprise_scale", self.surprise_scale),
+            ("reward_threshold", self.reward_threshold),
+        ] {
+            if !value.is_finite() {
+                return Err(AestheticConfigError::NonFinite(name));
+            }
+        }
+        if !(0.0..=1.0).contains(&self.ema_alpha) {
+            return Err(AestheticConfigError::OutOfRange("ema_alpha"));
+        }
+        if self.dopamine_scale < 0.0 {
+            return Err(AestheticConfigError::OutOfRange("dopamine_scale"));
+        }
+        if self.serotonin_scale < 0.0 {
+            return Err(AestheticConfigError::OutOfRange("serotonin_scale"));
+        }
+        if self.surprise_scale < 0.0 {
+            return Err(AestheticConfigError::OutOfRange("surprise_scale"));
+        }
+        if !(0.0..=1.0).contains(&self.reward_threshold) {
+            return Err(AestheticConfigError::OutOfRange("reward_threshold"));
+        }
+        Ok(())
+    }
+
+    /// Fail-safe normalization for legacy callers that use [`AestheticTracker::new`].
+    pub fn sanitized(mut self) -> Self {
+        let defaults = Self::default();
+        if !self.ema_alpha.is_finite() {
+            self.ema_alpha = defaults.ema_alpha;
+        }
+        if !self.dopamine_scale.is_finite() {
+            self.dopamine_scale = defaults.dopamine_scale;
+        }
+        if !self.serotonin_scale.is_finite() {
+            self.serotonin_scale = defaults.serotonin_scale;
+        }
+        if !self.surprise_scale.is_finite() {
+            self.surprise_scale = defaults.surprise_scale;
+        }
+        if !self.reward_threshold.is_finite() {
+            self.reward_threshold = defaults.reward_threshold;
+        }
+        self.ema_alpha = self.ema_alpha.clamp(0.0, 1.0);
+        self.dopamine_scale = self.dopamine_scale.max(0.0);
+        self.serotonin_scale = self.serotonin_scale.max(0.0);
+        self.surprise_scale = self.surprise_scale.max(0.0);
+        self.reward_threshold = self.reward_threshold.clamp(0.0, 1.0);
+        self
+    }
+}
+
 impl Default for AestheticConfig {
     fn default() -> Self {
         Self {
@@ -206,46 +342,170 @@ impl Default for AestheticConfig {
 
 /// Persisted aesthetic memory — survives across sessions.
 ///
-/// Stores the EMA baseline and accumulated harmony bias so Symthaea
-/// develops a genuine long-term aesthetic identity.
+/// Stores the intrinsic-quality expectation and accumulated harmony bias so
+/// Symthaea can carry an aesthetic identity across process boundaries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AestheticMemory {
-    /// EMA of composite scores accumulated across all sessions.
+    /// Persistence schema version. Version zero is accepted as the legacy
+    /// unversioned representation and upgraded on the next save.
+    #[serde(default)]
+    pub schema_version: u32,
+    /// EMA of intrinsic scores accumulated across all sessions.
     pub ema: f32,
-    /// Accumulated harmony bias (which harmonies have historically scored well).
+    /// Accumulated compatibility view of harmony preference.
     pub harmony_bias: [f32; 8],
+    /// Contrastive evidence supporting the compatibility bias.
+    #[serde(default)]
+    pub harmony_evidence: HarmonyEvidenceLedger,
     /// Total evaluations ever performed.
     pub total_evaluations: u64,
     /// Sessions completed.
     pub session_count: u32,
 }
 
+pub const AESTHETIC_MEMORY_SCHEMA_VERSION: u32 = 2;
+
+/// Failure while loading, validating, or atomically saving aesthetic memory.
+#[derive(Debug)]
+pub enum AestheticMemoryError {
+    Io(std::io::Error),
+    Json(serde_json::Error),
+    UnsupportedSchema(u32),
+    InvalidState(&'static str),
+}
+
+impl std::fmt::Display for AestheticMemoryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(error) => write!(f, "aesthetic memory I/O failed: {error}"),
+            Self::Json(error) => write!(f, "aesthetic memory JSON failed: {error}"),
+            Self::UnsupportedSchema(version) => {
+                write!(f, "unsupported aesthetic memory schema version {version}")
+            }
+            Self::InvalidState(field) => write!(f, "invalid aesthetic memory field: {field}"),
+        }
+    }
+}
+
+impl std::error::Error for AestheticMemoryError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(error) => Some(error),
+            Self::Json(error) => Some(error),
+            Self::UnsupportedSchema(_) | Self::InvalidState(_) => None,
+        }
+    }
+}
+
+impl From<std::io::Error> for AestheticMemoryError {
+    fn from(value: std::io::Error) -> Self {
+        Self::Io(value)
+    }
+}
+
+impl From<serde_json::Error> for AestheticMemoryError {
+    fn from(value: serde_json::Error) -> Self {
+        Self::Json(value)
+    }
+}
+
 impl AestheticMemory {
     pub fn new() -> Self {
         Self {
+            schema_version: AESTHETIC_MEMORY_SCHEMA_VERSION,
             ema: 0.5,
             harmony_bias: [0.0; 8],
+            harmony_evidence: HarmonyEvidenceLedger::new(),
             total_evaluations: 0,
             session_count: 0,
         }
     }
 
-    /// Load from a JSON file, or return a fresh memory if missing/corrupt.
-    pub fn load(path: &std::path::Path) -> Self {
-        std::fs::read_to_string(path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
+    /// Validate persisted state before it can influence feedback dynamics.
+    pub fn validate(&self) -> Result<(), AestheticMemoryError> {
+        if self.schema_version > AESTHETIC_MEMORY_SCHEMA_VERSION {
+            return Err(AestheticMemoryError::UnsupportedSchema(self.schema_version));
+        }
+        if !self.ema.is_finite() || !(0.0..=1.0).contains(&self.ema) {
+            return Err(AestheticMemoryError::InvalidState("ema"));
+        }
+        if self
+            .harmony_bias
+            .iter()
+            .any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
+        {
+            return Err(AestheticMemoryError::InvalidState("harmony_bias"));
+        }
+        if !self.harmony_evidence.validate() {
+            return Err(AestheticMemoryError::InvalidState("harmony_evidence"));
+        }
+        Ok(())
     }
 
-    /// Persist to a JSON file. Silently no-ops on write failure.
+    /// Load and validate memory, preserving the cause of any failure.
+    pub fn try_load(path: &std::path::Path) -> Result<Self, AestheticMemoryError> {
+        let json = std::fs::read_to_string(path)?;
+        let mut memory: Self = serde_json::from_str(&json)?;
+        memory.validate()?;
+        if memory.schema_version < AESTHETIC_MEMORY_SCHEMA_VERSION {
+            memory.schema_version = AESTHETIC_MEMORY_SCHEMA_VERSION;
+        }
+        Ok(memory)
+    }
+
+    /// Compatibility loader that falls back to a fresh identity.
+    ///
+    /// New code should prefer [`Self::try_load`] so corruption and permission
+    /// failures remain observable.
+    pub fn load(path: &std::path::Path) -> Self {
+        Self::try_load(path).unwrap_or_default()
+    }
+
+    /// Atomically persist validated memory using write, sync, then rename.
+    pub fn try_save(&self, path: &std::path::Path) -> Result<(), AestheticMemoryError> {
+        use std::io::Write;
+
+        self.validate()?;
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let file_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("aesthetic-memory.json");
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let temporary =
+            path.with_file_name(format!(".{file_name}.{}.{nonce}.tmp", std::process::id()));
+        let json = serde_json::to_vec_pretty(self)?;
+
+        let result = (|| -> Result<(), AestheticMemoryError> {
+            let mut file = std::fs::OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open(&temporary)?;
+            file.write_all(&json)?;
+            file.sync_all()?;
+            std::fs::rename(&temporary, path)?;
+            Ok(())
+        })();
+
+        if result.is_err() {
+            let _ = std::fs::remove_file(&temporary);
+        }
+        result
+    }
+
+    /// Compatibility saver. New code should prefer [`Self::try_save`].
     pub fn save(&self, path: &std::path::Path) {
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        if let Ok(json) = serde_json::to_string_pretty(self) {
-            let _ = std::fs::write(path, json);
-        }
+        let _ = self.try_save(path);
     }
 }
 
@@ -260,22 +520,41 @@ impl Default for AestheticMemory {
 #[derive(Debug, Clone)]
 pub struct AestheticTracker {
     config: AestheticConfig,
-    /// Exponential moving average of composite scores.
+    /// Exponential moving average of intrinsic quality scores.
     ema: f32,
-    /// Accumulated harmony bias from historical high-scoring works.
+    /// Compatibility view of contrastively learned harmony preference.
     harmony_bias: [f32; 8],
-    /// Total evaluations performed.
+    /// Active-versus-inactive evidence, separated by provenance.
+    harmony_evidence: HarmonyEvidenceLedger,
+    /// Evaluations performed in the current session.
     evaluation_count: u64,
+    /// Evaluations performed over the persisted lifetime, including this session.
+    lifetime_evaluation_count: u64,
 }
 
 impl AestheticTracker {
     pub fn new(config: AestheticConfig) -> Self {
         Self {
-            config,
+            config: config.sanitized(),
             ema: 0.5, // neutral starting expectation
             harmony_bias: [0.0; 8],
+            harmony_evidence: HarmonyEvidenceLedger::new(),
             evaluation_count: 0,
+            lifetime_evaluation_count: 0,
         }
+    }
+
+    /// Construct a tracker only if the configuration is valid.
+    pub fn try_new(config: AestheticConfig) -> Result<Self, AestheticConfigError> {
+        config.validate()?;
+        Ok(Self {
+            config,
+            ema: 0.5,
+            harmony_bias: [0.0; 8],
+            harmony_evidence: HarmonyEvidenceLedger::new(),
+            evaluation_count: 0,
+            lifetime_evaluation_count: 0,
+        })
     }
 
     /// Create a tracker pre-warmed from persisted memory.
@@ -284,20 +563,24 @@ impl AestheticTracker {
     /// so Symthaea's aesthetic expectations carry forward over time.
     pub fn from_memory(config: AestheticConfig, memory: &AestheticMemory) -> Self {
         Self {
-            config,
-            ema: memory.ema,
-            harmony_bias: memory.harmony_bias,
-            evaluation_count: memory.total_evaluations,
+            config: config.sanitized(),
+            ema: sanitize_unit(memory.ema),
+            harmony_bias: std::array::from_fn(|i| sanitize_unit(memory.harmony_bias[i])),
+            harmony_evidence: memory.harmony_evidence.clone(),
+            evaluation_count: 0,
+            lifetime_evaluation_count: memory.total_evaluations,
         }
     }
 
     /// Snapshot current state into an `AestheticMemory` for persistence.
     pub fn to_memory(&self, previous: &AestheticMemory) -> AestheticMemory {
         AestheticMemory {
+            schema_version: AESTHETIC_MEMORY_SCHEMA_VERSION,
             ema: self.ema,
             harmony_bias: self.harmony_bias,
-            total_evaluations: self.evaluation_count,
-            session_count: previous.session_count + 1,
+            harmony_evidence: self.harmony_evidence.clone(),
+            total_evaluations: self.lifetime_evaluation_count,
+            session_count: previous.session_count.saturating_add(1),
         }
     }
 
@@ -315,14 +598,18 @@ impl AestheticTracker {
         score: &AestheticScore,
         harmony_activations: &[f32; 8],
     ) -> AestheticFeedback {
-        self.evaluation_count += 1;
+        self.evaluation_count = self.evaluation_count.saturating_add(1);
+        self.lifetime_evaluation_count = self.lifetime_evaluation_count.saturating_add(1);
 
-        // Compute surprise as deviation from expectation
-        let delta = score.composite - self.ema;
+        // Resolve surprise from intrinsic prediction error. The expectation is
+        // updated from intrinsic quality only, preventing surprise from
+        // recursively inflating its own future baseline.
+        let intrinsic = score.intrinsic_composite();
+        let surprise = score.surprise_against(self.ema);
+        let delta = intrinsic - self.ema;
 
-        // Update EMA
-        self.ema =
-            self.ema * (1.0 - self.config.ema_alpha) + score.composite * self.config.ema_alpha;
+        // Update the intrinsic-quality expectation.
+        self.ema = self.ema * (1.0 - self.config.ema_alpha) + intrinsic * self.config.ema_alpha;
 
         // Dopamine: reward prediction error (positive when exceeding expectation)
         let dopamine_delta = if delta > self.config.reward_threshold {
@@ -335,23 +622,25 @@ impl AestheticTracker {
         };
 
         // Serotonin: proportional to harmony alignment
-        let serotonin_delta = score.harmony * self.config.serotonin_scale;
+        let serotonin_delta = sanitize_unit(score.harmony) * self.config.serotonin_scale;
 
         // Surprise signal for exploration system
-        let surprise_signal = score.surprise * self.config.surprise_scale;
+        let surprise_signal = surprise * self.config.surprise_scale;
 
         // Project aesthetic quality onto harmonies using the system's current activations.
         // Harmonies that are active AND the artwork scored well get reinforced.
         let harmony_projection: [f32; 8] =
-            std::array::from_fn(|i| harmony_activations[i] * score.composite);
+            std::array::from_fn(|i| sanitize_unit(harmony_activations[i]) * intrinsic);
 
-        // Accumulate long-term harmony bias: EMA toward high-scoring harmony activations.
-        // Alpha 0.01 = very slow drift, building aesthetic identity over many sessions.
-        let bias_alpha = 0.01_f32;
-        for (bias, &activation) in self.harmony_bias.iter_mut().zip(harmony_activations.iter()) {
-            let target = activation * score.composite;
-            *bias = *bias * (1.0 - bias_alpha) + target * bias_alpha;
-        }
+        // Learn contrastively rather than rewarding whichever harmonies happen
+        // to be most prevalent. Self-evaluation is intentionally low-confidence.
+        self.harmony_evidence.observe(
+            HarmonyEvidenceSource::SelfEvaluation,
+            harmony_activations,
+            intrinsic,
+            0.25,
+        );
+        self.refresh_harmony_bias();
 
         AestheticFeedback {
             dopamine_delta,
@@ -361,17 +650,30 @@ impl AestheticTracker {
         }
     }
 
+    fn refresh_harmony_bias(&mut self) {
+        for index in 0..8 {
+            self.harmony_bias[index] = self
+                .harmony_evidence
+                .preference(index, self.harmony_bias[index]);
+        }
+    }
+
     /// Current EMA value (the system's aesthetic expectation).
     pub fn expectation(&self) -> f32 {
         self.ema
     }
 
-    /// Total number of evaluations performed.
+    /// Number of evaluations performed in the current session.
     pub fn evaluation_count(&self) -> u64 {
         self.evaluation_count
     }
 
-    /// Reset the tracker to initial state (preserves harmony_bias).
+    /// Total number of evaluations represented by this tracker.
+    pub fn total_evaluation_count(&self) -> u64 {
+        self.lifetime_evaluation_count
+    }
+
+    /// Reset session-local expectation and count while preserving lifetime taste.
     pub fn reset(&mut self) {
         self.ema = 0.5;
         self.evaluation_count = 0;
@@ -402,11 +704,12 @@ impl AestheticTracker {
         rating: f32,
         harmony_activations: &[f32; 8],
     ) -> AestheticFeedback {
-        let rating = rating.clamp(-1.0, 1.0);
+        let rating = sanitize_signed(rating);
         // Map rating [-1, 1] to score [0, 1]
         let score = (rating + 1.0) * 0.5;
 
-        self.evaluation_count += 1;
+        self.evaluation_count = self.evaluation_count.saturating_add(1);
+        self.lifetime_evaluation_count = self.lifetime_evaluation_count.saturating_add(1);
 
         let delta = score - self.ema;
 
@@ -415,13 +718,15 @@ impl AestheticTracker {
         let human_alpha = (self.config.ema_alpha * 10.0).min(0.5);
         self.ema = self.ema * (1.0 - human_alpha) + score * human_alpha;
 
-        // Harmony bias: human-rated works get 5x stronger bias update.
-        // This is how Symthaea learns "what sounds she likes = what humans like."
-        let human_bias_alpha = 0.05_f32;
-        for (bias, &activation) in self.harmony_bias.iter_mut().zip(harmony_activations.iter()) {
-            let target = activation * score;
-            *bias = *bias * (1.0 - human_bias_alpha) + target * human_bias_alpha;
-        }
+        // Keep human evidence separate and give it full confidence. The ledger
+        // will only infer a preference once active and inactive contrasts exist.
+        self.harmony_evidence.observe(
+            HarmonyEvidenceSource::Human,
+            harmony_activations,
+            score,
+            1.0,
+        );
+        self.refresh_harmony_bias();
 
         // Strong dopamine signal: human approval is the ultimate reward
         let dopamine_delta = delta * self.config.dopamine_scale * 2.0;
@@ -433,7 +738,8 @@ impl AestheticTracker {
             0.0
         };
 
-        let harmony_projection: [f32; 8] = std::array::from_fn(|i| harmony_activations[i] * score);
+        let harmony_projection: [f32; 8] =
+            std::array::from_fn(|i| sanitize_unit(harmony_activations[i]) * score);
 
         AestheticFeedback {
             dopamine_delta: dopamine_delta.clamp(-0.2, 0.3),
@@ -462,10 +768,11 @@ impl AestheticTracker {
     /// absent information should mean *no* bias update, not a decay toward
     /// zero (which is what passing an all-zero activation array would do).
     pub fn human_feedback_unattributed(&mut self, rating: f32) -> AestheticFeedback {
-        let rating = rating.clamp(-1.0, 1.0);
+        let rating = sanitize_signed(rating);
         let score = (rating + 1.0) * 0.5;
 
-        self.evaluation_count += 1;
+        self.evaluation_count = self.evaluation_count.saturating_add(1);
+        self.lifetime_evaluation_count = self.lifetime_evaluation_count.saturating_add(1);
 
         let delta = score - self.ema;
         let human_alpha = (self.config.ema_alpha * 10.0).min(0.5);
@@ -674,5 +981,129 @@ mod tests {
         tracker.reset();
         assert_eq!(tracker.expectation(), 0.5);
         assert_eq!(tracker.evaluation_count(), 0);
+    }
+
+    #[test]
+    fn prediction_surprise_is_generated_when_score_field_is_zero() {
+        let mut tracker = AestheticTracker::default();
+        for _ in 0..12 {
+            tracker.process(&AestheticScore::uniform(0.2), &[0.5; 8]);
+        }
+        let mut high = AestheticScore::uniform(0.9);
+        high.surprise = 0.0;
+        high.compute_composite();
+        let feedback = tracker.process(&high, &[0.5; 8]);
+        assert!(feedback.surprise_signal > 0.0);
+    }
+
+    #[test]
+    fn intrinsic_expectation_is_not_novelty_recursive() {
+        let mut tracker = AestheticTracker::default();
+        let mut score = AestheticScore::uniform(0.6);
+        score.surprise = 1.0;
+        score.compute_composite();
+        let intrinsic = score.intrinsic_composite();
+        tracker.process(&score, &[0.5; 8]);
+        let expected = 0.5 * (1.0 - AestheticConfig::default().ema_alpha)
+            + intrinsic * AestheticConfig::default().ema_alpha;
+        assert!((tracker.expectation() - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn invalid_config_is_rejected_or_sanitized() {
+        let invalid = AestheticConfig {
+            ema_alpha: 2.0,
+            dopamine_scale: -1.0,
+            serotonin_scale: f32::NAN,
+            surprise_scale: 0.1,
+            reward_threshold: 0.02,
+        };
+        assert!(AestheticTracker::try_new(invalid.clone()).is_err());
+        let tracker = AestheticTracker::new(invalid);
+        assert!(tracker.expectation().is_finite());
+    }
+
+    #[test]
+    fn memory_roundtrip_is_validated_and_atomic() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-aesthetic-memory-{}.json",
+            std::process::id()
+        ));
+        let memory = AestheticMemory {
+            schema_version: AESTHETIC_MEMORY_SCHEMA_VERSION,
+            ema: 0.7,
+            harmony_bias: [0.2; 8],
+            harmony_evidence: HarmonyEvidenceLedger::new(),
+            total_evaluations: 42,
+            session_count: 3,
+        };
+        memory.try_save(&path).expect("save memory");
+        let loaded = AestheticMemory::try_load(&path).expect("load memory");
+        assert_eq!(loaded.total_evaluations, 42);
+        assert_eq!(loaded.session_count, 3);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn corrupt_memory_is_observable() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-aesthetic-corrupt-{}.json",
+            std::process::id()
+        ));
+        std::fs::write(&path, "{not-json").expect("write corrupt fixture");
+        assert!(AestheticMemory::try_load(&path).is_err());
+        assert_eq!(AestheticMemory::load(&path).total_evaluations, 0);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn session_reset_does_not_erase_lifetime_count() {
+        let memory = AestheticMemory {
+            schema_version: AESTHETIC_MEMORY_SCHEMA_VERSION,
+            ema: 0.5,
+            harmony_bias: [0.0; 8],
+            harmony_evidence: HarmonyEvidenceLedger::new(),
+            total_evaluations: 100,
+            session_count: 2,
+        };
+        let mut tracker = AestheticTracker::from_memory(AestheticConfig::default(), &memory);
+        tracker.process(&AestheticScore::uniform(0.5), &[0.5; 8]);
+        assert_eq!(tracker.evaluation_count(), 1);
+        assert_eq!(tracker.total_evaluation_count(), 101);
+        tracker.reset();
+        assert_eq!(tracker.evaluation_count(), 0);
+        assert_eq!(tracker.to_memory(&memory).total_evaluations, 101);
+    }
+
+    #[test]
+    fn harmony_bias_requires_active_inactive_contrast() {
+        let mut tracker = AestheticTracker::default();
+        for _ in 0..20 {
+            tracker.process(&AestheticScore::uniform(0.9), &[1.0; 8]);
+        }
+        assert_eq!(*tracker.harmony_bias(), [0.0; 8]);
+
+        let mut active = [0.0; 8];
+        active[0] = 1.0;
+        for _ in 0..20 {
+            tracker.human_feedback(0.9, &active);
+            tracker.human_feedback(-0.9, &[0.0; 8]);
+        }
+        assert!(tracker.harmony_bias()[0] > 0.8);
+    }
+
+    #[test]
+    fn non_finite_human_feedback_fails_safe() {
+        let mut tracker = AestheticTracker::default();
+        let feedback = tracker.human_feedback(f32::NAN, &[f32::NAN; 8]);
+        assert!(tracker.expectation().is_finite());
+        assert!(feedback.dopamine_delta.is_finite());
+        assert!(feedback.serotonin_delta.is_finite());
+        assert!(
+            feedback
+                .harmony_projection
+                .iter()
+                .all(|value| value.is_finite())
+        );
     }
 }

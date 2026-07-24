@@ -60,14 +60,15 @@ impl HelicopterController {
             *w *= 0.01;
         }
 
-        // Bias initialized to hover command
+        // Biases live in pre-activation space. Use inverse activations so
+        // the untrained head emits the documented hover command exactly.
         let output_bias = [
-            HelicopterCommand::HOVER_COLLECTIVE,
+            atanh_clamped(HelicopterCommand::HOVER_COLLECTIVE),
             0.0, // cyclic_lon
             0.0, // cyclic_lat
             0.0, // pedal
-            HelicopterCommand::HOVER_THRUST,
-            HelicopterCommand::HOVER_TAIL,
+            logit_clamped(HelicopterCommand::HOVER_THRUST),
+            logit_clamped(HelicopterCommand::HOVER_TAIL),
         ];
 
         Self {
@@ -238,8 +239,20 @@ fn fast_tanh(x: f32) -> f32 {
     if x.abs() > 4.97 {
         x.signum()
     } else {
-        x * (27.0 + x * x) / (27.0 + 9.0 * x * x)
+        // The Padé approximation overshoots slightly near its cutoff. Clamp
+        // before caching so the training derivative 1 - out² stays valid.
+        (x * (27.0 + x * x) / (27.0 + 9.0 * x * x)).clamp(-1.0, 1.0)
     }
+}
+
+fn atanh_clamped(y: f32) -> f32 {
+    let y = y.clamp(-0.999_999, 0.999_999);
+    0.5 * ((1.0 + y) / (1.0 - y)).ln()
+}
+
+fn logit_clamped(p: f32) -> f32 {
+    let p = p.clamp(0.000_001, 0.999_999);
+    (p / (1.0 - p)).ln()
 }
 
 /// Fast sigmoid via shifted tanh.
@@ -291,6 +304,23 @@ mod tests {
         assert!(fast_tanh(100.0) == 1.0);
         assert!(fast_tanh(-100.0) == -1.0);
         assert!((fast_tanh(0.0)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_untrained_biases_emit_hover_trim() {
+        let mut ctrl = make_controller();
+        // Zero features isolate the output biases from genesis weights.
+        ctrl.last_features = vec![0.0; HDC_DIM];
+        let collective = fast_tanh(ctrl.output_bias[0]);
+        let thrust = fast_sigmoid(ctrl.output_bias[4]);
+        let tail = fast_sigmoid(ctrl.output_bias[5]);
+        // output_bias is computed via the exact mathematical atanh/logit, but
+        // fast_tanh/fast_sigmoid are Padé approximations — composing them
+        // doesn't exactly round-trip. These tolerances reflect that real,
+        // expected approximation error (~1e-3), not a formula bug.
+        assert!((collective - HelicopterCommand::HOVER_COLLECTIVE).abs() < 2e-3);
+        assert!((thrust - HelicopterCommand::HOVER_THRUST).abs() < 1e-3);
+        assert!((tail - HelicopterCommand::HOVER_TAIL).abs() < 1e-6);
     }
 
     #[test]

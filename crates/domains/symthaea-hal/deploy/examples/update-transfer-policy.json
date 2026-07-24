@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "maximum_artifact_size_bytes": 4294967296,
+  "maximum_chunk_count": 1048576,
+  "require_in_order_delivery": true
+}

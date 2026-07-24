@@ -6,7 +6,7 @@
 //! Discovers natural "units" in any acoustic signal without prior
 //! knowledge of the species, language, or communication system.
 //!
-//! # The Universal Translator Architecture
+//! # Acoustic Unit Discovery Architecture
 //!
 //! ```text
 //! ┌─────────────────────────────────────────────────────────────────────────┐
@@ -52,7 +52,8 @@
 //! # Key Insight
 //!
 //! By removing the dependency on "text" and focusing on "temporal dynamics,"
-//! Symthaea listens to **physics**, not linguistics. Physics is universal.
+//! This module detects candidate boundaries, clusters recurring acoustic units,
+//! and records transitions. It does not infer reference, intent, or translation.
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -63,10 +64,10 @@ use std::path::Path;
 use crate::hdc::{HV16, bundle};
 
 // ============================================================================
-// DISCOVERED UNIT (The "Alien Phoneme")
+// DISCOVERED UNIT
 // ============================================================================
 
-/// A discovered acoustic unit (the system's invented "phoneme")
+/// A discovered acoustic unit. It is not presumed to be a phoneme or word.
 #[derive(Clone, Debug)]
 pub struct DiscoveredUnit {
     /// Unique identifier (e.g., "UNIT_001")
@@ -236,18 +237,25 @@ impl DiscoveryConfig {
         }
     }
 
-    /// Configuration for unknown/alien signals
-    pub fn xenolinguistic() -> Self {
+    /// Permissive configuration for an unknown acoustic signal.
+    pub fn unknown_signal() -> Self {
         Self {
-            similarity_threshold: 0.55, // More lenient (unknown structure)
+            similarity_threshold: 0.55,
             min_instances: 2,
-            max_units: 500,          // Allow many clusters
-            salience_threshold: 0.3, // Detect subtle boundaries
-            min_segment_ms: 1.0,     // Could be very fast
-            max_segment_ms: 60000.0, // Could be very slow (1 minute)
+            max_units: 500,
+            salience_threshold: 0.3,
+            min_segment_ms: 1.0,
+            max_segment_ms: 60000.0,
             track_transitions: true,
             max_instances_per_unit: 200,
         }
+    }
+
+    /// Legacy name retained for API compatibility. This configuration performs
+    /// anomaly segmentation and clustering, not xenolinguistic understanding.
+    #[deprecated(note = "use unknown_signal(); clustering does not establish language")]
+    pub fn xenolinguistic() -> Self {
+        Self::unknown_signal()
     }
 }
 

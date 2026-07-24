@@ -1,0 +1,10 @@
+{
+  "event_kind": "Correction",
+  "recorded_at_utc": "REPLACE_RFC3339",
+  "public_notice_uri": "https://REPLACE",
+  "reason": "REPLACE",
+  "authority_id": "REPLACE",
+  "authorization_sha256": "REPLACE_64_HEX",
+  "claim_changes": [],
+  "supporting_evidence_sha256": []
+}

@@ -90,6 +90,9 @@ pub struct CreativeTelemetry {
     pub observer_viewing_surprise: f32,
     /// Total completed observation windows since startup.
     pub observer_verdicts: u64,
+    /// Whether the most recent viewing window showed the pixel-scrambled
+    /// CONTROL frame (A/B mode) rather than the artwork itself.
+    pub observer_was_control: bool,
 }
 
 /// Creative output from a single cycle.
@@ -224,6 +227,8 @@ pub(crate) struct CreativeManager {
     observer_viewing_surprise: f32,
     /// Completed observation windows since startup.
     observer_verdicts: u64,
+    /// Whether the most recent viewing was the scrambled control arm.
+    observer_was_control: bool,
 }
 
 /// Gallery capacity before curation prunes (surprise-protected pruning).
@@ -365,6 +370,7 @@ impl CreativeManager {
             observer_delta_psi: 0.0,
             observer_viewing_surprise: 0.0,
             observer_verdicts: 0,
+            observer_was_control: false,
         }
     }
 
@@ -612,15 +618,17 @@ impl CreativeManager {
 
                 #[cfg(feature = "social-fabric")]
                 let artwork = match self.cultural_memory.best_seed_for_domain(DOMAIN_VISUAL) {
-                    // Imitation path mutates a canon piece directly and does
-                    // not run the iterate loop — the eye applies to fresh
-                    // generation only (perceptual scoring of imitation is a
-                    // follow-up).
+                    // Imitation path: mutation candidates of a canon piece
+                    // compete on the same blended internal+perceptual score
+                    // as fresh generation (P1.5, 2026-07-16 — previously the
+                    // eye applied to fresh generation only and canon-derived
+                    // works evolved unseen).
                     Some(seed) => create_artwork_via_imitation(
                         &self.atelier_config,
                         snap,
                         seed,
                         self.seed_counter,
+                        eye_scorer,
                     ),
                     None => symthaea_atelier::create_iterative_scored(
                         &self.atelier_config,
@@ -786,9 +794,24 @@ impl CreativeManager {
                 // the music a recognizable identity that develops over time.
                 let strategy = self.motif_memory.decide_strategy(&musical_state);
                 if strategy != symthaea_muse::motif_memory::MotifStrategy::GenerateNew {
+                    // BOUNDED drain — `next_note` is a looping generator:
+                    // whenever its replay queue empties it re-decides the
+                    // strategy against `musical_state` (constant here) and
+                    // re-enqueues the WHOLE phrase, so under any Repeat*
+                    // strategy it never returns None. An unbounded
+                    // `while let` here grew one Vec to a 137GB peak (31
+                    // doublings, heaptrack-verified 2026-07-16) and was the
+                    // actual root cause of the "vision-manifold FEP balloon"
+                    // OOMs hunted on 2026-07-11 — the kill landed in
+                    // whatever cycle the Music modality ticked, which is why
+                    // it looked vision-correlated. We truncate to max_notes
+                    // below anyway; collecting more was pure waste.
                     let mut replay_notes = Vec::new();
-                    while let Some(note) = self.motif_memory.next_note(&musical_state) {
-                        replay_notes.push(note);
+                    while replay_notes.len() < self.muse_config.max_notes {
+                        match self.motif_memory.next_note(&musical_state) {
+                            Some(note) => replay_notes.push(note),
+                            None => break,
+                        }
                     }
                     if !replay_notes.is_empty() {
                         // Prepend motif replay before generated notes — the familiar
@@ -1175,6 +1198,7 @@ impl CreativeManager {
             observer_delta_psi: self.observer_delta_psi,
             observer_viewing_surprise: self.observer_viewing_surprise,
             observer_verdicts: self.observer_verdicts,
+            observer_was_control: self.observer_was_control,
         };
     }
 
@@ -1186,10 +1210,16 @@ impl CreativeManager {
     /// recorded but NOT punished: over a short open-loop viewing window ψ
     /// moves for many reasons (this is a first-order probe, and the
     /// asymmetry keeps its confounds from becoming a penalty signal).
+    ///
+    /// `was_control` marks the scrambled-frame A/B arm: control verdicts are
+    /// recorded for the experiment but NEVER rewarded — a probe frame is not
+    /// her art, and rewarding it would corrupt the very comparison the
+    /// control exists to make.
     pub fn record_observer_verdict(
         &mut self,
         delta_psi: f32,
         viewing_surprise: f32,
+        was_control: bool,
     ) -> AestheticFeedback {
         /// Dopamine per unit of positive Δψ.
         const OBSERVER_DOPAMINE_GAIN: f32 = 0.5;
@@ -1199,16 +1229,28 @@ impl CreativeManager {
         self.observer_delta_psi = delta_psi;
         self.observer_viewing_surprise = viewing_surprise;
         self.observer_verdicts += 1;
+        self.observer_was_control = was_control;
         self.last_telemetry.observer_delta_psi = delta_psi;
         self.last_telemetry.observer_viewing_surprise = viewing_surprise;
         self.last_telemetry.observer_verdicts = self.observer_verdicts;
+        self.last_telemetry.observer_was_control = was_control;
 
         tracing::info!(
             delta_psi,
             viewing_surprise,
+            was_control,
             verdicts = self.observer_verdicts,
-            "Observer verdict: she looked at her artwork"
+            "Observer verdict: she looked at {}",
+            if was_control {
+                "a scrambled control frame"
+            } else {
+                "her artwork"
+            }
         );
+
+        if was_control {
+            return AestheticFeedback::neutral();
+        }
 
         AestheticFeedback {
             dopamine_delta: (delta_psi.max(0.0) * OBSERVER_DOPAMINE_GAIN)
@@ -1297,41 +1339,78 @@ fn unix_now() -> u64 {
 /// the original artifact. A full-fidelity ancestor replay would require
 /// snapshotting the entire cognitive state at publish time, which is out of
 /// scope for this pass.
+/// Number of mutation candidates evaluated per imitation. Small on purpose:
+/// each candidate costs one `score_scene` plus (with `art-eye`) one
+/// rasterize+critique pass, and this runs inside the live cycle budget.
+#[cfg(all(feature = "creative", feature = "social-fabric"))]
+const IMITATION_CANDIDATES: usize = 4;
+
 #[cfg(all(feature = "creative", feature = "social-fabric"))]
 fn create_artwork_via_imitation(
     config: &AtelierConfig,
     snap: &CognitiveSnapshot,
     parent_seed: u64,
     mutation_seed: u64,
+    mut eye_scorer: Option<&mut symthaea_atelier::iterate::ExternalScorer<'_>>,
 ) -> symthaea_atelier::Artwork {
     use rand::SeedableRng;
 
     let mut parent_rng = rand::rngs::StdRng::seed_from_u64(parent_seed);
     let parent_scene = symthaea_atelier::generate(config, snap, &mut parent_rng);
 
-    // Decorrelate the mutation RNG stream from the parent's generation
-    // stream (same splitmix-style scramble atelier's own iterate.rs uses).
-    let mut mutation_rng = rand::rngs::StdRng::seed_from_u64(
-        mutation_seed
-            .wrapping_mul(0x9E37_79B9_7F4A_7C15)
-            .wrapping_add(0x2545_F491_4F6C_DD1D),
-    );
-    let mutant = symthaea_atelier::iterate::mutate_scene(
-        &parent_scene,
-        &mut mutation_rng,
-        0.4, // moderate mutation strength — enough to vary, not enough to erase lineage
-        (config.width, config.height),
-    );
+    // Selection mirrors atelier's iterate loop exactly: candidates compete
+    // on the blended internal+perceptual composite (EXTERNAL_SCORE_WEIGHT),
+    // while `Artwork.aesthetic_score` reports the internal composite. Until
+    // 2026-07-16 this path mutated ONCE and never looked at the result —
+    // canon-derived works (the dominant path once a canon exists) evolved
+    // entirely unseen (review P1.5).
+    let blend = |internal: f32, ext: Option<f32>| match ext {
+        Some(e) => {
+            (1.0 - symthaea_atelier::iterate::EXTERNAL_SCORE_WEIGHT) * internal
+                + symthaea_atelier::iterate::EXTERNAL_SCORE_WEIGHT * e
+        }
+        None => internal,
+    };
 
-    let score = symthaea_atelier::score_scene(&mutant, snap);
-    let svg = symthaea_canvas::render_svg(&mutant, snap.consciousness_level);
+    // (scene, internal AestheticScore, blended selection score)
+    let mut best = None;
+    for i in 0..IMITATION_CANDIDATES as u64 {
+        // Decorrelate each candidate's mutation RNG stream from the parent's
+        // generation stream (same splitmix-style scramble atelier's own
+        // iterate.rs uses), varied per candidate.
+        let mut mutation_rng = rand::rngs::StdRng::seed_from_u64(
+            mutation_seed
+                .wrapping_add(i)
+                .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+                .wrapping_add(0x2545_F491_4F6C_DD1D),
+        );
+        let mutant = symthaea_atelier::iterate::mutate_scene(
+            &parent_scene,
+            &mut mutation_rng,
+            0.4, // moderate mutation strength — enough to vary, not enough to erase lineage
+            (config.width, config.height),
+        );
+        let internal = symthaea_atelier::score_scene(&mutant, snap);
+        let blended = blend(
+            internal.composite,
+            eye_scorer.as_mut().and_then(|s| s(&mutant, snap)),
+        );
+        if best
+            .as_ref()
+            .is_none_or(|&(_, _, b): &(_, _, f32)| blended > b)
+        {
+            best = Some((mutant, internal, blended));
+        }
+    }
+    let (scene, score, _) = best.expect("IMITATION_CANDIDATES > 0");
+    let svg = symthaea_canvas::render_svg(&scene, snap.consciousness_level);
 
     symthaea_atelier::Artwork {
-        scene: mutant,
+        scene,
         svg,
         aesthetic_score: score,
         style: config.style,
-        generation_cycles: 1,
+        generation_cycles: IMITATION_CANDIDATES,
     }
 }
 

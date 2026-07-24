@@ -1,0 +1,8 @@
+{
+  "family_values": [0.12, 0.08, 0.11, 0.09, 0.14, 0.07, 0.10, 0.13],
+  "required_margin": 0.05,
+  "alpha": 0.05,
+  "bootstrap_replicates": 2000,
+  "randomization_replicates": 10000,
+  "seed": 424242
+}

@@ -1,0 +1,87 @@
+{
+  "schema_version": "symthaea.quantum_comp.hdqf_pilot_experiment.v1.alpha10",
+  "protocol": {
+    "id": "symthaea-hdqf-pilot-2026-01",
+    "version": "1.0.0",
+    "decision_date": "2026-07-13",
+    "literature_baseline_date": "2026-07-13",
+    "preregistration_path": "docs/HDQF_PILOT_PREREGISTRATION.md"
+  },
+  "run": {
+    "run_id": "hdqf-smoke-exhaustive-d8-f2-n4-e0-s0",
+    "matrix": "correctness",
+    "cell_id": "d8-f2-n4-e0-random",
+    "instance_seed": 0,
+    "measurement_seed": null,
+    "replicate": 0,
+    "started_at": "2026-07-13T00:00:00Z",
+    "finished_at": null
+  },
+  "problem": {
+    "binding_algebra": "binary_xor",
+    "dimension_d": 8,
+    "factor_count_f": 2,
+    "codebook_size_n": 4,
+    "epsilon": 0.0,
+    "instance_family": "random",
+    "generator_version": "hdqf-generator-v1",
+    "target_objective": "exact_product",
+    "planted_indices": [1, 2],
+    "mu": 1,
+    "mu_evidence": "exhaustive",
+    "correlation_rate": null,
+    "target_margin_bits": 1,
+    "serialized_instance_digest": "blake3:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "algorithm": {
+    "family": "exhaustive",
+    "variant": "lexicographic",
+    "implementation_version": "hdqf-baselines-v1",
+    "parameters": {
+      "return_all_optima": true
+    },
+    "stopping_policy": "enumerate the complete candidate product",
+    "calibration_source": "none",
+    "applicability_assumptions": []
+  },
+  "access_model": {
+    "kind": "classical_direct",
+    "construction_charge": "per_instance",
+    "reuse_count_r": 1,
+    "accounting_boundary": "instance deserialization through verified result",
+    "logical_gate_set": null
+  },
+  "success_policy": {
+    "primary_outcome": "any_valid_factorization",
+    "secondary_outcome": "planted_factorization",
+    "target_success_probability": 0.95,
+    "confidence_level": 0.95,
+    "shot_policy": {
+      "initial_shots": 1024,
+      "max_shots": 65536,
+      "wilson_half_width_target": 0.03
+    }
+  },
+  "resource_policy": {
+    "evidence_level": "measured_classical_execution",
+    "statevector_qubit_ceiling": 20,
+    "resident_memory_ceiling_bytes": 17179869184,
+    "pareto_coordinates": [
+      "wall_time_ns",
+      "peak_resident_memory_bytes",
+      "oracle_queries"
+    ],
+    "simulator_time_is_advantage_evidence": false
+  },
+  "status": "planned",
+  "deviations": [],
+  "provenance": {
+    "git_commit": "0000000-smoke-fixture",
+    "dirty_worktree": false,
+    "toolchain": "rust-version-pinned-by-crate",
+    "host": "fixture-not-executed",
+    "runner": "symthaea-quantum-comp",
+    "artifacts_digest": "blake3:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "claim_boundary": "controlled_hypervector_factorization_only"
+}

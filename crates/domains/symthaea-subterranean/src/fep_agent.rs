@@ -1,11 +1,13 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
+use crate::encoder::normalized_channels;
 use crate::types::{NUM_STATE_CHANNELS, SubterraneanState};
 use symthaea_fep::Observation;
 
 pub struct SubterraneanFepResult {
     pub tau_factor: f32,
     pub free_energy: f64,
+    pub observation_precision: f64,
 }
 
 /// Reference implementation for Tier 1 of
@@ -17,8 +19,8 @@ pub struct SubterraneanFepResult {
 /// `select_action`/`act`/`learn_from_outcome` are NOT used here — this
 /// platform's motor command comes from a separate HDC-LTC controller, not
 /// from FEP action selection, so only the perception half of the agent
-/// applies. `obs_dim` matches `NUM_STATE_CHANNELS` so the full state feeds
-/// the belief update (the previous `obs_dim: 6` against a 32-channel state
+/// applies. `obs_dim` matches `NUM_STATE_CHANNELS` so the full normalized
+/// state feeds the belief update (the previous `obs_dim: 6` against a 32-channel state
 /// silently used only the first 6 channels' worth of likelihood-matrix
 /// rows/columns — dimension mismatch that made even a "real" wiring
 /// attempt here quietly wrong).
@@ -44,10 +46,23 @@ impl ActiveInferenceSubterraneanAgent {
         }
     }
     pub fn tick(&mut self, state: &SubterraneanState) -> SubterraneanFepResult {
+        self.tick_with_precision(state, 1.0)
+    }
+
+    pub fn tick_with_precision(
+        &mut self,
+        state: &SubterraneanState,
+        observation_precision: f64,
+    ) -> SubterraneanFepResult {
         self.tick_count += 1;
+        let observation_precision = if observation_precision.is_finite() {
+            observation_precision.clamp(0.05, 1.0)
+        } else {
+            0.05
+        };
         let observation = Observation {
-            values: state.channels.to_vec(),
-            precision: 1.0,
+            values: normalized_channels(state).to_vec(),
+            precision: observation_precision,
             timestamp: self.tick_count,
             modality: "subterranean".to_string(),
         };
@@ -57,6 +72,7 @@ impl ActiveInferenceSubterraneanAgent {
         SubterraneanFepResult {
             tau_factor: tau,
             free_energy: fe,
+            observation_precision,
         }
     }
     pub fn reset(&mut self) {
@@ -116,5 +132,14 @@ mod tests {
             belief_before, a.agent.belief.mean,
             "belief must change after repeated perception of an extreme observation"
         );
+    }
+
+    #[test]
+    fn supplied_observation_precision_is_bounded_and_reported() {
+        let mut agent = ActiveInferenceSubterraneanAgent::new();
+        let result = agent.tick_with_precision(&SubterraneanState::home(), 0.2);
+        assert_eq!(result.observation_precision, 0.2);
+        let invalid = agent.tick_with_precision(&SubterraneanState::home(), f64::NAN);
+        assert_eq!(invalid.observation_precision, 0.05);
     }
 }

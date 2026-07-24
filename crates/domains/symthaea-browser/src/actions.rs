@@ -11,7 +11,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Selector for targeting a DOM element.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ElementSelector {
     /// CDP backend node ID (most reliable after accessibility tree query).
     BackendNodeId(i64),
@@ -21,8 +21,23 @@ pub enum ElementSelector {
     Accessible { role: String, name: String },
 }
 
+/// Explicit authority required to perform a class of browser operation.
+///
+/// Capabilities are independent of Phi: coherence cannot create authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum BrowserCapability {
+    /// Passive observation and viewport-only movement.
+    Observe,
+    /// Change page/history location.
+    Navigate,
+    /// Activate controls such as buttons and links.
+    Interact,
+    /// Enter user-controlled text into a page.
+    EnterText,
+}
+
 /// A browser action that the cognitive loop can dispatch.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BrowserAction {
     /// Navigate to a URL.
     Navigate { url: String },
@@ -48,6 +63,21 @@ pub enum BrowserAction {
 }
 
 impl BrowserAction {
+    /// Explicit capability required for this action.
+    pub fn required_capability(&self) -> BrowserCapability {
+        match self {
+            BrowserAction::NoOp
+            | BrowserAction::Screenshot
+            | BrowserAction::ExtractText { .. }
+            | BrowserAction::ScrollTo { .. } => BrowserCapability::Observe,
+            BrowserAction::Navigate { .. } | BrowserAction::GoBack | BrowserAction::GoForward => {
+                BrowserCapability::Navigate
+            }
+            BrowserAction::Click { .. } => BrowserCapability::Interact,
+            BrowserAction::Type { .. } => BrowserCapability::EnterText,
+        }
+    }
+
     /// Minimum Phi required to execute this action.
     ///
     /// Higher values demand more conscious engagement before the system
@@ -168,5 +198,35 @@ mod tests {
                 phi
             );
         }
+    }
+
+    #[test]
+    fn test_capabilities_are_independent_of_phi_thresholds() {
+        assert_eq!(
+            BrowserAction::Screenshot.required_capability(),
+            BrowserCapability::Observe
+        );
+        assert_eq!(
+            BrowserAction::Navigate {
+                url: "https://example.com".into()
+            }
+            .required_capability(),
+            BrowserCapability::Navigate
+        );
+        assert_eq!(
+            BrowserAction::Click {
+                selector: ElementSelector::Css("button".into())
+            }
+            .required_capability(),
+            BrowserCapability::Interact
+        );
+        assert_eq!(
+            BrowserAction::Type {
+                selector: ElementSelector::Css("input".into()),
+                text: "hello".into()
+            }
+            .required_capability(),
+            BrowserCapability::EnterText
+        );
     }
 }

@@ -142,15 +142,31 @@ pub fn compute_theory_scores(molecule: &Molecule, name: &str, temperature: f64) 
     };
 
     // === Theory 3: HOT — Excitation gap (meta-representation capacity) ===
-    let exc = cis_excitations(&rhf, 1);
+    let exc = cis_excitations(&rhf, &eri, 1);
     let first_exc_ev = if exc.is_empty() {
         100.0
     } else {
         exc[0].energy_ev
     };
     let hot_raw = first_exc_ev;
-    // Higher score for SMALLER gap (easier meta-representation)
-    let hot_norm = 1.0 / (1.0 + first_exc_ev / 10.0);
+    // Higher score for SMALLER gap (easier meta-representation). Phase Q5
+    // (2026-07-17): switched from the old rational form `1/(1+de/10)` to a
+    // logistic -- that old form assumed `de` (the excitation gap) is always
+    // positive, an assumption the previous Koopmans-only implementation
+    // enforced by construction (it filtered `de > 0.0` before returning any
+    // excitation at all). Real CIS has no such filter, correctly: a
+    // negative CIS eigenvalue is a real, physically meaningful signal (RHF
+    // reference instability -- found for N2/STO-3G here, a system Q0's own
+    // audit already flagged as having an unresolved HF discrepancy). The
+    // old rational form is unbounded and sign-flips for `de < -10`,
+    // violating this module's own declared [0,1] invariant
+    // (`test_theory_scores_bounded`). The logistic is bounded in (0,1) for
+    // any real input, monotonic decreasing (preserving the intended
+    // "smaller gap = more meta-representation capacity" ordering), and
+    // saturates toward 1.0 for a large negative (unstable) gap -- a
+    // defensible qualitative reading, not a claim of new precision on an
+    // already-exploratory, disclosed-as-unvalidated proxy metric.
+    let hot_norm = 1.0 / (1.0 + (first_exc_ev / 10.0).exp());
 
     // === Theory 4: Orch-OR — Coherence time ===
     let homo_lumo_gap = phi_meas.homo_lumo_gap;

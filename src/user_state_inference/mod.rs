@@ -76,85 +76,94 @@ pub enum ContextKind {
     Unknown,
 }
 
+/// Whether any word in `text_lower` (already lowercased) *starts with* one of
+/// `prefixes`, tokenizing on non-alphanumeric boundaries.
+///
+/// Prefix-of-token (rather than raw substring) matching avoids false
+/// positives where the target string appears mid-word or as a suffix of an
+/// unrelated word — e.g. raw `"code".contains()` matches inside "encode"/
+/// "decode", and `"fix"` matches inside "prefix"/"suffix". Matching on token
+/// prefix still catches legitimate inflections ("fail" -> "failed"/
+/// "failing", "config" -> "configure"/"configuration").
+fn starts_with_any(text_lower: &str, prefixes: &[&str]) -> bool {
+    text_lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|token| !token.is_empty())
+        .any(|token| prefixes.iter().any(|p| token.starts_with(p)))
+}
+
 impl ContextKind {
     /// Detect context from text
     pub fn detect(text: &str) -> Self {
         let text_lower = text.to_lowercase();
 
         // Troubleshooting patterns
-        if text_lower.contains("error")
-            || text_lower.contains("fail")
-            || text_lower.contains("broken")
+        if starts_with_any(&text_lower, &["error", "fail", "broken", "fix", "debug"])
             || text_lower.contains("not working")
-            || text_lower.contains("fix")
-            || text_lower.contains("debug")
         {
             return ContextKind::Troubleshooting;
         }
 
         // Help patterns
-        if text_lower.contains("help")
+        if starts_with_any(&text_lower, &["help", "explain", "documentation"])
             || text_lower.contains("how do i")
             || text_lower.contains("how to")
             || text_lower.contains("what is")
-            || text_lower.contains("explain")
-            || text_lower.contains("documentation")
         {
             return ContextKind::Help;
         }
 
         // Configuration patterns
-        if text_lower.contains("config")
-            || text_lower.contains("setting")
-            || text_lower.contains("option")
-            || text_lower.contains("preference")
-            || text_lower.contains("customize")
-            || text_lower.contains("configure")
-        {
+        if starts_with_any(
+            &text_lower,
+            &["config", "setting", "option", "preference", "customize"],
+        ) {
             return ContextKind::Configuration;
         }
 
         // Development patterns
-        if text_lower.contains("code")
-            || text_lower.contains("function")
-            || text_lower.contains("implement")
-            || text_lower.contains("program")
-            || text_lower.contains("develop")
-            || text_lower.contains("build")
-        {
+        if starts_with_any(
+            &text_lower,
+            &[
+                "code",
+                "function",
+                "implement",
+                "program",
+                "develop",
+                "build",
+            ],
+        ) {
             return ContextKind::Development;
         }
 
         // Task patterns
-        if text_lower.contains("install")
-            || text_lower.contains("remove")
-            || text_lower.contains("update")
-            || text_lower.contains("run")
-            || text_lower.contains("start")
-            || text_lower.contains("stop")
-        {
+        if starts_with_any(
+            &text_lower,
+            &["install", "remove", "update", "run", "start", "stop"],
+        ) {
             return ContextKind::Task;
         }
 
         // Exploration patterns
-        if text_lower.contains("search")
-            || text_lower.contains("find")
-            || text_lower.contains("list")
-            || text_lower.contains("show")
-            || text_lower.contains("available")
-            || text_lower.contains("options")
-        {
+        if starts_with_any(
+            &text_lower,
+            &["search", "find", "list", "show", "available", "option"],
+        ) {
             return ContextKind::Exploration;
         }
 
         // Maintenance patterns
-        if text_lower.contains("clean")
-            || text_lower.contains("garbage")
-            || text_lower.contains("optimize")
-            || text_lower.contains("maintenance")
-            || text_lower.contains("backup")
-            || text_lower.contains("restore")
-        {
+        if starts_with_any(
+            &text_lower,
+            &[
+                "clean",
+                "garbage",
+                "optimize",
+                "maintenance",
+                "backup",
+                "restore",
+            ],
+        ) {
             return ContextKind::Maintenance;
         }
 
@@ -194,6 +203,25 @@ pub enum ExperienceLevel {
     Intermediate,
     /// Experienced user, prefers efficiency
     Expert,
+}
+
+impl ExperienceLevel {
+    /// Estimate experience level from a partner relationship's total
+    /// interaction count (e.g. `HumanPartnerModel::interactions_count`, which
+    /// persists across sessions — unlike `UserState::interaction_count`,
+    /// which historically reset every process restart).
+    ///
+    /// Coarse, deliberately round-numbered heuristic (not learned): a
+    /// returning partner with a long history is assumed more experienced.
+    /// Nothing here accounts for actual skill/vocabulary/error rate — it's a
+    /// starting point, not a calibrated model.
+    pub fn from_interaction_count(count: u64) -> Self {
+        match count {
+            0..=9 => ExperienceLevel::Beginner,
+            10..=49 => ExperienceLevel::Intermediate,
+            _ => ExperienceLevel::Expert,
+        }
+    }
 }
 
 /// Inferred cognitive load
@@ -267,6 +295,15 @@ pub struct UserState {
 
     /// Timestamp of this inference
     pub timestamp: u64,
+
+    /// Whether this turn's text contained explicit urgency language
+    /// ("urgent", "asap", "hurry", ...). A direct textual signal, unlike
+    /// `idle_time_secs` — which is a poor proxy for "rushed" in turn-based
+    /// chat, since a full round trip (cognition + generation) typically
+    /// takes longer than any idle-time threshold short enough to be
+    /// meaningful.
+    #[serde(default)]
+    pub urgent_language: bool,
 }
 
 impl Default for UserState {
@@ -281,6 +318,7 @@ impl Default for UserState {
             idle_time_secs: 0.0,
             interaction_count: 0,
             timestamp: 0,
+            urgent_language: false,
         }
     }
 }
@@ -409,6 +447,23 @@ impl UserStateInference {
         }
     }
 
+    /// Rebuild an inference engine from a persisted snapshot of `UserState`.
+    ///
+    /// Only `current_state` survives across restarts — `interaction_history`
+    /// is write-only (never read back for pattern analysis) so isn't worth
+    /// persisting, and `last_interaction` is a monotonic `Instant` with no
+    /// defined epoch, so it can't be reconstructed. The first `process()`
+    /// call after resume will therefore see a stale `idle_time_secs` (whatever
+    /// was last persisted) for one turn before it self-corrects.
+    pub fn from_persisted(current_state: UserState) -> Self {
+        Self {
+            current_state,
+            interaction_history: VecDeque::new(),
+            last_interaction: None,
+            config: InferenceConfig::default(),
+        }
+    }
+
     /// Process a new user input and update state
     pub fn process(&mut self, text: &str, had_error: bool) -> &UserState {
         let now = Instant::now();
@@ -422,6 +477,12 @@ impl UserStateInference {
         // Detect context
         let context = ContextKind::detect(text);
         self.current_state.context = context;
+
+        // Detect explicit urgency language (direct textual signal for "rushed")
+        self.current_state.urgent_language = starts_with_any(
+            &text.to_lowercase(),
+            &["urgent", "asap", "hurry", "immediately", "quick", "rush"],
+        );
 
         // Update frustration based on errors
         if had_error {
@@ -475,10 +536,14 @@ impl UserStateInference {
     /// Estimate cognitive load from text
     fn estimate_cognitive_load(&mut self, text: &str) {
         let word_count = text.split_whitespace().count();
-        let has_technical = text.contains("error")
-            || text.contains("config")
-            || text.contains("derivation")
-            || text.contains("flake");
+        // Previously matched against raw `text` (case-sensitive, so "Error"/
+        // "Config" were silently missed) via unbounded `.contains()` (so
+        // "flake" would match inside unrelated words too). Lowercased +
+        // token-prefix matching fixes both.
+        let has_technical = starts_with_any(
+            &text.to_lowercase(),
+            &["error", "config", "derivation", "flake"],
+        );
 
         let load = (word_count as f64 / 50.0).min(0.5)
             + if has_technical { 0.3 } else { 0.0 }

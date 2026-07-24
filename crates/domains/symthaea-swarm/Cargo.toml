@@ -10,20 +10,31 @@ license = "AGPL-3.0-or-later"
 yrs.workspace = true
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-runtime = { path = "../../core/symthaea-runtime" }
-symtropy-robotics-bridge-core = { workspace = true }
+# [standalone-stripped] # symtropy-robotics-bridge-core = { path = "../../../../symtropy/crates/symtropy-robotics-bridge-core" }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
-futures = "0.3"
-tokio = { workspace = true, features = ["full"] }
-bincode = { workspace = true }
-anyhow = { workspace = true }
+futures = { version = "0.3", optional = true }
+tokio = { workspace = true, features = ["full"], optional = true }
+bincode = { workspace = true, optional = true }
+blake3 = { version = "1", optional = true }
 
 # Distributed networking via Iroh
-iroh = "0.97"
-iroh-gossip = "0.97"
+iroh = { version = "0.97", optional = true }
+iroh-gossip = { version = "0.97", optional = true }
 
 [features]
 default = ["networking"]
-networking = []
+networking = [
+    "dep:bincode",
+    "dep:blake3",
+    "dep:futures",
+    "dep:iroh",
+    "dep:iroh-gossip",
+    "dep:tokio",
+]
+
+[[example]]
+name = "direct_transport_witness"
+required-features = ["networking"]

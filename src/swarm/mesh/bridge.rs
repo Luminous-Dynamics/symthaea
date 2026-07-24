@@ -384,12 +384,12 @@ impl MeshBridgeActor {
                             if let Some(ref attestation) = self.attestation {
                                 let mgr = attestation.read();
                                 if mgr.requires_attestation() {
-                                    // Packet needs to carry attestation data in its auth_mac field
-                                    // For now, log and pass through — full attestation requires
+                                    // The authentication tag is not an attestation. For now, log
+                                    // and pass through — full attestation requires
                                     // AttestedConsciousnessVector wrapping which is a higher-level concern
                                     tracing::trace!(
                                         source = ?packet.source_id,
-                                        "Attestation active: packet auth_mac={}", packet.auth_mac
+                                        "Attestation active: packet auth_mac={:02x?}", packet.auth_mac
                                     );
                                 }
                             }
@@ -442,7 +442,7 @@ mod tests {
                     urgency: super::super::MeshUrgency::Normal,
                     timestamp_s: 0,
                     payload_type: super::super::PayloadType::WisdomVector,
-                    auth_mac: 0,
+                    auth_mac: [0; 32],
                     ttl: 0,
                     wisdom: symthaea_core::hdc::BinaryHV([0u8; 2048]),
                 },
@@ -484,7 +484,7 @@ mod tests {
             urgency: super::super::MeshUrgency::Normal,
             timestamp_s: 1000,
             payload_type: super::super::PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0; 32],
             ttl: 5,
             wisdom: symthaea_core::hdc::BinaryHV([0u8; 2048]),
         };

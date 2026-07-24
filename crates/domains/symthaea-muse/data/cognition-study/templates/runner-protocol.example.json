@@ -1,0 +1,17 @@
+{
+  "consent_document_text": "I understand the study information, participation is voluntary, and I may stop at any time.",
+  "consent_document_sha256": "78a8ba6916c8e27617e113ba7df3c06c1adab17d1a228eab044cc110d744efe6",
+  "instructions_text": "Listen to every example through to completion before responding. Use the anonymous codes only, answer honestly, and do not attempt to infer policy identities.",
+  "instructions_sha256": "785cc71b37a48c6801c8dc343f82527bd07233d1972c1cab438d20d0ddb7e7f8",
+  "minimum_playback_fraction": 0.9,
+  "maximum_replays_per_presentation": 1,
+  "require_attention_check": true,
+  "prevent_backtracking": true,
+  "attention_check_prompt": "According to the instructions, which option should you select?",
+  "attention_check_options": [
+    "First option",
+    "Second option",
+    "Third option"
+  ],
+  "attention_check_expected_index": 1
+}

@@ -305,7 +305,7 @@ impl VehicleEmbodiment {
             total_steps: self.total_steps as u64,
             control_effort: self.last_control_effort,
             prediction_error: self.last_prediction_error,
-            safety_level: format!("{:?}", self.current_safety),
+            safety_level: self.current_safety,
             platform: "vehicle".to_string(),
             num_actuators: 3,
             epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
@@ -495,5 +495,55 @@ mod tests {
             bridge.fallback_stage(),
             VehicleFallbackStage::MaintainCourse
         );
+    }
+
+    mod proptest_fallback {
+        use super::*;
+        use crate::simulator::BicycleModelSimulator;
+        use proptest::prelude::*;
+
+        proptest! {
+            // Deliberately small: every bridge.step is a full 16,384-dim
+            // controller forward, so case/step counts multiply into real
+            // wall-clock (the first draft's 16×4000 ran for >50 min under
+            // machine load — a CI-timeout hazard, see robotics plan
+            // 2026-07-10). 6×1200 keeps the same 20 s of simulated time
+            // via a coarser (still physically tested) dt.
+            #![proptest_config(ProptestConfig::with_cases(6))]
+
+            /// Red-tier fallback must decelerate monotonically to a stop
+            /// from any initial speed and any thought vector — every stage
+            /// commands throttle=0 and brake >= 0.1, so speed must never
+            /// increase once Red engages, and must reach ~0 given time.
+            #[test]
+            fn red_fallback_decelerates_monotonically_to_zero(
+                speed in 1.0f64..40.0,
+                thought_seed in 0u64..1000,
+            ) {
+                let mut bridge =
+                    VehicleEmbodiment::new(&GenesisSeed::from_phrase("proptest-fallback"));
+                bridge.simulator = BicycleModelSimulator::at_speed(speed);
+                let hv = ContinuousHV::random(16384, thought_seed);
+
+                let mut prev = bridge.simulator.state().speed;
+                for _ in 0..1200 {
+                    let r = bridge.step(&hv, 0.0167, 0.05); // Red, ~20 s total
+                    prop_assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+                    let s = bridge.simulator.state().speed;
+                    prop_assert!(
+                        s <= prev + 1e-9,
+                        "speed increased during Red fallback: {} -> {}",
+                        prev,
+                        s
+                    );
+                    prev = s;
+                }
+                prop_assert!(
+                    prev < 0.1,
+                    "vehicle failed to stop under Red fallback: final speed {}",
+                    prev
+                );
+            }
+        }
     }
 }

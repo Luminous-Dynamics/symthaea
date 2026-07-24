@@ -1,0 +1,441 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symthaea.org/schemas/quantum-comp/hdqf-pilot-experiment-v1.schema.json",
+  "title": "Symthaea HDQF Pilot Experiment v1",
+  "description": "Preregistered manifest and result envelope for controlled bound-hypervector factorization experiments. It does not describe integer factorization or production-key recovery.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol",
+    "run",
+    "problem",
+    "algorithm",
+    "access_model",
+    "success_policy",
+    "resource_policy",
+    "status",
+    "provenance",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea.quantum_comp.hdqf_pilot_experiment.v1.alpha10"
+    },
+    "protocol": { "$ref": "#/$defs/protocol" },
+    "run": { "$ref": "#/$defs/run" },
+    "problem": { "$ref": "#/$defs/problem" },
+    "algorithm": { "$ref": "#/$defs/algorithm" },
+    "access_model": { "$ref": "#/$defs/accessModel" },
+    "success_policy": { "$ref": "#/$defs/successPolicy" },
+    "resource_policy": { "$ref": "#/$defs/resourcePolicy" },
+    "status": {
+      "enum": ["planned", "running", "completed", "failed", "resource_censored", "not_applicable"]
+    },
+    "result": { "$ref": "#/$defs/result" },
+    "deviations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/deviation" },
+      "default": []
+    },
+    "provenance": { "$ref": "#/$defs/provenance" },
+    "claim_boundary": {
+      "const": "controlled_hypervector_factorization_only"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "completed" } },
+        "required": ["status"]
+      },
+      "then": { "required": ["result"] }
+    },
+    {
+      "if": {
+        "properties": {
+          "access_model": {
+            "properties": { "kind": { "const": "explicit_reversible_rom" } },
+            "required": ["kind"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "access_model": { "required": ["logical_gate_set", "rom_construction"] }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "access_model": {
+            "properties": { "kind": { "const": "qram_like" } },
+            "required": ["kind"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "access_model": { "required": ["qram_assumptions"] }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonNegativeNumber": {
+      "type": "number",
+      "minimum": 0
+    },
+    "nullableNonNegativeNumber": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "evidenceLevel": {
+      "enum": [
+        "asymptotic_accounting",
+        "symbolic_resource_formula",
+        "measured_classical_execution",
+        "constructed_logical_circuit",
+        "transpiled_circuit",
+        "simulated_circuit",
+        "physical_backend_observation"
+      ]
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "decision_date", "literature_baseline_date", "preregistration_path"],
+      "properties": {
+        "id": { "const": "symthaea-hdqf-pilot-2026-01" },
+        "version": { "const": "1.0.0" },
+        "decision_date": { "const": "2026-07-13" },
+        "literature_baseline_date": { "const": "2026-07-13" },
+        "preregistration_path": {
+          "const": "docs/HDQF_PILOT_PREREGISTRATION.md"
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "matrix", "cell_id", "instance_seed", "replicate", "started_at"],
+      "properties": {
+        "run_id": { "type": "string", "minLength": 1 },
+        "matrix": { "enum": ["correctness", "scaling", "extension"] },
+        "cell_id": { "type": "string", "minLength": 1 },
+        "instance_seed": { "type": "integer", "minimum": 0 },
+        "measurement_seed": { "type": ["integer", "null"], "minimum": 0 },
+        "replicate": { "type": "integer", "minimum": 0 },
+        "started_at": { "type": "string", "format": "date-time" },
+        "finished_at": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "problem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "binding_algebra",
+        "dimension_d",
+        "factor_count_f",
+        "codebook_size_n",
+        "epsilon",
+        "instance_family",
+        "generator_version",
+        "target_objective",
+        "mu",
+        "mu_evidence",
+        "serialized_instance_digest"
+      ],
+      "properties": {
+        "binding_algebra": { "enum": ["bipolar_component_product", "binary_xor"] },
+        "dimension_d": { "type": "integer", "minimum": 1 },
+        "factor_count_f": { "type": "integer", "minimum": 2 },
+        "codebook_size_n": { "type": "integer", "minimum": 2 },
+        "codebook_sizes": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "integer", "minimum": 2 },
+          "description": "Optional nonuniform extension; the frozen matrices use uniform N."
+        },
+        "epsilon": { "type": "number", "minimum": 0, "maximum": 0.5 },
+        "instance_family": {
+          "enum": ["planted_unique", "random", "collision_rich", "correlated", "adversarial"]
+        },
+        "generator_version": { "type": "string", "minLength": 1 },
+        "target_objective": { "enum": ["exact_product", "minimum_hamming_distance"] },
+        "planted_indices": {
+          "type": ["array", "null"],
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "mu": { "type": ["integer", "null"], "minimum": 1 },
+        "mu_evidence": { "enum": ["exhaustive", "independent_exact_method", "unknown"] },
+        "correlation_rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "target_margin_bits": { "type": ["integer", "null"], "minimum": 0 },
+        "serialized_instance_digest": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]+:[A-Fa-f0-9]+$"
+        }
+      }
+    },
+    "algorithm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "implementation_version", "parameters", "stopping_policy", "calibration_source"],
+      "properties": {
+        "family": {
+          "enum": [
+            "exhaustive",
+            "meet_in_the_middle",
+            "generalized_birthday",
+            "resonator_network",
+            "noise_aware_nearest_neighbor",
+            "grover",
+            "hdqf"
+          ]
+        },
+        "variant": { "type": ["string", "null"] },
+        "implementation_version": { "type": "string", "minLength": 1 },
+        "parameters": { "type": "object", "additionalProperties": true },
+        "stopping_policy": { "type": "string", "minLength": 1 },
+        "calibration_source": {
+          "enum": ["none", "disjoint_calibration_instances", "published_fixed_parameters"]
+        },
+        "applicability_assumptions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "accessModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "construction_charge", "reuse_count_r", "accounting_boundary"],
+      "properties": {
+        "kind": { "enum": ["classical_direct", "ideal_oracle", "qram_like", "explicit_reversible_rom"] },
+        "construction_charge": { "enum": ["per_instance", "amortized_stable_codebook"] },
+        "reuse_count_r": { "type": "integer", "enum": [1, 10, 100, 1000] },
+        "accounting_boundary": { "type": "string", "minLength": 1 },
+        "logical_gate_set": {
+          "type": ["string", "null"],
+          "enum": ["clifford_t_measure_reset", "toffoli_clifford_measure_reset", null]
+        },
+        "qram_assumptions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lookup_latency_cycles", "address_width_qubits", "data_width_qubits", "coherent_queries", "build_cost_included"],
+          "properties": {
+            "lookup_latency_cycles": { "type": "integer", "minimum": 1 },
+            "address_width_qubits": { "type": "integer", "minimum": 1 },
+            "data_width_qubits": { "type": "integer", "minimum": 1 },
+            "coherent_queries": { "type": "integer", "minimum": 1 },
+            "build_cost_included": { "type": "boolean" },
+            "notes": { "type": "string" }
+          }
+        },
+        "rom_construction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lookup_method", "target_comparison", "workspace_cleanup", "inverse_included"],
+          "properties": {
+            "lookup_method": { "type": "string", "minLength": 1 },
+            "target_comparison": { "type": "string", "minLength": 1 },
+            "workspace_cleanup": { "type": "string", "minLength": 1 },
+            "inverse_included": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "successPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary_outcome", "secondary_outcome", "target_success_probability", "confidence_level", "shot_policy"],
+      "properties": {
+        "primary_outcome": { "const": "any_valid_factorization" },
+        "secondary_outcome": { "const": "planted_factorization" },
+        "target_success_probability": { "type": "number", "exclusiveMinimum": 0.5, "maximum": 1 },
+        "confidence_level": { "const": 0.95 },
+        "shot_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["initial_shots", "max_shots", "wilson_half_width_target"],
+          "properties": {
+            "initial_shots": { "type": "integer", "minimum": 1024 },
+            "max_shots": { "type": "integer", "minimum": 1024 },
+            "wilson_half_width_target": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.03 }
+          }
+        }
+      }
+    },
+    "resourcePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_level", "statevector_qubit_ceiling", "resident_memory_ceiling_bytes", "pareto_coordinates", "simulator_time_is_advantage_evidence"],
+      "properties": {
+        "evidence_level": { "$ref": "#/$defs/evidenceLevel" },
+        "statevector_qubit_ceiling": { "type": "integer", "const": 20 },
+        "resident_memory_ceiling_bytes": { "type": "integer", "const": 17179869184 },
+        "pareto_coordinates": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "wall_time_ns",
+              "peak_resident_memory_bytes",
+              "oracle_queries",
+              "codebook_accesses",
+              "logical_qubits",
+              "logical_depth",
+              "t_depth",
+              "t_count",
+              "toffoli_count",
+              "shots"
+            ]
+          }
+        },
+        "simulator_time_is_advantage_evidence": { "const": false }
+      }
+    },
+    "costBreakdown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit", "evidence_level", "build", "query", "readout", "verify", "uncomputation", "per_target_amortized"],
+      "properties": {
+        "unit": { "enum": ["nanoseconds", "bytes", "logical_gates", "logical_depth", "queries", "accesses", "joules"] },
+        "evidence_level": { "$ref": "#/$defs/evidenceLevel" },
+        "build": { "$ref": "#/$defs/nullableNonNegativeNumber" },
+        "query": { "$ref": "#/$defs/nullableNonNegativeNumber" },
+        "readout": { "$ref": "#/$defs/nullableNonNegativeNumber" },
+        "verify": { "$ref": "#/$defs/nullableNonNegativeNumber" },
+        "uncomputation": { "$ref": "#/$defs/nullableNonNegativeNumber" },
+        "per_target_amortized": { "$ref": "#/$defs/nullableNonNegativeNumber" },
+        "formula": { "type": ["string", "null"] }
+      }
+    },
+    "circuitResources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_level"],
+      "properties": {
+        "evidence_level": { "$ref": "#/$defs/evidenceLevel" },
+        "logical_qubits": { "type": ["integer", "null"], "minimum": 0 },
+        "clean_ancillas": { "type": ["integer", "null"], "minimum": 0 },
+        "dirty_ancillas": { "type": ["integer", "null"], "minimum": 0 },
+        "clifford_count": { "type": ["integer", "null"], "minimum": 0 },
+        "t_count": { "type": ["integer", "null"], "minimum": 0 },
+        "toffoli_count": { "type": ["integer", "null"], "minimum": 0 },
+        "measurement_count": { "type": ["integer", "null"], "minimum": 0 },
+        "reset_count": { "type": ["integer", "null"], "minimum": 0 },
+        "logical_depth": { "type": ["integer", "null"], "minimum": 0 },
+        "t_depth": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["estimate", "lower", "upper", "method", "confidence_level"],
+      "properties": {
+        "estimate": { "type": "number" },
+        "lower": { "type": "number" },
+        "upper": { "type": "number" },
+        "method": { "enum": ["wilson", "bootstrap", "exact", "not_applicable"] },
+        "confidence_level": { "const": 0.95 }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "any_valid_factorization",
+        "planted_factorization",
+        "success_probability",
+        "shots",
+        "oracle_queries",
+        "codebook_accesses",
+        "wall_time_ns",
+        "peak_resident_memory_bytes",
+        "cost_breakdowns",
+        "circuit_resources",
+        "resource_evidence",
+        "pareto_status",
+        "failure_class"
+      ],
+      "properties": {
+        "any_valid_factorization": { "type": "boolean" },
+        "planted_factorization": { "type": ["boolean", "null"] },
+        "returned_indices": {
+          "type": ["array", "null"],
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "achieved_hamming_distance": { "type": ["integer", "null"], "minimum": 0 },
+        "global_minimum_hamming_distance": { "type": ["integer", "null"], "minimum": 0 },
+        "success_probability": { "$ref": "#/$defs/interval" },
+        "shots": { "type": "integer", "minimum": 0 },
+        "oracle_queries": { "type": ["integer", "null"], "minimum": 0 },
+        "codebook_accesses": { "type": ["integer", "null"], "minimum": 0 },
+        "wall_time_ns": { "type": "integer", "minimum": 0 },
+        "peak_resident_memory_bytes": { "type": "integer", "minimum": 0 },
+        "energy_joules": { "type": ["number", "null"], "minimum": 0 },
+        "cost_breakdowns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/costBreakdown" }
+        },
+        "circuit_resources": { "$ref": "#/$defs/circuitResources" },
+        "resource_evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["resource", "evidence_level", "source"],
+            "properties": {
+              "resource": { "type": "string", "minLength": 1 },
+              "evidence_level": { "$ref": "#/$defs/evidenceLevel" },
+              "source": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "pareto_status": { "enum": ["not_analyzed", "nondominated", "dominated", "incomparable_evidence"] },
+        "failure_class": {
+          "enum": ["none", "incorrect", "non_convergence", "timeout", "memory_ceiling", "qubit_ceiling", "invalid_instance", "not_applicable"]
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "deviation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timestamp", "author", "affected_fields", "reason", "outcomes_inspected", "expected_bias", "disposition"],
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "author": { "type": "string", "minLength": 1 },
+        "affected_fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "reason": { "type": "string", "minLength": 1 },
+        "outcomes_inspected": { "type": "boolean" },
+        "expected_bias": { "enum": ["none", "favors_hdqf", "favors_baseline", "unknown"] },
+        "disposition": { "enum": ["restart", "new_protocol_version", "exploratory_only"] }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["git_commit", "dirty_worktree", "toolchain", "host", "runner", "artifacts_digest"],
+      "properties": {
+        "git_commit": { "type": "string", "minLength": 7 },
+        "dirty_worktree": { "type": "boolean" },
+        "toolchain": { "type": "string", "minLength": 1 },
+        "host": { "type": "string", "minLength": 1 },
+        "runner": { "type": "string", "minLength": 1 },
+        "artifacts_digest": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]+:[A-Fa-f0-9]+$"
+        }
+      }
+    }
+  }
+}

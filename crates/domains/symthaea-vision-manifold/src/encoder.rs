@@ -24,7 +24,40 @@ use symthaea_core::hdc::ContinuousHV;
 
 use crate::types::{PatchGrid, ScaleHealth, VisionConfig};
 
-/// Encodes video frames into 16,384-dimensional holographic hypervectors.
+/// Confidence-aware per-patch stereo reconstruction.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StereoDepthEstimate {
+    /// Raw normalized depth (`0 = near`, `1 = far`).
+    pub depths: Vec<f32>,
+    /// Match confidence in `[0, 1]`.
+    pub confidences: Vec<f32>,
+    /// Winning horizontal disparity in pixels.
+    pub disparities: Vec<usize>,
+}
+
+impl StereoDepthEstimate {
+    /// Blend uncertain estimates toward neutral depth before feature injection.
+    pub fn fused_depths(&self) -> Vec<f32> {
+        self.depths
+            .iter()
+            .zip(&self.confidences)
+            .map(|(&depth, &confidence)| {
+                let confidence = confidence.clamp(0.0, 1.0);
+                (confidence * depth + (1.0 - confidence) * 0.5).clamp(0.0, 1.0)
+            })
+            .collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.depths.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.depths.is_empty()
+    }
+}
+
+/// Encodes video frames into holographic hypervectors.
 pub struct PatchHdcEncoder {
     config: VisionConfig,
     row_hvs: Vec<ContinuousHV>,
@@ -42,24 +75,40 @@ pub struct PatchHdcEncoder {
 impl PatchHdcEncoder {
     /// Create a new encoder sized for frames up to `max_width × max_height`.
     pub fn new(config: &VisionConfig, max_width: u32, max_height: u32) -> Self {
-        let max_cols = max_width as usize / config.patch_size.max(1);
-        let max_rows = max_height as usize / config.patch_size.max(1);
+        Self::new_with_basis_seeds(config, max_width, max_height, config.seed, config.seed)
+    }
+
+    /// Construct an encoder with independent spatial and appearance seeds.
+    ///
+    /// Multi-scale encoders use unique spatial bases per scale while sharing the
+    /// feature/level bases. That makes position-unbound appearance HVs directly
+    /// comparable across scales without collapsing the spatial coordinate systems.
+    fn new_with_basis_seeds(
+        config: &VisionConfig,
+        max_width: u32,
+        max_height: u32,
+        position_seed: u64,
+        appearance_seed: u64,
+    ) -> Self {
+        let patch_size = config.patch_size.max(1);
+        let max_cols = (max_width as usize).div_ceil(patch_size).max(1);
+        let max_rows = (max_height as usize).div_ceil(patch_size).max(1);
 
         let row_hvs: Vec<ContinuousHV> = (0..max_rows)
-            .map(|r| ContinuousHV::random(config.hdc_dim, config.seed + r as u64))
+            .map(|r| ContinuousHV::random(config.hdc_dim, position_seed + r as u64))
             .collect();
 
         let col_hvs: Vec<ContinuousHV> = (0..max_cols)
-            .map(|c| ContinuousHV::random(config.hdc_dim, config.seed + 50_000 + c as u64))
+            .map(|c| ContinuousHV::random(config.hdc_dim, position_seed + 50_000 + c as u64))
             .collect();
 
         let total_features = config.total_features();
         let feature_hvs: Vec<ContinuousHV> = (0..total_features)
-            .map(|f| ContinuousHV::random(config.hdc_dim, config.seed + 100_000 + f as u64))
+            .map(|f| ContinuousHV::random(config.hdc_dim, appearance_seed + 100_000 + f as u64))
             .collect();
 
         let level_hvs =
-            Self::generate_level_hvs(config.hdc_dim, config.num_levels, config.seed + 200_000);
+            Self::generate_level_hvs(config.hdc_dim, config.num_levels, appearance_seed + 200_000);
 
         let feature_weights = vec![1.0 / total_features as f32; total_features];
 
@@ -77,6 +126,10 @@ impl PatchHdcEncoder {
     }
 
     /// Perform 'Holographic Dilation' - scale internal basis vectors.
+    pub(crate) fn hdc_vector_count(&self) -> usize {
+        self.row_hvs.len() + self.col_hvs.len() + self.feature_hvs.len() + self.level_hvs.len()
+    }
+
     pub fn dilate(&mut self, target_dim: usize) {
         if self.config.hdc_dim == target_dim {
             return;
@@ -145,7 +198,46 @@ impl PatchHdcEncoder {
         height: u32,
         channels: usize,
     ) -> (ContinuousHV, Vec<ContinuousHV>) {
+        self.encode_frame_impl(pixels, width, height, channels, None)
+    }
+
+    /// Encode a frame while overriding the depth feature for each patch.
+    ///
+    /// `patch_depths` must be in row-major patch-grid order and use the same
+    /// convention as the built-in depth channel: `0.0 = near`, `1.0 = far`.
+    /// The override is ignored when `enable_depth` is false.
+    pub fn encode_frame_with_depth(
+        &mut self,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        channels: usize,
+        patch_depths: &[f32],
+    ) -> (ContinuousHV, Vec<ContinuousHV>) {
         let grid = PatchGrid::new(width, height, self.config.patch_size);
+        assert_eq!(
+            patch_depths.len(),
+            grid.num_patches(),
+            "depth override length must match patch grid"
+        );
+        self.encode_frame_impl(pixels, width, height, channels, Some(patch_depths))
+    }
+
+    fn encode_frame_impl(
+        &mut self,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        channels: usize,
+        patch_depths: Option<&[f32]>,
+    ) -> (ContinuousHV, Vec<ContinuousHV>) {
+        let grid = PatchGrid::new(width, height, self.config.patch_size);
+        assert!(
+            grid.rows <= self.max_rows && grid.cols <= self.max_cols,
+            "frame {width}x{height} exceeds encoder capacity of {}x{} patches",
+            self.max_cols,
+            self.max_rows
+        );
         if grid.num_patches() == 0 {
             return (ContinuousHV::zero(self.config.hdc_dim), vec![]);
         }
@@ -160,10 +252,12 @@ impl PatchHdcEncoder {
                 let features = self.extract_patch_features(
                     pixels,
                     width,
+                    height,
                     channels,
                     col * self.config.patch_size,
                     row * self.config.patch_size,
                     prev_lum,
+                    patch_depths.and_then(|depths| depths.get(patch_idx).copied()),
                 );
                 // Store current luminance (first feature = mean_r for grayscale, or weighted lum)
                 let mean_lum = 0.299 * features[0] + 0.587 * features[1] + 0.114 * features[2];
@@ -195,6 +289,12 @@ impl PatchHdcEncoder {
         attention: &[f32],
     ) -> (ContinuousHV, Vec<ContinuousHV>) {
         let grid = PatchGrid::new(width, height, self.config.patch_size);
+        assert!(
+            grid.rows <= self.max_rows && grid.cols <= self.max_cols,
+            "frame {width}x{height} exceeds encoder capacity of {}x{} patches",
+            self.max_cols,
+            self.max_rows
+        );
         if grid.num_patches() == 0 {
             return (ContinuousHV::zero(self.config.hdc_dim), vec![]);
         }
@@ -209,10 +309,12 @@ impl PatchHdcEncoder {
                 let features = self.extract_patch_features(
                     pixels,
                     width,
+                    height,
                     channels,
                     col * self.config.patch_size,
                     row * self.config.patch_size,
                     prev_lum,
+                    None,
                 );
                 let mean_lum = 0.299 * features[0] + 0.587 * features[1] + 0.114 * features[2];
                 current_lum.push(mean_lum);
@@ -225,19 +327,35 @@ impl PatchHdcEncoder {
 
         self.prev_patch_lum = current_lum;
 
-        // Compute attention-weighted bundle
+        let frame_hv = self.bundle_attended_patches(&patch_hvs, attention);
+        (frame_hv, patch_hvs)
+    }
+
+    /// Rebundle already-encoded patches using attention weights.
+    ///
+    /// This is intentionally side-effect free: predictive feedback can focus an
+    /// existing fine-scale encoding without extracting the same frame twice and
+    /// accidentally advancing motion history a second time.
+    pub fn bundle_attended_patches(
+        &self,
+        patch_hvs: &[ContinuousHV],
+        attention: &[f32],
+    ) -> ContinuousHV {
+        if patch_hvs.is_empty() {
+            return ContinuousHV::zero(self.config.hdc_dim);
+        }
+
         let max_att = attention.iter().copied().fold(0.0f32, f32::max).max(1e-8);
         let weights: Vec<f32> = (0..patch_hvs.len())
             .map(|i| {
                 let att = attention.get(i).copied().unwrap_or(0.0) / max_att;
-                // Base weight 1.0 + attention boost up to 2x
+                // Base weight 1.0 + attention boost up to 2x.
                 1.0 + att
             })
             .collect();
 
         let refs: Vec<&ContinuousHV> = patch_hvs.iter().collect();
-        let frame_hv = ContinuousHV::weighted_bundle(&refs, &weights);
-        (frame_hv, patch_hvs)
+        ContinuousHV::weighted_bundle(&refs, &weights)
     }
 
     /// Convenience wrapper for single-channel grayscale frames.
@@ -288,15 +406,22 @@ impl PatchHdcEncoder {
 
     /// Extract the appearance component from a position-bound patch HV.
     ///
-    /// Since `patch_hv = position_hv ⊗ appearance_hv` and HDC binding is
-    /// self-inverse (`a ⊗ a ⊗ b ≈ b`), we recover appearance by re-binding
-    /// with the position HV: `appearance ≈ patch_hv ⊗ position_hv`.
+    /// `patch_hv = position_hv ⊗ appearance_hv`, where `⊗` is element-wise
+    /// multiplication. Binding is only *exactly* self-inverse
+    /// (`a ⊗ a ⊗ b = b`) for bipolar {-1, +1} vectors; `position_hv` here is
+    /// continuous-valued, so re-binding with the position HV a second time
+    /// (the textbook bipolar-HDC trick) only approximately recovers
+    /// appearance and materially degrades cross-scale/cross-position
+    /// comparability. The *exact* inverse of element-wise multiplication is
+    /// element-wise reciprocal, so we recover appearance via
+    /// `patch_hv ⊗ position_hv⁻¹` using [`ContinuousHV::inverse`]
+    /// (documented there for precisely this unbinding use case).
     ///
     /// This enables position-invariant template matching: compare a template's
     /// appearance against patches regardless of where they are on screen.
     pub fn unbind_position(&self, patch_hv: &ContinuousHV, row: usize, col: usize) -> ContinuousHV {
         let pos = self.position_hv(row, col);
-        patch_hv.bind(&pos)
+        patch_hv.bind(&pos.inverse())
     }
 
     /// Factored position HV: row_hv ⊗ col_hv (GridEncoder pattern).
@@ -317,10 +442,12 @@ impl PatchHdcEncoder {
         &self,
         pixels: &[u8],
         width: u32,
+        height: u32,
         channels: usize,
         patch_x: usize,
         patch_y: usize,
         prev_mean_lum: f32,
+        depth_override: Option<f32>,
     ) -> Vec<f32> {
         let ps = self.config.patch_size;
         let stride = width as usize * channels.max(1);
@@ -455,11 +582,14 @@ impl PatchHdcEncoder {
         // Final depth = 0.6 * texture + 0.4 * position (texture-dominant blend).
         // Values in [0, 1]: 0 = near, 1 = far.
         if self.config.enable_depth {
-            let texture_depth = (1.0 - variance).clamp(0.0, 1.0);
-            let frame_height = (width as f32 / self.config.patch_size as f32).max(1.0)
-                * self.config.patch_size as f32;
-            let position_depth = 1.0 - (patch_y as f32 / frame_height.max(1.0)).clamp(0.0, 1.0);
-            let depth = (0.6 * texture_depth + 0.4 * position_depth).clamp(0.0, 1.0);
+            let depth = if let Some(sensor_depth) = depth_override {
+                sensor_depth.clamp(0.0, 1.0)
+            } else {
+                let texture_depth = (1.0 - variance).clamp(0.0, 1.0);
+                let frame_height = height.max(1) as f32;
+                let position_depth = 1.0 - (patch_y as f32 / frame_height).clamp(0.0, 1.0);
+                (0.6 * texture_depth + 0.4 * position_depth).clamp(0.0, 1.0)
+            };
             features.push(depth);
         }
 
@@ -535,16 +665,65 @@ impl PatchHdcEncoder {
     ///
     /// Weights are clamped and normalized to sum to 1.0.
     pub fn set_feature_weights(&mut self, weights: &[f32]) {
-        let n = self.feature_weights.len().min(weights.len());
-        for i in 0..n {
-            self.feature_weights[i] = weights[i].clamp(0.01, 10.0);
+        if weights.len() == self.feature_weights.len() {
+            let _ = self.set_feature_weights_checked(weights);
+            return;
         }
-        let sum: f32 = self.feature_weights.iter().sum();
-        if sum > 0.0 {
-            for w in &mut self.feature_weights {
-                *w /= sum;
+
+        // Legacy partial-update behavior remains available, but malformed
+        // values are rejected before any existing weight changes.
+        if weights
+            .iter()
+            .any(|weight| !weight.is_finite() || *weight < 0.0)
+        {
+            return;
+        }
+        let mut candidate = self.feature_weights.clone();
+        for (target, weight) in candidate.iter_mut().zip(weights) {
+            *target = weight.clamp(0.01, 10.0);
+        }
+        let sum: f32 = candidate.iter().sum();
+        if sum.is_finite() && sum > 0.0 {
+            for weight in &mut candidate {
+                *weight /= sum;
             }
+            self.feature_weights = candidate;
         }
+    }
+
+    /// Atomically replace the complete feature-weight vector.
+    pub fn set_feature_weights_checked(&mut self, weights: &[f32]) -> Result<(), String> {
+        if weights.len() != self.feature_weights.len() {
+            return Err(format!(
+                "feature weight count mismatch: got {}, expected {}",
+                weights.len(),
+                self.feature_weights.len()
+            ));
+        }
+        if let Some((index, weight)) = weights
+            .iter()
+            .copied()
+            .enumerate()
+            .find(|(_, weight)| !weight.is_finite() || *weight < 0.0)
+        {
+            return Err(format!(
+                "feature weight at index {index} must be finite and non-negative, got {weight}"
+            ));
+        }
+
+        let mut candidate: Vec<f32> = weights
+            .iter()
+            .map(|weight| weight.clamp(0.01, 10.0))
+            .collect();
+        let sum: f32 = candidate.iter().sum();
+        if !sum.is_finite() || sum <= 0.0 {
+            return Err("feature weights must have a finite positive sum".to_string());
+        }
+        for weight in &mut candidate {
+            *weight /= sum;
+        }
+        self.feature_weights = candidate;
+        Ok(())
     }
 
     /// Quantize a [0, 1] feature value to a level index.
@@ -564,17 +743,9 @@ impl PatchHdcEncoder {
 
     /// Compute per-patch stereo disparity from left and right camera frames.
     ///
-    /// Uses block-matching: for each patch in the left frame, find the best
-    /// horizontal match in the right frame (within `max_disparity` pixels).
-    /// Disparity ∝ 1/depth (closer objects have larger disparity).
-    ///
-    /// Returns per-patch depth values in [0, 1] where 0 = near, 1 = far.
-    /// The values can be injected into the depth feature channel.
-    ///
-    /// # Arguments
-    /// * `left`, `right` — Grayscale pixel buffers (same dimensions)
-    /// * `width`, `height` — Frame dimensions
-    /// * `max_disparity` — Maximum horizontal search range in pixels (default: 16)
+    /// This compatibility wrapper returns an empty map when validation fails.
+    /// New integrations should use [`Self::compute_stereo_depth_checked`] so
+    /// malformed sensor buffers cannot be mistaken for a valid far-depth map.
     pub fn compute_stereo_depth(
         &self,
         left: &[u8],
@@ -583,58 +754,149 @@ impl PatchHdcEncoder {
         height: u32,
         max_disparity: usize,
     ) -> Vec<f32> {
+        match self.compute_stereo_depth_checked(left, right, width, height, max_disparity) {
+            Ok(estimate) => estimate.depths,
+            Err(error) => {
+                tracing::warn!(%error, "rejected malformed stereo frame pair");
+                Vec::new()
+            }
+        }
+    }
+
+    /// Compute confidence-aware stereo depth with full-patch SAD matching.
+    ///
+    /// Mean-only matching aliases every flat patch. This implementation scores
+    /// every pixel in the patch, tracks the runner-up match, and combines match
+    /// margin, texture energy, and absolute quality into a confidence value.
+    pub fn compute_stereo_depth_checked(
+        &self,
+        left: &[u8],
+        right: &[u8],
+        width: u32,
+        height: u32,
+        max_disparity: usize,
+    ) -> Result<StereoDepthEstimate, String> {
+        if width == 0 || height == 0 {
+            return Err(format!(
+                "stereo dimensions must be non-zero, got {width}x{height}"
+            ));
+        }
+        if max_disparity == 0 {
+            return Err("stereo max_disparity must be > 0".to_string());
+        }
+        let expected_len = (width as usize)
+            .checked_mul(height as usize)
+            .ok_or_else(|| "stereo frame geometry overflow".to_string())?;
+        if left.len() != expected_len || right.len() != expected_len {
+            return Err(format!(
+                "stereo buffer length mismatch: left={}, right={}, expected={expected_len}",
+                left.len(),
+                right.len()
+            ));
+        }
+
         let grid = self.grid_for(width, height);
+        if grid.rows > self.max_rows || grid.cols > self.max_cols {
+            return Err(format!(
+                "stereo frame {width}x{height} exceeds encoder capacity of {}x{} patches",
+                self.max_cols, self.max_rows
+            ));
+        }
+        if grid.num_patches() == 0 {
+            return Err(format!(
+                "stereo frame {width}x{height} is smaller than patch size {}",
+                self.config.patch_size
+            ));
+        }
+
         let ps = self.config.patch_size;
         let stride = width as usize;
         let mut depths = Vec::with_capacity(grid.num_patches());
+        let mut confidences = Vec::with_capacity(grid.num_patches());
+        let mut disparities = Vec::with_capacity(grid.num_patches());
 
         for row in 0..grid.rows {
             for col in 0..grid.cols {
                 let py = row * ps;
                 let px = col * ps;
-
-                // Compute mean luminance of left patch
-                let left_mean = Self::patch_mean_lum(left, stride, px, py, ps);
-
-                // Search for best match in right frame (horizontal only, epipolar)
+                let search_limit = max_disparity.min(px);
                 let mut best_disparity = 0usize;
-                let mut best_sad = f32::MAX;
+                let mut best_sad = f32::INFINITY;
+                let mut second_sad = f32::INFINITY;
+                let mut candidates = 0usize;
 
-                let search_start = px.saturating_sub(max_disparity);
-                let search_end = px; // disparity is always leftward for standard stereo
-
-                for d_px in search_start..=search_end {
-                    let right_mean = Self::patch_mean_lum(right, stride, d_px, py, ps);
-                    let sad = (left_mean - right_mean).abs();
+                for disparity in 0..=search_limit {
+                    let right_x = px - disparity;
+                    let sad = Self::patch_sad(left, right, stride, px, right_x, py, ps);
+                    candidates += 1;
                     if sad < best_sad {
+                        second_sad = best_sad;
                         best_sad = sad;
-                        best_disparity = px - d_px;
+                        best_disparity = disparity;
+                    } else if sad < second_sad {
+                        second_sad = sad;
                     }
                 }
 
-                // Disparity → depth: large disparity = near (0), zero disparity = far (1)
+                let texture = (Self::patch_stddev(left, stride, px, py, ps) / 64.0).clamp(0.0, 1.0);
+                let margin = if candidates >= 2 && second_sad.is_finite() {
+                    ((second_sad - best_sad).max(0.0) / (second_sad + 1.0)).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                let quality = (1.0 - best_sad / 255.0).clamp(0.0, 1.0);
+                let confidence = (texture * margin * quality).clamp(0.0, 1.0);
                 let max_d = max_disparity.max(1) as f32;
                 let depth = 1.0 - (best_disparity as f32 / max_d).clamp(0.0, 1.0);
+
                 depths.push(depth);
+                confidences.push(confidence);
+                disparities.push(best_disparity);
             }
         }
-        depths
+
+        Ok(StereoDepthEstimate {
+            depths,
+            confidences,
+            disparities,
+        })
     }
 
-    /// Mean luminance of a patch region.
-    fn patch_mean_lum(pixels: &[u8], stride: usize, px: usize, py: usize, ps: usize) -> f32 {
+    /// Mean absolute difference between two full patch regions.
+    fn patch_sad(
+        left: &[u8],
+        right: &[u8],
+        stride: usize,
+        left_x: usize,
+        right_x: usize,
+        py: usize,
+        ps: usize,
+    ) -> f32 {
         let mut sum = 0.0f32;
-        let mut count = 0.0f32;
         for dy in 0..ps {
             for dx in 0..ps {
-                let idx = (py + dy) * stride + (px + dx);
-                if idx < pixels.len() {
-                    sum += pixels[idx] as f32;
-                    count += 1.0;
-                }
+                let left_idx = (py + dy) * stride + left_x + dx;
+                let right_idx = (py + dy) * stride + right_x + dx;
+                sum += (left[left_idx] as f32 - right[right_idx] as f32).abs();
             }
         }
-        if count > 0.0 { sum / count } else { 0.0 }
+        sum / (ps * ps).max(1) as f32
+    }
+
+    /// Standard deviation of one grayscale patch, used as texture evidence.
+    fn patch_stddev(pixels: &[u8], stride: usize, px: usize, py: usize, ps: usize) -> f32 {
+        let mut sum = 0.0f32;
+        let mut sum_sq = 0.0f32;
+        let count = (ps * ps).max(1) as f32;
+        for dy in 0..ps {
+            for dx in 0..ps {
+                let value = pixels[(py + dy) * stride + px + dx] as f32;
+                sum += value;
+                sum_sq += value * value;
+            }
+        }
+        let mean = sum / count;
+        (sum_sq / count - mean * mean).max(0.0).sqrt()
     }
 
     pub fn max_rows(&self) -> usize {
@@ -670,28 +932,93 @@ impl MultiScaleEncoder {
     /// Create a multi-scale encoder from a `VisionConfig`.
     ///
     /// One `PatchHdcEncoder` is created per scale in `config.multi_scale.scales`.
-    /// Each encoder uses a different seed offset so basis vectors don't collide.
+    /// Spatial bases are independent per scale, while appearance feature/level
+    /// bases are shared so position-unbound patches remain cross-scale comparable.
     pub fn new(config: &VisionConfig, max_width: u32, max_height: u32) -> Self {
-        let scales = config.multi_scale.scales.clone();
-        let fine_weight = config.multi_scale.fine_weight.clamp(0.0, 1.0);
+        Self::try_new(config, max_width, max_height)
+            .expect("invalid multi-scale encoder configuration")
+    }
 
+    /// Create a multi-scale encoder without panicking on malformed topology.
+    pub fn try_new(config: &VisionConfig, max_width: u32, max_height: u32) -> Result<Self, String> {
+        config.validate()?;
+        if max_width == 0 || max_height == 0 {
+            return Err(format!(
+                "multi-scale encoder capacity must be non-zero, got {max_width}x{max_height}"
+            ));
+        }
+
+        let scales = config.multi_scale.scales.clone();
+        let fine_weight = config.multi_scale.fine_weight;
         let encoders: Vec<PatchHdcEncoder> = scales
             .iter()
             .enumerate()
             .map(|(i, &patch_size)| {
                 let mut scale_cfg = config.clone();
                 scale_cfg.patch_size = patch_size;
-                // Offset seeds so each scale has independent basis vectors
-                scale_cfg.seed = config.seed + (i as u64 + 1) * 500_000;
-                PatchHdcEncoder::new(&scale_cfg, max_width, max_height)
+                let position_seed = config.seed + (i as u64 + 1) * 500_000;
+                PatchHdcEncoder::new_with_basis_seeds(
+                    &scale_cfg,
+                    max_width,
+                    max_height,
+                    position_seed,
+                    config.seed,
+                )
             })
             .collect();
 
-        Self {
+        Ok(Self {
             encoders,
             scales,
             fine_weight,
+        })
+    }
+
+    fn validate_frame_input(
+        &self,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        channels: usize,
+    ) -> Result<(), String> {
+        if width == 0 || height == 0 {
+            return Err(format!(
+                "multi-scale frame dimensions must be non-zero, got {width}x{height}"
+            ));
         }
+        if !matches!(channels, 1 | 3 | 4) {
+            return Err(format!(
+                "multi-scale frame channel count must be 1, 3, or 4, got {channels}"
+            ));
+        }
+        let expected = (width as usize)
+            .checked_mul(height as usize)
+            .and_then(|value| value.checked_mul(channels))
+            .ok_or_else(|| "multi-scale frame geometry overflow".to_string())?;
+        if pixels.len() != expected {
+            return Err(format!(
+                "multi-scale frame buffer length mismatch: got {}, expected {expected}",
+                pixels.len()
+            ));
+        }
+        for (index, encoder) in self.encoders.iter().enumerate() {
+            let grid = encoder.grid_for(width, height);
+            if grid.rows > encoder.max_rows() || grid.cols > encoder.max_cols() {
+                return Err(format!(
+                    "multi-scale frame {width}x{height} exceeds scale {index} capacity of {}x{} patches",
+                    encoder.max_cols(),
+                    encoder.max_rows()
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn hdc_vector_count(&self) -> usize {
+        self.encoders
+            .iter()
+            .map(PatchHdcEncoder::hdc_vector_count)
+            .sum()
     }
 
     /// Perform 'Holographic Dilation' - scale all internal encoders.
@@ -706,6 +1033,18 @@ impl MultiScaleEncoder {
     /// Returns `(blended_hv, per_scale_hvs, per_scale_patches)`.
     /// The blended HV uses a linear weight ramp: finest scale gets `fine_weight`,
     /// coarsest gets `1 - fine_weight`, intermediate scales are linearly interpolated.
+    pub fn encode_frame_checked(
+        &mut self,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        channels: usize,
+    ) -> Result<(ContinuousHV, Vec<ContinuousHV>, Vec<Vec<ContinuousHV>>), String> {
+        self.validate_frame_input(pixels, width, height, channels)?;
+        Ok(self.encode_frame(pixels, width, height, channels))
+    }
+
+    /// Compatibility wrapper for callers that already guarantee valid input.
     pub fn encode_frame(
         &mut self,
         pixels: &[u8],
@@ -815,6 +1154,36 @@ impl MultiScaleEncoder {
     /// weights are adjusted: 50% static base + 50% surprise-proportional.
     /// Scales with higher surprise receive more weight.
     /// Falls back to static weights when surprise is absent or too short.
+    pub fn encode_frame_saliency_guided_checked(
+        &mut self,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        channels: usize,
+        per_scale_surprise: Option<&[f32]>,
+    ) -> Result<(ContinuousHV, Vec<ContinuousHV>, Vec<Vec<ContinuousHV>>), String> {
+        self.validate_frame_input(pixels, width, height, channels)?;
+        if let Some(surprise) = per_scale_surprise {
+            if surprise.len() != self.encoders.len() {
+                return Err(format!(
+                    "multi-scale surprise length mismatch: got {}, expected {}",
+                    surprise.len(),
+                    self.encoders.len()
+                ));
+            }
+            if surprise
+                .iter()
+                .any(|value| !value.is_finite() || *value < 0.0)
+            {
+                return Err(
+                    "multi-scale surprise values must be finite and non-negative".to_string(),
+                );
+            }
+        }
+        Ok(self.encode_frame_saliency_guided(pixels, width, height, channels, per_scale_surprise))
+    }
+
+    /// Compatibility wrapper for callers that already guarantee valid input.
     pub fn encode_frame_saliency_guided(
         &mut self,
         pixels: &[u8],
@@ -889,6 +1258,10 @@ impl MotionField {
             .map(|d| ContinuousHV::random(dim, seed + 900_000 + d as u64))
             .collect();
         Self { direction_hvs, dim }
+    }
+
+    pub(crate) fn hdc_vector_count(&self) -> usize {
+        self.direction_hvs.len()
     }
 
     /// Perform 'Holographic Dilation' - scale internal basis vectors.
@@ -1738,6 +2111,15 @@ mod tests {
     }
 
     #[test]
+    fn test_encode_frame_includes_partial_edge_patches() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 17, 9);
+        let frame = vec![128u8; 17 * 9];
+        let (_, patches) = enc.encode_frame(&frame, 17, 9, 1);
+        assert_eq!(patches.len(), 6); // ceil(17/8) × ceil(9/8) = 3 × 2
+    }
+
+    #[test]
     fn test_set_feature_weights_partial_update() {
         let cfg = VisionConfig::default();
         let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
@@ -1752,6 +2134,32 @@ mod tests {
             "Weights should sum to 1.0 after partial set: {sum}"
         );
         assert!(weights.iter().all(|w| w.is_finite() && *w > 0.0));
+    }
+
+    #[test]
+    fn test_checked_feature_weights_are_atomic() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        let before = enc.feature_weights().to_vec();
+        let mut malformed = before.clone();
+        malformed[1] = f32::NAN;
+
+        assert!(enc.set_feature_weights_checked(&malformed).is_err());
+        assert_eq!(enc.feature_weights(), before.as_slice());
+        assert!(enc.set_feature_weights_checked(&[0.5, 0.5]).is_err());
+        assert_eq!(enc.feature_weights(), before.as_slice());
+    }
+
+    #[test]
+    fn test_checked_feature_weights_replace_complete_vector() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        let mut replacement = vec![1.0; enc.feature_weights().len()];
+        replacement[0] = 8.0;
+        enc.set_feature_weights_checked(&replacement).unwrap();
+        let sum: f32 = enc.feature_weights().iter().sum();
+        assert!((sum - 1.0).abs() < 1e-6);
+        assert!(enc.feature_weights()[0] > enc.feature_weights()[1]);
     }
 
     #[test]
@@ -1793,10 +2201,11 @@ mod tests {
         let mut ms = MultiScaleEncoder::new(&cfg, 32, 32);
         let frame = vec![128u8; 32 * 32];
 
-        // Coarse encoder (64px patches) produces 0 patches on 32x32 frame — should not crash
-        let (hv, scale_hvs, _) = ms.encode_frame(&frame, 32, 32, 1);
+        // Coarse encoder keeps one partial 32x32 patch rather than discarding the frame.
+        let (hv, scale_hvs, scale_patches) = ms.encode_frame(&frame, 32, 32, 1);
         assert_eq!(hv.dim(), cfg.hdc_dim);
         assert_eq!(scale_hvs.len(), 2);
+        assert_eq!(scale_patches[1].len(), 1);
     }
 
     // === Per-Scale Health ===
@@ -1865,5 +2274,226 @@ mod tests {
         assert_eq!(health.len(), 1);
         assert_eq!(health[0].patch_size, 16);
         assert!((health[0].blend_weight - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_depth_position_uses_actual_frame_height() {
+        let mut cfg = VisionConfig::default();
+        cfg.enable_depth = true;
+        cfg.enable_motion = false;
+        cfg.enable_color = false;
+        cfg.enable_opponent_color = false;
+        let encoder = PatchHdcEncoder::new(&cfg, 64, 128);
+        let pixels = vec![128u8; 64 * 128];
+
+        let features = encoder.extract_patch_features(&pixels, 64, 128, 1, 0, 96, 0.5, None);
+        let depth = *features.last().expect("depth feature");
+        assert!(
+            (depth - 0.7).abs() < 0.02,
+            "depth must use height=128 rather than width=64: {depth}"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "exceeds encoder capacity")]
+    fn test_frame_larger_than_capacity_is_rejected() {
+        let cfg = VisionConfig::default();
+        let mut encoder = PatchHdcEncoder::new(&cfg, 64, 64);
+        let pixels = vec![128u8; 128 * 64];
+        let _ = encoder.encode_frame(&pixels, 128, 64, 1);
+    }
+
+    #[test]
+    fn test_multiscale_position_unbound_appearance_is_comparable() {
+        let mut cfg = VisionConfig::default();
+        cfg.enable_motion = false;
+        cfg.enable_color = false;
+        cfg.enable_opponent_color = false;
+        cfg.multi_scale.scales = vec![8, 16];
+        let mut encoder = MultiScaleEncoder::new(&cfg, 32, 32);
+        let frame = vec![96u8; 32 * 32];
+
+        let (_, _, patches) = encoder.encode_frame(&frame, 32, 32, 1);
+        let fine = encoder
+            .encoder_at(0)
+            .expect("fine encoder")
+            .unbind_position(&patches[0][0], 0, 0);
+        let coarse = encoder
+            .encoder_at(1)
+            .expect("coarse encoder")
+            .unbind_position(&patches[1][0], 0, 0);
+
+        assert!(
+            fine.similarity(&coarse) > 0.9,
+            "shared appearance bases should make identical content comparable across scales"
+        );
+    }
+
+    #[test]
+    fn test_rebundling_attention_does_not_mutate_motion_history() {
+        let cfg = VisionConfig::default();
+        let mut encoder = PatchHdcEncoder::new(&cfg, 32, 32);
+        let frame = vec![128u8; 32 * 32];
+        let (_, patches) = encoder.encode_frame(&frame, 32, 32, 1);
+        let before = encoder.prev_patch_lum.clone();
+
+        let attention = vec![1.0; patches.len()];
+        let _ = encoder.bundle_attended_patches(&patches, &attention);
+
+        assert_eq!(encoder.prev_patch_lum, before);
+    }
+
+    #[test]
+    fn test_sensor_depth_override_changes_patch_encoding() {
+        let mut cfg = VisionConfig::default();
+        cfg.enable_depth = true;
+        cfg.enable_motion = false;
+        cfg.enable_color = false;
+        cfg.enable_opponent_color = false;
+        let frame = vec![128u8; 32 * 32];
+        let grid = PatchGrid::new(32, 32, cfg.patch_size);
+        let near = vec![0.0; grid.num_patches()];
+        let far = vec![1.0; grid.num_patches()];
+        let mut near_encoder = PatchHdcEncoder::new(&cfg, 32, 32);
+        let mut far_encoder = PatchHdcEncoder::new(&cfg, 32, 32);
+
+        let (near_hv, _) = near_encoder.encode_frame_with_depth(&frame, 32, 32, 1, &near);
+        let (far_hv, _) = far_encoder.encode_frame_with_depth(&frame, 32, 32, 1, &far);
+
+        assert!(
+            near_hv.similarity(&far_hv) < 0.99,
+            "sensor depth must affect the encoded representation"
+        );
+    }
+
+    #[test]
+    fn test_stereo_flat_patches_have_zero_confidence_and_neutral_fusion() {
+        let mut cfg = VisionConfig::default();
+        cfg.hdc_dim = 256;
+        cfg.patch_size = 8;
+        let encoder = PatchHdcEncoder::new(&cfg, 32, 16);
+        let left = vec![128u8; 32 * 16];
+        let right = left.clone();
+
+        let estimate = encoder
+            .compute_stereo_depth_checked(&left, &right, 32, 16, 8)
+            .unwrap();
+        assert_eq!(estimate.len(), 8);
+        assert!(estimate.confidences.iter().all(|&value| value == 0.0));
+        assert!(
+            estimate
+                .fused_depths()
+                .iter()
+                .all(|&value| (value - 0.5).abs() < 1e-6)
+        );
+    }
+
+    #[test]
+    fn test_stereo_textured_patch_recovers_disparity_with_confidence() {
+        let mut cfg = VisionConfig::default();
+        cfg.hdc_dim = 256;
+        cfg.patch_size = 8;
+        let encoder = PatchHdcEncoder::new(&cfg, 32, 16);
+        let mut left = vec![0u8; 32 * 16];
+        let mut right = vec![0u8; 32 * 16];
+
+        for y in 0..8usize {
+            for dx in 0..8usize {
+                let value = ((dx * 31 + y * 47 + dx * y * 7) % 251 + 1) as u8;
+                left[y * 32 + 16 + dx] = value;
+                right[y * 32 + 12 + dx] = value;
+            }
+        }
+
+        let estimate = encoder
+            .compute_stereo_depth_checked(&left, &right, 32, 16, 8)
+            .unwrap();
+        let patch = 2usize;
+        assert_eq!(estimate.disparities[patch], 4);
+        assert!((estimate.depths[patch] - 0.5).abs() < 1e-6);
+        assert!(
+            estimate.confidences[patch] > 0.4,
+            "unique textured match should be confident: {}",
+            estimate.confidences[patch]
+        );
+    }
+
+    #[test]
+    fn test_stereo_checked_rejects_malformed_buffers() {
+        let cfg = VisionConfig::default();
+        let encoder = PatchHdcEncoder::new(&cfg, 16, 16);
+        let error = encoder
+            .compute_stereo_depth_checked(&vec![0; 256], &vec![0; 255], 16, 16, 8)
+            .unwrap_err();
+        assert!(error.contains("buffer length mismatch"));
+    }
+
+    #[test]
+    #[should_panic(expected = "depth override length must match patch grid")]
+    fn test_sensor_depth_override_requires_one_value_per_patch() {
+        let mut cfg = VisionConfig::default();
+        cfg.enable_depth = true;
+        let frame = vec![128u8; 32 * 32];
+        let mut encoder = PatchHdcEncoder::new(&cfg, 32, 32);
+        let _ = encoder.encode_frame_with_depth(&frame, 32, 32, 1, &[0.5]);
+    }
+
+    #[test]
+    fn test_multiscale_try_new_rejects_invalid_capacity_and_config() {
+        let cfg = VisionConfig::default();
+        assert!(MultiScaleEncoder::try_new(&cfg, 0, 64).is_err());
+
+        let mut invalid = cfg;
+        invalid.multi_scale.scales = vec![32, 8];
+        assert!(MultiScaleEncoder::try_new(&invalid, 64, 64).is_err());
+    }
+
+    #[test]
+    fn test_multiscale_checked_rejection_preserves_temporal_history() {
+        let cfg = VisionConfig::default();
+        let mut encoder = MultiScaleEncoder::try_new(&cfg, 32, 32).unwrap();
+        let frame = vec![128u8; 32 * 32];
+        encoder.encode_frame_checked(&frame, 32, 32, 1).unwrap();
+        let before: Vec<Vec<f32>> = encoder
+            .encoders
+            .iter()
+            .map(|scale| scale.prev_patch_lum.clone())
+            .collect();
+
+        assert!(
+            encoder
+                .encode_frame_checked(&frame[..frame.len() - 1], 32, 32, 1)
+                .is_err()
+        );
+        let after: Vec<Vec<f32>> = encoder
+            .encoders
+            .iter()
+            .map(|scale| scale.prev_patch_lum.clone())
+            .collect();
+        assert_eq!(after, before);
+    }
+
+    #[test]
+    fn test_multiscale_checked_saliency_is_atomic() {
+        let cfg = VisionConfig::default();
+        let mut encoder = MultiScaleEncoder::try_new(&cfg, 32, 32).unwrap();
+        let frame = vec![64u8; 32 * 32];
+        let before: Vec<Vec<f32>> = encoder
+            .encoders
+            .iter()
+            .map(|scale| scale.prev_patch_lum.clone())
+            .collect();
+
+        assert!(
+            encoder
+                .encode_frame_saliency_guided_checked(&frame, 32, 32, 1, Some(&[f32::NAN, 0.0]))
+                .is_err()
+        );
+        let after: Vec<Vec<f32>> = encoder
+            .encoders
+            .iter()
+            .map(|scale| scale.prev_patch_lum.clone())
+            .collect();
+        assert_eq!(after, before);
     }
 }

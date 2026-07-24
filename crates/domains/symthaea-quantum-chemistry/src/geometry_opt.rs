@@ -76,7 +76,12 @@ fn compute_energy(mol: &Molecule, config: &RhfConfig) -> f64 {
 /// using central finite differences.
 ///
 /// Returns a flat vector: [dE/dx₁, dE/dy₁, dE/dz₁, dE/dx₂, ...]
-fn compute_gradient(mol: &Molecule, config: &RhfConfig, fd_step: f64) -> Vec<f64> {
+///
+/// `pub(crate)` since Phase Q4 (2026-07-17): reused by `vibrational.rs` to
+/// build the Hessian via a second layer of finite differencing over this
+/// already-verified gradient, rather than re-deriving nuclear-coordinate
+/// derivatives from scratch.
+pub(crate) fn compute_gradient(mol: &Molecule, config: &RhfConfig, fd_step: f64) -> Vec<f64> {
     let n_atoms = mol.n_atoms();
     let mut gradient = vec![0.0; 3 * n_atoms];
 

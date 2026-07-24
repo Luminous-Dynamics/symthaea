@@ -1197,6 +1197,18 @@ impl HdcLtcUnifiedNeuron {
     }
 
     /// Get total time evolved
+    /// Evolution clock: (total_time, update_count). total_time is the
+    /// Fourier equilibrium phase — evolution state, snapshot-relevant.
+    pub fn evolution_clock(&self) -> (f64, u64) {
+        (self.total_time, self.update_count)
+    }
+
+    /// Restore the evolution clock (see [`Self::evolution_clock`]).
+    pub fn set_evolution_clock(&mut self, total_time: f64, update_count: u64) {
+        self.total_time = total_time;
+        self.update_count = update_count;
+    }
+
     pub fn total_time(&self) -> f64 {
         self.total_time
     }
@@ -1752,6 +1764,72 @@ impl Default for UnifiedNetworkConfig {
     }
 }
 
+/// Reusable buffer holding a network's mutable evolution state
+/// (see [`HdcLtcUnifiedNetwork::snapshot_state_into`]).
+#[derive(Debug, Clone, Default)]
+pub struct NetworkStateSnapshot {
+    neuron_states: Vec<ContinuousHV>,
+    layer_outputs: Vec<ContinuousHV>,
+    /// Per-neuron (total_time, update_count). total_time is NOT telemetry:
+    /// it is the phase clock of the Fourier equilibrium basis
+    /// (compute_fourier_basis), i.e. genuine evolution state. Excluding it
+    /// made snapshot/restore subtly impure — invisible while the bind-chain
+    /// annihilation kept outputs at ~1e-10, exposed by the 2026-07-18 scale
+    /// restoration (the purity twin test caught it at honest magnitudes).
+    neuron_clocks: Vec<(f64, u64)>,
+}
+
+impl NetworkStateSnapshot {
+    /// Dimension of the captured neuron-state HVs (None if never filled).
+    /// Lets callers detect stale snapshots after an adaptive network resize.
+    pub fn dimension(&self) -> Option<usize> {
+        self.neuron_states.first().map(|hv| hv.values.len())
+    }
+
+    /// Element-wise approximate equality of two snapshots (states, layer
+    /// outputs, and evolution clocks). The formal test surface for
+    /// "this operation does not perturb evolution state".
+    pub fn approx_eq(&self, other: &Self, eps: f32) -> bool {
+        if self.neuron_states.len() != other.neuron_states.len()
+            || self.layer_outputs.len() != other.layer_outputs.len()
+            || self.neuron_clocks.len() != other.neuron_clocks.len()
+        {
+            return false;
+        }
+        let hv_eq = |a: &ContinuousHV, b: &ContinuousHV| {
+            a.values.len() == b.values.len()
+                && a.values
+                    .iter()
+                    .zip(b.values.iter())
+                    .all(|(x, y)| (x - y).abs() <= eps)
+        };
+        self.neuron_states
+            .iter()
+            .zip(other.neuron_states.iter())
+            .all(|(a, b)| hv_eq(a, b))
+            && self
+                .layer_outputs
+                .iter()
+                .zip(other.layer_outputs.iter())
+                .all(|(a, b)| hv_eq(a, b))
+            && self
+                .neuron_clocks
+                .iter()
+                .zip(other.neuron_clocks.iter())
+                .all(|(&(t1, n1), &(t2, n2))| (t1 - t2).abs() <= eps as f64 && n1 == n2)
+    }
+}
+
+/// Copy one HV's values into another, reallocating only on dimension change.
+#[inline]
+fn copy_hv_into(src: &ContinuousHV, dst: &mut ContinuousHV) {
+    if dst.values.len() == src.values.len() {
+        dst.values.copy_from_slice(&src.values);
+    } else {
+        *dst = src.clone();
+    }
+}
+
 /// Network of unified HDC-LTC neurons
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HdcLtcUnifiedNetwork {
@@ -1977,6 +2055,77 @@ impl HdcLtcUnifiedNetwork {
         }
         for output in &mut self.layer_outputs {
             *output = ContinuousHV::zero(self.config.neuron_config.dimension);
+        }
+    }
+
+    /// Snapshot the network's mutable evolution state (neuron state HVs +
+    /// cached layer outputs) into a reusable buffer, resizing it on first use.
+    ///
+    /// This exists to make prediction pure: snapshot → evolve at a horizon →
+    /// read output → restore. It deliberately excludes learning parameters
+    /// (weights, momentum) — those are only mutated by explicit training
+    /// calls. Per-neuron evolution clocks (total_time/update_count) ARE
+    /// captured: total_time is the Fourier equilibrium phase, i.e. genuine
+    /// evolution state (a 2026-07-18 correction — the earlier "harmless
+    /// telemetry drift" claim was false and broke purity at honest signal
+    /// magnitudes).
+    ///
+    /// After the buffer warms up (same network shape), snapshot/restore are
+    /// allocation-free element-wise copies.
+    pub fn snapshot_state_into(&self, snap: &mut NetworkStateSnapshot) {
+        let n_neurons: usize = self.layers.iter().map(|l| l.len()).sum();
+        snap.neuron_states
+            .resize_with(n_neurons, || ContinuousHV::zero(0));
+        snap.layer_outputs
+            .resize_with(self.layer_outputs.len(), || ContinuousHV::zero(0));
+
+        snap.neuron_clocks.resize(n_neurons, (0.0, 0));
+        let mut i = 0;
+        for layer in &self.layers {
+            for neuron in layer {
+                copy_hv_into(neuron.state(), &mut snap.neuron_states[i]);
+                snap.neuron_clocks[i] = neuron.evolution_clock();
+                i += 1;
+            }
+        }
+        for (src, dst) in self.layer_outputs.iter().zip(snap.layer_outputs.iter_mut()) {
+            copy_hv_into(src, dst);
+        }
+    }
+
+    /// Restore evolution state previously captured by [`snapshot_state_into`].
+    ///
+    /// Panics in debug builds if the snapshot shape does not match the network
+    /// (wrong neuron count); in release the mismatched tail is left untouched.
+    pub fn restore_state_from(&mut self, snap: &NetworkStateSnapshot) {
+        debug_assert_eq!(
+            snap.neuron_states.len(),
+            self.layers.iter().map(|l| l.len()).sum::<usize>(),
+            "NetworkStateSnapshot shape does not match network"
+        );
+        let mut i = 0;
+        for layer in &mut self.layers {
+            for neuron in layer {
+                if let Some(saved) = snap.neuron_states.get(i) {
+                    // Dimension guard (2026-07-17): after an adaptive resize a
+                    // stale snapshot holds old-dimension HVs; cloning them into
+                    // neuron state would poison it and panic the next bind().
+                    // Skip mismatches — rolling snapshot queues self-heal
+                    // within a couple of cycles.
+                    if saved.values.len() == neuron.state().values.len() {
+                        copy_hv_into(saved, neuron.state_mut());
+                        if let Some(&(t, n)) = snap.neuron_clocks.get(i) {
+                            neuron.set_evolution_clock(t, n);
+                        }
+                    }
+                }
+                i += 1;
+            }
+        }
+        for (dst, src) in self.layer_outputs.iter_mut().zip(snap.layer_outputs.iter()) {
+            if src.values.len() == dst.values.len() {
+                copy_hv_into(src, dst);
+            }
         }
     }
 

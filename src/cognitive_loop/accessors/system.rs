@@ -122,6 +122,33 @@ impl CognitiveLoopService {
             .map(|b| b.manifold().hdc_dim())
     }
 
+    /// Mean surprise across the vision manifold's patch surprise map.
+    /// Observation surface for tests/telemetry — the loop reads this
+    /// internally each perception phase but does not export it in
+    /// `CycleMetadata`.
+    #[cfg(feature = "vision-manifold")]
+    pub fn vision_mean_surprise(&self) -> Option<f32> {
+        self.sensorimotor
+            .vision_sensory
+            .vision_bridge
+            .as_ref()
+            .map(|b| b.manifold().surprise_map().mean_surprise())
+    }
+
+    /// Latest cross-manifold (vision→cognitive) predictor error, if the
+    /// predictor is enabled. This value feeds training importance and
+    /// dynamics internally but is not exported in `CycleMetadata`; this
+    /// accessor is the observation surface for tests/telemetry (e.g. the
+    /// Hebbian-convergence integration test).
+    #[cfg(feature = "vision-manifold")]
+    pub fn cross_manifold_prediction_error(&self) -> Option<f32> {
+        self.sensorimotor
+            .vision_sensory
+            .cross_manifold_predictor
+            .as_ref()
+            .map(|p| p.prediction_error())
+    }
+
     /// Get the unique node ID of this service.
     #[cfg(feature = "vision-manifold")]
     pub fn node_id(&self) -> Option<uuid::Uuid> {
@@ -324,6 +351,45 @@ impl CognitiveLoopService {
     #[cfg(feature = "voice-stt-live")]
     pub fn stt_capture_active(&self) -> bool {
         self.stt_capture.is_some()
+    }
+
+    /// Start live phone-screen capture (Pixel via ADB). On success,
+    /// subsequent cycles perceive the phone screen through the loop's own
+    /// VisionBridge whenever no frame was explicitly injected that cycle
+    /// (explicit injections — e.g. art-observer viewing windows — take
+    /// precedence). Frame dimensions and channel count are pinned to the
+    /// loop's configuration, not caller-supplied. Idempotent: if capture is
+    /// already running, returns Ok without restarting.
+    #[cfg(feature = "phone")]
+    pub fn start_phone_capture(&mut self, serial: &str) -> anyhow::Result<()> {
+        if self.phone_capture.is_some() {
+            return Ok(());
+        }
+        let mut config = crate::perception::PhoneCaptureConfig::new(
+            serial,
+            self.config.vision_frame_width,
+            self.config.vision_frame_height,
+        );
+        config.channels = match self.sensorimotor.vision_sensory.vision_bridge {
+            Some(ref bridge) if !bridge.manifold().encoder().config().enable_color => 1,
+            _ => 3,
+        };
+        let handle = crate::perception::PhoneCaptureHandle::start(config)?;
+        self.phone_capture = Some(handle);
+        Ok(())
+    }
+
+    /// Stop live phone-screen capture. The ADB worker thread is torn down
+    /// via the handle's Drop impl.
+    #[cfg(feature = "phone")]
+    pub fn stop_phone_capture(&mut self) {
+        self.phone_capture = None;
+    }
+
+    /// Whether live phone-screen capture is currently running.
+    #[cfg(feature = "phone")]
+    pub fn phone_capture_active(&self) -> bool {
+        self.phone_capture.is_some()
     }
 
     /// Install an IMU fusion module. Subsequent calls to `inject_imu_reading`
@@ -745,86 +811,17 @@ impl CognitiveLoopService {
         feature = "phone"
     ))]
     pub fn switch_embodiment(&mut self, platform: super::super::motor_bridge::EmbodimentPlatform) {
-        use super::super::motor_bridge::EmbodimentPlatform;
         let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(
             self.config.genesis_phrase.as_deref().unwrap_or("default"),
         );
-        let new_bridge: Option<Box<dyn super::super::motor_bridge::EmbodimentBridge>> =
-            match platform {
-                #[cfg(feature = "humanoid")]
-                EmbodimentPlatform::Humanoid => {
-                    // Use trait-polymorphic HumanoidEmbodiment matching
-                    // the pattern for the other 9 platforms
-                    // (commit `1a85fce8c8`).
-                    let bridge = crate::humanoid::embodiment::HumanoidEmbodiment::new(&genesis);
-                    Some(Box::new(bridge))
-                }
-                // Platform crates now implement EmbodimentBridge directly
-                // (symthaea-core trait), so the old `XBridgeAdapter` wrappers
-                // were removed. Box the implementation directly — matches the
-                // pattern used by exoskeleton/surgical/orbital/quadruped below.
-                #[cfg(feature = "helicopter")]
-                EmbodimentPlatform::Helicopter => Some(Box::new(
-                    crate::helicopter::embodiment::HelicopterEmbodiment::new(&genesis),
-                )),
-                #[cfg(feature = "flight")]
-                EmbodimentPlatform::Quadrotor => Some(Box::new(
-                    crate::multirotor::embodiment::FlightEmbodiment::new(&genesis),
-                )),
-                #[cfg(feature = "vehicle")]
-                EmbodimentPlatform::Vehicle => Some(Box::new(
-                    crate::vehicle::embodiment::VehicleEmbodiment::new(&genesis),
-                )),
-                #[cfg(feature = "manipulator")]
-                EmbodimentPlatform::Manipulator => Some(Box::new(
-                    crate::manipulator::embodiment::ManipulatorEmbodiment::new(&genesis),
-                )),
-                #[cfg(feature = "auv")]
-                EmbodimentPlatform::Auv => Some(Box::new(
-                    crate::auv::embodiment::AuvEmbodiment::new(&genesis),
-                )),
-                #[cfg(feature = "exoskeleton")]
-                EmbodimentPlatform::Exoskeleton => Some(Box::new(
-                    symthaea_exoskeleton::embodiment::ExoskeletonEmbodiment::new(&genesis),
-                )),
-                #[cfg(feature = "surgical")]
-                EmbodimentPlatform::Surgical => Some(Box::new(
-                    symthaea_surgical::embodiment::SurgicalEmbodiment::new(&genesis),
-                )),
-                #[cfg(feature = "orbital")]
-                EmbodimentPlatform::Orbital => Some(Box::new(
-                    symthaea_orbital::embodiment::OrbitalEmbodiment::new(&genesis),
-                )),
-                #[cfg(feature = "quadruped")]
-                EmbodimentPlatform::Quadruped => Some(Box::new(
-                    symthaea_quadruped::embodiment::QuadrupedEmbodiment::new(&genesis),
-                )),
-                #[cfg(feature = "subterranean")]
-                EmbodimentPlatform::Subterranean => Some(Box::new(
-                    symthaea_subterranean::embodiment::SubterraneanEmbodiment::new(&genesis),
-                )),
-                #[cfg(feature = "infrastructure")]
-                EmbodimentPlatform::Infrastructure => Some(Box::new(
-                    symthaea_infrastructure::embodiment::InfrastructureEmbodiment::new(&genesis),
-                )),
-                #[cfg(feature = "scavenger")]
-                EmbodimentPlatform::Scavenger => Some(Box::new(
-                    symthaea_scavenger::embodiment::ScavengerEmbodiment::new(&genesis),
-                )),
-                #[cfg(feature = "agribot")]
-                EmbodimentPlatform::Agribot => Some(Box::new(
-                    symthaea_agribot::embodiment::AgribotEmbodiment::new(&genesis),
-                )),
-                #[cfg(feature = "biota")]
-                EmbodimentPlatform::Biota => Some(Box::new(
-                    symthaea_biota::embodiment::BiotaEmbodiment::new(&genesis),
-                )),
-                #[cfg(feature = "clime")]
-                EmbodimentPlatform::Clime => Some(Box::new(
-                    symthaea_clime::embodiment::ClimeEmbodiment::new(&genesis),
-                )),
-                _ => None,
-            };
+        // Single source of truth: the plugin registry (platform_registry.rs).
+        // The hand-written per-platform match that used to live here was a
+        // second dispatch path competing with the (then-dead) plugin system —
+        // robotics plan 2026-07-10 Tier 2.1. Unregistered platforms (feature
+        // off, or `phone`, which needs a device serial) yield None, exactly
+        // like the old match's `_ => None`.
+        let registry = super::super::platform_registry::build_platform_registry();
+        let new_bridge = registry.create_bridge(platform, &genesis);
 
         self.sensorimotor.embodiment_bridge = new_bridge;
         self.sensorimotor.last_proprioceptive_hv = None;
@@ -1046,6 +1043,20 @@ impl CognitiveLoopService {
             .canvas_manager
             .as_mut()
             .and_then(|m| m.take_svg())
+    }
+
+    /// Snapshot of the creative pipeline's most recent telemetry (artwork
+    /// scores, observer-ΔΨ verdicts, modality, …). `None` when the creative
+    /// manager isn't constructed. Public so external drivers (examples,
+    /// experiment harnesses like `art_observer_ab`) can observe the creative
+    /// system without reaching into crate-private manager fields.
+    #[cfg(feature = "creative")]
+    pub fn creative_telemetry(&self) -> Option<super::super::creative_bridge::CreativeTelemetry> {
+        self.sensorimotor
+            .motor_rendering
+            .creative_manager
+            .as_ref()
+            .map(|m| m.last_telemetry().clone())
     }
 
     /// Deliver a human rating (`[-1, 1]`) of the most recently generated

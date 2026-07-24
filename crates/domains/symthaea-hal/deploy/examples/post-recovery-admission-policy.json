@@ -1,0 +1,12 @@
+{
+  "require_passing_objectives": true,
+  "require_passing_drill": true,
+  "require_passing_replay": true,
+  "require_passing_escrow_exercise": true,
+  "require_motion_corrective_actions_closed": true,
+  "minimum_service_phase": "RestrictedMotion",
+  "maximum_drill_age_ms": 7776000000,
+  "maximum_replay_age_ms": 86400000,
+  "maximum_escrow_exercise_age_ms": 15552000000,
+  "maximum_postmortem_age_ms": 31536000000
+}

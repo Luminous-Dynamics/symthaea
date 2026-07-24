@@ -15,7 +15,6 @@ categories = ["science", "algorithms", "multimedia::video"]
 image = "0.24"
 
 symthaea-core = { path = "../../core/symthaea-core" }
-symthaea-perception = { path = "../symthaea-perception", optional = true }
 serde = { workspace = true }
 tracing = { workspace = true }
 
@@ -24,4 +23,10 @@ serde_json = { workspace = true }
 
 [features]
 default = []
-perception = ["dep:symthaea-perception"]
+# REMOVED 2026-07-16 (vision review P2.2): the `perception` feature and its
+# optional symthaea-perception dep. Nothing in the workspace ever enabled it,
+# and symthaea-perception is now archived (workspace-excluded; its manifest
+# inherits workspace deps so it cannot be loaded as a path dep of a member).
+# The RealVentralPipeline cfg blocks in ventral.rs remain as the documented
+# adopt path — re-add `perception = ["dep:symthaea-perception"]` plus the
+# path dep (and de-inherit that crate's manifest) to revive it.

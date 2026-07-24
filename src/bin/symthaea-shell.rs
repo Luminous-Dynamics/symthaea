@@ -28,6 +28,11 @@
 //! │  [Phi: 0.85] Added firefox to environment.systemPackages │
 //! └──────────────────────────────────────────────────────────┘
 //! ```
+//!
+//! See also: `symthaea-ui` (`crates/bridges/symthaea-ui/`), a web UI over
+//! the `symthaea-service` HTTP gateway — a separate, browser-based surface,
+//! not a replacement for this terminal shell. See
+//! `SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md`.
 
 use std::io;
 use std::time::{Duration, Instant};

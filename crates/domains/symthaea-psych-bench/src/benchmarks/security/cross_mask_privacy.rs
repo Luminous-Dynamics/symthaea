@@ -1,10 +1,10 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # Cross-Mask Privacy Benchmark
+//! # Different-Mask Decorrelation Benchmark
 //!
-//! Tests that vectors encrypted with DIFFERENT masks reveal zero information
-//! about each other — the core OTP (One-Time Pad) privacy guarantee.
+//! Measures decorrelation under different deterministic XOR masks. This is an
+//! algebra benchmark, not evidence of privacy or an OTP security experiment.
 //!
 //! ## Protocol
 //!
@@ -47,12 +47,12 @@ pub struct CrossMaskPrivacyBenchmark;
 
 impl PsychBenchmark for CrossMaskPrivacyBenchmark {
     fn name(&self) -> &str {
-        "Security::CrossMaskPrivacy"
+        "InsecureAlgebraDemo::CrossMaskPrivacy"
     }
 
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
-            paradigm: "OTP Cross-Session Privacy",
+            paradigm: "Different-Mask XOR Decorrelation",
             citation: "Shannon, C. E. (1949). Communication theory of secrecy systems. Bell System Technical Journal, 28(4), 656-715.",
             year: 1949,
             doi: Some("10.1002/j.1538-7305.1949.tb00928.x"),

@@ -2018,6 +2018,12 @@ pub struct ReplVoiceOutput {
     /// Last voice output metrics (for feedback to cognitive loop)
     last_voice_metrics: Option<super::voice_feedback::VoiceOutputMetrics>,
 
+    /// Previous utterance's quality observation, fed to the FEP articulation
+    /// agent during the next utterance. This closes the observe→adapt loop
+    /// that used to be dead-conditional (`metrics: None` on every live path).
+    #[cfg(feature = "vocal-tract")]
+    pending_fep_observation: Option<super::vocal_tract_fep::VocalTractObservation>,
+
     /// Real-time streaming voice (cpal ring buffer) — preferred backend when available.
     #[cfg(feature = "live-voice")]
     live_voice: Option<super::live_voice::LiveVoice>,
@@ -2114,6 +2120,17 @@ impl ReplVoiceOutput {
             None
         };
 
+        // Honor base_rate from construction: previously it was consumed
+        // ONLY inside update_from_consciousness(), so any caller that
+        // synthesized directly (round-trip eval, tests, library users) got a
+        // silently ignored rate knob — measured live 2026-07-16: --rate 0.6
+        // produced byte-identical WER to 1.0 in both modes. (Hoisted before
+        // the struct literal: `config` moves into the first field.)
+        let initial_pacing = LTCPacing {
+            rate: config.base_rate,
+            ..LTCPacing::default()
+        };
+
         Ok(Self {
             config,
             articulatory,
@@ -2121,7 +2138,7 @@ impl ReplVoiceOutput {
             voice_output,
             cognitive_bridge,
             g2p,
-            current_pacing: LTCPacing::default(),
+            current_pacing: initial_pacing,
             audio_available,
             #[cfg(feature = "audio")]
             _audio_stream,
@@ -2132,6 +2149,8 @@ impl ReplVoiceOutput {
             #[cfg(feature = "vocal-tract")]
             formant_db: super::formant_targets::FormantDatabase::new(),
             last_voice_metrics: None,
+            #[cfg(feature = "vocal-tract")]
+            pending_fep_observation: None,
             #[cfg(feature = "live-voice")]
             live_voice,
             total_utterances: 0,
@@ -2362,6 +2381,11 @@ impl ReplVoiceOutput {
     fn synthesize_ltc_pipeline(&mut self, text: &str) -> Result<Vec<f32>> {
         use super::vocal_tract_encoder::VoiceCognitiveState;
 
+        // Previous utterance's quality observation → FEP articulation agent.
+        // Consumed once per utterance; the agent's cognitive ticks (10Hz) use it
+        // to modulate tau / learning rate / emphasis for this synthesis.
+        let fep_observation = self.pending_fep_observation.take();
+
         let pipeline = self
             .ltc_pipeline
             .as_mut()
@@ -2557,7 +2581,7 @@ impl ReplVoiceOutput {
                     let remaining = n_frames - frame_i;
                     let frame = pipeline.tick_with_anticipation(
                         &cognitive_state,
-                        None,
+                        fep_observation.as_ref(),
                         dt,
                         Some(effective_phoneme),
                         next_phoneme,
@@ -2590,11 +2614,6 @@ impl ReplVoiceOutput {
             return Ok(Vec::new());
         }
 
-        // Auto-compute voice quality metrics for feedback to cognitive loop
-        let metrics =
-            super::voice_feedback::VoiceOutputMetrics::from_formant_frames(&all_frames, None);
-        self.last_voice_metrics = Some(metrics);
-
         // Emotional voice quality from cognitive state
         let voice_quality = super::vocoder::cognitive_state_to_voice_quality(
             self.current_pacing.emotional_valence,
@@ -2607,6 +2626,38 @@ impl ReplVoiceOutput {
         let samples = self
             .vocoder
             .synthesize_with_quality(&all_frames, &quality_vec);
+
+        // Voice quality metrics for feedback to the cognitive loop. Base
+        // metrics come from the commanded formant frames; SELF-HEARING then
+        // refines them from the *produced audio* (voice plan P3.1): HNR via
+        // autocorrelation measures how clean the actual voicing came out —
+        // something the commanded parameters cannot know.
+        let mut metrics =
+            super::voice_feedback::VoiceOutputMetrics::from_formant_frames(&all_frames, None);
+        {
+            let voiced_f0s: Vec<f32> = all_frames
+                .iter()
+                .filter(|f| f.voicing > 0.5 && f.f0 > 0.0)
+                .map(|f| f.f0)
+                .collect();
+            if !voiced_f0s.is_empty() && !samples.is_empty() {
+                let mean_f0 = voiced_f0s.iter().sum::<f32>() / voiced_f0s.len() as f32;
+                let hnr = symthaea_vocal_tract::metrics::compute_hnr(
+                    &samples,
+                    mean_f0,
+                    self.config.sample_rate,
+                );
+                // Normalize: ~25 dB HNR = clean modal voice, 0 dB = pure noise.
+                let hnr_quality = (hnr / 25.0).clamp(0.0, 1.0);
+                // Blend heard quality into the commanded-parameter estimate.
+                metrics.articulation_score = metrics.articulation_score * 0.6 + hnr_quality * 0.4;
+            }
+        }
+        // Queue the (audio-informed) observation for the FEP articulation
+        // agent's next utterance.
+        self.pending_fep_observation = Some((&metrics).into());
+        self.last_voice_metrics = Some(metrics);
+
         let scaled: Vec<f32> = samples.iter().map(|s| s * self.config.volume).collect();
 
         Ok(scaled)
@@ -2656,6 +2707,20 @@ impl ReplVoiceOutput {
     /// Play audio samples
     #[cfg(feature = "audio")]
     fn play_audio(&mut self, samples: &[f32]) -> Result<()> {
+        let sample_rate = self.config.sample_rate;
+        self.play_audio_at(samples, sample_rate)
+    }
+
+    /// Play audio samples (stub when audio feature disabled)
+    #[cfg(not(feature = "audio"))]
+    fn play_audio(&mut self, _samples: &[f32]) -> Result<()> {
+        debug!("Audio playback disabled");
+        Ok(())
+    }
+
+    /// Play audio samples at an explicit sample rate (see `play_samples_at`).
+    #[cfg(feature = "audio")]
+    fn play_audio_at(&mut self, samples: &[f32], sample_rate: u32) -> Result<()> {
         if !self.audio_available {
             debug!("Audio not available, skipping playback");
             return Ok(());
@@ -2667,7 +2732,6 @@ impl ReplVoiceOutput {
             .ok_or_else(|| anyhow::anyhow!("Audio sink not initialized"))?;
 
         // Create rodio source from samples
-        let sample_rate = self.config.sample_rate;
         let source = rodio::buffer::SamplesBuffer::new(1, sample_rate, samples.to_vec());
 
         // Queue audio for playback
@@ -2676,9 +2740,10 @@ impl ReplVoiceOutput {
         Ok(())
     }
 
-    /// Play audio samples (stub when audio feature disabled)
+    /// Play audio samples at an explicit sample rate (stub when audio
+    /// feature disabled).
     #[cfg(not(feature = "audio"))]
-    fn play_audio(&mut self, _samples: &[f32]) -> Result<()> {
+    fn play_audio_at(&mut self, _samples: &[f32], _sample_rate: u32) -> Result<()> {
         debug!("Audio playback disabled");
         Ok(())
     }
@@ -2700,6 +2765,149 @@ impl ReplVoiceOutput {
     /// Check if audio output is available
     pub fn is_audio_available(&self) -> bool {
         self.audio_available
+    }
+
+    /// Play already-synthesized PCM samples through this output's audio
+    /// backend (no-op when no backend is available). Used by callers that
+    /// synthesize outside the speak() pipeline, e.g. singing (`/sing`).
+    /// Assumes `self.config.sample_rate` (Kokoro's rate) -- use
+    /// `play_samples_at` for a backend with a different native rate (e.g.
+    /// DiffSinger's 44.1kHz).
+    pub fn play_samples(&mut self, samples: &[f32]) -> Result<()> {
+        self.play_samples_at(samples, self.config.sample_rate)
+    }
+
+    /// Same as `play_samples`, but at an explicit sample rate rather than
+    /// assuming `self.config.sample_rate` -- lets callers mix backends with
+    /// different native rates (e.g. Kokoro's 24kHz vs DiffSinger's 44.1kHz)
+    /// without permanently mutating shared playback config.
+    pub fn play_samples_at(&mut self, samples: &[f32], sample_rate: u32) -> Result<()> {
+        if samples.is_empty() {
+            return Ok(());
+        }
+        self.total_utterances += 1;
+        self.total_audio_seconds += samples.len() as f32 / sample_rate as f32;
+        self.play_audio_at(samples, sample_rate)
+    }
+
+    /// Distillation v2 (voice plan, 2026-07-17): apply measured per-phoneme
+    /// formant targets to the database and RE-PRETRAIN the vocal-tract
+    /// controller on the updated table — the same pretraining path used at
+    /// construction, so the change reaches the controller exactly the way
+    /// the hand-tuned table did.
+    ///
+    /// Motivation: v1's frame-by-frame gradient distillation was an honest
+    /// negative (100.0% vs 98.6% control across a 10x LR range) — the crude
+    /// alignment trained phoneme HVs on neighbors' frames. Median targets
+    /// computed from span *centers* are robust to that alignment error, and
+    /// re-pretraining takes seconds instead of ~40 minutes.
+    #[cfg(feature = "vocal-tract")]
+    pub fn apply_formant_targets(
+        &mut self,
+        targets: &[(String, super::formant_targets::FormantTarget)],
+    ) -> Result<usize> {
+        use symthaea_core::genesis::GenesisSeed;
+
+        for (phoneme, target) in targets {
+            self.formant_db.set(phoneme.clone(), target.clone());
+        }
+
+        let pipeline = self
+            .ltc_pipeline
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("apply_formant_targets requires the LTC pipeline"))?;
+
+        // Re-pretrain on the updated table (same recipe as construction).
+        let genesis = GenesisSeed::from_phrase("repl-vocal-tract");
+        super::vocal_tract_controller::train_controller_on_phoneme_db(
+            &mut pipeline.controller,
+            &genesis,
+            &self.formant_db,
+            3,
+        );
+        super::vocal_tract_controller::train_controller_cv_vc_transitions(
+            &mut pipeline.controller,
+            &genesis,
+            &self.formant_db,
+            2,
+        );
+        Ok(targets.len())
+    }
+
+    /// Distill the vocal-tract controller toward reference formant
+    /// trajectories (voice plan Kokoro-teacher distillation, 2026-07-16).
+    ///
+    /// `corpus` pairs each training text with the formant track extracted
+    /// (via `symthaea_vocal_tract::formant_extraction`) from
+    /// verified-intelligible teacher audio of that text. Alignment is
+    /// duration-proportional: the text's `TimedPhoneme` spans (from the SAME
+    /// `SimpleG2P` the live LTC synthesis path uses) are stretched over the
+    /// reference frames; the controller is then trained frame-by-frame with
+    /// `train_step(phoneme_hv, reference_frame)` — exactly the online-
+    /// adaptation call the live path already makes, but with teacher targets
+    /// instead of the hand-tuned table.
+    ///
+    /// Returns `(pairs_trained, skipped_frames)`. Requires the LTC pipeline
+    /// (`use_ltc_pipeline`); errors otherwise.
+    #[cfg(feature = "vocal-tract")]
+    pub fn distill_from_references(
+        &mut self,
+        corpus: &[(String, Vec<super::FormantFrame>)],
+        epochs: usize,
+        lr: f32,
+    ) -> Result<(usize, usize)> {
+        use symthaea_vocal_tract::types::SourceType;
+
+        let base_duration = self.config.phoneme_duration_base / self.current_pacing.rate;
+        let pipeline = self
+            .ltc_pipeline
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("distillation requires the LTC pipeline"))?;
+
+        let dt = 1.0 / 200.0;
+        let mut pairs = 0usize;
+        let mut skipped = 0usize;
+
+        for _epoch in 0..epochs.max(1) {
+            for (text, ref_frames) in corpus {
+                if ref_frames.is_empty() {
+                    continue;
+                }
+                let phonemes = self.g2p.text_to_phonemes(text, base_duration);
+                let total_dur: f32 = phonemes.iter().map(|p| p.duration).sum();
+                if phonemes.is_empty() || total_dur <= 0.0 {
+                    continue;
+                }
+
+                // Duration-proportional alignment: phoneme i's span of the
+                // reference track is [t0/T, t1/T) scaled to frame indices.
+                let n = ref_frames.len() as f32;
+                let mut t_cursor = 0.0f32;
+                for tp in &phonemes {
+                    let f_start = ((t_cursor / total_dur) * n) as usize;
+                    t_cursor += tp.duration;
+                    let f_end = (((t_cursor / total_dur) * n) as usize).min(ref_frames.len());
+
+                    // Don't train phoneme HVs against pauses, and don't train
+                    // on frames the extractor marked silent.
+                    if tp.phoneme == "SIL" || tp.phoneme == "SP" {
+                        continue;
+                    }
+                    let phoneme_hv = pipeline.get_or_create_phoneme_hv(&tp.phoneme);
+                    for frame in &ref_frames[f_start..f_end] {
+                        if frame.source_type == SourceType::Silent {
+                            skipped += 1;
+                            continue;
+                        }
+                        pipeline
+                            .controller
+                            .train_step(&phoneme_hv, frame, dt, Some(lr));
+                        pairs += 1;
+                    }
+                }
+            }
+        }
+        Ok((pairs, skipped))
     }
 
     /// Get current pacing state

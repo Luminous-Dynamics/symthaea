@@ -15,6 +15,7 @@ categories = ["science", "algorithms"]
 symthaea-core = { path = "../../core/symthaea-core" }
 serde = { workspace = true }
 anyhow = "1.0"
+nalgebra = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

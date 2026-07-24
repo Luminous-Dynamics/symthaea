@@ -59,22 +59,60 @@ impl MoralTopology {
 
     /// Exact Betti computation via Hodge Laplacian on the Rips complex.
     ///
-    /// More accurate than triangle/tetrahedra counting but O(n³) for
-    /// boundary matrix operations. Use for small windows (n ≤ 32).
+    /// More accurate than triangle/tetrahedra counting but the Laplacian's
+    /// boundary-matrix products are dense in the SIMPLEX COUNT, which for a
+    /// dense similarity window grows like C(n,4). Two guards keep this
+    /// tractable (added 2026-07-16 after this function was caught as the
+    /// ">24h at 97.7% CPU" empty-input loop hang — a long run of
+    /// near-identical inputs makes every pair clear `scale`, and n=64 fully
+    /// connected is ~677k simplices, a ~10^15-op multiply; see
+    /// docs/PHI_SIGNAL_TRACE_2026-07-15.md follow-up 6):
+    ///
+    /// 1. A complete 1-skeleton means the Rips complex is the full simplex,
+    ///    which is contractible — Betti = (1, 0, 0) in CLOSED FORM. This is
+    ///    exact mathematics, not an approximation, and it is precisely the
+    ///    degenerate-window case that used to hang.
+    /// 2. Past `MAX_EXACT_SIMPLICES`, fall back to the counting-based
+    ///    `compute_betti` — an approximation, but a bounded one.
     pub(super) fn compute_betti_exact(sim: &[f64], n: usize, scale: f64) -> BettiNumbers {
+        // Guard 1: complete 1-skeleton → contractible → closed form.
+        let mut edge_count = 0usize;
+        for i in 0..n {
+            for j in (i + 1)..n {
+                if sim[i * n + j] >= scale {
+                    edge_count += 1;
+                }
+            }
+        }
+        if n >= 2 && edge_count == n * (n - 1) / 2 {
+            return BettiNumbers::new(1, 0, 0);
+        }
+
+        // Guard 2: simplex budget — exact homology only while tractable.
+        const MAX_EXACT_SIMPLICES: usize = 20_000;
+        let mut remaining = MAX_EXACT_SIMPLICES.saturating_sub(n);
+
         let mut complex = SimplicialComplex::new();
         // Add vertices
         for i in 0..n {
             complex.add_simplex(vec![i]);
         }
         // Add edges (1-simplices) where similarity ≥ scale
-        for i in 0..n {
+        'build: for i in 0..n {
             for j in (i + 1)..n {
                 if sim[i * n + j] >= scale {
+                    if remaining == 0 {
+                        break 'build;
+                    }
+                    remaining -= 1;
                     complex.add_simplex(vec![i, j]);
                     // Add triangles (2-simplices)
                     for k in (j + 1)..n {
                         if sim[i * n + k] >= scale && sim[j * n + k] >= scale {
+                            if remaining == 0 {
+                                break 'build;
+                            }
+                            remaining -= 1;
                             complex.add_simplex(vec![i, j, k]);
                             // Add tetrahedra (3-simplices)
                             for l in (k + 1)..n {
@@ -82,6 +120,10 @@ impl MoralTopology {
                                     && sim[j * n + l] >= scale
                                     && sim[k * n + l] >= scale
                                 {
+                                    if remaining == 0 {
+                                        break 'build;
+                                    }
+                                    remaining -= 1;
                                     complex.add_simplex(vec![i, j, k, l]);
                                 }
                             }
@@ -90,6 +132,13 @@ impl MoralTopology {
                 }
             }
         }
+        if remaining == 0 {
+            // Budget exhausted: the complex is too dense for in-loop exact
+            // homology. The bounded counting approximation is the honest
+            // alternative to a multi-hour Laplacian.
+            return Self::compute_betti(sim, n, scale);
+        }
+
         let laplacian = HodgeLaplacian::new(complex);
         let hodge_betti = laplacian.betti_numbers();
         BettiNumbers::new(hodge_betti.get(0), hodge_betti.get(1), hodge_betti.get(2))

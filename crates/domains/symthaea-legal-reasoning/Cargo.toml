@@ -1,10 +1,14 @@
 [package]
 name = "symthaea-legal-reasoning"
-version = "0.1.0"
+version = "0.4.0"
 edition = "2024"
+rust-version = "1.85"
 license = "AGPL-3.0-or-later"
-description = "Formal legal reasoning for Symthaea: deontic logic (obligation/permission/prohibition + consistency), defeasible rules (defaults + exceptions), and Hohfeldian jural relations. The formal core of law. Ground-truth-checked."
+description = "Deterministic legal-reasoning microkernel with bounded recursive inference, proof graphs, legal time, lifecycle, and canonical evidence"
+keywords = ["legal-reasoning", "deontic", "defeasible", "hohfeld", "logic"]
+categories = ["algorithms", "data-structures"]
 
-# Pure-std, zero dependencies, no symthaea-core link. Formal core of the "hard"
-# law domain (see symthaea/HARD_DOMAINS_PLAN_2026-07-07.md).
+# Pure std, zero dependencies, and no symthaea-core link. Natural-language
+# interpretation, precedent analogy, and normative policy remain outside the
+# trusted formal kernel.
 [dependencies]

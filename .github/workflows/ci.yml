@@ -142,12 +142,12 @@ jobs:
           #   "ssm_language" entry in Test Feature Combinations (--no-default-features).
           CI_FEATURES="parallel,service,shell,demo,api_module,\
           voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,\
-          embeddings,vision,perception,vision-manifold,foveation,\
+          embeddings,vision-manifold,foveation,\
           integrity,semantic-encoder,neural-bridge,webcam,\
           mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
           nix-mind,identity,physics,physics-bridge,\
           flight,humanoid,hal,ssm-power,\
-          lancedb-backend,multi_agent,full_consciousness,full_perception,\
+          lancedb-backend,multi_agent,full_consciousness,\
           full_language,magi_loop,reasoning_engine,code_generation,\
           wasm-sandbox,school_learning,benchmarks,all_benchmarks,\
           integration_module,observability_module,support,web_research_module,\
@@ -507,10 +507,10 @@ jobs:
           - group: core-media
             features: >-
               voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,
-              embeddings,vision,perception,vision-manifold,foveation
+              embeddings,vision-manifold,foveation
           - group: science-ai-core
             features: >-
-              multi_agent,full_consciousness,full_perception,
+              multi_agent,full_consciousness,
               full_language,magi_loop
           - group: science-ai-extended
             features: >-
@@ -658,9 +658,17 @@ jobs:
           # gallery/style-identity path (both landed 2026-07-10).
           - "creative"
           - "profile-culture,art-eye,gallery"
+          # Observer-ΔΨ (art-observer = art-eye + vision-manifold: she LOOKS
+          # at her own artwork through the live vision path) — the crown
+          # jewel of the projection stack, previously compiled by no CI leg
+          # at all (VISION_PROJECTION_REVIEW_2026-07-15.md P1.4). foveation
+          # rides along so the Phase 1.4 real-luma dispatch is covered too.
+          - "art-observer,foveation"
+          # Phone-screen capture pump (Pixel → loop VisionBridge, landed
+          # 2026-07-15) — previously the phone feature had no CI coverage.
+          - "phone"
           - "ssm_language"
           - "multi_agent"
-          - "full_perception"
           - "identity"
           - "all_benchmarks"
           - "genesis"
@@ -826,18 +834,21 @@ jobs:
           - "swarm,full_consciousness"
           - "ssm_language,reasoning_engine"
           - "multi_agent,reasoning_engine"
-          - "full_perception,reasoning_engine"
           - "all_benchmarks,reasoning_engine"
           - "genesis,reasoning_engine"
-          - "vision-manifold,full_perception"
+          - "vision-manifold,reasoning_engine"
           - "vocal-tract,voice-tts"
+          # voice-stt-live was previously the only voice feature never even
+          # compile-checked (cpal builds fine without an audio device).
+          - "voice-stt-live"
+          # Lyrics+melody singing bridge (muse -> vocal tract -> vocoder).
+          - "singing,voice-tts"
           - "embeddings,reasoning_engine"
           - "mesh-encryption,swarm"
           - "api_module,full_consciousness"
           - "neural-bridge,reasoning_engine"
           - "web_research_module,reasoning_engine"
           - "nix-mind,reasoning_engine"
-          - "vision-manifold-camera,full_perception"
           - "wasm-sandbox,reasoning_engine"
           - "integrity,full_consciousness"
           # Safety-critical interaction pairs (added 2026-03-23)
@@ -887,6 +898,14 @@ jobs:
               # (src/lib.rs's compile_error! guard) -- default features must be off.
               # Scoped to -p symthaea (see Test Feature Combinations job for why).
               cargo check -p symthaea --no-default-features --features "$FEATURES"
+              ;;
+            *,voice-tts,*)
+              cargo check --features "$FEATURES"
+              # Also compile the voice test surface: the gated integration
+              # tests once bit-rotted invisibly (imports of deleted types)
+              # because feature legs were check-only and never built tests.
+              cargo check -p symthaea --features "$FEATURES" \
+                --test voice_integration --test voice_pipeline_integration
               ;;
             *)
               cargo check --features "$FEATURES"
@@ -1102,7 +1121,6 @@ jobs:
           - symthaea-hodge
           - symthaea-field-dynamics
           - symthaea-enactive
-          - symthaea-sensorimotor
           - symthaea-factor-graph
           - symthaea-exploration
           - symthaea-spore

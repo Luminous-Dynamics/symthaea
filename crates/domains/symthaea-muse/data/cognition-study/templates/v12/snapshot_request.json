@@ -1,0 +1,9 @@
+{
+  "snapshot_sequence": 1,
+  "recorded_at_utc": "REPLACE_RFC3339",
+  "previous_snapshot_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "sessions": [],
+  "integrity_incident_open": false,
+  "governance_abort_order_sha256": null,
+  "frozen_deadline_reached": false
+}

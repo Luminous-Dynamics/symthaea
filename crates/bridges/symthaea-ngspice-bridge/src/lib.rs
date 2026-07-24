@@ -64,7 +64,7 @@ impl SimulationBackend for NgspiceBridge {
         }
 
         if self.dry_run {
-            return Ok(SimulationResult::converged(&request.id, 0.55)
+            return Ok(SimulationResult::dry_run(&request.id, self.name(), 0.55)
                 .with_metric("peak_voltage", 12.1, "V")
                 .with_metric("settling_time", 0.032, "s"));
         }

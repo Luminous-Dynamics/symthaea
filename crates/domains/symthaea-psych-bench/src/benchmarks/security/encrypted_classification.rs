@@ -3,8 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Encrypted Classification Benchmark
 //!
-//! Demonstrates that HDC nearest-neighbor classification operates identically
-//! on encrypted hypervectors as on plaintext, with zero accuracy loss.
+//! Demonstrates that a reused XOR mask preserves nearest-neighbor
+//! classification—and therefore leaks the exact distance structure. The
+//! ciphertext terminology is historical; this is not a privacy benchmark.
 //!
 //! ## Mathematical Basis
 //!
@@ -107,12 +108,12 @@ pub struct EncryptedClassificationBenchmark;
 
 impl PsychBenchmark for EncryptedClassificationBenchmark {
     fn name(&self) -> &str {
-        "Security::EncryptedClassification"
+        "InsecureAlgebraDemo::EncryptedClassification"
     }
 
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
-            paradigm: "Homomorphic HDC Classification",
+            paradigm: "Shared-Mask Distance-Leakage Classification",
             citation: "Imani, M. et al. (2019). A framework for collaborative learning in secure high-dimensional space. IEEE HPCA.",
             year: 2019,
             doi: Some("10.1109/HPCA.2019.00036"),
@@ -388,7 +389,7 @@ mod tests {
 
         let result = EncryptedClassificationBenchmark.run(&config);
 
-        println!("\n═══ HDC-FHE Encrypted Classification Results ═══");
+        println!("\n═══ Shared-Mask Classification Leakage Results ═══");
         for (key, val) in &result.metrics {
             println!(
                 "  {:<30} mean={:.6}  sd={:.6}  CI=[{:.6}, {:.6}]",
@@ -402,7 +403,7 @@ mod tests {
         let agg_result =
             super::super::collective_aggregation::CollectiveAggregationBenchmark.run(&config);
 
-        println!("═══ HDC-FHE Collective Aggregation Results ═══");
+        println!("═══ Shared-Mask Aggregation Demo Results ═══");
         for (key, val) in &agg_result.metrics {
             println!(
                 "  {:<30} mean={:.6}  sd={:.6}  CI=[{:.6}, {:.6}]",

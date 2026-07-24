@@ -135,6 +135,20 @@ pub const BODY_PSI_WEIGHT: f64 = 0.1;
 /// Basis: Thompson (2007) — enactive cognition extends consciousness.
 pub const EMBODIED_PSI_WEIGHT: f64 = 0.05;
 
+/// Φ→Ψ coupling weight: Ψ = (1−w)·components + w·consciousness_level.
+///
+/// Design decision 2026-07-16 (user-approved, see
+/// docs/PHI_SIGNAL_TRACE_2026-07-15.md follow-up 4): Ψ's social inputs
+/// (flow/relational/voice) are structurally inert in a text-only loop, so Ψ
+/// collapsed to a coherence-scaled constant (~0.51) and its gates never
+/// fired. Coupling to the now-regime-discriminating consciousness_level
+/// (Φ-side) gives Ψ real dynamic range while keeping its social identity:
+/// at w=0.35, E2's regimes map to Ψ≈0.42 (repetitive — hovers at Broca's
+/// 0.4 speak-threshold) vs Ψ≈0.61 (varied/alarming — comfortably above).
+/// Applied only when consciousness_level > 0 (measured), per the
+/// absent-vs-zero rule.
+pub const PSI_PHI_COUPLING_WEIGHT: f64 = 0.35;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MCE BOTTLENECK → SUBSYSTEM MODULATION
 // ═══════════════════════════════════════════════════════════════════════════════

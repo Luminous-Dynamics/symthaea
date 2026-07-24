@@ -510,6 +510,12 @@ impl StreamingSynth {
             Instrument::Bell | Instrument::Kalimba => (0.001, 0.5, 0.05, 0.8),
             Instrument::Pad | Instrument::Organ => (0.2, 0.1, 0.8, 0.5),
             Instrument::ElectricPiano => (0.01, 0.2, 0.3, 0.3),
+            // `select_instrument` never returns any of the newer additions
+            // below (Viola, Oboe, FrenchHorn, Bassoon, Accordion, Mandolin,
+            // Banjo, Vibraphone, Celesta, ChoirAah, StringEnsemble,
+            // ElectricBass, Timpani, MusicBox) — this arm only exists to
+            // keep the match exhaustive after the enum grew.
+            _ => (0.03, 0.1, 0.5, 0.3),
         };
 
         // ── Phase 1: Render per-voice mono buffers ──

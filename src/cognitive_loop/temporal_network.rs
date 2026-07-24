@@ -29,6 +29,15 @@ pub(super) enum TemporalNetwork {
     HierarchicalCfC(HierarchicalCfC),
 }
 
+/// Backend-specific evolution-state backup (see
+/// [`TemporalNetwork::save_evolution_state`]).
+pub(super) enum TemporalStateBackup {
+    /// CfC: the small hidden-state vector, restorable via true inject
+    CfC(Array1<f32>),
+    /// HdcLtc: full neuron-state snapshot
+    HdcLtc(symthaea_core::hdc::hdc_ltc_unified::NetworkStateSnapshot),
+}
+
 impl TemporalNetwork {
     /// Step the network forward
     pub fn step(&mut self, input: &Array1<f32>, dt: f32) -> Result<()> {
@@ -78,6 +87,31 @@ impl TemporalNetwork {
     /// Train step using BPTT (analytical gradients).
     /// For HdcLtc this falls through to the default train_step.
     /// For HierarchicalCfC this uses single-target multi-scale training.
+    /// Train with the forward pass starting from a historical evolution-state
+    /// backup instead of the live state (2026-07-17, sequence-prediction fix).
+    ///
+    /// For the per-cycle (enc_{t−1} → enc_t) training pair, the temporally
+    /// correct starting state is the one from the END of cycle t−2 — the live
+    /// state has already been stepped with enc_t by the planning phase.
+    /// Only the HdcLtc backend supports historical starts; other backends
+    /// fall back to their existing (state-agnostic or locally-seeded)
+    /// trainers, which at least do not corrupt live state.
+    pub fn train_step_from(
+        &mut self,
+        start: Option<&TemporalStateBackup>,
+        input: &Array1<f32>,
+        target: &Array1<f32>,
+        dt: f32,
+        learning_rate: f32,
+    ) -> Result<f32> {
+        match (self, start) {
+            (Self::HdcLtc(bridge), Some(TemporalStateBackup::HdcLtc(snap))) => {
+                bridge.train_step_from(snap, input, target, dt, learning_rate)
+            }
+            (me, _) => me.train_step_bptt(input, target, dt, learning_rate),
+        }
+    }
+
     pub fn train_step_bptt(
         &mut self,
         input: &Array1<f32>,
@@ -122,7 +156,24 @@ impl TemporalNetwork {
         }
     }
 
+    /// Whether `predict_forward` on this backend leaves live state untouched.
+    ///
+    /// True for HdcLtc (its predict_forward snapshots/restores internally).
+    /// False for classic CfC (predict_forward advances state; callers must
+    /// save/restore via read_state/inject, which is a true restore there) and
+    /// for HierarchicalCfC (predict_forward advances the hierarchy AND its
+    /// inject is a reset — a known unfixed footgun, tracked in
+    /// docs/PHI_SIGNAL_TRACE_2026-07-15.md follow-ups).
+    pub fn prediction_is_pure(&self) -> bool {
+        matches!(self, Self::HdcLtc(_))
+    }
+
     /// Inject state
+    ///
+    /// WARNING: only the CfC backend truly restores injected state. For HdcLtc
+    /// and HierarchicalCfC this is a RESET (internal state cannot be
+    /// reconstructed from the small projected vector) — never use it as the
+    /// "restore" half of a save/restore pattern on those backends.
     pub fn inject(&mut self, state: &Array1<f32>) -> Result<()> {
         match self {
             Self::CfC(cfc) => cfc.inject(state),
@@ -131,6 +182,33 @@ impl TemporalNetwork {
                 hcfc.reset();
                 Ok(())
             }
+        }
+    }
+
+    /// Best-effort snapshot of evolution state ahead of a deliberately
+    /// destructive operation (e.g. consolidation replay, which resets state
+    /// for clean replays). Returns None when the backend cannot snapshot
+    /// (HierarchicalCfC).
+    pub fn save_evolution_state(&self) -> Option<TemporalStateBackup> {
+        match self {
+            Self::CfC(cfc) => cfc.read_state().ok().map(TemporalStateBackup::CfC),
+            Self::HdcLtc(bridge) => Some(TemporalStateBackup::HdcLtc(
+                bridge.snapshot_evolution_state(),
+            )),
+            Self::HierarchicalCfC(_) => None,
+        }
+    }
+
+    /// Restore evolution state captured by [`save_evolution_state`].
+    pub fn restore_evolution_state(&mut self, backup: &TemporalStateBackup) {
+        match (self, backup) {
+            (Self::CfC(cfc), TemporalStateBackup::CfC(state)) => {
+                let _ = cfc.inject(state);
+            }
+            (Self::HdcLtc(bridge), TemporalStateBackup::HdcLtc(snap)) => {
+                bridge.restore_evolution_state(snap);
+            }
+            _ => {}
         }
     }
 

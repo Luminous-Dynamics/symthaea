@@ -189,7 +189,7 @@ impl SurgicalEmbodiment {
             total_steps: self.total_steps as u64,
             control_effort: self.last_control_effort,
             prediction_error: self.last_prediction_error,
-            safety_level: format!("{:?}", self.current_safety),
+            safety_level: self.current_safety,
             platform: "surgical".to_string(),
             num_actuators: NUM_ACTUATORS,
             epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),

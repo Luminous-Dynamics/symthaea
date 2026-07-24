@@ -92,22 +92,41 @@ impl Color {
         (h * 60.0, s, l)
     }
 
+    /// Return a finite color with every component clamped to [0, 1].
+    pub fn sanitized(&self) -> Self {
+        fn unit(value: f32, fallback: f32) -> f32 {
+            if value.is_finite() {
+                value.clamp(0.0, 1.0)
+            } else {
+                fallback
+            }
+        }
+
+        Self {
+            r: unit(self.r, 0.0),
+            g: unit(self.g, 0.0),
+            b: unit(self.b, 0.0),
+            a: unit(self.a, 1.0),
+        }
+    }
+
     /// Hex string like "#e8c547" or "rgba(232,197,71,0.5)" if alpha < 1.
     pub fn to_css(&self) -> String {
-        if (self.a - 1.0).abs() < 1e-3 {
+        let color = self.sanitized();
+        if (color.a - 1.0).abs() < 1e-3 {
             format!(
                 "#{:02x}{:02x}{:02x}",
-                (self.r * 255.0).round() as u8,
-                (self.g * 255.0).round() as u8,
-                (self.b * 255.0).round() as u8,
+                (color.r * 255.0).round() as u8,
+                (color.g * 255.0).round() as u8,
+                (color.b * 255.0).round() as u8,
             )
         } else {
             format!(
                 "rgba({},{},{},{:.2})",
-                (self.r * 255.0).round() as u8,
-                (self.g * 255.0).round() as u8,
-                (self.b * 255.0).round() as u8,
-                self.a,
+                (color.r * 255.0).round() as u8,
+                (color.g * 255.0).round() as u8,
+                (color.b * 255.0).round() as u8,
+                color.a,
             )
         }
     }
@@ -237,6 +256,12 @@ mod tests {
         let c = Color::rgba(1.0, 0.0, 0.0, 0.5);
         assert!(c.to_css().starts_with("rgba("));
         assert!(c.to_css().contains("0.50"));
+    }
+
+    #[test]
+    fn css_output_sanitizes_non_finite_components() {
+        let c = Color::rgba(f32::NAN, f32::INFINITY, -1.0, f32::NAN);
+        assert_eq!(c.to_css(), "#000000");
     }
 
     #[test]

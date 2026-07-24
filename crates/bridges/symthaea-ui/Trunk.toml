@@ -1,0 +1,10 @@
+[serve]
+address = "0.0.0.0"
+# Dev/test slot (PORTS.md 8400-8409, "ad-hoc, never persistent") — 8400 is
+# already muse_studio. Not yet a permanent allocation: Phase 4 of
+# SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md updates PORTS.md/WEBSITE_REGISTRY.md
+# once this app actually ships somewhere.
+port = 8401
+
+[build]
+target = "index.html"

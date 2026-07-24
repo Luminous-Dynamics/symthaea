@@ -25,7 +25,15 @@ pub fn compute_feedback(
     config: &AestheticConfig,
     harmony_activations: &[f32; 8],
 ) -> AestheticFeedback {
-    let delta = score.composite - ema;
+    let config = config.clone().sanitized();
+    let expectation = if ema.is_finite() {
+        ema.clamp(0.0, 1.0)
+    } else {
+        0.5
+    };
+    let intrinsic = score.intrinsic_composite();
+    let delta = intrinsic - expectation;
+    let surprise = score.surprise_against(expectation);
 
     // Dopamine: reward prediction error
     let dopamine_delta = if delta > config.reward_threshold {
@@ -37,15 +45,25 @@ pub fn compute_feedback(
     };
 
     // Serotonin: proportional to harmony alignment
-    let serotonin_delta = score.harmony * config.serotonin_scale;
+    let harmony = if score.harmony.is_finite() {
+        score.harmony.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let serotonin_delta = harmony * config.serotonin_scale;
 
     // Surprise signal for exploration system
-    let surprise_signal = score.surprise * config.surprise_scale;
+    let surprise_signal = surprise * config.surprise_scale;
 
     // Project onto active harmonies
     let mut harmony_projection = [0.0f32; 8];
     for i in 0..8 {
-        harmony_projection[i] = harmony_activations[i] * score.composite;
+        let activation = if harmony_activations[i].is_finite() {
+            harmony_activations[i].clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        harmony_projection[i] = activation * intrinsic;
     }
 
     AestheticFeedback {
@@ -157,7 +175,7 @@ mod tests {
     #[test]
     fn within_threshold_no_dopamine() {
         let score = AestheticScore::uniform(0.51);
-        let ema = 0.50;
+        let ema = score.intrinsic_composite() - 0.01;
         let config = AestheticConfig::default();
         let harmonies = [0.5; 8];
 

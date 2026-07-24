@@ -3,14 +3,13 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Chrome DevTools Protocol session wrapper.
 //!
-//! Provides an async interface to a headless Chrome/Chromium instance via
-//! `chromiumoxide`. All CDP calls are exposed as typed methods that return
-//! domain objects (`PageObservation`, `AccessibleElement`).
-//!
-//! This module requires a running Chrome instance with `--remote-debugging-port`.
-//! Use `BrowserAgentConfig` to specify the connection URL.
+//! Observation methods are public. Mutating primitives are crate-private and
+//! are dispatched through [`crate::executor::BrowserExecutor`], which records a
+//! policy decision and action receipt for every attempt.
 
-use anyhow::{Context, Result};
+use std::time::Duration;
+
+use anyhow::{Context, Result, bail};
 use chromiumoxide::Page;
 use chromiumoxide::browser::{Browser, BrowserConfig};
 use chromiumoxide::cdp::browser_protocol::accessibility::GetFullAxTreeParams;
@@ -27,20 +26,23 @@ use crate::observation::{AccessibleElement, PageObservation};
 pub struct CdpSession {
     _browser: Browser,
     page: Mutex<Page>,
+    max_elements: usize,
+    navigation_timeout: Duration,
 }
 
 impl CdpSession {
-    /// Connect to a Chrome instance using the provided config.
+    /// Launch a new Chrome instance using the provided configuration.
     ///
-    /// Launches a new browser process. If `config.cdp_url` is set,
-    /// a remote-debugging-port argument is added for the specified port.
+    /// To attach to an already-running browser, use
+    /// [`Self::connect_existing_with_config`].
     pub async fn connect(config: &BrowserAgentConfig) -> Result<Self> {
+        if config.cdp_url.is_some() {
+            return Self::connect_existing_with_config(config).await;
+        }
+
         let mut builder = BrowserConfig::builder();
         if config.headless {
             builder = builder.arg("--headless=new");
-        }
-        if let Some(ref url) = config.cdp_url {
-            builder = builder.arg(format!("--remote-debugging-port={}", extract_port(url)));
         }
         builder = builder.viewport(Viewport {
             width: config.viewport_width,
@@ -48,15 +50,17 @@ impl CdpSession {
             ..Default::default()
         });
 
-        let (browser, mut handler) =
-            Browser::launch(builder.build().map_err(|e| anyhow::anyhow!("{}", e))?)
-                .await
-                .context("Failed to launch browser")?;
+        let (browser, mut handler) = Browser::launch(
+            builder
+                .build()
+                .map_err(|error| anyhow::anyhow!("{error}"))?,
+        )
+        .await
+        .context("Failed to launch browser")?;
 
-        // Spawn the CDP event handler (Stream-based)
         tokio::spawn(async move {
             while let Some(_event) = handler.next().await {
-                // Events consumed to keep the CDP connection alive
+                // Events must be consumed to keep the CDP connection alive.
             }
         });
 
@@ -68,18 +72,58 @@ impl CdpSession {
         Ok(Self {
             _browser: browser,
             page: Mutex::new(page),
+            max_elements: config.max_elements,
+            navigation_timeout: Duration::from_millis(config.navigation_timeout_ms),
+        })
+    }
+
+    /// Connect to an already-running Chrome instance by its debug URL.
+    pub async fn connect_existing(debug_url: &str) -> Result<Self> {
+        let config = BrowserAgentConfig {
+            cdp_url: Some(debug_url.to_string()),
+            ..BrowserAgentConfig::default()
+        };
+        Self::connect_existing_with_config(&config).await
+    }
+
+    /// Connect to an already-running Chrome instance while applying observation
+    /// and timeout limits from the full browser configuration.
+    pub async fn connect_existing_with_config(config: &BrowserAgentConfig) -> Result<Self> {
+        let debug_url = config
+            .cdp_url
+            .as_deref()
+            .context("cdp_url is required when connecting to an existing browser")?;
+        let (browser, mut handler) = Browser::connect(debug_url)
+            .await
+            .context("Failed to connect to existing Chrome")?;
+
+        tokio::spawn(async move { while let Some(_event) = handler.next().await {} });
+
+        let page = browser
+            .new_page("about:blank")
+            .await
+            .context("Failed to create new page")?;
+
+        Ok(Self {
+            _browser: browser,
+            page: Mutex::new(page),
+            max_elements: config.max_elements,
+            navigation_timeout: Duration::from_millis(config.navigation_timeout_ms),
         })
     }
 
     /// Navigate to a URL and wait for the page to load.
-    pub async fn navigate(&self, url: &str) -> Result<()> {
+    pub(crate) async fn navigate(&self, url: &str) -> Result<()> {
         let page = self.page.lock().await;
-        page.goto(url).await.context("Navigation failed")?;
+        tokio::time::timeout(self.navigation_timeout, page.goto(url))
+            .await
+            .context("Navigation timed out")?
+            .context("Navigation failed")?;
         debug!(url, "Navigated");
         Ok(())
     }
 
-    /// Query the full accessibility tree and return a `PageObservation`.
+    /// Query the full accessibility tree and return a bounded observation.
     pub async fn get_accessibility_tree(&self) -> Result<PageObservation> {
         let page = self.page.lock().await;
 
@@ -88,14 +132,12 @@ impl CdpSession {
             .await
             .unwrap_or(None)
             .unwrap_or_else(|| "unknown".to_string());
-
         let title = page
             .get_title()
             .await
             .unwrap_or(None)
             .unwrap_or_else(|| "Untitled".to_string());
 
-        // Fetch the full accessibility tree via CDP
         let params = GetFullAxTreeParams::builder().build();
         let response = page
             .execute(params)
@@ -103,16 +145,12 @@ impl CdpSession {
             .context("Failed to get accessibility tree")?;
 
         let mut elements = Vec::new();
-        let mut focused_idx = None;
-
         for node in &response.result.nodes {
             let role = node
                 .role
                 .as_ref()
-                .and_then(|v| ax_value_to_string(&v.value))
+                .and_then(|value| ax_value_to_string(&value.value))
                 .unwrap_or_default();
-
-            // Skip internal/structural roles
             if role.is_empty() || role == "none" || role == "generic" {
                 continue;
             }
@@ -120,27 +158,21 @@ impl CdpSession {
             let name = node
                 .name
                 .as_ref()
-                .and_then(|v| ax_value_to_string(&v.value))
+                .and_then(|value| ax_value_to_string(&value.value))
                 .unwrap_or_default();
-
             let value = node
                 .value
                 .as_ref()
-                .and_then(|v| ax_value_to_string(&v.value));
-
+                .and_then(|value| ax_value_to_string(&value.value));
             let description = node
                 .description
                 .as_ref()
-                .and_then(|v| ax_value_to_string(&v.value));
-
+                .and_then(|value| ax_value_to_string(&value.value));
             let backend_node_id = node
                 .backend_dom_node_id
                 .as_ref()
                 .map(|id| *id.inner())
                 .unwrap_or(0);
-
-            let focused = false; // Accessibility tree doesn't directly expose focus
-            let disabled = node.ignored;
 
             elements.push(AccessibleElement {
                 backend_node_id,
@@ -148,38 +180,26 @@ impl CdpSession {
                 name,
                 value,
                 description,
-                focused,
-                disabled,
+                focused: false,
+                // AX `ignored` means omitted from the accessibility projection;
+                // it is not the HTML/ARIA disabled state.
+                disabled: false,
             });
         }
 
-        // Detect focused element via separate check
-        if let Ok(focus_result) = page
-            .evaluate("document.activeElement?.getAttribute('role') || ''")
-            .await
-        {
-            if let Some(focus_role) = focus_result.value().and_then(|v| v.as_str()) {
-                if !focus_role.is_empty() {
-                    for (i, elem) in elements.iter().enumerate() {
-                        if elem.role == focus_role {
-                            focused_idx = Some(i);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(PageObservation {
+        let focused_element = detect_focused_element(&page, &elements).await;
+        let mut observation = PageObservation {
             url,
             title,
             elements,
-            focused_element: focused_idx,
-        })
+            focused_element,
+        };
+        observation.sanitize(self.max_elements);
+        Ok(observation)
     }
 
-    /// Click an element identified by selector.
-    pub async fn click(&self, selector: &ElementSelector) -> Result<()> {
+    /// Click an element identified by a supported selector.
+    pub(crate) async fn click(&self, selector: &ElementSelector) -> Result<()> {
         let page = self.page.lock().await;
         match selector {
             ElementSelector::Css(css) => {
@@ -191,73 +211,147 @@ impl CdpSession {
                     .context("Click failed")?;
             }
             ElementSelector::BackendNodeId(id) => {
-                let js = format!(
-                    "document.querySelector('[data-backend-node-id=\"{}\"]')?.click()",
-                    id
+                bail!(
+                    "backend node targeting is not implemented safely for node {id}; use a CSS or accessible selector"
                 );
-                page.evaluate(js)
-                    .await
-                    .context("Click via backend node ID failed")?;
             }
             ElementSelector::Accessible { role, name } => {
-                let js = format!(
-                    r#"
-                    (function() {{
-                        const els = document.querySelectorAll('[role="{}"]');
-                        for (const el of els) {{
-                            if (el.getAttribute('aria-label') === '{}' ||
-                                el.textContent.trim() === '{}') {{
-                                el.click();
-                                return true;
-                            }}
-                        }}
-                        return false;
-                    }})()
-                    "#,
-                    role, name, name
-                );
-                page.evaluate(js)
+                let role = serde_json::to_string(role).context("Serialize accessible role")?;
+                let name = serde_json::to_string(name).context("Serialize accessible name")?;
+                let result = page
+                    .evaluate(format!(
+                        r#"(() => {{
+                            const wantedRole = {role};
+                            const wantedName = {name};
+                            const inferredRole = (el) => {{
+                                const explicit = el.getAttribute('role');
+                                if (explicit) return explicit;
+                                const tag = el.tagName.toLowerCase();
+                                if (tag === 'button') return 'button';
+                                if (tag === 'a' && el.hasAttribute('href')) return 'link';
+                                if (tag === 'textarea') return 'textbox';
+                                if (tag === 'select') return 'combobox';
+                                if (tag === 'input') {{
+                                    const type = (el.getAttribute('type') || 'text').toLowerCase();
+                                    if (type === 'checkbox') return 'checkbox';
+                                    if (type === 'radio') return 'radio';
+                                    return 'textbox';
+                                }}
+                                return '';
+                            }};
+                            const accessibleName = (el) =>
+                                (el.getAttribute('aria-label') ||
+                                 el.getAttribute('title') ||
+                                 el.getAttribute('placeholder') ||
+                                 el.textContent || '').trim();
+                            const matches = Array.from(document.querySelectorAll('*')).filter(
+                                el => inferredRole(el) === wantedRole && accessibleName(el) === wantedName
+                            );
+                            if (matches.length === 0) return 'not_found';
+                            if (matches.length > 1) return 'ambiguous';
+                            matches[0].click();
+                            return 'clicked';
+                        }})()"#
+                    ))
                     .await
-                    .context("Click via accessible selector failed")?;
+                    .context("Click via accessible selector failed")?
+                    .into_value::<String>()
+                    .unwrap_or_default();
+                match result.as_str() {
+                    "clicked" => {}
+                    "ambiguous" => bail!("accessible selector matched multiple elements"),
+                    _ => bail!("accessible selector did not match an element"),
+                }
             }
         }
         debug!(?selector, "Clicked");
         Ok(())
     }
 
-    /// Type text into an element.
-    pub async fn type_text(&self, selector: &ElementSelector, text: &str) -> Result<()> {
-        let page = self.page.lock().await;
+    /// Type text into an element after focusing it.
+    pub(crate) async fn type_text(&self, selector: &ElementSelector, text: &str) -> Result<()> {
         match selector {
             ElementSelector::Css(css) => {
-                // Focus the element first
-                let elem = page.find_element(css).await.context("Element not found")?;
-                elem.click().await.context("Focus failed")?;
-                // Type via JS since chromiumoxide 0.7 lacks page-level type_str
-                let escaped = text.replace('\\', "\\\\").replace('\'', "\\'");
-                let js = format!(
-                    "document.activeElement.value = '{}'; \
-                     document.activeElement.dispatchEvent(new Event('input', {{bubbles: true}}))",
-                    escaped
-                );
-                page.evaluate(js).await.context("Type failed")?;
+                let page = self.page.lock().await;
+                let element = page.find_element(css).await.context("Element not found")?;
+                element.click().await.context("Focus failed")?;
+                set_active_value(&page, text).await.context("Type failed")?;
             }
             _ => {
-                // For non-CSS selectors, click first then type
-                drop(page);
                 self.click(selector).await?;
                 let page = self.page.lock().await;
-                let escaped = text.replace('\\', "\\\\").replace('\'', "\\'");
-                let js = format!(
-                    "document.activeElement.value = '{}'; \
-                     document.activeElement.dispatchEvent(new Event('input', {{bubbles: true}}))",
-                    escaped
-                );
-                page.evaluate(js).await.context("Type after focus failed")?;
+                set_active_value(&page, text)
+                    .await
+                    .context("Type after focus failed")?;
             }
         }
         debug!(text_len = text.len(), "Typed text");
         Ok(())
+    }
+
+    /// Scroll a CSS-selected element into the viewport.
+    pub(crate) async fn scroll_to(&self, selector: &ElementSelector) -> Result<()> {
+        let ElementSelector::Css(css) = selector else {
+            bail!("scroll currently requires a CSS selector");
+        };
+        let page = self.page.lock().await;
+        let css = serde_json::to_string(css).context("Serialize CSS selector")?;
+        let result = page
+            .evaluate(format!(
+                "(() => {{ const el = document.querySelector({css}); if (!el) return 'not_found'; el.scrollIntoView({{block:'center', inline:'nearest'}}); return 'scrolled'; }})()"
+            ))
+            .await
+            .context("Scroll failed")?
+            .into_value::<String>()
+            .unwrap_or_default();
+        if result != "scrolled" {
+            bail!("scroll target not found");
+        }
+        Ok(())
+    }
+
+    pub(crate) async fn go_back(&self) -> Result<()> {
+        let page = self.page.lock().await;
+        page.evaluate("history.back(); true")
+            .await
+            .context("History back failed")?;
+        Ok(())
+    }
+
+    pub(crate) async fn go_forward(&self) -> Result<()> {
+        let page = self.page.lock().await;
+        page.evaluate("history.forward(); true")
+            .await
+            .context("History forward failed")?;
+        Ok(())
+    }
+
+    pub(crate) async fn extract_text(&self, selector: Option<&str>) -> Result<String> {
+        let page = self.page.lock().await;
+        let selector = serde_json::to_string(&selector).context("Serialize text selector")?;
+        let raw = page
+            .evaluate(format!(
+                r#"(() => {{
+                    const selector = {selector};
+                    const element = selector === null ? document.body : document.querySelector(selector);
+                    if (!element) return JSON.stringify({{status:'not_found', text:''}});
+                    return JSON.stringify({{status:'ok', text:(element.innerText || element.textContent || '')}});
+                }})()"#
+            ))
+            .await
+            .context("Text extraction failed")?
+            .into_value::<String>()
+            .unwrap_or_default();
+        let parsed: serde_json::Value =
+            serde_json::from_str(&raw).context("Invalid extraction result")?;
+        if parsed.get("status").and_then(|value| value.as_str()) != Some("ok") {
+            bail!("text extraction target not found");
+        }
+        Ok(parsed
+            .get("text")
+            .and_then(|value| value.as_str())
+            .unwrap_or_default()
+            .to_string())
     }
 
     /// Capture a PNG screenshot of the current page.
@@ -275,26 +369,7 @@ impl CdpSession {
         Ok(bytes)
     }
 
-    /// Connect to an already-running Chrome instance by its debug URL.
-    pub async fn connect_existing(debug_url: &str) -> Result<Self> {
-        let (browser, mut handler) = Browser::connect(debug_url)
-            .await
-            .context("Failed to connect to existing Chrome")?;
-
-        tokio::spawn(async move { while let Some(_event) = handler.next().await {} });
-
-        let page = browser
-            .new_page("about:blank")
-            .await
-            .context("Failed to create new page")?;
-
-        Ok(Self {
-            _browser: browser,
-            page: Mutex::new(page),
-        })
-    }
-
-    /// Get page state via JS (fallback when AX tree fails on WASM-heavy pages).
+    /// Get page state via JS when the AX tree is unavailable.
     pub async fn get_page_state_js(&self) -> Result<PageObservation> {
         let page = self.page.lock().await;
         let url = page.url().await.unwrap_or(None).unwrap_or_default();
@@ -304,13 +379,18 @@ impl CdpSession {
             .unwrap_or(None)
             .unwrap_or_else(|| "Untitled".into());
 
-        let json = page.evaluate(r#"JSON.stringify({
-            headings: Array.from(document.querySelectorAll('h1,h2')).slice(0,10).map(e=>e.textContent?.trim()||''),
-            buttons: Array.from(document.querySelectorAll('button')).slice(0,20).map(e=>e.textContent?.trim()||''),
-            inputs: Array.from(document.querySelectorAll('input')).slice(0,10).map(e=>e.placeholder||''),
-            links: Array.from(document.querySelectorAll('a')).slice(0,10).map(e=>e.textContent?.trim()||''),
-            texts: Array.from(document.querySelectorAll('p')).slice(0,5).map(e=>e.textContent?.trim().substring(0,80)||'')
-        })"#).await.context("JS eval failed")?;
+        let json = page
+            .evaluate(
+                r#"JSON.stringify({
+                    headings: Array.from(document.querySelectorAll('h1,h2')).slice(0,10).map(e=>e.textContent?.trim()||''),
+                    buttons: Array.from(document.querySelectorAll('button')).slice(0,20).map(e=>e.textContent?.trim()||''),
+                    inputs: Array.from(document.querySelectorAll('input')).slice(0,10).map(e=>e.placeholder||''),
+                    links: Array.from(document.querySelectorAll('a')).slice(0,10).map(e=>e.textContent?.trim()||''),
+                    texts: Array.from(document.querySelectorAll('p')).slice(0,5).map(e=>e.textContent?.trim().substring(0,80)||'')
+                })"#,
+            )
+            .await
+            .context("JS eval failed")?;
 
         let data: serde_json::Value =
             serde_json::from_str(&json.into_value::<String>().unwrap_or_default())
@@ -319,11 +399,12 @@ impl CdpSession {
         let mut elements = Vec::new();
         let extract = |key: &str, role: &str| -> Vec<AccessibleElement> {
             data.get(key)
-                .and_then(|v| v.as_array())
-                .map(|arr| {
-                    arr.iter()
-                        .filter_map(|v| {
-                            let name = v.as_str().unwrap_or("").to_string();
+                .and_then(|value| value.as_array())
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|value| {
+                            let name = value.as_str().unwrap_or("").to_string();
                             if name.is_empty() {
                                 return None;
                             }
@@ -348,79 +429,89 @@ impl CdpSession {
         elements.extend(extract("links", "link"));
         elements.extend(extract("texts", "text"));
 
-        Ok(PageObservation {
+        let mut observation = PageObservation {
             url,
             title,
             elements,
             focused_element: None,
-        })
+        };
+        observation.sanitize(self.max_elements);
+        Ok(observation)
     }
 
-    /// Try AX tree first, fall back to JS extraction.
+    /// Try AX tree first, then fall back to bounded JS extraction.
     pub async fn observe(&self) -> Result<PageObservation> {
         match self.get_accessibility_tree().await {
-            Ok(obs) => Ok(obs),
+            Ok(observation) => Ok(observation),
             Err(_) => self.get_page_state_js().await,
         }
     }
 
-    /// Click a button/link by its text content.
-    pub async fn click_by_text(&self, text: &str) -> Result<()> {
+    /// Low-level arbitrary JavaScript evaluation for internal diagnostics only.
+    pub(crate) async fn eval_js(&self, expression: &str) -> Result<String> {
         let page = self.page.lock().await;
-        let escaped = text.replace('\\', "\\\\").replace('\'', "\\'");
-        page.evaluate(format!(
-            r#"(()=>{{for(const b of document.querySelectorAll('button,a')){{if(b.textContent.includes('{escaped}')){{b.click();return}}}}}})();"#
-        )).await.context("click_by_text failed")?;
-        Ok(())
-    }
-
-    /// Type into an input by placeholder text match.
-    pub async fn type_by_placeholder(&self, placeholder: &str, text: &str) -> Result<()> {
-        let page = self.page.lock().await;
-        let ph = placeholder.replace('\\', "\\\\").replace('\'', "\\'");
-        let tx = text.replace('\\', "\\\\").replace('\'', "\\'");
-        page.evaluate(format!(
-            r#"(()=>{{for(const i of document.querySelectorAll('input')){{if((i.placeholder||'').toLowerCase().includes('{ph}')){{i.value='{tx}';i.dispatchEvent(new Event('input',{{bubbles:true}}));return}}}}}})();"#
-        )).await.context("type_by_placeholder failed")?;
-        Ok(())
-    }
-
-    /// Evaluate arbitrary JS and return string result.
-    pub async fn eval_js(&self, expr: &str) -> Result<String> {
-        let page = self.page.lock().await;
-        let result = page.evaluate(expr).await.context("JS eval failed")?;
+        let result = page
+            .evaluate(expression)
+            .await
+            .context("JS evaluation failed")?;
         Ok(result.into_value::<String>().unwrap_or_default())
     }
+}
+
+async fn set_active_value(page: &Page, text: &str) -> Result<()> {
+    let text = serde_json::to_string(text).context("Serialize input text")?;
+    let result = page
+        .evaluate(format!(
+            "(() => {{ const el = document.activeElement; const value = {text}; if (!el || !('value' in el)) return 'not_editable'; el.value = value; el.dispatchEvent(new Event('input', {{bubbles:true}})); el.dispatchEvent(new Event('change', {{bubbles:true}})); return 'typed'; }})()"
+        ))
+        .await
+        .context("Set active value failed")?
+        .into_value::<String>()
+        .unwrap_or_default();
+    if result != "typed" {
+        bail!("focused element is not editable");
+    }
+    Ok(())
+}
+
+async fn detect_focused_element(page: &Page, elements: &[AccessibleElement]) -> Option<usize> {
+    let result = page
+        .evaluate(
+            r#"(() => {
+                const el = document.activeElement;
+                if (!el || el === document.body) return '';
+                const role = el.getAttribute('role') ||
+                    (el.tagName.toLowerCase() === 'button' ? 'button' :
+                    (el.tagName.toLowerCase() === 'a' ? 'link' :
+                    (['input','textarea'].includes(el.tagName.toLowerCase()) ? 'textbox' : '')));
+                const name = (el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.textContent || '').trim();
+                return JSON.stringify({role, name});
+            })()"#,
+        )
+        .await
+        .ok()?
+        .into_value::<String>()
+        .ok()?;
+    let focused: serde_json::Value = serde_json::from_str(&result).ok()?;
+    let role = focused.get("role")?.as_str()?;
+    let name = focused.get("name")?.as_str()?;
+    elements
+        .iter()
+        .position(|element| element.role == role && element.name == name)
 }
 
 /// Extract a string from a `serde_json::Value` (the AxValue payload).
 fn ax_value_to_string(value: &Option<serde_json::Value>) -> Option<String> {
     match value {
-        Some(serde_json::Value::String(s)) => Some(s.clone()),
-        Some(v) => Some(v.to_string()),
+        Some(serde_json::Value::String(string)) => Some(string.clone()),
+        Some(value) => Some(value.to_string()),
         None => None,
     }
-}
-
-/// Extract port number from a WebSocket URL like "ws://127.0.0.1:9222/...".
-fn extract_port(url: &str) -> u16 {
-    url.split(':')
-        .nth(2)
-        .and_then(|s| s.split('/').next())
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(9222)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_extract_port() {
-        assert_eq!(extract_port("ws://127.0.0.1:9222/devtools"), 9222);
-        assert_eq!(extract_port("ws://localhost:9333"), 9333);
-        assert_eq!(extract_port("invalid"), 9222); // default
-    }
 
     #[test]
     fn test_ax_value_to_string() {

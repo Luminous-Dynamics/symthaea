@@ -13,10 +13,9 @@
 //! Φ-derived tier and the hazard-derived tier" needs no new machinery — see [`hazard_tier`] and
 //! its use via `.max()` at the call site.
 //!
-//! Deliberately does **not** build on `workspace_safety.rs`: that module's entire
-//! `ManipulatorSafetyLevel`/`WorkspaceBoundary` model has zero references anywhere else in this
-//! crate (verified via `grep` during scoping) — a second, disconnected safety model. This module
-//! composes with the live path (`symthaea_core::embodiment::MotorSafetyLevel`) instead.
+//! Workspace, force, speed, and human-zone limits are enforced by the live
+//! `ManipulatorSafetySupervisor`. Hazard tiers compose into that same canonical
+//! `MotorSafetyLevel`, so kitchen hazards and geometric safety cannot diverge.
 
 use crate::embodiment::MotorSafetyLevel;
 use symthaea_thermofluids::thermal::convection_heat_rate;

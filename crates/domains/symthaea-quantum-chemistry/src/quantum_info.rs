@@ -3,12 +3,44 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Quantum Information Theory from molecular physics.
 //!
-//! Computes von Neumann entropy, entanglement, and quantum discord
-//! from molecular orbital density matrices. Direct bridge to IIT.
-//!
 //! References:
 //! - Nielsen & Chuang (2000). *Quantum Computation and Quantum Information*.
 //! - Rissler, Noack & White (2006). Chem. Phys. 323, 519 (orbital entanglement).
+//!
+//! ## Status by function (Phase Q0, 2026-07-16)
+//!
+//! This module's functions are NOT uniformly "computed from molecular orbital
+//! density matrices" as the old module doc implied -- reviewed and labeled
+//! individually below, since they range from exact generic math to explicit
+//! proxies:
+//!
+//! - `von_neumann_entropy`, `mutual_information`: exact, generic formulas.
+//!   Correct given real eigenvalues/entropies as input -- but nothing in
+//!   this module computes those inputs from an actual molecular reduced
+//!   density matrix; callers must supply them.
+//! - `single_orbital_entropy`, `total_orbital_information`: a real formula
+//!   for RHF single-orbital entanglement entropy as a function of occupation
+//!   number, but RHF is a single Slater determinant with every orbital
+//!   either fully occupied (n=2) or fully empty (n=0) -- exactly the two
+//!   inputs this formula returns 0 for. Fed only real RHF occupations (as
+//!   `total_orbital_information` does), this is **structurally always
+//!   zero**, not a bug in the formula itself but a mismatch between what it
+//!   needs (fractional/correlated occupations, which nothing in this crate
+//!   currently produces) and what it's ever actually called with.
+//! - `orbital_mutual_information`: an honestly-labeled proxy (its own doc
+//!   comment already says "Simplified: uses orbital energy proximity as a
+//!   correlation proxy") -- NOT a real density-matrix-derived mutual
+//!   information, just `1/(1+100*Δε²)`. Correctly self-disclosed at the
+//!   function level, but the old module-level doc's blanket "computed from
+//!   density matrices" claim didn't reflect this.
+//! - `bipartition_entanglement`: the real overclaim in this module. Its doc
+//!   comment claims to compute "ρ_A = Tr_B|Ψ⟩⟨Ψ|" (a genuine reduced-density-
+//!   matrix trace), but the implementation computes something different and
+//!   simpler: a Shannon-entropy-like quantity from how each occupied MO's
+//!   coefficients are distributed across a basis-function bipartition. This
+//!   is a real, well-defined localization measure, but it is not the RDM
+//!   trace its doc comment describes and should not be read as genuine
+//!   orbital-orbital entanglement entropy.
 
 use crate::scf::rhf::RhfResult;
 
@@ -103,13 +135,17 @@ pub fn total_orbital_information(rhf: &RhfResult) -> f64 {
     total
 }
 
-/// Entanglement entropy of a bipartition of the orbital space.
+/// Basis-function localization entropy of each occupied MO across a
+/// bipartition of the AO basis -- NOT a reduced-density-matrix entanglement
+/// entropy despite the name (Phase Q0 status note, 2026-07-16; see the
+/// module doc's "Status by function" section for the full explanation).
 ///
-/// Partitions orbitals into sets A and B, computes the entanglement
-/// entropy of the reduced density matrix ρ_A = Tr_B |Ψ⟩⟨Ψ|.
-///
-/// For RHF with n_A occupied orbitals in partition A:
-/// The entanglement comes from the overlap between A and B orbitals.
+/// For each occupied orbital, treats the fraction of its MO-coefficient
+/// weight lying in partition A as a binary probability `p` and sums
+/// `-p ln p - (1-p) ln(1-p)` across occupied orbitals. This is a genuine,
+/// well-defined localization measure, but it is not `Tr_B |Ψ⟩⟨Ψ|` (a real
+/// reduced-density-matrix trace over Fock space), which this function does
+/// not compute.
 pub fn bipartition_entanglement(
     rhf: &RhfResult,
     partition_a: &[usize], // orbital indices in partition A

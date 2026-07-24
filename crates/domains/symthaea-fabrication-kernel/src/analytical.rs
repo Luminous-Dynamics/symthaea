@@ -8,7 +8,37 @@
 //! requiring external simulation dependencies.
 
 use crate::simulator::*;
+use crate::units::{Meters, Newtons};
 use serde::{Deserialize, Serialize};
+use std::fmt;
+
+/// Invalid material, section, load, or beam geometry supplied to the analytical backend.
+#[derive(Debug, Clone, PartialEq)]
+pub enum AnalyticalInputError {
+    InvalidMaterial(&'static str),
+    InvalidCrossSection(&'static str),
+    InvalidBeamLength,
+    InvalidForce,
+}
+
+impl fmt::Display for AnalyticalInputError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidMaterial(field) => write!(f, "invalid material property: {field}"),
+            Self::InvalidCrossSection(field) => {
+                write!(f, "invalid cross-section dimension: {field}")
+            }
+            Self::InvalidBeamLength => write!(f, "beam length must be finite and positive"),
+            Self::InvalidForce => write!(f, "force must be finite"),
+        }
+    }
+}
+
+impl std::error::Error for AnalyticalInputError {}
+
+fn finite_positive(value: f64) -> bool {
+    value.is_finite() && value > 0.0
+}
 
 /// Material properties for analytical calculations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,6 +85,26 @@ impl MaterialProperties {
         }
     }
 
+    /// Validate that the material is physically usable by the closed-form model.
+    pub fn validate(&self) -> Result<(), AnalyticalInputError> {
+        if !finite_positive(self.elastic_modulus) {
+            return Err(AnalyticalInputError::InvalidMaterial("elastic_modulus"));
+        }
+        if !finite_positive(self.yield_strength) {
+            return Err(AnalyticalInputError::InvalidMaterial("yield_strength"));
+        }
+        if !finite_positive(self.density) {
+            return Err(AnalyticalInputError::InvalidMaterial("density"));
+        }
+        if !self.poissons_ratio.is_finite()
+            || self.poissons_ratio <= -1.0
+            || self.poissons_ratio >= 0.5
+        {
+            return Err(AnalyticalInputError::InvalidMaterial("poissons_ratio"));
+        }
+        Ok(())
+    }
+
     /// Shear modulus G = E / (2(1 + ν))
     pub fn shear_modulus(&self) -> f64 {
         self.elastic_modulus / (2.0 * (1.0 + self.poissons_ratio))
@@ -89,6 +139,61 @@ pub enum CrossSection {
 }
 
 impl CrossSection {
+    /// Validate dimensions and hollow-section ordering.
+    pub fn validate(&self) -> Result<(), AnalyticalInputError> {
+        let invalid = |field| Err(AnalyticalInputError::InvalidCrossSection(field));
+        match self {
+            Self::Rectangle { width, height } => {
+                if !finite_positive(*width) {
+                    return invalid("width");
+                }
+                if !finite_positive(*height) {
+                    return invalid("height");
+                }
+            }
+            Self::Circle { radius } => {
+                if !finite_positive(*radius) {
+                    return invalid("radius");
+                }
+            }
+            Self::HollowCircle {
+                outer_radius,
+                inner_radius,
+            } => {
+                if !finite_positive(*outer_radius) {
+                    return invalid("outer_radius");
+                }
+                if !inner_radius.is_finite() || *inner_radius < 0.0 {
+                    return invalid("inner_radius");
+                }
+                if inner_radius >= outer_radius {
+                    return invalid("inner_radius must be smaller than outer_radius");
+                }
+            }
+            Self::IBeam {
+                flange_width,
+                flange_height,
+                web_height,
+                web_thickness,
+            } => {
+                for (name, value) in [
+                    ("flange_width", *flange_width),
+                    ("flange_height", *flange_height),
+                    ("web_height", *web_height),
+                    ("web_thickness", *web_thickness),
+                ] {
+                    if !finite_positive(value) {
+                        return invalid(name);
+                    }
+                }
+                if web_thickness > flange_width {
+                    return invalid("web_thickness must not exceed flange_width");
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn area(&self) -> f64 {
         match self {
             CrossSection::Rectangle { width, height } => width * height,
@@ -150,11 +255,17 @@ impl CrossSection {
 /// Analytical result from beam analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalyticalResult {
+    /// Axial stress in pascals.
     pub axial_stress: f64,
+    /// Bending stress in pascals.
     pub bending_stress: f64,
+    /// Shear stress in pascals.
     pub shear_stress: f64,
+    /// Maximum beam deflection in metres.
     pub max_deflection: f64,
+    /// Von Mises stress in pascals.
     pub von_mises_stress: f64,
+    /// Dimensionless yield safety factor.
     pub safety_factor: f64,
 }
 
@@ -183,6 +294,20 @@ impl AnalyticalBackend {
                 total_energy: 0.0,
             },
         }
+    }
+
+    /// Construct a backend through an explicit SI-unit and validity boundary.
+    pub fn new_checked(
+        material: MaterialProperties,
+        cross_section: CrossSection,
+        beam_length: Meters,
+    ) -> Result<Self, AnalyticalInputError> {
+        material.validate()?;
+        cross_section.validate()?;
+        if !finite_positive(beam_length.get()) {
+            return Err(AnalyticalInputError::InvalidBeamLength);
+        }
+        Ok(Self::new(material, cross_section, beam_length.get()))
     }
 
     /// Axial stress σ = F / A
@@ -233,6 +358,18 @@ impl AnalyticalBackend {
             von_mises_stress: von_mises,
             safety_factor,
         }
+    }
+
+    /// Analyze typed forces after rejecting non-finite inputs.
+    pub fn analyze_checked(
+        &self,
+        axial_force: Newtons,
+        transverse_force: Newtons,
+    ) -> Result<AnalyticalResult, AnalyticalInputError> {
+        if !axial_force.get().is_finite() || !transverse_force.get().is_finite() {
+            return Err(AnalyticalInputError::InvalidForce);
+        }
+        Ok(self.analyze(axial_force.get(), transverse_force.get()))
     }
 }
 
@@ -304,6 +441,62 @@ impl PhysicsBackend for AnalyticalBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn checked_constructor_rejects_invalid_material() {
+        let mut material = MaterialProperties::steel();
+        material.elastic_modulus = f64::NAN;
+        let error = AnalyticalBackend::new_checked(
+            material,
+            CrossSection::Rectangle {
+                width: 0.01,
+                height: 0.01,
+            },
+            Meters::positive(0.1).unwrap(),
+        )
+        .err()
+        .expect("invalid material must fail");
+        assert_eq!(
+            error,
+            AnalyticalInputError::InvalidMaterial("elastic_modulus")
+        );
+    }
+
+    #[test]
+    fn checked_constructor_rejects_inverted_hollow_section() {
+        let error = AnalyticalBackend::new_checked(
+            MaterialProperties::steel(),
+            CrossSection::HollowCircle {
+                outer_radius: 0.01,
+                inner_radius: 0.02,
+            },
+            Meters::positive(0.1).unwrap(),
+        )
+        .err()
+        .expect("inverted hollow section must fail");
+        assert!(matches!(
+            error,
+            AnalyticalInputError::InvalidCrossSection(_)
+        ));
+    }
+
+    #[test]
+    fn checked_analysis_accepts_typed_si_inputs() {
+        let backend = AnalyticalBackend::new_checked(
+            MaterialProperties::steel(),
+            CrossSection::Rectangle {
+                width: 0.01,
+                height: 0.02,
+            },
+            Meters::positive(0.1).unwrap(),
+        )
+        .unwrap();
+        let result = backend
+            .analyze_checked(Newtons::new(0.0).unwrap(), Newtons::new(1000.0).unwrap())
+            .unwrap();
+        assert!(result.safety_factor.is_finite());
+        assert!(result.max_deflection >= 0.0);
+    }
 
     #[test]
     fn test_pla_properties() {

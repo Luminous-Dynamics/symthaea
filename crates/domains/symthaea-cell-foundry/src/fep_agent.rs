@@ -102,33 +102,46 @@ impl CultureFepAgent {
         cell_state: &CellState,
         environment: &CultureEnvironment,
     ) -> CultureAction {
-        let deviation = environment.deviation_from_standard();
-
-        // If cell viability is critical, abort
-        if cell_state.viability < 0.2 {
+        // If cell viability is critical, abort before considering recovery actions.
+        if !cell_state.viability.is_finite() || cell_state.viability < 0.2 {
             return CultureAction::AbortProtocol;
         }
 
-        // Environmental deviations drive corrective actions
+        // Environmental deviations drive corrective actions. Compare normalized
+        // control error rather than raw values with incompatible units (degrees C,
+        // percentage points, and pH units).
         let std = CultureEnvironment::standard();
-        let temp_err = (environment.temperature_celsius - std.temperature_celsius).abs();
-        let co2_err = (environment.co2_percent - std.co2_percent).abs();
-        let ph_err = (environment.ph - std.ph).abs();
+        let temp_score = (environment.temperature_celsius - std.temperature_celsius).abs() / 0.5;
+        let co2_score = (environment.co2_percent - std.co2_percent).abs() / 0.3;
+        let ph_score = (environment.ph - std.ph).abs() / 0.2;
+        let media_score = if environment.media_volume_ml.is_finite() {
+            if environment.media_volume_ml < 5.0 {
+                1.0 + (5.0 - environment.media_volume_ml) / 5.0
+            } else {
+                0.0
+            }
+        } else {
+            f64::INFINITY
+        };
 
-        // Select action with largest error reduction potential
-        if temp_err > co2_err && temp_err > ph_err && temp_err > 0.5 {
-            CultureAction::AdjustTemp
-        } else if co2_err > ph_err && co2_err > 0.3 {
-            CultureAction::AdjustCo2
-        } else if ph_err > 0.2 {
-            CultureAction::AdjustPh
+        let corrective_scores = [
+            (CultureAction::AdjustTemp, temp_score),
+            (CultureAction::AdjustCo2, co2_score),
+            (CultureAction::AdjustPh, ph_score),
+            (CultureAction::AddMedia, media_score),
+        ];
+
+        let (best_action, best_score) = corrective_scores
+            .into_iter()
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
+            .expect("fixed corrective action set is non-empty");
+
+        if !best_score.is_finite() {
+            CultureAction::AbortProtocol
+        } else if best_score > 1.0 {
+            best_action
         } else if environment.passage_number > 15 {
             CultureAction::PassageCells
-        } else if deviation < 0.01 && cell_state.viability > 0.8 {
-            // Everything is fine, extend incubation
-            CultureAction::ExtendIncubation
-        } else if environment.media_volume_ml < 5.0 {
-            CultureAction::AddMedia
         } else {
             CultureAction::ExtendIncubation
         }
@@ -218,6 +231,36 @@ mod tests {
         let env = CultureEnvironment::standard();
         let action = agent.select_action(&cell, &env);
         assert_eq!(action, CultureAction::ExtendIncubation);
+    }
+
+    #[test]
+    fn test_select_action_add_media_even_when_other_conditions_are_standard() {
+        let agent = CultureFepAgent::new();
+        let cell = CellState::new_somatic();
+        let mut env = CultureEnvironment::standard();
+        env.media_volume_ml = 1.0;
+        let action = agent.select_action(&cell, &env);
+        assert_eq!(action, CultureAction::AddMedia);
+    }
+
+    #[test]
+    fn test_select_action_uses_normalized_control_error() {
+        let agent = CultureFepAgent::new();
+        let cell = CellState::new_somatic();
+        let mut env = CultureEnvironment::standard();
+        env.temperature_celsius += 0.6; // score 1.2
+        env.co2_percent += 0.6; // score 2.0
+        let action = agent.select_action(&cell, &env);
+        assert_eq!(action, CultureAction::AdjustCo2);
+    }
+
+    #[test]
+    fn test_select_action_aborts_on_non_finite_viability() {
+        let agent = CultureFepAgent::new();
+        let mut cell = CellState::new_somatic();
+        cell.viability = f64::NAN;
+        let action = agent.select_action(&cell, &CultureEnvironment::standard());
+        assert_eq!(action, CultureAction::AbortProtocol);
     }
 
     #[test]

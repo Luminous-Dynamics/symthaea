@@ -1,37 +1,32 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # HDC-Native Cryptographic Primitives
+#![allow(deprecated)]
+//! # Quarantined HDC Security-Claim Demonstrations
 //!
-//! Cryptographic operations that exploit the algebraic properties of 16,384-bit
-//! binary hypervectors ([`BinaryHV`]). These are **not replacements** for standard
-//! ciphers (AES, ChaCha20) but enable unique capabilities:
+//! **QUARANTINED INSECURE RESEARCH CODE.** These security-named types are
+//! retained for compatibility and attack demonstrations only. They do not
+//! provide a secure MAC, threshold scheme, KDF, or commitment.
 //!
-//! - [`HdcMac`] — Authenticate BinaryHV data without serialization overhead
-//! - [`HdcThresholdSharing`] — (k,n) secret splitting via majority-vote bundling
-//! - [`HdcContextKey`] — Sensor-derived keys via bind+permute chains
-//! - [`HdcCommitment`] — Hide-then-reveal via permutation (binding + hiding)
+//! Historical operations over 16,384-bit binary hypervectors ([`BinaryHV`]).
+//! Their names are retained for compatibility, not as security claims:
 //!
-//! ## Security Model
+//! - [`HdcMac`] — a forgeable linear message transform
+//! - [`HdcThresholdSharing`] — records that each reveal the input
+//! - [`HdcContextKey`] — a deterministic sensor-context fingerprint
+//! - [`HdcCommitment`] — a reversible cyclic rotation
 //!
-//! HDC crypto primitives provide _information-theoretic_ properties in
-//! high-dimensional spaces (D = 16,384) where:
+//! ## Algebraic facts (not security properties)
 //!
 //! - **Random collision probability**: P(HV_a = HV_b) = 2^{-16384} (negligible)
-//! - **Similarity concentration**: For random HVs, sim(a,b) ≈ 0.5 ± 0.0039 (3σ)
+//! - **Similarity concentration**: For random HVs, sim(a,b) ≈ 0.5 ± 0.0039 (1σ; σ =
+//!   1/(2√D) at D=16,384. 3σ is ≈0.0117, not 0.0039 — an earlier version of this
+//!   comment mislabeled 1σ as 3σ.)
 //! - **Binding invertibility**: a ⊗ a = 0 (XOR self-inverse)
 //! - **Permutation bijectivity**: π_k is a bijection on {0,1}^D for all k
 //!
-//! These primitives are suitable for:
-//! - Fast authentication of HDC-native data (WisdomPackets, ConsciousnessVectors)
-//! - Threshold secret operations in mesh networks (Kanerva 2009)
-//! - Context-aware key derivation from sensor state
-//! - Commitment schemes for distributed consensus
-//!
-//! They are **NOT** suitable for:
-//! - Bulk data encryption (use ChaCha20-Poly1305 via `mesh-encryption`)
-//! - Digital signatures (use Ed25519 via `identity`)
-//! - Key exchange (use X25519 via `mesh-key-exchange`)
+//! These facts do not establish authentication, threshold privacy, key entropy,
+//! hiding, or binding. Do not use this module at a security boundary.
 //!
 //! ## References
 //!
@@ -46,7 +41,7 @@ use super::binary_hv::BinaryHV;
 // HDC MESSAGE AUTHENTICATION CODE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// HDC-native message authentication code.
+/// Historical `HdcMac` compatibility transform. This is not a MAC.
 ///
 /// # Construction
 ///
@@ -56,37 +51,9 @@ use super::binary_hv::BinaryHV;
 ///
 /// where ⊗ is XOR binding and π_k is cyclic permutation by offset k.
 ///
-/// # Security Proof Sketch
-///
-/// **Unforgeability**: Given MAC and message (but not key), recovering the key
-/// requires inverting `MAC ⊗ message = π_k(key)`, then `π_{-k}(·)` to get key.
-/// The attacker must know k (the permutation offset). With k ∈ [0, D), this
-/// gives D = 16,384 possible keys — but each is a full 16,384-bit vector, so
-/// the search space is 16,384 × 2^{16,384}. Brute force is infeasible.
-///
-/// **Collision resistance**: For two distinct messages m1, m2 with the same key:
-/// P(MAC(m1, key) = MAC(m2, key)) = P(m1 ⊗ π_k(key) = m2 ⊗ π_k(key))
-///                                 = P(m1 = m2) = 0 (since m1 ≠ m2).
-/// XOR binding is a bijection per-operand, so distinct inputs always yield
-/// distinct MACs under the same key. **Zero collision probability**.
-///
-/// **Noise tolerance**: For lossy channels (LoRa, BLE), verification can use
-/// Hamming similarity with threshold τ. At D = 16,384, random similarity
-/// concentrates at 0.5 ± σ where σ = 1/(2√D) ≈ 0.0039. Setting τ = 0.95
-/// gives false-positive rate ≈ exp(-2D(0.95 - 0.5)²) ≈ 2^{-4700} (Hoeffding).
-///
-/// # Performance
-///
-/// MAC computation is a single permute + XOR: **O(D/W)** where W is SIMD width.
-/// At D = 16,384 with AVX2 (W = 256): ~2 iterations of 256-bit XOR ≈ **5-10 ns**.
-/// Compare: BLAKE3 MAC ≈ 50-100 ns, HMAC-SHA256 ≈ 200-400 ns.
-///
-/// # Key requirement
-///
-/// `key` must come from a true entropy source ([`BinaryHV::secure_random`])
-/// or an equivalent proper key-derivation path (e.g. [`HdcContextKey`]).
-/// A key produced by [`BinaryHV::random(seed)`] is a public, deterministic
-/// function of `seed` and lets anyone who knows the seed forge MACs.
+/// A known message/tag pair directly reveals `π_k(key)`, after which an
+/// attacker can tag any chosen message. Key entropy does not repair this.
+#[deprecated(note = "forgeable compatibility transform; use a standard audited MAC")]
 pub struct HdcMac;
 
 /// Default permutation offset for MAC key derivation.
@@ -95,8 +62,14 @@ const HDC_MAC_PERMUTE_OFFSET: usize = 7;
 
 /// Minimum similarity threshold for noisy HDC-MAC verification.
 ///
-/// At D = 16,384, random similarity ≈ 0.5 ± 0.0039 (3σ).
-/// Threshold of 0.95 gives false-positive rate ≈ 2^{-4700} (Hoeffding bound).
+/// At D = 16,384, random similarity ≈ 0.5 ± 0.0039 (1σ; σ = 1/(2√D)).
+/// By Hoeffding's inequality, P(similarity ≥ τ | random) ≤ exp(-2·D·(τ-0.5)²).
+/// At τ = 0.95: exponent = 2·16384·0.45² ≈ 6635.5 nats ≈ 9573 bits, so the
+/// false-positive rate is ≈ 2^-9573, not the previously stated 2^-4700 (that
+/// figure did not correctly convert the exp(·) bound to a base-2 exponent).
+///
+/// This bound describes only the *noise-tolerance* threshold; it says nothing
+/// about [`HdcMac`]'s forgeability, which is unconditional (see [`HdcMac`] docs).
 pub const HDC_MAC_NOISY_THRESHOLD: f32 = 0.95;
 
 impl HdcMac {
@@ -109,9 +82,15 @@ impl HdcMac {
         message.bind(&derived)
     }
 
-    /// Compute MAC with a custom permutation offset.
+    /// Compute the transform with a custom permutation offset.
     ///
-    /// Useful for domain separation: different offsets for different message types.
+    /// This does **not** provide domain separation. Given one known
+    /// (message, tag) pair at any offset, an attacker recovers
+    /// `π_offset(key)` and can derive `π_offset2(key)` for any other offset
+    /// by a further rotation (`permute` is a cyclic shift, so
+    /// `π_{o2-o1}(π_{o1}(key)) == π_{o2}(key)`). One known pair in one
+    /// "domain" therefore forges tags in every other "domain". See
+    /// `legacy_attack_cross_offset_forgery`.
     #[inline]
     pub fn compute_with_offset(message: &BinaryHV, key: &BinaryHV, offset: usize) -> BinaryHV {
         let derived = key.permute(offset);
@@ -145,7 +124,8 @@ impl HdcMac {
 // HDC THRESHOLD SECRET SHARING
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// (k,n) threshold secret sharing using HDC majority-vote bundling.
+/// Historical share-container compatibility transform. This is not threshold
+/// secret sharing.
 ///
 /// # Construction (Kanerva 2009)
 ///
@@ -153,39 +133,21 @@ impl HdcMac {
 /// **Recover**: Unbind each share with its mask → approximation of secret.
 /// Bundle k approximations via majority vote → recovered secret.
 ///
-/// # Security Proof Sketch
-///
-/// **Information-theoretic security** (Shannon 1949): Each share `s_i = secret ⊗ mask_i`
-/// is a one-time pad over {0,1}^D. Given any strict subset of fewer than k shares
-/// (with their masks), the secret has maximum entropy:
-///
-/// - Each mask_i is uniformly random over {0,1}^D
-/// - XOR with uniform mask produces uniform output regardless of secret
-/// - Without k shares to bundle, majority vote cannot recover the secret
-///
-/// **This only holds when masks come from [`BinaryHV::secure_random`].**
-/// [`HdcThresholdSharing::split`] derives masks deterministically from a
-/// `u64` seed via [`BinaryHV::random`] and provides no real secrecy -- it
-/// exists for reproducible tests only. Use
-/// [`HdcThresholdSharing::split_secure`] for any real secret-sharing use.
-///
-/// **Recovery accuracy**: With k shares, majority vote recovers each bit correctly
-/// with probability P(correct) = Σ_{j=⌈k/2⌉}^{k} C(k,j) × 0.5^k (for random noise).
-/// But since each unbound share equals the secret exactly (mask cancels), the
-/// recovery is **perfect when all masks are correct**: P(correct) = 1.0.
-///
-/// **Threshold property**: With fewer than k shares, missing shares contribute
-/// random noise. At k-1 shares, error rate per bit = P(majority wrong) ≈ 0.5
-/// for the missing share's contribution → recovered secret ≈ random.
+/// Every returned [`HdcShare`] includes both `secret XOR mask` and `mask`, so
+/// one record recovers the secret. The `k` argument does not enforce access,
+/// and OS-random masks do not repair the construction.
 ///
 /// # Constraints
 ///
 /// - k must be odd (majority vote requires odd count for deterministic tiebreaking)
 /// - k ≤ n (cannot require more shares than exist)
 /// - k ≥ 1 (at least one share needed)
+#[deprecated(
+    note = "not threshold sharing: every HdcShare includes enough data to recover the secret"
+)]
 pub struct HdcThresholdSharing;
 
-/// A single share in an HDC threshold scheme.
+/// A compatibility record that reveals the input by XORing its fields.
 #[derive(Clone)]
 pub struct HdcShare {
     /// Index of this share (0..n)
@@ -197,14 +159,12 @@ pub struct HdcShare {
 }
 
 impl HdcThresholdSharing {
-    /// Split a secret BinaryHV into n shares requiring k to recover, using a
-    /// deterministic seed for mask generation.
+    /// Produce `n` insecure compatibility records using deterministic masks.
     ///
     /// **Not secure.** Masks are derived from `seed` via [`BinaryHV::random`],
     /// so anyone who knows or brute-forces `seed` can reconstruct every mask
-    /// and recover the secret from a single share. This exists for
-    /// reproducible tests only -- use [`Self::split_secure`] for any real
-    /// secret-sharing use case.
+    /// and recover the secret from a single share. Even without the seed, each
+    /// record contains its own mask. This exists for reproducible tests only.
     ///
     /// # Panics
     ///
@@ -228,12 +188,10 @@ impl HdcThresholdSharing {
             .collect()
     }
 
-    /// Split a secret BinaryHV into n shares requiring k to recover, using
-    /// OS-entropy-backed masks.
+    /// Produce `n` insecure compatibility records using OS-entropy-backed masks.
     ///
-    /// This is the secure entry point: each mask comes from
-    /// [`BinaryHV::secure_random`], so the information-theoretic security
-    /// claimed for this scheme actually holds.
+    /// This remains insecure because every record includes its mask. The name
+    /// is retained for compatibility only.
     ///
     /// # Panics
     ///
@@ -256,7 +214,7 @@ impl HdcThresholdSharing {
             .collect()
     }
 
-    /// Recover secret from k or more shares.
+    /// Recover the input from one or more records; `k` is not checked or used.
     ///
     /// Each share is unbound with its mask, then all are bundled via majority vote.
     /// With k correct shares (where k is the threshold), recovery is exact.
@@ -290,7 +248,7 @@ impl HdcThresholdSharing {
 // HDC CONTEXT KEY
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Context-sensitive key derivation from sensor state.
+/// Deterministic context fingerprint derived from sensor state. This is not a KDF.
 ///
 /// # Construction
 ///
@@ -301,26 +259,25 @@ impl HdcThresholdSharing {
 /// Each sensor reading is permuted by its index to prevent commutativity
 /// (sensor order matters: GPS ⊗ π_1(accel) ≠ accel ⊗ π_1(GPS)).
 ///
-/// # Security Proof Sketch
+/// # Security warning
 ///
-/// **Context binding**: The derived key is cryptographically bound to the
-/// physical context at creation time. To reconstruct the key, an attacker
-/// must reproduce all n sensor readings in the correct order.
+/// This deterministic transform cannot create entropy. Hashing the result does
+/// not make enumerable sensor states secret. It may be used as public context
+/// input to a standard KDF only when combined with an independent secret.
 ///
-/// **Entropy**: Each sensor contributes up to D = 16,384 bits of entropy.
-/// Even if some sensors are low-entropy (e.g., temperature ≈ 8 bits effective),
-/// the XOR binding preserves the entropy of the highest-entropy input.
-/// With n independent sensors: H(key) ≥ max(H(sensor_i)) for all i.
+/// Use the result only as public context to a standard KDF that also receives
+/// independently established secret input.
 ///
-/// **Extraction**: `to_symmetric_key()` uses BLAKE3 hash to extract a
-/// uniform 256-bit key from the D-dimensional HDC key, providing
-/// computational security under the standard random oracle model.
-///
-/// # Applications
-///
-/// - Location-bound decryption (GPS + altitude → key only valid at location)
-/// - Temporal access windows (time sensor → key expires naturally)
-/// - Device-bound secrets (accelerometer + gyro → unique to physical device)
+/// This is a second, independent failure beyond low entropy: the pre-hash
+/// derivation is also linearly malleable and highly non-injective. Because
+/// XOR/permute is linear, replacing `sensors[0]` with `sensors[0] ⊗ delta`
+/// and `sensors[1]` with `sensors[1] ⊗ π^{-1}_1(delta)` cancels exactly, so
+/// two different sensor tuples derive an identical fingerprint (see
+/// `legacy_attack_context_key_collision`). Hashing the output cannot recover
+/// a distinction the pre-hash derivation already destroyed.
+#[deprecated(
+    note = "does not add entropy; combine context with an independent secret using a standard KDF"
+)]
 pub struct HdcContextKey;
 
 impl HdcContextKey {
@@ -339,15 +296,15 @@ impl HdcContextKey {
         result
     }
 
-    /// Derive a 256-bit symmetric key from an HDC context key.
+    /// Hash a context fingerprint to 32 bytes; hashing does not add secrecy.
     ///
     /// Uses BLAKE3 hash extraction to produce a uniform 32-byte key
-    /// suitable for ChaCha20-Poly1305 or other symmetric ciphers.
+    /// Do not use the result directly as a cipher key for enumerable inputs.
     pub fn to_symmetric_key(context: &BinaryHV) -> [u8; 32] {
         *blake3::hash(&context.0).as_bytes()
     }
 
-    /// Derive a context key and immediately extract a symmetric key.
+    /// Hash a derived context fingerprint to 32 bytes. This is not a KDF.
     ///
     /// Convenience method combining `derive()` + `to_symmetric_key()`.
     pub fn derive_symmetric(sensors: &[BinaryHV]) -> [u8; 32] {
@@ -360,7 +317,8 @@ impl HdcContextKey {
 // HDC COMMITMENT SCHEME
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// HDC commitment scheme using permutation chains.
+/// Historical rotation/opening compatibility transform. This is not a
+/// commitment scheme.
 ///
 /// # Construction
 ///
@@ -369,35 +327,20 @@ impl HdcContextKey {
 /// Verify(commitment, secret, offset) = (π_offset(secret) == commitment)
 /// ```
 ///
-/// # Security Proof Sketch
+/// # Security warning
 ///
-/// **Binding**: Cannot find (secret', offset') ≠ (secret, offset) such that
-/// π_{offset'}(secret') = π_{offset}(secret). Since permutation is a bijection,
-/// for a fixed offset, each secret maps to a unique commitment. For different
-/// offsets, the probability of collision is P = 2^{-D} = 2^{-16384} (negligible).
-///
-/// **Hiding**: The commitment π_offset(secret) reveals nothing about the secret
-/// because cyclic permutation preserves the Hamming weight (density) and all
-/// statistical moments of the bit distribution. Without knowing offset,
-/// the attacker faces D = 16,384 possible preimages — but each permutation
-/// produces a quasi-independent vector (similarity ≈ 0.5 for offset > 0).
-///
-/// **Caveat**: Unlike hash-based commitments, this scheme is _information-theoretically_
-/// hiding only against attackers who cannot enumerate all D offsets. For
-/// computationally unbounded adversaries, use BLAKE3 commitments instead.
-/// The advantage here is **zero-overhead for HDC-native data** — no serialization
-/// or hashing required.
+/// Cyclic rotation is reversible and has only `D` possible offsets. For every
+/// alternative offset there is a corresponding message that opens the same
+/// value. This is neither a hiding nor a binding commitment scheme.
 #[derive(Clone)]
+#[deprecated(note = "cyclic rotation is neither a hiding nor binding commitment scheme")]
 pub struct HdcCommitment {
     /// The commitment value (publicly shared).
     pub commitment: BinaryHV,
 }
 
 impl HdcCommitment {
-    /// Create a commitment to a secret using a permutation offset.
-    ///
-    /// The offset should be kept secret until reveal time.
-    /// Recommended: choose offset uniformly from [1, HDC_DIMENSION).
+    /// Rotate an input by an offset; this does not create a secure commitment.
     pub fn commit(secret: &BinaryHV, offset: usize) -> Self {
         Self {
             commitment: secret.permute(offset),
@@ -409,7 +352,7 @@ impl HdcCommitment {
         secret.permute(offset) == *commitment
     }
 
-    /// Verify with noise tolerance (for commitments transmitted over lossy channels).
+    /// Compare a rotated input with tolerance; this has no commitment security.
     pub fn verify_noisy(
         commitment: &BinaryHV,
         secret: &BinaryHV,
@@ -479,18 +422,35 @@ mod tests {
         assert!(!HdcMac::verify_noisy(&message, &wrong_key, &mac, 0.95));
     }
 
+    /// `compute_with_offset` is not domain separation: one known (message,
+    /// tag) pair at offset 7 lets an attacker forge a tag at a completely
+    /// different offset (11) for a chosen message, without the key. Replaces
+    /// the prior `test_hdc_mac_domain_separation`, which only checked that
+    /// two offsets produce different tags — true, but irrelevant to whether
+    /// an attacker who saw one tag can forge another.
     #[test]
-    fn test_hdc_mac_domain_separation() {
-        let message = BinaryHV::random(42);
+    fn legacy_attack_cross_offset_forgery() {
+        let known_offset = 7;
+        let target_offset = 11;
+        let known_message = BinaryHV::random(42);
+        let target_message = BinaryHV::random(43);
         let key = BinaryHV::random(99);
 
-        let mac_offset_7 = HdcMac::compute(&message, &key);
-        let mac_offset_11 = HdcMac::compute_with_offset(&message, &key, 11);
+        let known_tag = HdcMac::compute_with_offset(&known_message, &key, known_offset);
 
-        // Different offsets should produce different MACs
-        assert_ne!(mac_offset_7, mac_offset_11);
-        // But both should verify with their respective offsets
-        assert!(HdcMac::verify(&message, &key, &mac_offset_7));
+        // Recover π_known_offset(key), then rotate it the extra distance to
+        // π_target_offset(key), all without the key.
+        let permuted_key_at_known_offset = known_message.bind(&known_tag);
+        let shift_between_offsets = target_offset - known_offset;
+        let permuted_key_at_target_offset =
+            permuted_key_at_known_offset.permute(shift_between_offsets);
+        let forged_tag = target_message.bind(&permuted_key_at_target_offset);
+
+        assert_eq!(
+            forged_tag,
+            HdcMac::compute_with_offset(&target_message, &key, target_offset),
+            "cross-offset forgery should reproduce the real tag exactly"
+        );
     }
 
     #[test]
@@ -500,6 +460,18 @@ mod tests {
         let mac1 = HdcMac::compute(&message, &key);
         let mac2 = HdcMac::compute(&message, &key);
         assert_eq!(mac1, mac2);
+    }
+
+    #[test]
+    fn legacy_attack_known_pair_forges_hdc_mac() {
+        let known_message = BinaryHV::random(42);
+        let target_message = BinaryHV::random(43);
+        let key = BinaryHV::random(99);
+        let known_tag = HdcMac::compute(&known_message, &key);
+        let recovered_pad = known_message.bind(&known_tag);
+        let forged_tag = target_message.bind(&recovered_pad);
+
+        assert!(HdcMac::verify(&target_message, &key, &forged_tag));
     }
 
     // ── HdcThresholdSharing Tests ────────────────────────────────────────
@@ -563,16 +535,16 @@ mod tests {
     }
 
     #[test]
-    fn test_threshold_single_share_recovers() {
+    fn legacy_attack_single_share_recovers_despite_k_three() {
         let secret = BinaryHV::random(42);
-        let shares = HdcThresholdSharing::split(&secret, 1, 5, 1000);
+        let shares = HdcThresholdSharing::split(&secret, 3, 5, 1000);
 
-        // Any single share should recover the secret (k=1)
+        // Every serialized share carries its own mask, so k is irrelevant.
         for share in &shares {
             let recovered = HdcThresholdSharing::recover(&[share.clone()]);
             assert_eq!(
                 recovered, secret,
-                "k=1 should recover from any single share"
+                "one share recovers even though the API claimed k=3"
             );
         }
     }
@@ -606,7 +578,7 @@ mod tests {
     }
 
     #[test]
-    fn test_threshold_individual_share_leaks_nothing() {
+    fn legacy_share_value_looks_random_but_included_mask_reveals_secret() {
         let secret = BinaryHV::random(42);
         let shares = HdcThresholdSharing::split(&secret, 3, 5, 1000);
 
@@ -617,6 +589,7 @@ mod tests {
                 (sim - 0.5).abs() < 0.05,
                 "Individual share should be ~0.5 similar to secret (OTP), got {sim}"
             );
+            assert_eq!(share.share.bind(&share.mask), secret);
         }
     }
 
@@ -675,6 +648,36 @@ mod tests {
         assert_eq!(key, BinaryHV::zero());
     }
 
+    /// CI-005 (extended): the derivation is linearly malleable, so two
+    /// distinct 2-sensor tuples derive the identical context fingerprint.
+    /// `result = s0 ⊗ π_1(s1)`. Replacing `s0` with `s0 ⊗ delta` and `s1`
+    /// with `s1 ⊗ π_{-1}(delta)` cancels exactly: `π_1(s1 ⊗ π_{-1}(delta)) =
+    /// π_1(s1) ⊗ delta`, so the `delta` terms cancel and the derived key is
+    /// unchanged.
+    #[test]
+    fn legacy_attack_context_key_collision() {
+        let s0 = BinaryHV::random(1);
+        let s1 = BinaryHV::random(2);
+        let delta = BinaryHV::random(999);
+
+        let original = HdcContextKey::derive(&[s0, s1]);
+
+        let inverse_permuted_delta = delta.permute(BinaryHV::DIM - 1);
+        let s0_alt = s0.bind(&delta);
+        let s1_alt = s1.bind(&inverse_permuted_delta);
+        let collided = HdcContextKey::derive(&[s0_alt, s1_alt]);
+
+        assert_ne!(
+            (s0, s1),
+            (s0_alt, s1_alt),
+            "sensor tuples must actually differ"
+        );
+        assert_eq!(
+            original, collided,
+            "two different sensor tuples derived the same context fingerprint"
+        );
+    }
+
     #[test]
     fn test_context_key_to_symmetric() {
         let sensors = vec![BinaryHV::random(1), BinaryHV::random(2)];
@@ -725,9 +728,7 @@ mod tests {
     }
 
     #[test]
-    fn test_commitment_hiding() {
-        // Commitment should be quasi-independent of the secret
-        // (similarity ≈ 0.5 for non-trivial offsets)
+    fn test_rotated_value_has_low_similarity_but_is_not_hiding() {
         let secret = BinaryHV::random(42);
         let commitment = HdcCommitment::commit(&secret, 137);
         let sim = commitment.commitment.similarity(&secret);
@@ -735,6 +736,29 @@ mod tests {
             (sim - 0.5).abs() < 0.05,
             "Commitment should be ~0.5 similar to secret (hiding), got {sim}"
         );
+    }
+
+    #[test]
+    fn legacy_attack_commitment_has_multiple_valid_openings() {
+        let secret = BinaryHV::random(42);
+        let first_offset = 137;
+        let second_offset = 911;
+        let commitment = HdcCommitment::commit(&secret, first_offset);
+        let alternate_secret = commitment
+            .commitment
+            .permute(BinaryHV::DIM - (second_offset % BinaryHV::DIM));
+
+        assert_ne!(alternate_secret, secret);
+        assert!(HdcCommitment::verify(
+            &commitment.commitment,
+            &secret,
+            first_offset
+        ));
+        assert!(HdcCommitment::verify(
+            &commitment.commitment,
+            &alternate_secret,
+            second_offset
+        ));
     }
 
     #[test]
@@ -783,7 +807,7 @@ mod tests {
 
     #[test]
     fn test_threshold_with_context_key() {
-        // Scenario: derive a key from sensors, then split it into shares
+        // Compatibility scenario only: deterministic context plus broken records.
         let sensors = vec![
             BinaryHV::random(1),
             BinaryHV::random(2),
@@ -791,10 +815,10 @@ mod tests {
         ];
         let context_key = HdcContextKey::derive(&sensors);
 
-        // Split the context key into 5 shares requiring 3 to recover
+        // Produce five records (each one actually suffices to recover).
         let shares = HdcThresholdSharing::split(&context_key, 3, 5, 1000);
 
-        // Recover with 3 shares
+        // Exercise the historical three-record call path.
         let recovered = HdcThresholdSharing::recover(&shares[..3]);
         assert_eq!(recovered, context_key);
 
@@ -814,10 +838,7 @@ mod benchmarks {
     use super::*;
     use std::time::Instant;
 
-    /// Quick benchmark: HDC-MAC compute latency.
-    ///
-    /// Expected: ~5-10 ns (1 permute + 1 XOR at 16,384 bits with SIMD).
-    /// Compare: BLAKE3 keyed MAC ≈ 50-100 ns, HMAC-SHA256 ≈ 200-400 ns.
+    /// Quick benchmark of the forgeable compatibility transform's latency.
     #[test]
     fn bench_hdc_mac_compute() {
         let message = BinaryHV::random(42);
@@ -837,7 +858,7 @@ mod benchmarks {
         let ns_per_op = elapsed.as_nanos() as f64 / iters as f64;
 
         eprintln!(
-            "HDC-MAC compute: {:.1} ns/op ({} iterations, {:.1} ms total)",
+            "forgeable HDC tag transform: {:.1} ns/op ({} iterations, {:.1} ms total)",
             ns_per_op,
             iters,
             elapsed.as_secs_f64() * 1000.0

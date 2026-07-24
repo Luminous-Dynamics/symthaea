@@ -21,8 +21,8 @@
 //! │  Cruise ────────────── LoRa (868 MHz)           ~3s, 10-15km  │
 //! │                                                                │
 //! │  ┌──────────────────────────────────────────────────────────┐  │
-//! │  │  WisdomPacket (2,072 bytes)                              │  │
-//! │  │  ├─ Metadata:  24 bytes (source, phi, urgency, time)    │  │
+//! │  │  WisdomPacket (2,104 bytes)                              │  │
+//! │  │  ├─ Metadata:  56 bytes (version, fields, tag, TTL)     │  │
 //! │  │  └─ BinaryHV: 2,048 bytes (16,384 dimensions)           │  │
 //! │  └──────────────────────────────────────────────────────────┘  │
 //! │                                                                │
@@ -46,12 +46,13 @@
 //!
 //! # Security & Efficiency
 //!
-//! - **Authentication**: Optional BLAKE3 keyed MAC (byte 22). When an auth key
-//!   is configured, all packets are signed on send and verified on receive.
-//!   Unsigned packets are rejected when a key is set. (Round 5)
+//! - **Authentication**: Version-2 packets carry an untruncated HMAC-SHA-256
+//!   tag in bytes 23-54. Safety-critical packets fail closed without valid
+//!   authentication; ordinary telemetry may be admitted only as untrusted.
 //!
-//! - **Gossip TTL**: Multi-hop forwarding via TTL counter (byte 23, default 3).
-//!   Each relay decrements TTL; dedup ring prevents forwarding loops. (Round 5)
+//! - **Gossip TTL**: Multi-hop forwarding via authenticated TTL byte 55
+//!   (default 3). A relay needs a group forwarding key to decrement and re-sign
+//!   an authenticated packet; dedup prevents forwarding loops.
 //!
 //! - **Compression**: Packets are wrapped in a 1-byte envelope before
 //!   fragmentation. `0x00` = uncompressed, `0x01` = LZ4. Heartbeats (zero
@@ -410,28 +411,41 @@ impl std::error::Error for MeshError {}
 // WISDOM PACKET
 // ============================================================================
 
-/// Wire size of a [`WisdomPacket`]: 24 bytes metadata + 2,048 bytes BinaryHV.
-pub const WISDOM_PACKET_SIZE: usize = 24 + 2048; // 2,072
+/// Current authenticated WisdomPacket wire-format version.
+pub const WISDOM_PACKET_VERSION: u8 = 2;
+
+/// Size of the untruncated HMAC-SHA-256 authentication tag.
+pub const WISDOM_PACKET_AUTH_TAG_SIZE: usize = 32;
+
+const WISDOM_PACKET_AUTH_TAG_START: usize = 23;
+const WISDOM_PACKET_AUTH_TAG_END: usize =
+    WISDOM_PACKET_AUTH_TAG_START + WISDOM_PACKET_AUTH_TAG_SIZE;
+const WISDOM_PACKET_TTL_OFFSET: usize = WISDOM_PACKET_AUTH_TAG_END;
+const WISDOM_PACKET_WISDOM_OFFSET: usize = WISDOM_PACKET_TTL_OFFSET + 1;
+
+/// Wire size: 56 bytes of versioned metadata plus a 2,048-byte BinaryHV.
+pub const WISDOM_PACKET_SIZE: usize = WISDOM_PACKET_WISDOM_OFFSET + 2048; // 2,104
 
 /// A Wisdom Packet: the atomic unit of consciousness exchange over mesh radio.
 ///
 /// Contains a full [`BinaryHV`] (2,048 bytes = 16,384 dimensions) plus
-/// minimal metadata. Total wire size: 2,072 bytes, fragmenting into exactly
+/// versioned metadata. Total wire size: 2,104 bytes, fragmenting into exactly
 /// 10 data frames + 1 FEC parity = 11 LoRa transmissions.
 ///
 /// # Wire Format
 ///
 /// ```text
 /// Byte     Field           Type
-/// 0-7      source_id       [u8; 8]    truncated node identity
-/// 8-11     sequence        u32 LE     monotonic counter
-/// 12-15    phi             f32 LE     integrated information (Phi)
-/// 16       urgency         u8         MeshUrgency discriminant
-/// 17-20    timestamp_s     u32 LE     Unix seconds
-/// 21       payload_type    u8         PayloadType discriminant
-/// 22       auth_mac        u8         BLAKE3 keyed MAC (truncated to 8 bits)
-/// 23       ttl             u8         gossip hop count (0 = no forward)
-/// 24-2071  wisdom          [u8; 2048] BinaryHV raw bytes
+/// 0        version         u8         current value: 2
+/// 1-8      source_id       [u8; 8]    truncated node identity
+/// 9-12     sequence        u32 LE     monotonic counter
+/// 13-16    phi             f32 LE     integrated information (Phi)
+/// 17       urgency         u8         MeshUrgency discriminant
+/// 18-21    timestamp_s     u32 LE     Unix seconds
+/// 22       payload_type    u8         PayloadType discriminant
+/// 23-54    auth_mac        [u8; 32]   untruncated HMAC-SHA-256 tag
+/// 55       ttl             u8         gossip hop count (0 = no forward)
+/// 56-2103  wisdom          [u8; 2048] BinaryHV raw bytes
 /// ```
 #[derive(Clone)]
 pub struct WisdomPacket {
@@ -447,8 +461,8 @@ pub struct WisdomPacket {
     pub timestamp_s: u32,
     /// What this packet carries.
     pub payload_type: PayloadType,
-    /// BLAKE3 keyed MAC (truncated to 8 bits). 0 when no auth key is set.
-    pub auth_mac: u8,
+    /// Untruncated HMAC-SHA-256 authentication tag. All-zero when unsigned.
+    pub auth_mac: [u8; WISDOM_PACKET_AUTH_TAG_SIZE],
     /// Gossip TTL: decremented on each forward hop. 0 = do not forward.
     pub ttl: u8,
     /// The Wisdom Vector: 16,384-dimensional binary hypervector.
@@ -461,37 +475,43 @@ impl WisdomPacket {
     /// Zero-copy for the BinaryHV — just memcpy from the stack.
     pub fn to_bytes(&self) -> [u8; WISDOM_PACKET_SIZE] {
         let mut buf = [0u8; WISDOM_PACKET_SIZE];
-        buf[0..8].copy_from_slice(&self.source_id);
-        buf[8..12].copy_from_slice(&self.sequence.to_le_bytes());
-        buf[12..16].copy_from_slice(&self.phi.to_le_bytes());
-        buf[16] = self.urgency as u8;
-        buf[17..21].copy_from_slice(&self.timestamp_s.to_le_bytes());
-        buf[21] = self.payload_type as u8;
-        buf[22] = self.auth_mac;
-        buf[23] = self.ttl;
-        buf[24..WISDOM_PACKET_SIZE].copy_from_slice(&self.wisdom.0);
+        buf[0] = WISDOM_PACKET_VERSION;
+        buf[1..9].copy_from_slice(&self.source_id);
+        buf[9..13].copy_from_slice(&self.sequence.to_le_bytes());
+        buf[13..17].copy_from_slice(&self.phi.to_le_bytes());
+        buf[17] = self.urgency as u8;
+        buf[18..22].copy_from_slice(&self.timestamp_s.to_le_bytes());
+        buf[22] = self.payload_type as u8;
+        buf[WISDOM_PACKET_AUTH_TAG_START..WISDOM_PACKET_AUTH_TAG_END]
+            .copy_from_slice(&self.auth_mac);
+        buf[WISDOM_PACKET_TTL_OFFSET] = self.ttl;
+        buf[WISDOM_PACKET_WISDOM_OFFSET..WISDOM_PACKET_SIZE].copy_from_slice(&self.wisdom.0);
         buf
     }
 
     /// Deserialize from a byte slice.
     pub fn from_bytes(buf: &[u8]) -> Option<Self> {
-        if buf.len() < WISDOM_PACKET_SIZE {
+        if buf.len() != WISDOM_PACKET_SIZE {
+            return None;
+        }
+        if buf[0] != WISDOM_PACKET_VERSION {
             return None;
         }
 
         let mut source_id = [0u8; 8];
-        source_id.copy_from_slice(&buf[0..8]);
+        source_id.copy_from_slice(&buf[1..9]);
 
-        let sequence = u32::from_le_bytes([buf[8], buf[9], buf[10], buf[11]]);
-        let phi = f32::from_le_bytes([buf[12], buf[13], buf[14], buf[15]]);
-        let urgency = MeshUrgency::from_byte(buf[16]);
-        let timestamp_s = u32::from_le_bytes([buf[17], buf[18], buf[19], buf[20]]);
-        let payload_type = PayloadType::from_byte(buf[21]);
-        let auth_mac = buf[22];
-        let ttl = buf[23];
+        let sequence = u32::from_le_bytes([buf[9], buf[10], buf[11], buf[12]]);
+        let phi = f32::from_le_bytes([buf[13], buf[14], buf[15], buf[16]]);
+        let urgency = MeshUrgency::from_byte(buf[17]);
+        let timestamp_s = u32::from_le_bytes([buf[18], buf[19], buf[20], buf[21]]);
+        let payload_type = PayloadType::from_byte(buf[22]);
+        let mut auth_mac = [0u8; WISDOM_PACKET_AUTH_TAG_SIZE];
+        auth_mac.copy_from_slice(&buf[WISDOM_PACKET_AUTH_TAG_START..WISDOM_PACKET_AUTH_TAG_END]);
+        let ttl = buf[WISDOM_PACKET_TTL_OFFSET];
 
         let mut wisdom_bytes = [0u8; 2048];
-        wisdom_bytes.copy_from_slice(&buf[24..WISDOM_PACKET_SIZE]);
+        wisdom_bytes.copy_from_slice(&buf[WISDOM_PACKET_WISDOM_OFFSET..WISDOM_PACKET_SIZE]);
 
         Some(Self {
             source_id,
@@ -648,7 +668,7 @@ impl WisdomPacket {
             urgency: MeshUrgency::Cruise,
             timestamp_s,
             payload_type: PayloadType::Affective,
-            auth_mac: 0,
+            auth_mac: [0; 32],
             ttl: MESH_DEFAULT_TTL,
             wisdom: BinaryHV(bytes),
         }
@@ -687,7 +707,7 @@ impl WisdomPacket {
             urgency: MeshUrgency::Normal,
             timestamp_s: (msg.timestamp / 1000) as u32,
             payload_type: PayloadType::Gradient,
-            auth_mac: 0,
+            auth_mac: [0; 32],
             ttl: MESH_DEFAULT_TTL,
             wisdom: BinaryHV(bytes),
         })
@@ -717,7 +737,7 @@ impl WisdomPacket {
                 .unwrap_or_default()
                 .as_secs() as u32,
             payload_type: PayloadType::MoralTopology,
-            auth_mac: 0,
+            auth_mac: [0; 32],
             ttl: 2,
             wisdom: BinaryHV(wisdom_bytes),
         }
@@ -745,7 +765,7 @@ impl WisdomPacket {
 
     /// Fragment this packet for LoRa transmission.
     ///
-    /// Returns 11 fragments: 10 data (carrying the 2,072 byte payload) +
+    /// Returns 11 fragments: 10 data (carrying the 2,104-byte payload) +
     /// 1 XOR parity for single-loss recovery.
     pub fn fragment(&self) -> Vec<LoRaFragment> {
         let bytes = self.to_bytes();
@@ -763,9 +783,9 @@ impl WisdomPacket {
         FragmentAssembler::new(thought_id, total_fragments, WISDOM_PACKET_SIZE)
     }
 
-    // ── HDC-Native Authentication ────────────────────────────────────────
+    // ── Quarantined legacy HDC tag ───────────────────────────────────────
 
-    /// Compute an HDC-MAC over the wisdom BinaryHV using a BinaryHV key.
+    /// Compute the legacy forgeable HDC tag over the wisdom vector.
     ///
     /// This is a zero-serialization authentication: the MAC is computed
     /// directly on the 16,384-bit wisdom vector via a single XOR+permute
@@ -773,12 +793,16 @@ impl WisdomPacket {
     ///
     /// The returned BinaryHV can be sent alongside the packet or stored
     /// for later verification. It is NOT embedded in the packet wire format
-    /// (use `auth_mac` field for the existing 8-bit BLAKE3 MAC).
+    /// (use `auth_mac` for the version-2 untruncated HMAC-SHA-256 tag).
+    #[cfg(feature = "insecure-experimental-crypto")]
+    #[deprecated(note = "forgeable legacy tag; use a standard audited MAC")]
     pub fn compute_hdc_mac(&self, key: &BinaryHV) -> BinaryHV {
         symthaea_core::hdc::hdc_crypto::HdcMac::compute(&self.wisdom, key)
     }
 
-    /// Verify an HDC-MAC on the wisdom BinaryHV (exact match).
+    /// Verify the legacy forgeable HDC tag (exact match).
+    #[cfg(feature = "insecure-experimental-crypto")]
+    #[deprecated(note = "forgeable legacy tag; use a standard audited MAC")]
     pub fn verify_hdc_mac(&self, key: &BinaryHV, mac: &BinaryHV) -> bool {
         symthaea_core::hdc::hdc_crypto::HdcMac::verify(&self.wisdom, key, mac)
     }
@@ -786,6 +810,8 @@ impl WisdomPacket {
     /// Verify an HDC-MAC with noise tolerance (for lossy channels like LoRa/BLE).
     ///
     /// Recommended threshold: 0.95 (false positive rate ≈ 2^{-4700}).
+    #[cfg(feature = "insecure-experimental-crypto")]
+    #[deprecated(note = "forgeable legacy tag; noisy acceptance further weakens integrity")]
     pub fn verify_hdc_mac_noisy(&self, key: &BinaryHV, mac: &BinaryHV, threshold: f32) -> bool {
         symthaea_core::hdc::hdc_crypto::HdcMac::verify_noisy(&self.wisdom, key, mac, threshold)
     }
@@ -973,34 +999,46 @@ impl Default for MeshPeerRegistry {
 }
 
 // ============================================================================
-// PACKET AUTHENTICATION (BLAKE3)
+// PACKET AUTHENTICATION (HMAC-SHA-256)
 // ============================================================================
 
-/// Compute a truncated 8-bit BLAKE3 keyed MAC over the packet bytes.
+/// Compute an untruncated HMAC-SHA-256 tag over the packet bytes.
 ///
-/// The MAC is computed with byte 22 (the auth_mac field itself) zeroed,
+/// The tag is computed with its own 32-byte field zeroed,
 /// so the MAC doesn't include itself in the hash input.
-pub fn compute_packet_mac(packet_bytes: &[u8; WISDOM_PACKET_SIZE], key: &[u8; 32]) -> u8 {
+pub fn compute_packet_mac(
+    packet_bytes: &[u8; WISDOM_PACKET_SIZE],
+    key: &[u8; 32],
+) -> [u8; WISDOM_PACKET_AUTH_TAG_SIZE] {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+
     let mut input = *packet_bytes;
-    input[22] = 0; // Zero the auth_mac field before computing
-    let hash = blake3::keyed_hash(key, &input);
-    hash.as_bytes()[0]
+    input[WISDOM_PACKET_AUTH_TAG_START..WISDOM_PACKET_AUTH_TAG_END].fill(0);
+    let mut mac = Hmac::<Sha256>::new_from_slice(key).expect("HMAC accepts keys of any length");
+    mac.update(&input);
+    mac.finalize().into_bytes().into()
 }
 
 /// Verify the MAC on a packet byte slice.
 ///
 /// Returns `true` if the MAC matches, `false` otherwise.
-/// Returns `false` if the slice is too short.
+/// Returns `false` unless the slice is exactly one version-2 packet.
 pub fn verify_packet_mac(packet_bytes: &[u8], key: &[u8; 32]) -> bool {
-    if packet_bytes.len() < WISDOM_PACKET_SIZE {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+
+    if packet_bytes.len() != WISDOM_PACKET_SIZE || packet_bytes[0] != WISDOM_PACKET_VERSION {
         return false;
     }
     let mut input = [0u8; WISDOM_PACKET_SIZE];
     input.copy_from_slice(&packet_bytes[..WISDOM_PACKET_SIZE]);
-    let stored_mac = input[22];
-    input[22] = 0;
-    let hash = blake3::keyed_hash(key, &input);
-    hash.as_bytes()[0] == stored_mac
+    let mut stored_mac = [0u8; WISDOM_PACKET_AUTH_TAG_SIZE];
+    stored_mac.copy_from_slice(&input[WISDOM_PACKET_AUTH_TAG_START..WISDOM_PACKET_AUTH_TAG_END]);
+    input[WISDOM_PACKET_AUTH_TAG_START..WISDOM_PACKET_AUTH_TAG_END].fill(0);
+    let mut mac = Hmac::<Sha256>::new_from_slice(key).expect("HMAC accepts keys of any length");
+    mac.update(&input);
+    mac.verify_slice(&stored_mac).is_ok()
 }
 
 // ============================================================================

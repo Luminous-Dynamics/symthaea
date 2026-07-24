@@ -79,7 +79,7 @@ mod tests {
                 .observe_frame(&frame, 64, 64, 3, 0.033);
         }
 
-        // 3. Run enough cycles to ensure managers (VisionManager @ 11, Multimodal @ 31) run
+        // 3. Run enough cycles to ensure managers (VisionManager @ 17, Multimodal @ 31) run
         // We look for the cycle where the mental simulation actually triggered.
         let mut mental_movie = None;
         let mut last_result = None;

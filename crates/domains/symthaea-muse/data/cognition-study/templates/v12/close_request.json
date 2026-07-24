@@ -1,0 +1,18 @@
+{
+  "closed_at_utc": "REPLACE_RFC3339",
+  "close_reason": "FrozenTargetReached",
+  "signoffs": [
+    {
+      "role": "CollectionCustodian",
+      "signer_id": "REPLACE",
+      "authorization_sha256": "REPLACE_64_HEX",
+      "signed_at_utc": "REPLACE_RFC3339"
+    },
+    {
+      "role": "GovernanceOfficer",
+      "signer_id": "REPLACE_DISTINCT",
+      "authorization_sha256": "REPLACE_64_HEX",
+      "signed_at_utc": "REPLACE_RFC3339"
+    }
+  ]
+}

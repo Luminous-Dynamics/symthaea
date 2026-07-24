@@ -66,7 +66,7 @@ fn run_organoid(seed: u64, framework: &mut ConsciousnessEthicsFramework) -> RunR
         };
 
         let metrics = pipeline.digital_organoid().metrics();
-        let assessment = framework.assess(metrics, snapshot.lfp.as_ref());
+        let assessment = framework.assess_at(metrics, snapshot.lfp.as_ref(), snapshot.day as u64);
         let tier_idx = assessment.current_tier.index() as usize;
 
         if snapshot.phi > peak_phi {
@@ -340,8 +340,8 @@ fn analysis_precautionary_vs_standard() {
         };
 
         let metrics = pipeline.digital_organoid().metrics();
-        let a_precaut = fw_precaut.assess(metrics, snapshot.lfp.as_ref());
-        let a_standard = fw_standard.assess(metrics, snapshot.lfp.as_ref());
+        let a_precaut = fw_precaut.assess_at(metrics, snapshot.lfp.as_ref(), snapshot.day as u64);
+        let a_standard = fw_standard.assess_at(metrics, snapshot.lfp.as_ref(), snapshot.day as u64);
 
         let tier_changed =
             a_precaut.current_tier != prev_precaut || a_standard.current_tier != prev_standard;

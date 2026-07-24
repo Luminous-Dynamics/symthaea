@@ -1,228 +1,382 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Web agent: orchestrates Prism search + CDP browsing for grounded answers.
+//! Prism-first web research orchestration.
 //!
-//! Flow:
-//! 1. User query → Prism local search (offline, sub-ms)
-//! 2. If sufficient local results → return immediately
-//! 3. If insufficient → browse web via CDP → extract content → verify claims
-//! 4. Feed verified claims back into Prism knowledge base
-//!
-//! This is the integration layer between Prism (epistemic search) and
-//! symthaea-browser (CDP-connected browser agent).
+//! This layer deliberately distinguishes local knowledge, search-result
+//! snippets, retrieved-page evidence, and corroborated claims. Search snippets
+//! are discovery candidates only and are never represented as verified facts or
+//! made eligible for durable Prism ingestion.
+
+use std::collections::BTreeSet;
+
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
 use crate::actions::BrowserAction;
 use crate::cdp::CdpSession;
+use crate::executor::BrowserExecutor;
+use crate::observation::PageObservation;
 use crate::safety::BrowserSafetyPolicy;
-use anyhow::Result;
 
-/// Result of a web agent query — combines local + web sources.
-#[derive(Debug, Clone)]
-pub struct WebAgentResult {
-    /// Claims found from local Prism search.
-    pub local_claims: Vec<WebClaim>,
-    /// Claims extracted from web browsing.
-    pub web_claims: Vec<WebClaim>,
-    /// URLs visited during research.
+/// Epistemic status of a claim-like text fragment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EvidenceStatus {
+    /// Existing local knowledge supplied by Prism or another trusted store.
+    LocalKnowledge,
+    /// Text observed on a search-result page. Discovery only; not verification.
+    SearchResultSnippet,
+    /// Text extracted from the actual cited page but not independently checked.
+    RetrievedPage,
+    /// Claim supported by independent evidence and contradiction checks.
+    Corroborated,
+}
+
+/// A claim candidate with explicit epistemic status and source provenance.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WebClaim {
+    pub content: String,
+    /// Canonical page from which this text was observed.
+    pub source: String,
+    /// Calibrated confidence in `[0.0, 1.0]`.
+    pub confidence: f32,
+    pub evidence_status: EvidenceStatus,
+    /// Exact bounded evidence text supporting this candidate.
+    pub evidence_excerpt: Option<String>,
+    /// Search engine, local index, or retrieval mechanism that surfaced it.
+    pub retrieved_from: Option<String>,
+}
+
+impl WebClaim {
+    /// Construct a local claim supplied by an upstream knowledge system.
+    pub fn local(content: impl Into<String>, source: impl Into<String>, confidence: f32) -> Self {
+        Self {
+            content: content.into(),
+            source: source.into(),
+            confidence: confidence.clamp(0.0, 1.0),
+            evidence_status: EvidenceStatus::LocalKnowledge,
+            evidence_excerpt: None,
+            retrieved_from: Some("Prism".to_string()),
+        }
+    }
+
+    /// Whether this claim may enter a durable knowledge store without another
+    /// promotion step.
+    pub fn eligible_for_prism_ingest(&self) -> bool {
+        matches!(self.evidence_status, EvidenceStatus::Corroborated)
+            && self.confidence.is_finite()
+            && self.confidence >= 0.75
+            && self.evidence_excerpt.is_some()
+    }
+}
+
+/// Result of a browser research pass.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct WebResearchResult {
+    pub claims: Vec<WebClaim>,
+    /// Actual successfully observed final URLs, not configured engine bases.
     pub urls_visited: Vec<String>,
-    /// Whether the query was answered from local knowledge alone.
+}
+
+/// Result of the Prism-first query pipeline.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct WebAgentResult {
+    pub local_claims: Vec<WebClaim>,
+    pub web_claims: Vec<WebClaim>,
+    pub urls_visited: Vec<String>,
     pub answered_locally: bool,
 }
 
-/// A single verified claim with source information.
-#[derive(Debug, Clone)]
-pub struct WebClaim {
-    pub content: String,
-    pub source: String,
-    pub confidence: f32,
-}
+const MIN_SUFFICIENT_LOCAL_CLAIMS: usize = 2;
+const MAX_SEARCH_CANDIDATES: usize = 12;
 
-/// Minimum local results before triggering web research.
-const MIN_LOCAL_RESULTS: usize = 3;
-
-/// Search URLs to try for web research.
 const SEARCH_URLS: &[(&str, &str)] = &[
     ("Wikipedia", "https://en.wikipedia.org/w/index.php?search="),
     ("DuckDuckGo", "https://html.duckduckgo.com/html/?q="),
 ];
 
-/// The web agent: Prism-first, browser-fallback.
+/// The web agent: local knowledge first, browser discovery second.
 pub struct WebAgent {
     safety: BrowserSafetyPolicy,
     phi: f64,
 }
 
 impl WebAgent {
-    /// Create a web agent with the given safety policy and consciousness level.
     pub fn new(safety: BrowserSafetyPolicy, phi: f64) -> Self {
         Self { safety, phi }
     }
 
-    /// Update the consciousness level (from cognitive loop).
     pub fn set_phi(&mut self, phi: f64) {
         self.phi = phi;
     }
 
-    /// Check if the agent can navigate (Phi >= 0.30).
-    pub fn can_navigate(&self) -> bool {
-        self.safety
-            .is_action_allowed(&BrowserAction::Navigate { url: String::new() }, self.phi)
+    pub fn can_navigate_url(&self, url: &str) -> bool {
+        self.safety.is_action_allowed(
+            &BrowserAction::Navigate {
+                url: url.to_string(),
+            },
+            self.phi,
+        )
     }
 
-    /// Execute a web research session via CDP.
-    ///
-    /// Navigates to search engine, extracts results page, returns claims.
-    /// Requires Phi >= 0.30 for navigation.
-    pub async fn research(&self, session: &CdpSession, query: &str) -> Result<Vec<WebClaim>> {
-        if !self.can_navigate() {
-            tracing::info!(phi = self.phi, "Phi too low for web navigation");
-            return Ok(vec![]);
-        }
+    pub fn can_navigate(&self) -> bool {
+        self.can_navigate_url("https://example.com/")
+    }
 
-        let mut claims = Vec::new();
-        let encoded_query = query.replace(' ', "+");
+    /// Browse search-result pages and return low-confidence discovery
+    /// candidates with actual visited URLs.
+    pub async fn research_detailed(
+        &self,
+        session: &CdpSession,
+        query: &str,
+    ) -> Result<WebResearchResult> {
+        let executor = BrowserExecutor::new(session, &self.safety, self.phi);
+        let encoded_query: String =
+            url::form_urlencoded::byte_serialize(query.as_bytes()).collect();
+        let mut result = WebResearchResult::default();
+        let mut seen_claims = BTreeSet::new();
 
         for &(engine_name, base_url) in SEARCH_URLS {
-            let url = format!("{}{}", base_url, encoded_query);
-
-            tracing::info!(engine = engine_name, url = %url, "Web agent navigating");
-
-            if let Err(e) = session.navigate(&url).await {
-                tracing::warn!(engine = engine_name, error = %e, "Navigation failed");
+            let requested_url = format!("{base_url}{encoded_query}");
+            let receipt = executor
+                .execute(BrowserAction::Navigate {
+                    url: requested_url.clone(),
+                })
+                .await;
+            if !receipt.succeeded() {
+                tracing::warn!(
+                    engine = engine_name,
+                    outcome = ?receipt.outcome,
+                    "Search navigation denied or failed"
+                );
                 continue;
             }
 
-            // Observe the page
-            let obs = match session.observe().await {
-                Ok(obs) => obs,
-                Err(e) => {
-                    tracing::warn!(engine = engine_name, error = %e, "Observation failed");
+            let observation = match session.observe().await {
+                Ok(observation) => observation,
+                Err(error) => {
+                    tracing::warn!(
+                        engine = engine_name,
+                        error = %error,
+                        "Search observation failed"
+                    );
                     continue;
                 }
             };
 
-            // Extract text content from the page
-            let page_text = obs.to_cognitive_text();
+            let final_url = observation.redacted_url();
+            if !result.urls_visited.contains(&final_url) {
+                result.urls_visited.push(final_url.clone());
+            }
 
-            // Extract claims from page text (simple sentence splitting)
-            let page_claims = extract_claims_from_text(&page_text, &url);
-            tracing::info!(
-                engine = engine_name,
-                claims = page_claims.len(),
-                "Extracted claims from page"
-            );
-
-            claims.extend(page_claims);
-
-            // One successful source is enough for basic queries
-            if claims.len() >= MIN_LOCAL_RESULTS {
-                break;
+            for candidate in extract_search_candidates(&observation, engine_name) {
+                let normalized = normalize_claim_key(&candidate.content);
+                if seen_claims.insert(normalized) {
+                    result.claims.push(candidate);
+                }
+                if result.claims.len() >= MAX_SEARCH_CANDIDATES {
+                    return Ok(result);
+                }
             }
         }
 
-        Ok(claims)
+        Ok(result)
     }
 
-    /// Full query pipeline: Prism local → web fallback → merged results.
-    ///
-    /// `local_results` should come from `SearchEngine::search()`.
+    /// Compatibility helper returning only the discovery candidates.
+    pub async fn research(&self, session: &CdpSession, query: &str) -> Result<Vec<WebClaim>> {
+        Ok(self.research_detailed(session, query).await?.claims)
+    }
+
+    /// Full query pipeline using actual local claims rather than a count that
+    /// cannot be inspected for quality.
     pub async fn query_with_fallback(
         &self,
         session: &CdpSession,
         query: &str,
-        local_result_count: usize,
+        local_claims: Vec<WebClaim>,
     ) -> Result<WebAgentResult> {
-        if local_result_count >= MIN_LOCAL_RESULTS {
+        if local_knowledge_is_sufficient(&local_claims) {
             return Ok(WebAgentResult {
-                local_claims: vec![],
-                web_claims: vec![],
-                urls_visited: vec![],
+                local_claims,
+                web_claims: Vec::new(),
+                urls_visited: Vec::new(),
                 answered_locally: true,
             });
         }
 
-        let web_claims = self.research(session, query).await?;
-        let urls: Vec<String> = SEARCH_URLS.iter().map(|(_, u)| u.to_string()).collect();
-
+        let web = self.research_detailed(session, query).await?;
         Ok(WebAgentResult {
-            local_claims: vec![],
-            web_claims,
-            urls_visited: urls,
+            local_claims,
+            web_claims: web.claims,
+            urls_visited: web.urls_visited,
             answered_locally: false,
         })
     }
 }
 
-/// Extract factual claims from page text (simple heuristic).
-///
-/// Splits into sentences, filters for informative ones (>40 chars, not questions).
-fn extract_claims_from_text(text: &str, source_url: &str) -> Vec<WebClaim> {
-    text.split(|c: char| c == '.' || c == '!' || c == '\n')
-        .map(|s| s.trim())
-        .filter(|s| s.len() > 40 && s.len() < 500)
-        .filter(|s| !s.contains('?')) // Skip questions
-        .filter(|s| !s.starts_with('[')) // Skip [link] fragments
-        .filter(|s| s.chars().filter(|c| c.is_alphabetic()).count() > s.len() / 2) // Mostly text
-        .take(10)
-        .map(|s| WebClaim {
-            content: s.to_string(),
-            source: source_url.to_string(),
-            confidence: 0.6, // Moderate confidence for web-extracted text
+fn local_knowledge_is_sufficient(claims: &[WebClaim]) -> bool {
+    if claims.len() < MIN_SUFFICIENT_LOCAL_CLAIMS {
+        return false;
+    }
+    let trustworthy: Vec<&WebClaim> = claims
+        .iter()
+        .filter(|claim| {
+            matches!(
+                claim.evidence_status,
+                EvidenceStatus::LocalKnowledge | EvidenceStatus::Corroborated
+            ) && claim.confidence.is_finite()
+                && claim.confidence >= 0.70
         })
-        .collect()
+        .collect();
+    if trustworthy.len() < MIN_SUFFICIENT_LOCAL_CLAIMS {
+        return false;
+    }
+    let mean = trustworthy
+        .iter()
+        .map(|claim| claim.confidence)
+        .sum::<f32>()
+        / trustworthy.len() as f32;
+    mean >= 0.80
+}
+
+fn extract_search_candidates(observation: &PageObservation, engine_name: &str) -> Vec<WebClaim> {
+    let source = observation.redacted_url();
+    let mut candidates = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    for element in &observation.elements {
+        if !matches!(
+            element.role.to_ascii_lowercase().as_str(),
+            "link" | "heading" | "text" | "statictext" | "paragraph" | "listitem"
+        ) {
+            continue;
+        }
+
+        for sentence in split_candidate_sentences(&element.name) {
+            let key = normalize_claim_key(sentence);
+            if seen.insert(key) {
+                candidates.push(WebClaim {
+                    content: sentence.to_string(),
+                    source: source.clone(),
+                    confidence: 0.20,
+                    evidence_status: EvidenceStatus::SearchResultSnippet,
+                    evidence_excerpt: Some(sentence.to_string()),
+                    retrieved_from: Some(engine_name.to_string()),
+                });
+            }
+            if candidates.len() >= MAX_SEARCH_CANDIDATES {
+                return candidates;
+            }
+        }
+    }
+    candidates
+}
+
+fn split_candidate_sentences(text: &str) -> impl Iterator<Item = &str> {
+    text.split(|character: char| matches!(character, '.' | '!' | '\n'))
+        .map(str::trim)
+        .filter(|sentence| sentence.len() > 40 && sentence.len() < 500)
+        .filter(|sentence| !sentence.contains('?'))
+        .filter(|sentence| {
+            sentence
+                .chars()
+                .filter(|character| character.is_alphabetic())
+                .count()
+                > sentence.chars().count() / 2
+        })
+}
+
+fn normalize_claim_key(claim: &str) -> String {
+    claim
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::observation::AccessibleElement;
 
-    #[test]
-    fn extract_claims_filters_short_sentences() {
-        let text = "Short. This is a longer sentence that should be extracted as a factual claim from the page. Another short one.";
-        let claims = extract_claims_from_text(text, "https://example.com");
-        assert_eq!(claims.len(), 1);
-        assert!(claims[0].content.contains("longer sentence"));
+    fn search_observation() -> PageObservation {
+        PageObservation {
+            url: "https://search.example/?q=consciousness".into(),
+            title: "Search".into(),
+            elements: vec![
+                AccessibleElement {
+                    backend_node_id: 1,
+                    role: "link".into(),
+                    name: "Consciousness is commonly described as awareness of internal and external existence in philosophical and scientific literature".into(),
+                    value: None,
+                    description: None,
+                    focused: false,
+                    disabled: false,
+                },
+                AccessibleElement {
+                    backend_node_id: 2,
+                    role: "button".into(),
+                    name: "Search".into(),
+                    value: None,
+                    description: None,
+                    focused: false,
+                    disabled: false,
+                },
+            ],
+            focused_element: None,
+        }
     }
 
     #[test]
-    fn extract_claims_skips_questions() {
-        let text = "What is consciousness and how does it arise in biological systems?\nConsciousness is the state of being aware of surroundings and internal mental states according to modern neuroscience research conducted across multiple laboratories";
-        let claims = extract_claims_from_text(text, "https://example.com");
+    fn snippets_are_discovery_only() {
+        let claims = extract_search_candidates(&search_observation(), "ExampleSearch");
+        assert_eq!(claims.len(), 1);
         assert_eq!(
-            claims.len(),
-            1,
-            "Should skip question, keep statement: {:?}",
-            claims
+            claims[0].evidence_status,
+            EvidenceStatus::SearchResultSnippet
         );
-        assert!(claims[0].content.contains("aware"));
+        assert!(!claims[0].eligible_for_prism_ingest());
+        assert_eq!(claims[0].confidence, 0.20);
+    }
+
+    #[test]
+    fn local_sufficiency_uses_quality_not_count_alone() {
+        let weak = vec![
+            WebClaim::local("A", "local", 0.4),
+            WebClaim::local("B", "local", 0.4),
+            WebClaim::local("C", "local", 0.4),
+        ];
+        assert!(!local_knowledge_is_sufficient(&weak));
+
+        let strong = vec![
+            WebClaim::local("A", "local", 0.85),
+            WebClaim::local("B", "local", 0.80),
+        ];
+        assert!(local_knowledge_is_sufficient(&strong));
+    }
+
+    #[test]
+    fn only_corroborated_evidence_is_ingestible() {
+        let mut claim = WebClaim {
+            content: "A supported claim".into(),
+            source: "https://example.com/evidence".into(),
+            confidence: 0.9,
+            evidence_status: EvidenceStatus::RetrievedPage,
+            evidence_excerpt: Some("A supported claim".into()),
+            retrieved_from: Some("direct".into()),
+        };
+        assert!(!claim.eligible_for_prism_ingest());
+        claim.evidence_status = EvidenceStatus::Corroborated;
+        assert!(claim.eligible_for_prism_ingest());
     }
 
     #[test]
     fn web_agent_phi_gating() {
         let safety = BrowserSafetyPolicy::default();
         let low_phi = WebAgent::new(safety.clone(), 0.1);
-        assert!(
-            !low_phi.can_navigate(),
-            "Low Phi should not allow navigation"
-        );
+        assert!(!low_phi.can_navigate());
 
         let high_phi = WebAgent::new(safety, 0.5);
-        assert!(high_phi.can_navigate(), "High Phi should allow navigation");
-    }
-
-    #[test]
-    fn extract_claims_limits_output() {
-        // Generate many sentences
-        let text: String = (0..100)
-            .map(|i| format!("This is sentence number {} which is a factual claim about the world and its properties", i))
-            .collect::<Vec<_>>()
-            .join(". ");
-        let claims = extract_claims_from_text(&text, "https://example.com");
-        assert!(
-            claims.len() <= 10,
-            "Should cap at 10 claims, got {}",
-            claims.len()
-        );
+        assert!(high_phi.can_navigate());
     }
 }

@@ -274,7 +274,7 @@ pub fn discover_conservation_laws_with_custom(
     results
 }
 
-fn random_expr_multivar(
+pub(crate) fn random_expr_multivar(
     rng: &mut u64,
     max_depth: usize,
     var_names: &[&str],
@@ -1006,9 +1006,68 @@ pub fn discover_invariants_autonomous_with_seed_templates(
     results
 }
 
+/// Nearest-neighbor-chain energy template: for a system whose variables are
+/// named exactly `u1..un, v1..vn` (position/velocity pairs on a linear
+/// chain -- the shape a finite-difference discretization of a 1D wave
+/// equation produces), seeds the generic coupled energy
+/// `1/2*sum(vi²) + sum(ui²) - sum_{i=1}^{n-1} ui*u_{i+1}`.
+///
+/// Parametrized over `n`, not hand-derived per system size. Unlike the
+/// `n==2`-hardcoded coupled-quadratic template below (which only matches a
+/// 4-variable, single-cross-term shape), this recognizes and handles any
+/// chain length -- added after a deliberately unseeded search over a
+/// 3-point chain (`symthaea-physics-bridge/src/pde_wave_stage_a.rs`) found
+/// nothing, confirming the 2-point recall-gap fix didn't generalize to
+/// bigger chains on its own. Verified to recover the exact discretized
+/// wave energy for both n=2 and n=3.
+fn chain_energy_template(var_names: &[&str]) -> Option<Expr> {
+    let n = var_names.len() / 2;
+    if n < 2 || var_names.len() != 2 * n {
+        return None;
+    }
+    for i in 0..n {
+        if var_names[i] != format!("u{}", i + 1) || var_names[n + i] != format!("v{}", i + 1) {
+            return None;
+        }
+    }
+
+    let var = |s: String| Expr::Var(s);
+    let pow2 = |s: String| Expr::BinOp(BinOp::Pow, Box::new(var(s)), Box::new(Expr::Const(2.0)));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+    let sub = |a: Expr, b: Expr| Expr::BinOp(BinOp::Sub, Box::new(a), Box::new(b));
+    let scale = |c: f64, e: Expr| Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(c)), Box::new(e));
+    let mul = |a: Expr, b: Expr| Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b));
+
+    let mut kinetic_terms = (0..n).map(|i| pow2(format!("v{}", i + 1)));
+    let mut kinetic = kinetic_terms.next()?;
+    for t in kinetic_terms {
+        kinetic = add(kinetic, t);
+    }
+    kinetic = scale(0.5, kinetic);
+
+    let mut pos_terms = (0..n).map(|i| pow2(format!("u{}", i + 1)));
+    let mut pos_sq = pos_terms.next()?;
+    for t in pos_terms {
+        pos_sq = add(pos_sq, t);
+    }
+
+    let mut cross_terms =
+        (0..n - 1).map(|i| mul(var(format!("u{}", i + 1)), var(format!("u{}", i + 2))));
+    let mut cross = cross_terms.next()?;
+    for t in cross_terms {
+        cross = add(cross, t);
+    }
+
+    Some(add(kinetic, sub(pos_sq, cross)))
+}
+
 fn build_invariant_templates(var_names: &[&str]) -> Vec<Expr> {
     let mut templates = Vec::new();
     let ndim = var_names.len();
+
+    if let Some(chain) = chain_energy_template(var_names) {
+        templates.push(chain);
+    }
 
     if ndim >= 2 {
         let mut sum = Expr::BinOp(
@@ -1190,8 +1249,25 @@ fn build_invariant_templates(var_names: &[&str]) -> Vec<Expr> {
             Box::new(Expr::Var(var_names[0].into())),
             Box::new(Expr::Var(var_names[1].into())),
         );
+        // Coupled-quadratic-form template (Move 11): kinetic + position
+        // squares + a position cross term. Only the +cross_qq sign was
+        // seeded here; a system whose coupling has the opposite sign (e.g.
+        // a discretized wave equation's nearest-neighbor energy, which needs
+        // -u1*u2, not +u1*u2 — found via PDE Stage A, 2026-07-12) had no
+        // seed of the right shape at all and had to rely on the optimizer
+        // discovering the sign flip on its own, which it didn't reliably do
+        // within a normal search budget. Seed both signs.
         templates.push(Expr::BinOp(
             BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Add,
+                Box::new(half_vel2.clone()),
+                Box::new(pos_sq.clone()),
+            )),
+            Box::new(cross_qq.clone()),
+        ));
+        templates.push(Expr::BinOp(
+            BinOp::Sub,
             Box::new(Expr::BinOp(
                 BinOp::Add,
                 Box::new(half_vel2),

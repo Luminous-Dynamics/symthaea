@@ -122,7 +122,7 @@ pub struct MacroPoolMetrics {
     pub cycle: u64,
     pub total_operators: usize,
     pub total_candidates: usize,
-    pub formal_operators: usize,
+    pub fast_track_operators: usize,
     pub recurrent_operators: usize,
     pub quarantined_operators: usize,
     pub used_operators: usize,
@@ -246,7 +246,7 @@ impl DynamicGrammar {
                             && subtree_admits_fast_track(&canon_expr)
                         {
                             existing.strongly_verified_count += 1;
-                            existing.promotion_tier = MacroPromotionTier::Formal;
+                            existing.promotion_tier = MacroPromotionTier::FastTrackVerified;
                         }
                     }
                 }
@@ -281,7 +281,7 @@ impl DynamicGrammar {
                     && subtree_admits_fast_track(&canon_expr)
                 {
                     strongly_verified_count += 1;
-                    promotion_tier = MacroPromotionTier::Formal;
+                    promotion_tier = MacroPromotionTier::FastTrackVerified;
                 }
             }
         }
@@ -367,7 +367,7 @@ impl DynamicGrammar {
                 candidate.canonical.replace(' ', "_")
             );
             let promotion_tier = if fast_track_promote {
-                MacroPromotionTier::Formal
+                MacroPromotionTier::FastTrackVerified
             } else {
                 MacroPromotionTier::RecurrentNumerical
             };
@@ -528,13 +528,13 @@ impl DynamicGrammar {
             .sum::<usize>();
 
         let mut signature_map: HashMap<String, SignatureMacroMetrics> = HashMap::new();
-        let mut formal_operators = 0usize;
+        let mut fast_track_operators = 0usize;
         let mut recurrent_operators = 0usize;
         let mut quarantined_operators = 0usize;
 
         for op in &self.operators {
             match op.promotion_tier {
-                MacroPromotionTier::Formal => formal_operators += 1,
+                MacroPromotionTier::FastTrackVerified => fast_track_operators += 1,
                 MacroPromotionTier::RecurrentNumerical => recurrent_operators += 1,
                 MacroPromotionTier::Quarantined => quarantined_operators += 1,
             }
@@ -561,7 +561,7 @@ impl DynamicGrammar {
             cycle: self.cycle,
             total_operators,
             total_candidates: self.candidates.len(),
-            formal_operators,
+            fast_track_operators,
             recurrent_operators,
             quarantined_operators,
             used_operators,
@@ -805,7 +805,7 @@ mod tests {
             fitness: 0.001 + 0.001 * complexity as f64,
             status,
             confidence: 0.95,
-            macro_promotion_tier: MacroPromotionTier::Formal,
+            macro_promotion_tier: MacroPromotionTier::FastTrackVerified,
             eml_compiled: None,
             eml_metrics: None,
             eml_verified_real: None,
@@ -1515,7 +1515,7 @@ mod tests {
             template: Expr::Var("n".to_string()),
             canonical: "n".to_string(),
             arity: 0,
-            promotion_tier: MacroPromotionTier::Formal,
+            promotion_tier: MacroPromotionTier::FastTrackVerified,
             source_conjectures: vec![0],
             parent_formulas: vec!["n".to_string()],
             vars_used: vec!["n".to_string()],
@@ -1542,7 +1542,7 @@ mod tests {
             template: Expr::Var("n".to_string()),
             canonical: "n".to_string(),
             arity: 0,
-            promotion_tier: MacroPromotionTier::Formal,
+            promotion_tier: MacroPromotionTier::FastTrackVerified,
             source_conjectures: vec![0],
             parent_formulas: vec!["n".to_string()],
             vars_used: vec!["n".to_string()],
@@ -1566,7 +1566,7 @@ mod tests {
             template: Expr::Var("n".to_string()),
             canonical: "n".to_string(),
             arity: 0,
-            promotion_tier: MacroPromotionTier::Formal,
+            promotion_tier: MacroPromotionTier::FastTrackVerified,
             source_conjectures: vec![0],
             parent_formulas: vec!["n".to_string()],
             vars_used: vec!["n".to_string()],
@@ -1611,7 +1611,7 @@ mod tests {
             template: Expr::Var("n".to_string()),
             canonical: "n".to_string(),
             arity: 0,
-            promotion_tier: MacroPromotionTier::Formal,
+            promotion_tier: MacroPromotionTier::FastTrackVerified,
             source_conjectures: vec![0],
             parent_formulas: vec!["n".to_string()],
             vars_used: vec!["n".to_string()],
@@ -1666,7 +1666,7 @@ mod tests {
             template: Expr::Var("n".to_string()),
             canonical: "n".to_string(),
             arity: 0,
-            promotion_tier: MacroPromotionTier::Formal,
+            promotion_tier: MacroPromotionTier::FastTrackVerified,
             source_conjectures: vec![0],
             parent_formulas: vec!["n".to_string()],
             vars_used: vec!["n".to_string()],
@@ -1699,7 +1699,7 @@ mod tests {
 
         let metrics = grammar.metrics();
         assert_eq!(metrics.total_operators, 2);
-        assert_eq!(metrics.formal_operators, 1);
+        assert_eq!(metrics.fast_track_operators, 1);
         assert_eq!(metrics.recurrent_operators, 1);
         assert_eq!(metrics.used_operators, 1);
         assert_eq!(metrics.mature_operators, 2);

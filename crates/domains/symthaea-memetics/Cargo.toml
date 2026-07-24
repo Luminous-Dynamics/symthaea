@@ -12,3 +12,8 @@ description = "Memetics for Symthaea: a meme as a transmissible HDC unit with fi
 serde = { workspace = true }
 symthaea-core = { workspace = true }
 symthaea-epidemiology = { workspace = true }
+
+# Test-only: proves Ruleset (src/ruleset.rs) round-trips through a real wire
+# format, not just an in-process convenience. Not a runtime dependency.
+[dev-dependencies]
+serde_json = { workspace = true }

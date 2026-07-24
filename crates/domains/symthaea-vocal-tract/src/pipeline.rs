@@ -13,9 +13,22 @@
 use crate::controller::{SpeakerProfile, VocalTractConfig, VocalTractController};
 use crate::encoder::{VocalTractHdcEncoder, VoiceCognitiveState};
 use crate::fep::{VocalTractFepAgent, VocalTractFepResult, VocalTractObservation};
+use crate::phonetics::{PhonemeClass, arpabet_articulation, canonical_arpabet_symbol};
 use crate::types::{FormantFrame, SourceType};
 use symthaea_core::genesis::{GenesisCovenant, GenesisSeed};
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
+
+fn source_type_for_class(class: PhonemeClass) -> SourceType {
+    match class {
+        PhonemeClass::Vowel => SourceType::Vowel,
+        PhonemeClass::Stop => SourceType::Stop,
+        PhonemeClass::Fricative => SourceType::Fricative,
+        PhonemeClass::Nasal => SourceType::Nasal,
+        PhonemeClass::Liquid | PhonemeClass::Glide => SourceType::Liquid,
+        PhonemeClass::Affricate => SourceType::Affricate,
+        PhonemeClass::Silence => SourceType::Silent,
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTONATION & PROSODY
@@ -799,14 +812,25 @@ impl VocalTractPipeline {
         frame.time = self.cumulative_time;
         self.cumulative_time += dt;
 
-        // Set source_type and voicing from phoneme maps
+        // Explicit caller maps remain authoritative, but the shared ARPAbet
+        // table provides a fail-closed production default so the live pipeline
+        // cannot silently render every unregistered consonant as a vowel.
         if let Some(ph) = phoneme {
-            if let Some(&manner) = self.phoneme_manner_map.get(ph) {
+            let metadata = canonical_arpabet_symbol(ph).map(|_| arpabet_articulation(ph));
+            if let Some(manner) = self
+                .phoneme_manner_map
+                .get(ph)
+                .copied()
+                .or_else(|| metadata.map(|value| source_type_for_class(value.class)))
+            {
                 frame.source_type = manner;
             }
-            if let Some(&is_voiced) = self.phoneme_voicing_map.get(ph)
-                && !is_voiced
-            {
+            let is_voiced = self
+                .phoneme_voicing_map
+                .get(ph)
+                .copied()
+                .or_else(|| metadata.map(|value| value.voiced));
+            if is_voiced == Some(false) {
                 frame.voicing = 0.0;
             }
         }
@@ -961,14 +985,25 @@ impl VocalTractPipeline {
         frame.time = self.cumulative_time;
         self.cumulative_time += dt;
 
-        // Set source_type and voicing from phoneme maps
+        // Explicit caller maps remain authoritative, but the shared ARPAbet
+        // table provides a fail-closed production default so the live pipeline
+        // cannot silently render every unregistered consonant as a vowel.
         if let Some(ph) = phoneme {
-            if let Some(&manner) = self.phoneme_manner_map.get(ph) {
+            let metadata = canonical_arpabet_symbol(ph).map(|_| arpabet_articulation(ph));
+            if let Some(manner) = self
+                .phoneme_manner_map
+                .get(ph)
+                .copied()
+                .or_else(|| metadata.map(|value| source_type_for_class(value.class)))
+            {
                 frame.source_type = manner;
             }
-            if let Some(&is_voiced) = self.phoneme_voicing_map.get(ph)
-                && !is_voiced
-            {
+            let is_voiced = self
+                .phoneme_voicing_map
+                .get(ph)
+                .copied()
+                .or_else(|| metadata.map(|value| value.voiced));
+            if is_voiced == Some(false) {
                 frame.voicing = 0.0;
             }
         }
@@ -1673,6 +1708,21 @@ mod tests {
             "Transition F1 delta should be ≤20 Hz/frame: got {:.2}",
             transition_max
         );
+    }
+
+    #[test]
+    fn authoritative_phonetics_cover_unregistered_live_phonemes() {
+        let genesis = GenesisSeed::from_phrase("test-authoritative-phonetics");
+        let mut pipeline = VocalTractPipeline::new(&genesis);
+        let state = VoiceCognitiveState::default();
+
+        let affricate = pipeline.tick_phoneme(&state, None, 0.005, Some("CH"));
+        assert_eq!(affricate.source_type, SourceType::Affricate);
+        assert_eq!(affricate.voicing, 0.0);
+
+        let liquid = pipeline.tick_phoneme(&state, None, 0.005, Some("L"));
+        assert_eq!(liquid.source_type, SourceType::Liquid);
+        assert!(liquid.voicing > 0.0);
     }
 
     #[test]

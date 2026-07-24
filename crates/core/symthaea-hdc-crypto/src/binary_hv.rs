@@ -27,6 +27,17 @@ pub const HDC_BYTES: usize = 2048;
 ///
 /// 2048 bytes = 16,384 bits (2^14). 32-byte aligned for potential SIMD use.
 ///
+/// # Not a secret-handling type
+///
+/// This type is `Copy`, exposes its bytes publicly, and its [`Debug`] impl
+/// prints a prefix of the raw bytes. It has no zeroization support: dropping
+/// or moving a `BinaryHV` does not clear its memory, and any `Copy` silently
+/// leaves the old bytes behind. That is fine for a public HDC value, but it
+/// is not an appropriate type for anything this crate's docs call a "mask" or
+/// "symmetric key" -- those names are historical, not a claim that this type
+/// handles secrets safely. If real secret material is ever needed, use a
+/// dedicated non-`Copy`, zeroizing wrapper, not `BinaryHV` directly.
+///
 /// # Examples
 ///
 /// ```
@@ -96,11 +107,9 @@ impl BinaryHV {
     ///
     /// Fills all 2048 bytes directly from the OS entropy source (via
     /// `getrandom`). Unlike [`Self::new_random`], the result is unpredictable
-    /// and cannot be recomputed from a known/guessable input. **Use this to
-    /// generate any mask or key for [`crate::crypto::HdcMac`],
-    /// [`crate::fhe::EncryptedHV`], or [`crate::crypto::HdcThresholdSharing`]**
-    /// — those primitives' claimed information-theoretic security properties
-    /// only hold when keys/masks come from a true entropy source.
+    /// and cannot be recomputed from a known/guessable input. This supplies
+    /// entropy only; it does not make the quarantined HDC MAC, threshold, or
+    /// shared-mask aggregation constructions secure.
     ///
     /// # Panics
     ///
@@ -202,10 +211,13 @@ impl BinaryHV {
 
         let shift = shift % Self::DIM;
 
-        // Convert bytes to u64 words for efficient rotation
+        // Convert bytes to u64 words for efficient rotation. Explicit little-endian
+        // (not native-endian) so the result is architecture-independent: two machines
+        // permuting the same input bytes by the same shift must get the same output
+        // bytes, which native-endian conversion does not guarantee on a big-endian host.
         let mut words = [0u64; 256];
         for (i, chunk) in self.0.chunks_exact(8).enumerate() {
-            words[i] = u64::from_ne_bytes([
+            words[i] = u64::from_le_bytes([
                 chunk[0], chunk[1], chunk[2], chunk[3], chunk[4], chunk[5], chunk[6], chunk[7],
             ]);
         }
@@ -230,7 +242,7 @@ impl BinaryHV {
 
         let mut result = [0u8; HDC_BYTES];
         for (i, word) in result_words.iter().enumerate() {
-            let bytes = word.to_ne_bytes();
+            let bytes = word.to_le_bytes();
             result[i * 8..i * 8 + 8].copy_from_slice(&bytes);
         }
 
@@ -393,6 +405,43 @@ mod tests {
     fn test_permute_full_cycle() {
         let a = BinaryHV::new_random(42);
         assert_eq!(a.permute(HDC_DIMENSION), a);
+    }
+
+    /// Known-answer vectors for `permute()`, independently computed (Python
+    /// re-implementation of the exact word-rotation algorithm, little-endian
+    /// word conversion). Input: byte `i` = `i % 256` for `i` in `0..HDC_BYTES`.
+    /// Guards against a regression back to native-endian byte conversion,
+    /// which would silently change these outputs on a big-endian host.
+    #[test]
+    fn test_permute_known_answer_vectors() {
+        let mut bytes = [0u8; HDC_BYTES];
+        for (i, b) in bytes.iter_mut().enumerate() {
+            *b = (i % 256) as u8;
+        }
+        let input = BinaryHV(bytes);
+
+        // Case 1: shift=137 exercises the general (non-word-aligned) path.
+        let r137 = input.permute(137);
+        assert_eq!(&r137.0[0..8], &[223, 225, 227, 229, 231, 233, 235, 237]);
+        assert_eq!(r137.0[1000], 175);
+        assert_eq!(r137.0[1023], 221);
+        assert_eq!(r137.0[1024], 223);
+        assert_eq!(
+            &r137.0[HDC_BYTES - 8..],
+            &[207, 209, 211, 213, 215, 217, 219, 221]
+        );
+
+        // Case 2: shift=128 is word-aligned (128 bits = 16 bytes = 2 words),
+        // exercising the `bit_shift == 0` branch.
+        let r128 = input.permute(128);
+        assert_eq!(&r128.0[0..8], &[240, 241, 242, 243, 244, 245, 246, 247]);
+        assert_eq!(r128.0[1000], 216);
+        assert_eq!(r128.0[1023], 239);
+        assert_eq!(r128.0[1024], 240);
+        assert_eq!(
+            &r128.0[HDC_BYTES - 8..],
+            &[232, 233, 234, 235, 236, 237, 238, 239]
+        );
     }
 
     #[test]

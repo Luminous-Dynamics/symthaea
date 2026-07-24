@@ -67,7 +67,7 @@ pub struct BaselineCollection {
     pub spatial: BaselineMap,
     /// Causal reasoning baselines (causal chain, confound detection, intervention effect).
     pub causal_reasoning: BaselineMap,
-    /// Security (HDC-FHE) baselines (encrypted classification, collective aggregation).
+    /// Insecure shared-mask algebra demo baselines (encrypted classification, collective aggregation).
     pub security: BaselineMap,
     /// Coding domain baselines (HumanEval, bug detection).
     pub coding: BaselineMap,
@@ -4703,7 +4703,7 @@ pub fn causal_reasoning_baselines() -> BaselineMap {
     m
 }
 
-/// Security (HDC-FHE) domain baselines.
+/// Insecure shared-mask algebra demo domain baselines.
 ///
 /// These baselines represent what conventional encrypted inference achieves.
 /// Standard FHE (CKKS/BGV) introduces quantization noise that degrades accuracy.

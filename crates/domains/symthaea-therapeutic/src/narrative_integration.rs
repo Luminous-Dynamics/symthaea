@@ -10,6 +10,7 @@
 //! Science: White & Epston (1990), Angus & McLeod (2004) narrative processes,
 //! Pennebaker (1997) expressive writing, Adler (2012) narrative identity.
 
+use crate::semantic_encoding::encode_therapeutic_text;
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::BinaryHV;
 
@@ -37,15 +38,13 @@ pub struct NarrativeFragment {
 impl NarrativeFragment {
     /// Create a new narrative fragment with HDC encoding.
     pub fn new(text: &str, cycle: u64, emotional_valence: f32, is_traumatic: bool) -> Self {
-        let hash = blake3::hash(text.as_bytes());
-        let seed = u64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap());
         Self {
             text: text.to_string(),
             cycle,
             emotional_valence: emotional_valence.clamp(-1.0, 1.0),
             is_traumatic,
             integration_level: if is_traumatic { 0.2 } else { 0.5 },
-            encoding: Some(BinaryHV::random(seed)),
+            encoding: encode_therapeutic_text(text),
         }
     }
 

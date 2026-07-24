@@ -8,8 +8,13 @@
 //!
 //! All sensors have configurable noise models for sim-to-real transfer.
 //!
-//! Used by: symthaea-manipulator, symthaea-quadruped, symthaea-exoskeleton,
-//! and future platforms including the full-frame exoskeleton.
+//! Used by: symthaea-exoskeleton only, and only behind its non-default
+//! `sensors` feature (which nothing in the workspace enables as of
+//! 2026-07-15 — see VISION_PROJECTION_REVIEW_2026-07-15.md). A prior
+//! version of this note also claimed symthaea-manipulator and
+//! symthaea-quadruped as consumers; neither has ever depended on this
+//! crate. Intended for those platforms and the full-frame exoskeleton
+//! once wired.
 
 use nalgebra::SVector;
 use symtropy_physics::articulation::ArticulatedChain;

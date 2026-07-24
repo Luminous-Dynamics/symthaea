@@ -105,6 +105,7 @@ use crate::cognitive_loop::thresholds::{
     PHYSICS_EXPLOIT_THRESHOLD,
     PHYSICS_EXPLORE_SCALE,
     PHYSICS_EXPLORE_THRESHOLD,
+    PSI_PHI_COUPLING_WEIGHT,
     // Self-reflection
     REFLECTION_CONFIDENCE_THRESHOLD,
     REFLECTION_EXPLORATION_DECREASE,
@@ -171,6 +172,9 @@ impl CognitiveLoopService {
             detected_primitives: vec![],
             learning_occurred: false,
             training_loss: None,
+            bits_saved_persist: None,
+            bits_saved_zero: None,
+            bits_kappa: None,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             metadata,
             thought_vector: vec![0.0; 32],
@@ -558,7 +562,7 @@ impl CognitiveLoopService {
             .smoothed_coherence()
             * BASELINE_INTEGRATION_SCALE;
 
-        let unified_psi = (baseline_integration
+        let component_psi = (baseline_integration
             + coherence_psi
             + voice_psi
             + flow_psi
@@ -566,6 +570,25 @@ impl CognitiveLoopService {
             + body_psi_contrib as f32
             + embodied_psi_contrib as f32)
             .clamp(0.0, 1.0) as f64;
+
+        // Φ→Ψ coupling (2026-07-16, user-approved design — see
+        // PSI_PHI_COUPLING_WEIGHT's doc): in a text-only loop the social
+        // components above are structurally inert, so component_psi is a
+        // near-constant coherence proxy (~0.51) and Ψ's gates (ethics input,
+        // Broca's speak-trigger at 0.4) never fired. Blending in the
+        // regime-discriminating consciousness_level gives Ψ real dynamic
+        // range. Coupling applies only once Φ has actually been measured:
+        // carryover.history.consciousness_level cold-starts at the 0.05
+        // consciousness floor, which is a prior, not a measurement — treating
+        // it as one would suppress Ψ (and Broca's speech) for the first ~47
+        // cycles until spectral Φ first computes (the absent-vs-zero rule).
+        let phi_level = self.carryover.history.consciousness_level;
+        let unified_psi = if phi_level > 0.05 {
+            ((1.0 - PSI_PHI_COUPLING_WEIGHT) * component_psi + PSI_PHI_COUPLING_WEIGHT * phi_level)
+                .clamp(0.0, 1.0)
+        } else {
+            component_psi
+        };
         self.unification_engine.update_psi(unified_psi);
         unified_psi
     }

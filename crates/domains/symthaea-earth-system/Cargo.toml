@@ -3,8 +3,8 @@ name = "symthaea-earth-system"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-description = "Earth-system climate physics for Symthaea: zero-dimensional energy-balance model (Stefan-Boltzmann effective temperature, grey-atmosphere greenhouse, CO2 radiative forcing, climate sensitivity). Closed-form, ground-truth-checked."
+description = "Reduced-order Earth-system baselines: climate, carbon, water, soil and nutrient turnover, productivity accounting, sea level, and driver export."
 
-# Zero external dependencies, no symthaea-core link: self-contained climate
-# energy-balance physics. Builds fast and in isolation.
+# Zero external dependencies, no symthaea-core link: self-contained reduced-order
+# climate and carbon-cycle reference models. Builds fast and in isolation.
 [dependencies]

@@ -1,0 +1,27 @@
+{
+  "protocol_version": "symthaea-muse-confirmatory-collection-protocol-v1",
+  "study_id": "REPLACE",
+  "readiness_release_sha256": "REPLACE_64_HEX",
+  "external_preregistration_sha256": "REPLACE_64_HEX",
+  "manifest_sha256": "REPLACE_64_HEX",
+  "methodology_sha256": "REPLACE_64_HEX",
+  "blinded_schedule_sha256": "REPLACE_64_HEX",
+  "participant_schedule_sha256": "REPLACE_64_HEX",
+  "artifact_bundle_sha256": "REPLACE_64_HEX",
+  "cohort_registry_sha256": "REPLACE_64_HEX",
+  "planned_open_utc": "REPLACE_RFC3339",
+  "planned_close_utc": "REPLACE_RFC3339",
+  "target_complete_blocks": 96,
+  "maximum_enrolled_participants": 128,
+  "maximum_exclusion_rate_basis_points": 2500,
+  "minimum_completion_rate_basis_points": 7500,
+  "outcome_monitoring_prohibited": true,
+  "codebook_access_prohibited": true,
+  "collection_roles": [
+    "CollectionOperator",
+    "GovernanceOfficer",
+    "EvidenceCustodian",
+    "BlindedMonitor"
+  ],
+  "protocol_sha256": ""
+}

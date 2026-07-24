@@ -325,6 +325,21 @@ pub struct CognitiveLoopConfig {
     /// Enable Phi-weighted attention routing with adaptive thresholds.
     pub enable_phi_attention: bool,
 
+    /// Master switch for the ConsciousnessEngine measurement spine
+    /// (SpectralMIPFinder Φ + consensus + its LR/confidence feedbacks). When
+    /// false, measure() is skipped entirely and a neutral no-op output is
+    /// substituted — consciousness_level degrades to its unmeasured fallback.
+    /// Exists so experiments can ablate the measurement spine itself
+    /// (keystone P5 open question; the 15 enable_* flags never covered the
+    /// engine). Default: true.
+    pub enable_consciousness_engine: bool,
+
+    /// Legacy Φ input: push only the stimulus encoding to SpectralMIPFinder
+    /// instead of stimulus ⊗ internal-temporal-state. Kept for before/after
+    /// comparisons — stimulus-only Φ measures the input stream, not the system
+    /// (docs/PHI_SIGNAL_TRACE_2026-07-15.md symptom 2). Default: false.
+    pub phi_measures_stimulus_only: bool,
+
     /// Enable negation detection for moral evaluation preprocessing.
     pub enable_negation_detection: bool,
 
@@ -616,6 +631,17 @@ pub struct CognitiveLoopConfig {
     /// Enable vision predictive coding hierarchy (default false).
     #[cfg(feature = "vision-manifold")]
     pub enable_vision_predictive_hierarchy: bool,
+    /// Surprise-driven holographic auto-dilation of the vision manifold
+    /// (default true, preserving historical behavior — but BEWARE: Ultra is
+    /// 65,536 dims and the manifold's O(dim²) structures then allocate
+    /// ~17-22 GB, which OOM-kills the process on a 31 GB machine. A
+    /// camera-less loop (empty frame buffer → max surprise every cycle)
+    /// triggers this within ~70 cycles — found 2026-07-11 by the
+    /// observer-ΔΨ A/B probe via kernel oom_reaper. Disable for bounded
+    /// deployments and experiments; whether the DEFAULT should stay true is
+    /// flagged in VISUAL_ART_IMPROVEMENT_PLAN_2026-07-10.md.
+    #[cfg(feature = "vision-manifold")]
+    pub enable_vision_auto_dilation: bool,
     /// Scene memory coherence threshold (default 0.7).
     #[cfg(feature = "vision-manifold")]
     pub scene_memory_coherence_threshold: f32,
@@ -628,6 +654,22 @@ pub struct CognitiveLoopConfig {
     /// Enable cross-manifold predictor (vision→cognitive Hebbian mapping, default false).
     #[cfg(feature = "vision-manifold")]
     pub enable_cross_manifold_predictor: bool,
+    /// Observer-ΔΨ A/B mode (feature `art-observer`, default false): every
+    /// other artwork-viewing window shows a pixel-scrambled version of the
+    /// render instead of the artwork itself — same color/luminance
+    /// statistics, zero composition. Control verdicts are recorded in
+    /// telemetry (`observer_was_control`) but never rewarded, so comparing
+    /// Δψ across the two arms isolates whether her response tracks
+    /// *composition* rather than any bright frame. Research probe; leave
+    /// off in production.
+    #[cfg(feature = "art-observer")]
+    pub art_observer_ab_mode: bool,
+    /// A/B counterbalancing (default false = art arm first): when true, the
+    /// scrambled control opens the session instead. Run paired sessions with
+    /// both values to separate order effects (early-session ψ trends) from
+    /// the arm effect.
+    #[cfg(feature = "art-observer")]
+    pub art_observer_ab_control_first: bool,
 
     // ── Foveation Dispatch ──────────────────────────────────────────────
     /// Enable foveation attention dispatch (requires vision-manifold feature).
@@ -895,6 +937,8 @@ impl Default for CognitiveLoopConfig {
             enable_hierarchical_bundling: true,
             enable_contextual_weights: true,
             enable_phi_attention: true,
+            enable_consciousness_engine: true,
+            phi_measures_stimulus_only: false,
             enable_negation_detection: true,
             enable_visualization: true,
             enable_soul_alignment: true,
@@ -968,6 +1012,8 @@ impl Default for CognitiveLoopConfig {
             #[cfg(feature = "vision-manifold")]
             enable_vision_predictive_hierarchy: true,
             #[cfg(feature = "vision-manifold")]
+            enable_vision_auto_dilation: true,
+            #[cfg(feature = "vision-manifold")]
             scene_memory_coherence_threshold: 0.7,
             #[cfg(feature = "vision-manifold")]
             scene_memory_error_threshold: 0.1,
@@ -975,6 +1021,10 @@ impl Default for CognitiveLoopConfig {
             scene_memory_dampen_factor: 0.5,
             #[cfg(feature = "vision-manifold")]
             enable_cross_manifold_predictor: false,
+            #[cfg(feature = "art-observer")]
+            art_observer_ab_mode: false,
+            #[cfg(feature = "art-observer")]
+            art_observer_ab_control_first: false,
             #[cfg(feature = "foveation")]
             enable_foveation: true,
             #[cfg(feature = "foveation")]

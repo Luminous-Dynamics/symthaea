@@ -935,7 +935,7 @@ impl BenchmarkReport {
                 &bl.clinical,
             ),
             ("mi_spirit_score", "mi_spirit_score", &bl.clinical),
-            // Security (HDC-FHE)
+            // Insecure shared-mask algebra demo
             ("encrypted_accuracy", "encrypted_accuracy", &bl.security),
             ("aggregation_fidelity", "aggregation_fidelity", &bl.security),
             ("learning_accuracy", "learning_accuracy", &bl.security),
@@ -2300,7 +2300,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("CrisisDetection") => "crisis_sensitivity",
         b if b.contains("CognitiveDistortion") => "distortion_identification",
         b if b.contains("MotivationalInterviewing") => "mi_spirit_score",
-        // Security (HDC-FHE) domain
+        // Insecure shared-mask algebra demo domain
         b if b.contains("EncryptedLearning") => "learning_accuracy",
         b if b.contains("CrossMaskPrivacy") => "cross_session_leakage",
         // EncryptedBinding handled above (before generic "Binding" arm)
@@ -3288,7 +3288,7 @@ mod tests {
             Box::new(ConstraintPuzzlesBenchmark),
             Box::new(ProofConstructionBenchmark),
             Box::new(DefiniteIntegralsBenchmark),
-            // Security (HDC-FHE)
+            // Insecure shared-mask algebra demo
             Box::new(EncryptedClassificationBenchmark),
             Box::new(CollectiveAggregationBenchmark),
             Box::new(EncryptedLearningBenchmark),

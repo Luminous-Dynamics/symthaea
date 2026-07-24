@@ -31,7 +31,8 @@ use serde::{Deserialize, Serialize};
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::hdc_ltc_unified::{
-    HdcLtcUnifiedNetwork, UnifiedActivation, UnifiedConfig, UnifiedNetworkConfig,
+    HdcLtcUnifiedNetwork, NetworkStateSnapshot, UnifiedActivation, UnifiedConfig,
+    UnifiedNetworkConfig,
 };
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
@@ -201,6 +202,14 @@ pub struct HdcLtcBridge {
 
     /// Optional genesis seed for deterministic re-initialization (e.g. during resize)
     genesis: Option<GenesisSeed>,
+
+    /// Reusable snapshot buffer that lets predict_forward evolve-and-restore
+    /// without wiping live state (allocation-free after first use)
+    predict_scratch: NetworkStateSnapshot,
+
+    /// Reusable snapshot buffer for the training pass's live-state save
+    /// (train_step is pure w.r.t. evolution state; see its doc)
+    train_scratch: NetworkStateSnapshot,
 }
 
 impl HdcLtcBridge {
@@ -249,6 +258,8 @@ impl HdcLtcBridge {
             state_diversity: 0.0,
             cycles_since_resize: 0,
             genesis: None,
+            predict_scratch: NetworkStateSnapshot::default(),
+            train_scratch: NetworkStateSnapshot::default(),
         }
     }
 
@@ -305,6 +316,8 @@ impl HdcLtcBridge {
             state_diversity: 0.0,
             cycles_since_resize: 0,
             genesis: Some(genesis.clone()),
+            predict_scratch: NetworkStateSnapshot::default(),
+            train_scratch: NetworkStateSnapshot::default(),
         }
     }
 
@@ -394,6 +407,23 @@ impl HdcLtcBridge {
             let row = &self.output_projection[j * output_dim..(j + 1) * output_dim];
             for (o, &w) in output.iter_mut().zip(row.iter()) {
                 *o += x * w;
+            }
+        }
+
+        // SCALE RESTORATION (2026-07-18, probe_signal_scale finding): the bind
+        // chain annihilates state magnitude ∝ d^-1.9 — at hdc_dim=16,384 the
+        // raw projection lands at ~3e-10 vs unit-norm input, the readout's
+        // loss equals mean(target²) (it contributes nothing), and its
+        // gradients (~1e-13) are untrainable at any learning rate. Normalize
+        // by the state HV's norm so the readout operates at O(1) scale:
+        // direction (the meaning-carrier in HDC) is untouched, downstream
+        // consumers finally receive signal, and readout gradient flow is
+        // restored. Zero-norm guard: a truly empty state projects to zeros
+        // (absence, honestly).
+        let state_norm = hv.norm();
+        if state_norm > 1e-30 {
+            for o in output.iter_mut() {
+                *o /= state_norm;
             }
         }
 
@@ -560,12 +590,60 @@ impl HdcLtcBridge {
         Array1::from_vec(self.current_output.clone())
     }
 
-    /// Train step using analytical BPTT gradients (matches CfCNetwork::train_step)
+    /// Train step using analytical BPTT gradients (matches CfCNetwork::train_step).
     ///
-    /// Replaces Hebbian learning with backpropagation through the closed-form
-    /// evolution step, computing exact gradients for weight_hv and input_mask.
+    /// PURE with respect to live evolution state (2026-07-17): the training
+    /// forward pass runs on a scratch evolution — live neuron state,
+    /// `current_output`, `total_steps`, and the diversity metric are all
+    /// untouched. Only WEIGHTS (neuron parameters + output projection) change.
+    ///
+    /// HISTORY: this used to evolve the LIVE network as a side effect and
+    /// overwrite `current_output`. With per-cycle training, the live temporal
+    /// trajectory was re-evolved every cycle with the PREVIOUS cycle's
+    /// encoding after the planning phase had already stepped it with the
+    /// current one — shuffling subjective time (enc_t → enc_{t−1} →
+    /// enc_{t+1} → …) and making sequence learning impossible by
+    /// construction. Keystone Phase 3 measured the consequence: zero order
+    /// anticipation in every arm, PE above the uncorrelated baseline (the
+    /// one-step-behind signature). docs/KEYSTONE_AB_PROTOCOL_2026-07-17.md.
     pub fn train_step(
         &mut self,
+        input: &Array1<f32>,
+        target: &Array1<f32>,
+        dt: f32,
+        learning_rate: f32,
+    ) -> Result<f32> {
+        self.train_step_impl(None, input, target, dt, learning_rate)
+    }
+
+    /// Like [`Self::train_step`], but the training forward pass starts from
+    /// the given historical snapshot instead of the current live state — for
+    /// callers training on a (state at end of cycle t−2, enc_{t−1} → enc_t)
+    /// pair whose correct starting state is no longer the live one.
+    pub fn train_step_from(
+        &mut self,
+        start: &NetworkStateSnapshot,
+        input: &Array1<f32>,
+        target: &Array1<f32>,
+        dt: f32,
+        learning_rate: f32,
+    ) -> Result<f32> {
+        // Stale-snapshot guard: after an adaptive resize the historical
+        // snapshot's dimension no longer matches the network — fall back to
+        // a live-state start rather than restoring poisoned state. The
+        // caller's rolling queue refills with current-dimension snapshots
+        // within two cycles.
+        let start = if start.dimension() == Some(self.config.hdc_dim) {
+            Some(start)
+        } else {
+            None
+        };
+        self.train_step_impl(start, input, target, dt, learning_rate)
+    }
+
+    fn train_step_impl(
+        &mut self,
+        start: Option<&NetworkStateSnapshot>,
         input: &Array1<f32>,
         target: &Array1<f32>,
         dt: f32,
@@ -577,7 +655,17 @@ impl HdcLtcBridge {
         // Project target to HDC (reuse same projection)
         let hdc_target = self.project_to_hdc(target);
 
-        // Evolve network
+        // Save live evolution state — training must not perturb it.
+        let mut live = std::mem::take(&mut self.train_scratch);
+        self.network.snapshot_state_into(&mut live);
+
+        // Start the training forward pass from the historical state if given
+        // (otherwise from the live state, without mutating it observably).
+        if let Some(start) = start {
+            self.network.restore_state_from(start);
+        }
+
+        // Training forward pass (on what is now scratch state)
         self.network.evolve_closed_form(dt, &hdc_input);
 
         // Get output and compute error in output space
@@ -592,7 +680,7 @@ impl HdcLtcBridge {
             .sum::<f32>()
             / target.len() as f32;
 
-        // Apply BPTT gradients to all layers
+        // Apply BPTT gradients to all layers (weights persist past the restore)
         let n_layers = self.network.n_layers();
         for layer_idx in 0..n_layers {
             let layer_in = self.network.layer_input(layer_idx, &hdc_input);
@@ -604,13 +692,13 @@ impl HdcLtcBridge {
             }
         }
 
-        // Update projection weights using gradient descent
+        // Update projection weights (reads the training-state output — must
+        // run before the live-state restore below)
         self.update_projections(&hdc_input, target, &output, learning_rate);
 
-        // Update cached output
-        self.current_output = output;
-        self.total_steps += 1;
-        self.update_diversity();
+        // Restore live evolution state; weight updates survive.
+        self.network.restore_state_from(&live);
+        self.train_scratch = live;
 
         Ok(loss)
     }
@@ -632,23 +720,79 @@ impl HdcLtcBridge {
             .map(|(o, t)| o - t)
             .collect();
 
-        // Update output projection (simple gradient descent)
+        // Update output projection (simple gradient descent).
+        // Forward is W·hv/‖hv‖ (scale restoration in project_from_hdc), so the
+        // gradient w.r.t. W is error × hv/‖hv‖ — use the same normalization
+        // here or the update direction is scaled inconsistently with the
+        // forward pass (and collapses with the d^-1.9 annihilation).
         let hdc_output = self.network.output();
         let hdc_dim = self.config.hdc_dim;
+        let state_norm = hdc_output.norm();
+        if state_norm <= 1e-30 {
+            return;
+        }
+        let inv_norm = 1.0 / state_norm;
         for i in 0..output_dim {
             for j in 0..hdc_dim {
-                let grad = errors[i] * hdc_output.values[j];
+                let grad = errors[i] * hdc_output.values[j] * inv_norm;
                 self.output_projection[j * output_dim + i] -= learning_rate * grad;
             }
         }
     }
 
-    /// Predict forward at a specific time horizon (matches CfCNetwork::predict_forward)
+    /// Predict forward at a specific time horizon (matches CfCNetwork::predict_forward).
+    ///
+    /// PURE with respect to observable state: evolves the network at the given
+    /// horizon, reads the projected output, then restores the pre-call neuron
+    /// states and layer outputs from a reusable snapshot buffer. `current_output`,
+    /// `total_steps`, and the diversity metric are untouched.
+    ///
+    /// History: this used to call `forward()` (a real state advance) and rely on
+    /// the caller's read_state/inject "save/restore" — but `read_state` only
+    /// captures the small projected output and `inject` RESETS the network, so
+    /// every prediction wiped the temporal state. See
+    /// docs/PHI_SIGNAL_TRACE_2026-07-15.md (PE ≡ 1.0 root cause).
     pub fn predict_forward(&mut self, input: &Array1<f32>, horizon: f32) -> Result<Array1<f32>> {
-        Ok(self.forward(input, horizon))
+        let hdc_input = self.project_to_hdc(input);
+
+        let mut scratch = std::mem::take(&mut self.predict_scratch);
+        self.network.snapshot_state_into(&mut scratch);
+
+        self.network.evolve_closed_form(horizon, &hdc_input);
+        let output = self.project_from_hdc(&self.network.output());
+
+        self.network.restore_state_from(&scratch);
+        self.predict_scratch = scratch;
+
+        Ok(Array1::from_vec(output))
+    }
+
+    /// Whether `predict_forward` leaves network state untouched (it does — see
+    /// its doc). Callers can skip external save/restore when this is true.
+    pub fn prediction_is_pure(&self) -> bool {
+        true
+    }
+
+    /// Capture the network's full evolution state (for callers about to run a
+    /// deliberately destructive operation such as consolidation replay).
+    pub fn snapshot_evolution_state(&self) -> NetworkStateSnapshot {
+        let mut snap = NetworkStateSnapshot::default();
+        self.network.snapshot_state_into(&mut snap);
+        snap
+    }
+
+    /// Restore evolution state captured by [`snapshot_evolution_state`].
+    pub fn restore_evolution_state(&mut self, snap: &NetworkStateSnapshot) {
+        self.network.restore_state_from(snap);
     }
 
     /// Inject state into the network (matches CfCNetwork::inject)
+    ///
+    /// WARNING: unlike CfCNetwork::inject, this cannot restore internal neuron
+    /// state — the injected vector lives in the small projected output space.
+    /// It RESETS the whole network and seeds only `current_output`. Use it for
+    /// deliberate resets (e.g. clean replay), never as the "restore" half of a
+    /// save/restore pattern.
     pub fn inject(&mut self, state: &Array1<f32>) -> Result<()> {
         // Reset the network and set initial state based on input
         self.network.reset();
@@ -677,10 +821,21 @@ impl HdcLtcBridge {
 
         for layer_idx in 0..self.network.n_layers() {
             if let Some(layer) = self.network.layer(layer_idx) {
-                // Create a single tau array for this layer based on neuron configs
+                // LIVE per-neuron tau: τ ≈ τ₀ × (1 + backbone × ||state||),
+                // matching the state-dependent term of the neuron's real
+                // τ(||x||, u) (the ±20% input-similarity term is omitted —
+                // the bridge doesn't retain the last input HV).
+                //
+                // HISTORY (2026-07-16): this used to return the CONFIG constant
+                // τ₀ × (1 + backbone) per neuron — identical every cycle — so
+                // downstream temporal coherence (1/(1+CV)) was frozen and Ψ,
+                // whose dominant terms are coherence-derived, had ~0.01 dynamic
+                // range (docs/PHI_SIGNAL_TRACE_2026-07-15.md follow-up 4).
                 let layer_taus: Vec<f32> = layer
                     .iter()
-                    .map(|n| n.config().tau_base * (1.0 + n.config().backbone_tau))
+                    .map(|n| {
+                        n.config().tau_base * (1.0 + n.config().backbone_tau * n.state().norm())
+                    })
                     .collect();
                 taus.push(Array1::from_vec(layer_taus));
             }
@@ -797,6 +952,86 @@ pub struct HdcLtcBridgeStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The d^-1.9 bind-chain annihilation (probe_signal_scale, 2026-07-18)
+    /// must never silently return: after real steps on a unit-norm input, the
+    /// bridge output must live at a sane order of magnitude — the readout is
+    /// untrainable otherwise (gradients ~1e-13 pre-fix).
+    #[test]
+    fn output_scale_is_not_annihilated() {
+        let config = HdcLtcBridgeConfig {
+            input_dim: 8,
+            output_dim: 8,
+            layer_sizes: vec![2, 2],
+            hdc_dim: 2048,
+            seed: 11,
+            ..Default::default()
+        };
+        let mut bridge = HdcLtcBridge::new(config);
+        let raw: Vec<f32> = (0..8).map(|i| (i as f32 * 0.7).sin()).collect();
+        let norm = raw.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let input = Array1::from_vec(raw.iter().map(|x| x / norm).collect());
+        for _ in 0..10 {
+            bridge.step(&input, 0.02).unwrap();
+        }
+        let out = bridge.read_state().unwrap();
+        let out_norm = out.iter().map(|x| x * x).sum::<f32>().sqrt();
+        assert!(
+            out_norm > 1e-3 && out_norm < 1e3,
+            "bridge output norm {out_norm:.3e} is outside sane scale — \
+             the bind-chain annihilation (or an explosion) is back"
+        );
+    }
+
+    /// train_step must not perturb live evolution state (keystone Phase-3
+    /// root cause: the old trainer evolved the LIVE network with the previous
+    /// cycle's encoding every learning cycle, shuffling subjective time).
+    ///
+    /// Tests the property train_step actually promises: EVOLUTION STATE
+    /// (neuron states, layer outputs, Fourier phase clocks) is bit-preserved
+    /// across a training call — even at a real learning rate, where weights
+    /// legitimately change. (An earlier twin-trajectory design assumed lr=0
+    /// implies unchanged weights; false — apply_gradients applies weight
+    /// decay independently of lr, a discovery of the 2026-07-18 scale work.)
+    #[test]
+    fn train_step_does_not_perturb_live_evolution_state() {
+        let config = HdcLtcBridgeConfig {
+            input_dim: 8,
+            output_dim: 8,
+            layer_sizes: vec![2, 2],
+            hdc_dim: 256,
+            seed: 7,
+            ..Default::default()
+        };
+        let mut bridge = HdcLtcBridge::new(config);
+
+        let warm = Array1::from_vec(vec![0.3; 8]);
+        for _ in 0..3 {
+            bridge.step(&warm, 0.02).unwrap();
+        }
+
+        let before = bridge.snapshot_evolution_state();
+        let out_before = bridge.read_state().unwrap();
+
+        let train_in = Array1::from_vec(vec![0.7; 8]);
+        let train_target = Array1::from_vec(vec![-0.2; 8]);
+        bridge
+            .train_step(&train_in, &train_target, 0.02, 0.05)
+            .unwrap();
+
+        let after = bridge.snapshot_evolution_state();
+        assert!(
+            before.approx_eq(&after, 1e-7),
+            "train_step perturbed live evolution state (states/outputs/clocks)"
+        );
+        let out_after = bridge.read_state().unwrap();
+        for (x, y) in out_before.iter().zip(out_after.iter()) {
+            assert!(
+                (x - y).abs() < 1e-7,
+                "train_step changed current_output: {x} vs {y}"
+            );
+        }
+    }
 
     #[test]
     fn test_bridge_creation() {

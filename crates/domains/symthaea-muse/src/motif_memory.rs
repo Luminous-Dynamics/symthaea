@@ -119,6 +119,14 @@ impl MotifMemory {
     }
 
     /// Get the next note: either from replay queue or None (caller should generate new).
+    /// # Looping-generator semantics — callers MUST bound their drain
+    ///
+    /// When the replay queue empties, this re-decides the strategy against
+    /// `state` and re-enqueues the WHOLE phrase — so under any `Repeat*`
+    /// strategy with a stored phrase it **never returns `None`**. Pull one
+    /// note per tick (streaming) or cap the count; an unbounded
+    /// `while let Some(..)` drain with a constant `state` loops forever
+    /// (creative_bridge OOM'd at a 137GB Vec this way; found 2026-07-16).
     pub fn next_note(&mut self, state: &MusicalState) -> Option<Note> {
         // If replay queue has notes, return from it
         if let Some(note) = self.replay_queue.pop_front() {

@@ -4,31 +4,93 @@
 //! Mesh validation: watertight checks, degenerate triangle detection,
 //! normal consistency, and index bounds validation.
 
+use crate::intersection::{DEFAULT_SELF_INTERSECTION_PAIR_BUDGET, find_self_intersections};
 use crate::mesh::TriangleMesh;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Full validation report for a mesh
 #[derive(Debug, Clone)]
 pub struct ValidationReport {
     pub triangle_count: usize,
     pub vertex_count: usize,
+    pub is_empty: bool,
+    pub normal_count_matches: bool,
     pub is_watertight: bool,
+    /// Edges referenced by exactly one triangle.
     pub boundary_edges: usize,
+    /// Edges referenced by more than two triangles.
+    pub non_manifold_edges: usize,
+    /// Triangle-connected components under shared quantized edges.
+    pub connected_components: usize,
+    /// Duplicate geometric triangles after position quantization.
+    pub duplicate_triangles: Vec<usize>,
     pub degenerate_triangles: Vec<usize>,
     pub inconsistent_normals: Vec<usize>,
     pub out_of_bounds_indices: Vec<usize>,
+    pub non_finite_vertices: Vec<usize>,
+    pub non_finite_normals: Vec<usize>,
+    /// Non-adjacent triangle pairs whose interiors intersect.
+    pub self_intersections: Vec<[usize; 2]>,
+    /// True when the bounded self-intersection scan examined every candidate.
+    pub self_intersection_scan_complete: bool,
     pub signed_volume: f32,
 }
 
-impl ValidationReport {
-    /// True if mesh passes all checks
-    pub fn is_valid(&self) -> bool {
-        self.out_of_bounds_indices.is_empty() && self.degenerate_triangles.is_empty()
+/// Owned mesh that has crossed the baseline closed-solid fabrication gate.
+#[derive(Debug, Clone)]
+pub struct FabricationReadyMesh {
+    mesh: TriangleMesh,
+    report: ValidationReport,
+}
+
+impl FabricationReadyMesh {
+    /// Validate and grant the fabrication-ready capability.
+    pub fn try_new(mesh: TriangleMesh) -> Result<Self, ValidationReport> {
+        let report = validate_mesh(&mesh);
+        if !report.is_printable() {
+            return Err(report);
+        }
+        Ok(Self { mesh, report })
     }
 
-    /// True if mesh is suitable for 3D printing (valid + watertight + consistent normals)
+    pub fn mesh(&self) -> &TriangleMesh {
+        &self.mesh
+    }
+
+    pub fn report(&self) -> &ValidationReport {
+        &self.report
+    }
+
+    pub fn into_mesh(self) -> TriangleMesh {
+        self.mesh
+    }
+}
+
+impl ValidationReport {
+    /// True if the mesh is a non-empty, finite, internally consistent triangle set.
+    pub fn is_valid(&self) -> bool {
+        !self.is_empty
+            && self.normal_count_matches
+            && self.out_of_bounds_indices.is_empty()
+            && self.degenerate_triangles.is_empty()
+            && self.duplicate_triangles.is_empty()
+            && self.non_manifold_edges == 0
+            && self.non_finite_vertices.is_empty()
+            && self.non_finite_normals.is_empty()
+            && self.self_intersection_scan_complete
+            && self.self_intersections.is_empty()
+    }
+
+    /// True if the mesh passes the minimum closed-solid gate for fabrication.
+    ///
+    /// This remains a baseline gate rather than proof of manufacturability: it
+    /// does not yet establish self-intersection freedom, minimum wall thickness,
+    /// process clearances, or support adequacy.
     pub fn is_printable(&self) -> bool {
-        self.is_valid() && self.is_watertight && self.inconsistent_normals.is_empty()
+        self.is_valid()
+            && self.is_watertight
+            && self.inconsistent_normals.is_empty()
+            && self.signed_volume > 1.0e-9
     }
 }
 
@@ -36,20 +98,46 @@ impl ValidationReport {
 pub fn validate_mesh(mesh: &TriangleMesh) -> ValidationReport {
     let degenerate_triangles = find_degenerate_triangles(mesh, 1e-10);
     let out_of_bounds_indices = check_index_bounds(mesh);
-    let (is_watertight, boundary_edges) = check_watertight(mesh);
+    let topology = analyze_edge_topology(mesh);
+    let is_watertight = topology.boundary_edges == 0 && topology.non_manifold_edges == 0;
+    let duplicate_triangles = find_duplicate_triangles(mesh);
     let inconsistent_normals = check_normal_consistency(mesh);
+    let non_finite_vertices = find_non_finite_vectors(&mesh.vertices);
+    let non_finite_normals = find_non_finite_vectors(&mesh.normals);
+    let self_intersection_report =
+        find_self_intersections(mesh, 1.0e-5, DEFAULT_SELF_INTERSECTION_PAIR_BUDGET);
     let signed_volume = compute_signed_volume(mesh);
 
     ValidationReport {
         triangle_count: mesh.triangle_count(),
         vertex_count: mesh.vertices.len(),
+        is_empty: mesh.vertices.is_empty() || mesh.indices.is_empty(),
+        normal_count_matches: mesh.normals.len() == mesh.vertices.len(),
         is_watertight,
-        boundary_edges,
+        boundary_edges: topology.boundary_edges,
+        non_manifold_edges: topology.non_manifold_edges,
+        connected_components: topology.connected_components,
+        duplicate_triangles,
         degenerate_triangles,
         inconsistent_normals,
         out_of_bounds_indices,
+        non_finite_vertices,
+        non_finite_normals,
+        self_intersections: self_intersection_report.triangle_pairs,
+        self_intersection_scan_complete: !self_intersection_report.truncated,
         signed_volume,
     }
+}
+
+/// Return indices of vectors containing NaN or infinity.
+pub fn find_non_finite_vectors(values: &[[f32; 3]]) -> Vec<usize> {
+    values
+        .iter()
+        .enumerate()
+        .filter_map(|(index, value)| {
+            (!value.iter().all(|component| component.is_finite())).then_some(index)
+        })
+        .collect()
 }
 
 /// Find triangles with near-zero area (degenerate)
@@ -86,6 +174,135 @@ pub fn check_index_bounds(mesh: &TriangleMesh) -> Vec<usize> {
     bad
 }
 
+type QuantizedPoint = [i64; 3];
+type QuantizedEdge = (QuantizedPoint, QuantizedPoint);
+
+fn quantize_position(value: [f32; 3]) -> QuantizedPoint {
+    const SCALE: f64 = 1_000_000.0;
+    [
+        (value[0] as f64 * SCALE).round() as i64,
+        (value[1] as f64 * SCALE).round() as i64,
+        (value[2] as f64 * SCALE).round() as i64,
+    ]
+}
+
+fn canonical_edge(a: QuantizedPoint, b: QuantizedPoint) -> QuantizedEdge {
+    if a < b { (a, b) } else { (b, a) }
+}
+
+/// Edge-level topology evidence for a triangle mesh.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EdgeTopologyReport {
+    pub boundary_edges: usize,
+    pub non_manifold_edges: usize,
+    pub connected_components: usize,
+}
+
+/// Analyze edge multiplicity and triangle connectivity.
+pub fn analyze_edge_topology(mesh: &TriangleMesh) -> EdgeTopologyReport {
+    let valid_triangles: Vec<(usize, [QuantizedPoint; 3])> = mesh
+        .indices
+        .iter()
+        .enumerate()
+        .filter_map(|(triangle_index, triangle)| {
+            let indices = [
+                triangle[0] as usize,
+                triangle[1] as usize,
+                triangle[2] as usize,
+            ];
+            if indices.iter().any(|index| *index >= mesh.vertices.len()) {
+                return None;
+            }
+            Some((
+                triangle_index,
+                [
+                    quantize_position(mesh.vertices[indices[0]]),
+                    quantize_position(mesh.vertices[indices[1]]),
+                    quantize_position(mesh.vertices[indices[2]]),
+                ],
+            ))
+        })
+        .collect();
+
+    let mut edge_faces: HashMap<QuantizedEdge, Vec<usize>> = HashMap::new();
+    for (triangle_index, vertices) in &valid_triangles {
+        for edge in [
+            canonical_edge(vertices[0], vertices[1]),
+            canonical_edge(vertices[1], vertices[2]),
+            canonical_edge(vertices[2], vertices[0]),
+        ] {
+            edge_faces.entry(edge).or_default().push(*triangle_index);
+        }
+    }
+
+    let boundary_edges = edge_faces.values().filter(|faces| faces.len() == 1).count();
+    let non_manifold_edges = edge_faces.values().filter(|faces| faces.len() > 2).count();
+
+    let mut adjacency: HashMap<usize, Vec<usize>> = HashMap::new();
+    for (triangle_index, _) in &valid_triangles {
+        adjacency.entry(*triangle_index).or_default();
+    }
+    for faces in edge_faces.values() {
+        if let Some((&first, rest)) = faces.split_first() {
+            for &other in rest {
+                adjacency.entry(first).or_default().push(other);
+                adjacency.entry(other).or_default().push(first);
+            }
+        }
+    }
+
+    let mut visited = HashSet::new();
+    let mut connected_components = 0usize;
+    for &(triangle_index, _) in &valid_triangles {
+        if !visited.insert(triangle_index) {
+            continue;
+        }
+        connected_components += 1;
+        let mut stack = vec![triangle_index];
+        while let Some(current) = stack.pop() {
+            if let Some(neighbors) = adjacency.get(&current) {
+                for &neighbor in neighbors {
+                    if visited.insert(neighbor) {
+                        stack.push(neighbor);
+                    }
+                }
+            }
+        }
+    }
+
+    EdgeTopologyReport {
+        boundary_edges,
+        non_manifold_edges,
+        connected_components,
+    }
+}
+
+/// Return all but the first instance of each duplicate geometric triangle.
+pub fn find_duplicate_triangles(mesh: &TriangleMesh) -> Vec<usize> {
+    let mut seen: HashMap<[QuantizedPoint; 3], usize> = HashMap::new();
+    let mut duplicates = Vec::new();
+    for (triangle_index, triangle) in mesh.indices.iter().enumerate() {
+        let indices = [
+            triangle[0] as usize,
+            triangle[1] as usize,
+            triangle[2] as usize,
+        ];
+        if indices.iter().any(|index| *index >= mesh.vertices.len()) {
+            continue;
+        }
+        let mut key = [
+            quantize_position(mesh.vertices[indices[0]]),
+            quantize_position(mesh.vertices[indices[1]]),
+            quantize_position(mesh.vertices[indices[2]]),
+        ];
+        key.sort();
+        if seen.insert(key, triangle_index).is_some() {
+            duplicates.push(triangle_index);
+        }
+    }
+    duplicates
+}
+
 /// Check mesh is watertight (every edge shared by exactly 2 faces)
 ///
 /// Returns (is_watertight, boundary_edge_count).
@@ -94,35 +311,11 @@ pub fn check_index_bounds(mesh: &TriangleMesh) -> Vec<usize> {
 /// Uses position-based edge matching (quantized to avoid floating-point issues)
 /// since tessellated meshes may have separate vertex instances per face.
 pub fn check_watertight(mesh: &TriangleMesh) -> (bool, usize) {
-    // Quantize positions to avoid floating-point comparison issues
-    fn quantize(v: [f32; 3]) -> [i64; 3] {
-        const SCALE: f64 = 1_000_000.0;
-        [
-            (v[0] as f64 * SCALE).round() as i64,
-            (v[1] as f64 * SCALE).round() as i64,
-            (v[2] as f64 * SCALE).round() as i64,
-        ]
-    }
-
-    let mut edge_count: HashMap<([i64; 3], [i64; 3]), u32> = HashMap::new();
-
-    for tri in &mesh.indices {
-        if tri[0] as usize >= mesh.vertices.len()
-            || tri[1] as usize >= mesh.vertices.len()
-            || tri[2] as usize >= mesh.vertices.len()
-        {
-            continue;
-        }
-        for k in 0..3 {
-            let va = quantize(mesh.vertices[tri[k] as usize]);
-            let vb = quantize(mesh.vertices[tri[(k + 1) % 3] as usize]);
-            let edge = if va < vb { (va, vb) } else { (vb, va) };
-            *edge_count.entry(edge).or_insert(0) += 1;
-        }
-    }
-
-    let boundary = edge_count.values().filter(|&&c| c != 2).count();
-    (boundary == 0, boundary)
+    let topology = analyze_edge_topology(mesh);
+    (
+        topology.boundary_edges == 0 && topology.non_manifold_edges == 0,
+        topology.boundary_edges + topology.non_manifold_edges,
+    )
 }
 
 /// Check that stored normals are consistent with face winding direction.
@@ -225,11 +418,84 @@ mod tests {
     use crate::mesh::resolve_to_mesh;
 
     #[test]
+    fn fabrication_ready_mesh_accepts_closed_cube() {
+        let mesh = resolve_to_mesh(&CSGNode::cube());
+        let ready = FabricationReadyMesh::try_new(mesh).unwrap();
+        assert!(ready.report().is_printable());
+    }
+
+    #[test]
+    fn fabrication_ready_mesh_rejects_open_surface() {
+        let mesh = TriangleMesh {
+            vertices: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            normals: vec![[0.0, 0.0, 1.0]; 3],
+            indices: vec![[0, 1, 2]],
+        };
+        let report = FabricationReadyMesh::try_new(mesh)
+            .err()
+            .expect("open surface must not gain fabrication authority");
+        assert!(!report.is_printable());
+    }
+
+    #[test]
     fn cube_is_watertight() {
         let mesh = resolve_to_mesh(&CSGNode::cube());
         let report = validate_mesh(&mesh);
         assert!(report.is_watertight, "cube should be watertight");
         assert_eq!(report.boundary_edges, 0);
+    }
+
+    #[test]
+    fn duplicate_triangle_is_reported_and_breaks_manifoldness() {
+        let mut mesh = resolve_to_mesh(&CSGNode::cube());
+        mesh.indices.push(mesh.indices[0]);
+        let report = validate_mesh(&mesh);
+        assert_eq!(report.duplicate_triangles, vec![12]);
+        assert!(report.non_manifold_edges > 0);
+        assert!(!report.is_printable());
+    }
+
+    #[test]
+    fn disconnected_closed_solids_are_counted_separately() {
+        use crate::csg::Transform3D;
+        let mut left = resolve_to_mesh(&CSGNode::cube());
+        let right = resolve_to_mesh(&CSGNode::cube().with_transform(Transform3D {
+            translate: [2.0, 0.0, 0.0],
+            ..Default::default()
+        }));
+        left.merge(&right);
+        let report = validate_mesh(&left);
+        assert_eq!(report.connected_components, 2);
+        assert_eq!(report.non_manifold_edges, 0);
+        assert_eq!(report.boundary_edges, 0);
+    }
+
+    #[test]
+    fn overlapping_closed_shells_fail_self_intersection_gate() {
+        use crate::csg::Transform3D;
+        let mut left = resolve_to_mesh(&CSGNode::cube());
+        let right = resolve_to_mesh(&CSGNode::cube().with_transform(Transform3D {
+            translate: [0.25, 0.25, 0.25],
+            ..Default::default()
+        }));
+        left.merge(&right);
+        let report = validate_mesh(&left);
+        assert!(report.self_intersection_scan_complete);
+        assert!(!report.self_intersections.is_empty());
+        assert!(!report.is_printable());
+    }
+
+    #[test]
+    fn open_triangle_has_boundary_but_no_non_manifold_edges() {
+        let mesh = TriangleMesh {
+            vertices: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            normals: vec![[0.0, 0.0, 1.0]; 3],
+            indices: vec![[0, 1, 2]],
+        };
+        let report = validate_mesh(&mesh);
+        assert_eq!(report.boundary_edges, 3);
+        assert_eq!(report.non_manifold_edges, 0);
+        assert_eq!(report.connected_components, 1);
     }
 
     #[test]
@@ -266,20 +532,11 @@ mod tests {
     }
 
     #[test]
-    fn sphere_mostly_watertight() {
-        // Sphere tessellation has degenerate triangles at poles where multiple
-        // vertices converge to the same point. This creates a small number of
-        // boundary edges in the quantized representation. We check that the
-        // boundary count is very low relative to total edges.
+    fn sphere_is_watertight_without_pole_degeneracy() {
         let mesh = resolve_to_mesh(&CSGNode::sphere());
         let report = validate_mesh(&mesh);
-        let total_edges = mesh.triangle_count() * 3;
-        let boundary_pct = report.boundary_edges as f32 / total_edges as f32;
-        assert!(
-            boundary_pct < 0.05,
-            "sphere boundary edges should be <5%, got {:.1}%",
-            boundary_pct * 100.0
-        );
+        assert!(report.is_watertight);
+        assert!(report.degenerate_triangles.is_empty());
     }
 
     #[test]
@@ -316,12 +573,38 @@ mod tests {
     }
 
     #[test]
-    fn empty_mesh_valid() {
+    fn empty_mesh_is_not_a_fabrication_candidate() {
         let mesh = TriangleMesh::empty();
         let report = validate_mesh(&mesh);
-        assert!(report.is_valid());
-        assert!(report.is_watertight); // vacuously true
+        assert!(report.is_empty);
+        assert!(!report.is_valid());
+        assert!(!report.is_printable());
+        assert!(report.is_watertight); // topologically vacuous, but not valid
         assert_eq!(report.signed_volume, 0.0);
+    }
+
+    #[test]
+    fn rejects_non_finite_geometry() {
+        let mesh = TriangleMesh {
+            vertices: vec![[0.0, 0.0, 0.0], [f32::NAN, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            normals: vec![[0.0, 0.0, 1.0]; 3],
+            indices: vec![[0, 1, 2]],
+        };
+        let report = validate_mesh(&mesh);
+        assert_eq!(report.non_finite_vertices, vec![1]);
+        assert!(!report.is_valid());
+    }
+
+    #[test]
+    fn rejects_missing_normals() {
+        let mesh = TriangleMesh {
+            vertices: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            normals: vec![],
+            indices: vec![[0, 1, 2]],
+        };
+        let report = validate_mesh(&mesh);
+        assert!(!report.normal_count_matches);
+        assert!(!report.is_valid());
     }
 
     #[test]

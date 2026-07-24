@@ -70,6 +70,27 @@ pub fn prigogine_dissipation_cost(
     dissipation_rate.max(0.0) * order_maintained.powi(2) * temperature.max(1e-6)
 }
 
+/// Bits of resolution encoded by observing a `[0,1]` quantity with bucket width `grain` --
+/// `log2(number_of_distinguishable_buckets)` = `log2(1/grain)`. Feeds [`landauer_minimum`] to
+/// charge a real energy cost for how much perceptual detail a strategy actually resolves, per
+/// Mark, Marion & Hoffman (2010) "Natural selection and veridical perceptions" (J. Theoretical
+/// Biology): their central result is that truth-tracking perception is never beaten by a coarser
+/// "interface" strategy *unless* resolving detail carries a real cost -- prior to this function,
+/// `symthaea-alife` charged none. `grain` is clamped away from zero: an unboundedly fine bucket
+/// would need unboundedly many bits, which is not a claim this crate makes.
+pub fn perceptual_resolution_bits(grain: f64) -> f64 {
+    (1.0 / grain.max(1e-6)).log2().max(0.0)
+}
+
+/// Quantize a `[0,1]` observation to the nearest multiple of `grain` -- the coarse-graining a
+/// perceptual strategy actually applies to what it observes, before belief update ever sees it.
+/// Companion to [`perceptual_resolution_bits`]: the same `grain` drives both how distorted the
+/// observation is and how much it cost to have resolved that much of it.
+pub fn quantize_to_grain(value: f64, grain: f64) -> f64 {
+    let grain = grain.max(1e-6);
+    ((value / grain).round() * grain).clamp(0.0, 1.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -124,5 +145,56 @@ mod tests {
     #[test]
     fn prigogine_cost_zero_when_no_order_maintained() {
         assert_eq!(prigogine_dissipation_cost(0.0, 1.0, 1.0), 0.0);
+    }
+
+    #[test]
+    fn resolution_bits_grows_as_grain_shrinks() {
+        let coarse = perceptual_resolution_bits(0.5); // 2 buckets, 1 bit
+        let fine = perceptual_resolution_bits(0.02); // 50 buckets, ~5.64 bits
+        assert!(
+            fine > coarse,
+            "finer grain should cost more bits: coarse={coarse}, fine={fine}"
+        );
+        assert!(
+            (coarse - 1.0).abs() < 1e-9,
+            "log2(1/0.5) should be exactly 1 bit, got {coarse}"
+        );
+    }
+
+    #[test]
+    fn resolution_bits_never_negative() {
+        assert!(perceptual_resolution_bits(2.0) >= 0.0); // grain > 1 -- fewer than 1 "bucket"
+        assert!(perceptual_resolution_bits(1.0) >= 0.0);
+    }
+
+    #[test]
+    fn quantize_stays_in_unit_range() {
+        for grain in [0.02, 0.1, 0.4, 0.9] {
+            for i in 0..=20 {
+                let value = i as f64 / 20.0;
+                let q = quantize_to_grain(value, grain);
+                assert!(
+                    (0.0..=1.0).contains(&q),
+                    "grain={grain} value={value} -> {q}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn coarse_quantization_collapses_distinct_values() {
+        // A wide bucket should make two nearby values indistinguishable, where a narrow one
+        // keeps them apart -- the actual coarse-graining Hoffman's "interface" strategies apply.
+        let (a, b) = (0.40, 0.45);
+        assert_eq!(
+            quantize_to_grain(a, 0.5),
+            quantize_to_grain(b, 0.5),
+            "grain=0.5 should collapse 0.40 and 0.45 into the same bucket"
+        );
+        assert_ne!(
+            quantize_to_grain(a, 0.02),
+            quantize_to_grain(b, 0.02),
+            "grain=0.02 should keep 0.40 and 0.45 distinguishable"
+        );
     }
 }

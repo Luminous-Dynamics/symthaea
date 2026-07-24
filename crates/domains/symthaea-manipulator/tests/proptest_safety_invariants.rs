@@ -103,9 +103,14 @@ fn threshold_boundaries_exact() {
     // At threshold values (using > not >=):
     // phi=0.6 → Yellow (not Green, because > 0.6 needed for Green)
     assert_eq!(MotorSafetyLevel::from_phi(0.6), MotorSafetyLevel::Yellow);
+    // Any value STRICTLY above the threshold crosses it — from_phi is an
+    // exact `>` comparison with no epsilon band, so even one ULP above 0.6
+    // is Green. (This assertion previously expected Yellow, which is wrong
+    // for `0.6 + f64::EPSILON > 0.6`; it sat unexercised behind a
+    // fail-fast-earlier failing target until 2026-07-11.)
     assert_eq!(
         MotorSafetyLevel::from_phi(0.6 + f64::EPSILON),
-        MotorSafetyLevel::Yellow
+        MotorSafetyLevel::Green
     );
     assert_eq!(MotorSafetyLevel::from_phi(0.60001), MotorSafetyLevel::Green);
 

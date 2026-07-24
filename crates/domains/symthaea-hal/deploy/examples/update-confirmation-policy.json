@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "required_key_purpose": "update-confirmation",
+  "minimum_observation_ms": 60000,
+  "minimum_successful_control_ticks": 1000,
+  "minimum_watchdog_heartbeats": 100,
+  "minimum_supervisor_heartbeats": 10,
+  "maximum_deadline_misses": 0,
+  "maximum_sensor_faults": 0,
+  "maximum_signature_lifetime_ms": 600000
+}

@@ -48,11 +48,17 @@ pub mod dimensional;
 pub mod dimensional_inference;
 pub mod discovery;
 pub mod equation_ast;
+pub mod integrated_discovery;
+pub mod lyapunov;
+pub mod noise_robustness;
+pub mod pde_wave_stage_a;
+pub mod pde_wave_stage_b;
 pub mod query;
 pub mod recognize;
 pub mod symmetry;
 pub mod symmetry_inference;
 pub mod tensor_structure;
+pub mod typed_generation;
 pub mod types;
 
 // Re-export primary API types.
@@ -68,4 +74,5 @@ pub use recognize::{
 pub use symmetry::SymmetryEncoder;
 pub use symmetry_inference::infer_symmetry;
 pub use tensor_structure::TensorEncoder;
+pub use typed_generation::random_expr_with_dimension;
 pub use types::*;

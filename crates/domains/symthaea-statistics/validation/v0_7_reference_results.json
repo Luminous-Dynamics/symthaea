@@ -1,0 +1,55 @@
+{
+  "elastic_net": {
+    "coefficients": [
+      2.9826740767270317,
+      0.0
+    ],
+    "intercept": 1.9913370383635154,
+    "iterations": 2
+  },
+  "negative_binomial": {
+    "cdf": 0.844479919949704,
+    "log_pmf": -3.2956292587802802,
+    "pmf": 0.03704472699170051,
+    "sf": 0.15552008005029602
+  },
+  "negative_binomial_regression": {
+    "coefficients": [
+      0.24919256239736642,
+      0.19198405994266482
+    ],
+    "deviance": 6.242553710441211,
+    "log_likelihood": -43.705203471011274,
+    "null_deviance": 16.891227880967122,
+    "standard_errors": [
+      0.5354084939209975,
+      0.056796935677427614
+    ]
+  },
+  "paired_categorical": {
+    "cochran_p": 0.022370771856165598,
+    "cochran_q": 7.6,
+    "mcnemar_exact_p": 0.021484375
+  },
+  "rank_robust": {
+    "kendall_tau_b": 0.7999999999999999,
+    "theil_sen_intercept": 1.0,
+    "theil_sen_slope": 2.0
+  },
+  "survey": {
+    "hajek_mean": 4.0,
+    "horvitz_thompson_total": 24.0,
+    "kish_effective_sample_size": 3.0,
+    "stratified_mean": 8.0
+  },
+  "survival_extensions": {
+    "nelson_aalen_at_4": 1.75,
+    "target_cumulative_incidence_at_3": 0.5
+  },
+  "versions": {
+    "numpy": "2.3.5",
+    "scikit_learn": "1.8.0",
+    "scipy": "1.17.0",
+    "statsmodels": "0.14.6"
+  }
+}

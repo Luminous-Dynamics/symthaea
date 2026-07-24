@@ -632,7 +632,13 @@ impl CognitiveLoopService {
                 virtual_body,
                 #[cfg(feature = "vision-manifold")]
                 vision_bridge: if vision_manifold_enabled {
-                    let vm_config = symthaea_vision_manifold::VisionConfig::default();
+                    let mut vm_config = symthaea_vision_manifold::VisionConfig::default();
+                    // Thread the loop-level dilation policy into the
+                    // manifold's own FEP ExplorationTrigger — the manifold
+                    // dilates ITSELF to Ultra otherwise, bypassing the
+                    // loop-level gate entirely (observer-ΔΨ probe hunt,
+                    // 2026-07-11).
+                    vm_config.allow_auto_dilation = config.enable_vision_auto_dilation;
                     Some(symthaea_vision_manifold::VisionBridge::new(
                         vm_config,
                         vision_frame_width,
@@ -746,6 +752,8 @@ impl CognitiveLoopService {
             config,
             encoder,
             temporal_network,
+            train_history_snapshots: VecDeque::with_capacity(2),
+            training_frozen: false,
             buffer: VecDeque::with_capacity(super::thresholds::EXPERIENCE_BUFFER_CAPACITY),
             stats: LoopStats::default(),
             error_history: VecDeque::with_capacity(super::thresholds::ERROR_HISTORY_CAPACITY),
@@ -784,6 +792,7 @@ impl CognitiveLoopService {
                 broca_lite: super::broca_lite::BrocaLiteManager::new(broca_lite_seed),
                 last_broca_text: None,
                 last_language_source: None,
+                last_qualified_language_output: None,
                 user_state: if enable_user_state {
                     Some(crate::user_state_inference::UserStateInference::new())
                 } else {
@@ -792,6 +801,9 @@ impl CognitiveLoopService {
                 broca_code_channels: None,
             },
             voice_synthesis: None,
+            voice_audio_buffer: VecDeque::new(),
+            #[cfg(feature = "voice-stt")]
+            pending_self_voice_hv: None,
             llm_language: None,
             behavior: super::behavioral_synthesis::BehavioralSynthesis::new(
                 FlowState::default(),
@@ -987,6 +999,8 @@ impl CognitiveLoopService {
             sensorimotor: sensorimotor_built,
             #[cfg(feature = "voice-stt-live")]
             stt_capture: None,
+            #[cfg(feature = "phone")]
+            phone_capture: None,
             #[cfg(feature = "sensor-imu")]
             imu_fusion: None,
             #[cfg(feature = "sensor-imu")]
@@ -1206,8 +1220,15 @@ impl CognitiveLoopService {
             scientific_method_engine: crate::scientific_method::ScientificMethodEngine::new(),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
             streaming_inference: None,
-            metabolic_conductor: None,
         };
+
+        // Honor the config flag (previously declared but never read — setting
+        // it did nothing; the only activation path was the explicit
+        // enable_voice_synthesis() accessor).
+        let mut service = service;
+        if service.config.enable_voice_synthesis {
+            service.enable_voice_synthesis();
+        }
 
         Ok(service)
     }

@@ -3,9 +3,13 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Autonomous Lab Controller — Genesis Mission Challenge 10
 //!
-//! A generic closed-loop controller for autonomous wet-lab experiments.
-//! Uses FEP action selection and ethics gating to safely drive multi-step
+//! A generic closed-loop controller for simulated or supervised wet-lab workflows.
+//! Uses deterministic action selection and ethics gating to evaluate multi-step
 //! protocols (e.g., iPSC reprogramming, gene editing, tissue culture).
+//!
+//! This crate does **not** certify unattended physical execution. Production
+//! instrument adapters must add hardware interlocks, calibrated/timestamped
+//! readings, authorization, idempotent commands, and emergency-stop handling.
 //!
 //! The controller is generic over `InstrumentAdapter`, allowing any lab
 //! instrument (incubator, sequencer, microscope) to be plugged in.
@@ -209,6 +213,12 @@ pub struct LabControllerStepResult {
     pub failure_reason: Option<String>,
     /// Predicted state at the step's horizon.
     pub predicted_state_similarity: f32,
+    /// Action declared by the protocol author, when one was provided.
+    pub expected_action: Option<CultureAction>,
+    /// Whether the selected action matched the declared expectation.
+    /// `None` means no expectation was declared or execution was blocked before
+    /// action selection.
+    pub action_matches_expectation: Option<bool>,
     /// Current cell viability.
     pub viability: f64,
 }
@@ -270,6 +280,39 @@ impl<I: InstrumentAdapter> LabController<I> {
         let cell_state = self.instrument.read_cell_state();
         let environment = self.instrument.read_environment();
 
+        if !step.duration_seconds.is_finite() || step.duration_seconds < 0.0 {
+            return LabControllerStepResult {
+                step_index,
+                step_name: step.name.clone(),
+                selected_action: CultureAction::AbortProtocol,
+                action_executed: false,
+                failure_reason: Some(format!(
+                    "Invalid step duration {}; expected a finite non-negative value",
+                    step.duration_seconds
+                )),
+                predicted_state_similarity: 0.0,
+                expected_action: step.expected_action,
+                action_matches_expectation: None,
+                viability: cell_state.viability,
+            };
+        }
+        if !step.min_viability.is_finite() || !(0.0..=1.0).contains(&step.min_viability) {
+            return LabControllerStepResult {
+                step_index,
+                step_name: step.name.clone(),
+                selected_action: CultureAction::AbortProtocol,
+                action_executed: false,
+                failure_reason: Some(format!(
+                    "Invalid minimum viability {}; expected [0, 1]",
+                    step.min_viability
+                )),
+                predicted_state_similarity: 0.0,
+                expected_action: step.expected_action,
+                action_matches_expectation: None,
+                viability: cell_state.viability,
+            };
+        }
+
         // Check ethics gate
         if step.requires_ethics_check
             && let Err(reason) = self.ethics.check_manipulation(&step.name)
@@ -281,6 +324,8 @@ impl<I: InstrumentAdapter> LabController<I> {
                 action_executed: false,
                 failure_reason: Some(format!("Ethics gate: {}", reason)),
                 predicted_state_similarity: 0.0,
+                expected_action: step.expected_action,
+                action_matches_expectation: None,
                 viability: cell_state.viability,
             };
         }
@@ -297,6 +342,8 @@ impl<I: InstrumentAdapter> LabController<I> {
                     cell_state.viability, step.min_viability
                 )),
                 predicted_state_similarity: 0.0,
+                expected_action: step.expected_action,
+                action_matches_expectation: None,
                 viability: cell_state.viability,
             };
         }
@@ -325,6 +372,8 @@ impl<I: InstrumentAdapter> LabController<I> {
             action_executed: executed,
             failure_reason: failure,
             predicted_state_similarity: predicted_sim,
+            expected_action: step.expected_action,
+            action_matches_expectation: step.expected_action.map(|expected| expected == action),
             viability: cell_state.viability,
         }
     }
@@ -337,16 +386,43 @@ impl<I: InstrumentAdapter> LabController<I> {
         let mut step_results = Vec::new();
         let mut elapsed_seconds = 0.0f64;
 
+        if !protocol.max_duration_seconds.is_finite() || protocol.max_duration_seconds < 0.0 {
+            return ProtocolResult {
+                success: false,
+                failure_reason: Some(format!(
+                    "Invalid protocol max duration {}; expected zero (unlimited) or a finite positive value",
+                    protocol.max_duration_seconds
+                )),
+                steps_completed: 0,
+                step_results,
+            };
+        }
+        if !protocol.safety_viability_floor.is_finite()
+            || !(0.0..=1.0).contains(&protocol.safety_viability_floor)
+        {
+            return ProtocolResult {
+                success: false,
+                failure_reason: Some(format!(
+                    "Invalid protocol safety viability floor {}; expected [0, 1]",
+                    protocol.safety_viability_floor
+                )),
+                steps_completed: 0,
+                step_results,
+            };
+        }
+
         for (i, step) in protocol.steps.iter().enumerate() {
-            // Check protocol-level duration limit
+            // Preflight the entire next step so the controller never executes an
+            // action that would make the protocol exceed its declared limit.
+            let next_elapsed = elapsed_seconds + step.duration_seconds;
             if protocol.max_duration_seconds > 0.0
-                && elapsed_seconds > protocol.max_duration_seconds
+                && (!next_elapsed.is_finite() || next_elapsed > protocol.max_duration_seconds)
             {
                 return ProtocolResult {
                     success: false,
                     failure_reason: Some(format!(
-                        "Protocol exceeded max duration {:.0}s at step {}",
-                        protocol.max_duration_seconds, i
+                        "Step {} would exceed max duration {:.0}s (projected {:.0}s)",
+                        i, protocol.max_duration_seconds, next_elapsed
                     )),
                     steps_completed: i,
                     step_results,
@@ -371,7 +447,7 @@ impl<I: InstrumentAdapter> LabController<I> {
                 };
             }
 
-            elapsed_seconds += step.duration_seconds;
+            elapsed_seconds = next_elapsed;
             step_results.push(result);
 
             if failed {
@@ -645,8 +721,10 @@ mod tests {
                 .unwrap()
                 .contains("max duration")
         );
-        // Steps 0 and 1 complete (elapsed = 200 > 150), step 2 is blocked
-        assert_eq!(result.steps_completed, 2);
+        // Step 0 completes; step 1 is rejected before execution because its
+        // projected end time would exceed the protocol limit.
+        assert_eq!(result.steps_completed, 1);
+        assert_eq!(controller.instrument().executed_actions().len(), 1);
     }
 
     #[test]
@@ -684,14 +762,13 @@ mod tests {
 
     #[test]
     fn test_execute_step_instrument_failure() {
-        // Test that instrument failure is reported correctly in a single step
-        let mut mock = MockInstrument::new();
-        // Set fail on AdjustTemp — we'll construct a step where FEP is likely to select it
+        let mut env = CultureEnvironment::standard();
+        env.temperature_celsius = 39.0;
+        let mut mock = MockInstrument::with_state(CellState::new_somatic(), env);
         mock.set_fail_on(CultureAction::AdjustTemp);
         let ethics = EthicsGate::fully_approved();
         let mut controller = LabController::new(mock, ethics);
 
-        // Use AdjustTemp as expected_action
         let step = ProtocolStep {
             name: "Test".to_string(),
             duration_seconds: 3600.0,
@@ -701,11 +778,76 @@ mod tests {
         };
 
         let result = controller.execute_step(&step, 0);
-        // The FEP agent selects an action based on cell/env state, not expected_action.
-        // If it happens to pick AdjustTemp, execution fails; otherwise succeeds.
-        // Either way, viability should be reported.
-        assert!(result.viability > 0.0);
-        assert!(result.predicted_state_similarity.is_finite());
+        assert!(!result.action_executed);
+        assert_eq!(result.selected_action, CultureAction::AdjustTemp);
+        assert_eq!(result.action_matches_expectation, Some(true));
+        assert!(result.failure_reason.is_some());
+    }
+
+    #[test]
+    fn test_expected_action_mismatch_is_reported_without_overriding_controller() {
+        let mock = MockInstrument::new();
+        let ethics = EthicsGate::fully_approved();
+        let mut controller = LabController::new(mock, ethics);
+        let step = ProtocolStep {
+            name: "Expectation audit".to_string(),
+            duration_seconds: 3600.0,
+            min_viability: 0.5,
+            expected_action: Some(CultureAction::AdjustTemp),
+            requires_ethics_check: false,
+        };
+
+        let result = controller.execute_step(&step, 0);
+        assert_eq!(result.selected_action, CultureAction::ExtendIncubation);
+        assert_eq!(result.expected_action, Some(CultureAction::AdjustTemp));
+        assert_eq!(result.action_matches_expectation, Some(false));
+        assert!(result.action_executed);
+    }
+
+    #[test]
+    fn test_invalid_step_duration_fails_closed() {
+        let mock = MockInstrument::new();
+        let ethics = EthicsGate::fully_approved();
+        let mut controller = LabController::new(mock, ethics);
+        let step = ProtocolStep {
+            name: "Invalid duration".to_string(),
+            duration_seconds: f64::NAN,
+            min_viability: 0.5,
+            expected_action: None,
+            requires_ethics_check: false,
+        };
+
+        let result = controller.execute_step(&step, 0);
+        assert!(!result.action_executed);
+        assert!(
+            result
+                .failure_reason
+                .unwrap()
+                .contains("Invalid step duration")
+        );
+    }
+
+    #[test]
+    fn test_protocol_exact_duration_limit_is_allowed() {
+        let mock = MockInstrument::new();
+        let ethics = EthicsGate::fully_approved();
+        let mut controller = LabController::new(mock, ethics);
+        let protocol = LabProtocol {
+            name: "Exact limit".to_string(),
+            steps: vec![ProtocolStep {
+                name: "Only step".to_string(),
+                duration_seconds: 100.0,
+                min_viability: 0.5,
+                expected_action: None,
+                requires_ethics_check: false,
+            }],
+            safety_viability_floor: 0.2,
+            max_duration_seconds: 100.0,
+        };
+
+        let result = controller.run_protocol(&protocol);
+        assert!(result.success);
+        assert_eq!(result.steps_completed, 1);
     }
 
     #[test]

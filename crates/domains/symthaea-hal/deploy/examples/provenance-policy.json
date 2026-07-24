@@ -1,0 +1,14 @@
+{
+  "required_component_classes": [
+    "Compute",
+    "Actuator",
+    "Sensor",
+    "Power",
+    "SafetyInterlock",
+    "Firmware"
+  ],
+  "maximum_components": 4096,
+  "allow_legacy_observed": false,
+  "require_firmware_sbom": true,
+  "maximum_record_age_ms": 31536000000
+}

@@ -3,11 +3,10 @@ name = "symthaea-hdc-crypto"
 version = "0.1.0"
 edition = "2024"
 authors = ["Luminous Dynamics <contact@luminousdynamics.org>"]
-description = "Information-theoretically secure homomorphic encryption on hyperdimensional binary vectors"
+description = "Insecure experimental HDC masking and algebra demonstrations; not production cryptography"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-keywords = ["homomorphic-encryption", "hyperdimensional-computing", "cryptography", "privacy", "fhe"]
-categories = ["cryptography"]
+keywords = ["hyperdimensional-computing", "research", "experimental"]
 readme = "README.md"
 
 [dependencies]
@@ -20,3 +19,9 @@ serde_json = "1"
 
 [features]
 default = []
+# Root re-exports of the quarantined MAC/threshold/commitment/FHE types require this
+# explicit opt-in, so an external consumer can't discover an apparently-legitimate
+# security API (`symthaea_hdc_crypto::HdcMac`, `::EncryptedHV`, ...) without deliberately
+# enabling it. The underlying modules (`crypto`, `fhe`) always compile and their own
+# tests always run -- only the crate-root convenience re-export is gated.
+insecure-experimental-crypto = []

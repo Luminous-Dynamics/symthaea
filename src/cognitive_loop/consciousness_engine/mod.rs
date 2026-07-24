@@ -30,7 +30,8 @@ pub mod topological_measure;
 mod types;
 
 pub(crate) use types::{
-    ConsciousnessEngineCache, ConsciousnessEngineInput, MoralConsciousnessCoupling,
+    ConsciousnessEngineCache, ConsciousnessEngineInput, ConsciousnessEngineOutput,
+    MoralConsciousnessCoupling,
 };
 
 use crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2;

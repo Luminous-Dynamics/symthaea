@@ -3,6 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Manipulator controller: HdcLtcUnifiedNetwork + output projection (16,384D → 8D).
 
+use crate::sensorimotor::ControllerInputSchema;
 use crate::types::{ManipulatorCommand, ManipulatorConfig, NUM_JOINTS};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig};
@@ -131,6 +132,7 @@ impl ManipulatorController {
     /// bridge or persisted by the caller.
     pub fn export_weights(&self) -> ControllerWeights {
         ControllerWeights {
+            input_schema: ControllerInputSchema::LegacyDirectV0,
             output_weights: self.output_weights.clone(),
             output_bias: self.output_bias.to_vec(),
         }
@@ -153,13 +155,19 @@ impl ManipulatorController {
                 weights.output_bias.len()
             ));
         }
+        if !weights.output_weights.iter().all(|v| v.is_finite())
+            || !weights.output_bias.iter().all(|v| v.is_finite())
+        {
+            return Err("controller snapshot contains NaN or infinite values".to_string());
+        }
         self.output_weights.copy_from_slice(&weights.output_weights);
         self.output_bias.copy_from_slice(&weights.output_bias);
         Ok(())
     }
 }
 
-/// Portable snapshot of the controller's trainable output layer.
+/// Portable snapshot of the controller's trainable output layer and its
+/// required controller-input feature schema.
 ///
 /// This is the trainer→bridge transfer contract: `ManipulatorTrainer` (or
 /// the intent curriculum in `training.rs`) exports one, and a shipped
@@ -169,8 +177,17 @@ impl ManipulatorController {
 /// cognition-ablation example: thought had no task-axis motor authority).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ControllerWeights {
+    #[serde(default)]
+    pub input_schema: ControllerInputSchema,
     pub output_weights: Vec<f32>,
     pub output_bias: Vec<f32>,
+}
+
+impl ControllerWeights {
+    pub fn with_input_schema(mut self, input_schema: ControllerInputSchema) -> Self {
+        self.input_schema = input_schema;
+        self
+    }
 }
 
 fn fast_tanh(x: f32) -> f32 {
@@ -248,9 +265,20 @@ mod tests {
         let config = ManipulatorConfig::default();
         let mut ctrl = ManipulatorController::new(&GenesisSeed::from_phrase("test-dims"), &config);
         let bad = ControllerWeights {
+            input_schema: ControllerInputSchema::LegacyDirectV0,
             output_weights: vec![0.0; 3],
             output_bias: vec![0.0; NUM_OUTPUTS],
         };
+        assert!(ctrl.import_weights(&bad).is_err());
+    }
+
+    #[test]
+    fn test_import_weights_rejects_non_finite_values() {
+        let config = ManipulatorConfig::default();
+        let mut ctrl =
+            ManipulatorController::new(&GenesisSeed::from_phrase("test-finite"), &config);
+        let mut bad = ctrl.export_weights();
+        bad.output_weights[0] = f32::NAN;
         assert!(ctrl.import_weights(&bad).is_err());
     }
 }

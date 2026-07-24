@@ -1,7 +1,11 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # HDC Homomorphic Computation — Privacy-Preserving Collective Intelligence
+#![allow(deprecated)]
+//! # HDC Shared-Mask Algebra Demonstration
+//!
+//! **QUARANTINED:** this is not FHE or a privacy-preserving protocol. Reusing
+//! the mask exposes pairwise XOR and Hamming-distance relationships.
 //!
 //! Binary hypervectors support natural homomorphic operations:
 //!
@@ -10,25 +14,27 @@
 //! bundle(enc(A), enc(B)) ≈ enc(bundle(A, B))   [majority vote preserves under shared mask]
 //! ```
 //!
-//! This enables peers to share encrypted wisdom vectors, perform collective
-//! bundling without revealing individual states, and decrypt only the aggregate.
-//!
-//! ## Security Model
+//! ## Single-use XOR fact
 //!
 //! [`EncryptedHV`] uses a one-time pad (XOR with random mask):
 //! - **Perfect secrecy** (Shannon 1949): ciphertext reveals zero information
 //!   about the plaintext when the mask is truly random and used only once.
 //! - **Key size**: D = 16,384 bits (mask is same size as message).
-//! - **Homomorphic property**: XOR binding distributes over XOR encryption,
-//!   so `enc(A) ⊗ enc(B) = enc(A ⊗ B)` when masks are combined accordingly.
+//! - XOR binding distributes algebraically when masks are combined accordingly.
 //!
 //! ## Limitations
 //!
 //! - Masks must never be reused (OTP constraint).
-//! - Majority-vote bundling on encrypted vectors is approximate, not exact.
-//!   Accuracy improves with more contributors (central limit theorem).
-//! - This is NOT a general-purpose FHE scheme (no arbitrary computation).
-//!   It supports only the HDC algebra: bind, bundle, similarity.
+//! - Majority-vote bundling under a shared mask is **exact for an odd number of
+//!   contributors** (ties are structurally impossible) and only **approximate for an
+//!   even number** (a tied local tally resolves to 0 both in plaintext and ciphertext,
+//!   but if the shared mask bit is 1, decrypting the ciphertext tally flips that 0 to
+//!   1, disagreeing with the plaintext bundle). See
+//!   `legacy_attack_even_count_bundle_disagrees_with_plaintext` for a concrete
+//!   counterexample. The earlier blanket "approximate, not exact" claim understated
+//!   this: it is exact for odd counts and has this specific failure mode for even ones.
+//! - The pool below deliberately reuses one mask, violating the one-time-pad
+//!   condition and exposing pairwise plaintext relationships.
 //!
 //! ## References
 //!
@@ -63,7 +69,20 @@ use super::hdc_crypto::HdcThresholdSharing;
 /// So binding two encrypted vectors produces the encryption of their binding
 /// under the combined mask `M_a ⊗ M_b`. The decryptor needs `M_a ⊗ M_b`
 /// (which both parties can compute from their individual masks).
+///
+/// # Quarantine note
+///
+/// This is a bare XOR transform with no authentication, no integrity check,
+/// and no protection against mask reuse by the caller — the single-use
+/// discipline the "perfect secrecy" claim depends on is entirely the
+/// caller's responsibility and nothing here enforces or even detects a
+/// violation. [`CollectiveWisdomPool`] in this same module *is* such a
+/// violation (it reuses one mask across every contribution). Do not treat
+/// this type as a general-purpose encryption primitive.
 #[derive(Clone, PartialEq, Eq)]
+#[deprecated(
+    note = "correct only as a single-use OTP XOR transform with a secure-random mask you track yourself; provides no authentication, integrity, or misuse resistance"
+)]
 pub struct EncryptedHV {
     /// Ciphertext: plaintext ⊗ mask.
     pub ciphertext: BinaryHV,
@@ -107,7 +126,8 @@ impl EncryptedHV {
     /// this returns the true similarity: `sim(enc(A,M), enc(B,M)) = sim(A,B)`.
     ///
     /// When masks differ, the result is noisy (≈ 0.5 ± small error).
-    /// This enables privacy-preserving nearest-neighbor search within a session.
+    /// This equality is precisely a leakage channel, not privacy-preserving
+    /// nearest-neighbor search.
     #[inline]
     pub fn encrypted_similarity(&self, other: &EncryptedHV) -> f32 {
         self.ciphertext.similarity(&other.ciphertext)
@@ -129,20 +149,18 @@ impl std::fmt::Debug for EncryptedHV {
 /// Maximum contributions before forced aggregation (memory bound: 256 × 2KB = 512KB).
 pub const HDC_FHE_MAX_POOL_SIZE: usize = 256;
 
-/// Privacy-preserving collective wisdom aggregation.
+/// Shared-mask collective aggregation demonstration. This is not
+/// privacy-preserving aggregation.
 ///
 /// Each peer encrypts their wisdom vector with a per-session mask and
 /// contributes the encrypted version. The pool collects encrypted
 /// contributions and can compute an aggregate via majority-vote bundling
 /// on the ciphertexts.
 ///
-/// # Decryption
-///
-/// The aggregate can only be decrypted if sufficient mask shares are
-/// available (via [`HdcThresholdSharing`]). This ensures:
-/// - No single peer can decrypt the aggregate alone
-/// - At least k-of-n peers must cooperate to reveal the collective wisdom
-/// - Individual contributions remain private (OTP encryption)
+/// Every contributor uses the same mask, so any observer can recover pairwise
+/// plaintext XORs and exact Hamming distances. In addition,
+/// [`HdcThresholdSharing`] gives every single record enough information to
+/// recover the mask.
 ///
 /// # Protocol
 ///
@@ -151,12 +169,28 @@ pub const HDC_FHE_MAX_POOL_SIZE: usize = 256;
 /// 2. Each peer receives one mask share
 /// 3. Each peer encrypts their wisdom: enc(wisdom_i, collective_mask)
 /// 4. Pool bundles encrypted contributions
-/// 5. k peers reconstruct the mask → decrypt the aggregate
+/// 5. any one broken compatibility share can reconstruct the mask
 /// ```
 ///
-/// Note: Step 3 requires all peers to use the SAME mask for the
-/// homomorphic bundling to work. The mask is distributed via threshold
-/// sharing so no single peer holds the full mask until k cooperate.
+/// Step 3 requires mask reuse for the algebra to work and is the source of the
+/// leakage. The listed protocol is retained only as an executable toy model.
+///
+/// # Known failed invariants (attack-study subjects, not bugs to silently patch)
+///
+/// - No check that all contributions actually share the same mask or round;
+///   the aggregate is meaningless algebra if they don't.
+/// - Duplicate `contributor_ids` are accepted, so one participant can submit
+///   multiple contributions and disproportionately weight the majority vote.
+/// - No authentication or provenance on any contribution.
+/// - `with_capacity(n)` sets `max_size` to the caller-supplied `n` with no
+///   ceiling; only the *internal `Vec`'s pre-allocation* is capped at
+///   [`HDC_FHE_MAX_POOL_SIZE`]. The "256" figure describes the default
+///   constructor, not an enforced ceiling on every pool.
+/// - Aggregation is exact only for an odd `contribution_count()` (see
+///   [`Self::aggregate`]).
+#[deprecated(
+    note = "shared-mask aggregation toy model; leaks pairwise relationships and is not FHE"
+)]
 pub struct CollectiveWisdomPool {
     /// Encrypted contributions from peers.
     contributions: Vec<EncryptedHV>,
@@ -207,7 +241,7 @@ impl CollectiveWisdomPool {
         self.contributions.is_empty()
     }
 
-    /// Compute encrypted collective wisdom via majority-vote bundling.
+    /// Compute a shared-mask algebraic aggregate via majority-vote bundling.
     ///
     /// All contributions must be encrypted with the **same mask** for the
     /// bundling to preserve semantic content. The result is:
@@ -217,8 +251,9 @@ impl CollectiveWisdomPool {
     /// ≈ enc(bundle(w_1, w_2, ..., w_n), M)
     /// ```
     ///
-    /// The approximation arises because majority vote and XOR don't perfectly
-    /// commute. Accuracy improves with more contributors (CLT).
+    /// This is exact when `contribution_count()` is odd and only
+    /// approximate when it is even (see the module-level "Limitations"
+    /// section for why).
     ///
     /// Returns `None` if the pool is empty.
     pub fn aggregate(&self) -> Option<EncryptedHV> {
@@ -255,12 +290,14 @@ impl Default for CollectiveWisdomPool {
 // SESSION KEY DISTRIBUTION
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Helper: generate a random collective mask and split it into threshold shares.
+/// Generate a mask and broken compatibility share records.
 ///
 /// Returns `(mask, shares)` where `mask` is the full mask (held only transiently)
-/// and `shares` are the (k,n) threshold shares to distribute to peers.
+/// Each returned record independently reveals the mask; do not distribute it
+/// as if it were a threshold share.
 ///
 /// The full mask should be zeroized after share distribution.
+#[deprecated(note = "uses the broken compatibility threshold-sharing construction")]
 pub fn generate_collective_mask(
     k: usize,
     n: usize,
@@ -288,15 +325,19 @@ mod tests {
         assert_eq!(decrypted, plaintext);
     }
 
+    /// Renamed from `test_otp_ciphertext_hides_plaintext`: a low-similarity
+    /// sample under one deterministic-seed mask does not establish hiding
+    /// (the whole point of this module is that it does not). This is a
+    /// decorrelation observation on one sample, nothing more.
     #[test]
-    fn test_otp_ciphertext_hides_plaintext() {
+    fn deterministic_xor_mask_decorrelates_one_sample() {
         let plaintext = BinaryHV::random(42);
         let mask = BinaryHV::random(99);
         let encrypted = EncryptedHV::encrypt(&plaintext, &mask);
         let sim = encrypted.ciphertext.similarity(&plaintext);
         assert!(
             (sim - 0.5).abs() < 0.05,
-            "Ciphertext should be ~0.5 similar to plaintext (OTP hiding), got {sim}"
+            "Ciphertext should be ~0.5 similar to plaintext for this one sample, got {sim}"
         );
     }
 
@@ -346,6 +387,18 @@ mod tests {
     }
 
     #[test]
+    fn legacy_attack_reused_mask_leaks_pairwise_relationships() {
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
+        let shared_mask = BinaryHV::random(99);
+        let enc_a = EncryptedHV::encrypt(&a, &shared_mask);
+        let enc_b = EncryptedHV::encrypt(&b, &shared_mask);
+
+        assert_eq!(enc_a.ciphertext.bind(&enc_b.ciphertext), a.bind(&b));
+        assert_eq!(enc_a.encrypted_similarity(&enc_b), a.similarity(&b));
+    }
+
+    #[test]
     fn test_different_masks_destroy_similarity() {
         let a = BinaryHV::random(1);
         let b = BinaryHV::random(1); // Same vector!
@@ -379,11 +432,13 @@ mod tests {
     }
 
     #[test]
-    fn test_collective_pool_aggregate() {
+    fn test_collective_pool_aggregate_odd_count_is_exact() {
         let mask = BinaryHV::random(99);
         let mut pool = CollectiveWisdomPool::new();
 
-        // 5 peers contribute different wisdom vectors
+        // 5 contributors: an odd count, so majority-vote ties are
+        // structurally impossible and mask cancellation is exact — see the
+        // module docs.
         for i in 0..5 {
             let wisdom = BinaryHV::random(i as u64);
             let encrypted = EncryptedHV::encrypt(&wisdom, &mask);
@@ -391,19 +446,59 @@ mod tests {
         }
 
         let aggregate = pool.aggregate().expect("should aggregate");
-
-        // Decrypt aggregate
         let decrypted_aggregate = aggregate.decrypt(&mask);
 
-        // Compute expected: bundle of all plaintext wisdoms
         let plaintexts: Vec<BinaryHV> = (0..5).map(|i| BinaryHV::random(i as u64)).collect();
         let expected_bundle = BinaryHV::bundle(&plaintexts);
 
-        // Approximate equality (bundling and XOR don't perfectly commute)
-        let sim = decrypted_aggregate.similarity(&expected_bundle);
-        assert!(
-            sim > 0.85,
-            "Decrypted aggregate should be close to plaintext bundle, got sim={sim}"
+        assert_eq!(
+            decrypted_aggregate, expected_bundle,
+            "odd contributor count must decrypt to the exact plaintext bundle"
+        );
+    }
+
+    /// CI-004 (extended): for an even contributor count, a locally-tied bit
+    /// resolves to 0 in both the plaintext and ciphertext tallies, but if the
+    /// shared mask bit there is 1, decrypting the ciphertext tally flips that
+    /// 0 to 1 — disagreeing with the plaintext bundle. This falsifies the
+    /// blanket "bundle(enc(A),enc(B)) ≈ enc(bundle(A,B))" claim for even
+    /// counts; it is only exact for odd counts.
+    #[test]
+    fn legacy_attack_even_count_bundle_disagrees_with_plaintext() {
+        // Construct two 1-bit-wide vectors (only bit 0 matters here) with a
+        // mask whose bit 0 is 1, and plaintexts that disagree in bit 0 —
+        // i.e. a tied 2-contributor local tally.
+        let mut p0_bytes = [0u8; BinaryHV::BYTES];
+        let mut p1_bytes = [0u8; BinaryHV::BYTES];
+        let mut mask_bytes = [0u8; BinaryHV::BYTES];
+        p0_bytes[0] = 0b0000_0000; // bit 0 = 0
+        p1_bytes[0] = 0b0000_0001; // bit 0 = 1
+        mask_bytes[0] = 0b0000_0001; // mask bit 0 = 1
+
+        let p0 = BinaryHV(p0_bytes);
+        let p1 = BinaryHV(p1_bytes);
+        let mask = BinaryHV(mask_bytes);
+
+        let plaintext_bundle = BinaryHV::bundle(&[p0, p1]);
+        assert_eq!(
+            plaintext_bundle.0[0] & 1,
+            0,
+            "tied plaintext bit must resolve to 0 (count=1 is not > threshold=1)"
+        );
+
+        let enc0 = EncryptedHV::encrypt(&p0, &mask);
+        let enc1 = EncryptedHV::encrypt(&p1, &mask);
+        let ciphertext_bundle = BinaryHV::bundle(&[enc0.ciphertext, enc1.ciphertext]);
+        let decrypted = ciphertext_bundle.bind(&mask);
+
+        assert_eq!(
+            decrypted.0[0] & 1,
+            1,
+            "decrypting the tied ciphertext tally flips the bit versus the plaintext bundle"
+        );
+        assert_ne!(
+            decrypted, plaintext_bundle,
+            "even-count aggregation must disagree with the plaintext bundle here"
         );
     }
 

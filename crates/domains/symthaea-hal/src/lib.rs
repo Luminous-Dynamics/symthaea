@@ -49,7 +49,7 @@
 //! let cal = CalibrationProfile::default_21();
 //! let mut servo = ServoOutput::new(MockI2cBus::new(), MockI2cBus::new(), cal);
 //! servo.init(50.0).unwrap();
-//! servo.enable();
+//! servo.enable().unwrap();
 //!
 //! // Safety interlock filters commands
 //! let mut safety = SafetyInterlock::new();

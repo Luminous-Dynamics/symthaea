@@ -36,8 +36,11 @@
 pub mod controller;
 pub mod encoder;
 pub mod fep;
+pub mod formant_extraction;
 pub mod metrics;
+pub mod phonetics;
 pub mod pipeline;
+pub mod speech;
 pub mod types;
 
 // Re-export core types at crate root

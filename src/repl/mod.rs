@@ -225,8 +225,12 @@ use crate::action::{
     ActionIR, ActionOutcome, ExecutionMode, PolicyBundle, SandboxRoot, SimpleExecutor,
 };
 
-// Voice output (optional larynx)
-use crate::voice::{LTCPacing, VoiceOutput, VoiceOutputConfig};
+// Voice output (optional larynx). Real formant/vocal-tract synthesis with
+// consciousness-modulated pacing (repl_voice.rs) -- not the basic
+// VoiceOutput wrapper, which falls through to a placeholder sine wave
+// whenever Kokoro isn't available (P4 fold, 2026-07-17: this session's
+// voice-plan verified pipeline replaces the parallel test-only path).
+use crate::voice::repl_voice::{ReplVoiceConfig, ReplVoiceOutput};
 
 // Shell/IPC infrastructure
 use crate::shell::ipc_client::MetricsSnapshot;
@@ -315,7 +319,7 @@ pub struct ReplSession {
     ///
     /// When enabled, speaks responses with consciousness-modulated
     /// pacing based on flow state, attention, and arousal.
-    pub voice: Option<VoiceOutput>,
+    pub voice: Option<ReplVoiceOutput>,
 
     /// Conversation history.
     ///
@@ -560,15 +564,16 @@ impl ReplSession {
         let policy = PolicyBundle::restrictive();
         let sandbox = SandboxRoot::new("repl-session").ok();
 
-        // Initialize voice (optional)
+        // Initialize voice (optional): real formant/vocal-tract synthesis
+        // with consciousness-modulated pacing, not the basic VoiceOutput
+        // wrapper (which falls through to a placeholder sine wave whenever
+        // Kokoro is unavailable).
         let voice = if config.voice_enabled {
-            let voice_config = VoiceOutputConfig {
-                enable_tts: true,
+            let voice_config = ReplVoiceConfig {
+                base_rate: config.voice_rate,
                 ..Default::default()
             };
-            let mut v = VoiceOutput::new(voice_config);
-            let _ = v.initialize();
-            Some(v)
+            Some(ReplVoiceOutput::new(voice_config)?)
         } else {
             None
         };
@@ -731,15 +736,21 @@ impl ReplSession {
             llm_response.text
         };
 
-        // Voice output if enabled
+        // Voice output if enabled: full consciousness-modulated pacing
+        // (phi, prediction error, valence/arousal, flow, tau), matching the
+        // real caller pattern in src/bin/symthaea-repl.rs rather than a
+        // partial rate/pause-only reconstruction.
         if let Some(ref mut voice) = self.voice {
-            // Update pacing from consciousness state
-            let pacing = LTCPacing::default().apply_adaptive_behavior(
+            voice.update_from_consciousness(
+                snapshot.unified_psi,
+                snapshot.prediction_error,
+                snapshot.unified_valence,
+                snapshot.unified_arousal,
+                snapshot.in_flow,
                 snapshot.speech_rate_multiplier,
                 snapshot.pause_multiplier,
-                1.0, // attention sensitivity
+                snapshot.tau_mean,
             );
-            voice.set_pacing(pacing);
 
             if voice.synthesize(&response).is_ok() {
                 self.stats.voice_utterances += 1;
@@ -1001,7 +1012,7 @@ impl ReplSession {
         self.cognitive.reset();
         self.history.clear();
         // Voice state is reset by the next pacing update
-        // (no explicit reset needed for VoiceOutput)
+        // (no explicit reset needed for ReplVoiceOutput)
         for observer in &mut self.observers {
             observer.on_reset();
         }

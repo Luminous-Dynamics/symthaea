@@ -179,13 +179,37 @@ fn render_report(cert: &symthaea_forge::ForgeCertificate) -> String {
             )
         })
         .collect();
+    let lineage_section: String = if cert.mutation_history.len() > 1 {
+        let entries: String = cert
+            .mutation_history
+            .iter()
+            .map(|m| {
+                format!(
+                    "{}. gen {}: **{}** — {}\n",
+                    m.generation + 1,
+                    m.generation,
+                    m.operator,
+                    m.detail
+                )
+            })
+            .collect();
+        format!(
+            "\n**⚠ This diff compounds {n} mutations, not just the one above** -- elitism \
+             means each generation mutates the previous generation's winner, so the \
+             Before/After diff below reflects all {n} applied in order:\n\n{entries}\n",
+            n = cert.mutation_history.len(),
+        )
+    } else {
+        String::new()
+    };
     format!(
         "# symthaea-forge candidate report\n\n\
          Generated: {generated} ms since epoch\n\
          Target: `{file}::{func}` (package `{package}`)\n\
          Git SHA at search time: `{sha}`\n\
          Generation found: {generation}\n\
-         Mutation: **{op}** — {detail}\n\n\
+         Mutation: **{op}** — {detail}\n\
+         {lineage}\n\
          ## Gates\n{gates}\n\
          ## Benchmark\n{bench}\n\
          ## Before\n```rust\n{before}\n```\n\n\
@@ -194,7 +218,9 @@ fn render_report(cert: &symthaea_forge::ForgeCertificate) -> String {
          Manually replace the `{func}` function body in `{file}` with the \"After\" \
          block above, after reading it carefully — this certificate proves the gates \
          that were run and their results, not that the change is a good idea in every \
-         context the function is called from.\n",
+         context the function is called from. If the lineage above shows more than one \
+         mutation, review EACH one individually before applying -- do not assume the \
+         label on this report is the only thing that changed.\n",
         generated = cert.generated_at_unix_ms,
         file = cert.target_file.display(),
         func = cert.target_function,
@@ -203,6 +229,7 @@ fn render_report(cert: &symthaea_forge::ForgeCertificate) -> String {
         generation = cert.generation,
         op = cert.mutation_operator,
         detail = cert.mutation_detail,
+        lineage = lineage_section,
         gates = gates_section,
         bench = bench_section,
         before = cert.before_source,

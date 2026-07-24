@@ -12,6 +12,7 @@
 #[allow(clippy::field_reassign_with_default)]
 mod accessors_and_types;
 mod arousal_trap;
+mod art_observer_live;
 mod behavioral_modulation;
 mod core;
 mod creative_mesh_sharing;
@@ -31,6 +32,7 @@ mod moral_and_drives;
 #[allow(clippy::field_reassign_with_default)]
 mod phase_coverage;
 mod phase_results;
+mod phone_capture_live;
 mod proptest_cross_coupling;
 mod proptest_feedback_consensus;
 // proptest_feedback_loops: references MCE_NARRATIVE/MCE_SOCIAL/RESONANCE_FLOW constants

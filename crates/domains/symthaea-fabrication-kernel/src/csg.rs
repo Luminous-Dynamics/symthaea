@@ -67,15 +67,7 @@ impl Default for Transform3D {
 }
 
 impl Transform3D {
-    /// Apply transform to a point: scale → rotate → translate
-    pub fn apply(&self, point: [f32; 3]) -> [f32; 3] {
-        // Scale
-        let mut p = [
-            point[0] * self.scale[0],
-            point[1] * self.scale[1],
-            point[2] * self.scale[2],
-        ];
-
+    fn rotate_vector(&self, mut p: [f32; 3]) -> [f32; 3] {
         // Rotate X
         let (sx, cx) = self.rotate[0].sin_cos();
         let y = p[1] * cx - p[2] * sx;
@@ -97,12 +89,60 @@ impl Transform3D {
         p[0] = x;
         p[1] = y;
 
-        // Translate
+        p
+    }
+
+    /// Apply transform to a point: scale → rotate → translate.
+    pub fn apply(&self, point: [f32; 3]) -> [f32; 3] {
+        let scaled = [
+            point[0] * self.scale[0],
+            point[1] * self.scale[1],
+            point[2] * self.scale[2],
+        ];
+        let mut p = self.rotate_vector(scaled);
         p[0] += self.translate[0];
         p[1] += self.translate[1];
         p[2] += self.translate[2];
-
         p
+    }
+
+    /// Transform a normal with the inverse-transpose of the linear transform.
+    ///
+    /// Returns `None` for a singular or non-finite transform because a normal
+    /// is undefined when any scale axis collapses to zero.
+    pub fn apply_normal(&self, normal: [f32; 3]) -> Option<[f32; 3]> {
+        const MIN_SCALE: f32 = 1.0e-12;
+        if self
+            .scale
+            .iter()
+            .any(|s| !s.is_finite() || s.abs() <= MIN_SCALE)
+            || self.rotate.iter().any(|r| !r.is_finite())
+        {
+            return None;
+        }
+
+        let inverse_scaled = [
+            normal[0] / self.scale[0],
+            normal[1] / self.scale[1],
+            normal[2] / self.scale[2],
+        ];
+        let mut transformed = self.rotate_vector(inverse_scaled);
+        let len = (transformed[0] * transformed[0]
+            + transformed[1] * transformed[1]
+            + transformed[2] * transformed[2])
+            .sqrt();
+        if !len.is_finite() || len <= 1.0e-12 {
+            return None;
+        }
+        transformed[0] /= len;
+        transformed[1] /= len;
+        transformed[2] /= len;
+        Some(transformed)
+    }
+
+    /// True when the linear transform reverses orientation.
+    pub fn reverses_orientation(&self) -> bool {
+        self.scale[0] * self.scale[1] * self.scale[2] < 0.0
     }
 }
 

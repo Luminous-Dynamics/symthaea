@@ -12,7 +12,7 @@
 
 use symthaea_fabrication_kernel::csg::CSGNode;
 use symthaea_fabrication_kernel::mesh::resolve_to_mesh;
-use symthaea_fabrication_kernel::step_import::parse_step;
+use symthaea_fabrication_kernel::step_import::parse_step_subset;
 use symthaea_fabrication_kernel::{
     GCodeCommand, SliceConfig, ToolpathConfig, generate_gcode, slice_mesh, validate_mesh,
 };
@@ -45,7 +45,7 @@ fn main() {
     println!("=== STEP-to-G-code Fabrication Pipeline ===\n");
 
     // ── Stage 1: Parse STEP ─────────────────────────────────────────────
-    let step_file = parse_step(BOX_STEP).expect("Failed to parse STEP file");
+    let step_file = parse_step_subset(BOX_STEP).expect("Failed to parse STEP file");
     let total_entities = step_file.entities.len();
     let surface_entities = step_file
         .entities

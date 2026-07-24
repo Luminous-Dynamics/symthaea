@@ -64,6 +64,11 @@ pub struct MotorRenderingManager {
     /// Short ψ history ring (pre-viewing baseline for observer-Δψ).
     #[cfg(feature = "art-observer")]
     pub(crate) psi_history: std::collections::VecDeque<f64>,
+
+    /// Total viewing windows ever opened — the A/B mode alternates arms on
+    /// this counter's parity (even = real artwork, odd = scrambled control).
+    #[cfg(feature = "art-observer")]
+    pub(crate) art_viewings_started: u64,
 }
 
 /// State of one artwork-observation window.
@@ -79,6 +84,9 @@ pub(crate) struct ArtViewing {
     pub psi_sum: f64,
     /// Number of ψ samples accumulated.
     pub psi_samples: u32,
+    /// Whether this window shows the pixel-scrambled CONTROL frame instead
+    /// of the artwork (A/B mode; control verdicts are never rewarded).
+    pub is_control: bool,
 }
 
 impl MotorRenderingManager {
@@ -111,6 +119,8 @@ impl MotorRenderingManager {
             art_viewing: None,
             #[cfg(feature = "art-observer")]
             psi_history: std::collections::VecDeque::with_capacity(8),
+            #[cfg(feature = "art-observer")]
+            art_viewings_started: 0,
         }
     }
 }

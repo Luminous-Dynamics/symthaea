@@ -80,6 +80,7 @@ pub mod embodiment;
 pub mod encoder;
 pub mod fep_agent;
 pub mod perturbations;
+pub mod plugin;
 pub mod reward;
 pub mod road;
 pub mod scenarios;

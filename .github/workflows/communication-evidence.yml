@@ -1,0 +1,52 @@
+name: Communication Evidence Gates
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-communication/**"
+      - "crates/core/symthaea-stt/src/communication_adapter.rs"
+      - "communication/**"
+      - ".github/workflows/communication-evidence.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Test communication contracts and CLI
+        run: cargo test -p symthaea-communication
+      - name: Check locked offline worker and Python syntax
+        run: |
+          uv lock --check --project communication/worker
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          for path in [
+              Path("communication/worker/seamless_worker.py"),
+              Path("communication/worker/whisper_worker.py"),
+              Path("communication/worker/provision_whisper.py"),
+              Path("communication/pilot/prepare_fleurs.py"),
+              Path("communication/pilot/test_worker_e2e.py"),
+          ]:
+              ast.parse(path.read_text(), filename=str(path))
+          PY
+      - name: Check acoustic capability adapter
+        run: cargo check -p symthaea-stt --lib
+      - name: Ensure unpinned templates cannot become release evidence
+        run: |
+          if cargo run -p symthaea-communication --bin symthaea-comm-eval -- validate-provider communication/pilot/provider-manifest.template.json; then
+            echo "unpinned provider template unexpectedly passed"
+            exit 1
+          fi
+          if cargo run -p symthaea-communication --bin symthaea-comm-eval -- validate-plan communication/pilot/evaluation-plan.template.json; then
+            echo "unpinned evaluation template unexpectedly passed"
+            exit 1
+          fi

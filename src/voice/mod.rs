@@ -58,12 +58,30 @@ pub mod voice_feedback;
 // Voice pipeline orchestrator: bridges STT, cognitive loop, Broca, and TTS
 pub mod audio_bridge;
 pub mod orchestrator;
-pub mod synthesis_bridge;
+// synthesis_bridge deleted 2026-07-15 (voice plan P4): its
+// cycle_result_to_thought_channels had zero callers outside its own tests —
+// the real CycleResult→Broca bridge lives in the cognitive loop.
 
 /// Bridges `symthaea-muse::singing_bridge` (lyrics + melody) into
 /// `FormantVocoder` — see module docs.
 #[cfg(feature = "singing")]
 pub mod singing;
+
+// Newer Kokoro-based singing pipeline (real STFT phase vocoder + acoustic-
+// boundary phoneme/syllable alignment, see kokoro_singing.rs module docs)
+// -- these files landed via a merge but were never wired into the module
+// tree in any branch's history (verified against origin/main too), so
+// they were unreachable dead code until this declaration. Declared in
+// dependency order: singing_engine is the shared contract the other three
+// build on.
+#[cfg(feature = "singing")]
+pub mod diffsinger;
+#[cfg(feature = "singing")]
+pub mod kokoro_singing;
+#[cfg(feature = "singing")]
+pub mod singing_engine;
+#[cfg(feature = "singing")]
+pub mod singing_quality;
 
 // LTC-driven articulatory synthesis (Phase 17)
 pub mod vocal_tract_controller;
@@ -124,8 +142,6 @@ pub use voice_feedback::{
 // Re-export voice pipeline orchestrator types
 pub use audio_bridge::{aggregate_audio_hvs, binary_to_continuous};
 pub use orchestrator::VoiceOrchestrator;
-#[cfg(feature = "ssm_language")]
-pub use synthesis_bridge::cycle_result_to_thought_channels;
 
 // Re-export vocal tract types (Phase 17)
 pub use vocal_tract_controller::{
@@ -361,6 +377,13 @@ pub struct VoiceOutputConfig {
 
     /// Buffer size for audio streaming
     pub buffer_size: usize,
+
+    /// Request CUDA GPU acceleration for Kokoro synthesis (needs the
+    /// `voice-tts-gpu` feature + a CUDA-enabled `ORT_DYLIB_PATH`; falls
+    /// back to CPU with a warning otherwise). `#[serde(default)]` so
+    /// existing serialized configs without this field still deserialize.
+    #[serde(default)]
+    pub use_gpu: bool,
 }
 
 impl Default for VoiceOutputConfig {
@@ -373,6 +396,7 @@ impl Default for VoiceOutputConfig {
             volume: 0.8,
             stream_output: false,
             buffer_size: 4096,
+            use_gpu: false,
         }
     }
 }
@@ -435,11 +459,22 @@ impl VoiceOutput {
         // Attempt to load Kokoro TTS
         let kokoro_config = kokoro_engine::KokoroConfig {
             sample_rate: self.config.sample_rate,
+            use_gpu: self.config.use_gpu,
             ..kokoro_engine::KokoroConfig::default()
         };
         self.kokoro = kokoro_engine::KokoroEngine::load(kokoro_config);
         if self.kokoro.is_some() {
-            tracing::info!("VoiceOutput initialized with Kokoro TTS engine");
+            // Verified live 2026-07-16 (voice plan LF4): real tokenizer +
+            // [510,256] style tables produce intelligible speech (Whisper
+            // round-trip 0% WER on the first sample). Real-time factor
+            // measured 2026-07-18 (see kokoro_realtime_factor.rs): CPU ~1.42
+            // (slower than real time), GPU ~0.22 on an RTX 2070 (~6x faster,
+            // comfortably real-time) via `use_gpu` + the `voice-tts-gpu`
+            // feature. CPU remains the default (clarity/teacher role).
+            tracing::info!(
+                "VoiceOutput initialized with Kokoro TTS (verified live 2026-07-16; \
+                 CPU RTF ~1.42, GPU RTF ~0.22 via use_gpu + voice-tts-gpu)"
+            );
         } else {
             tracing::info!("VoiceOutput initialized with simulated TTS (Kokoro unavailable)");
         }
@@ -640,7 +675,7 @@ fn resample_audio(samples: &[f32], rate: f32) -> Vec<f32> {
     output
 }
 
-/// Speech recognizer configuration (for future STT support)
+/// Speech recognizer configuration for the communication-provider bridge.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpeechRecognizerConfig {
     /// Sample rate for input audio
@@ -652,7 +687,8 @@ pub struct SpeechRecognizerConfig {
     /// Whether to enable continuous recognition
     pub continuous: bool,
 
-    /// Model path (for Whisper ONNX)
+    /// Local Transformers-compatible Whisper snapshot. Model provisioning is
+    /// explicit; the voice runtime never downloads weights.
     pub model_path: Option<String>,
 }
 
@@ -662,34 +698,14 @@ impl Default for SpeechRecognizerConfig {
             sample_rate: 16000,
             language: "en-US".to_string(),
             continuous: false,
-            model_path: Some("models/whisper-tiny.onnx".to_string()),
+            model_path: std::env::var("SYMTHAEA_WHISPER_MODEL_PATH").ok(),
         }
     }
 }
 
-/// Phoneme representation for advanced TTS
-#[derive(Debug, Clone)]
-pub struct Phoneme {
-    /// IPA symbol
-    pub symbol: String,
-    /// Duration in milliseconds
-    pub duration_ms: u32,
-    /// Stress level (0-2)
-    pub stress: u8,
-    /// Pitch modifier
-    pub pitch_mod: f32,
-}
-
-/// Word with phoneme breakdown
-#[derive(Debug, Clone)]
-pub struct PhonemizedWord {
-    /// Original text
-    pub text: String,
-    /// Phoneme sequence
-    pub phonemes: Vec<Phoneme>,
-    /// Part of speech tag
-    pub pos_tag: Option<String>,
-}
+// Phoneme/PhonemizedWord deleted 2026-07-15 (voice plan P4): dead types with
+// zero constructors or consumers anywhere. Real phoneme types live in
+// repl_voice (TimedPhoneme) and symthaea_vocal_tract::speech::g2p::Phoneme.
 
 /// Configuration for a voice conversation session.
 ///
@@ -716,11 +732,17 @@ impl Default for VoiceConfig {
 
 /// Voice conversation session combining STT (listen) and TTS (speak).
 ///
-/// Wraps the voice output pipeline and provides a simple listen/speak API
-/// for the service binary's conversational voice turns.
+/// Wraps the REPL voice pipeline (real formant/vocal-tract synthesis with
+/// audio playback when the `audio`/`live-voice` features are compiled) and
+/// provides a simple listen/speak API for the service binary's conversational
+/// voice turns.
+///
+/// Previously this wrapped `VoiceOutput` with `enable_tts: false`, which fell
+/// through to `simulate_tts` (a placeholder sine wave) and then discarded the
+/// samples — the service `--voice` flag was a silent no-op.
 pub struct VoiceConversation {
-    /// Voice output for TTS
-    voice_output: VoiceOutput,
+    /// Real voice synthesis + playback pipeline
+    voice: repl_voice::ReplVoiceOutput,
     /// Configuration
     _config: VoiceConfig,
 }
@@ -728,15 +750,21 @@ pub struct VoiceConversation {
 impl VoiceConversation {
     /// Create a new voice conversation from config.
     pub fn new(config: VoiceConfig) -> Result<Self> {
-        let voice_config = VoiceOutputConfig {
+        let repl_config = repl_voice::ReplVoiceConfig {
             sample_rate: config.sample_rate,
-            voice_id: config.voice_id as usize,
-            ..VoiceOutputConfig::default()
+            consciousness_modulated: config.ltc_pacing,
+            ..repl_voice::ReplVoiceConfig::default()
         };
-        let mut voice_output = VoiceOutput::new(voice_config);
-        voice_output.initialize()?;
+        let voice = repl_voice::ReplVoiceOutput::new(repl_config)?;
+        if !voice.is_audio_available() {
+            tracing::warn!(
+                "Voice interface: no audio playback backend compiled/available \
+                 (build with the `audio` or `live-voice` feature to hear speech); \
+                 synthesis will run but audio is not played"
+            );
+        }
         Ok(Self {
-            voice_output,
+            voice,
             _config: config,
         })
     }
@@ -750,12 +778,82 @@ impl VoiceConversation {
         Ok(String::new())
     }
 
-    /// Speak text aloud via TTS.
-    pub fn speak(&mut self, text: &str) -> Result<()> {
-        let _samples = self.voice_output.synthesize(text)?;
-        // In a real implementation, samples would be played via audio output.
-        Ok(())
+    /// Transcribe already-captured mono audio through the common communication
+    /// provider contract. Microphone capture remains the caller's responsibility.
+    pub fn transcribe_audio(
+        &mut self,
+        provider: &mut impl symthaea_communication::human::HumanCommunicationProvider,
+        samples: Vec<f32>,
+        sample_rate_hz: u32,
+        expected_language: Option<&str>,
+    ) -> Result<symthaea_communication::human::PreservedText> {
+        transcribe_samples(provider, samples, sample_rate_hz, expected_language)
     }
+
+    /// Speak text aloud via TTS (real formant synthesis; plays audio when a
+    /// playback backend is compiled, otherwise synthesizes and logs at debug).
+    pub fn speak(&mut self, text: &str) -> Result<()> {
+        self.voice.speak(text)
+    }
+
+    /// Whether an audio playback backend is actually available.
+    pub fn is_audio_available(&self) -> bool {
+        self.voice.is_audio_available()
+    }
+
+    /// Take the most recent synthesis quality metrics (for the
+    /// voice→cognition feedback bridge).
+    pub fn take_voice_metrics(&mut self) -> Option<voice_feedback::VoiceOutputMetrics> {
+        self.voice.take_voice_metrics()
+    }
+}
+
+/// Transcribe already-captured mono audio through the common communication
+/// provider contract (e.g. the Whisper JSONL worker). Free function so
+/// transcription does not require a TTS session to be active.
+pub fn transcribe_samples(
+    provider: &mut impl symthaea_communication::human::HumanCommunicationProvider,
+    samples: Vec<f32>,
+    sample_rate_hz: u32,
+    expected_language: Option<&str>,
+) -> Result<symthaea_communication::human::PreservedText> {
+    use std::collections::BTreeMap;
+    use symthaea_communication::{Modality, SensorCalibration, SignalObservation, TimeSpan};
+
+    if sample_rate_hz == 0 {
+        anyhow::bail!("audio sample rate must be positive");
+    }
+    let duration = samples.len() as f64 / sample_rate_hz as f64;
+    let mut environment = BTreeMap::new();
+    if let Some(language) = expected_language {
+        environment.insert("expected_language".into(), language.into());
+    }
+    let mut observation = SignalObservation {
+        id: String::new(),
+        modality: Modality::Audio {
+            sample_rate_hz,
+            channels: 1,
+        },
+        samples,
+        features: BTreeMap::new(),
+        original_text: None,
+        normalized_text: None,
+        uncertain_spans: vec![],
+        timing: TimeSpan {
+            start_s: 0.0,
+            end_s: duration,
+        },
+        location: None,
+        calibration: SensorCalibration::default(),
+        source_identity: None,
+        environment,
+    };
+    observation
+        .refresh_id()
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    provider
+        .transcribe(&observation)
+        .map_err(anyhow::Error::msg)
 }
 
 #[cfg(test)]

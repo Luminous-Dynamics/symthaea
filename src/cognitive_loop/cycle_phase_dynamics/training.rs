@@ -53,6 +53,7 @@ impl CognitiveLoopService {
             self.carryover.history.consciousness_level > 0.0 || self.stats.total_cycles < 20;
         let (learning_occurred, training_loss) = if prediction_error > neuromod_threshold
             && !self.behavior.adaptive_behavior.pause_learning
+            && !self.training_frozen
             && !self.carryover.quality.narrative_veto_active
             && consciousness_awake
         {
@@ -94,6 +95,14 @@ impl CognitiveLoopService {
             #[cfg(not(feature = "vision-manifold"))]
             let importance = TRAINING_BASE_IMPORTANCE;
 
+            // Temporally correct training start (2026-07-17): the pair below is
+            // (enc_{t−1} → enc_t), so the forward pass must start from the
+            // evolution state at the END of cycle t−2 — front() of the rolling
+            // pre-step queue once warm. The live state is NOT a valid start
+            // (it was already stepped with enc_t this cycle). None during
+            // warm-up or for the cold-start self-pair (prev absent).
+            let use_history = previous_state.is_some() && self.train_history_snapshots.len() == 2;
+
             if let Some(ref mut trainer) = self.async_trainer {
                 trainer.send(TrainingSample {
                     input: train_input,
@@ -118,7 +127,13 @@ impl CognitiveLoopService {
                     }
                     TrainingMethod::Bptt => {
                         self.stats.bptt_steps += 1;
-                        self.temporal_network.train_step_bptt(
+                        let start = if use_history {
+                            self.train_history_snapshots.front()
+                        } else {
+                            None
+                        };
+                        self.temporal_network.train_step_from(
+                            start,
                             &train_input,
                             &train_target,
                             delta_t,
@@ -127,7 +142,13 @@ impl CognitiveLoopService {
                     }
                     TrainingMethod::BpttWithSpsaFallback => {
                         let old_loss = self.stats.avg_training_loss;
-                        let bptt_result = self.temporal_network.train_step_bptt(
+                        let start = if use_history {
+                            self.train_history_snapshots.front()
+                        } else {
+                            None
+                        };
+                        let bptt_result = self.temporal_network.train_step_from(
+                            start,
                             &train_input,
                             &train_target,
                             delta_t,

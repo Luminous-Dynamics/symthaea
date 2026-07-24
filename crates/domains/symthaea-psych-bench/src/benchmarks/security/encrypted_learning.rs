@@ -3,8 +3,8 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Encrypted Learning Benchmark
 //!
-//! Tests that class prototypes can be incrementally UPDATED under homomorphic
-//! encryption (XOR-OTP) with no accuracy loss relative to plaintext learning.
+//! Tests shared-mask XOR algebra for incremental prototype updates. Mask reuse
+//! and cancellation make this unsuitable as encryption or private learning.
 //!
 //! ## Protocol
 //!
@@ -72,12 +72,12 @@ pub struct EncryptedLearningBenchmark;
 
 impl PsychBenchmark for EncryptedLearningBenchmark {
     fn name(&self) -> &str {
-        "Security::EncryptedLearning"
+        "InsecureAlgebraDemo::EncryptedLearning"
     }
 
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
-            paradigm: "Homomorphic Incremental HDC Learning",
+            paradigm: "Shared-Mask Incremental HDC Algebra",
             citation: "Imani, M. et al. (2019). A framework for collaborative learning in secure high-dimensional space. IEEE HPCA.",
             year: 2019,
             doi: Some("10.1109/HPCA.2019.00036"),

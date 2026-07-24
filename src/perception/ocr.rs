@@ -112,33 +112,29 @@ impl RustOcrEngine {
         Self::default()
     }
 
-    /// Initialize the OCR engine (load models)
+    /// Initialize the OCR engine (load models).
+    ///
+    /// rten/ocrs model loading is deferred (blocked on `perception` feature
+    /// stabilization), so this engine cannot recognize anything yet and
+    /// refuses to report itself ready. (Until 2026-07-15 it marked itself
+    /// initialized and `recognize()` returned an empty `Ok` result — so the
+    /// auto strategy silently produced no text on precisely the
+    /// highest-quality images.)
     pub fn initialize(&mut self) -> Result<()> {
-        // Deferred: Load rten/ocrs models when the `perception` feature matures.
-        // Models are small (~8MB total) and fast to load.
-        self.initialized = true;
-        Ok(())
+        self.initialized = false;
+        anyhow::bail!("Rust OCR (rten/ocrs) models not integrated yet — engine unavailable")
+    }
+
+    /// Whether the engine can actually recognize text.
+    pub fn is_available(&self) -> bool {
+        self.initialized
     }
 
     /// Recognize text from an image
     pub fn recognize(&self, _image: &DynamicImage) -> Result<OcrResult> {
-        if !self.initialized {
-            anyhow::bail!("OCR engine not initialized. Call initialize() first.");
-        }
-
-        let start = Instant::now();
-
-        // Stub: returns empty result until rten/ocrs models are integrated
-        // (deferred — blocked on `perception` feature stabilization)
-        let result = OcrResult {
-            text: String::new(),
-            confidence: 0.0,
-            method: OcrMethod::RustOcr,
-            duration_ms: start.elapsed().as_millis() as u64,
-            words: Vec::new(),
-        };
-
-        Ok(result)
+        anyhow::bail!(
+            "Rust OCR (rten/ocrs) models not integrated yet — use Tesseract or OcrMethod::None"
+        )
     }
 
     /// Set minimum confidence threshold
@@ -314,12 +310,16 @@ impl OcrSystem {
         Self::default()
     }
 
-    /// Initialize the OCR system
+    /// Initialize the OCR system.
+    ///
+    /// Engine availability is graceful: the Rust OCR engine currently has no
+    /// models integrated and reports itself unavailable; Tesseract is probed
+    /// on the system. Strategy selection only routes to engines that are
+    /// actually available.
     pub fn initialize(&mut self) -> Result<()> {
-        // Initialize Rust OCR
-        self.rust_ocr
-            .initialize()
-            .context("Failed to initialize Rust OCR engine")?;
+        if let Err(e) = self.rust_ocr.initialize() {
+            tracing::debug!(error = %e, "Rust OCR engine unavailable");
+        }
 
         // Check if Tesseract is available (optional)
         self.tesseract.check_available();
@@ -389,11 +389,16 @@ impl OcrSystem {
         }
     }
 
-    /// Select best OCR strategy based on image quality
+    /// Select best OCR strategy based on image quality.
+    ///
+    /// Only routes to engines that are actually available. (Until 2026-07-15
+    /// this routed high-quality images to the model-less Rust OCR stub, which
+    /// silently returned empty text with `Ok` — the best inputs produced
+    /// nothing while low-quality ones fell back to working Tesseract.)
     pub fn select_strategy(&self, quality: &ImageQuality) -> OcrMethod {
         if !self.auto_strategy {
-            // Manual strategy: prefer Rust OCR if enabled
-            if self.prefer_rust {
+            // Manual strategy: prefer Rust OCR if enabled AND available
+            if self.prefer_rust && self.rust_ocr.is_available() {
                 return OcrMethod::RustOcr;
             } else if self.tesseract.available {
                 return OcrMethod::Tesseract;
@@ -402,16 +407,18 @@ impl OcrSystem {
             }
         }
 
-        // Auto strategy: choose based on quality
-        if quality.score >= 0.7 {
+        // Auto strategy: choose based on quality, among available engines
+        if quality.score >= 0.7 && self.rust_ocr.is_available() {
             // High quality: Rust OCR is fast and accurate
             OcrMethod::RustOcr
         } else if self.tesseract.available {
-            // Low quality: Tesseract is more robust
+            // Low quality (or no Rust OCR): Tesseract is more robust
             OcrMethod::Tesseract
-        } else {
+        } else if self.rust_ocr.is_available() {
             // No good option: try Rust OCR anyway
             OcrMethod::RustOcr
+        } else {
+            OcrMethod::None
         }
     }
 
@@ -439,14 +446,21 @@ impl OcrSystem {
 
     /// Recognize text with fallback strategy
     ///
-    /// Tries Rust OCR first, falls back to Tesseract if confidence is low
+    /// Tries Rust OCR first (if available), falls back to Tesseract if
+    /// confidence is low. With neither engine available, returns an
+    /// `OcrMethod::None` empty result rather than fabricating output.
     pub fn recognize_with_fallback(&mut self, image: &DynamicImage) -> Result<OcrResult> {
-        // Try Rust OCR first
-        let rust_result = self.rust_ocr.recognize(image)?;
+        let rust_result = if self.rust_ocr.is_available() {
+            Some(self.rust_ocr.recognize(image)?)
+        } else {
+            None
+        };
 
         // If confidence is high enough, return it
-        if rust_result.confidence >= 0.7 {
-            return Ok(rust_result);
+        if let Some(ref r) = rust_result {
+            if r.confidence >= 0.7 {
+                return Ok(rust_result.unwrap());
+            }
         }
 
         // If Tesseract is available, try it as fallback
@@ -454,14 +468,21 @@ impl OcrSystem {
             let tesseract_result = self.tesseract.recognize(image)?;
 
             // Return whichever has higher confidence
-            if tesseract_result.confidence > rust_result.confidence {
-                Ok(tesseract_result)
-            } else {
-                Ok(rust_result)
+            match rust_result {
+                Some(r) if r.confidence > tesseract_result.confidence => Ok(r),
+                _ => Ok(tesseract_result),
             }
-        } else {
+        } else if let Some(r) = rust_result {
             // No fallback available
-            Ok(rust_result)
+            Ok(r)
+        } else {
+            Ok(OcrResult {
+                text: String::new(),
+                confidence: 0.0,
+                method: OcrMethod::None,
+                duration_ms: 0,
+                words: Vec::new(),
+            })
         }
     }
 
@@ -557,27 +578,35 @@ mod tests {
     }
 
     #[test]
-    fn test_strategy_selection() {
+    fn test_strategy_selection_never_routes_to_unavailable_engine() {
         let ocr = OcrSystem::new();
 
-        // High quality image
+        // Rust OCR has no models integrated and Tesseract has not been
+        // probed — with no available engine, every quality level must
+        // select None rather than an engine that silently returns nothing.
         let high_quality = ImageQuality {
             score: 0.9,
             resolution_ok: true,
             contrast_ok: true,
             too_noisy: false,
         };
-        assert_eq!(ocr.select_strategy(&high_quality), OcrMethod::RustOcr);
+        assert_eq!(ocr.select_strategy(&high_quality), OcrMethod::None);
 
-        // Low quality image (would prefer Tesseract if available)
         let low_quality = ImageQuality {
             score: 0.3,
             resolution_ok: true,
             contrast_ok: false,
             too_noisy: true,
         };
-        // Since Tesseract is not available, should still return RustOcr
-        assert_eq!(ocr.select_strategy(&low_quality), OcrMethod::RustOcr);
+        assert_eq!(ocr.select_strategy(&low_quality), OcrMethod::None);
+    }
+
+    #[test]
+    fn test_rust_ocr_refuses_to_report_ready_without_models() {
+        let mut engine = RustOcrEngine::new();
+        assert!(engine.initialize().is_err());
+        assert!(!engine.is_available());
+        assert!(engine.recognize(&create_test_image(200, 100)).is_err());
     }
 
     #[test]

@@ -319,6 +319,8 @@ struct CfcPlanningResult {
     output: Vec<f32>,
     /// Multi-scale prediction from CfC.
     prediction: Vec<f32>,
+    /// Shortest-horizon raw prediction (bits-saved diagnostics only).
+    prediction_first_horizon: Option<Vec<f32>>,
     /// Cross-horizon prediction coherence (EMA'd).
     prediction_coherence: f32,
     /// Model uncertainty (reducible by exploration).
@@ -550,10 +552,59 @@ impl CognitiveLoopService {
                                         #[cfg(not(feature = "mesh-trust"))]
                                         let is_flagged_sybil = false;
 
+                                        // Warded Node design, Phase 3 (Layer B, allowlist-first
+                                        // receive): a node's `WardConfig.allowlist_mode` can
+                                        // require a minimum LOCAL trust score before admitting a
+                                        // peer at all — inverting the cold-start-friendly default
+                                        // above for nodes where a stranger's silence isn't
+                                        // evidence of safety. `AllowlistMode` is a pure data type
+                                        // (symthaea-memetics stays trust-graph-unaware); this is
+                                        // the one call site that supplies the actual score, from
+                                        // symthaea's OWN local web-of-trust graph — NOT the
+                                        // separate mycelix-identity Holochain zome, which would
+                                        // need an async DHT round-trip this ~50Hz hot loop cannot
+                                        // afford. No trust graph compiled in (`mesh-trust` off)
+                                        // ⇒ score 0.0 ⇒ `AllowlistOnly` fails closed, `Open` is
+                                        // unaffected (it ignores the score).
+                                        #[cfg(feature = "mesh-trust")]
+                                        let peer_trust_score =
+                                            self.trust_manager.graph().transitive_trust(
+                                                self.trust_manager.our_node_id(),
+                                                peer_id,
+                                                crate::swarm::web_of_trust::MAX_TRUST_HOPS,
+                                            );
+                                        #[cfg(not(feature = "mesh-trust"))]
+                                        let peer_trust_score = 0.0f64;
+                                        let allowlist_admits = self
+                                            .memetic_immune
+                                            .ward_config()
+                                            .allowlist_mode
+                                            .admits(peer_trust_score);
+
                                         if is_flagged_sybil {
                                             tracing::debug!(
                                                 peer_id = %peer_id,
                                                 "Rejected ContentAnnounced from peer flagged as Sybil anomaly"
+                                            );
+                                            // Transparency (Warded Node Phase 2/3): both
+                                            // pre-screen rejection paths land in the same
+                                            // guardian-facing audit log as memetic-screen
+                                            // rejections — "not a black box" applies to
+                                            // everything the node blocked, not just what the
+                                            // memetic screen itself rejected.
+                                            self.memetic_immune.log_gate_denial(
+                                                *created_at,
+                                                "Sybil anomaly: peer flagged by trust graph",
+                                            );
+                                        } else if !allowlist_admits {
+                                            tracing::debug!(
+                                                peer_id = %peer_id,
+                                                trust_score = peer_trust_score,
+                                                "Rejected ContentAnnounced: peer below this warded node's allowlist trust threshold"
+                                            );
+                                            self.memetic_immune.log_gate_denial(
+                                                *created_at,
+                                                "allowlist gate: peer trust below threshold",
                                             );
                                         } else {
                                             // Reconstruct an (approximate, lossy) full-dimension
@@ -1070,7 +1121,30 @@ impl CognitiveLoopService {
                                 .and_then(|raster| {
                                     symthaea_art_eye::to_channels(&raster, channels)
                                 });
-                                if let Some(frame) = frame {
+                                if let Some(mut frame) = frame {
+                                    // A/B mode: alternate arms on the window
+                                    // counter's parity; odd windows show the
+                                    // pixel-scrambled control (same
+                                    // color/luminance histogram, zero
+                                    // composition), seeded by cycle number
+                                    // for determinism.
+                                    // Counterbalancing: control_first flips
+                                    // which arm opens the session, so order
+                                    // effects (early-session ψ trends) can
+                                    // be separated from the arm effect
+                                    // across paired runs.
+                                    let odd_window =
+                                        self.sensorimotor.motor_rendering.art_viewings_started % 2
+                                            == 1;
+                                    let is_control = self.config.art_observer_ab_mode
+                                        && (odd_window
+                                            != self.config.art_observer_ab_control_first);
+                                    if is_control {
+                                        symthaea_art_eye::scramble_pixels(
+                                            &mut frame, channels, cycle_num,
+                                        );
+                                    }
+                                    self.sensorimotor.motor_rendering.art_viewings_started += 1;
                                     let history = &self.sensorimotor.motor_rendering.psi_history;
                                     let baseline_psi =
                                         history.iter().sum::<f64>() / history.len() as f64;
@@ -1081,13 +1155,14 @@ impl CognitiveLoopService {
                                             baseline_psi,
                                             psi_sum: 0.0,
                                             psi_samples: 0,
+                                            is_control,
                                         });
                                 }
                             }
                         }
 
                         // Tick an active viewing window.
-                        let mut completed: Option<(f64, f64)> = None;
+                        let mut completed: Option<(f64, f64, bool)> = None;
                         if let Some(viewing) =
                             self.sensorimotor.motor_rendering.art_viewing.as_mut()
                         {
@@ -1098,10 +1173,11 @@ impl CognitiveLoopService {
                             viewing.cycles_remaining -= 1;
                             if viewing.cycles_remaining == 0 {
                                 let mean_psi = viewing.psi_sum / viewing.psi_samples.max(1) as f64;
-                                completed = Some((mean_psi, viewing.baseline_psi));
+                                completed =
+                                    Some((mean_psi, viewing.baseline_psi, viewing.is_control));
                             }
                         }
-                        if let Some((mean_psi, baseline_psi)) = completed {
+                        if let Some((mean_psi, baseline_psi, was_control)) = completed {
                             self.sensorimotor.motor_rendering.art_viewing = None;
                             let viewing_surprise = self
                                 .sensorimotor
@@ -1116,6 +1192,7 @@ impl CognitiveLoopService {
                                 let fb = mgr.record_observer_verdict(
                                     (mean_psi - baseline_psi) as f32,
                                     viewing_surprise,
+                                    was_control,
                                 );
                                 if fb.dopamine_delta != 0.0 {
                                     self.neuromod.bath.dopamine.produce(fb.dopamine_delta);
@@ -1909,6 +1986,7 @@ impl CognitiveLoopService {
         let delta_t = cfc_plan.delta_t;
         let output = cfc_plan.output;
         let prediction = cfc_plan.prediction;
+        let prediction_first_horizon = cfc_plan.prediction_first_horizon;
         let prediction_coherence = cfc_plan.prediction_coherence;
         let epistemic_uncertainty = cfc_plan.epistemic_uncertainty;
         let aleatoric_uncertainty = cfc_plan.aleatoric_uncertainty;
@@ -3495,6 +3573,7 @@ impl CognitiveLoopService {
             core: DynCore {
                 output,
                 prediction,
+                prediction_first_horizon,
                 prediction_error,
                 coherence,
                 unified_psi,

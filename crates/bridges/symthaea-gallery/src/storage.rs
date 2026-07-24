@@ -7,7 +7,65 @@
 //! No database dependency — flat file storage sufficient for single-instance system.
 
 use crate::GalleryIndex;
+use std::ffi::OsStr;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use uuid::Uuid;
+
+const MAX_ARTIFACT_FILENAME_BYTES: usize = 255;
+
+/// Validate an artifact filename before joining it to a gallery directory.
+///
+/// Gallery metadata stores basenames, not paths. Keeping that distinction at
+/// the write boundary prevents a caller from escaping the configured root.
+pub(crate) fn validate_artifact_filename(
+    filename: &str,
+    expected_extension: &str,
+) -> std::io::Result<()> {
+    let path = Path::new(filename);
+    let is_single_component = path.file_name() == Some(OsStr::new(filename));
+    let has_expected_extension = path.extension() == Some(OsStr::new(expected_extension));
+    if filename.is_empty()
+        || filename.len() > MAX_ARTIFACT_FILENAME_BYTES
+        || filename.contains('\0')
+        || filename.contains('/')
+        || filename.contains('\\')
+        || !is_single_component
+        || !has_expected_extension
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("invalid gallery artifact filename: {filename:?}"),
+        ));
+    }
+    Ok(())
+}
+
+fn atomic_write(path: &Path, contents: &[u8]) -> std::io::Result<()> {
+    let parent = path.parent().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "path has no parent")
+    })?;
+    let filename = path.file_name().and_then(OsStr::to_str).ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "path has no filename")
+    })?;
+    let temporary = parent.join(format!(".{filename}.{}.tmp", Uuid::new_v4()));
+
+    let result = (|| {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)?;
+        file.write_all(contents)?;
+        file.sync_all()?;
+        drop(file);
+        std::fs::rename(&temporary, path)
+    })();
+
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    result
+}
 
 /// Gallery storage manager.
 pub struct GalleryStorage {
@@ -50,8 +108,9 @@ impl GalleryStorage {
 
     /// Save a visual artwork SVG to disk.
     pub fn save_visual(&self, filename: &str, svg_content: &str) -> std::io::Result<PathBuf> {
+        validate_artifact_filename(filename, "svg")?;
         let path = self.visual_dir().join(filename);
-        std::fs::write(&path, svg_content)?;
+        atomic_write(&path, svg_content.as_bytes())?;
         Ok(path)
     }
 
@@ -62,10 +121,11 @@ impl GalleryStorage {
         samples: &[i16],
         sample_rate: u32,
     ) -> std::io::Result<PathBuf> {
+        validate_artifact_filename(filename, "wav")?;
         let path = self.music_dir().join(filename);
         // Write minimal WAV header + data
-        let data = encode_wav(samples, sample_rate);
-        std::fs::write(&path, data)?;
+        let data = encode_wav(samples, sample_rate)?;
+        atomic_write(&path, &data)?;
         Ok(path)
     }
 
@@ -73,7 +133,7 @@ impl GalleryStorage {
     pub fn save_index(&self, index: &GalleryIndex) -> std::io::Result<()> {
         let json = serde_json::to_string_pretty(index)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        std::fs::write(self.index_path(), json)
+        atomic_write(&self.index_path(), json.as_bytes())
     }
 
     /// Load the gallery index from JSON.
@@ -84,9 +144,29 @@ impl GalleryStorage {
 }
 
 /// Encode PCM i16 mono samples as a minimal WAV byte buffer.
-fn encode_wav(samples: &[i16], sample_rate: u32) -> Vec<u8> {
-    let data_len = (samples.len() * 2) as u32;
-    let file_len = 36 + data_len;
+fn encode_wav(samples: &[i16], sample_rate: u32) -> std::io::Result<Vec<u8>> {
+    let byte_rate = sample_rate
+        .checked_mul(2)
+        .filter(|_| sample_rate > 0)
+        .ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid WAV sample rate")
+        })?;
+    let data_len = samples
+        .len()
+        .checked_mul(2)
+        .and_then(|len| u32::try_from(len).ok())
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "WAV data exceeds RIFF limit",
+            )
+        })?;
+    let file_len = 36u32.checked_add(data_len).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "WAV file exceeds RIFF limit",
+        )
+    })?;
 
     let mut buf = Vec::with_capacity(44 + samples.len() * 2);
 
@@ -101,7 +181,7 @@ fn encode_wav(samples: &[i16], sample_rate: u32) -> Vec<u8> {
     buf.extend_from_slice(&1u16.to_le_bytes()); // PCM format
     buf.extend_from_slice(&1u16.to_le_bytes()); // mono
     buf.extend_from_slice(&sample_rate.to_le_bytes());
-    buf.extend_from_slice(&(sample_rate * 2).to_le_bytes()); // byte rate
+    buf.extend_from_slice(&byte_rate.to_le_bytes()); // byte rate
     buf.extend_from_slice(&2u16.to_le_bytes()); // block align
     buf.extend_from_slice(&16u16.to_le_bytes()); // bits per sample
 
@@ -112,7 +192,7 @@ fn encode_wav(samples: &[i16], sample_rate: u32) -> Vec<u8> {
         buf.extend_from_slice(&sample.to_le_bytes());
     }
 
-    buf
+    Ok(buf)
 }
 
 #[cfg(test)]
@@ -122,7 +202,7 @@ mod tests {
     #[test]
     fn wav_header_valid() {
         let samples = vec![0i16, 1000, -1000, 500, -500];
-        let wav = encode_wav(&samples, 44100);
+        let wav = encode_wav(&samples, 44100).unwrap();
 
         // RIFF header
         assert_eq!(&wav[0..4], b"RIFF");
@@ -198,5 +278,49 @@ mod tests {
         assert_eq!(content, "<svg></svg>");
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn artifact_writes_reject_paths_and_wrong_extensions() {
+        let dir = std::env::temp_dir().join(format!("symthaea-gallery-paths-{}", Uuid::new_v4()));
+        let storage = GalleryStorage::new(&dir);
+        storage.ensure_dirs().unwrap();
+
+        assert_eq!(
+            storage
+                .save_visual("../escape.svg", "<svg/>")
+                .unwrap_err()
+                .kind(),
+            std::io::ErrorKind::InvalidInput
+        );
+        assert_eq!(
+            storage
+                .save_music("nested/audio.wav", &[], 44_100)
+                .unwrap_err()
+                .kind(),
+            std::io::ErrorKind::InvalidInput
+        );
+        assert_eq!(
+            storage
+                .save_visual("art.html", "<svg/>")
+                .unwrap_err()
+                .kind(),
+            std::io::ErrorKind::InvalidInput
+        );
+        assert!(!dir.join("escape.svg").exists());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn wav_rejects_invalid_sample_rate() {
+        assert_eq!(
+            encode_wav(&[], 0).unwrap_err().kind(),
+            std::io::ErrorKind::InvalidInput
+        );
+        assert_eq!(
+            encode_wav(&[], u32::MAX).unwrap_err().kind(),
+            std::io::ErrorKind::InvalidInput
+        );
     }
 }

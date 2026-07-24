@@ -20,6 +20,7 @@ pub trait ManipulatorPhysicsSimulator {
 /// For joint i, gravity torque = sum_j(m_j * g * d_j * cos(q_i)) for j >= i.
 /// This is a first-order approximation valid for arms where all joints
 /// rotate about roughly horizontal axes (e.g., Panda-class).
+#[derive(Debug, Clone)]
 pub struct SimpleManipulatorSimulator {
     state: ManipulatorState,
     kinematics: ManipulatorKinematics,
@@ -43,9 +44,12 @@ pub struct SimpleManipulatorSimulator {
 
 impl SimpleManipulatorSimulator {
     pub fn new() -> Self {
+        let kinematics = ManipulatorKinematics::default_7dof();
+        let mut state = ManipulatorState::home();
+        state.end_effector_position = kinematics.end_effector_position(&state.joint_angles);
         Self {
-            state: ManipulatorState::home(),
-            kinematics: ManipulatorKinematics::default_7dof(),
+            state,
+            kinematics,
             inertias: [2.0, 2.0, 1.5, 1.0, 0.5, 0.3, 0.2],
             damping: [5.0, 5.0, 4.0, 3.0, 2.0, 1.5, 1.0],
             max_torques: [87.0, 87.0, 87.0, 87.0, 12.0, 12.0, 12.0], // Panda-like
@@ -106,6 +110,18 @@ impl SimpleManipulatorSimulator {
     pub fn max_torques(&self) -> &[f64; NUM_JOINTS] {
         &self.max_torques
     }
+
+    /// Predict one dynamics step without mutating the live simulator.
+    ///
+    /// This is the embodiment's explicit generative model. The simple backend
+    /// doubles as its digital twin; hardware backends can replace this with a
+    /// learned or identified dynamics model while preserving the same
+    /// prediction-error contract.
+    pub fn predict_next_state(&self, cmd: &ManipulatorCommand, dt: f64) -> ManipulatorState {
+        let mut predicted = self.clone();
+        predicted.step(cmd, dt);
+        predicted.state
+    }
 }
 
 impl Default for SimpleManipulatorSimulator {
@@ -165,6 +181,10 @@ impl ManipulatorPhysicsSimulator for SimpleManipulatorSimulator {
 
     fn reset(&mut self) {
         self.state = ManipulatorState::home();
+        self.state.end_effector_position = self
+            .kinematics
+            .end_effector_position(&self.state.joint_angles);
+        self.external_forces = [0.0; 3];
     }
 }
 
@@ -246,8 +266,14 @@ mod tests {
         let mut cmd = ManipulatorCommand::zero();
         cmd.joint_torques[0] = 0.5;
         sim.step(&cmd, 0.01);
+        sim.external_forces = [1.0, 2.0, 3.0];
         sim.reset();
         assert_eq!(sim.state().joint_velocities, [0.0; NUM_JOINTS]);
+        assert_eq!(sim.external_forces, [0.0; 3]);
+        let expected = sim
+            .kinematics()
+            .end_effector_position(&sim.state().joint_angles);
+        assert_eq!(sim.state().end_effector_position, expected);
     }
 
     #[test]
@@ -275,6 +301,17 @@ mod tests {
             "Gravity should cause joints to drift: max_drift={}",
             max_drift
         );
+    }
+
+    #[test]
+    fn prediction_does_not_mutate_live_state() {
+        let sim = SimpleManipulatorSimulator::new();
+        let before = sim.state().clone();
+        let mut cmd = ManipulatorCommand::zero();
+        cmd.joint_torques[0] = 0.5;
+        let predicted = sim.predict_next_state(&cmd, 0.002);
+        assert_eq!(sim.state().joint_angles, before.joint_angles);
+        assert_ne!(predicted.joint_velocities, before.joint_velocities);
     }
 
     mod proptest_physics {

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 /// A scale/mode family, defined by its ascending semitone offsets from the
 /// tonic (the tonic itself is offset 0 and is implicit).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Mode {
     Ionian,     // major
     Dorian,     // minor with raised 6

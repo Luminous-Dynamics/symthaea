@@ -1,0 +1,28 @@
+{
+  "plan_version": "symthaea-muse-study-release-plan-v1",
+  "source_revision": "replace-with-immutable-git-revision",
+  "workspace_tree_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "execution_environment_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "external_registration_uri": "https://replace-with-registration-record.invalid",
+  "entries": [
+    {"role":"Readme","visibility":"PublicAtRegistration","relative_path":"README.md"},
+    {"role":"FrozenManifest","visibility":"PublicAtRegistration","relative_path":"manifest.json"},
+    {"role":"FrozenMethodology","visibility":"PublicAtRegistration","relative_path":"methodology.json"},
+    {"role":"ExternalPreregistrationReceipt","visibility":"PublicAtRegistration","relative_path":"preregistration-receipt.json"},
+    {"role":"BlindedSchedule","visibility":"PublicBeforeCollection","relative_path":"schedule.json"},
+    {"role":"ParticipantSchedule","visibility":"PublicBeforeCollection","relative_path":"participant-schedule.json"},
+    {"role":"ArtifactProductionPlan","visibility":"PublicBeforeCollection","relative_path":"artifact-plan.json"},
+    {"role":"ArtifactBundle","visibility":"PublicBeforeCollection","relative_path":"artifact-bundle.json"},
+    {"role":"StructuralEvidence","visibility":"PublicAfterCollection","relative_path":"structural-evidence.json"},
+    {"role":"PolicyBudgetEvidence","visibility":"PublicAfterCollection","relative_path":"policy-budget.json"},
+    {"role":"ParticipantEvidence","visibility":"PublicAfterCollection","relative_path":"participant-evidence.json"},
+    {"role":"ConfirmatoryAnalysisPlan","visibility":"PublicAtRegistration","relative_path":"analysis-plan.json"},
+    {"role":"ConfirmatoryAnalysisReport","visibility":"PublicAfterCollection","relative_path":"analysis-report.json"},
+    {"role":"IndependentAnalysisReport","visibility":"PublicAfterCollection","relative_path":"independent-analysis-report.json"},
+    {"role":"SourceArchive","visibility":"PublicAtRegistration","relative_path":"source.tar.gz"},
+    {"role":"NixFlakeLock","visibility":"PublicAtRegistration","relative_path":"flake.lock"},
+    {"role":"ToolchainEvidence","visibility":"PublicAfterCollection","relative_path":"toolchain-evidence.json"},
+    {"role":"BlindingCodebook","visibility":"PublicAfterUnblinding","relative_path":"codebook.json"},
+    {"role":"RandomizationKeyReveal","visibility":"PublicAfterUnblinding","relative_path":"randomization-key.txt"}
+  ]
+}

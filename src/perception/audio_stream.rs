@@ -57,6 +57,14 @@ pub struct MicCaptureConfig {
     /// Minimum number of HV16 frames bundled before an HV is emitted.
     /// A single 10 ms frame is noisy; 5 frames ≈ 50 ms of auditory context.
     pub min_frames_per_emit: usize,
+    /// Optional path to a `TrainedPrototypes` file. When set (or when the
+    /// `SYMTHAEA_STT_PROTOTYPES` env var points at one), the worker loads
+    /// phoneme prototypes so `StreamFrame.phoneme` is actually decoded —
+    /// previously the processor was always constructed bare, so the live
+    /// path never exercised the phoneme channel at all. Frame-level phoneme
+    /// decode is research-grade (~19% accuracy at best); the HV texture is
+    /// the production signal either way.
+    pub prototype_model_path: Option<std::path::PathBuf>,
 }
 
 impl Default for MicCaptureConfig {
@@ -68,6 +76,8 @@ impl Default for MicCaptureConfig {
             stream_config: StreamConfig::low_latency(),
             worker_idle_us: 1_000,
             min_frames_per_emit: 5,
+            prototype_model_path: std::env::var_os("SYMTHAEA_STT_PROTOTYPES")
+                .map(std::path::PathBuf::from),
         }
     }
 }
@@ -242,14 +252,49 @@ pub(super) fn run_worker(
     config: MicCaptureConfig,
 ) {
     let mut processor = StreamProcessor::new(config.stream_config.clone());
+
+    // Load phoneme prototypes when configured so the phoneme channel is
+    // actually exercised (StreamFrame.phoneme stays None otherwise).
+    if let Some(ref path) = config.prototype_model_path {
+        match symthaea_stt::TrainedPrototypes::load(path) {
+            Ok(prototypes) => {
+                tracing::info!(
+                    "STT worker: loaded {} phoneme prototypes from {}",
+                    prototypes.len(),
+                    path.display()
+                );
+                processor.load_prototypes(&prototypes.as_pairs());
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "STT worker: failed to load prototypes from {}: {} \
+                     (continuing with HV texture only)",
+                    path.display(),
+                    e
+                );
+            }
+        }
+    }
+
     let mut scratch = vec![0.0_f32; 4096];
     let mut pending: Vec<HV16> = Vec::new();
+    let mut phonemes_decoded: u64 = 0;
 
     while !shutdown.load(Ordering::Relaxed) {
         let n = consumer.pop_slice(&mut scratch);
         if n > 0 {
             processor.push_audio(&scratch[..n]);
             for frame in processor.process() {
+                if let Some(ref ph) = frame.phoneme {
+                    phonemes_decoded += 1;
+                    if phonemes_decoded.is_multiple_of(100) {
+                        tracing::debug!(
+                            "STT worker: {} phonemes decoded (latest: {})",
+                            phonemes_decoded,
+                            ph
+                        );
+                    }
+                }
                 pending.push(frame.hv);
             }
 

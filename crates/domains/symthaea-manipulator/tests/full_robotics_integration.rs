@@ -83,7 +83,20 @@ fn test_ethics_blocks_motor_output() {
 
     let r2 = bridge.step(&hv, 0.002, 0.9); // High Phi, but ethics Blocked
     assert_eq!(r2.safety_level, MotorSafetyLevel::Red);
-    assert_eq!(r2.control_effort, 0.0, "Blocked should zero motor output");
+    // Blocked → Red → GravityHold: cognitive authority is revoked but the
+    // arm holds its pose against gravity at full authority — a limp zero
+    // would drop whatever it's holding (the old contract this replaces).
+    // Thought-independence of the Red-tier output is proven separately in
+    // tests/consciousness_proofs.rs proof2.
+    assert!(
+        r2.control_effort > 1e-4,
+        "Blocked must engage GravityHold (nonzero holding torque), got {}",
+        r2.control_effort
+    );
+    assert!(
+        normal_effort.is_finite(),
+        "pre-Blocked effort must be finite"
+    );
 
     // Clear moral gate — should restore normal operation
     bridge.apply_moral_gate(MoralGateInput {

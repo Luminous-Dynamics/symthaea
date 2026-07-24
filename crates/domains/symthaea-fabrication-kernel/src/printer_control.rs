@@ -62,6 +62,8 @@ pub enum PrinterError {
     ApiError(String),
     /// Operation attempted while not connected.
     NotConnected,
+    /// Backend is declared but no live transport implementation is compiled.
+    BackendUnavailable(String),
 }
 
 impl fmt::Display for PrinterError {
@@ -71,6 +73,9 @@ impl fmt::Display for PrinterError {
             Self::Timeout => write!(f, "request timed out"),
             Self::ApiError(msg) => write!(f, "API error: {msg}"),
             Self::NotConnected => write!(f, "printer not connected"),
+            Self::BackendUnavailable(name) => {
+                write!(f, "printer backend unavailable: {name}")
+            }
         }
     }
 }
@@ -281,10 +286,11 @@ impl PrinterApi for MockPrinter {
 // OctoPrintClient (stub)
 // ---------------------------------------------------------------------------
 
-/// Stub client for OctoPrint REST API.
+/// Capability marker for a future OctoPrint REST implementation.
 ///
-/// Real HTTP communication is behind the `printer-control` feature; this stub
-/// allows compile-time wiring without a live printer.
+/// This type fails closed: [`PrinterApi::connect`] returns
+/// [`PrinterError::BackendUnavailable`] until a real authenticated transport is
+/// implemented. It must never report a successful live connection.
 pub struct OctoPrintClient {
     base_url: String,
     api_key: String,
@@ -311,7 +317,7 @@ impl OctoPrintClient {
     }
 
     fn stub_err() -> PrinterError {
-        PrinterError::ApiError("Not implemented: requires printer-control feature".into())
+        PrinterError::BackendUnavailable("OctoPrint transport is not implemented".into())
     }
 }
 
@@ -321,8 +327,8 @@ impl PrinterApi for OctoPrintClient {
     }
 
     fn connect(&mut self) -> Result<(), PrinterError> {
-        self.connected = true;
-        Ok(())
+        self.connected = false;
+        Err(Self::stub_err())
     }
 
     fn status(&self) -> Result<PrinterStatus, PrinterError> {
@@ -358,7 +364,9 @@ impl PrinterApi for OctoPrintClient {
 // MoonrakerClient (stub)
 // ---------------------------------------------------------------------------
 
-/// Stub client for the Moonraker (Klipper) JSON-RPC API.
+/// Capability marker for a future Moonraker (Klipper) JSON-RPC transport.
+///
+/// Connection fails closed until the transport is implemented.
 pub struct MoonrakerClient {
     base_url: String,
     connected: bool,
@@ -378,7 +386,7 @@ impl MoonrakerClient {
     }
 
     fn stub_err() -> PrinterError {
-        PrinterError::ApiError("Not implemented: requires printer-control feature".into())
+        PrinterError::BackendUnavailable("Moonraker transport is not implemented".into())
     }
 }
 
@@ -388,8 +396,8 @@ impl PrinterApi for MoonrakerClient {
     }
 
     fn connect(&mut self) -> Result<(), PrinterError> {
-        self.connected = true;
-        Ok(())
+        self.connected = false;
+        Err(Self::stub_err())
     }
 
     fn status(&self) -> Result<PrinterStatus, PrinterError> {
@@ -425,19 +433,27 @@ impl PrinterApi for MoonrakerClient {
 // Factory
 // ---------------------------------------------------------------------------
 
-/// Create a boxed [`PrinterApi`] implementation based on a URL hint.
+/// Create a printer backend from an explicit URL scheme.
 ///
-/// - URLs containing `"octoprint"` yield an [`OctoPrintClient`].
-/// - URLs containing `"moonraker"` yield a [`MoonrakerClient`].
-/// - Everything else yields a [`MockPrinter`].
-pub fn printer_from_url(url: &str) -> Box<dyn PrinterApi> {
+/// Only `mock://` is operational in this crate snapshot. Declared live
+/// backends fail closed instead of silently constructing clients that can never
+/// complete a request.
+pub fn printer_from_url(url: &str) -> Result<Box<dyn PrinterApi>, PrinterError> {
     let lower = url.to_lowercase();
-    if lower.contains("octoprint") {
-        Box::new(OctoPrintClient::new(url, ""))
-    } else if lower.contains("moonraker") {
-        Box::new(MoonrakerClient::new(url))
+    if lower.starts_with("mock://") {
+        Ok(Box::new(MockPrinter::new()))
+    } else if lower.contains("octoprint") {
+        Err(PrinterError::BackendUnavailable(
+            "OctoPrint transport is not implemented".into(),
+        ))
+    } else if lower.contains("moonraker") || lower.contains("klipper") {
+        Err(PrinterError::BackendUnavailable(
+            "Moonraker transport is not implemented".into(),
+        ))
     } else {
-        Box::new(MockPrinter::new())
+        Err(PrinterError::ConnectionFailed(format!(
+            "unsupported printer URL: {url}"
+        )))
     }
 }
 
@@ -562,12 +578,9 @@ mod tests {
         // Not connected yet.
         assert!(c.status().is_err());
 
-        c.connect().unwrap();
-        // Connected but stub — operations return ApiError.
-        let err = c.submit_gcode("G28").unwrap_err();
-        assert!(matches!(err, PrinterError::ApiError(_)));
-        let err = c.status().unwrap_err();
-        assert!(matches!(err, PrinterError::ApiError(_)));
+        let err = c.connect().unwrap_err();
+        assert!(matches!(err, PrinterError::BackendUnavailable(_)));
+        assert!(matches!(c.status(), Err(PrinterError::NotConnected)));
     }
 
     #[test]
@@ -577,20 +590,26 @@ mod tests {
         assert_eq!(c.base_url(), "http://moonraker.local");
 
         assert!(c.get_temperatures().is_err());
-        c.connect().unwrap();
-        let err = c.get_temperatures().unwrap_err();
-        assert!(matches!(err, PrinterError::ApiError(_)));
+        let err = c.connect().unwrap_err();
+        assert!(matches!(err, PrinterError::BackendUnavailable(_)));
+        assert!(matches!(
+            c.get_temperatures(),
+            Err(PrinterError::NotConnected)
+        ));
     }
 
     #[test]
-    fn url_factory() {
-        let p = printer_from_url("http://my-octoprint:5000");
-        assert_eq!(p.name(), "OctoPrint");
+    fn url_factory_fails_closed_for_live_backends() {
+        assert!(matches!(
+            printer_from_url("http://my-octoprint:5000"),
+            Err(PrinterError::BackendUnavailable(_))
+        ));
+        assert!(matches!(
+            printer_from_url("http://moonraker.lan:7125"),
+            Err(PrinterError::BackendUnavailable(_))
+        ));
 
-        let p = printer_from_url("http://moonraker.lan:7125");
-        assert_eq!(p.name(), "Moonraker");
-
-        let p = printer_from_url("http://localhost:9999");
+        let p = printer_from_url("mock://local").unwrap();
         assert_eq!(p.name(), "MockPrinter");
     }
 
@@ -607,5 +626,8 @@ mod tests {
 
         let e = PrinterError::NotConnected;
         assert!(e.to_string().contains("not connected"));
+
+        let e = PrinterError::BackendUnavailable("octoprint".into());
+        assert!(e.to_string().contains("unavailable"));
     }
 }

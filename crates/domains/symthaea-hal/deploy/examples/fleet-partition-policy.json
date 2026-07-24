@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "deployment_id": "robot-01",
+  "coordinator_contact_freshness_ms": 1000,
+  "maximum_partition_grace_ms": 5000,
+  "maximum_local_command_age_ms": 100,
+  "maximum_trusted_time_uncertainty_ms": 50,
+  "require_operator_presence": true,
+  "require_local_supervisor_quorum": true,
+  "allow_actuation_during_grace": true
+}

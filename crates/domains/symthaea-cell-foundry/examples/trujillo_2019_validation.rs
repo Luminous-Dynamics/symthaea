@@ -524,7 +524,7 @@ fn run_validation(
     let mut assessments = Vec::new();
 
     for (i, dp) in data_points.iter().enumerate() {
-        let assessment = framework.assess(&dp.metrics, dp.lfp.as_ref());
+        let assessment = framework.assess_at(&dp.metrics, dp.lfp.as_ref(), dp.day as u64);
 
         let theta_str = dp
             .lfp
@@ -873,7 +873,7 @@ fn main() {
         let mut fw = ConsciousnessEthicsFramework::new();
         let mut last_assessment = None;
         for dp in &sharf_points {
-            last_assessment = Some(fw.assess(&dp.metrics, dp.lfp.as_ref()));
+            last_assessment = Some(fw.assess_at(&dp.metrics, dp.lfp.as_ref(), dp.day as u64));
         }
         (fw, last_assessment)
     };

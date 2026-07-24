@@ -2,11 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! Digital Twin Consciousness for Computational Psychiatry
+//! Exploratory Psychopharmacology Scenario Simulator
 //!
-//! Creates a dynamic neurochemical digital twin that can simulate
-//! drug interventions, predict consciousness state changes, and
-//! run virtual clinical trials — all without physical drug administration.
+//! # Research-only, unvalidated model
+//!
+//! This module contains hand-authored computational scenarios. It does **not**
+//! identify an individual patient's neurochemistry, predict treatment response,
+//! recommend medication, estimate remission, or support clinical decisions.
+//! It is compiled only with the `experimental-computational-psychiatry` feature.
+//! Real client data must not be supplied to this model.
 //!
 //! Unlike static MRI-derived models, this twin has:
 //! - 9-transmitter neuromodulator dynamics with pharmacokinetics
@@ -63,6 +67,47 @@ const RESPONSE_THRESHOLD: f32 = 0.5;
 /// Remission threshold: symptom severity < 0.2.
 /// Science: Rush et al. (2006) STAR*D definition.
 const REMISSION_THRESHOLD: f32 = 0.2;
+
+// ---------------------------------------------------------------------------
+// Research status and use policy
+// ---------------------------------------------------------------------------
+
+/// Maturity label attached to every result produced by this module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ModelStatus {
+    /// Hand-authored exploratory equations with no prospective clinical validation.
+    UnvalidatedResearchSimulation,
+}
+
+/// Machine-readable restrictions for downstream systems.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResearchUsePolicy {
+    pub clinical_use_prohibited: bool,
+    pub real_client_data_prohibited: bool,
+    pub prescribing_use_prohibited: bool,
+    pub autonomous_intervention_prohibited: bool,
+    pub allowed_use: String,
+}
+
+impl Default for ResearchUsePolicy {
+    fn default() -> Self {
+        Self {
+            clinical_use_prohibited: true,
+            real_client_data_prohibited: true,
+            prescribing_use_prohibited: true,
+            autonomous_intervention_prohibited: true,
+            allowed_use: "Synthetic educational and software research scenarios only".to_string(),
+        }
+    }
+}
+
+/// A response-rate prior used only inside a synthetic scenario.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ScenarioResponsePrior {
+    pub probability: f64,
+    pub model_status: ModelStatus,
+    pub not_a_personal_prediction: bool,
+}
 
 // ---------------------------------------------------------------------------
 // Enums
@@ -235,6 +280,11 @@ pub struct TrialOutcome {
 /// Full record of a virtual drug trial.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VirtualDrugTrial {
+    /// Always [`ModelStatus::UnvalidatedResearchSimulation`].
+    pub model_status: ModelStatus,
+    /// Always true. Downstream code must not suppress this restriction.
+    pub clinical_use_prohibited: bool,
+    /// Synthetic scenario label; not a prescription or recommendation.
     pub drug_name: String,
     pub drug_class: DrugClass,
     pub dose: f32,
@@ -246,7 +296,12 @@ pub struct VirtualDrugTrial {
 /// Comparison across multiple completed trials.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TreatmentComparison {
+    pub model_status: ModelStatus,
+    pub clinical_use_prohibited: bool,
     pub ranked_drugs: Vec<(String, TrialOutcome)>,
+    /// Top result under the simulator's own hand-authored scoring only.
+    pub top_simulated_scenario: String,
+    #[deprecated(note = "use top_simulated_scenario; this is not a medication recommendation")]
     pub best_drug: String,
     pub fastest_response: String,
     pub fewest_side_effects: String,
@@ -256,10 +311,10 @@ pub struct TreatmentComparison {
 // Main engine
 // ---------------------------------------------------------------------------
 
-/// Digital twin for computational psychiatry virtual trials.
+/// Research-only simulator for synthetic psychopharmacology scenarios.
 ///
-/// Encapsulates a psychiatric condition's neurochemical profile and
-/// provides methods to run, compare, and predict drug interventions.
+/// The internal state is not a patient digital twin and must not be populated
+/// from real client records or used to rank treatment options.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DigitalTwinPsychiatry {
     condition: PsychiatricCondition,
@@ -269,11 +324,8 @@ pub struct DigitalTwinPsychiatry {
 }
 
 impl DigitalTwinPsychiatry {
-    /// Create a new digital twin initialized from a psychiatric condition.
-    ///
-    /// The neurochemical profile is populated from established neuroscience
-    /// models of each condition.
-    pub fn new(condition: PsychiatricCondition) -> Self {
+    /// Create an unvalidated synthetic research scenario.
+    pub fn new_for_research(condition: PsychiatricCondition) -> Self {
         let neuromod_profile = Self::condition_profile(&condition);
         Self {
             condition,
@@ -283,7 +335,25 @@ impl DigitalTwinPsychiatry {
         }
     }
 
-    /// Derive a neurochemical baseline profile from a condition.
+    /// Legacy constructor retained for source compatibility.
+    #[deprecated(note = "use new_for_research; this model is not a patient digital twin")]
+    pub fn new(condition: PsychiatricCondition) -> Self {
+        Self::new_for_research(condition)
+    }
+
+    /// Machine-readable restrictions for this simulator.
+    pub fn use_policy() -> ResearchUsePolicy {
+        ResearchUsePolicy::default()
+    }
+
+    /// Fixed maturity label for this simulator.
+    pub const fn model_status() -> ModelStatus {
+        ModelStatus::UnvalidatedResearchSimulation
+    }
+
+    /// Derive a synthetic neurochemical scenario from a condition label.
+    ///
+    /// These values are assumptions, not observed biomarkers or patient estimates.
     pub fn condition_profile(condition: &PsychiatricCondition) -> NeuromodProfile {
         match condition {
             PsychiatricCondition::MajorDepression { severity, .. } => {
@@ -672,6 +742,8 @@ impl DigitalTwinPsychiatry {
         };
 
         let trial = VirtualDrugTrial {
+            model_status: ModelStatus::UnvalidatedResearchSimulation,
+            clinical_use_prohibited: true,
             drug_name: drug_name.to_string(),
             drug_class,
             dose,
@@ -730,18 +802,23 @@ impl DigitalTwinPsychiatry {
             .unwrap_or_default();
 
         TreatmentComparison {
+            model_status: ModelStatus::UnvalidatedResearchSimulation,
+            clinical_use_prohibited: true,
             ranked_drugs: ranked,
+            top_simulated_scenario: best_drug.clone(),
             best_drug,
             fastest_response,
             fewest_side_effects,
         }
     }
 
-    /// Predict response probability (0.0-1.0) for a drug class given the
-    /// current condition profile. Based on STAR*D-like empirical priors.
-    pub fn predict_response(&self, drug_class: DrugClass) -> f64 {
+    /// Return a synthetic response prior for scenario exploration.
+    ///
+    /// The value is not calibrated for an individual and is not a treatment
+    /// prediction. It must never be shown as a personalized probability.
+    pub fn scenario_response_prior(&self, drug_class: DrugClass) -> ScenarioResponsePrior {
         let p = &self.neuromod_profile;
-        match (&self.condition, drug_class) {
+        let probability = match (&self.condition, drug_class) {
             (PsychiatricCondition::MajorDepression { .. }, DrugClass::SSRI) => {
                 // STAR*D step 1: ~33% remission, ~50% response
                 (0.5 + 0.2 * (0.5 - p.serotonin_baseline) as f64).clamp(0.0, 1.0)
@@ -770,10 +847,22 @@ impl DigitalTwinPsychiatry {
                 // Generic moderate response
                 0.35
             }
+        };
+
+        ScenarioResponsePrior {
+            probability,
+            model_status: ModelStatus::UnvalidatedResearchSimulation,
+            not_a_personal_prediction: true,
         }
     }
 
-    /// Return the current neurochemical profile.
+    /// Legacy scalar wrapper retained for research code migration.
+    #[deprecated(note = "use scenario_response_prior; this is not a personal prediction")]
+    pub fn predict_response(&self, drug_class: DrugClass) -> f64 {
+        self.scenario_response_prior(drug_class).probability
+    }
+
+    /// Return the current synthetic neurochemical profile.
     pub fn profile(&self) -> &NeuromodProfile {
         &self.neuromod_profile
     }
@@ -847,6 +936,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn research_policy_is_fail_closed() {
+        let policy = DigitalTwinPsychiatry::use_policy();
+        assert!(policy.clinical_use_prohibited);
+        assert!(policy.real_client_data_prohibited);
+        assert!(policy.prescribing_use_prohibited);
+        assert!(policy.autonomous_intervention_prohibited);
+    }
+
+    #[test]
     fn test_depression_profile_low_serotonin() {
         let profile =
             DigitalTwinPsychiatry::condition_profile(&PsychiatricCondition::MajorDepression {
@@ -905,10 +1003,11 @@ mod tests {
 
     #[test]
     fn test_ssri_trial_gradual_onset() {
-        let mut twin = DigitalTwinPsychiatry::new(PsychiatricCondition::MajorDepression {
-            severity: 0.7,
-            duration_weeks: 8,
-        });
+        let mut twin =
+            DigitalTwinPsychiatry::new_for_research(PsychiatricCondition::MajorDepression {
+                severity: 0.7,
+                duration_weeks: 8,
+            });
 
         let trial = twin.run_virtual_trial("Sertraline", DrugClass::SSRI, 1.0, 42);
 
@@ -934,10 +1033,11 @@ mod tests {
 
     #[test]
     fn test_benzo_immediate_then_tolerance() {
-        let mut twin = DigitalTwinPsychiatry::new(PsychiatricCondition::GeneralizedAnxiety {
-            severity: 0.7,
-            panic_frequency: 0.5,
-        });
+        let mut twin =
+            DigitalTwinPsychiatry::new_for_research(PsychiatricCondition::GeneralizedAnxiety {
+                severity: 0.7,
+                panic_frequency: 0.5,
+            });
 
         let trial = twin.run_virtual_trial("Alprazolam", DrugClass::Benzodiazepine, 1.0, 28);
 
@@ -958,7 +1058,7 @@ mod tests {
 
     #[test]
     fn test_psychedelic_phi_spike() {
-        let mut twin = DigitalTwinPsychiatry::new(PsychiatricCondition::PTSD {
+        let mut twin = DigitalTwinPsychiatry::new_for_research(PsychiatricCondition::PTSD {
             severity: 0.8,
             dissociation_risk: 0.3,
         });
@@ -985,10 +1085,11 @@ mod tests {
 
     #[test]
     fn test_ketamine_rapid_onset() {
-        let mut twin = DigitalTwinPsychiatry::new(PsychiatricCondition::MajorDepression {
-            severity: 0.8,
-            duration_weeks: 24,
-        });
+        let mut twin =
+            DigitalTwinPsychiatry::new_for_research(PsychiatricCondition::MajorDepression {
+                severity: 0.8,
+                duration_weeks: 24,
+            });
 
         let trial = twin.run_virtual_trial("Esketamine", DrugClass::Ketamine, 1.0, 14);
 
@@ -1008,7 +1109,7 @@ mod tests {
 
     #[test]
     fn test_stimulant_adhd_response() {
-        let mut twin = DigitalTwinPsychiatry::new(PsychiatricCondition::ADHD {
+        let mut twin = DigitalTwinPsychiatry::new_for_research(PsychiatricCondition::ADHD {
             inattention: 0.8,
             hyperactivity: 0.6,
         });
@@ -1029,10 +1130,11 @@ mod tests {
 
     #[test]
     fn test_trial_outcome_response_remission() {
-        let mut twin = DigitalTwinPsychiatry::new(PsychiatricCondition::MajorDepression {
-            severity: 0.6,
-            duration_weeks: 8,
-        });
+        let mut twin =
+            DigitalTwinPsychiatry::new_for_research(PsychiatricCondition::MajorDepression {
+                severity: 0.6,
+                duration_weeks: 8,
+            });
 
         let trial = twin.run_virtual_trial("Sertraline", DrugClass::SSRI, 1.0, 56);
         let outcome = trial.outcome.as_ref().expect("outcome should exist");
@@ -1046,10 +1148,11 @@ mod tests {
 
     #[test]
     fn test_compare_treatments() {
-        let mut twin = DigitalTwinPsychiatry::new(PsychiatricCondition::MajorDepression {
-            severity: 0.7,
-            duration_weeks: 12,
-        });
+        let mut twin =
+            DigitalTwinPsychiatry::new_for_research(PsychiatricCondition::MajorDepression {
+                severity: 0.7,
+                duration_weeks: 12,
+            });
 
         let ssri = twin.run_virtual_trial("Sertraline", DrugClass::SSRI, 1.0, 42);
         let ketamine = twin.run_virtual_trial("Esketamine", DrugClass::Ketamine, 1.0, 42);
@@ -1057,9 +1160,10 @@ mod tests {
         let comparison = twin.compare_treatments(&[&ssri, &ketamine]);
         assert_eq!(comparison.ranked_drugs.len(), 2);
         assert!(
-            !comparison.best_drug.is_empty(),
-            "best drug should be identified"
+            !comparison.top_simulated_scenario.is_empty(),
+            "top simulated scenario should be identified"
         );
+        assert!(comparison.clinical_use_prohibited);
         assert!(
             !comparison.fastest_response.is_empty()
                 || comparison
@@ -1072,18 +1176,20 @@ mod tests {
 
     #[test]
     fn test_predict_response_ranges() {
-        let twin = DigitalTwinPsychiatry::new(PsychiatricCondition::MajorDepression {
+        let twin = DigitalTwinPsychiatry::new_for_research(PsychiatricCondition::MajorDepression {
             severity: 0.7,
             duration_weeks: 8,
         });
 
-        let ssri_pred = twin.predict_response(DrugClass::SSRI);
+        let ssri_pred = twin.scenario_response_prior(DrugClass::SSRI).probability;
         assert!(
             (0.0..=1.0).contains(&ssri_pred),
             "prediction should be in [0,1]"
         );
 
-        let ketamine_pred = twin.predict_response(DrugClass::Ketamine);
+        let ketamine_pred = twin
+            .scenario_response_prior(DrugClass::Ketamine)
+            .probability;
         assert!(
             ketamine_pred > ssri_pred,
             "ketamine should have higher predicted response in treatment-resistant"
@@ -1129,10 +1235,11 @@ mod tests {
 
     #[test]
     fn test_antipsychotic_reduces_dopamine() {
-        let mut twin = DigitalTwinPsychiatry::new(PsychiatricCondition::Schizophrenia {
-            positive_symptoms: 0.8,
-            negative_symptoms: 0.4,
-        });
+        let mut twin =
+            DigitalTwinPsychiatry::new_for_research(PsychiatricCondition::Schizophrenia {
+                positive_symptoms: 0.8,
+                negative_symptoms: 0.4,
+            });
         let baseline_da = twin.profile().dopamine_baseline;
 
         let trial = twin.run_virtual_trial("Olanzapine", DrugClass::Antipsychotic, 1.0, 28);

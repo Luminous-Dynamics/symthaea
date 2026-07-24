@@ -50,6 +50,9 @@ mod vision_signal_tests {
             service.cycle("observing a stable scene")
         };
         let _baseline_exploration = baseline_result.metadata.exploration_action;
+        // Mean surprise is read via the service accessor — the value is no
+        // longer exported on VisionTelemetry.
+        let baseline_surprise = service.vision_mean_surprise().unwrap_or(0.0);
 
         // Phase 2: inject a high-contrast novel frame (high surprise)
         let novel_frame: Vec<u8> = (0..32 * 32).map(|i| ((i * 73) % 256) as u8).collect();
@@ -61,17 +64,9 @@ mod vision_signal_tests {
             novel_result.metadata.vision.is_some(),
             "Vision telemetry should be present"
         );
-        let vision_tel = novel_result.metadata.vision.as_ref().unwrap();
-        assert!(vision_tel.vision_active, "Vision should be active");
 
         // Novel frame should produce higher mean surprise than stable baseline
-        let baseline_surprise = baseline_result
-            .metadata
-            .vision
-            .as_ref()
-            .map(|v| v.vision_mean_surprise)
-            .unwrap_or(0.0);
-        let novel_surprise = vision_tel.vision_mean_surprise;
+        let novel_surprise = service.vision_mean_surprise().unwrap_or(0.0);
         assert!(
             novel_surprise > baseline_surprise,
             "Novel frame should produce higher surprise: novel={novel_surprise:.4}, baseline={baseline_surprise:.4}"
@@ -91,30 +86,21 @@ mod vision_signal_tests {
             service.cycle("a calm day");
         }
 
-        // Record baseline cross-manifold error
-        let baseline = {
+        // Record baseline cross-manifold error (read via the service accessor —
+        // the value is no longer exported on VisionTelemetry)
+        let baseline_cross_error = {
             service.inject_vision_frame(stable.clone());
-            service.cycle("a calm day")
+            let _ = service.cycle("a calm day");
+            service.cross_manifold_prediction_error().unwrap_or(0.0)
         };
-        let baseline_cross_error = baseline
-            .metadata
-            .vision
-            .as_ref()
-            .map(|v| v.cross_manifold_prediction_error)
-            .unwrap_or(0.0);
 
         // Inject dramatically different frame while talking about something unrelated
         // (visual-cognitive mismatch → cross-manifold error)
         let chaotic: Vec<u8> = (0..32 * 32).map(|i| ((i * 197 + 51) % 256) as u8).collect();
         service.inject_vision_frame(chaotic);
-        let mismatch_result = service.cycle("the weather is mild today");
+        let _mismatch_result = service.cycle("the weather is mild today");
 
-        let mismatch_cross_error = mismatch_result
-            .metadata
-            .vision
-            .as_ref()
-            .map(|v| v.cross_manifold_prediction_error)
-            .unwrap_or(0.0);
+        let mismatch_cross_error = service.cross_manifold_prediction_error().unwrap_or(0.0);
 
         // Cross-manifold error should remain near baseline (10% tolerance for CfC noise)
         assert!(
@@ -143,12 +129,13 @@ mod vision_signal_tests {
             service.cycle("what just happened")
         };
 
-        // Verify horizon errors are populated in telemetry
-        if let Some(ref vision) = result.metadata.vision {
-            // horizon_errors may be empty if horizon predictor wasn't enabled,
-            // but the field should exist and be well-formed
+        // Verify horizon errors are well-formed (read via the service
+        // accessor — no longer exported on VisionTelemetry). They may be
+        // empty if the horizon predictor wasn't enabled, but every reported
+        // value must be finite.
+        if let Some(horizons) = service.vision_evaluate_horizons() {
             assert!(
-                vision.vision_horizon_errors.iter().all(|e| e.is_finite()),
+                horizons.errors.iter().all(|e| e.is_finite()),
                 "Horizon errors should be finite"
             );
         }
@@ -216,8 +203,10 @@ mod vision_signal_tests {
         for _ in 0..50 {
             service.inject_vision_frame(static_frame.clone());
             let result = service.cycle("watching the same thing");
-            if let Some(ref vision) = result.metadata.vision {
-                surprises.push(vision.vision_mean_surprise);
+            if result.metadata.vision.is_some() {
+                if let Some(s) = service.vision_mean_surprise() {
+                    surprises.push(s);
+                }
             }
         }
 

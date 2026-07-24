@@ -96,7 +96,7 @@ fn test_kokoro_engine() {
     println!("  Model file: {}", config.model_filename);
 
     match KokoroEngine::load(config) {
-        Some(engine) => {
+        Some(mut engine) => {
             println!("  [OK] Kokoro engine loaded successfully");
             println!("  Sample rate: {} Hz", engine.sample_rate());
             println!("  Available voices: {}", engine.num_voices());

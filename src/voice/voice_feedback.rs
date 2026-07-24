@@ -486,7 +486,15 @@ impl VoiceFeedbackBridge {
     ///
     /// Low voice quality → reduce learning rate (uncertain state)
     /// High voice quality → normal learning rate (confident state)
+    ///
+    /// Neutral (1.0) until the bridge has received at least one real metrics
+    /// update: the empty-history defaults would otherwise impose a constant
+    /// ×0.85 on every cycle's learning rate in builds where nothing feeds
+    /// voice metrics.
     pub fn learning_rate_modifier(&self) -> f32 {
+        if self.update_count == 0 {
+            return 1.0;
+        }
         let articulation = self.smoothed_articulation();
         let stability = self.rate_stability();
 
@@ -703,6 +711,29 @@ mod tests {
             high_quality_lr,
             low_quality_lr
         );
+    }
+
+    #[test]
+    fn test_learning_rate_modifier_neutral_when_never_fed() {
+        // Regression: an unfed bridge must not scale the learning rate.
+        // The empty-history defaults (articulation 0.5, stability 1.0) used to
+        // yield a permanent ×0.85 on every cycle in default builds.
+        let bridge = VoiceFeedbackBridge::default();
+        assert_eq!(bridge.learning_rate_modifier(), 1.0);
+
+        // After a real update it becomes an actual signal again.
+        let mut bridge = bridge;
+        bridge.update(VoiceOutputMetrics {
+            articulation_score: 0.9,
+            speech_rate: 4.0,
+            ..Default::default()
+        });
+        assert!(bridge.learning_rate_modifier() < 1.0 + f32::EPSILON);
+        assert!(bridge.learning_rate_modifier() > 0.5);
+
+        // Reset returns to neutral.
+        bridge.reset();
+        assert_eq!(bridge.learning_rate_modifier(), 1.0);
     }
 
     #[test]

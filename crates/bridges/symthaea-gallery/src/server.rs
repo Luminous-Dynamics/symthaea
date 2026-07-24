@@ -25,17 +25,18 @@
 //!   information must mean *no* harmony-bias update, not fabricated data.
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use axum::Router;
 use axum::extract::{Json, Path as UrlPath, State};
-use axum::http::{StatusCode, header};
+use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::storage::GalleryStorage;
+use crate::storage::validate_artifact_filename;
 use crate::{ArtModality, GalleryEntry, GalleryIndex};
 
 /// Default gallery root, sibling convention to `.claude/aesthetic_memory.json`.
@@ -44,6 +45,8 @@ pub const DEFAULT_GALLERY_ROOT: &str = ".claude/gallery";
 /// `creative_bridge::AESTHETIC_MEMORY_PATH` in the main crate so ratings
 /// land in the same file the cognitive loop reads.
 pub const DEFAULT_AESTHETIC_MEMORY_PATH: &str = ".claude/aesthetic_memory.json";
+/// Refuse unexpectedly large stored SVGs before allocating or serving them.
+pub const MAX_SVG_BYTES: u64 = 2 * 1024 * 1024;
 
 /// Server configuration.
 #[derive(Debug, Clone)]
@@ -52,6 +55,14 @@ pub struct GalleryServerConfig {
     pub gallery_root: PathBuf,
     /// Path of the persisted `AestheticMemory` JSON that ratings write to.
     pub aesthetic_memory_path: PathBuf,
+}
+
+/// Shared server state. Rating writes are serialized within this process so
+/// concurrent HTTP requests cannot overwrite one another's load/modify/save
+/// cycle.
+struct GalleryServerState {
+    config: GalleryServerConfig,
+    rating_lock: Mutex<()>,
 }
 
 impl Default for GalleryServerConfig {
@@ -85,6 +96,8 @@ pub enum SvgError {
     NotVisual,
     /// Stored filename contains a path separator (refuse traversal).
     BadFilename,
+    /// Stored SVG exceeds the server's response-size limit.
+    TooLarge,
     /// Underlying file read failed.
     Io(std::io::Error),
 }
@@ -105,14 +118,35 @@ pub fn resolve_visual_svg(root: &Path, index: &GalleryIndex, id: Uuid) -> Result
         ArtModality::Score {
             score_svg: Some(svg),
             ..
-        } => return Ok(svg.clone()),
+        } => {
+            if svg.len() as u64 > MAX_SVG_BYTES {
+                return Err(SvgError::TooLarge);
+            }
+            return Ok(svg.clone());
+        }
         _ => return Err(SvgError::NotVisual),
     };
-    if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
+    if validate_artifact_filename(filename, "svg").is_err() {
         return Err(SvgError::BadFilename);
     }
     let path = GalleryStorage::new(root).visual_dir().join(filename);
+    let len = std::fs::metadata(&path).map_err(SvgError::Io)?.len();
+    if len > MAX_SVG_BYTES {
+        return Err(SvgError::TooLarge);
+    }
     std::fs::read_to_string(path).map_err(SvgError::Io)
+}
+
+/// Why a rating could not be applied.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RatingError {
+    /// NaN and infinities cannot be persisted as meaningful feedback.
+    NonFinite,
+}
+
+enum ServerRatingError {
+    Invalid(RatingError),
+    StatePoisoned,
 }
 
 /// Outcome of applying a human rating.
@@ -129,10 +163,16 @@ pub struct RatingOutcome {
 }
 
 /// Apply a human rating to the persisted aesthetic memory at `memory_path`
-/// and save it back. Mirrors `Symthaea::rate_art` exactly: load →
+/// and save it back. Callers that may write concurrently must serialize this
+/// load/modify/save operation; the HTTP server does so for requests in its own
+/// process. Cross-process writers still require external coordination.
+/// Mirrors `Symthaea::rate_art` exactly: load →
 /// `AestheticTracker::from_memory` → `human_feedback_unattributed` →
 /// `to_memory(...).save`. Rating is clamped to [-1, 1].
-pub fn apply_rating(memory_path: &Path, rating: f32) -> RatingOutcome {
+pub fn apply_rating(memory_path: &Path, rating: f32) -> Result<RatingOutcome, RatingError> {
+    if !rating.is_finite() {
+        return Err(RatingError::NonFinite);
+    }
     let rating = rating.clamp(-1.0, 1.0);
     let memory = symthaea_aesthetic::AestheticMemory::load(memory_path);
     let mut tracker = symthaea_aesthetic::AestheticTracker::from_memory(
@@ -141,12 +181,23 @@ pub fn apply_rating(memory_path: &Path, rating: f32) -> RatingOutcome {
     );
     let feedback = tracker.human_feedback_unattributed(rating);
     tracker.to_memory(&memory).save(memory_path);
-    RatingOutcome {
+    Ok(RatingOutcome {
         rating_applied: rating,
         ema: tracker.expectation(),
         total_evaluations: tracker.evaluation_count(),
         dopamine_delta: feedback.dopamine_delta,
-    }
+    })
+}
+
+fn apply_server_rating(
+    state: &GalleryServerState,
+    rating: f32,
+) -> Result<RatingOutcome, ServerRatingError> {
+    let _guard = state
+        .rating_lock
+        .lock()
+        .map_err(|_| ServerRatingError::StatePoisoned)?;
+    apply_rating(&state.config.aesthetic_memory_path, rating).map_err(ServerRatingError::Invalid)
 }
 
 /// Minimal HTML escaping for text interpolated into the page.
@@ -165,7 +216,10 @@ fn entry_artwork_html(root: &Path, index: &GalleryIndex, entry: &GalleryEntry) -
         ArtModality::Visual { .. }
         | ArtModality::Synesthetic { .. }
         | ArtModality::Score { .. } => match resolve_visual_svg(root, index, entry.id) {
-            Ok(svg) => Some(format!("<div class=\"art\">{svg}</div>")),
+            Ok(_) => Some(format!(
+                "<div class=\"art\"><img src=\"/api/entry/{}/svg\" alt=\"Stored artwork\"></div>",
+                entry.id
+            )),
             Err(_) => {
                 Some("<div class=\"art missing\">(SVG file missing from store)</div>".to_string())
             }
@@ -251,7 +305,7 @@ pub fn render_gallery_html(index: &GalleryIndex, root: &Path) -> String {
   main {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.2rem; padding: 1.5rem 2rem; }}
   .card {{ background: #17171d; border: 1px solid #2a2a33; border-radius: 10px; padding: 1rem; }}
   .art {{ background: #fff; border-radius: 6px; overflow: hidden; }}
-  .art svg {{ display: block; width: 100%; height: auto; }}
+  .art img {{ display: block; width: 100%; height: auto; }}
   .art.missing {{ background: none; color: #77778a; padding: 2rem; text-align: center; }}
   .art.poetry {{ background: none; color: #e8e8ee; white-space: pre-wrap; font-family: Georgia, serif; padding: 0.5rem; }}
   .meta {{ font-size: 0.8rem; color: #9a9aa8; margin-top: 0.6rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }}
@@ -328,30 +382,38 @@ fn io_error_response(e: std::io::Error) -> Response {
         .into_response()
 }
 
-async fn page_handler(State(config): State<Arc<GalleryServerConfig>>) -> Response {
-    match load_gallery(&config.gallery_root) {
-        Ok(index) => Html(render_gallery_html(&index, &config.gallery_root)).into_response(),
+async fn page_handler(State(state): State<Arc<GalleryServerState>>) -> Response {
+    match load_gallery(&state.config.gallery_root) {
+        Ok(index) => Html(render_gallery_html(&index, &state.config.gallery_root)).into_response(),
         Err(e) => io_error_response(e),
     }
 }
 
-async fn entries_handler(State(config): State<Arc<GalleryServerConfig>>) -> Response {
-    match load_gallery(&config.gallery_root) {
+async fn entries_handler(State(state): State<Arc<GalleryServerState>>) -> Response {
+    match load_gallery(&state.config.gallery_root) {
         Ok(index) => Json(index).into_response(),
         Err(e) => io_error_response(e),
     }
 }
 
 async fn svg_handler(
-    State(config): State<Arc<GalleryServerConfig>>,
+    State(state): State<Arc<GalleryServerState>>,
     UrlPath(id): UrlPath<Uuid>,
 ) -> Response {
-    let index = match load_gallery(&config.gallery_root) {
+    let index = match load_gallery(&state.config.gallery_root) {
         Ok(index) => index,
         Err(e) => return io_error_response(e),
     };
-    match resolve_visual_svg(&config.gallery_root, &index, id) {
-        Ok(svg) => ([(header::CONTENT_TYPE, "image/svg+xml")], svg).into_response(),
+    match resolve_visual_svg(&state.config.gallery_root, &index, id) {
+        Ok(svg) => (
+            [
+                ("content-type", "image/svg+xml"),
+                ("content-security-policy", "sandbox; default-src 'none'"),
+                ("x-content-type-options", "nosniff"),
+            ],
+            svg,
+        )
+            .into_response(),
         Err(SvgError::NotFound) => (StatusCode::NOT_FOUND, "no such entry").into_response(),
         Err(SvgError::NotVisual) => {
             (StatusCode::NOT_FOUND, "entry has no SVG component").into_response()
@@ -359,22 +421,35 @@ async fn svg_handler(
         Err(SvgError::BadFilename) => {
             (StatusCode::BAD_REQUEST, "entry filename rejected").into_response()
         }
+        Err(SvgError::TooLarge) => {
+            (StatusCode::PAYLOAD_TOO_LARGE, "stored SVG is too large").into_response()
+        }
         Err(SvgError::Io(e)) => io_error_response(e),
     }
 }
 
 async fn rate_handler(
-    State(config): State<Arc<GalleryServerConfig>>,
+    State(state): State<Arc<GalleryServerState>>,
     Json(req): Json<RateRequest>,
-) -> Json<RateResponse> {
-    let outcome = apply_rating(&config.aesthetic_memory_path, req.rating);
-    Json(RateResponse {
-        rating_applied: outcome.rating_applied,
-        ema: outcome.ema,
-        total_evaluations: outcome.total_evaluations,
-        dopamine_delta: outcome.dopamine_delta,
-        entry_id: req.entry_id,
-    })
+) -> Response {
+    match apply_server_rating(&state, req.rating) {
+        Ok(outcome) => Json(RateResponse {
+            rating_applied: outcome.rating_applied,
+            ema: outcome.ema,
+            total_evaluations: outcome.total_evaluations,
+            dopamine_delta: outcome.dopamine_delta,
+            entry_id: req.entry_id,
+        })
+        .into_response(),
+        Err(ServerRatingError::Invalid(RatingError::NonFinite)) => {
+            (StatusCode::BAD_REQUEST, "rating must be finite").into_response()
+        }
+        Err(ServerRatingError::StatePoisoned) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "rating state is unavailable",
+        )
+            .into_response(),
+    }
 }
 
 /// Build the gallery router. Routes:
@@ -388,7 +463,10 @@ pub fn router(config: GalleryServerConfig) -> Router {
         .route("/api/entries", get(entries_handler))
         .route("/api/entry/{id}/svg", get(svg_handler))
         .route("/api/rate", post(rate_handler))
-        .with_state(Arc::new(config))
+        .with_state(Arc::new(GalleryServerState {
+            config,
+            rating_lock: Mutex::new(()),
+        }))
 }
 
 #[cfg(test)]
@@ -513,7 +591,7 @@ mod tests {
         let memory_path = dir.join("aesthetic_memory.json");
 
         // Way out of range — must clamp to 1.0.
-        let outcome = apply_rating(&memory_path, 5.0);
+        let outcome = apply_rating(&memory_path, 5.0).unwrap();
         assert_eq!(outcome.rating_applied, 1.0);
         assert!(outcome.ema > 0.5, "positive rating should raise the EMA");
         assert_eq!(outcome.total_evaluations, 1);
@@ -523,7 +601,7 @@ mod tests {
         assert_eq!(saved.total_evaluations, 1);
         assert!(saved.ema > 0.5);
 
-        let outcome2 = apply_rating(&memory_path, -3.0);
+        let outcome2 = apply_rating(&memory_path, -3.0).unwrap();
         assert_eq!(outcome2.rating_applied, -1.0);
         assert_eq!(outcome2.total_evaluations, 2);
         assert!(
@@ -543,7 +621,7 @@ mod tests {
         memory.harmony_bias = [0.3; 8];
         memory.save(&memory_path);
 
-        apply_rating(&memory_path, 0.9);
+        apply_rating(&memory_path, 0.9).unwrap();
         let saved = symthaea_aesthetic::AestheticMemory::load(&memory_path);
         assert_eq!(
             saved.harmony_bias, [0.3; 8],
@@ -554,14 +632,62 @@ mod tests {
     }
 
     #[test]
-    fn render_html_contains_svg_and_rating_controls() {
+    fn server_serializes_concurrent_rating_updates() {
+        let dir = temp_dir("rating-concurrent");
+        let memory_path = dir.join("aesthetic_memory.json");
+        let state = Arc::new(GalleryServerState {
+            config: GalleryServerConfig {
+                gallery_root: dir.join("gallery"),
+                aesthetic_memory_path: memory_path.clone(),
+            },
+            rating_lock: Mutex::new(()),
+        });
+        let start = Arc::new(std::sync::Barrier::new(16));
+
+        let writers = (0..16)
+            .map(|_| {
+                let state = Arc::clone(&state);
+                let start = Arc::clone(&start);
+                std::thread::spawn(move || {
+                    start.wait();
+                    apply_server_rating(&state, 0.75).unwrap()
+                })
+            })
+            .collect::<Vec<_>>();
+        for writer in writers {
+            writer.join().unwrap();
+        }
+
+        let saved = symthaea_aesthetic::AestheticMemory::load(&memory_path);
+        assert_eq!(saved.total_evaluations, 16);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn render_html_embeds_svg_as_an_isolated_image() {
         let (root, index, id) = seeded_store("render");
         let html = render_gallery_html(&index, &root);
-        assert!(html.contains("<circle"), "SVG should be inlined");
+        assert!(!html.contains("<circle"), "stored SVG must not be inlined");
+        assert!(html.contains(&format!("/api/entry/{id}/svg")));
         assert!(html.contains(&id.to_string()), "entry id should appear");
         assert!(html.contains("/api/rate"), "rating JS should be present");
         assert!(html.contains("Symthaea Gallery"));
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn non_finite_rating_is_rejected_without_persistence() {
+        let dir = temp_dir("rating-non-finite");
+        let memory_path = dir.join("aesthetic_memory.json");
+
+        assert_eq!(
+            apply_rating(&memory_path, f32::NAN).unwrap_err(),
+            RatingError::NonFinite
+        );
+        assert!(!memory_path.exists());
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

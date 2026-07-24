@@ -1,0 +1,186 @@
+{
+  "bland_altman": {
+    "bias": 0.19999999999999965,
+    "lower": -0.25965229808864876,
+    "standard_deviation": 0.23452078799117082,
+    "standard_error_bias": 0.10488088481701485,
+    "upper": 0.6596522980886481
+  },
+  "circular": {
+    "mean_direction": 0.05247262464846829,
+    "mean_resultant_length": 0.986944548857179,
+    "rayleigh_p_value": 0.0004374839079605499,
+    "rayleigh_statistic": 4.870297712594502,
+    "standard_deviation": 0.16211984844087896,
+    "variance": 0.013055451142821028
+  },
+  "concordance": {
+    "coefficient": 0.9870129870129871
+  },
+  "cronbach": {
+    "raw": 0.9911894273127754,
+    "standardized": 0.9914680656130793
+  },
+  "dirichlet": {
+    "covariance": [
+      [
+        0.014545454545454545,
+        -0.005454545454545454,
+        -0.009090909090909092
+      ],
+      [
+        -0.005454545454545454,
+        0.01909090909090909,
+        -0.013636363636363636
+      ],
+      [
+        -0.009090909090909092,
+        -0.013636363636363636,
+        0.022727272727272728
+      ]
+    ],
+    "log_pdf": 2.1406542258478254,
+    "mean": [
+      0.2,
+      0.3,
+      0.5
+    ]
+  },
+  "dirichlet_multinomial": {
+    "predictive_log_mass": -2.2155737160044167
+  },
+  "generalized_pareto": {
+    "shape_+0.0": {
+      "cdf": 0.5276334472589853,
+      "log_pdf": -1.4431471805599454,
+      "quantile_0_9": 4.605170185988092,
+      "sf": 0.4723665527410147
+    },
+    "shape_+0.2": {
+      "cdf": 0.5028232647017103,
+      "log_pdf": -1.5317188348108974,
+      "quantile_0_9": 5.8489319246111355,
+      "sf": 0.4971767352982897
+    },
+    "shape_-0.2": {
+      "cdf": 0.5562946875,
+      "log_pdf": -1.343222898551045,
+      "quantile_0_9": 3.690426555198068,
+      "sf": 0.44370531249999995
+    }
+  },
+  "hill": {
+    "pareto_exponent": 1.1755274221898322,
+    "tail_index": 0.8506819842085429,
+    "threshold": 3.0
+  },
+  "hotelling_one_sample": {
+    "f_statistic": 7.5,
+    "p_value": 0.06804138174397717,
+    "t_squared": 20.0
+  },
+  "hotelling_two_sample": {
+    "f_statistic": 2.625,
+    "p_value": 0.1410479666040265,
+    "t_squared": 6.0
+  },
+  "icc": {
+    "mean_square_error": 0.4000000000000001,
+    "mean_square_raters": 0.06666666666666679,
+    "mean_square_targets": 4.8999999999999995,
+    "mean_square_within": 0.3333333333333332,
+    "one_way_random": 0.8203592814371259,
+    "two_way_mixed_consistency": 0.7894736842105262,
+    "two_way_random_agreement": 0.8181818181818181
+  },
+  "local_level": {
+    "log_likelihood": -4.853790667756668,
+    "smoothed_means": [
+      1.0533201189296333,
+      1.17998017839445,
+      1.2186323092170466,
+      1.3847373637264617
+    ],
+    "smoothed_variances": [
+      0.21129831516352823,
+      0.17542120911793854,
+      0.18037661050545092,
+      0.2348860257680872
+    ],
+    "steps": [
+      {
+        "filtered_mean": 0.8,
+        "filtered_variance": 0.3999999999999999,
+        "gain": 0.8,
+        "innovation": 1.0,
+        "innovation_variance": 2.5,
+        "predicted_mean": 0.0,
+        "predicted_variance": 2.0
+      },
+      {
+        "filtered_mean": 1.1272727272727272,
+        "filtered_variance": 0.2727272727272727,
+        "gain": 0.5454545454545454,
+        "innovation": 0.5999999999999999,
+        "innovation_variance": 1.0999999999999999,
+        "predicted_mean": 0.8,
+        "predicted_variance": 0.5999999999999999
+      },
+      {
+        "filtered_mean": 1.016822429906542,
+        "filtered_variance": 0.24299065420560745,
+        "gain": 0.48598130841121495,
+        "innovation": -0.22727272727272718,
+        "innovation_variance": 0.9727272727272727,
+        "predicted_mean": 1.1272727272727272,
+        "predicted_variance": 0.4727272727272727
+      },
+      {
+        "filtered_mean": 1.3847373637264617,
+        "filtered_variance": 0.2348860257680872,
+        "gain": 0.4697720515361744,
+        "innovation": 0.783177570093458,
+        "innovation_variance": 0.9429906542056075,
+        "predicted_mean": 1.016822429906542,
+        "predicted_variance": 0.44299065420560746
+      }
+    ]
+  },
+  "multiclass": {
+    "accuracy": 0.7,
+    "kappa": 0.5522388059701493,
+    "macro_f1": 0.6984126984126985,
+    "macro_precision": 0.7222222222222222,
+    "macro_recall": 0.6944444444444443,
+    "matrix": [
+      [
+        2,
+        1,
+        0
+      ],
+      [
+        1,
+        2,
+        0
+      ],
+      [
+        0,
+        1,
+        3
+      ]
+    ]
+  },
+  "multinomial": {
+    "log_pmf": -2.0024805005437063
+  },
+  "versions": {
+    "numpy": "2.3.5",
+    "scikit_learn": "1.8.0",
+    "scipy": "1.17.0"
+  },
+  "weighted_kappa": {
+    "linear": 0.7,
+    "quadratic": 0.85,
+    "unweighted": 0.5
+  }
+}

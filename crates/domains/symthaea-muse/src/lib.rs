@@ -3,61 +3,206 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # symthaea-muse
 //!
-//! Consciousness-driven music synthesis for Symthaea. Maps cognitive state —
-//! Eight Harmonies, neuromodulators, temporal dynamics — into melody, rhythm,
-//! and timbre, producing PCM audio.
+//! Symbolic composition, cognitive planning, and audio realization for
+//! Symthaea.
 //!
-//! # Architecture
+//! Muse has two intentionally distinct paths:
 //!
-//! ```text
-//! MusicalState → pitch (Harmonies → intervals) + rhythm (arousal/NE → tempo)
-//!              → melody (autoregressive note generation) → synth (additive) → PCM
-//! ```
+//! 1. **Symbolic composition** (`theory` feature): expressive intent is mapped
+//!    to a deterministic score, performance plan, and rendered audio. This is
+//!    the canonical product path for Studio, Listen, Research, export, and
+//!    provenance.
+//! 2. **Live cognitive sonification**: [`MusicalState`] drives real-time
+//!    melody, rhythm, timbre, and synthesis for games, experiments, and direct
+//!    state expression.
 //!
-//! # Harmony-to-Interval Mapping
+//! The boundary is deliberate:
 //!
-//! | Harmony | Interval | Character |
-//! |---------|----------|-----------|
-//! | ResonantCoherence | Unison/Octave | Consonance |
-//! | PanSentientFlourishing | Major 3rd | Warmth |
-//! | IntegralWisdom | Perfect 5th | Stability |
-//! | InfinitePlay | Minor 7th | Tension |
-//! | UniversalInterconnectedness | Perfect 4th | Openness |
-//! | SacredReciprocity | Major 6th | Reciprocal warmth |
-//! | EvolutionaryProgression | Ascending seq | Growth |
-//! | SacredStillness | Drone/pedal | Contemplation |
+//! - `symthaea-music-theory` owns musical invariants and exact symbolic data;
+//! - Symthaea owns memory, prediction, action selection, and revision;
+//! - this crate owns performance realization, rendering, and the bridge
+//!   between cognition and symbolic composition.
+//!
+//! With the `theory` feature, [`cognitive_bridge`] converts active-inference
+//! evidence and long-range compositional obligations into inspectable symbolic
+//! action proposals. It does not bypass theory rules or write notes directly.
+//!
+//! See `COGNITIVE_INTEGRATION.md` for the integration contract and first
+//! closed-loop experiment.
 
 #![deny(unsafe_code)]
 
+#[cfg(feature = "theory")]
+pub mod adaptive_experiment;
+#[cfg(feature = "theory")]
+pub mod adaptive_prediction;
+#[cfg(feature = "theory")]
+pub mod analysis_crosscheck;
+#[cfg(feature = "theory")]
+pub mod analyst;
 pub mod audio_analyzer;
+#[cfg(feature = "theory")]
+pub mod blinded_study;
 pub mod choreography;
 #[cfg(feature = "clap-fad")]
 pub mod clap_embed;
 #[cfg(feature = "clap-fad")]
 pub mod clap_mel;
+#[cfg(feature = "theory")]
+pub mod closed_loop;
+#[cfg(feature = "theory")]
+pub mod cognitive_bridge;
+#[cfg(feature = "theory")]
+pub mod cognitive_evidence_report;
+#[cfg(feature = "theory")]
+pub mod cognitive_experiment;
+#[cfg(feature = "theory")]
+pub mod cognitive_selection;
+#[cfg(feature = "theory")]
+pub mod cognitive_session;
+#[cfg(feature = "theory")]
+pub mod cognitive_session_experiment;
+#[cfg(feature = "theory")]
+pub mod cohort_registry;
+#[cfg(feature = "theory")]
+pub mod confirmatory_amendment_control;
+#[cfg(feature = "theory")]
+pub mod confirmatory_analysis;
+#[cfg(feature = "theory")]
+pub mod confirmatory_analysis_execution;
+#[cfg(feature = "theory")]
+pub mod confirmatory_cohort_registry;
+#[cfg(feature = "theory")]
+pub mod confirmatory_collection_close;
+#[cfg(feature = "theory")]
+pub mod confirmatory_collection_monitor;
+#[cfg(feature = "theory")]
+pub mod confirmatory_collection_protocol;
+#[cfg(feature = "theory")]
+pub mod confirmatory_final_release;
+#[cfg(feature = "theory")]
+pub mod confirmatory_publication;
+#[cfg(feature = "theory")]
+pub mod confirmatory_readiness;
+#[cfg(feature = "theory")]
+pub mod confirmatory_readiness_release;
+#[cfg(feature = "theory")]
+pub mod confirmatory_unblinding;
 pub mod critic;
+#[cfg(feature = "theory")]
+pub mod evidence_digest;
+#[cfg(feature = "theory")]
+pub mod experiment_manifest;
 pub mod export;
 pub mod expressive;
+#[cfg(feature = "theory")]
+pub mod external_review_completion;
+#[cfg(feature = "theory")]
+pub mod external_review_package;
+#[cfg(feature = "theory")]
+pub mod external_review_protocol;
+#[cfg(feature = "theory")]
+pub mod external_review_resolution;
+#[cfg(feature = "theory")]
+pub mod external_review_response;
+#[cfg(feature = "theory")]
+pub mod family_clustered_analysis;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod fluid_render;
 pub mod form;
+#[cfg(feature = "studio")]
+pub mod genealogy;
+#[cfg(feature = "theory")]
+pub mod intervention;
 #[cfg(feature = "muse-live")]
 pub mod live_output;
 pub mod mel_extractor;
 pub mod mel_mlp;
 pub mod melody;
+#[cfg(feature = "theory")]
+pub mod methodology_plan;
 pub mod midi;
 pub mod midi_loader;
+#[cfg(feature = "theory")]
+pub mod musical_policy;
 pub mod neural_melody;
 pub mod notation;
+#[cfg(feature = "theory")]
+pub mod participant_evidence;
+#[cfg(feature = "theory")]
+pub mod participant_schedule;
+#[cfg(feature = "theory")]
+pub mod piece_recipe;
+#[cfg(feature = "theory")]
+pub mod pilot_collection;
+#[cfg(feature = "theory")]
+pub mod pilot_monitoring;
+#[cfg(feature = "theory")]
+pub mod pilot_protocol;
+#[cfg(feature = "theory")]
+pub mod pilot_report;
+#[cfg(feature = "theory")]
+pub mod pilot_schedule;
 pub mod pitch;
+#[cfg(feature = "theory")]
+pub mod policy_budget_evidence;
+#[cfg(feature = "theory")]
+pub mod post_publication_audit;
+#[cfg(feature = "theory")]
+pub mod ranked_preference_analysis;
+#[cfg(feature = "theory")]
+pub mod replication_execution;
+#[cfg(feature = "theory")]
+pub mod replication_orchestration;
+#[cfg(feature = "theory")]
+pub mod replication_package;
+#[cfg(feature = "theory")]
+pub mod replication_protocol;
+#[cfg(feature = "theory")]
+pub mod replication_site_registry;
+#[cfg(feature = "theory")]
+pub mod replication_synthesis;
+#[cfg(feature = "theory")]
+pub mod reproducibility_attestation;
+#[cfg(feature = "theory")]
+pub mod research_archive;
+#[cfg(feature = "theory")]
+pub mod research_release_promotion;
+#[cfg(feature = "theory")]
+pub mod research_revision_governance;
 pub mod rhythm;
+#[cfg(feature = "theory")]
+pub mod sonata_intervention;
 #[cfg(all(feature = "clap-fad", feature = "theory"))]
 pub mod steering;
+#[cfg(feature = "theory")]
+pub mod stewardship_governance;
+#[cfg(feature = "theory")]
+pub mod stewardship_release;
 pub mod stream;
 pub mod streaming;
+#[cfg(feature = "theory")]
+pub mod structural_evidence;
 pub mod structure;
+#[cfg(feature = "theory")]
+pub mod studio_contract;
+#[cfg(feature = "theory")]
+pub mod study_artifact;
+#[cfg(feature = "theory")]
+pub mod study_collection;
+#[cfg(feature = "theory")]
+pub mod study_evidence;
+#[cfg(feature = "theory")]
+pub mod study_operations_release;
+#[cfg(feature = "theory")]
+pub mod study_orchestration;
+#[cfg(feature = "theory")]
+pub mod study_release;
+#[cfg(feature = "theory")]
+pub mod study_runner;
 pub mod synth;
+#[cfg(feature = "theory")]
+pub mod temporal_confirmatory;
 #[cfg(feature = "theory")]
 pub mod theory_realize;
 pub mod training;
@@ -66,12 +211,21 @@ pub mod training_pairs;
 pub mod vcsl;
 pub mod voice;
 
+// Re-exported so downstream crates (e.g. the root symthaea crate's REPL,
+// which depends on symthaea-muse but not directly on symthaea-music-theory)
+// can build a MusicalIntent/pick a Style to drive
+// theory_realize::compose_and_perform_melody without adding a new direct
+// dependency edge — keeps the existing muse -> music-theory seam as the
+// only place that crate name needs to be spelled.
+#[cfg(feature = "theory")]
+pub use symthaea_music_theory::{MusicalIntent, Style};
+
 use serde::{Deserialize, Serialize};
 
 // ─── Core Types ──────────────────────────────────────────────────────────────
 
 /// Cognitive state for music generation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicalState {
     pub harmony_activations: [f32; 8],
     pub dopamine: f32,

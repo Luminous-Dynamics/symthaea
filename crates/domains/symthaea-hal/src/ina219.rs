@@ -96,8 +96,8 @@ impl SensorDecoder for Ina219Decoder {
     }
 
     fn decode(&self, raw: &[u8]) -> Vec<f32> {
-        if raw.len() < 4 {
-            return vec![0.0, 0.0];
+        if raw.len() < 4 || !self.shunt_resistance.is_finite() || self.shunt_resistance <= 0.0 {
+            return vec![f32::NAN, f32::NAN];
         }
 
         // Shunt voltage: 16-bit signed, LSB = 10µV
@@ -105,17 +105,26 @@ impl SensorDecoder for Ina219Decoder {
         let shunt_v = shunt_raw as f32 * SHUNT_LSB_V;
 
         // Current: I = V_shunt / R_shunt
-        let current_a = if self.shunt_resistance.abs() > f32::EPSILON {
-            shunt_v / self.shunt_resistance
-        } else {
-            0.0
-        };
+        let current_a = shunt_v / self.shunt_resistance;
 
         // Bus voltage: bits [15:3], LSB = 4mV
         let bus_raw = ((raw[2] as u16) << 8) | (raw[3] as u16);
         let bus_voltage_v = ((bus_raw >> 3) & 0x1FFF) as f32 * BUS_LSB_V;
 
         vec![current_a, bus_voltage_v]
+    }
+
+    fn validate_config(&self) -> Result<(), String> {
+        if !self.shunt_resistance.is_finite() || self.shunt_resistance <= 0.0 {
+            return Err(format!(
+                "shunt resistance must be finite and positive, got {}",
+                self.shunt_resistance
+            ));
+        }
+        if self.address > 0x7F {
+            return Err(format!("invalid 7-bit I2C address: 0x{:02X}", self.address));
+        }
+        Ok(())
     }
 
     fn who_am_i(&self) -> Option<(u8, u8)> {
@@ -214,8 +223,8 @@ mod tests {
         let raw = [0u8; 2]; // too short
         let values = decoder.decode(&raw);
         assert_eq!(values.len(), 2);
-        assert!(values[0].abs() < f32::EPSILON);
-        assert!(values[1].abs() < f32::EPSILON);
+        assert!(values[0].is_nan());
+        assert!(values[1].is_nan());
     }
 
     #[test]
@@ -223,10 +232,9 @@ mod tests {
         let decoder = Ina219Decoder::new(0.0); // zero resistance
         let raw = [0x03, 0xE8, 0x00, 0x00];
         let values = decoder.decode(&raw);
-        assert!(
-            values[0].abs() < f32::EPSILON,
-            "zero resistance should give zero current"
-        );
+        assert!(values[0].is_nan());
+        assert!(values[1].is_nan());
+        assert!(decoder.validate_config().is_err());
     }
 
     #[test]

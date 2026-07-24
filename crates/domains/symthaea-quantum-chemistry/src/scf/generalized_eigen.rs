@@ -128,7 +128,14 @@ pub fn solve_generalized_eigen(
 
 /// Symmetric eigendecomposition via Jacobi rotations.
 /// Returns (eigenvalues, eigenvectors) where eigenvectors are column-major.
-fn symmetric_eigen(matrix: &[f64], n: usize) -> (Vec<f64>, Vec<f64>) {
+/// Eigenvalues are returned in the order the Jacobi sweep converges them
+/// (NOT pre-sorted) -- callers that need sorted output must sort themselves
+/// (see `canonical_orthogonalize`/`generalized_eigen_fock` above for the
+/// established pattern).
+///
+/// `pub(crate)` since Phase Q4 (2026-07-17): reused by `vibrational.rs` to
+/// diagonalize the mass-weighted Hessian for normal-mode analysis.
+pub(crate) fn symmetric_eigen(matrix: &[f64], n: usize) -> (Vec<f64>, Vec<f64>) {
     let mut a = matrix.to_vec();
     let mut v = vec![0.0; n * n];
     // Initialize V = I

@@ -9,6 +9,10 @@
 //! - Domain-agnostic plugin system
 //! - NixOS configuration parsing (via plugin)
 //! - Consciousness monitoring
+//!
+//! Modality-neutral observations and evidence contracts live in the
+//! `symthaea-communication` crate. This module contains human-language providers
+//! and adapters; it is not the universal semantic substrate.
 
 // Core working modules
 pub mod consciousness_prompts;
@@ -35,6 +39,8 @@ pub mod epidemiology_plugin;
 pub mod formal_language_plugin;
 pub mod general_assistant_plugin;
 pub mod geodesy_plugin;
+pub mod grid_physics_plugin;
+pub mod information_theory_plugin;
 pub mod math_plugin;
 pub mod modal_plugin;
 pub mod nixos_plugin;

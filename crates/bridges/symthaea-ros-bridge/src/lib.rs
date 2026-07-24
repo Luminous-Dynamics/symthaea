@@ -31,6 +31,12 @@ pub enum RosBridgeError {
     Communication(String),
     #[error("Serialization error: {0}")]
     Serialization(String),
+    #[error("Invalid consciousness status: {0}")]
+    InvalidStatus(String),
+    #[error("Invalid trajectory command: {0}")]
+    InvalidTrajectory(String),
+    #[error("Safety interlock blocked trajectory publication: {0}")]
+    SafetyInterlock(String),
 }
 
 /// Normalized consciousness metrics for ROS2 broadcasting.
@@ -118,6 +124,111 @@ pub struct RosTrajectoryPoint {
     pub velocities: Vec<f64>,
     pub efforts: Vec<f64>,
     pub time_from_start_ns: u64,
+}
+
+impl ConsciousnessStatusMsg {
+    fn validate(&self) -> Result<(), RosBridgeError> {
+        fn unit(value: f64, name: &str) -> Result<(), RosBridgeError> {
+            if value.is_finite() && (0.0..=1.0).contains(&value) {
+                Ok(())
+            } else {
+                Err(RosBridgeError::InvalidStatus(format!(
+                    "{name} must be finite and in [0, 1]"
+                )))
+            }
+        }
+
+        unit(self.phi, "phi")?;
+        unit(self.arousal as f64, "arousal")?;
+        unit(self.uncertainty as f64, "uncertainty")?;
+        for (index, value) in self.harmonies.iter().enumerate() {
+            unit(*value as f64, &format!("harmonies[{index}]"))?;
+        }
+        for (index, value) in self.neuromodulators.iter().enumerate() {
+            unit(*value as f64, &format!("neuromodulators[{index}]"))?;
+        }
+        if self.timestamp.trim().is_empty() {
+            return Err(RosBridgeError::InvalidStatus(
+                "timestamp must not be empty".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl RosTrajectoryCommand {
+    fn validate(&self) -> Result<(), RosBridgeError> {
+        use std::collections::HashSet;
+
+        if self.joint_names.is_empty() {
+            return Err(RosBridgeError::InvalidTrajectory(
+                "joint_names must not be empty".into(),
+            ));
+        }
+        if self.points.is_empty() {
+            return Err(RosBridgeError::InvalidTrajectory(
+                "trajectory must contain at least one point".into(),
+            ));
+        }
+        let mut unique = HashSet::with_capacity(self.joint_names.len());
+        for name in &self.joint_names {
+            if name.trim().is_empty() || !unique.insert(name) {
+                return Err(RosBridgeError::InvalidTrajectory(
+                    "joint names must be non-empty and unique".into(),
+                ));
+            }
+        }
+
+        let joint_count = self.joint_names.len();
+        let mut previous_time = None;
+        for (point_index, point) in self.points.iter().enumerate() {
+            if previous_time.is_some_and(|time| point.time_from_start_ns <= time) {
+                return Err(RosBridgeError::InvalidTrajectory(format!(
+                    "point {point_index} time_from_start must be strictly increasing"
+                )));
+            }
+            if point.time_from_start_ns / 1_000_000_000 > i32::MAX as u64 {
+                return Err(RosBridgeError::InvalidTrajectory(format!(
+                    "point {point_index} time_from_start exceeds ROS Duration range"
+                )));
+            }
+            previous_time = Some(point.time_from_start_ns);
+
+            if point.positions.is_empty() && point.velocities.is_empty() && point.efforts.is_empty()
+            {
+                return Err(RosBridgeError::InvalidTrajectory(format!(
+                    "point {point_index} has no command values"
+                )));
+            }
+            for (field, values) in [
+                ("positions", &point.positions),
+                ("velocities", &point.velocities),
+                ("efforts", &point.efforts),
+            ] {
+                if !values.is_empty() && values.len() != joint_count {
+                    return Err(RosBridgeError::InvalidTrajectory(format!(
+                        "point {point_index} {field} length {} does not match {joint_count} joints",
+                        values.len()
+                    )));
+                }
+                if values.iter().any(|value| !value.is_finite()) {
+                    return Err(RosBridgeError::InvalidTrajectory(format!(
+                        "point {point_index} {field} contains a non-finite value"
+                    )));
+                }
+            }
+            if point
+                .efforts
+                .iter()
+                .any(|value| value.abs() > f32::MAX as f64)
+            {
+                return Err(RosBridgeError::InvalidTrajectory(format!(
+                    "point {point_index} effort exceeds interlock numeric range"
+                )));
+            }
+        }
+        Ok(())
+    }
 }
 
 impl RosBridgeNode {
@@ -389,6 +500,7 @@ impl RosBridgeNode {
         if !self.is_running {
             return Err(RosBridgeError::NotInitialized);
         }
+        status.validate()?;
 
         // Store the latest Φ value for gain scheduling
         {
@@ -446,6 +558,7 @@ impl RosBridgeNode {
         if !self.is_running {
             return Err(RosBridgeError::NotInitialized);
         }
+        command.validate()?;
 
         // 1. Amygdala Interlock safety checks
         let mut peak_torque = 0.0f32;
@@ -462,8 +575,21 @@ impl RosBridgeNode {
 
         if safety_status == symthaea_sim_bridge::SafetyStatus::Red {
             tracing::warn!(
-                "ROS2 Amygdala Interlock E-STOP triggered! Clamping all motor command efforts to zero."
+                "ROS2 Amygdala Interlock E-STOP triggered; trajectory was not published"
             );
+            return Err(RosBridgeError::SafetyInterlock(
+                "emergency stop is latched; explicitly reset it before sending commands".into(),
+            ));
+        }
+        if safety_status == symthaea_sim_bridge::SafetyStatus::Yellow
+            && command
+                .points
+                .iter()
+                .any(|point| !point.positions.is_empty() || !point.velocities.is_empty())
+        {
+            return Err(RosBridgeError::SafetyInterlock(
+                "yellow state cannot safely damp position/velocity trajectories".into(),
+            ));
         }
 
         // Apply any dampening or clamping overrides
@@ -678,7 +804,7 @@ mod tests {
 
         {
             let mut interlock = node.interlock.lock().unwrap();
-            assert_eq!(interlock.status, symthaea_sim_bridge::SafetyStatus::Green);
+            assert_eq!(interlock.status(), symthaea_sim_bridge::SafetyStatus::Green);
 
             // Peak torque exceeding limit * 1.5 triggers RED
             let status = interlock.monitor(200.0, 0.0);
@@ -700,6 +826,56 @@ mod tests {
             let cmd = normal_cmd.clone();
             node.publish_trajectory(cmd).unwrap();
         }
+    }
+
+    #[test]
+    fn invalid_and_estopped_trajectories_fail_closed() {
+        let mut node = RosBridgeNode::new(RosBridgeConfig::default());
+        node.init().unwrap();
+
+        let invalid = RosTrajectoryCommand {
+            joint_names: vec!["joint_1".into(), "joint_2".into()],
+            points: vec![RosTrajectoryPoint {
+                positions: vec![f64::NAN, 0.0],
+                velocities: Vec::new(),
+                efforts: Vec::new(),
+                time_from_start_ns: 1_000_000,
+            }],
+        };
+        assert!(matches!(
+            node.publish_trajectory(invalid),
+            Err(RosBridgeError::InvalidTrajectory(_))
+        ));
+
+        node.interlock.lock().unwrap().trigger_emergency_stop();
+        let command = RosTrajectoryCommand {
+            joint_names: vec!["joint_1".into()],
+            points: vec![RosTrajectoryPoint {
+                positions: Vec::new(),
+                velocities: Vec::new(),
+                efforts: vec![0.0],
+                time_from_start_ns: 1_000_000,
+            }],
+        };
+        assert!(matches!(
+            node.publish_trajectory(command),
+            Err(RosBridgeError::SafetyInterlock(_))
+        ));
+    }
+
+    #[test]
+    fn non_finite_status_is_rejected_before_gain_scheduling() {
+        let mut node = RosBridgeNode::new(RosBridgeConfig::default());
+        node.init().unwrap();
+        let result = node.publish_status(ConsciousnessStatusMsg {
+            phi: f64::NAN,
+            harmonies: [0.5; 8],
+            neuromodulators: [0.5; 4],
+            arousal: 0.5,
+            uncertainty: 0.1,
+            timestamp: "now".into(),
+        });
+        assert!(matches!(result, Err(RosBridgeError::InvalidStatus(_))));
     }
 
     #[test]

@@ -1,0 +1,14 @@
+{
+  "expected_fleet_id": "production-fleet",
+  "expected_rollout_id": "replace-with-approved-rollout-id",
+  "minimum_inventory_generation": 1,
+  "minimum_update_generation": 1,
+  "maximum_assurance_age_ms": 900000,
+  "maximum_trusted_time_interval_ms": 2000,
+  "require_passing_device_admission": true,
+  "require_passing_current_health": true,
+  "require_no_quarantined_devices": true,
+  "require_active_or_complete_rollout": true,
+  "minimum_recovery_media_manifests": 2,
+  "maximum_devices": 10000
+}
