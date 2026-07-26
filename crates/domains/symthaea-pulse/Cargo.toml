@@ -10,7 +10,7 @@ name = "symthaea-pulse"
 path = "src/main.rs"
 
 [dependencies]
-# [standalone-stripped] symthaea = { path = "../../.." }
+symthaea = { path = "../../.." }
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-broca = { path = "../symthaea-broca" }
 symthaea-psych-bench = { path = "../symthaea-psych-bench" }
