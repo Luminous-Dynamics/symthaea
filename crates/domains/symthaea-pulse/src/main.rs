@@ -1888,10 +1888,10 @@ fn main() -> Result<()> {
         eprintln!("Pulse: evaluating Butlin consciousness indicators...");
         let butlin = ButlinIndicatorSuite::evaluate(&bench_config);
         eprintln!(
-            "  butlin: {}/{} present, {}/{} partial",
-            butlin.present_count,
+            "  butlin: {}/{} functionally/causally supported, {}/{} observed",
+            butlin.causally_supported_count + butlin.functionally_supported_count,
             butlin.indicators.len(),
-            butlin.partial_count,
+            butlin.observed_count,
             butlin.indicators.len()
         );
 
