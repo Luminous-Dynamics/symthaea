@@ -2313,6 +2313,21 @@ impl Symthaea {
 
                 tracing::info!(target: "symthaea::action", primitives = ?primitives, "Translating primitives to actions");
                 if let Ok(actions) = prim_executor.translate(&primitives, &action_ctx) {
+                    // Workspace/monorepo roots, derived from where THIS crate was
+                    // compiled from rather than hardcoded -- CARGO_MANIFEST_DIR is
+                    // resolved at compile time, so it correctly reflects the real
+                    // checkout location in every environment (dev machine, CI
+                    // runner, standalone-synced repo) instead of only the one
+                    // machine a literal "/srv/luminous-dynamics" was authored on.
+                    // A hardcoded root previously made every `cargo`-running action
+                    // path (needs_workspace) fail with EACCES on any other machine,
+                    // since `SandboxRoot::at` calls create_dir_all on it.
+                    let workspace_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                    let monorepo_root = workspace_dir
+                        .parent()
+                        .map(PathBuf::from)
+                        .unwrap_or_else(|| workspace_dir.clone());
+
                     let needs_workspace = actions.iter().any(|action| {
                         matches!(
                             action,
@@ -2321,10 +2336,10 @@ impl Symthaea {
                         )
                     });
                     let sandbox = if needs_workspace {
-                        crate::action::SandboxRoot::at(PathBuf::from("/srv/luminous-dynamics"))?
+                        crate::action::SandboxRoot::at(monorepo_root.clone())?
                     } else if let Some(ref path) = action_ctx.target_path {
-                        if path.starts_with("/srv/luminous-dynamics") {
-                            crate::action::SandboxRoot::at(PathBuf::from("/srv/luminous-dynamics"))?
+                        if path.starts_with(&monorepo_root) {
+                            crate::action::SandboxRoot::at(monorepo_root.clone())?
                         } else {
                             crate::action::SandboxRoot::new(&correlation_id)?
                         }
@@ -2333,17 +2348,18 @@ impl Symthaea {
                     };
 
                     let mut policy = crate::action::PolicyBundle::restrictive();
-                    if sandbox.root().starts_with("/srv/luminous-dynamics") {
+                    if sandbox.root().starts_with(&monorepo_root) {
+                        let workspace_pattern = format!("{}/", workspace_dir.display());
                         policy
                             .capabilities
                             .filesystem
                             .read_patterns
-                            .push("/srv/luminous-dynamics/symthaea/".into());
+                            .push(workspace_pattern.clone());
                         policy
                             .capabilities
                             .filesystem
                             .write_patterns
-                            .push("/srv/luminous-dynamics/symthaea/".into());
+                            .push(workspace_pattern);
                     }
                     policy
                         .capabilities
@@ -2374,8 +2390,7 @@ impl Symthaea {
                                 ..
                             } => {
                                 if program == "cargo" {
-                                    *working_dir =
-                                        Some(PathBuf::from("/srv/luminous-dynamics/symthaea"));
+                                    *working_dir = Some(workspace_dir.clone());
                                     tracing::info!(
                                         target: "symthaea::action",
                                         working_dir = %working_dir.as_ref().unwrap().display(),

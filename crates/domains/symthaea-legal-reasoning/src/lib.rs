@@ -32,8 +32,8 @@ pub use context::{
     TemporalRevision, TemporalScope, governing_revisions, unique_governing_revision,
 };
 pub use defeasible::{
-    BlockedRule, Derivation, DerivationError, DerivationStep, Rule, derive, entails,
-    try_derive, try_derive_with_trace, try_entails, try_why_not,
+    BlockedRule, Derivation, DerivationError, DerivationStep, Rule, derive, entails, try_derive,
+    try_derive_with_trace, try_entails, try_why_not,
 };
 pub use deontic::{
     DeonticProposition, Modality, Norm, NormAssessment, PermissionStatus, StructuredNorm,
@@ -43,8 +43,8 @@ pub use deontic::{
 pub use evidence::{CanonicalEvidence, EvidenceEnvelope, EvidenceManifest};
 pub use hohfeld::{Jural, JuralRelation, contradictory_relations};
 pub use lifecycle::{
-    ActionEvent, LifecycleAssessment, LifecycleError, NormEvent, NormState, TimedNorm,
-    WaiverEvent, assess_lifecycle,
+    ActionEvent, LifecycleAssessment, LifecycleError, NormEvent, NormState, TimedNorm, WaiverEvent,
+    assess_lifecycle,
 };
 pub use model::{
     ActionId, Atom, AuthorityId, DocumentId, EventId, IdentifierError, JurisdictionId, Literal,

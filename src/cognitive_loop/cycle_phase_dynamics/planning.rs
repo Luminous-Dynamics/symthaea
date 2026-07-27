@@ -393,7 +393,63 @@ impl CognitiveLoopService {
         // diagnostics (Predictive Compression Program P0) — the registered C1
         // metric uses this, not the multi-horizon average. None on the
         // fallback paths that return no per-horizon predictions.
+        let mut prediction = prediction;
         let prediction_first_horizon = raw_predictions.first().map(|p| p.to_vec());
+
+        // Predictive Compression Program C3 (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md
+        // §7): explicit content-based recall, gated OFF by default — every existing C1 result
+        // stays reproducible bit-for-bit with this flag off. When on, look up the top-1
+        // episode whose stored `input` is most similar to THIS cycle's attended encoding, and
+        // — only above a similarity floor — blend its stored `output` into the multi-scale
+        // prediction. The blend weight is capped at 0.5: recall can nudge the CfC's own
+        // state-based estimate, never override it.
+        // CORRECTION (2026-07-25): episodes store the COMPRESSED CfC
+        // input/output (same dimension as `prediction`), not the full
+        // attended HDV — query with `compressed_state`, and use the
+        // recalled episode's `output` directly, no re-compression needed.
+        //
+        // EMPIRICAL STATUS as of C3f (2026-07-26): six sub-experiments (C3b-C3f) found this
+        // blend net-neutral-to-harmful on every schedule tested, and the KEY finding is that
+        // which content gets harmed flips depending on schedule structure (tier count /
+        // interleaving / per-tier frequency) — not a stable property of the content. Do not
+        // enable in production or hand-tune this blend formula (e.g. discount by
+        // `Episode.replay_count`) without a fresh causal experiment across multiple schedules;
+        // any single-schedule "improvement" here is unvalidatable by construction. See
+        // PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md §C3f "Headline finding" for the full
+        // reasoning.
+        // Telemetry (measurement-only, mirrors the P0 bits_saved pattern): whether
+        // recall actually fired this cycle and at what similarity — the C3
+        // manipulation check ("hit rate > 0 by rep 30+") needs this to be
+        // observable from outside, since it's otherwise an internal fact.
+        let mut recall_fired = false;
+        let mut recall_similarity: Option<f32> = None;
+        // C3c (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C3c): which
+        // episode (by write-cycle number) was matched, if any — lets an external harness
+        // that already knows what each cycle number "was" look up the matched episode's
+        // provenance, testing whether recall on ambiguous content preferentially matches
+        // the wrong kind of stored episode.
+        let mut recall_matched_timestamp: Option<u64> = None;
+        if self.config.enable_episodic_recall_prediction
+            && let Some(ref replay) = self.memory.episodic_persistence.replay
+        {
+            let recalled =
+                replay.retrieve_by_input_similarity(&perception.encoding.compressed_state, 1);
+            if let Some((episode, sim)) = recalled.into_iter().next() {
+                recall_similarity = Some(sim);
+                recall_matched_timestamp = Some(episode.timestamp);
+                if sim >= super::super::thresholds::RECALL_BLEND_SIM_THRESHOLD
+                    && episode.output.values.len() == prediction.len()
+                {
+                    recall_fired = true;
+                    let w = ((sim - super::super::thresholds::RECALL_BLEND_SIM_THRESHOLD)
+                        / (1.0 - super::super::thresholds::RECALL_BLEND_SIM_THRESHOLD))
+                        .clamp(0.0, 0.5);
+                    for (p, r) in prediction.iter_mut().zip(episode.output.values.iter()) {
+                        *p = (1.0 - w) * *p + w * *r;
+                    }
+                }
+            }
+        }
 
         // 5a. JEPA: parallel latent-space prediction alongside CfC.
         // Uses the CfC input as "current state" and the multi-scale prediction
@@ -597,6 +653,9 @@ impl CognitiveLoopService {
             output,
             prediction,
             prediction_first_horizon,
+            recall_fired,
+            recall_similarity,
+            recall_matched_timestamp,
             prediction_coherence,
             epistemic_uncertainty,
             aleatoric_uncertainty,

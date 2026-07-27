@@ -1,0 +1,53 @@
+base_config:
+  - configs/csd_en_acoustic.yaml
+
+# Gate 5: generalization benchmark. Trains on 4 real songs (~330s total:
+# en001a minus its held-out target, plus en002a/en003a/en004a in full)
+# and holds out 9 phrases -- the exact Gate 3/4 target ("won't you sing
+# along with me", en001a) plus 8 phrases from en005a, an ENTIRELY unseen
+# song, chosen deliberately for phonetic diversity (one simple control,
+# one consonant-cluster-heavy control, 6 more spanning length/content).
+# Every held-out phoneme is covered by the training set (verified by
+# build_benchmark_dataset.py) -- a real compositional-generalization
+# test, not memorization.
+dictionaries:
+  en: dictionaries/benchmark-01.txt
+
+datasets:
+  - raw_data_dir: raw/benchmark-01
+    speaker: csd-en
+    spk_id: 0
+    language: en
+    test_prefixes:
+      - heldout_wontyou
+      - heldout_simple_chirp
+      - heldout_cluster_windyspring
+      - heldout_butterfly
+      - heldout_comeflyover
+      - heldout_yellowwait
+      - heldout_petalssmile
+      - heldout_singsong
+      - heldout_comedanceover
+
+binary_data_dir: data/benchmark-01/binary
+
+augmentation_args:
+  random_pitch_shifting:
+    enabled: false
+  fixed_pitch_shifting:
+    enabled: false
+  random_time_stretching:
+    enabled: false
+
+# ~330s of training content (vs Gate 4's 57s) -- more data to fit means
+# the overfitting onset should occur later, per typical scaling. Ladder
+# to 6000 steps, checkpoints every 500 for a dense loss curve; full
+# per-phrase Whisper evaluation done at 4 representative checkpoints
+# (1000/2000/4000/6000) post-training rather than at every checkpoint,
+# to keep the evaluation volume (9 phrases x N checkpoints) tractable.
+max_updates: 6000
+val_check_interval: 500
+num_valid_plots: 1
+permanent_ckpt_start: 500
+permanent_ckpt_interval: 500
+num_ckpt_keep: 12

@@ -537,6 +537,38 @@ fn midi_to_hz(midi: u8) -> f32 {
     440.0 * 2.0_f32.powf((midi as f32 - 69.0) / 12.0)
 }
 
+/// De-overlap a monophonic performed voice's notes in place: sorted by
+/// start time, any note whose end now runs past the next note's start is
+/// truncated to end exactly there; a note with no usable room at all (an
+/// exact-duplicate or negative-gap start, which humanize's onset jitter can
+/// produce) is dropped rather than forced into a degenerate/overlapping
+/// duration. Mirrors `symthaea-music-theory`'s own `composer::deoverlap_voice`
+/// (same reasoning, seconds/f32 instead of exact rational beats — this
+/// layer runs after humanize, which isn't exact-rational).
+fn deoverlap_performance_notes(notes: &mut Vec<Note>) {
+    let mut order: Vec<usize> = (0..notes.len()).collect();
+    order.sort_by(|&a, &b| notes[a].start_time.total_cmp(&notes[b].start_time));
+    let mut to_remove = Vec::new();
+    for w in order.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let a_end = notes[a].start_time + notes[a].duration;
+        let b_start = notes[b].start_time;
+        if a_end > b_start + 1e-6 {
+            let gap = b_start - notes[a].start_time;
+            if gap <= 1e-6 {
+                to_remove.push(a);
+            } else {
+                notes[a].duration = gap;
+            }
+        }
+    }
+    to_remove.sort_unstable();
+    to_remove.dedup();
+    for i in to_remove.into_iter().rev() {
+        notes.remove(i);
+    }
+}
+
 /// Roll the tones of each block chord low-to-high like a real strum (plucked
 /// instruments) or hand roll (keyboards). Chord tones arrive from the score
 /// with bit-identical start times (identical onset beats through the same
@@ -981,6 +1013,7 @@ pub fn realize_styled(
         seed,
         state,
         sample_rate,
+        None,
     )
 }
 
@@ -1098,7 +1131,59 @@ pub fn realize_with_spec(
         seed,
         state,
         sample_rate,
+        None,
     )
+}
+
+/// [`realize_with_spec`] with an explicit grammar-level [`symthaea_music_theory::
+/// PerformanceDialect`] override — the controlled-comparison escape hatch a
+/// listening study needs: e.g. force every arm to `ProcessExact` (neutral
+/// performance) so timing/expression differences don't confound a
+/// structural-recognition question, or force each arm to its own style's
+/// dialect deliberately. Maps down to this crate's own smaller
+/// [`PerformanceDialect`] via [`map_grammar_dialect`] before reaching the
+/// render internals.
+pub fn realize_with_spec_and_dialect(
+    score: &TheoryScore,
+    spec: &symthaea_music_theory::CompositionSpec,
+    seed: u64,
+    state: &MusicalState,
+    sample_rate: u32,
+    dialect: symthaea_music_theory::PerformanceDialect,
+) -> Composition {
+    realize_core(
+        score,
+        resolve_spec_ensemble(spec, seed),
+        spec,
+        seed,
+        state,
+        sample_rate,
+        Some(map_grammar_dialect(dialect)),
+    )
+}
+
+/// Map the grammar-level 8-variant [`symthaea_music_theory::
+/// PerformanceDialect`] (declared per [`crate::style::Style::
+/// grammar_profile`]/[`symthaea_music_theory::grammar::GrammarProfile`])
+/// down to this crate's own 5-variant rendering-internals enum. The two
+/// are deliberately separate types (this crate's is what `Rubato`/
+/// `performance_voices_with_dialect` actually consume; the grammar crate's
+/// is a higher-level per-style-family label) — `DramaticTiming`/
+/// `ChoralBlend` have no closer existing analog than the general classical
+/// rubato feel, disclosed here rather than silently picked.
+pub(crate) fn map_grammar_dialect(
+    d: symthaea_music_theory::PerformanceDialect,
+) -> PerformanceDialect {
+    use symthaea_music_theory::PerformanceDialect as G;
+    match d {
+        G::ClassicalRubato => PerformanceDialect::ClassicalRubato,
+        G::DanceLocked => PerformanceDialect::DanceLocked,
+        G::JazzLaidBack => PerformanceDialect::JazzLaidBack,
+        G::FolkLift => PerformanceDialect::FolkLift,
+        // Matches dialect_for_spec's own drone -> ProcessExact precedent.
+        G::ProcessExact | G::DroneElastic => PerformanceDialect::ProcessExact,
+        G::DramaticTiming | G::ChoralBlend => PerformanceDialect::ClassicalRubato,
+    }
 }
 
 /// Compose from a user spec AND realize it — the full user-owned pipeline.
@@ -1293,7 +1378,19 @@ pub(crate) fn performance_voices_with_dialect(
                 dialect.jitter_scale(),
             );
         }
-        let notes: Vec<Note> = beat_notes.into_iter().map(|(_, n)| n).collect();
+        let mut notes: Vec<Note> = beat_notes.into_iter().map(|(_, n)| n).collect();
+        // The symbolic score is already overlap-free for every monophonic
+        // theory role (`symthaea-music-theory`'s own debug validation gate
+        // guarantees it) -- but humanize's per-note onset jitter runs AFTER
+        // that guarantee, independently on each note, and can push two
+        // once-adjacent notes into a real overlap (an audible double-attack
+        // / phase-comb artifact, not just a data-format concern the way
+        // MIDI export's overlap hazard was). `Harmony` is excluded: its
+        // notes are legitimately simultaneous chord tones, not a single
+        // monophonic line.
+        if theory_role != TheoryRole::Harmony {
+            deoverlap_performance_notes(&mut notes);
+        }
         voices.push(PerformanceVoice {
             name,
             role: muse_role,
@@ -1324,7 +1421,7 @@ pub(crate) fn performance_voices_with_dialect(
             .iter()
             .any(|n| (n.section_intensity - max_intensity).abs() > 1e-6);
         if has_real_arc {
-            let peak_notes: Vec<Note> = melody_notes_raw
+            let mut peak_notes: Vec<Note> = melody_notes_raw
                 .iter()
                 .filter(|n| (n.section_intensity - max_intensity).abs() < 1e-6)
                 .map(|n| {
@@ -1368,6 +1465,7 @@ pub(crate) fn performance_voices_with_dialect(
                     note
                 })
                 .collect();
+            deoverlap_performance_notes(&mut peak_notes);
             if !peak_notes.is_empty() {
                 voices.push(PerformanceVoice {
                     name: "Doubling",
@@ -1467,31 +1565,40 @@ fn realize_core(
     seed: u64,
     state: &MusicalState,
     sample_rate: u32,
+    dialect_override: Option<PerformanceDialect>,
 ) -> Composition {
+    let dialect = dialect_override.unwrap_or_else(|| dialect_for_spec(spec));
     let swing = spec.texture.swing as f64;
     // Same beat→seconds map as performance_voices builds internally —
     // Rubato::from_score_with_dialect is deterministic, so the drum track
     // and total length stay sample-locked to the performed voices.
     let timeline = Timeline {
-        rubato: Rubato::from_score_with_dialect(score, dialect_for_spec(spec)),
+        rubato: Rubato::from_score_with_dialect(score, dialect),
         swing,
     };
-    let voices: Vec<Voice> = performance_voices(score, ensemble, spec, state)
-        .into_iter()
-        .map(|pv| {
-            let (lo, hi) = pv.notes.iter().fold((f32::MAX, 0.0f32), |(lo, hi), n| {
-                (lo.min(n.frequency), hi.max(n.frequency))
-            });
-            Voice {
-                role: pv.role,
-                notes: pv.notes,
-                pitch_range: (lo, hi),
-                volume: pv.volume,
-                pan: pv.pan,
-                instrument: Some(pv.instrument),
-            }
-        })
-        .collect();
+    let voices: Vec<Voice> = performance_voices_with_dialect(
+        score,
+        ensemble,
+        spec.texture.swing as f64,
+        state,
+        spec.texture.return_color,
+        dialect,
+    )
+    .into_iter()
+    .map(|pv| {
+        let (lo, hi) = pv.notes.iter().fold((f32::MAX, 0.0f32), |(lo, hi), n| {
+            (lo.min(n.frequency), hi.max(n.frequency))
+        });
+        Voice {
+            role: pv.role,
+            notes: pv.notes,
+            pitch_range: (lo, hi),
+            volume: pv.volume,
+            pan: pv.pan,
+            instrument: Some(pv.instrument),
+        }
+    })
+    .collect();
 
     let arrangement = Arrangement { voices };
 
@@ -1587,6 +1694,46 @@ pub fn compose_and_realize_styled(
 mod tests {
     use super::*;
     use symthaea_music_theory::pitch::PitchClass;
+
+    fn note(start: f32, duration: f32) -> Note {
+        Note {
+            frequency: 440.0,
+            start_time: start,
+            duration,
+            velocity: 0.8,
+        }
+    }
+
+    #[test]
+    fn deoverlap_performance_notes_truncates_a_humanize_induced_overlap() {
+        // Two once-adjacent notes that now overlap by 0.05s (e.g. humanize
+        // jittered the second note's onset earlier) -- the first must be
+        // truncated to end exactly where the second begins.
+        let mut notes = vec![note(0.0, 0.5), note(0.45, 0.5)];
+        deoverlap_performance_notes(&mut notes);
+        assert_eq!(notes.len(), 2);
+        assert!((notes[0].duration - 0.45).abs() < 1e-6, "{:?}", notes[0]);
+        assert!((notes[0].start_time + notes[0].duration - notes[1].start_time).abs() < 1e-6);
+    }
+
+    #[test]
+    fn deoverlap_performance_notes_drops_an_exact_duplicate_start() {
+        let mut notes = vec![note(0.0, 0.5), note(0.0, 0.3)];
+        deoverlap_performance_notes(&mut notes);
+        assert_eq!(notes.len(), 1, "{notes:?}");
+        assert!((notes[0].start_time - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn deoverlap_performance_notes_leaves_non_overlapping_notes_untouched() {
+        let mut notes = vec![note(0.0, 0.5), note(0.6, 0.5)];
+        deoverlap_performance_notes(&mut notes);
+        assert_eq!(notes.len(), 2);
+        assert!((notes[0].start_time - 0.0).abs() < 1e-6);
+        assert!((notes[0].duration - 0.5).abs() < 1e-6);
+        assert!((notes[1].start_time - 0.6).abs() < 1e-6);
+        assert!((notes[1].duration - 0.5).abs() < 1e-6);
+    }
 
     #[test]
     fn dialect_derivation_maps_every_style_preset() {

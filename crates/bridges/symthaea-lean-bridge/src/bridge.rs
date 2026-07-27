@@ -338,10 +338,15 @@ pub fn render_lean_file(theorem_name: &str, goal: &Proposition, result: &ProofRe
     ));
     lines.push(String::new());
 
-    // Propositional variables
+    // Propositional variables. Atom names come from `Proposition::variables()`
+    // (an externally-sourced AST) and are not otherwise validated, so they
+    // must be sanitized before interpolation -- see `sanitize` module docs.
     if !atoms.is_empty() {
         for a in &atoms {
-            lines.push(format!("variable ({} : Prop)", a));
+            lines.push(format!(
+                "variable ({} : Prop)",
+                crate::sanitize::sanitize_ident(a)
+            ));
         }
         lines.push(String::new());
     }
@@ -504,5 +509,39 @@ mod tests {
         assert!(file.contains("variable (P : Prop)"));
         assert!(file.contains("variable (Q : Prop)"));
         assert!(file.contains("theorem t"));
+    }
+
+    /// Regression test for the Lean-source-injection finding: a
+    /// `Proposition::Atom` name (an externally-sourced identifier) crafted
+    /// with a newline and a Lean top-level command must not be able to
+    /// break out of the `variable (... : Prop)` declaration and land its
+    /// own line in the emitted file, all the way through the real public
+    /// `render_lean_file` entry point (not just the sanitizer in isolation).
+    #[test]
+    fn malicious_atom_name_cannot_break_out_of_variable_declaration() {
+        let attack_atom = "P\nend\n#eval IO.Process.run { cmd := \"sh\" }";
+        let goal = atom(attack_atom).implies(atom("Q"));
+        let result = ProofResult {
+            valid: true,
+            proof_steps: vec![ProofStepLogic {
+                step_number: 1,
+                rule: "Premise".to_string(),
+                formula: "P".to_string(),
+                justification: "given".to_string(),
+            }],
+            phi: 0.5,
+            description: "test".to_string(),
+        };
+        let file = render_lean_file("t", &goal, &result);
+        assert!(
+            !file.contains("#eval"),
+            "attack payload's #eval must be neutralized, got: {}",
+            file
+        );
+        assert!(
+            !file.lines().any(|l| l.trim() == "end"),
+            "attack payload must not produce a bare top-level `end` line, got: {}",
+            file
+        );
     }
 }

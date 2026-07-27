@@ -9,7 +9,8 @@
 //! installed.
 
 use std::path::Path;
-use std::process::Command;
+
+use crate::subprocess::{RunError, run_bounded_on_file};
 
 /// Outcome of running `lean4 --check` on a single `.lean` file.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,23 +43,35 @@ fn resolve_lean_binary() -> String {
 /// separate `--check` flag (that was a Lean 3 convention). A zero exit code
 /// means the file type-checked with no errors. Any stderr output from a
 /// successful run is informational (e.g. #check statements), not errors.
+///
+/// Bounded by [`crate::subprocess::run_bounded_on_file`]: a hanging `lean`
+/// process is killed after a wall-clock timeout (default 300s, override via
+/// `LEAN_CHECK_TIMEOUT_SECS`) rather than blocking the caller forever, and
+/// captured output is capped rather than buffered without limit.
 pub fn check_with_lean4<P: AsRef<Path>>(path: P) -> CheckOutcome {
     let bin = resolve_lean_binary();
-    let output = match Command::new(&bin).arg(path.as_ref()).output() {
+    let output = match run_bounded_on_file(&bin, path.as_ref()) {
         Ok(o) => o,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return CheckOutcome::LeanNotInstalled;
-        }
-        Err(e) => return CheckOutcome::ProcessError(e.to_string()),
+        Err(RunError::NotFound) => return CheckOutcome::LeanNotInstalled,
+        Err(RunError::Io(e)) => return CheckOutcome::ProcessError(e),
     };
 
-    if output.status.success() {
+    if output.timed_out {
+        return CheckOutcome::ProcessError(
+            "lean did not finish within the configured timeout and was killed".to_string(),
+        );
+    }
+
+    if output.success() {
         CheckOutcome::Accepted
     } else {
         // Lean writes errors to stdout in its default output mode, not stderr.
         // Merge both so the rejection string is useful for triage.
         let mut combined = String::from_utf8_lossy(&output.stdout).into_owned();
         combined.push_str(&String::from_utf8_lossy(&output.stderr));
+        if output.truncated {
+            combined.push_str("\n[... output truncated at the capture limit ...]");
+        }
         CheckOutcome::Rejected(combined)
     }
 }

@@ -18,8 +18,29 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STRUCT_FILE="${SCRIPT_DIR}/../src/cognitive_loop/mod.rs"
 
-# Verified 2026-07-05 baseline. See header comment before bumping.
-MAX_CLS_FIELDS=89
+# Bumped 2026-07-26 from the 2026-07-05 baseline of 89, after auditing all 3
+# new fields individually against the "no scattered state" rule above (not a
+# rubber-stamp bump):
+#   - train_history_snapshots: VecDeque<TemporalStateBackup> -- the 2026-07-17
+#     sequence-prediction fix (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md
+#     Phase 5) that made the loop's temporal learning actually work (all 3
+#     pre-registered acceptance gates passed for the first time). Read/written
+#     every cycle from cycle_phase_dynamics/{training,planning}.rs -- core
+#     hot-path state, not a bolt-on.
+#   - training_frozen: bool -- a single kill-switch bool gating one existing
+#     condition in cycle_phase_dynamics/training.rs, set only by the
+#     Predictive Compression C1 experiment harness (examples/compression_bits.rs).
+#     Minimal footprint; not scattered scalars.
+#   - memetic_immune: symthaea_memetics::MemeticImmuneSystem -- a whole
+#     encapsulated subsystem (screens incoming memes, tracks contagion,
+#     psi-gated guardian posture; MEMETICS_ANTIMEMETICS_PLAN.md) with its own
+#     accessor module (accessors/memetics.rs), structurally identical to how
+#     other subsystem-holding fields already live on this struct -- not raw
+#     loose state that belongs in a new manager.
+# None of the three are unprincipled sprawl; each traces to a specific,
+# already-landed, previously-verified initiative. Re-derive this list, don't
+# just bump the number, next time this fails.
+MAX_CLS_FIELDS=92
 
 if [[ ! -f "${STRUCT_FILE}" ]]; then
     echo "check-cls-field-count: struct file not found: ${STRUCT_FILE}" >&2

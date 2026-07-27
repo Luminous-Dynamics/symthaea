@@ -1,0 +1,9 @@
+=== OS ===
+Linux luminous-laptop 7.1.3 #1-NixOS SMP PREEMPT_DYNAMIC Sat Jul  4 11:45:09 UTC 2026 x86_64 GNU/Linux
+
+=== nixos version ===
+ANSI_COLOR="0;38;2;126;186;228"
+BUG_REPORT_URL="https://github.com/NixOS/nixpkgs/issues"
+BUILD_ID="26.11.20260711.e7a3ca8"
+CPE_NAME="cpe:/o:nixos:nixos:26.11"
+DEFAULT_HOSTNAME=nixos

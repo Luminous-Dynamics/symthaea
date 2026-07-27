@@ -33,6 +33,8 @@ pub mod bridge;
 pub mod fol_ext_bridge; // Phase 2: FolFormulaExt → Lean proof script w/ Mathlib
 pub mod minif2f_ingest; // Phase 4: miniF2F-v2 automated parser + translator
 pub mod runner;
+pub mod sanitize; // Shared identifier/statement sanitization for generated Lean source
+pub mod subprocess; // Bounded-time, bounded-memory Lean subprocess execution
 pub mod tactic;
 pub mod term;
 pub mod z3_to_lean;

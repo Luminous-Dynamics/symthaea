@@ -5,7 +5,7 @@
 //!
 //! High-level query methods (flow state, prediction confidence, consciousness
 //! snapshot, etc.) are `pub` for use by external consumers (examples, LUCID,
-//! symthaea-nix). A small number of `pub(crate)` accessors exist for internal
+//! nixward). A small number of `pub(crate)` accessors exist for internal
 //! unit tests (e.g., `flow_state()`, `curiosity_drive()`).
 //!
 //! Organized into thematic sub-modules:

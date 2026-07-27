@@ -25,6 +25,16 @@ use crate::rhythm::Duration;
 use crate::spec::{Attitude, DevelopmentDna, MelodicDna, PhraseRhetoric};
 use serde::{Deserialize, Serialize};
 
+/// `BaroqueSuite`'s progression BEFORE the 2026-07-26 harmonic-syntax pilot
+/// (see `HARMONIC_SYNTAX_REWORK_SCOPE_2026-07-26.md`) — plain I-IV-V-I,
+/// cycled to length. Deliberately kept as a named constant (not just a git-
+/// history footnote) after the pilot's A/B evidence favored the real
+/// functional-harmony generator (`ProgressionSpec::Grammar`) it replaced:
+/// a compatibility baseline for debugging, an Analyst A/B control, and a
+/// regression fixture proving the old behavior still composes cleanly.
+/// See `composer::tests::baroque_suite_compatibility_baseline_still_composes_and_genuinely_differs_from_the_new_route`.
+pub const BAROQUE_SUITE_COMPATIBILITY_PROGRESSION: [i32; 4] = [1, 4, 5, 1];
+
 /// A named genre/style bias. See the module docs for what this does and
 /// does not change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
@@ -1501,10 +1511,24 @@ impl Style {
                         (1, 1, 1),
                     ],
                 ],
-                // The 12-bar chorus: I-I-I-I / IV-IV-I-I / V-IV-I-I. Purely
+                // Three real, standard 12-bar-blues chord variants (purely
                 // major-functional — the "blues" identity is entirely in
-                // the melody's blue notes, not in the chords.
-                progression: ProgressionSpec::Archetype(vec![1, 1, 1, 1, 4, 4, 1, 1, 5, 4, 1, 1]),
+                // the melody's blue notes, not the chords). `ArchetypePool`
+                // (not a single `Archetype`) so `realize_call_response`'s
+                // already-computed per-chorus `seed_variant` — threaded
+                // into `spec.progression(...)` since day one — actually
+                // varies the harmony chorus to chorus, not just the
+                // melody: a real gap where every chorus in a multi-chorus
+                // piece got matched melodic variation but byte-identical
+                // harmony every time.
+                progression: ProgressionSpec::ArchetypePool(vec![
+                    // Standard: I-I-I-I / IV-IV-I-I / V-IV-I-I.
+                    vec![1, 1, 1, 1, 4, 4, 1, 1, 5, 4, 1, 1],
+                    // Quick-change: bar 2 moves to IV and back.
+                    vec![1, 4, 1, 1, 4, 4, 1, 1, 5, 4, 1, 1],
+                    // Turnaround ending on V, setting up the next chorus.
+                    vec![1, 1, 1, 1, 4, 4, 1, 1, 5, 4, 1, 5],
+                ]),
                 accompaniment_pool: vec![A::Shuffle],
                 form_pool: vec![FormKind::Ternary, FormKind::Rondo],
                 ensemble_pool: s(&[
@@ -1840,7 +1864,29 @@ impl Style {
                         (2, 1, 2),
                     ],
                 ],
-                progression: ProgressionSpec::Archetype(vec![1, 4, 5, 1]),
+                // Harmonic-syntax pilot (2026-07-26, see
+                // HARMONIC_SYNTAX_REWORK_SCOPE_2026-07-26.md): this style's
+                // own doc already calls it "functional common-practice
+                // tonality, not an exotic mode" -- the SAME tonal world
+                // Classical's real T-PD-D-T generator lives in, with no
+                // documented reason (unlike Cinematic/Folk/Playful/
+                // ModalFolk/Impressionism/SacredChoral, all of which
+                // deliberately avoid or restrict specific chords) for
+                // staying on a fixed 4-chord loop instead of it.
+                //
+                // A/B evidence (2026-07-27, note-data + rendered-audio
+                // analysis, not a human listening session): across 2 seeds,
+                // same form/rhythm/instrumentation/tempo, the functional
+                // route showed lower estimated dissonance, fewer large
+                // melodic leaps, and more varied harmonic motion than
+                // BAROQUE_SUITE_COMPATIBILITY_PROGRESSION (the route it
+                // replaced, kept as a named constant -- a compatibility
+                // baseline, an Analyst A/B control, and a regression
+                // fixture, not deleted). One disclosed rough edge: seed 7's
+                // counter-voice realization didn't fully adapt to the new
+                // harmony (more angular leaps) -- a real follow-up target,
+                // not a reason to keep the old route.
+                progression: ProgressionSpec::Grammar,
                 accompaniment_pool: vec![A::Arpeggio], // broken-chord continuo
                 form_pool: vec![FormKind::Ternary],
                 ensemble_pool: s(&[["violin", "organ", "cello"]]), // trio-sonata continuo
@@ -2832,7 +2878,7 @@ mod tests {
 
     #[test]
     fn new_styles_validate_compose_and_stay_distinct() {
-        use crate::composer::{compose_with_spec, MusicalIntent};
+        use crate::composer::{MusicalIntent, compose_with_spec};
         // Every new style's preset must validate, compose a full piece in
         // its own meter/tempo band, and differ audibly from Classical.
         let classical = compose_with_spec(&MusicalIntent::default(), &Style::Classical.spec());
@@ -2920,7 +2966,7 @@ mod tests {
 
     #[test]
     fn styled_scores_realize_their_accompaniment_rhythm() {
-        use crate::composer::{compose_styled, compose_with_spec, MusicalIntent};
+        use crate::composer::{MusicalIntent, compose_styled, compose_with_spec};
         use crate::score::VoiceRole;
         // Waltz BODY: no harmony tone on ANY barline (beat 1 belongs to the
         // bass) and the bass is a crisp quarter note, not a whole-bar drone.

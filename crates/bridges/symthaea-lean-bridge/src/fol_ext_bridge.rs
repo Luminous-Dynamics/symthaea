@@ -37,9 +37,15 @@ use crate::bridge::render_lean_file;
 use crate::tactic::{LeanProofScript, LeanTactic};
 
 /// Render a Lean 4 term for an arithmetic `Term`. Mathlib syntax.
+///
+/// `Term::Var` names originate from `symthaea_core`'s externally-sourced
+/// `Term` AST and are sanitized here -- the sole choke point every
+/// rendering path in this module goes through -- before interpolation. See
+/// `sanitize` module docs for why this matters (Lean source injection via
+/// unescaped identifiers).
 fn term_to_lean(t: &Term) -> String {
     match t {
-        Term::Var(n) => n.clone(),
+        Term::Var(n) => crate::sanitize::sanitize_ident(n),
         Term::IntLit(n) => format!("({})", n),
         Term::RealLit(x) => {
             // Emit with explicit Real coercion so Lean doesn't infer Nat
@@ -99,7 +105,7 @@ fn formula_to_lean(phi: &FolFormulaExt) -> String {
         FolFormulaExt::Forall(name, ty, body) => {
             format!(
                 "(∀ {} : {}, {})",
-                name,
+                crate::sanitize::sanitize_ident(name),
                 numeric_to_lean(*ty),
                 formula_to_lean(body)
             )
@@ -107,7 +113,7 @@ fn formula_to_lean(phi: &FolFormulaExt) -> String {
         FolFormulaExt::Exists(name, ty, body) => {
             format!(
                 "(∃ {} : {}, {})",
-                name,
+                crate::sanitize::sanitize_ident(name),
                 numeric_to_lean(*ty),
                 formula_to_lean(body)
             )
@@ -132,6 +138,12 @@ fn numeric_to_lean(ty: NumericType) -> &'static str {
 /// - Arithmetic goals emit `import Mathlib.Tactic` + the tactic suggested
 ///   by the detected SMT fragment.
 pub fn render_fol_ext_file(theorem_name: &str, phi: &FolFormulaExt) -> String {
+    // Sanitized once up front: Route 2 below interpolates `theorem_name`
+    // directly (not through `LeanProofScript::to_lean`, which does its own
+    // sanitization), so this is that route's choke point. Route 1 delegates
+    // to `render_lean_file`, which is independently safe regardless.
+    let theorem_name_owned = crate::sanitize::sanitize_ident(theorem_name);
+    let theorem_name = theorem_name_owned.as_str();
     // Route 1: pure propositional.
     if phi.is_purely_propositional()
         && let FolFormulaExt::Base(prop) = phi
@@ -184,11 +196,16 @@ pub fn render_fol_ext_file(theorem_name: &str, phi: &FolFormulaExt) -> String {
 /// For `∀ x : ℝ, ∀ y : ℝ, x + y = y + x` → `["x", "y"]`.
 /// For `3 * (1/3) = 1` → `[]`.
 /// For `∀ x : ℝ, P → Q` → `["x"]` (stops at `Implies`).
+///
+/// Sanitizes each binder name at collection time (rather than at each of
+/// the many downstream render sites) so every caller -- `intro_line`, the
+/// `nlinarith` hint builders, `lt_trichotomy_alt` -- inherits a
+/// already-safe `Vec<String>` for free. See `sanitize` module docs.
 fn collect_outer_forall_binders(phi: &FolFormulaExt) -> Vec<String> {
     let mut out = Vec::new();
     let mut cur = phi;
     while let FolFormulaExt::Forall(name, _, body) = cur {
-        out.push(name.clone());
+        out.push(crate::sanitize::sanitize_ident(name));
         cur = body;
     }
     out
@@ -866,6 +883,37 @@ mod tests {
             !no_field_file.contains("field_simp"),
             "No-division conclusion should NOT emit field_simp: {}",
             no_field_file
+        );
+    }
+
+    /// Regression test for the Lean-source-injection finding, covering
+    /// `render_fol_ext_file`'s Route 2 (arithmetic goals), which builds its
+    /// output with direct `format!` calls rather than going through
+    /// `LeanProofScript::to_lean`. A malicious `theorem_name` and a
+    /// malicious `Term::Var`/`Forall` binder name (both externally-sourced)
+    /// must not survive into the emitted file as raw newlines.
+    #[test]
+    fn malicious_theorem_name_and_var_cannot_inject_lean_commands() {
+        let attack_var = "x\nend\n#eval IO.Process.run { cmd := \"sh\" }";
+        let phi = FolFormulaExt::forall(
+            attack_var,
+            NumericType::Real,
+            FolFormulaExt::le(
+                Term::IntLit(0),
+                Term::var(attack_var).mul(Term::var(attack_var)),
+            ),
+        );
+        let attack_theorem = "t\nend\n#eval 2";
+        let file = render_fol_ext_file(attack_theorem, &phi);
+        assert!(
+            !file.contains("#eval"),
+            "injected #eval must be neutralized, got: {}",
+            file
+        );
+        assert!(
+            !file.lines().any(|l| l.trim() == "end"),
+            "injected bare `end` must not land on its own line, got: {}",
+            file
         );
     }
 }

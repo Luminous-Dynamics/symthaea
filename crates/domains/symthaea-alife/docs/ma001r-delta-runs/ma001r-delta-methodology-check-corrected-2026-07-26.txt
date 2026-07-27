@@ -1,0 +1,18 @@
+MA-001R-delta methodology check -- resource_level=0.5 outcome_a=0.9 outcome_b=0.2 training_ticks=2000
+
+=== Equal-outcome control (constant target 0.6) ===
+  baseline delta=0.1753 post-training delta=0.0714
+
+=== Shuffled-context control (alternating target, per-tick randomized context) ===
+  baseline delta=0.1753 post-training delta=0.1821
+
+=== NEW (corrected): balanced-decorrelated control (alternating target, period-4 block context, exactly balanced mean outcome per context) ===
+  baseline delta=0.1753 post-training delta=0.1206
+
+=== Analysis ===
+  equal-outcome (constant target):                         post-training delta = 0.0714
+  balanced-decorrelated (alternating target, real context variation, balanced mean outcome): post-training delta = 0.1206
+  shuffled (alternating target, per-tick randomized context):        post-training delta = 0.1821
+  bound (alternating target, correctly-bound context):               post-training delta = 0.7656 (known from prior run)
+
+VERDICT: AMBIGUOUS: the balanced-decorrelated control's value is not clearly close to either equal-outcome's or shuffled's -- report the exact numbers and reconsider the hypothesis rather than forcing a verdict either way.

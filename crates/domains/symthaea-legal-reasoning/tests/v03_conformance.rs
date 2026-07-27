@@ -1,11 +1,11 @@
 use std::collections::BTreeSet;
 
 use symthaea_legal_reasoning::{
-    ActionId, ActionEvent, Atom, CanonicalEvidence, DeonticProposition, EvidenceEnvelope,
-    EvidenceManifest, EventId, FormalRule, Jural, JuralRelation, LegalDate, LegalPositionState,
-    LegalStatus, Literal, Modality, NormEvent, NormState, PartyId, PowerExercise, PriorityBasis,
-    QueryId, RuleId, RuleKind, RulePack, RulePackId, SemanticProfileId, StructuredNorm,
-    Superiority, TemporalScope, TimedNorm, assess_lifecycle, exercise_power, resolve_literal,
+    ActionEvent, ActionId, Atom, CanonicalEvidence, DeonticProposition, EventId, EvidenceEnvelope,
+    EvidenceManifest, FormalRule, Jural, JuralRelation, LegalDate, LegalPositionState, LegalStatus,
+    Literal, Modality, NormEvent, NormState, PartyId, PowerExercise, PriorityBasis, QueryId,
+    RuleId, RuleKind, RulePack, RulePackId, SemanticProfileId, StructuredNorm, Superiority,
+    TemporalScope, TimedNorm, assess_lifecycle, exercise_power, resolve_literal,
     validate_rule_pack,
 };
 
@@ -79,11 +79,7 @@ fn lifecycle_violation_can_activate_a_reparative_norm() {
     .unwrap()
     .with_reparation(StructuredNorm::new(Modality::Obligatory, interest.clone()));
 
-    let result = assess_lifecycle(
-        &primary,
-        &[],
-        LegalDate::new(2026, 7, 21).unwrap(),
-    );
+    let result = assess_lifecycle(&primary, &[], LegalDate::new(2026, 7, 21).unwrap());
     assert_eq!(result.state, NormState::Violated);
     assert_eq!(
         result.activated_reparation,
@@ -112,7 +108,10 @@ fn recorded_performance_fulfils_only_the_matching_party_bound_norm() {
         .with_beneficiary(creditor),
     );
 
-    assert_eq!(assess_lifecycle(&norm, &[event], date).state, NormState::Fulfilled);
+    assert_eq!(
+        assess_lifecycle(&norm, &[event], date).state,
+        NormState::Fulfilled
+    );
 }
 
 #[test]
@@ -130,7 +129,8 @@ fn power_exercise_preserves_correlative_closure() {
         ActionId::new("pay-judgment").unwrap(),
     );
     let state = LegalPositionState::new([power.clone()]).unwrap();
-    let (next, _) = exercise_power(&state, &PowerExercise::new(power).assert(right.clone())).unwrap();
+    let (next, _) =
+        exercise_power(&state, &PowerExercise::new(power).assert(right.clone())).unwrap();
 
     assert!(next.contains(&right));
     assert!(next.contains(&right.correlative_relation()));
@@ -146,12 +146,7 @@ fn validation_remains_advisory_and_does_not_change_results() {
         positive("enter"),
     )
     .unwrap();
-    let pack = RulePack::new(
-        RulePackId::new("entry").unwrap(),
-        [allow],
-        [],
-    )
-    .unwrap();
+    let pack = RulePack::new(RulePackId::new("entry").unwrap(), [allow], []).unwrap();
     let report = validate_rule_pack(&pack);
     let facts = [positive("condition")].into_iter().collect();
 

@@ -131,13 +131,29 @@ fn arithmetic_goals_are_lean_accepted() {
     }
 
     // Gate enabled: actually run each file through Lean.
-    let dir = std::env::temp_dir().join("symthaea_lean_gate");
+    //
+    // The directory name includes this process's PID so a local user can't
+    // pre-stage a symlink at a guessable, stable path before the test runs
+    // (a prior fixed `symthaea_lean_gate` name was guessable on a shared
+    // multi-tenant host). File writes below additionally use
+    // `create_new` (O_EXCL) rather than `fs::write`, so even a
+    // same-PID-guessed pre-existing path/symlink causes a hard failure
+    // instead of a silent write-through.
+    let dir = std::env::temp_dir().join(format!("symthaea_lean_gate_{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("create temp dir");
 
     let mut failures: Vec<String> = Vec::new();
     for (name, file) in &rendered {
         let path = dir.join(format!("{name}.lean"));
-        std::fs::write(&path, file).expect("write lean file");
+        {
+            use std::io::Write;
+            let mut f = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+                .expect("create lean file (fails closed if the path is unexpectedly pre-occupied)");
+            f.write_all(file.as_bytes()).expect("write lean file");
+        }
         match check_with_lean4(&path) {
             CheckOutcome::Accepted => {}
             CheckOutcome::LeanNotInstalled => {

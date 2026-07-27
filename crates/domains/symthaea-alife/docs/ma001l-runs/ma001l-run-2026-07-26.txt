@@ -1,0 +1,79 @@
+MA-001L -- training_total=4000 held_out_count=200 reversal_total=4000
+
+Per plan sec 8: gates are computed from the structured Ma001lGateResults BEFORE any prose verdict.
+
+--- Arm: Hebbian-only ---
+  held-out error: bound=0.1807 shuffled=0.3245 neither=0.3002 unconditional_baseline=0.3500
+  counterfactual (Transfer): A=0.6680 B=0.3295 direction_correct=true
+  reversal: pre-reversal(A>B)=true at_checkpoint(A>B)=true at_end(A>B)=true reversal_passes=false
+  max Forage/Rest self-transition drift: 0.0244 (threshold 0.20) no_catastrophic_drift=true
+  counterfactual magnitude: Transfer=0.3385 Forage=0.3385 Rest=0.3648 action_specificity_passes=false
+  shuffled vs neither held-out error: shuffled=0.3245 neither=0.3002 shuffled_genuinely_fails=true
+  ALL 7 GATES PASS: false (failed: ["D:reversal_passes", "F:action_specificity_passes"])
+
+--- Arm: TD-only ---
+  held-out error: bound=0.5500 shuffled=0.5500 neither=0.3002 unconditional_baseline=0.3500
+  counterfactual (Transfer): A=0.0000 B=0.0000 direction_correct=false
+  reversal: pre-reversal(A>B)=false at_checkpoint(A>B)=false at_end(A>B)=false reversal_passes=true
+  max Forage/Rest self-transition drift: 0.8971 (threshold 0.20) no_catastrophic_drift=false
+  counterfactual magnitude: Transfer=0.0000 Forage=0.0000 Rest=0.0000 action_specificity_passes=false
+  shuffled vs neither held-out error: shuffled=0.5500 neither=0.3002 shuffled_genuinely_fails=false
+  ALL 7 GATES PASS: false (failed: ["A:bound_beats_shuffled", "B:heldout_beats_baseline", "C:counterfactual_direction_correct", "E:no_catastrophic_drift", "F:action_specificity_passes", "G:shuffled_genuinely_fails"])
+
+--- Arm: Neither (no-learning control) ---
+  held-out error: bound=0.3002 shuffled=0.3002 neither=0.3002 unconditional_baseline=0.3500
+  counterfactual (Transfer): A=0.6902 B=0.5906 direction_correct=true
+  reversal: pre-reversal(A>B)=true at_checkpoint(A>B)=true at_end(A>B)=true reversal_passes=false
+  max Forage/Rest self-transition drift: 0.0000 (threshold 0.20) no_catastrophic_drift=true
+  counterfactual magnitude: Transfer=0.0996 Forage=0.0996 Rest=0.0839 action_specificity_passes=false
+  shuffled vs neither held-out error: shuffled=0.3002 neither=0.3002 shuffled_genuinely_fails=true
+  ALL 7 GATES PASS: false (failed: ["A:bound_beats_shuffled", "B:heldout_beats_baseline", "D:reversal_passes", "F:action_specificity_passes"])
+
+--- Arm: Delta-rule (no bias) ---
+  held-out error: bound=0.1378 shuffled=0.3281 neither=0.3002 unconditional_baseline=0.3500
+  counterfactual (Transfer): A=0.8473 B=0.4229 direction_correct=true
+  reversal: pre-reversal(A>B)=true at_checkpoint(A>B)=false at_end(A>B)=false reversal_passes=true
+  max Forage/Rest self-transition drift: 0.0502 (threshold 0.20) no_catastrophic_drift=true
+  counterfactual magnitude: Transfer=0.4245 Forage=0.0538 Rest=0.0839 action_specificity_passes=true
+  shuffled vs neither held-out error: shuffled=0.3281 neither=0.3002 shuffled_genuinely_fails=true
+  ALL 7 GATES PASS: true (failed: [])
+
+--- Arm: Delta-rule (with bias) ---
+  held-out error: bound=0.1305 shuffled=0.3283 neither=0.3002 unconditional_baseline=0.3500
+  counterfactual (Transfer): A=0.8456 B=0.4065 direction_correct=true
+  reversal: pre-reversal(A>B)=true at_checkpoint(A>B)=false at_end(A>B)=false reversal_passes=true
+  max Forage/Rest self-transition drift: 0.0216 (threshold 0.20) no_catastrophic_drift=true
+  counterfactual magnitude: Transfer=0.4390 Forage=0.0711 Rest=0.0839 action_specificity_passes=true
+  shuffled vs neither held-out error: shuffled=0.3283 neither=0.3002 shuffled_genuinely_fails=true
+  ALL 7 GATES PASS: true (failed: [])
+
+--- Arm: Delta-rule+TD (no bias) ---
+  held-out error: bound=0.5500 shuffled=0.5500 neither=0.3002 unconditional_baseline=0.3500
+  counterfactual (Transfer): A=0.0000 B=0.0000 direction_correct=false
+  reversal: pre-reversal(A>B)=false at_checkpoint(A>B)=false at_end(A>B)=false reversal_passes=true
+  max Forage/Rest self-transition drift: 0.8864 (threshold 0.20) no_catastrophic_drift=false
+  counterfactual magnitude: Transfer=0.0000 Forage=0.0000 Rest=0.0000 action_specificity_passes=false
+  shuffled vs neither held-out error: shuffled=0.5500 neither=0.3002 shuffled_genuinely_fails=false
+  ALL 7 GATES PASS: false (failed: ["A:bound_beats_shuffled", "B:heldout_beats_baseline", "C:counterfactual_direction_correct", "E:no_catastrophic_drift", "F:action_specificity_passes", "G:shuffled_genuinely_fails"])
+
+--- Arm: Delta-rule+TD (with bias) ---
+  held-out error: bound=0.5500 shuffled=0.5500 neither=0.3002 unconditional_baseline=0.3500
+  counterfactual (Transfer): A=0.0000 B=0.0000 direction_correct=false
+  reversal: pre-reversal(A>B)=false at_checkpoint(A>B)=false at_end(A>B)=false reversal_passes=true
+  max Forage/Rest self-transition drift: 0.8897 (threshold 0.20) no_catastrophic_drift=false
+  counterfactual magnitude: Transfer=0.0000 Forage=0.0000 Rest=0.0000 action_specificity_passes=false
+  shuffled vs neither held-out error: shuffled=0.5500 neither=0.3002 shuffled_genuinely_fails=false
+  ALL 7 GATES PASS: false (failed: ["A:bound_beats_shuffled", "B:heldout_beats_baseline", "C:counterfactual_direction_correct", "E:no_catastrophic_drift", "F:action_specificity_passes", "G:shuffled_genuinely_fails"])
+
+=== Summary (plan sec 6/8) ===
+
+arm                                   A      B      C      D      E      F      G      ALL
+Hebbian-only                       true   true   true  false   true  false   true    false
+TD-only                           false  false  false   true  false  false  false    false
+Neither (no-learning control)     false  false   true  false   true  false   true    false
+Delta-rule (no bias)               true   true   true   true   true   true   true     true
+Delta-rule (with bias)             true   true   true   true   true   true   true     true
+Delta-rule+TD (no bias)           false  false  false   true  false  false  false    false
+Delta-rule+TD (with bias)         false  false  false   true  false  false  false    false
+
+VERDICT: At least one learning-rule config passes all 7 gates -- see plan sec 9 next steps (integrate into a live Organism, repeat MA-001R).

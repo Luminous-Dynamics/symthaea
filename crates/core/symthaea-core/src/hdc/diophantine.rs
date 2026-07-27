@@ -25,8 +25,10 @@ impl PellSolution {
     /// Returns the n-th positive solution (x_n, y_n) generated from the
     /// recurrence
     ///
-    ///     x_{n+1} = x₁·x_n + D·y₁·y_n
-    ///     y_{n+1} = x₁·y_n + y₁·x_n
+    /// ```text
+    /// x_{n+1} = x₁·x_n + D·y₁·y_n
+    /// y_{n+1} = x₁·y_n + y₁·x_n
+    /// ```
     ///
     /// with (x₁, y₁) the fundamental solution. `n ≥ 1`.
     pub fn nth(&self, n: usize) -> (i128, i128) {

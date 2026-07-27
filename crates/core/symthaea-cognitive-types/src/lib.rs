@@ -871,6 +871,21 @@ pub struct HarmonicMetrics {
 pub struct EthicalTelemetry {
     /// Moral judgment score for this cycle (-1.0 to 1.0). 0.0 when skipped.
     pub moral_score: f32,
+    /// Whether this cycle's moral evaluation flagged a concern: `moral_score` below
+    /// threshold, a consent violation, or any recorded violation. Text-content-driven
+    /// (sourced from the same-cycle `MoralParser` evaluation of the perceived input),
+    /// not an internal-metric proxy. Scoped to agent-action moral framing — see
+    /// `moral_violations` for the raw evidence behind this verdict.
+    #[serde(default)]
+    pub moral_concern_detected: bool,
+    /// Whether this cycle's moral evaluation detected a consent violation.
+    #[serde(default)]
+    pub consent_violation: bool,
+    /// Raw violation descriptions from this cycle's moral evaluation (empty when none).
+    /// Kept alongside the derived booleans above so consumers see the evidence, not
+    /// just the verdict.
+    #[serde(default)]
+    pub moral_violations: Vec<String>,
     /// Moral violation category that triggered specific steering (empty when none).
     pub moral_steering_category: String,
     /// Unified value evaluator overall score (0.0–1.0, 0.0 when off).

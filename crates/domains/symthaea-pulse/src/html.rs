@@ -13,7 +13,9 @@
 //! No external dependencies (except optional Google Fonts) — opens in any browser.
 
 use std::fmt::Write;
-use symthaea_psych_bench::benchmarks::butlin::{ButlinIndicatorReport, IndicatorStatus};
+use symthaea_psych_bench::benchmarks::butlin::{
+    ButlinIndicatorReport, EvidenceOutcome, SupportTier,
+};
 use symthaea_psych_bench::harness::cognitive_profile::CognitiveProfile;
 
 use symthaea_types::N_HARMONIES;
@@ -1855,30 +1857,45 @@ fn write_butlin_pane(html: &mut String, butlin: Option<&ButlinIndicatorReport>) 
         }
     };
 
-    // Summary bar
+    // Summary bar. Evidence tiers, not a present/partial/absent status --
+    // see BUTLIN_EVIDENCE_TIER_DESIGN.md in symthaea-psych-bench.
     let total = report.indicators.len();
     let _ = write!(
         html,
         r#"<div style="text-align:center;margin-bottom:14px;font-size:0.82em;color:rgba(213,208,200,0.5);font-weight:300;">
-  <span style="color:#7ec8a0;">{} present</span> · <span style="color:#e8c547;">{} partial</span> · <span style="color:#6b7d6b;">{} absent</span> of {} indicators
+  <span style="color:#7ec8a0;">{} functionally/causally supported</span> · <span style="color:#e8c547;">{} observed</span> · <span style="color:#6b7d6b;">{} architectural-only</span> · <span style="color:#c96a6a;">{} not-demonstrated/contradicted</span> · <span style="color:#8a7ca8;">{} inconclusive</span> of {} indicators
 </div>
 "#,
-        report.present_count, report.partial_count, report.absent_count, total
+        report.causally_supported_count + report.functionally_supported_count,
+        report.observed_count,
+        report.architectural_only_count,
+        report.not_demonstrated_count + report.contradicted_count,
+        report.inconclusive_count,
+        total
     );
 
     let _ = write!(html, "<div class=\"butlin-grid\">\n");
 
     for ind in &report.indicators {
-        let (dot_color, dot_glow) = match ind.status {
-            IndicatorStatus::Present => ("#7ec8a0", "0 0 6px rgba(126,200,160,0.5)"),
-            IndicatorStatus::Partial => ("#e8c547", "0 0 6px rgba(232,197,71,0.4)"),
-            IndicatorStatus::Absent => ("#6b7d6b", "none"),
+        let (dot_color, dot_glow) = match ind.outcome {
+            EvidenceOutcome::Supported(SupportTier::FunctionallySupported)
+            | EvidenceOutcome::Supported(SupportTier::CausallySupported) => {
+                ("#7ec8a0", "0 0 6px rgba(126,200,160,0.5)")
+            }
+            EvidenceOutcome::Supported(SupportTier::Observed) => {
+                ("#e8c547", "0 0 6px rgba(232,197,71,0.4)")
+            }
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly) => ("#6b7d6b", "none"),
+            EvidenceOutcome::NotDemonstrated | EvidenceOutcome::Contradicted => {
+                ("#c96a6a", "0 0 6px rgba(201,106,106,0.4)")
+            }
+            EvidenceOutcome::Inconclusive => ("#8a7ca8", "0 0 6px rgba(138,124,168,0.4)"),
         };
 
         let score_str = ind
-            .score
+            .live_score
             .map(|s| format!(" ({:.0}%)", s * 100.0))
-            .unwrap_or_default();
+            .unwrap_or_else(|| format!(" ({:.0}%*)", ind.architectural_score * 100.0));
 
         let _ = write!(
             html,

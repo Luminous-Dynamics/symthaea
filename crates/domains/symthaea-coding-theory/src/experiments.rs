@@ -7,17 +7,12 @@ use std::fmt;
 
 use crate::{
     channel::{
-        BinarySymmetricChannel, ChannelError, DeterministicRng,
-        FixedCountErasureChannel, FixedCountErrataChannel, SymbolErasureChannel,
-        Transmission,
+        BinarySymmetricChannel, ChannelError, DeterministicRng, FixedCountErasureChannel,
+        FixedCountErrataChannel, SymbolErasureChannel, Transmission,
     },
-    hamming::{
-        Hamming84Status, hamming84_decode, hamming84_encode_checked,
-    },
+    hamming::{Hamming84Status, hamming84_decode, hamming84_encode_checked},
     interoperability::ReedSolomonProfile,
-    reed_solomon::{
-        ReedSolomon, ReedSolomonConfig, ReedSolomonError,
-    },
+    reed_solomon::{ReedSolomon, ReedSolomonConfig, ReedSolomonError},
 };
 
 /// Error while configuring or running a coding experiment.
@@ -161,10 +156,7 @@ pub fn run_reed_solomon_erasure_experiment(
         let transmission = experiment.channel.transmit(&codeword, &mut rng)?;
         report.channel_erasures += transmission.corrupted_positions.len();
 
-        match codec.decode_erasures(
-            &transmission.received,
-            &transmission.corrupted_positions,
-        ) {
+        match codec.decode_erasures(&transmission.received, &transmission.corrupted_positions) {
             Ok(decoded) => {
                 if transmission.corrupted_positions.is_empty() {
                     report.clean_frames += 1;
@@ -313,10 +305,7 @@ pub fn run_reed_solomon_errata_experiment(
         report.channel_errors += transmission.error_positions.len();
         report.channel_erasures += transmission.erasure_positions.len();
 
-        match codec.decode_with_erasures(
-            &transmission.received,
-            &transmission.erasure_positions,
-        ) {
+        match codec.decode_with_erasures(&transmission.received, &transmission.erasure_positions) {
             Ok(decoded) => {
                 if decoded.message == message && decoded.corrected_codeword == codeword {
                     report.exact_recovery_frames += 1;
@@ -412,8 +401,8 @@ pub fn run_hamming84_experiment(
 
     for _ in 0..experiment.frames {
         let source = nibble_to_bits(rng.next_u8() & 0x0F);
-        let codeword = hamming84_encode_checked(source)
-            .expect("nibble_to_bits always returns binary symbols");
+        let codeword =
+            hamming84_encode_checked(source).expect("nibble_to_bits always returns binary symbols");
         let transmission = experiment.channel.transmit(&codeword, &mut rng)?;
         report.channel_bit_errors += transmission.corrupted_positions.len();
 
@@ -467,17 +456,16 @@ mod tests {
     #[test]
     fn reed_solomon_recovers_exactly_through_erasure_capacity() {
         let parity_symbols = 12;
-        let report = run_reed_solomon_erasure_experiment(
-            ReedSolomonErasureExperiment {
-                frames: 500,
-                message_symbols: 64,
-                seed: 0xE2A5_5EED,
-                config: ReedSolomonConfig::aes(parity_symbols),
-                channel: SymbolErasureModel::FixedCount(
-                    FixedCountErasureChannel::new(parity_symbols, 0),
-                ),
-            },
-        )
+        let report = run_reed_solomon_erasure_experiment(ReedSolomonErasureExperiment {
+            frames: 500,
+            message_symbols: 64,
+            seed: 0xE2A5_5EED,
+            config: ReedSolomonConfig::aes(parity_symbols),
+            channel: SymbolErasureModel::FixedCount(FixedCountErasureChannel::new(
+                parity_symbols,
+                0,
+            )),
+        })
         .unwrap();
 
         assert_eq!(report.clean_frames, 0);
@@ -493,17 +481,16 @@ mod tests {
     #[test]
     fn reed_solomon_reports_every_over_capacity_frame() {
         let parity_symbols = 8;
-        let report = run_reed_solomon_erasure_experiment(
-            ReedSolomonErasureExperiment {
-                frames: 200,
-                message_symbols: 32,
-                seed: 99,
-                config: ReedSolomonConfig::aes(parity_symbols),
-                channel: SymbolErasureModel::FixedCount(
-                    FixedCountErasureChannel::new(parity_symbols + 1, 0xFF),
-                ),
-            },
-        )
+        let report = run_reed_solomon_erasure_experiment(ReedSolomonErasureExperiment {
+            frames: 200,
+            message_symbols: 32,
+            seed: 99,
+            config: ReedSolomonConfig::aes(parity_symbols),
+            channel: SymbolErasureModel::FixedCount(FixedCountErasureChannel::new(
+                parity_symbols + 1,
+                0xFF,
+            )),
+        })
         .unwrap();
 
         assert_eq!(report.over_capacity_frames, report.frames);
@@ -519,9 +506,10 @@ mod tests {
             message_symbols: 48,
             seed: 0xC0DE_E2A5,
             config: ReedSolomonConfig::aes(10),
-            channel: SymbolErasureModel::Independent(
-                SymbolErasureChannel::new(Probability::new(1, 100).unwrap(), 0),
-            ),
+            channel: SymbolErasureModel::Independent(SymbolErasureChannel::new(
+                Probability::new(1, 100).unwrap(),
+                0,
+            )),
         };
         let first = run_reed_solomon_erasure_experiment(experiment).unwrap();
         let second = run_reed_solomon_erasure_experiment(experiment).unwrap();
@@ -534,17 +522,13 @@ mod tests {
 
     #[test]
     fn reed_solomon_experiment_rejects_impossible_fixed_count() {
-        let result = run_reed_solomon_erasure_experiment(
-            ReedSolomonErasureExperiment {
-                frames: 1,
-                message_symbols: 2,
-                seed: 1,
-                config: ReedSolomonConfig::aes(2),
-                channel: SymbolErasureModel::FixedCount(
-                    FixedCountErasureChannel::new(5, 0),
-                ),
-            },
-        );
+        let result = run_reed_solomon_erasure_experiment(ReedSolomonErasureExperiment {
+            frames: 1,
+            message_symbols: 2,
+            seed: 1,
+            config: ReedSolomonConfig::aes(2),
+            channel: SymbolErasureModel::FixedCount(FixedCountErasureChannel::new(5, 0)),
+        });
         assert_eq!(
             result,
             Err(ExperimentError::Channel(
@@ -561,15 +545,13 @@ mod tests {
         let parity_symbols = 10;
         for erasures in 0..=parity_symbols {
             for errors in 0..=(parity_symbols - erasures) / 2 {
-                let report = run_reed_solomon_errata_experiment(
-                    ReedSolomonErrataExperiment {
-                        frames: 40,
-                        message_symbols: 48,
-                        seed: 0xE22A_0000 ^ ((errors as u64) << 8) ^ erasures as u64,
-                        config: ReedSolomonConfig::aes(parity_symbols),
-                        channel: FixedCountErrataChannel::new(errors, erasures, 0),
-                    },
-                )
+                let report = run_reed_solomon_errata_experiment(ReedSolomonErrataExperiment {
+                    frames: 40,
+                    message_symbols: 48,
+                    seed: 0xE22A_0000 ^ ((errors as u64) << 8) ^ erasures as u64,
+                    config: ReedSolomonConfig::aes(parity_symbols),
+                    channel: FixedCountErrataChannel::new(errors, erasures, 0),
+                })
                 .unwrap();
 
                 assert!(report.within_guaranteed_capacity);
@@ -607,15 +589,13 @@ mod tests {
 
     #[test]
     fn mixed_errata_campaign_accounts_for_unguaranteed_outcomes() {
-        let report = run_reed_solomon_errata_experiment(
-            ReedSolomonErrataExperiment {
-                frames: 400,
-                message_symbols: 40,
-                seed: 0xBAD0_E22A,
-                config: ReedSolomonConfig::aes(6),
-                channel: FixedCountErrataChannel::new(2, 3, 0),
-            },
-        )
+        let report = run_reed_solomon_errata_experiment(ReedSolomonErrataExperiment {
+            frames: 400,
+            message_symbols: 40,
+            seed: 0xBAD0_E22A,
+            config: ReedSolomonConfig::aes(6),
+            channel: FixedCountErrataChannel::new(2, 3, 0),
+        })
         .unwrap();
 
         assert!(!report.within_guaranteed_capacity);
@@ -626,22 +606,22 @@ mod tests {
 
     #[test]
     fn mixed_errata_experiment_rejects_impossible_distinct_locations() {
-        let result = run_reed_solomon_errata_experiment(
-            ReedSolomonErrataExperiment {
-                frames: 0,
-                message_symbols: 2,
-                seed: 1,
-                config: ReedSolomonConfig::aes(2),
-                channel: FixedCountErrataChannel::new(3, 2, 0),
-            },
-        );
+        let result = run_reed_solomon_errata_experiment(ReedSolomonErrataExperiment {
+            frames: 0,
+            message_symbols: 2,
+            seed: 1,
+            config: ReedSolomonConfig::aes(2),
+            channel: FixedCountErrataChannel::new(3, 2, 0),
+        });
         assert_eq!(
             result,
-            Err(ExperimentError::Channel(ChannelError::TooManyRequestedErrata {
-                errors: 3,
-                erasures: 2,
-                symbols: 4,
-            }))
+            Err(ExperimentError::Channel(
+                ChannelError::TooManyRequestedErrata {
+                    errors: 3,
+                    erasures: 2,
+                    symbols: 4,
+                }
+            ))
         );
     }
 

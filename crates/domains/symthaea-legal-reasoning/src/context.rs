@@ -32,10 +32,9 @@ impl fmt::Display for TemporalError {
             TemporalError::InvalidDay { year, month, day } => {
                 write!(f, "invalid civil date: {year:04}-{month:02}-{day:02}")
             }
-            TemporalError::InvertedInterval { from, until } => write!(
-                f,
-                "legal interval begins after it ends: {from} > {until}"
-            ),
+            TemporalError::InvertedInterval { from, until } => {
+                write!(f, "legal interval begins after it ends: {from} > {until}")
+            }
         }
     }
 }
@@ -72,8 +71,7 @@ fn days_in_month(year: i32, month: u8) -> u8 {
 }
 
 fn is_leap_year(year: i32) -> bool {
-    year.rem_euclid(4) == 0
-        && (year.rem_euclid(100) != 0 || year.rem_euclid(400) == 0)
+    year.rem_euclid(4) == 0 && (year.rem_euclid(100) != 0 || year.rem_euclid(400) == 0)
 }
 
 /// Inclusive legal-validity interval. An omitted bound is open-ended.
@@ -260,11 +258,7 @@ pub struct TemporalRevision<T> {
 }
 
 impl<T> TemporalRevision<T> {
-    pub fn new(
-        revision: crate::model::RevisionId,
-        value: T,
-        time: TemporalDimensions,
-    ) -> Self {
+    pub fn new(revision: crate::model::RevisionId, value: T, time: TemporalDimensions) -> Self {
         Self {
             revision,
             value,
@@ -287,7 +281,10 @@ impl fmt::Display for TemporalOverlap {
             .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join(", ");
-        write!(f, "multiple temporal revisions govern the query: {revisions}")
+        write!(
+            f,
+            "multiple temporal revisions govern the query: {revisions}"
+        )
     }
 }
 
@@ -333,16 +330,10 @@ mod legal_time_tests {
 
     #[test]
     fn legal_time_separates_effect_and_applicability() {
-        let effective = TemporalScope::new(
-            Some(LegalDate::new(2026, 7, 1).unwrap()),
-            None,
-        )
-        .unwrap();
-        let applicability = TemporalScope::new(
-            Some(LegalDate::new(2026, 1, 1).unwrap()),
-            None,
-        )
-        .unwrap();
+        let effective =
+            TemporalScope::new(Some(LegalDate::new(2026, 7, 1).unwrap()), None).unwrap();
+        let applicability =
+            TemporalScope::new(Some(LegalDate::new(2026, 1, 1).unwrap()), None).unwrap();
         let time = TemporalDimensions::new(effective).with_applicability(applicability);
 
         assert!(time.is_potentially_retroactive());
@@ -366,15 +357,10 @@ mod legal_time_tests {
                 "old",
                 time.clone(),
             ),
-            TemporalRevision::new(
-                crate::model::RevisionId::new("v2").unwrap(),
-                "new",
-                time,
-            ),
+            TemporalRevision::new(crate::model::RevisionId::new("v2").unwrap(), "new", time),
         ];
 
         let overlap = unique_governing_revision(&revisions, date, date).unwrap_err();
         assert_eq!(overlap.revisions.len(), 2);
     }
-
 }

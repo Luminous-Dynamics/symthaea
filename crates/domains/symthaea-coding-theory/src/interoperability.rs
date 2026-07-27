@@ -11,9 +11,7 @@
 
 use std::fmt;
 
-use crate::reed_solomon::{
-    AES_FIELD_POLYNOMIAL, AES_PRIMITIVE_ELEMENT, ReedSolomonConfig,
-};
+use crate::reed_solomon::{AES_FIELD_POLYNOMIAL, AES_PRIMITIVE_ELEMENT, ReedSolomonConfig};
 
 /// Polynomial coefficient serialization order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -99,10 +97,7 @@ impl ReedSolomonProfile {
     pub fn identifier(self) -> String {
         format!(
             "rs-gf256-p{:03x}-g{:02x}-fcr{:02x}-msb-systematic-nsym{}",
-            self.primitive_polynomial,
-            self.primitive_element,
-            self.first_root,
-            self.parity_symbols,
+            self.primitive_polynomial, self.primitive_element, self.first_root, self.parity_symbols,
         )
     }
 }
@@ -123,34 +118,26 @@ pub struct ReedSolomonGoldenVector {
     pub codeword: &'static [u8],
 }
 
-const PROFILE_FCR0_NSYM4: ReedSolomonProfile = ReedSolomonProfile::aes(
-    ReedSolomonConfig {
-        parity_symbols: 4,
-        primitive_element: AES_PRIMITIVE_ELEMENT,
-        first_root: 0,
-    },
-);
-const PROFILE_FCR0_NSYM8: ReedSolomonProfile = ReedSolomonProfile::aes(
-    ReedSolomonConfig {
-        parity_symbols: 8,
-        primitive_element: AES_PRIMITIVE_ELEMENT,
-        first_root: 0,
-    },
-);
-const PROFILE_FCR1_NSYM8: ReedSolomonProfile = ReedSolomonProfile::aes(
-    ReedSolomonConfig {
-        parity_symbols: 8,
-        primitive_element: AES_PRIMITIVE_ELEMENT,
-        first_root: 1,
-    },
-);
-const PROFILE_FCR17_NSYM12: ReedSolomonProfile = ReedSolomonProfile::aes(
-    ReedSolomonConfig {
-        parity_symbols: 12,
-        primitive_element: AES_PRIMITIVE_ELEMENT,
-        first_root: 17,
-    },
-);
+const PROFILE_FCR0_NSYM4: ReedSolomonProfile = ReedSolomonProfile::aes(ReedSolomonConfig {
+    parity_symbols: 4,
+    primitive_element: AES_PRIMITIVE_ELEMENT,
+    first_root: 0,
+});
+const PROFILE_FCR0_NSYM8: ReedSolomonProfile = ReedSolomonProfile::aes(ReedSolomonConfig {
+    parity_symbols: 8,
+    primitive_element: AES_PRIMITIVE_ELEMENT,
+    first_root: 0,
+});
+const PROFILE_FCR1_NSYM8: ReedSolomonProfile = ReedSolomonProfile::aes(ReedSolomonConfig {
+    parity_symbols: 8,
+    primitive_element: AES_PRIMITIVE_ELEMENT,
+    first_root: 1,
+});
+const PROFILE_FCR17_NSYM12: ReedSolomonProfile = ReedSolomonProfile::aes(ReedSolomonConfig {
+    parity_symbols: 12,
+    primitive_element: AES_PRIMITIVE_ELEMENT,
+    first_root: 17,
+});
 
 /// Independent fixed vectors covering two parity widths and three root offsets.
 pub const REED_SOLOMON_GOLDEN_VECTORS: &[ReedSolomonGoldenVector] = &[
@@ -167,8 +154,8 @@ pub const REED_SOLOMON_GOLDEN_VECTORS: &[ReedSolomonGoldenVector] = &[
         message: b"123456789",
         generator: &[0x01, 0x80, 0x0D, 0x45, 0x24, 0x91, 0xC7, 0xA5, 0x1E],
         codeword: &[
-            0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x23, 0x53,
-            0x53, 0x14, 0x9E, 0x61, 0x20, 0xD9,
+            0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x23, 0x53, 0x53, 0x14, 0x9E,
+            0x61, 0x20, 0xD9,
         ],
     },
     ReedSolomonGoldenVector {
@@ -177,8 +164,8 @@ pub const REED_SOLOMON_GOLDEN_VECTORS: &[ReedSolomonGoldenVector] = &[
         message: &[0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09],
         generator: &[0x01, 0x9B, 0x39, 0xDE, 0x52, 0xC6, 0x0F, 0x99, 0x37],
         codeword: &[
-            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x89,
-            0x55, 0x84, 0x36, 0x6C, 0xB2, 0xE2, 0x9D,
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x89, 0x55, 0x84, 0x36,
+            0x6C, 0xB2, 0xE2, 0x9D,
         ],
     },
     ReedSolomonGoldenVector {
@@ -186,12 +173,11 @@ pub const REED_SOLOMON_GOLDEN_VECTORS: &[ReedSolomonGoldenVector] = &[
         profile: PROFILE_FCR17_NSYM12,
         message: &[0xA5, 0x5A, 0x00, 0xFF, 0x11, 0x22, 0x33],
         generator: &[
-            0x01, 0xEC, 0x28, 0xC9, 0x43, 0xE1, 0x91, 0xB2, 0xF7, 0x22, 0x05,
-            0x98, 0x35,
+            0x01, 0xEC, 0x28, 0xC9, 0x43, 0xE1, 0x91, 0xB2, 0xF7, 0x22, 0x05, 0x98, 0x35,
         ],
         codeword: &[
-            0xA5, 0x5A, 0x00, 0xFF, 0x11, 0x22, 0x33, 0x5C, 0x24, 0xA6, 0xBE,
-            0x32, 0xD9, 0x37, 0x89, 0xEF, 0x9A, 0x21, 0x54,
+            0xA5, 0x5A, 0x00, 0xFF, 0x11, 0x22, 0x33, 0x5C, 0x24, 0xA6, 0xBE, 0x32, 0xD9, 0x37,
+            0x89, 0xEF, 0x9A, 0x21, 0x54,
         ],
     },
 ];
@@ -214,14 +200,23 @@ mod tests {
         for vector in REED_SOLOMON_GOLDEN_VECTORS {
             let codec = ReedSolomon::new(vector.profile.config()).unwrap();
             assert_eq!(codec.generator(), vector.generator, "{}", vector.name);
-            assert_eq!(codec.encode(vector.message).unwrap(), vector.codeword, "{}", vector.name);
+            assert_eq!(
+                codec.encode(vector.message).unwrap(),
+                vector.codeword,
+                "{}",
+                vector.name
+            );
             assert!(codec.is_valid(vector.codeword).unwrap(), "{}", vector.name);
 
             let mut corrupted = vector.codeword.to_vec();
             corrupted[vector.codeword.len() / 2] ^= 0xA5;
             let decoded = codec.decode(&corrupted).unwrap();
             assert_eq!(decoded.message, vector.message, "{}", vector.name);
-            assert_eq!(decoded.corrected_codeword, vector.codeword, "{}", vector.name);
+            assert_eq!(
+                decoded.corrected_codeword, vector.codeword,
+                "{}",
+                vector.name
+            );
         }
     }
 }

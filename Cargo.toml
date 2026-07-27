@@ -15,6 +15,11 @@ members = [
 # members despite being listed below, because of this). `default-members`
 # below may still reference "." — only the `members` array triggers the bug.
 exclude = [
+    # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
+    # cleanly into workspace-wide manifest resolution alongside its native
+    # `nixward` path dependency. Keep it out of the workspace and build it
+    # standalone (`cargo build -p nixward-web` from its own directory).
+    "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
@@ -38,7 +43,7 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 
 [workspace.metadata.symthaea.tiers]
-core = ["symthaea", "symthaea-core", "symthaea-nix"]
+core = ["symthaea", "symthaea-core", "nixward"]
 gpu = ["symthaea-broca", "symthaea-stt"]
 wasm = ["symthaea-spore", "symthaea-web"]
 robotics = ["symthaea-multirotor", "symthaea-helicopter", "symthaea-humanoid", "symthaea-auv"]
@@ -56,12 +61,11 @@ engineering = [
 ]
 
 [workspace.dependencies]
-mycelix-zkp-core = { path = "stubs/mycelix-zkp-core" }
-symtropy-robotics-bridge-core = { path = "stubs/symtropy-robotics-bridge-core" }
 log = "0.4"
 url = "2.5"
 bs58 = { version = "0.5", default-features = false, features = ["alloc"] }
 getrandom = "0.2"
+mycelix-zkp-core = { path = "stubs/mycelix-zkp-core", features = ["dilithium"] }
 
 # Mycelix Shared Deps (Bundled Standalone)
 sha2 = { version = "0.10", features = ["oid"] }
@@ -126,6 +130,7 @@ num-complex = "0.4"
 libc = "0.2"
 csv = "1.3"
 axum = { version = "0.8", features = ["ws"] }
+symtropy-robotics-bridge-core = { path = "stubs/symtropy-robotics-bridge-core" }
 symthaea-fep = { path = "crates/core/symthaea-fep" }
 symthaea-core = { path = "crates/core/symthaea-core" }
 symthaea-communication = { path = "crates/core/symthaea-communication" }
@@ -134,6 +139,26 @@ symthaea-memetics = { path = "crates/domains/symthaea-memetics" }
 symthaea-earth-system = { path = "crates/domains/symthaea-earth-system" }
 symthaea-thermofluids = { path = "crates/domains/symthaea-thermofluids" }
 symthaea-organic-chemistry = { path = "crates/domains/symthaea-organic-chemistry" }
+# Symthaea Futures Laboratory workspace-inherited deps (fixes a workspace-wide
+# manifest parse failure, 2026-07-25: symthaea-futures-analysis/-calibration/
+# -ensemble/-symtropy all declare these via `{ workspace = true }`, but only
+# symthaea-fep/symthaea-alife's OWN entries existed here — futures-core and
+# futures-state were never added, breaking `cargo` for the whole workspace
+# regardless of -p scoping, since workspace member enumeration happens before
+# package-specific resolution. Extended 2026-07-26 to cover the remaining 5
+# futures-* crates for the same reason (symthaea-futures-ensemble started
+# depending on -symtropy and, as a dev-dependency, -calibration via
+# `{ workspace = true }`, neither of which existed here yet — same failure
+# mode, same fix). Additive only — not touching the in-progress Futures
+# Laboratory feature itself, see SYMTHAEA_FUTURES_LABORATORY_PLAN_2026-07-25.md).
+symthaea-futures-core = { path = "crates/domains/symthaea-futures-core" }
+symthaea-futures-state = { path = "crates/domains/symthaea-futures-state" }
+symthaea-futures-ensemble = { path = "crates/domains/symthaea-futures-ensemble" }
+symthaea-futures-calibration = { path = "crates/domains/symthaea-futures-calibration" }
+symthaea-futures-ledger = { path = "crates/domains/symthaea-futures-ledger" }
+symthaea-futures-symtropy = { path = "crates/domains/symthaea-futures-symtropy" }
+symthaea-futures-analysis = { path = "crates/domains/symthaea-futures-analysis" }
+symthaea-alife = { path = "crates/domains/symthaea-alife" }
 
 [package]
 name = "symthaea"
@@ -194,6 +219,16 @@ symthaea-grid-physics = { path = "crates/domains/symthaea-grid-physics" }
 symthaea-pragmatics = { path = "crates/domains/symthaea-pragmatics" }
 symthaea-information-theory = { path = "crates/domains/symthaea-information-theory" }
 symthaea-alife = { path = "crates/domains/symthaea-alife" }
+
+# Symthaea Futures Laboratory — calibrated, auditable forecasting of possible futures,
+# scored against ground truth. See SYMTHAEA_FUTURES_LABORATORY_PLAN_2026-07-25.md.
+symthaea-futures-core = { path = "crates/domains/symthaea-futures-core" }
+symthaea-futures-state = { path = "crates/domains/symthaea-futures-state" }
+symthaea-futures-ensemble = { path = "crates/domains/symthaea-futures-ensemble" }
+symthaea-futures-calibration = { path = "crates/domains/symthaea-futures-calibration" }
+symthaea-futures-ledger = { path = "crates/domains/symthaea-futures-ledger" }
+symthaea-futures-symtropy = { path = "crates/domains/symthaea-futures-symtropy" }
+symthaea-futures-analysis = { path = "crates/domains/symthaea-futures-analysis" }
 symthaea-memetics = { path = "crates/domains/symthaea-memetics", optional = true }
 
 # Symthaea Causal Reasoning - Pearl's do-calculus, counterfactual reasoning, causal emergence
@@ -352,7 +387,7 @@ symthaea-clinical = { path = "crates/domains/symthaea-clinical", optional = true
 symthaea-therapeutic = { path = "crates/domains/symthaea-therapeutic", optional = true }
 
 # Symthaea Nix - Conscious NixOS mind (HDC + active inference)
-symthaea-nix = { path = "crates/core/symthaea-nix", optional = true }
+nixward = { path = "crates/core/nixward", optional = true }
 
 # Genesis Pipeline - DNA-to-Human species stewardship
 symthaea-genomics = { path = "crates/domains/symthaea-genomics", optional = true }
@@ -428,6 +463,8 @@ mycelix-sdk = { path = "stubs/mycelix-sdk", optional = true, default-features = 
 sha3 = { version = "0.10", optional = true }  # For gradient hashing
 
 # Prism epistemic search (local, offline, 16,384-bit BinaryHV)
+# [standalone-stripped] prism-common = { path = "../mycelix-workspace/mycelix-prism/prism-common", optional = true }
+# [standalone-stripped] prism-search = { path = "../mycelix-workspace/mycelix-prism/prism-search", optional = true }
 
 # Web Research & Epistemic Verification (Track 6)
 reqwest = { version = "0.13", features = ["json", "multipart", "rustls", "blocking"], default-features = false }
@@ -687,8 +724,8 @@ survival = ["mesh"]                            # Infrastructure monitoring + dem
 
 # ── Desktop & System Integration ────────────────────────────────────
 notifications = ["zbus"]                    # D-Bus desktop notifications
-nix-mind = ["symthaea-nix"]                 # Conscious NixOS mind with HDC world model + active inference
-# Note: nix-cli/nix-tui/nix-daemon removed — use `cargo build -p symthaea-nix --features cli/tui/daemon` directly
+nixward = ["dep:nixward"]                 # Nixward: causal NixOS diagnosis with HDC world model + active inference
+# Note: nix-cli/nix-tui/nix-daemon removed — use `cargo build -p nixward --features cli/tui/daemon` directly
 identity = ["ed25519-dalek", "dep:sha2"]        # Ed25519 signatures, capability gating
 physics = ["dep:symthaea-physics"]           # Tokamak plasma encoding, C-Mod adapter
 multirotor = ["dep:symthaea-multirotor"]   # HDC-LTC multirotor control via FEP Active Inference
@@ -846,7 +883,7 @@ proliferation-safeguards = ["nuclear-forensics"]
 # Group related features that users commonly enable together.
 # REMOVED: consciousness_full (0 cfg gates; pure bundle — enable reasoning_engine + identity directly)
 # REMOVED: candle_stack (was alias for neural-bridge) — use neural-bridge directly
-# REMOVED: nix_full (was alias for nix-mind) — use nix-mind directly
+# REMOVED: nix_full (was alias for nixward) — use nixward directly
 all_benchmarks = ["benchmarks", "physics"]              # All benchmarking features (causal validation + tokamak plasma)
 
 # ── Tested profiles — CI-validated feature combinations ──────────
@@ -2279,7 +2316,52 @@ name = "probe_cl_calibration"
 [[example]]
 name = "earn_or_demote"
 
+# MoralParser category discrimination probe (acceptance gate for the ethical_text_alarm
+# telemetry channel — see SYMTHAEA_COGNITION_IMPROVEMENT_PLAN follow-up, PR1)
+[[example]]
+name = "probe_moral_parser_categories"
+
 # Predictive Compression C1 bits-saved A/B
 # (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md)
 [[example]]
 name = "compression_bits"
+
+# Predictive Compression C3 -- episodic recall -> prediction
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md section 7)
+[[example]]
+name = "episodic_recall_probe"
+
+# Predictive Compression C3b -- similarity-gradient probe
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C3b)
+[[example]]
+name = "episodic_recall_gradient_probe"
+
+# Predictive Compression C3c -- recall provenance diagnostic
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C3c)
+[[example]]
+name = "episodic_recall_provenance_probe"
+
+# Predictive Compression C3d -- frequency-equalization test
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C3d)
+[[example]]
+name = "episodic_recall_frequency_probe"
+
+# Predictive Compression C3e -- content-difficulty test
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C3e)
+[[example]]
+name = "episodic_recall_difficulty_probe"
+
+# Predictive Compression -- within-tier homogeneity diagnostic
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Diagnostic)
+[[example]]
+name = "episodic_recall_homogeneity_probe"
+
+# Predictive Compression C3f -- homogeneity x difficulty factorial
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C3f)
+[[example]]
+name = "episodic_recall_factorial_probe"
+
+# Predictive Compression C2 -- compression-gated Chronicle
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C2)
+[[example]]
+name = "compression_gated_chronicle_probe"

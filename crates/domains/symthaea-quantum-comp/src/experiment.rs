@@ -21,6 +21,15 @@ pub enum ExperimentProtocol {
     NegativeControl,
     /// Noise sweep over one or more binding probes.
     NoiseSweep,
+    /// Cross-representation comparison at a matched, calibrated bit-error-rate.
+    ///
+    /// Unlike `PhaseBindingSimulation`/`ClassicalXorBinding` run independently,
+    /// this protocol measures both representations at a shared noise unit
+    /// (bit-error-rate under each representation's own hard-decision rule) so
+    /// their recovery accuracy is directly comparable. See
+    /// `calibrated_comparison` module docs and
+    /// `docs/RESEARCH_NOTES.md` ("First independent run and a real finding").
+    CalibratedCrossRepresentationComparison,
 }
 
 /// Explicit boundary for what a result is allowed to claim.

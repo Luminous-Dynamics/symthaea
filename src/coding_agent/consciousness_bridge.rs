@@ -11,6 +11,10 @@ use crate::consciousness::reasoning_engine::CodeReasoningContext;
 #[derive(Debug, Clone, Default)]
 pub struct ReasoningFeedback {
     pub gate_blocked: bool,
+    /// Whether a tool gate actually ran this cycle (see
+    /// `CycleMetadata.reasoning_gate_evaluated`). `gate_blocked` alone cannot
+    /// distinguish "gate ran and passed" from "no gate ran" — this can.
+    pub gate_evaluated: bool,
     pub reasoning_confidence: f32,
     pub plan_action: Option<usize>,
     pub plan_confidence: f32,
@@ -21,6 +25,7 @@ impl ReasoningFeedback {
     pub fn from_cycle_result(result: &CycleResult) -> Self {
         Self {
             gate_blocked: result.metadata.reasoning_gate_blocked,
+            gate_evaluated: result.metadata.reasoning_gate_evaluated,
             reasoning_confidence: result.metadata.reasoning_confidence,
             plan_action: result.metadata.reasoning_plan_action,
             plan_confidence: result.metadata.reasoning_plan_confidence,
@@ -32,6 +37,35 @@ impl ReasoningFeedback {
     }
     pub fn should_diagnose(&self) -> bool {
         !self.gate_blocked && self.reasoning_confidence >= 0.15 && self.reasoning_confidence < 0.35
+    }
+}
+
+/// Captured at the cognitive-loop cycle where a code-generation action was
+/// actually decided (Generating/Fixing phase), consumed exactly once when that
+/// attempt's outcome resolves (Testing phase). Needed because
+/// `record_generation_outcome`'s resolution happens cycles later, after
+/// intervening Testing-phase cycles would otherwise overwrite the gate/PE state
+/// that belongs to the original decision — see
+/// `feedback_plan_review_rigor_standards.md` item 5.
+#[derive(Debug, Clone, Copy)]
+pub struct PendingReasoningOutcome {
+    /// Whether a tool gate actually ran at decision time. If `false`, no posthoc
+    /// should be recorded at all — "no gate ran" must never be reported as
+    /// "gate passed" (item 4 of the same checklist).
+    pub gate_evaluated: bool,
+    pub gate_passed: bool,
+    pub reasoning_confidence: f32,
+    pub prediction_error_at_decision: f64,
+}
+
+impl PendingReasoningOutcome {
+    pub fn capture(reasoning: &ReasoningFeedback, prediction_error: f64) -> Self {
+        Self {
+            gate_evaluated: reasoning.gate_evaluated,
+            gate_passed: !reasoning.gate_blocked,
+            reasoning_confidence: reasoning.reasoning_confidence,
+            prediction_error_at_decision: prediction_error,
+        }
     }
 }
 

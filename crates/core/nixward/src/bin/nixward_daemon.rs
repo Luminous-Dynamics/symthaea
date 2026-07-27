@@ -1,0 +1,3253 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! nixward-daemon: background daemon for continuous NixOS awareness.
+//!
+//! Periodically observes the system state, encodes it into the HDC world model,
+//! and updates the causal graph with any state transitions. High-surprise events
+//! (large prediction errors) are stored in episodic memory for future reference.
+//!
+//! The daemon writes a `DaemonSnapshot` to disk on every cycle for TUI consumption.
+//!
+//! Designed to run as a systemd service via the NixOS module.
+
+use std::collections::HashMap;
+use std::thread;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+use nixward::NixParser;
+use nixward::encoding::{NixCodebook, ServiceState, SystemStateEncoder, SystemStateSnapshot};
+use nixward::ipc::{
+    AlertEntry, AlertSeverity, AnomalyEntry, CausalEdgeEntry, ConcernEntry, DaemonConfig,
+    DaemonSnapshot, default_snapshot_path,
+};
+use nixward::mind::active_inference::NixActiveInference;
+use nixward::mind::causal_graph::{NixCausalGraph, NixOSCausalPatterns};
+use nixward::mind::episodic_memory::{EpisodeOutcome, NixEpisodicMemory, SystemEpisode};
+use nixward::mind::ollama_bridge::{OllamaBridge, OllamaBridgeConfig};
+use nixward::mind::working_memory::{MemorySource, WorkingMemory};
+use nixward::mind::{ActionCategory, JournalAnomalyDetector, NixWorldModel};
+use nixward::observe::SystemObserver;
+use nixward::observe::journal::JournalObserver;
+use nixward::plugin::domain_plugin::NixOsPlugin;
+use nixward::support::health_check::{HealthAssessor, HealthStatus};
+use nixward::support::knowledge::{DynamicKnowledgeArticle, KnowledgeBase, KnowledgeCategory};
+use nixward::support::poml::{PomlContext, PomlProcessor, PomlValue};
+use nixward::support::predictive::{
+    AlertThresholds, PredictiveMonitor, SavedPredictiveState, SystemTelemetry,
+};
+use nixward::traits::DomainPlugin;
+use symthaea_core::hdc::ContinuousHV;
+
+#[cfg(feature = "observability")]
+use nixward::observability::{Metrics, PhaseTimer, init_tracing};
+
+/// Mutable daemon state collected across cycles.
+struct DaemonState {
+    codebook: NixCodebook,
+    world_model: NixWorldModel,
+    causal_graph: NixCausalGraph,
+    episodic_memory: NixEpisodicMemory,
+    working_memory: WorkingMemory,
+    anomaly_detector: JournalAnomalyDetector,
+    health_assessor: HealthAssessor,
+    predictive_monitor: PredictiveMonitor,
+    prev_snapshot: Option<SystemStateSnapshot>,
+    prev_state_hv: Option<ContinuousHV>,
+    observation_count: u64,
+    anomaly_count: u64,
+    recent_anomalies: Vec<AnomalyEntry>,
+    knowledge_base: Option<KnowledgeBase>,
+    ollama: Option<OllamaBridge>,
+    last_health_status: Option<HealthStatus>,
+    last_health_issue_count: usize,
+    /// Per-unit Ollama query cooldown: unit → last query time.
+    ollama_cooldowns: HashMap<String, Instant>,
+    /// Last observed memory usage percentage.
+    last_memory_pct: Option<f64>,
+    /// Persistent alert state: metric+horizon key → (first_seen, consecutive_cycles, prev_predicted).
+    alert_state: HashMap<String, AlertTracking>,
+    /// Last watchdog verdict (read from disk, written by `nixward watch`).
+    watchdog_status: Option<String>,
+    /// Cached last-known hardware probe results (fallback when probe fails).
+    last_hw_probe: Option<nixward::observe::hardware::HardwareInfo>,
+    /// Whether the daemon is in degraded mode (using cached data).
+    degraded: bool,
+    /// Active inference engine for formulating maintenance goals.
+    active_inference: NixActiveInference,
+    /// NixOS domain plugin for enriching anomaly diagnostics.
+    nix_plugin: NixOsPlugin,
+    /// Count of maintenance plans generated (dry-run).
+    maintenance_plan_count: u32,
+    /// Cumulative count of persistence write errors (working_memory, predictions, knowledge, causal graph).
+    persist_error_count: u64,
+    /// Last recommended executive action for tracking feedback: (target_name, action_category, state_before_hv, initial_value)
+    last_recommended_action: Option<(String, ActionCategory, ContinuousHV, f64)>,
+    /// Cooldowns for recently failed actions: (target_name, action_category) -> remaining_cycles
+    failed_action_cooldowns: HashMap<(String, ActionCategory), u32>,
+    /// Rolling EMA of recent anomaly scores — drives the adaptive surprise threshold (allostasis).
+    /// Range [0, 1]: near 1 = turbulent system, near 0 = calm. Initialised to 0.5 (neutral).
+    anomaly_volatility_ema: f64,
+    /// Number of consecutive cycles the system has been calm.
+    calm_cycles: u64,
+    /// Whether the daemon has entered deep sleep/hibernation mode.
+    hibernating: bool,
+    /// Metacognitive journal of actions taken and their outcomes.
+    metacognitive_journal: Vec<nixward::ipc::MetacognitiveEntry>,
+    /// Whether autonomic countermeasures (active healing) are enabled.
+    active_healing: bool,
+    /// The currently pending system command waiting for watchdog approval.
+    pending_action: Option<String>,
+    /// The currently pending conversational response from Ollama.
+    pending_response: Option<String>,
+    /// Custom user goal set via natural language input: (goal_description, target_name, expected_value)
+    custom_user_goal: Option<(String, String, f64)>,
+    /// Rolling EMA of recently-observed "stable" system states (no detected
+    /// transitions since the prior snapshot) — the `goal_state` that
+    /// `world_model.compute_free_energy()` is measured against. `None`
+    /// until the first stable cycle is observed. Added because
+    /// `world_model.free_energy()` previously never left its constructor
+    /// default of 1.0: `compute_free_energy()` (the only method that
+    /// updates it) was never called anywhere in the live daemon loop — see
+    /// SYMTHAEA_NIXOS_MANAGEMENT_IMPROVEMENT_PLAN_2026-07-26.md Phase 3
+    /// follow-up. This is a deliberate, disclosed definition of "healthy
+    /// baseline" (an EMA over calm states), not a claim that it's the only
+    /// valid one.
+    stable_baseline_hv: Option<ContinuousHV>,
+}
+
+/// Tracks alert continuity across IPC cycles.
+struct AlertTracking {
+    first_seen: u64,
+    consecutive_cycles: u32,
+    prev_predicted_value: f64,
+}
+
+impl DaemonState {
+    fn new(config: &DaemonConfig) -> Self {
+        let mut codebook = NixCodebook::new();
+        let mut causal_graph = NixCausalGraph::new(42);
+        for (cause, effect, _) in NixOSCausalPatterns::known_patterns() {
+            causal_graph.add_structural_edge(cause, effect, 0.5);
+        }
+
+        let knowledge_base = if config.enable_knowledge_learning {
+            Some(KnowledgeBase::new(&mut codebook))
+        } else {
+            None
+        };
+
+        let ollama = {
+            let ollama_config = OllamaBridgeConfig {
+                endpoint: config.ollama_endpoint.clone(),
+                model: config.ollama_model.clone(),
+                timeout: Duration::from_secs(config.ollama_timeout),
+                ..OllamaBridgeConfig::default()
+            };
+            Some(OllamaBridge::new(ollama_config))
+        };
+
+        Self {
+            codebook,
+            world_model: NixWorldModel::default_dim(),
+            causal_graph,
+            episodic_memory: NixEpisodicMemory::new(),
+            working_memory: WorkingMemory::new(),
+            anomaly_detector: JournalAnomalyDetector::new()
+                .with_dim(symthaea_core::hdc::HDC_DIMENSION),
+            health_assessor: HealthAssessor::default(),
+            predictive_monitor: PredictiveMonitor::with_defaults(),
+            prev_snapshot: None,
+            prev_state_hv: None,
+            observation_count: 0,
+            anomaly_count: 0,
+            recent_anomalies: Vec::new(),
+            knowledge_base,
+            ollama,
+            last_health_status: None,
+            last_health_issue_count: 0,
+            ollama_cooldowns: HashMap::new(),
+            last_memory_pct: None,
+            alert_state: HashMap::new(),
+            watchdog_status: None,
+            last_hw_probe: None,
+            degraded: false,
+            active_inference: NixActiveInference::new(),
+            nix_plugin: NixOsPlugin,
+            maintenance_plan_count: 0,
+            persist_error_count: 0,
+            last_recommended_action: None,
+            failed_action_cooldowns: HashMap::new(),
+            anomaly_volatility_ema: 0.5,
+            calm_cycles: 0,
+            hibernating: false,
+            metacognitive_journal: Vec::new(),
+            active_healing: config.active_healing,
+            pending_action: None,
+            pending_response: None,
+            custom_user_goal: None,
+            stable_baseline_hv: None,
+        }
+    }
+
+    /// Learn from a resolved anomaly by creating a dynamic knowledge article.
+    ///
+    /// If Ollama is available, also queries for resolution verification (BL)
+    /// to determine if the fix is permanent or temporary.
+    fn learn_from_resolution(&mut self, symptom: &str, resolution: &str, commands: Vec<String>) {
+        let kb = match self.knowledge_base.as_mut() {
+            Some(kb) => kb,
+            None => return,
+        };
+
+        // Query Ollama for resolution analysis if available (BL)
+        let enriched_solution = if let Some(ollama) = self.ollama.as_mut() {
+            let prompt = build_resolution_prompt(symptom, resolution, &commands);
+            if let Some(response) = ollama.query(&prompt) {
+                eprintln!(
+                    "nixward-daemon: resolution verified via Ollama ({}ms)",
+                    response.duration_ms
+                );
+                format!("{}\n\nAnalysis: {}", resolution, response.text)
+            } else {
+                resolution.to_string()
+            }
+        } else {
+            resolution.to_string()
+        };
+
+        let id = format!("learned_{}", now_secs());
+        let article = DynamicKnowledgeArticle {
+            id,
+            title: format!("Resolved: {}", symptom),
+            category: KnowledgeCategory::ServiceIssue,
+            symptoms: vec![symptom.to_string()],
+            solution: enriched_solution,
+            commands,
+            learned_at: now_secs() as i64,
+            hit_count: 0,
+        };
+        kb.add_learned_article(article, &mut self.codebook);
+    }
+
+    /// Decide *what* NixOS hardening option a failed service needs, using
+    /// tree-sitter AST parsing to check whether it's already set (Proposal 2).
+    ///
+    /// Returns `(display_line, option_path, value)` -- the caller is
+    /// responsible for turning `(option_path, value)` into an actual
+    /// `ConfigPatch` via `ConfigWriter::set_option()` at apply-time, so the
+    /// patch is always built from the freshest on-disk content rather than
+    /// the snapshot read here. This function used to also splice the new
+    /// content itself (a hand-rolled `rfind('}')` insert), duplicating
+    /// exactly what `ConfigWriter::set_option()` already does -- the two
+    /// copies could only ever drift apart, never usefully differ, since
+    /// they implemented the same "insert before the last closing brace"
+    /// logic. Kept here: the AST-based already-configured check, which is
+    /// more accurate than `set_option()`'s own naive substring search and
+    /// has no equivalent inside `ConfigWriter` itself.
+    fn generate_nixos_hardening_patch(&mut self, unit: &str) -> Option<(String, String, String)> {
+        let path = std::path::Path::new("/etc/nixos/configuration.nix");
+        let content = if path.exists() {
+            std::fs::read_to_string(path).ok()?
+        } else {
+            // Fallback for development/testing sandbox
+            "{}\n".to_string()
+        };
+
+        let mut parser = NixParser::new();
+        let config = parser.parse(&content).ok()?;
+
+        // Clean target unit name
+        let unit_clean = unit.replace(".service", "");
+
+        // Based on unit name, recommend a hardening configuration parameter
+        let (path_str, value_str) = match unit_clean.as_str() {
+            "clickhouse-server" | "clickhouse" => (
+                "services.clickhouse.extraConfig".to_string(),
+                "<max_server_memory_usage>80%</max_server_memory_usage>".to_string(),
+            ),
+            "postgresql" | "postgres" => (
+                "services.postgresql.settings.shared_buffers".to_string(),
+                "\"512MB\"".to_string(),
+            ),
+            _ => (
+                format!("systemd.services.{}.serviceConfig.RestartSec", unit_clean),
+                "5".to_string(),
+            ),
+        };
+
+        // AST verification: check if this option is already set in options
+        let already_configured = config.options.iter().any(|opt| opt.path == path_str);
+        if already_configured {
+            return None;
+        }
+
+        let hardened_line = format!("{} = {}", path_str, value_str);
+        Some((hardened_line, path_str, value_str))
+    }
+
+    /// Sync causal graphs and learned resolutions with other local daemons (Proposal 4)
+    fn sync_with_cluster(&mut self) {
+        let state_dir = default_snapshot_path().parent().unwrap().to_path_buf();
+        let parent_dir = state_dir.parent().unwrap(); // e.g. ~/.config/agy/data1
+
+        if let Some(grandparent) = parent_dir.parent() {
+            if let Ok(entries) = std::fs::read_dir(grandparent) {
+                for entry in entries.filter_map(Result::ok) {
+                    let path = entry.path();
+                    if path.is_dir() && path != parent_dir {
+                        let other_nm = path.join("nixward");
+                        if other_nm.exists() {
+                            // 1. Sync Causal Graph
+                            let other_causal = other_nm.join("causal_graph.json");
+                            if other_causal.exists() {
+                                let mut other_graph = NixCausalGraph::new(42);
+                                if other_graph.load(&other_causal).is_ok() {
+                                    let before = self.causal_graph.edge_count();
+                                    self.causal_graph.merge(&other_graph);
+                                    let added = self.causal_graph.edge_count() - before;
+                                    if added > 0 {
+                                        eprintln!(
+                                            "nixward-daemon: Clustered Sync: merged {} causal edges from {:?}",
+                                            added, other_causal
+                                        );
+                                    }
+                                }
+                            }
+
+                            // 2. Sync Learned Knowledge
+                            let other_kb = other_nm.join("knowledge_learned.json");
+                            if other_kb.exists() {
+                                if let Ok(json) = std::fs::read_to_string(&other_kb) {
+                                    if let Some(kb) = self.knowledge_base.as_mut() {
+                                        let before = kb.dynamic_len();
+                                        kb.load_dynamic(&json, &mut self.codebook);
+                                        let added = kb.dynamic_len() - before;
+                                        if added > 0 {
+                                            eprintln!(
+                                                "nixward-daemon: Clustered Sync: merged {} learned knowledge articles from {:?}",
+                                                added, other_kb
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Process a system snapshot: encode, detect transitions, learn.
+    fn process_snapshot(&mut self, snapshot: SystemStateSnapshot, config: &DaemonConfig) {
+        let state_hv = {
+            let mut encoder = SystemStateEncoder::new(&mut self.codebook);
+            encoder.encode_snapshot(&snapshot)
+        };
+
+        self.world_model.observe(state_hv.clone());
+        self.observation_count += 1;
+
+        // Detect transitions up front (rather than inside the borrow below)
+        // so we know whether this is a "stable" cycle before computing free
+        // energy. A stable cycle (no detected transitions vs. the prior
+        // snapshot) is a candidate sample for the rolling "healthy
+        // baseline" — the goal_state world_model.compute_free_energy()
+        // measures distance against. Without this, free_energy never left
+        // its constructor default of 1.0 (compute_free_energy was never
+        // called in the live loop) — see
+        // SYMTHAEA_NIXOS_MANAGEMENT_IMPROVEMENT_PLAN_2026-07-26.md Phase 3
+        // follow-up.
+        let transitions_precomputed = self
+            .prev_snapshot
+            .as_ref()
+            .map(|prev_snap| detect_transitions(prev_snap, &snapshot));
+        let is_stable_cycle = transitions_precomputed
+            .as_ref()
+            .is_some_and(|t| t.is_empty());
+
+        const BASELINE_EMA_ALPHA: f32 = 0.1;
+        if is_stable_cycle {
+            match &mut self.stable_baseline_hv {
+                Some(baseline) => {
+                    baseline.lerp_in_place(&state_hv, 1.0 - BASELINE_EMA_ALPHA, BASELINE_EMA_ALPHA);
+                }
+                None => self.stable_baseline_hv = Some(state_hv.clone()),
+            }
+        }
+        if let Some(ref baseline) = self.stable_baseline_hv {
+            self.world_model.compute_free_energy(baseline);
+        }
+        // else: no stable baseline established yet (still cold-starting) —
+        // free_energy honestly stays at its 1.0 default rather than
+        // comparing against a fabricated goal_state.
+
+        let free_energy = self.world_model.free_energy();
+
+        // Detect state transitions vs previous snapshot
+        let mut wm_pushes = 0usize;
+        let mut recoveries: Vec<(String, String, String)> = Vec::new();
+        if let (Some(prev_snap), Some(prev_hv)) = (&self.prev_snapshot, &self.prev_state_hv) {
+            let transitions =
+                transitions_precomputed.unwrap_or_else(|| detect_transitions(prev_snap, &snapshot));
+            if !transitions.is_empty() {
+                // Causal learning: observe which changes co-occurred
+                let all_keys: Vec<&str> = transitions.iter().map(|t| t.key.as_str()).collect();
+                let occurred_keys: Vec<&str> = transitions
+                    .iter()
+                    .filter(|t| t.occurred)
+                    .map(|t| t.key.as_str())
+                    .collect();
+                self.causal_graph
+                    .observe_outcome(&transitions[0].key, &occurred_keys, &all_keys);
+
+                // Add transitions to working memory and collect recoveries
+                for transition in &transitions {
+                    let label = format!(
+                        "{}: {} → {}",
+                        transition.key, transition.from, transition.to
+                    );
+                    self.working_memory.push(
+                        state_hv.clone(),
+                        MemorySource::SystemObservation,
+                        label,
+                    );
+                    wm_pushes += 1;
+
+                    if transition.is_recovery {
+                        recoveries.push((
+                            transition.key.clone(),
+                            transition.from.clone(),
+                            transition.to.clone(),
+                        ));
+                    }
+                }
+            }
+
+            // Episodic storage for high-surprise events
+            if free_energy > config.surprise_threshold {
+                let episode = SystemEpisode {
+                    state_before: prev_hv.clone(),
+                    action: "system_transition".to_string(),
+                    state_after: state_hv.clone(),
+                    outcome: EpisodeOutcome::Success,
+                    phi_at_encoding: free_energy,
+                    prediction_error: free_energy,
+                    emotional_valence: 0.0,
+                    timestamp: now_secs() as i64,
+                };
+                self.episodic_memory.record(episode);
+            }
+        }
+
+        // Graduate evicted items and learn from recoveries after borrows end
+        if wm_pushes > 0 {
+            self.graduate_evicted(free_energy);
+        }
+        for (key, from, to) in recoveries {
+            self.learn_from_resolution(
+                &format!("{} service failure", key),
+                &format!(
+                    "Service {} recovered automatically ({} → {})",
+                    key, from, to
+                ),
+                vec![format!("systemctl status {}", key)],
+            );
+        }
+
+        // Run health assessment — cache successful probes, fall back to cached on failure
+        let hw = match nixward::observe::hardware::HardwareObserver::probe() {
+            Ok(info) => {
+                self.last_hw_probe = Some(info.clone());
+                self.degraded = false;
+                Some(info)
+            }
+            Err(_) => {
+                if self.last_hw_probe.is_some() {
+                    self.degraded = true;
+                }
+                self.last_hw_probe.clone()
+            }
+        };
+        let (overall, checks) = self.health_assessor.assess_all(&snapshot, hw.as_ref());
+        self.last_health_status = Some(overall);
+        self.last_health_issue_count = checks
+            .iter()
+            .filter(|c| c.status != HealthStatus::Healthy)
+            .count();
+        if overall == HealthStatus::Critical {
+            eprintln!(
+                "nixward-daemon: CRITICAL health detected, cycle {}",
+                self.observation_count
+            );
+        }
+
+        // Feed predictive monitor
+        let telemetry = Self::build_telemetry(hw.as_ref(), &snapshot);
+        let telemetry_clone = telemetry.clone();
+        let mem_pct = telemetry.memory_used_pct;
+        self.predictive_monitor.ingest(telemetry);
+        self.last_memory_pct = if mem_pct > 0.0 { Some(mem_pct) } else { None };
+
+        // Telemetry feedback loop: learn from the last recommended action
+        if let Some((target, action, state_before, initial_val)) =
+            self.last_recommended_action.take()
+        {
+            let success = if target.starts_with("explore:") {
+                // Epistemic exploration is always considered a success for world model learning
+                true
+            } else if target == "disk_used_pct" {
+                telemetry_clone.disk_used_pct < initial_val
+            } else if target == "memory_used_pct" {
+                telemetry_clone.memory_used_pct < initial_val
+            } else if target == "failed_unit_count" {
+                (telemetry_clone.failed_unit_count as f64) < initial_val
+            } else {
+                !self.recent_anomalies.iter().any(|a| a.unit == target)
+            };
+
+            let outcome = if success {
+                EpisodeOutcome::Success
+            } else {
+                self.failed_action_cooldowns
+                    .insert((target.clone(), action.clone()), 5);
+                EpisodeOutcome::Failure(format!("Target '{}' did not improve", target))
+            };
+
+            // Update outcome in the metacognitive journal
+            if let Some(entry) = self
+                .metacognitive_journal
+                .iter_mut()
+                .rfind(|e| e.outcome == "Pending")
+            {
+                entry.outcome = if target.starts_with("explore:") {
+                    "Exploration completed: transition mapped.".to_string()
+                } else if success {
+                    "Success".to_string()
+                } else {
+                    format!("Failure (Target '{}' did not improve)", target)
+                };
+            }
+
+            // Causal learning: associate the corrective action with the target metric improvement or failure
+            let action_node = format!("action:{:?}", action);
+            if success {
+                // Strengthen edge between action and target variable
+                self.causal_graph
+                    .observe_outcome(&action_node, &[&target], &[]);
+            } else {
+                // Weaken/decay edge between action and target variable
+                self.causal_graph
+                    .observe_outcome(&action_node, &[], &[&target]);
+            }
+
+            self.active_inference.learn_from_outcome(
+                &state_before,
+                action,
+                &state_hv,
+                outcome,
+                free_energy,
+            );
+        }
+
+        // Tick down failed action cooldowns
+        self.failed_action_cooldowns.retain(|_, ticks| {
+            if *ticks > 1 {
+                *ticks -= 1;
+                true
+            } else {
+                false
+            }
+        });
+
+        // Update allostatic volatility EMA from recent anomaly scores.
+        // EMA alpha = 0.2 gives ~5-cycle memory. We average current anomaly
+        // scores and blend toward that value each snapshot.
+        const VOLATILITY_ALPHA: f64 = 0.2;
+        let current_volatility = if self.recent_anomalies.is_empty() {
+            0.0
+        } else {
+            self.recent_anomalies.iter().map(|a| a.score).sum::<f64>()
+                / self.recent_anomalies.len() as f64
+        };
+        self.anomaly_volatility_ema = VOLATILITY_ALPHA * current_volatility
+            + (1.0 - VOLATILITY_ALPHA) * self.anomaly_volatility_ema;
+
+        // Surprise-modulated causal learning rate adaptation (precision-weighted):
+        // Highly turbulent state -> speed up learning (up to 0.3) to quickly map new failure dependencies
+        // Stable, calm state -> slow down learning (down to 0.05) to avoid spurious correlation noise
+        let dynamic_learning_rate = (0.05 + 0.25 * self.anomaly_volatility_ema).clamp(0.05, 0.3);
+        self.causal_graph.set_learning_rate(dynamic_learning_rate);
+
+        // Feed the state to the active inference engine
+        self.active_inference.observe_state(state_hv.clone());
+
+        // Deep sleep / hibernation entry and exit:
+        // Calm criteria: low volatility (EMA < 0.1) AND no recent predictive alerts.
+        let is_currently_calm = self.anomaly_volatility_ema < 0.1 && self.alert_state.is_empty();
+        if is_currently_calm {
+            self.calm_cycles += 1;
+            if self.calm_cycles >= 15 {
+                if !self.hibernating {
+                    eprintln!("nixward-daemon: entering cognitive deep sleep/hibernation mode");
+                    self.hibernating = true;
+                }
+            }
+        } else {
+            self.calm_cycles = 0;
+            if self.hibernating {
+                eprintln!("nixward-daemon: system activity detected; waking up from hibernation");
+                self.hibernating = false;
+            }
+        }
+
+        // Causal graph self-optimization:
+        // Apply global decay to prune weak Hebbian connections every 50 cycles
+        if self.observation_count % 50 == 0 {
+            self.causal_graph.decay_all(0.98);
+        }
+
+        self.prev_snapshot = Some(snapshot);
+        self.prev_state_hv = Some(state_hv);
+    }
+
+    /// Graduate evicted working memory items to episodic memory.
+    fn graduate_evicted(&mut self, current_phi: f64) {
+        const MIN_STEPS_FOR_GRADUATION: u64 = 3;
+        if let Some(evicted) = self.working_memory.take_evicted() {
+            if evicted.steps_survived >= MIN_STEPS_FOR_GRADUATION {
+                let episode = SystemEpisode {
+                    state_before: evicted.content.clone(),
+                    action: format!("graduated_wm:{}", evicted.label),
+                    state_after: evicted.content,
+                    outcome: EpisodeOutcome::Success,
+                    phi_at_encoding: current_phi,
+                    prediction_error: 1.0 - evicted.activation,
+                    emotional_valence: 0.0,
+                    timestamp: now_secs() as i64,
+                };
+                self.episodic_memory.record(episode);
+            }
+        }
+    }
+
+    /// Process journal entries for anomaly detection.
+    fn process_journal(&mut self, batch_size: usize) {
+        let entries = match JournalObserver::recent_entries(batch_size) {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+
+        let bridge = nixward::mind::neural_bridge::NeuralBridge::new();
+        let anomalies = self
+            .anomaly_detector
+            .process_entries_hybrid_offline(&entries, &bridge)
+            .unwrap_or_else(|_| self.anomaly_detector.process_entries(&entries));
+        for anomaly in &anomalies {
+            self.anomaly_count += 1;
+
+            let concern_hv = self
+                .anomaly_detector
+                .encode_entry_hybrid_offline(&anomaly.entry, &bridge)
+                .unwrap_or_else(|_| self.anomaly_detector.encode_entry(&anomaly.entry));
+
+            // Retrieve similar past episodes before moving concern_hv
+            let similar_context = if anomaly.anomaly_score > 0.7 {
+                self.recall_similar_episodes(&concern_hv)
+            } else {
+                vec![]
+            };
+
+            self.working_memory.push(
+                concern_hv,
+                MemorySource::SystemObservation,
+                format!("anomaly: {}", anomaly.reason),
+            );
+            self.graduate_evicted(anomaly.anomaly_score as f64);
+
+            // High-score anomalies: ask Ollama for diagnosis and learn from it
+            if anomaly.anomaly_score > 0.7 {
+                self.query_ollama_for_anomaly(
+                    &anomaly.entry.unit,
+                    &anomaly.reason,
+                    &anomaly.entry.message,
+                    &similar_context,
+                );
+            }
+
+            // Query root causes from the causal graph
+            let causal_analysis = self.causal_graph.analyze_root_causes(&anomaly.entry.unit);
+            let causal_suggestion = if !causal_analysis.root_causes.is_empty() {
+                let causes: Vec<String> = causal_analysis
+                    .root_causes
+                    .iter()
+                    .take(3)
+                    .map(|rc| format!("{} ({:.1}%)", rc.variable, rc.confidence * 100.0))
+                    .collect();
+                Some(format!("Causal analysis suspects: {}", causes.join(", ")))
+            } else {
+                None
+            };
+
+            // Enrich anomaly with NixOS domain diagnosis (AS/AW)
+            let diag = self.nix_plugin.diagnose_error(&anomaly.entry.message);
+
+            let suggestion = match (
+                diag.as_ref().and_then(|d| d.suggestion.clone()),
+                causal_suggestion,
+            ) {
+                (Some(s), Some(cs)) => Some(format!("{}. {}", s, cs)),
+                (Some(s), None) => Some(s),
+                (None, Some(cs)) => Some(cs),
+                (None, None) => None,
+            };
+
+            self.recent_anomalies.push(AnomalyEntry {
+                score: anomaly.anomaly_score as f64,
+                reason: anomaly.reason.clone(),
+                unit: anomaly.entry.unit.clone(),
+                error_type: diag.as_ref().map(|d| d.error_type.clone()),
+                suggestion,
+            });
+        }
+
+        if self.recent_anomalies.len() > 20 {
+            let excess = self.recent_anomalies.len() - 20;
+            self.recent_anomalies.drain(..excess);
+        }
+    }
+
+    /// Retrieve similar past episodes as context strings.
+    fn recall_similar_episodes(&self, query_hv: &ContinuousHV) -> Vec<String> {
+        self.episodic_memory
+            .retrieve_similar(query_hv, 3)
+            .into_iter()
+            .map(|ep| format!("{} (PE={:.2})", ep.action, ep.prediction_error))
+            .collect()
+    }
+
+    /// Query Ollama for anomaly diagnosis and learn from the response.
+    ///
+    /// Rate-limited: at most one query per unit every 5 minutes.
+    fn query_ollama_for_anomaly(
+        &mut self,
+        unit: &str,
+        reason: &str,
+        message: &str,
+        past_context: &[String],
+    ) {
+        const COOLDOWN: Duration = Duration::from_secs(300); // 5 minutes
+
+        if let Some(last) = self.ollama_cooldowns.get(unit) {
+            if last.elapsed() < COOLDOWN {
+                return;
+            }
+        }
+
+        let ollama = match self.ollama.as_mut() {
+            Some(o) => o,
+            None => return,
+        };
+
+        let mut prompt = build_anomaly_prompt(unit, reason, message);
+        if !past_context.is_empty() {
+            prompt.push_str("\n\nSimilar past events:\n");
+            for ctx in past_context {
+                prompt.push_str(&format!("- {}\n", ctx));
+            }
+        }
+
+        if let Some(response) = ollama.query(&prompt) {
+            self.learn_from_resolution(
+                &format!("{}: {}", unit, reason),
+                &response.text,
+                vec![format!("journalctl -u {} --since '5 min ago'", unit)],
+            );
+            self.ollama_cooldowns
+                .insert(unit.to_string(), Instant::now());
+            eprintln!(
+                "nixward-daemon: Ollama diagnosed anomaly in {} ({}ms, model: {})",
+                unit, response.duration_ms, response.model_used
+            );
+        }
+    }
+
+    /// Read the latest watchdog verdict from disk (written by `nixward watch`).
+    fn refresh_watchdog_status(&mut self, state_dir: &std::path::Path) {
+        let wd_path = state_dir.with_file_name("watchdog_verdict.txt");
+        self.watchdog_status = std::fs::read_to_string(&wd_path)
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+    }
+
+    /// Build predictive alerts with deduplication and trend tracking.
+    fn build_alerts(&mut self, now: u64) -> Vec<AlertEntry> {
+        let mut active_keys = std::collections::HashSet::new();
+        let alerts: Vec<AlertEntry> = self
+            .predictive_monitor
+            .predict_all_horizons()
+            .into_iter()
+            .filter(|p| p.crosses_threshold || p.predicted_value >= p.threshold * 0.9)
+            .map(|p| {
+                let key = format!("{}@{}h", p.metric, p.hours_ahead);
+                active_keys.insert(key.clone());
+
+                let tracking = self.alert_state.entry(key).or_insert(AlertTracking {
+                    first_seen: now,
+                    consecutive_cycles: 0,
+                    prev_predicted_value: p.predicted_value,
+                });
+                tracking.consecutive_cycles += 1;
+                let prev = tracking.prev_predicted_value;
+                tracking.prev_predicted_value = p.predicted_value;
+
+                // Cross-reference recent anomalies to populate journal context (BD)
+                let journal_context: Vec<String> = self
+                    .recent_anomalies
+                    .iter()
+                    .filter(|a| anomaly_matches_metric(a, &p.metric))
+                    .take(3)
+                    .map(|a| {
+                        if let Some(ref et) = a.error_type {
+                            format!("[{}] {}", et, a.reason)
+                        } else {
+                            a.reason.clone()
+                        }
+                    })
+                    .collect();
+
+                AlertEntry {
+                    metric: p.metric.to_string(),
+                    current_value: p.current_value,
+                    predicted_value: p.predicted_value,
+                    hours_ahead: p.hours_ahead,
+                    threshold: p.threshold,
+                    confidence: p.confidence as f64,
+                    recommended_action: p.recommended_action,
+                    severity: if p.crosses_threshold {
+                        AlertSeverity::Critical
+                    } else {
+                        AlertSeverity::Warning
+                    },
+                    first_seen: tracking.first_seen,
+                    last_seen: now,
+                    consecutive_cycles: tracking.consecutive_cycles,
+                    prev_predicted_value: if tracking.consecutive_cycles > 1 {
+                        Some(prev)
+                    } else {
+                        None
+                    },
+                    journal_context,
+                }
+            })
+            .collect();
+
+        // Prune alert state for alerts that are no longer active
+        self.alert_state.retain(|k, _| active_keys.contains(k));
+
+        // Hard cap to prevent unbounded growth if predictions accumulate
+        const MAX_ALERT_ENTRIES: usize = 500;
+        if self.alert_state.len() > MAX_ALERT_ENTRIES {
+            // Keep entries with highest consecutive_cycles (most established)
+            let mut entries: Vec<_> = self.alert_state.drain().collect();
+            entries.sort_by(|a, b| b.1.consecutive_cycles.cmp(&a.1.consecutive_cycles));
+            entries.truncate(MAX_ALERT_ENTRIES);
+            self.alert_state = entries.into_iter().collect();
+        }
+
+        alerts
+    }
+
+    /// Formulate maintenance goals for persistent high-confidence alerts and anomalies,
+    /// prioritizing them to select the single most urgent plan to recommend.
+    ///
+    /// Returns `(active_threshold, last_plan_efe)` for TUI observability.
+    fn run_active_inference_plans(&mut self, alerts: &[AlertEntry]) -> (f64, Option<f64>) {
+        let now = now_secs();
+        let mut candidates = Vec::new();
+
+        // 1. Collect candidates from persistent alerts and proactive predictions (Proposal 3)
+        for alert in alerts {
+            let is_persistent = alert.consecutive_cycles >= 3 && alert.confidence > 0.6;
+
+            // Proactive auto-tuning: predicted crossing within 6 hours with high confidence
+            let is_proactive_crossing = alert.predicted_value > alert.threshold
+                && alert.hours_ahead <= 6.0
+                && alert.confidence > 0.6;
+
+            if is_persistent || is_proactive_crossing {
+                let prefix = if is_proactive_crossing && !is_persistent {
+                    "[Proactive Auto-Tune] "
+                } else {
+                    ""
+                };
+                let goal_description = format!(
+                    "{}Maintain {} below {} (currently {} predicted {})",
+                    prefix,
+                    alert.metric,
+                    alert.threshold,
+                    alert.current_value,
+                    alert.predicted_value
+                );
+                let severity_weight = match alert.severity {
+                    AlertSeverity::Critical => 3.0,
+                    AlertSeverity::Warning => 1.0,
+                    AlertSeverity::Info => 0.5,
+                };
+                // Proactive plans have slightly lower urgency weight than persistent active alerts
+                let priority_multiplier = if is_proactive_crossing && !is_persistent {
+                    0.7
+                } else {
+                    1.0
+                };
+                let priority = severity_weight
+                    * (alert.consecutive_cycles.max(1) as f64)
+                    * alert.confidence
+                    * priority_multiplier;
+                candidates.push((
+                    goal_description,
+                    priority,
+                    alert.metric.clone(),
+                    alert.current_value,
+                ));
+            }
+        }
+
+        // 2. Collect candidates from recent high-score journal anomalies.
+        // Use an adaptive allostatic threshold rather than a hard-coded 0.7:
+        //   - BASE_THRESHOLD = 0.7 (the historical fixed value)
+        //   - When the system is calm (low ema) the threshold rises → fewer false alarms
+        //   - When the system is turbulent (high ema) the threshold drops → higher vigilance
+        const BASE_ANOMALY_THRESHOLD: f64 = 0.7;
+        const ALLOSTASIS_K: f64 = 0.2;
+        let dynamic_threshold = (BASE_ANOMALY_THRESHOLD
+            + ALLOSTASIS_K * (1.0 - self.anomaly_volatility_ema))
+            .clamp(0.4, 0.9);
+        for anomaly in &self.recent_anomalies {
+            if anomaly.score > dynamic_threshold {
+                let goal_description = format!(
+                    "Resolve service failure in '{}' (reason: {})",
+                    anomaly.unit, anomaly.reason
+                );
+                // Weight anomaly priority by its score
+                let priority = 2.5 * anomaly.score;
+                candidates.push((goal_description, priority, anomaly.unit.clone(), 1.0));
+            }
+        }
+
+        // 2.5 Collect candidates from custom user natural language goal (Proposal 4)
+        if let Some((goal_desc, target, val)) = &self.custom_user_goal {
+            let priority = 10.0; // Max priority for user-directed goals
+            candidates.push((
+                format!("[User Goal] {goal_desc}"),
+                priority,
+                target.clone(),
+                *val,
+            ));
+        }
+
+        // 3. Proactive epistemic exploration (curiosity drive):
+        // If there are no alerts or anomalies, and we are in calm state,
+        // periodically explore unexplored actions to build the world model.
+        if candidates.is_empty() && self.anomaly_volatility_ema < 0.15 {
+            if self.observation_count > 0 && self.observation_count % 100 == 0 {
+                if let Some(unexplored) = self.active_inference.next_unexplored_action() {
+                    let goal_description =
+                        format!("Explore consequences of action {:?}", unexplored);
+                    candidates.push((
+                        goal_description,
+                        0.2, // low priority
+                        format!("explore:{:?}", unexplored),
+                        0.0,
+                    ));
+                }
+            }
+        }
+
+        // 3. Evaluate and prioritize candidate plans
+        if !candidates.is_empty() {
+            // Sort by priority descending (most urgent first)
+            candidates.sort_by(|a, b| b.1.total_cmp(&a.1));
+
+            // Select and plan for the top candidate
+            if let Some((best_goal, priority, target_name, initial_val)) = candidates.first() {
+                // Query root causes from the causal graph for this target
+                let causal_analysis = self.causal_graph.analyze_root_causes(target_name);
+                let root_causes: Vec<String> = causal_analysis
+                    .root_causes
+                    .iter()
+                    .map(|rc| rc.variable.clone())
+                    .collect();
+
+                let plan = self
+                    .active_inference
+                    .process_input_with_causal_bias(best_goal, &root_causes);
+
+                // Find the first action that is not on cooldown for this target
+                let non_cooldown_action = plan.actions.iter().find(|sa| {
+                    !self
+                        .failed_action_cooldowns
+                        .contains_key(&(target_name.clone(), sa.action.clone()))
+                });
+
+                if let Some(best_action) = non_cooldown_action.or_else(|| plan.actions.first()) {
+                    if self.active_healing {
+                        use nixward::action::executor::{NixOSCommand, NixOSExecutor, SafetyLevel};
+                        let target_name_clone = target_name.clone();
+
+                        // Try to generate a NixOS configuration AST hardening patch (Proposal 2)
+                        let patch_tweak = self.generate_nixos_hardening_patch(&target_name_clone);
+
+                        let (cmd, cmd_str, _is_patch) = if let Some((tweak, _, _)) = &patch_tweak {
+                            let command_str =
+                                format!("PATCH /etc/nixos/configuration.nix: {}", tweak);
+                            (
+                                NixOSCommand::Custom {
+                                    command: "nixos-rebuild".into(),
+                                    args: vec!["switch".into()],
+                                    safety_level: SafetyLevel::SystemModify,
+                                },
+                                command_str,
+                                true,
+                            )
+                        } else {
+                            let default_cmd = match &best_action.action {
+                                ActionCategory::GarbageCollect => NixOSCommand::CollectGarbage {
+                                    older_than_days: None,
+                                    delete_all: false,
+                                },
+                                ActionCategory::Rebuild => NixOSCommand::RebuildSwitch {
+                                    flake: None,
+                                    extra_args: vec![],
+                                },
+                                ActionCategory::Rollback => NixOSCommand::EnvRollback,
+                                ActionCategory::Enable => NixOSCommand::Custom {
+                                    command: "systemctl".into(),
+                                    args: vec!["enable".into(), target_name_clone.clone()],
+                                    safety_level: SafetyLevel::SystemModify,
+                                },
+                                ActionCategory::Disable => NixOSCommand::Custom {
+                                    command: "systemctl".into(),
+                                    args: vec!["disable".into(), target_name_clone.clone()],
+                                    safety_level: SafetyLevel::SystemModify,
+                                },
+                                _ => NixOSCommand::Custom {
+                                    command: "systemctl".into(),
+                                    args: vec!["restart".into(), target_name_clone.clone()],
+                                    safety_level: SafetyLevel::SystemModify,
+                                },
+                            };
+                            let (bin, args) = default_cmd.to_command();
+                            let command_str = format!("{} {}", bin, args.join(" "));
+                            (default_cmd, command_str, false)
+                        };
+
+                        let safety = cmd.safety_level();
+                        let is_modifying = safety != SafetyLevel::ReadOnly;
+
+                        if is_modifying {
+                            let is_approved = self
+                                .watchdog_status
+                                .as_ref()
+                                .map(|s| {
+                                    s.eq_ignore_ascii_case("approved")
+                                        || s.eq_ignore_ascii_case("a")
+                                        || s.eq_ignore_ascii_case("yes")
+                                })
+                                .unwrap_or(false);
+
+                            if !is_approved {
+                                self.pending_action = Some(cmd_str.clone());
+                                eprintln!(
+                                    "nixward-daemon: Gating action [safety={:?}]. Waiting for watchdog approval: {}",
+                                    safety, cmd_str
+                                );
+                                return (dynamic_threshold, Some(best_action.expected_free_energy));
+                            } else {
+                                // TOCTOU guard: the operator approved a *specific*
+                                // command (the one stored in `pending_action` when we
+                                // requested approval). The plan can change between
+                                // cycles, so if the command we would run now differs
+                                // from what was approved, re-gate instead of executing
+                                // an unapproved action.
+                                if self.pending_action.as_deref() != Some(cmd_str.as_str()) {
+                                    eprintln!(
+                                        "nixward-daemon: Plan changed since approval; re-gating (approved {:?}, now {}).",
+                                        self.pending_action, cmd_str
+                                    );
+                                    self.pending_action = Some(cmd_str.clone());
+                                    self.watchdog_status = None;
+                                    return (
+                                        dynamic_threshold,
+                                        Some(best_action.expected_free_energy),
+                                    );
+                                }
+
+                                eprintln!("nixward-daemon: Watchdog APPROVED action: {}", cmd_str);
+
+                                // If it was an AST configuration patch, apply the configuration change before switching!
+                                if let Some((_, option_path, value)) = &patch_tweak {
+                                    // Route through ConfigWriter -- both its write
+                                    // mechanics (apply_patch: atomicity via temp+
+                                    // rename, a git backup so restore_last_backup()
+                                    // can undo it, syntax validation before anything
+                                    // touches disk) AND its patch-construction logic
+                                    // (set_option: read the freshest on-disk content
+                                    // and splice in the option, rather than the
+                                    // daemon hand-rolling an equivalent-but-separate
+                                    // rfind('}') insert that could only ever drift
+                                    // out of sync with ConfigWriter's own copy of the
+                                    // same logic). See
+                                    // SYMTHAEA_NIXOS_MANAGEMENT_IMPROVEMENT_PLAN_2026-07-26.md
+                                    // Phase 2.
+                                    use nixward::action::config_writer::ConfigWriter;
+                                    let path = std::path::Path::new("/etc/nixos/configuration.nix");
+                                    if path.exists() {
+                                        let writer = ConfigWriter::new();
+                                        let apply_result = writer
+                                            .set_option(option_path, value)
+                                            .and_then(|patch| {
+                                                let modified = patch.modified.clone();
+                                                writer.apply_patch(&patch)?;
+                                                Ok(modified)
+                                            });
+                                        // Do NOT proceed to `nixos-rebuild switch` if the
+                                        // config write failed — a partial/unwritten/invalid
+                                        // config would rebuild the wrong system.
+                                        match apply_result {
+                                            Ok(modified) => {
+                                                let local_harden = default_snapshot_path()
+                                                    .with_file_name("symthaea_hardening.nix");
+                                                if let Err(e) =
+                                                    std::fs::write(&local_harden, &modified)
+                                                {
+                                                    eprintln!(
+                                                        "nixward-daemon: warning: failed to write local hardening snapshot ({e})."
+                                                    );
+                                                }
+                                            }
+                                            Err(e) => {
+                                                eprintln!(
+                                                    "nixward-daemon: FAILED to apply /etc/nixos/configuration.nix patch ({e}); aborting rebuild."
+                                                );
+                                                self.watchdog_status = None;
+                                                self.pending_action = None;
+                                                return (
+                                                    dynamic_threshold,
+                                                    Some(best_action.expected_free_energy),
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Clear verdict file
+                                let wd_path =
+                                    default_snapshot_path().with_file_name("watchdog_verdict.txt");
+                                let _ = std::fs::remove_file(wd_path);
+                                self.watchdog_status = None;
+                                self.pending_action = None;
+                            }
+                        } else {
+                            self.pending_action = None;
+                        }
+
+                        eprintln!(
+                            "nixward-daemon: Executing Coordinated Executive Plan [priority={:.2}]: {} → {:?}",
+                            priority, best_goal, best_action.action
+                        );
+
+                        // Spawn in a background thread to execute asynchronously without blocking daemon tick loop
+                        std::thread::spawn(move || {
+                            let rt = tokio::runtime::Builder::new_current_thread()
+                                .enable_all()
+                                .build()
+                                .expect("Failed to build executor runtime");
+                            rt.block_on(async {
+                                let mut executor = NixOSExecutor::new();
+                                // By the time we reach this point, `cmd` has already
+                                // cleared the real safety gate above (lines ~997-1074):
+                                // ReadOnly commands skip approval entirely (safe by
+                                // design), and every modifying command required an
+                                // explicit human "Approved" verdict via the TUI
+                                // watchdog (`is_approved`, one-shot-consumed). Calling
+                                // `execute()` with a hardcoded `phi` here would just be
+                                // re-litigating an already-satisfied gate with a fake
+                                // number — `execute_confirmed` says what actually
+                                // happened: this command was already confirmed.
+                                let result = executor.execute_confirmed(cmd, 1.0).await;
+                                eprintln!("nixward-daemon: Active healing execution finished. Result: {:?}", result);
+                            });
+                        });
+                    } else {
+                        eprintln!(
+                            "nixward-daemon: Coordinated Executive Plan (dry-run) [priority={:.2}]: {} → {:?} (EFE={:.3})",
+                            priority,
+                            best_goal,
+                            best_action.action,
+                            best_action.expected_free_energy
+                        );
+                    }
+                    self.maintenance_plan_count += 1;
+
+                    // Clear custom user goal if this action target matches it
+                    if let Some((_, target, _)) = &self.custom_user_goal {
+                        if target == target_name {
+                            self.custom_user_goal = None;
+                        }
+                    }
+
+                    // Set last_recommended_action for telemetry feedback loop in the next cycle
+                    let state_before = self.active_inference.world_model().system_state().clone();
+                    self.last_recommended_action = Some((
+                        target_name.clone(),
+                        best_action.action.clone(),
+                        state_before,
+                        *initial_val,
+                    ));
+
+                    // Query Ollama for rationales (Proposal 3: LLM-Enriched Metacognitive Explanations)
+                    let mut rationale = best_action.rationale.clone();
+                    if let Some(ollama) = self.ollama.as_mut() {
+                        let prompt = format!(
+                            "As a NixOS cognitive reliability agent, explain concisely (1 sentence) why you recommended the action '{:?}' to address the system goal '{}', considering the suspected root causes: {}.\nKeep it technical, precise, and direct. Format as a statement.",
+                            best_action.action,
+                            best_goal,
+                            root_causes.join(", ")
+                        );
+                        if let Some(resp) = ollama.query(&prompt) {
+                            let text = resp.text.trim().to_string();
+                            if !text.is_empty() {
+                                rationale = text;
+                            }
+                        }
+                    }
+
+                    // Add entry to metacognitive journal (cap at 20 entries)
+                    let entry = nixward::ipc::MetacognitiveEntry {
+                        timestamp: now,
+                        symptom: best_goal.clone(),
+                        root_causes: root_causes.clone(),
+                        action: format!("{:?}", best_action.action),
+                        expected_free_energy: best_action.expected_free_energy,
+                        rationale,
+                        outcome: "Pending".to_string(),
+                        allostatic_threshold: dynamic_threshold,
+                        volatility_ema: self.anomaly_volatility_ema,
+                    };
+                    self.metacognitive_journal.push(entry);
+                    if self.metacognitive_journal.len() > 20 {
+                        self.metacognitive_journal.remove(0);
+                    }
+
+                    return (dynamic_threshold, Some(best_action.expected_free_energy));
+                }
+            }
+        }
+
+        (dynamic_threshold, None)
+    }
+
+    /// Build telemetry from hardware info and system snapshot.
+    fn build_telemetry(
+        hw: Option<&nixward::observe::hardware::HardwareInfo>,
+        snapshot: &SystemStateSnapshot,
+    ) -> SystemTelemetry {
+        SystemTelemetry {
+            disk_used_pct: hw.map_or(0.0, |h| {
+                h.disks.first().map_or(0.0, |d| {
+                    if d.total_bytes > 0 {
+                        d.used_bytes as f64 / d.total_bytes as f64 * 100.0
+                    } else {
+                        0.0
+                    }
+                })
+            }),
+            memory_used_pct: hw.map_or(0.0, |h| {
+                if h.memory_total_mb > 0 {
+                    let used = h.memory_total_mb.saturating_sub(h.memory_available_mb);
+                    used as f64 / h.memory_total_mb as f64 * 100.0
+                } else {
+                    0.0
+                }
+            }),
+            store_path_count: snapshot.store_path_count.unwrap_or(0) as u64,
+            failed_unit_count: snapshot
+                .services
+                .iter()
+                .filter(|(_, s)| *s == ServiceState::Failed)
+                .count() as u32,
+            load_average_1m: hw.map_or(0.0, |h| h.load_average[0]),
+            swap_used_pct: hw.map_or(0.0, |h| {
+                if h.swap_total_mb > 0 {
+                    h.swap_used_mb as f64 / h.swap_total_mb as f64 * 100.0
+                } else {
+                    0.0
+                }
+            }),
+        }
+    }
+
+    /// Build a DaemonSnapshot for IPC.
+    fn to_ipc_snapshot(&mut self) -> DaemonSnapshot {
+        let hierarchy = self.world_model.prediction_hierarchy();
+        let hierarchy_errors = hierarchy.errors();
+
+        let concerns: Vec<ConcernEntry> = self
+            .working_memory
+            .items()
+            .iter()
+            .map(|item| ConcernEntry {
+                label: item.label.clone(),
+                activation: item.activation,
+                source: format!("{:?}", item.source),
+            })
+            .collect();
+
+        let now = now_secs();
+        let alerts = self.build_alerts(now);
+
+        // Record predictions for accuracy tracking (AP)
+        let predictions_for_tracking = self.predictive_monitor.predict_all_horizons();
+        self.predictive_monitor
+            .record_predictions(&predictions_for_tracking);
+
+        // Active inference: formulate maintenance goals (AO)
+        let (active_threshold, last_plan_efe) = self.run_active_inference_plans(&alerts);
+
+        // Export top-10 strongest causal edges
+        let top_causal_edges: Vec<CausalEdgeEntry> = self
+            .causal_graph
+            .top_edges(10)
+            .into_iter()
+            .map(|e| CausalEdgeEntry {
+                from: e.from,
+                to: e.to,
+                confidence: e.confidence,
+            })
+            .collect();
+
+        DaemonSnapshot {
+            version: nixward::ipc::SNAPSHOT_VERSION,
+            timestamp: now,
+            observation_count: self.observation_count,
+            anomaly_count: self.anomaly_count,
+            hierarchy_errors,
+            free_energy: self.world_model.free_energy(),
+            is_surprised: self.world_model.free_energy() > 0.3,
+            drift_similarity: self
+                .prev_state_hv
+                .as_ref()
+                .map_or(1.0, |prev| self.world_model.system_state().similarity(prev)),
+            causal_edge_count: self.causal_graph.edge_count(),
+            episodic_count: self.episodic_memory.len(),
+            concerns,
+            recent_anomalies: self.recent_anomalies.clone(),
+            daemon_running: true,
+            daemon_pid: std::process::id(),
+            support_status: self.last_health_status.map(|s| format!("{:?}", s)),
+            recommendation_count: self.last_health_issue_count,
+            alerts,
+            top_causal_edges,
+            memory_used_percent: self.last_memory_pct,
+            watchdog_status: self.watchdog_status.clone(),
+            degraded: self.degraded,
+            prediction_accuracy: self.predictive_monitor.rolling_mae(),
+            maintenance_plan_count: self.maintenance_plan_count,
+            load_average_1m: self.last_hw_probe.as_ref().map(|h| h.load_average[0]),
+            swap_used_percent: self.last_hw_probe.as_ref().and_then(|h| {
+                if h.swap_total_mb > 0 {
+                    Some(h.swap_used_mb as f64 / h.swap_total_mb as f64 * 100.0)
+                } else {
+                    None
+                }
+            }),
+            anomaly_volatility_ema: self.anomaly_volatility_ema,
+            active_anomaly_threshold: active_threshold,
+            last_plan_efe,
+            hibernating: self.hibernating,
+            metacognitive_journal: self.metacognitive_journal.clone(),
+            risk_aversion: self.active_inference.risk_aversion(),
+            curiosity_weight: self.active_inference.curiosity_weight(),
+            causal_learning_rate: self.causal_graph.learning_rate(),
+            pending_action: self.pending_action.clone(),
+            pending_response: self.pending_response.clone(),
+        }
+    }
+}
+
+/// A detected state transition between two snapshots.
+struct StateTransition {
+    key: String,
+    from: String,
+    to: String,
+    occurred: bool,
+    is_recovery: bool,
+}
+
+/// Diff two snapshots to find state transitions.
+fn detect_transitions(
+    before: &SystemStateSnapshot,
+    after: &SystemStateSnapshot,
+) -> Vec<StateTransition> {
+    let mut transitions = Vec::new();
+
+    let before_services: std::collections::HashMap<&str, &ServiceState> = before
+        .services
+        .iter()
+        .map(|(n, s)| (n.as_str(), s))
+        .collect();
+
+    for (name, after_state) in &after.services {
+        if let Some(before_state) = before_services.get(name.as_str()) {
+            if *before_state != after_state {
+                let is_recovery =
+                    **before_state == ServiceState::Failed && *after_state != ServiceState::Failed;
+                transitions.push(StateTransition {
+                    key: name.clone(),
+                    from: format!("{:?}", before_state),
+                    to: format!("{:?}", after_state),
+                    occurred: true,
+                    is_recovery,
+                });
+            }
+        } else {
+            transitions.push(StateTransition {
+                key: name.clone(),
+                from: "absent".to_string(),
+                to: format!("{:?}", after_state),
+                occurred: true,
+                is_recovery: false,
+            });
+        }
+    }
+
+    if before.generation != after.generation {
+        transitions.push(StateTransition {
+            key: "generation".to_string(),
+            from: before.generation.map_or("none".into(), |g| g.to_string()),
+            to: after.generation.map_or("none".into(), |g| g.to_string()),
+            occurred: true,
+            is_recovery: false,
+        });
+    }
+
+    transitions
+}
+
+/// Check if an anomaly is relevant to a predictive metric (BD).
+///
+/// Maps anomaly reasons/units to metric names for journal context correlation.
+fn anomaly_matches_metric(anomaly: &AnomalyEntry, metric: &str) -> bool {
+    let reason_lower = anomaly.reason.to_lowercase();
+    let unit_lower = anomaly.unit.to_lowercase();
+    match metric {
+        "disk_used_pct" => {
+            reason_lower.contains("disk")
+                || reason_lower.contains("space")
+                || reason_lower.contains("storage")
+                || reason_lower.contains("no space")
+        }
+        "memory_used_pct" => {
+            reason_lower.contains("memory")
+                || reason_lower.contains("oom")
+                || reason_lower.contains("killed process")
+        }
+        "failed_unit_count" => {
+            reason_lower.contains("failed")
+                || reason_lower.contains("crash")
+                || reason_lower.contains("exit code")
+                || unit_lower.contains(".service")
+        }
+        "store_path_count" => {
+            reason_lower.contains("store")
+                || reason_lower.contains("nix-build")
+                || reason_lower.contains("derivation")
+        }
+        "load_average_1m" => {
+            reason_lower.contains("load")
+                || reason_lower.contains("cpu")
+                || reason_lower.contains("overload")
+        }
+        "swap_used_pct" => reason_lower.contains("swap") || reason_lower.contains("paging"),
+        _ => false,
+    }
+}
+
+/// POML template for anomaly diagnosis prompts.
+const ANOMALY_DIAGNOSIS_POML: &str = r#"<poml version="2.0">
+  <metadata>
+    <title>Anomaly Diagnosis</title>
+    <model-hints><temperature>0.3</temperature><max-tokens>256</max-tokens></model-hints>
+  </metadata>
+  <variables>
+    <let name="unit">{{ unit }}</let>
+    <let name="reason">{{ reason }}</let>
+    <let name="message">{{ message }}</let>
+  </variables>
+  <prompt>
+    <system>You are a NixOS systemd diagnostician. Be concise (2-3 sentences max).</system>
+    <stepwise-instructions>
+      <step id="s1">Identify the root cause of the anomaly in unit '{{ unit }}'.</step>
+      <step id="s2">Suggest a concrete fix or investigation command.</step>
+    </stepwise-instructions>
+    <output-format>Plain text: diagnosis followed by suggested fix.</output-format>
+  </prompt>
+</poml>"#;
+
+/// POML template for resolution verification prompts.
+///
+/// After a service recovers, ask the LLM to summarize why the recovery happened
+/// and whether the fix is permanent or temporary — feeding the response back
+/// into the knowledge base for future reference.
+const RESOLUTION_VERIFICATION_POML: &str = r#"<poml version="2.0">
+  <metadata>
+    <title>Resolution Verification</title>
+    <model-hints><temperature>0.2</temperature><max-tokens>192</max-tokens></model-hints>
+  </metadata>
+  <variables>
+    <let name="symptom">{{ symptom }}</let>
+    <let name="resolution">{{ resolution }}</let>
+    <let name="commands">{{ commands }}</let>
+  </variables>
+  <prompt>
+    <system>You are a NixOS reliability analyst. Be concise (2-3 sentences).</system>
+    <stepwise-instructions>
+      <step id="s1">Analyze why the symptom '{{ symptom }}' was resolved by '{{ resolution }}'.</step>
+      <step id="s2">Determine if the fix is permanent or a workaround that may recur.</step>
+      <step id="s3">If temporary, suggest a permanent fix.</step>
+    </stepwise-instructions>
+    <output-format>Plain text: analysis, permanence verdict, optional permanent fix.</output-format>
+  </prompt>
+</poml>"#;
+
+/// Build a resolution verification prompt using POML template processing.
+fn build_resolution_prompt(symptom: &str, resolution: &str, commands: &[String]) -> String {
+    let mut proc = PomlProcessor::new("/dev/null");
+    if proc
+        .load_template_str("resolution_verification", RESOLUTION_VERIFICATION_POML)
+        .is_ok()
+    {
+        let mut ctx = PomlContext::default();
+        ctx.variables
+            .insert("symptom".into(), PomlValue::from(symptom));
+        ctx.variables
+            .insert("resolution".into(), PomlValue::from(resolution));
+        ctx.variables
+            .insert("commands".into(), PomlValue::from(commands.join(", ")));
+
+        if let Ok(result) = proc.process("resolution_verification", &ctx) {
+            return result.prompt;
+        }
+    }
+    format!(
+        "A NixOS issue '{}' was resolved by: {}\n\
+         Commands used: {}\n\n\
+         Was this a permanent fix or a temporary workaround? \
+         If temporary, suggest a permanent solution (2-3 sentences).",
+        symptom,
+        resolution,
+        commands.join(", ")
+    )
+}
+
+/// Build an anomaly diagnosis prompt using POML template processing.
+fn build_anomaly_prompt(unit: &str, reason: &str, message: &str) -> String {
+    let mut proc = PomlProcessor::new("/dev/null");
+    if proc
+        .load_template_str("anomaly_diagnosis", ANOMALY_DIAGNOSIS_POML)
+        .is_ok()
+    {
+        let mut ctx = PomlContext::default();
+        ctx.variables.insert("unit".into(), PomlValue::from(unit));
+        ctx.variables
+            .insert("reason".into(), PomlValue::from(reason));
+        ctx.variables
+            .insert("message".into(), PomlValue::from(message));
+
+        if let Ok(result) = proc.process("anomaly_diagnosis", &ctx) {
+            return result.prompt;
+        }
+    }
+    format!(
+        "A NixOS systemd unit '{}' has an anomaly.\n\
+         Anomaly reason: {}\nLog message: {}\n\n\
+         Briefly diagnose the likely cause and suggest a fix (2-3 sentences max).",
+        unit, reason, message
+    )
+}
+
+fn now_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Prints usage and exits. `nixward-daemon` takes no positional args or
+/// flags (it's designed to run unattended as a systemd service via the
+/// NixOS module) -- everything is configured through environment
+/// variables, so `--help`/`-h` is documentation-only, not a clap parser.
+fn print_help_and_exit() -> ! {
+    println!(
+        "nixward-daemon: continuous NixOS awareness daemon (background, unattended)
+
+Usage: nixward-daemon
+
+Designed to run as a systemd service via the NixOS module
+(services.nixward). Takes no command-line arguments -- all
+configuration is via environment variables:
+
+  NIXWARD_CONFIG          Path to the daemon config JSON file
+                          (default: $XDG_CONFIG_HOME/nixward/daemon.json,
+                          falling back to /etc/nixward/daemon.json)
+  NIXWARD_STATE_DIR       Directory for snapshot/state files
+                          (default: $XDG_DATA_HOME/nixward,
+                          falling back to /var/lib/nixward)
+  NIXWARD_ACTIVE_HEALING  Set to \"1\" or \"true\" to allow the daemon to
+                          apply approved config patches automatically.
+                          Unset/false by default (dry-run only, plus the
+                          watchdog-approval gate must still be satisfied
+                          for any modifying command).
+
+See `nixward doctor`/`nixward watch` for the interactive, human-driven
+equivalents of what this daemon does continuously."
+    );
+    std::process::exit(0);
+}
+
+fn main() -> ! {
+    // A real gap found while smoke-testing the symthaea-nix -> nixward
+    // rename: this binary had no arg handling whatsoever, so `--help`
+    // silently started the real daemon instead of printing usage.
+    for arg in std::env::args().skip(1) {
+        match arg.as_str() {
+            "--help" | "-h" => print_help_and_exit(),
+            "--version" | "-V" => {
+                println!("nixward-daemon {}", env!("CARGO_PKG_VERSION"));
+                std::process::exit(0);
+            }
+            _ => {}
+        }
+    }
+
+    // Initialize structured JSON logging when observability is enabled.
+    #[cfg(feature = "observability")]
+    init_tracing();
+
+    let mut config = DaemonConfig::load_default();
+    if std::env::var("NIXWARD_ACTIVE_HEALING")
+        .map(|v| v == "1" || v.to_lowercase() == "true")
+        .unwrap_or(false)
+    {
+        config.active_healing = true;
+    }
+    let mut state = DaemonState::new(&config);
+    let snapshot_path = default_snapshot_path();
+
+    // Spawn Prometheus metrics HTTP endpoint in a background thread.
+    #[cfg(feature = "observability")]
+    {
+        let metrics_port = config.metrics_port;
+        // Eagerly initialize the global metrics registry (fallible).
+        match Metrics::try_global() {
+            Ok(_) => {
+                std::thread::spawn(move || {
+                    let rt = match tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                    {
+                        Ok(rt) => rt,
+                        Err(e) => {
+                            eprintln!(
+                                "nixward-daemon: cannot create tokio runtime for metrics: {e}"
+                            );
+                            return;
+                        }
+                    };
+                    rt.block_on(async {
+                        if let Err(e) = nixward::observability::serve_metrics(metrics_port).await {
+                            eprintln!("nixward-daemon: metrics server failed: {e}");
+                        }
+                    });
+                });
+                eprintln!(
+                    "nixward-daemon: Prometheus metrics endpoint on port {}",
+                    metrics_port
+                );
+            }
+            Err(e) => {
+                eprintln!(
+                    "nixward-daemon: metrics initialization failed, running without metrics: {e}"
+                );
+            }
+        }
+    }
+
+    // Restore persisted working memory
+    let wm_path = snapshot_path.with_file_name("working_memory.json");
+    if let Ok(json) = std::fs::read_to_string(&wm_path) {
+        if let Ok(saved) = serde_json::from_str::<nixward::mind::SavedWorkingMemory>(&json) {
+            let item_count = saved.items.len();
+            state.working_memory = WorkingMemory::load(&saved, &mut state.codebook);
+            eprintln!(
+                "nixward-daemon: restored {} working memory items",
+                item_count
+            );
+        }
+    }
+
+    // Restore persisted dynamic knowledge articles
+    let kb_path = snapshot_path.with_file_name("knowledge_learned.json");
+    if let Ok(json) = std::fs::read_to_string(&kb_path) {
+        if let Some(kb) = state.knowledge_base.as_mut() {
+            let before = kb.dynamic_len();
+            kb.load_dynamic(&json, &mut state.codebook);
+            let loaded = kb.dynamic_len() - before;
+            if loaded > 0 {
+                eprintln!(
+                    "nixward-daemon: restored {} learned knowledge articles",
+                    loaded
+                );
+            }
+        }
+    }
+
+    // Restore persisted predictive history
+    let pred_path = snapshot_path.with_file_name("predictive_history.json");
+    if let Ok(json) = std::fs::read_to_string(&pred_path) {
+        if let Ok(saved) = serde_json::from_str::<SavedPredictiveState>(&json) {
+            let sample_count = saved.samples.len();
+            state.predictive_monitor = PredictiveMonitor::load(saved, AlertThresholds::default());
+            eprintln!(
+                "nixward-daemon: restored {} predictive samples",
+                sample_count
+            );
+        }
+    }
+
+    // Restore persisted causal graph
+    let causal_path = snapshot_path.with_file_name("causal_graph.json");
+    if let Ok(loaded) = state.causal_graph.load(&causal_path) {
+        if loaded > 0 {
+            eprintln!(
+                "nixward-daemon: restored {} causal edges (total: {})",
+                loaded,
+                state.causal_graph.edge_count()
+            );
+        }
+    }
+
+    eprintln!(
+        "nixward-daemon: starting continuous awareness (pid {})",
+        std::process::id()
+    );
+    eprintln!(
+        "  snapshot every {}s, poll every {}s, surprise threshold {:.2}",
+        config.snapshot_interval, config.poll_interval, config.surprise_threshold
+    );
+    eprintln!("  IPC path: {}", snapshot_path.display());
+    eprintln!(
+        "  causal graph bootstrapped with {} edges",
+        state.causal_graph.edge_count()
+    );
+    if let Some(ollama) = state.ollama.as_mut() {
+        let available = ollama.check_available();
+        eprintln!(
+            "  Ollama: {} (endpoint: {}, model: {})",
+            if available {
+                "available"
+            } else {
+                "unavailable"
+            },
+            config.ollama_endpoint,
+            config.ollama_model,
+        );
+    }
+
+    let mut last_snapshot = Instant::now() - Duration::from_secs(config.snapshot_interval);
+    let mut cycle = 0u64;
+
+    loop {
+        cycle += 1;
+
+        // Check for TUI commands (Proposal 4: Natural Language Goal-Setting)
+        let cmd_path = snapshot_path.with_file_name("tui_command.txt");
+        if cmd_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&cmd_path) {
+                let content = content.trim().to_string();
+                if !content.is_empty() {
+                    state.pending_response = None;
+                    eprintln!(
+                        "nixward-daemon: Received TUI natural language command: '{}'",
+                        content
+                    );
+
+                    let lower = content.to_lowercase();
+                    let is_question = lower.contains("why")
+                        || lower.contains("what")
+                        || lower.contains("how")
+                        || lower.contains("explain")
+                        || content.starts_with('?');
+
+                    if is_question {
+                        // Gather log context for failed/anomalous services
+                        let mut logs_context = String::new();
+                        for anomaly in &state.recent_anomalies {
+                            if anomaly.score > 0.5 {
+                                let unit = &anomaly.unit;
+                                if let Ok(output) = std::process::Command::new("journalctl")
+                                    .args(&["-u", unit, "-n", "10", "--no-pager"])
+                                    .output()
+                                {
+                                    let logs = String::from_utf8_lossy(&output.stdout);
+                                    if !logs.is_empty() {
+                                        logs_context.push_str(&format!(
+                                            "\n--- Logs for {} ---\n{}",
+                                            unit, logs
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+
+                        let top_causal_edges: Vec<String> = state
+                            .causal_graph
+                            .top_edges(5)
+                            .iter()
+                            .map(|e| format!("{} -> {} ({:.2})", e.from, e.to, e.confidence))
+                            .collect();
+
+                        let prompt = format!(
+                            "As a NixOS cognitive reliability agent, answer the user's diagnostic question: '{}'\n\n\
+                            Internal System State:\n\
+                            - Free Energy: {:.3}\n\
+                            - Anomaly Volatility (EMA): {:.3}\n\
+                            - Risk Aversion: {:.3}\n\
+                            - Curiosity explore weight: {:.3}\n\
+                            - Causal learning rate: {:.3}\n\
+                            - Recent anomalies: {:?}\n\
+                            - Top causal links: {:?}\n\
+                            {}\n\n\
+                            Provide a concise, expert answer (max 3 sentences) explaining the diagnosis and suggesting any actions.",
+                            content,
+                            state.world_model.free_energy(),
+                            state.anomaly_volatility_ema,
+                            state.active_inference.risk_aversion(),
+                            state.active_inference.curiosity_weight(),
+                            state.causal_graph.learning_rate(),
+                            state.recent_anomalies,
+                            top_causal_edges,
+                            logs_context
+                        );
+
+                        if let Some(ollama) = state.ollama.as_mut() {
+                            if let Some(resp) = ollama.query(&prompt) {
+                                state.pending_response = Some(resp.text.trim().to_string());
+                            } else {
+                                state.pending_response =
+                                    Some("Failed to query local Ollama instance.".to_string());
+                            }
+                        } else {
+                            state.pending_response =
+                                Some("Ollama is not configured or offline.".to_string());
+                        }
+                    } else {
+                        let (target, val) = if lower.contains("disk") {
+                            let num = lower
+                                .split_whitespace()
+                                .filter_map(|w| w.parse::<f64>().ok())
+                                .next()
+                                .unwrap_or(85.0);
+                            ("disk_used_pct".to_string(), num)
+                        } else if lower.contains("memory") || lower.contains("mem") {
+                            let num = lower
+                                .split_whitespace()
+                                .filter_map(|w| w.parse::<f64>().ok())
+                                .next()
+                                .unwrap_or(80.0);
+                            ("memory_used_pct".to_string(), num)
+                        } else if lower.contains("restart")
+                            || lower.contains("enable")
+                            || lower.contains("disable")
+                        {
+                            let target = lower
+                                .split_whitespace()
+                                .skip_while(|w| {
+                                    *w != "restart" && *w != "enable" && *w != "disable"
+                                })
+                                .nth(1)
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| "systemd".to_string());
+                            (target, 1.0)
+                        } else {
+                            ("systemd".to_string(), 1.0)
+                        };
+
+                        state.custom_user_goal = Some((content, target, val));
+                    }
+                }
+            }
+            let _ = std::fs::remove_file(&cmd_path);
+        }
+
+        if last_snapshot.elapsed() >= Duration::from_secs(config.snapshot_interval) {
+            #[cfg(feature = "observability")]
+            let _observe_timer = PhaseTimer::start("observe");
+
+            match SystemObserver::snapshot() {
+                Ok(snapshot) => {
+                    #[cfg(feature = "observability")]
+                    let _process_timer = PhaseTimer::start("process_snapshot");
+
+                    state.process_snapshot(snapshot, &config);
+
+                    #[cfg(feature = "observability")]
+                    drop(_process_timer);
+
+                    let fe = state.world_model.free_energy();
+
+                    if fe > config.surprise_threshold {
+                        eprintln!(
+                            "nixward-daemon: surprise detected (FE={:.3}), cycle {}",
+                            fe, cycle
+                        );
+                    }
+
+                    // Update observability gauges after snapshot processing.
+                    #[cfg(feature = "observability")]
+                    {
+                        let m = Metrics::global();
+                        m.set_free_energy(fe);
+                        m.set_causal_edge_count(state.causal_graph.edge_count() as f64);
+                        m.set_episodic_count(state.episodic_memory.len() as f64);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("nixward-daemon: snapshot failed: {}", e);
+                }
+            }
+            last_snapshot = Instant::now();
+        }
+
+        {
+            #[cfg(feature = "observability")]
+            let _journal_timer = PhaseTimer::start("process_journal");
+
+            #[cfg(feature = "observability")]
+            let anomaly_count_before = state.anomaly_count;
+
+            state.process_journal(config.journal_batch_size);
+
+            // Track newly detected anomalies.
+            #[cfg(feature = "observability")]
+            {
+                let new_anomalies = state.anomaly_count - anomaly_count_before;
+                if new_anomalies > 0 {
+                    let m = Metrics::global();
+                    for _ in 0..new_anomalies {
+                        m.inc_anomalies();
+                    }
+                }
+            }
+        }
+
+        if cycle == 1 || cycle % config.ipc_write_interval == 0 {
+            // Run P2P clustered synchronization (Proposal 4)
+            if cycle % (config.ipc_write_interval * 2) == 0 {
+                state.sync_with_cluster();
+            }
+
+            #[cfg(feature = "observability")]
+            let _ipc_timer = PhaseTimer::start("ipc_write");
+
+            state.refresh_watchdog_status(&snapshot_path);
+            let ipc_snap = state.to_ipc_snapshot();
+
+            // Update consciousness-level and phi gauges from the IPC snapshot.
+            #[cfg(feature = "observability")]
+            {
+                let m = Metrics::global();
+                // consciousness_level: derive from hierarchy errors (lower error = higher consciousness)
+                // The snapshot doesn't expose a single "consciousness level" scalar, so we
+                // use 1.0 - mean(hierarchy_errors) clamped to [0,1] as a proxy.
+                if !ipc_snap.hierarchy_errors.is_empty() {
+                    let mean_err: f64 = ipc_snap.hierarchy_errors.iter().sum::<f64>()
+                        / ipc_snap.hierarchy_errors.len() as f64;
+                    m.set_consciousness_level((1.0 - mean_err).clamp(0.0, 1.0));
+                }
+                // phi_value: use drift_similarity as a proxy (higher = more integrated)
+                m.set_phi_value(ipc_snap.drift_similarity as f64);
+                // Refresh edge/episodic counts from the snapshot
+                m.set_causal_edge_count(ipc_snap.causal_edge_count as f64);
+                m.set_episodic_count(ipc_snap.episodic_count as f64);
+
+                // Increment gate_vetoes_total for any critical alerts (gate veto proxy)
+                let critical_count = ipc_snap
+                    .alerts
+                    .iter()
+                    .filter(|a| matches!(a.severity, AlertSeverity::Critical))
+                    .count();
+                if critical_count > 0 {
+                    for _ in 0..critical_count {
+                        m.inc_gate_vetoes();
+                    }
+                }
+            }
+
+            if let Err(e) = ipc_snap.write_to(&snapshot_path) {
+                eprintln!("nixward-daemon: IPC write failed: {}", e);
+            }
+
+            let wm_path = snapshot_path.with_file_name("working_memory.json");
+            let saved = state.working_memory.save();
+            if let Ok(json) = serde_json::to_string_pretty(&saved) {
+                if let Err(e) = std::fs::write(&wm_path, json) {
+                    state.persist_error_count += 1;
+                    eprintln!("nixward-daemon: working_memory write failed: {e}");
+                }
+            }
+
+            let pred_path = snapshot_path.with_file_name("predictive_history.json");
+            let pred_saved = state.predictive_monitor.save();
+            if let Ok(json) = serde_json::to_string_pretty(&pred_saved) {
+                if let Err(e) = std::fs::write(&pred_path, json) {
+                    state.persist_error_count += 1;
+                    eprintln!("nixward-daemon: predictive_history write failed: {e}");
+                }
+            }
+
+            if let Some(kb) = &state.knowledge_base {
+                if kb.dynamic_len() > 0 {
+                    let kb_path = snapshot_path.with_file_name("knowledge_learned.json");
+                    if let Err(e) = std::fs::write(&kb_path, kb.save_dynamic()) {
+                        state.persist_error_count += 1;
+                        eprintln!("nixward-daemon: knowledge_learned write failed: {e}");
+                    }
+                }
+            }
+
+            // Persist causal graph
+            let causal_path = snapshot_path.with_file_name("causal_graph.json");
+            if let Err(e) = state.causal_graph.save(&causal_path) {
+                state.persist_error_count += 1;
+                eprintln!("nixward-daemon: causal_graph write failed: {e}");
+            }
+        }
+
+        // Increment the cycle counter for observability.
+        #[cfg(feature = "observability")]
+        Metrics::global().inc_consciousness_cycles();
+
+        // Allostatic sleep cycle modulation / deep sleep hibernation:
+        // Adjust sleep interval based on anomaly_volatility_ema and hibernation state.
+        let volatility = state.anomaly_volatility_ema;
+        let sleep_factor = if state.hibernating {
+            5.0 // scale sleep by 5x in deep sleep/hibernation
+        } else {
+            1.5 - volatility // range: 0.5 to 1.5
+        };
+        let sleep_secs = ((config.poll_interval as f64) * sleep_factor)
+            .round()
+            .max(1.0)
+            .min(120.0) as u64;
+
+        thread::sleep(Duration::from_secs(sleep_secs));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_config() -> DaemonConfig {
+        DaemonConfig {
+            enable_knowledge_learning: false,
+            ..DaemonConfig::default()
+        }
+    }
+
+    #[test]
+    fn test_build_telemetry_from_hardware() {
+        use nixward::observe::hardware::{DiskInfo, HardwareInfo};
+
+        let hw = HardwareInfo {
+            cpu_model: "Test".into(),
+            cpu_cores: 4,
+            memory_total_mb: 16000,
+            memory_available_mb: 4000,
+            gpus: vec![],
+            disks: vec![DiskInfo {
+                device: "/dev/sda1".into(),
+                mount_point: "/".into(),
+                total_bytes: 100_000_000_000,
+                used_bytes: 75_000_000_000,
+            }],
+            load_average: [2.5, 1.5, 1.0],
+            swap_total_mb: 4096,
+            swap_used_mb: 1024,
+        };
+        let snapshot = SystemStateSnapshot {
+            services: vec![
+                ("ok.service".into(), ServiceState::Running),
+                ("broken.service".into(), ServiceState::Failed),
+            ],
+            store_path_count: Some(50_000),
+            ..Default::default()
+        };
+
+        let telemetry = DaemonState::build_telemetry(Some(&hw), &snapshot);
+        assert!((telemetry.disk_used_pct - 75.0).abs() < 0.1);
+        assert!((telemetry.memory_used_pct - 75.0).abs() < 0.1);
+        assert_eq!(telemetry.store_path_count, 50_000);
+        assert_eq!(telemetry.failed_unit_count, 1);
+        assert!((telemetry.load_average_1m - 2.5).abs() < 1e-6);
+        assert!((telemetry.swap_used_pct - 25.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_build_telemetry_no_hardware() {
+        let snapshot = SystemStateSnapshot {
+            store_path_count: Some(1000),
+            ..Default::default()
+        };
+        let telemetry = DaemonState::build_telemetry(None, &snapshot);
+        assert!((telemetry.disk_used_pct).abs() < 1e-6);
+        assert!((telemetry.memory_used_pct).abs() < 1e-6);
+        assert_eq!(telemetry.store_path_count, 1000);
+    }
+
+    #[test]
+    fn test_build_alerts_empty_monitor() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+        let alerts = state.build_alerts(1700000000);
+        // With no data ingested, should produce no alerts
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_build_alerts_rising_disk() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Feed rising disk data
+        for i in 0..20 {
+            state.predictive_monitor.ingest(SystemTelemetry {
+                disk_used_pct: 70.0 + i as f64,
+                memory_used_pct: 40.0,
+                store_path_count: 50_000,
+                failed_unit_count: 0,
+                load_average_1m: 0.5,
+                swap_used_pct: 5.0,
+            });
+        }
+
+        let alerts = state.build_alerts(1700000000);
+        // Rising disk from 70→89% should trigger some alerts
+        let disk_alerts: Vec<_> = alerts
+            .iter()
+            .filter(|a| a.metric == "disk_used_pct")
+            .collect();
+        assert!(
+            !disk_alerts.is_empty(),
+            "Rising disk should generate alerts"
+        );
+        // All alerts should have timestamps set
+        for alert in &alerts {
+            assert!(alert.first_seen > 0);
+            assert!(alert.last_seen >= alert.first_seen);
+        }
+    }
+
+    #[test]
+    fn test_build_alerts_consecutive_tracking() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        for i in 0..20 {
+            state.predictive_monitor.ingest(SystemTelemetry {
+                disk_used_pct: 70.0 + i as f64,
+                memory_used_pct: 40.0,
+                store_path_count: 50_000,
+                failed_unit_count: 0,
+                load_average_1m: 0.5,
+                swap_used_pct: 5.0,
+            });
+        }
+
+        let alerts1 = state.build_alerts(1700000000);
+        let alerts2 = state.build_alerts(1700000060);
+
+        // Second call should have higher consecutive_cycles
+        for a2 in &alerts2 {
+            if let Some(a1) = alerts1
+                .iter()
+                .find(|a| a.metric == a2.metric && a.hours_ahead == a2.hours_ahead)
+            {
+                assert!(
+                    a2.consecutive_cycles >= a1.consecutive_cycles,
+                    "Consecutive cycles should increase"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_run_active_inference_plans_no_persistent() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+        assert_eq!(state.maintenance_plan_count, 0);
+
+        // Non-persistent alert (1 cycle, below threshold)
+        let alerts = vec![AlertEntry {
+            metric: "disk_used_pct".into(),
+            current_value: 85.0,
+            predicted_value: 95.0,
+            hours_ahead: 24.0,
+            threshold: 90.0,
+            confidence: 0.8,
+            recommended_action: Some("nix-collect-garbage -d".into()),
+            severity: AlertSeverity::Warning,
+            first_seen: 1700000000,
+            last_seen: 1700000000,
+            consecutive_cycles: 1, // below threshold of 3
+            prev_predicted_value: None,
+            journal_context: vec![],
+        }];
+        state.run_active_inference_plans(&alerts);
+        assert_eq!(
+            state.maintenance_plan_count, 0,
+            "1-cycle alert should not trigger plan"
+        );
+    }
+
+    #[test]
+    fn test_run_active_inference_plans_persistent() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        let alerts = vec![AlertEntry {
+            metric: "disk_used_pct".into(),
+            current_value: 85.0,
+            predicted_value: 95.0,
+            hours_ahead: 24.0,
+            threshold: 90.0,
+            confidence: 0.8,
+            recommended_action: Some("nix-collect-garbage -d".into()),
+            severity: AlertSeverity::Critical,
+            first_seen: 1700000000,
+            last_seen: 1700000300,
+            consecutive_cycles: 5, // persistent
+            prev_predicted_value: Some(93.0),
+            journal_context: vec![],
+        }];
+        state.run_active_inference_plans(&alerts);
+        assert!(
+            state.maintenance_plan_count > 0,
+            "Persistent alert should trigger maintenance plan"
+        );
+    }
+
+    #[test]
+    fn test_anomaly_matches_metric() {
+        let disk_anomaly = AnomalyEntry {
+            score: 0.8,
+            reason: "No space left on device".into(),
+            unit: "nix-daemon.service".into(),
+            error_type: Some("disk_full".into()),
+            suggestion: Some("Run nix-collect-garbage".into()),
+        };
+        assert!(anomaly_matches_metric(&disk_anomaly, "disk_used_pct"));
+        assert!(!anomaly_matches_metric(&disk_anomaly, "memory_used_pct"));
+
+        let oom_anomaly = AnomalyEntry {
+            score: 0.9,
+            reason: "OOM killer invoked".into(),
+            unit: "nginx.service".into(),
+            error_type: None,
+            suggestion: None,
+        };
+        assert!(anomaly_matches_metric(&oom_anomaly, "memory_used_pct"));
+        assert!(!anomaly_matches_metric(&oom_anomaly, "disk_used_pct"));
+
+        let service_anomaly = AnomalyEntry {
+            score: 0.7,
+            reason: "Process crashed with exit code 1".into(),
+            unit: "myapp.service".into(),
+            error_type: None,
+            suggestion: None,
+        };
+        assert!(anomaly_matches_metric(
+            &service_anomaly,
+            "failed_unit_count"
+        ));
+    }
+
+    #[test]
+    fn test_journal_context_populated() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Add anomalies that should match disk alerts
+        state.recent_anomalies.push(AnomalyEntry {
+            score: 0.8,
+            reason: "No space left on device".into(),
+            unit: "nix-daemon.service".into(),
+            error_type: Some("disk_full".into()),
+            suggestion: Some("Run garbage collection".into()),
+        });
+
+        // Feed rising disk data to generate alerts
+        for i in 0..20 {
+            state.predictive_monitor.ingest(SystemTelemetry {
+                disk_used_pct: 70.0 + i as f64,
+                memory_used_pct: 40.0,
+                store_path_count: 50_000,
+                failed_unit_count: 0,
+                load_average_1m: 0.5,
+                swap_used_pct: 5.0,
+            });
+        }
+
+        let alerts = state.build_alerts(1700000000);
+        let disk_alerts: Vec<_> = alerts
+            .iter()
+            .filter(|a| a.metric == "disk_used_pct")
+            .collect();
+
+        // Disk alerts should now have journal context from the anomaly
+        let has_context = disk_alerts.iter().any(|a| !a.journal_context.is_empty());
+        assert!(
+            has_context,
+            "Disk alerts should have journal context from disk anomaly"
+        );
+    }
+
+    #[test]
+    fn test_degraded_mode_initial_state() {
+        let config = test_config();
+        let state = DaemonState::new(&config);
+        assert!(!state.degraded, "Should not start in degraded mode");
+        assert!(state.last_hw_probe.is_none(), "No cached probe initially");
+    }
+
+    #[test]
+    fn test_degraded_mode_cached_hw_used() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Simulate a successful hardware probe
+        let hw = nixward::observe::hardware::HardwareInfo {
+            cpu_model: "Test CPU".into(),
+            cpu_cores: 4,
+            memory_total_mb: 16000,
+            memory_available_mb: 8000,
+            gpus: vec![],
+            disks: vec![],
+            load_average: [1.0, 0.8, 0.5],
+            swap_total_mb: 4096,
+            swap_used_mb: 512,
+        };
+        state.last_hw_probe = Some(hw.clone());
+        state.degraded = false;
+
+        // Simulate probe failure → should use cached data
+        state.degraded = true;
+        let cached = state.last_hw_probe.clone();
+        assert!(cached.is_some(), "Cached hw should be available");
+        assert_eq!(cached.unwrap().cpu_cores, 4);
+    }
+
+    #[test]
+    fn test_degraded_flag_in_ipc_snapshot() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+        state.degraded = true;
+
+        let ipc = state.to_ipc_snapshot();
+        assert!(ipc.degraded, "IPC snapshot should reflect degraded state");
+
+        state.degraded = false;
+        let ipc = state.to_ipc_snapshot();
+        assert!(!ipc.degraded, "IPC snapshot should reflect recovered state");
+    }
+
+    #[test]
+    fn test_degraded_recovery_clears_flag() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Simulate degraded state with cached data
+        let hw = nixward::observe::hardware::HardwareInfo {
+            cpu_model: "Test CPU".into(),
+            cpu_cores: 8,
+            memory_total_mb: 32000,
+            memory_available_mb: 16000,
+            gpus: vec![],
+            disks: vec![],
+            load_average: [0.5, 0.3, 0.2],
+            swap_total_mb: 8192,
+            swap_used_mb: 100,
+        };
+        state.last_hw_probe = Some(hw);
+        state.degraded = true;
+
+        // Simulate successful probe (recovery)
+        state.degraded = false;
+        assert!(!state.degraded);
+
+        let ipc = state.to_ipc_snapshot();
+        assert!(!ipc.degraded);
+    }
+
+    #[test]
+    fn test_load_and_swap_from_cached_hw_in_snapshot() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        let hw = nixward::observe::hardware::HardwareInfo {
+            cpu_model: "Test".into(),
+            cpu_cores: 4,
+            memory_total_mb: 16000,
+            memory_available_mb: 8000,
+            gpus: vec![],
+            disks: vec![],
+            load_average: [3.5, 2.0, 1.0],
+            swap_total_mb: 4096,
+            swap_used_mb: 2048,
+        };
+        state.last_hw_probe = Some(hw);
+
+        let ipc = state.to_ipc_snapshot();
+        assert!((ipc.load_average_1m.unwrap() - 3.5).abs() < 1e-6);
+        assert!((ipc.swap_used_percent.unwrap() - 50.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_build_resolution_prompt_via_poml() {
+        let prompt = build_resolution_prompt(
+            "nginx.service crashed",
+            "Service restarted automatically",
+            &["systemctl restart nginx".to_string()],
+        );
+        assert!(
+            prompt.contains("nginx.service crashed"),
+            "Prompt should contain the symptom"
+        );
+        assert!(
+            prompt.contains("restart"),
+            "Prompt should contain the resolution"
+        );
+    }
+
+    #[test]
+    fn test_build_anomaly_prompt_via_poml() {
+        let prompt = build_anomaly_prompt(
+            "nix-daemon.service",
+            "No space left on device",
+            "write error at /nix/store",
+        );
+        // The POML template substitutes {{ unit }} with the unit name
+        assert!(
+            prompt.contains("nix-daemon.service"),
+            "Prompt should contain unit name. Got: {}",
+            prompt
+        );
+        assert!(!prompt.is_empty());
+    }
+
+    #[test]
+    fn test_learn_from_resolution_without_ollama() {
+        let config = DaemonConfig {
+            enable_knowledge_learning: true,
+            ..DaemonConfig::default()
+        };
+        let mut state = DaemonState::new(&config);
+        // Disable ollama for this test
+        state.ollama = None;
+
+        state.learn_from_resolution(
+            "test.service failure",
+            "Restarted the service",
+            vec!["systemctl restart test".into()],
+        );
+
+        // Should have learned the article (without Ollama enrichment)
+        let kb = state.knowledge_base.as_ref().unwrap();
+        assert_eq!(kb.dynamic_len(), 1);
+    }
+
+    #[test]
+    fn test_persist_error_count_starts_at_zero() {
+        let state = DaemonState::new(&test_config());
+        assert_eq!(state.persist_error_count, 0);
+    }
+
+    #[test]
+    fn test_alert_state_capacity_bounded() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Insert many alert tracking entries
+        for i in 0..2000 {
+            state.alert_state.insert(
+                format!("metric_{}@1h", i),
+                AlertTracking {
+                    first_seen: i as u64,
+                    consecutive_cycles: 1,
+                    prev_predicted_value: 0.5,
+                },
+            );
+        }
+        assert_eq!(state.alert_state.len(), 2000);
+
+        // After build_alerts with no active predictions, all should be pruned
+        state.predictive_monitor = PredictiveMonitor::with_defaults();
+        let alerts = state.build_alerts(100);
+        // All entries pruned since no predictions match
+        assert!(
+            state.alert_state.is_empty(),
+            "Alert state should be pruned when no predictions are active, got {}",
+            state.alert_state.len()
+        );
+        // Should return empty alerts
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_anomaly_remediation_enriched_with_causal_graph_suggestions() {
+        let mut causal_graph = NixCausalGraph::new(42);
+
+        // Inject a causal edge: "services.postgresql.enable" causes "postgresql"
+        causal_graph.add_structural_edge("services.postgresql.enable", "postgresql", 0.85);
+
+        // Analyze root causes of postgresql symptom
+        let analysis = causal_graph.analyze_root_causes("postgresql");
+        assert_eq!(analysis.root_causes.len(), 1);
+        assert_eq!(
+            analysis.root_causes[0].variable,
+            "services.postgresql.enable"
+        );
+        assert!((analysis.root_causes[0].confidence - 0.85).abs() < 1e-6);
+
+        // Construct suggestion
+        let causes: Vec<String> = analysis
+            .root_causes
+            .iter()
+            .take(3)
+            .map(|rc| format!("{} ({:.1}%)", rc.variable, rc.confidence * 100.0))
+            .collect();
+        let causal_suggestion = format!("Causal analysis suspects: {}", causes.join(", "));
+
+        assert!(causal_suggestion.contains("services.postgresql.enable"));
+        assert!(causal_suggestion.contains("85.0%"));
+    }
+
+    #[test]
+    fn test_self_healing_plan_generated_for_high_score_anomaly() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+        assert_eq!(state.maintenance_plan_count, 0);
+
+        // Formulate a recovery goal for postgresql service failure
+        let goal_description = "Resolve service failure in 'postgresql' (reason: FATAL error)";
+        let plan = state.active_inference.process_input(goal_description);
+
+        assert!(
+            !plan.actions.is_empty(),
+            "Active inference should generate a plan to resolve service failure"
+        );
+        assert!(plan.current_free_energy.is_finite());
+    }
+
+    #[test]
+    fn test_multi_goal_prioritization() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+        assert_eq!(state.maintenance_plan_count, 0);
+
+        // 1. Alert A: Low priority warning
+        let alert_low = AlertEntry {
+            metric: "memory_used_pct".into(),
+            current_value: 85.0,
+            predicted_value: 90.0,
+            hours_ahead: 12.0,
+            threshold: 80.0,
+            confidence: 0.7,
+            recommended_action: None,
+            severity: AlertSeverity::Warning,
+            first_seen: 1700000000,
+            last_seen: 1700000000,
+            consecutive_cycles: 3,
+            prev_predicted_value: None,
+            journal_context: vec![],
+        };
+
+        // 2. Alert B: Critical high priority
+        let alert_high = AlertEntry {
+            metric: "disk_used_pct".into(),
+            current_value: 95.0,
+            predicted_value: 99.0,
+            hours_ahead: 2.0,
+            threshold: 90.0,
+            confidence: 0.95,
+            recommended_action: None,
+            severity: AlertSeverity::Critical,
+            first_seen: 1700000000,
+            last_seen: 1700000300,
+            consecutive_cycles: 6,
+            prev_predicted_value: None,
+            journal_context: vec![],
+        };
+
+        // 3. High-score anomaly in recent_anomalies
+        state.recent_anomalies.push(AnomalyEntry {
+            score: 0.9,
+            reason: "OOM killer invoked".into(),
+            unit: "postgresql.service".into(),
+            error_type: Some("OOM".into()),
+            suggestion: None,
+        });
+
+        // Run prioritization
+        let alerts = vec![alert_low, alert_high];
+        state.run_active_inference_plans(&alerts);
+
+        // One coordinated executive plan should be processed
+        assert_eq!(state.maintenance_plan_count, 1);
+    }
+
+    #[test]
+    fn test_telemetry_feedback_loop_success_and_failure() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        let state_before = ContinuousHV::random(symthaea_core::hdc::HDC_DIMENSION, 42);
+
+        // 1. Test Success path (telemetry metric improves)
+        state.last_recommended_action = Some((
+            "disk_used_pct".to_string(),
+            nixward::mind::ActionCategory::GarbageCollect,
+            state_before.clone(),
+            80.0,
+        ));
+
+        // Inject HardwareInfo to simulate 70% disk usage (lower than 80%)
+        let hw_success = nixward::observe::hardware::HardwareInfo {
+            cpu_model: "Test CPU".into(),
+            cpu_cores: 4,
+            memory_total_mb: 1000,
+            memory_available_mb: 500,
+            gpus: vec![],
+            disks: vec![nixward::observe::hardware::DiskInfo {
+                device: "/dev/sda1".into(),
+                mount_point: "/".into(),
+                total_bytes: 1000,
+                used_bytes: 700, // 70% used (lower than 80%)
+            }],
+            load_average: [0.5, 0.5, 0.5],
+            swap_total_mb: 0,
+            swap_used_mb: 0,
+        };
+        state.last_hw_probe = Some(hw_success);
+
+        // Run process_snapshot to trigger the feedback loop
+        let snapshot_success = SystemStateSnapshot::default();
+        state.process_snapshot(snapshot_success, &config);
+
+        // Verify last_recommended_action was processed and cleared
+        assert!(state.last_recommended_action.is_none());
+        // Verify active inference episodic memory has recorded the episode
+        assert!(state.active_inference.episodic_memory().len() > 0);
+    }
+
+    #[test]
+    fn test_action_cooldown_habituation() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Put GarbageCollect on cooldown for disk_used_pct
+        state.failed_action_cooldowns.insert(
+            (
+                "disk_used_pct".to_string(),
+                nixward::mind::ActionCategory::GarbageCollect,
+            ),
+            5,
+        );
+
+        // Create alert for disk_used_pct
+        let alert_high = AlertEntry {
+            metric: "disk_used_pct".into(),
+            current_value: 95.0,
+            predicted_value: 99.0,
+            hours_ahead: 2.0,
+            threshold: 90.0,
+            confidence: 0.95,
+            recommended_action: None,
+            severity: AlertSeverity::Critical,
+            first_seen: 1700000000,
+            last_seen: 1700000300,
+            consecutive_cycles: 6,
+            prev_predicted_value: None,
+            journal_context: vec![],
+        };
+
+        state.run_active_inference_plans(&[alert_high]);
+
+        // If the top action was GarbageCollect, it should have been skipped in favor of another action (like Rebuild, Custom, etc.)
+        if let Some((_, chosen_action, _, _)) = &state.last_recommended_action {
+            assert_ne!(
+                *chosen_action,
+                nixward::mind::ActionCategory::GarbageCollect
+            );
+        }
+
+        // Run process_snapshot to check cooldown ticks decrement
+        let snapshot = SystemStateSnapshot::default();
+        state.process_snapshot(snapshot, &config);
+
+        let ticks = state
+            .failed_action_cooldowns
+            .get(&(
+                "disk_used_pct".to_string(),
+                nixward::mind::ActionCategory::GarbageCollect,
+            ))
+            .copied();
+
+        assert_eq!(
+            ticks,
+            Some(4),
+            "Cooldown ticks should decrement by 1 on snapshot tick"
+        );
+    }
+
+    #[test]
+    fn test_causal_active_inference_bias() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        let goal = "Resolve service failure in 'postgresql' (reason: FATAL error)";
+
+        // 1. Get unbiased plan
+        let unbiased_plan = state.active_inference.process_input(goal);
+        let unbiased_rebuild = unbiased_plan
+            .actions
+            .iter()
+            .find(|sa| matches!(sa.action, nixward::mind::ActionCategory::Rebuild))
+            .unwrap()
+            .clone();
+
+        // 2. Get causally biased plan
+        let causal_options = vec!["services.postgresql.enable".to_string()];
+        let biased_plan = state
+            .active_inference
+            .process_input_with_causal_bias(goal, &causal_options);
+        let biased_rebuild = biased_plan
+            .actions
+            .iter()
+            .find(|sa| matches!(sa.action, nixward::mind::ActionCategory::Rebuild))
+            .unwrap()
+            .clone();
+
+        // Expect the biased Rebuild expected free energy to be lower (preferred)
+        assert!(
+            biased_rebuild.expected_free_energy < unbiased_rebuild.expected_free_energy,
+            "Biased Rebuild EFE ({}) should be lower than unbiased EFE ({})",
+            biased_rebuild.expected_free_energy,
+            unbiased_rebuild.expected_free_energy
+        );
+
+        assert!(
+            biased_rebuild.rationale.contains("[Causal Bias Applied]"),
+            "Rationale should note that the causal bias was applied"
+        );
+    }
+
+    #[test]
+    fn test_allostatic_threshold_adapts_to_volatility() {
+        let config = test_config();
+
+        // -- Scenario A: calm system (EMA near 0) → high threshold (≈ 0.88..0.9)
+        let mut calm_state = DaemonState::new(&config);
+        calm_state.anomaly_volatility_ema = 0.05; // nearly calm
+
+        // An anomaly with score 0.75 — above the old hard-coded 0.7
+        let below_threshold_anomaly = AnomalyEntry {
+            unit: "nginx".into(),
+            reason: "connection reset".into(),
+            score: 0.75,
+            error_type: None,
+            suggestion: None,
+        };
+        calm_state.recent_anomalies = vec![below_threshold_anomaly];
+
+        // With EMA = 0.05: threshold = (0.7 + 0.2*(1-0.05)).clamp(0.4, 0.9) ≈ 0.89
+        // → score 0.75 is BELOW the calm threshold, no plan should be generated
+        calm_state.run_active_inference_plans(&[]);
+        assert!(
+            calm_state.last_recommended_action.is_none(),
+            "Calm system: a 0.75-score anomaly should NOT trigger a plan (threshold ~0.89)"
+        );
+
+        // -- Scenario B: turbulent system (EMA near 1) → low threshold (≈ 0.7)
+        let mut turbulent_state = DaemonState::new(&config);
+        turbulent_state.anomaly_volatility_ema = 0.95; // nearly turbulent
+
+        // Same anomaly — same score 0.75
+        let above_threshold_anomaly = AnomalyEntry {
+            unit: "postgresql".into(),
+            reason: "FATAL: connection refused".into(),
+            score: 0.75,
+            error_type: None,
+            suggestion: None,
+        };
+        turbulent_state.recent_anomalies = vec![above_threshold_anomaly];
+
+        // With EMA = 0.95: threshold = (0.7 + 0.2*(1-0.95)).clamp(0.4, 0.9) ≈ 0.71
+        // → score 0.75 is ABOVE the turbulent threshold, a plan SHOULD be generated
+        turbulent_state.run_active_inference_plans(&[]);
+        assert!(
+            turbulent_state.last_recommended_action.is_some(),
+            "Turbulent system: a 0.75-score anomaly SHOULD trigger a plan (threshold ~0.71)"
+        );
+
+        // -- Scenario C: verify EMA converges from neutral after calm cycles
+        let mut state = DaemonState::new(&config);
+        assert!(
+            (state.anomaly_volatility_ema - 0.5).abs() < 1e-9,
+            "Initial EMA should be 0.5 (neutral)"
+        );
+
+        // Inject 10 calm snapshots (no anomalies) → EMA should drift toward 0
+        for _ in 0..10 {
+            state.recent_anomalies = vec![];
+            let snapshot = SystemStateSnapshot::default();
+            state.process_snapshot(snapshot, &config);
+        }
+        assert!(
+            state.anomaly_volatility_ema < 0.5,
+            "After 10 calm cycles EMA ({:.4}) should be below 0.5",
+            state.anomaly_volatility_ema
+        );
+    }
+
+    #[test]
+    fn test_action_specific_episodic_valence() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        let state_hv = ContinuousHV::random(symthaea_core::hdc::HDC_DIMENSION, 42);
+
+        // Record a catastrophic failure specifically for action "Rebuild"
+        let failure_episode = SystemEpisode {
+            state_before: state_hv.clone(),
+            action: "Rebuild".to_string(),
+            state_after: state_hv.clone(),
+            outcome: EpisodeOutcome::Failure("Rebuild broke the system".to_string()),
+            phi_at_encoding: 0.9,
+            prediction_error: 0.9,
+            emotional_valence: -1.0, // catastrophic
+            timestamp: 1700000000,
+        };
+
+        state
+            .active_inference
+            .episodic_memory_mut()
+            .record(failure_episode);
+
+        // Predict valence for Rebuild - should be highly negative
+        let rebuild_val = state
+            .active_inference
+            .episodic_memory()
+            .predict_valence_for_action(&state_hv, "Rebuild");
+        assert!(
+            rebuild_val < -0.7,
+            "Expected negative valence for Rebuild: {}",
+            rebuild_val
+        );
+
+        // Predict valence for Rollback - should not be negative
+        let rollback_val = state
+            .active_inference
+            .episodic_memory()
+            .predict_valence_for_action(&state_hv, "Rollback");
+        assert!(
+            rollback_val >= 0.0,
+            "Expected non-negative valence for Rollback: {}",
+            rollback_val
+        );
+    }
+
+    #[test]
+    fn test_hibernation_entry_and_wakeup() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        state.anomaly_volatility_ema = 0.05; // very calm
+
+        // 1. Process 15 calm snapshots
+        for _ in 0..15 {
+            let snapshot = SystemStateSnapshot::default();
+            state.process_snapshot(snapshot, &config);
+        }
+
+        // Verify state is in hibernation
+        assert!(
+            state.hibernating,
+            "Daemon should enter hibernation after 15 calm cycles"
+        );
+
+        // 2. Inject an alert to trigger wakeup
+        state.alert_state.insert(
+            "disk_used_pct_1h".to_string(),
+            AlertTracking {
+                first_seen: 1700000000,
+                consecutive_cycles: 5,
+                prev_predicted_value: 95.0,
+            },
+        );
+
+        let snapshot = SystemStateSnapshot::default();
+        state.process_snapshot(snapshot, &config);
+
+        // Verify state exited hibernation
+        assert!(
+            !state.hibernating,
+            "Daemon should wake up immediately when alert is present"
+        );
+    }
+
+    #[test]
+    fn test_causal_graph_global_decay() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Add a causal edge
+        state.causal_graph.add_structural_edge("A", "B", 0.8);
+        let conf_before = state.causal_graph.edge_confidence("A", "B").unwrap();
+        assert_eq!(conf_before, 0.8);
+
+        // Set observation_count to 50 (triggering decay check in process_snapshot)
+        state.observation_count = 49; // it will become 50 in process_snapshot
+
+        let snapshot = SystemStateSnapshot::default();
+        state.process_snapshot(snapshot, &config);
+
+        // Verify confidence decayed
+        let conf_after = state.causal_graph.edge_confidence("A", "B").unwrap();
+        assert!(
+            conf_after < conf_before,
+            "Confidence ({}) should be decayed from before ({})",
+            conf_after,
+            conf_before
+        );
+    }
+
+    #[test]
+    fn test_metacognitive_journaling() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Verify initial state is empty
+        assert!(state.metacognitive_journal.is_empty());
+
+        // Create alert for disk_used_pct
+        let alert_high = AlertEntry {
+            metric: "disk_used_pct".into(),
+            current_value: 95.0,
+            predicted_value: 99.0,
+            hours_ahead: 2.0,
+            threshold: 90.0,
+            confidence: 0.95,
+            recommended_action: None,
+            severity: AlertSeverity::Critical,
+            first_seen: 1700000000,
+            last_seen: 1700000300,
+            consecutive_cycles: 6,
+            prev_predicted_value: None,
+            journal_context: vec![],
+        };
+
+        state.run_active_inference_plans(&[alert_high]);
+
+        // Verify journal has 1 pending entry
+        assert_eq!(state.metacognitive_journal.len(), 1);
+        assert_eq!(state.metacognitive_journal[0].outcome, "Pending");
+        assert_eq!(
+            state.metacognitive_journal[0].symptom,
+            "Maintain disk_used_pct below 90 (currently 95 predicted 99)"
+        );
+
+        // Process a snapshot where disk_used_pct has improved to 85.0 (success criteria: < 95.0)
+        let mut snapshot_success = SystemStateSnapshot::default();
+        snapshot_success.store_path_count = Some(100);
+        state.process_snapshot(snapshot_success, &config);
+
+        // Verify journal entry has transitioned to Success
+        assert_eq!(state.metacognitive_journal[0].outcome, "Success");
+    }
+
+    #[test]
+    fn test_custom_user_goal_and_watchdog_veto() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Verify initial custom goal and pending action is None
+        assert!(state.custom_user_goal.is_none());
+        assert!(state.pending_action.is_none());
+
+        // Set custom user goal: keep disk below 75%
+        state.custom_user_goal = Some((
+            "keep disk below 75".to_string(),
+            "disk_used_pct".to_string(),
+            75.0,
+        ));
+
+        // When we run planning, the daemon should formulate a plan for the custom user goal
+        // Because active_healing = false in test_config(), it shouldn't execute or gate, but should plan it as dry-run
+        state.run_active_inference_plans(&[]);
+        assert!(
+            state.last_recommended_action.is_some(),
+            "Expected a plan to be formulated for the custom user goal"
+        );
+        let planned = state.last_recommended_action.as_ref().unwrap();
+        assert_eq!(planned.0, "disk_used_pct");
+
+        // Now, enable active healing
+        state.active_healing = true;
+        // Re-inject custom goal
+        state.custom_user_goal = Some((
+            "keep disk below 75".to_string(),
+            "disk_used_pct".to_string(),
+            75.0,
+        ));
+
+        // When we run planning with active_healing = true and watchdog_status = None,
+        // it should GATE the action and set pending_action!
+        state.run_active_inference_plans(&[]);
+        assert!(
+            state.pending_action.is_some(),
+            "Expected action to be gated behind watchdog approval"
+        );
+        assert!(
+            state.pending_action.as_ref().unwrap().contains("systemctl")
+                || state.pending_action.as_ref().unwrap().contains("nix-store")
+                || state.pending_action.as_ref().unwrap().contains("PATCH"),
+            "Expected pending command to be a PATCH, systemctl, or nix-store command"
+        );
+
+        // Approve it!
+        state.watchdog_status = Some("Approved".to_string());
+        state.run_active_inference_plans(&[]);
+
+        // It should clear pending action on approval
+        assert!(
+            state.pending_action.is_none(),
+            "Expected pending action to be cleared on approval"
+        );
+    }
+
+    #[test]
+    fn test_proactive_epistemic_exploration() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        state.anomaly_volatility_ema = 0.05; // calm state
+        state.observation_count = 100; // multiple of 100
+
+        // Run active inference plans with no alerts/anomalies
+        state.run_active_inference_plans(&[]);
+
+        // A proactive plan should be generated
+        assert!(state.last_recommended_action.is_some());
+        let (target, _action, _, _) = state.last_recommended_action.clone().unwrap();
+        assert!(target.starts_with("explore:"));
+
+        // Verify metacognitive journal pending entry
+        assert_eq!(state.metacognitive_journal.len(), 1);
+        assert_eq!(state.metacognitive_journal[0].outcome, "Pending");
+        assert!(
+            state.metacognitive_journal[0]
+                .symptom
+                .starts_with("Explore consequences of action")
+        );
+
+        // Tick process_snapshot
+        let mut snapshot = SystemStateSnapshot::default();
+        snapshot.store_path_count = Some(100);
+        state.process_snapshot(snapshot, &config);
+
+        // Verify outcome is marked as explored
+        assert_eq!(
+            state.metacognitive_journal[0].outcome,
+            "Exploration completed: transition mapped."
+        );
+    }
+
+    #[test]
+    fn test_surprise_modulated_learning_rate() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // 1. Test calm state -> low learning rate
+        state.anomaly_volatility_ema = 0.02;
+        let snapshot = SystemStateSnapshot::default();
+        state.process_snapshot(snapshot, &config);
+        let rate_calm = state.causal_graph.learning_rate();
+        assert!(
+            rate_calm < 0.1,
+            "Expected low learning rate in calm state: {}",
+            rate_calm
+        );
+
+        // 2. Test turbulent state -> high learning rate
+        state.anomaly_volatility_ema = 0.95;
+        let snapshot = SystemStateSnapshot::default();
+        state.process_snapshot(snapshot, &config);
+        let rate_turbulent = state.causal_graph.learning_rate();
+        assert!(
+            rate_turbulent > 0.2,
+            "Expected high learning rate in turbulent state: {}",
+            rate_turbulent
+        );
+    }
+
+    #[test]
+    fn test_free_energy_moves_off_default_once_baseline_established() {
+        // Regression test: world_model.free_energy() used to be permanently
+        // pinned at its constructor default of 1.0 because
+        // compute_free_energy() (the only method that updates it) was
+        // never called anywhere in the live daemon loop. Fixed by
+        // establishing a rolling "stable baseline" HV from cycles with no
+        // detected transitions and computing free energy against it.
+        // A fully-default snapshot encodes to (at/near) the zero HV, whose
+        // self-similarity is degenerate (NaN, clamped to 0.0) -- populate
+        // real fields so the encoded vector is non-degenerate, matching
+        // what a real observation looks like.
+        fn populated_snapshot() -> SystemStateSnapshot {
+            let mut s = SystemStateSnapshot::default();
+            s.services = vec![
+                ("nginx".to_string(), ServiceState::Running),
+                ("postgresql".to_string(), ServiceState::Running),
+            ];
+            s.packages = vec!["vim".to_string(), "git".to_string()];
+            s.generation = Some(42);
+            s.store_size_bytes = Some(50_000_000_000);
+            s.store_path_count = Some(12345);
+            s
+        }
+
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+        assert!(
+            state.stable_baseline_hv.is_none(),
+            "no baseline should exist before any snapshot is processed"
+        );
+
+        // Cycle 1: no prior snapshot to compare against, so this cannot yet
+        // be classified as a "stable" cycle -- free_energy stays at the
+        // honest cold-start default.
+        state.process_snapshot(populated_snapshot(), &config);
+        assert_eq!(
+            state.world_model.free_energy(),
+            1.0,
+            "cycle 1 has no baseline yet, free_energy should stay at the cold-start default"
+        );
+
+        // Cycle 2: an identical snapshot has zero detected transitions vs.
+        // cycle 1, so it's a "stable" cycle -- a baseline gets established
+        // and free_energy is computed against it for the first time.
+        state.process_snapshot(populated_snapshot(), &config);
+        assert!(
+            state.stable_baseline_hv.is_some(),
+            "a stable baseline should be established after a stable cycle"
+        );
+        assert!(
+            state.world_model.free_energy() < 0.5,
+            "free_energy should have moved off the 1.0 default once a \
+             baseline matching the current (identical, stable) state \
+             exists, got {}",
+            state.world_model.free_energy()
+        );
+    }
+
+    /// `generate_nixos_hardening_patch` reads the real
+    /// `/etc/nixos/configuration.nix` path (not injectable), so this test
+    /// necessarily depends on that file's absence on the host running it --
+    /// true for this dev/CI environment (confirmed: no declarative
+    /// `/etc/nixos/configuration.nix` here), and the common case for any
+    /// non-NixOS-declarative sandbox. If this ever runs somewhere that file
+    /// exists with content, this test's exact assertions may not hold --
+    /// that's an environment assumption, not a bug in the function itself.
+    #[test]
+    fn test_generate_nixos_hardening_patch_known_units() {
+        assert!(
+            !std::path::Path::new("/etc/nixos/configuration.nix").exists(),
+            "this test assumes no real /etc/nixos/configuration.nix on the \
+             test host; see doc comment"
+        );
+
+        let mut state = DaemonState::new(&test_config());
+
+        let (line, path, value) = state
+            .generate_nixos_hardening_patch("clickhouse-server.service")
+            .expect("clickhouse hardening patch should be generated against a fresh {} config");
+        assert_eq!(path, "services.clickhouse.extraConfig");
+        assert!(value.contains("max_server_memory_usage"));
+        assert!(line.contains(&path));
+
+        let (_, path, value) = state
+            .generate_nixos_hardening_patch("postgresql.service")
+            .expect("postgresql hardening patch should be generated");
+        assert_eq!(path, "services.postgresql.settings.shared_buffers");
+        assert_eq!(value, "\"512MB\"");
+
+        let (_, path, _) = state
+            .generate_nixos_hardening_patch("some-other-thing.service")
+            .expect("generic hardening patch should be generated for unknown units");
+        assert_eq!(
+            path,
+            "systemd.services.some-other-thing.serviceConfig.RestartSec"
+        );
+    }
+
+    /// The real "wiring" test: the (option_path, value) pair
+    /// `generate_nixos_hardening_patch` decides on must actually produce a
+    /// correct patch when fed into `ConfigWriter::set_option` -- the same
+    /// call the daemon's apply-time code now makes, replacing the old
+    /// hand-rolled `rfind('}')` splice that used to live inline in this
+    /// file (and could only ever drift from ConfigWriter's own copy of the
+    /// same logic, never usefully differ from it).
+    #[test]
+    fn test_hardening_patch_path_value_apply_via_config_writer() {
+        use nixward::action::config_writer::ConfigWriter;
+
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("configuration.nix"),
+            "{ config, pkgs, ... }:\n{\n  services.openssh.enable = true;\n}\n",
+        )
+        .unwrap();
+        let writer = ConfigWriter::new()
+            .with_config_root(dir.path())
+            .with_git_backup(false)
+            .with_dry_run(true);
+
+        let patch = writer
+            .set_option(
+                "services.clickhouse.extraConfig",
+                "<max_server_memory_usage>80%</max_server_memory_usage>",
+            )
+            .unwrap();
+        assert!(patch.modified.contains("services.clickhouse.extraConfig"));
+        assert!(patch.modified.contains("max_server_memory_usage"));
+        // The pre-existing option must survive the patch untouched.
+        assert!(patch.modified.contains("services.openssh.enable = true;"));
+
+        let result = writer.apply_patch(&patch).unwrap();
+        assert!(result.changed);
+    }
+}

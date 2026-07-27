@@ -1,0 +1,27 @@
+MA-001R-delta multi-seed shuffled check -- 10 independent RNG seeds
+
+Reference values already on record (single default RNG seed = 1):
+  Equal-outcome control:      0.0714
+  Balanced-decorrelated ctrl: 0.1206
+  Shuffled (this seed):       0.1821
+
+  rng_seed= 1: post-training delta_predicted = 0.1821
+  rng_seed= 2: post-training delta_predicted = 0.1110
+  rng_seed= 3: post-training delta_predicted = 0.0833
+  rng_seed= 4: post-training delta_predicted = 0.1479
+  rng_seed= 5: post-training delta_predicted = 0.1248
+  rng_seed= 6: post-training delta_predicted = 0.0967
+  rng_seed= 7: post-training delta_predicted = 0.1458
+  rng_seed= 8: post-training delta_predicted = 0.1038
+  rng_seed= 9: post-training delta_predicted = 0.1368
+  rng_seed=10: post-training delta_predicted = 0.1025
+
+=== Summary across 10 seeds ===
+  mean   = 0.1235
+  std_dev = 0.0283
+  min    = 0.0833
+  max    = 0.1821
+
+For comparison: Equal-outcome=0.0714, Balanced-decorrelated=0.1206, single-seed Shuffled=0.1821
+
+VERDICT: The multi-seed MEAN converges toward the balanced-decorrelated control's value, not the single default seed's elevated 0.1821 -- CONFIRMS the residual was a single-seed finite-sample artifact, not a systematic property of per-tick randomized assignment. The default seed (1) happened to land on the high end of the distribution.

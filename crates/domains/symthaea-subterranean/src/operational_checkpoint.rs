@@ -10,6 +10,7 @@ use crate::mission_executive::{MissionCheckpointError, MissionExecutiveCheckpoin
 use crate::operator_authority::OperatorAuthority;
 use crate::partition_recovery::PartitionRecoverySupervisor;
 use crate::sensor_redundancy::SensorFusionSupervisor;
+use crate::temporal_assurance::TemporalAssuranceSupervisor;
 use crate::update_control::UpdateManager;
 use serde::{Deserialize, Serialize};
 
@@ -35,6 +36,8 @@ pub struct SubterraneanOperationalCheckpoint {
     pub field_envelope: FieldEnvelopeSupervisor,
     #[serde(default)]
     pub partition_recovery: PartitionRecoverySupervisor,
+    #[serde(default)]
+    pub temporal: TemporalAssuranceSupervisor,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,6 +52,7 @@ pub enum OperationalCheckpointError {
     InvalidActuatorIsolationState,
     InvalidFieldEnvelopeState,
     InvalidPartitionRecoveryState,
+    InvalidTemporalState,
 }
 
 impl From<CheckpointError> for OperationalCheckpointError {

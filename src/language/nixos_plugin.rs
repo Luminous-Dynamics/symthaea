@@ -618,4 +618,197 @@ mod tests {
             entities,
         );
     }
+
+    #[test]
+    fn test_nix_option_extraction() {
+        let plugin = NixOsPlugin;
+
+        let entities = plugin.extract_entities("Set services.nginx.enable = true");
+        assert!(
+            entities
+                .iter()
+                .any(|e| e.entity_type == "nix_option" && e.value.contains("services.nginx")),
+            "Should extract NixOS option path. Got: {:?}",
+            entities,
+        );
+    }
+
+    #[test]
+    fn test_flake_reference_extraction() {
+        let plugin = NixOsPlugin;
+
+        let entities = plugin.extract_entities("Add github:NixOS/nixpkgs as input");
+        assert!(
+            entities.iter().any(|e| e.entity_type == "flake_ref"),
+            "Should extract github: flake ref. Got: {:?}",
+            entities,
+        );
+    }
+
+    #[test]
+    fn test_intent_prototypes() {
+        let plugin = NixOsPlugin;
+        let protos = plugin.intent_prototypes();
+
+        assert!(protos.command.contains(&"install".to_string()));
+        assert!(protos.command.contains(&"rebuild".to_string()));
+        assert!(protos.command.contains(&"rollback".to_string()));
+        assert!(!protos.question.is_empty());
+        assert!(!protos.complaint.is_empty());
+        assert!(protos.custom.contains_key("configuration"));
+        assert!(protos.custom.contains_key("deployment"));
+    }
+
+    #[test]
+    fn test_prompts_non_empty() {
+        let plugin = NixOsPlugin;
+        let prompts = plugin.prompts();
+
+        assert!(!prompts.system.is_empty());
+        assert!(prompts.clarification.contains("{}"));
+        assert!(prompts.action_confirm.contains("{}"));
+        assert!(!prompts.error_explain.is_empty());
+        assert!(!prompts.out_of_domain.is_empty());
+    }
+
+    #[test]
+    fn test_diagnose_all_error_patterns() {
+        let plugin = NixOsPlugin;
+
+        // Note: patterns use literal `contains()` matching, not regex.
+        // "attribute .* missing" means the text must literally contain "attribute .* missing"
+        let errors = [
+            ("syntax error: unexpected token", "syntax"),
+            ("undefined variable 'pkgs'", "undefined_variable"),
+            (
+                "attribute .* missing in the derivation",
+                "missing_attribute",
+            ),
+            ("infinite recursion encountered", "infinite_recursion"),
+            ("hash mismatch in fixed-output derivation", "hash_mismatch"),
+            ("builder .* failed to produce output", "build_failure"),
+            ("permission denied", "permission"),
+            (
+                "collision between /nix/store/a and /nix/store/b",
+                "collision",
+            ),
+        ];
+
+        for (error_text, expected_type) in errors {
+            let diag = plugin.diagnose_error(error_text);
+            assert!(diag.is_some(), "Should diagnose: {}", error_text);
+            assert_eq!(
+                diag.unwrap().error_type,
+                expected_type,
+                "Wrong error type for: {}",
+                error_text
+            );
+        }
+    }
+
+    #[test]
+    fn test_diagnose_unknown_error() {
+        let plugin = NixOsPlugin;
+        let diag = plugin.diagnose_error("something completely unrelated went wrong");
+        assert!(diag.is_none(), "Should not diagnose unknown errors");
+    }
+
+    #[test]
+    fn test_validation_bracket_mismatch() {
+        let plugin = NixOsPlugin;
+
+        let result = plugin.validate_input("[ 1 2 3");
+        assert!(!result.valid, "Mismatched brackets should be invalid");
+
+        let result = plugin.validate_input("[ 1 2 3 ]");
+        assert!(result.valid);
+    }
+
+    #[test]
+    fn test_domain_detection_boundary() {
+        let plugin = NixOsPlugin;
+
+        // NixOS-specific terms should score high
+        assert!(plugin.is_in_domain("I want to install a derivation") > 0.5);
+        assert!(plugin.is_in_domain("My flake.nix needs an overlay") > 0.5);
+
+        // Non-NixOS should score low
+        assert!(plugin.is_in_domain("How do I cook pasta?") < 0.3);
+        assert!(plugin.is_in_domain("What is 2 + 2?") < 0.3);
+    }
+
+    #[test]
+    fn test_suggest_actions_install() {
+        let plugin = NixOsPlugin;
+        let actions = plugin.suggest_actions("I want to install firefox");
+        assert!(!actions.is_empty());
+        assert!(actions.iter().any(|a| a.contains("nix-env")));
+    }
+
+    #[test]
+    fn test_suggest_actions_garbage() {
+        let plugin = NixOsPlugin;
+        let actions = plugin.suggest_actions("running out of disk space, need garbage collection");
+        assert!(actions.iter().any(|a| a.contains("nix-collect-garbage")));
+        assert!(actions.iter().any(|a| a.contains("optimise")));
+    }
+
+    #[test]
+    fn test_suggest_actions_no_match() {
+        let plugin = NixOsPlugin;
+        let actions = plugin.suggest_actions("hello world");
+        assert!(actions.is_empty());
+    }
+
+    #[test]
+    fn test_preprocess_normalizes_commands() {
+        let plugin = NixOsPlugin;
+        assert_eq!(
+            plugin.preprocess("nixos rebuild switch"),
+            "nixos-rebuild switch"
+        );
+        assert_eq!(plugin.preprocess("nix env -i vim"), "nix-env -i vim");
+    }
+
+    #[test]
+    fn test_multiple_entity_types() {
+        let plugin = NixOsPlugin;
+
+        // Text with multiple entity types
+        let entities = plugin.extract_entities(
+            "Run nixos-rebuild switch to apply services.nginx.enable from pkgs.nginx",
+        );
+
+        let types: Vec<&str> = entities.iter().map(|e| e.entity_type.as_str()).collect();
+        assert!(
+            types.contains(&"nix_command"),
+            "Should find nix_command. Types: {:?}",
+            types
+        );
+        assert!(
+            types.contains(&"package"),
+            "Should find package. Types: {:?}",
+            types
+        );
+        assert!(
+            types.contains(&"nix_option"),
+            "Should find nix_option. Types: {:?}",
+            types
+        );
+    }
+
+    #[test]
+    fn test_file_path_extraction() {
+        let plugin = NixOsPlugin;
+
+        let entities =
+            plugin.extract_entities("Edit /etc/nixos/configuration.nix to fix the error");
+        assert!(
+            entities
+                .iter()
+                .any(|e| e.entity_type == "file" && e.value.contains("configuration.nix")),
+            "Should extract file path. Got: {:?}",
+            entities,
+        );
+    }
 }

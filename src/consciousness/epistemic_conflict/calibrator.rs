@@ -99,6 +99,12 @@ impl TheoryCalibrator {
         self.gamma
     }
 
+    /// Total number of posthoc outcomes ever recorded (lifetime, unbounded —
+    /// `posthoc_outcomes` is never truncated). Used as `ToolDescriptor.calibration_count`.
+    pub fn posthoc_count(&self) -> usize {
+        self.posthoc_outcomes.len()
+    }
+
     /// Record a posthoc outcome for γ calibration.
     ///
     /// - `gate_passed`: whether the tool gate allowed the action.

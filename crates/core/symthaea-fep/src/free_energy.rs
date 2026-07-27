@@ -342,8 +342,20 @@ pub struct ExpectedFreeEnergyComputer {
     pub novelty_weight: f64,
     /// Preferred observations (goals)
     pub preferences: Vec<f64>,
-    /// Preference precision (how strongly to pursue goals)
+    /// Preference precision (how strongly to pursue goals) -- applied uniformly to every
+    /// observation dimension unless [`Self::precision_overrides`] is set.
     pub preference_precision: f64,
+    /// Per-dimension precision override, set via [`Self::set_preferences_with_precisions`].
+    /// `None` (the default, and what every pre-existing caller of [`Self::set_preferences`]
+    /// leaves it at) reproduces the exact prior behavior: `preference_precision` applied
+    /// uniformly to all dims. `Some(v)` lets a caller express "no preference at all" (`v[i] =
+    /// 0.0`) on specific dimensions while keeping real precision on others -- something a single
+    /// shared scalar cannot express. Added for `symthaea-alife`'s Genesis v0.1 audit: a `0.5`
+    /// preference shared across resource/energy *and* social-history channels was found to be a
+    /// real, non-neutral pull on the social channels, not the inert placeholder it was assumed
+    /// to be (`ALIFE_MULTIAGENT_GENESIS_PLAN_2026-07-25.md`, Gate 5).
+    #[serde(default)]
+    pub precision_overrides: Option<Vec<f64>>,
     /// Action history for novelty computation
     pub action_history: VecDeque<usize>,
 }
@@ -356,14 +368,28 @@ impl ExpectedFreeEnergyComputer {
             novelty_weight: 0.1,
             preferences: vec![0.8; obs_dim], // Default: prefer high values
             preference_precision: 2.0,
+            precision_overrides: None,
             action_history: VecDeque::with_capacity(100),
         }
     }
 
-    /// Set goal preferences
+    /// Set goal preferences, one shared precision across every dimension -- unchanged behavior
+    /// for every existing caller (clears any prior [`Self::set_preferences_with_precisions`]
+    /// override, matching "the last `set_preferences*` call wins").
     pub fn set_preferences(&mut self, preferences: Vec<f64>, precision: f64) {
         self.preferences = preferences;
         self.preference_precision = precision;
+        self.precision_overrides = None;
+    }
+
+    /// Set goal preferences with an explicit per-dimension precision vector. `precisions.len()`
+    /// should match `preferences.len()`; a dimension with precision `0.0` contributes nothing to
+    /// [`Self::compute_pragmatic_value`] regardless of its preference value -- a genuine "no
+    /// preference" on that channel, which [`Self::set_preferences`]'s single shared scalar cannot
+    /// express.
+    pub fn set_preferences_with_precisions(&mut self, preferences: Vec<f64>, precisions: Vec<f64>) {
+        self.preferences = preferences;
+        self.precision_overrides = Some(precisions);
     }
 
     /// Compute expected free energy for an action
@@ -414,11 +440,20 @@ impl ExpectedFreeEnergyComputer {
         }
     }
 
-    /// Compute pragmatic value (divergence from preferences)
-    fn compute_pragmatic_value(&self, expected_obs: &[f64]) -> f64 {
+    /// Compute pragmatic value (divergence from preferences). Per-dimension precision from
+    /// [`Self::precision_overrides`] when set (and matching `preferences`' length exactly --
+    /// otherwise falls back to the uniform `preference_precision`, same as no override at all,
+    /// rather than silently misaligning dimensions); the uniform `preference_precision`
+    /// otherwise, unchanged from before per-dimension precision existed.
+    pub(crate) fn compute_pragmatic_value(&self, expected_obs: &[f64]) -> f64 {
+        let overrides = self
+            .precision_overrides
+            .as_ref()
+            .filter(|v| v.len() == self.preferences.len());
         let mut divergence = 0.0;
-        for (obs, pref) in expected_obs.iter().zip(self.preferences.iter()) {
-            divergence += self.preference_precision * (obs - pref).powi(2);
+        for (i, (obs, pref)) in expected_obs.iter().zip(self.preferences.iter()).enumerate() {
+            let precision = overrides.map(|v| v[i]).unwrap_or(self.preference_precision);
+            divergence += precision * (obs - pref).powi(2);
         }
         divergence
     }

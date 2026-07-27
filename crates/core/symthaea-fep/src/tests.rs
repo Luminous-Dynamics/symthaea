@@ -178,6 +178,81 @@ fn test_expected_free_energy() {
 }
 
 #[test]
+fn test_set_preferences_with_precisions_defaults_to_none_and_uniform_precision_still_works() {
+    // Baseline equivalence: a computer that never calls the new method behaves exactly as
+    // before -- `precision_overrides` stays `None`, `compute_pragmatic_value` uses
+    // `preference_precision` uniformly.
+    let mut a = ExpectedFreeEnergyComputer::new(3);
+    let mut b = ExpectedFreeEnergyComputer::new(3);
+    a.set_preferences(vec![0.9, 0.5, 0.2], 2.0);
+    b.set_preferences(vec![0.9, 0.5, 0.2], 2.0);
+    assert_eq!(a.precision_overrides, None);
+    let model = GenerativeModel::new(3, 3, 2);
+    let state = HiddenState::new(3);
+    for action in 0..2 {
+        assert_eq!(
+            a.compute(action, &state, &model).pragmatic,
+            b.compute(action, &state, &model).pragmatic
+        );
+    }
+}
+
+#[test]
+fn test_zero_precision_dimension_contributes_nothing_regardless_of_preference() {
+    // The whole point of per-dimension precision: a `0.0`-precision dimension must not affect
+    // pragmatic value at all, no matter how far the expected observation is from its nominal
+    // "preference" value.
+    let mut near_pref = ExpectedFreeEnergyComputer::new(2);
+    near_pref.set_preferences_with_precisions(vec![0.5, 0.5], vec![2.0, 0.0]);
+    let mut far_from_pref = ExpectedFreeEnergyComputer::new(2);
+    far_from_pref.set_preferences_with_precisions(vec![0.5, 0.5], vec![2.0, 0.0]);
+
+    // Same real (precision-2.0) dimension for both; only the zero-precision dimension's
+    // hypothetical observation differs, computed directly rather than through model prediction
+    // so the test isolates `compute_pragmatic_value` itself.
+    let near = near_pref.compute_pragmatic_value(&[0.5, 0.5]); // dim 1 matches its "preference"
+    let far = far_from_pref.compute_pragmatic_value(&[0.5, 0.9]); // dim 1 far from its "preference"
+    assert_eq!(
+        near, far,
+        "a zero-precision dimension must contribute nothing to pragmatic value regardless of \
+         how far the observation is from its nominal preference"
+    );
+}
+
+#[test]
+fn test_mismatched_precision_override_length_falls_back_to_uniform_precision() {
+    // Defensive: a caller-supplied precisions vector that doesn't match preferences' length
+    // must not silently misalign dimensions -- fall back to uniform `preference_precision`,
+    // the same safe behavior as no override at all.
+    let mut computer = ExpectedFreeEnergyComputer::new(3);
+    computer.set_preferences_with_precisions(vec![0.5, 0.5, 0.5], vec![1.0, 1.0]); // wrong length
+    computer.preference_precision = 3.0;
+    let via_mismatched = computer.compute_pragmatic_value(&[0.8, 0.2, 0.9]);
+
+    let mut uniform = ExpectedFreeEnergyComputer::new(3);
+    uniform.set_preferences(vec![0.5, 0.5, 0.5], 3.0);
+    let via_uniform = uniform.compute_pragmatic_value(&[0.8, 0.2, 0.9]);
+
+    assert_eq!(via_mismatched, via_uniform);
+}
+
+#[test]
+fn test_agent_set_goals_with_precisions_delegates_to_efe_computer() {
+    let config = ActiveInferenceAgentConfig {
+        state_dim: 3,
+        obs_dim: 3,
+        ..Default::default()
+    };
+    let mut agent = ActiveInferenceAgent::new(config);
+    agent.set_goals_with_precisions(vec![0.9, 0.5, 0.5], vec![2.0, 0.0, 0.0]);
+    assert_eq!(agent.efe_computer.preferences, vec![0.9, 0.5, 0.5]);
+    assert_eq!(
+        agent.efe_computer.precision_overrides,
+        Some(vec![2.0, 0.0, 0.0])
+    );
+}
+
+#[test]
 fn test_active_inference_agent_creation() {
     let config = ActiveInferenceAgentConfig::default();
     let agent = ActiveInferenceAgent::new(config);

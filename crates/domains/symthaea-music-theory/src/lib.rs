@@ -32,6 +32,7 @@ pub const MUSIC_THEORY_ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub mod accompaniment;
 pub mod cadence;
+pub mod call_response;
 pub mod chord;
 pub mod cognitive_analysis;
 pub mod composer;
@@ -51,6 +52,7 @@ pub mod groove_cycle;
 pub mod harmony;
 pub mod hook;
 pub mod integration;
+pub mod jazz_chorus;
 pub mod live;
 pub mod melodic_contour_identity;
 pub mod meter;

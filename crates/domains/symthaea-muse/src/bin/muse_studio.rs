@@ -80,6 +80,19 @@ const SAMPLE_RATE: u32 = 48_000;
 const TICKS_PER_BEAT: u32 = 960;
 const MAX_CANDIDATES: u64 = 12;
 const MAX_STORED: usize = 200;
+/// `ComposeRequest::bars` must fall in this range or `/api/compose`
+/// rejects the request outright (HTTP 400) rather than silently
+/// rescaling it. Upper bound raised to 36 (was a silent `clamp(2, 16)`)
+/// specifically to make Blues call-response's 3-chorus/36-bar case
+/// reachable live -- 36 bars was already the render workload this
+/// interactive endpoint was accidentally producing before the chorus-
+/// count fix, so this isn't new cost, just an honest ceiling for it.
+/// Interactive-render-budget concerns for engines that DON'T scale
+/// linearly with `bars` (see `groove_cycle.rs`/`modal_arc.rs`) remain a
+/// real, separate, not-yet-built per-engine cost estimate -- this range
+/// only restores "the request means what it says," not a full budget
+/// system.
+const COMPOSE_BARS_RANGE: std::ops::RangeInclusive<usize> = 2..=36;
 /// Pre-render novelty floor (`MUSE_DIVERSITY_TRUTH_PLAN_2026-07-18.md` Phase
 /// 2): below this, a batch candidate is close enough — to its nearest
 /// BATCH neighbor's `NoveltyBreakdown.overall`, or to a recent KEEPER's —
@@ -372,6 +385,14 @@ struct Candidate {
     /// one (Fugue/ProgSuite/Sonata/Renaissance/Opera/ground forms). Powers
     /// the Muse Atlas endpoint's structural fingerprint.
     form: Option<symthaea_music_theory::Form>,
+    /// The REAL grammar-plan evidence this candidate was composed with
+    /// (`compose_with_grammar_plan`'s own `GrammarRealization::plan`) --
+    /// `None` only for a candidate composed from a user-authored custom
+    /// spec, which has no `Style` to derive a `GrammarProfile` from.
+    /// Consumed by the Analyst endpoint (`analyst_bundle`) so its
+    /// verification reflects what actually produced this piece, not a
+    /// synthesized guess.
+    plan: Option<GrammarPlanEvidence>,
     /// Identity grammar + erosion ending (see CandidateMeta).
     grammar: &'static str,
     ending: Option<&'static str>,
@@ -432,6 +453,13 @@ struct ComposeRequest {
     /// Semitone 0-11 (0 = C).
     tonic: i32,
     style: Style,
+    /// Must be in `COMPOSE_BARS_RANGE` (currently 2-36) -- validated, not
+    /// silently clamped: a request outside that range comes back as
+    /// HTTP 400 rather than being silently rewritten to a different
+    /// value. Found necessary 2026-07-26 after a live listening/analysis
+    /// session: two DIFFERENT `bars` requests (24 and 36) were silently
+    /// collapsing to the same clamped value, so the returned evidence no
+    /// longer matched what was actually asked for.
     bars: usize,
     base_seed: u64,
     n_candidates: u64,
@@ -1334,6 +1362,14 @@ async fn cognitive_sonata_return(
                 // entirely (see compose_with_spec_and_form's doc comment),
                 // so it never produces a Form.
                 form: None,
+                // This endpoint has its own dedicated, richer verification
+                // (theory_validation/preserved_invariants/obligation
+                // tracking, above) -- there's no matching
+                // `GrammarPlanEvidence` variant for it, so the Analyst
+                // endpoint's generic plan-based checks fall back to
+                // synthesizing `Compatibility` for this candidate, same as
+                // a user-authored custom spec.
+                plan: None,
                 grammar,
                 ending,
                 card: None,
@@ -1487,18 +1523,43 @@ async fn compose(
     State(studio): State<Arc<Studio>>,
     Json(req): Json<ComposeRequest>,
 ) -> Result<Json<ComposeResponse>, (StatusCode, String)> {
+    if !COMPOSE_BARS_RANGE.contains(&req.bars) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!(
+                "bars must be between {} and {} (got {}) -- requests outside \
+                 this range are rejected, never silently rescaled to a \
+                 different value",
+                COMPOSE_BARS_RANGE.start(),
+                COMPOSE_BARS_RANGE.end(),
+                req.bars
+            ),
+        ));
+    }
     let n = req.n_candidates.clamp(1, MAX_CANDIDATES);
     let intent_base = MusicalIntent {
         valence: req.valence.clamp(-1.0, 1.0),
         arousal: req.arousal.clamp(0.0, 1.0),
         energy: req.energy.clamp(0.0, 1.0),
-        bars: req.bars.clamp(2, 16),
+        bars: req.bars,
         seed: req.base_seed,
         tonic: PitchClass::new(req.tonic),
     };
     let style = req.style;
     let stride = req.seed_stride.clamp(1, 1_000);
     let prompt = req.prompt.trim().to_string();
+    // Captured BEFORE `req.spec` is moved below: whether the CALLER
+    // submitted their own spec, as distinct from the `spec` local variable
+    // further down (which becomes `Some` unconditionally once the
+    // identity-grammar override branch runs, even for a plain preset
+    // request). Real grammar-family engines (GrooveCycle/ProcessAdditive/
+    // RagaModalArc/CallResponse, and every other family's cadence/phrase-
+    // grammar-aware routing) assume a `Style`-derived `GrammarProfile`
+    // whose invariants (e.g. CallResponse's 12-bar-multiple progression)
+    // a genuinely user-authored spec has no obligation to satisfy -- so
+    // this stays the deciding signal for whether it's safe to route
+    // through them below, not the post-override `spec` variable.
+    let is_custom_spec = req.spec.is_some();
     // A user-authored spec replaces the style preset entirely.
     let spec = req.spec;
     // The identity-grammar override rewrites the effective form pool (and
@@ -1645,15 +1706,20 @@ async fn compose(
         let (seed, cand_spec, bars_mul) = per_candidate_render[i as usize].clone();
         let intent = MusicalIntent {
             seed,
-            bars: (intent_base.bars * bars_mul).min(16),
+            // A SEPARATE cap from `COMPOSE_BARS_RANGE`'s input validation:
+            // `bars_mul` (from the premise layer) can INFLATE the
+            // validated `intent_base.bars` well past what the caller
+            // asked for, so this still needs its own ceiling -- just kept
+            // in sync with the same range's upper bound rather than a
+            // second, independent magic number (found out of sync
+            // 2026-07-26: this site was still hardcoded to the OLD 16-bar
+            // limit after `COMPOSE_BARS_RANGE` raised it to 36, silently
+            // re-clamping a validated 36-bar request back down to 16).
+            bars: (intent_base.bars * bars_mul).min(*COMPOSE_BARS_RANGE.end()),
             ..intent_base
         };
         let state = state.clone();
         handles.push(tokio::task::spawn_blocking(move || {
-            // Every candidate composes through the spec path under ITS
-            // spec (premise or authored); for presets this is equivalent
-            // to the styled path by the spec-identity tests.
-            //
             // Compose once, not twice: `compose_and_realize_spec` already
             // calls `compose_with_spec` internally and discards the score
             // it produced — a second, separate `compose_with_spec` call
@@ -1661,10 +1727,38 @@ async fn compose(
             // this handler's own use (phi/coherence analysis, /api/notes,
             // MIDI export). Composing is deterministic given the same
             // (intent, spec), so the second call was pure waste — every
-            // candidate was being composed twice. Call `compose_with_spec`
-            // once and pass its result into `realize_with_spec` directly.
-            let (score, form) =
-                symthaea_music_theory::compose_with_spec_and_form(&intent, &cand_spec);
+            // candidate was being composed twice. Compose once and pass
+            // the result into `realize_with_spec` directly.
+            //
+            // Route through `compose_with_grammar_plan` (the SAME entry
+            // point `compose_styled`/`compose` use) whenever the request
+            // is still preset-derived (`!is_custom_spec`) — this is what
+            // actually reaches GrooveCycle/ProcessAdditive/RagaModalArc/
+            // CallResponse's dedicated engines, and gives every OTHER
+            // style the Jul22-24 grammar-family cadence/phrase-grammar
+            // routing too. Found 2026-07-25: this handler previously
+            // called `compose_with_spec_and_form` unconditionally, which
+            // NEVER reaches `compose_with_grammar_plan`'s family dispatch
+            // at all — so every dedicated grammar engine in this crate
+            // was real, tested, and completely unreachable from the live
+            // product. For a genuinely user-authored spec (`is_custom_
+            // spec`), there is no `Style` to derive a `GrammarProfile`
+            // from, so the plain spec path remains correct — a dedicated
+            // engine's invariants (e.g. CallResponse's 12-bar-multiple
+            // progression) aren't something arbitrary user data is
+            // obligated to satisfy.
+            let (score, form, plan) = if is_custom_spec {
+                let (score, form) =
+                    symthaea_music_theory::compose_with_spec_and_form(&intent, &cand_spec);
+                (score, form, None)
+            } else {
+                let realized = symthaea_music_theory::compose_with_grammar_plan(
+                    style.grammar_profile(),
+                    &intent,
+                    &cand_spec,
+                );
+                (realized.score, realized.form, Some(realized.plan))
+            };
             let comp = symthaea_muse::theory_realize::realize_with_spec(
                 &score,
                 &cand_spec,
@@ -1682,7 +1776,7 @@ async fn compose(
             } else {
                 fluidsynth_candidate_wav(&score, &cand_spec, seed, &state)
             };
-            (seed, comp, score, fluid_wav, form)
+            (seed, comp, score, fluid_wav, form, plan)
         }));
     }
     let _ = (&spec, style); // kept alive for the request's lifetime; unused past dispatch
@@ -1709,7 +1803,7 @@ async fn compose(
     {
         let mut store = studio.candidates.lock().unwrap();
         evict_oldest_candidates(&mut store); // session-scale memory bound
-        for (idx, (seed, comp, score, fluid_wav, form)) in rendered.into_iter().enumerate() {
+        for (idx, (seed, comp, score, fluid_wav, form, plan)) in rendered.into_iter().enumerate() {
             let id = studio.next_id.fetch_add(1, Ordering::Relaxed);
             let fingerprint = symthaea_music_theory::fingerprint::exact_fingerprint(&score);
             let duplicate_of = mark_duplicate(&mut seen_fingerprints, fingerprint, id);
@@ -1731,7 +1825,11 @@ async fn compose(
             let cand_spec = per_candidate[idx].1.clone();
             let candidate_intent = MusicalIntent {
                 seed,
-                bars: (intent_base.bars * per_candidate[idx].2).min(16),
+                // Must match the spawn_blocking closure's own bars
+                // computation above exactly -- this reconstructs the same
+                // per-candidate intent for the metadata/title/novelty
+                // pipeline below, not a second independent decision.
+                bars: (intent_base.bars * per_candidate[idx].2).min(*COMPOSE_BARS_RANGE.end()),
                 ..intent_base
             };
             let ground =
@@ -1837,6 +1935,7 @@ async fn compose(
                     global_coherence,
                     ground,
                     form,
+                    plan,
                     grammar,
                     ending,
                     card,
@@ -1870,6 +1969,7 @@ fn rank(
         Score,
         Option<Vec<u8>>,
         Option<symthaea_music_theory::Form>,
+        Option<GrammarPlanEvidence>,
     )],
 ) -> (Option<Vec<f32>>, String) {
     use symthaea_muse::clap_embed::{ClapEmbedder, ClapTextEmbedder, cosine_similarity};
@@ -1892,7 +1992,7 @@ fn rank(
         Err(e) => return (None, format!("prompt embedding failed: {e}")),
     };
     let mut sims = Vec::with_capacity(rendered.len());
-    for (_, comp, _, _, _) in rendered {
+    for (_, comp, _, _, _, _) in rendered {
         let mono: Vec<f64> = match &comp.audio {
             AudioData::StereoF32(frames) => {
                 frames.iter().map(|[l, r]| ((l + r) * 0.5) as f64).collect()
@@ -1920,6 +2020,7 @@ fn rank(
         Score,
         Option<Vec<u8>>,
         Option<symthaea_music_theory::Form>,
+        Option<GrammarPlanEvidence>,
     )],
 ) -> (Option<Vec<f32>>, String) {
     if prompt.is_empty() {
@@ -3741,6 +3842,23 @@ fn snake_case_variant<T: Serialize>(value: &T) -> String {
     }
 }
 
+/// `GrammarPlanEvidence`'s variants carry data, so they don't serialize to
+/// a bare string the way `snake_case_variant` expects (they'd become a
+/// JSON object like `{"call_response": {...}}`) — this names each variant
+/// directly instead.
+fn plan_kind_str(plan: &GrammarPlanEvidence) -> &'static str {
+    match plan {
+        GrammarPlanEvidence::PeriodSentence(_) => "period_sentence",
+        GrammarPlanEvidence::Contrapuntal(_) => "contrapuntal",
+        GrammarPlanEvidence::GrooveCycle(_) => "groove_cycle",
+        GrammarPlanEvidence::AdditiveProcess(_) => "additive_process",
+        GrammarPlanEvidence::ModalArc(_) => "modal_arc",
+        GrammarPlanEvidence::CallResponse(_) => "call_response",
+        GrammarPlanEvidence::JazzChorus(_) => "jazz_chorus",
+        GrammarPlanEvidence::Compatibility { .. } => "compatibility",
+    }
+}
+
 /// Every style Muse can compose in, each with its real
 /// `Style::grammar_family()` — lets `symthaea-muse-ui` make policy-aware
 /// style choices (`JourneyPolicy::Resonance`/`Contrast`) without
@@ -3762,22 +3880,24 @@ async fn listen_styles() -> Json<Vec<symthaea_muse_protocol::StyleFamily>> {
 /// (`symthaea_muse::analyst::analyze_piece`) — turns the compiled-but-inert
 /// verification pipeline into something actually reachable.
 ///
-/// Honesty note: the live `/api/compose` handler always builds candidates via
-/// `compose_with_spec_and_form(..., grammar: None)` — none of the flagship
-/// bypass engines (`GrooveCycle`/`ProcessAdditive`/`RagaModalArc`/
-/// `Contrapuntal`) are actually reached from this server today, even for
-/// styles whose `grammar_family()` names one of them. Recomposing here via
-/// `compose_with_grammar_plan` would silently claim a dedicated-engine plan
-/// that never produced the piece actually rendered. Instead this reports the
-/// same `GrammarPlanEvidence::Compatibility` the analyst's own design uses
-/// for exactly this situation, so the Analyst correctly flags
-/// "dedicated-family-engine" as `InsufficientEvidence` rather than fabricating
-/// evidence — see `symthaea_muse::analyst::plan_checks`.
+/// Updated 2026-07-25: the live `/api/compose` handler now routes
+/// preset-derived candidates through `compose_with_grammar_plan` for real
+/// (previously it always called `compose_with_spec_and_form` directly,
+/// which never reached any dedicated grammar engine — see git history for
+/// that finding). The REAL `GrammarPlanEvidence` produced during
+/// composition is now stored on the `Candidate` and used here directly
+/// (`candidate.plan`), rather than always synthesizing a
+/// `GrammarPlanEvidence::Compatibility` fallback. That fallback still
+/// applies, correctly, for the one case where there genuinely is no
+/// dedicated-engine plan to report: a candidate composed from a
+/// user-authored custom spec (`ComposeRequest::spec`), which has no
+/// `Style` to derive a `GrammarProfile` from in the first place — see
+/// `symthaea_muse::analyst::plan_checks`.
 async fn analyst_bundle(
     State(studio): State<Arc<Studio>>,
     AxPath(id): AxPath<u64>,
 ) -> Result<Json<BundleEnvelope<symthaea_muse_protocol::AnalystPieceBundle>>, StatusCode> {
-    let (score, recipe, spec, seed, state, form_available, created_at_unix_ms, wav) = {
+    let (score, recipe, spec, seed, state, form_available, created_at_unix_ms, wav, real_plan) = {
         let store = studio.candidates.lock().unwrap();
         let candidate = store.get(&id).ok_or(StatusCode::NOT_FOUND)?;
         (
@@ -3789,6 +3909,7 @@ async fn analyst_bundle(
             candidate.form.is_some(),
             candidate.created_at_unix_ms,
             candidate.wav.clone(),
+            candidate.plan.clone(),
         )
     };
     // `spec.name` matches a `Style` variant exactly for every preset-style
@@ -3819,12 +3940,21 @@ async fn analyst_bundle(
         family,
         GrammarFamily::GrooveCycle | GrammarFamily::RagaModalArc
     );
+    // The REAL plan the candidate was actually composed with, when one was
+    // stored (every preset-derived candidate since the /api/compose fix
+    // above) -- falls back to synthesizing `Compatibility` only for
+    // candidates with no stored plan (a user-authored custom spec, which
+    // has no `Style` to derive a `GrammarProfile` from at all).
+    let plan = real_plan.unwrap_or(GrammarPlanEvidence::Compatibility {
+        family,
+        form_available,
+    });
     let provenance = GrammarProvenance {
         family: snake_case_variant(&family),
         phrase_grammar: snake_case_variant(&profile.phrase),
         harmonic_syntax: snake_case_variant(&profile.harmony),
         performance_dialect: snake_case_variant(&profile.performance),
-        plan_kind: "compatibility".to_string(),
+        plan_kind: plan_kind_str(&plan).to_string(),
         culturally_qualified,
         obligations: Vec::new(),
         supported_intent_axes: profile
@@ -3833,10 +3963,6 @@ async fn analyst_bundle(
             .map(snake_case_variant)
             .collect(),
         performance_features: None,
-    };
-    let plan = GrammarPlanEvidence::Compatibility {
-        family,
-        form_available,
     };
     let (composition, mut warnings) = composition_bundle(&score, &recipe);
     let (performance, perf_warnings) = performance_bundle_payload(&score, &spec, seed, &state);
@@ -4441,5 +4567,99 @@ mod artifact_key_tests {
         assert_ne!(first, second);
         assert!(valid_artifact_key(&first));
         assert!(first.len() <= 80);
+    }
+}
+
+/// End-to-end tests for the `bars` request contract fixed 2026-07-26: the
+/// live `/api/compose` handler must neither silently rescale an
+/// out-of-range request nor lose track of what was actually asked for.
+/// Calls the real `compose` handler directly (not a mocked stand-in),
+/// forcing the native renderer so the test doesn't depend on FluidSynth
+/// being available in whatever environment runs `cargo test`.
+#[cfg(test)]
+mod compose_bars_contract_tests {
+    use super::{Candidate, ComposeRequest, Studio, compose};
+    use axum::Json;
+    use axum::extract::State;
+    use std::sync::Arc;
+    use symthaea_music_theory::{GrammarPlanEvidence, Style};
+
+    fn base_request(bars: usize) -> ComposeRequest {
+        ComposeRequest {
+            valence: 0.0,
+            arousal: 0.5,
+            energy: 0.6,
+            tonic: 0,
+            style: Style::Blues,
+            bars,
+            base_seed: 7,
+            n_candidates: 1,
+            prompt: String::new(),
+            explore: false,
+            grammar: None,
+            spec: None,
+            seed_stride: 1,
+            dopamine: 0.5,
+            serotonin: 0.5,
+            noradrenaline: 0.3,
+            consciousness: 0.5,
+            vary_premise: false,
+            renderer: Some("native".to_string()),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_36_bar_request_reaches_the_engine_with_intent_preserved() {
+        let studio = Arc::new(Studio::default());
+        let response = compose(State(studio.clone()), Json(base_request(36)))
+            .await
+            .expect("36 bars is within COMPOSE_BARS_RANGE");
+        let id = response.0.candidates[0].id;
+        let store = studio.candidates.lock().unwrap();
+        let candidate: &Candidate = store.get(&id).expect("candidate was stored");
+        let plan = candidate
+            .plan
+            .as_ref()
+            .expect("Blues is preset-derived, so a real plan must be stored");
+        match plan {
+            GrammarPlanEvidence::CallResponse(call_response_plan) => {
+                assert_eq!(
+                    call_response_plan.requested_bars, 36,
+                    "the server must not silently rewrite the request before \
+                     it reaches the engine"
+                );
+                assert_eq!(call_response_plan.realized_bars, 36);
+                assert_eq!(call_response_plan.choruses, 3);
+            }
+            other => panic!("expected GrammarPlanEvidence::CallResponse, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_request_above_the_maximum_is_rejected_not_rescaled() {
+        // Not `.expect_err(...)` -- `ComposeResponse` (the Ok side) has no
+        // Debug impl, which `.expect_err` needs to format the failure
+        // message if the call unexpectedly succeeds. Match explicitly
+        // instead.
+        let studio = Arc::new(Studio::default());
+        match compose(State(studio), Json(base_request(37))).await {
+            Err((status, message)) => {
+                assert_eq!(status, axum::http::StatusCode::BAD_REQUEST);
+                assert!(
+                    message.contains("37"),
+                    "the rejection message should name the offending value: {message}"
+                );
+            }
+            Ok(_) => panic!("37 bars exceeds COMPOSE_BARS_RANGE and must be rejected"),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_request_below_the_minimum_is_rejected_not_rescaled() {
+        let studio = Arc::new(Studio::default());
+        match compose(State(studio), Json(base_request(1))).await {
+            Err((status, _)) => assert_eq!(status, axum::http::StatusCode::BAD_REQUEST),
+            Ok(_) => panic!("1 bar is below COMPOSE_BARS_RANGE and must be rejected"),
+        }
     }
 }

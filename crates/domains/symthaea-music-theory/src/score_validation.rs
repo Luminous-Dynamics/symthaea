@@ -114,6 +114,51 @@ pub fn validate_score(score: &Score, config: &ScoreValidationConfig) -> TheoryVa
     }
 }
 
+/// Rules that represent a genuinely MALFORMED score, regardless of style or
+/// grammar family — collisions, out-of-range notes, missing metadata.
+/// Deliberately excludes `StrongBeatConsonance`/`ParallelPerfectMotion`/
+/// `VoiceCrossing`/`FinalTonicArrival`/`MelodicLeap`: those are real
+/// music-theoretic judgments, but they're style-dependent (a raga arc, a
+/// blues turnaround, or a groove cycle has no obligation to satisfy
+/// classical-tonal voice-leading rules it was never designed against), so
+/// gating production on them would either mask genuine stylistic idioms as
+/// "fatal" or force every grammar-family engine to a tonal common
+/// denominator it doesn't share.
+pub fn is_universal_invariant(rule: ScoreValidationRule) -> bool {
+    matches!(
+        rule,
+        ScoreValidationRule::ScoreMetadata
+            | ScoreValidationRule::NoteBounds
+            | ScoreValidationRule::VoiceMonophony
+    )
+}
+
+/// Debug-only production gate: panics if `score` has any Fatal issue among
+/// the universal-invariant rules (see [`is_universal_invariant`]), under the
+/// default validation config. Compiles to nothing in release builds — a
+/// development/test-time safety net against a score that collides or
+/// malforms itself, not a claim that the score is musically "correct" (the
+/// excluded voice-leading rules can and do still fail; see that function's
+/// doc for why they're deliberately not gated here).
+pub fn debug_assert_no_structural_defects(score: &Score, label: &str) {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+    let report = validate_score(score, &ScoreValidationConfig::default());
+    let defects: Vec<&ScoreValidationIssue> = report
+        .issues
+        .iter()
+        .filter(|i| i.severity == ValidationSeverity::Fatal && is_universal_invariant(i.rule))
+        .collect();
+    assert!(
+        defects.is_empty(),
+        "{label}: composed score has {} structural defect(s) (collision/malformation \
+         within a single voice — not a voice-leading judgment call):\n{:#?}",
+        defects.len(),
+        defects
+    );
+}
+
 fn validate_metadata(score: &Score, issues: &mut Vec<ScoreValidationIssue>) {
     if !score.tempo_bpm.is_finite() || score.tempo_bpm <= 0.0 {
         issue(
@@ -500,6 +545,62 @@ mod tests {
                 .issues
                 .iter()
                 .any(|issue| { issue.rule == ScoreValidationRule::FinalTonicArrival })
+        );
+    }
+
+    #[test]
+    fn universal_invariant_excludes_style_dependent_voice_leading_rules() {
+        assert!(is_universal_invariant(ScoreValidationRule::ScoreMetadata));
+        assert!(is_universal_invariant(ScoreValidationRule::NoteBounds));
+        assert!(is_universal_invariant(ScoreValidationRule::VoiceMonophony));
+        assert!(!is_universal_invariant(ScoreValidationRule::VoiceCrossing));
+        assert!(!is_universal_invariant(
+            ScoreValidationRule::StrongBeatConsonance
+        ));
+        assert!(!is_universal_invariant(
+            ScoreValidationRule::ParallelPerfectMotion
+        ));
+        assert!(!is_universal_invariant(ScoreValidationRule::MelodicLeap));
+        assert!(!is_universal_invariant(
+            ScoreValidationRule::FinalTonicArrival
+        ));
+    }
+
+    #[test]
+    fn debug_gate_panics_on_a_same_voice_overlap_but_not_on_a_missing_tonic() {
+        // A genuine same-voice collision (VoiceMonophony, a universal
+        // invariant) must panic -- this is exactly the bug class fixed in
+        // composer.rs's apply_counter_hook_echoes/CounterShift.
+        let mut colliding = valid_score();
+        colliding.notes[2].role = VoiceRole::Melody;
+        colliding.notes[2].onset = Duration::new(0, 1);
+        colliding.notes[2].duration = Duration::new(2, 1);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            debug_assert_no_structural_defects(&colliding, "test");
+        }));
+        assert!(result.is_err(), "expected a panic on a colliding score");
+
+        // A score whose ONLY fatal issue is a non-universal, style-dependent
+        // rule (missing final-tonic arrival) must NOT panic -- see
+        // `is_universal_invariant`'s doc for why.
+        let mut no_tonic = valid_score();
+        no_tonic.notes.last_mut().unwrap().pitch = Pitch::from_midi(62);
+        let report = validate_score(&no_tonic, &ScoreValidationConfig::default());
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|i| i.rule == ScoreValidationRule::FinalTonicArrival
+                    && i.severity == ValidationSeverity::Fatal),
+            "test setup must actually produce a FinalTonicArrival fatal: {:?}",
+            report.issues
+        );
+        let result2 = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            debug_assert_no_structural_defects(&no_tonic, "test");
+        }));
+        assert!(
+            result2.is_ok(),
+            "must not panic on a non-universal-rule fatal issue"
         );
     }
 }

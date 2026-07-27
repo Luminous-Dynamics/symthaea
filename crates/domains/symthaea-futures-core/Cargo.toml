@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-futures-core"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Symthaea Futures Laboratory — neutral forecast/branch/outcome types and the TrajectoryGenerator trait every predictor (classical, FEP-based, later quantum) competes through. See SYMTHAEA_FUTURES_LABORATORY_PLAN_2026-07-25.md. Deliberately zero non-std, non-serde dependencies — this crate must not know symthaea-fep, Symtropy, or any specific model backend exists."
+
+[dependencies]
+serde = { workspace = true }

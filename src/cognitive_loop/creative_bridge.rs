@@ -1579,7 +1579,21 @@ fn try_load_poetry_generator() -> Option<symthaea_broca::BrocaGenerator> {
             continue;
         }
         match symthaea_broca::BrocaGenerator::from_checkpoint(path, &genesis) {
-            Ok((generator, _adam, _proj, _lm_config)) => {
+            Ok((mut generator, _adam, _proj, _lm_config)) => {
+                // Fix (2026-07-26, SYMTHAEA_COGNITION_IMPROVEMENT_PLAN_2026-07-21.md
+                // follow-up): the checkpoint's own saved config always carries
+                // `SamplingStrategy::Greedy` regardless of what's set here (config is
+                // restored wholesale from the checkpoint, not from BrocaConfig::default()),
+                // so overriding it must happen post-load, not via any default. Greedy
+                // decoding was measured to collapse to the same first-1-2 tokens across
+                // most distinct thought inputs (6/8 unique 3-word prefixes on the
+                // promoted checkpoint); a modest, controlled TopK immediately fixes this
+                // (8/8 unique, same checkpoint, no retraining) without going as loose as
+                // TopP, which showed even more variety but less predictable quality.
+                generator.set_sampling(symthaea_broca::generator::SamplingStrategy::TopK {
+                    k: 5,
+                    temperature: 0.7,
+                });
                 tracing::info!(path = %path, "Loaded Broca checkpoint for poetry");
                 return Some(generator);
             }

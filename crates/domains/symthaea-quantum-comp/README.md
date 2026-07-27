@@ -43,7 +43,32 @@ The crate remains conservative: local reports are not publishable proof, hardwar
 - `noise_sweep` — controlled degradation sweeps.
 - `robustness` — noise-sweep robustness summaries.
 - `statistics` — small dependency-free report statistics.
-- `comparative` — replicated comparison reports.
+- `comparative` — replicated comparison reports. **Uncalibrated**: compares
+  classical and phase-HDC at the same literal `noise` parameter value, which
+  does not mean the same perturbation magnitude in each channel — see
+  `docs/RESEARCH_NOTES.md` ("First independent run and a real finding"). Use
+  `calibrated_comparison` for cross-representation noise claims.
+- `calibrated_comparison` — cross-representation comparison at a matched,
+  calibrated bit-error-rate, with both arms scored by the same final metric.
+  The fair replacement for `comparative`/`noise_sweep`'s cross-representation
+  columns; see the module doc comment and
+  `docs/RESEARCH_NOTES.md` for the full result.
+- `capacity_comparison` — calibrated bundling-capacity comparison (how many
+  superposed items survive reliable two-alternative forced-choice recall),
+  the more theoretically distinctive claim for phase/holographic
+  representations than noise-robustness; see `docs/RESEARCH_NOTES.md` for
+  the full result.
+- `continuous_value_comparison` — calibrated comparison of storing a
+  continuous scalar (not a bit) directly as a phase angle vs. classical
+  thermometer coding, including (a) a debiasing correction for thermometer
+  decode's noise-induced bias, and (b) a shrinkage-factor sweep testing
+  whether a *partial* correction beats full debiasing. **Not a flat win for
+  either side**: phase wins at zero noise (a real quantization-floor gap)
+  and at higher noise (target BER ≳ 0.10) even at classical's best available
+  decoder; debiased classical wins at low-to-moderate noise. Shrinkage
+  doesn't meaningfully change this picture except very close to the noise
+  ceiling. See `docs/RESEARCH_NOTES.md` for the full crossover result and
+  the honest caveats.
 - `matrix` — dimension-by-noise replicated experiment grids.
 - `stability` — alpha surface stability annotations.
 - `api_inventory` — dependency-free API inventory and surface catalog.
@@ -84,9 +109,25 @@ Run the robustness summary:
 
 `cargo run --example robustness_summary`
 
-Run the replicated comparison report:
+Run the replicated comparison report (uncalibrated — see `docs/RESEARCH_NOTES.md`):
 
 `cargo run --example comparative_report`
+
+Run the calibrated cross-representation comparison (the fair replacement for the above):
+
+`cargo run --example calibrated_comparison`
+
+Run the calibrated capacity comparison (bundling capacity, not noise-robustness):
+
+`cargo run --example capacity_comparison`
+
+Run the calibrated continuous-value comparison (a real crossover, not a flat win for either side):
+
+`cargo run --example continuous_value_comparison`
+
+Run the shrinkage probe (does a partial bias correction beat full debiasing at high noise?):
+
+`cargo run --example shrinkage_probe`
 
 Run a dimension-by-noise experiment matrix:
 

@@ -11,15 +11,20 @@
 //! - explicit field-survivability authority under partial sensor, actuator, power, and link failure
 
 pub mod actuator_isolation;
+pub mod adaptation_validation;
 pub mod audit_chain;
 pub mod authority_validation;
 pub mod capability_profile;
+pub mod causal_attribution;
 pub mod certification_bundle;
 pub mod certification_validation;
 pub mod control_context;
 pub mod controller;
+pub mod counterfactual_explanation;
 pub mod curriculum;
+pub mod degradation_forecast;
 pub mod degraded_operations;
+pub mod delayed_observation;
 pub mod embodiment;
 pub mod encoder;
 pub mod evidence;
@@ -29,6 +34,7 @@ pub mod fep_agent;
 pub mod field_envelope;
 pub mod geology;
 pub mod invariant_monitor;
+pub mod lifecycle_validation;
 pub mod logistics;
 pub mod long_horizon_validation;
 pub mod maintenance;
@@ -44,6 +50,8 @@ pub mod operator_challenge;
 pub mod operator_protocol;
 pub mod partition_recovery;
 pub mod path_memory;
+pub mod peer_trust;
+pub mod plan_freshness;
 pub mod plugin;
 pub mod policy_ablation;
 pub mod recovery_journal;
@@ -63,10 +71,16 @@ pub mod scenario_runner;
 pub mod sensor_redundancy;
 pub mod shared_map;
 pub mod simulator;
+pub mod stewardship_validation;
 pub mod survivability_validation;
 pub mod team;
+pub mod team_leadership;
 pub mod team_operations;
 pub mod team_validation;
+pub mod temporal_assurance;
+pub mod temporal_clock;
+pub mod temporal_event;
+pub mod temporal_runtime;
 pub mod traceability;
 pub mod training;
 pub mod tunnel_graph;
@@ -78,6 +92,7 @@ pub use actuator_isolation::{
     ActuatorIsolationPolicy, ActuatorIsolationReport, ActuatorIsolationSupervisor,
     NUM_MONITORED_ACTUATORS, PhysicalActuator,
 };
+pub use adaptation_validation::{AdaptationGateFailure, AdaptationReport, AdaptationValidator};
 pub use audit_chain::{
     AuditChainError, AuditDigestProvider, AuditEvent, AuditLedger, AuditRecord,
     DeterministicAuditDigest,
@@ -86,6 +101,11 @@ pub use authority_validation::{
     AuthorityContract, AuthorityGateFailure, AuthorityValidationReport, AuthorityValidator,
 };
 pub use capability_profile::{CapabilityDisposition, CapabilityProfile};
+pub use causal_attribution::{
+    AttributionDisposition, AttributionRecord, CAUSAL_ATTRIBUTION_SCHEMA_VERSION,
+    CausalAttributionLedger, CommandCause, ExpectedResponseSign, MAX_ATTRIBUTION_RECORDS,
+    MAX_PENDING_CAUSES, ResponseObservation,
+};
 pub use certification_bundle::{
     BuildIdentity, BundleDigestProvider, CERTIFICATION_BUNDLE_SCHEMA_VERSION, CertificationBundle,
     CertificationBundleError, DeterministicBundleDigest,
@@ -95,9 +115,18 @@ pub use certification_validation::{
     CertificationValidator,
 };
 pub use controller::{CheckpointError, ControllerCheckpoint};
+pub use counterfactual_explanation::{
+    CounterfactualActuator, CounterfactualAnswer, CounterfactualQuestion, explain_counterfactual,
+};
+pub use degradation_forecast::{DegradationForecast, DegradationForecaster, ForecastDisposition};
 pub use degraded_operations::{
     DegradedMode, DegradedObservation, DegradedOperationsSupervisor, DegradedPolicy,
     DegradedTransition,
+};
+pub use delayed_observation::{
+    DELAYED_OBSERVATION_SCHEMA_VERSION, DelayedObservationSupervisor, MAX_TIMED_OBSERVATIONS,
+    ObservationAgeDisposition, ObservationBatchAssessment, ObservationPurpose,
+    ObservationTimingAssessment, ObservationTimingIssue, TimedObservation,
 };
 pub use embodiment::EmbodimentBuildError;
 pub use encoder::EncoderError;
@@ -119,6 +148,9 @@ pub use geology::{
 };
 pub use invariant_monitor::{
     InvariantAssessment, InvariantContext, RuntimeInvariant, RuntimeInvariantMonitor,
+};
+pub use lifecycle_validation::{
+    LifecycleAssuranceReport, LifecycleAssuranceValidator, LifecycleGateFailure,
 };
 pub use logistics::{
     AdmissionRefusal, LogisticsError, LogisticsLedger, LogisticsPlanner, LogisticsPolicy,
@@ -172,6 +204,14 @@ pub use partition_recovery::{
     PartitionRecoveryPolicy, PartitionRecoverySupervisor,
 };
 pub use path_memory::{ReturnPathAssessment, ReturnPathMemory, ReturnPathSegment};
+pub use peer_trust::{
+    PeerAuthenticationAssertion, PeerAuthenticationOutcome, PeerTrustPolicy, PeerTrustRejection,
+    PeerTrustSupervisor,
+};
+pub use plan_freshness::{
+    PLAN_FRESHNESS_SCHEMA_VERSION, PlanBasis, PlanFreshnessAssessment, PlanFreshnessSupervisor,
+    PlanInvalidationReason, RuntimeRevisions,
+};
 pub use policy_ablation::{
     PolicyAblationReport, PolicyAblationRunner, PolicyAblationSuite, PolicyVariant,
 };
@@ -223,6 +263,7 @@ pub use shared_map::{
     SharedMapRejection, SharedRouteKnowledge, SharedTunnelBin, SharedTunnelMap,
     SharedTunnelObservation,
 };
+pub use stewardship_validation::{StewardshipGateFailure, StewardshipReport, StewardshipValidator};
 pub use survivability_validation::{
     SurvivabilityContract, SurvivabilityGateFailure, SurvivabilityValidationReport,
     SurvivabilityValidator,
@@ -230,11 +271,33 @@ pub use survivability_validation::{
 pub use team::{
     AgentId, HeartbeatRejection, PeerCondition, TeamDirectory, TeamHeartbeat, TeamRole, TeamStatus,
 };
-pub use team_operations::{TeamCoordinator, TeamDirective, TeamOperationalAssessment};
+pub use team_leadership::{
+    ByzantineContainmentAssessment, ByzantineContainmentAuthority, LeadershipLeaseVote,
+    TeamLeadershipPolicy, TeamLeadershipSupervisor, VoteRejection,
+};
+pub use team_operations::{
+    DISTRIBUTED_RECOVERY_CHECKPOINT_SCHEMA_VERSION, DistributedRecoveryCheckpoint, TeamCoordinator,
+    TeamDirective, TeamOperationalAssessment,
+};
 pub use team_validation::{
     TeamOperationalContract, TeamOperationalGateFailure, TeamOperationalValidationReport,
     TeamOperationalValidator,
 };
+pub use temporal_assurance::{
+    MAX_TEMPORAL_REASONS, TEMPORAL_ASSURANCE_SCHEMA_VERSION, TEMPORAL_REVIEW_CLEAN_DWELL_STEPS,
+    TEMPORAL_RUNTIME_FRAME_SCHEMA_VERSION, TemporalAssuranceAssessment,
+    TemporalAssuranceSupervisor, TemporalAuthority, TemporalRuntimeFrame,
+};
+pub use temporal_clock::{
+    ClockAssessment, ClockDisposition, ClockDomain, ClockIssue, ClockPolicy, ClockSample,
+    ClockSourceId, MAX_CLOCK_SOURCES, TEMPORAL_CLOCK_SCHEMA_VERSION, TemporalClockSupervisor,
+};
+pub use temporal_event::{
+    CausalEvent, CausalEventId, CausalEventKind, CausalEventLedger, EventAppendAssessment,
+    EventAppendError, EventOrdering, MAX_CAUSAL_EVENTS, MAX_EVENT_DEPENDENCIES,
+    TEMPORAL_EVENT_SCHEMA_VERSION, TimeInterval,
+};
+pub use temporal_runtime::{TemporalRuntimeInputs, temporal_runtime_revisions};
 pub use traceability::{
     TraceLink, TraceabilityMatrix, TraceabilityReport, VerificationArtifactKind,
 };

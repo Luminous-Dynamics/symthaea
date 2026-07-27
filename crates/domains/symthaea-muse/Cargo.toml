@@ -17,6 +17,7 @@ hound = { workspace = true }
 flacenc = "0.5.1"
 rustfft = { workspace = true }
 midly = "0.5"
+roxmltree = "0.20"
 serde_json = { workspace = true }
 sha2 = "0.10"
 bevy = { version = "0.18", default-features = false, optional = true }
@@ -41,13 +42,13 @@ anyhow = { workspace = true, optional = true }
 tokenizers = { version = "0.21", optional = true }
 
 # Muse Studio local web app (feature `studio`).
-axum = { workspace = true, optional = true }
+axum = { workspace = true, optional = true, features = ["multipart"] }
 tokio = { workspace = true, optional = true }
 tower-http = { version = "0.5", features = ["cors", "fs"], optional = true }
 # Genealogy ledger (src/genealogy.rs): structured/relational metadata only —
 # audio/MIDI bytes stay in the existing data/taste/audio/<key>/ content-
 # addressed layout, matching the workspace's established embedded-DB choice
-# (symthaea-memory, symthaea-nix also use rusqlite).
+# (symthaea-memory, nixward also use rusqlite).
 rusqlite = { workspace = true, optional = true }
 # Shared DTOs for Muse Studio's evidence-bundle endpoints (listen/performance/
 # provenance bundles) and title provenance. Also proves at compile time that

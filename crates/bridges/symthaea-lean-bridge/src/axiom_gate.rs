@@ -16,10 +16,11 @@
 //! Lean-less environment degrades gracefully instead of failing.
 
 use std::path::Path;
-use std::process::Command;
 
 pub use symthaea_proof_audit::{AxiomPolicy, GateReport};
 use symthaea_proof_audit::{GateInput, gate};
+
+use crate::subprocess::{RunError, run_bounded_on_file};
 
 /// Append a `#print axioms <theorem>` command to a proof-file body so Lean
 /// prints the proof's axiom dependencies to stdout when it checks the file.
@@ -76,20 +77,31 @@ fn resolve_lean_binary() -> String {
 }
 
 /// Run `bin <path>` and return combined stdout+stderr, or a terminal outcome.
+///
+/// Bounded by [`crate::subprocess::run_bounded_on_file`]: a hanging `lean`
+/// process is killed after a wall-clock timeout rather than blocking the
+/// caller forever, and captured output is capped rather than buffered
+/// without limit.
 fn run_lean_capture(path: &Path, bin: &str) -> Result<String, ProofAuditOutcome> {
-    let output = match Command::new(bin).arg(path).output() {
+    let output = match run_bounded_on_file(bin, path) {
         Ok(o) => o,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return Err(ProofAuditOutcome::LeanNotInstalled);
-        }
-        Err(e) => return Err(ProofAuditOutcome::ProcessError(e.to_string())),
+        Err(RunError::NotFound) => return Err(ProofAuditOutcome::LeanNotInstalled),
+        Err(RunError::Io(e)) => return Err(ProofAuditOutcome::ProcessError(e)),
     };
+    if output.timed_out {
+        return Err(ProofAuditOutcome::ProcessError(
+            "lean did not finish within the configured timeout and was killed".to_string(),
+        ));
+    }
     let mut combined = String::from_utf8_lossy(&output.stdout).into_owned();
     combined.push_str(&String::from_utf8_lossy(&output.stderr));
-    if !output.status.success() {
+    if output.truncated {
+        combined.push_str("\n[... output truncated at the capture limit ...]");
+    }
+    if !output.success() {
         return Err(ProofAuditOutcome::ProcessError(format!(
-            "Lean exited with {}: {}",
-            output.status, combined
+            "Lean exited with failure: {}",
+            combined
         )));
     }
     Ok(combined)
@@ -100,6 +112,16 @@ fn run_lean_capture(path: &Path, bin: &str) -> Result<String, ProofAuditOutcome>
 ///
 /// `proved_statement` is the theorem statement the generator emitted;
 /// `expected_statement` is the pinned spec it must match.
+///
+/// **This is the sanctioned entry point for a real accept/reject
+/// decision** -- unlike `symthaea_proof_audit::gate()` (which this
+/// function calls internally, see [`gate_lean_output`]), the axiom-output
+/// evidence here is genuinely captured from running `lean` via
+/// [`run_lean_capture`], not caller-supplied text. Do not build an
+/// alternate path that hands hand-written or LLM-generated text straight
+/// to `gate_lean_output`/`gate()` and treats the result as a real proof
+/// check -- see `symthaea_proof_audit::GateInput`'s doc comment for why
+/// that can't be caught at the type level.
 pub fn audit_lean_file<P: AsRef<Path>>(
     path: P,
     expected_theorem: &str,

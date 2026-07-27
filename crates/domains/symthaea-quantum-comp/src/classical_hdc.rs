@@ -137,6 +137,41 @@ impl BinaryHypervector {
         out
     }
 
+    /// Encodes a scalar in `[0, 1]` as a thermometer/unary code: the first
+    /// `round(value * dimension)` bits are set to `1`, the rest `0`.
+    ///
+    /// Thermometer coding is the fair, graceful-degradation baseline for
+    /// representing a continuous quantity in a binary vector: decode is a
+    /// plain popcount, so a bit flip *anywhere* changes the decoded estimate
+    /// by exactly `1/dimension`, regardless of which bit flipped. A
+    /// positional (even gray-coded) binary encoding of the same value does
+    /// not have this property — see
+    /// `docs/RESEARCH_NOTES.md`'s continuous-value comparison for why this
+    /// is the representation classical HDC gets to be tested with, not a
+    /// weaker strawman.
+    pub fn thermometer_encode(value: f32, dimension: usize) -> Result<Self> {
+        if dimension == 0 {
+            return Err(QuantumCompError::InvalidDimension);
+        }
+        let clamped = value.clamp(0.0, 1.0);
+        let ones = ((clamped * dimension as f32).round() as usize).min(dimension);
+        let mut out = Self::zeros(dimension)?;
+        for i in 0..ones {
+            out.set_bit(i, true)?;
+        }
+        Ok(out)
+    }
+
+    /// Decodes a thermometer-coded hypervector back to a scalar estimate in `[0, 1]`.
+    ///
+    /// The estimate is the fraction of set bits — `mask_unused_bits` already
+    /// zeroes any bits beyond `dimension`, so summing popcount across all
+    /// words is safe.
+    pub fn thermometer_decode(&self) -> f32 {
+        let ones: usize = self.words.iter().map(|w| w.count_ones() as usize).sum();
+        ones as f32 / self.dimension as f32
+    }
+
     /// Majority-bundles a nonempty slice of hypervectors.
     pub fn majority_bundle(vectors: &[Self], tie_seed: u64) -> Result<Self> {
         if vectors.is_empty() {
@@ -238,6 +273,44 @@ mod tests {
         let bound = a.bind_xor(&key).unwrap();
         let recovered = bound.unbind_xor(&key).unwrap();
         assert_eq!(a, recovered);
+    }
+
+    #[test]
+    fn thermometer_round_trips_within_one_quantization_step() {
+        for x in [0.0f32, 0.1, 0.37, 0.5, 0.83, 1.0] {
+            let encoded = BinaryHypervector::thermometer_encode(x, 1024).unwrap();
+            let decoded = encoded.thermometer_decode();
+            assert!(
+                (decoded - x).abs() <= 1.0 / 1024.0,
+                "x={x} decoded={decoded}"
+            );
+        }
+    }
+
+    #[test]
+    fn thermometer_clamps_out_of_range_inputs() {
+        assert_eq!(
+            BinaryHypervector::thermometer_encode(-1.0, 64)
+                .unwrap()
+                .thermometer_decode(),
+            0.0
+        );
+        assert_eq!(
+            BinaryHypervector::thermometer_encode(2.0, 64)
+                .unwrap()
+                .thermometer_decode(),
+            1.0
+        );
+    }
+
+    #[test]
+    fn thermometer_decode_moves_by_exactly_one_step_per_bit_flip() {
+        let encoded = BinaryHypervector::thermometer_encode(0.5, 1024).unwrap();
+        let before = encoded.thermometer_decode();
+        let mut flipped = encoded.clone();
+        flipped.flip_bit(10); // arbitrary index, anywhere works by design
+        let after = flipped.thermometer_decode();
+        assert!(((after - before).abs() - 1.0 / 1024.0).abs() < 1e-6);
     }
 
     #[test]

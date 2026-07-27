@@ -689,6 +689,35 @@ impl CompositionSpec {
         crate::form::oriented(&picked, orientation)
     }
 
+    /// Force every arousal tier's motif bank to a single, caller-supplied
+    /// motif — the minimal-pair listening-study control: presenting the
+    /// SAME melodic material through several different grammar families
+    /// isolates structural cues (form, harmony, phrase grammar) as what a
+    /// listener actually recognizes, rather than "I remember this tune."
+    /// Returns `false` (and changes nothing) if `source` doesn't fit one
+    /// bar of this spec's own meter — installing a motif the engine would
+    /// have to silently truncate or overrun defeats the point of a
+    /// controlled comparison. Also disables the hook-cell graft (`texture.
+    /// hook_cell`): grafting a DIFFERENT per-style hook onto the shared
+    /// motif would reintroduce exactly the per-family melodic variation
+    /// this method exists to eliminate.
+    pub fn install_primary_motif_for_seed(&mut self, source: &Motif, _seed: u64) -> bool {
+        let total_beats: f64 = source.notes.iter().map(|n| n.duration.beats()).sum();
+        if total_beats > self.meter as f64 + 1e-9 {
+            return false;
+        }
+        let spec_notes: Vec<SpecNote> = source
+            .notes
+            .iter()
+            .map(|n| (n.degree.unwrap_or(1), n.duration.num(), n.duration.den()))
+            .collect();
+        self.motifs_calm = vec![spec_notes.clone()];
+        self.motifs_medium = vec![spec_notes.clone()];
+        self.motifs_busy = vec![spec_notes];
+        self.texture.hook_cell = false;
+        true
+    }
+
     /// A progression `bars` measures long, from the grammar or the cycled
     /// archetype (same length contract as [`crate::style::Style`] had).
     pub fn progression(&self, bars: usize, seed: u64) -> Progression {

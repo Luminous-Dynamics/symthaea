@@ -131,7 +131,11 @@ impl FormalRule {
 }
 
 fn canonical_literals(values: impl IntoIterator<Item = Literal>) -> Vec<Literal> {
-    values.into_iter().collect::<BTreeSet<_>>().into_iter().collect()
+    values
+        .into_iter()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
 }
 
 fn validate_premises(rule: &RuleId, premises: &[Literal]) -> Result<(), RulePackError> {

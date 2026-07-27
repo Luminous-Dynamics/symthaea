@@ -9,9 +9,7 @@ use std::fmt;
 /// The Hamming weight (number of 1-bits) of a byte slice.
 #[must_use]
 pub fn weight(a: &[u8]) -> usize {
-    a.iter()
-        .map(|byte| byte.count_ones() as usize)
-        .sum()
+    a.iter().map(|byte| byte.count_ones() as usize).sum()
 }
 
 /// The Hamming distance between equal-length byte slices.
@@ -64,7 +62,10 @@ impl fmt::Display for PackedHammingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NibbleOutOfRange { value } => {
-                write!(f, "packed Hamming payload must fit in four bits, got 0x{value:02x}")
+                write!(
+                    f,
+                    "packed Hamming payload must fit in four bits, got 0x{value:02x}"
+                )
             }
             Self::Hamming74WordOutOfRange { value } => write!(
                 f,
@@ -106,9 +107,7 @@ pub fn hamming74_encode_checked(data: [u8; 4]) -> Result<[u8; 7], InvalidBit> {
 ///
 /// Hamming(7,4) cannot distinguish one error from many multi-bit error
 /// patterns. Use [`hamming84_decode`] when double-error detection is required.
-pub fn hamming74_decode_report(
-    codeword: [u8; 7],
-) -> Result<Hamming74DecodeResult, InvalidBit> {
+pub fn hamming74_decode_report(codeword: [u8; 7]) -> Result<Hamming74DecodeResult, InvalidBit> {
     validate_bits(&codeword)?;
     Ok(hamming74_decode_bits(codeword))
 }

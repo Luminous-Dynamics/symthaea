@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-futures-symtropy"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Symthaea Futures Laboratory — the observation firewall (ObservationPolicy) between hidden ground-truth simulator state and what forecasters are allowed to see, plus scenario-family adapters. See SYMTHAEA_FUTURES_LABORATORY_PLAN_2026-07-25.md."
+
+[dependencies]
+symthaea-futures-core = { workspace = true }
+symthaea-futures-state = { workspace = true }
+symthaea-alife = { workspace = true }
+serde = { workspace = true }

@@ -18,8 +18,6 @@ pub enum Norm {
     Forbidden(String),
 }
 
-
-
 /// The modality of a structured legal norm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Modality {
@@ -185,7 +183,6 @@ pub fn is_permitted(norms: &[Norm], act: &str) -> bool {
     permission_status(norms, act).is_permitted()
 }
 
-
 /// Collect all modal evidence for one typed proposition.
 pub fn assess_proposition(
     norms: &[StructuredNorm],
@@ -316,13 +313,10 @@ mod tests {
         let employee = PartyId::new("employee").unwrap();
         let employer = PartyId::new("employer").unwrap();
         let pay_wage = ActionId::new("pay_wage").unwrap();
-        let proposition = DeonticProposition::new(employer.clone(), pay_wage)
-            .with_beneficiary(employee.clone());
-        let reversed = DeonticProposition::new(
-            employee,
-            ActionId::new("pay_wage").unwrap(),
-        )
-        .with_beneficiary(employer);
+        let proposition =
+            DeonticProposition::new(employer.clone(), pay_wage).with_beneficiary(employee.clone());
+        let reversed = DeonticProposition::new(employee, ActionId::new("pay_wage").unwrap())
+            .with_beneficiary(employer);
         let norms = vec![StructuredNorm::new(
             Modality::Obligatory,
             proposition.clone(),

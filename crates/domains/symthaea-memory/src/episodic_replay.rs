@@ -1047,6 +1047,55 @@ impl EpisodicMemory {
         scored
     }
 
+    /// Retrieve episodes by similarity of their stored `input` vector.
+    ///
+    /// CORRECTION (2026-07-25, caught by C3's own purity test —
+    /// `recall_prediction_flag_on_eventually_diverges_from_off` panicked
+    /// "256 vs 16384" on first run): `Episode.input`/`.output` are NOT
+    /// full 16,384-D HDC vectors despite the `ContinuousHV` type — they
+    /// wrap the COMPRESSED CfC input/output (`compressed_state`/`output`,
+    /// same dimension as `prediction`; see `cycle_phases_memory.rs:356-358`).
+    /// Takes a plain `&[f32]` query in that compressed space, not a
+    /// `ContinuousHV`, to make the dimension honest at the call site.
+    ///
+    /// Unlike [`retrieve_by_embedding_similarity`], this needs no optional
+    /// `semantic_embedding` field (gated behind the non-default
+    /// `semantic-encoder` feature), so it works on any default build.
+    ///
+    /// Used by the Predictive Compression Program's C3 experiment
+    /// (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md §7) to test
+    /// whether explicit content-based recall can supply predictive
+    /// information plain state carryover didn't (C1's P1 finding).
+    /// Read-only — does not affect consolidation/reconsolidation state.
+    pub fn retrieve_by_input_similarity(&self, query: &[f32], top_k: usize) -> Vec<(Episode, f32)> {
+        if query.is_empty() {
+            return Vec::new();
+        }
+        let query_norm: f32 = query.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if query_norm < 1e-12 {
+            return Vec::new();
+        }
+        let mut scored: Vec<(Episode, f32)> = self
+            .episodes
+            .iter()
+            .filter_map(|pe| {
+                let input = &pe.episode.input.values;
+                if input.len() != query.len() {
+                    return None;
+                }
+                let dot: f32 = input.iter().zip(query.iter()).map(|(a, b)| a * b).sum();
+                let input_norm: f32 = input.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if input_norm < 1e-12 {
+                    return None;
+                }
+                Some((pe.episode.clone(), dot / (input_norm * query_norm)))
+            })
+            .collect();
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored.truncate(top_k);
+        scored
+    }
+
     /// The Art of Forgetting: Causal Pruning.
     ///
     /// Removes episodes whose survival value falls below the threshold.

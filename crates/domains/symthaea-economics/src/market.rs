@@ -211,9 +211,7 @@ pub fn market_surplus(
     let consumer_surplus = 0.5 * (demand.choke_price() - point.price) * point.quantity;
     let producer_surplus = 0.5 * (point.price - supply.reservation_price()) * point.quantity;
     let total_surplus = consumer_surplus + producer_surplus;
-    if consumer_surplus < -tolerance
-        || producer_surplus < -tolerance
-        || !total_surplus.is_finite()
+    if consumer_surplus < -tolerance || producer_surplus < -tolerance || !total_surplus.is_finite()
     {
         return Err(EconomicsError::NumericalFailure {
             context: "market surplus is outside the supported linear domain",
@@ -350,7 +348,8 @@ pub fn arc_price_elasticity_of_demand(
             context: "arc elasticity is undefined at a zero midpoint",
         });
     }
-    Ok(((second_quantity - first_quantity) / average_quantity
+    Ok(((second_quantity - first_quantity)
+        / average_quantity
         / ((second_price - first_price) / average_price))
         .abs())
 }

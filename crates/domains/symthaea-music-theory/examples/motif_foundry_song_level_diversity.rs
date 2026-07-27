@@ -23,18 +23,14 @@
 
 use symthaea_music_theory::explorer::novelty_within;
 use symthaea_music_theory::{
-    compose_with_spec, melodic_contour_report, rhythmic_identity_report, MusicalIntent, Style,
+    MusicalIntent, Style, compose_with_spec, melodic_contour_report, rhythmic_identity_report,
 };
 
 const SEEDS: u64 = 20;
 
 fn mean(xs: impl Iterator<Item = f64>) -> f64 {
     let (sum, n) = xs.fold((0.0, 0usize), |(s, n), x| (s + x, n + 1));
-    if n == 0 {
-        0.0
-    } else {
-        sum / n as f64
-    }
+    if n == 0 { 0.0 } else { sum / n as f64 }
 }
 
 fn survey_style(style: Style) {

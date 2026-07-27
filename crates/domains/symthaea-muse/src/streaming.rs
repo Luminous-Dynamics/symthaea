@@ -596,7 +596,26 @@ impl StreamingSynth {
                         let s = samp.data[idx] * (1.0 - frac) + samp.data[idx + 1] * frac;
                         Some(s * env)
                     } else {
-                        None
+                        // Recording exhausted. The `else` branch below (pure
+                        // additive, full-bandwidth, no manifold blend) is a
+                        // categorically different signal from this branch's
+                        // sample+LP-filtered-additive blend -- switching
+                        // branches at full amplitude the instant data runs
+                        // out was an audible identity-swap artifact on any
+                        // note whose duration+release outlasts its
+                        // recording (long/held notes: arrival cadences,
+                        // climaxes). Extend a short fading tail from the
+                        // last valid frame so THIS branch's own
+                        // contribution has already decayed toward silence
+                        // by the time control passes to pure additive,
+                        // rather than jumping there at full strength.
+                        const GRACE_SAMPLES: f64 = 200.0; // ~4.5ms at 44.1kHz
+                        let last_idx = samp.data.len().saturating_sub(2);
+                        let overrun = idx as f64 - last_idx as f64;
+                        (overrun < GRACE_SAMPLES).then(|| {
+                            let fade = (1.0 - overrun / GRACE_SAMPLES) as f32;
+                            samp.data[last_idx] * env * fade
+                        })
                     }
                 });
 

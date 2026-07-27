@@ -876,6 +876,22 @@ fn render_vcsl_note(
         0.0
     };
     let mut src_pos = attack_skip_secs * sample.sample_rate as f32;
+    // How many output samples this recording can actually supply at
+    // `ratio`'s playback speed before running out -- a note whose
+    // duration+release outlasts the recording used to hard-stop here with
+    // no fade at all (`idx + 1 >= sample.frames.len() { break; }` below),
+    // an audible dropout on exactly the long/held notes (arrival cadences,
+    // climaxes) that matter most. When exhaustion would land before the
+    // note's own natural end, ramp the envelope to zero over the last
+    // `FADE_TAIL_SAMPLES` instead of cutting off mid-sustain.
+    const FADE_TAIL_SECS: f32 = 0.01;
+    let i_exhaust = if ratio > 0.0 {
+        ((sample.frames.len() as f32 - 1.0 - src_pos).max(0.0) / ratio).floor() as usize
+    } else {
+        usize::MAX
+    };
+    let fade_tail = ((FADE_TAIL_SECS * sr) as usize).max(1);
+    let fade_out_start = i_exhaust.saturating_sub(fade_tail);
     for i in 0..out_len {
         let si = start + i;
         if si >= bl.len() {
@@ -893,6 +909,9 @@ fn render_vcsl_note(
         }
         if i >= fade_start && out_len > fade_start {
             env *= 1.0 - (i - fade_start) as f32 / (out_len - fade_start) as f32;
+        }
+        if i_exhaust < out_len && i >= fade_out_start {
+            env *= (1.0 - (i - fade_out_start) as f32 / fade_tail as f32).clamp(0.0, 1.0);
         }
         if sustained_shape && fade_start > 0 {
             // Messa di voce: 0.85 at the bow start, swelling to 1.12 at

@@ -145,7 +145,7 @@ jobs:
           embeddings,vision-manifold,foveation,\
           integrity,semantic-encoder,neural-bridge,webcam,\
           mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
-          nix-mind,identity,physics,physics-bridge,\
+          nixward,identity,physics,physics-bridge,\
           flight,humanoid,hal,ssm-power,\
           lancedb-backend,multi_agent,full_consciousness,\
           full_language,magi_loop,reasoning_engine,code_generation,\
@@ -328,32 +328,32 @@ jobs:
       - name: Phase 2.7 — Active Inference / Epistemic Modulation
         env:
           CARGO_TARGET_DIR: target/cognitive-hardening
-        run: cargo test -p symthaea-nix --lib "mind::active_inference"
+        run: cargo test -p nixward --lib "mind::active_inference"
 
       - name: Phase 2.8 — Causal Graph Topology Hardening
         env:
           CARGO_TARGET_DIR: target/cognitive-hardening
-        run: cargo test -p symthaea-nix --lib "mind::causal_graph"
+        run: cargo test -p nixward --lib "mind::causal_graph"
 
       - name: Phase 2.8 — Drift Detection Hardening
         env:
           CARGO_TARGET_DIR: target/cognitive-hardening
-        run: cargo test -p symthaea-nix --lib "mind::hdc_world_model"
+        run: cargo test -p nixward --lib "mind::hdc_world_model"
 
       - name: Phase 2.9-A — World Model Transition Hardening
         env:
           CARGO_TARGET_DIR: target/cognitive-hardening
-        run: cargo test -p symthaea-nix --lib "mind::world_model"
+        run: cargo test -p nixward --lib "mind::world_model"
 
       - name: Phase 2.9-B — Episodic Memory Boundary Tests
         env:
           CARGO_TARGET_DIR: target/cognitive-hardening
-        run: cargo test -p symthaea-nix --lib "mind::episodic_memory"
+        run: cargo test -p nixward --lib "mind::episodic_memory"
 
       - name: Phase 2.9-C — End-to-End Cross-Layer Integration
         env:
           CARGO_TARGET_DIR: target/cognitive-hardening
-        run: cargo test -p symthaea-nix --test sensor_drift_causal_action_integration
+        run: cargo test -p nixward --test sensor_drift_causal_action_integration
 
   test-hardened-daemon:
     name: Hardened Daemon Regressions
@@ -503,7 +503,7 @@ jobs:
             features: >-
               parallel,service,shell,demo,api_module,
               integrity,semantic-encoder,webcam,
-              nix-mind,identity,notifications
+              nixward,identity,notifications
           - group: core-media
             features: >-
               voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,
@@ -687,7 +687,13 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-feature-${{ matrix.features }}-${{ hashFiles('**/Cargo.lock') }}
+          # actions/cache@v4 rejects keys containing commas -- matrix.features
+          # is comma-separated for multi-feature entries (e.g.
+          # "profile-culture,art-eye,gallery"), which every single-feature
+          # entry in this matrix doesn't hit, so this only broke those combos
+          # (found 2026-07-26 triaging standalone CI: "Key Validation Error:
+          # ... cannot contain commas").
+          key: ${{ runner.os }}-cargo-feature-${{ replace(matrix.features, ',', '_') }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-feature-
 
@@ -733,7 +739,7 @@ jobs:
               # (src/lib.rs's compile_error! guard) -- default features must be off.
               # Scoped to -p symthaea: workspace default-members include
               # crates/core/*, and a bare --no-default-features (no -p) disables
-              # every default-member's own defaults too -- e.g. symthaea-nix's
+              # every default-member's own defaults too -- e.g. nixward's
               # `default = ["native"]`, breaking its native-gated tests.
               cargo test -p symthaea --lib --no-default-features --features "$FEATURES"
             else
@@ -848,7 +854,7 @@ jobs:
           - "api_module,full_consciousness"
           - "neural-bridge,reasoning_engine"
           - "web_research_module,reasoning_engine"
-          - "nix-mind,reasoning_engine"
+          - "nixward,reasoning_engine"
           - "wasm-sandbox,reasoning_engine"
           - "integrity,full_consciousness"
           # Safety-critical interaction pairs (added 2026-03-23)
@@ -1089,7 +1095,7 @@ jobs:
           - symthaea-embeddings
           - symthaea-harmonies
           - symthaea-observability
-          - symthaea-nix
+          - nixward
           - symthaea-stt
           # Robotics platform crates — every EmbodimentBridge platform gets a
           # CI leg. (symthaea-flight was the stale pre-rename name for

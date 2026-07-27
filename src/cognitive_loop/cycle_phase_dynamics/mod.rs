@@ -321,6 +321,16 @@ struct CfcPlanningResult {
     prediction: Vec<f32>,
     /// Shortest-horizon raw prediction (bits-saved diagnostics only).
     prediction_first_horizon: Option<Vec<f32>>,
+    /// Predictive Compression C3: whether episodic recall blended into the
+    /// prediction this cycle (always false when the flag is off).
+    recall_fired: bool,
+    /// C3: top-1 recall similarity this cycle, when a recall was attempted
+    /// (`None` if the flag is off or the store was empty).
+    recall_similarity: Option<f32>,
+    /// C3c: write-cycle number of the matched episode, when a recall was
+    /// attempted — lets an external harness look up the matched episode's
+    /// provenance.
+    recall_matched_timestamp: Option<u64>,
     /// Cross-horizon prediction coherence (EMA'd).
     prediction_coherence: f32,
     /// Model uncertainty (reducible by exploration).
@@ -1987,6 +1997,9 @@ impl CognitiveLoopService {
         let output = cfc_plan.output;
         let prediction = cfc_plan.prediction;
         let prediction_first_horizon = cfc_plan.prediction_first_horizon;
+        let recall_fired = cfc_plan.recall_fired;
+        let recall_similarity = cfc_plan.recall_similarity;
+        let recall_matched_timestamp = cfc_plan.recall_matched_timestamp;
         let prediction_coherence = cfc_plan.prediction_coherence;
         let epistemic_uncertainty = cfc_plan.epistemic_uncertainty;
         let aleatoric_uncertainty = cfc_plan.aleatoric_uncertainty;
@@ -3574,6 +3587,9 @@ impl CognitiveLoopService {
                 output,
                 prediction,
                 prediction_first_horizon,
+                recall_fired,
+                recall_similarity,
+                recall_matched_timestamp,
                 prediction_error,
                 coherence,
                 unified_psi,

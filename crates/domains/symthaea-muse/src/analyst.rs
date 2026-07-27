@@ -150,6 +150,126 @@ fn plan_checks(plan: Option<&GrammarPlanEvidence>) -> Vec<AnalystCheck> {
                 plan.jhala_end.beats()
             ),
         )],
+        GrammarPlanEvidence::CallResponse(plan) => vec![
+            // Label scoped precisely to what's actually checked (fixed
+            // 2026-07-26, an independent code-review workflow caught the
+            // previous wording overclaiming): `call_starts`/
+            // `response_starts` record only the FIRST chorus's bar
+            // template (every chorus reuses the same relative [0,4,8]/
+            // [2,6,10] offsets by construction, so this is the real
+            // template every chorus follows) -- this check verifies that
+            // template's temporal ordering, NOT that each chorus's
+            // ACTUAL emitted response notes differ from that chorus's
+            // call (see `call_response.rs`'s own
+            // `a_three_chorus_piece_genuinely_varies_its_response_across_
+            // choruses` test for a real-notes check of that, which this
+            // Analyst check does not have score access to perform).
+            observed_check(
+                "grammar-obligation-call-answered-by-response",
+                "The call/response bar template (used by every chorus) is temporally ordered: each response strictly follows its call",
+                plan.call_starts.len() == plan.response_starts.len()
+                    && plan
+                        .call_starts
+                        .iter()
+                        .zip(plan.response_starts.iter())
+                        .all(|(&call, &response)| response > call),
+                "each call bar strictly precedes its paired response bar",
+                format!(
+                    "{} choruses; call bars {:?}; response bars {:?}",
+                    plan.choruses, plan.call_starts, plan.response_starts
+                ),
+            ),
+            // Added 2026-07-26 after a real listening session found 3
+            // seeds at `bars: 4` realizing as identical 36-bar pieces --
+            // traced to `chorus_count` never having been wired to
+            // `intent.bars` at all. This check independently re-derives
+            // the SAME div_ceil quantization policy the engine claims to
+            // use (not just trusting the reported fields agree with each
+            // other) and confirms the realized length never falls short
+            // of what was requested nor exceeds the next whole chorus.
+            observed_check(
+                "grammar-obligation-duration-quantization-policy",
+                "Realized length rounds the request up to the nearest whole chorus, never down or past it",
+                plan.bars_per_chorus > 0
+                    && plan.choruses == plan.requested_bars.max(1).div_ceil(plan.bars_per_chorus)
+                    && plan.realized_bars == plan.choruses * plan.bars_per_chorus,
+                "realized_bars = ceil(requested_bars / bars_per_chorus) * bars_per_chorus",
+                format!(
+                    "requested {} bars -> realized {} bars ({} chorus(es) of {})",
+                    plan.requested_bars, plan.realized_bars, plan.choruses, plan.bars_per_chorus
+                ),
+            ),
+            // Added 2026-07-26, the user's own follow-up once duration was
+            // fixed ("do not generate identical chorus templates back-to-
+            // back"): a multi-chorus piece must use MORE than one distinct
+            // ChorusRole across its trajectory. Re-derives this from the
+            // actual `trajectory` data rather than trusting the engine's
+            // own claim that it develops -- a single-chorus piece has
+            // nothing to develop across, so it's exempt.
+            //
+            // Known limitation (confirmed by an independent code-review
+            // workflow, 2026-07-26): this only inspects the DECLARED role
+            // labels in `plan.trajectory`, not the actual emitted score
+            // notes -- it would still pass if `response_for` had a bug
+            // that made every chorus emit identical response material
+            // regardless of its labeled role, since `trajectory_for`
+            // picks the labels independently, before `response_for` is
+            // ever called. This Analyst check has no access to the real
+            // `Score`'s notes to check that directly (unlike
+            // `call_response.rs`'s own
+            // `a_three_chorus_piece_genuinely_varies_its_response_across_
+            // choruses` test, which does). Verifies label diversity, not
+            // realized-material diversity -- disclosed, not silently
+            // overclaimed.
+            observed_check(
+                "grammar-obligation-chorus-trajectory-develops",
+                "A multi-chorus piece DECLARES more than one chorus role (label-level; does not verify the emitted notes differ)",
+                plan.choruses <= 1 || {
+                    let distinct: std::collections::HashSet<_> = plan.trajectory.iter().collect();
+                    distinct.len() > 1
+                },
+                "trajectory.len() > 1 distinct role(s) whenever choruses > 1",
+                format!(
+                    "{} choruses; trajectory {:?}",
+                    plan.choruses, plan.trajectory
+                ),
+            ),
+        ],
+        GrammarPlanEvidence::JazzChorus(plan) => vec![
+            // Same reasoning as call_response's identical check: re-derives
+            // the div_ceil quantization policy independently rather than
+            // trusting the reported fields agree with each other.
+            observed_check(
+                "grammar-obligation-duration-quantization-policy",
+                "Realized length rounds the request up to the nearest whole chorus, never down or past it",
+                plan.bars_per_chorus > 0
+                    && plan.choruses == plan.requested_bars.max(1).div_ceil(plan.bars_per_chorus)
+                    && plan.realized_bars == plan.choruses * plan.bars_per_chorus,
+                "realized_bars = ceil(requested_bars / bars_per_chorus) * bars_per_chorus",
+                format!(
+                    "requested {} bars -> realized {} bars ({} chorus(es) of {})",
+                    plan.requested_bars, plan.realized_bars, plan.choruses, plan.bars_per_chorus
+                ),
+            ),
+            // Label-level only, same disclosed limitation as
+            // call_response's identical check: this doesn't verify the
+            // emitted notes actually differ (see jazz_chorus.rs's own
+            // multi_chorus_pieces_genuinely_vary_across_seeds test for a
+            // real-notes check of that).
+            observed_check(
+                "grammar-obligation-chorus-trajectory-develops",
+                "A multi-chorus piece DECLARES more than one chorus role (label-level; does not verify the emitted notes differ)",
+                plan.choruses <= 1 || {
+                    let distinct: std::collections::HashSet<_> = plan.trajectory.iter().collect();
+                    distinct.len() > 1
+                },
+                "trajectory.len() > 1 distinct role(s) whenever choruses > 1",
+                format!(
+                    "{} choruses; trajectory {:?}",
+                    plan.choruses, plan.trajectory
+                ),
+            ),
+        ],
         GrammarPlanEvidence::Compatibility {
             family,
             form_available,

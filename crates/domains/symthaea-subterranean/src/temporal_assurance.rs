@@ -13,15 +13,15 @@ use crate::delayed_observation::{
     DelayedObservationSupervisor, ObservationAgeDisposition, ObservationBatchAssessment,
     TimedObservation,
 };
+use crate::embodiment::MotorSafetyLevel;
+use crate::mission::SubterraneanMissionIntent;
 use crate::plan_freshness::{
     PlanBasis, PlanFreshnessAssessment, PlanFreshnessSupervisor, RuntimeRevisions,
 };
 use crate::temporal_clock::{
     ClockAssessment, ClockDisposition, ClockSample, TemporalClockSupervisor,
 };
-use crate::temporal_event::{
-    CausalEvent, CausalEventLedger, EventAppendError, EventOrdering,
-};
+use crate::temporal_event::{CausalEvent, CausalEventLedger, EventAppendError, EventOrdering};
 use crate::types::SubterraneanCommand;
 use serde::{Deserialize, Serialize};
 
@@ -47,6 +47,28 @@ impl TemporalAuthority {
             Self::HoldForReview => "hold_for_review",
         }
     }
+
+    /// A broken clock or unattributable command/response history means the
+    /// platform cannot trust its own recent history, which is a strictly
+    /// worse position than merely losing comms (`DegradedMode::AutonomousReturn`,
+    /// which floors at Yellow) -- so `ReturnOnly` floors at Orange and
+    /// `HoldForReview` at Red, rather than mirroring that lighter mapping.
+    pub const fn safety_floor(self) -> Option<MotorSafetyLevel> {
+        match self {
+            Self::Nominal => None,
+            Self::ProbeOnly => Some(MotorSafetyLevel::Yellow),
+            Self::ReturnOnly => Some(MotorSafetyLevel::Orange),
+            Self::HoldForReview => Some(MotorSafetyLevel::Red),
+        }
+    }
+
+    pub const fn mission_override(self) -> Option<SubterraneanMissionIntent> {
+        match self {
+            Self::Nominal | Self::ProbeOnly => None,
+            Self::ReturnOnly => Some(SubterraneanMissionIntent::ReturnHome),
+            Self::HoldForReview => Some(SubterraneanMissionIntent::HoldPosition),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -68,10 +90,18 @@ impl TemporalRuntimeFrame {
             && self.events.len() <= 32
             && self.causes.len() <= 32
             && self.responses.len() <= 32
-            && self.observations.iter().copied().all(TimedObservation::validate)
+            && self
+                .observations
+                .iter()
+                .copied()
+                .all(TimedObservation::validate)
             && self.events.iter().all(CausalEvent::validate)
             && self.causes.iter().copied().all(CommandCause::validate)
-            && self.responses.iter().copied().all(ResponseObservation::validate)
+            && self
+                .responses
+                .iter()
+                .copied()
+                .all(ResponseObservation::validate)
             && self.plan.is_none_or(PlanBasis::validate)
     }
 }

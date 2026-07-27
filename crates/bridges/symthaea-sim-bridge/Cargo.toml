@@ -17,6 +17,9 @@ iceoryx2.workspace = true
 symthaea-core = { path = "../../core/symthaea-core" }
 serde = { workspace = true }
 thiserror = { workspace = true }
+# Non-blocking-mode (O_NONBLOCK) for CommandSolver::execute's subprocess
+# output pipes -- see drain_nonblocking's doc comment in src/lib.rs.
+libc = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
