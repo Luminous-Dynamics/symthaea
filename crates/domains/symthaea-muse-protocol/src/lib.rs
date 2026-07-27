@@ -61,6 +61,252 @@ pub struct ArtifactIdentity {
     pub rendition: RenditionArtifactId,
 }
 
+/// The permission boundary attached to musician-supplied material. Importing a
+/// work never implies permission to publish it, extract motifs from it, or use
+/// it to improve Muse globally.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContributionScope {
+    #[default]
+    PrivateProject,
+    SharedListening,
+    DerivativeUseAllowed,
+    FoundryContribution,
+    GrammarResearch,
+    GlobalMuseLearning,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MusicalContentLicense {
+    #[default]
+    AllRightsReserved,
+    Cc0,
+    CcBy,
+    CcBySa,
+    PublicDomain,
+    Custom,
+}
+
+/// What the importer is actually asserting about their relationship to the
+/// uploaded work — distinct from the single "authorized" checkbox the
+/// import form used to conflate. "I created this" and "I have permission
+/// to import someone else's work" are not the same claim, and only the
+/// former should ever set [`ContributionManifest::declared_authorship`].
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthorizationBasis {
+    /// The importer wrote this work themselves.
+    OwnWork,
+    /// The importer has permission to import and privately analyze someone
+    /// else's work, but did not write it.
+    AuthorizedImport,
+    /// This record predates `authorization_basis` entirely (the field
+    /// didn't exist yet) -- NOT the same claim as `AuthorizedImport`, which
+    /// is an active, currently-asserted claim a new import makes today.
+    /// Reusing `AuthorizedImport` as the deserialization default for old
+    /// records would silently manufacture a claim nobody actually made and
+    /// could read as consistent with an old record's stored
+    /// `declared_authorship: true` (itself unreliable -- the pre-this-fix
+    /// importer set it unconditionally, regardless of what the single old
+    /// checkbox actually meant). `LegacyUnspecified` keeps that
+    /// inconsistency visible instead of papering over it.
+    LegacyUnspecified,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SymbolicImportFormat {
+    Midi,
+    MusicXml,
+    MuseScore,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ImportedWorkId(pub String);
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ContributionManifest {
+    pub work_id: ImportedWorkId,
+    pub title: String,
+    pub contributor: String,
+    /// What the importer actually asserted (see [`AuthorizationBasis`]) --
+    /// `declared_authorship` below is DERIVED from this (true only for
+    /// `OwnWork`), never set independently of it, for every record written
+    /// since this field was introduced. Records written before it existed
+    /// deserialize to `AuthorizationBasis::LegacyUnspecified` (see that
+    /// variant's doc) and their stored `declared_authorship` should NOT be
+    /// read as consistent with it -- both fields on such a record are
+    /// historical artifacts of the old single-checkbox importer, not a
+    /// currently-asserted claim.
+    #[serde(default = "default_authorization_basis")]
+    pub authorization_basis: AuthorizationBasis,
+    pub declared_authorship: bool,
+    pub source_format: SymbolicImportFormat,
+    pub source_sha256: String,
+    pub score_sha256: String,
+    pub contribution_scope: ContributionScope,
+    pub content_license: MusicalContentLicense,
+    #[serde(default)]
+    pub attribution: Vec<String>,
+    pub imported_at_unix_ms: u64,
+}
+
+/// `serde(default)` fallback for manifests written before
+/// `authorization_basis` existed. `LegacyUnspecified`, not
+/// `AuthorizedImport` -- the latter is a claim a NEW import actively makes;
+/// defaulting old records to it would manufacture a claim nobody made and
+/// contradict the field's own invariant against an old record's stored
+/// `declared_authorship: true`.
+fn default_authorization_basis() -> AuthorizationBasis {
+    AuthorizationBasis::LegacyUnspecified
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImportedMotifSummary {
+    pub occurrence_count: usize,
+    pub midi_pitches: Vec<u8>,
+    pub identity_note: String,
+    pub confidence: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImportedSectionSummary {
+    pub label: String,
+    pub start_beat: f64,
+    pub end_beat: f64,
+    pub evidence: String,
+    pub confidence: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImportedWorkAnalysis {
+    pub source_native: bool,
+    pub inferred_territory: Option<String>,
+    pub tempo_bpm: f32,
+    pub meter: u8,
+    pub tonic: String,
+    pub note_count: usize,
+    pub voice_count: usize,
+    pub duration_seconds: f64,
+    pub motifs: Vec<ImportedMotifSummary>,
+    pub sections: Vec<ImportedSectionSummary>,
+    pub unresolved_interpretations: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImportedWorkSummary {
+    pub manifest: ContributionManifest,
+    pub analysis: ImportedWorkAnalysis,
+    pub audio_available: bool,
+    /// Which renderer produced `audition.wav` -- `"fluidsynth"` or
+    /// `"native"` (the same disclosed-fallback convention `/api/compose`
+    /// already uses). `#[serde(default)]` so summaries written before this
+    /// field existed still deserialize.
+    #[serde(default)]
+    pub audio_renderer: String,
+    /// Discloses that `audition.wav`'s TIMBRE is reconstructed, not
+    /// preserved from the source. `parse_symbolic` extracts pitch, rhythm,
+    /// tempo, meter, and voice roles into a plain `Score` -- it does not
+    /// carry the source file's own instrument/program assignments, so
+    /// there is nothing to "preserve." The audition is voiced with a fixed
+    /// instrument palette instead (currently a `Style::Classical`
+    /// string-trio pool in `theory_realize::instruments_for`); pitch,
+    /// rhythm, and voice-role assignment DO come from the source
+    /// unchanged. `#[serde(default)]` so summaries written before this
+    /// field existed still deserialize.
+    #[serde(default = "default_instrumentation_note")]
+    pub instrumentation_note: String,
+}
+
+/// `pub` so `muse_studio.rs` can reuse the exact same text at construction
+/// time -- one string, not a duplicated copy that could drift.
+pub fn default_instrumentation_note() -> String {
+    "reconstructed: fixed Classical-style instrument palette (source instrumentation is not \
+     preserved through parsing); pitch, rhythm, and voice roles are from the source unchanged"
+        .to_string()
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CompositionLessonStatus {
+    Authored,
+    Analyzed,
+    HumanApprovedAbstraction,
+    ShadowTested,
+    GeneralizationVerified,
+    ListeningPromising,
+    TrustedStrategy,
+    Rejected,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LessonArtifactIntegrity {
+    pub score_json: bool,
+    pub lesson_json: bool,
+    pub midi: bool,
+    pub audition_audio: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CompositionLessonSummary {
+    pub lesson_id: String,
+    pub title: String,
+    pub subtitle: String,
+    pub primary_dimension: String,
+    pub strategy: String,
+    pub abstract_rule: String,
+    pub expected_effects: Vec<String>,
+    pub applicable_grammars: Vec<String>,
+    pub prohibited_literal_reuse: Vec<String>,
+    pub status: CompositionLessonStatus,
+    pub first_shadow_wave: bool,
+    pub duration_seconds: f64,
+    pub note_count: usize,
+    pub section_count: usize,
+    pub score_content_sha256: String,
+    pub integrity: LessonArtifactIntegrity,
+    pub typed_shadow_mapping: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TeachingCorpusSummary {
+    pub protocol_version: String,
+    pub corpus_status: String,
+    pub validation_passed: bool,
+    pub exact_score_collisions: usize,
+    pub near_clone_pairs: usize,
+    pub lessons: Vec<CompositionLessonSummary>,
+}
+
+/// Server-owned deterministic Journey style choice. The browser supplies
+/// durable journey state; the server owns style/family policy semantics.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct JourneyNextRequest {
+    pub policy: String,
+    pub traversal_seed: u64,
+    pub step: u64,
+    #[serde(default)]
+    pub current_style: Option<String>,
+    #[serde(default)]
+    pub recent_styles: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct JourneyNextResponse {
+    pub style: String,
+    pub family: String,
+    pub relation: String,
+    pub traversal_seed: u64,
+    pub step: u64,
+    pub composition_seed: u64,
+    pub tonic: i32,
+    pub valence: f32,
+    pub arousal: f32,
+    pub energy: f32,
+    pub bars: usize,
+}
+
 /// Mirrors `IdentityCard` in `symthaea-music-theory/src/describe.rs`.
 /// Only `traits` is pulled in — `Candidate::title` already incorporates
 /// the card's own title when one exists (see `CandidateMeta::title`'s doc
@@ -83,6 +329,26 @@ pub struct TitleRecipeSummary {
     pub source_traits: Vec<String>,
     #[serde(default)]
     pub alternatives: Vec<String>,
+}
+
+/// Listener-facing, stable projection of the structural plan that made two
+/// candidates meaningfully different. Strings are deliberate: the authoritative
+/// typed enums stay in `symthaea-music-theory`, while this wasm-safe crate
+/// carries their version-tolerant display representation.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DiversityPlanSummary {
+    pub formal_topology: String,
+    pub selected_form: String,
+    pub motif_development: String,
+    pub harmony: String,
+    pub rhythm: String,
+    pub orchestration: String,
+    pub climax: String,
+    pub ending: String,
+    #[serde(default)]
+    pub applied: bool,
+    #[serde(default)]
+    pub lesson_id: Option<String>,
 }
 
 /// The fields of `CandidateMeta` (`muse_studio.rs`) that a client
@@ -121,6 +387,11 @@ pub struct Candidate {
     /// missing this field still deserializes.
     #[serde(default)]
     pub identity: Option<ArtifactIdentity>,
+    /// The resolved high-level difference plan used for this candidate.
+    /// Present even when the plan did not need to rewrite the score spec, so
+    /// Create/Listen can explain candidate contrast without reverse inference.
+    #[serde(default)]
+    pub diversity_plan: Option<DiversityPlanSummary>,
 }
 
 /// `POST /api/compose`'s response envelope.
@@ -185,6 +456,15 @@ pub struct ComposeRequest {
     /// always reports which one rendered, regardless of preference.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub renderer: Option<String>,
+    /// Explicit research opt-in for the procedural Motif Foundry generator.
+    /// It is never silently enabled for ordinary or imported music.
+    #[serde(default)]
+    pub use_motif_foundry: bool,
+    /// Optional authored-etude abstraction to apply in shadow mode. The
+    /// server accepts only lessons with a typed mapping and never copies the
+    /// etude's source notes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composition_lesson_id: Option<String>,
 }
 
 /// One performed note — the wire shape `/api/notes/{id}` returns per
@@ -577,6 +857,8 @@ pub struct PieceProvenanceBundle {
     pub renderer_binary_sha256: Option<String>,
     pub performance_model_sha256: Option<String>,
     pub render_environment_sha256: Option<String>,
+    #[serde(default)]
+    pub diversity_plan: Option<DiversityPlanSummary>,
     pub reproduction: ReproducibilityClaim,
     pub artifacts: Vec<ProvenanceArtifact>,
 }
@@ -707,6 +989,10 @@ pub struct AtlasPoint {
     /// `true` for a kept/liked piece, `false` for an in-session candidate
     /// that hasn't been kept.
     pub kept: bool,
+    /// Imported musician-owned work visible only inside this local/private
+    /// workspace.
+    #[serde(default)]
+    pub private: bool,
     /// This point's nearest neighbor by RAW (unweighted) structural
     /// fingerprint distance — deliberately independent of the active lens,
     /// so switching lenses doesn't change which piece is treated as
@@ -811,6 +1097,7 @@ mod atlas_tests {
                 title: "Copper Meridian".to_string(),
                 style: "Folk".to_string(),
                 duration_secs: 42.5,
+                private: false,
                 x: 0.125,
                 y: -0.5,
                 kept: false,
@@ -1381,6 +1668,8 @@ mod tests {
             spec: None,
             vary_premise: false,
             renderer: None,
+            use_motif_foundry: false,
+            composition_lesson_id: None,
         };
         let json = serde_json::to_string(&req).unwrap();
         // `spec: None` must not appear in the wire payload at all — the
@@ -1421,6 +1710,8 @@ mod tests {
             spec: None,
             vary_premise: true,
             renderer: None,
+            use_motif_foundry: false,
+            composition_lesson_id: None,
         };
         let json = serde_json::to_string(&req).unwrap();
         assert!(json.contains("\"vary_premise\":true"));
@@ -1451,6 +1742,8 @@ mod tests {
             })),
             vary_premise: false,
             renderer: None,
+            use_motif_foundry: false,
+            composition_lesson_id: None,
         };
         let json = serde_json::to_string(&req).unwrap();
         let back: ComposeRequest = serde_json::from_str(&json).unwrap();

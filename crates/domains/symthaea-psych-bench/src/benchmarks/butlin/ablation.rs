@@ -197,7 +197,11 @@ fn extract_indicator_score(
 ///
 /// Both baseline and ablated paths use Standard profile (all mechanisms enabled)
 /// so that disabling a single mechanism produces a measurable indicator drop.
-fn build_loop(
+///
+/// `pub(crate)`, not private: reused by `ae2_empirical_runner.rs` so its
+/// baseline/target/sham arms are built identically to the rest of this
+/// campaign, not via a second, potentially-divergent builder.
+pub(crate) fn build_loop(
     mutator: Option<fn(&mut symthaea::cognitive_loop::CognitiveLoopConfig)>,
 ) -> Result<symthaea::cognitive_loop::CognitiveLoopService, Box<dyn std::error::Error>> {
     use symthaea::cognitive_loop::{CognitiveLoopConfig, ConsciousnessProfile};
@@ -518,7 +522,10 @@ pub fn build_evidence_bundle(
 ///
 /// Uses lightweight WM benchmarks with config variations to simulate
 /// the effect of disabling cognitive loop mechanisms.
-fn run_downstream_benchmark(spec: &AblationSpec) -> (f64, f64) {
+///
+/// `pub(crate)`, not private: reused by `ae2_empirical_runner.rs` rather
+/// than duplicating the `AblationSpec::downstream_benchmark` dispatch.
+pub(crate) fn run_downstream_benchmark(spec: &AblationSpec) -> (f64, f64) {
     use crate::harness::PsychBenchmark;
 
     let baseline_config = BenchmarkConfig {

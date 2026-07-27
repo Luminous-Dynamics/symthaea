@@ -32,6 +32,7 @@ pub mod speech;
 pub mod substrate;
 pub mod sustained_attention;
 pub mod tombench;
+pub mod ual;
 pub mod worm;
 
 // Science benchmarks: always-on modules (ode_chaos, chemistry) +

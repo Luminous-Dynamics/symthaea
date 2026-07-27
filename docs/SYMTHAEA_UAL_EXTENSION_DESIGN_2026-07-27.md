@@ -320,16 +320,37 @@ Phase 1.
 
 ## Gates before implementation begins
 
-1. **Gate A**: the existing Butlin qualification runner (`qualification_runtime.rs`) is
-   confirmed to correctly enforce runtime controls on at least one existing indicator
-   end-to-end — concretely, a real AE-2 run through the runner, not a partial or
-   simulated one (i.e., prove the harness itself works before asking it to carry a new,
-   harder construct).
-2. **Gate B**: this design has at least three Phase-1-specified probes (P1, P2, P4a —
-   the minimal set below) with baseline ladders, controls, and multi-schedule
-   replication plans fully written out — not just prose sketches. A named target
+1. **Gate A — CLOSED 2026-07-27** (by separate, undiscovered-until-now work; not
+   originally scoped for this design). The real runner turned out not to be
+   `qualification_runtime.rs` itself — that module's own doc comment discloses it
+   "does not touch a real `CognitiveLoopService`," and is a pure contract layer tested
+   only against 12 synthetic fixtures. The actual end-to-end proof is
+   `crates/domains/symthaea-psych-bench/src/benchmarks/butlin/ae2_empirical_runner.rs`,
+   documented in `symthaea/docs/BUTLIN_PR_B_RUNNER_PLAN_2026-07-27.md` ("Step 5 result,"
+   2026-07-27): a real `CognitiveLoopService` (`ConsciousnessProfile::Standard`, 200
+   cycles, 20-cycle warmup), 4 arms (baseline / target ablation / sham / positive
+   control), all 7 pre-registered qualification questions resolved from live
+   measurements. **Outcome: `Supported(CausallySupported)`** —
+   `embodied_agency` collapsed 1.0→0.0 under `disable_embodied_cognition`, unmoved
+   (1.0) under the sham. A real bug was caught and fixed mid-run (an overly strict
+   health-panel check on a module never enabled by `ConsciousnessProfile::Standard`).
+   This closes Gate A's requirement — the harness genuinely works end-to-end on a real
+   indicator — but the result is explicitly **single-seed**; the source plan's own
+   recommendation is to repeat AE-2 across fresh seeds and a second stimulus schedule
+   before treating the health-panel tolerance as calibrated. Treat Gate A as
+   "mechanism proven," not "AE-2 fully characterized," when citing this closure.
+2. **Gate B — CLOSED 2026-07-27** (`SYMTHAEA_UAL_PHASE1_PROTOCOLS_2026-07-27.md`): P1,
+   P2, and P4a are fully specified — baseline ladders, controls, and multi-schedule
+   replication plans written out against real code, not prose sketches. A named target
    mechanism and causal intervention are required only before a probe enters Phase 2,
    not before Phase 1 implementation begins.
+
+**Both gates are now closed. Implementation of the minimal P1/P2/P4a Phase-1 packet
+(per the protocols doc) is no longer blocked on this design's own terms** — though
+starting it is a separate decision from having designed it, and the codebase-wide
+"verify before duplicating" norm applies: Gate A's closure was discovered, not
+performed, by this track, underscoring that this fast-moving monorepo can close a
+gate out from under a design before anyone reads it.
 
 ## Minimal implementation sequence
 
@@ -396,8 +417,14 @@ HOT-3/PP-1 in the existing Butlin report.
 - `THE_SUBSTRATE_ROADMAP.md` / `CORE_SUBSTRATE.md` — for how other capability-vs-
   architecture distinctions are already handled in this codebase (Φ vs Ψ, e.g.).
 - `crates/domains/symthaea-psych-bench/src/benchmarks/butlin/{indicators,report,ablation,
-  qualification_design,qualification_runtime}.rs` — the pattern this design deliberately
-  follows rather than reinvents.
+  qualification_design,qualification_runtime,ae2_empirical_runner}.rs` — the pattern
+  this design deliberately follows rather than reinvents; `ae2_empirical_runner.rs` is
+  the file that actually closed Gate A (see above).
+- `symthaea/docs/BUTLIN_PR_B_RUNNER_PLAN_2026-07-27.md` — the Gate A closure evidence:
+  the first real, single-seed AE-2 empirical run, plus the broader Butlin
+  indicator-repair campaign this document's runner work belongs to.
+- `symthaea/docs/SYMTHAEA_UAL_PHASE1_PROTOCOLS_2026-07-27.md` — the Gate B
+  specification (P1/P2/P4a fully specified protocols).
 - `memory/symthaea_alife_ma001_jul26.md` — source of the learning-vs-expression
   requirement above.
 - `memory/symthaea_structural_phi_inverse_response_jul25.md` — prior Butlin-suite work,

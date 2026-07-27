@@ -14,7 +14,9 @@ together). `ControlReadiness::Verified` was also renamed to `FormulaVerified`, s
 was found to overclaim what had actually been checked (see Finding B). The sequencing below (fix
 static predicate → rename → runtime qualification design → conformance fixtures → prove fail-closed
 → only then run a real row) reflects that ordering; the static-predicate fix and the rename are
-now **done**; everything from `RuntimeQualification` onward is still proposal-only.
+now **done**, and steps 3-4 (`RuntimeQualification` + conformance fixtures) are now **done** too —
+see `qualification_runtime.rs`, described below. Only step 5 (a real `AE-2` run against
+`CognitiveLoopService`) remains.
 
 ## Design review of the 5 nominally-qualifying rows
 
@@ -70,42 +72,55 @@ before PR B is supposed to do.
 The remaining part of Finding B (achievability, not just formula correctness) isn't more static
 taxonomy (per the "stop adding taxonomy" guidance) — it's a **runtime** concept the static design
 can't resolve on its own, since achievability and specificity can only be established by actually
-running something. Store the components, not just a final boolean, so a failure is diagnosable
-rather than a single opaque `false`:
+running something. **Implemented** in `crates/domains/symthaea-psych-bench/src/benchmarks/butlin/qualification_runtime.rs`
+(always compiled, no `symthaea-backend` feature needed — same rationale as `qualification_design.rs`
+itself: this is pure decision logic, not a call into `symthaea::cognitive_loop`):
 
 ```rust
-// Sketch only -- not implemented. Lives in the future PR B runner crate/module,
-// not in qualification_design.rs.
+// As landed -- one deliberate change from the original sketch: failure_reasons is a
+// computed method (Vec<QualificationFailure>), not a stored field, so there's a single
+// source of truth instead of two things that could drift apart.
 pub struct RuntimeQualification {
-    pub static_design_qualifies: bool,       // QualificationDesign::static_design_qualifies()
-    pub intervention_applied: bool,          // did the targeted ablation lever actually execute?
-    pub intervention_specificity_passed: bool, // did it change ONLY the intended state, not unrelated fields?
-    pub positive_control_effect_observed: bool, // did the control's manipulation produce the claimed effect THIS run?
-    pub sham_behaved_as_expected: bool,      // did the sham NOT produce the targeted effect, confirming specificity?
-    pub probe_signal_usable: bool,           // probe_validity re-checked at runtime, not just assumed from the static design
-    pub identity_and_config_match: bool,     // does this run's actual config match what the design declared? (registry/identity check)
-    pub failure_reasons: Vec<QualificationFailure>, // every reason qualifies_run() is false, not just the first
+    pub static_design_qualifies: bool,
+    pub intervention_applied: bool,
+    pub intervention_specificity_passed: bool,
+    pub positive_control_effect_observed: bool,
+    pub sham_behaved_as_expected: bool,
+    pub probe_signal_usable: bool,
+    pub identity_and_config_match: bool,
 }
 
 impl RuntimeQualification {
-    pub fn qualifies_run(&self) -> bool {
-        self.static_design_qualifies
-            && self.intervention_applied
-            && self.intervention_specificity_passed
-            && self.positive_control_effect_observed
-            && self.sham_behaved_as_expected
-            && self.probe_signal_usable
-            && self.identity_and_config_match
-    }
+    pub fn from_static_design(design: &QualificationDesign) -> Self { /* runtime fields start false */ }
+    pub fn failure_reasons(&self) -> Vec<QualificationFailure> { /* every failing dimension, in order */ }
+    pub fn qualifies_run(&self) -> bool { self.failure_reasons().is_empty() }
 }
+
+pub fn resolve_outcome(
+    qualification: &RuntimeQualification,
+    indicator_effect_observed: bool,
+    functional_effect_observed: bool,
+) -> EvidenceOutcome { /* !qualifies_run() -> Inconclusive; else NotDemonstrated / Supported(tier) */ }
+
+pub enum QualificationRunError {
+    RegistryIdentityMismatch { indicator: &'static str, field: &'static str, declared: String, actual: String },
+}
+pub fn check_identity_against_registry(
+    design: &QualificationDesign, live_target_lever: &str, live_functional_benchmark: &str,
+) -> Result<(), QualificationRunError> { /* hard error, never silently downgraded to Inconclusive */ }
 ```
 
-A run that fails any one of these stays `Inconclusive`, even when the row's static design is
-otherwise sound (`GWT-4`'s design is fine, but if the pin turns out unachievable at runtime, that
-specific run is still `Inconclusive` — `static_design_qualifies() == true` doesn't get inherited for
-free). `intervention_specificity_passed` matters on its own, separate from `intervention_applied`:
-successfully changing `actual_effective_lr` isn't enough if the same hook also perturbs several
-unrelated state variables — that would be a real intervention with a fake specificity claim.
+A run that fails any one of these stays `Inconclusive` (via `resolve_outcome`), even when the
+row's static design is otherwise sound (`GWT-4`'s design is fine, but if the pin turns out
+unachievable at runtime, that specific run is still `Inconclusive` — `static_design_qualifies() ==
+true` doesn't get inherited for free; `from_static_design()` deliberately defaults every
+runtime-only field to `false`). `intervention_specificity_passed` matters on its own, separate from
+`intervention_applied`: successfully changing `actual_effective_lr` isn't enough if the same hook
+also perturbs several unrelated state variables — that would be a real intervention with a fake
+specificity claim. A registry/identity mismatch is deliberately modeled as a hard `Result::Err`
+(`QualificationRunError`), not folded into `qualifies_run()`'s boolean space, mirroring `report.rs`'s
+existing `EvidenceMergeError::ClassificationMismatch` — a stale/self-contradictory row must be
+rejected outright, not silently graded `Inconclusive` alongside legitimate runtime failures.
 
 ## Runner conformance fixtures vs. empirical evidence — two distinct layers
 
@@ -130,6 +145,21 @@ This specifically tests `intervention_specificity_passed`/`intervention_applied`
 `positive_control_effect_observed` — guarding against accepting a coincidental metric movement as
 proof the intended manipulation occurred. Expected result: hard failure or `Inconclusive`, never a
 qualified pass, even though the metric "looks right."
+
+**All of the above are now implemented and green**, as synthetic fixtures in
+`qualification_runtime.rs`'s `#[cfg(test)]` module (12 tests, `cargo test -p symthaea-psych-bench
+--lib -- qualification_runtime`): `test_gwt3_static_design_alone_forces_inconclusive` (demonstration
+4, needs no runtime check at all — the static failure alone is sufficient),
+`test_runtime_control_failure_forces_inconclusive_despite_qualifying_static_design` (demonstration
+3), `test_metric_moved_but_intervention_not_applied_is_not_a_qualified_pass` (the "hook never fired"
+fixture), `test_qualified_probe_with_no_effect_is_not_demonstrated` (demonstration 2),
+`test_qualified_probe_with_effect_resolves_to_supported` (demonstration 1, **fixture only** — proves
+the mapping logic, explicitly not a claim about a real `AE-2` measurement),
+`test_identity_check_hard_fails_on_target_lever_mismatch` /
+`_functional_benchmark_mismatch` (demonstration 6), and
+`test_hot3_pp1_qualified_pair_must_not_be_reported_as_independent` (demonstration 5 — reuses
+`qualification_design.rs`'s already-verified `fully_independent_of()`/`shares_probe_signal()`
+rather than re-deriving the dependency logic).
 
 ## Minimal PR B scope
 
@@ -189,28 +219,53 @@ The runner must demonstrate all six of:
 1. ~~Correct the static qualification predicate~~ — **done** (`static_design_qualifies()` split
    from `control_design_qualifies()`).
 2. ~~Rename `Verified` to reflect formula-level verification~~ — **done** (`FormulaVerified`).
-3. Design `RuntimeQualification` for real (the sketch above), sized to the minimal scope's rows
-   only — not all 12.
-4. Implement the runner-conformance fixtures (both malformed-manipulation cases) and prove they
-   resolve to `Inconclusive`/hard-failure as designed, entirely before touching a real
+3. ~~Design `RuntimeQualification` for real~~ — **done** (`qualification_runtime.rs`), sized to the
+   minimal scope's rows only (`AE-2`, `HOT-3`, `PP-1`, `GWT-3`), not all 12.
+4. ~~Implement the runner-conformance fixtures~~ — **done**, all resolve to `Inconclusive`/hard-
+   failure exactly as designed (12/12 tests green), entirely without touching a real
    `CognitiveLoopService`.
-5. Only then execute `AE-2` as the first genuine empirical row, followed by `HOT-3`/`PP-1`
-   (linked) and `GWT-3` (deliberately unqualified).
+5. ~~Execute `AE-2` as the first genuine empirical row~~ — **done**
+   (`ae2_empirical_runner.rs`), AE-2 only per explicit scope direction. `HOT-3`/`PP-1` (linked) and
+   `GWT-3` (deliberately unqualified) remain for a later, separate run.
 
-This sequencing exists so the first real run doesn't have to simultaneously test the scientific
-hypothesis *and* the runner's basic correctness — by the time `AE-2` actually runs, the contract
-itself will already be proven to hold via the synthetic fixtures.
+This sequencing existed so the first real run wouldn't have to simultaneously test the scientific
+hypothesis *and* the runner's basic correctness — by the time `AE-2` actually ran, the contract
+itself was already proven to hold via the synthetic fixtures (steps 3-4).
+
+## Step 5 result: the first real AE-2 empirical run (2026-07-27)
+
+`ae2_empirical_runner.rs` runs four arms against a real `CognitiveLoopService`. All seven
+pre-registered questions resolved cleanly, a real bug in the runner's own specificity check was
+caught and fixed on the first live run (not before it), and the result reproduced on a second
+independent run. **Full numbers, correction history, positive-control scope caveat, the 6 gating +
+17 non-gating diagnostic fields, and known limitations are frozen in
+`BUTLIN_AE2_FIRST_EMPIRICAL_RESULT_2026-07-27.md`** — not duplicated here to avoid two documents
+drifting apart.
+
+**Precise headline** (narrower than the bare `EvidenceOutcome` label): the embodied-cognition
+ablation causally eliminated the internal AE-2 probe signal (`embodied_agency`) while the sham and
+measured unrelated state remained stable; no degradation was detected on the current downstream
+proxy benchmark (a ceiling effect), so functional embodied-agency consequences — and a fortiori any
+claim about consciousness — remain unestablished. `Ae2EmpiricalRun::claim_scope_note()` encodes
+this distinction in code rather than leaving it as prose that could drift from what the outcome
+actually says.
 
 ## Recommendation
 
-The next code change in this area should be the minimal PR B runner scoped above, following the
-sequencing just given — not a bigger one, and not more static types. The goal of that first runner
-is to prove the fail-closed contract actually holds in practice (broken controls, execution
-proxies, shared signals, and malformed interventions all resolve to `Inconclusive` or a hard error,
-never an attractive false positive), not to collect indicator results.
+Per the explicit direction that produced this result: **stop here for review.** The next steps
+in order, none started: (1) `AE-2` repeated across fresh seeds — the health-panel tolerance above
+is a disclosed, uncalibrated first-pass guess and needs a real baseline-variance study; (2) `AE-2`
+under a second stimulus schedule; (3) `HOT-3`/`PP-1` together, explicitly linked as one shared-signal
+evidence unit; (4) `GWT-3` as the deliberate real-world fail-closed case; (5) only then the broader
+indicator-repair campaign (`BUTLIN_INDICATOR_REPAIR_CAMPAIGN_2026-07-27.md`).
 
 **The honest state right now**: twelve direct designs exist. Five positive controls are
 formula-verified. Four complete probe designs (`GWT-4`, `HOT-3`, `PP-1`, `AE-2`) are statically
 interpretation-eligible, and two of those four (`HOT-3`/`PP-1`) share a raw probe signal and so
-constitute fewer than four independent evidence units. No control is yet runtime-achievability
-verified, because the runner and mutation instrumentation don't exist yet.
+constitute fewer than four independent evidence units. The runtime-qualification contract
+(`RuntimeQualification`, `resolve_outcome`, `check_identity_against_registry`) is implemented and
+proven correct against synthetic fixtures. `AE-2` is now the first row with a genuine, single-seed,
+reproduced empirical result — causal support scoped to its internal probe signal only, with
+functional (downstream-benchmark) support explicitly not established (ceiling effect) and no claim
+made about the broader theoretical capacity or consciousness. See
+`BUTLIN_AE2_FIRST_EMPIRICAL_RESULT_2026-07-27.md` for the full frozen record.

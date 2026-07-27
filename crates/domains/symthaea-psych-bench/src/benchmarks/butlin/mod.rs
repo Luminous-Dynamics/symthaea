@@ -16,6 +16,8 @@
 
 #[cfg(feature = "symthaea-backend")]
 pub mod ablation;
+#[cfg(feature = "symthaea-backend")]
+pub mod ae2_empirical_runner;
 pub mod indicators;
 pub mod qualification_design;
 pub mod qualification_runtime;

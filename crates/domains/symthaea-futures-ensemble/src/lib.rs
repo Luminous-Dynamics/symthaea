@@ -36,6 +36,15 @@ pub enum BaselineRung {
     ScenarioMechanistic,
     /// The FEP-driven ensemble — the actual system under test.
     FepDriven,
+    /// Linear/OLS fit on an evolving-trait signal alone (ignoring population count entirely).
+    /// Added for the evolutionary-rescue family's Phase 2.2B rung hierarchy — the plan's own
+    /// "trait-trend statistical predictor," distinct from [`Self::SimpleStatistical`]'s
+    /// population-count trend.
+    TraitTrend,
+    /// The FEP-driven ensemble reading population count *and* a trait signal jointly (2D belief
+    /// state) — the evolutionary-rescue family's "trait-augmented model" the Phase 2.2B
+    /// acceptance gate compares against [`Self::FepDriven`] run census-only.
+    FepCensusPlusTrait,
     /// Full `SymtropyGroundTruth` access, evaluation-only. Isolates whether weak performance
     /// at rung 5 comes from partial observability (rungs 1–5 close the gap to this as more is
     /// observed) or from the model itself being weak (rung 5 doesn't approach this even with
@@ -76,4 +85,5 @@ pub(crate) fn boolean_distribution(
 }
 
 pub mod ecological;
+pub mod evolutionary_rescue;
 pub mod predator_prey;
