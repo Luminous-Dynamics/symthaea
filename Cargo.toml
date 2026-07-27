@@ -1135,6 +1135,15 @@ required-features = ["vision-manifold"]
 name = "foveal_bridge_integration"
 required-features = ["foveation"]
 
+# Same dead-target class as above: tests/binary_service.rs (#![cfg(feature =
+# "service")]) was never registered under autotests = false, so "Hardened
+# Daemon Regressions" CI's `cargo test --test binary_service --features
+# service` failed with "no test target named `binary_service`" (found
+# 2026-07-26 triaging standalone CI).
+[[test]]
+name = "binary_service"
+required-features = ["service"]
+
 # Examples needing cfg-gated modules
 [[example]]
 name = "benchmark_mental_rotation_rendered"
@@ -1169,10 +1178,6 @@ path = "examples/agw_ethics_holdout.rs"
 [[example]]
 name = "engineering_school_benchmarks"
 path = "examples/engineering_school_benchmarks.rs"
-
-[[example]]
-name = "gwt_ignition_shadow_benchmark"
-path = "examples/gwt_ignition_shadow_benchmark.rs"
 
 [[example]]
 name = "sovereign_design_loop"
@@ -2365,3 +2370,8 @@ name = "episodic_recall_factorial_probe"
 # (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C2)
 [[example]]
 name = "compression_gated_chronicle_probe"
+
+# Predictive Compression C4 -- calibrated surprise (intent classifier confidence)
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C4)
+[[example]]
+name = "calibrated_intent_confidence"
