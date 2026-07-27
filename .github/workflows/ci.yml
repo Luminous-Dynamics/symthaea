@@ -35,7 +35,7 @@ jobs:
           fetch-depth: 0
 
       - name: Check for safety-critical changes
-        run: bash symthaea/scripts/check-class-a-changes.sh --ci
+        run: bash scripts/check-class-a-changes.sh --ci
 
   fmt:
     name: Format Check
@@ -680,6 +680,29 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
+      - name: Compute cache-safe feature key
+        # actions/cache@v4 rejects keys containing commas -- matrix.features
+        # is comma-separated for multi-feature entries (e.g.
+        # "profile-culture,art-eye,gallery"). The previous fix for this
+        # (2026-07-26, "Key Validation Error: ... cannot contain commas")
+        # used a GitHub Actions expression `replace(matrix.features, ',',
+        # '_')` -- but the Actions expression language has no `replace`
+        # function (confirmed via actionlint; available functions are
+        # always/cancelled/case/contains/endswith/failure/format/fromjson/
+        # hashfiles/join/startswith/success/tojson). An invalid function
+        # reference fails validation for the ENTIRE workflow file, not just
+        # this job -- this silently broke every job in ci.yml, not just this
+        # one, since introduction (found 2026-07-27 verifying
+        # export-to-standalone.sh: the file had apparently never actually
+        # been evaluated by GitHub Actions since that commit). Fixed by
+        # computing the substitution in a shell step instead, matching the
+        # pattern this same file already uses elsewhere for comma-separated
+        # features (see the "Test with feature" step below).
+        id: cache-key
+        run: echo "key=${FEATURES//,/_}" >> "$GITHUB_OUTPUT"
+        env:
+          FEATURES: ${{ matrix.features }}
+
       - name: Cache cargo registry and target
         uses: actions/cache@v4
         with:
@@ -687,13 +710,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          # actions/cache@v4 rejects keys containing commas -- matrix.features
-          # is comma-separated for multi-feature entries (e.g.
-          # "profile-culture,art-eye,gallery"), which every single-feature
-          # entry in this matrix doesn't hit, so this only broke those combos
-          # (found 2026-07-26 triaging standalone CI: "Key Validation Error:
-          # ... cannot contain commas").
-          key: ${{ runner.os }}-cargo-feature-${{ replace(matrix.features, ',', '_') }}-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-feature-${{ steps.cache-key.outputs.key }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-feature-
 
