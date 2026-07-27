@@ -33,8 +33,8 @@
 //! that drift is a known, disclosed, not-yet-triaged issue, out of scope here.
 
 use super::report::{
-    ButlinIndicatorReport, EvidenceAnnotation, EvidenceOutcome, IndicatorEvidence, ProbeQuality,
-    Responsiveness, SupportTier,
+    ButlinIndicatorReport, EvidenceAnnotation, EvidenceOutcome, FallbackStatus, IndicatorEvidence,
+    ProbeQuality, Responsiveness, SupportTier,
 };
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
@@ -115,12 +115,18 @@ impl ButlinIndicatorSuite {
             evidence,
             architectural_score,
             live_score: live_value,
+            // `fallback_status: Unknown`, not `NotUsed` -- this generic path
+            // doesn't itself know whether the underlying static/behavioral
+            // signal it was handed took a fallback/default path lower in
+            // the pipeline. Doesn't affect `outcome` here (always
+            // `ArchitecturalOnly` above, regardless of `ProbeQuality`), but
+            // the field shouldn't assert a fact this call site can't verify.
             probe_quality: live_value.map(|_| ProbeQuality {
-                sample_count: 1,
+                sample_count: Some(1),
                 finite_fraction: 1.0,
                 variance: None,
                 responsiveness: Responsiveness::NotAssessed,
-                fallback_used: false,
+                fallback_status: FallbackStatus::Unknown,
                 degeneracy: None,
             }),
             causal_effect: None,
@@ -342,11 +348,15 @@ impl ButlinIndicatorSuite {
                 architectural_score: 0.80,
                 live_score: Some(live),
                 probe_quality: Some(ProbeQuality {
-                    sample_count: 2,
+                    sample_count: Some(2),
                     finite_fraction: 1.0,
                     variance: None,
                     responsiveness: Responsiveness::SensitiveToManipulation,
-                    fallback_used: false,
+                    // Genuinely known here (unlike the generic
+                    // `architectural_indicator()` site above): this branch
+                    // only executes when `hot4_live` is a real computed
+                    // value with no fallback/default path in between.
+                    fallback_status: FallbackStatus::NotUsed,
                     degeneracy: None,
                 }),
                 causal_effect: None,
@@ -537,6 +547,10 @@ impl PsychBenchmark for ButlinIndicatorSuite {
             "contradicted_count",
             MetricValue::from_samples(&[report.contradicted_count as f64]),
         );
+        result.insert(
+            "inconclusive_count",
+            MetricValue::from_samples(&[report.inconclusive_count as f64]),
+        );
 
         // Individual indicator architectural/live scores (reported
         // separately, never blended — see module doc).
@@ -625,7 +639,8 @@ mod tests {
             + result.metrics["causally_supported_count"].mean
             + result.metrics["functionally_supported_count"].mean
             + result.metrics["not_demonstrated_count"].mean
-            + result.metrics["contradicted_count"].mean;
+            + result.metrics["contradicted_count"].mean
+            + result.metrics["inconclusive_count"].mean;
         assert_eq!(total, 14.0);
     }
 
@@ -929,7 +944,8 @@ mod tests {
             + result.metrics["causally_supported_count"].mean
             + result.metrics["functionally_supported_count"].mean
             + result.metrics["not_demonstrated_count"].mean
-            + result.metrics["contradicted_count"].mean;
+            + result.metrics["contradicted_count"].mean
+            + result.metrics["inconclusive_count"].mean;
         assert_eq!(total, 14.0);
     }
 

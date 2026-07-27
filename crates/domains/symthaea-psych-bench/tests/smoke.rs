@@ -161,7 +161,8 @@ fn smoke_butlin_indicators() {
         + result.metrics["causally_supported_count"].mean
         + result.metrics["functionally_supported_count"].mean
         + result.metrics["not_demonstrated_count"].mean
-        + result.metrics["contradicted_count"].mean;
+        + result.metrics["contradicted_count"].mean
+        + result.metrics["inconclusive_count"].mean;
     assert_eq!(total, 14.0);
 }
 

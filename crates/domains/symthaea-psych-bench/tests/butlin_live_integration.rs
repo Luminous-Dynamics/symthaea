@@ -31,6 +31,7 @@ fn tier_counts_are_sane(result: &symthaea_psych_bench::harness::report::Benchmar
         "functionally_supported_count",
         "not_demonstrated_count",
         "contradicted_count",
+        "inconclusive_count",
     ];
     let mut total = 0.0;
     for name in names {

@@ -1863,13 +1863,14 @@ fn write_butlin_pane(html: &mut String, butlin: Option<&ButlinIndicatorReport>) 
     let _ = write!(
         html,
         r#"<div style="text-align:center;margin-bottom:14px;font-size:0.82em;color:rgba(213,208,200,0.5);font-weight:300;">
-  <span style="color:#7ec8a0;">{} functionally/causally supported</span> · <span style="color:#e8c547;">{} observed</span> · <span style="color:#6b7d6b;">{} architectural-only</span> · <span style="color:#c96a6a;">{} not-demonstrated/contradicted</span> of {} indicators
+  <span style="color:#7ec8a0;">{} functionally/causally supported</span> · <span style="color:#e8c547;">{} observed</span> · <span style="color:#6b7d6b;">{} architectural-only</span> · <span style="color:#c96a6a;">{} not-demonstrated/contradicted</span> · <span style="color:#8a7ca8;">{} inconclusive</span> of {} indicators
 </div>
 "#,
         report.causally_supported_count + report.functionally_supported_count,
         report.observed_count,
         report.architectural_only_count,
         report.not_demonstrated_count + report.contradicted_count,
+        report.inconclusive_count,
         total
     );
 
@@ -1888,6 +1889,7 @@ fn write_butlin_pane(html: &mut String, butlin: Option<&ButlinIndicatorReport>) 
             EvidenceOutcome::NotDemonstrated | EvidenceOutcome::Contradicted => {
                 ("#c96a6a", "0 0 6px rgba(201,106,106,0.4)")
             }
+            EvidenceOutcome::Inconclusive => ("#8a7ca8", "0 0 6px rgba(138,124,168,0.4)"),
         };
 
         let score_str = ind

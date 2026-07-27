@@ -148,7 +148,8 @@ fn butlin_tier_counts_sum_to_14() {
         + report.causally_supported_count
         + report.functionally_supported_count
         + report.not_demonstrated_count
-        + report.contradicted_count;
+        + report.contradicted_count
+        + report.inconclusive_count;
     assert_eq!(total, 14);
 }
 

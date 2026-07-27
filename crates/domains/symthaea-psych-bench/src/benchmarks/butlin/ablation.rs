@@ -19,6 +19,7 @@ use crate::harness::config::BenchmarkConfig;
 // the cheap `butlin_regression.rs` gate). This module, which genuinely needs
 // `symthaea::cognitive_loop` types throughout, stays feature-gated.
 pub use super::report::AblationResult;
+use super::report::classify_ablation;
 
 /// Specification for a single ablation row.
 pub struct AblationSpec {
@@ -448,23 +449,18 @@ pub fn run_ablation_matrix(_config: &BenchmarkConfig) -> Vec<AblationResult> {
         // Run the relevant benchmark with default and ablated configs
         let (baseline_acc, ablated_acc) = run_downstream_benchmark(spec);
 
-        let indicator_dropped = if baseline_indicator > 0.0005 {
-            ablated_indicator < baseline_indicator * 0.5
-        } else {
-            // Baseline was already near zero — can't prove a drop
-            false
-        };
-
-        let benchmark_degraded = if baseline_acc > 0.01 {
-            ablated_acc < baseline_acc * 0.7
-        } else {
-            false
-        };
-
-        // Mutually exclusive with indicator_dropped by construction (can't be
-        // both < baseline*0.5 and > baseline*1.5).
-        let contradicted =
-            baseline_indicator > 0.0005 && ablated_indicator > baseline_indicator * 1.5;
+        // Single source of truth: `report::classify_ablation` -- also called
+        // by `annotate_with_ablation_results` at merge time, which
+        // deliberately recomputes rather than trusts these cached booleans
+        // (see that function's doc comment). Kept here purely as cached
+        // diagnostics on `AblationResult`, never as the merge's actual
+        // classification input.
+        let classification = classify_ablation(
+            baseline_indicator,
+            ablated_indicator,
+            baseline_acc,
+            ablated_acc,
+        );
 
         results.push(AblationResult {
             name: spec.name.to_string(),
@@ -473,9 +469,9 @@ pub fn run_ablation_matrix(_config: &BenchmarkConfig) -> Vec<AblationResult> {
             ablated_indicator_score: ablated_indicator,
             baseline_benchmark_accuracy: baseline_acc,
             ablated_benchmark_accuracy: ablated_acc,
-            indicator_dropped,
-            benchmark_degraded,
-            contradicted,
+            indicator_dropped: classification.indicator_dropped,
+            benchmark_degraded: classification.benchmark_degraded,
+            contradicted: classification.contradicted,
         });
     }
 
