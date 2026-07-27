@@ -608,22 +608,51 @@ mod tests {
     // `/etc/nixos`. See SYMTHAEA_NIXOS_MANAGEMENT_IMPROVEMENT_PLAN_2026-07-26.md
     // Phase 2.
 
+    // These tests exercise the real nix-instantiate --parse validation path
+    // (and, when git_backup=true, real git commands), not a mock. That's
+    // the point -- see the module comment above. But nix-instantiate isn't
+    // installed in every CI environment that runs `cargo test` (e.g. the
+    // plain "Test Feature Combinations" matrix legs, as opposed to the
+    // Nix-equipped "Hardened Nix Regressions" job) -- and since nixward is
+    // a default workspace member, that made every one of those legs fail
+    // regardless of which symthaea feature was actually under test (found
+    // 2026-07-27 verifying export-to-standalone.sh against real CI). Skip
+    // gracefully rather than fail when the tool genuinely isn't there,
+    // rather than fail the whole matrix on an environment gap unrelated to
+    // the code under test.
+    fn nix_instantiate_available() -> bool {
+        Command::new("nix-instantiate")
+            .arg("--version")
+            .output()
+            .is_ok()
+    }
+
     fn setup_temp_config_live(
         content: &str,
         git_backup: bool,
-    ) -> (tempfile::TempDir, ConfigWriter) {
+    ) -> Option<(tempfile::TempDir, ConfigWriter)> {
+        if !nix_instantiate_available() {
+            eprintln!(
+                "SKIPPED: nix-instantiate not found on PATH -- this test exercises the real \
+                 nix-instantiate --parse validation path and cannot run without it. \
+                 Run under `nix develop` or in a Nix-equipped CI job to exercise this test."
+            );
+            return None;
+        }
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("configuration.nix"), content).unwrap();
         let writer = ConfigWriter::new()
             .with_config_root(dir.path())
             .with_git_backup(git_backup)
             .with_dry_run(false);
-        (dir, writer)
+        Some((dir, writer))
     }
 
     #[test]
     fn test_apply_patch_writes_atomically_for_real() {
-        let (dir, writer) = setup_temp_config_live(SAMPLE_CONFIG, false);
+        let Some((dir, writer)) = setup_temp_config_live(SAMPLE_CONFIG, false) else {
+            return;
+        };
         let patch = writer.add_system_package("htop").unwrap();
         let result = writer.apply_patch(&patch).unwrap();
         assert!(result.changed);
@@ -642,7 +671,9 @@ mod tests {
         // Brace/bracket-balanced but syntactically invalid — the crude
         // structural check in validate_content_structure() cannot catch
         // this; only the real `nix-instantiate --parse` layer can.
-        let (dir, writer) = setup_temp_config_live(SAMPLE_CONFIG, false);
+        let Some((dir, writer)) = setup_temp_config_live(SAMPLE_CONFIG, false) else {
+            return;
+        };
         let patch = ConfigPatch {
             target: dir.path().join("configuration.nix"),
             original: SAMPLE_CONFIG.to_string(),
@@ -667,7 +698,9 @@ mod tests {
 
     #[test]
     fn test_apply_patch_creates_real_git_backup() {
-        let (dir, writer) = setup_temp_config_live(SAMPLE_CONFIG, true);
+        let Some((dir, writer)) = setup_temp_config_live(SAMPLE_CONFIG, true) else {
+            return;
+        };
         let patch = writer.add_system_package("htop").unwrap();
         writer.apply_patch(&patch).unwrap();
 
@@ -699,7 +732,9 @@ mod tests {
         // skips one change too far back, and on the very first restore
         // (only one commit exists, no parent) failed outright with
         // "unknown revision HEAD~1".
-        let (dir, writer) = setup_temp_config_live(SAMPLE_CONFIG, true);
+        let Some((dir, writer)) = setup_temp_config_live(SAMPLE_CONFIG, true) else {
+            return;
+        };
 
         let patch = writer.add_system_package("htop").unwrap();
         writer.apply_patch(&patch).unwrap();
@@ -719,7 +754,9 @@ mod tests {
 
     #[test]
     fn test_restore_last_backup_after_two_applies() {
-        let (dir, writer) = setup_temp_config_live(SAMPLE_CONFIG, true);
+        let Some((dir, writer)) = setup_temp_config_live(SAMPLE_CONFIG, true) else {
+            return;
+        };
 
         let patch1 = writer.add_system_package("htop").unwrap();
         writer.apply_patch(&patch1).unwrap();

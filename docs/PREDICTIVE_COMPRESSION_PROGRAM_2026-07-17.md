@@ -2136,8 +2136,80 @@ two unrelated subsystems' calibration quality under one label, which this pass w
    already found in `calibrate_from_prediction`. No change to `knowledge_calibration_ece`'s
    live wiring in this pass (see scope correction above).
 
-### C4 Results
-*(to be appended — no implementation or run has occurred as of this registration)*
+### C4 Results (run 2026-07-27)
+
+Implementation: `SemanticIntentClassifier::confidence_calibrated` (`language/semantic_intent.rs`,
+purely additive, 3 unit tests, existing `confidence` field/callers untouched) +
+`examples/calibrated_intent_confidence.rs` (40-example held-out labeled set, deliberately
+distinct wording from the classifier's own prototype-building examples — verified by inspection,
+not just intent — a genuine generalization test, not training-set recall).
+
+**Held-out accuracy**: 25/40 (62.5%) top-1. **Baseline diagnostic** (clamped raw affine
+confidence): range **0.5101–0.5980**, a 0.09-wide band — confirms the classifier's own doc
+comment ("Character n-gram HDC encodings produce narrow score margins for short queries") in a
+concrete, measured number. With 10 `analyze_pairs` bins spanning `[0,1]`, that band sits entirely
+inside a single bin: `BASELINE ECE=0.0825 resolution=0.0000` — a **single data point**
+(`|mean_conf(0.5425) − bin_accuracy(0.6250)| = 0.0825`), not a genuine multi-bin calibration
+curve. `resolution=0.0000` is the tell: the predictor makes essentially the same confidence claim
+regardless of instance, so it cannot be miscalibrated in any way `analyze_pairs`'s binning can
+detect — the low ECE is a **degenerate-predictor artifact**, the same failure class this
+program's own `feedback_suspiciously_tight_bootstrap_ci_is_a_red_flag.md` lesson warns about,
+applied here to "suspiciously good ECE" rather than "suspiciously tight CI."
+
+**Grid search**, extended from the registered range up to `beta=1000` specifically to find the
+interior turnaround the softmax mechanism predicts (as `beta→∞`, `confidence_calibrated`
+converges to 1.0 for every example regardless of margin, which should push ECE back up toward
+`|1.0 − 0.625| = 0.375`):
+
+| beta | ECE | Brier | reliability | resolution |
+|---|---|---|---|---|
+| 0.5 | 0.4225 | 0.4120 | 0.1785 | 0.0000 |
+| 5.0 | 0.3987 | 0.3838 | 0.1590 | 0.0000 |
+| 20.0 | 0.3050 | 0.2879 | 0.1272 | 0.0689 |
+| 40.0 | 0.1767 | 0.2015 | 0.0458 | 0.0725 |
+| **80.0** | **0.0949** | **0.1582** | 0.0197 | 0.0879 |
+| 100.0 | 0.1446 | 0.1627 | 0.0387 | 0.1080 |
+| 250.0 | 0.2763 | 0.2509 | 0.0850 | 0.0612 |
+| 1000.0 | 0.3682 | 0.3566 | 0.1393 | 0.0142 |
+
+The predicted turnaround is exactly what happens — ECE and Brier both bottom out around
+`beta≈60–100` and rise back toward the baseline-mismatch region by `beta=1000`. This is a real
+sanity check that the whole apparatus (softmax mechanism, grid, metric) is behaving as designed,
+not noise.
+
+**Honest verdict — the naive top-line ECE comparison and the deeper calibration-quality question
+give different answers, and both need reporting:**
+
+- **By raw ECE**, the baseline nominally wins at every beta tested (best calibrated ECE 0.0949 at
+  `beta=80` vs. baseline 0.0825). Registering this plainly: **the original question, "does
+  calibrated confidence reduce ECE," does not have a clean yes at n=40.** The baseline's
+  advantage is not because it is well-calibrated — it is because it is *uninformative*
+  (resolution≈0), and a 10-bin ECE estimate at n=40 (≈4 samples/bin) is too underpowered to
+  penalize that degeneracy the way it should.
+- **By Brier score** (a proper scoring rule that does not require binning and so is not subject
+  to the same bin-sparsity artifact), the calibrated confidence wins decisively and consistently
+  across a wide beta range: `beta=40..150` all beat the baseline's `0.2295`, bottoming at
+  `beta=80`'s `0.1582` — a **~31% reduction**. This is the metric that should be trusted at this
+  sample size, and by it the calibrated confidence is a genuinely better probabilistic predictor,
+  not just a differently-shaped one.
+- **Resolution** confirms this directly: the calibrated confidence spreads meaningfully across
+  instances (0.07–0.11 in the beta≈40–150 range) where the baseline has none at all — it is
+  actually discriminating between more- and less-confident predictions, which is the entire point
+  of a confidence signal, independent of what any single aggregate metric reports.
+
+**Conclusion**: `confidence_calibrated` is a real, substantive calibration improvement over the
+raw affine score by the metric that is actually trustworthy at this sample size (Brier +
+resolution), but the registered question's literal framing ("reduce ECE") is **not supported** at
+n=40/10-bins, because the baseline's apparent ECE advantage is a measurement artifact of its own
+degeneracy rather than genuine calibration quality. Reporting both, undiluted, per house
+convention — this is a mixed/nuanced result, not an unambiguous win, and should not be summarized
+as one.
+
+**Scope closure**: per the registered scope correction, `knowledge_calibration_ece`'s live 0.0
+sentinel and `calibrate_from_prediction`'s coarse global-proxy correctness label remain
+untouched and undiagnosed-further — a separate task, not attempted here. No production call site
+of `SemanticIntentClassifier::classify()` was modified; `confidence_calibrated` exists as an
+additive, currently-unused-in-production offline-analysis method only.
 
 ---
 

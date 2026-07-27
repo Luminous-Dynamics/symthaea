@@ -181,7 +181,10 @@ must be reported relative to *each* rung, not just against the weakest one:
 4. HDC binding without learned temporal dynamics (bind/bundle only, no CfC/Hebbian
    update) — isolates how much of a pass is representational (the binding algebra
    itself) vs. genuinely learned.
-5. Full Symthaea learning path (the actual system under test).
+5. Benchmark-local candidate learner (`SystemUnderTest::BenchmarkLocalHdcLearner` in the
+   real implementation — see the 2026-07-27 claim-integrity repair pass; the label "Full
+   Symthaea" used here originally was itself found to be a naming trap and retracted, not
+   just a placeholder name).
 
 A probe-level **capacity** claim requires Symthaea to pass its preregistered held-out
 behavioral generalization criterion and its manipulation checks (leakage, drift,
@@ -377,7 +380,7 @@ isolation — to get a capability gradient rather than three disconnected number
 | First-order learner | possible          | expected fail     | expected fail                        |
 | Graph propagation   | possible          | possible          | design-dependent                     |
 | Static HDC binding  | design-dependent  | design-dependent  | possible representational transfer   |
-| Full Symthaea       | empirical         | empirical         | empirical                            |
+| Benchmark-local candidate | empirical    | empirical         | empirical                            |
 
 These expected outcomes are predictions to confirm, not assumptions to encode into the
 harness — but the table is what makes each baseline diagnostic rather than decorative: a

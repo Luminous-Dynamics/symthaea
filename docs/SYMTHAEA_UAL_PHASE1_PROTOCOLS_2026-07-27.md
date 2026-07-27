@@ -16,6 +16,24 @@ Read the parent design doc first for the full rationale (why UAL sits outside Bu
 the P1–P6 family, the capacity/explanatory-novelty split, the internal/behavioral
 reporting split, and the schedule-robustness rule this document operationalizes).
 
+**IMPLEMENTATION UPDATE (2026-07-27, same day)**: P1/P2/P4a were implemented per this
+spec, then subjected to a claim-integrity repair pass after an independent review plus
+this codebase's own direct verification found real defects — some in this spec itself,
+not just the code. Two are load-bearing enough to flag here rather than only in the
+commits: (1) **P2's originally-specified behavioral criterion
+(`b_inferred_value - c_value > 0`) was mathematically incapable of detecting success**
+(A and C are reward-matched, so their expected values are equal regardless of retrieval
+quality) — replaced with a retrieval-identity criterion (rate at which querying with B
+ranks A above C, vs. chance) plus a value-transfer check against a new neutral stimulus
+D; (2) **P2's confidence-weighted pairing mechanism, meant to satisfy the
+schedule-robustness rule below, was proven algebraically inert** (an executable proof
+test now pins this) and has been removed — P2's honest finding is that this specific
+mechanism is schedule-invariant by construction, unlike P4a's. See commits `7784cab403`
+and `99382557e5` for full detail, and the two probes' own module docs in
+`crates/domains/symthaea-psych-bench/src/benchmarks/ual/` for the authoritative current
+design — the P2 section below describes the ORIGINAL (partially incorrect) spec and is
+kept for historical record, not as a description of what shipped.
+
 ## Common apparatus (shared by all three protocols)
 
 **RNG/seeding**: reuse the existing convention exactly —

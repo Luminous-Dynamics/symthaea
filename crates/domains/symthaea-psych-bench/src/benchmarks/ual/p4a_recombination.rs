@@ -31,10 +31,34 @@
 //! genuinely changes the final accumulated memory (EMA is order-sensitive
 //! when successive targets differ, unlike P2's single fixed-target case) —
 //! `Blocked-by-element` vs `Interleaved-by-element` is not a schedule no-op
-//! here.
+//! here. This claim survived the same algebraic scrutiny that found P2's
+//! confidence-weighting inert (see `p2_second_order.rs` module doc) — the
+//! non-collinear-targets argument is real, not just asserted.
+//!
+//! **PROTOTYPE — binding semantics under audit, no capability interpretation
+//! yet** (claim-integrity repair pass, 2026-07-27): the value-readout query
+//! uses `.bind(compound_hv)` rather than `.bind(&compound_hv.inverse())`, so
+//! it does not perform textbook VSA unbinding of `value_memory`. Whether the
+//! resulting WZ/YX readouts reflect genuine compositional generalization or
+//! are dominated by higher-order self-product/geometric artifacts of this
+//! crate's specific `ContinuousHV::random` distribution (uniform[-1,1], not
+//! bipolar) is an open, currently-unresolved question — see
+//! `hdc_binding_properties.rs` for the bounded audit of `bind`/`inverse`'s
+//! actual measured properties. **Do not cite this probe's `wz`/`yx` readouts
+//! as evidence of compositional recombination until that audit's findings
+//! are folded back in.** The schedule-sensitivity finding above is
+//! independent of this caveat (it concerns EMA accumulation order, not
+//! readout validity) and stands on its own.
+//!
+//! **System under test**: `SystemUnderTest::BenchmarkLocalHdcLearner`
+//! (renamed from the misleading `FullSymthaea` — this mechanism does not
+//! construct or call `CognitiveLoopService`, and is not live Symthaea).
 
 use super::common::{generate_near_chance_hv, next_seed};
-use super::report::{Presence, UalProbeReport, UalSchedule, combine_schedule_reports};
+use super::report::{
+    FunctionalOutcome, Presence, SystemUnderTest, UalProbeReport, UalRuntimeQualification,
+    UalSchedule, combine_schedule_reports,
+};
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
@@ -52,8 +76,10 @@ pub enum BaselineRung {
     /// Rung 4: pure representational geometry (no value component at all)
     /// — nearest trained compound by raw HV similarity.
     StaticBindingNoValueLearning,
-    /// Rung 5: the mechanism under test.
-    FullSymthaea,
+    /// Rung 5: the benchmark-local candidate mechanism under test. NOT live
+    /// Symthaea (formerly misleadingly named `FullSymthaea`; renamed in the
+    /// claim-integrity repair pass, 2026-07-27).
+    CandidateHdcLearner,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -162,7 +188,7 @@ impl P4aRecombination {
         );
 
         let apply_value_learning = true; // only StaticBinding rung skips this, handled separately
-        let apply_memory_formation = matches!(rung, BaselineRung::FullSymthaea);
+        let apply_memory_formation = matches!(rung, BaselineRung::CandidateHdcLearner);
 
         let reward_tag = ContinuousHV::random(dim, REWARD_TAG_SEED);
         let no_reward_tag = ContinuousHV::random(dim, NO_REWARD_TAG_SEED);
@@ -229,7 +255,7 @@ impl P4aRecombination {
                 BaselineRung::GraphPropagationMarginalMean => {
                     ((wx_value + yz_value) / 2.0, f32::NAN)
                 }
-                BaselineRung::FullSymthaea => {
+                BaselineRung::CandidateHdcLearner => {
                     let query = value_memory.bind(compound_hv);
                     let sim_reward = query.similarity(&reward_tag);
                     let sim_no_reward = query.similarity(&no_reward_tag);
@@ -305,10 +331,12 @@ impl P4aRecombination {
     ) -> UalProbeReport {
         let mut diffs = Vec::with_capacity(n);
         let mut margin_diffs = Vec::with_capacity(n);
+        let mut wx_true_values = Vec::with_capacity(n);
         for i in 0..n {
-            let o = self.run_trial_value(config, i, schedule, BaselineRung::FullSymthaea);
+            let o = self.run_trial_value(config, i, schedule, BaselineRung::CandidateHdcLearner);
             diffs.push(o.wz_readout - o.yz_readout);
             margin_diffs.push((o.wz_raw_margin - o.yz_raw_margin) as f64);
+            wx_true_values.push(o.wx_true_value);
         }
         let diff_metric = MetricValue::from_samples_bootstrap(&diffs, config.seed ^ 0x51DE51DE);
         let behavioral = if diff_metric.ci_lower > 0.0 {
@@ -322,8 +350,41 @@ impl P4aRecombination {
         } else {
             Presence::NotObserved
         };
-        UalProbeReport::new("UAL-P4a", behavioral, internal).with_note(format!(
-            "mean(WZ_readout - YZ_readout)={:.4} [{:.4},{:.4}] under {:?}; mean internal margin diff={:.4}",
+
+        let mean_wx_true = wx_true_values.iter().sum::<f64>() / wx_true_values.len() as f64;
+        let positive_control_passed = mean_wx_true > 0.55;
+
+        let blocked_steps = Self::build_sequence(UalSchedule::Blocked, config.seed);
+        let interleaved_steps = Self::build_sequence(UalSchedule::Interleaved, config.seed);
+        let schedule_valid = format!("{blocked_steps:?}") != format!("{interleaved_steps:?}");
+
+        let qualification = UalRuntimeQualification {
+            // Training trials always execute (no analog of P1's hazard-based
+            // non-manipulation); real check that memory formation happened.
+            manipulation_applied: true,
+            positive_control_passed,
+            // ValueTableNoDecomposition's "no entry -> 0.5" default is a
+            // structural guarantee, pinned by `value_table_fails_on_held_out_compounds`.
+            negative_controls_passed: true,
+            // Structural: `leakage_held_out_compounds_never_collide_with_trained`
+            // pins the hard assertion inside `run_trial_value` itself.
+            leakage_checks_passed: true,
+            // Covered by `marginal_mean_baseline_passes_by_construction` and
+            // `static_binding_geometry_only_no_value_semantics`.
+            baseline_ladder_valid: true,
+            signal_usable: n > 0 && diff_metric.mean.is_finite(),
+            schedule_valid,
+        };
+
+        UalProbeReport::new(
+            "UAL-P4a",
+            SystemUnderTest::BenchmarkLocalHdcLearner,
+            qualification,
+            behavioral,
+            internal,
+        )
+        .with_note(format!(
+            "mean(WZ_readout - YZ_readout)={:.4} [{:.4},{:.4}] under {:?}; mean internal margin diff={:.4}; PROTOTYPE: binding semantics under audit, see module doc",
             diff_metric.mean, diff_metric.ci_lower, diff_metric.ci_upper, schedule, mean_margin_diff
         ))
     }
@@ -353,7 +414,7 @@ impl PsychBenchmark for P4aRecombination {
                 config,
                 trial,
                 UalSchedule::Blocked,
-                BaselineRung::FullSymthaea,
+                BaselineRung::CandidateHdcLearner,
             );
             wz.push(o.wz_readout);
             yz.push(o.yz_readout);
@@ -397,7 +458,7 @@ mod tests {
                 &cfg,
                 i,
                 UalSchedule::Blocked,
-                BaselineRung::FullSymthaea,
+                BaselineRung::CandidateHdcLearner,
             );
         }
     }
@@ -491,7 +552,7 @@ mod tests {
     }
 
     /// Positive control: the seen compound WX's test-time read-out under
-    /// FullSymthaea must track its real trained value.
+    /// CandidateHdcLearner must track its real trained value.
     #[test]
     fn positive_control_seen_compound_tracks_trained_value() {
         let cfg = config();
@@ -502,7 +563,7 @@ mod tests {
                 &cfg,
                 i,
                 UalSchedule::Blocked,
-                BaselineRung::FullSymthaea,
+                BaselineRung::CandidateHdcLearner,
             );
             diffs.push(o.wx_readout - o.wx_true_value);
         }
@@ -521,13 +582,13 @@ mod tests {
             &cfg,
             4,
             UalSchedule::Blocked,
-            BaselineRung::FullSymthaea,
+            BaselineRung::CandidateHdcLearner,
         );
         let b = P4aRecombination.run_trial_value(
             &cfg,
             4,
             UalSchedule::Blocked,
-            BaselineRung::FullSymthaea,
+            BaselineRung::CandidateHdcLearner,
         );
         assert!((a.wz_readout - b.wz_readout).abs() < 1e-12);
     }
@@ -545,8 +606,12 @@ mod tests {
         let mean_wz = |schedule: UalSchedule| -> f64 {
             let mut sum = 0.0;
             for i in 0..n {
-                let o =
-                    P4aRecombination.run_trial_value(&cfg, i, schedule, BaselineRung::FullSymthaea);
+                let o = P4aRecombination.run_trial_value(
+                    &cfg,
+                    i,
+                    schedule,
+                    BaselineRung::CandidateHdcLearner,
+                );
                 sum += o.wz_readout;
             }
             sum / n as f64
@@ -556,6 +621,23 @@ mod tests {
         assert!(
             (blocked - interleaved).abs() > 1e-6,
             "schedule must have a genuine mechanistic effect, not be a no-op: blocked={blocked}, interleaved={interleaved}"
+        );
+    }
+
+    /// Closes a disclosed gap: `ual_report()` itself (both schedules,
+    /// `combine_schedule_reports`) was previously exercised only indirectly
+    /// via `schedule_report`'s constituent pieces. Mirrors P1's
+    /// `ual_report_produces_valid_three_field_report` test.
+    #[test]
+    fn ual_report_produces_valid_three_field_report() {
+        let cfg = config();
+        let report = P4aRecombination.ual_report(&cfg, 40);
+        if report.functional_outcome == FunctionalOutcome::Demonstrated {
+            assert_eq!(report.behavioral_expression, Presence::Observed);
+        }
+        assert!(
+            !report.notes.is_empty(),
+            "ual_report must always attach at least one schedule note"
         );
     }
 }

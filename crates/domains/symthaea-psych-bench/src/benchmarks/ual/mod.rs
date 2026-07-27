@@ -24,11 +24,26 @@
 //!
 //! `common` holds shared low-level helpers (xorshift PRNG, softmax choice,
 //! near-chance-similarity HV generation); `report` holds the mandatory
-//! three-field UAL reporting types (functional outcome / internal
-//! association formation / behavioral expression, with a schedule-status
-//! qualifier).
+//! reporting types: functional outcome (`Demonstrated`/`NotDemonstrated`/
+//! `Inconclusive` — fail-closed via `UalRuntimeQualification`), system-under-
+//! test identity (`SystemUnderTest` — every probe here is a benchmark-local
+//! reference mechanism, never `LiveSymthaea`), internal association
+//! formation, behavioral expression, and a schedule-status qualifier.
+//!
+//! **Claim-integrity repair pass (2026-07-27)**: an independent review plus
+//! this codebase's own direct verification found real defects that predated
+//! this pass — a misleading `FullSymthaea` enum-variant name (fixed:
+//! `CandidateHdcLearner`), a P1 metric bug and an unhandled no-manipulation
+//! edge case (fixed), and a P2 mechanism whose schedule-dependence claim was
+//! algebraically inert (fixed: mechanism simplified, claim retracted with an
+//! executable proof test) plus a behavioral criterion that was mathematically
+//! incapable of detecting success (fixed: retrieval-identity criterion).
+//! P4a's own binding/unbinding semantics remain an open, disclosed
+//! "prototype, under audit" caveat — see `p4a_recombination`'s module doc and
+//! `hdc_binding_properties.rs`.
 
 pub mod common;
+pub mod hdc_binding_properties;
 pub mod p1_reversal;
 pub mod p2_second_order;
 pub mod p4a_recombination;
@@ -37,4 +52,7 @@ pub mod report;
 pub use p1_reversal::P1Reversal;
 pub use p2_second_order::P2SecondOrder;
 pub use p4a_recombination::P4aRecombination;
-pub use report::{FunctionalOutcome, Presence, ScheduleStatus, UalProbeReport, UalSchedule};
+pub use report::{
+    FunctionalOutcome, Presence, ScheduleStatus, SystemUnderTest, UalProbeReport,
+    UalRuntimeQualification, UalSchedule,
+};

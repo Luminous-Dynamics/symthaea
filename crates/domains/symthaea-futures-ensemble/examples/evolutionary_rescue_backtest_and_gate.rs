@@ -368,4 +368,15 @@ fn main() {
             "does not extract"
         }
     );
+    if !gate_passes {
+        println!(
+            "\nCAVEAT (do not over-read this run alone): fep_census_only used state_dim=1 while \
+             every trait-augmented arm used state_dim=2, so this comparison confounds \
+             information content with model capacity. The PRIVILEGED arm scoring worst of the \
+             three trait-augmented conditions rules out \"the signal was too noisy,\" but does \
+             NOT by itself prove dimensionality/architecture is the cause -- see \
+             SYMTHAEA_FUTURES_LABORATORY_PLAN_2026-07-25.md's Phase 2.2C for the \
+             constant/duplicate-channel ablation that would isolate this properly."
+        );
+    }
 }
