@@ -1,12 +1,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! The Coffee Cup Gate — proves consciousness-modulated grasping.
+//! The Coffee Cup Gate — demonstrates Phi-modulated grasping.
+//!
+//! "Phi" here is this crate's computed integration metric, not a claim that
+//! the system is conscious. This test validates that grip force and release
+//! behavior actually track that metric end-to-end, not a philosophical claim
+//! about awareness.
 //!
 //! If Symthaea can't be trusted with a latte, she isn't ready for a human spine.
 //!
-//! This test validates the full consciousness-coupled robotics pipeline:
+//! This test validates the full Phi-coupled robotics safety pipeline:
 //! 1. Arm approaches target (contact physics)
-//! 2. Grip force proportional to Φ (consciousness-modulated)
+//! 2. Grip force proportional to Φ (the computed metric, scaled by safety tier)
 //! 3. Release when Φ drops below threshold
 //! 4. Moral audit proof generated and verified
 //!

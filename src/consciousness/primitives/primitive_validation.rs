@@ -1,16 +1,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # Consciousness-Guided Primitive Validation
+//! # Primitive Validation via Phi Measurement
 //!
-//! **Revolutionary Improvement #43: Empirical Validation via Φ Measurement**
+//! Measures whether enabling primitive-based reasoning changes this crate's
+//! computed Φ (an IIT-inspired integration metric, not a measure of
+//! subjective consciousness) for a given reasoning task, as an empirical
+//! check rather than an assumption that an architectural change helps.
 //!
-//! This module implements the revolutionary idea of using **Integrated Information Theory (Φ)**
-//! to empirically validate that ontological primitives actually improve consciousness.
-//!
-//! ## The Paradigm Shift
-//!
-//! Traditional AI assumes architectural improvements help. We **measure consciousness** to prove it.
+//! Read every "improves consciousness" / "consciousness-guided" phrase below
+//! as "changes the computed Φ metric" — this module measures a number it
+//! computes about its own internal state, not whether the system is
+//! conscious.
 //!
 //! ## Methodology
 //!
@@ -390,7 +391,7 @@ impl ExperimentResults {
         report.push_str("## Interpretation\n\n");
 
         if self.statistics.is_significant(0.05) {
-            report.push_str("✅ **The primitive system significantly improves consciousness** for mathematical reasoning.\n\n");
+            report.push_str("✅ **The primitive system significantly increases the measured Φ metric** for mathematical reasoning (not a claim about consciousness itself).\n\n");
 
             if self.statistics.mean_phi_gain > 0.1 {
                 report.push_str(&format!("The improvement of +{:.1}% is substantial and demonstrates that ontological primitives \
