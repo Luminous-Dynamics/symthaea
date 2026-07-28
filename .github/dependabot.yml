@@ -4,7 +4,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
     ignore:
@@ -12,10 +12,31 @@ updates:
       - dependency-name: "wasmtime*"
       - dependency-name: "bytes"
         versions: [">=2.0.0"]
+    groups:
+      # Patch/minor updates across the workspace get bundled into one PR
+      # per week instead of one PR per crate — a dozen individually-tiny
+      # dependency PRs made the repo look unattended and buried real work
+      # (e.g. the evidence-tier redesign) under noise.
+      patch-and-minor:
+        applies-to: version-updates
+        update-types:
+          - "patch"
+          - "minor"
+      # Major-version bumps stay OUT of the group above and land as their
+      # own individually-reviewable PR (a major bump can be a real breaking
+      # change — e.g. leptos 0.6->0.8 — and shouldn't be silently bundled
+      # with a patch-level typo fix in an unrelated crate).
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 3
     labels:
       - "ci"
+    groups:
+      actions-updates:
+        applies-to: version-updates
+        update-types:
+          - "patch"
+          - "minor"
