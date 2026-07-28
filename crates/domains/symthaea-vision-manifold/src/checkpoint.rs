@@ -2061,11 +2061,11 @@ fn authenticated_envelope_limit(
         .ok_or_else(|| "authenticated checkpoint limit overflow".to_string())
 }
 
-fn authenticated_checkpoint_parts<'a>(
-    encoded: &'a [u8],
+fn authenticated_checkpoint_parts(
+    encoded: &[u8],
     max_payload_bytes: usize,
     max_tag_bytes: usize,
-) -> Result<(&'a [u8], &'a [u8]), String> {
+) -> Result<(&[u8], &[u8]), String> {
     if max_tag_bytes == 0 || max_tag_bytes > DEFAULT_MAX_CHECKPOINT_AUTH_TAG_BYTES {
         return Err(format!(
             "checkpoint authentication tag limit must be in 1..={DEFAULT_MAX_CHECKPOINT_AUTH_TAG_BYTES}, got {max_tag_bytes}"
@@ -2253,6 +2253,11 @@ where
     Some(encoded)
 }
 
+// Genuinely needs this many parameters for its authenticated+versioned+retention-report API
+// surface (path, kind, encoded payload, two size limits, retention policy, verify closure,
+// heartbeat closure) -- bundling them into a struct would just move the same complexity, not
+// remove it, for a private helper with a small number of call sites.
+#[allow(clippy::too_many_arguments)]
 fn write_authenticated_checkpoint_file_with_retention_report<V, H>(
     path: &Path,
     kind: &str,
@@ -2314,6 +2319,9 @@ where
 ///
 /// Existing generations are rotated only after their authentication tag,
 /// integrity envelope, kind, and JSON payload all validate.
+// Genuinely needs this many parameters -- same rationale as
+// write_authenticated_checkpoint_file_with_retention_report above.
+#[allow(clippy::too_many_arguments)]
 pub fn save_authenticated_checkpoint_file_with_retention_report<T, S, V>(
     path: impl AsRef<Path>,
     kind: &str,
@@ -2352,6 +2360,9 @@ where
 }
 
 /// Save authenticated retained history under one cross-process writer lease.
+// Genuinely needs this many parameters -- adds a writer-lock policy on top of the same
+// authenticated+versioned+retention-report surface as the sibling functions above.
+#[allow(clippy::too_many_arguments)]
 pub fn save_authenticated_checkpoint_file_with_retention_locked_report<T, S, V>(
     path: impl AsRef<Path>,
     kind: &str,
