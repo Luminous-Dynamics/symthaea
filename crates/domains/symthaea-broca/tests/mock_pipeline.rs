@@ -36,7 +36,7 @@ fn test_generate_distill_pe_finite() {
 
     for _ in 0..10 {
         let result = gen_obj.generate(&channels);
-        gen_obj.distill_step(&channels, &result);
+        gen_obj.train_step(&channels, &result.token_ids);
 
         assert!(
             result.semantic_pe.is_finite(),
@@ -65,14 +65,14 @@ fn test_distillation_modifies_weights() {
     let mut gen_obj = mock_gen(config);
     let channels = ThoughtChannels::with_intent(1);
 
-    let initial_weights = gen_obj.projection().flatten_weights();
+    let initial_weights = gen_obj.projection.flatten_weights();
 
     for _ in 0..6 {
         let result = gen_obj.generate(&channels);
-        gen_obj.distill_step(&channels, &result);
+        gen_obj.train_step(&channels, &result.token_ids);
     }
 
-    let final_weights = gen_obj.projection().flatten_weights();
+    let final_weights = gen_obj.projection.flatten_weights();
     assert_eq!(initial_weights.len(), final_weights.len());
 
     // At least some weights should have changed
@@ -97,7 +97,7 @@ fn test_pe_trend_after_distillation() {
 
     for _ in 0..20 {
         let result = gen_obj.generate(&channels);
-        gen_obj.distill_step(&channels, &result);
+        gen_obj.train_step(&channels, &result.token_ids);
     }
 
     let (mean, std_dev, trend) = gen_obj.pe_stats();
@@ -162,12 +162,14 @@ fn test_collapse_recovery_health_check() {
     let mut gen_obj = mock_gen(config);
     let channels = ThoughtChannels::with_intent(1);
 
+    let mut last_output_hvs = Vec::new();
     for _ in 0..55 {
         let result = gen_obj.generate(&channels);
-        gen_obj.distill_step(&channels, &result);
+        gen_obj.train_step(&channels, &result.token_ids);
+        last_output_hvs = result.output_hvs;
     }
 
-    let rank = gen_obj.last_cached_rank();
+    let rank = gen_obj.projection.effective_rank(&last_output_hvs);
     assert!(rank.is_finite(), "Cached rank should be finite: {rank}");
     assert!(rank > 0.0, "Cached rank should be positive: {rank}");
 }
@@ -230,7 +232,7 @@ fn test_warm_start_then_generate_distill() {
             "PE should be finite after warm-start: {}",
             result.semantic_pe
         );
-        gen_obj.distill_step(&channels, &result);
+        gen_obj.train_step(&channels, &result.token_ids);
     }
 }
 
@@ -285,13 +287,13 @@ fn test_surprise_gradient_amplifies() {
     let mut gen_obj = mock_gen(config);
     let channels = ThoughtChannels::with_intent(1);
 
-    let initial_weights = gen_obj.projection().flatten_weights();
+    let initial_weights = gen_obj.projection.flatten_weights();
 
     // Run generate + distill
     let result = gen_obj.generate(&channels);
-    gen_obj.distill_step(&channels, &result);
+    gen_obj.train_step(&channels, &result.token_ids);
 
-    let after_weights = gen_obj.projection().flatten_weights();
+    let after_weights = gen_obj.projection.flatten_weights();
 
     // Weights should have changed (non-zero PE → amplified gradients)
     let changed = initial_weights
@@ -332,21 +334,21 @@ fn test_eval_only_workflow() {
     // 1. Train for 5 rounds
     for _ in 0..5 {
         let result = gen_obj.generate(&channels);
-        gen_obj.distill_step(&channels, &result);
+        gen_obj.train_step(&channels, &result.token_ids);
     }
 
     // 2. Save projection checkpoint to tempfile
     let dir = std::env::temp_dir();
     let path = dir.join("test_eval_only_workflow.bin");
-    let weights = gen_obj.projection().flatten_weights();
+    let weights = gen_obj.projection.flatten_weights();
     let mut ckpt = ProjectionCheckpoint::new(
         weights,
-        gen_obj.config().hdc_dim,
-        gen_obj.config().bottleneck_dim,
-        gen_obj.config().ssm_dim,
+        gen_obj.config.hdc_dim,
+        gen_obj.config.bottleneck_dim,
+        gen_obj.config.ssm_dim,
         5,
-        gen_obj.projection().is_deep(),
-        gen_obj.projection().inner_dim(),
+        gen_obj.projection.is_deep(),
+        gen_obj.projection.inner_dim(),
     );
     ckpt.save_to_file(&path).unwrap();
 
@@ -421,7 +423,7 @@ fn test_diagnostics_across_training() {
     // Train 10 rounds (warmup=0, accum=1 so every step applies)
     for _ in 0..10 {
         let result = gen_obj.generate(&channels);
-        gen_obj.distill_step(&channels, &result);
+        gen_obj.train_step(&channels, &result.token_ids);
     }
 
     let diag = gen_obj
@@ -463,7 +465,7 @@ fn test_diagnostics_restore_from_checkpoint() {
     // Train 10 rounds
     for _ in 0..10 {
         let result = gen_obj.generate(&channels);
-        gen_obj.distill_step(&channels, &result);
+        gen_obj.train_step(&channels, &result.token_ids);
     }
 
     let diag = gen_obj
@@ -477,15 +479,15 @@ fn test_diagnostics_restore_from_checkpoint() {
 
     // Take snapshot and save checkpoint
     let snap = diag.snapshot();
-    let weights = gen_obj.projection().flatten_weights();
+    let weights = gen_obj.projection.flatten_weights();
     let mut ckpt = ProjectionCheckpoint::new(
         weights,
-        gen_obj.config().hdc_dim,
-        gen_obj.config().bottleneck_dim,
-        gen_obj.config().ssm_dim,
+        gen_obj.config.hdc_dim,
+        gen_obj.config.bottleneck_dim,
+        gen_obj.config.ssm_dim,
         10,
-        gen_obj.projection().is_deep(),
-        gen_obj.projection().inner_dim(),
+        gen_obj.projection.is_deep(),
+        gen_obj.projection.inner_dim(),
     );
     ckpt.diagnostics_snapshot = Some(snap);
     let dir = std::env::temp_dir();
@@ -517,7 +519,7 @@ fn test_diagnostics_restore_from_checkpoint() {
     // Train 5 more rounds
     for _ in 0..5 {
         let result = fresh_gen.generate(&channels);
-        fresh_gen.distill_step(&channels, &result);
+        fresh_gen.train_step(&channels, &result.token_ids);
     }
 
     let final_diag = fresh_gen
@@ -554,7 +556,7 @@ fn test_diagnostics_triggered_collapse_recovery() {
     // Phase 1: Train normally to accumulate healthy diagnostics baselines
     for _ in 0..10 {
         let result = gen_obj.generate(&channels);
-        gen_obj.distill_step(&channels, &result);
+        gen_obj.train_step(&channels, &result.token_ids);
     }
 
     let diag = gen_obj
@@ -571,7 +573,7 @@ fn test_diagnostics_triggered_collapse_recovery() {
     );
 
     // Phase 2: Inject uniform weights to induce dimensional collapse
-    let initial_weights = gen_obj.projection().flatten_weights();
+    let initial_weights = gen_obj.projection.flatten_weights();
     let uniform: Vec<f32> = initial_weights.iter().map(|_| 0.001).collect();
     gen_obj.projection_mut().load_weights(&uniform);
 
@@ -579,7 +581,7 @@ fn test_diagnostics_triggered_collapse_recovery() {
     // gradient application. With uniform weights, variance should be near-zero.
     for _ in 0..10 {
         let result = gen_obj.generate(&channels);
-        gen_obj.distill_step(&channels, &result);
+        gen_obj.train_step(&channels, &result.token_ids);
     }
 
     let diag = gen_obj
@@ -603,15 +605,13 @@ fn test_diagnostics_triggered_collapse_recovery() {
             gen_obj.encoder().encode(&ch)
         })
         .collect();
-    gen_obj.check_projection_health(&sample_hvs);
-
     // After health check, rank should be finite and positive
-    let rank = gen_obj.last_cached_rank();
+    let rank = gen_obj.projection.effective_rank(&sample_hvs);
     assert!(rank.is_finite(), "Cached rank should be finite: {rank}");
     assert!(rank > 0.0, "Cached rank should be positive: {rank}");
 
     // Weights should have changed from the uniform injection
-    let final_weights = gen_obj.projection().flatten_weights();
+    let final_weights = gen_obj.projection.flatten_weights();
     let changed = uniform
         .iter()
         .zip(final_weights.iter())
@@ -671,31 +671,31 @@ fn test_full_training_pipeline_smoke() {
         for pair in &dataset.pairs {
             let ch = pair.to_thought_channels();
             let result = gen_obj.generate(&ch);
-            gen_obj.distill_step(&ch, &result);
+            gen_obj.train_step(&ch, &result.token_ids);
         }
     }
 
     // 4. Compute effective rank
-    let rank = gen_obj.last_cached_rank();
+    let rank = gen_obj.projection.effective_rank(&samples);
     assert!(
         rank.is_finite(),
         "Rank should be finite after training: {rank}"
     );
 
     // 5. Save checkpoint with diagnostics snapshot
-    let weights = gen_obj.projection().flatten_weights();
+    let weights = gen_obj.projection.flatten_weights();
     let diag = gen_obj
         .projection_diagnostics()
         .expect("diagnostics enabled");
     let snap = diag.snapshot();
     let mut ckpt = ProjectionCheckpoint::new(
         weights.clone(),
-        gen_obj.config().hdc_dim,
-        gen_obj.config().bottleneck_dim,
-        gen_obj.config().ssm_dim,
+        gen_obj.config.hdc_dim,
+        gen_obj.config.bottleneck_dim,
+        gen_obj.config.ssm_dim,
         10,
-        gen_obj.projection().is_deep(),
-        gen_obj.projection().inner_dim(),
+        gen_obj.projection.is_deep(),
+        gen_obj.projection.inner_dim(),
     );
     ckpt.diagnostics_snapshot = Some(snap);
     let dir = std::env::temp_dir();
@@ -710,7 +710,7 @@ fn test_full_training_pipeline_smoke() {
         .load_weights(&loaded_ckpt.projection_weights);
 
     // 7. Assert loaded weights match saved weights
-    let loaded_weights = fresh_gen.projection().flatten_weights();
+    let loaded_weights = fresh_gen.projection.flatten_weights();
     assert_eq!(weights.len(), loaded_weights.len());
     let weight_match = weights
         .iter()
@@ -780,12 +780,12 @@ fn test_ema_inference_swap() {
 
     for _ in 0..10 {
         let result = gen_obj.generate(&channels);
-        gen_obj.distill_step(&channels, &result);
+        gen_obj.train_step(&channels, &result.token_ids);
     }
 
-    assert!(gen_obj.projection().has_ema(), "EMA should be active");
+    assert!(gen_obj.projection.has_ema(), "EMA should be active");
 
-    let weights = gen_obj.projection().flatten_weights();
+    let weights = gen_obj.projection.flatten_weights();
     assert!(
         weights.iter().all(|w| w.is_finite()),
         "All projection weights should be finite after EMA inference cycles"
@@ -833,7 +833,7 @@ fn test_temporal_generation_pipeline() {
             "PE should be in [0, 2] at round {i}, got: {}",
             result.semantic_pe
         );
-        gen_obj.distill_step(&channels, &result);
+        gen_obj.train_step(&channels, &result.token_ids);
     }
 
     // Temporal weights should have changed
@@ -880,20 +880,20 @@ fn test_temporal_checkpoint_roundtrip() {
     // Train for 5 rounds
     for _ in 0..5 {
         let result = gen_obj.generate(&channels);
-        gen_obj.distill_step(&channels, &result);
+        gen_obj.train_step(&channels, &result.token_ids);
     }
 
     // Save temporal checkpoint
     let tp = gen_obj.temporal_proj().unwrap();
     let temporal_weights = tp.flatten_weights();
-    let spatial_weights = gen_obj.projection().flatten_weights();
+    let spatial_weights = gen_obj.projection.flatten_weights();
 
     let mut ckpt = ProjectionCheckpoint::new_temporal(
         spatial_weights.clone(),
         temporal_weights.clone(),
-        gen_obj.config().hdc_dim,
-        gen_obj.config().bottleneck_dim,
-        gen_obj.config().ssm_dim,
+        gen_obj.config.hdc_dim,
+        gen_obj.config.bottleneck_dim,
+        gen_obj.config.ssm_dim,
         5,
         tp.chunk_size(),
         tp.num_chunks(),
@@ -957,7 +957,7 @@ fn test_temporal_collapse_recovery_health_check() {
     // Phase 1: Train normally to get baseline
     for _ in 0..5 {
         let result = gen_obj.generate(&channels);
-        gen_obj.distill_step(&channels, &result);
+        gen_obj.train_step(&channels, &result.token_ids);
     }
 
     // Phase 2: Inject uniform weights to induce collapse
@@ -973,10 +973,8 @@ fn test_temporal_collapse_recovery_health_check() {
             gen_obj.encoder().encode(&ch)
         })
         .collect();
-    gen_obj.check_projection_health(&sample_hvs);
-
     // Rank should be finite and positive
-    let rank = gen_obj.last_cached_rank();
+    let rank = gen_obj.temporal_proj().unwrap().effective_rank(&sample_hvs);
     assert!(rank.is_finite(), "Cached rank should be finite: {rank}");
     assert!(rank > 0.0, "Cached rank should be positive: {rank}");
 

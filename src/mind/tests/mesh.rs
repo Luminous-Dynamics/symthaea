@@ -135,7 +135,7 @@ fn test_process_mesh_drains_inbox() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xFF; 2048]),
     });
@@ -241,7 +241,7 @@ fn test_process_mesh_updates_registry() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xAA; 2048]),
     });
@@ -252,7 +252,7 @@ fn test_process_mesh_updates_registry() {
         urgency: MeshUrgency::Critical,
         timestamp_s: 0,
         payload_type: PayloadType::Heartbeat,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xBB; 2048]),
     });
@@ -338,7 +338,7 @@ fn test_swarm_phi_boosts_consciousness() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     });
@@ -745,7 +745,7 @@ fn test_mesh_stats_count_receives() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xAA; 2048]),
     });
@@ -785,7 +785,7 @@ fn test_peer_expiry_cleans_social_coherence() {
         urgency: crate::swarm::mesh::MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: symthaea_core::hdc::BinaryHV([0xFF; 2048]),
     };
@@ -931,7 +931,7 @@ fn test_bandwidth_metering_receive() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xAA; 2048]),
     });
@@ -976,7 +976,7 @@ fn test_mesh_telemetry_snapshot() {
         urgency: crate::swarm::mesh::MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     });
@@ -1160,7 +1160,7 @@ fn test_lora_double_loss_graceful() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0x42; 2048]),
     };
@@ -1238,7 +1238,7 @@ fn test_four_minds_mesh_stress() {
                     urgency: MeshUrgency::Normal,
                     timestamp_s: tick as u32,
                     payload_type: PayloadType::WisdomVector,
-                    auth_mac: 0,
+                    auth_mac: [0u8; 32],
                     ttl: 0,
                     wisdom: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(
                         &minds[i].state.current_thought,
@@ -1323,7 +1323,7 @@ fn test_mesh_inbox_backpressure() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0xAA; 2048]),
         });
@@ -1366,7 +1366,7 @@ fn test_mesh_outbox_backpressure() {
                 urgency: MeshUrgency::Normal,
                 timestamp_s: 0,
                 payload_type: PayloadType::WisdomVector,
-                auth_mac: 0,
+                auth_mac: [0u8; 32],
                 ttl: 0,
                 wisdom: BinaryHV([0; 2048]),
             },
@@ -1403,7 +1403,7 @@ fn test_mesh_dedup_same_packet() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xAA; 2048]),
     };
@@ -1442,7 +1442,7 @@ fn test_mesh_dedup_different_sequence() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0xAA; 2048]),
         });
@@ -1478,7 +1478,7 @@ fn test_mesh_dedup_ring_eviction() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -1499,7 +1499,7 @@ fn test_mesh_dedup_ring_eviction() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     });
@@ -1534,7 +1534,7 @@ fn test_mesh_process_rate_limits_flood() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     });
@@ -1551,7 +1551,7 @@ fn test_mesh_process_rate_limits_flood() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -1582,7 +1582,7 @@ fn test_mesh_process_rate_limits_flood() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     });
@@ -1596,7 +1596,7 @@ fn test_mesh_process_rate_limits_flood() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -1611,7 +1611,7 @@ fn test_mesh_process_rate_limits_flood() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -1696,7 +1696,7 @@ fn test_health_urgency_allows_cruise_when_healthy() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -1741,7 +1741,7 @@ fn test_populate_mesh_metadata() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xAA; 2048]),
     });
@@ -1896,7 +1896,7 @@ fn test_mesh_auth_rejects_unsigned_when_key_set() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xAA; 2048]),
     });
@@ -1929,7 +1929,7 @@ fn test_mesh_auth_passes_signed_packet() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xAA; 2048]),
     };
@@ -1964,7 +1964,7 @@ fn test_mesh_no_auth_key_passes_all() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xAA; 2048]),
     });
@@ -2003,7 +2003,7 @@ fn test_inbox_backpressure_drops_gradients_first() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::Heartbeat,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -2016,7 +2016,7 @@ fn test_inbox_backpressure_drops_gradients_first() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::Gradient,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -2029,7 +2029,7 @@ fn test_inbox_backpressure_drops_gradients_first() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -2067,7 +2067,7 @@ fn test_outbox_backpressure_drops_gradients_first() {
                 urgency: MeshUrgency::Normal,
                 timestamp_s: 0,
                 payload_type: PayloadType::Heartbeat,
-                auth_mac: 0,
+                auth_mac: [0u8; 32],
                 ttl: 0,
                 wisdom: BinaryHV([0; 2048]),
             },
@@ -2082,7 +2082,7 @@ fn test_outbox_backpressure_drops_gradients_first() {
                 urgency: MeshUrgency::Normal,
                 timestamp_s: 0,
                 payload_type: PayloadType::Gradient,
-                auth_mac: 0,
+                auth_mac: [0u8; 32],
                 ttl: 0,
                 wisdom: BinaryHV([0; 2048]),
             },
@@ -2121,7 +2121,7 @@ fn test_mesh_forward_decrements_ttl() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xAA; 2048]),
     });
@@ -2160,7 +2160,7 @@ fn test_mesh_no_forward_ttl_zero() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xBB; 2048]),
     });
@@ -2190,7 +2190,7 @@ fn test_mesh_no_forward_ttl_one() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 1,
         wisdom: BinaryHV([0xCC; 2048]),
     });
@@ -2276,7 +2276,7 @@ fn test_replay_on_new_peer() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xFF; 2048]),
     });
@@ -2315,7 +2315,7 @@ fn test_no_replay_on_known_peer() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     });
@@ -2328,7 +2328,7 @@ fn test_no_replay_on_known_peer() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     });
@@ -2366,7 +2366,7 @@ fn test_aimd_additive_increase() {
         urgency: crate::swarm::mesh::MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: symthaea_core::hdc::BinaryHV([0; 2048]),
     });
@@ -2449,7 +2449,7 @@ fn test_aimd_budget_ceiling() {
         urgency: crate::swarm::mesh::MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: symthaea_core::hdc::BinaryHV([0; 2048]),
     });
@@ -2548,7 +2548,7 @@ fn test_aimd_increase_counter() {
         urgency: crate::swarm::mesh::MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: symthaea_core::hdc::BinaryHV::zero(),
     };
@@ -2617,7 +2617,7 @@ fn test_not_partitioned_with_active_peers() {
         urgency: crate::swarm::mesh::MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: symthaea_core::hdc::BinaryHV::zero(),
     };
@@ -2901,7 +2901,7 @@ fn test_xchacha_send_receive_roundtrip() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 12345,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xAB; 2048]),
     };
@@ -2962,7 +2962,7 @@ fn test_rapid_key_rotation_under_load() {
                 urgency: MeshUrgency::Normal,
                 timestamp_s: 1_700_000_000,
                 payload_type: PayloadType::WisdomVector,
-                auth_mac: 0,
+                auth_mac: [0u8; 32],
                 ttl: 3,
                 wisdom: BinaryHV([rotation; 2048]),
             };
@@ -3101,7 +3101,7 @@ fn test_fragment_swap_rejected() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xCC; 2048]),
     };
@@ -3177,7 +3177,7 @@ fn test_fragment_cross_stream_rejected() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xAA; 2048]),
     };
@@ -3189,7 +3189,7 @@ fn test_fragment_cross_stream_rejected() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xBB; 2048]),
     };
@@ -3264,7 +3264,7 @@ fn test_fragment_replay_after_completion() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xDD; 2048]),
     };
@@ -3325,7 +3325,7 @@ fn test_downgrade_unencrypted_rejected() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xEE; 2048]),
     };
@@ -3366,7 +3366,7 @@ fn test_downgrade_legacy_format_backward_compat() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xFF; 2048]),
     };
