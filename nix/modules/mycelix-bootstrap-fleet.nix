@@ -7,8 +7,8 @@
 # symthaea/src/swarm/config.rs MYCELIX_BOOTSTRAP_NODES.
 #
 # Deploy to 3 geographically distributed VPS instances:
-#   1. bootstrap-1.mycelix.luminousdynamics.org (US-East)
-#   2. bootstrap-2.mycelix.luminousdynamics.org (EU-West)
+#   1. bootstrap-1.mycelix.net (US-East)
+#   2. bootstrap-2.mycelix.net (EU-West)
 #   3. bootstrap.mycelix.community             (AP-South)
 #
 # Each node gets a unique identity key in /var/lib/mycelix-bootstrap/keys/
@@ -65,18 +65,21 @@
   #     - job_name: 'mycelix-bootstrap'
   #       static_configs:
   #         - targets:
-  #           - 'bootstrap-1.mycelix.luminousdynamics.org:9091'
-  #           - 'bootstrap-2.mycelix.luminousdynamics.org:9091'
+  #           - 'bootstrap-1.mycelix.net:9091'
+  #           - 'bootstrap-2.mycelix.net:9091'
   #           - 'bootstrap.mycelix.community:9091'
 
   # ── DNS Records ───────────────────────────────────────────────────
   #
-  # Required DNS records (add to mycelix.luminousdynamics.org zone):
+  # Required DNS records (add to mycelix.net zone -- relative names updated
+  # after moving off the old mycelix.luminousdynamics.org zone, where
+  # "mycelix" was a necessary prefix; it would be a redundant double
+  # "mycelix.mycelix.net" here):
   #
-  #   bootstrap-1.mycelix  A      <us-east-ip>
-  #   bootstrap-1.mycelix  AAAA   <us-east-ipv6>
-  #   bootstrap-2.mycelix  A      <eu-west-ip>
-  #   bootstrap-2.mycelix  AAAA   <eu-west-ipv6>
+  #   bootstrap-1  A      <us-east-ip>
+  #   bootstrap-1  AAAA   <us-east-ipv6>
+  #   bootstrap-2  A      <eu-west-ip>
+  #   bootstrap-2  AAAA   <eu-west-ipv6>
   #
   # Required DNS records (add to mycelix.community zone):
   #

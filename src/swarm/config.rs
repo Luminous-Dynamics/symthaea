@@ -196,24 +196,45 @@ impl SwarmConfig {
 
 /// Default Mycelix network bootstrap nodes.
 ///
-/// These are well-known nodes that help new peers discover the network.
-/// Format: Iroh EndpointAddr serialized as JSON or base64 ticket string.
+/// **Status (verified 2026-07-28): none of these currently resolve to a
+/// running node.** All three addresses below (the two "primary" and the
+/// one "fallback") were checked and none of the domains involved even
+/// resolve in DNS -- `luminousdynamics.org` is closed, and
+/// `mycelix.community` (the fallback's domain) has no DNS presence at all.
+/// Separately, the NixOS module that would deploy a real bootstrap node
+/// (`nix/modules/mycelix-bootstrap.nix`) is not imported into any live
+/// config on this org's infrastructure, and its own default package
+/// binding is a placeholder (`pkgs.iroh or pkgs.hello`). This was
+/// scaffolded but never actually built or deployed -- these were never
+/// working addresses that broke, they were aspirational from the start.
 ///
-/// Override at runtime via `MYCELIX_BOOTSTRAP_NODES` environment variable
-/// (comma-separated list of Iroh ticket strings).
+/// Renamed to `mycelix.net` (Mycelix's own live domain, rather than a
+/// borrowed subdomain of the parent org's site) as the intended future
+/// home once a real node exists -- but a hostname change alone does not
+/// make bootstrapping work. Until `mycelix-bootstrap.nix` is actually
+/// deployed somewhere and DNS points at it, anyone running the swarm for
+/// real needs to supply working peers via the `MYCELIX_BOOTSTRAP_NODES`
+/// environment variable (comma-separated Iroh ticket strings) --
+/// that override path already existed and is unaffected by this.
 pub const MYCELIX_BOOTSTRAP_NODES_PRIMARY: &[&str] = &[
-    // Luminous Dynamics operated bootstrap nodes
-    "iroh://bootstrap-1.mycelix.luminousdynamics.org:4433",
-    "iroh://bootstrap-2.mycelix.luminousdynamics.org:4433",
+    // Not yet deployed anywhere -- see module doc comment above.
+    "iroh://bootstrap-1.mycelix.net:4433",
+    "iroh://bootstrap-2.mycelix.net:4433",
 ];
 
 /// Fallback bootstrap nodes operated by community partners.
+///
+/// Not yet deployed anywhere either -- `mycelix.community` has no DNS
+/// presence at all as of 2026-07-28. Kept as a placeholder for a future
+/// community-operated node rather than removed outright.
 pub const MYCELIX_BOOTSTRAP_NODES_FALLBACK: &[&str] = &["iroh://bootstrap.mycelix.community:4433"];
 
 /// Combined bootstrap nodes (primary + fallback) for backward compatibility.
+/// See `MYCELIX_BOOTSTRAP_NODES_PRIMARY`'s doc comment: none of these
+/// resolve to a running node yet.
 pub const MYCELIX_BOOTSTRAP_NODES: &[&str] = &[
-    "iroh://bootstrap-1.mycelix.luminousdynamics.org:4433",
-    "iroh://bootstrap-2.mycelix.luminousdynamics.org:4433",
+    "iroh://bootstrap-1.mycelix.net:4433",
+    "iroh://bootstrap-2.mycelix.net:4433",
     "iroh://bootstrap.mycelix.community:4433",
 ];
 
