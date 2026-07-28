@@ -1303,6 +1303,45 @@ required-features = ["neuroevolution"]
 [[test]]
 name = "genesis_feedback_telemetry"
 
+# The following 11 test files existed on disk but were never registered under
+# autotests = false, so `cargo test --test <name>` (used throughout ci.yml)
+# failed with "no test target named X in default-run packages" -- found
+# 2026-07-28 triaging PR #31's CI failures; this single registration gap was
+# the root cause behind several failing jobs (Compliance, Hardened API/Nix
+# Regressions, science-infra, symthaea-broca test-helpers, others).
+[[test]]
+name = "adversarial_moral_algebra"
+
+[[test]]
+name = "api_integration"
+
+[[test]]
+name = "calibration_e2e"
+
+[[test]]
+name = "pathology_resilience"
+
+[[test]]
+name = "proptest_cognitive_loop"
+
+[[test]]
+name = "proptest_feedback_stability"
+
+[[test]]
+name = "proptest_threshold_sensitivity"
+
+[[test]]
+name = "safety_agent_escalation_soak"
+
+[[test]]
+name = "substrate_simulation"
+
+[[test]]
+name = "voice_integration"
+
+[[test]]
+name = "voice_pipeline_integration"
+
 [[example]]
 name = "helicopter_phi_benchmark"
 required-features = ["helicopter"]
