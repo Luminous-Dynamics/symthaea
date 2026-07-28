@@ -499,4 +499,4 @@ All validation scripts are available in the `scripts/` directory:
 
 *This work is part of the Luminous Dynamics Consciousness-First Computing initiative.*
 
-*Contact: research@luminousdynamics.org*
+*Contact: tristan.stoltz@evolvingresonantcocreationism.com*

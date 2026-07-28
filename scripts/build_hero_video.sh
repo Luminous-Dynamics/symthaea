@@ -105,7 +105,7 @@ ffmpeg -y -f lavfi -i "color=c=black:s=1920x1080:d=4,format=yuv420p" \
   -vf "drawtext=fontfile='$FONT':text='SYMTHAEA':fontsize=72:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-80:alpha='if(lt(t\,0.5)\,t/0.5\,if(gt(t\,3)\,max(0\,1-(t-3))\,1))',\
 drawtext=fontfile='$FONT':text='Holographic Liquid Brain Architecture':fontsize=32:fontcolor=0xc8c8e0:x=(w-text_w)/2:y=(h-text_h)/2-20:alpha='if(lt(t\,0.8)\,0\,if(lt(t\,1.3)\,min(1\,(t-0.8)/0.5)\,if(gt(t\,3)\,max(0\,1-(t-3))\,1)))',\
 drawtext=fontfile='$FONT':text='HDC + IIT/Phi + LTC/CfC + Active Inference':fontsize=24:fontcolor=0x5090ff:x=(w-text_w)/2:y=(h-text_h)/2+30:alpha='if(lt(t\,1)\,0\,if(lt(t\,1.5)\,min(1\,(t-1)/0.5)\,if(gt(t\,3)\,max(0\,1-(t-3))\,1)))',\
-drawtext=fontfile='$FONT':text='luminousdynamics.org':fontsize=20:fontcolor=0x6a6a8a:x=(w-text_w)/2:y=(h-text_h)/2+80:alpha='if(lt(t\,1.5)\,0\,if(lt(t\,2)\,min(1\,(t-1.5)/0.5)\,if(gt(t\,3)\,max(0\,1-(t-3))\,1)))',\
+drawtext=fontfile='$FONT':text='github.com/Luminous-Dynamics':fontsize=20:fontcolor=0x6a6a8a:x=(w-text_w)/2:y=(h-text_h)/2+80:alpha='if(lt(t\,1.5)\,0\,if(lt(t\,2)\,min(1\,(t-1.5)/0.5)\,if(gt(t\,3)\,max(0\,1-(t-3))\,1)))',\
 fade=t=in:st=0:d=0.5" \
   -c:v libx264 -preset fast -pix_fmt yuv420p -r 30 "$VID_DIR/_p7_end.mp4" 2>/dev/null
 echo "  7/7 End card"

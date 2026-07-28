@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Simulator-agnostic engineering bridge traits for FEA, CFD, multibody, process, and circuit solvers"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://luminousdynamics.org"
+homepage = "https://github.com/Luminous-Dynamics/symthaea"
 keywords = ["engineering", "simulation", "fea", "cfd", "digital-twin"]
 categories = ["science", "simulation"]
 

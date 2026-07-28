@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "HDC-LTC + FEP Active Inference bipedal humanoid control on DMC Humanoid benchmark"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://luminousdynamics.org"
+homepage = "https://github.com/Luminous-Dynamics/symthaea"
 keywords = ["humanoid", "active-inference", "hdc", "bipedal", "mujoco"]
 categories = ["science", "algorithms", "simulation"]
 

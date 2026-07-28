@@ -2,7 +2,7 @@
 
 nix-mind brings hyperdimensional computing (HDC) and active inference to NixOS system management. It encodes system state, configuration, and user intent into a shared semantic space, enabling causal reasoning about NixOS options, predictive hierarchy monitoring, and consciousness-gated command execution.
 
-Part of the [Symthaea](https://luminousdynamics.org) cognitive architecture.
+Part of the [Symthaea](https://github.com/Luminous-Dynamics) cognitive architecture.
 
 ## Architecture
 

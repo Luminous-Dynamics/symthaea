@@ -72,7 +72,7 @@
 
           meta = with pkgs.lib; {
             description = "Conscious NixOS management tool (${name})";
-            homepage = "https://luminousdynamics.org";
+            homepage = "https://github.com/Luminous-Dynamics/symthaea";
             license = licenses.mit;
           };
         };

@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Patch-based HDC video encoding with CfC temporal manifold and surprise-driven attention"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://luminousdynamics.org"
+homepage = "https://github.com/Luminous-Dynamics/symthaea"
 keywords = ["vision", "hdc", "cfc", "temporal-manifold", "video"]
 categories = ["science", "algorithms", "multimedia::video"]
 

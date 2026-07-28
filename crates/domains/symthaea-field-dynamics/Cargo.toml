@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Consciousness field dynamics — wave equations, energy conservation, and resonant modes for consciousness evolution"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://luminousdynamics.org"
+homepage = "https://github.com/Luminous-Dynamics/symthaea"
 keywords = ["consciousness", "field-theory", "wave-equation", "dynamics", "neuroscience"]
 categories = ["science", "algorithms"]
 

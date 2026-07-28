@@ -2,7 +2,7 @@
 name = "symthaea-hdc-crypto"
 version = "0.1.0"
 edition = "2024"
-authors = ["Luminous Dynamics <contact@luminousdynamics.org>"]
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Insecure experimental HDC masking and algebra demonstrations; not production cryptography"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"

@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Counterfactual Dream Engine — simulate alternative pasts to learn from mistakes not made"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://luminousdynamics.org"
+homepage = "https://github.com/Luminous-Dynamics/symthaea"
 keywords = ["consciousness", "counterfactual", "dreaming", "ai", "simulation"]
 categories = ["science", "algorithms"]
 

@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Consciousness-driven browser agent: CDP observation + HDC encoding + Phi-gated actions"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://luminousdynamics.org"
+homepage = "https://github.com/Luminous-Dynamics/symthaea"
 keywords = ["browser-agent", "consciousness", "hdc", "cdp", "active-inference"]
 categories = ["science", "algorithms", "web-programming"]
 

@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Geodesic Code Synthesis — topology-aware code generation via manifold navigation, execution prediction, and sheaf coherence"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://luminousdynamics.org"
+homepage = "https://github.com/Luminous-Dynamics/symthaea"
 keywords = ["topology", "code-synthesis", "geodesic", "sheaf", "manifold"]
 categories = ["science", "algorithms", "development-tools"]
 

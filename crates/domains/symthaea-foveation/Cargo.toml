@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Dual-stream foveation bridge: dorsal surprise → ventral recognition via background dispatch"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://luminousdynamics.org"
+homepage = "https://github.com/Luminous-Dynamics/symthaea"
 keywords = ["vision", "foveation", "hdc", "attention", "ventral-stream"]
 categories = ["science", "algorithms", "multimedia::video"]
 

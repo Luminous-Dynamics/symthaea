@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Engineering reasoning facade: requirements, concepts, simulations, digital twins, and safety cases"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://luminousdynamics.org"
+homepage = "https://github.com/Luminous-Dynamics/symthaea"
 keywords = ["engineering", "reasoning", "simulation", "safety", "digital-twin"]
 categories = ["science", "simulation"]
 

@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Artificial womb ectogenesis with 40-week developmental gating, consent proxy escalation, and FEP control"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://luminousdynamics.org"
+homepage = "https://github.com/Luminous-Dynamics/symthaea"
 keywords = ["ectogenesis", "artificial-womb", "hdc", "developmental", "ethics"]
 categories = ["science", "algorithms"]
 

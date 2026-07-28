@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Free Energy Principle exploration — surprise-driven adaptive exploration strategies"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://luminousdynamics.org"
+homepage = "https://github.com/Luminous-Dynamics/symthaea"
 keywords = ["consciousness", "exploration", "fep", "surprise", "adaptive"]
 categories = ["science", "algorithms"]
 

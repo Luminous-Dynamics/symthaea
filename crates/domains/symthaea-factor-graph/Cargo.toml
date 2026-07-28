@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Factor graphs with belief propagation — probabilistic inference for active inference generative models"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://luminousdynamics.org"
+homepage = "https://github.com/Luminous-Dynamics/symthaea"
 keywords = ["factor-graph", "belief-propagation", "probabilistic-inference", "active-inference", "neuroscience"]
 categories = ["science", "algorithms"]
 

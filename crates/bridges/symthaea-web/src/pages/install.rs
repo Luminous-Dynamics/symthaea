@@ -3208,7 +3208,7 @@ pub fn InstallPage() -> impl IntoView {
                 <p>
                     <a href="https://github.com/Luminous-Dynamics/symthaea">{move || i18n::t(lang.get(), "footer_source")}</a>
                     " \u{00b7} "
-                    <a href="https://luminousdynamics.org">"Luminous Dynamics"</a>
+                    <a href="https://github.com/Luminous-Dynamics">"Luminous Dynamics"</a>
                     " \u{00b7} "
                     {move || i18n::t(lang.get(), "footer_no_tracking")}
                     " \u{00b7} "
