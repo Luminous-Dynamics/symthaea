@@ -710,7 +710,7 @@ impl CognitiveLoopService {
                                                         urgency: crate::swarm::mesh::MeshUrgency::Cruise,
                                                         timestamp_s: *created_at as u32,
                                                         payload_type: crate::swarm::mesh::PayloadType::ContentAnnounce,
-                                                        auth_mac: 0,
+                                                        auth_mac: [0u8; 32],
                                                         ttl: crate::swarm::mesh::MESH_DEFAULT_TTL,
                                                         wisdom: announce.encode(),
                                                     };
@@ -1248,7 +1248,7 @@ impl CognitiveLoopService {
                             urgency: crate::swarm::mesh::MeshUrgency::Cruise,
                             timestamp_s: content_ref.created_at as u32,
                             payload_type: crate::swarm::mesh::PayloadType::ContentAnnounce,
-                            auth_mac: 0,
+                            auth_mac: [0u8; 32],
                             ttl: crate::swarm::mesh::MESH_DEFAULT_TTL,
                             wisdom: announce.encode(),
                         };
@@ -1650,7 +1650,7 @@ impl CognitiveLoopService {
                         urgency: crate::swarm::mesh::MeshUrgency::Cruise,
                         timestamp_s,
                         payload_type: crate::swarm::mesh::PayloadType::TimeBeacon,
-                        auth_mac: 0,
+                        auth_mac: [0u8; 32],
                         ttl: crate::swarm::mesh::MESH_DEFAULT_TTL,
                         wisdom: hv,
                     };
