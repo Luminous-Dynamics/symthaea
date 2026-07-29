@@ -759,6 +759,16 @@ jobs:
               # every default-member's own defaults too -- e.g. nixward's
               # `default = ["native"]`, breaking its native-gated tests.
               cargo test -p symthaea --lib --no-default-features --features "$FEATURES"
+            elif [ "$FEATURES" = "mesh" ]; then
+              # EXPERIMENT (PR #31, to be reverted): serial threads to test whether
+              # the reproducible SIGSEGV in symthaea-core's --lib test binary on
+              # this leg (and others: humanoid/multirotor/swarm/service/shell/
+              # voice-tts) is a parallel-execution race. The only passing job
+              # ("Test (default features)") both scopes to -p symthaea (never runs
+              # symthaea-core's own tests) AND forces --test-threads=1; this leg
+              # isolates just the threading variable while keeping the same -p
+              # scope (none) and feature set as the real failing leg.
+              cargo test --lib --features "$FEATURES" -- --test-threads=1
             else
               cargo test --lib --features "$FEATURES"
             fi
