@@ -245,11 +245,15 @@ fn test_process_mesh_updates_registry() {
         ttl: 0,
         wisdom: BinaryHV([0xAA; 2048]),
     });
+    // Normal, not Critical: this test is about registry/phi tracking, not
+    // authentication, and an unsigned Critical packet is fail-closed
+    // dropped before it ever reaches the registry (see
+    // ContinuousMind::process_mesh's is_critical gate).
     mind.mesh_inbox.push(WisdomPacket {
         source_id: [0x22; 8],
         sequence: 1,
         phi: 0.9,
-        urgency: MeshUrgency::Critical,
+        urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::Heartbeat,
         auth_mac: [0u8; 32],
@@ -318,11 +322,19 @@ fn test_swarm_phi_boosts_consciousness() {
     // for the same root cause.
     let base = ContinuousHV::random(512, 42);
 
+    // ContinuousHV::perturb() draws its entropy from a process-global atomic
+    // counter, not a caller-supplied seed -- calling it fresh in each mind's
+    // loop gives solo and swarm genuinely different perturbation sequences,
+    // an uncontrolled confound on top of the swarm-phi boost this test is
+    // trying to isolate. Precompute one sequence and replay it identically
+    // for both minds so the boost is the only thing that differs.
+    let perturbed: Vec<ContinuousHV> = (0..5).map(|_| base.perturb(0.2)).collect();
+
     // Mind without peers
     let mut mind_solo = ContinuousMind::default();
     mind_solo.activate();
-    for _ in 0..5 {
-        mind_solo.perceive(base.perturb(0.2));
+    for p in &perturbed {
+        mind_solo.perceive(p.clone());
         mind_solo.tick();
     }
     let solo_consciousness = mind_solo.state.consciousness_level;
@@ -342,8 +354,8 @@ fn test_swarm_phi_boosts_consciousness() {
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     });
-    for _ in 0..5 {
-        mind_swarm.perceive(base.perturb(0.2));
+    for p in &perturbed {
+        mind_swarm.perceive(p.clone());
         mind_swarm.tick();
     }
     let swarm_consciousness = mind_swarm.state.consciousness_level;
@@ -3440,18 +3452,24 @@ fn test_moral_topology_packet_roundtrip() {
 fn test_process_mesh_dispatches_moral_topology() {
     use crate::swarm::mesh::WisdomPacket;
 
+    let key = [0x42u8; 32];
     let mut mind = ContinuousMind::default();
     mind.activate();
+    mind.set_mesh_auth_key(Some(key));
 
-    // Create a moral topology packet via the factory method
+    // Create a moral topology packet via the factory method. MoralTopology
+    // packets are always treated as safety-critical (fail-closed without a
+    // valid MAC, see ContinuousMind::process_mesh), so it must be signed.
     let summary = crate::hdc::moral_topology::MoralTopologySummary {
         beta_0: 5,
         unity: 0.9,
         scenario_count: 10,
         ..Default::default()
     };
-    let packet =
+    let mut packet =
         WisdomPacket::from_moral_topology([10, 20, 30, 40, 50, 60, 70, 80], 1, 0.5, &summary);
+    let bytes = packet.to_bytes();
+    packet.auth_mac = crate::swarm::mesh::compute_packet_mac(&bytes, &key);
 
     mind.mesh_inbox.push(packet);
     mind.tick();

@@ -69,6 +69,46 @@ jobs:
       - name: Every workspace member has a build target
         run: bash scripts/check-workspace-targets.sh
 
+  embodiment-safety-composition:
+    name: Embodiment Safety Composition
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fails if a platform gates motor authority on Phi without also admitting a
+      # SafetyAgent override and a moral verdict -- i.e. if an ethics verdict has
+      # no route to its actuators. Encodes the 2026-07-29 platform audit
+      # (SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md), which found
+      # exactly one such platform. Source lint, not a proof -- the script's header
+      # explains why it cannot be a Rust test (per-platform Cargo features mean no
+      # configuration compiles all 16 together).
+      - name: Phi-gating platforms compose override + moral gate
+        run: bash scripts/check-embodiment-safety-composition.sh
+
+  orphan-modules:
+    name: Orphan Module Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # rustc never warns about a .rs file no `mod` declares — it just is not
+      # part of the crate, so it never compiles and its tests never run. Three
+      # shipped-code instances were found on 2026-07-28 (see the script's header
+      # comment); one had already rotted against an API that moved under it.
+      #
+      # Enforces on all ~200 workspace members minus a QUARANTINE list of 28
+      # crates with a pre-existing backlog. This started opt-in (3 muse crates)
+      # on the assumption most of the workspace was dirty; measuring it on
+      # 2026-07-29 found 172 of 200 crates already clean, so opt-in had it
+      # backwards — it left 172 unprotected to accommodate 28. Deleting a line
+      # from QUARANTINE is how a crate gets cleaned; adding one to go green is
+      # the reflex this gate exists to catch.
+      - name: No orphan modules outside quarantine
+        run: bash scripts/check-orphan-modules.sh
+
+      - name: Report the workspace-wide backlog (informational)
+        run: bash scripts/check-orphan-modules.sh --all --summary | tail -2
+
   doc-tests:
     name: Documentation Tests
     runs-on: ubuntu-latest
@@ -92,6 +132,94 @@ jobs:
 
       - name: Run doc tests
         run: cargo test --doc
+
+  muse:
+    name: Muse (tests, studio, wasm UI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Nothing tested symthaea-muse before 2026-07-28: no job ran `-p
+    # symthaea-muse` or `--workspace` (`cargo test` at the spark-engine job is
+    # scoped by working-directory; nextest is `-p symthaea --lib`). So its 816
+    # tests had never run in CI, `studio` had never even been compiled here, and
+    # 26 warnings had accumulated — three of which turned out to be marking
+    # tests that computed a value and never asserted on it.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-muse-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-muse-
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libasound2-dev
+
+      - name: Test (default features)
+        run: cargo test -p symthaea-muse --lib
+
+      # `theory` is the canonical product path (symbolic score -> performance ->
+      # audio). It roughly doubles the compiled surface: 40.5K of the crate's
+      # 76.3K src lines sit behind this flag.
+      - name: Test (theory)
+        run: cargo test -p symthaea-muse --lib --features theory
+
+      # `studio` reaches no root-crate feature, so it was never built by any
+      # other job — despite owning the HTTP server, its CORS/path-validation
+      # logic, and the genealogy ledger.
+      #
+      # `--bins` covers every studio binary. It was briefly narrowed to
+      # --bin muse_studio because muse_motif_foundry_pilot did not compile;
+      # that binary has since been removed (it was written against 8 types
+      # that have never existed in any commit), so the wider check is back.
+      - name: Test the studio server (handlers + wire-compat)
+        run: |
+          cargo test -p symthaea-muse --features studio --bin muse_studio
+          cargo check -p symthaea-muse --features studio --bins
+
+      # The check that would have caught the orphaned Research views: this crate
+      # only ever builds for wasm32, so a native-only job cannot cover it.
+      - name: Compile-check the wasm UI
+        run: cargo check -p symthaea-muse-ui --target wasm32-unknown-unknown
+
+      # Lint under `theory` rather than default features on purpose: several
+      # midi_export items (the ControlChange variant, cc_volume, cc_pan) are
+      # constructed only by theory-gated code, so they read as dead under
+      # default features. Linting where the code is actually live avoids
+      # contorting the source to satisfy a lint for a feature set that
+      # legitimately does not use it.
+      - name: Clippy (theory)
+        run: cargo clippy -p symthaea-muse --lib --features theory -- -D warnings
+
+      - name: Clippy (protocol + wasm UI)
+        run: |
+          cargo clippy -p symthaea-muse-protocol -- -D warnings
+          cargo clippy -p symthaea-muse-ui --target wasm32-unknown-unknown -- -D warnings
+
+      # The cognition-study apparatus is a third of this crate (51 modules,
+      # ~25.8K lines, 120 subcommands) and had never been executed before
+      # 2026-07-29 — its own check-cognition-*.sh / verify_cognition_study_*.py
+      # scripts assert on file existence and on a Python reimplementation, and
+      # never invoke the binary. This runs the real chain on synthetic
+      # responses and fails closed unless it separates an injected preference
+      # ordering from random preference. Mechanism check only; says nothing
+      # about music. See docs/research/evidence/muse-cognition-study-dryrun-2026-07-29/.
+      - name: Cognition-study pipeline dry run (manipulation check)
+        run: |
+          cargo build -p symthaea-muse --features theory --bin cognitive_study
+          crates/domains/symthaea-muse/scripts/dryrun-cognition-study.sh \
+            "$PWD/target/debug/cognitive_study"
 
   clippy:
     name: Clippy
@@ -759,18 +887,22 @@ jobs:
               # every default-member's own defaults too -- e.g. nixward's
               # `default = ["native"]`, breaking its native-gated tests.
               cargo test -p symthaea --lib --no-default-features --features "$FEATURES"
-            elif [ "$FEATURES" = "mesh" ]; then
-              # EXPERIMENT (PR #31, to be reverted): serial threads to test whether
-              # the reproducible SIGSEGV in symthaea-core's --lib test binary on
-              # this leg (and others: humanoid/multirotor/swarm/service/shell/
-              # voice-tts) is a parallel-execution race. The only passing job
-              # ("Test (default features)") both scopes to -p symthaea (never runs
-              # symthaea-core's own tests) AND forces --test-threads=1; this leg
-              # isolates just the threading variable while keeping the same -p
-              # scope (none) and feature set as the real failing leg.
-              cargo test --lib --features "$FEATURES" -- --test-threads=1
             else
-              cargo test --lib --features "$FEATURES"
+              # Serial threads: `cargo test --lib` (no -p) pulls in every
+              # default-member, including symthaea-core's own ~5k-test --lib
+              # suite, which segfaults under parallel execution (confirmed
+              # 2026-07-29 via a targeted experiment on the `mesh` leg: the
+              # identical command with `-- --test-threads=1` ran the full
+              # suite to completion, 6137 passed, where the parallel default
+              # SIGSEGV'd deterministically on every attempt). The exact
+              # racing test(s) haven't been isolated yet -- this trades some
+              # CI wall-clock time for a suite that actually runs and reports
+              # real pass/fail instead of a crash with zero signal. The only
+              # other job that exercises symthaea-core's tests without this
+              # flag ("Test (default features)") avoids the crash by scoping
+              # to `-p symthaea`, which never builds/runs symthaea-core's own
+              # tests at all -- not evidence the race is otherwise absent.
+              cargo test --lib --features "$FEATURES" -- --test-threads=1
             fi
 
   psych-bench:
@@ -1120,6 +1252,7 @@ jobs:
           - symthaea-narrative-self
           - symthaea-consciousness-equation
           - symthaea-embeddings
+          - symthaea-evidence-plane
           - symthaea-harmonies
           - symthaea-observability
           - nixward

@@ -62,7 +62,14 @@ impl DomainProfile {
             capabilities: vec!["sonar".into()],
             transport: DomainTransportProfile {
                 store_and_forward_required: true,
-                ..Default::default()
+                // Water attenuates local RF mesh (LoRa/B.A.T.M.A.N.) far too
+                // much to be usable -- omit it entirely rather than just
+                // deprioritizing it, so `supports_transport` correctly
+                // refuses it too.
+                preferred_transports: vec![
+                    DomainTransportClass::MetroRelay,
+                    DomainTransportClass::RegionalRelay,
+                ],
             },
         }
     }
@@ -71,7 +78,14 @@ impl DomainProfile {
             primary_domain: "subterranean".into(),
             kind: "subterranean".into(),
             capabilities: vec!["lidar".into()],
-            ..Default::default()
+            transport: DomainTransportProfile {
+                // Underground comms are delay-tolerant / relay-dependent --
+                // allow store-and-forward fragmentation rather than
+                // blocking when no tier meets the nominal bandwidth
+                // preference.
+                store_and_forward_required: true,
+                ..Default::default()
+            },
         }
     }
     pub fn deep_space() -> Self {
