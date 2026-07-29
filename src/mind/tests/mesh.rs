@@ -320,6 +320,15 @@ fn test_swarm_phi_boosts_consciousness() {
     // collapsed toward the same value, making `swarm > solo` fail whenever
     // both landed at ~0.0. See src/mind/tests/core.rs's test_consciousness_update
     // for the same root cause.
+    //
+    // Tick count: ConsciousnessCore's min_samples is 5 (consciousness_core.rs),
+    // so with exactly 5 ticks the real spectral Phi computation only turns on
+    // for the very last one -- consciousness_level ends up reading its first-
+    // ever (structurally unstable) measurement rather than a settled one,
+    // which was observed to saturate both minds at exactly 1.0 with no
+    // headroom left for the swarm-phi boost. 10 ticks gives the spectral
+    // window several real measurements to settle before this test reads it.
+    const TICKS: usize = 10;
     let base = ContinuousHV::random(512, 42);
 
     // ContinuousHV::perturb() draws its entropy from a process-global atomic
@@ -328,7 +337,7 @@ fn test_swarm_phi_boosts_consciousness() {
     // an uncontrolled confound on top of the swarm-phi boost this test is
     // trying to isolate. Precompute one sequence and replay it identically
     // for both minds so the boost is the only thing that differs.
-    let perturbed: Vec<ContinuousHV> = (0..5).map(|_| base.perturb(0.2)).collect();
+    let perturbed: Vec<ContinuousHV> = (0..TICKS).map(|_| base.perturb(0.2)).collect();
 
     // Mind without peers
     let mut mind_solo = ContinuousMind::default();
