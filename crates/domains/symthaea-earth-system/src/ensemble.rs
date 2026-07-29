@@ -119,7 +119,7 @@ pub fn summarize_horizon_warming(
     }
     values.sort_by(f64::total_cmp);
     let count = values.len();
-    let median = if count % 2 == 0 {
+    let median = if count.is_multiple_of(2) {
         0.5 * (values[count / 2 - 1] + values[count / 2])
     } else {
         values[count / 2]

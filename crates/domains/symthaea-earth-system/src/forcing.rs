@@ -162,7 +162,7 @@ impl ForcingProtocol {
             Self::Pulse {
                 baseline,
                 anomaly,
-                start_seconds,
+                start_seconds: _,
                 end_seconds,
             } if time_seconds == end_seconds => baseline + anomaly,
             Self::Pulse {
