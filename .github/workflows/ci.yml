@@ -17,7 +17,14 @@ on:
 concurrency:
   # Group by workflow + branch so that only the latest push per branch runs.
   # Older pushes to the same branch are cancelled, avoiding runner queue backlog.
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # workflow_dispatch gets a unique group per run and is therefore NEVER cancelled:
+  # a manual dispatch is a deliberate request for a definitive full-matrix result.
+  # Dispatch runs previously shared this group keyed on refs/heads/<branch>, so each
+  # new dispatch cancelled the previous one -- 33 of 157 jobs cancelled in the export
+  # branch's surviving run, including the entire Test Feature Combinations (25) and
+  # Test CI-safe (7) matrices. See docs/CI_FAILURE_CATALOGUE_2026-07-30.md.
+  # push/pull_request keep supersede-on-new-commit, which is correct.
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
   cancel-in-progress: true
 
 env:
