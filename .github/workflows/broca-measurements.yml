@@ -5,7 +5,7 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
-      - "crates/symthaea-broca/**"
+      - "crates/domains/symthaea-broca/**"
       - "scripts/broca_measurement_artifacts.sh"
       - "scripts/broca_capture_baseline.sh"
       - ".github/workflows/broca-measurements.yml"

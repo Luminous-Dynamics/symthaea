@@ -5,7 +5,12 @@ on:
     branches: [main]
     paths:
       - 'book/**'
-      - 'docs/architecture/d2/rendered/**'
+      # Was 'docs/architecture/d2/rendered/**', which has never existed in this
+      # repo's history (0 commits, 0 tracked files) -- so this workflow could
+      # never be triggered by a diagram change. The step that consumes it copies
+      # rendered/*.svg with `|| true`, so the absence was silent. Point at the
+      # .d2 SOURCES instead, which do exist and are what an author actually edits.
+      - 'docs/architecture/d2/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 

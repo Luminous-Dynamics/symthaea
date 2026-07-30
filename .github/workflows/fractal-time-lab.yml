@@ -4,11 +4,11 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'crates/symthaea-fractal-time-lab/**'
+      - 'crates/domains/symthaea-fractal-time-lab/**'
   pull_request:
     branches: [ main, develop ]
     paths:
-      - 'crates/symthaea-fractal-time-lab/**'
+      - 'crates/domains/symthaea-fractal-time-lab/**'
 
 jobs:
   test:

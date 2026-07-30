@@ -5,7 +5,7 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
-      - "crates/symthaea-broca/**"
+      - "crates/domains/symthaea-broca/**"
       - ".github/workflows/broca-feature-matrix.yml"
   workflow_dispatch:
 

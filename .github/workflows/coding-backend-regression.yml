@@ -5,7 +5,7 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
-      - "crates/symthaea-geodesic/**"
+      - "crates/domains/symthaea-geodesic/**"
       - "examples/benchmark_coding_backends.rs"
       - "scripts/coding_backend_regression.sh"
       - "scripts/coding_backend_hard_geodesic_ab.sh"
