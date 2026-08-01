@@ -13,7 +13,7 @@ categories = ["science", "algorithms", "web-programming"]
 
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
-chromiumoxide = { version = "0.7", features = ["tokio-runtime"], default-features = false }
+chromiumoxide = { version = "0.8", features = ["tokio-runtime"], default-features = false }
 tokio = { version = "1", features = ["sync", "rt-multi-thread", "macros", "time"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
