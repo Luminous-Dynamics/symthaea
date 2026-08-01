@@ -13,6 +13,13 @@
 //! Gated behind `#[cfg(feature = "symthaea-backend")]`.
 
 use crate::harness::config::BenchmarkConfig;
+// `AblationResult` lives in `report.rs` (always compiled) rather than here —
+// `ButlinEvidenceBundle` (also in report.rs) embeds it, and report.rs must
+// compile without the `symthaea-backend` feature (that's the whole point of
+// the cheap `butlin_regression.rs` gate). This module, which genuinely needs
+// `symthaea::cognitive_loop` types throughout, stays feature-gated.
+pub use super::report::AblationResult;
+use super::report::classify_ablation;
 
 /// Specification for a single ablation row.
 pub struct AblationSpec {
@@ -26,30 +33,13 @@ pub struct AblationSpec {
     pub downstream_benchmark: &'static str,
 }
 
-/// Result of a single ablation row.
-pub struct AblationResult {
-    /// Which ablation was performed.
-    pub name: &'static str,
-    /// Target indicator ID.
-    pub target_indicator: &'static str,
-    /// Indicator score with mechanism ON (baseline).
-    pub baseline_indicator_score: f64,
-    /// Indicator score with mechanism OFF (ablated).
-    pub ablated_indicator_score: f64,
-    /// Downstream benchmark accuracy with mechanism ON.
-    pub baseline_benchmark_accuracy: f64,
-    /// Downstream benchmark accuracy with mechanism OFF.
-    pub ablated_benchmark_accuracy: f64,
-    /// Whether the indicator dropped sufficiently (ablated < baseline * 0.2).
-    pub indicator_dropped: bool,
-    /// Whether the downstream benchmark degraded (ablated_acc < baseline_acc * 0.7).
-    pub benchmark_degraded: bool,
-}
-
 /// The 12 ablation rows (5 original + 7 added 2026-07-24 extending real-signal
 /// coverage from 5/14 to as much of 14/14 as an ablation-style test can honestly
 /// support — GWT-1 and HOT-4 are covered differently, see `indicators.rs` and
-/// `live_runner.rs`).
+/// `live_runner.rs`). Two rows (originally PP-2, IIT-1) were swapped 2026-07-26
+/// for AE-1 and AE-2 (Agency and Embodiment) — the paper's actual remaining 2
+/// indicators (arXiv:2308.08708 Table 1); the old PP-2/IIT-1 were not in the
+/// real Butlin et al. (2023) indicator set at all.
 fn ablation_specs() -> Vec<AblationSpec> {
     vec![
         AblationSpec {
@@ -134,37 +124,37 @@ fn ablation_specs() -> Vec<AblationSpec> {
             downstream_benchmark: "CogBench::InstrumentalLearning",
         },
         AblationSpec {
-            name: "disable_hierarchical_free_energy",
-            target_indicator: "PP-2",
+            name: "disable_trajectory_planning",
+            target_indicator: "AE-1",
             config_mutator: |config| {
-                config.enable_hierarchical_free_energy = false;
+                config.enable_trajectory_planning = false;
             },
-            downstream_benchmark: "WorM::N-back",
+            downstream_benchmark: "CogBench::TwoStep",
         },
         AblationSpec {
-            name: "disable_gwt_for_iit1",
-            target_indicator: "IIT-1",
+            name: "disable_embodied_cognition",
+            target_indicator: "AE-2",
             config_mutator: |config| {
-                config.enable_gwt = false;
+                config.enable_embodied_cognition = false;
             },
-            downstream_benchmark: "WorM::ChangeDetection",
+            downstream_benchmark: "WorM::SpatialUpdating",
         },
     ]
 }
 
 /// Extract the indicator score from CycleMetadata for a given indicator ID.
 ///
-/// RPT-1, GWT-2, GWT-3, RPT-2, and PP-2 are handled specially in
-/// `measure_indicator` because they require cross-cycle computation (temporal
-/// coherence, module-activity fraction). HOT-1 also needs cross-cycle
-/// variance and is handled there too.
+/// RPT-1, GWT-2, GWT-3, and RPT-2 are handled specially in `measure_indicator`
+/// because they require cross-cycle computation (temporal coherence,
+/// module-activity fraction). HOT-1 and AE-1 also need cross-cycle
+/// aggregation (PE variance, distinct-action count) and are handled there too.
 fn extract_indicator_score(
     metadata: &symthaea::cognitive_loop::CycleMetadata,
     indicator: &str,
 ) -> f64 {
     match indicator {
         // Computed in measure_indicator, not per-cycle
-        "RPT-1" | "GWT-2" | "GWT-3" | "RPT-2" | "PP-2" | "HOT-1" => 0.0,
+        "RPT-1" | "GWT-2" | "GWT-3" | "RPT-2" | "AE-1" | "HOT-1" => 0.0,
         "HOT-2" => {
             // Metacognitive monitoring: meta_cognitive_accuracy
             metadata.quality.meta_cognitive_accuracy as f64
@@ -180,11 +170,7 @@ fn extract_indicator_score(
         "AST-1" => {
             // Attention schema: attention_schema_focus with non-zero fallback
             let focus = metadata.attention.attention_schema_focus as f64;
-            if focus > 0.0 {
-                focus
-            } else {
-                0.01
-            }
+            if focus > 0.0 { focus } else { 0.01 }
         }
         "GWT-4" => {
             // State-dependent attention: deviation of phi_attention_weight
@@ -194,13 +180,10 @@ fn extract_indicator_score(
                 .abs()
                 .min(1.0)
         }
-        "IIT-1" => {
-            // Raw structural macro Phi. Averaged across cycles by
-            // measure_indicator's generic path; run_ablation_matrix's
-            // baseline-vs-ablated comparison is what actually tests whether
-            // Phi responds to an integration-relevant manipulation
-            // (enable_gwt=false) rather than sitting at a constant.
-            metadata.structural.structural_macro_phi
+        "AE-2" => {
+            // Embodiment: embodied_agency, already 0.0 when embodied
+            // cognition is disabled (see EmbodiedAffectMetrics doc comment).
+            metadata.embodied.embodied_agency
         }
         _ => 0.0,
     }
@@ -231,7 +214,7 @@ fn build_loop(
 
 /// Fraction of post-warmup cycles for which `predicate` holds on the cycle's
 /// result. Shared by every indicator whose real signal is "did this specific
-/// module/mechanism actually engage" (GWT-2, GWT-3, RPT-2, PP-2).
+/// module/mechanism actually engage" (GWT-2, GWT-3, RPT-2).
 fn measure_activity_fraction(
     service: &mut symthaea::cognitive_loop::CognitiveLoopService,
     num_cycles: usize,
@@ -361,15 +344,24 @@ pub fn measure_indicator(
                 r.metadata.module_timings_us.cross_modal_binding > 0
             })
         }
-        "PP-2" => {
-            // Hierarchical prediction at multiple scales: hierarchical_free_energy
-            // module activity. Coarser than a true per-tau-level error trace (which
-            // would need internal HierarchicalCfC instrumentation not currently
-            // surfaced on CycleMetadata) but real: when
-            // enable_hierarchical_free_energy=false, this module never runs.
-            measure_activity_fraction(service, num_cycles, warmup, &inputs, |r| {
-                r.metadata.module_timings_us.hierarchical_free_energy > 0
-            })
+        "AE-1" => {
+            // Agency: does the FEP agent's action selection
+            // (0=exploit, 1=consolidate, 2=explore, 3=tighten) actually vary
+            // across distinct inputs ("flexible responsiveness to competing
+            // goals"), or is it pinned to the same action regardless of
+            // context? Counts distinct actions seen, normalized by 4.
+            let mut seen = [false; 4];
+            for i in 0..num_cycles {
+                let input = inputs[i % inputs.len()];
+                let result = service.cycle(input);
+                if i >= warmup {
+                    let action = result.metadata.fep.fep_action;
+                    if action < 4 {
+                        seen[action] = true;
+                    }
+                }
+            }
+            seen.iter().filter(|&&s| s).count() as f64 / 4.0
         }
         "GWT-2" => {
             // Limited capacity + selective attention: the GWT winning coalition
@@ -457,32 +449,65 @@ pub fn run_ablation_matrix(_config: &BenchmarkConfig) -> Vec<AblationResult> {
         // Run the relevant benchmark with default and ablated configs
         let (baseline_acc, ablated_acc) = run_downstream_benchmark(spec);
 
-        let indicator_dropped = if baseline_indicator > 0.0005 {
-            ablated_indicator < baseline_indicator * 0.5
-        } else {
-            // Baseline was already near zero — can't prove a drop
-            false
-        };
-
-        let benchmark_degraded = if baseline_acc > 0.01 {
-            ablated_acc < baseline_acc * 0.7
-        } else {
-            false
-        };
+        // Single source of truth: `report::classify_ablation` -- also called
+        // by `annotate_with_ablation_results` at merge time, which
+        // deliberately recomputes rather than trusts these cached booleans
+        // (see that function's doc comment). Kept here purely as cached
+        // diagnostics on `AblationResult`, never as the merge's actual
+        // classification input.
+        let classification = classify_ablation(
+            baseline_indicator,
+            ablated_indicator,
+            baseline_acc,
+            ablated_acc,
+        );
 
         results.push(AblationResult {
-            name: spec.name,
-            target_indicator: spec.target_indicator,
+            name: spec.name.to_string(),
+            target_indicator: spec.target_indicator.to_string(),
             baseline_indicator_score: baseline_indicator,
             ablated_indicator_score: ablated_indicator,
             baseline_benchmark_accuracy: baseline_acc,
             ablated_benchmark_accuracy: ablated_acc,
-            indicator_dropped,
-            benchmark_degraded,
+            indicator_dropped: classification.indicator_dropped,
+            benchmark_degraded: classification.benchmark_degraded,
+            contradicted: classification.contradicted,
         });
     }
 
     results
+}
+
+/// Wrap a freshly-run ablation matrix in a `ButlinEvidenceBundle` for merging
+/// onto a static report (see `report::annotate_with_ablation_results`).
+///
+/// Provenance fields are best-effort for this in-process, ephemeral use (a
+/// single `run()` call annotating its own report); a persisted baseline
+/// artifact (the regression lane's comparison target) should fill
+/// `commit_sha` from real CI/VCS context rather than relying on these
+/// defaults. `seeds` is empty because `run_ablation_matrix` does not yet do
+/// multi-seed sampling — reported honestly as zero seeds (which
+/// `EffectEstimate::new`'s `.max(1)` treats as a single deterministic run),
+/// not padded with a fabricated seed list.
+pub fn build_evidence_bundle(
+    config: &BenchmarkConfig,
+    ablations: Vec<AblationResult>,
+) -> super::report::ButlinEvidenceBundle {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let mut hasher = DefaultHasher::new();
+    format!("{config:?}").hash(&mut hasher);
+    let config_hash = format!("{:x}", hasher.finish());
+
+    super::report::ButlinEvidenceBundle {
+        schema_version: super::report::REPORT_SCHEMA_VERSION,
+        commit_sha: "unknown".to_string(),
+        config_hash,
+        seeds: Vec::new(),
+        generated_at: format!("{:?}", std::time::SystemTime::now()),
+        ablations,
+    }
 }
 
 /// Run a downstream benchmark with default and ablated configs.
@@ -604,23 +629,24 @@ fn run_downstream_benchmark(spec: &AblationSpec) -> (f64, f64) {
                 ..baseline_config.clone()
             }
         }
-        "PP-2" => {
-            // Without multi-scale/hierarchical prediction, collapse the
-            // planning horizon to 1 step — removes the multi-step
-            // look-ahead PP-2 specifically claims.
+        "AE-1" => {
+            // Without trajectory planning, action selection loses its
+            // multi-step look-ahead over competing goals — collapse the
+            // planning horizon to 1 step, directly removing what AE-1 claims.
             BenchmarkConfig {
                 planning_horizon: 1,
+                enable_fep: false,
                 ..baseline_config.clone()
             }
         }
-        "IIT-1" => {
-            // Without integration (GWT disabled), tasks needing bound
-            // multi-source information should degrade — proxy-ablate via
-            // disabling social coherence (a real integration consumer) plus
-            // a smaller representational space.
+        "AE-2" => {
+            // Without embodiment, spatial/body-state tracking should
+            // degrade — proxy-ablate via a smaller representational space
+            // (less capacity to model output-input contingencies) plus
+            // reduced working memory for body-state history.
             BenchmarkConfig {
-                enable_social: false,
                 dimension: 64,
+                working_memory_capacity: 2,
                 ..baseline_config.clone()
             }
         }
@@ -702,8 +728,8 @@ mod tests {
             "ablation_specs rows must target distinct indicators"
         );
         for expected in [
-            "RPT-1", "RPT-2", "GWT-2", "GWT-3", "GWT-4", "HOT-1", "HOT-2", "HOT-3", "PP-1", "PP-2",
-            "AST-1", "IIT-1",
+            "RPT-1", "RPT-2", "GWT-2", "GWT-3", "GWT-4", "HOT-1", "HOT-2", "HOT-3", "PP-1",
+            "AST-1", "AE-1", "AE-2",
         ] {
             assert!(
                 indicators.contains(&expected),
@@ -724,5 +750,115 @@ mod tests {
         let fraction = active as f64 / post_warmup as f64;
         assert!((0.0..=1.0).contains(&fraction));
         assert!((fraction - 0.5).abs() < 1e-9);
+    }
+
+    /// Diagnostic, not a regression check — `#[ignore]`d by default so it
+    /// never blocks or slows normal CI. Standalone structural-Phi-engine
+    /// investigation, kept independent of the Butlin indicator suite: this
+    /// originated from an `IIT-1` ablation row (`disable_gwt_for_iit1`) that
+    /// found structural macro Phi essentially unmoved by disabling GWT alone
+    /// (34.91 → 34.96, matching the independent 2026-07-15 E1 audit's finding
+    /// that Phi is frozen across nearly every single-mechanism ablation).
+    /// IIT-1 has since been removed from the Butlin suite (2026-07-26 — it
+    /// isn't in the real Butlin et al. 2023 indicator set at all, which
+    /// explicitly excludes IIT), but the underlying Phi-engine question this
+    /// diagnostic asks — is Phi insensitive to *everything*, or just to
+    /// single-flag toggles? — remains genuinely open and worth keeping.
+    ///
+    /// **Result (2026-07-25, properly scoped at 200 cycles — a first attempt
+    /// at 60 cycles came back all-zero and was discarded as inconclusive,
+    /// not negative; structural Phi apparently updates on a multi-cycle
+    /// interval too short to fire within 60 cycles):**
+    /// - `combined_integration_off` (GWT + cross-modal binding + phenomenal
+    ///   binding + meta-cognition all disabled at once): 17.33 → 17.19,
+    ///   Δ≈1% — still essentially insensitive, even to four mechanisms
+    ///   disabled simultaneously. Not just a wrong-single-flag artifact.
+    /// - `cfc_collapsed` (RPT-1's severe ablation: 1 neuron, input_dim 1,
+    ///   which we independently know produces a large *behavioral* effect):
+    ///   17.33 → 27.63, Δ≈-59% — Phi INCREASED substantially. This is the
+    ///   more important result: Phi is not simply frozen/insensitive to
+    ///   everything — it responds to this manipulation, but in the wrong
+    ///   direction. A network collapsed to near-zero capacity should show
+    ///   less integration, not more. This suggests a possible real artifact
+    ///   in how `SpectralMIPFinder` behaves on a near-degenerate network
+    ///   (e.g. normalization or partition-search behaving oddly at that
+    ///   extreme), not just "no signal" — worth its own dedicated
+    ///   investigation rather than folding further into the Butlin suite.
+    #[test]
+    #[ignore = "diagnostic investigation, not a regression check — run explicitly with --ignored"]
+    fn diagnostic_structural_phi_sensitivity_to_severe_ablations() {
+        use symthaea::cognitive_loop::{CognitiveLoopConfig, ConsciousnessProfile};
+
+        // Reads structural_macro_phi directly rather than going through
+        // measure_indicator/extract_indicator_score's "IIT-1" dispatch —
+        // this diagnostic is now independent of the Butlin indicator suite
+        // (IIT-1 was removed from it 2026-07-26), so it shouldn't depend on
+        // that string still being wired there.
+        fn mean_macro_phi(mutator: Option<fn(&mut CognitiveLoopConfig)>, num_cycles: usize) -> f64 {
+            let mut config = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Standard);
+            config.genesis_phrase = Some("structural-phi-sensitivity-diagnostic".to_string());
+            config.async_training = false;
+            if let Some(m) = mutator {
+                m(&mut config);
+            }
+            let mut service = symthaea::cognitive_loop::CognitiveLoopService::new(config)
+                .expect("failed to build diagnostic service");
+            let warmup = 20;
+            let inputs = [
+                "The quick brown fox jumps over the lazy dog",
+                "A neural network learns to predict sequences",
+                "Consciousness emerges from integrated information",
+                "Working memory maintains active representations",
+                "Prediction errors drive learning and adaptation",
+            ];
+            let mut sum = 0.0;
+            let mut count = 0u64;
+            for i in 0..num_cycles {
+                let result = service.cycle(inputs[i % inputs.len()]);
+                if i >= warmup {
+                    sum += result.metadata.structural.structural_macro_phi;
+                    count += 1;
+                }
+            }
+            if count == 0 { 0.0 } else { sum / count as f64 }
+        }
+
+        // Was 60 — found (2026-07-25) that this was too short for structural
+        // Phi to ever compute at all (it, like several subsystems in this
+        // codebase, updates on a multi-cycle interval): a first run returned
+        // exactly 0.0000 for baseline AND every ablated variant, which is
+        // "never computed", not "insensitive". Matching the real ablation
+        // matrix's 200 cycles instead — this needs to be long enough for the
+        // phenomenon to appear at all before it can say anything about
+        // sensitivity to ablation.
+        let num_cycles = 200;
+
+        let baseline = mean_macro_phi(None, num_cycles);
+
+        let combined_integration_off = mean_macro_phi(
+            Some(|config| {
+                config.enable_gwt = false;
+                config.enable_cross_modal_binding = false;
+                config.enable_phenomenal_binding = false;
+                config.enable_meta_cognition = false;
+            }),
+            num_cycles,
+        );
+
+        let cfc_collapsed = mean_macro_phi(
+            Some(|config| {
+                config.cfc_config.num_neurons = 1;
+                config.cfc_config.input_dim = 1;
+            }),
+            num_cycles,
+        );
+
+        eprintln!(
+            "Structural Phi sensitivity diagnostic: baseline={baseline:.4}, \
+             combined_integration_off={combined_integration_off:.4} (Δ={:.4}), \
+             cfc_collapsed={cfc_collapsed:.4} (Δ={:.4})",
+            baseline - combined_integration_off,
+            baseline - cfc_collapsed,
+        );
     }
 }

@@ -209,11 +209,11 @@ impl CognitiveLoopBenchmarkRunner {
         }
     }
 
-    /// Measure the 11 real, mechanism-specific behavioral signals available
+    /// Measure the 12 real, mechanism-specific behavioral signals available
     /// via `ablation::measure_indicator` (RPT-1, RPT-2, GWT-2, GWT-3, GWT-4,
-    /// HOT-1, HOT-2, HOT-3, PP-1, PP-2, AST-1), by reusing that same probe
-    /// code against this runner's own (non-ablated) service. GWT-1 and IIT-1
-    /// aren't measured here — see `report::BehavioralIndicatorSignals`'s doc
+    /// HOT-1, HOT-2, HOT-3, PP-1, AE-1, AE-2, AST-1), by reusing that same
+    /// probe code against this runner's own (non-ablated) service. GWT-1
+    /// isn't measured here — see `report::BehavioralIndicatorSignals`'s doc
     /// comment for why. HOT-4 needs no cognitive loop at all — see
     /// `measure_hot4_sparse_smooth_coding`.
     ///
@@ -247,7 +247,8 @@ impl CognitiveLoopBenchmarkRunner {
             hot2_meta_cognitive_accuracy: measure_indicator(&mut self.service, "HOT-2", num_cycles),
             hot3_effective_lr: measure_indicator(&mut self.service, "HOT-3", num_cycles),
             pp1_effective_lr: measure_indicator(&mut self.service, "PP-1", num_cycles),
-            pp2_hierarchical_activity: measure_indicator(&mut self.service, "PP-2", num_cycles),
+            ae1_action_diversity: measure_indicator(&mut self.service, "AE-1", num_cycles),
+            ae2_embodied_agency: measure_indicator(&mut self.service, "AE-2", num_cycles),
             ast1_attention_focus: measure_indicator(&mut self.service, "AST-1", num_cycles),
             hot4_sparsity: hot4.0,
             hot4_smoothness: hot4.1,
@@ -481,11 +482,7 @@ fn cosine_f32_vec(a: &[f32], b: &[f32]) -> f64 {
         norm_b += bi * bi;
     }
     let denom = (norm_a * norm_b).sqrt();
-    if denom > 1e-10 {
-        dot / denom
-    } else {
-        0.0
-    }
+    if denom > 1e-10 { dot / denom } else { 0.0 }
 }
 
 // ──── LoopDrivable implementations for 6 benchmarks ────
