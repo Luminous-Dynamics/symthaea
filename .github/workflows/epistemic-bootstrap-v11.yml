@@ -103,9 +103,17 @@ jobs:
           phase=materialization
           git worktree add --detach "$candidate" "$REVIEWED_BASE"
           cp -a "$payload/." "$candidate/"
+          override_root=.epistemic-bootstrap/source-overrides
+          (cd "$override_root" && sha256sum --check --strict SHA256SUMS)
+          while IFS= read -r relative_path; do
+            install -D -m 0644 "$override_root/$relative_path" "$candidate/$relative_path"
+          done < <(awk '{print $2}' "$override_root/SHA256SUMS")
           install -m 0644 .epistemic-bootstrap/epistemic-hardening-v11.yml.override "$candidate/.github/workflows/epistemic-hardening.yml"
           chmod 0755 "$candidate/scripts/check-epistemic-authority.py"
-          find "$payload" -type f -printf '%P\n' | sort > "$RUNNER_TEMP/expected-paths.txt"
+          {
+            find "$payload" -type f -printf '%P\n'
+            awk '{print $2}' "$override_root/SHA256SUMS"
+          } | sort -u > "$RUNNER_TEMP/expected-paths.txt"
           git -C "$candidate" add -N .
           git -C "$candidate" diff --name-only --diff-filter=ACMRTUXB | sort > "$RUNNER_TEMP/materialized-paths.txt"
           diff -u "$RUNNER_TEMP/expected-paths.txt" "$RUNNER_TEMP/materialized-paths.txt"
