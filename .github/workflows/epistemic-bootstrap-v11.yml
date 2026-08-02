@@ -20,7 +20,7 @@ env:
   SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
   PAYLOAD_SHA256: 3585a35e445af93a1f826cb58de0c3aaeb6bdc737398dc6ac7f85d614f98a486
   WORKFLOW_OVERRIDE_SHA256: b7cadbb4be3685a774989c42be24736688edbe4c0bbcfcb3a90d0e1d9ec161ce
-  EXPECTED_LOCK_SHA256: d24b4b887371f874956fb05d82013e91b3bb2b335328313c01295b16c29c486d
+  EXPECTED_LOCK_SHA256: 59e323cefdfd5e4d2130fd1817e64c02c95afc54729243f6039c497bea53950c
   RUSTUP_TOOLCHAIN: 1.94.0
 
 jobs:
@@ -64,6 +64,7 @@ jobs:
 
           python3 - <<'PY'
           from pathlib import Path
+          import textwrap
 
           path = Path('/tmp/epistemic-bootstrap-v5.sh')
           script = path.read_text()
@@ -73,8 +74,75 @@ jobs:
               raise SystemExit('permanent workflow override anchor count changed')
           script = script.replace(old, new)
 
-          tests = script.index('run_logged tests cargo test --locked --all-targets --all-features')
-          tail = r'''phase=patch
+          lock_start = script.index('phase=lockfile_resolution\n')
+          tests_anchor = 'run_logged tests cargo test --locked --all-targets --all-features'
+          lock_end = script.index(tests_anchor, lock_start)
+          lock_block = textwrap.dedent(r'''\
+          phase=lockfile_resolution
+          git -C "$worktree" show "$REVIEWED_BASE:Cargo.lock" > "$evidence/Cargo.lock.before"
+          cp "$evidence/Cargo.lock.before" "$worktree/Cargo.lock"
+
+          python3 - "$worktree/Cargo.lock" <<'PYLOCK'
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          before_text = path.read_text()
+          needle = ' "serde_json",\n "symthaea-acoustics",'
+          replacement = ' "serde_json",\n "sha2 0.10.9",\n "symthaea-acoustics",'
+          if before_text.count(needle) != 1:
+              raise SystemExit('engineering dependency insertion anchor was not found exactly once')
+          after_text = before_text.replace(needle, replacement, 1)
+          path.write_text(after_text)
+
+          before = tomllib.loads(before_text)
+          after = tomllib.loads(after_text)
+
+          def indexed(doc):
+              return {
+                  (pkg['name'], pkg['version'], pkg.get('source')): pkg
+                  for pkg in doc.get('package', [])
+              }
+
+          old = indexed(before)
+          new = indexed(after)
+          if old.keys() != new.keys():
+              raise SystemExit('minimal lock edit changed the package identity set')
+          changed = [key for key in old if old[key] != new[key]]
+          expected = ('symthaea-engineering', '0.1.0', None)
+          if changed != [expected]:
+              raise SystemExit(f'minimal lock edit changed unexpected packages: {changed!r}')
+          old_pkg = dict(old[expected])
+          new_pkg = dict(new[expected])
+          old_deps = set(old_pkg.pop('dependencies', []))
+          new_deps = set(new_pkg.pop('dependencies', []))
+          if old_pkg != new_pkg:
+              raise SystemExit('minimal lock edit changed engineering metadata beyond dependencies')
+          if new_deps - old_deps != {'sha2 0.10.9'} or old_deps - new_deps:
+              raise SystemExit('minimal lock edit was not solely the sha2 0.10.9 dependency addition')
+          PYLOCK
+
+          cp "$worktree/Cargo.lock" "$evidence/Cargo.lock.after"
+          git -C "$worktree" diff -- Cargo.lock > "$evidence/Cargo.lock.diff"
+          echo "$EXPECTED_LOCK_SHA256  $worktree/Cargo.lock" | sha256sum --check --strict
+
+          phase=lockfile_scope
+          { cat "$RUNNER_TEMP/expected-paths.txt"; echo Cargo.lock; } | sort -u > "$RUNNER_TEMP/expected-paths-with-lock.txt"
+          git -C "$worktree" add -N .
+          git -C "$worktree" diff --name-only --diff-filter=ACMRTUXB | sort > "$RUNNER_TEMP/post-lock-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-paths-with-lock.txt" "$RUNNER_TEMP/post-lock-paths.txt"
+          git -C "$worktree" diff --check
+          git -C "$worktree" diff > "$evidence/canonical-with-lock.diff"
+
+          run_logged locked_resolution cargo metadata --locked --format-version 1
+
+          ''')
+          script = script[:lock_start] + lock_block + script[lock_end:]
+
+          tests = script.index(tests_anchor)
+          tail = textwrap.dedent(r'''\
+          phase=patch
           git -C "$worktree" diff --binary > "$RUNNER_TEMP/canonical.patch"
           test -s "$RUNNER_TEMP/canonical.patch"
           patch_sha="$(sha256sum "$RUNNER_TEMP/canonical.patch" | awk '{print $1}')"
@@ -83,12 +151,8 @@ jobs:
           echo "patch_sha=$patch_sha" >> "$GITHUB_OUTPUT"
           publish_status prepared "patch_sha=$patch_sha"
           trap - ERR
-          '''
-          fixed = '\n'.join(
-              line[10:] if line.startswith('          ') else line
-              for line in tail.splitlines()
-          ) + '\n'
-          path.write_text(script[:tests] + fixed)
+          ''')
+          path.write_text(script[:tests] + tail)
           PY
           bash -n /tmp/epistemic-bootstrap-v5.sh
 
