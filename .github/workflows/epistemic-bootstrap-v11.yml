@@ -1,0 +1,298 @@
+name: Epistemic hardening bootstrap v11 matrix
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: epistemic-bootstrap-v11-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+env:
+  REVIEWED_BASE: f9c68947fa77fd6e29c4d2e87293715122f53cbf
+  TARGET_BRANCH: agent/epistemic-hardening-r6
+  STATUS_BRANCH: agent/epistemic-hardening-r6-v11-status
+  SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+  PAYLOAD_SHA256: 3585a35e445af93a1f826cb58de0c3aaeb6bdc737398dc6ac7f85d614f98a486
+  WORKFLOW_OVERRIDE_SHA256: a436cc10ff77e40f9cb442292587134fa558df64b2a9a6dfec6cd48f264d21bf
+  EXPECTED_LOCK_SHA256: d24b4b887371f874956fb05d82013e91b3bb2b335328313c01295b16c29c486d
+
+jobs:
+  prepare:
+    if: github.event.pull_request.head.ref == 'agent/epistemic-hardening-r6'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      patch_sha: ${{ steps.prepare.outputs.patch_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: rustfmt, clippy
+
+      - name: Derive exact-lock preparation script
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/epistemic-bootstrap-v10.yml').read_text()
+          marker = '      - name: Derive v7 and bind the exact retained lockfile\n'
+          start = workflow.index(marker)
+          run_marker = '        run: |\n'
+          body_start = workflow.index(run_marker, start) + len(run_marker)
+          body_end = workflow.index('\n      - name: Run exact-lock guarded canonical gate', body_start)
+          lines = workflow[body_start:body_end].splitlines()
+          derive = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines) + '\n'
+          Path('/tmp/derive-v10.sh').write_text(derive)
+          PY
+          chmod 0755 /tmp/derive-v10.sh
+          /tmp/derive-v10.sh
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('/tmp/epistemic-bootstrap-v5.sh')
+          script = path.read_text()
+          old = '.epistemic-bootstrap/epistemic-hardening.yml.override'
+          new = '.epistemic-bootstrap/epistemic-hardening-v11.yml.override'
+          if script.count(old) != 2:
+              raise SystemExit('permanent workflow override anchor count changed')
+          script = script.replace(old, new)
+
+          tests = script.index('run_logged tests cargo test --locked --all-targets --all-features')
+          tail = r'''phase=patch
+          git -C "$worktree" diff --binary > "$RUNNER_TEMP/canonical.patch"
+          test -s "$RUNNER_TEMP/canonical.patch"
+          patch_sha="$(sha256sum "$RUNNER_TEMP/canonical.patch" | awk '{print $1}')"
+          cp "$RUNNER_TEMP/canonical.patch" "$evidence/canonical.patch"
+          printf '%s  canonical.patch\n' "$patch_sha" > "$evidence/PATCH_SHA256"
+          echo "patch_sha=$patch_sha" >> "$GITHUB_OUTPUT"
+          publish_status prepared "patch_sha=$patch_sha"
+          trap - ERR
+          '''
+          fixed = '\n'.join(
+              line[10:] if line.startswith('          ') else line
+              for line in tail.splitlines()
+          ) + '\n'
+          path.write_text(script[:tests] + fixed)
+          PY
+          bash -n /tmp/epistemic-bootstrap-v5.sh
+
+      - name: Prepare exact canonical patch
+        id: prepare
+        shell: bash
+        run: /tmp/epistemic-bootstrap-v5.sh
+
+      - name: Upload canonical patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: epistemic-hardening-canonical-patch
+          path: ${{ runner.temp }}/canonical.patch
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload preparation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: epistemic-hardening-v11-prepare-evidence
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: warn
+          retention-days: 90
+
+  test:
+    name: test / ${{ matrix.package }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - symthaea-engineering
+          - symthaea-materials
+          - symthaea-nuclear
+          - symthaea-nuclear-forensics
+          - symthaea-process-discovery
+          - symthaea-quantum-chemistry
+          - symthaea-thermofluids
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.REVIEWED_BASE }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: epistemic-hardening-canonical-patch
+          path: ${{ runner.temp }}/patch
+
+      - name: Verify and apply exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${{ needs.prepare.outputs.patch_sha }}  $RUNNER_TEMP/patch/canonical.patch" | sha256sum --check --strict
+          git apply --check "$RUNNER_TEMP/patch/canonical.patch"
+          git apply "$RUNNER_TEMP/patch/canonical.patch"
+          git diff --check
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: epistemic-hardening-${{ matrix.package }}
+
+      - name: Test all targets and features
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --locked --all-targets --all-features -p "${{ matrix.package }}" 2>&1 | tee "$RUNNER_TEMP/test-${{ matrix.package }}.log"
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-${{ matrix.package }}
+          path: ${{ runner.temp }}/test-${{ matrix.package }}.log
+          if-no-files-found: warn
+          retention-days: 90
+
+  clippy:
+    name: clippy / ${{ matrix.package }}
+    needs: [prepare, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - symthaea-engineering
+          - symthaea-materials
+          - symthaea-nuclear
+          - symthaea-nuclear-forensics
+          - symthaea-process-discovery
+          - symthaea-quantum-chemistry
+          - symthaea-thermofluids
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.REVIEWED_BASE }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: epistemic-hardening-canonical-patch
+          path: ${{ runner.temp }}/patch
+
+      - name: Verify and apply exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${{ needs.prepare.outputs.patch_sha }}  $RUNNER_TEMP/patch/canonical.patch" | sha256sum --check --strict
+          git apply --check "$RUNNER_TEMP/patch/canonical.patch"
+          git apply "$RUNNER_TEMP/patch/canonical.patch"
+          git diff --check
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: epistemic-hardening-${{ matrix.package }}
+
+      - name: Lint all targets and features
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo clippy --locked --all-targets --all-features -p "${{ matrix.package }}" -- -D warnings 2>&1 | tee "$RUNNER_TEMP/clippy-${{ matrix.package }}.log"
+
+      - name: Upload Clippy log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clippy-${{ matrix.package }}
+          path: ${{ runner.temp }}/clippy-${{ matrix.package }}.log
+          if-no-files-found: warn
+          retention-days: 90
+
+  publish:
+    needs: [prepare, test, clippy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.REVIEWED_BASE }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: epistemic-hardening-canonical-patch
+          path: ${{ runner.temp }}/patch
+
+      - name: Verify canonical patch and contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${{ needs.prepare.outputs.patch_sha }}  $RUNNER_TEMP/patch/canonical.patch" | sha256sum --check --strict
+          git apply --check "$RUNNER_TEMP/patch/canonical.patch"
+          git apply "$RUNNER_TEMP/patch/canonical.patch"
+          git diff --check
+          python3 scripts/check-epistemic-authority.py
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+          cargo fmt \
+            -p symthaea-engineering \
+            -p symthaea-materials \
+            -p symthaea-nuclear \
+            -p symthaea-nuclear-forensics \
+            -p symthaea-process-discovery \
+            -p symthaea-quantum-chemistry \
+            -p symthaea-thermofluids \
+            -- --check
+
+      - name: Commit and publish exact tested tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: enforce epistemic authority across scientific domains"
+          final_sha="$(git rev-parse HEAD)"
+          git push \
+            --force-with-lease="refs/heads/$TARGET_BRANCH:$SOURCE_SHA" \
+            origin "HEAD:refs/heads/$TARGET_BRANCH"
+
+          status_file="$RUNNER_TEMP/STATUS"
+          cat > "$status_file" <<STATUS
+          state=succeeded
+          phase=complete
+          detail=final_sha=$final_sha
+          run_id=$GITHUB_RUN_ID
+          trigger_sha=$SOURCE_SHA
+          reviewed_base=$REVIEWED_BASE
+          patch_sha=${{ needs.prepare.outputs.patch_sha }}
+          STATUS
+          blob="$(git hash-object -w "$status_file")"
+          tree="$(printf '100644 blob %s\tSTATUS\n' "$blob" | git mktree)"
+          commit="$(printf 'bootstrap v11 status: succeeded\n' | git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit-tree "$tree")"
+          git push --force origin "$commit:refs/heads/$STATUS_BRANCH"
