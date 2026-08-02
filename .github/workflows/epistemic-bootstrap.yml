@@ -30,9 +30,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "$REVIEWED_BASE"
+          test "$(git merge-base HEAD "$REVIEWED_BASE")" = "$REVIEWED_BASE"
           test "$(git branch --show-current)" = "$TARGET_BRANCH"
           test -z "$(git status --porcelain)"
+          git diff --name-only "$REVIEWED_BASE"..HEAD \
+            | grep -Ev '^(\.github/workflows/epistemic-bootstrap\.yml|\.epistemic-bootstrap/)' \
+            > "$RUNNER_TEMP/unexpected-bootstrap-paths.txt" || true
+          test ! -s "$RUNNER_TEMP/unexpected-bootstrap-paths.txt"
 
       - name: Reconstruct and verify reviewed payload
         shell: bash
@@ -69,8 +73,6 @@ jobs:
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: ${{ env.WORKTREE }}
 
       - name: Verify epistemic authority contracts
         shell: bash
