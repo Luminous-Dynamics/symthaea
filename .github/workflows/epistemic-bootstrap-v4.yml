@@ -1,0 +1,77 @@
+name: Epistemic hardening bootstrap v4
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: epistemic-bootstrap-v4-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  corrected-v3-gate:
+    if: github.event.pull_request.head.ref == 'agent/epistemic-hardening-r6'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      REVIEWED_BASE: f9c68947fa77fd6e29c4d2e87293715122f53cbf
+      TARGET_BRANCH: agent/epistemic-hardening-r6
+      STATUS_BRANCH: agent/epistemic-hardening-r6-v4-status
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      PAYLOAD_SHA256: 3585a35e445af93a1f826cb58de0c3aaeb6bdc737398dc6ac7f85d614f98a486
+      WORKFLOW_OVERRIDE_SHA256: 85b1de02d08cfd13c750cdd1093774099f624b9b1a25b7213b886d953636cc1f
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: rustfmt, clippy
+
+      - name: Extract and correct the reviewed v3 gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/workflows/epistemic-bootstrap-v3.yml').read_text()
+          marker = '      - name: Run guarded canonical gate\n'
+          start = source.index(marker)
+          run_marker = '        run: |\n'
+          body_start = source.index(run_marker, start) + len(run_marker)
+          body_end = source.index('\n      - name: Upload retained gate evidence', body_start)
+          lines = source[body_start:body_end].splitlines()
+          script = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines) + '\n'
+
+          needle = '''phase=formatting_scope\ngit -C "$worktree" diff --name-only --diff-filter=ACMRTUXB | sort > "$RUNNER_TEMP/post-format-paths.txt"'''
+          replacement = '''phase=formatting_scope\ngit -C "$worktree" add -N .\ngit -C "$worktree" diff --name-only --diff-filter=ACMRTUXB | sort > "$RUNNER_TEMP/post-format-paths.txt"'''
+          if script.count(needle) != 1:
+              raise SystemExit('reviewed v3 formatting-scope anchor was not found exactly once')
+          script = script.replace(needle, replacement)
+          Path('/tmp/epistemic-bootstrap-v4.sh').write_text(script)
+          PY
+          chmod 0755 /tmp/epistemic-bootstrap-v4.sh
+          bash -n /tmp/epistemic-bootstrap-v4.sh
+
+      - name: Run corrected guarded canonical gate
+        shell: bash
+        run: /tmp/epistemic-bootstrap-v4.sh
+
+      - name: Upload retained gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: epistemic-hardening-bootstrap-v4-evidence
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: warn
+          retention-days: 90
