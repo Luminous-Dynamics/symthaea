@@ -1,0 +1,7 @@
+state=failed
+phase=locked_resolution
+detail=exit=101
+run_id=30757387587
+run_attempt=1
+trigger_sha=5fd5ab592067ccd2b937fccc252e56b62e64b74a
+reviewed_base=f9c68947fa77fd6e29c4d2e87293715122f53cbf
