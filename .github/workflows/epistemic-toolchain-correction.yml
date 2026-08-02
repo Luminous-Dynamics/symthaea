@@ -1,0 +1,73 @@
+name: Epistemic toolchain authority correction
+
+on:
+  push:
+    branches:
+      - agent/epistemic-hardening-r6
+
+permissions:
+  contents: write
+
+concurrency:
+  group: epistemic-toolchain-correction-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  correct:
+    if: github.event.head_commit.message == 'bootstrap: correct toolchain authority to Rust 1.96'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TARGET_BRANCH: agent/epistemic-hardening-r6
+      SOURCE_SHA: ${{ github.sha }}
+      OLD_OVERRIDE_SHA256: 1efa982478f21b0d3d4d3d1e08a8fefc123f9360d5593c50d674d18a1ebfa0a7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Apply exact authority correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          override=.epistemic-bootstrap/epistemic-hardening-v11.yml.override
+          bootstrap=.github/workflows/epistemic-bootstrap-v11.yml
+          self=.github/workflows/epistemic-toolchain-correction.yml
+
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(sha256sum "$override" | awk '{print $1}')" = "$OLD_OVERRIDE_SHA256"
+          test "$(grep -o '1\.94\.0' "$override" | wc -l)" -eq 4
+          test "$(grep -o '1\.94\.0' "$bootstrap" | wc -l)" -eq 4
+          test "$(grep -c "WORKFLOW_OVERRIDE_SHA256: $OLD_OVERRIDE_SHA256" "$bootstrap")" -eq 1
+
+          sed -i 's/1\.94\.0/1.96.0/g' "$override" "$bootstrap"
+          override_sha="$(sha256sum "$override" | awk '{print $1}')"
+          OLD_OVERRIDE_SHA256="$OLD_OVERRIDE_SHA256" NEW_OVERRIDE_SHA256="$override_sha" \
+            python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          path = Path('.github/workflows/epistemic-bootstrap-v11.yml')
+          text = path.read_text()
+          old = f"WORKFLOW_OVERRIDE_SHA256: {os.environ['OLD_OVERRIDE_SHA256']}"
+          new = f"WORKFLOW_OVERRIDE_SHA256: {os.environ['NEW_OVERRIDE_SHA256']}"
+          if text.count(old) != 1:
+              raise SystemExit('override hash anchor was not found exactly once')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+          rm "$self"
+          test "$(grep -o '1\.96\.0' "$override" | wc -l)" -eq 4
+          test "$(grep -o '1\.96\.0' "$bootstrap" | wc -l)" -eq 4
+          test "$(grep -c "WORKFLOW_OVERRIDE_SHA256: $override_sha" "$bootstrap")" -eq 1
+          test "$(sha256sum "$override" | awk '{print $1}')" = "$override_sha"
+          git diff --check
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "bootstrap: align gates with repository Rust 1.96 authority"
+          git push \
+            --force-with-lease="refs/heads/$TARGET_BRANCH:$SOURCE_SHA" \
+            origin "HEAD:refs/heads/$TARGET_BRANCH"
