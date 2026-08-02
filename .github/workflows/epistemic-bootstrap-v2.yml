@@ -4,28 +4,38 @@ on:
   push:
     branches:
       - agent/epistemic-hardening-r6
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 concurrency:
-  group: epistemic-bootstrap-v2-${{ github.ref }}
+  group: epistemic-bootstrap-v2-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
   materialize-gate-publish:
-    if: github.event.head_commit.message == 'bootstrap: trigger epistemic hardening v2'
+    if: >-
+      (github.event_name == 'push' &&
+       github.event.head_commit.message == 'bootstrap: trigger epistemic hardening v2') ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.ref == 'agent/epistemic-hardening-r6')
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
       REVIEWED_BASE: f9c68947fa77fd6e29c4d2e87293715122f53cbf
       TARGET_BRANCH: agent/epistemic-hardening-r6
       STATUS_BRANCH: agent/epistemic-hardening-r6-status
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       PAYLOAD_SHA256: 3585a35e445af93a1f826cb58de0c3aaeb6bdc737398dc6ac7f85d614f98a486
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ env.SOURCE_SHA }}
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -53,7 +63,7 @@ jobs:
           detail=$detail
           run_id=$GITHUB_RUN_ID
           run_attempt=$GITHUB_RUN_ATTEMPT
-          trigger_sha=$GITHUB_SHA
+          trigger_sha=$SOURCE_SHA
           reviewed_base=$REVIEWED_BASE
           STATUS
             local blob tree commit
@@ -74,8 +84,8 @@ jobs:
           publish_status running
 
           phase=provenance
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           test "$(git merge-base HEAD "$REVIEWED_BASE")" = "$REVIEWED_BASE"
-          test "$(git branch --show-current)" = "$TARGET_BRANCH"
           test -z "$(git status --porcelain)"
           git diff --name-only "$REVIEWED_BASE"..HEAD \
             | grep -Ev '^(\.github/workflows/epistemic-bootstrap(-v2)?\.yml|\.epistemic-bootstrap/)' \
@@ -141,7 +151,7 @@ jobs:
           printf '%s\n' "$final_sha" > "$evidence/final-sha.txt"
           sha256sum "$evidence"/* > "$evidence/SHA256SUMS"
           git -C "$worktree" push \
-            --force-with-lease="refs/heads/$TARGET_BRANCH:$GITHUB_SHA" \
+            --force-with-lease="refs/heads/$TARGET_BRANCH:$SOURCE_SHA" \
             origin "HEAD:refs/heads/$TARGET_BRANCH"
 
           phase=complete
