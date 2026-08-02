@@ -3,7 +3,6 @@ name: Epistemic hardening
 on:
   pull_request:
     paths:
-      - "Cargo.lock"
       - "crates/domains/symthaea-engineering/**"
       - "crates/domains/symthaea-materials/**"
       - "crates/domains/symthaea-nuclear/**"
@@ -27,12 +26,16 @@ env:
   RUSTUP_TOOLCHAIN: 1.94.0
 
 jobs:
-  contract:
-    name: contract
+  resolve:
+    name: resolve differential lock
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    outputs:
+      lock_sha: ${{ steps.resolve.outputs.lock_sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -40,31 +43,91 @@ jobs:
           toolchain: 1.94.0
           components: rustfmt, clippy
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Verify contracts and formatting
+        run: |
+          set -euo pipefail
+          python3 scripts/check-epistemic-authority.py
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+          cargo fmt \
+            -p symthaea-engineering \
+            -p symthaea-materials \
+            -p symthaea-nuclear \
+            -p symthaea-nuclear-forensics \
+            -p symthaea-process-discovery \
+            -p symthaea-quantum-chemistry \
+            -p symthaea-thermofluids \
+            -- --check
+
+      - name: Resolve and compare base and candidate locks
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline="$RUNNER_TEMP/epistemic-lock-baseline"
+          git worktree add --detach "$baseline" "${{ github.event.pull_request.base.sha }}"
+          (cd "$baseline" && cargo metadata --format-version 1 >/dev/null)
+          cargo metadata --format-version 1 >/dev/null
+          cp "$baseline/Cargo.lock" "$RUNNER_TEMP/Cargo.lock.baseline"
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.candidate"
+
+          python3 - "$RUNNER_TEMP/Cargo.lock.baseline" "$RUNNER_TEMP/Cargo.lock.candidate" <<'PY'
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          baseline = tomllib.loads(Path(sys.argv[1]).read_text())
+          candidate = tomllib.loads(Path(sys.argv[2]).read_text())
+
+          def indexed(document):
+              return {
+                  (package["name"], package["version"], package.get("source")): package
+                  for package in document.get("package", [])
+              }
+
+          old = indexed(baseline)
+          new = indexed(candidate)
+          if old.keys() != new.keys():
+              raise SystemExit("candidate changed the resolved package identity set")
+
+          changed = [key for key in old if old[key] != new[key]]
+          expected = ("symthaea-engineering", "0.1.0", None)
+          if changed != [expected]:
+              raise SystemExit(f"unexpected resolved package changes: {changed!r}")
+
+          old_package = dict(old[expected])
+          new_package = dict(new[expected])
+          old_dependencies = set(old_package.pop("dependencies", []))
+          new_dependencies = set(new_package.pop("dependencies", []))
+          if old_package != new_package:
+              raise SystemExit("engineering lock metadata changed beyond dependencies")
+          if new_dependencies - old_dependencies != {"sha2 0.10.9"}:
+              raise SystemExit(
+                  f"unexpected dependency additions: {new_dependencies - old_dependencies!r}"
+              )
+          if old_dependencies - new_dependencies:
+              raise SystemExit(
+                  f"unexpected dependency removals: {old_dependencies - new_dependencies!r}"
+              )
+          PY
+
+          lock_sha="$(sha256sum "$RUNNER_TEMP/Cargo.lock.candidate" | awk '{print $1}')"
+          echo "lock_sha=$lock_sha" >> "$GITHUB_OUTPUT"
+          printf '%s  Cargo.lock\n' "$lock_sha" > "$RUNNER_TEMP/Cargo.lock.SHA256"
+
+      - name: Upload candidate validation lock
+        uses: actions/upload-artifact@v4
         with:
-          shared-key: epistemic-hardening-contract
-
-      - name: Verify epistemic authority contracts
-        run: python3 scripts/check-epistemic-authority.py
-
-      - name: Resolve locked workspace metadata
-        run: cargo metadata --locked --no-deps --format-version 1
-
-      - name: Check formatting for hardened scientific crates
-        run: >-
-          cargo fmt
-          -p symthaea-engineering
-          -p symthaea-materials
-          -p symthaea-nuclear
-          -p symthaea-nuclear-forensics
-          -p symthaea-process-discovery
-          -p symthaea-quantum-chemistry
-          -p symthaea-thermofluids
-          -- --check
+          name: epistemic-hardening-validation-lock
+          path: |
+            ${{ runner.temp }}/Cargo.lock.candidate
+            ${{ runner.temp }}/Cargo.lock.baseline
+            ${{ runner.temp }}/Cargo.lock.SHA256
+          if-no-files-found: error
+          retention-days: 90
 
   test:
     name: test / ${{ matrix.package }}
-    needs: contract
+    needs: resolve
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -80,6 +143,17 @@ jobs:
           - symthaea-thermofluids
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: epistemic-hardening-validation-lock
+          path: ${{ runner.temp }}/lock
+
+      - name: Install validated lock
+        run: |
+          set -euo pipefail
+          echo "${{ needs.resolve.outputs.lock_sha }}  $RUNNER_TEMP/lock/Cargo.lock.candidate" | sha256sum --check --strict
+          cp "$RUNNER_TEMP/lock/Cargo.lock.candidate" Cargo.lock
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -95,7 +169,7 @@ jobs:
 
   clippy:
     name: clippy / ${{ matrix.package }}
-    needs: test
+    needs: [resolve, test]
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -111,6 +185,17 @@ jobs:
           - symthaea-thermofluids
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: epistemic-hardening-validation-lock
+          path: ${{ runner.temp }}/lock
+
+      - name: Install validated lock
+        run: |
+          set -euo pipefail
+          echo "${{ needs.resolve.outputs.lock_sha }}  $RUNNER_TEMP/lock/Cargo.lock.candidate" | sha256sum --check --strict
+          cp "$RUNNER_TEMP/lock/Cargo.lock.candidate" Cargo.lock
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@master
