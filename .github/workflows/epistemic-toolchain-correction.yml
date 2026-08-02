@@ -7,7 +7,7 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: epistemic-toolchain-correction-${{ github.event.pull_request.head.sha }}
@@ -19,7 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      TARGET_BRANCH: agent/epistemic-hardening-r6
       SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
       OLD_OVERRIDE_SHA256: 1efa982478f21b0d3d4d3d1e08a8fefc123f9360d5593c50d674d18a1ebfa0a7
       TRIGGER_SHA256: dea16ef9df37a1a3126ea9e7bdff821df715f3cc095d1df857b9bae1a86d2ec3
@@ -29,14 +28,14 @@ jobs:
           fetch-depth: 0
           ref: ${{ env.SOURCE_SHA }}
 
-      - name: Apply exact authority correction
+      - name: Produce exact authority correction
+        id: correct
         shell: bash
         run: |
           set -euo pipefail
           override=.epistemic-bootstrap/epistemic-hardening-v11.yml.override
           bootstrap=.github/workflows/epistemic-bootstrap-v11.yml
           trigger=.epistemic-bootstrap/TOOLCHAIN_CORRECTION_READY
-          self=.github/workflows/epistemic-toolchain-correction.yml
 
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           test "$(sha256sum "$trigger" | awk '{print $1}')" = "$TRIGGER_SHA256"
@@ -61,17 +60,21 @@ jobs:
           path.write_text(text.replace(old, new, 1))
           PY
 
-          rm "$self" "$trigger"
           test "$(grep -o '1\.96\.0' "$override" | wc -l)" -eq 4
           test "$(grep -o '1\.96\.0' "$bootstrap" | wc -l)" -eq 4
           test "$(grep -c "WORKFLOW_OVERRIDE_SHA256: $override_sha" "$bootstrap")" -eq 1
           test "$(sha256sum "$override" | awk '{print $1}')" = "$override_sha"
           git diff --check
+          printf '%s\n' "$override_sha" > .epistemic-bootstrap/CORRECTED_OVERRIDE_SHA256
+          echo "override_sha=$override_sha" >> "$GITHUB_OUTPUT"
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "bootstrap: align gates with repository Rust 1.96 authority"
-          git push \
-            --force-with-lease="refs/heads/$TARGET_BRANCH:$SOURCE_SHA" \
-            origin "HEAD:refs/heads/$TARGET_BRANCH"
+      - name: Upload exact corrected files
+        uses: actions/upload-artifact@v4
+        with:
+          name: epistemic-toolchain-authority-correction
+          path: |
+            .github/workflows/epistemic-bootstrap-v11.yml
+            .epistemic-bootstrap/epistemic-hardening-v11.yml.override
+            .epistemic-bootstrap/CORRECTED_OVERRIDE_SHA256
+          if-no-files-found: error
+          retention-days: 90
