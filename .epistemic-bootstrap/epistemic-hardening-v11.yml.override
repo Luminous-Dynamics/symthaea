@@ -23,7 +23,7 @@ concurrency:
 
 env:
   RUST_BACKTRACE: 1
-  RUSTUP_TOOLCHAIN: 1.94.0
+  RUSTUP_TOOLCHAIN: 1.96.0
 
 jobs:
   resolve:
@@ -40,7 +40,7 @@ jobs:
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.94.0
+          toolchain: 1.96.0
           components: rustfmt, clippy
 
       - name: Verify contracts and formatting
@@ -158,7 +158,7 @@ jobs:
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.94.0
+          toolchain: 1.96.0
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -200,7 +200,7 @@ jobs:
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.94.0
+          toolchain: 1.96.0
           components: clippy
 
       - uses: Swatinem/rust-cache@v2

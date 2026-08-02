@@ -1,0 +1,453 @@
+name: Epistemic hardening bootstrap v11 matrix
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: epistemic-bootstrap-v11-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+env:
+  REVIEWED_BASE: f9c68947fa77fd6e29c4d2e87293715122f53cbf
+  TARGET_BRANCH: agent/epistemic-hardening-r6
+  STATUS_BRANCH: agent/epistemic-hardening-r6-v11-status
+  SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+  PAYLOAD_SHA256: 3585a35e445af93a1f826cb58de0c3aaeb6bdc737398dc6ac7f85d614f98a486
+  WORKFLOW_OVERRIDE_SHA256: 7247759da201c42ac366cc8e3b2c4df33d6ccaae2f44ec857347571a60c7d2a2
+  RUSTUP_TOOLCHAIN: 1.96.0
+
+jobs:
+  prepare:
+    if: github.event.pull_request.head.ref == 'agent/epistemic-hardening-r6'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      patch_sha: ${{ steps.prepare.outputs.patch_sha }}
+      lock_sha: ${{ steps.prepare.outputs.lock_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Prepare exact source patch and differential lock
+        id: prepare
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          phase=initializing
+          evidence="$RUNNER_TEMP/evidence"
+          payload="$RUNNER_TEMP/epistemic-payload"
+          candidate="$RUNNER_TEMP/symthaea-candidate"
+          baseline="$RUNNER_TEMP/symthaea-baseline"
+          mkdir -p "$evidence" "$payload"
+
+          publish_status() {
+            local state="$1"
+            local detail="${2:-}"
+            local status_file="$RUNNER_TEMP/STATUS"
+            cat > "$status_file" <<STATUS
+          state=$state
+          phase=$phase
+          detail=$detail
+          run_id=$GITHUB_RUN_ID
+          run_attempt=$GITHUB_RUN_ATTEMPT
+          trigger_sha=$SOURCE_SHA
+          reviewed_base=$REVIEWED_BASE
+          STATUS
+            local blob tree commit
+            blob="$(git hash-object -w "$status_file")"
+            tree="$(printf '100644 blob %s\tSTATUS\n' "$blob" | git mktree)"
+            commit="$(printf 'bootstrap v11 status: %s\n' "$state" | git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit-tree "$tree")"
+            git push --force origin "$commit:refs/heads/$STATUS_BRANCH"
+          }
+
+          fail_closed() {
+            local rc=$?
+            trap - ERR
+            publish_status failed "exit=$rc" || true
+            exit "$rc"
+          }
+          trap fail_closed ERR
+          publish_status running
+
+          phase=provenance
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git merge-base HEAD "$REVIEWED_BASE")" = "$REVIEWED_BASE"
+          test -z "$(git status --porcelain)"
+          git diff --name-only "$REVIEWED_BASE"..HEAD \
+            | grep -Ev '^(\.github/workflows/epistemic-bootstrap(-v[0-9]+)?\.yml|\.epistemic-bootstrap/)' \
+            > "$RUNNER_TEMP/unexpected-bootstrap-paths.txt" || true
+          test ! -s "$RUNNER_TEMP/unexpected-bootstrap-paths.txt"
+
+          phase=payload
+          cat .epistemic-bootstrap/chunk-* | base64 --decode > "$RUNNER_TEMP/payload.tar.gz"
+          echo "$PAYLOAD_SHA256  $RUNNER_TEMP/payload.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/payload.tar.gz" -C "$payload"
+          (cd "$payload" && sha256sum --check --strict FILES.sha256)
+          rm "$payload/FILES.sha256"
+          echo "$WORKFLOW_OVERRIDE_SHA256  .epistemic-bootstrap/epistemic-hardening-v11.yml.override" | sha256sum --check --strict
+
+          phase=materialization
+          git worktree add --detach "$candidate" "$REVIEWED_BASE"
+          cp -a "$payload/." "$candidate/"
+          install -m 0644 .epistemic-bootstrap/epistemic-hardening-v11.yml.override "$candidate/.github/workflows/epistemic-hardening.yml"
+          chmod 0755 "$candidate/scripts/check-epistemic-authority.py"
+          find "$payload" -type f -printf '%P\n' | sort > "$RUNNER_TEMP/expected-paths.txt"
+          git -C "$candidate" add -N .
+          git -C "$candidate" diff --name-only --diff-filter=ACMRTUXB | sort > "$RUNNER_TEMP/materialized-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-paths.txt" "$RUNNER_TEMP/materialized-paths.txt"
+          git -C "$candidate" reset
+          git -C "$candidate" diff --check
+
+          run_logged() {
+            local name="$1"
+            shift
+            phase="$name"
+            set +e
+            (cd "$candidate" && "$@") > "$evidence/$name.stdout" 2> "$evidence/$name.stderr"
+            local rc=$?
+            set -e
+            return "$rc"
+          }
+
+          run_logged authority python3 scripts/check-epistemic-authority.py
+          run_logged metadata cargo metadata --locked --no-deps --format-version 1
+          run_logged formatting cargo fmt \
+            -p symthaea-engineering \
+            -p symthaea-materials \
+            -p symthaea-nuclear \
+            -p symthaea-nuclear-forensics \
+            -p symthaea-process-discovery \
+            -p symthaea-quantum-chemistry \
+            -p symthaea-thermofluids
+          run_logged formatting_check cargo fmt \
+            -p symthaea-engineering \
+            -p symthaea-materials \
+            -p symthaea-nuclear \
+            -p symthaea-nuclear-forensics \
+            -p symthaea-process-discovery \
+            -p symthaea-quantum-chemistry \
+            -p symthaea-thermofluids \
+            -- --check
+
+          phase=formatting_scope
+          git -C "$candidate" add -N .
+          git -C "$candidate" diff --name-only --diff-filter=ACMRTUXB | sort > "$RUNNER_TEMP/formatted-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-paths.txt" "$RUNNER_TEMP/formatted-paths.txt"
+          git -C "$candidate" reset
+          git -C "$candidate" diff --check
+
+          phase=differential_lock
+          git worktree add --detach "$baseline" "$REVIEWED_BASE"
+          (cd "$baseline" && cargo metadata --format-version 1 > "$evidence/baseline-metadata.json" 2> "$evidence/baseline-metadata.stderr")
+          (cd "$candidate" && cargo metadata --format-version 1 > "$evidence/candidate-metadata.json" 2> "$evidence/candidate-metadata.stderr")
+          cp "$baseline/Cargo.lock" "$RUNNER_TEMP/Cargo.lock.baseline"
+          cp "$candidate/Cargo.lock" "$RUNNER_TEMP/Cargo.lock.candidate"
+
+          python3 - "$RUNNER_TEMP/Cargo.lock.baseline" "$RUNNER_TEMP/Cargo.lock.candidate" <<'PY'
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          baseline = tomllib.loads(Path(sys.argv[1]).read_text())
+          candidate = tomllib.loads(Path(sys.argv[2]).read_text())
+
+          def indexed(document):
+              return {
+                  (package["name"], package["version"], package.get("source")): package
+                  for package in document.get("package", [])
+              }
+
+          old = indexed(baseline)
+          new = indexed(candidate)
+          if old.keys() != new.keys():
+              added = sorted(new.keys() - old.keys())
+              removed = sorted(old.keys() - new.keys())
+              raise SystemExit(
+                  f"candidate changed resolved package identities; added={added!r}, removed={removed!r}"
+              )
+
+          changed = [key for key in old if old[key] != new[key]]
+          expected = ("symthaea-engineering", "0.1.0", None)
+          if changed != [expected]:
+              raise SystemExit(f"unexpected resolved package changes: {changed!r}")
+
+          old_package = dict(old[expected])
+          new_package = dict(new[expected])
+          old_dependencies = set(old_package.pop("dependencies", []))
+          new_dependencies = set(new_package.pop("dependencies", []))
+          if old_package != new_package:
+              raise SystemExit("engineering lock metadata changed beyond dependencies")
+          additions = new_dependencies - old_dependencies
+          removals = old_dependencies - new_dependencies
+          if additions != {"sha2 0.10.9"} or removals:
+              raise SystemExit(
+                  f"unexpected engineering dependency delta: additions={additions!r}, removals={removals!r}"
+              )
+          PY
+
+          lock_sha="$(sha256sum "$RUNNER_TEMP/Cargo.lock.candidate" | awk '{print $1}')"
+          printf '%s  Cargo.lock.candidate\n' "$lock_sha" > "$evidence/LOCK_SHA256"
+          cp "$RUNNER_TEMP/Cargo.lock.baseline" "$evidence/Cargo.lock.baseline"
+          cp "$RUNNER_TEMP/Cargo.lock.candidate" "$evidence/Cargo.lock.candidate"
+          diff -u "$RUNNER_TEMP/Cargo.lock.baseline" "$RUNNER_TEMP/Cargo.lock.candidate" > "$evidence/Cargo.lock.diff" || true
+
+          phase=locked_candidate
+          cp "$RUNNER_TEMP/Cargo.lock.candidate" "$candidate/Cargo.lock"
+          run_logged locked_resolution cargo metadata --locked --format-version 1
+          git -C "$candidate" show "$REVIEWED_BASE:Cargo.lock" > "$candidate/Cargo.lock"
+
+          phase=patch
+          git -C "$candidate" add -N .
+          git -C "$candidate" diff --name-only --diff-filter=ACMRTUXB | sort > "$RUNNER_TEMP/final-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-paths.txt" "$RUNNER_TEMP/final-paths.txt"
+          git -C "$candidate" reset
+          git -C "$candidate" diff --check
+          git -C "$candidate" diff --binary > "$RUNNER_TEMP/canonical.patch"
+          test -s "$RUNNER_TEMP/canonical.patch"
+          patch_sha="$(sha256sum "$RUNNER_TEMP/canonical.patch" | awk '{print $1}')"
+          cp "$RUNNER_TEMP/canonical.patch" "$evidence/canonical.patch"
+          printf '%s  canonical.patch\n' "$patch_sha" > "$evidence/PATCH_SHA256"
+          echo "patch_sha=$patch_sha" >> "$GITHUB_OUTPUT"
+          echo "lock_sha=$lock_sha" >> "$GITHUB_OUTPUT"
+          publish_status prepared "patch_sha=$patch_sha lock_sha=$lock_sha"
+          trap - ERR
+
+      - name: Upload canonical patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: epistemic-hardening-canonical-patch
+          path: ${{ runner.temp }}/canonical.patch
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload validation lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: epistemic-hardening-validation-lock
+          path: |
+            ${{ runner.temp }}/Cargo.lock.candidate
+            ${{ runner.temp }}/Cargo.lock.baseline
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload preparation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: epistemic-hardening-v11-prepare-evidence
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: warn
+          retention-days: 90
+
+  test:
+    name: test / ${{ matrix.package }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - symthaea-engineering
+          - symthaea-materials
+          - symthaea-nuclear
+          - symthaea-nuclear-forensics
+          - symthaea-process-discovery
+          - symthaea-quantum-chemistry
+          - symthaea-thermofluids
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.REVIEWED_BASE }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: epistemic-hardening-canonical-patch
+          path: ${{ runner.temp }}/patch
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: epistemic-hardening-validation-lock
+          path: ${{ runner.temp }}/lock
+
+      - name: Verify and install exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${{ needs.prepare.outputs.patch_sha }}  $RUNNER_TEMP/patch/canonical.patch" | sha256sum --check --strict
+          echo "${{ needs.prepare.outputs.lock_sha }}  $RUNNER_TEMP/lock/Cargo.lock.candidate" | sha256sum --check --strict
+          git apply --check "$RUNNER_TEMP/patch/canonical.patch"
+          git apply "$RUNNER_TEMP/patch/canonical.patch"
+          cp "$RUNNER_TEMP/lock/Cargo.lock.candidate" Cargo.lock
+          git diff --check
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: epistemic-hardening-${{ matrix.package }}
+
+      - name: Test all targets and features
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --locked --all-targets --all-features -p "${{ matrix.package }}" 2>&1 | tee "$RUNNER_TEMP/test-${{ matrix.package }}.log"
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-${{ matrix.package }}
+          path: ${{ runner.temp }}/test-${{ matrix.package }}.log
+          if-no-files-found: warn
+          retention-days: 90
+
+  clippy:
+    name: clippy / ${{ matrix.package }}
+    needs: [prepare, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - symthaea-engineering
+          - symthaea-materials
+          - symthaea-nuclear
+          - symthaea-nuclear-forensics
+          - symthaea-process-discovery
+          - symthaea-quantum-chemistry
+          - symthaea-thermofluids
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.REVIEWED_BASE }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: epistemic-hardening-canonical-patch
+          path: ${{ runner.temp }}/patch
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: epistemic-hardening-validation-lock
+          path: ${{ runner.temp }}/lock
+
+      - name: Verify and install exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${{ needs.prepare.outputs.patch_sha }}  $RUNNER_TEMP/patch/canonical.patch" | sha256sum --check --strict
+          echo "${{ needs.prepare.outputs.lock_sha }}  $RUNNER_TEMP/lock/Cargo.lock.candidate" | sha256sum --check --strict
+          git apply --check "$RUNNER_TEMP/patch/canonical.patch"
+          git apply "$RUNNER_TEMP/patch/canonical.patch"
+          cp "$RUNNER_TEMP/lock/Cargo.lock.candidate" Cargo.lock
+          git diff --check
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: epistemic-hardening-${{ matrix.package }}
+
+      - name: Lint all targets and features
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo clippy --locked --all-targets --all-features -p "${{ matrix.package }}" -- -D warnings 2>&1 | tee "$RUNNER_TEMP/clippy-${{ matrix.package }}.log"
+
+      - name: Upload Clippy log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clippy-${{ matrix.package }}
+          path: ${{ runner.temp }}/clippy-${{ matrix.package }}.log
+          if-no-files-found: warn
+          retention-days: 90
+
+  publish:
+    needs: [prepare, test, clippy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.REVIEWED_BASE }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: epistemic-hardening-canonical-patch
+          path: ${{ runner.temp }}/patch
+
+      - name: Verify canonical patch and contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${{ needs.prepare.outputs.patch_sha }}  $RUNNER_TEMP/patch/canonical.patch" | sha256sum --check --strict
+          git apply --check "$RUNNER_TEMP/patch/canonical.patch"
+          git apply "$RUNNER_TEMP/patch/canonical.patch"
+          git diff --check
+          python3 scripts/check-epistemic-authority.py
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+          cargo fmt \
+            -p symthaea-engineering \
+            -p symthaea-materials \
+            -p symthaea-nuclear \
+            -p symthaea-nuclear-forensics \
+            -p symthaea-process-discovery \
+            -p symthaea-quantum-chemistry \
+            -p symthaea-thermofluids \
+            -- --check
+
+      - name: Commit and publish exact tested tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: enforce epistemic authority across scientific domains"
+          final_sha="$(git rev-parse HEAD)"
+          git push \
+            --force-with-lease="refs/heads/$TARGET_BRANCH:$SOURCE_SHA" \
+            origin "HEAD:refs/heads/$TARGET_BRANCH"
+
+          status_file="$RUNNER_TEMP/STATUS"
+          cat > "$status_file" <<STATUS
+          state=succeeded
+          phase=complete
+          detail=final_sha=$final_sha
+          run_id=$GITHUB_RUN_ID
+          trigger_sha=$SOURCE_SHA
+          reviewed_base=$REVIEWED_BASE
+          patch_sha=${{ needs.prepare.outputs.patch_sha }}
+          lock_sha=${{ needs.prepare.outputs.lock_sha }}
+          STATUS
+          blob="$(git hash-object -w "$status_file")"
+          tree="$(printf '100644 blob %s\tSTATUS\n' "$blob" | git mktree)"
+          commit="$(printf 'bootstrap v11 status: succeeded\n' | git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit-tree "$tree")"
+          git push --force origin "$commit:refs/heads/$STATUS_BRANCH"
