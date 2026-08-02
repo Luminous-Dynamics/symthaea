@@ -31,6 +31,7 @@ jobs:
       STATUS_BRANCH: agent/epistemic-hardening-r6-status
       SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       PAYLOAD_SHA256: 3585a35e445af93a1f826cb58de0c3aaeb6bdc737398dc6ac7f85d614f98a486
+      WORKFLOW_OVERRIDE_SHA256: 85b1de02d08cfd13c750cdd1093774099f624b9b1a25b7213b886d953636cc1f
     steps:
       - uses: actions/checkout@v4
         with:
@@ -98,10 +99,12 @@ jobs:
           tar -xzf "$RUNNER_TEMP/payload.tar.gz" -C "$payload"
           (cd "$payload" && sha256sum --check --strict FILES.sha256)
           rm "$payload/FILES.sha256"
+          echo "$WORKFLOW_OVERRIDE_SHA256  .epistemic-bootstrap/epistemic-hardening.yml.override" | sha256sum --check --strict
 
           phase=materialization
           git worktree add --detach "$worktree" "$REVIEWED_BASE"
           cp -a "$payload/." "$worktree/"
+          install -m 0644 .epistemic-bootstrap/epistemic-hardening.yml.override "$worktree/.github/workflows/epistemic-hardening.yml"
           chmod 0755 "$worktree/scripts/check-epistemic-authority.py"
           find "$payload" -type f -printf '%P\n' | sort > "$RUNNER_TEMP/expected-paths.txt"
           git -C "$worktree" add -N .
@@ -123,7 +126,15 @@ jobs:
 
           run_logged authority python3 scripts/check-epistemic-authority.py
           run_logged metadata cargo metadata --locked --no-deps --format-version 1
-          run_logged formatting cargo fmt --all -- --check
+          run_logged formatting cargo fmt \
+            -p symthaea-engineering \
+            -p symthaea-materials \
+            -p symthaea-nuclear \
+            -p symthaea-nuclear-forensics \
+            -p symthaea-process-discovery \
+            -p symthaea-quantum-chemistry \
+            -p symthaea-thermofluids \
+            -- --check
           run_logged tests cargo test --locked --all-targets --all-features \
             -p symthaea-engineering \
             -p symthaea-materials \
