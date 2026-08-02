@@ -1,0 +1,143 @@
+name: Epistemic hardening bootstrap
+
+on:
+  push:
+    branches:
+      - agent/epistemic-hardening-r6
+
+permissions:
+  contents: write
+
+concurrency:
+  group: epistemic-bootstrap-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize-and-gate:
+    if: github.event.head_commit.message == 'bootstrap: trigger epistemic hardening'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      REVIEWED_BASE: f9c68947fa77fd6e29c4d2e87293715122f53cbf
+      TARGET_BRANCH: agent/epistemic-hardening-r6
+      PAYLOAD_SHA256: 3585a35e445af93a1f826cb58de0c3aaeb6bdc737398dc6ac7f85d614f98a486
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify bootstrap provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$REVIEWED_BASE"
+          test "$(git branch --show-current)" = "$TARGET_BRANCH"
+          test -z "$(git status --porcelain)"
+
+      - name: Reconstruct and verify reviewed payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/epistemic-payload"
+          cat .epistemic-bootstrap/chunk-* | base64 --decode > "$RUNNER_TEMP/payload.tar.gz"
+          echo "$PAYLOAD_SHA256  $RUNNER_TEMP/payload.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/payload.tar.gz" -C "$RUNNER_TEMP/epistemic-payload"
+          (cd "$RUNNER_TEMP/epistemic-payload" && sha256sum --check --strict FILES.sha256)
+          rm "$RUNNER_TEMP/epistemic-payload/FILES.sha256"
+
+      - name: Materialize exact canonical diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          worktree="$RUNNER_TEMP/symthaea-canonical"
+          git worktree add --detach "$worktree" "$REVIEWED_BASE"
+          cp -a "$RUNNER_TEMP/epistemic-payload/." "$worktree/"
+          chmod 0755 "$worktree/scripts/check-epistemic-authority.py"
+
+          find "$RUNNER_TEMP/epistemic-payload" -type f -printf '%P\n' | sort > "$RUNNER_TEMP/expected-paths.txt"
+          git -C "$worktree" add -N .
+          git -C "$worktree" diff --name-only --diff-filter=ACMRTUXB | sort > "$RUNNER_TEMP/actual-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-paths.txt" "$RUNNER_TEMP/actual-paths.txt"
+          git -C "$worktree" reset
+          git -C "$worktree" diff --check
+          echo "WORKTREE=$worktree" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ env.WORKTREE }}
+
+      - name: Verify epistemic authority contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/evidence"
+          (cd "$WORKTREE" && python3 scripts/check-epistemic-authority.py) 2>&1 | tee "$RUNNER_TEMP/evidence/authority.log"
+
+      - name: Resolve locked workspace metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd "$WORKTREE" && cargo metadata --locked --no-deps --format-version 1) > "$RUNNER_TEMP/evidence/metadata.stdout" 2> "$RUNNER_TEMP/evidence/metadata.stderr"
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd "$WORKTREE" && cargo fmt --all -- --check) > "$RUNNER_TEMP/evidence/fmt.stdout" 2> "$RUNNER_TEMP/evidence/fmt.stderr"
+
+      - name: Test hardened scientific crates
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd "$WORKTREE" && cargo test --locked --all-targets --all-features \
+            -p symthaea-engineering \
+            -p symthaea-materials \
+            -p symthaea-nuclear \
+            -p symthaea-nuclear-forensics \
+            -p symthaea-process-discovery \
+            -p symthaea-quantum-chemistry \
+            -p symthaea-thermofluids) > "$RUNNER_TEMP/evidence/tests.stdout" 2> "$RUNNER_TEMP/evidence/tests.stderr"
+
+      - name: Lint hardened scientific crates
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd "$WORKTREE" && cargo clippy --locked --all-targets --all-features \
+            -p symthaea-engineering \
+            -p symthaea-materials \
+            -p symthaea-nuclear \
+            -p symthaea-nuclear-forensics \
+            -p symthaea-process-discovery \
+            -p symthaea-quantum-chemistry \
+            -p symthaea-thermofluids \
+            -- -D warnings) > "$RUNNER_TEMP/evidence/clippy.stdout" 2> "$RUNNER_TEMP/evidence/clippy.stderr"
+
+      - name: Commit and publish only the gated tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C "$WORKTREE" config user.name "github-actions[bot]"
+          git -C "$WORKTREE" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$WORKTREE" add -A
+          git -C "$WORKTREE" commit -m "fix: enforce epistemic authority across scientific domains"
+          final_sha="$(git -C "$WORKTREE" rev-parse HEAD)"
+          printf '%s\n' "$final_sha" > "$RUNNER_TEMP/evidence/final-sha.txt"
+          sha256sum "$RUNNER_TEMP"/evidence/* > "$RUNNER_TEMP/evidence/SHA256SUMS"
+          git -C "$WORKTREE" push \
+            --force-with-lease="refs/heads/$TARGET_BRANCH:$GITHUB_SHA" \
+            origin "HEAD:refs/heads/$TARGET_BRANCH"
+
+      - name: Upload retained gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: epistemic-hardening-bootstrap-evidence
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: warn
+          retention-days: 90
