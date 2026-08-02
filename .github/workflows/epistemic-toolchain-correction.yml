@@ -1,26 +1,28 @@
 name: Epistemic toolchain authority correction
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/epistemic-hardening-r6
+      - main
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 concurrency:
-  group: epistemic-toolchain-correction-${{ github.ref }}
+  group: epistemic-toolchain-correction-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: true
 
 jobs:
   correct:
-    if: github.event.head_commit.message == 'bootstrap: correct toolchain authority to Rust 1.96'
+    if: github.event.pull_request.head.ref == 'agent/epistemic-hardening-r6'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       TARGET_BRANCH: agent/epistemic-hardening-r6
-      SOURCE_SHA: ${{ github.sha }}
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
       OLD_OVERRIDE_SHA256: 1efa982478f21b0d3d4d3d1e08a8fefc123f9360d5593c50d674d18a1ebfa0a7
+      TRIGGER_SHA256: dea16ef9df37a1a3126ea9e7bdff821df715f3cc095d1df857b9bae1a86d2ec3
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,9 +35,11 @@ jobs:
           set -euo pipefail
           override=.epistemic-bootstrap/epistemic-hardening-v11.yml.override
           bootstrap=.github/workflows/epistemic-bootstrap-v11.yml
+          trigger=.epistemic-bootstrap/TOOLCHAIN_CORRECTION_READY
           self=.github/workflows/epistemic-toolchain-correction.yml
 
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(sha256sum "$trigger" | awk '{print $1}')" = "$TRIGGER_SHA256"
           test "$(sha256sum "$override" | awk '{print $1}')" = "$OLD_OVERRIDE_SHA256"
           test "$(grep -o '1\.94\.0' "$override" | wc -l)" -eq 4
           test "$(grep -o '1\.94\.0' "$bootstrap" | wc -l)" -eq 4
@@ -57,7 +61,7 @@ jobs:
           path.write_text(text.replace(old, new, 1))
           PY
 
-          rm "$self"
+          rm "$self" "$trigger"
           test "$(grep -o '1\.96\.0' "$override" | wc -l)" -eq 4
           test "$(grep -o '1\.96\.0' "$bootstrap" | wc -l)" -eq 4
           test "$(grep -c "WORKFLOW_OVERRIDE_SHA256: $override_sha" "$bootstrap")" -eq 1
