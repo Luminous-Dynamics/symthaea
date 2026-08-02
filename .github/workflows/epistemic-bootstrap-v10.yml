@@ -1,0 +1,148 @@
+name: Epistemic hardening bootstrap v10
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: epistemic-bootstrap-v10-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  exact-lock-canonical-gate:
+    if: github.event.pull_request.head.ref == 'agent/epistemic-hardening-r6'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      REVIEWED_BASE: f9c68947fa77fd6e29c4d2e87293715122f53cbf
+      TARGET_BRANCH: agent/epistemic-hardening-r6
+      STATUS_BRANCH: agent/epistemic-hardening-r6-v10-status
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      PAYLOAD_SHA256: 3585a35e445af93a1f826cb58de0c3aaeb6bdc737398dc6ac7f85d614f98a486
+      WORKFLOW_OVERRIDE_SHA256: 85b1de02d08cfd13c750cdd1093774099f624b9b1a25b7213b886d953636cc1f
+      EXPECTED_LOCK_SHA256: d24b4b887371f874956fb05d82013e91b3bb2b335328313c01295b16c29c486d
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: rustfmt, clippy
+
+      - name: Derive v7 and bind the exact retained lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/epistemic-bootstrap-v7.yml').read_text()
+          marker = '      - name: Derive v5 and correct its generated heredoc\n'
+          start = workflow.index(marker)
+          run_marker = '        run: |\n'
+          body_start = workflow.index(run_marker, start) + len(run_marker)
+          body_end = workflow.index('\n      - name: Run corrected lock-aware guarded gate', body_start)
+          lines = workflow[body_start:body_end].splitlines()
+          derive = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines) + '\n'
+          Path('/tmp/derive-v7.sh').write_text(derive)
+          PY
+          chmod 0755 /tmp/derive-v7.sh
+          /tmp/derive-v7.sh
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('/tmp/epistemic-bootstrap-v5.sh')
+          script = path.read_text()
+          start = script.index('phase=lockfile_refresh\n')
+          end = script.index('run_logged tests cargo test --locked --all-targets --all-features', start)
+          replacement = r'''phase=lockfile_resolution
+          git -C "$worktree" show "$REVIEWED_BASE:Cargo.lock" > "$evidence/Cargo.lock.before"
+          run_logged lockfile cargo metadata --format-version 1
+          cp "$worktree/Cargo.lock" "$evidence/Cargo.lock.after"
+          git -C "$worktree" diff -- Cargo.lock > "$evidence/Cargo.lock.diff"
+          echo "$EXPECTED_LOCK_SHA256  $worktree/Cargo.lock" | sha256sum --check --strict
+
+          python3 - "$evidence/Cargo.lock.before" "$evidence/Cargo.lock.after" <<'PYLOCK'
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          before = tomllib.loads(Path(sys.argv[1]).read_text())
+          after = tomllib.loads(Path(sys.argv[2]).read_text())
+
+          def indexed(doc):
+              return {
+                  (pkg['name'], pkg['version'], pkg.get('source')): pkg
+                  for pkg in doc.get('package', [])
+              }
+
+          old = indexed(before)
+          new = indexed(after)
+          registry = 'registry+https://github.com/rust-lang/crates.io-index'
+          expected_added = {
+              ('clap', '4.5.60', registry),
+              ('clap_builder', '4.5.60', registry),
+              ('clap_derive', '4.5.55', registry),
+              ('heck', '0.5.0', registry),
+          }
+          if new.keys() - old.keys() != expected_added:
+              raise SystemExit(f'unexpected added lock packages: {new.keys() - old.keys()!r}')
+          if old.keys() - new.keys():
+              raise SystemExit(f'unexpected removed lock packages: {old.keys() - new.keys()!r}')
+
+          changed = [key for key in old if old[key] != new[key]]
+          expected = next(
+              key for key in old
+              if key[0] == 'symthaea-engineering' and key[1] == '0.1.0'
+          )
+          if changed != [expected]:
+              raise SystemExit(f'unexpected changed lock packages: {changed!r}')
+          old_pkg = dict(old[expected])
+          new_pkg = dict(new[expected])
+          old_deps = set(old_pkg.pop('dependencies', []))
+          new_deps = set(new_pkg.pop('dependencies', []))
+          if old_pkg != new_pkg or new_deps - old_deps != {'sha2'} or old_deps - new_deps:
+              raise SystemExit('engineering lock delta was not solely the sha2 dependency addition')
+          PYLOCK
+
+          phase=lockfile_scope
+          { cat "$RUNNER_TEMP/expected-paths.txt"; echo Cargo.lock; } | sort -u > "$RUNNER_TEMP/expected-paths-with-lock.txt"
+          git -C "$worktree" add -N .
+          git -C "$worktree" diff --name-only --diff-filter=ACMRTUXB | sort > "$RUNNER_TEMP/post-lock-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-paths-with-lock.txt" "$RUNNER_TEMP/post-lock-paths.txt"
+          git -C "$worktree" diff --check
+          git -C "$worktree" diff > "$evidence/canonical-with-lock.diff"
+
+          run_logged locked_resolution cargo metadata --locked --format-version 1
+
+          '''
+          fixed = '\n'.join(
+              line[10:] if line.startswith('          ') else line
+              for line in replacement.splitlines()
+          ) + '\n\n'
+          path.write_text(script[:start] + fixed + script[end:])
+          PY
+          bash -n /tmp/epistemic-bootstrap-v5.sh
+
+      - name: Run exact-lock guarded canonical gate
+        shell: bash
+        run: /tmp/epistemic-bootstrap-v5.sh
+
+      - name: Upload retained gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: epistemic-hardening-bootstrap-v10-evidence
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: warn
+          retention-days: 90
