@@ -19,17 +19,17 @@ env:
   STATUS_BRANCH: agent/epistemic-hardening-r6-v11-status
   SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
   PAYLOAD_SHA256: 3585a35e445af93a1f826cb58de0c3aaeb6bdc737398dc6ac7f85d614f98a486
-  WORKFLOW_OVERRIDE_SHA256: b7cadbb4be3685a774989c42be24736688edbe4c0bbcfcb3a90d0e1d9ec161ce
-  EXPECTED_LOCK_SHA256: 59e323cefdfd5e4d2130fd1817e64c02c95afc54729243f6039c497bea53950c
+  WORKFLOW_OVERRIDE_SHA256: 1efa982478f21b0d3d4d3d1e08a8fefc123f9360d5593c50d674d18a1ebfa0a7
   RUSTUP_TOOLCHAIN: 1.94.0
 
 jobs:
   prepare:
     if: github.event.pull_request.head.ref == 'agent/epistemic-hardening-r6'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     outputs:
       patch_sha: ${{ steps.prepare.outputs.patch_sha }}
+      lock_sha: ${{ steps.prepare.outputs.lock_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,130 +42,205 @@ jobs:
           toolchain: 1.94.0
           components: rustfmt, clippy
 
-      - name: Derive exact-lock preparation script
+      - name: Prepare exact source patch and differential lock
+        id: prepare
         shell: bash
         run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
+          set -Eeuo pipefail
+          phase=initializing
+          evidence="$RUNNER_TEMP/evidence"
+          payload="$RUNNER_TEMP/epistemic-payload"
+          candidate="$RUNNER_TEMP/symthaea-candidate"
+          baseline="$RUNNER_TEMP/symthaea-baseline"
+          mkdir -p "$evidence" "$payload"
 
-          workflow = Path('.github/workflows/epistemic-bootstrap-v10.yml').read_text()
-          marker = '      - name: Derive v7 and bind the exact retained lockfile\n'
-          start = workflow.index(marker)
-          run_marker = '        run: |\n'
-          body_start = workflow.index(run_marker, start) + len(run_marker)
-          body_end = workflow.index('\n      - name: Run exact-lock guarded canonical gate', body_start)
-          lines = workflow[body_start:body_end].splitlines()
-          derive = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines) + '\n'
-          Path('/tmp/derive-v10.sh').write_text(derive)
-          PY
-          chmod 0755 /tmp/derive-v10.sh
-          /tmp/derive-v10.sh
+          publish_status() {
+            local state="$1"
+            local detail="${2:-}"
+            local status_file="$RUNNER_TEMP/STATUS"
+            cat > "$status_file" <<STATUS
+          state=$state
+          phase=$phase
+          detail=$detail
+          run_id=$GITHUB_RUN_ID
+          run_attempt=$GITHUB_RUN_ATTEMPT
+          trigger_sha=$SOURCE_SHA
+          reviewed_base=$REVIEWED_BASE
+          STATUS
+            local blob tree commit
+            blob="$(git hash-object -w "$status_file")"
+            tree="$(printf '100644 blob %s\tSTATUS\n' "$blob" | git mktree)"
+            commit="$(printf 'bootstrap v11 status: %s\n' "$state" | git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit-tree "$tree")"
+            git push --force origin "$commit:refs/heads/$STATUS_BRANCH"
+          }
 
-          python3 - <<'PY'
-          from pathlib import Path
-          import textwrap
+          fail_closed() {
+            local rc=$?
+            trap - ERR
+            publish_status failed "exit=$rc" || true
+            exit "$rc"
+          }
+          trap fail_closed ERR
+          publish_status running
 
-          path = Path('/tmp/epistemic-bootstrap-v5.sh')
-          script = path.read_text()
-          old = '.epistemic-bootstrap/epistemic-hardening.yml.override'
-          new = '.epistemic-bootstrap/epistemic-hardening-v11.yml.override'
-          if script.count(old) != 2:
-              raise SystemExit('permanent workflow override anchor count changed')
-          script = script.replace(old, new)
+          phase=provenance
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git merge-base HEAD "$REVIEWED_BASE")" = "$REVIEWED_BASE"
+          test -z "$(git status --porcelain)"
+          git diff --name-only "$REVIEWED_BASE"..HEAD \
+            | grep -Ev '^(\.github/workflows/epistemic-bootstrap(-v[0-9]+)?\.yml|\.epistemic-bootstrap/)' \
+            > "$RUNNER_TEMP/unexpected-bootstrap-paths.txt" || true
+          test ! -s "$RUNNER_TEMP/unexpected-bootstrap-paths.txt"
 
-          lock_start = script.index('phase=lockfile_resolution\n')
-          tests_anchor = 'run_logged tests cargo test --locked --all-targets --all-features'
-          lock_end = script.index(tests_anchor, lock_start)
-          lock_block = textwrap.dedent(r'''\
-          phase=lockfile_resolution
-          git -C "$worktree" show "$REVIEWED_BASE:Cargo.lock" > "$evidence/Cargo.lock.before"
-          cp "$evidence/Cargo.lock.before" "$worktree/Cargo.lock"
+          phase=payload
+          cat .epistemic-bootstrap/chunk-* | base64 --decode > "$RUNNER_TEMP/payload.tar.gz"
+          echo "$PAYLOAD_SHA256  $RUNNER_TEMP/payload.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/payload.tar.gz" -C "$payload"
+          (cd "$payload" && sha256sum --check --strict FILES.sha256)
+          rm "$payload/FILES.sha256"
+          echo "$WORKFLOW_OVERRIDE_SHA256  .epistemic-bootstrap/epistemic-hardening-v11.yml.override" | sha256sum --check --strict
 
-          python3 - "$worktree/Cargo.lock" <<'PYLOCK'
+          phase=materialization
+          git worktree add --detach "$candidate" "$REVIEWED_BASE"
+          cp -a "$payload/." "$candidate/"
+          install -m 0644 .epistemic-bootstrap/epistemic-hardening-v11.yml.override "$candidate/.github/workflows/epistemic-hardening.yml"
+          chmod 0755 "$candidate/scripts/check-epistemic-authority.py"
+          find "$payload" -type f -printf '%P\n' | sort > "$RUNNER_TEMP/expected-paths.txt"
+          git -C "$candidate" add -N .
+          git -C "$candidate" diff --name-only --diff-filter=ACMRTUXB | sort > "$RUNNER_TEMP/materialized-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-paths.txt" "$RUNNER_TEMP/materialized-paths.txt"
+          git -C "$candidate" reset
+          git -C "$candidate" diff --check
+
+          run_logged() {
+            local name="$1"
+            shift
+            phase="$name"
+            set +e
+            (cd "$candidate" && "$@") > "$evidence/$name.stdout" 2> "$evidence/$name.stderr"
+            local rc=$?
+            set -e
+            return "$rc"
+          }
+
+          run_logged authority python3 scripts/check-epistemic-authority.py
+          run_logged metadata cargo metadata --locked --no-deps --format-version 1
+          run_logged formatting cargo fmt \
+            -p symthaea-engineering \
+            -p symthaea-materials \
+            -p symthaea-nuclear \
+            -p symthaea-nuclear-forensics \
+            -p symthaea-process-discovery \
+            -p symthaea-quantum-chemistry \
+            -p symthaea-thermofluids
+          run_logged formatting_check cargo fmt \
+            -p symthaea-engineering \
+            -p symthaea-materials \
+            -p symthaea-nuclear \
+            -p symthaea-nuclear-forensics \
+            -p symthaea-process-discovery \
+            -p symthaea-quantum-chemistry \
+            -p symthaea-thermofluids \
+            -- --check
+
+          phase=formatting_scope
+          git -C "$candidate" add -N .
+          git -C "$candidate" diff --name-only --diff-filter=ACMRTUXB | sort > "$RUNNER_TEMP/formatted-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-paths.txt" "$RUNNER_TEMP/formatted-paths.txt"
+          git -C "$candidate" reset
+          git -C "$candidate" diff --check
+
+          phase=differential_lock
+          git worktree add --detach "$baseline" "$REVIEWED_BASE"
+          (cd "$baseline" && cargo metadata --format-version 1 > "$evidence/baseline-metadata.json" 2> "$evidence/baseline-metadata.stderr")
+          (cd "$candidate" && cargo metadata --format-version 1 > "$evidence/candidate-metadata.json" 2> "$evidence/candidate-metadata.stderr")
+          cp "$baseline/Cargo.lock" "$RUNNER_TEMP/Cargo.lock.baseline"
+          cp "$candidate/Cargo.lock" "$RUNNER_TEMP/Cargo.lock.candidate"
+
+          python3 - "$RUNNER_TEMP/Cargo.lock.baseline" "$RUNNER_TEMP/Cargo.lock.candidate" <<'PY'
           import sys
           import tomllib
           from pathlib import Path
 
-          path = Path(sys.argv[1])
-          before_text = path.read_text()
-          needle = ' "serde_json",\n "symthaea-acoustics",'
-          replacement = ' "serde_json",\n "sha2 0.10.9",\n "symthaea-acoustics",'
-          if before_text.count(needle) != 1:
-              raise SystemExit('engineering dependency insertion anchor was not found exactly once')
-          after_text = before_text.replace(needle, replacement, 1)
-          path.write_text(after_text)
+          baseline = tomllib.loads(Path(sys.argv[1]).read_text())
+          candidate = tomllib.loads(Path(sys.argv[2]).read_text())
 
-          before = tomllib.loads(before_text)
-          after = tomllib.loads(after_text)
-
-          def indexed(doc):
+          def indexed(document):
               return {
-                  (pkg['name'], pkg['version'], pkg.get('source')): pkg
-                  for pkg in doc.get('package', [])
+                  (package["name"], package["version"], package.get("source")): package
+                  for package in document.get("package", [])
               }
 
-          old = indexed(before)
-          new = indexed(after)
+          old = indexed(baseline)
+          new = indexed(candidate)
           if old.keys() != new.keys():
-              raise SystemExit('minimal lock edit changed the package identity set')
+              added = sorted(new.keys() - old.keys())
+              removed = sorted(old.keys() - new.keys())
+              raise SystemExit(
+                  f"candidate changed resolved package identities; added={added!r}, removed={removed!r}"
+              )
+
           changed = [key for key in old if old[key] != new[key]]
-          expected = ('symthaea-engineering', '0.1.0', None)
+          expected = ("symthaea-engineering", "0.1.0", None)
           if changed != [expected]:
-              raise SystemExit(f'minimal lock edit changed unexpected packages: {changed!r}')
-          old_pkg = dict(old[expected])
-          new_pkg = dict(new[expected])
-          old_deps = set(old_pkg.pop('dependencies', []))
-          new_deps = set(new_pkg.pop('dependencies', []))
-          if old_pkg != new_pkg:
-              raise SystemExit('minimal lock edit changed engineering metadata beyond dependencies')
-          if new_deps - old_deps != {'sha2 0.10.9'} or old_deps - new_deps:
-              raise SystemExit('minimal lock edit was not solely the sha2 0.10.9 dependency addition')
-          PYLOCK
+              raise SystemExit(f"unexpected resolved package changes: {changed!r}")
 
-          cp "$worktree/Cargo.lock" "$evidence/Cargo.lock.after"
-          git -C "$worktree" diff -- Cargo.lock > "$evidence/Cargo.lock.diff"
-          echo "$EXPECTED_LOCK_SHA256  $worktree/Cargo.lock" | sha256sum --check --strict
+          old_package = dict(old[expected])
+          new_package = dict(new[expected])
+          old_dependencies = set(old_package.pop("dependencies", []))
+          new_dependencies = set(new_package.pop("dependencies", []))
+          if old_package != new_package:
+              raise SystemExit("engineering lock metadata changed beyond dependencies")
+          additions = new_dependencies - old_dependencies
+          removals = old_dependencies - new_dependencies
+          if additions != {"sha2 0.10.9"} or removals:
+              raise SystemExit(
+                  f"unexpected engineering dependency delta: additions={additions!r}, removals={removals!r}"
+              )
+          PY
 
-          phase=lockfile_scope
-          { cat "$RUNNER_TEMP/expected-paths.txt"; echo Cargo.lock; } | sort -u > "$RUNNER_TEMP/expected-paths-with-lock.txt"
-          git -C "$worktree" add -N .
-          git -C "$worktree" diff --name-only --diff-filter=ACMRTUXB | sort > "$RUNNER_TEMP/post-lock-paths.txt"
-          diff -u "$RUNNER_TEMP/expected-paths-with-lock.txt" "$RUNNER_TEMP/post-lock-paths.txt"
-          git -C "$worktree" diff --check
-          git -C "$worktree" diff > "$evidence/canonical-with-lock.diff"
+          lock_sha="$(sha256sum "$RUNNER_TEMP/Cargo.lock.candidate" | awk '{print $1}')"
+          printf '%s  Cargo.lock.candidate\n' "$lock_sha" > "$evidence/LOCK_SHA256"
+          cp "$RUNNER_TEMP/Cargo.lock.baseline" "$evidence/Cargo.lock.baseline"
+          cp "$RUNNER_TEMP/Cargo.lock.candidate" "$evidence/Cargo.lock.candidate"
+          diff -u "$RUNNER_TEMP/Cargo.lock.baseline" "$RUNNER_TEMP/Cargo.lock.candidate" > "$evidence/Cargo.lock.diff" || true
 
+          phase=locked_candidate
+          cp "$RUNNER_TEMP/Cargo.lock.candidate" "$candidate/Cargo.lock"
           run_logged locked_resolution cargo metadata --locked --format-version 1
+          git -C "$candidate" show "$REVIEWED_BASE:Cargo.lock" > "$candidate/Cargo.lock"
 
-          ''')
-          script = script[:lock_start] + lock_block + script[lock_end:]
-
-          tests = script.index(tests_anchor)
-          tail = textwrap.dedent(r'''\
           phase=patch
-          git -C "$worktree" diff --binary > "$RUNNER_TEMP/canonical.patch"
+          git -C "$candidate" add -N .
+          git -C "$candidate" diff --name-only --diff-filter=ACMRTUXB | sort > "$RUNNER_TEMP/final-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-paths.txt" "$RUNNER_TEMP/final-paths.txt"
+          git -C "$candidate" reset
+          git -C "$candidate" diff --check
+          git -C "$candidate" diff --binary > "$RUNNER_TEMP/canonical.patch"
           test -s "$RUNNER_TEMP/canonical.patch"
           patch_sha="$(sha256sum "$RUNNER_TEMP/canonical.patch" | awk '{print $1}')"
           cp "$RUNNER_TEMP/canonical.patch" "$evidence/canonical.patch"
           printf '%s  canonical.patch\n' "$patch_sha" > "$evidence/PATCH_SHA256"
           echo "patch_sha=$patch_sha" >> "$GITHUB_OUTPUT"
-          publish_status prepared "patch_sha=$patch_sha"
+          echo "lock_sha=$lock_sha" >> "$GITHUB_OUTPUT"
+          publish_status prepared "patch_sha=$patch_sha lock_sha=$lock_sha"
           trap - ERR
-          ''')
-          path.write_text(script[:tests] + tail)
-          PY
-          bash -n /tmp/epistemic-bootstrap-v5.sh
-
-      - name: Prepare exact canonical patch
-        id: prepare
-        shell: bash
-        run: /tmp/epistemic-bootstrap-v5.sh
 
       - name: Upload canonical patch
         uses: actions/upload-artifact@v4
         with:
           name: epistemic-hardening-canonical-patch
           path: ${{ runner.temp }}/canonical.patch
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload validation lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: epistemic-hardening-validation-lock
+          path: |
+            ${{ runner.temp }}/Cargo.lock.candidate
+            ${{ runner.temp }}/Cargo.lock.baseline
           if-no-files-found: error
           retention-days: 90
 
@@ -205,13 +280,20 @@ jobs:
           name: epistemic-hardening-canonical-patch
           path: ${{ runner.temp }}/patch
 
-      - name: Verify and apply exact patch
+      - uses: actions/download-artifact@v4
+        with:
+          name: epistemic-hardening-validation-lock
+          path: ${{ runner.temp }}/lock
+
+      - name: Verify and install exact candidate
         shell: bash
         run: |
           set -euo pipefail
           echo "${{ needs.prepare.outputs.patch_sha }}  $RUNNER_TEMP/patch/canonical.patch" | sha256sum --check --strict
+          echo "${{ needs.prepare.outputs.lock_sha }}  $RUNNER_TEMP/lock/Cargo.lock.candidate" | sha256sum --check --strict
           git apply --check "$RUNNER_TEMP/patch/canonical.patch"
           git apply "$RUNNER_TEMP/patch/canonical.patch"
+          cp "$RUNNER_TEMP/lock/Cargo.lock.candidate" Cargo.lock
           git diff --check
 
       - name: Install pinned Rust toolchain
@@ -265,13 +347,20 @@ jobs:
           name: epistemic-hardening-canonical-patch
           path: ${{ runner.temp }}/patch
 
-      - name: Verify and apply exact patch
+      - uses: actions/download-artifact@v4
+        with:
+          name: epistemic-hardening-validation-lock
+          path: ${{ runner.temp }}/lock
+
+      - name: Verify and install exact candidate
         shell: bash
         run: |
           set -euo pipefail
           echo "${{ needs.prepare.outputs.patch_sha }}  $RUNNER_TEMP/patch/canonical.patch" | sha256sum --check --strict
+          echo "${{ needs.prepare.outputs.lock_sha }}  $RUNNER_TEMP/lock/Cargo.lock.candidate" | sha256sum --check --strict
           git apply --check "$RUNNER_TEMP/patch/canonical.patch"
           git apply "$RUNNER_TEMP/patch/canonical.patch"
+          cp "$RUNNER_TEMP/lock/Cargo.lock.candidate" Cargo.lock
           git diff --check
 
       - name: Install pinned Rust toolchain
@@ -356,6 +445,7 @@ jobs:
           trigger_sha=$SOURCE_SHA
           reviewed_base=$REVIEWED_BASE
           patch_sha=${{ needs.prepare.outputs.patch_sha }}
+          lock_sha=${{ needs.prepare.outputs.lock_sha }}
           STATUS
           blob="$(git hash-object -w "$status_file")"
           tree="$(printf '100644 blob %s\tSTATUS\n' "$blob" | git mktree)"
