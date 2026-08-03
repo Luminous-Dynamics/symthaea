@@ -1,3 +1,0 @@
-source=dff2cbcb8a27205bcbe6906a068a89ef84c7c591
-failure=discovery::tests::test_discovery_with_reference_nuclei
-expected_region=Z80-84,N124-128

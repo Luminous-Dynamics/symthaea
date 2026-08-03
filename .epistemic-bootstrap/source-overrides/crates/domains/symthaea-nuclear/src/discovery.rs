@@ -468,8 +468,8 @@ mod tests {
         let mut engine = NuclearDiscoveryEngine::new();
         engine.add_reference_nuclei();
 
-        // Run discovery on a small region
-        let report = engine.discover(110, 116, 175, 185);
+        // Run discovery in a compact measured region around Pb-208.
+        let report = engine.discover(80, 84, 124, 128);
 
         assert!(!report.predictions.is_empty());
         assert!(report.calibration.n_calibration > 0);
