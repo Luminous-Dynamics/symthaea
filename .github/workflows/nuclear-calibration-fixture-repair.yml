@@ -11,21 +11,28 @@ permissions:
 
 jobs:
   repair:
-    if: >-
-      github.event.pull_request.head.ref == 'agent/nuclear-calibration-fixture' &&
-      github.event.pull_request.head.sha == 'dff2cbcb8a27205bcbe6906a068a89ef84c7c591'
+    if: github.event.pull_request.head.ref == 'agent/nuclear-calibration-fixture'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      TARGET_BRANCH: agent/nuclear-calibration-fixture
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: dff2cbcb8a27205bcbe6906a068a89ef84c7c591
+          ref: ${{ env.SOURCE_SHA }}
 
       - name: Apply anchored measured-region correction
         shell: bash
         run: |
           set -euo pipefail
+          trigger=.epistemic-bootstrap/NUCLEAR_FIXTURE_REPAIR_READY
+          if [[ ! -f "$trigger" ]]; then
+            echo "repair trigger already consumed"
+            exit 0
+          fi
+
           source_path=.epistemic-bootstrap/source-overrides/crates/domains/symthaea-nuclear/src/discovery.rs
           manifest=.epistemic-bootstrap/source-overrides/SHA256SUMS
 
@@ -57,15 +64,16 @@ jobs:
           print(f'overlay_sha256={digest}')
           PY
 
+          rm "$trigger"
           (cd .epistemic-bootstrap/source-overrides && sha256sum --check --strict SHA256SUMS)
           git diff --check
           git diff --exit-code -- .github/workflows/nuclear-calibration-fixture-repair.yml
-          test "$(git diff --name-only | sort)" = $'.epistemic-bootstrap/source-overrides/SHA256SUMS\n.epistemic-bootstrap/source-overrides/crates/domains/symthaea-nuclear/src/discovery.rs'
+          test "$(git diff --name-only | sort)" = $'.epistemic-bootstrap/NUCLEAR_FIXTURE_REPAIR_READY\n.epistemic-bootstrap/source-overrides/SHA256SUMS\n.epistemic-bootstrap/source-overrides/crates/domains/symthaea-nuclear/src/discovery.rs'
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .epistemic-bootstrap/source-overrides/SHA256SUMS "$source_path"
+          git add -A "$trigger" "$manifest" "$source_path"
           git commit -m "test(nuclear): calibrate against a measured region"
           git push \
-            --force-with-lease="refs/heads/agent/nuclear-calibration-fixture:dff2cbcb8a27205bcbe6906a068a89ef84c7c591" \
-            origin HEAD:refs/heads/agent/nuclear-calibration-fixture
+            --force-with-lease="refs/heads/$TARGET_BRANCH:$SOURCE_SHA" \
+            origin "HEAD:refs/heads/$TARGET_BRANCH"
