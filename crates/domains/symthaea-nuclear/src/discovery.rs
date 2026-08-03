@@ -18,6 +18,13 @@ use crate::mass_formula::SemiEmpiricalMassFormula;
 use crate::shell_model::ShellModel;
 use serde::{Deserialize, Serialize};
 
+const MIN_SIGMA_MEV: f64 = 1.0;
+const NO_CALIBRATION_SIGMA_MEV: f64 = 30.0;
+const LOCAL_Z_SCALE: f64 = 10.0;
+const LOCAL_N_SCALE: f64 = 15.0;
+const LOCAL_PRIOR_EFFECTIVE_SAMPLES: f64 = 4.0;
+const EXTRAPOLATION_GROWTH: f64 = 0.5;
+
 /// A known nuclear binding energy (from AME2020 or experiment).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MeasuredNucleus {
@@ -44,7 +51,11 @@ pub struct PredictionWithUncertainty {
     pub measured_be: Option<f64>,
     /// Residual: measured - predicted (MeV), if measured
     pub residual: Option<f64>,
-    /// Model uncertainty σ (MeV) — estimated from local residual variance
+    /// Model uncertainty σ (MeV).
+    ///
+    /// This combines observed residual scale, local calibration sparsity, and
+    /// distance beyond measured evidence. It is an empirical screening
+    /// uncertainty, not a calibrated posterior standard deviation.
     pub sigma: f64,
     /// Anomaly score: |residual|/σ (only if measured)
     pub anomaly_score: Option<f64>,
@@ -139,17 +150,16 @@ impl NuclearDiscoveryEngine {
         let shell_corr = self.shell.shell_correction_energy(a, z);
         let total = predicted_be + shell_corr;
 
-        // Find measured value if available
-        let measured = self.known_nuclei.iter().find(|m| m.z == z && m.n == n);
+        let measured = self
+            .known_nuclei
+            .iter()
+            .find(|m| m.is_measured && m.z == z && m.n == n);
         let measured_be = measured.map(|m| m.binding_energy_mev);
         let residual = measured_be.map(|m| m - total);
 
-        // Estimate local uncertainty from nearby known nuclei residuals
         let sigma = self.estimate_local_sigma(z, n);
-
         let anomaly_score = residual.map(|r| r.abs() / sigma.max(0.1));
 
-        // Discovery interest: high when uncertain AND shell-enhanced AND unmeasured
         let unmeasured_bonus = if measured_be.is_none() { 1.0 } else { 0.3 };
         let shell_bonus = if shell_corr < -3.0 {
             (-shell_corr / 10.0).min(1.0)
@@ -175,39 +185,87 @@ impl NuclearDiscoveryEngine {
         }
     }
 
-    /// Estimate model uncertainty at (Z, N) from nearby calibration data.
+    fn model_residual(&self, nucleus: &MeasuredNucleus) -> f64 {
+        let a = nucleus.z + nucleus.n;
+        let predicted = self.semf.binding_energy(a, nucleus.z)
+            + self.shell.shell_correction_energy(a, nucleus.z);
+        nucleus.binding_energy_mev - predicted
+    }
+
+    fn normalized_distance(z: u16, n: u16, nucleus: &MeasuredNucleus) -> f64 {
+        let dz = (nucleus.z as f64 - z as f64) / LOCAL_Z_SCALE;
+        let dn = (nucleus.n as f64 - n as f64) / LOCAL_N_SCALE;
+        dz.hypot(dn)
+    }
+
+    /// Estimate screening uncertainty at (Z, N) from measured calibration data.
+    ///
+    /// The estimate combines an observed global residual floor, a
+    /// distance-weighted local residual scale with finite-sample shrinkage,
+    /// and a nearest-evidence extrapolation penalty. Extrapolated reference
+    /// entries are excluded because a model prediction cannot calibrate that
+    /// same model's epistemic uncertainty.
     fn estimate_local_sigma(&self, z: u16, n: u16) -> f64 {
-        // Collect residuals from nearby known nuclei (within ΔZ=10, ΔN=15)
-        let nearby_residuals: Vec<f64> = self
+        let measured: Vec<_> = self
             .known_nuclei
             .iter()
-            .filter(|m| {
-                let dz = (m.z as i32 - z as i32).unsigned_abs();
-                let dn = (m.n as i32 - n as i32).unsigned_abs();
-                dz <= 10 && dn <= 15
-            })
-            .filter_map(|m| {
-                let a = m.z + m.n;
-                let pred =
-                    self.semf.binding_energy(a, m.z) + self.shell.shell_correction_energy(a, m.z);
-                Some(m.binding_energy_mev - pred)
-            })
+            .filter(|nucleus| nucleus.is_measured)
             .collect();
 
-        if nearby_residuals.is_empty() {
-            // No nearby data — high uncertainty (extrapolation region)
-            return 15.0;
+        if measured.is_empty() {
+            return NO_CALIBRATION_SIGMA_MEV;
         }
 
-        // RMS of nearby residuals
-        let mean: f64 = nearby_residuals.iter().sum::<f64>() / nearby_residuals.len() as f64;
-        let variance: f64 = nearby_residuals
+        let residuals: Vec<_> = measured
             .iter()
-            .map(|r| (r - mean).powi(2))
-            .sum::<f64>()
-            / nearby_residuals.len() as f64;
+            .map(|nucleus| self.model_residual(nucleus))
+            .collect();
+        let global_rms = (residuals.iter().map(|r| r * r).sum::<f64>()
+            / residuals.len() as f64)
+            .sqrt()
+            .max(MIN_SIGMA_MEV);
 
-        variance.sqrt().max(1.0) // Minimum 1 MeV uncertainty
+        let mut weight_sum = 0.0;
+        let mut weight_sq_sum = 0.0;
+        let mut weighted_residual_sum = 0.0;
+        let mut weighted_residual_sq_sum = 0.0;
+        let mut nearest_distance = f64::INFINITY;
+
+        for (nucleus, residual) in measured.iter().zip(residuals.iter()) {
+            let distance = Self::normalized_distance(z, n, nucleus);
+            nearest_distance = nearest_distance.min(distance);
+            let weight = (-0.5 * distance * distance).exp();
+            weight_sum += weight;
+            weight_sq_sum += weight * weight;
+            weighted_residual_sum += weight * residual;
+            weighted_residual_sq_sum += weight * residual * residual;
+        }
+
+        let effective_samples = if weight_sq_sum > f64::EPSILON {
+            weight_sum * weight_sum / weight_sq_sum
+        } else {
+            0.0
+        };
+
+        let local_variance = if weight_sum > f64::EPSILON {
+            let mean = weighted_residual_sum / weight_sum;
+            (weighted_residual_sq_sum / weight_sum - mean * mean).max(0.0)
+        } else {
+            global_rms * global_rms
+        };
+
+        let local_authority = effective_samples
+            / (effective_samples + LOCAL_PRIOR_EFFECTIVE_SAMPLES);
+        let residual_variance = local_authority * local_variance
+            + (1.0 - local_authority) * global_rms * global_rms;
+        let sparsity_variance = global_rms * global_rms
+            / (effective_samples + 1.0);
+        let outside_distance = (nearest_distance - 1.0).max(0.0);
+        let extrapolation_sigma = global_rms * EXTRAPOLATION_GROWTH * outside_distance;
+
+        (residual_variance + sparsity_variance + extrapolation_sigma.powi(2))
+            .sqrt()
+            .max(MIN_SIGMA_MEV)
     }
 
     /// Run the full discovery analysis on a region of the nuclear chart.
@@ -218,7 +276,6 @@ impl NuclearDiscoveryEngine {
         n_min: u16,
         n_max: u16,
     ) -> NuclearDiscoveryReport {
-        // Generate all predictions
         let mut predictions = Vec::new();
         for z in z_min..=z_max {
             for n in n_min..=n_max {
@@ -226,7 +283,6 @@ impl NuclearDiscoveryEngine {
             }
         }
 
-        // Calibration statistics
         let calibrated: Vec<_> = predictions
             .iter()
             .filter(|p| p.residual.is_some())
@@ -269,7 +325,6 @@ impl NuclearDiscoveryEngine {
             fraction_within_1sigma: within_1sigma,
         };
 
-        // Find discovery candidates (top-20 by interest score)
         let mut candidates: Vec<DiscoveryCandidate> = predictions
             .iter()
             .filter(|p| p.discovery_interest > 0.5)
@@ -366,12 +421,15 @@ impl Default for NuclearDiscoveryEngine {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_discovery_with_reference_nuclei() {
+    fn reference_engine() -> NuclearDiscoveryEngine {
         let mut engine = NuclearDiscoveryEngine::new();
         engine.add_reference_nuclei();
+        engine
+    }
 
-        // Run discovery on a small region
+    #[test]
+    fn test_discovery_with_reference_nuclei() {
+        let engine = reference_engine();
         let report = engine.discover(110, 116, 175, 185);
 
         assert!(!report.predictions.is_empty());
@@ -381,27 +439,12 @@ mod tests {
 
     #[test]
     fn test_uncertainty_varies_with_data_density() {
-        let mut engine = NuclearDiscoveryEngine::new();
-        engine.add_reference_nuclei();
-
-        // Near Pb-208 — dense data region (many nearby calibration nuclei)
+        let engine = reference_engine();
         let near = engine.predict(82, 126);
-        // Far from any data (Z=130, N=220) — well beyond synthesized elements
         let far = engine.predict(130, 220);
 
-        // Both should have finite, positive uncertainty
-        assert!(
-            near.sigma > 0.0 && near.sigma.is_finite(),
-            "Near σ={}",
-            near.sigma
-        );
-        assert!(
-            far.sigma > 0.0 && far.sigma.is_finite(),
-            "Far σ={}",
-            far.sigma
-        );
-
-        // The well-measured region should have lower uncertainty than extrapolation
+        assert!(near.sigma > 0.0 && near.sigma.is_finite(), "Near σ={}", near.sigma);
+        assert!(far.sigma > 0.0 && far.sigma.is_finite(), "Far σ={}", far.sigma);
         assert!(
             far.sigma >= near.sigma,
             "Far-from-data σ ({}) should be >= near-data σ ({})",
@@ -411,13 +454,69 @@ mod tests {
     }
 
     #[test]
-    fn test_discovery_candidates_sorted() {
-        let mut engine = NuclearDiscoveryEngine::new();
-        engine.add_reference_nuclei();
+    fn test_uncertainty_grows_across_extrapolation() {
+        let engine = reference_engine();
+        let boundary = engine.predict(118, 176);
+        let moderate = engine.predict(124, 198);
+        let far = engine.predict(130, 220);
 
+        assert!(moderate.sigma >= boundary.sigma);
+        assert!(far.sigma >= moderate.sigma);
+    }
+
+    #[test]
+    fn test_uncertainty_is_calibration_order_invariant() {
+        let forward = crate::ame2020::ame2020_reference_nuclei();
+        let mut reverse = forward.clone();
+        reverse.reverse();
+
+        let mut forward_engine = NuclearDiscoveryEngine::new();
+        forward_engine.add_known_nuclei(forward);
+        let mut reverse_engine = NuclearDiscoveryEngine::new();
+        reverse_engine.add_known_nuclei(reverse);
+
+        for (z, n) in [(82, 126), (118, 176), (130, 220)] {
+            let forward_sigma = forward_engine.predict(z, n).sigma;
+            let reverse_sigma = reverse_engine.predict(z, n).sigma;
+            assert!(
+                (forward_sigma - reverse_sigma).abs() < 1e-10,
+                "Order changed σ at ({z}, {n}): {forward_sigma} vs {reverse_sigma}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_extrapolated_entries_do_not_self_calibrate() {
+        let engine = reference_engine();
+        let target = (130, 220);
+        let baseline = engine.predict(target.0, target.1).sigma;
+        let predicted = engine.semf.binding_energy(target.0 + target.1, target.0)
+            + engine
+                .shell
+                .shell_correction_energy(target.0 + target.1, target.0);
+        let mut augmented = engine;
+        augmented.add_known_nuclei(vec![MeasuredNucleus {
+            z: target.0,
+            n: target.1,
+            binding_energy_mev: predicted,
+            is_measured: false,
+        }]);
+
+        assert_eq!(augmented.predict(target.0, target.1).sigma, baseline);
+        assert!(augmented.predict(target.0, target.1).measured_be.is_none());
+    }
+
+    #[test]
+    fn test_no_calibration_fails_conservatively() {
+        let engine = NuclearDiscoveryEngine::new();
+        assert_eq!(engine.predict(82, 126).sigma, NO_CALIBRATION_SIGMA_MEV);
+    }
+
+    #[test]
+    fn test_discovery_candidates_sorted() {
+        let engine = reference_engine();
         let report = engine.discover(110, 120, 170, 190);
 
-        // Candidates should be sorted by interest (descending)
         for i in 1..report.candidates.len() {
             assert!(
                 report.candidates[i - 1].interest_score >= report.candidates[i].interest_score,
@@ -431,12 +530,8 @@ mod tests {
 
     #[test]
     fn test_unmeasured_isotopes_have_higher_interest() {
-        let mut engine = NuclearDiscoveryEngine::new();
-        engine.add_reference_nuclei();
-
-        // Pb-208 is measured → lower discovery interest
+        let engine = reference_engine();
         let pb208 = engine.predict(82, 126);
-        // Element 120, N=184 is unmeasured → higher interest
         let e120 = engine.predict(120, 184);
 
         assert!(
@@ -449,10 +544,7 @@ mod tests {
 
     #[test]
     fn test_calibration_statistics() {
-        let mut engine = NuclearDiscoveryEngine::new();
-        engine.add_reference_nuclei();
-
-        // Use a focused region near heavy nuclei where SEMF is most accurate
+        let engine = reference_engine();
         let report = engine.discover(75, 95, 110, 155);
 
         assert!(
@@ -460,8 +552,6 @@ mod tests {
             "Should calibrate against at least 2 nuclei, got {}",
             report.calibration.n_calibration
         );
-
-        // RMS should be finite and positive
         assert!(
             report.calibration.rms_residual > 0.0 && report.calibration.rms_residual.is_finite(),
             "RMS residual should be positive and finite: {}",
