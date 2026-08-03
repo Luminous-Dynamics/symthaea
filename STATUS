@@ -1,0 +1,7 @@
+state=prepared
+phase=patch
+detail=patch_sha=d7ad75052e4743dffe653f6cbeeea4795a8bece878b4c2195be0bb8aa493aa10 lock_sha=85be8e76cd819452b02ddcf0f0f79bf56ca11ad8568d00885d41a255a68b402d
+run_id=30805669265
+run_attempt=1
+trigger_sha=735248c2ced6de4cbc43ac9e48a918f24a756e6d
+reviewed_base=f9c68947fa77fd6e29c4d2e87293715122f53cbf
