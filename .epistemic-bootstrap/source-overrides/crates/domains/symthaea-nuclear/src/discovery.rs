@@ -27,6 +27,13 @@ const MIN_SIGMA_MEV: f64 = 1.0;
 const UNCALIBRATED_SIGMA_MEV: f64 = 15.0;
 const MIN_WEIGHT_SUM: f64 = 1.0e-12;
 
+#[derive(Debug, Clone, Copy)]
+struct CalibrationResidual {
+    z: u16,
+    n: u16,
+    residual_mev: f64,
+}
+
 /// A known nuclear binding energy (from AME2020 or experiment).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MeasuredNucleus {
@@ -115,6 +122,7 @@ pub struct NuclearDiscoveryEngine {
     semf: SemiEmpiricalMassFormula,
     shell: ShellModel,
     known_nuclei: Vec<MeasuredNucleus>,
+    calibration_residuals: Vec<CalibrationResidual>,
 }
 
 impl NuclearDiscoveryEngine {
@@ -124,11 +132,25 @@ impl NuclearDiscoveryEngine {
             semf: SemiEmpiricalMassFormula::default(),
             shell: ShellModel::default(),
             known_nuclei: Vec::new(),
+            calibration_residuals: Vec::new(),
         }
     }
 
     /// Add known binding energies for calibration.
     pub fn add_known_nuclei(&mut self, nuclei: Vec<MeasuredNucleus>) {
+        for nucleus in nuclei.iter().filter(|nucleus| nucleus.is_measured) {
+            let a = nucleus.z + nucleus.n;
+            let prediction = self.semf.binding_energy(a, nucleus.z)
+                + self.shell.shell_correction_energy(a, nucleus.z);
+            let residual_mev = nucleus.binding_energy_mev - prediction;
+            if residual_mev.is_finite() {
+                self.calibration_residuals.push(CalibrationResidual {
+                    z: nucleus.z,
+                    n: nucleus.n,
+                    residual_mev,
+                });
+            }
+        }
         self.known_nuclei.extend(nuclei);
     }
 
@@ -198,28 +220,22 @@ impl NuclearDiscoveryEngine {
     /// - an extrapolation penalty that grows monotonically with distance to the
     ///   nearest measured nucleus.
     ///
+    /// Measured residuals are cached when calibration data are added. This keeps
+    /// large discovery sweeps linear in the number of predictions instead of
+    /// repeatedly solving the shell model for every calibration nucleus.
     /// Extrapolated reference values never calibrate the estimator. If no measured
     /// calibration data exist at all, the result is the explicit uncalibrated prior
     /// `UNCALIBRATED_SIGMA_MEV` rather than a claim inferred from absent evidence.
     fn estimate_local_sigma(&self, z: u16, n: u16) -> f64 {
         let residuals: Vec<(f64, f64)> = self
-            .known_nuclei
+            .calibration_residuals
             .iter()
-            .filter(|m| m.is_measured)
-            .filter(|m| m.z != z || m.n != n)
-            .filter_map(|m| {
-                let a = m.z + m.n;
-                let prediction = self.semf.binding_energy(a, m.z)
-                    + self.shell.shell_correction_energy(a, m.z);
-                let residual = m.binding_energy_mev - prediction;
-                if !residual.is_finite() {
-                    return None;
-                }
-
-                let dz = f64::from(m.z.abs_diff(z)) / Z_CORRELATION_LENGTH;
-                let dn = f64::from(m.n.abs_diff(n)) / N_CORRELATION_LENGTH;
+            .filter(|point| point.z != z || point.n != n)
+            .map(|point| {
+                let dz = f64::from(point.z.abs_diff(z)) / Z_CORRELATION_LENGTH;
+                let dn = f64::from(point.n.abs_diff(n)) / N_CORRELATION_LENGTH;
                 let scaled_distance = (dz.mul_add(dz, dn * dn)).sqrt();
-                Some((residual, scaled_distance))
+                (point.residual_mev, scaled_distance)
             })
             .collect();
 
@@ -529,6 +545,16 @@ mod tests {
         let engine = NuclearDiscoveryEngine::new();
         let prediction = engine.predict(82, 126);
         assert_eq!(prediction.sigma, UNCALIBRATED_SIGMA_MEV);
+    }
+
+    #[test]
+    fn test_cached_residual_count_tracks_measured_inputs() {
+        let mut engine = NuclearDiscoveryEngine::new();
+        let measured = synthetic_measurement(&engine, 82, 126, 2.0, true);
+        let extrapolated = synthetic_measurement(&engine, 130, 220, 0.0, false);
+        engine.add_known_nuclei(vec![measured, extrapolated]);
+
+        assert_eq!(engine.calibration_residuals.len(), 1);
     }
 
     #[test]
