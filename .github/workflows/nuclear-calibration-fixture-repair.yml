@@ -1,6 +1,9 @@
 name: Nuclear calibration fixture repair
 
 on:
+  push:
+    branches:
+      - agent/nuclear-calibration-fixture
   pull_request:
     branches:
       - main
@@ -9,13 +12,19 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: nuclear-calibration-fixture-repair
+  cancel-in-progress: true
+
 jobs:
   repair:
-    if: github.event.pull_request.head.ref == 'agent/nuclear-calibration-fixture'
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/agent/nuclear-calibration-fixture') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'agent/nuclear-calibration-fixture')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       TARGET_BRANCH: agent/nuclear-calibration-fixture
     steps:
       - uses: actions/checkout@v4
