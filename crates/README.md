@@ -1,56 +1,53 @@
 # Crates
 
-Sub-crates for specific functionality.
+Sub-crates for specific functionality, organised by tier:
 
-## sophia-gym
+- `core/` — substrate and shared contracts
+- `domains/` — domain-specific capability crates
+- `bridges/` — integration boundaries to external tools
 
-Reinforcement learning environment for training consciousness-aware agents.
+## There is deliberately no crate list here
 
-```rust
-// Usage
-use sophia_gym::SophiaEnv;
+An earlier version of this file hand-documented two crates, `sophia-gym` and
+`symthaea-gym`, with usage examples and `cargo build -p …` instructions. **Neither exists
+in this workspace.** They were removed at some point and this file was never updated, so
+its build commands had been wrong long enough that nobody noticed — the predictable fate
+of any hand-maintained list of 200+ packages.
 
-let env = SophiaEnv::new();
-let obs = env.reset();
-let (next_obs, reward, done) = env.step(action);
-```
-
-## symthaea-gym
-
-Consciousness training environment - OpenAI Gym-compatible interface for training agents that interact with the consciousness system.
-
-```rust
-// Usage
-use symthaea_gym::SymthaeaEnv;
-
-let env = SymthaeaEnv::new(config);
-// Train with any RL algorithm
-```
-
-## Building
+The inventory is therefore **generated**, never written down:
 
 ```bash
-# Build all crates
-cargo build -p sophia-gym -p symthaea-gym
-
-# Run tests
-cargo test -p sophia-gym
-cargo test -p symthaea-gym
+cargo xtask crate-status --report     # full inventory, derived from `cargo metadata`
+cargo xtask crate-status              # integrity check + classification coverage
 ```
 
-## Engineering Crates
+## A crate's existence does not imply endorsement
 
-The engineering track is intentionally split into lightweight crates that keep
-external CAD/solver dependencies out of default builds:
+The generated inventory is joined with `docs/crate-status.toml`, a registry of the
+judgements that cannot be derived from code: lifecycle, evidence level (E0–E5), what that
+evidence actually rests on, the commit it was last confirmed at, safety criticality, and
+whether the crate may appear on a production path.
 
-- `symthaea-sim-bridge`: normalized simulation request/result types and backend
-  traits for FEA, CFD, multibody, circuit, and process tools.
-- `symthaea-digital-twin`: engineered asset telemetry, health, and free-energy
-  trend tracking.
-- `symthaea-formal-safety`: safety cases, proof obligations, and evidence
-  records.
-- `symthaea-engineering`: facade tying requirements, concepts, simulations,
-  twins, and safety gates together.
+Most crates are currently **unclassified**, and the tooling prints that count on every run
+rather than hiding it. Unclassified means nobody has assessed the crate — a different and
+more useful statement than a confident-looking label nobody earned. Do not read a crate's
+presence in this directory as a claim that it is current, validated, or safe to depend on.
+
+See `xtask/src/crate_status.rs` for the schema and the integrity rules it enforces.
+
+## Engineering crates
+
+The engineering track is intentionally split into lightweight crates that keep external
+CAD/solver dependencies out of default builds. All eight were verified present at the time
+of writing; check the generated inventory rather than trusting this list if it matters.
+
+- `symthaea-sim-bridge`: normalized simulation request/result types and backend traits for
+  FEA, CFD, multibody, circuit, and process tools.
+- `symthaea-digital-twin`: engineered asset telemetry, health, and free-energy trend
+  tracking.
+- `symthaea-formal-safety`: safety cases, proof obligations, and evidence records.
+- `symthaea-engineering`: facade tying requirements, concepts, simulations, twins, and
+  safety gates together.
 - `symthaea-mujoco-bridge`: dry-run generic MuJoCo backend boundary.
 - `symthaea-opensees-bridge`: dry-run OpenSees structural backend boundary.
 - `symthaea-ngspice-bridge`: dry-run ngspice circuit backend boundary.

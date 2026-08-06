@@ -23,26 +23,39 @@
 //!
 //! Neither claim is about consciousness or Φ — see the plan doc's Non-goals.
 
+pub mod agent_id;
 pub mod coalition;
 pub mod earth_forcing;
+pub mod encounter;
 pub mod environment;
+pub mod events;
 pub mod genome;
 pub mod hierarchy;
+pub mod ledger;
+pub mod ma001;
+pub mod ma001l;
+pub mod ma001r;
 pub mod metabolism;
 pub mod organism;
 pub mod population;
 pub mod predator_prey;
 pub mod types;
 
+pub use agent_id::{AgentId, AgentIdAllocator};
 pub use coalition::{Coalition, detect_coalitions, detect_paying_coalitions};
 pub use earth_forcing::EarthForcedEnvironment;
+pub use encounter::{EncounterScheduler, PairingMode};
 pub use environment::Environment;
+pub use events::GenesisEvent;
 pub use genome::Genome;
 pub use hierarchy::HierarchicalStack;
+pub use ledger::{InteractionRecord, compress_for_observation};
 pub use metabolism::{
     K_ALIFE_BOLTZMANN, landauer_minimum, prigogine_dissipation_cost, shannon_entropy_bits,
 };
-pub use organism::{Action, Organism, OrganismConfig, OrganismTick};
-pub use population::{InheritanceMode, Population, PopulationConfig, StepSummary};
+pub use organism::{Action, Organism, OrganismConfig, OrganismTick, PendingSocialLearning};
+pub use population::{
+    InheritanceMode, Population, PopulationConfig, StepSummary, resolve_pair_transfer,
+};
 pub use predator_prey::{PredatorPreyConfig, PredatorPreySim, PredatorPreyStep};
 pub use types::BoundaryModulators;

@@ -549,6 +549,22 @@ impl CodingAgent {
                 if let Some(ref result) = effective_result {
                     self.record_generation_outcome(result.success);
 
+                    // Consume the pending gate/confidence state captured when this
+                    // attempt was decided (Generating/Fixing phase), not whatever
+                    // the current (Testing-phase) cycle's state happens to be.
+                    // Record nothing if no gate was ever evaluated for the attempt
+                    // -- "no gate ran" must never be recorded as "gate passed".
+                    #[cfg(feature = "reasoning_engine")]
+                    if let Some(pending) = self.pending_reasoning_outcome.take() {
+                        if pending.gate_evaluated {
+                            self.cognitive_loop.record_reasoning_posthoc(
+                                pending.gate_passed,
+                                result.success,
+                                pending.prediction_error_at_decision,
+                            );
+                        }
+                    }
+
                     if result.success {
                         self.tests_passed = Some(true);
                         self.phase = TaskPhase::Done;

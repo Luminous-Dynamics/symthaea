@@ -703,7 +703,18 @@ pub struct LiquidMambaGenerator {
     /// Phase 3: Learned prediction head for next-chunk thought vector.
     pub chunk_predictor: Option<ChunkPredictor>,
     /// Phase 4: Long-term memory bridge (HDC Store integration).
-    pub memory_bridge: Option<MemoryBridge>,
+    ///
+    /// `Arc<Mutex<_>>`, not a bare `MemoryBridge`: `MemoryBridge` is
+    /// deliberately not `Clone` (see its doc comment -- `HdcStore` is a
+    /// zero-copy mmap with an exclusive advisory file lock, so duplicating
+    /// the handle would violate the store's single-writer invariant).
+    /// `debate_parallel` clones the whole generator per debate branch
+    /// (`gen_clone.clone()` below), so every clone needs to share the SAME
+    /// underlying store -- the mutex serializes the few `&mut self`
+    /// `remember()` calls across those branches instead of duplicating the
+    /// store itself. Same pattern already used by `betti_history`/
+    /// `workspace_handle` on this struct.
+    pub memory_bridge: Option<Arc<Mutex<MemoryBridge>>>,
     /// Phase 4: Active Inference agent for FEP-driven generation.
     pub fep_agent: Option<ActiveInferenceAgent>,
     /// Epistemic gate for logit adjustment.
@@ -968,6 +979,8 @@ impl LiquidMambaGenerator {
                     eos_terminated: false,
                     veto_triggered: false,
                     final_coherence: 0.0,
+                    // Generation failed outright — 0.0 is a placeholder, not a reading.
+                    coherence_measured: false,
                     long_coherence: 0.0,
                     coherence_dynamics: Vec::new(),
                     gating_trace: Vec::new(),
@@ -1268,6 +1281,7 @@ impl LiquidMambaGenerator {
         for i in 1..max_chunks {
             // --- Phase 4: Long-term Memory Blending ---
             if let Some(ref bridge) = self.memory_bridge {
+                let bridge = bridge.lock();
                 let _ = bridge.blend_past_experiences(&mut current_thought);
             }
 
@@ -1312,13 +1326,14 @@ impl LiquidMambaGenerator {
         }
 
         // --- Phase 4: Persistence (Remember this monologue) ---
-        if let Some(ref mut bridge) = self.memory_bridge {
+        if let Some(ref bridge) = self.memory_bridge {
             if !sequence.chunks.is_empty() {
                 let refs: Vec<&ContinuousHV> =
                     sequence.chunks.iter().map(|c| &c.thought_hv).collect();
                 let average_thought = ContinuousHV::bundle(&refs);
                 let memory_id =
                     (self.generation_count as u64) << 32 | (sequence.chunks.len() as u64);
+                let mut bridge = bridge.lock();
                 let _ = bridge.remember(memory_id, &average_thought);
             }
         }
@@ -2797,6 +2812,9 @@ impl LiquidMambaGenerator {
                 eos_terminated,
                 veto_triggered: false,
                 final_coherence: coherence_monitor.current_coherence(),
+                // The Liquid-Mamba path drives its own `coherence_monitor` per token, so this
+                // is a real measurement even though `coherence_dynamics` is left empty here.
+                coherence_measured: true,
                 long_coherence: long_coherence_monitor.current_coherence(),
                 coherence_dynamics: Vec::new(),
                 gating_trace: Vec::new(),
@@ -3251,7 +3269,7 @@ mod tests {
         let mem_hv = ContinuousHV::random(16384, 42);
         bridge.remember(100, &mem_hv).unwrap();
 
-        generator.memory_bridge = Some(bridge);
+        generator.memory_bridge = Some(Arc::new(Mutex::new(bridge)));
 
         // 3. Generate monologue (should trigger blending)
         let channels = ThoughtChannels::default();

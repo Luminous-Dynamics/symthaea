@@ -1,0 +1,18 @@
+MA-001R-delta methodology check -- resource_level=0.5 outcome_a=0.9 outcome_b=0.2 training_ticks=2000
+
+=== Equal-outcome control (constant target 0.6, known: post=0.0714) ===
+  baseline delta=0.1753 post-training delta=0.0714
+
+=== Shuffled-context control (alternating target, randomized context, known: post=0.1821) ===
+  baseline delta=0.1753 post-training delta=0.1821
+
+=== NEW: Fixed-context control (alternating target, context ALWAYS B -- isolates target-variance-alone effect) ===
+  baseline delta=0.1753 post-training delta=0.1753
+
+=== Analysis ===
+  equal-outcome (constant target):     post-training delta = 0.0714
+  fixed-context (alternating target, no context variation at all): post-training delta = 0.1753
+  shuffled (alternating target, randomized context):    post-training delta = 0.1821
+  bound (alternating target, correctly-bound context):  post-training delta = 0.7656 (known from prior run)
+
+VERDICT: CONFIRMED: the fixed-context control (alternating target, zero context variation) produces a delta_predicted close to Shuffled's own, and far from Equal-outcome's. This means shuffled_collapses's failure is a CONTROL-DESIGN ARTIFACT -- Equal-outcome (constant target) is not a fair "no coupling" baseline for Shuffled (alternating target); the alternating target ALONE, with no context variation whatsoever, already produces comparable coefficient movement. shuffled_collapses should be re-baselined against this fixed-context control, not equal-outcome.

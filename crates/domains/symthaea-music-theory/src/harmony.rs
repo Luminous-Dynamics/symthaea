@@ -228,7 +228,16 @@ fn classify_triad(root: PitchClass, third: PitchClass, fifth: PitchClass) -> Cho
         (4, 8) => ChordQuality::Augmented,
         (2, 7) => ChordQuality::Sus2,
         (5, 7) => ChordQuality::Sus4,
-        _ => ChordQuality::Major, // fallback for exotic scale spellings
+        // Same reasoning as `classify_seventh`'s fallback: keep degrading rather
+        // than failing a render, but do not do it silently.
+        _ => {
+            debug_assert!(
+                false,
+                "unclassified triad ({t}, {f}) from root {root:?}: add a ChordQuality \
+                 variant instead of falling back to Major"
+            );
+            ChordQuality::Major
+        }
     }
 }
 
@@ -248,7 +257,24 @@ fn classify_seventh(
         (3, 7, 11) => ChordQuality::MinorMajor7,
         (3, 6, 10) => ChordQuality::HalfDiminished7,
         (3, 6, 9) => ChordQuality::Diminished7,
-        _ => ChordQuality::Dominant7,
+        // ♭III of every minor key: HarmonicMinor's degree 3 stacks to
+        // (major third, augmented fifth, major seventh). This used to fall
+        // through to the Dominant7 fallback below, silently turning
+        // C–E–G♯–B into C–E–G–B♭ and destroying A minor's leading tone.
+        (4, 8, 11) => ChordQuality::AugmentedMajor7,
+        // Genuinely exotic stacks (non-heptatonic or synthetic scales) still
+        // degrade to a dominant seventh rather than failing a render, but they
+        // must not do so SILENTLY: the bug above hid here for as long as this
+        // arm existed. `debug_assert` fails the test suite while leaving release
+        // renders working.
+        _ => {
+            debug_assert!(
+                false,
+                "unclassified seventh stack ({t}, {f}, {s}) from root {root:?}: add a \
+                 ChordQuality variant instead of falling back to Dominant7"
+            );
+            ChordQuality::Dominant7
+        }
     }
 }
 
@@ -327,6 +353,50 @@ impl Progression {
     /// deterministic seeded walk. Always starts on tonic and ends on a
     /// resolution (authentic V→I or deceptive V→vi). `bars` chords total.
     pub fn generate(bars: usize, seed: u64) -> Self {
+        Progression::generate_with(bars, seed, &HarmonicPalette::classical())
+    }
+
+    /// [`Progression::generate`] with a style's own harmonic vocabulary.
+    ///
+    /// # Why this exists
+    ///
+    /// `generate` is style-AGNOSTIC: same seed, same progression, whatever style
+    /// asked. Measured 2026-07-30 over Classical / BaroqueSuite / March /
+    /// Nocturne × 32 seeds, every `ProgressionSpec::Grammar` style produced
+    /// **bit-identical progressions, 96/96**. Converting a style to `Grammar`
+    /// therefore bought within-style variety (1 → 26 distinct) at the cost of
+    /// making it harmonically indistinguishable from every other Grammar style —
+    /// the exact cross-style bleed the diversity census fixed for
+    /// Folk/Cinematic/Playful by giving each its own degree set. That blocked
+    /// the harmonic-syntax rework (see
+    /// `HARMONIC_SYNTAX_REWORK_SCOPE_2026-07-26.md`).
+    ///
+    /// A palette is the same idiom those three styles already use, applied to
+    /// the generator instead of to a fixed archetype: the T-PD-D-T *grammar* is
+    /// universal, the *vocabulary* is the style's.
+    ///
+    /// [`HarmonicPalette::classical`] reproduces the previous behaviour exactly
+    /// — see `generate_with_classical_palette_is_bit_identical_to_generate`.
+    pub fn generate_with(bars: usize, seed: u64, palette: &HarmonicPalette) -> Self {
+        // The mid-phrase walk leaves a predominant ONLY via
+        // `cadential_dominant`, and it leaves a dominant via the hardwired
+        // D → T. So a `cadential_dominant` that is not Dominant-function makes
+        // the predominant branch self-looping: a plagal palette (IV as the
+        // "dominant") yields IV → IV → IV forever and never returns to tonic.
+        //
+        // That rules palettes out for genuinely NON-FUNCTIONAL styles — a
+        // Cinematic-style suspended arc with no dominant at all, or
+        // impressionist planing — which is a real limit, not an oversight.
+        // Those belong on `ProgressionSpec::ArchetypePool` with their own
+        // hand-chosen degree sets, which is exactly where they already are.
+        debug_assert_eq!(
+            degree_function(palette.cadential_dominant),
+            HarmonicFunction::Dominant,
+            "cadential_dominant must be Dominant-function (got degree {}); a predominant \
+             here makes the walk loop on it forever. Non-functional styles need \
+             ProgressionSpec::ArchetypePool, not a palette.",
+            palette.cadential_dominant
+        );
         if bars == 0 {
             return Progression::default();
         }
@@ -337,19 +407,27 @@ impl Progression {
             let prev_fn = degree_function(prev);
             // The last two chords form the cadence: force D then T.
             let next = if i == bars - 1 {
-                // Final chord: authentic (1) most of the time, deceptive (6) sometimes.
-                if rng.next_below(4) == 0 { 6 } else { 1 }
+                // Final chord: authentic most of the time, deceptive sometimes.
+                if rng.next_below(palette.deceptive_cadence_one_in) == 0 {
+                    6
+                } else {
+                    1
+                }
             } else if i == bars - 2 {
-                5 // penultimate: the dominant, to set up the cadence
+                palette.cadential_dominant // penultimate: set up the cadence
             } else {
                 match prev_fn {
                     HarmonicFunction::Tonic => {
-                        // T → PD (ii/IV) or another T (vi)
-                        [2, 4, 6][rng.next_below(3) as usize]
+                        let from = &palette.from_tonic;
+                        from[rng.next_below(from.len() as u64) as usize]
                     }
                     HarmonicFunction::Predominant => {
-                        // PD → D (V) usually, sometimes another PD
-                        if rng.next_below(4) == 0 { 4 } else { 5 }
+                        // Usually move on to the dominant; sometimes linger.
+                        if rng.next_below(palette.linger_on_predominant_one_in) == 0 {
+                            palette.predominant_linger
+                        } else {
+                            palette.cadential_dominant
+                        }
                     }
                     HarmonicFunction::Dominant => 1, // D → T
                 }
@@ -357,6 +435,121 @@ impl Progression {
             degrees.push(next);
         }
         Progression::new(degrees)
+    }
+}
+
+/// A style's harmonic VOCABULARY for [`Progression::generate_with`]. The
+/// T→PD→D→T grammar is universal; which degrees realize each function, and how
+/// readily the walk leaves them, is what makes a march sound unlike a nocturne.
+///
+/// Deliberately narrow: it constrains *choices within* the existing grammar
+/// rather than replacing it, so every palette still starts on tonic, still ends
+/// on a real resolution, and still cannot emit a musically invalid sequence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HarmonicPalette {
+    /// Degrees reachable from a tonic-function chord, sampled uniformly.
+    pub from_tonic: Vec<i32>,
+    /// The degree that serves as the cadential dominant.
+    pub cadential_dominant: i32,
+    /// The predominant the walk lingers on instead of moving to the dominant.
+    pub predominant_linger: i32,
+    /// One-in-N chance of lingering on a predominant. Higher = more direct.
+    pub linger_on_predominant_one_in: u64,
+    /// One-in-N chance the final chord is deceptive (vi) rather than tonic.
+    /// Higher = more decisive endings.
+    pub deceptive_cadence_one_in: u64,
+}
+
+impl HarmonicPalette {
+    /// The historical behaviour, exactly: T→{ii,IV,vi}, V as dominant, a 1-in-4
+    /// lingering IV, a 1-in-4 deceptive close. Every value here is the literal
+    /// that was inline in `generate` before palettes existed, so
+    /// `generate_with(.., &CLASSICAL)` is bit-identical to `generate(..)`.
+    pub fn classical() -> HarmonicPalette {
+        HarmonicPalette {
+            from_tonic: vec![2, 4, 6],
+            cadential_dominant: 5,
+            predominant_linger: 4,
+            linger_on_predominant_one_in: 4,
+            deceptive_cadence_one_in: 4,
+        }
+    }
+
+    /// Sequential and driving — the harmony of a baroque suite movement.
+    ///
+    /// Baroque functional harmony chains predominants (the circle-of-fifths
+    /// sequence is its signature gesture) and closes decisively; it does not
+    /// wander to vi the way a classical period does. So: ii is the favoured
+    /// departure from tonic, the walk lingers on predominants *often* rather
+    /// than rarely (that lingering IS the sequence), and deceptive closes are
+    /// uncommon.
+    ///
+    /// Added 2026-07-30 because
+    /// `grammar_generated_styles_must_not_be_harmonically_interchangeable`
+    /// caught BaroqueSuite and Classical producing identical progressions on
+    /// 32/32 seeds — a real defect that shipped with the 2026-07-26 harmonic
+    /// pilot, which converted BaroqueSuite to the style-agnostic `Grammar`
+    /// generator and so made it a harmonic clone of Classical.
+    pub fn baroque() -> HarmonicPalette {
+        HarmonicPalette {
+            from_tonic: vec![2, 2, 4],
+            cadential_dominant: 5,
+            predominant_linger: 2,
+            linger_on_predominant_one_in: 2,
+            deceptive_cadence_one_in: 8,
+        }
+    }
+
+    /// Circling and songlike — the harmony of a waltz.
+    ///
+    /// Its fixed archetype was Pachelbel's [1,5,6,3,4,1,4,5], and the palette
+    /// keeps that sequence's flavour rather than discarding it: the descending
+    /// vi–iii–IV chain means a waltz leaves tonic toward *any* of the three
+    /// non-dominant functions about equally, then walks down to the dominant
+    /// rather than driving at it. Lingering is common (that is the descent);
+    /// deceptive closes are rare, because a waltz phrase lands.
+    pub fn waltz() -> HarmonicPalette {
+        HarmonicPalette {
+            from_tonic: vec![6, 3, 4, 2],
+            cadential_dominant: 5,
+            predominant_linger: 4,
+            linger_on_predominant_one_in: 2,
+            deceptive_cadence_one_in: 6,
+        }
+    }
+
+    /// Wistful and unhurried — the harmony of a nocturne.
+    ///
+    /// The opposite of [`HarmonicPalette::march`] on every axis that matters:
+    /// it leans on vi (the relative minor colouring that gives a nocturne its
+    /// melancholy), reaches the dominant only reluctantly — lingering on ii
+    /// rather than driving through — and closes deceptively far more often than
+    /// Classical does, because a nocturne is characteristically reluctant to
+    /// settle.
+    pub fn nocturne() -> HarmonicPalette {
+        HarmonicPalette {
+            from_tonic: vec![6, 6, 2, 4],
+            cadential_dominant: 5,
+            predominant_linger: 2,
+            linger_on_predominant_one_in: 2,
+            deceptive_cadence_one_in: 3,
+        }
+    }
+
+    /// Plain, decisive, unwandering — the harmony of a march.
+    ///
+    /// Drops vi from the tonic branch (no relative-minor colouring), uses IV as
+    /// the only predominant, never lingers, and never closes deceptively. The
+    /// result is I-IV-V-I motion with real per-seed variety in *where* those
+    /// chords fall, rather than a fixed loop or Classical's wandering walk.
+    pub fn march() -> HarmonicPalette {
+        HarmonicPalette {
+            from_tonic: vec![4, 4, 5],
+            cadential_dominant: 5,
+            predominant_linger: 4,
+            linger_on_predominant_one_in: u64::MAX, // never lingers
+            deceptive_cadence_one_in: u64::MAX,     // always closes authentic
+        }
     }
 }
 
@@ -454,6 +647,73 @@ mod tests {
         let v7 = k.diatonic_seventh(5);
         assert_eq!(v7.root, PitchClass::G);
         assert_eq!(v7.quality, ChordQuality::Dominant7);
+    }
+
+    /// ♭III of a minor key is an AUGMENTED-MAJOR seventh, not a dominant seventh.
+    ///
+    /// `Key::minor` builds chords from harmonic minor (`Tonality::Minor` =>
+    /// `Mode::HarmonicMinor`), whose degree 3 stacks to (major third, AUGMENTED
+    /// fifth, major seventh) = (4, 8, 11). `classify_seventh` had no arm for that
+    /// stack and fell through to `_ => Dominant7`, so in A minor
+    /// `diatonic_seventh(3)` returned C–E–G–B♭ instead of C–E–G♯–B — a perfect
+    /// fifth where the augmented fifth belongs, a minor seventh where the major
+    /// belongs, and the key's LEADING TONE (G♯) replaced by G natural.
+    ///
+    /// It also broke the invariant `composer.rs:4146-4150` relies on ("a seventh
+    /// is a strict superset of its triad, so the melody's triad-based chord-tone
+    /// snapping never clashes"): `diatonic_triad(3)` correctly returned Augmented
+    /// (C–E–G♯) via `classify_triad`'s own (4, 8) arm, so the triad contained G♯
+    /// while the seventh contained G — a melody snapped to G♯ sounded a semitone
+    /// against its own harmony. That superset property is asserted below.
+    #[test]
+    fn flat_three_of_a_minor_is_augmented_major_seventh_not_dominant() {
+        let k = Key::minor(PitchClass::A);
+        let chord = k.diatonic_seventh(3);
+        assert_eq!(chord.root, PitchClass::C);
+        assert_eq!(
+            chord.quality,
+            ChordQuality::AugmentedMajor7,
+            "C-E-G#-B is +M7; Dominant7 would mean C-E-G-Bb and lose A minor's leading tone"
+        );
+        assert_eq!(chord.quality.intervals(), &[0, 4, 8, 11]);
+
+        // The leading tone must be present: C + 8 semitones = G#.
+        let tones: Vec<PitchClass> = chord
+            .quality
+            .intervals()
+            .iter()
+            .map(|&i| chord.root.transpose(i as i32))
+            .collect();
+        assert!(
+            tones.contains(&PitchClass::GSHARP),
+            "the augmented fifth must be G#, A minor's leading tone: got {tones:?}"
+        );
+        assert!(!tones.contains(&PitchClass::G), "G natural must NOT appear");
+
+        // Superset invariant: the seventh contains every tone of its triad.
+        let triad = k.diatonic_triad(3);
+        assert_eq!(triad.quality, ChordQuality::Augmented);
+        for i in triad.quality.intervals() {
+            let t = triad.root.transpose(*i as i32);
+            assert!(
+                tones.contains(&t),
+                "seventh must be a superset of its triad; missing {t:?}"
+            );
+        }
+    }
+
+    /// Every minor key, not just A — the defect was in the interval stack, so it
+    /// applied to all 12 transpositions.
+    #[test]
+    fn flat_three_is_augmented_major_seventh_in_every_minor_key() {
+        for pc in 0..12i32 {
+            let k = Key::minor(PitchClass::new(pc));
+            assert_eq!(
+                k.diatonic_seventh(3).quality,
+                ChordQuality::AugmentedMajor7,
+                "minor key with tonic pc={pc}"
+            );
+        }
     }
 
     #[test]
@@ -587,6 +847,71 @@ mod tests {
         // Parallel flips brightness on the same tonic.
         assert_eq!(dorian.parallel(), Key::major(PitchClass::D));
         assert_eq!(mixo.parallel(), Key::minor(PitchClass::G));
+    }
+
+    /// The palette refactor must be a strict no-op for every existing caller.
+    ///
+    /// `HarmonicPalette::classical()` holds the exact literals that were inline
+    /// in `generate` before palettes existed, so this is what makes the change
+    /// safe to land: Classical and BaroqueSuite (the two shipped
+    /// `ProgressionSpec::Grammar` styles, one of them the reference the
+    /// BaroqueSuite pilot was A/B'd against) keep byte-identical output.
+    ///
+    /// A previous attempt at per-style character — salting the seed with the
+    /// style name — failed exactly here: it silently changed Classical. Bit
+    /// equality across a wide seed and length sweep is the guard against
+    /// repeating that.
+    #[test]
+    fn generate_with_classical_palette_is_bit_identical_to_generate() {
+        let classical = HarmonicPalette::classical();
+        for bars in [0usize, 1, 2, 3, 4, 7, 8, 12, 16, 32] {
+            for seed in 0..64u64 {
+                assert_eq!(
+                    Progression::generate(bars, seed),
+                    Progression::generate_with(bars, seed, &classical),
+                    "bars={bars} seed={seed}: the default palette must reproduce the \
+                     pre-palette generator exactly"
+                );
+            }
+        }
+    }
+
+    /// A palette must produce a genuinely DIFFERENT style, not just a different
+    /// seed stream — that was the whole point of adding them.
+    #[test]
+    fn march_palette_differs_from_classical_yet_keeps_the_grammar() {
+        let classical = HarmonicPalette::classical();
+        let march = HarmonicPalette::march();
+        let mut differ = 0;
+        for seed in 0..64u64 {
+            let c = Progression::generate_with(8, seed, &classical);
+            let m = Progression::generate_with(8, seed, &march);
+            if c != m {
+                differ += 1;
+            }
+            // Both must still obey the universal grammar the palette only
+            // supplies vocabulary for.
+            for p in [&c, &m] {
+                assert_eq!(p.degrees[0], 1, "must start on tonic");
+                assert_eq!(p.degrees[6], 5, "penultimate must be the dominant");
+                assert!(p.degrees[7] == 1 || p.degrees[7] == 6);
+            }
+            // March never wanders to vi and never closes deceptively.
+            assert!(
+                !m.degrees[..7].contains(&6),
+                "march palette must not reach vi: {:?}",
+                m.degrees
+            );
+            assert_eq!(
+                m.degrees[7], 1,
+                "march must close authentic: {:?}",
+                m.degrees
+            );
+        }
+        assert!(
+            differ >= 60,
+            "march should differ from classical on nearly every seed, got {differ}/64"
+        );
     }
 
     #[test]

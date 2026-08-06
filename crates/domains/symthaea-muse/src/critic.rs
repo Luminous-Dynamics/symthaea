@@ -20,12 +20,33 @@
 
 use crate::{Composition, MusicalState, Note, form};
 
+/// Onsets closer together than this are one rhythmic event, not several.
+///
+/// 30 ms matches `creative_bench::extract_melody`'s onset-grouping tolerance, and
+/// sits comfortably below the ~100 ms at which listeners begin to hear two attacks
+/// as separate rather than as one chord.
+const SIMULTANEOUS_ONSET_EPSILON: f32 = 0.03;
+
 /// Music critic verdict.
 #[derive(Debug, Clone)]
 pub struct MusicVerdict {
     /// Melodic interest: pitch variety and contour quality.
     pub melodic_interest: f32,
-    /// Rhythmic regularity: timing coefficient of variation.
+    /// Rhythmic regularity: `1 − CV(inter-onset intervals)`, so **1.0 means
+    /// perfectly metronomic** — higher is not better.
+    ///
+    /// Was pinned at exactly 0.0 until 2026-07-31 because it differenced the note
+    /// list in *voice-major* order; see the comment at the computation site. It
+    /// measures rhythm now, which means the downstream threshold matters for the
+    /// first time.
+    ///
+    /// Still a *different* computation from `creative_bench::onset_evenness`
+    /// despite the shared idea: that one filters section-boundary gaps
+    /// (IOI > 3× median) and this one does not, so the two disagree on music with
+    /// pauses. Real repertoire measures ~0.60 on the filtered version
+    /// (`examples/rhythm_gate_calibration.rs`); **this unfiltered one has never
+    /// been calibrated, so the 0.4 threshold in `update_state_from_verdict` below
+    /// remains a guess.** Calibrate it the same way before trusting it.
     pub rhythmic_regularity: f32,
     /// Harmonic alignment: harmony activation mean.
     pub harmonic_alignment: f32,
@@ -53,23 +74,43 @@ pub fn evaluate_composition(comp: &Composition, state: &MusicalState) -> MusicVe
         0.3
     };
 
-    // Rhythmic regularity: low CV of inter-onset intervals
-    let rhythmic_regularity = if notes.len() >= 3 {
-        let intervals: Vec<f32> = notes
-            .windows(2)
-            .map(|w| (w[1].start_time - w[0].start_time).max(0.001))
-            .collect();
-        let mean = intervals.iter().sum::<f32>() / intervals.len() as f32;
-        if mean > 0.001 {
-            let variance =
-                intervals.iter().map(|&i| (i - mean).powi(2)).sum::<f32>() / intervals.len() as f32;
-            let cv = variance.sqrt() / mean;
-            (1.0 - cv).clamp(0.0, 1.0)
+    // Rhythmic regularity: low CV of inter-onset intervals.
+    //
+    // FIXED 2026-07-31. This used to difference `comp.notes` in LIST order, which
+    // is voice-major: the melody is emitted first, then the accompaniment restarts
+    // the clock at t=0, and chord tones share an onset. So the difference at each
+    // voice boundary was NEGATIVE and each chord contributed ZEROes, and the
+    // `.max(0.001)` collapsed all of them to one tiny constant. The CV exploded and
+    // `1 − CV` clamped to 0.0 for *every* composition either generation path
+    // produces — the metric was reading note-list ordering, not rhythm.
+    //
+    // That was not confined to the score: `update_state_from_verdict` decrements
+    // arousal whenever this reads below 0.4, so with the value pinned at 0.0 that
+    // branch fired unconditionally on every composition.
+    //
+    // Two things are needed, and sorting alone is not enough. A chord is ONE
+    // rhythmic event, so simultaneous onsets are collapsed before differencing;
+    // otherwise a densely voiced passage reads as maximally irregular however
+    // steady its pulse.
+    let rhythmic_regularity = {
+        let mut onsets: Vec<f32> = notes.iter().map(|n| n.start_time).collect();
+        onsets.sort_by(|a, b| a.total_cmp(b));
+        onsets.dedup_by(|a, b| (*a - *b).abs() < SIMULTANEOUS_ONSET_EPSILON);
+
+        if onsets.len() >= 3 {
+            let intervals: Vec<f32> = onsets.windows(2).map(|w| w[1] - w[0]).collect();
+            let mean = intervals.iter().sum::<f32>() / intervals.len() as f32;
+            if mean > 0.001 {
+                let variance = intervals.iter().map(|&i| (i - mean).powi(2)).sum::<f32>()
+                    / intervals.len() as f32;
+                let cv = variance.sqrt() / mean;
+                (1.0 - cv).clamp(0.0, 1.0)
+            } else {
+                0.5
+            }
         } else {
-            0.5
+            0.3
         }
-    } else {
-        0.3
     };
 
     // Harmonic alignment
@@ -621,5 +662,99 @@ mod tests {
             ..intent
         });
         assert_ne!(a, b, "different seeds must produce different scores");
+    }
+}
+
+#[cfg(test)]
+mod onset_ordering_tests {
+    use super::*;
+    use crate::{AudioData, Composition, MusicalState, Note, structure::SectionType};
+
+    /// A composition as the generator actually builds one: VOICE-MAJOR. The melody
+    /// is emitted first, then the accompaniment restarts at t=0, and chord tones
+    /// share an onset. `comp.notes` is therefore not in time order.
+    fn voice_major_composition() -> Composition {
+        let mut notes = Vec::new();
+        // Melody: 8 notes, evenly spaced over 4s. Perfectly regular.
+        for i in 0..8 {
+            notes.push(Note {
+                frequency: 440.0 + i as f32 * 20.0,
+                start_time: i as f32 * 0.5,
+                duration: 0.45,
+                velocity: 0.7,
+            });
+        }
+        // Accompaniment: two 3-note chords, restarting the clock at t=0.
+        for (chord, t) in [(0, 0.0f32), (1, 2.0f32)] {
+            for v in 0..3 {
+                notes.push(Note {
+                    frequency: 220.0 + chord as f32 * 10.0 + v as f32 * 30.0,
+                    start_time: t,
+                    duration: 1.9,
+                    velocity: 0.5,
+                });
+            }
+        }
+        Composition {
+            audio: AudioData::F32(Vec::new()),
+            sample_rate: 48_000,
+            notes,
+            duration_secs: 4.0,
+            section: SectionType::Developmental,
+        }
+    }
+
+    /// The melody in the fixture is PERFECTLY regular — 8 notes at a fixed 0.5s
+    /// spacing. Any honest onset-regularity measure must score it high.
+    ///
+    /// Before the 2026-07-31 fix this returned 0.0000, because
+    /// `evaluate_composition` differenced `comp.notes` in list order. At the
+    /// melody→accompaniment boundary that difference is NEGATIVE (3.5 → 0.0) and
+    /// the three chord tones are SIMULTANEOUS (difference 0.0); `.max(0.001)`
+    /// collapsed all of them to the same tiny constant, so the CV exploded and
+    /// `1 − CV` clamped to zero.
+    ///
+    /// The consequence was not confined to the score. `update_state_from_verdict`
+    /// decrements arousal whenever this reads below 0.4 — so with the metric pinned
+    /// at 0.0 that branch fired on *every* composition, unconditionally, which is
+    /// not a rhythm response at all.
+    #[test]
+    fn rhythmic_regularity_survives_voice_major_note_order() {
+        let v = evaluate_composition(&voice_major_composition(), &MusicalState::default());
+        assert!(
+            v.rhythmic_regularity > 0.5,
+            "rhythmic_regularity {:.4} on a fixture whose melody is perfectly \
+             regular — the note list is voice-major, so this is measuring list \
+             ORDER rather than rhythm.",
+            v.rhythmic_regularity,
+        );
+    }
+
+    /// Sorting alone is not enough: a chord is ONE rhythmic event, not three
+    /// zero-length intervals. If simultaneous onsets are kept, a densely voiced
+    /// passage reads as maximally irregular no matter how steady its pulse.
+    #[test]
+    fn simultaneous_chord_tones_are_one_rhythmic_event() {
+        let mut c = voice_major_composition();
+        // Thicken every chord to 6 voices. The PULSE is unchanged, so the metric
+        // must not move much.
+        let extra: Vec<Note> = c
+            .notes
+            .iter()
+            .filter(|n| n.frequency < 400.0)
+            .map(|n| Note {
+                frequency: n.frequency + 7.0,
+                ..*n
+            })
+            .collect();
+        let thin = evaluate_composition(&c, &MusicalState::default()).rhythmic_regularity;
+        c.notes.extend(extra);
+        let thick = evaluate_composition(&c, &MusicalState::default()).rhythmic_regularity;
+        assert!(
+            (thin - thick).abs() < 0.15,
+            "doubling chord voicing moved rhythmic_regularity {thin:.4} -> {thick:.4}; \
+             the pulse did not change, so simultaneous onsets are being counted as \
+             separate rhythmic events.",
+        );
     }
 }

@@ -7,6 +7,7 @@
 //! Run: cargo run --example check_prediction_error_degeneracy
 
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+use tracing::Level;
 
 fn input_script() -> Vec<&'static str> {
     vec![
@@ -26,6 +27,12 @@ fn input_script() -> Vec<&'static str> {
 }
 
 fn main() {
+    // Surfaces the existing `tracing::warn!` in cycle_strategy.rs's ZeroPrediction-degeneracy
+    // check (see memory/symthaea_prediction_error_frozen_investigation.md) -- direct confirmation
+    // of which PredictionDegeneracy branch fires, without needing a new CognitiveLoopService
+    // accessor.
+    tracing_subscriber::fmt().with_max_level(Level::WARN).init();
+
     let mut config = CognitiveLoopConfig::default();
     config.genesis_phrase = Some("pe-degeneracy-check-2026-07-23".to_string());
     config.async_training = false;

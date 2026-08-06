@@ -379,13 +379,8 @@ pub fn irr_analysis(cash_flows: &[f64], options: IrrOptions) -> Result<IrrAnalys
 
         if let Some((previous_rate, previous_value, previous_derivative)) = previous {
             if previous_value.signum() != value.signum() {
-                let root = bisect_value_root(
-                    previous_rate,
-                    rate,
-                    previous_value,
-                    &normalized,
-                    options,
-                )?;
+                let root =
+                    bisect_value_root(previous_rate, rate, previous_value, &normalized, options)?;
                 push_root(&mut roots, root, options.tolerance);
             }
 
@@ -462,8 +457,8 @@ pub fn mirr(cash_flows: &[f64], finance_rate: f64, reinvestment_rate: f64) -> Re
         if cash_flow < 0.0 {
             negative_present_value += cash_flow / (1.0 + finance_rate).powi(period as i32);
         } else if cash_flow > 0.0 {
-            positive_terminal_value += cash_flow
-                * (1.0 + reinvestment_rate).powi((terminal_period - period) as i32);
+            positive_terminal_value +=
+                cash_flow * (1.0 + reinvestment_rate).powi((terminal_period - period) as i32);
         }
     }
     if negative_present_value >= 0.0 || positive_terminal_value <= 0.0 {
@@ -472,8 +467,7 @@ pub fn mirr(cash_flows: &[f64], finance_rate: f64, reinvestment_rate: f64) -> Re
         });
     }
     checked_output(
-        (positive_terminal_value / -negative_present_value)
-            .powf(1.0 / terminal_period as f64)
+        (positive_terminal_value / -negative_present_value).powf(1.0 / terminal_period as f64)
             - 1.0,
         "MIRR calculation overflowed",
     )

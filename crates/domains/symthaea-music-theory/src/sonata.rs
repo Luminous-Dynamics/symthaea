@@ -388,6 +388,21 @@ pub fn realize_sonata_with_plan(
             meter,
             false,
         );
+        // Bass is realized BEFORE harmony so `realize_harmony_measures` can read the
+        // ACTUAL sounding bass from the score and voice the upper parts against it
+        // (rootless chords + bass-vs-upper parallel fifths, both measured 2026-07-30).
+        // Purely a reordering: the two use independent `prev_bass`/`prev_upper` chains
+        // and never read each other's state, so the emitted NOTES are unchanged.
+        crate::composer::realize_bass(
+            &mut phrase_score,
+            &form,
+            meter,
+            intent,
+            &mut prev_bass,
+            pattern,
+            true,
+            false,
+        );
         crate::composer::realize_harmony(
             &mut phrase_score,
             &form,
@@ -398,15 +413,6 @@ pub fn realize_sonata_with_plan(
             true,
             true,
             false,
-        );
-        crate::composer::realize_bass(
-            &mut phrase_score,
-            &form,
-            meter,
-            intent,
-            &mut prev_bass,
-            pattern,
-            true,
         );
 
         for n in &phrase_score.notes {

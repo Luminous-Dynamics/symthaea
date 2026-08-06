@@ -1,0 +1,249 @@
+{
+  "sample_rate": 24000,
+  "crossfade_ms": 10.0,
+  "word_edge_fade_ms": 8.0,
+  "groups": [
+    {
+      "method": "raw",
+      "phonemes": "\u0283",
+      "vclass": "voiceless_obstruent",
+      "output_start": 0,
+      "output_end": 1440,
+      "core_start": 0,
+      "core_end": 1200,
+      "entry_fade": null,
+      "exit_fade": [
+        1200,
+        1440
+      ],
+      "source_start_sample": 7680,
+      "source_end_sample": 8880,
+      "word_index": 0,
+      "word_text": "she"
+    },
+    {
+      "method": "world",
+      "phonemes": "i",
+      "vclass": "sonorant",
+      "output_start": 1200,
+      "output_end": 6480,
+      "core_start": 1440,
+      "core_end": 6480,
+      "entry_fade": [
+        1200,
+        1440
+      ],
+      "exit_fade": null,
+      "word_index": 0,
+      "word_text": "she"
+    },
+    {
+      "method": "raw",
+      "phonemes": "s",
+      "vclass": "voiceless_obstruent",
+      "output_start": 7920,
+      "output_end": 9302,
+      "core_start": 7920,
+      "core_end": 9062,
+      "entry_fade": null,
+      "exit_fade": [
+        9062,
+        9302
+      ],
+      "source_start_sample": 11640,
+      "source_end_sample": 12840,
+      "word_index": 1,
+      "word_text": "sells"
+    },
+    {
+      "method": "world",
+      "phonemes": "\u025blz",
+      "vclass": "sonorant",
+      "output_start": 9062,
+      "output_end": 14702,
+      "core_start": 9302,
+      "core_end": 14702,
+      "entry_fade": [
+        9062,
+        9302
+      ],
+      "exit_fade": null,
+      "word_index": 1,
+      "word_text": "sells"
+    },
+    {
+      "method": "raw",
+      "phonemes": "s",
+      "vclass": "voiceless_obstruent",
+      "output_start": 16142,
+      "output_end": 17582,
+      "core_start": 16142,
+      "core_end": 17342,
+      "entry_fade": null,
+      "exit_fade": [
+        17342,
+        17582
+      ],
+      "source_start_sample": 18360,
+      "source_end_sample": 19800,
+      "word_index": 2,
+      "word_text": "seashells"
+    },
+    {
+      "method": "world",
+      "phonemes": "i",
+      "vclass": "sonorant",
+      "output_start": 17342,
+      "output_end": 22622,
+      "core_start": 17582,
+      "core_end": 22382,
+      "entry_fade": [
+        17342,
+        17582
+      ],
+      "exit_fade": [
+        22382,
+        22622
+      ],
+      "word_index": 2,
+      "word_text": "seashells"
+    },
+    {
+      "method": "raw",
+      "phonemes": "\u0283",
+      "vclass": "voiceless_obstruent",
+      "output_start": 22382,
+      "output_end": 23822,
+      "core_start": 22622,
+      "core_end": 23582,
+      "entry_fade": [
+        22382,
+        22622
+      ],
+      "exit_fade": [
+        23582,
+        23822
+      ],
+      "source_start_sample": 21960,
+      "source_end_sample": 23280,
+      "word_index": 2,
+      "word_text": "seashells"
+    },
+    {
+      "method": "world",
+      "phonemes": "\u025blz",
+      "vclass": "sonorant",
+      "output_start": 23582,
+      "output_end": 30062,
+      "core_start": 23822,
+      "core_end": 30062,
+      "entry_fade": [
+        23582,
+        23822
+      ],
+      "exit_fade": null,
+      "word_index": 2,
+      "word_text": "seashells"
+    },
+    {
+      "method": "world",
+      "phonemes": "bI",
+      "vclass": "voiced_obstruent",
+      "output_start": 31502,
+      "output_end": 38222,
+      "core_start": 31502,
+      "core_end": 38222,
+      "entry_fade": null,
+      "exit_fade": null,
+      "word_index": 3,
+      "word_text": "by"
+    },
+    {
+      "method": "world",
+      "phonemes": "\u00f0\u0259",
+      "vclass": "voiced_obstruent",
+      "output_start": 39662,
+      "output_end": 46382,
+      "core_start": 39662,
+      "core_end": 46382,
+      "entry_fade": null,
+      "exit_fade": null,
+      "word_index": 4,
+      "word_text": "the"
+    },
+    {
+      "method": "raw",
+      "phonemes": "s",
+      "vclass": "voiceless_obstruent",
+      "output_start": 47822,
+      "output_end": 49262,
+      "core_start": 47822,
+      "core_end": 49022,
+      "entry_fade": null,
+      "exit_fade": [
+        49022,
+        49262
+      ],
+      "source_start_sample": 35280,
+      "source_end_sample": 36720,
+      "word_index": 5,
+      "word_text": "seashore"
+    },
+    {
+      "method": "world",
+      "phonemes": "i",
+      "vclass": "sonorant",
+      "output_start": 49022,
+      "output_end": 54302,
+      "core_start": 49262,
+      "core_end": 54062,
+      "entry_fade": [
+        49022,
+        49262
+      ],
+      "exit_fade": [
+        54062,
+        54302
+      ],
+      "word_index": 5,
+      "word_text": "seashore"
+    },
+    {
+      "method": "raw",
+      "phonemes": "\u0283",
+      "vclass": "voiceless_obstruent",
+      "output_start": 54062,
+      "output_end": 55502,
+      "core_start": 54302,
+      "core_end": 55262,
+      "entry_fade": [
+        54062,
+        54302
+      ],
+      "exit_fade": [
+        55262,
+        55502
+      ],
+      "source_start_sample": 39480,
+      "source_end_sample": 40920,
+      "word_index": 5,
+      "word_text": "seashore"
+    },
+    {
+      "method": "world",
+      "phonemes": "\u0254\u0279",
+      "vclass": "sonorant",
+      "output_start": 55262,
+      "output_end": 60902,
+      "core_start": 55502,
+      "core_end": 60902,
+      "entry_fade": [
+        55262,
+        55502
+      ],
+      "exit_fade": null,
+      "word_index": 5,
+      "word_text": "seashore"
+    }
+  ]
+}

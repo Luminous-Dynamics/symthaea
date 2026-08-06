@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Synthetic Physics Lab — deterministic graph-rewriting experiments for emergent metric space discovery"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["synthetic-physics", "graph-rewriting", "emergent-geometry", "attractor", "topology"]
 categories = ["science", "algorithms", "simulation"]
 

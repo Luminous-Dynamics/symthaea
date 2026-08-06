@@ -1,0 +1,122 @@
+{
+  "phrases": [
+    {
+      "id": "positive_control",
+      "text": "won't you sing along with me",
+      "melody_hz": [
+        261.63,
+        293.66,
+        329.63,
+        392.0,
+        440.0,
+        261.63
+      ]
+    },
+    {
+      "id": "conversational",
+      "text": "i love the summer breeze tonight",
+      "melody_hz": [
+        261.63,
+        293.66,
+        329.63,
+        392.0,
+        440.0,
+        261.63
+      ]
+    },
+    {
+      "id": "repeated_syllables",
+      "text": "bye bye bye bye baby",
+      "melody_hz": [
+        261.63,
+        293.66,
+        329.63,
+        392.0,
+        440.0
+      ]
+    },
+    {
+      "id": "rapid_letter_names",
+      "text": "a b c d e f g",
+      "melody_hz": [
+        261.63,
+        293.66,
+        329.63,
+        392.0,
+        440.0,
+        261.63,
+        293.66
+      ]
+    },
+    {
+      "id": "phrase_final_stops",
+      "text": "turn off the light and lock it",
+      "melody_hz": [
+        261.63,
+        293.66,
+        329.63,
+        392.0,
+        440.0,
+        261.63,
+        293.66
+      ]
+    },
+    {
+      "id": "fricative_heavy",
+      "text": "she sells seashells by the seashore",
+      "melody_hz": [
+        261.63,
+        293.66,
+        329.63,
+        392.0,
+        440.0,
+        261.63
+      ]
+    },
+    {
+      "id": "consonant_clusters",
+      "text": "strong streams splashed strangely",
+      "melody_hz": [
+        261.63,
+        293.66,
+        329.63,
+        392.0
+      ]
+    },
+    {
+      "id": "long_sustained_vowels",
+      "text": "moon over the blue lagoon",
+      "melody_hz": [
+        261.63,
+        293.66,
+        329.63,
+        392.0,
+        440.0
+      ]
+    },
+    {
+      "id": "short_unstressed",
+      "text": "it is what it is to me",
+      "melody_hz": [
+        261.63,
+        293.66,
+        329.63,
+        392.0,
+        440.0,
+        261.63,
+        293.66
+      ]
+    },
+    {
+      "id": "semantically_unusual",
+      "text": "the clock ate my umbrella",
+      "melody_hz": [
+        261.63,
+        293.66,
+        329.63,
+        392.0,
+        440.0
+      ]
+    }
+  ]
+}

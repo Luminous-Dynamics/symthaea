@@ -1,0 +1,56 @@
+[
+  {
+    "csd_phone": "j",
+    "espeak_target": "dʒ",
+    "aligned_label": "dʒ",
+    "start": 4.8214,
+    "end": 4.8415,
+    "note_idx": 0,
+    "syllable": "j_e_n"
+  },
+  {
+    "csd_phone": "e",
+    "espeak_target": "ɛ",
+    "aligned_label": "ɛ",
+    "start": 4.8817,
+    "end": 4.9018,
+    "note_idx": 0,
+    "syllable": "j_e_n"
+  },
+  {
+    "csd_phone": "n",
+    "espeak_target": "n",
+    "aligned_label": "n",
+    "start": 5.0424,
+    "end": 5.0625,
+    "note_idx": 0,
+    "syllable": "j_e_n"
+  },
+  {
+    "csd_phone": "t",
+    "espeak_target": "t",
+    "aligned_label": "t",
+    "start": 5.1228,
+    "end": 5.1429,
+    "note_idx": 1,
+    "syllable": "t_l_ii"
+  },
+  {
+    "csd_phone": "l",
+    "espeak_target": "l",
+    "aligned_label": "l",
+    "start": 5.2031,
+    "end": 5.2232,
+    "note_idx": 1,
+    "syllable": "t_l_ii"
+  },
+  {
+    "csd_phone": "ii",
+    "espeak_target": "iː",
+    "aligned_label": "iː",
+    "start": 5.2433,
+    "end": 5.2634,
+    "note_idx": 1,
+    "syllable": "t_l_ii"
+  }
+]

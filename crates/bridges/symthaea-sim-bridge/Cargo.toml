@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Simulator-agnostic engineering bridge traits for FEA, CFD, multibody, process, and circuit solvers"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["engineering", "simulation", "fea", "cfd", "digital-twin"]
 categories = ["science", "simulation"]
 
@@ -17,6 +17,9 @@ iceoryx2.workspace = true
 symthaea-core = { path = "../../core/symthaea-core" }
 serde = { workspace = true }
 thiserror = { workspace = true }
+# Non-blocking-mode (O_NONBLOCK) for CommandSolver::execute's subprocess
+# output pipes -- see drain_nonblocking's doc comment in src/lib.rs.
+libc = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

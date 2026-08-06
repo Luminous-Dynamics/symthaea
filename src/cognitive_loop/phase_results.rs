@@ -131,6 +131,13 @@ pub(super) struct DynCore {
     /// Shortest-horizon raw prediction (bits-saved diagnostics only; None on
     /// fallback/degenerate prediction paths).
     pub(super) prediction_first_horizon: Option<Vec<f32>>,
+    /// Predictive Compression C3: whether episodic recall blended into the
+    /// prediction this cycle.
+    pub(super) recall_fired: bool,
+    /// C3: top-1 recall similarity this cycle, when a recall was attempted.
+    pub(super) recall_similarity: Option<f32>,
+    /// C3c: write-cycle number of the matched episode, when a recall was attempted.
+    pub(super) recall_matched_timestamp: Option<u64>,
     pub(super) prediction_error: f32,
     pub(super) coherence: f32,
     pub(super) unified_psi: f64,

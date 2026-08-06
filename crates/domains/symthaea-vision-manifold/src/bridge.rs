@@ -988,36 +988,34 @@ impl VisionBridge {
         self.manifold.load_state(&state.manifold)?;
         if let (Some(encoder), Some(saved)) =
             (self.multi_spectral.as_mut(), state.multi_spectral.as_ref())
+            && let Err(error) = encoder.load_state(saved)
         {
-            if let Err(error) = encoder.load_state(saved) {
-                let _ = self.manifold.load_state(&before_manifold);
-                if let Some(ref previous) = before_spectral {
-                    let _ = encoder.load_state(previous);
-                }
-                return Err(format!(
-                    "failed to restore multispectral bridge state: {error}"
-                ));
+            let _ = self.manifold.load_state(&before_manifold);
+            if let Some(ref previous) = before_spectral {
+                let _ = encoder.load_state(previous);
             }
+            return Err(format!(
+                "failed to restore multispectral bridge state: {error}"
+            ));
         }
 
         if let (Some(predictor), Some(saved)) = (
             self.cross_predictor.as_mut(),
             state.cross_predictor.as_ref(),
-        ) {
-            if let Err(error) = predictor.load_state(saved) {
-                let _ = self.manifold.load_state(&before_manifold);
-                if let (Some(encoder), Some(previous)) =
-                    (self.multi_spectral.as_mut(), before_spectral.as_ref())
-                {
-                    let _ = encoder.load_state(previous);
-                }
-                if let Some(previous) = before_predictor.as_ref() {
-                    let _ = predictor.load_state(previous);
-                }
-                return Err(format!(
-                    "failed to restore cross-manifold bridge state: {error}"
-                ));
+        ) && let Err(error) = predictor.load_state(saved)
+        {
+            let _ = self.manifold.load_state(&before_manifold);
+            if let (Some(encoder), Some(previous)) =
+                (self.multi_spectral.as_mut(), before_spectral.as_ref())
+            {
+                let _ = encoder.load_state(previous);
             }
+            if let Some(previous) = before_predictor.as_ref() {
+                let _ = predictor.load_state(previous);
+            }
+            return Err(format!(
+                "failed to restore cross-manifold bridge state: {error}"
+            ));
         }
 
         self.attention_boost = state.attention_boost;

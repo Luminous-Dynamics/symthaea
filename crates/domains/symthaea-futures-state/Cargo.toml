@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-futures-state"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Symthaea Futures Laboratory — observation-to-belief-state estimation. Intended to WRAP symthaea-fep's ActiveInferenceAgent, not reimplement belief-state estimation; see the plan's 'Do not duplicate symthaea-fep' spike, not yet run."
+
+[dependencies]
+symthaea-futures-core = { workspace = true }
+symthaea-fep = { workspace = true }
+serde = { workspace = true }

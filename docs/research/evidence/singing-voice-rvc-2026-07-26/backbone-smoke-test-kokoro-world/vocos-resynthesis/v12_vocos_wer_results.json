@@ -1,0 +1,62 @@
+[
+  {
+    "id": "positive_control",
+    "target": "wont you sing along with me",
+    "wer": 0.0,
+    "hypothesis": "Won't you sing along with me?"
+  },
+  {
+    "id": "conversational",
+    "target": "i love the summer breeze tonight",
+    "wer": 0.0,
+    "hypothesis": "I love the summer breeze tonight"
+  },
+  {
+    "id": "repeated_syllables",
+    "target": "bye bye bye bye baby",
+    "wer": 0.0,
+    "hypothesis": "Bye, bye, bye, bye, baby."
+  },
+  {
+    "id": "rapid_letter_names",
+    "target": "a b c d e f g",
+    "wer": 1.0,
+    "hypothesis": "It's deep."
+  },
+  {
+    "id": "phrase_final_stops",
+    "target": "turn off the light and lock it",
+    "wer": 0.0,
+    "hypothesis": "Turn off the light and lock it."
+  },
+  {
+    "id": "fricative_heavy",
+    "target": "she sells seashells by the seashore",
+    "wer": 0.5,
+    "hypothesis": "She tells seashells by the sea shore."
+  },
+  {
+    "id": "consonant_clusters",
+    "target": "strong streams splashed strangely",
+    "wer": 0.75,
+    "hypothesis": "Dronged dreams slashed strangely."
+  },
+  {
+    "id": "long_sustained_vowels",
+    "target": "moon over the blue lagoon",
+    "wer": 1.0,
+    "hypothesis": "Move all through the blues again!"
+  },
+  {
+    "id": "short_unstressed",
+    "target": "it is what it is to me",
+    "wer": 0.0,
+    "hypothesis": "It is what it is to me"
+  },
+  {
+    "id": "semantically_unusual",
+    "target": "the clock ate my umbrella",
+    "wer": 0.6,
+    "hypothesis": "Through clotty my umbrella."
+  }
+]

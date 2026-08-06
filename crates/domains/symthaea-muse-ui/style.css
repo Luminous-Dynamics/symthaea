@@ -1144,3 +1144,163 @@ body {
         flex: 1 1 100%;
     }
 }
+
+/* Add Music / Teach Muse is intentionally an editorial workspace rather
+   than another nested diagnostics panel. */
+.add-music-page {
+    width: min(1120px, calc(100vw - 2rem));
+    margin: 0 auto;
+    padding: 2rem 0 8rem;
+}
+
+.add-music-intro {
+    max-width: 48rem;
+    margin-bottom: 1.5rem;
+}
+
+.add-music-intro h2 {
+    margin: 0.2rem 0 0.65rem;
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    font-weight: 500;
+}
+
+.import-workbench,
+.import-analysis {
+    padding: clamp(1.25rem, 3vw, 2.25rem);
+    background: color-mix(in srgb, var(--panel) 72%, transparent);
+    border-top: 1px solid var(--border);
+}
+
+.import-workbench label,
+.import-fields {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.import-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.import-workbench input[type="text"],
+.import-workbench input[type="file"] {
+    width: 100%;
+    padding: 0.75rem;
+    color: var(--ink);
+    background: #17130e;
+    border: 1px solid var(--border);
+    border-radius: 0.35rem;
+}
+
+.authorship-confirmation {
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    margin: 1rem 0;
+}
+
+.authorship-choice {
+    border: 1px solid var(--border);
+    border-radius: 0.35rem;
+    padding: 0.6rem 0.8rem 0.8rem;
+    margin: 1rem 0;
+}
+
+.authorship-choice legend {
+    padding: 0 0.4rem;
+    color: var(--dim);
+}
+
+.authorship-choice .authorship-confirmation {
+    margin: 0.4rem 0;
+}
+
+.privacy-receipt,
+.import-analysis-facts,
+.teaching-meta,
+.import-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 1rem;
+}
+
+.privacy-receipt {
+    padding: 0.8rem 0;
+    color: var(--dim);
+}
+
+.private-badge,
+.teaching-meta span {
+    color: var(--amber);
+    font-size: 0.78rem;
+}
+
+.import-analysis {
+    margin-top: 1.5rem;
+}
+
+.import-analysis > header {
+    display: flex;
+    justify-content: space-between;
+}
+
+.import-analysis-facts {
+    margin: 1rem 0;
+}
+
+.import-analysis-facts span {
+    min-width: 7rem;
+    display: grid;
+}
+
+.teaching-shelf {
+    margin-top: 5rem;
+}
+
+.teaching-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--border);
+}
+
+.teaching-card {
+    min-height: 18rem;
+    padding: 1.4rem;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.teaching-card h3,
+.teaching-card p {
+    margin: 0.25rem 0;
+}
+
+.teaching-rule {
+    color: var(--ink);
+    flex: 1;
+}
+
+.candidate-plan {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0.75rem 0;
+}
+
+.candidate-plan span {
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--dim);
+    font-size: 0.75rem;
+}
+
+@media (max-width: 760px) {
+    .import-fields,
+    .teaching-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "hello_world",
+    "target": "hello world",
+    "spoken_hypothesis": "Hello world.",
+    "spoken_wer": 0.0,
+    "sung_hypothesis": "Hello world.",
+    "sung_wer": 0.0,
+    "melody_tracking": {
+      "median_cents_error_to_nearest_target_note": 4.2,
+      "fraction_frames_within_50_cents_of_a_target_note": 0.888,
+      "target_melody_range_semitones": 7.0,
+      "observed_range_semitones": 13.68
+    }
+  },
+  {
+    "id": "sun_rises",
+    "target": "the sun rises over the valley",
+    "spoken_hypothesis": "The sun rises over the valley.",
+    "spoken_wer": 0.0,
+    "sung_hypothesis": "The sun rises over the valley.",
+    "sung_wer": 0.0,
+    "melody_tracking": {
+      "median_cents_error_to_nearest_target_note": 3.4,
+      "fraction_frames_within_50_cents_of_a_target_note": 0.907,
+      "target_melody_range_semitones": 9.0,
+      "observed_range_semitones": 21.45
+    }
+  },
+  {
+    "id": "quiet_morning",
+    "target": "a quiet morning walk",
+    "spoken_hypothesis": "A quiet morning walk.",
+    "spoken_wer": 0.0,
+    "sung_hypothesis": "The quiet morning walk!",
+    "sung_wer": 0.25,
+    "melody_tracking": {
+      "median_cents_error_to_nearest_target_note": 4.3,
+      "fraction_frames_within_50_cents_of_a_target_note": 0.9,
+      "target_melody_range_semitones": 12.0,
+      "observed_range_semitones": 15.92
+    }
+  }
+]

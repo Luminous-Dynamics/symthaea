@@ -397,6 +397,42 @@ pub fn build_grammar_trace(
                 }
             }
         }
+        GrammarPlanEvidence::CallResponse(plan) => {
+            let bar = score.meter as f64;
+            let bars_per_chorus = plan.bars_per_chorus as f64;
+            for chorus in 0..plan.choruses {
+                let chorus_start = chorus as f64 * bars_per_chorus * bar;
+                for (line_index, (&call_bar, &response_bar)) in plan
+                    .call_starts
+                    .iter()
+                    .zip(plan.response_starts.iter())
+                    .enumerate()
+                {
+                    let call_start = chorus_start + call_bar as f64 * bar;
+                    if let Some(assertion) = structure_for_region(
+                        score,
+                        format!("call-response-chorus-{chorus}-line-{line_index}-call"),
+                        "call".into(),
+                        call_start,
+                        call_start + bar,
+                        "call-response-engine",
+                    ) {
+                        structures.push(assertion);
+                    }
+                    let response_start = chorus_start + response_bar as f64 * bar;
+                    if let Some(assertion) = structure_for_region(
+                        score,
+                        format!("call-response-chorus-{chorus}-line-{line_index}-response"),
+                        "response".into(),
+                        response_start,
+                        response_start + bar,
+                        "call-response-engine",
+                    ) {
+                        structures.push(assertion);
+                    }
+                }
+            }
+        }
         GrammarPlanEvidence::Compatibility { .. } => {
             if let Some(form) = form {
                 let mut start = 0.0;
@@ -413,6 +449,24 @@ pub fn build_grammar_trace(
                         structures.push(assertion);
                     }
                     start = end;
+                }
+            }
+        }
+        GrammarPlanEvidence::JazzChorus(plan) => {
+            let bar = score.meter as f64;
+            let bars_per_chorus = plan.bars_per_chorus as f64;
+            for (chorus, role) in plan.trajectory.iter().enumerate() {
+                let start = chorus as f64 * bars_per_chorus * bar;
+                let end = start + bars_per_chorus * bar;
+                if let Some(assertion) = structure_for_region(
+                    score,
+                    format!("jazz-chorus-{chorus}"),
+                    format!("{role:?}").to_ascii_lowercase(),
+                    start,
+                    end,
+                    "jazz-chorus-engine",
+                ) {
+                    structures.push(assertion);
                 }
             }
         }
@@ -529,6 +583,48 @@ pub fn build_grammar_trace(
                     .collect(),
                 responsible_pass: "modal-arc-realizer".into(),
                 transformation: Some("exposition-pulse-intensification".into()),
+            });
+        }
+        GrammarPlanEvidence::CallResponse(_) => {
+            obligations.push(ObligationAssertion {
+                obligation_id: "call-answered-by-response".into(),
+                from: None,
+                to: AssertedObligationState::Created,
+                evidence: Vec::new(),
+                responsible_pass: "call-response-planner".into(),
+                transformation: None,
+            });
+            obligations.push(ObligationAssertion {
+                obligation_id: "call-answered-by-response".into(),
+                from: Some(AssertedObligationState::Created),
+                to: AssertedObligationState::Fulfilled,
+                evidence: structures
+                    .iter()
+                    .flat_map(|region| [region.start, region.end])
+                    .collect(),
+                responsible_pass: "call-response-engine".into(),
+                transformation: Some("inverted-response-per-call".into()),
+            });
+        }
+        GrammarPlanEvidence::JazzChorus(_) => {
+            obligations.push(ObligationAssertion {
+                obligation_id: "chorus-trajectory-develops".into(),
+                from: None,
+                to: AssertedObligationState::Created,
+                evidence: Vec::new(),
+                responsible_pass: "jazz-chorus-planner".into(),
+                transformation: None,
+            });
+            obligations.push(ObligationAssertion {
+                obligation_id: "chorus-trajectory-develops".into(),
+                from: Some(AssertedObligationState::Created),
+                to: AssertedObligationState::Fulfilled,
+                evidence: structures
+                    .iter()
+                    .flat_map(|region| [region.start, region.end])
+                    .collect(),
+                responsible_pass: "jazz-chorus-engine".into(),
+                transformation: Some("role-transformed-theme-per-chorus".into()),
             });
         }
         GrammarPlanEvidence::Compatibility { .. } => {}

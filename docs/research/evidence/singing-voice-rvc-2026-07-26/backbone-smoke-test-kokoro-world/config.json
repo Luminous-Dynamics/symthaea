@@ -1,0 +1,19 @@
+{
+  "phrases": [
+    {
+      "id": "hello_world",
+      "text": "hello world",
+      "melody_hz": [261.63, 392.00]
+    },
+    {
+      "id": "sun_rises",
+      "text": "the sun rises over the valley",
+      "melody_hz": [261.63, 293.66, 329.63, 349.23, 392.00, 440.00]
+    },
+    {
+      "id": "quiet_morning",
+      "text": "a quiet morning walk",
+      "melody_hz": [261.63, 329.63, 392.00, 523.25]
+    }
+  ]
+}

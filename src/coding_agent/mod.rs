@@ -416,6 +416,13 @@ pub struct CodingAgent {
     quality_rejections: usize,
     /// Counter: consciousness gate deferrals.
     consciousness_deferrals: usize,
+    /// Reasoning-engine gate/confidence state captured at the cycle where the
+    /// current code-generation attempt was decided (Generating/Fixing phase),
+    /// consumed once its outcome resolves (Testing phase). Single slot: this
+    /// agent runs one task serially with one in-flight generation at a time —
+    /// revisit if that assumption changes (e.g. concurrent attempts).
+    #[cfg(feature = "reasoning_engine")]
+    pending_reasoning_outcome: Option<consciousness_bridge::PendingReasoningOutcome>,
     /// Whether stuck detection triggered during this run.
     stuck_detected: bool,
     /// Semantic knowledge graph of error patterns → fix strategies.
@@ -550,6 +557,8 @@ impl CodingAgent {
             dedup_skips: 0,
             quality_rejections: 0,
             consciousness_deferrals: 0,
+            #[cfg(feature = "reasoning_engine")]
+            pending_reasoning_outcome: None,
             stuck_detected: false,
             error_knowledge: error_knowledge::CodeErrorKnowledge::new(),
             #[cfg(feature = "geodesic_synthesis")]
@@ -806,12 +815,44 @@ impl CodingAgent {
 
         // 5.5. Extract reasoning feedback — defer or diagnose if needed.
         let reasoning = consciousness_bridge::ReasoningFeedback::from_cycle_result(&cycle_result);
+
+        // Extract consciousness signals early (pure read of cycle_result, no side
+        // effects) so prediction_error is available for the pending-outcome capture
+        // below even on the early-return defer/diagnose paths.
+        let signals = self.extract_consciousness_signals(&cycle_result);
+
+        // Capture the gate/confidence state for THIS attempt now, at decision time —
+        // not later at Testing-outcome time, when intervening cycles (the Testing
+        // phase's own cargo-check cycles) would have overwritten it with unrelated
+        // state. Only Generating/Fixing cycles represent a real code-generation
+        // decision; inject_code_signals() runs unconditionally every phase, but the
+        // gate result is only attributable to this attempt on those two phases.
+        #[cfg(feature = "reasoning_engine")]
+        if matches!(self.phase, TaskPhase::Generating | TaskPhase::Fixing) {
+            self.pending_reasoning_outcome =
+                Some(consciousness_bridge::PendingReasoningOutcome::capture(
+                    &reasoning,
+                    signals.prediction_error as f64,
+                ));
+        }
+
         if reasoning.should_defer() && self.phase == TaskPhase::Generating {
             self.consciousness_deferrals += 1;
-            self.observations.push(format!(
-                "Reasoning deferral: confidence={:.2}",
-                reasoning.reasoning_confidence
-            ));
+            // Bounded fallback: a repeatedly-gated action must not stall the agent
+            // forever (the early `return` below never increments `phase_failures`,
+            // so nothing else would catch this). Reuse the existing
+            // `max_phase_failures` threshold rather than a new field.
+            if self.consciousness_deferrals >= self.config.max_phase_failures {
+                self.observations
+                    .push("Reasoning deferral limit reached, re-planning".into());
+                self.phase = TaskPhase::Planning;
+                self.consciousness_deferrals = 0;
+            } else {
+                self.observations.push(format!(
+                    "Reasoning deferral: confidence={:.2}",
+                    reasoning.reasoning_confidence
+                ));
+            }
             return;
         }
         if reasoning.should_diagnose() && self.phase == TaskPhase::Generating {
@@ -824,7 +865,6 @@ impl CodingAgent {
         }
 
         // Extract consciousness signals for decision-making
-        let signals = self.extract_consciousness_signals(&cycle_result);
         let phi = signals.phi;
         self.phi_trace.push(phi);
         self.prediction_error_history.push(signals.prediction_error);

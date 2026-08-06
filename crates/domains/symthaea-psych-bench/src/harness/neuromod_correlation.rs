@@ -241,6 +241,11 @@ mod tests {
                 cycle_time_us: 1000 + (i as u64 * 50),
                 learning_occurred: i % 5 == 0,
                 reward: 0.0,
+                // Added 2026-07-31 to unblock the crate: another session's
+                // LoopTrialResult gained `cycle_reward` and this test fixture was
+                // collateral damage. Synthetic data, so 0.0 matches the
+                // neighbouring `reward`/`moral_score` fixtures.
+                cycle_reward: 0.0,
                 oxytocin: 0.3,
                 moral_score: 0.0,
                 bath_entropy: 0.5,

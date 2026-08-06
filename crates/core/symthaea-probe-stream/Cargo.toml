@@ -2,7 +2,7 @@
 name = "symthaea-probe-stream"
 version = "0.1.0"
 edition = "2024"
-authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+authors = ["Luminous Dynamics <contact@luminousdynamics.org>"]
 description = "Probe-matrix streaming adapter: turns embedding oracles into real-time ContinuousHV streams for the Holographic Liquid Brain"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"

@@ -207,7 +207,7 @@ impl ContinuousMind {
             urgency: MeshUrgency::from(urgency),
             timestamp_s,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: crate::swarm::mesh::MESH_DEFAULT_TTL,
             wisdom: wisdom_hv,
         };
@@ -401,7 +401,7 @@ impl ContinuousMind {
             urgency: MeshUrgency::Cruise,
             timestamp_s,
             payload_type: PayloadType::Heartbeat,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: crate::swarm::mesh::MESH_DEFAULT_TTL,
             wisdom: symthaea_core::hdc::BinaryHV::zero(),
         };

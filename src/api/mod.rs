@@ -169,14 +169,14 @@ pub fn create_router_with_config(config: ApiConfig) -> Router {
     Router::new()
         // Core endpoints
         .route("/v1/submit", post(handlers::submit_model))
-        .route("/v1/results/:submission_id", get(handlers::get_results))
+        .route("/v1/results/{submission_id}", get(handlers::get_results))
         .route("/v1/leaderboard", get(handlers::get_leaderboard))
         .route(
             "/v1/leaderboard/topologies",
             get(handlers::get_topology_rankings),
         )
         .route("/v1/datasets", get(handlers::list_datasets))
-        .route("/v1/datasets/:dataset_id", get(handlers::get_dataset))
+        .route("/v1/datasets/{dataset_id}", get(handlers::get_dataset))
         .route("/v1/compare", post(handlers::compare_models))
         .route("/v1/dimensional-sweep", post(handlers::dimensional_sweep))
         .route("/v1/audit/events", get(handlers::get_audit_events))
@@ -243,14 +243,14 @@ fn build_demo_router(
     let app = Router::new()
         // Core benchmark endpoints
         .route("/v1/submit", post(handlers::submit_model))
-        .route("/v1/results/:submission_id", get(handlers::get_results))
+        .route("/v1/results/{submission_id}", get(handlers::get_results))
         .route("/v1/leaderboard", get(handlers::get_leaderboard))
         .route(
             "/v1/leaderboard/topologies",
             get(handlers::get_topology_rankings),
         )
         .route("/v1/datasets", get(handlers::list_datasets))
-        .route("/v1/datasets/:dataset_id", get(handlers::get_dataset))
+        .route("/v1/datasets/{dataset_id}", get(handlers::get_dataset))
         .route("/v1/compare", post(handlers::compare_models))
         .route("/v1/dimensional-sweep", post(handlers::dimensional_sweep))
         .route("/v1/audit/events", get(handlers::get_audit_events))

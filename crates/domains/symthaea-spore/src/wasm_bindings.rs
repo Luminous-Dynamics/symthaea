@@ -600,7 +600,7 @@ pub fn generate_hardware_nix(hardware_json: &str) -> Result<String, JsError> {
 use std::cell::RefCell;
 
 thread_local! {
-    static SOVEREIGN_CONVERSATION: RefCell<Option<symthaea_nix::sovereign_conversation::SovereignConversation>> = RefCell::new(None);
+    static SOVEREIGN_CONVERSATION: RefCell<Option<nixward::sovereign_conversation::SovereignConversation>> = RefCell::new(None);
 }
 
 /// Initialize a sovereign conversation session.
@@ -608,13 +608,12 @@ thread_local! {
 /// Call this once, then use sovereign_chat() for each message.
 #[wasm_bindgen]
 pub fn sovereign_init(hardware_json: &str, migration_json: &str) -> Result<JsValue, JsError> {
-    let hardware: symthaea_nix::sovereign_config::HardwareProfile =
+    let hardware: nixward::sovereign_config::HardwareProfile =
         serde_json::from_str(hardware_json).unwrap_or_default();
-    let migration: symthaea_nix::sovereign_config::MigrationData =
+    let migration: nixward::sovereign_config::MigrationData =
         serde_json::from_str(migration_json).unwrap_or_default();
 
-    let mut conv =
-        symthaea_nix::sovereign_conversation::SovereignConversation::new(hardware, migration);
+    let mut conv = nixward::sovereign_conversation::SovereignConversation::new(hardware, migration);
     let greeting = conv.greet();
 
     SOVEREIGN_CONVERSATION.with(|c| {
@@ -655,14 +654,14 @@ pub fn generate_sovereign_config(
     choices_json: &str,
     migration_json: &str,
 ) -> Result<JsValue, JsError> {
-    let hardware: symthaea_nix::sovereign_config::HardwareProfile =
+    let hardware: nixward::sovereign_config::HardwareProfile =
         serde_json::from_str(hardware_json).unwrap_or_default();
-    let choices: symthaea_nix::sovereign_config::UserChoices =
+    let choices: nixward::sovereign_config::UserChoices =
         serde_json::from_str(choices_json).unwrap_or_default();
-    let migration: symthaea_nix::sovereign_config::MigrationData =
+    let migration: nixward::sovereign_config::MigrationData =
         serde_json::from_str(migration_json).unwrap_or_default();
 
-    let mut b_gen = symthaea_nix::sovereign_config::SovereignConfigGenerator::new();
+    let mut b_gen = nixward::sovereign_config::SovereignConfigGenerator::new();
     let config = b_gen.generate(&hardware, &choices, &migration);
 
     let json = serde_json::json!({
@@ -682,7 +681,7 @@ pub fn generate_sovereign_config(
 /// Returns: JSON migration report with matches, confidence, and NixOS equivalents.
 #[wasm_bindgen]
 pub fn match_app_list(app_list_text: &str) -> Result<JsValue, JsError> {
-    let mut db = symthaea_nix::app_database::AppDatabase::new();
+    let mut db = nixward::app_database::AppDatabase::new();
     let names: Vec<String> = app_list_text
         .lines()
         .map(|l| l.trim().to_string())

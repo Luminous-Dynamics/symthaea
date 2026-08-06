@@ -210,6 +210,12 @@ pub struct HdcLtcBridge {
     /// Reusable snapshot buffer for the training pass's live-state save
     /// (train_step is pure w.r.t. evolution state; see its doc)
     train_scratch: NetworkStateSnapshot,
+
+    /// Reusable snapshot buffer for [`Self::eval_loss_from`]'s live-state save
+    /// -- a dedicated buffer (not reusing `train_scratch`/`predict_scratch`)
+    /// so this purely-evaluative path can never alias with an in-flight
+    /// train/predict call.
+    eval_scratch: NetworkStateSnapshot,
 }
 
 impl HdcLtcBridge {
@@ -260,6 +266,7 @@ impl HdcLtcBridge {
             genesis: None,
             predict_scratch: NetworkStateSnapshot::default(),
             train_scratch: NetworkStateSnapshot::default(),
+            eval_scratch: NetworkStateSnapshot::default(),
         }
     }
 
@@ -318,6 +325,7 @@ impl HdcLtcBridge {
             genesis: Some(genesis.clone()),
             predict_scratch: NetworkStateSnapshot::default(),
             train_scratch: NetworkStateSnapshot::default(),
+            eval_scratch: NetworkStateSnapshot::default(),
         }
     }
 
@@ -639,6 +647,60 @@ impl HdcLtcBridge {
             None
         };
         self.train_step_impl(start, input, target, dt, learning_rate)
+    }
+
+    /// Predictive Compression Program C2 (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md §6):
+    /// pure loss evaluation from a historical snapshot -- no weights, no evolution state, no
+    /// counters change. Lets a caller compute `(pre_loss, post_loss)` around a real
+    /// [`Self::train_step_from`] call (evaluate here, train, evaluate again) without touching
+    /// `train_step_from`'s existing `Result<f32>` signature or any of its production call
+    /// sites (`cognitive_loop::temporal_network`, `cycle_phase_dynamics::training`) -- this is
+    /// additive, not a breaking change to the training path.
+    ///
+    /// Same stale-snapshot guard and scratch-buffer pattern as [`Self::train_step_from`]/
+    /// [`Self::predict_forward`], but with its own dedicated `eval_scratch` buffer so this can
+    /// never alias an in-flight train/predict call's own scratch state.
+    pub fn eval_loss_from(
+        &mut self,
+        start: &NetworkStateSnapshot,
+        input: &Array1<f32>,
+        target: &Array1<f32>,
+        dt: f32,
+    ) -> f32 {
+        let start = if start.dimension() == Some(self.config.hdc_dim) {
+            Some(start)
+        } else {
+            None
+        };
+
+        let hdc_input = self.project_to_hdc(input);
+
+        // Save live evolution state -- this evaluation must not perturb it, exactly like
+        // train_step_impl's own live-state save/restore.
+        let mut live = std::mem::take(&mut self.eval_scratch);
+        self.network.snapshot_state_into(&mut live);
+
+        if let Some(start) = start {
+            self.network.restore_state_from(start);
+        }
+
+        self.network.evolve_closed_form(dt, &hdc_input);
+        let hdc_output = self.network.output();
+        let output = self.project_from_hdc(&hdc_output);
+
+        let loss: f32 = output
+            .iter()
+            .zip(target.iter())
+            .map(|(o, t)| (o - t).powi(2))
+            .sum::<f32>()
+            / target.len() as f32;
+
+        // Restore live evolution state -- no weights were ever touched in this path, so there
+        // is nothing else to persist.
+        self.network.restore_state_from(&live);
+        self.eval_scratch = live;
+
+        loss
     }
 
     fn train_step_impl(
@@ -1088,6 +1150,86 @@ mod tests {
 
         let loss = bridge.train_step(&input, &target, 0.02, 0.01).unwrap();
         assert!(loss >= 0.0);
+    }
+
+    #[test]
+    fn test_eval_loss_from_is_pure() {
+        // Predictive Compression Program C2: eval_loss_from must leave every observable field
+        // untouched -- same purity bar as train_step_from/predict_forward.
+        let config = HdcLtcBridgeConfig::default();
+        let mut bridge = HdcLtcBridge::new(config);
+
+        let seed_input = Array1::from_vec(vec![0.4; 256]);
+        let _ = bridge.step(&seed_input, 0.02);
+        let start = bridge.snapshot_evolution_state();
+
+        let before_output = bridge.read_state().unwrap();
+        let before_steps = bridge.total_steps();
+        let before_diversity = bridge.state_diversity();
+
+        let input = Array1::from_vec(vec![0.5; 256]);
+        let target = Array1::from_vec(vec![0.3; 256]);
+        let _loss = bridge.eval_loss_from(&start, &input, &target, 0.02);
+
+        assert_eq!(bridge.read_state().unwrap(), before_output);
+        assert_eq!(bridge.total_steps(), before_steps);
+        assert_eq!(bridge.state_diversity(), before_diversity);
+    }
+
+    #[test]
+    fn test_eval_loss_from_matches_train_step_from_pre_update_loss() {
+        // train_step_impl computes its returned loss BEFORE applying any gradient -- so calling
+        // eval_loss_from first, then train_step_from with the identical (start, input, target,
+        // dt), must return the same loss value train_step_from itself reports. This is the
+        // correctness check that the new pure path measures the same thing the real training
+        // path already computes internally, not a different formula.
+        let config = HdcLtcBridgeConfig::default();
+        let mut bridge = HdcLtcBridge::new(config);
+
+        let seed_input = Array1::from_vec(vec![0.4; 256]);
+        let _ = bridge.step(&seed_input, 0.02);
+        let start = bridge.snapshot_evolution_state();
+
+        let input = Array1::from_vec(vec![0.5; 256]);
+        let target = Array1::from_vec(vec![0.3; 256]);
+
+        let pre_loss = bridge.eval_loss_from(&start, &input, &target, 0.02);
+        let train_reported_loss = bridge
+            .train_step_from(&start, &input, &target, 0.02, 0.01)
+            .unwrap();
+
+        assert!(
+            (pre_loss - train_reported_loss).abs() < 1e-6,
+            "eval_loss_from={pre_loss}, train_step_from's own pre-update loss={train_reported_loss}"
+        );
+    }
+
+    #[test]
+    fn test_train_step_from_reduces_loss_pre_vs_post() {
+        // The actual C2 signal: does a single training update on (start, input, target)
+        // measurably reduce loss on that same triple? pre_loss and post_loss are both computed
+        // via the pure eval_loss_from -- only the weights differ between the two calls.
+        let config = HdcLtcBridgeConfig::default();
+        let mut bridge = HdcLtcBridge::new(config);
+
+        let seed_input = Array1::from_vec(vec![0.4; 256]);
+        let _ = bridge.step(&seed_input, 0.02);
+        let start = bridge.snapshot_evolution_state();
+
+        let input = Array1::from_vec(vec![0.5; 256]);
+        let target = Array1::from_vec(vec![0.3; 256]);
+
+        let pre_loss = bridge.eval_loss_from(&start, &input, &target, 0.02);
+        let _ = bridge
+            .train_step_from(&start, &input, &target, 0.02, 0.01)
+            .unwrap();
+        let post_loss = bridge.eval_loss_from(&start, &input, &target, 0.02);
+
+        assert!(
+            post_loss < pre_loss,
+            "expected a single training update to reduce loss on the same (start, input, \
+             target) triple: pre={pre_loss}, post={post_loss}"
+        );
     }
 
     #[test]

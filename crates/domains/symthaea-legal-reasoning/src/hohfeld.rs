@@ -55,7 +55,6 @@ impl Jural {
     }
 }
 
-
 /// A fully instantiated Hohfeldian position between two parties.
 ///
 /// `holder` owns `position`; `counterparty` necessarily owns the correlative
@@ -70,12 +69,7 @@ pub struct JuralRelation {
 }
 
 impl JuralRelation {
-    pub fn new(
-        holder: PartyId,
-        counterparty: PartyId,
-        position: Jural,
-        action: ActionId,
-    ) -> Self {
+    pub fn new(holder: PartyId, counterparty: PartyId, position: Jural, action: ActionId) -> Self {
         Self {
             holder,
             counterparty,

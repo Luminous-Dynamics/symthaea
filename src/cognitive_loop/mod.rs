@@ -125,6 +125,8 @@ use training::AsyncTrainerHandle;
 
 mod temporal_network;
 
+mod observation_bridge;
+
 mod metrics_provider;
 
 mod identity_integration;
@@ -193,6 +195,11 @@ pub mod safety_supervisor;
 pub(crate) mod subsystem_trait;
 pub(crate) mod threshold_overrides;
 pub(crate) mod thresholds;
+
+/// Re-exported so external consumers (e.g. `symthaea/examples/*.rs`, which compile as
+/// separate binaries against this library crate) can reference the same threshold the
+/// loop itself uses for `moral_concern_detected`, instead of duplicating the literal.
+pub const MORAL_CONCERN_THRESHOLD: f32 = thresholds::MORAL_CONCERN_THRESHOLD;
 
 #[cfg(feature = "epistemic_auditor")]
 pub(crate) mod epistemic_auditor;
@@ -1113,6 +1120,27 @@ impl CognitiveLoopService {
         let dim = self.config.cfc_config.input_dim;
         let zeros = ndarray::Array1::<f32>::zeros(dim);
         let _ = self.temporal_network.inject(&zeros);
+    }
+
+    /// Feed a resolved outcome back into the reasoning engine's calibrator
+    /// (`ConsciousReasoningEngine::record_posthoc`). No-op if the feature is off
+    /// or the engine hasn't been constructed. Must live here rather than in an
+    /// external bridge module — `reasoning_engine` is a private field, unlike
+    /// `carryover`/`language_comm` which are `pub(crate)`.
+    ///
+    /// Callers must only pass `gate_passed`/`prediction_error` for a cycle where a
+    /// gate was actually evaluated (see `CycleMetadata.reasoning_gate_evaluated`) —
+    /// recording "no gate ran" as "gate passed" corrupts calibration.
+    #[cfg(feature = "reasoning_engine")]
+    pub fn record_reasoning_posthoc(
+        &mut self,
+        gate_passed: bool,
+        outcome_good: bool,
+        prediction_error: f64,
+    ) {
+        if let Some(ref mut re) = self.reasoning_engine {
+            re.record_posthoc(gate_passed, outcome_good, prediction_error);
+        }
     }
 }
 

@@ -1,0 +1,271 @@
+MA-001R-delta hyperparameter sweep -- resource_level=0.5 outcome_a=0.9 outcome_b=0.2 training_ticks=2000 held_out_ticks=200 reversal_ticks=2000
+
+############################################
+### Config: 1. Default (eta=0.01, decay=0.001, clip=5.0)
+### eta=0.01 decay=0.001 clip_bound=5 bias_learning=false
+############################################
+
+Untrained baseline held-out error: context A=0.1891 context B=0.3969
+
+=== Main Bound training run ===
+  baseline (pre-training): predicted_energy(A=0.6902, B=0.5906) delta_predicted=0.1753
+  post-training: predicted_energy(A=0.6648, B=0.5196) delta_predicted=0.1955
+  post-training coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=-0.01525 energy=0.39057
+    given_to_partner       -> resource=0.00926 energy=0.05606
+    received_from_partner  -> resource=-0.00269 energy=-0.04100
+    encounter_count        -> resource=0.00051 energy=0.10439
+  held-out (200 ticks, no further updates): mean_abs_error(context A)=0.2118 mean_abs_error(context B)=0.3388
+
+=== Equal-outcome control ===
+  baseline delta=0.1753 post-training delta=0.1446
+
+=== Shuffled-context control ===
+  baseline delta=0.1753 post-training delta=0.1971
+
+=== Reversal condition ===
+  mid-reversal: predicted_energy(A=0.7313, B=0.5330) delta_predicted=0.2605
+  post-reversal: predicted_energy(A=0.7417, B=0.5239) delta_predicted=0.2844
+
+=== Structured gate results (1. Default (eta=0.01, decay=0.001, clip=5.0)) ===
+  direction_correct (post-training A>B): true
+  separates_from_equal_outcome (bound 0.1955 > equal 0.1446): true
+  shuffled_collapses (shuffled 0.1971 <= 1.10x equal 0.1446): false
+  held_out_confirms (bound A 0.2118 < untrained A 0.1891 AND bound B 0.3388 < untrained B 0.3969): false
+  reversal_flips_and_holds (mid=false AND end=false): false
+  ALL GATES PASS: false
+  STABILITY: all_finite=true coeff_saturated=false -> stable=true
+
+############################################
+### Config: 2. Higher eta (eta=0.05, decay=0.001, clip=5.0)
+### eta=0.05 decay=0.001 clip_bound=5 bias_learning=false
+############################################
+
+Untrained baseline held-out error: context A=0.1891 context B=0.3969
+
+=== Main Bound training run ===
+  baseline (pre-training): predicted_energy(A=0.6902, B=0.5906) delta_predicted=0.1753
+  post-training: predicted_energy(A=0.8630, B=0.5963) delta_predicted=0.3565
+  post-training coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=0.02406 energy=0.75126
+    given_to_partner       -> resource=0.01660 energy=0.13085
+    received_from_partner  -> resource=-0.01260 energy=-0.11678
+    encounter_count        -> resource=0.01803 energy=0.27274
+  held-out (200 ticks, no further updates): mean_abs_error(context A)=0.1163 mean_abs_error(context B)=0.3583
+
+=== Equal-outcome control ===
+  baseline delta=0.1753 post-training delta=0.2097
+
+=== Shuffled-context control ===
+  baseline delta=0.1753 post-training delta=0.1547
+
+=== Reversal condition ===
+  mid-reversal: predicted_energy(A=0.7620, B=0.3966) delta_predicted=0.4681
+  post-reversal: predicted_energy(A=0.7866, B=0.3739) delta_predicted=0.5299
+
+=== Structured gate results (2. Higher eta (eta=0.05, decay=0.001, clip=5.0)) ===
+  direction_correct (post-training A>B): true
+  separates_from_equal_outcome (bound 0.3565 > equal 0.2097): true
+  shuffled_collapses (shuffled 0.1547 <= 1.10x equal 0.2097): true
+  held_out_confirms (bound A 0.1163 < untrained A 0.1891 AND bound B 0.3583 < untrained B 0.3969): true
+  reversal_flips_and_holds (mid=false AND end=false): false
+  ALL GATES PASS: false
+  STABILITY: all_finite=true coeff_saturated=false -> stable=true
+
+############################################
+### Config: 3. Much higher eta (eta=0.1, decay=0.001, clip=5.0)
+### eta=0.1 decay=0.001 clip_bound=5 bias_learning=false
+############################################
+
+Untrained baseline held-out error: context A=0.1891 context B=0.3969
+
+=== Main Bound training run ===
+  baseline (pre-training): predicted_energy(A=0.6902, B=0.5906) delta_predicted=0.1753
+  post-training: predicted_energy(A=0.9416, B=0.6162) delta_predicted=0.4343
+  post-training coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=0.03806 energy=0.87164
+    given_to_partner       -> resource=0.01974 energy=0.16489
+    received_from_partner  -> resource=-0.01541 energy=-0.13523
+    encounter_count        -> resource=0.02543 energy=0.34335
+  held-out (200 ticks, no further updates): mean_abs_error(context A)=0.0755 mean_abs_error(context B)=0.3576
+
+=== Equal-outcome control ===
+  baseline delta=0.1753 post-training delta=0.2792
+
+=== Shuffled-context control ===
+  baseline delta=0.1753 post-training delta=0.1082
+
+=== Reversal condition ===
+  mid-reversal: predicted_energy(A=0.7755, B=0.3455) delta_predicted=0.5491
+  post-reversal: predicted_energy(A=0.8044, B=0.3180) delta_predicted=0.6236
+
+=== Structured gate results (3. Much higher eta (eta=0.1, decay=0.001, clip=5.0)) ===
+  direction_correct (post-training A>B): true
+  separates_from_equal_outcome (bound 0.4343 > equal 0.2792): true
+  shuffled_collapses (shuffled 0.1082 <= 1.10x equal 0.2792): true
+  held_out_confirms (bound A 0.0755 < untrained A 0.1891 AND bound B 0.3576 < untrained B 0.3969): true
+  reversal_flips_and_holds (mid=false AND end=false): false
+  ALL GATES PASS: false
+  STABILITY: all_finite=true coeff_saturated=false -> stable=true
+
+############################################
+### Config: 4. No weight decay (eta=0.01, decay=0.0, clip=5.0)
+### eta=0.01 decay=0 clip_bound=5 bias_learning=false
+############################################
+
+Untrained baseline held-out error: context A=0.1891 context B=0.3969
+
+=== Main Bound training run ===
+  baseline (pre-training): predicted_energy(A=0.6902, B=0.5906) delta_predicted=0.1753
+  post-training: predicted_energy(A=0.8096, B=0.5655) delta_predicted=0.3251
+  post-training coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=0.00924 energy=0.62686
+    given_to_partner       -> resource=0.01412 energy=0.11439
+    received_from_partner  -> resource=-0.00912 energy=-0.08296
+    encounter_count        -> resource=0.01228 energy=0.22958
+  held-out (200 ticks, no further updates): mean_abs_error(context A)=0.1363 mean_abs_error(context B)=0.3461
+
+=== Equal-outcome control ===
+  baseline delta=0.1753 post-training delta=0.1659
+
+=== Shuffled-context control ===
+  baseline delta=0.1753 post-training delta=0.2306
+
+=== Reversal condition ===
+  mid-reversal: predicted_energy(A=0.7238, B=0.4081) delta_predicted=0.4118
+  post-reversal: predicted_energy(A=0.7351, B=0.3695) delta_predicted=0.4709
+
+=== Structured gate results (4. No weight decay (eta=0.01, decay=0.0, clip=5.0)) ===
+  direction_correct (post-training A>B): true
+  separates_from_equal_outcome (bound 0.3251 > equal 0.1659): true
+  shuffled_collapses (shuffled 0.2306 <= 1.10x equal 0.1659): false
+  held_out_confirms (bound A 0.1363 < untrained A 0.1891 AND bound B 0.3461 < untrained B 0.3969): true
+  reversal_flips_and_holds (mid=false AND end=false): false
+  ALL GATES PASS: false
+  STABILITY: all_finite=true coeff_saturated=false -> stable=true
+
+############################################
+### Config: 5. Higher eta + no decay (eta=0.05, decay=0.0, clip=5.0)
+### eta=0.05 decay=0 clip_bound=5 bias_learning=false
+############################################
+
+Untrained baseline held-out error: context A=0.1891 context B=0.3969
+
+=== Main Bound training run ===
+  baseline (pre-training): predicted_energy(A=0.6902, B=0.5906) delta_predicted=0.1753
+  post-training: predicted_energy(A=1.0957, B=0.6040) delta_predicted=0.6528
+  post-training coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=0.05247 energy=0.97702
+    given_to_partner       -> resource=0.02638 energy=0.25123
+    received_from_partner  -> resource=-0.01482 energy=-0.10642
+    encounter_count        -> resource=0.03943 energy=0.49456
+  held-out (200 ticks, no further updates): mean_abs_error(context A)=0.0532 mean_abs_error(context B)=0.3195
+
+=== Equal-outcome control ===
+  baseline delta=0.1753 post-training delta=0.3092
+
+=== Shuffled-context control ===
+  baseline delta=0.1753 post-training delta=0.0529
+
+=== Reversal condition ===
+  mid-reversal: predicted_energy(A=0.7420, B=0.2900) delta_predicted=0.5723
+  post-reversal: predicted_energy(A=0.7397, B=0.2926) delta_predicted=0.5613
+
+=== Structured gate results (5. Higher eta + no decay (eta=0.05, decay=0.0, clip=5.0)) ===
+  direction_correct (post-training A>B): true
+  separates_from_equal_outcome (bound 0.6528 > equal 0.3092): true
+  shuffled_collapses (shuffled 0.0529 <= 1.10x equal 0.3092): true
+  held_out_confirms (bound A 0.0532 < untrained A 0.1891 AND bound B 0.3195 < untrained B 0.3969): true
+  reversal_flips_and_holds (mid=false AND end=false): false
+  ALL GATES PASS: false
+  STABILITY: all_finite=true coeff_saturated=false -> stable=true
+
+############################################
+### Config: 6. Looser clip bound (eta=0.01, decay=0.001, clip=20.0)
+### eta=0.01 decay=0.001 clip_bound=20 bias_learning=false
+############################################
+
+Untrained baseline held-out error: context A=0.1891 context B=0.3969
+
+=== Main Bound training run ===
+  baseline (pre-training): predicted_energy(A=0.6902, B=0.5906) delta_predicted=0.1753
+  post-training: predicted_energy(A=0.6648, B=0.5196) delta_predicted=0.1955
+  post-training coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=-0.01525 energy=0.39057
+    given_to_partner       -> resource=0.00926 energy=0.05606
+    received_from_partner  -> resource=-0.00269 energy=-0.04100
+    encounter_count        -> resource=0.00051 energy=0.10439
+  held-out (200 ticks, no further updates): mean_abs_error(context A)=0.2118 mean_abs_error(context B)=0.3388
+
+=== Equal-outcome control ===
+  baseline delta=0.1753 post-training delta=0.1446
+
+=== Shuffled-context control ===
+  baseline delta=0.1753 post-training delta=0.1971
+
+=== Reversal condition ===
+  mid-reversal: predicted_energy(A=0.7313, B=0.5330) delta_predicted=0.2605
+  post-reversal: predicted_energy(A=0.7417, B=0.5239) delta_predicted=0.2844
+
+=== Structured gate results (6. Looser clip bound (eta=0.01, decay=0.001, clip=20.0)) ===
+  direction_correct (post-training A>B): true
+  separates_from_equal_outcome (bound 0.1955 > equal 0.1446): true
+  shuffled_collapses (shuffled 0.1971 <= 1.10x equal 0.1446): false
+  held_out_confirms (bound A 0.2118 < untrained A 0.1891 AND bound B 0.3388 < untrained B 0.3969): false
+  reversal_flips_and_holds (mid=false AND end=false): false
+  ALL GATES PASS: false
+  STABILITY: all_finite=true coeff_saturated=false -> stable=true
+
+############################################
+### Summary: gate pass/fail across all configs
+############################################
+
+Config                                                        Dir   SepEq ShufCol HeldOut RevFlip   N/5   Stable
+1. Default (eta=0.01, decay=0.001, clip=5.0)                 true    true   false   false   false     2     true
+2. Higher eta (eta=0.05, decay=0.001, clip=5.0)              true    true    true    true   false     4     true
+3. Much higher eta (eta=0.1, decay=0.001, clip=5.0)          true    true    true    true   false     4     true
+4. No weight decay (eta=0.01, decay=0.0, clip=5.0)           true    true   false    true   false     3     true
+5. Higher eta + no decay (eta=0.05, decay=0.0, clip=5.0)     true    true    true    true   false     4     true
+6. Looser clip bound (eta=0.01, decay=0.001, clip=20.0)      true    true   false   false   false     2     true
+
+############################################
+### Summary: key raw numbers per config
+############################################
+
+--- 1. Default (eta=0.01, decay=0.001, clip=5.0) ---
+  post_training_delta=0.1955 equal_post_delta=0.1446 shuffled_post_delta=0.1971
+  held_out: untrained(A=0.1891, B=0.3969) bound(A=0.2118, B=0.3388)
+  reversal: mid(A=0.7313, B=0.5330) post(A=0.7417, B=0.5239)
+
+--- 2. Higher eta (eta=0.05, decay=0.001, clip=5.0) ---
+  post_training_delta=0.3565 equal_post_delta=0.2097 shuffled_post_delta=0.1547
+  held_out: untrained(A=0.1891, B=0.3969) bound(A=0.1163, B=0.3583)
+  reversal: mid(A=0.7620, B=0.3966) post(A=0.7866, B=0.3739)
+
+--- 3. Much higher eta (eta=0.1, decay=0.001, clip=5.0) ---
+  post_training_delta=0.4343 equal_post_delta=0.2792 shuffled_post_delta=0.1082
+  held_out: untrained(A=0.1891, B=0.3969) bound(A=0.0755, B=0.3576)
+  reversal: mid(A=0.7755, B=0.3455) post(A=0.8044, B=0.3180)
+
+--- 4. No weight decay (eta=0.01, decay=0.0, clip=5.0) ---
+  post_training_delta=0.3251 equal_post_delta=0.1659 shuffled_post_delta=0.2306
+  held_out: untrained(A=0.1891, B=0.3969) bound(A=0.1363, B=0.3461)
+  reversal: mid(A=0.7238, B=0.4081) post(A=0.7351, B=0.3695)
+
+--- 5. Higher eta + no decay (eta=0.05, decay=0.0, clip=5.0) ---
+  post_training_delta=0.6528 equal_post_delta=0.3092 shuffled_post_delta=0.0529
+  held_out: untrained(A=0.1891, B=0.3969) bound(A=0.0532, B=0.3195)
+  reversal: mid(A=0.7420, B=0.2900) post(A=0.7397, B=0.2926)
+
+--- 6. Looser clip bound (eta=0.01, decay=0.001, clip=20.0) ---
+  post_training_delta=0.1955 equal_post_delta=0.1446 shuffled_post_delta=0.1971
+  held_out: untrained(A=0.1891, B=0.3969) bound(A=0.2118, B=0.3388)
+  reversal: mid(A=0.7313, B=0.5330) post(A=0.7417, B=0.5239)
+
+############################################
+### Verdict
+############################################
+
+No config passes all 5 gates cleanly (stably).
+
+Best partial result by gate count: 5. Higher eta + no decay (eta=0.05, decay=0.0, clip=5.0) (4/5 gates, stable=true)

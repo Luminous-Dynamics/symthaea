@@ -269,7 +269,19 @@ pub struct GenerationResult {
     /// Whether a semantic veto was triggered.
     pub veto_triggered: bool,
     /// Final short-window coherence score.
+    ///
+    /// Only meaningful when [`Self::coherence_measured`] is `true`. When no measurement was
+    /// taken this generation (coherence feedback disabled, or zero tokens emitted) this holds
+    /// [`CoherenceFeedback`](crate::gating::CoherenceFeedback)'s neutral initial value, which
+    /// is **not** a reading. Always check `coherence_measured` before aggregating.
     pub final_coherence: f32,
+    /// Whether `final_coherence` came from an actual measurement this generation.
+    ///
+    /// Added 2026-07-28. `final_coherence` alone could not distinguish "measured 1.0" from
+    /// "never measured, still at the initial 1.0" — the recorded Jul-10 eval reported
+    /// `avg_coherence: 1.0` unchanged across a ~9,870x perplexity regression, and there was
+    /// no field that could say which it was.
+    pub coherence_measured: bool,
     /// Final long-window coherence score (Liquid-Mamba only, 0.0 for CfC-HDC).
     pub long_coherence: f32,
     /// Per-token coherence dynamics: coherence score at each generated position.
@@ -579,7 +591,23 @@ impl BrocaGenerator {
     }
 
     fn from_checkpoint_struct(checkpoint: BrocaCheckpoint, genesis: &GenesisSeed) -> Self {
-        let mut r#gen = Self::new(genesis, checkpoint.config);
+        // Bug fix (2026-07-25, SYMTHAEA_COGNITION_IMPROVEMENT_PLAN_2026-07-21.md Tier 2.2
+        // follow-up): this used to call `Self::new(genesis, checkpoint.config)`, which
+        // hardcodes `BpeTokenizer::default_minimal()` (~256 tokens) regardless of what
+        // vocab the checkpoint was actually trained with (fresh training goes through
+        // `new_4k()`/`default_4k()`, 4096 tokens, or larger). `token_embeddings` below is
+        // then restored as a flat array indexed by the TRAINING-time vocab's IDs, but
+        // decoded/generated against the wrong (smaller, differently-ordered) reload-time
+        // vocab — every token after the first ~256 IDs reads a stale/foreign embedding
+        // row. Root cause of "training converges cleanly, `--resume` generation is near-
+        // total `<unk>` garbage" (confirmed via a same-checkpoint in-memory-vs-reload A/B:
+        // in-memory generation right after training produces real English words, reloading
+        // the identical checkpoint collapses to `<unk>`/a handful of `default_minimal`'s
+        // hardcoded common words). The checkpoint already carries its own vocab
+        // (`vocab: self.tokenizer.export_vocab()` in `save_checkpoint`) — it was just never
+        // read back. Reconstruct the tokenizer from that saved vocab instead.
+        let tokenizer = crate::tokenizer::BpeTokenizer::from_vocab_file(&checkpoint.vocab);
+        let mut r#gen = Self::with_tokenizer(genesis, checkpoint.config, tokenizer);
         r#gen.controller.restore_network(checkpoint.network_state);
         r#gen
             .controller
@@ -762,6 +790,16 @@ impl BrocaGenerator {
         } else {
             0.0
         };
+
+        // 2b. Clear per-generation coherence measurement state.
+        //
+        // Unconditional, and deliberately NOT tied to `reset_state` (which governs CfC
+        // network continuity across multi-turn conversation). Coherence is a per-generation
+        // *measurement*, not conversational state: carrying it over meant a generation that
+        // recorded no samples silently reported the previous generation's value, or on the
+        // first call the constructor's initial 1.0. Correction/veto tuning is preserved by
+        // `reset()`; only the measurement is cleared.
+        self.coherence_feedback.reset();
 
         // 3. Optionally reset controller state (skip for multi-turn continuity)
         if reset_state {
@@ -1086,10 +1124,16 @@ impl BrocaGenerator {
             prev_token = next_token;
         }
 
-        let final_coherence = coherence_dynamics
+        // Prefer the per-token dynamics; fall back to the feedback monitor's own state only
+        // when it actually recorded something (`measured_coherence()` is `None` otherwise).
+        // The old unconditional `unwrap_or_else(|| coherence_feedback.coherence())` is what
+        // let an unmeasured generation report the neutral initial 1.0 as if it were a reading.
+        let measured = coherence_dynamics
             .last()
             .copied()
-            .unwrap_or_else(|| self.coherence_feedback.coherence());
+            .or_else(|| self.coherence_feedback.measured_coherence());
+        let coherence_measured = measured.is_some();
+        let final_coherence = measured.unwrap_or(1.0);
         let text = String::from_utf8(text_bytes)
             .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned());
 
@@ -1100,6 +1144,7 @@ impl BrocaGenerator {
             eos_terminated,
             veto_triggered,
             final_coherence,
+            coherence_measured,
             long_coherence: 0.0, // CfC-HDC backend doesn't use long window
             coherence_dynamics,
             gating_trace,
@@ -2553,6 +2598,49 @@ mod tests {
             mean_jaccard < 0.95,
             "Mean pairwise Jaccard similarity {mean_jaccard:.4} too high — \
              outputs are too similar across intents"
+        );
+    }
+
+    // ── Regression: checkpoint round-trip must preserve the training-time vocab ──
+
+    /// Contract test (2026-07-25, SYMTHAEA_COGNITION_IMPROVEMENT_PLAN_2026-07-21.md
+    /// Tier 2.2 follow-up): `from_checkpoint_struct` used to reconstruct the generator
+    /// via `Self::new()`, which hardcodes `BpeTokenizer::default_minimal()` (~256
+    /// tokens) regardless of what vocab the checkpoint actually trained with. Any
+    /// checkpoint saved with a larger vocab (`new_4k`/`default_4k`, 4096 tokens, or
+    /// larger) would silently reload with the wrong, much smaller vocab, misaligning
+    /// every restored embedding row against the wrong token ID — root cause of
+    /// "training converges cleanly but --resume generation is near-total `<unk>`
+    /// garbage". This pins the fix: `from_checkpoint`'s tokenizer vocab_size must match
+    /// what was saved, not silently fall back to the default_minimal size.
+    #[test]
+    fn test_checkpoint_roundtrip_preserves_vocab_size() {
+        let genesis = test_genesis();
+        let mut config = test_config();
+        config.enable_coherence_feedback = false;
+        let generator = BrocaGenerator::new_4k(&genesis, config.clone());
+        let original_vocab_size = generator.tokenizer.vocab_size();
+        // Sanity: new_4k must NOT match default_minimal's size, or this test can't
+        // distinguish "restored correctly" from "silently fell back to minimal".
+        let minimal_size = crate::tokenizer::BpeTokenizer::default_minimal().vocab_size();
+        assert_ne!(
+            original_vocab_size, minimal_size,
+            "test fixture invalid: new_4k's vocab must differ in size from default_minimal"
+        );
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("roundtrip-test.bin");
+        generator
+            .save_checkpoint(&path, 0, 0.0, None, None, None)
+            .expect("save_checkpoint");
+
+        let (reloaded, ..) =
+            BrocaGenerator::from_checkpoint(&path, &genesis).expect("from_checkpoint should load");
+        assert_eq!(
+            reloaded.tokenizer.vocab_size(),
+            original_vocab_size,
+            "reloaded tokenizer vocab_size must match the checkpoint's saved vocab, \
+             not silently fall back to a different default"
         );
     }
 }

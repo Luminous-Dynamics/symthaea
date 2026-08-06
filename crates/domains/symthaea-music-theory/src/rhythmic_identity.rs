@@ -167,10 +167,12 @@ mod tests {
     use crate::harmony::Key;
     use crate::pitch::{Pitch, PitchClass};
     use crate::rhythm::Duration;
+    use crate::score::PartId;
     use crate::score::ScoreNote;
 
     fn note(onset_beats: f64, dur_beats: f64, emphasis: Emphasis) -> ScoreNote {
         ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: Pitch::new(PitchClass::C, 4),
             onset: Duration::new((onset_beats * 480.0).round() as i64, 480),
             duration: Duration::new((dur_beats * 480.0).round() as i64, 480),

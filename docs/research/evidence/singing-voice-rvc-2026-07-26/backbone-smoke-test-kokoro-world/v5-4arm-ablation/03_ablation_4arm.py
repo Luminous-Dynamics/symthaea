@@ -1,0 +1,318 @@
+#!/usr/bin/env python3
+"""4-arm ablation (2026-07-28): separates the two v4 mechanisms that were
+confounded together, per the reviewer's original design:
+
+  Arm A: v3 behavior              (voicing=source-derived, duration=v3 scaling)
+  Arm B: force obstruents unvoiced, v3 duration scaling
+  Arm C: v3 voicing,               obstruent duration pinned near-natural
+  Arm D: force obstruents unvoiced AND duration pinned (= v4)
+
+Run on an obstruent-heavy phrase (consonant_clusters: "strong streams
+splashed strangely" -- real stops/fricatives/clusters throughout) plus
+hello_world as the reviewer's own predicted low-effect negative control.
+"""
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+import pyworld as pw
+import soundfile as sf
+from kokoro import KPipeline
+
+BASE = Path("/var/lib/symthaea/training-runs/kokoro-world-vocoder")
+
+FRAME_PERIOD_MS = 5.0
+FRAME_DT = FRAME_PERIOD_MS / 1000.0
+GAP_S = 0.06
+FADE_MS = 8.0
+MIN_SYLLABLE_DUR_S = 0.28
+STRETCH = 1.2
+OBSTRUENT_NATURAL_MS = 60.0
+SONORANT_FLOOR_S = 0.08
+GLIDE_MS = 40.0
+VIBRATO_RATE_HZ = 5.5
+VIBRATO_DEPTH_CENTS = 30.0
+VIBRATO_MIN_VOWEL_MS = 150.0
+
+VOWEL_CHARS = set("əɜʌIᵻæiɔɪɐuʊɑɛeAOWYɚɝᵊ")
+SONORANT_CONSONANT_CHARS = set("mnŋlɹrwj")
+STRESS_MARKS = "ˈˌ"
+NOTES_CYCLE = [261.63, 293.66, 329.63, 392.00, 440.00]
+
+
+def strip_stress(ps):
+    return "".join(c for c in ps if c not in STRESS_MARKS)
+
+
+def classify(ps):
+    out = []
+    for c in strip_stress(ps):
+        if c in VOWEL_CHARS or c in SONORANT_CONSONANT_CHARS:
+            out.append((c, "sonorant"))
+        else:
+            out.append((c, "obstruent"))
+    return out
+
+
+def syllabify(phonemes):
+    if not phonemes:
+        return []
+    vowel_idx = [i for i, (c, _cls) in enumerate(phonemes) if c in VOWEL_CHARS]
+    if not vowel_idx:
+        return [phonemes]
+    syllables, start = [], 0
+    for k, vi in enumerate(vowel_idx):
+        end = vi + 1 if k + 1 < len(vowel_idx) else len(phonemes)
+        syllables.append(phonemes[start:end])
+        start = end
+    return syllables
+
+
+def sub_durations(phonemes, natural_dur_s, target_dur_s, obstruent_ms, pin_obstruent):
+    """pin_obstruent=False reproduces v3's binary-split scaling behavior
+    exactly (treating sonorant as "is_v"); pin_obstruent=True pins
+    obstruent target duration to its own natural estimate, letting
+    sonorants absorb the difference (v4's duration mechanism)."""
+    n = len(phonemes)
+    if n == 0:
+        return [], []
+    n_sonorant = sum(1 for _, cls in phonemes if cls == "sonorant")
+    if n_sonorant == 0:
+        ratio = target_dur_s / natural_dur_s if natural_dur_s > 0 else 1.0
+        nat = [natural_dur_s / n] * n
+        tgt = [d * ratio for d in nat]
+        return nat, tgt
+    n_obstruent = n - n_sonorant
+    max_c_share_nat = 0.6 * natural_dur_s / max(1, n_obstruent) if n_obstruent else 0.0
+    c_nat = min(obstruent_ms / 1000.0, max_c_share_nat) if n_obstruent else 0.0
+    if pin_obstruent:
+        c_tgt = c_nat
+    else:
+        max_c_share_tgt = 0.6 * target_dur_s / max(1, n_obstruent) if n_obstruent else 0.0
+        c_tgt = min(obstruent_ms / 1000.0, max_c_share_tgt) if n_obstruent else 0.0
+    sonorant_nat_total = max(SONORANT_FLOOR_S * 0.5, natural_dur_s - n_obstruent * c_nat)
+    sonorant_tgt_total = max(SONORANT_FLOOR_S, target_dur_s - n_obstruent * c_tgt)
+    nat_each = sonorant_nat_total / n_sonorant
+    tgt_each = sonorant_tgt_total / n_sonorant
+    nat = [nat_each if cls == "sonorant" else c_nat for _, cls in phonemes]
+    tgt = [tgt_each if cls == "sonorant" else c_tgt for _, cls in phonemes]
+    return nat, tgt
+
+
+def resample_frames(arr, n_out):
+    t_in = arr.shape[0]
+    if t_in == 0:
+        return np.zeros((n_out,) + arr.shape[1:], dtype=arr.dtype)
+    if t_in == 1:
+        return np.repeat(arr, n_out, axis=0)
+    x_old = np.linspace(0.0, 1.0, t_in)
+    x_new = np.linspace(0.0, 1.0, n_out)
+    out = np.empty((n_out,) + arr.shape[1:], dtype=arr.dtype)
+    for idx in np.ndindex(arr.shape[1:]):
+        out[(slice(None),) + idx] = np.interp(x_new, x_old, arr[(slice(None),) + idx])
+    return out
+
+
+def fade_edges(y, fs, fade_ms):
+    n = max(1, int(fs * fade_ms / 1000.0))
+    n = min(n, len(y) // 2) if len(y) > 1 else 0
+    if n <= 0:
+        return y
+    ramp = np.linspace(0.0, 1.0, n)
+    y = y.copy()
+    y[:n] *= ramp
+    y[-n:] *= ramp[::-1]
+    return y
+
+
+def synthesize_word(f0_seg, sp_seg, ap_seg, syll_specs, fs, force_obstruent_unvoiced, pin_obstruent):
+    all_f0, all_sp, all_ap, all_sonorant = [], [], [], []
+    syll_frame_ranges = []
+    cursor_in = 0
+    cursor_out = 0
+    for spec in syll_specs:
+        phonemes = spec["phonemes"]
+        natural_subdurs, target_subdurs = sub_durations(
+            phonemes, spec["natural_dur_s"], spec["target_dur_s"], OBSTRUENT_NATURAL_MS, pin_obstruent
+        )
+        vowel_out_start, vowel_out_end = None, None
+        for (ch, cls), nat_d, tgt_d in zip(phonemes, natural_subdurs, target_subdurs):
+            n_in = max(1, round(nat_d / FRAME_DT))
+            end_in = min(cursor_in + n_in, len(f0_seg))
+            seg_f0 = f0_seg[cursor_in:end_in]
+            seg_sp = sp_seg[cursor_in:end_in]
+            seg_ap = ap_seg[cursor_in:end_in]
+            cursor_in = end_in
+
+            n_out = max(2, round(tgt_d / FRAME_DT))
+            r_f0 = resample_frames(seg_f0, n_out)
+            r_sp = resample_frames(seg_sp, n_out)
+            r_ap = resample_frames(seg_ap, n_out)
+            all_f0.append(r_f0)
+            all_sp.append(r_sp)
+            all_ap.append(r_ap)
+            all_sonorant.append(np.full(n_out, cls == "sonorant"))
+            if ch in VOWEL_CHARS:
+                if vowel_out_start is None:
+                    vowel_out_start = cursor_out
+                vowel_out_end = cursor_out + n_out
+            cursor_out += n_out
+        syll_start = syll_frame_ranges[-1][1] if syll_frame_ranges else 0
+        syll_frame_ranges.append((syll_start, cursor_out, vowel_out_start, vowel_out_end))
+
+    word_f0 = np.concatenate(all_f0).astype(np.float64)
+    word_sp = np.concatenate(all_sp, axis=0).astype(np.float64)
+    word_ap = np.concatenate(all_ap, axis=0).astype(np.float64)
+    sonorant_mask = np.concatenate(all_sonorant)
+
+    if force_obstruent_unvoiced:
+        eligible_mask = (word_f0 > 0) & sonorant_mask
+    else:
+        eligible_mask = word_f0 > 0  # v3 behavior: any originally-voiced frame is eligible
+
+    target_traj = np.zeros(len(word_f0))
+    n_syll = len(syll_specs)
+    for i, (s, e, vs, ve) in enumerate(syll_frame_ranges):
+        target_traj[s:e] = syll_specs[i]["target_hz"]
+
+    glide_frames = max(1, round(GLIDE_MS / 1000.0 / FRAME_DT))
+    for i in range(n_syll - 1):
+        s0, e0, _, _ = syll_frame_ranges[i]
+        s1, e1, _, _ = syll_frame_ranges[i + 1]
+        hz0 = syll_specs[i]["target_hz"]
+        hz1 = syll_specs[i + 1]["target_hz"]
+        n = min(glide_frames, e0 - s0, e1 - s1)
+        if n <= 1:
+            continue
+        half = max(1, n // 2)
+        ramp_out = np.linspace(hz0, hz1, 2 * half)
+        target_traj[e0 - half:e0] = ramp_out[:half]
+        target_traj[s1:s1 + half] = ramp_out[half:]
+
+    t_abs = np.arange(len(word_f0)) * FRAME_DT
+    vibrato_mult = np.ones(len(word_f0))
+    for (s, e, vs, ve) in syll_frame_ranges:
+        if vs is None or ve is None:
+            continue
+        vowel_dur_ms = (ve - vs) * FRAME_PERIOD_MS
+        if vowel_dur_ms < VIBRATO_MIN_VOWEL_MS:
+            continue
+        inner_s = vs + round(0.4 * (ve - vs))
+        inner_e = vs + round(0.9 * (ve - vs))
+        if inner_e <= inner_s:
+            continue
+        phase = 2 * np.pi * VIBRATO_RATE_HZ * t_abs[inner_s:inner_e]
+        cents = VIBRATO_DEPTH_CENTS * np.sin(phase)
+        vibrato_mult[inner_s:inner_e] = 2.0 ** (cents / 1200.0)
+
+    final_f0 = np.where(eligible_mask, target_traj * vibrato_mult, 0.0)
+    return final_f0, word_sp, word_ap
+
+
+def build_config_with_syllable_melody(phrases, pipeline):
+    out = []
+    note_idx = 0
+    for phrase in phrases:
+        ps_full = " ".join(ps for _gs, ps, _audio in pipeline(phrase["text"], voice="af_heart"))
+        ps_words = ps_full.split()
+        word_syllables = [syllabify(classify(w)) for w in ps_words]
+        n_syllables_total = sum(len(s) for s in word_syllables)
+        melody = [NOTES_CYCLE[(note_idx + i) % len(NOTES_CYCLE)] for i in range(n_syllables_total)]
+        note_idx += n_syllables_total
+        out.append({**phrase, "word_syllables": word_syllables, "syllable_melody_hz": melody})
+    return out
+
+
+def render(phrase, words, f0, sp, ap, fs, force_obstruent_unvoiced, pin_obstruent):
+    melody_cursor = 0
+    word_waveforms = []
+    for word, sylls in zip(words, phrase["word_syllables"]):
+        n_syll = len(sylls)
+        syll_specs = []
+        start_frame = int(round(word["start"] / FRAME_DT))
+        cursor_frame = max(0, min(start_frame, len(f0) - 1))
+        end_frame_word = min(int(round(word["end"] / FRAME_DT)), len(f0))
+        remaining_frames = max(1, end_frame_word - cursor_frame)
+        per_syll_natural_frames = max(1, remaining_frames // n_syll)
+        for i, syll_phonemes in enumerate(sylls):
+            target_hz = phrase["syllable_melody_hz"][melody_cursor]
+            melody_cursor += 1
+            n_frames = per_syll_natural_frames if i < n_syll - 1 else (end_frame_word - cursor_frame)
+            natural_dur_s = max(1, n_frames) * FRAME_DT
+            target_dur_s = max(MIN_SYLLABLE_DUR_S, natural_dur_s * STRETCH)
+            syll_specs.append({
+                "phonemes": syll_phonemes, "natural_dur_s": natural_dur_s,
+                "target_dur_s": target_dur_s, "target_hz": target_hz,
+            })
+            cursor_frame += n_frames
+
+        f0_seg = f0[start_frame:end_frame_word]
+        sp_seg = sp[start_frame:end_frame_word]
+        ap_seg = ap[start_frame:end_frame_word]
+        word_f0, word_sp, word_ap = synthesize_word(
+            f0_seg, sp_seg, ap_seg, syll_specs, fs, force_obstruent_unvoiced, pin_obstruent
+        )
+        y_word = pw.synthesize(word_f0, word_sp, word_ap, fs, frame_period=FRAME_PERIOD_MS)
+        y_word = fade_edges(y_word, fs, FADE_MS)
+        word_waveforms.append(y_word)
+
+    gap_samples = np.zeros(int(round(GAP_S * fs)))
+    pieces = []
+    for i, y_word in enumerate(word_waveforms):
+        pieces.append(y_word)
+        if i < len(word_waveforms) - 1:
+            pieces.append(gap_samples)
+    return np.concatenate(pieces) if pieces else np.zeros(1)
+
+
+ARMS = {
+    "A_v3": (False, False),
+    "B_mask_only": (True, False),
+    "C_duration_only": (False, True),
+    "D_combined": (True, True),
+}
+
+
+def main(config_path, audio_dir, align_dir):
+    config = json.loads((BASE / config_path).read_text())
+    pipeline = KPipeline(lang_code="a")
+    phrases = build_config_with_syllable_melody(config["phrases"], pipeline)
+
+    for phrase in phrases:
+        wav_path = BASE / audio_dir / f"{phrase['id']}_spoken.wav"
+        align_path = BASE / align_dir / f"{phrase['id']}.json"
+        words = json.loads(align_path.read_text())
+        if len(words) != len(phrase["word_syllables"]):
+            print(f"{phrase['id']}: SKIPPED -- word-count mismatch")
+            continue
+
+        x, fs = sf.read(str(wav_path))
+        if x.ndim > 1:
+            x = x.mean(axis=1)
+        x = x.astype(np.float64)
+        spoken_rms = float(np.sqrt(np.mean(x**2)))
+
+        f0, t = pw.harvest(x, fs, frame_period=FRAME_PERIOD_MS)
+        sp = pw.cheaptrick(x, f0, t, fs)
+        ap = pw.d4c(x, f0, t, fs)
+
+        for arm_name, (force_unvoiced, pin_dur) in ARMS.items():
+            y = render(phrase, words, f0, sp, ap, fs, force_unvoiced, pin_dur)
+            sung_rms = float(np.sqrt(np.mean(y**2))) + 1e-9
+            y = y * (spoken_rms / sung_rms)
+            peak = np.abs(y).max()
+            if peak > 0.98:
+                y = y * (0.98 / peak)
+            out_path = BASE / audio_dir / f"{phrase['id']}_ablation_{arm_name}.wav"
+            sf.write(str(out_path), y, fs)
+            print(f"{phrase['id']} [{arm_name}]: wrote {out_path} ({len(y)/fs:.2f}s)")
+
+    print("\n4-arm ablation done.")
+
+
+if __name__ == "__main__":
+    config_path = sys.argv[1] if len(sys.argv) > 1 else "ablation_config.json"
+    audio_dir = sys.argv[2] if len(sys.argv) > 2 else "gate2_audio"
+    align_dir = sys.argv[3] if len(sys.argv) > 3 else "gate2_alignments"
+    main(config_path, audio_dir, align_dir)

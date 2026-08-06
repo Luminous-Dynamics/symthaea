@@ -220,8 +220,20 @@ pub struct VocalTractController {
     output_weights: Vec<f32>,
     /// Output bias (9D) — initialized to schwa defaults.
     output_bias: [f32; OUTPUT_DIM],
-    /// Current learning rate (modulated by FEP agent).
+    /// Current (effective) learning rate.
     learning_rate: f32,
+    /// Immutable baseline learning rate this controller was constructed with.
+    ///
+    /// FEP modulation derives the effective rate from THIS, not from
+    /// `learning_rate` itself -- reading the already-modulated current value
+    /// as the new baseline every tick was found (2026-07-29 verification
+    /// ledger) to compound multiplicatively without bound (up to the
+    /// `set_learning_rate` clamp) across repeated same-direction FEP actions.
+    base_learning_rate: f32,
+    /// Immutable baseline neuron time constant (seconds). `modulate_tau`
+    /// derives every neuron's tau from THIS, not from the neuron's current
+    /// `tau_base`, for the same compounding reason as `base_learning_rate`.
+    base_tau: f32,
     /// Configuration.
     config: VocalTractConfig,
     /// Optional learned prosody head: cognitive channels → F0/energy/voicing corrections.
@@ -261,8 +273,9 @@ impl VocalTractController {
         config: &VocalTractConfig,
         weight_init_scale: f32,
     ) -> Self {
+        const BASE_TAU: f32 = 0.005;
         let neuron_config = UnifiedConfig {
-            tau_base: 0.005,
+            tau_base: BASE_TAU,
             backbone_tau: 0.1,
             dimension: HDC_DIMENSION,
             learning_rate: config.learning_rate,
@@ -311,6 +324,8 @@ impl VocalTractController {
             output_weights,
             output_bias,
             learning_rate: config.learning_rate,
+            base_learning_rate: config.learning_rate,
+            base_tau: BASE_TAU,
             config: config.clone(),
             prosody_head,
             prev_frame: None,
@@ -604,10 +619,14 @@ impl VocalTractController {
     /// - `factor > 1.0`: slower, smoother (stable sustained vowels)
     pub fn modulate_tau(&mut self, factor: f32) {
         let factor = factor.clamp(0.3, 3.0);
+        // Derived from the immutable `base_tau`, not each neuron's current
+        // (possibly already-modulated) `tau_base` -- reading the live value
+        // here let repeated calls compound multiplicatively (2026-07-29
+        // verification ledger).
+        let new_tau = self.base_tau * factor;
         for layer_idx in 0..self.network.n_layers() {
             if let Some(layer) = self.network.layer_mut(layer_idx) {
                 for neuron in layer.iter_mut() {
-                    let new_tau = neuron.config().tau_base * factor;
                     neuron.set_tau_base(new_tau);
                 }
             }
@@ -621,11 +640,17 @@ impl VocalTractController {
         self.cached_cognitive_channels = channels;
     }
 
-    /// Reset network state.
+    /// Reset network state, including restoring the learning rate and every
+    /// neuron's tau to their construction-time baselines -- previously only
+    /// network state/cached frames were reset, leaving LR/tau drift from
+    /// FEP modulation permanently in place across a reset (2026-07-29
+    /// verification ledger).
     pub fn reset(&mut self) {
         self.network.reset();
         self.prev_frame = None;
         self.cached_cognitive_channels = None;
+        self.learning_rate = self.base_learning_rate;
+        self.modulate_tau(1.0);
     }
 
     /// Set the learning rate directly.
@@ -633,9 +658,16 @@ impl VocalTractController {
         self.learning_rate = lr.clamp(1e-6, 0.1);
     }
 
-    /// Get current learning rate.
+    /// Get current (effective) learning rate.
     pub fn learning_rate(&self) -> f32 {
         self.learning_rate
+    }
+
+    /// Get the immutable baseline learning rate (construction-time value).
+    /// FEP-driven modulation should derive the effective rate from this, not
+    /// from `learning_rate()`, to avoid unbounded compounding.
+    pub fn base_learning_rate(&self) -> f32 {
+        self.base_learning_rate
     }
 
     /// Set the maximum formant delta per frame (Hz). Clamped to [1.0, 50.0].

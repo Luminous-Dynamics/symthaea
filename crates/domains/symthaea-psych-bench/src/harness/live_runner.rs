@@ -14,6 +14,11 @@ use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, Consci
 
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::ContinuousHV;
+// Tier-1 observation contract (Reconciliation Plan Phase 2). Read through this trait rather
+// than `CognitiveLoopService`'s inherent methods so this crate depends on a narrow, stable
+// surface instead of the concrete ~124-135-field struct — see `symthaea_core::observation`.
+#[cfg(feature = "symthaea-backend")]
+use symthaea_core::observation::CognitiveObservation;
 
 /// A stimulus for a loop-driven benchmark trial.
 #[derive(Debug, Clone)]
@@ -178,7 +183,11 @@ impl CognitiveLoopBenchmarkRunner {
 
     /// Run warmup cycles to stabilize the loop.
     fn warmup(&mut self) {
-        let dim = self.service.state_dim();
+        // Via the `CognitiveObservation` trait, not the inherent `state_dim()`. Identical
+        // value by construction (the impl delegates straight to `state_dim()`), so this is a
+        // behavior-preserving substitution; the point is that the dependency now runs through
+        // the Tier-1 contract.
+        let dim = self.service.state_dimensions();
         let warmup_hv = ContinuousHV::random(dim, 0xDEAD_BEEF);
         for _ in 0..self.warmup_cycles {
             let _ = self.service.cycle_with_hv(&warmup_hv);
@@ -209,11 +218,11 @@ impl CognitiveLoopBenchmarkRunner {
         }
     }
 
-    /// Measure the 11 real, mechanism-specific behavioral signals available
+    /// Measure the 12 real, mechanism-specific behavioral signals available
     /// via `ablation::measure_indicator` (RPT-1, RPT-2, GWT-2, GWT-3, GWT-4,
-    /// HOT-1, HOT-2, HOT-3, PP-1, PP-2, AST-1), by reusing that same probe
-    /// code against this runner's own (non-ablated) service. GWT-1 and IIT-1
-    /// aren't measured here — see `report::BehavioralIndicatorSignals`'s doc
+    /// HOT-1, HOT-2, HOT-3, PP-1, AE-1, AE-2, AST-1), by reusing that same
+    /// probe code against this runner's own (non-ablated) service. GWT-1
+    /// isn't measured here — see `report::BehavioralIndicatorSignals`'s doc
     /// comment for why. HOT-4 needs no cognitive loop at all — see
     /// `measure_hot4_sparse_smooth_coding`.
     ///
@@ -247,7 +256,8 @@ impl CognitiveLoopBenchmarkRunner {
             hot2_meta_cognitive_accuracy: measure_indicator(&mut self.service, "HOT-2", num_cycles),
             hot3_effective_lr: measure_indicator(&mut self.service, "HOT-3", num_cycles),
             pp1_effective_lr: measure_indicator(&mut self.service, "PP-1", num_cycles),
-            pp2_hierarchical_activity: measure_indicator(&mut self.service, "PP-2", num_cycles),
+            ae1_action_diversity: measure_indicator(&mut self.service, "AE-1", num_cycles),
+            ae2_embodied_agency: measure_indicator(&mut self.service, "AE-2", num_cycles),
             ast1_attention_focus: measure_indicator(&mut self.service, "AST-1", num_cycles),
             hot4_sparsity: hot4.0,
             hot4_smoothness: hot4.1,
@@ -481,11 +491,7 @@ fn cosine_f32_vec(a: &[f32], b: &[f32]) -> f64 {
         norm_b += bi * bi;
     }
     let denom = (norm_a * norm_b).sqrt();
-    if denom > 1e-10 {
-        dot / denom
-    } else {
-        0.0
-    }
+    if denom > 1e-10 { dot / denom } else { 0.0 }
 }
 
 // ──── LoopDrivable implementations for 6 benchmarks ────

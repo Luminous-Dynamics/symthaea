@@ -441,7 +441,7 @@ mod tests {
         );
         // All should be in range
         for &f in &scale {
-            let midi = ((12.0 * (f / 440.0).log2() + 69.0).round() as i32);
+            let midi = (12.0 * (f / 440.0).log2() + 69.0).round() as i32;
             assert!(
                 midi >= 48 && midi <= 84,
                 "scale tone out of range: MIDI {midi}"

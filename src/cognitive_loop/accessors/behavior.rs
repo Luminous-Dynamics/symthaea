@@ -674,74 +674,14 @@ impl CognitiveLoopService {
             }
         }
 
-        // 3. Drain completed outcomes and record as episodic memories
-        let completed = self.governance_mgr.drain_completed();
-        if !completed.is_empty() {
-            if let Some(ref mut bus) = self.experience_bus {
-                for (outcome, gov_pe) in &completed {
-                    // Generate deterministic HDV from governance outcome content via BLAKE3 XOF.
-                    // 256 floats in [-1,1] — compact but retrievable by similarity.
-                    let gov_hdv = {
-                        let content = format!(
-                            "gov:{}:{}:{:.4}:{:.4}",
-                            outcome.proposal_id,
-                            outcome.passed,
-                            outcome.value_alignment_score,
-                            outcome.harmonic_resonance,
-                        );
-                        let mut hasher = blake3::Hasher::new();
-                        hasher.update(content.as_bytes());
-                        let mut xof = hasher.finalize_xof();
-                        let mut embedding = vec![0f32; 256];
-                        for val in &mut embedding {
-                            let mut buf = [0u8; 4];
-                            xof.fill(&mut buf);
-                            *val = (i32::from_le_bytes(buf) as f32) / (i32::MAX as f32);
-                        }
-                        embedding
-                    };
-                    // Use governance prediction error for dream consolidation priority:
-                    // high PE → surprising outcome → prioritized during sleep consolidation.
-                    let pe_for_memory = *gov_pe as f32;
-                    // Salience scales with PE: surprising outcomes are more memorable.
-                    let salience =
-                        if outcome.passed { 0.7 } else { 0.5 } + (pe_for_memory * 0.3).min(0.3);
-                    let memory = crate::experience::memory::EpisodicMemory {
-                        id: format!("gov-{}", outcome.proposal_id),
-                        timestamp: self.stats.total_cycles as u64,
-                        hdv_embedding: gov_hdv,
-                        thought_primitives: vec!["governance_outcome".to_string()],
-                        context_hash: outcome.proposal_id.clone(),
-                        user_id: None,
-                        prediction_error: pe_for_memory,
-                        uncertainty: if outcome.my_vote_aligned.is_some() {
-                            0.2
-                        } else {
-                            0.8
-                        },
-                        coherence: outcome.harmonic_resonance as f32,
-                        confidence: if outcome.my_vote_aligned == Some(true) {
-                            0.8
-                        } else {
-                            0.3
-                        },
-                        salience,
-                        kosmic_snapshot: None,
-                        outcome: None,
-                        input_summary: format!(
-                            "Governance: proposal {} {}",
-                            outcome.proposal_id,
-                            if outcome.passed { "passed" } else { "failed" }
-                        ),
-                        output_summary: format!(
-                            "alignment={:.2}, resonance={:.2}, pe={:.3}",
-                            outcome.value_alignment_score, outcome.harmonic_resonance, gov_pe,
-                        ),
-                    };
-                    bus.record_experience(memory);
-                }
-            }
-        }
+        // 3. Drain completed outcomes. This no longer feeds episodic recording (Reconciliation
+        // Plan Phase 3, 2026-07-28): the write target, `experience::memory::ExperienceRecord`
+        // (formerly name-colliding `EpisodicMemory`), had zero read consumers in the live
+        // cognitive loop — confirmed via `generate_with_experience`'s doc comment, the only
+        // reader, having zero callers. The drain call itself must stay: `completed_outcomes`
+        // is only ever cleared here (`std::mem::take`); dropping this call would make it grow
+        // unboundedly instead.
+        let _ = self.governance_mgr.drain_completed();
     }
 
     /// Apply pending neuromodulatory effects from governance events.

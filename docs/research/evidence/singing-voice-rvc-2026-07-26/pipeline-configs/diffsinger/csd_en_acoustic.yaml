@@ -1,0 +1,133 @@
+base_config:
+  - configs/acoustic.yaml
+
+dictionaries:
+  en: dictionaries/csd-en.txt
+extra_phonemes: []
+merged_phoneme_groups: []
+
+datasets:
+  - raw_data_dir: raw/csd-en
+    speaker: csd-en
+    spk_id: 0
+    language: en
+    test_prefixes:
+      - en001a
+      - en010a
+      - en025a
+      - en040a
+      - en050a
+
+binary_data_dir: data/csd-en/binary
+binarization_args:
+  num_workers: 2
+pe: parselmouth
+# 'world' (classical PyWorld decomposition, no checkpoint) instead of the
+# default 'vr' (neural, needs a separate hnsep checkpoint we don't have) --
+# fine since use_breathiness_embed/use_voicing_embed are both off, so this
+# path's actual harmonic-noise separation output is never consumed.
+hnsep: world
+vocoder: NsfHifiGAN
+vocoder_ckpt: checkpoints/nsf_hifigan_44.1k_hop512_128bin_2024.02/model.ckpt
+
+use_lang_id: false
+num_lang: 1
+use_spk_id: false
+num_spk: 1
+
+use_mix_ln: false
+
+use_energy_embed: false
+use_breathiness_embed: false
+use_voicing_embed: false
+use_tension_embed: false
+
+use_key_shift_embed: true
+use_speed_embed: true
+
+augmentation_args:
+  random_pitch_shifting:
+    enabled: true
+    range: [-5., 5.]
+    scale: 0.75
+  fixed_pitch_shifting:
+    enabled: false
+    targets: [-5., 5.]
+    scale: 0.5
+  # Disabled after diagnosing 2 identical OOM crashes at the exact same
+  # step (13) regardless of max_batch_size (8 then 3) -- both runs showed
+  # batch_size=1 throughout, so batch composition wasn't the variable.
+  # max_batch_frames' safety check operates on binarized (pre-augmentation)
+  # frame counts; random_time_stretching can inflate a sample's RUNTIME
+  # frame count up to 2x, silently defeating that budget. Deterministic
+  # sample ordering (sort_by_len) explains why both runs died at the same
+  # position. Not essential for proving the pipeline trains end-to-end.
+  random_time_stretching:
+    enabled: false
+    range: [0.5, 2.]
+    scale: 0.75
+
+# SING-17: small/bounded run to prove the pipeline end-to-end, not a
+# converged voice -- diffusion_type/backbone left at repo defaults.
+diffusion_type: reflow
+enc_ffn_kernel_size: 3
+use_rope: true
+rope_interleaved: false
+use_stretch_embed: true
+use_variance_scaling: true
+use_shallow_diffusion: true
+T_start: 0.4
+T_start_infer: 0.4
+K_step: 300
+K_step_infer: 300
+hidden_size: 384
+backbone_type: 'lynxnet2'
+backbone_args:
+  num_channels: 1024
+  num_layers: 6
+  kernel_size: 31
+  dropout_rate: 0.0
+  use_conditioner_cache: true
+  glu_type: 'atanglu'
+shallow_diffusion_args:
+  train_aux_decoder: true
+  train_diffusion: true
+  val_gt_start: false
+  aux_decoder_arch: convnext
+  aux_decoder_args:
+    num_channels: 512
+    num_layers: 6
+    kernel_size: 7
+    dropout_rate: 0.1
+  aux_decoder_grad: 0.1
+lambda_aux_mel_loss: 0.2
+
+optimizer_args:
+  optimizer_cls: modules.optimizer.muon.Muon_AdamW
+  lr: 0.0006
+  muon_args:
+    weight_decay: 0.1
+  adamw_args:
+    weight_decay: 0.0
+lr_scheduler_args:
+  step_size: 5000
+  gamma: 0.8
+# True max single sample is ~12700 frames (the 23190 figure was a phantom
+# from a stretched sample baked into stale binarized data, since fixed by
+# disabling random_time_stretching + re-binarizing). Lowered further after
+# training ran steadily to step 129 (2 full epochs) then OOM'd at an epoch
+# boundary with GPU at 7.50/7.60GB -- running too close to the ceiling at
+# steady state, not a single-outlier problem this time. 16000/2 leaves
+# real headroom instead of running at the edge.
+max_batch_frames: 16000
+max_batch_size: 2
+max_updates: 2000
+
+num_valid_plots: 5
+val_with_vocoder: true
+val_check_interval: 500
+num_ckpt_keep: 3
+permanent_ckpt_start: 2000
+permanent_ckpt_interval: 1000
+pl_trainer_devices: 'auto'
+pl_trainer_precision: '16-mixed'

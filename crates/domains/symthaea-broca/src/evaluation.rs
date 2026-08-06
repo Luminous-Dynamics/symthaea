@@ -63,8 +63,31 @@ pub struct EvalResult {
     pub perplexity: f32,
     /// Fraction of tokens that are real vocabulary words (not byte/special).
     pub english_word_ratio: f32,
-    /// Average final coherence across generated samples.
+    /// Average final coherence across generated samples **that actually measured it**.
+    ///
+    /// Read together with [`Self::coherence_samples`]: this is `0.0` when nothing was
+    /// measured, which is not the same as a measured 0.0.
     pub avg_coherence: f32,
+    /// How many generated samples contributed a real coherence measurement.
+    ///
+    /// If this is 0, [`Self::avg_coherence`] is meaningless. If it is well below
+    /// `num_samples`, the average covers only part of the suite.
+    #[serde(default)]
+    pub coherence_samples: usize,
+    /// Minimum measured coherence across the suite, and the spread around the mean.
+    ///
+    /// These exist to make a *saturated* coherence metric visible in the evidence itself
+    /// rather than requiring a code read. The Jul-10 eval artifacts reported
+    /// `avg_coherence: 1.0` across a ~9,870x perplexity regression; a `min_coherence` of
+    /// 1.0 with `coherence_stddev` of 0.0 says "this metric is pinned" immediately, whereas
+    /// the mean alone looked like a healthy score. A pinned metric is not evidence of
+    /// coherent output — it is evidence the instrument is not responding.
+    #[serde(default)]
+    pub min_coherence: Option<f32>,
+    /// Population standard deviation of measured coherence. `0.0` with a non-trivial
+    /// `coherence_samples` means the metric never moved — see [`Self::min_coherence`].
+    #[serde(default)]
+    pub coherence_stddev: Option<f32>,
     /// Per-intent quality breakdown.
     pub intent_scores: HashMap<String, IntentScore>,
     /// Number of samples evaluated.
@@ -677,7 +700,10 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
     let mut total_ce = 0.0f32;
     let mut total_ce_tokens = 0usize;
     let mut total_english_ratio = 0.0f32;
-    let mut total_coherence = 0.0f32;
+    // Every measured coherence reading, retained so the aggregate can report min/stddev and
+    // expose a pinned metric. See `EvalResult::min_coherence`. Replaces a running
+    // `total_coherence` sum, which could not distinguish "measured 0.0" from "not measured".
+    let mut coherence_readings: Vec<f32> = Vec::new();
     let mut gen_count = 0usize;
     let mut all_gen_token_ids: Vec<u32> = Vec::new(); // for distinct-n computation
     let mut all_teacher_forced_top_ids: Vec<u32> = Vec::new();
@@ -754,7 +780,13 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
         if config.compute_english_ratio {
             let result = generate_for_eval(generator, &channels, config.max_gen_tokens);
             pair_english_ratio = english_word_ratio(&result.token_ids, generator.tokenizer());
-            pair_coherence = result.final_coherence;
+            // Only aggregate coherence that was actually measured. Unmeasured generations
+            // carry a neutral placeholder, and folding those into the mean is exactly how a
+            // never-measured metric comes out looking like a confident 1.0.
+            if result.coherence_measured {
+                pair_coherence = result.final_coherence;
+                coherence_readings.push(result.final_coherence);
+            }
             total_target_overlap += target_token_overlap(&result.text, &pair.target_text);
             target_overlap_count += 1;
             if contains_refusal_language(&result.text) {
@@ -764,7 +796,6 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
                 unknown_token_rate(&result.token_ids, generator.tokenizer());
             total_code_token_rate += code_token_rate(&result.token_ids, generator.tokenizer());
             total_english_ratio += pair_english_ratio;
-            total_coherence += pair_coherence;
             all_gen_token_ids.extend_from_slice(&result.token_ids);
             gen_count += 1;
         }
@@ -800,11 +831,33 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
         0.0
     };
 
-    let avg_coherence = if gen_count > 0 {
-        total_coherence / gen_count as f32
+    // Averaged over *measured* readings only, not over all generations. Dividing by
+    // `gen_count` would silently fold in the neutral placeholder that unmeasured generations
+    // carry — the mechanism by which a never-measured metric comes out looking like a
+    // confident 1.0. `coherence_samples` reports the true denominator.
+    //
+    // Note: the per-intent breakdown below still divides by its own generation count, so
+    // under partial measurement its coherence figures read low rather than absent. The
+    // top-level `coherence_samples` is the authoritative signal for whether coherence was
+    // measured at all.
+    let coherence_samples = coherence_readings.len();
+    let avg_coherence = if coherence_samples > 0 {
+        coherence_readings.iter().sum::<f32>() / coherence_samples as f32
     } else {
         0.0
     };
+    let min_coherence = coherence_readings
+        .iter()
+        .copied()
+        .fold(None::<f32>, |acc, v| Some(acc.map_or(v, |a| a.min(v))));
+    let coherence_stddev = (coherence_samples > 0).then(|| {
+        let var = coherence_readings
+            .iter()
+            .map(|v| (v - avg_coherence).powi(2))
+            .sum::<f32>()
+            / coherence_samples as f32;
+        var.sqrt()
+    });
 
     // Per-intent scores
     let mut intent_scores = HashMap::new();
@@ -917,6 +970,9 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
         perplexity,
         english_word_ratio: english_word_ratio_avg,
         avg_coherence,
+        coherence_samples,
+        min_coherence,
+        coherence_stddev,
         intent_scores,
         num_samples: total_pairs,
         contrastive_intent_score: contrastive_score,
@@ -2267,6 +2323,13 @@ pub fn evaluate_liquid_mamba(
         perplexity,
         english_word_ratio: english_word_ratio_avg,
         avg_coherence,
+        // The Liquid-Mamba lane averages over `gen_count` and keeps no per-reading history,
+        // so it cannot yet report a measured-sample count or spread. Left unset rather than
+        // filled with a plausible-looking number — the whole point of these fields is that
+        // absent and measured must not look alike.
+        coherence_samples: 0,
+        min_coherence: None,
+        coherence_stddev: None,
         intent_scores,
         num_samples: config.dataset.len(),
         contrastive_intent_score: None,
@@ -2932,6 +2995,9 @@ mod tests {
             perplexity: 10.0,
             english_word_ratio: 0.8,
             avg_coherence: 0.8,
+            coherence_samples: 1,
+            min_coherence: Some(0.8),
+            coherence_stddev: Some(0.0),
             intent_scores: HashMap::new(),
             num_samples: 1,
             contrastive_intent_score: None,
@@ -2950,6 +3016,9 @@ mod tests {
             perplexity: 20.0,
             english_word_ratio: 0.4,
             avg_coherence: 0.3,
+            coherence_samples: 1,
+            min_coherence: Some(0.3),
+            coherence_stddev: Some(0.0),
             intent_scores: HashMap::new(),
             num_samples: 1,
             contrastive_intent_score: None,
@@ -3323,6 +3392,9 @@ mod tests {
             perplexity: 50.0,
             english_word_ratio: 0.7,
             avg_coherence: 0.5,
+            coherence_samples: 1,
+            min_coherence: Some(0.5),
+            coherence_stddev: Some(0.0),
             intent_scores,
             num_samples: 10,
             contrastive_intent_score: None,
@@ -3485,6 +3557,9 @@ mod tests {
                     perplexity: 120.5,
                     english_word_ratio: 0.45,
                     avg_coherence: 0.3,
+                    coherence_samples: 1,
+                    min_coherence: Some(0.3),
+                    coherence_stddev: Some(0.0),
                     intent_scores: HashMap::new(),
                     num_samples: 5,
                     contrastive_intent_score: None,
@@ -3599,6 +3674,9 @@ mod tests {
                     perplexity: 200.0,
                     english_word_ratio: 0.1,
                     avg_coherence: 0.1,
+                    coherence_samples: 1,
+                    min_coherence: Some(0.1),
+                    coherence_stddev: Some(0.0),
                     intent_scores: HashMap::new(),
                     num_samples: 1,
                     contrastive_intent_score: None,

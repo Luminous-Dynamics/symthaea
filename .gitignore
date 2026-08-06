@@ -3,6 +3,10 @@ target/
 target-test/
 symthaea-core/target/
 
+# Regeneratable experiment fixtures (large, derived, reproducible via the generating example --
+# see evolutionary_rescue_generate_worlds.rs's own doc comment).
+crates/domains/symthaea-futures-ensemble/fixtures/
+
 # JS/TS build output and deps (for standalone-repo cleanliness;
 # the parent monorepo already gitignores node_modules globally, but
 # sync-to-standalone ships symthaea/ without the parent gitignore).

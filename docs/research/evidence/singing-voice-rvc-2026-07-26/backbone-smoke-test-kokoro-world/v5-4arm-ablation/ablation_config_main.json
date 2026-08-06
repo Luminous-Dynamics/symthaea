@@ -1,0 +1,12 @@
+{
+  "phrases": [
+    {
+      "id": "hello_world",
+      "text": "hello world",
+      "melody_hz": [
+        261.63,
+        392.0
+      ]
+    }
+  ]
+}

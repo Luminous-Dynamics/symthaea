@@ -50,7 +50,7 @@ service, shell, demo, api_module, voice-stt, vocal-tract,
 embeddings, vision, perception, webcam, vision-manifold,
 foveation, integrity, semantic-encoder, neural-bridge,
 mesh, lz4_compression, mesh-encryption, mesh-key-exchange,
-swarm, mycelix, notifications, nix-mind, identity, physics,
+swarm, mycelix, notifications, nixward, identity, physics,
 flight, humanoid, ssm-power, ssm_language, liquid-mamba,
 lancedb-backend, multi_agent, full_consciousness,
 full_perception, full_language, magi_loop, reasoning_engine,
@@ -138,7 +138,7 @@ hal, ssm-power-hal (I2C hardware)
 | Feature | Enables | Deps |
 |---------|---------|------|
 | `notifications` | D-Bus desktop notify | zbus |
-| `nix-mind` | Conscious NixOS | symthaea-nix |
+| `nixward` | Causal NixOS diagnosis | nixward |
 | `identity` | Ed25519 signing | ed25519-dalek, sha2 |
 | `physics` | Tokamak plasma encoding | symthaea-physics |
 | `multirotor` | Multirotor FEP control | symthaea-multirotor |

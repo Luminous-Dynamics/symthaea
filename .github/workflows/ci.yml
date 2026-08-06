@@ -17,13 +17,23 @@ on:
 concurrency:
   # Group by workflow + branch so that only the latest push per branch runs.
   # Older pushes to the same branch are cancelled, avoiding runner queue backlog.
-  # workflow_dispatch gets a unique group per run and is therefore NEVER cancelled:
-  # a manual dispatch is a deliberate request for a definitive full-matrix result.
-  # Dispatch runs previously shared this group keyed on refs/heads/<branch>, so each
-  # new dispatch cancelled the previous one -- 33 of 157 jobs cancelled in the export
-  # branch's surviving run, including the entire Test Feature Combinations (25) and
-  # Test CI-safe (7) matrices. See docs/CI_FAILURE_CATALOGUE_2026-07-30.md.
-  # push/pull_request keep supersede-on-new-commit, which is correct.
+  #
+  # EXCEPT workflow_dispatch, which gets a unique group per run via run_id and is
+  # therefore never cancelled. A manual dispatch is a deliberate request for a
+  # definitive full-matrix result; killing it because someone dispatched again, or
+  # pushed, is always wrong -- and it is what made this suite unusable on the
+  # long-lived export branch. Iterating on `export/6a2fdb112e-20260727-180925`
+  # produced six head SHAs in two days; every pull_request run was `cancelled`
+  # before a 62-job matrix could finish, so whoever was working it fell back to
+  # manual dispatch -- and those then cancelled each other too. Net effect: 33 of
+  # 157 jobs cancelled in the surviving run, including the ENTIRE
+  # `Test Feature Combinations` (25 legs) and `Test CI-safe` (7 legs) matrices, so
+  # the real failure count was unknowable rather than merely bad.
+  # See symthaea/docs/CI_FAILURE_CATALOGUE_2026-07-30.md.
+  #
+  # push and pull_request keep the supersede-on-new-commit behaviour, which is
+  # correct: only the newest commit's result matters and cancelling saves runner
+  # minutes. Only the deliberate path is made non-cancellable.
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
   cancel-in-progress: true
 
@@ -42,7 +52,7 @@ jobs:
           fetch-depth: 0
 
       - name: Check for safety-critical changes
-        run: bash symthaea/scripts/check-class-a-changes.sh --ci
+        run: bash scripts/check-class-a-changes.sh --ci
 
   fmt:
     name: Format Check
@@ -76,6 +86,91 @@ jobs:
       - name: Every workspace member has a build target
         run: bash scripts/check-workspace-targets.sh
 
+      # This job was bash-only until 2026-07-30. The two cargo steps below need the SAME pinned
+      # toolchain every other cargo-running job uses; without this they would run against
+      # whatever Rust the runner image happens to ship.
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      # Added 2026-07-30. These make three guards ENFORCED rather than merely available —
+      # they were documentation until CI ran them.
+      #
+      # duplicate-scan closes the blind spot that let five crates be created in 48 hours, each
+      # falsely claiming the workspace lacked a capability it had held for months:
+      # DOMAIN_CRATES_INDEX.md indexes only crates/domains/, so in-core modules were invisible
+      # to the check meant to prevent exactly that. Fails only on an UNADJUDICATED collision,
+      # because the name heuristic ran at ~22% precision and a permanently-red check gets ignored.
+      - name: No unadjudicated duplicate-capability collisions
+        run: cargo run -q -p xtask -- duplicate-scan
+
+      # crate-status enforces "a crate's existence does not imply endorsement": stale registry
+      # entries, evidence levels with no stated basis, and production_allowed claimed below E2
+      # are hard errors. Evidence-gap findings print but do not fail (no --strict), so the gate
+      # does not go red on honest entries it cannot fix.
+      - name: Crate registry integrity
+        run: cargo run -q -p xtask -- crate-status
+
+  embodiment-safety-composition:
+    name: Embodiment Safety Composition
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fails if a platform gates motor authority on Phi without also admitting a
+      # SafetyAgent override and a moral verdict -- i.e. if an ethics verdict has
+      # no route to its actuators. Encodes the 2026-07-29 platform audit
+      # (SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md), which found
+      # exactly one such platform. Source lint, not a proof -- the script's header
+      # explains why it cannot be a Rust test (per-platform Cargo features mean no
+      # configuration compiles all 16 together).
+      - name: Phi-gating platforms compose override + moral gate
+        run: bash scripts/check-embodiment-safety-composition.sh
+
+  orphan-modules:
+    name: Orphan Module Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # rustc never warns about a .rs file no `mod` declares — it just is not
+      # part of the crate, so it never compiles and its tests never run. Three
+      # shipped-code instances were found on 2026-07-28 (see the script's header
+      # comment); one had already rotted against an API that moved under it.
+      #
+      # Enforces on all ~200 workspace members minus a QUARANTINE list of 28
+      # crates with a pre-existing backlog. This started opt-in (3 muse crates)
+      # on the assumption most of the workspace was dirty; measuring it on
+      # 2026-07-29 found 172 of 200 crates already clean, so opt-in had it
+      # backwards — it left 172 unprotected to accommodate 28. Deleting a line
+      # from QUARANTINE is how a crate gets cleaned; adding one to go green is
+      # the reflex this gate exists to catch.
+      - name: No orphan modules outside quarantine
+        run: bash scripts/check-orphan-modules.sh
+
+      - name: Report the workspace-wide backlog (informational)
+        run: bash scripts/check-orphan-modules.sh --all --summary | tail -2
+
+      # The tests/ and examples/ counterparts of the same failure class:
+      # `autotests = false` / `autoexamples = false` mean an undeclared file in
+      # those directories is never built, never run, and never warned about.
+      # Measured 2026-07-31: 177 of 204 tests/ files and 215 of 454 examples/
+      # files are dead this way.
+      #
+      # Both scripts existed before this wiring and neither had a trigger —
+      # check-orphan-tests.sh was written 2026-07-30 and was in NO workflow at
+      # all. A guard nobody runs is an instance of the very pattern it detects,
+      # which is why these are here rather than in a new script.
+      #
+      # The examples/ gate matters beyond dead code: CLAUDE.md cited
+      # benchmark_sleepstage.rs (Sleep-EDF) and benchmark_arc_reasoning.rs
+      # (ARC-AGI) as EXTERNAL VALIDATION while both were unbuildable. Ratcheted
+      # against a quarantine of the known backlog, so only NEW orphans fail.
+      - name: No orphan tests outside quarantine
+        run: bash scripts/check-orphan-tests.sh
+
+      - name: No orphan examples outside quarantine
+        run: bash scripts/check-orphan-examples.sh
+
   doc-tests:
     name: Documentation Tests
     runs-on: ubuntu-latest
@@ -99,6 +194,143 @@ jobs:
 
       - name: Run doc tests
         run: cargo test --doc
+
+  muse:
+    name: Muse (tests, studio, wasm UI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Nothing tested symthaea-muse before 2026-07-28: no job ran `-p
+    # symthaea-muse` or `--workspace` (`cargo test` at the spark-engine job is
+    # scoped by working-directory; nextest is `-p symthaea --lib`). So its 816
+    # tests had never run in CI, `studio` had never even been compiled here, and
+    # 26 warnings had accumulated — three of which turned out to be marking
+    # tests that computed a value and never asserted on it.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-muse-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-muse-
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libasound2-dev
+
+      - name: Test (default features)
+        run: cargo test -p symthaea-muse --lib
+
+      # `theory` is the canonical product path (symbolic score -> performance ->
+      # audio). It roughly doubles the compiled surface: 40.5K of the crate's
+      # 76.3K src lines sit behind this flag.
+      - name: Test (theory)
+        run: cargo test -p symthaea-muse --lib --features theory
+
+      # `studio` reaches no root-crate feature, so it was never built by any
+      # other job — despite owning the HTTP server, its CORS/path-validation
+      # logic, and the genealogy ledger.
+      #
+      # `--bins` covers every studio binary. It was briefly narrowed to
+      # --bin muse_studio because muse_motif_foundry_pilot did not compile;
+      # that binary has since been removed (it was written against 8 types
+      # that have never existed in any commit), so the wider check is back.
+      - name: Test the studio server (handlers + wire-compat)
+        run: |
+          cargo test -p symthaea-muse --features studio --bin muse_studio
+          cargo check -p symthaea-muse --features studio --bins
+
+      # Integration tests (tests/*.rs) were the THIRD blind spot in the same
+      # family as examples/ and the src/ orphan check: every step above targets
+      # --lib or a specific --bin, so nothing here had ever run tests/. That is
+      # why tests/creative_regression.rs was failing unobserved (found
+      # 2026-07-29, see its own module doc and the split-out
+      # rhythmic_regularity_gate_is_directionally_suspect).
+      #
+      # `--tests` runs EVERY test target, including any tests/*.rs added later.
+      #
+      # This originally named the two files explicitly, on the reasoning that a
+      # new integration test should be a "deliberate" addition to CI. That was
+      # backwards, and an external review caught it: the incident being repaired
+      # here is precisely that invisible targets rot because verification does
+      # not DISCOVER them. An explicit list reintroduces the same hole one file
+      # later.
+      #
+      # The cost of `--tests` is that it re-runs the lib unit tests the two
+      # steps above already cover -- about 50 seconds against a 45-minute
+      # budget. Trading a discovery blind spot for that is not a trade worth
+      # making, which is what the original comment got wrong.
+      - name: Integration tests (all test targets)
+        run: cargo test -p symthaea-muse --tests
+
+      # Examples are a blind spot no other gate covers. Cargo auto-discovers
+      # `examples/*.rs` as binary targets, so no `mod` declares them and
+      # check-orphan-modules.sh is structurally blind to them; and plain
+      # `cargo check -p <crate>` builds the lib only, so it never touches them
+      # either.
+      #
+      # That is how 35 of symthaea-music-theory's 45 examples sat broken: on
+      # 2026-07-29, 0d2a2d2090 correctly deleted the evidence_calibration
+      # subtree and verified with `cargo check -p symthaea-music-theory` —
+      # clean — while 28 examples importing the deleted Calibration* API and 7
+      # `// placeholder` stubs stayed broken and invisible. Found hours later
+      # by running `cargo build --examples` by hand.
+      #
+      # The script now catches the two static shapes (no `fn main`, placeholder
+      # stubs), but it CANNOT catch "imports a type that no longer exists" —
+      # that needs a real compile, which is this step. music-theory is
+      # serde-only and builds its examples in ~8s, so this is nearly free.
+      #
+      # LIMIT, stated rather than implied: this covers symthaea-music-theory
+      # only. symthaea-muse's own examples are not built here — the crate is
+      # heavy and several examples are feature-gated behind clap-fad/muse-live,
+      # so a full `--examples` pass risks the 45-minute budget. Extending this
+      # to muse is real follow-up work, not an oversight.
+      - name: Build symthaea-music-theory examples (the examples blind spot)
+        run: cargo build -p symthaea-music-theory --examples
+
+      # The check that would have caught the orphaned Research views: this crate
+      # only ever builds for wasm32, so a native-only job cannot cover it.
+      - name: Compile-check the wasm UI
+        run: cargo check -p symthaea-muse-ui --target wasm32-unknown-unknown
+
+      # Lint under `theory` rather than default features on purpose: several
+      # midi_export items (the ControlChange variant, cc_volume, cc_pan) are
+      # constructed only by theory-gated code, so they read as dead under
+      # default features. Linting where the code is actually live avoids
+      # contorting the source to satisfy a lint for a feature set that
+      # legitimately does not use it.
+      - name: Clippy (theory)
+        run: cargo clippy -p symthaea-muse --lib --features theory -- -D warnings
+
+      - name: Clippy (protocol + wasm UI)
+        run: |
+          cargo clippy -p symthaea-muse-protocol -- -D warnings
+          cargo clippy -p symthaea-muse-ui --target wasm32-unknown-unknown -- -D warnings
+
+      # The cognition-study apparatus is a third of this crate (51 modules,
+      # ~25.8K lines, 120 subcommands) and had never been executed before
+      # 2026-07-29 — its own check-cognition-*.sh / verify_cognition_study_*.py
+      # scripts assert on file existence and on a Python reimplementation, and
+      # never invoke the binary. This runs the real chain on synthetic
+      # responses and fails closed unless it separates an injected preference
+      # ordering from random preference. Mechanism check only; says nothing
+      # about music. See docs/research/evidence/muse-cognition-study-dryrun-2026-07-29/.
+      - name: Cognition-study pipeline dry run (manipulation check)
+        run: |
+          cargo build -p symthaea-muse --features theory --bin cognitive_study
+          crates/domains/symthaea-muse/scripts/dryrun-cognition-study.sh \
+            "$PWD/target/debug/cognitive_study"
 
   clippy:
     name: Clippy
@@ -152,7 +384,7 @@ jobs:
           embeddings,vision-manifold,foveation,\
           integrity,semantic-encoder,neural-bridge,webcam,\
           mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
-          nix-mind,identity,physics,physics-bridge,\
+          nixward,identity,physics,physics-bridge,\
           flight,humanoid,hal,ssm-power,\
           lancedb-backend,multi_agent,full_consciousness,\
           full_language,magi_loop,reasoning_engine,code_generation,\
@@ -335,32 +567,32 @@ jobs:
       - name: Phase 2.7 — Active Inference / Epistemic Modulation
         env:
           CARGO_TARGET_DIR: target/cognitive-hardening
-        run: cargo test -p symthaea-nix --lib "mind::active_inference"
+        run: cargo test -p nixward --lib "mind::active_inference"
 
       - name: Phase 2.8 — Causal Graph Topology Hardening
         env:
           CARGO_TARGET_DIR: target/cognitive-hardening
-        run: cargo test -p symthaea-nix --lib "mind::causal_graph"
+        run: cargo test -p nixward --lib "mind::causal_graph"
 
       - name: Phase 2.8 — Drift Detection Hardening
         env:
           CARGO_TARGET_DIR: target/cognitive-hardening
-        run: cargo test -p symthaea-nix --lib "mind::hdc_world_model"
+        run: cargo test -p nixward --lib "mind::hdc_world_model"
 
       - name: Phase 2.9-A — World Model Transition Hardening
         env:
           CARGO_TARGET_DIR: target/cognitive-hardening
-        run: cargo test -p symthaea-nix --lib "mind::world_model"
+        run: cargo test -p nixward --lib "mind::world_model"
 
       - name: Phase 2.9-B — Episodic Memory Boundary Tests
         env:
           CARGO_TARGET_DIR: target/cognitive-hardening
-        run: cargo test -p symthaea-nix --lib "mind::episodic_memory"
+        run: cargo test -p nixward --lib "mind::episodic_memory"
 
       - name: Phase 2.9-C — End-to-End Cross-Layer Integration
         env:
           CARGO_TARGET_DIR: target/cognitive-hardening
-        run: cargo test -p symthaea-nix --test sensor_drift_causal_action_integration
+        run: cargo test -p nixward --test sensor_drift_causal_action_integration
 
   test-hardened-daemon:
     name: Hardened Daemon Regressions
@@ -510,7 +742,7 @@ jobs:
             features: >-
               parallel,service,shell,demo,api_module,
               integrity,semantic-encoder,webcam,
-              nix-mind,identity,notifications
+              nixward,identity,notifications
           - group: core-media
             features: >-
               voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,
@@ -687,6 +919,29 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
+      - name: Compute cache-safe feature key
+        # actions/cache@v4 rejects keys containing commas -- matrix.features
+        # is comma-separated for multi-feature entries (e.g.
+        # "profile-culture,art-eye,gallery"). The previous fix for this
+        # (2026-07-26, "Key Validation Error: ... cannot contain commas")
+        # used a GitHub Actions expression `replace(matrix.features, ',',
+        # '_')` -- but the Actions expression language has no `replace`
+        # function (confirmed via actionlint; available functions are
+        # always/cancelled/case/contains/endswith/failure/format/fromjson/
+        # hashfiles/join/startswith/success/tojson). An invalid function
+        # reference fails validation for the ENTIRE workflow file, not just
+        # this job -- this silently broke every job in ci.yml, not just this
+        # one, since introduction (found 2026-07-27 verifying
+        # export-to-standalone.sh: the file had apparently never actually
+        # been evaluated by GitHub Actions since that commit). Fixed by
+        # computing the substitution in a shell step instead, matching the
+        # pattern this same file already uses elsewhere for comma-separated
+        # features (see the "Test with feature" step below).
+        id: cache-key
+        run: echo "key=${FEATURES//,/_}" >> "$GITHUB_OUTPUT"
+        env:
+          FEATURES: ${{ matrix.features }}
+
       - name: Cache cargo registry and target
         uses: actions/cache@v4
         with:
@@ -694,7 +949,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-feature-${{ matrix.features }}-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-feature-${{ steps.cache-key.outputs.key }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-feature-
 
@@ -740,11 +995,25 @@ jobs:
               # (src/lib.rs's compile_error! guard) -- default features must be off.
               # Scoped to -p symthaea: workspace default-members include
               # crates/core/*, and a bare --no-default-features (no -p) disables
-              # every default-member's own defaults too -- e.g. symthaea-nix's
+              # every default-member's own defaults too -- e.g. nixward's
               # `default = ["native"]`, breaking its native-gated tests.
               cargo test -p symthaea --lib --no-default-features --features "$FEATURES"
             else
-              cargo test --lib --features "$FEATURES"
+              # Serial threads: `cargo test --lib` (no -p) pulls in every
+              # default-member, including symthaea-core's own ~5k-test --lib
+              # suite, which segfaults under parallel execution (confirmed
+              # 2026-07-29 via a targeted experiment on the `mesh` leg: the
+              # identical command with `-- --test-threads=1` ran the full
+              # suite to completion, 6137 passed, where the parallel default
+              # SIGSEGV'd deterministically on every attempt). The exact
+              # racing test(s) haven't been isolated yet -- this trades some
+              # CI wall-clock time for a suite that actually runs and reports
+              # real pass/fail instead of a crash with zero signal. The only
+              # other job that exercises symthaea-core's tests without this
+              # flag ("Test (default features)") avoids the crash by scoping
+              # to `-p symthaea`, which never builds/runs symthaea-core's own
+              # tests at all -- not evidence the race is otherwise absent.
+              cargo test --lib --features "$FEATURES" -- --test-threads=1
             fi
 
   psych-bench:
@@ -855,7 +1124,7 @@ jobs:
           - "api_module,full_consciousness"
           - "neural-bridge,reasoning_engine"
           - "web_research_module,reasoning_engine"
-          - "nix-mind,reasoning_engine"
+          - "nixward,reasoning_engine"
           - "wasm-sandbox,reasoning_engine"
           - "integrity,full_consciousness"
           # Safety-critical interaction pairs (added 2026-03-23)
@@ -1094,9 +1363,10 @@ jobs:
           - symthaea-narrative-self
           - symthaea-consciousness-equation
           - symthaea-embeddings
+          - symthaea-evidence-plane
           - symthaea-harmonies
           - symthaea-observability
-          - symthaea-nix
+          - nixward
           - symthaea-stt
           # Robotics platform crates — every EmbodimentBridge platform gets a
           # CI leg. (symthaea-flight was the stale pre-rename name for
@@ -1121,7 +1391,11 @@ jobs:
           - symthaea-humanoid
           - symthaea-vehicle
           - symthaea-fabrication-kernel
-          - symthaea-perception
+          # symthaea-perception is deliberately in the workspace `exclude` list
+          # (ARCHIVED 2026-07-16, vision review P2.2 — real ONNX stack, zero
+          # consumers). `cargo test -p symthaea-perception` therefore cannot
+          # resolve it, and this entry failed with "did not match any packages"
+          # on every run. Re-add only if the crate is un-archived.
           - symthaea-phi-search
           - symthaea-sentinel
           - symthaea-support
@@ -1154,7 +1428,25 @@ jobs:
           sudo apt-get install -y pkg-config libssl-dev
 
       - name: Test ${{ matrix.crate }}
-        run: cargo test -p ${{ matrix.crate }}
+        # A crate can be real in the monorepo yet outside the public export's scope,
+        # so this checkout may legitimately not contain it -- symthaea-evidence-plane
+        # and nixward are both genuine crates here and absent from the export. Hard
+        # failing on that reports a PACKAGING gap as a TEST failure, which is what the
+        # 2026-07-30 CI catalogue found (two "bogus" matrix entries that are not bogus
+        # in the monorepo at all).
+        #
+        # Deleting the entries would lose the coverage where the crates do exist, so
+        # instead: skip when absent, and say so with ::notice:: -- visible in the run
+        # summary rather than silent, because a gate that quietly tests nothing is the
+        # failure mode this repo keeps hitting. When the crate IS present, its tests
+        # fail normally.
+        run: |
+          if ! cargo metadata --no-deps --format-version 1 \
+               | jq -e --arg c "${{ matrix.crate }}" '.packages[] | select(.name==$c)' >/dev/null; then
+            echo "::notice title=Crate not in this checkout::${{ matrix.crate }} is absent (export scope); skipping."
+            exit 0
+          fi
+          cargo test -p ${{ matrix.crate }}
 
   genesis-benchmarks:
     name: Genesis Mission Benchmarks
@@ -1178,8 +1470,12 @@ jobs:
             features: water-prediction
           - name: multiscale
             features: physics
+          # Spans every Genesis domain. MUST stay in sync with the
+          # `required-features` of [[example]] benchmark_genesis_temporal_unified
+          # in Cargo.toml — if this string is narrower, cargo refuses to build
+          # the target ("requires the features: ...") instead of running it.
           - name: temporal_unified
-            features: safety-agents
+            features: physics,nuclear-forensics,safety-agents
     steps:
       - uses: actions/checkout@v4
 
@@ -1204,9 +1500,31 @@ jobs:
 
       - name: Run genesis ${{ matrix.name }} benchmark
         run: |
-          output=$(cargo run --example benchmark_genesis_${{ matrix.name }} --features "${{ matrix.features }},unstable-examples" --release 2>&1)
-          echo "$output"
-          echo "$output" | grep -q "PASS" || { echo "::error::Benchmark did not print PASS"; exit 1; }
+          set -o pipefail
+          log="genesis-${{ matrix.name }}.log"
+          # Stream to the console AND to a file.
+          #
+          # Do NOT go back to `output=$(cargo run ...)`. Steps run under
+          # `bash -e`, so a non-zero cargo exit aborts the step *at the
+          # assignment* — the compiler error is captured into $output and then
+          # discarded, and the failure shows up as a completely empty step.
+          # That is what hid a plain "unresolved crate `symthaea_physics`"
+          # error in the temporal_unified leg for months.
+          if ! cargo run --example "benchmark_genesis_${{ matrix.name }}" \
+              --features "${{ matrix.features }},unstable-examples" \
+              --release 2>&1 | tee "$log"; then
+            echo "::error::genesis ${{ matrix.name }} benchmark failed to build or run — see the log above"
+            exit 1
+          fi
+          grep -q "PASS" "$log" || { echo "::error::Benchmark did not print PASS"; exit 1; }
+
+      - name: Upload genesis ${{ matrix.name }} log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: genesis-${{ matrix.name }}-log
+          path: genesis-${{ matrix.name }}.log
+          if-no-files-found: ignore
 
   stress-tests:
     name: Stress Tests (nightly)

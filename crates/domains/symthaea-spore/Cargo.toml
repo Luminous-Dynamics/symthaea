@@ -20,7 +20,7 @@ symthaea-harmonies = { path = "../symthaea-harmonies" }
 symthaea-broca = { path = "../symthaea-broca", optional = true, default-features = false }
 symthaea-neuroevolution = { path = "../symthaea-neuroevolution", optional = true }
 # NixOS config generation — WASM-safe subset (no tokio/tree-sitter/rusqlite)
-symthaea-nix = { path = "../../core/symthaea-nix", optional = true, default-features = false }
+nixward = { path = "../../core/nixward", optional = true, default-features = false }
 serde = { workspace = true }
 serde_json = { workspace = true }
 bincode = { workspace = true }
@@ -61,7 +61,7 @@ uuid = { version = "1.6", features = ["rng-getrandom"] }
 
 [features]
 default = []
-wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:console_error_panic_hook", "dep:symthaea-nix"]
+wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:console_error_panic_hook", "dep:nixward"]
 # Full Broca pipeline (Tier 2): 24-channel encoder, epistemic gating,
 # emotional modulation, coherence feedback with semantic veto.
 # No additional dependencies — uses symthaea-core HDC-CfC infrastructure.

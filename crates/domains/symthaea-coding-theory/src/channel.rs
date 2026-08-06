@@ -46,8 +46,7 @@ pub struct Probability {
 impl Probability {
     /// Construct an exact probability in the closed interval `[0, 1]`.
     pub fn new(numerator: u64, denominator: u64) -> Result<Self, ProbabilityError> {
-        let denominator =
-            NonZeroU64::new(denominator).ok_or(ProbabilityError::ZeroDenominator)?;
+        let denominator = NonZeroU64::new(denominator).ok_or(ProbabilityError::ZeroDenominator)?;
         if numerator > denominator.get() {
             return Err(ProbabilityError::NumeratorExceedsDenominator {
                 numerator,
@@ -253,11 +252,7 @@ impl SymbolErrorChannel {
 
     /// Transmit bytes and record every changed symbol.
     #[must_use]
-    pub fn transmit(
-        self,
-        symbols: &[u8],
-        rng: &mut DeterministicRng,
-    ) -> Transmission<Vec<u8>> {
+    pub fn transmit(self, symbols: &[u8], rng: &mut DeterministicRng) -> Transmission<Vec<u8>> {
         let mut received = symbols.to_vec();
         let mut corrupted_positions = Vec::new();
         for (position, symbol) in received.iter_mut().enumerate() {
@@ -307,11 +302,7 @@ impl SymbolErasureChannel {
     /// Erase symbols independently and record all erased positions, including
     /// positions whose original byte happened to equal the placeholder.
     #[must_use]
-    pub fn transmit(
-        self,
-        symbols: &[u8],
-        rng: &mut DeterministicRng,
-    ) -> Transmission<Vec<u8>> {
+    pub fn transmit(self, symbols: &[u8], rng: &mut DeterministicRng) -> Transmission<Vec<u8>> {
         let mut received = symbols.to_vec();
         let mut corrupted_positions = Vec::new();
         for (position, symbol) in received.iter_mut().enumerate() {
@@ -401,11 +392,7 @@ pub struct FixedCountErrataChannel {
 
 impl FixedCountErrataChannel {
     #[must_use]
-    pub const fn new(
-        error_count: usize,
-        erasure_count: usize,
-        erasure_placeholder: u8,
-    ) -> Self {
+    pub const fn new(error_count: usize, erasure_count: usize, erasure_placeholder: u8) -> Self {
         Self {
             error_count,
             erasure_count,
@@ -488,11 +475,7 @@ pub struct BurstXorChannel {
 impl BurstXorChannel {
     /// Apply one uniformly positioned bounded burst.
     #[must_use]
-    pub fn transmit(
-        self,
-        symbols: &[u8],
-        rng: &mut DeterministicRng,
-    ) -> Transmission<Vec<u8>> {
+    pub fn transmit(self, symbols: &[u8], rng: &mut DeterministicRng) -> Transmission<Vec<u8>> {
         let mut received = symbols.to_vec();
         let width = self.burst_len.min(received.len());
         if width == 0 || self.magnitude == 0 {
@@ -609,17 +592,20 @@ mod tests {
         let second = channel.transmit(&source, &mut second_rng).unwrap();
         assert_eq!(first, second);
         assert_eq!(first.corrupted_positions.len(), 7);
-        assert!(first
-            .corrupted_positions
-            .windows(2)
-            .all(|pair| pair[0] < pair[1]));
-        assert!(first
-            .corrupted_positions
-            .iter()
-            .all(|&position| first.received[position] == 0xEE));
+        assert!(
+            first
+                .corrupted_positions
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert!(
+            first
+                .corrupted_positions
+                .iter()
+                .all(|&position| first.received[position] == 0xEE)
+        );
         assert_eq!(
-            FixedCountErasureChannel::new(21, 0)
-                .transmit(&source, &mut first_rng),
+            FixedCountErasureChannel::new(21, 0).transmit(&source, &mut first_rng),
             Err(ChannelError::TooManyRequestedErasures {
                 requested: 21,
                 symbols: 20,
@@ -639,18 +625,24 @@ mod tests {
         assert_eq!(first.error_positions.len(), 4);
         assert_eq!(first.erasure_positions.len(), 7);
         assert_eq!(first.total_errata(), 11);
-        assert!(first
-            .error_positions
-            .iter()
-            .all(|position| first.erasure_positions.binary_search(position).is_err()));
-        assert!(first
-            .error_positions
-            .iter()
-            .all(|&position| first.received[position] != source[position]));
-        assert!(first
-            .erasure_positions
-            .iter()
-            .all(|&position| first.received[position] == 0xEE));
+        assert!(
+            first
+                .error_positions
+                .iter()
+                .all(|position| first.erasure_positions.binary_search(position).is_err())
+        );
+        assert!(
+            first
+                .error_positions
+                .iter()
+                .all(|&position| first.received[position] != source[position])
+        );
+        assert!(
+            first
+                .erasure_positions
+                .iter()
+                .all(|&position| first.received[position] == 0xEE)
+        );
     }
 
     #[test]
@@ -658,8 +650,7 @@ mod tests {
         let source = [0u8; 10];
         let mut rng = DeterministicRng::new(1);
         assert_eq!(
-            FixedCountErrataChannel::new(6, 5, 0)
-                .transmit(&source, &mut rng),
+            FixedCountErrataChannel::new(6, 5, 0).transmit(&source, &mut rng),
             Err(ChannelError::TooManyRequestedErrata {
                 errors: 6,
                 erasures: 5,
@@ -678,10 +669,12 @@ mod tests {
         let mut rng = DeterministicRng::new(9);
         let transmission = channel.transmit(&source, &mut rng);
         assert_eq!(transmission.corrupted_positions.len(), 6);
-        assert!(transmission
-            .corrupted_positions
-            .windows(2)
-            .all(|pair| pair[1] == pair[0] + 1));
+        assert!(
+            transmission
+                .corrupted_positions
+                .windows(2)
+                .all(|pair| pair[1] == pair[0] + 1)
+        );
         for &position in &transmission.corrupted_positions {
             assert_eq!(transmission.received[position], 0xA5);
         }

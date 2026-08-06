@@ -6,7 +6,7 @@ cd "$ROOT"
 source scripts/broca_runtime_crust.sh
 broca_resolve_runtime
 
-BASELINE_ROOT="${BROCA_BASELINE_ROOT:-target/broca-baselines}"
+BASELINE_ROOT="${BROCA_BASELINE_ROOT:-crates/domains/symthaea-broca/data/models/baselines}"
 BASELINE_NAME="${1:-$(date -u +%Y%m%dT%H%M%SZ)}"
 OUT_DIR="$BASELINE_ROOT/$BASELINE_NAME"
 

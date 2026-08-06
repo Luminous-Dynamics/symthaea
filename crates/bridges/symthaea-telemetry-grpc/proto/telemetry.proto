@@ -8,6 +8,11 @@ service TelemetryService {
 
 message TelemetryRequest {
   string client_id = 1;
+  // Optional shared-secret token. Only checked server-side when the
+  // server has SYMTHAEA_TELEMETRY_TOKEN set; a server run without that
+  // env var accepts any (including empty) token, preserving the prior
+  // no-auth loopback-dev-tool behavior. See lib.rs's stream_telemetry.
+  string auth_token = 2;
 }
 
 message TelemetryFrame {

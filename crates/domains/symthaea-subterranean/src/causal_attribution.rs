@@ -174,7 +174,10 @@ impl CausalAttributionLedger {
             self.ambiguities = self.ambiguities.saturating_add(1);
             (AttributionDisposition::Ambiguous, None)
         } else {
-            (AttributionDisposition::Supported, compatible.first().copied())
+            (
+                AttributionDisposition::Supported,
+                compatible.first().copied(),
+            )
         };
         let record = AttributionRecord {
             observation_id: observation.observation_id,

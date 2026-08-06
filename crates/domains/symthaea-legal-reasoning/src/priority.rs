@@ -251,23 +251,16 @@ mod tests {
         let graph = SuperiorityGraph::new(
             [id("specific"), id("general")],
             [
-                Superiority::new(
-                    id("specific"),
-                    id("general"),
-                    PriorityBasis::MoreSpecific,
-                ),
-                Superiority::new(
-                    id("specific"),
-                    id("general"),
-                    PriorityBasis::LaterInTime,
-                ),
+                Superiority::new(id("specific"), id("general"), PriorityBasis::MoreSpecific),
+                Superiority::new(id("specific"), id("general"), PriorityBasis::LaterInTime),
             ],
         )
         .unwrap();
 
         assert_eq!(graph.relations().len(), 2);
         assert_eq!(
-            graph.direct_bases(&id("specific"), &id("general"))
+            graph
+                .direct_bases(&id("specific"), &id("general"))
                 .unwrap()
                 .len(),
             2

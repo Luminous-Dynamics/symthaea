@@ -159,8 +159,7 @@ pub fn try_derive_with_trace(
     initial_facts: &[&str],
 ) -> Result<Derivation, DerivationError> {
     let strata = compute_strata(rules)?;
-    let initial_facts: BTreeSet<String> =
-        initial_facts.iter().map(|s| s.to_string()).collect();
+    let initial_facts: BTreeSet<String> = initial_facts.iter().map(|s| s.to_string()).collect();
     let mut facts = initial_facts.clone();
     let mut ordered_rules: Vec<&Rule> = rules.iter().collect();
     ordered_rules.sort_unstable();
@@ -343,10 +342,7 @@ mod tests {
 
     #[test]
     fn positive_cycles_are_valid_and_close_to_a_fixpoint() {
-        let rules = vec![
-            Rule::new(&["a"], &[], "b"),
-            Rule::new(&["b"], &[], "a"),
-        ];
+        let rules = vec![Rule::new(&["a"], &[], "b"), Rule::new(&["b"], &[], "a")];
         let facts = try_derive(&rules, &["a"]).unwrap();
         assert!(facts.contains("a"));
         assert!(facts.contains("b"));
@@ -354,10 +350,7 @@ mod tests {
 
     #[test]
     fn exception_cycles_are_rejected() {
-        let rules = vec![
-            Rule::new(&[], &["b"], "a"),
-            Rule::new(&[], &["a"], "b"),
-        ];
+        let rules = vec![Rule::new(&[], &["b"], "a"), Rule::new(&[], &["a"], "b")];
         assert!(matches!(
             try_derive(&rules, &[]),
             Err(DerivationError::NonStratified { .. })
@@ -400,12 +393,7 @@ mod tests {
             &["disenfranchised"],
             "may_vote",
         )];
-        let blocked = try_why_not(
-            &rules,
-            &["citizen", "disenfranchised"],
-            "may_vote",
-        )
-        .unwrap();
+        let blocked = try_why_not(&rules, &["citizen", "disenfranchised"], "may_vote").unwrap();
 
         assert_eq!(blocked.len(), 1);
         assert_eq!(blocked[0].missing_conditions, vec!["adult"]);

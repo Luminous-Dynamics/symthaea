@@ -1,0 +1,15 @@
+# DiffSinger acoustic checkpoint
+e80416e8f2ffcabaf9a2ac89cb22a0f3517b6049614f1e75cbd99c5273f9eec1  /var/lib/symthaea/training-runs/diffsinger/DiffSinger/checkpoints/csd-en-poc/model_ckpt_steps_2000.ckpt
+
+# RVC training checkpoints (generator only -- discriminator omitted, training-only artifact)
+fff41545f268db3e9321ab0da797d20386af8b8811821b6e4df380ebaa894f61  /var/lib/symthaea/training-runs/voice-conversion/rvc/logs/af_heart/G_2775.pth
+e6510ce0a8676a82b00bf22810b0f33a315860fe66a583213d38f5b91f298f98  /var/lib/symthaea/training-runs/voice-conversion/rvc/logs/af_heart/G_5550.pth
+81735d0fe1be0a865325df78e2e1a9c370b1f62d661ec9eefe1762b1a2210b55  /var/lib/symthaea/training-runs/voice-conversion/rvc/logs/af_heart/G_8325.pth
+669e0f08949d4894827ea73323f082a3020b7a9f72c601f200cae71b3ebab728  /var/lib/symthaea/training-runs/voice-conversion/rvc/logs/af_heart/G_22200.pth
+
+# Exported inference-ready RVC models
+8793cf6b803a8ac1989082efe1b4d6b0391275a5282cc2e37464acd02bca6c9b  /var/lib/symthaea/training-runs/voice-conversion/rvc/assets/weights/af_heart_ep25.pth
+99e92353f7782149542f4bdb7914f38d8cf88d26b5e39223cdb4ea11ef8a9f7d  /var/lib/symthaea/training-runs/voice-conversion/rvc/assets/weights/af_heart_ep50.pth
+29166d0a7626319fdf74babc49876ba9fc7bd13e0a26511e14d676d4b2905dbc  /var/lib/symthaea/training-runs/voice-conversion/rvc/assets/weights/af_heart_ep75.pth
+d71fb97206d56dfa5463cf7be34a8e531a8e90ab434bc9ed7eadb2d60b413685  /var/lib/symthaea/training-runs/voice-conversion/rvc/assets/weights/af_heart_final.pth
+a7a41fa0f2bd5e05712cb31ee5aace6d3ba3765ef95219364fe81c985f43356e  /var/lib/symthaea/training-runs/voice-conversion/rvc/assets/weights/af_heart.pth

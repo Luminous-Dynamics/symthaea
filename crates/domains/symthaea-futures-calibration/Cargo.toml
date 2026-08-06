@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-futures-calibration"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Symthaea Futures Laboratory — proper scoring rules (Brier/CRPS/log-score) and calibration curves. See SYMTHAEA_FUTURES_LABORATORY_PLAN_2026-07-25.md Phase 1 deliverables."
+
+[dependencies]
+symthaea-futures-core = { workspace = true }
+serde = { workspace = true }

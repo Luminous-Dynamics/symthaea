@@ -1,7 +1,6 @@
 use symthaea_legal_reasoning::{
-    ActionId, DeonticProposition, Jural, JuralRelation, Modality, PartyId,
-    PermissionStatus, Rule, StructuredNorm, proposition_permission_status,
-    try_derive_with_trace, try_why_not,
+    ActionId, DeonticProposition, Jural, JuralRelation, Modality, PartyId, PermissionStatus, Rule,
+    StructuredNorm, proposition_permission_status, try_derive_with_trace, try_why_not,
 };
 
 #[test]
@@ -25,11 +24,7 @@ fn derived_exception_is_order_invariant_with_identical_trace() {
 
 #[test]
 fn why_not_exposes_the_operative_exception() {
-    let rules = vec![Rule::new(
-        &["resident"],
-        &["exempt"],
-        "must_register",
-    )];
+    let rules = vec![Rule::new(&["resident"], &["exempt"], "must_register")];
     let blocked = try_why_not(&rules, &["resident", "exempt"], "must_register").unwrap();
 
     assert_eq!(blocked.len(), 1);
@@ -42,8 +37,8 @@ fn deontic_and_hohfeld_models_preserve_party_direction() {
     let employer = PartyId::new("employer").unwrap();
     let employee = PartyId::new("employee").unwrap();
     let pay = ActionId::new("pay_wage").unwrap();
-    let proposition = DeonticProposition::new(employer.clone(), pay.clone())
-        .with_beneficiary(employee.clone());
+    let proposition =
+        DeonticProposition::new(employer.clone(), pay.clone()).with_beneficiary(employee.clone());
     let norms = vec![StructuredNorm::new(
         Modality::Obligatory,
         proposition.clone(),

@@ -419,19 +419,20 @@ impl VisionManifold {
     }
 
     fn fresh_modality_context(&self) -> ModalityTemporalContext {
-        let mut context = ModalityTemporalContext::default();
-        context.object_memory = self.object_memory.as_ref().map(|memory| {
-            let mut state = memory.save_state();
-            state.tracks.clear();
-            state
-        });
-        context.working_memory = self.working_memory.as_ref().map(|memory| {
-            let mut state = memory.save_state();
-            state.slots.clear();
-            state
-        });
-        context.scene_graph_enabled = self.scene_graph.is_some();
-        context
+        ModalityTemporalContext {
+            object_memory: self.object_memory.as_ref().map(|memory| {
+                let mut state = memory.save_state();
+                state.tracks.clear();
+                state
+            }),
+            working_memory: self.working_memory.as_ref().map(|memory| {
+                let mut state = memory.save_state();
+                state.slots.clear();
+                state
+            }),
+            scene_graph_enabled: self.scene_graph.is_some(),
+            ..Default::default()
+        }
     }
 
     fn install_modality_context(&mut self, context: ModalityTemporalContext) {
@@ -986,6 +987,10 @@ impl VisionManifold {
         )
     }
 
+    // Genuinely needs this many parameters: the raw frame buffer plus its geometry
+    // (width/height/channels), the elapsed-time and optional-depth inputs the temporal/stereo
+    // pipeline requires, and the modality being observed under.
+    #[allow(clippy::too_many_arguments)]
     fn observe_frame_impl(
         &mut self,
         pixels: &[u8],
@@ -1937,7 +1942,7 @@ impl VisionManifold {
 
         let mut current = from.clone();
         // Adjust loop count to produce exactly 'steps' elements
-        let inner_steps = if steps > 1 { steps - 1 } else { 0 };
+        let inner_steps = steps.saturating_sub(1);
 
         // Science: Geodesics on the learned manifold follow the "flow"
         // defined by the system's own dynamics (CfC).
@@ -3728,13 +3733,12 @@ impl VisionManifold {
             return Err("active FEP belief contains non-finite values".to_string());
         }
 
-        if schema_version >= 3 {
-            if !(0.0..=1.0).contains(&state.scene_store_coherence_threshold)
+        if schema_version >= 3
+            && (!(0.0..=1.0).contains(&state.scene_store_coherence_threshold)
                 || !(0.0..=1.0).contains(&state.scene_store_error_threshold)
-                || !(0.0..=1.0).contains(&state.scene_dampen_factor)
-            {
-                return Err("checkpoint scene-memory policy is outside [0,1]".to_string());
-            }
+                || !(0.0..=1.0).contains(&state.scene_dampen_factor))
+        {
+            return Err("checkpoint scene-memory policy is outside [0,1]".to_string());
         }
 
         let validate_values = |name: &str, values: &[f32]| -> Result<(), String> {
@@ -3941,13 +3945,13 @@ impl VisionManifold {
                         );
                     }
                 }
-                if let Some(maximum_allocated_id) = maximum_allocated_id {
-                    if context.next_track_id <= maximum_allocated_id {
-                        return Err(format!(
-                            "modality_contexts[{context_idx}].next_track_id {} would reuse allocated track ID {maximum_allocated_id}",
-                            context.next_track_id
-                        ));
-                    }
+                if let Some(maximum_allocated_id) = maximum_allocated_id
+                    && context.next_track_id <= maximum_allocated_id
+                {
+                    return Err(format!(
+                        "modality_contexts[{context_idx}].next_track_id {} would reuse allocated track ID {maximum_allocated_id}",
+                        context.next_track_id
+                    ));
                 }
             }
         }
@@ -4075,13 +4079,13 @@ impl VisionManifold {
                     );
                 }
             }
-            if let Some(maximum_allocated_id) = maximum_allocated_id {
-                if state.next_track_id <= maximum_allocated_id {
-                    return Err(format!(
-                        "next_track_id {} would reuse allocated track ID {maximum_allocated_id}",
-                        state.next_track_id
-                    ));
-                }
+            if let Some(maximum_allocated_id) = maximum_allocated_id
+                && state.next_track_id <= maximum_allocated_id
+            {
+                return Err(format!(
+                    "next_track_id {} would reuse allocated track ID {maximum_allocated_id}",
+                    state.next_track_id
+                ));
             }
         }
         if let Some(ref trainer_state) = state.trainer_state {
@@ -4299,10 +4303,10 @@ impl VisionManifold {
             self.surprise.load_state(surprise_state);
             self.config.surprise_decay = surprise_state.decay;
         }
-        if let Some(ref predictive_state) = state.predictive_state {
-            if let Some(ref mut predictive) = self.predictive {
-                predictive.load_state(predictive_state);
-            }
+        if let Some(ref predictive_state) = state.predictive_state
+            && let Some(ref mut predictive) = self.predictive
+        {
+            predictive.load_state(predictive_state);
         }
 
         if schema_version >= 2 {
@@ -5692,7 +5696,7 @@ fn maximum_weight_assignment(scores: &[Vec<Option<f32>>]) -> Vec<Option<usize>> 
     let mut assignment = vec![None; rows];
     for col in 1..=cols {
         let row = p[col];
-        if row == 0 || col - 1 >= real_cols {
+        if row == 0 || col > real_cols {
             continue;
         }
         let score = scores[row - 1][col - 1];

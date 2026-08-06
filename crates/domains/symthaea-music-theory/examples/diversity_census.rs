@@ -103,7 +103,11 @@ const SEEDS_PER_STYLE: u64 = 25;
 // census and the Muse Atlas endpoint call the same code) — thin local
 // aliases below keep the rest of this file's call sites unchanged.
 const STRUCT_DIMS: usize = FP_STRUCT_DIMS;
-const NUM_LAYERS: usize = symthaea_music_theory::fingerprint::NUM_LAYERS;
+// Derived from `FP_LAYERS` itself rather than a separately-exported constant:
+// `fingerprint::NUM_LAYERS` never existed, so this file stopped compiling the
+// moment the fingerprint layer table moved into the crate. Deriving the count
+// from the array cannot drift again when layers are added or removed.
+const NUM_LAYERS: usize = FP_LAYERS.len();
 const LAYERS: [(&str, usize, usize); NUM_LAYERS] = FP_LAYERS;
 
 use fingerprint::exact_fingerprint;

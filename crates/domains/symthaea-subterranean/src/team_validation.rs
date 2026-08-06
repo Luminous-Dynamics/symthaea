@@ -236,6 +236,8 @@ impl TeamOperationalValidator {
             ReservationPriority::Routine,
             2.0,
             1.0,
+            false,
+            0.5,
         );
         if assessment.directive == TeamDirective::AssistPeer {
             return Err("distress heartbeat bypassed explicit rescue acceptance".to_string());

@@ -1,0 +1,99 @@
+
+====================================================================================================
+REGION: Closing phrase: 'Now I know my ABC, won't you sing along with me'
+====================================================================================================
+word      syll      phon  class      note  note_dur_ms  ph_start_ms  ph_end_ms   ph_dur_ms  frames  flags
+---------------------------------------------------------------------------------------------------------
+Now       n_au      n     nasal      61    600.0        55200.0      55270.0     70.0       6.03    
+Now       n_au      au    vowel      61    600.0        55270.0      55800.0     530.0      45.65   
+    [word-boundary pause before this syllable: NONE (no SP gap)]
+I         ai        ai    vowel      61    600.0        55800.0      56400.0     600.0      51.68   
+    [word-boundary pause before this syllable: NONE (no SP gap)]
+know      n_ou      n     nasal      68    600.0        56400.0      56470.0     70.0       6.03    
+know      n_ou      ou    vowel      68    600.0        56470.0      57000.0     530.0      45.65   
+    [word-boundary pause before this syllable: NONE (no SP gap)]
+my        m_ai      m     nasal      68    468.8        57000.0      57070.0     70.0       6.03    
+my        m_ai      ai    vowel      68    468.8        57070.0      57468.8     398.8      34.35   
+    [word-boundary pause before this syllable: NONE (no SP gap)]
+A         ei        ei    vowel      70    506.3        57618.7      58125.0     506.3      43.61   
+    [word-boundary pause before this syllable: 149.9ms]
+B         b_ii      b     stop       70    543.7        58218.8      58288.8     70.0       6.03    
+B         b_ii      ii    vowel      70    543.7        58288.8      58762.5     473.7      40.80   
+    [word-boundary pause before this syllable: 93.8ms]
+C         s_ii      s     fricative  68    450.0        58762.5      58832.5     70.0       6.03    
+C         s_ii      ii    vowel      68    450.0        58832.5      59212.5     380.0      32.73   
+    [word-boundary pause before this syllable: NONE (no SP gap)]
+won't     w_ou_n_t  w     glide      66    412.5        60000.0      60070.0     70.0       6.03    compressed_syllable(n=4)
+won't     w_ou_n_t  ou    vowel      66    412.5        60070.0      60272.5     202.5      17.44   compressed_syllable(n=4)
+won't     w_ou_n_t  n     nasal      66    412.5        60272.5      60342.5     70.0       6.03    compressed_syllable(n=4)
+won't     w_ou_n_t  t     stop       66    412.5        60342.5      60412.5     70.0       6.03    compressed_syllable(n=4)
+    [word-boundary pause before this syllable: 787.5ms]
+U         y_uu      y     glide      66    581.2        60581.3      60651.3     70.0       6.03    
+U         y_uu      uu    vowel      66    581.2        60651.3      61162.5     511.2      44.03   
+    [word-boundary pause before this syllable: 168.8ms]
+sing      s_i_ng    s     fricative  65    618.7        61162.5      61232.5     70.0       6.03    compressed_syllable(n=3)
+sing      s_i_ng    i     vowel      65    618.7        61232.5      61711.2     478.7      41.23   compressed_syllable(n=3)
+sing      s_i_ng    ng    nasal      65    618.7        61711.2      61781.2     70.0       6.03    compressed_syllable(n=3)
+    [word-boundary pause before this syllable: NONE (no SP gap)]
+?         eo        eo    vowel      65    618.8        61781.2      62400.0     618.8      53.30   
+    [word-boundary pause before this syllable: NONE (no SP gap)]
+along     l_ou_ng   l     liquid     63    600.0        62400.0      62470.0     70.0       6.03    compressed_syllable(n=3)
+along     l_ou_ng   ou    vowel      63    600.0        62470.0      62930.0     460.0      39.62   compressed_syllable(n=3)
+along     l_ou_ng   ng    nasal      63    600.0        62930.0      63000.0     70.0       6.03    compressed_syllable(n=3)
+    [word-boundary pause before this syllable: NONE (no SP gap)]
+with      w_i_dh    w     glide      63    562.5        63000.0      63070.0     70.0       6.03    compressed_syllable(n=3)
+with      w_i_dh    i     vowel      63    562.5        63070.0      63492.5     422.5      36.39   compressed_syllable(n=3)
+with      w_i_dh    dh    fricative  63    562.5        63492.5      63562.5     70.0       6.03    compressed_syllable(n=3)
+    [word-boundary pause before this syllable: NONE (no SP gap)]
+me        m_ii      m     nasal      61    318.8        63562.5      63632.5     70.0       6.03    
+me        m_ii      ii    vowel      61    318.8        63632.5      63881.3     248.8      21.43   
+    [word-boundary pause before this syllable: NONE (no SP gap)]
+
+--- SUMMARY for Closing phrase: 'Now I know my ABC, won't you sing along with me' ---
+  FLAG: word="won't" syllable='w_ou_n_t' phoneme='w' -> compressed_syllable(n=4)
+  FLAG: word="won't" syllable='w_ou_n_t' phoneme='ou' -> compressed_syllable(n=4)
+  FLAG: word="won't" syllable='w_ou_n_t' phoneme='n' -> compressed_syllable(n=4)
+  FLAG: word="won't" syllable='w_ou_n_t' phoneme='t' -> compressed_syllable(n=4)
+  FLAG: word='sing' syllable='s_i_ng' phoneme='s' -> compressed_syllable(n=3)
+  FLAG: word='sing' syllable='s_i_ng' phoneme='i' -> compressed_syllable(n=3)
+  FLAG: word='sing' syllable='s_i_ng' phoneme='ng' -> compressed_syllable(n=3)
+  FLAG: word='along' syllable='l_ou_ng' phoneme='l' -> compressed_syllable(n=3)
+  FLAG: word='along' syllable='l_ou_ng' phoneme='ou' -> compressed_syllable(n=3)
+  FLAG: word='along' syllable='l_ou_ng' phoneme='ng' -> compressed_syllable(n=3)
+  FLAG: word='with' syllable='w_i_dh' phoneme='w' -> compressed_syllable(n=3)
+  FLAG: word='with' syllable='w_i_dh' phoneme='i' -> compressed_syllable(n=3)
+  FLAG: word='with' syllable='w_i_dh' phoneme='dh' -> compressed_syllable(n=3)
+
+====================================================================================================
+REGION: Alphabet segment: H I J K L M N O P
+====================================================================================================
+word      syll      phon  class      note  note_dur_ms  ph_start_ms  ph_end_ms   ph_dur_ms  frames  flags
+---------------------------------------------------------------------------------------------------------
+H         ei_ch     ei    vowel      66    468.8        7143.7       7542.5      398.8      34.35   
+H         ei_ch     ch    affricate  66    468.8        7542.5       7612.5      70.0       6.03    
+    [word-boundary pause before this syllable: NONE (no SP gap)]
+I         ai        ai    vowel      66    431.3        7781.2       8212.5      431.3      37.15   
+    [word-boundary pause before this syllable: 168.7ms]
+J         j_ei      j     affricate  65    468.8        8325.0       8395.0      70.0       6.03    
+J         j_ei      ei    vowel      65    468.8        8395.0       8793.8      398.8      34.35   
+    [word-boundary pause before this syllable: 112.5ms]
+K         k_ei      k     stop       65    300.0        8962.5       9032.5      70.0       6.03    
+K         k_ei      ei    vowel      65    300.0        9032.5       9262.5      230.0      19.81   
+    [word-boundary pause before this syllable: 168.7ms]
+L         e_l       e     vowel      63    337.5        9525.0       9792.5      267.5      23.04   
+L         e_l       l     liquid     63    337.5        9792.5       9862.5      70.0       6.03    
+    [word-boundary pause before this syllable: 262.5ms]
+M         e_m       e     vowel      63    337.5        9862.5       10130.0     267.5      23.04   
+M         e_m       m     nasal      63    337.5        10130.0      10200.0     70.0       6.03    
+    [word-boundary pause before this syllable: NONE (no SP gap)]
+N         e_n       e     vowel      63    300.0        10200.0      10430.0     230.0      19.81   
+N         e_n       n     nasal      63    300.0        10430.0      10500.0     70.0       6.03    
+    [word-boundary pause before this syllable: NONE (no SP gap)]
+O         ou        ou    vowel      63    150.0        10500.0      10650.0     150.0      12.92   
+    [word-boundary pause before this syllable: NONE (no SP gap)]
+P         p_ii      p     stop       61    412.5        10762.5      10832.5     70.0       6.03    
+P         p_ii      ii    vowel      61    412.5        10832.5      11175.0     342.5      29.50   
+    [word-boundary pause before this syllable: 112.5ms]
+
+--- SUMMARY for Alphabet segment: H I J K L M N O P ---
+  No flags raised.

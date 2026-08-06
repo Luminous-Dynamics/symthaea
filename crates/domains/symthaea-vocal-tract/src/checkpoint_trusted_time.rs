@@ -11,9 +11,8 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    CheckpointPublicSignature, CheckpointPublicSigningKey,
-    CheckpointPublicVerificationError, CheckpointPublicVerifyingKey,
-    MAX_CHECKPOINT_PUBLIC_ARTIFACT_BYTES,
+    CheckpointPublicSignature, CheckpointPublicSigningKey, CheckpointPublicVerificationError,
+    CheckpointPublicVerifyingKey, MAX_CHECKPOINT_PUBLIC_ARTIFACT_BYTES,
 };
 
 pub const CHECKPOINT_TRUSTED_TIME_AUTHORITY_SCHEMA: &str =
@@ -106,7 +105,8 @@ impl CheckpointTrustedTimePolicy {
             || self.maximum_uncertainty_seconds == 0
             || self.maximum_uncertainty_seconds > MAX_CHECKPOINT_TRUSTED_TIME_UNCERTAINTY_SECONDS
             || self.maximum_statement_age_seconds == 0
-            || self.maximum_statement_age_seconds > MAX_CHECKPOINT_TRUSTED_TIME_STATEMENT_AGE_SECONDS
+            || self.maximum_statement_age_seconds
+                > MAX_CHECKPOINT_TRUSTED_TIME_STATEMENT_AGE_SECONDS
             || self.valid_from_unix_seconds == 0
             || self.valid_until_unix_seconds <= self.valid_from_unix_seconds
         {
@@ -368,7 +368,6 @@ impl CheckpointTrustedTimeBundle {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CheckpointTrustedTimeStaleNegativeSummary {
     pub schema: String,
@@ -423,8 +422,7 @@ pub fn verify_trusted_time_stale_negative(
     }
     candidate.verify(fresh_verification_time)?;
     if candidate.statements.iter().any(|statement| {
-        verification_time_unix_seconds
-            .saturating_sub(statement.issued_at_unix_seconds)
+        verification_time_unix_seconds.saturating_sub(statement.issued_at_unix_seconds)
             <= candidate.policy.maximum_statement_age_seconds
     }) {
         return Err(CheckpointTrustedTimeError::InvalidStaleCandidate);
@@ -486,7 +484,9 @@ impl std::fmt::Display for CheckpointTrustedTimeError {
             Self::TooLarge => "trusted-time artifact exceeds its bound",
             Self::PublicVerification => "trusted-time signature verification failed",
             Self::StaleTimeNotRejected => "stale trusted-time evidence was not rejected",
-            Self::InvalidStaleCandidate => "trusted-time stale candidate was not valid before expiry",
+            Self::InvalidStaleCandidate => {
+                "trusted-time stale candidate was not valid before expiry"
+            }
         };
         formatter.write_str(message)
     }

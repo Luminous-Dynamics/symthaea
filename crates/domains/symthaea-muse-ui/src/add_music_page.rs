@@ -6,7 +6,7 @@ use leptos::task::spawn_local;
 use leptos_router::components::A;
 use wasm_bindgen::JsCast;
 
-use crate::api::{self, ImportedWorkSummary};
+use crate::api::{self, ImportAuthorization, ImportedWorkSummary, TeachingCorpusSummary};
 use crate::state::MuseState;
 
 #[component]
@@ -15,10 +15,30 @@ pub fn AddMusicPage() -> impl IntoView {
     let file_ref = NodeRef::<leptos::html::Input>::new();
     let title = RwSignal::new(String::new());
     let contributor = RwSignal::new(String::new());
-    let authorized = RwSignal::new(false);
+    // `None` until the contributor makes an explicit choice -- there is no
+    // safe default between "I made this" and "I'm just authorized to import
+    // it", so unlike the old single checkbox this cannot default to checked.
+    let authorization = RwSignal::new(None::<ImportAuthorization>);
     let working = RwSignal::new(false);
     let status = RwSignal::new(String::new());
     let imported = RwSignal::new(None::<ImportedWorkSummary>);
+    let teaching = RwSignal::new(None::<TeachingCorpusSummary>);
+    let teaching_status = RwSignal::new("Loading the authored etudes…".to_string());
+
+    Effect::new(move |_| {
+        spawn_local(async move {
+            match api::fetch_teaching_corpus(api::DEFAULT_BACKEND).await {
+                Ok(corpus) => {
+                    teaching_status.set(format!(
+                        "{} authored etudes available · none trusted automatically",
+                        corpus.lessons.len()
+                    ));
+                    teaching.set(Some(corpus));
+                }
+                Err(error) => teaching_status.set(error),
+            }
+        });
+    });
 
     let submit = move || {
         let Some(input) = file_ref.get_untracked() else {
@@ -30,20 +50,30 @@ pub fn AddMusicPage() -> impl IntoView {
             status.set("Choose a MIDI or MusicXML file.".into());
             return;
         };
-        if title.get_untracked().trim().is_empty() || contributor.get_untracked().trim().is_empty() {
+        if title.get_untracked().trim().is_empty() || contributor.get_untracked().trim().is_empty()
+        {
             status.set("Add the work title and contributor name.".into());
             return;
         }
-        if !authorized.get_untracked() {
-            status.set("Confirm that you created this work or are authorized to import it.".into());
+        let Some(basis) = authorization.get_untracked() else {
+            status
+                .set("Choose whether you created this work or are authorized to import it.".into());
             return;
-        }
+        };
         working.set(true);
         status.set("Reconstructing score, form, and motif evidence…".into());
         let title_value = title.get_untracked();
         let contributor_value = contributor.get_untracked();
         spawn_local(async move {
-            match api::import_music(api::DEFAULT_BACKEND, file, &title_value, &contributor_value).await {
+            match api::import_music(
+                api::DEFAULT_BACKEND,
+                file,
+                &title_value,
+                &contributor_value,
+                basis,
+            )
+            .await
+            {
                 Ok(work) => {
                     status.set("Imported privately. Nothing was contributed to Foundry or global learning.".into());
                     imported.set(Some(work));
@@ -78,11 +108,21 @@ pub fn AddMusicPage() -> impl IntoView {
                         prop:value=move || contributor.get()
                         on:input=move |event| contributor.set(event_target_value(&event)) /></label>
                 </div>
-                <label class="authorship-confirmation">
-                    <input type="checkbox" prop:checked=move || authorized.get()
-                        on:change=move |event| authorized.set(event_target_checked(&event)) />
-                    <span>"I created this work or am authorized to import and revise it."</span>
-                </label>
+                <fieldset class="authorship-choice">
+                    <legend>"Whose work is this?"</legend>
+                    <label class="authorship-confirmation">
+                        <input type="radio" name="authorization-basis"
+                            prop:checked=move || authorization.get() == Some(ImportAuthorization::OwnWork)
+                            on:change=move |_| authorization.set(Some(ImportAuthorization::OwnWork)) />
+                        <span>"I created this work."</span>
+                    </label>
+                    <label class="authorship-confirmation">
+                        <input type="radio" name="authorization-basis"
+                            prop:checked=move || authorization.get() == Some(ImportAuthorization::AuthorizedImport)
+                            on:change=move |_| authorization.set(Some(ImportAuthorization::AuthorizedImport)) />
+                        <span>"I'm authorized to import and privately analyze someone else's work."</span>
+                    </label>
+                </fieldset>
                 <aside class="privacy-receipt">
                     <strong>"Permission receipt · version 1"</strong>
                     <span>"Private project only"</span>
@@ -103,6 +143,7 @@ pub fn AddMusicPage() -> impl IntoView {
                 let title = work.manifest.title.clone();
                 let playback_title = title.clone();
                 let analysis = work.analysis.clone();
+                let instrumentation_note = work.instrumentation_note.clone();
                 view! {
                     <section class="import-analysis">
                         <header>
@@ -128,11 +169,12 @@ pub fn AddMusicPage() -> impl IntoView {
                         <div class="import-actions">
                             <button type="button" on:click=move |_| muse.play_review_audio(
                                 api::imported_audio_url(api::DEFAULT_BACKEND, &audio_id), playback_title.clone())>
-                                "Play neutral rendition"
+                                "Play reconstructed rendition"
                             </button>
                             <A href="/liked">"Open Library"</A>
                             <A href="/atlas">"Show in private Atlas"</A>
                         </div>
+                        <p class="muted small">{instrumentation_note}</p>
                         <details>
                             <summary>"Unresolved interpretations"</summary>
                             <ul>{analysis.unresolved_interpretations.into_iter().map(|item| view! { <li>{item}</li> }).collect_view()}</ul>
@@ -142,6 +184,47 @@ pub fn AddMusicPage() -> impl IntoView {
                     </section>
                 }
             })}
+
+            <section class="teaching-shelf">
+                <header class="add-music-intro">
+                    <span class="eyebrow">"Teach Muse · shadow mode"</span>
+                    <h2>"Sixteen ways a composition can think"</h2>
+                    <p>
+                        "These provenance-clean etudes teach abstract strategies, never source notes. The first four have typed shadow mappings; every lesson remains authored until evidence earns a stronger status."
+                    </p>
+                    <small class="muted">{move || teaching_status.get()}</small>
+                </header>
+                <div class="teaching-grid">
+                    {move || teaching.get().map(|corpus| corpus.lessons.into_iter().map(|lesson| {
+                        let lesson_id = lesson.lesson_id.clone();
+                        let play_id = lesson_id.clone();
+                        let title = lesson.title.clone();
+                        let playback_title = title.clone();
+                        view! {
+                            <article class="teaching-card">
+                                <div>
+                                    <span class="eyebrow">{lesson.primary_dimension}</span>
+                                    <h3>{title}</h3>
+                                    <p>{lesson.subtitle}</p>
+                                </div>
+                                <p class="teaching-rule">{lesson.abstract_rule}</p>
+                                <div class="teaching-meta">
+                                    <span>{format!("{} sections", lesson.section_count)}</span>
+                                    <span>{format!("{:.0}s", lesson.duration_seconds)}</span>
+                                    <span>{if lesson.typed_shadow_mapping { "Shadow-ready" } else { "Authored" }}</span>
+                                </div>
+                                <button type="button" on:click=move |_| muse.play_review_audio(
+                                    api::teaching_audio_url(api::DEFAULT_BACKEND, &play_id),
+                                    format!("Teaching etude · {playback_title}"),
+                                )>
+                                    "Hear the etude"
+                                </button>
+                                <small class="muted">{lesson_id}</small>
+                            </article>
+                        }
+                    }).collect_view())}
+                </div>
+            </section>
         </main>
     }
 }

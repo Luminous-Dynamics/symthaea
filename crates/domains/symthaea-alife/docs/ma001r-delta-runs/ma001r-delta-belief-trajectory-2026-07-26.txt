@@ -1,0 +1,81 @@
+MA-001R-delta belief trajectory diagnostic -- resource_level=0.5 outcome_a=0.9 outcome_b=0.2 training_ticks=2000
+
+Context A raw social fields: partner_present=1.0000 given_to_partner=0.6667 received_from_partner=0.6667 encounter_count=0.9524
+Context B raw social fields: partner_present=1.0000 given_to_partner=0.0000 received_from_partner=0.0000 encounter_count=0.0000
+True raw |A-B| difference per dim: 0.0000 0.6667 0.6667 0.9524
+
+tick  ctx  belief[2..6] = partner_present  given_to_partner  received_from_partner  encounter_count
+    0    A  0.7250  0.5918  0.5961  0.7254
+    1    B  0.7613  0.3046  0.2509  0.4222
+    2    A  0.9081  0.4663  0.4603  0.7012
+    3    B  0.8978  0.2211  0.1790  0.4231
+    4    A  1.0000  0.4066  0.4219  0.7099
+    5    B  0.9677  0.1709  0.1515  0.4266
+    6    A  1.0000  0.3780  0.4151  0.7249
+    7    B  0.9721  0.1470  0.1411  0.4298
+    8    A  1.0000  0.3697  0.4177  0.7383
+    9    B  0.9741  0.1342  0.1338  0.4295
+   10    A  1.0000  0.3689  0.4220  0.7494
+   11    B  0.9752  0.1253  0.1264  0.4265
+   12    A  1.0000  0.3712  0.4267  0.7594
+   13    B  0.9761  0.1179  0.1185  0.4219
+   14    A  1.0000  0.3750  0.4317  0.7691
+   15    B  0.9735  0.1192  0.1192  0.4238
+   16    A  1.0000  0.3790  0.4351  0.7720
+   17    B  0.9709  0.1210  0.1197  0.4215
+   18    A  1.0000  0.3835  0.4391  0.7725
+   19    B  0.9680  0.1230  0.1208  0.4174
+   20    A  1.0000  0.3884  0.4439  0.7719
+   21    B  0.9648  0.1253  0.1224  0.4124
+   22    A  1.0000  0.3937  0.4492  0.7709
+   23    B  0.9604  0.1278  0.1244  0.4069
+   24    A  1.0000  0.3993  0.4549  0.7696
+   25    B  0.9544  0.1309  0.1265  0.4010
+   26    A  1.0000  0.4054  0.4608  0.7681
+   27    B  0.9481  0.1342  0.1288  0.3949
+   28    A  1.0000  0.4119  0.4668  0.7666
+   29    B  0.9413  0.1378  0.1312  0.3887
+   30    A  1.0000  0.4185  0.4729  0.7651
+   31    B  0.9340  0.1416  0.1337  0.3825
+   32    A  1.0000  0.4255  0.4791  0.7635
+   33    B  0.9263  0.1457  0.1362  0.3762
+   34    A  1.0000  0.4327  0.4853  0.7620
+   35    B  0.9182  0.1501  0.1388  0.3700
+   36    A  1.0000  0.4402  0.4915  0.7606
+   37    B  0.9096  0.1547  0.1415  0.3638
+   38    A  1.0000  0.4481  0.4977  0.7592
+   39    B  0.9006  0.1596  0.1443  0.3577
+  100    A  1.0000  0.4990  0.5608  0.8555
+  200    A  1.0000  0.5028  0.5664  0.8685
+  300    A  1.0000  0.5006  0.5639  0.8625
+  400    A  1.0000  0.5025  0.5660  0.8676
+  500    A  1.0000  0.5003  0.5635  0.8616
+  600    A  1.0000  0.5023  0.5656  0.8666
+  700    A  1.0000  0.5000  0.5631  0.8606
+  800    A  1.0000  0.5020  0.5652  0.8657
+  900    A  1.0000  0.5033  0.5668  0.8698
+ 1000    A  1.0000  0.5009  0.5644  0.8638
+ 1100    A  1.0000  0.5029  0.5665  0.8688
+ 1200    A  1.0000  0.5006  0.5640  0.8628
+ 1300    A  1.0000  0.5026  0.5661  0.8679
+ 1400    A  1.0000  0.5003  0.5636  0.8619
+ 1500    A  1.0000  0.5023  0.5657  0.8669
+ 1600    A  1.0000  0.5001  0.5632  0.8609
+ 1700    A  1.0000  0.5021  0.5653  0.8659
+ 1800    A  1.0000  0.5033  0.5669  0.8701
+ 1900    A  1.0000  0.5010  0.5645  0.8640
+ 1995    B  0.9298  0.0765  0.0486  0.2612
+ 1996    A  1.0000  0.5032  0.5668  0.8697
+ 1997    B  0.9324  0.0732  0.0450  0.2581
+ 1998    A  1.0000  0.5009  0.5644  0.8638
+ 1999    B  0.9297  0.0768  0.0491  0.2614
+
+=== Late-window analysis (ticks 1900..2000) ===
+  ticks presenting context A in this window: 50, context B: 50
+  dim                     amplitude(max-min)  mean|ctx=A  mean|ctx=B  true_raw_|A-B|  tracking_ratio
+  partner_present                  0.072494      1.0000      0.9300          0.0000  NaN
+  given_to_partner                 0.430311      0.5015      0.0763          0.6667  0.6378
+  received_from_partner            0.522087      0.5649      0.0485          0.6667  0.7745
+  encounter_count                  0.612022      0.8650      0.2610          0.9524  0.6342
+
+Interpretation guide: tracking_ratio near 1.0 (and amplitude close to true_raw_|A-B|) means belief cleanly alternates between the two contexts' true field values each tick (tracks). tracking_ratio near 0 (and small amplitude relative to true_raw_|A-B|) means belief has settled onto a single damped/smeared value that barely distinguishes the two contexts (smears). Judge from the actual numbers above, not this guide alone.

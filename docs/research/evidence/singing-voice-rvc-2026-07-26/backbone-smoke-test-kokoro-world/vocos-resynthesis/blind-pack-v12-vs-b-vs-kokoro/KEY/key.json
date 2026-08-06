@@ -1,0 +1,152 @@
+{
+  "clip_01": {
+    "phrase": "consonant_clusters",
+    "condition": "K",
+    "condition_label": "spoken Kokoro TTS (reference anchor -- not a singing candidate)",
+    "target_text": "strong streams splashed strangely",
+    "src": "/var/lib/symthaea/training-runs/kokoro-world-vocoder/gate2_audio/consonant_clusters_spoken.wav",
+    "gain_applied": 2.268,
+    "peak_after_dbfs": -1.0,
+    "duration_s": 2.5
+  },
+  "clip_02": {
+    "phrase": "positive_control",
+    "condition": "B",
+    "condition_label": "Arm B (event-informed masking, WORLD vocoder)",
+    "target_text": "won't you sing along with me",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/positive_control_sung_v10full_b.wav",
+    "gain_applied": 3.068,
+    "peak_after_dbfs": -1.0,
+    "duration_s": 2.25
+  },
+  "clip_03": {
+    "phrase": "short_unstressed",
+    "condition": "K",
+    "condition_label": "spoken Kokoro TTS (reference anchor -- not a singing candidate)",
+    "target_text": "it is what it is to me",
+    "src": "/var/lib/symthaea/training-runs/kokoro-world-vocoder/gate2_audio/short_unstressed_spoken.wav",
+    "gain_applied": 2.1848,
+    "peak_after_dbfs": -1.0,
+    "duration_s": 1.82
+  },
+  "clip_04": {
+    "phrase": "positive_control",
+    "condition": "K",
+    "condition_label": "spoken Kokoro TTS (reference anchor -- not a singing candidate)",
+    "target_text": "won't you sing along with me",
+    "src": "/var/lib/symthaea/training-runs/kokoro-world-vocoder/gate2_audio/positive_control_spoken.wav",
+    "gain_applied": 2.8649,
+    "peak_after_dbfs": -1.0,
+    "duration_s": 1.98
+  },
+  "clip_05": {
+    "phrase": "fricative_heavy",
+    "condition": "K",
+    "condition_label": "spoken Kokoro TTS (reference anchor -- not a singing candidate)",
+    "target_text": "she sells seashells by the seashore",
+    "src": "/var/lib/symthaea/training-runs/kokoro-world-vocoder/gate2_audio/fricative_heavy_spoken.wav",
+    "gain_applied": 2.3469,
+    "peak_after_dbfs": -1.0,
+    "duration_s": 2.38
+  },
+  "clip_06": {
+    "phrase": "long_sustained_vowels",
+    "condition": "B",
+    "condition_label": "Arm B (event-informed masking, WORLD vocoder)",
+    "target_text": "moon over the blue lagoon",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/long_sustained_vowels_sung_v10full_b.wav",
+    "gain_applied": 3.5059,
+    "peak_after_dbfs": -1.0,
+    "duration_s": 2.2
+  },
+  "clip_07": {
+    "phrase": "positive_control",
+    "condition": "V",
+    "condition_label": "v12 (Arm B resynthesized through Vocos charactr/vocos-mel-24khz)",
+    "target_text": "won't you sing along with me",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/positive_control_sung_v12_vocos.wav",
+    "gain_applied": 3.0584,
+    "peak_after_dbfs": -1.0,
+    "duration_s": 2.25
+  },
+  "clip_08": {
+    "phrase": "short_unstressed",
+    "condition": "B",
+    "condition_label": "Arm B (event-informed masking, WORLD vocoder)",
+    "target_text": "it is what it is to me",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/short_unstressed_sung_v10full_b.wav",
+    "gain_applied": 2.7291,
+    "peak_after_dbfs": -1.0,
+    "duration_s": 2.32
+  },
+  "clip_09": {
+    "phrase": "fricative_heavy",
+    "condition": "V",
+    "condition_label": "v12 (Arm B resynthesized through Vocos charactr/vocos-mel-24khz)",
+    "target_text": "she sells seashells by the seashore",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/fricative_heavy_sung_v12_vocos.wav",
+    "gain_applied": 2.2875,
+    "peak_after_dbfs": -1.0,
+    "duration_s": 2.55
+  },
+  "clip_10": {
+    "phrase": "fricative_heavy",
+    "condition": "B",
+    "condition_label": "Arm B (event-informed masking, WORLD vocoder)",
+    "target_text": "she sells seashells by the seashore",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/fricative_heavy_sung_v10full_b.wav",
+    "gain_applied": 2.2083,
+    "peak_after_dbfs": -1.0,
+    "duration_s": 2.55
+  },
+  "clip_11": {
+    "phrase": "long_sustained_vowels",
+    "condition": "K",
+    "condition_label": "spoken Kokoro TTS (reference anchor -- not a singing candidate)",
+    "target_text": "moon over the blue lagoon",
+    "src": "/var/lib/symthaea/training-runs/kokoro-world-vocoder/gate2_audio/long_sustained_vowels_spoken.wav",
+    "gain_applied": 2.2678,
+    "peak_after_dbfs": -1.0,
+    "duration_s": 2.08
+  },
+  "clip_12": {
+    "phrase": "consonant_clusters",
+    "condition": "V",
+    "condition_label": "v12 (Arm B resynthesized through Vocos charactr/vocos-mel-24khz)",
+    "target_text": "strong streams splashed strangely",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/consonant_clusters_sung_v12_vocos.wav",
+    "gain_applied": 3.1098,
+    "peak_after_dbfs": -1.0,
+    "duration_s": 1.97
+  },
+  "clip_13": {
+    "phrase": "short_unstressed",
+    "condition": "V",
+    "condition_label": "v12 (Arm B resynthesized through Vocos charactr/vocos-mel-24khz)",
+    "target_text": "it is what it is to me",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/short_unstressed_sung_v12_vocos.wav",
+    "gain_applied": 1.9338,
+    "peak_after_dbfs": -1.0,
+    "duration_s": 2.31
+  },
+  "clip_14": {
+    "phrase": "consonant_clusters",
+    "condition": "B",
+    "condition_label": "Arm B (event-informed masking, WORLD vocoder)",
+    "target_text": "strong streams splashed strangely",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/consonant_clusters_sung_v10full_b.wav",
+    "gain_applied": 2.6583,
+    "peak_after_dbfs": -1.0,
+    "duration_s": 1.98
+  },
+  "clip_15": {
+    "phrase": "long_sustained_vowels",
+    "condition": "V",
+    "condition_label": "v12 (Arm B resynthesized through Vocos charactr/vocos-mel-24khz)",
+    "target_text": "moon over the blue lagoon",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/long_sustained_vowels_sung_v12_vocos.wav",
+    "gain_applied": 3.2274,
+    "peak_after_dbfs": -1.0,
+    "duration_s": 2.2
+  }
+}

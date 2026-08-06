@@ -3,13 +3,22 @@
 //! Full-pipeline streaming PCM synthesis with all consciousness-coupled modules.
 //!
 //! [`StreamingSynth`] integrates:
-//! - Wavetable morphing (consciousness → table selection)
 //! - Sidechain ducking (lead → bass/harmony gain reduction)
 //! - Consciousness reverb (Phi → room, harmonies → early reflections)
 //! - Binaural rendering (Phi → spatial spread, harmonies → positions)
 //! - Audio feedback (output → feature extraction → state modulation)
 //! - Phi optimizer (target Phi → parameter perturbation)
 //! - Substrate timbre (substrate type → synthesis character)
+//!
+//! **Not currently integrated, despite being allocated here** (found
+//! 2026-07-28 by a review that turned on this crate's own compiler
+//! warnings for the first time — see below): wavetable morphing. A
+//! [`WavetableOscillator`] is constructed per active note and a
+//! [`WavetableBank`] per synth, but neither is ever read, so consciousness
+//! never selects a table and no morphing happens. This doc previously
+//! listed it first among the integrated modules; that claim was wrong.
+//! Wiring it is deferred rather than done inline because it changes what
+//! Muse sounds like and wants a listening check, not just a green build.
 
 use crate::aesthetic_listener::AestheticListener;
 use crate::ambient_drone::AmbientDrone;
@@ -55,6 +64,16 @@ const GAIN_MIN: f32 = 0.22;
 /// Reduced from 0.30 to prevent clipping when drums + notes overlap at high arousal.
 const GAIN_AROUSAL_COEFF: f32 = 0.20;
 /// Valence gain modulation ±15%. Huron (2006): happy music performed louder.
+///
+/// NOT WIRED (2026-07-28). Nothing reads this — valence has no effect on
+/// gain today, only arousal does (via `GAIN_AROUSAL_COEFF` at the
+/// `master_gain` site below). Deliberately left in place rather than
+/// deleted: the intent and its citation are real, and wiring it is a
+/// one-line change at that site. It was NOT wired as part of the review
+/// that found it because `GAIN_AROUSAL_COEFF`'s own comment records that
+/// gain was already *reduced* (0.30 → 0.20) to stop drums+notes clipping
+/// at high arousal, so adding another +15% needs a listening check.
+#[allow(dead_code)] // documented-but-unwired coupling; see doc comment above
 const VALENCE_GAIN_SCALE: f32 = 0.15;
 
 /// Dopamine→brightness floor. Minimum spectral brightness even at DA=0.
@@ -63,8 +82,18 @@ const BRIGHTNESS_FLOOR: f32 = 0.3;
 const BRIGHTNESS_DA_SCALE: f32 = 0.7;
 
 /// Base attack time (seconds) at full arousal. Fast transients = excited.
+///
+/// NOT WIRED (2026-07-28), together with [`ATTACK_AROUSAL_SCALE`] below:
+/// nothing reads either, so arousal does not shape envelope attack time.
+/// Kept rather than deleted for the same reason as [`VALENCE_GAIN_SCALE`] —
+/// the intent is real and the wiring is small, but it is an audible change
+/// that should land with a listening check rather than inside a
+/// clear-the-warnings pass.
+#[allow(dead_code)] // documented-but-unwired coupling; see doc comment above
 const ATTACK_BASE: f32 = 0.01;
 /// Attack lengthening at zero arousal. Slow onsets = calm.
+/// NOT WIRED — see [`ATTACK_BASE`].
+#[allow(dead_code)] // documented-but-unwired coupling; see ATTACK_BASE
 const ATTACK_AROUSAL_SCALE: f32 = 0.05;
 
 /// Phi-vibrato rate (Hz). Co-prime with typical musical vibrato (5-6Hz).
@@ -132,9 +161,19 @@ struct ActiveNote {
     total_samples: usize,
     partial_phases: Vec<f32>,
     fm_phase: f32,
+    /// NOT WIRED (2026-07-28): set to real per-voice positions at the two
+    /// construction sites below, but never read. Stereo placement actually
+    /// comes from the separate `pans` table inside the Haas/wide-panning
+    /// block in `render_chunk`, so this field is a second, ignored copy of
+    /// the same idea rather than an unimplemented feature. Left in place
+    /// pending a decision on which of the two should own panning.
+    #[allow(dead_code)]
     pan: f32,
     volume: f32,
     voice_idx: usize,
+    /// NOT WIRED (2026-07-28): constructed per note but never ticked, so no
+    /// wavetable morphing reaches the output. See this module's doc comment.
+    #[allow(dead_code)]
     wavetable_osc: WavetableOscillator,
     vibrato_phase: f32,
     /// Instrument assigned to this note.
@@ -169,6 +208,9 @@ pub struct StreamingSynth {
     sidechain: DuckingMatrix,
     feedback: AudioFeedbackEncoder,
     phi_optimizer: PhiOptimizer,
+    /// NOT WIRED (2026-07-28): the bank is built but never read — see this
+    /// module's doc comment and [`ActiveNote::wavetable_osc`].
+    #[allow(dead_code)]
     wavetable_bank: WavetableBank,
     substrate: Option<SubstrateTimbreModifier>,
     /// Aesthetic self-listener: judges beauty, corrects harshness.
@@ -596,7 +638,26 @@ impl StreamingSynth {
                         let s = samp.data[idx] * (1.0 - frac) + samp.data[idx + 1] * frac;
                         Some(s * env)
                     } else {
-                        None
+                        // Recording exhausted. The `else` branch below (pure
+                        // additive, full-bandwidth, no manifold blend) is a
+                        // categorically different signal from this branch's
+                        // sample+LP-filtered-additive blend -- switching
+                        // branches at full amplitude the instant data runs
+                        // out was an audible identity-swap artifact on any
+                        // note whose duration+release outlasts its
+                        // recording (long/held notes: arrival cadences,
+                        // climaxes). Extend a short fading tail from the
+                        // last valid frame so THIS branch's own
+                        // contribution has already decayed toward silence
+                        // by the time control passes to pure additive,
+                        // rather than jumping there at full strength.
+                        const GRACE_SAMPLES: f64 = 200.0; // ~4.5ms at 44.1kHz
+                        let last_idx = samp.data.len().saturating_sub(2);
+                        let overrun = idx as f64 - last_idx as f64;
+                        (overrun < GRACE_SAMPLES).then(|| {
+                            let fade = (1.0 - overrun / GRACE_SAMPLES) as f32;
+                            samp.data[last_idx] * env * fade
+                        })
                     }
                 });
 
@@ -1458,7 +1519,8 @@ impl StreamingSynth {
                 // Lead uses the melody note as-is. Bass/harmony/ostinato derive
                 // musically related pitches from the lead frequency.
                 let note_counter = self.note_counter;
-                let voice_idx = 0_usize; // Lead voice always gets the melody note
+                // (Lead voice always gets the melody note as-is; the
+                // accompaniment voices below derive from its frequency.)
 
                 // Spawn accompaniment voices alongside lead (not randomly)
                 // Bass: every 2nd note, octave below
@@ -1786,11 +1848,18 @@ mod tests {
         for _ in 0..20 {
             s.render_chunk();
         }
-        // Audio feedback should have modified state
         let features = s.feedback_features();
         assert!(
             features.rms_energy > 0.0 || features.spectral_centroid > 0.0,
             "feedback should detect audio features"
+        );
+        // Detecting features is only half the loop. The property this test is
+        // named for is that the detected audio feeds BACK into state — with
+        // feedback_strength at max and 20 rendered chunks, arousal must have
+        // moved off its starting value.
+        assert!(
+            (s.state.arousal - orig_arousal).abs() > f32::EPSILON,
+            "audio feedback should modify state: arousal stayed at {orig_arousal}"
         );
     }
 

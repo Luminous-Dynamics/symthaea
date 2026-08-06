@@ -350,6 +350,29 @@ impl CognitiveLoopService {
                             }
                         }
                     }
+                    // ── A1.1 consumption-boundary record ─────────────────────
+                    // What the safety path ACTUALLY consumed, captured at the point
+                    // the tier is selected. Write-side provenance cannot establish
+                    // this; see GateConsumption's doc and the Phase 4 protocol's
+                    // Amendment 1. `from_phi` here is the real production classifier,
+                    // not a reimplemented ladder, so the record cannot drift from what
+                    // platforms actually do.
+                    let (consumed_writer, consumed_written_at) = (
+                        self.carryover.history.consciousness_level_source,
+                        self.carryover.history.consciousness_level_written_at,
+                    );
+                    self.sensorimotor.last_gate_consumption =
+                        Some(crate::cognitive_loop::types::GateConsumption {
+                            cycle_index: self.stats.total_cycles,
+                            consumed_value: phi,
+                            resulting_tier: symthaea_core::embodiment::MotorSafetyLevel::from_phi(
+                                phi,
+                            ),
+                            platform: bridge.platform(),
+                            writer: consumed_writer,
+                            written_at: consumed_written_at,
+                        });
+
                     let result = bridge.step(&thought_hv, dt, phi);
                     if result.success {
                         let proprioceptive_hv = bridge.encode_perception();
@@ -421,16 +444,13 @@ impl CognitiveLoopService {
                     }
                 },
                 self.stats.total_cycles as usize,
-                {
-                    #[cfg(feature = "sentinel")]
-                    {
-                        Some(&self.collective_immune_state)
-                    }
-                    #[cfg(not(feature = "sentinel"))]
-                    {
-                        None
-                    }
-                },
+                // `SafetySupervisor::assess`'s 6th parameter is itself declared
+                // `#[cfg(feature = "sentinel")]` (safety_supervisor.rs:34), so the
+                // argument must disappear with it — an inner `cfg` block would still
+                // pass 6 arguments to a 5-argument method. Same pattern as the
+                // `compute_enforcement` call at safety_supervisor.rs:44-48.
+                #[cfg(feature = "sentinel")]
+                Some(&self.collective_immune_state),
             );
 
             self.apply_safety_gates(&safety_result, feedback.consciousness.consciousness_level);

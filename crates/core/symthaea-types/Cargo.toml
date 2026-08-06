@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Shared types for the Symthaea ecosystem — Eight Harmonies, value alignment, and common enums"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["consciousness", "harmonies", "types", "values", "alignment"]
 categories = ["science"]
 

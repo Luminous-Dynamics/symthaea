@@ -60,8 +60,7 @@ pub struct RepetitionCode {
 impl RepetitionCode {
     /// Construct a code with a non-zero odd repetition count.
     pub fn new(repetitions: usize) -> Result<Self, RepetitionError> {
-        let repetitions =
-            NonZeroUsize::new(repetitions).ok_or(RepetitionError::ZeroRepetitions)?;
+        let repetitions = NonZeroUsize::new(repetitions).ok_or(RepetitionError::ZeroRepetitions)?;
         if repetitions.get() % 2 == 0 {
             return Err(RepetitionError::EvenRepetitions {
                 repetitions: repetitions.get(),
@@ -147,11 +146,7 @@ impl RepetitionCode {
     }
 
     /// Decode into an exactly-sized caller-owned buffer.
-    pub fn decode_into(
-        self,
-        received: &[u8],
-        output: &mut [u8],
-    ) -> Result<(), RepetitionError> {
+    pub fn decode_into(self, received: &[u8], output: &mut [u8]) -> Result<(), RepetitionError> {
         let expected = self.decoded_len(received.len())?;
         if output.len() != expected {
             return Err(RepetitionError::OutputLengthMismatch {
@@ -178,10 +173,7 @@ pub fn encode_checked(bits: &[u8], repetitions: usize) -> Result<Vec<u8>, Repeti
 }
 
 /// Checked repetition decoding with complete groups and no tie policy.
-pub fn decode_checked(
-    received: &[u8],
-    repetitions: usize,
-) -> Result<Vec<u8>, RepetitionError> {
+pub fn decode_checked(received: &[u8], repetitions: usize) -> Result<Vec<u8>, RepetitionError> {
     RepetitionCode::new(repetitions)?.decode(received)
 }
 
@@ -213,10 +205,7 @@ pub fn decode(received: &[u8], n: usize) -> Vec<u8> {
     received
         .chunks_exact(n)
         .map(|group| {
-            let ones = group
-                .iter()
-                .map(|&bit| usize::from(bit & 1))
-                .sum::<usize>();
+            let ones = group.iter().map(|&bit| usize::from(bit & 1)).sum::<usize>();
             u8::from(ones > n / 2)
         })
         .collect()
@@ -335,11 +324,7 @@ mod tests {
         assert!(decode(&[1, 1], 0).is_empty());
     }
 
-    fn for_each_combination(
-        population: usize,
-        choose: usize,
-        visit: &mut impl FnMut(&[usize]),
-    ) {
+    fn for_each_combination(population: usize, choose: usize, visit: &mut impl FnMut(&[usize])) {
         fn recurse(
             start: usize,
             population: usize,

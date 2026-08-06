@@ -109,16 +109,12 @@ pub fn resolve_literal(
 
     let undefeated_support: Vec<RuleId> = positive
         .iter()
-        .filter(|rule| {
-            rule.kind != RuleKind::Defeater && !defeated_positive.contains(&rule.id)
-        })
+        .filter(|rule| rule.kind != RuleKind::Defeater && !defeated_positive.contains(&rule.id))
         .map(|rule| rule.id.clone())
         .collect();
     let undefeated_opposition: Vec<RuleId> = negative
         .iter()
-        .filter(|rule| {
-            rule.kind != RuleKind::Defeater && !defeated_negative.contains(&rule.id)
-        })
+        .filter(|rule| rule.kind != RuleKind::Defeater && !defeated_negative.contains(&rule.id))
         .map(|rule| rule.id.clone())
         .collect();
 
@@ -277,12 +273,7 @@ mod tests {
         Literal::Negative(Atom::new(value).unwrap())
     }
 
-    fn rule(
-        id: &str,
-        kind: RuleKind,
-        premise: &str,
-        conclusion: Literal,
-    ) -> FormalRule {
+    fn rule(id: &str, kind: RuleKind, premise: &str, conclusion: Literal) -> FormalRule {
         FormalRule::new(
             RuleId::new(id).unwrap(),
             kind,
@@ -334,18 +325,8 @@ mod tests {
             "condition",
             positive("enter"),
         );
-        let deny = rule(
-            "deny",
-            RuleKind::Defeasible,
-            "condition",
-            negative("enter"),
-        );
-        let pack = RulePack::new(
-            RulePackId::new("entry").unwrap(),
-            [allow, deny],
-            [],
-        )
-        .unwrap();
+        let deny = rule("deny", RuleKind::Defeasible, "condition", negative("enter"));
+        let pack = RulePack::new(RulePackId::new("entry").unwrap(), [allow, deny], []).unwrap();
         let facts = [positive("condition")].into_iter().collect();
 
         assert_eq!(
@@ -368,12 +349,8 @@ mod tests {
             "citizen",
             negative("appeal"),
         );
-        let pack = RulePack::new(
-            RulePackId::new("appeal").unwrap(),
-            [strict, contrary],
-            [],
-        )
-        .unwrap();
+        let pack =
+            RulePack::new(RulePackId::new("appeal").unwrap(), [strict, contrary], []).unwrap();
         let facts = [positive("citizen")].into_iter().collect();
 
         assert_eq!(
@@ -431,12 +408,7 @@ mod tests {
 
     #[test]
     fn defeater_blocks_without_establishing_its_conclusion() {
-        let deny = rule(
-            "deny",
-            RuleKind::Defeasible,
-            "condition",
-            negative("enter"),
-        );
+        let deny = rule("deny", RuleKind::Defeasible, "condition", negative("enter"));
         let blocker = rule(
             "block-denial",
             RuleKind::Defeater,

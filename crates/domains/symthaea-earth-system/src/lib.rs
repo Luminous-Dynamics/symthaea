@@ -49,8 +49,8 @@ pub use calibration::{
 };
 pub use carbon::{
     BudgetHeadroomRange, DEFAULT_TCRE_ESTIMATE, TcreEstimate, WarmingRange,
-    central_tcre_budget_headroom_carbon, central_tcre_budget_headroom_co2, remaining_carbon_budget,
-    remaining_co2_budget, warming_from_cumulative_carbon, warming_from_cumulative_co2,
+    central_tcre_budget_headroom_carbon, central_tcre_budget_headroom_co2,
+    warming_from_cumulative_carbon, warming_from_cumulative_co2,
 };
 pub use carbon_cycle::{
     CarbonClimateModel, CarbonClimateSample, CarbonClimateState, CarbonSample, CarbonState,
@@ -95,9 +95,8 @@ pub use transient::{
 };
 
 pub use energy_balance::{
-    EnergyBalanceModel, co2_radiative_forcing, co2_radiative_forcing_myhre1998,
-    effective_emissivity_surface_temperature, effective_temperature, equilibrium_warming,
-    grey_atmosphere_surface_temperature, stefan_boltzmann_temperature, try_blackbody_flux,
+    EnergyBalanceModel, co2_radiative_forcing_myhre1998, effective_emissivity_surface_temperature,
+    effective_temperature, equilibrium_warming, stefan_boltzmann_temperature, try_blackbody_flux,
     try_co2_radiative_forcing_myhre1998, try_effective_emissivity_surface_temperature,
     try_effective_temperature, try_stefan_boltzmann_temperature,
 };

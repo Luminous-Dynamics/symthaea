@@ -5,7 +5,9 @@
 //! A phrase develops a motif over a chord progression, snapping strong-beat
 //! notes to chord tones (so the line is heard *as* the harmony) while leaving
 //! weak-beat notes as diatonic passing/neighbor tones (the stepwise motion
-//! that gives a line life). It ends on a cadence.
+//! that gives a line life) -- or, on a strong beat, as a genuine SUSPENSION
+//! when the dissonance is prepared (the same pitch carried from the previous
+//! chord) and resolves down by step. It ends on a cadence.
 //!
 //! A [`Period`] pairs an **antecedent** (ends on a Half cadence — an
 //! unresolved musical *question*) with a **consequent** built from the same
@@ -286,46 +288,155 @@ impl Period {
 }
 
 /// Realize a sequence of per-measure motif variants over `progression`,
-/// re-anchoring each to its chord's root and snapping strong beats to chord
-/// tones. `variant_for(measure_idx)` supplies the (relative-degree-space)
-/// motif to state in that measure, BEFORE the per-chord re-anchor. Shared by
-/// [`Phrase::build`] (development-by-inversion) and
-/// [`Phrase::build_sentence`] (development-by-fragmentation) so both phrase
-/// archetypes share one strong-beat/chord-fitting implementation.
+/// re-anchoring each to its chord's root, snapping strong beats to chord
+/// tones, and legitimizing (or correcting) weak beats as genuine
+/// passing/neighbor tones. `variant_for(measure_idx)` supplies the
+/// (relative-degree-space) motif to state in that measure, BEFORE the
+/// per-chord re-anchor. Shared by [`Phrase::build`] (development-by-inversion)
+/// and [`Phrase::build_sentence`] (development-by-fragmentation) so both
+/// phrase archetypes share one strong-beat/chord-fitting implementation.
 fn realize_over_progression(
     progression: &[i32],
     meter: f64,
     variant_for: impl Fn(usize) -> Motif,
 ) -> Vec<crate::motif::MotifNote> {
-    let mut line_notes = Vec::new();
+    // Pass 0: transpose each measure's stated variant onto its chord's root.
+    // Nothing is snapped yet -- pass 1 (below) needs each note's RAW degree
+    // to recognize suspensions, which are defined by what a note WOULD be
+    // before any correction (prepared by an identical raw predecessor,
+    // resolving by step to an identical raw follower).
+    struct Staged {
+        raw_degree: Option<i32>,
+        duration: Duration,
+        is_strong: bool,
+        chord_deg: i32,
+    }
+    let mut staged = Vec::new();
     for (measure_idx, &chord_deg) in progression.iter().enumerate() {
-        // Re-anchor so degree-1 lands on this chord's root degree.
         let stated = variant_for(measure_idx).transpose(chord_deg - 1);
-
         let mut beat_pos = 0.0f64;
         for note in &stated.notes {
             let is_strong = is_strong_beat(beat_pos, meter);
-            let fitted = match note.degree {
-                Some(d) if is_strong => Some(nearest_chord_tone(d, chord_deg)),
-                other => other, // weak beat or rest: leave as diatonic / rest
-            };
-            line_notes.push(crate::motif::MotifNote {
-                degree: fitted,
+            staged.push(Staged {
+                raw_degree: note.degree,
                 duration: note.duration,
+                is_strong,
+                chord_deg,
             });
             beat_pos += note.duration.beats();
         }
     }
-    line_notes
+
+    // Pass 1: strong beats snap to the nearest chord tone -- UNLESS the raw
+    // degree forms a genuine SUSPENSION: prepared by the immediately
+    // preceding note carrying the identical pitch (typically consonant
+    // against the previous chord), dissonant against the CURRENT chord, and
+    // resolving DOWN by exactly one scale-degree step to the immediately
+    // following note. That specific shape (not just "any dissonance") is
+    // the textbook suspension (4-3, 7-6, 9-8, ...); an unprepared dissonance,
+    // or one that doesn't resolve down by step, has no such justification
+    // and is snapped exactly as a plain strong beat would be.
+    let mut degrees: Vec<Option<i32>> = Vec::with_capacity(staged.len());
+    for i in 0..staged.len() {
+        let value = if !staged[i].is_strong {
+            staged[i].raw_degree
+        } else {
+            match staged[i].raw_degree {
+                None => None,
+                Some(raw) if is_chord_tone(raw, staged[i].chord_deg) => Some(raw),
+                Some(raw) => {
+                    // The predecessor's ACTUAL final pitch, not its raw
+                    // pre-correction value -- `degrees[i-1]` is already
+                    // decided at this point in the same left-to-right pass
+                    // (for a strong-beat predecessor, that's its own
+                    // chord-tone-snapped or suspension-preserved value; for
+                    // a weak beat, pass 2 hasn't run yet, so it's still the
+                    // raw value either way). A suspension is prepared by
+                    // what's really sounding beforehand, not by what an
+                    // untransformed motif happened to say.
+                    let prepared = i > 0 && degrees[i - 1] == Some(raw);
+                    // The follower's finalized value isn't decided yet at
+                    // this point in a single forward pass, so its raw value
+                    // is used as a proxy -- a disclosed approximation, not a
+                    // full fixed-point resolution.
+                    let resolves_down = staged
+                        .get(i + 1)
+                        .and_then(|s| s.raw_degree)
+                        .map(|next| raw - next == 1)
+                        .unwrap_or(false);
+                    if prepared && resolves_down {
+                        Some(raw) // a genuine suspension: leave it dissonant
+                    } else {
+                        Some(nearest_chord_tone(raw, staged[i].chord_deg))
+                    }
+                }
+            }
+        };
+        degrees.push(value);
+    }
+
+    // Pass 2: a weak-beat degree is a legitimate passing tone (moves by
+    // step between two different neighbors) or neighboring tone (steps away
+    // and back to the same pitch) only if EVERY neighbor it has (previous
+    // and/or next -- a rest or phrase boundary just means one side isn't
+    // checked) is exactly one scale-degree-step away. A weak-beat degree
+    // that leaps has no such justification and gets the same chord-tone
+    // snap a strong beat would -- there is no term for an unprepared,
+    // unstepped dissonance on a weak beat either.
+    const STEP: i32 = 1;
+    for i in 0..staged.len() {
+        if staged[i].is_strong {
+            continue;
+        }
+        let Some(d) = degrees[i] else { continue };
+        let steps_to = |other: Option<Option<i32>>| -> bool {
+            match other.flatten() {
+                Some(neighbor) => (neighbor - d).abs() == STEP,
+                None => true, // no neighbor on this side (rest/boundary): not disqualifying
+            }
+        };
+        let prev = if i > 0 { Some(degrees[i - 1]) } else { None };
+        let next = if i + 1 < degrees.len() {
+            Some(degrees[i + 1])
+        } else {
+            None
+        };
+        if !(steps_to(prev) && steps_to(next)) {
+            degrees[i] = Some(nearest_chord_tone(d, staged[i].chord_deg));
+        }
+    }
+
+    staged
+        .into_iter()
+        .zip(degrees)
+        .map(|(s, degree)| crate::motif::MotifNote {
+            degree,
+            duration: s.duration,
+        })
+        .collect()
 }
 
-/// Steer the final pitched note to the cadence's melodic goal, in the
-/// register it currently occupies (so the close resolves convincingly).
+/// Steer the final pitched note to the cadence's melodic goal, choosing the
+/// octave that minimizes the leap FROM THE NOTE THAT ACTUALLY LEADS INTO IT
+/// (the previous pitched note, skipping rests) -- not the final note's own
+/// pre-steering value. Using the final note's own prior degree as the
+/// register reference (an earlier version of this function did) can pick an
+/// octave close to wherever the raw motif transform happened to leave that
+/// one note, while ignoring what the melody was actually doing on approach;
+/// a large, unmotivated leap right into the cadence undercuts exactly the
+/// "phrase destination" a cadence is supposed to deliver. Falls back to the
+/// final note's own value when there's no earlier pitched note (a
+/// single-note line).
 fn steer_final_cadence(line_notes: &mut [crate::motif::MotifNote], cadence: Cadence) {
-    if let Some(idx) = line_notes.iter().rposition(|n| n.degree.is_some()) {
-        let cur = line_notes[idx].degree.unwrap();
-        line_notes[idx].degree = Some(nearest_octave_of(cadence.melodic_goal(), cur));
-    }
+    let Some(idx) = line_notes.iter().rposition(|n| n.degree.is_some()) else {
+        return;
+    };
+    let reference = line_notes[..idx]
+        .iter()
+        .rev()
+        .find_map(|n| n.degree)
+        .unwrap_or_else(|| line_notes[idx].degree.unwrap());
+    line_notes[idx].degree = Some(nearest_octave_of(cadence.melodic_goal(), reference));
 }
 
 /// Build the SENTENCE continuation unit: the first half of `motif`'s notes
@@ -359,9 +470,24 @@ fn continuation_unit(motif: &Motif, meter: f64) -> Option<Motif> {
 
 /// A beat position is "strong" if it is the downbeat (0) or the mid-measure
 /// accent (>= meter/2), e.g. beats 1 and 3 in 4/4. Tolerant of float drift.
-fn is_strong_beat(beat_pos: f64, meter: f64) -> bool {
+///
+/// `pub(crate)` so [`crate::score_validation`] shares this definition rather
+/// than reimplementing it. It previously had no metrical model at all and
+/// treated EVERY integer beat as strong, which made an ordinary passing tone on
+/// beat 2 of 4/4 a Fatal issue — see `validate_strong_beats`.
+pub(crate) fn is_strong_beat(beat_pos: f64, meter: f64) -> bool {
     let within = beat_pos.rem_euclid(meter);
     within < 1e-6 || (within - meter / 2.0).abs() < 1e-6
+}
+
+/// True if `raw` is itself a chord tone (root, third, or fifth, or an
+/// octave transposition of one) of the diatonic triad on `chord_root_deg`.
+fn is_chord_tone(raw: i32, chord_root_deg: i32) -> bool {
+    (-1..=1).any(|oct| {
+        [0, 2, 4]
+            .iter()
+            .any(|&offset| chord_root_deg + offset + 7 * oct == raw)
+    })
 }
 
 /// The chord tone (as a scale degree) nearest to `raw`, where the chord is the
@@ -452,6 +578,168 @@ mod tests {
             }
             measure_beat += note.duration.beats();
         }
+    }
+
+    #[test]
+    fn a_weak_beat_stepwise_between_two_chord_tones_is_kept_as_a_genuine_passing_tone() {
+        // Chord I (tones {1,3,5,...}). Degree 2 on beat 1 (weak) sits
+        // exactly one step from both its strong-beat neighbors (1, then
+        // 3) -- a textbook passing tone. It must survive unchanged; if
+        // weak beats were (incorrectly) snapped like strong beats, degree
+        // 2 would collapse to the nearer of {1,3} (both distance 1, ties
+        // break toward the first candidate found: 1).
+        let m = Motif::from_degrees(&[
+            (1, Duration::quarter()),
+            (2, Duration::quarter()),
+            (3, Duration::quarter()),
+            (5, Duration::quarter()),
+        ]);
+        let notes = realize_over_progression(&[1], 4.0, |_| m.clone());
+        let degrees: Vec<Option<i32>> = notes.iter().map(|n| n.degree).collect();
+        assert_eq!(
+            degrees,
+            vec![Some(1), Some(2), Some(3), Some(5)],
+            "the passing tone (degree 2) must be preserved, not snapped"
+        );
+    }
+
+    #[test]
+    fn a_weak_beat_that_leaps_from_both_neighbors_is_corrected_to_the_nearest_chord_tone() {
+        // Chord I again. Degree 6 on beat 1 (weak) leaps a fifth from its
+        // preceding strong-beat neighbor (1) and a third from its
+        // following one (3, the strong-beat-snapped value of raw degree
+        // 3) -- neither side is a step, so it has no passing-tone
+        // justification and must be corrected the same way a strong beat
+        // would be: to its nearest chord tone (5, distance 1).
+        let m = Motif::from_degrees(&[
+            (1, Duration::quarter()),
+            (6, Duration::quarter()),
+            (3, Duration::quarter()),
+            (5, Duration::quarter()),
+        ]);
+        let notes = realize_over_progression(&[1], 4.0, |_| m.clone());
+        let degrees: Vec<Option<i32>> = notes.iter().map(|n| n.degree).collect();
+        assert_eq!(
+            degrees,
+            vec![Some(1), Some(5), Some(3), Some(5)],
+            "the unprepared leap (degree 6) must be corrected to its nearest chord tone (5)"
+        );
+    }
+
+    #[test]
+    fn a_weak_beat_neighboring_tone_that_steps_away_and_back_is_kept() {
+        // Chord I. Degree 2 sandwiched between two statements of degree 1
+        // (the tonic) is a classic neighboring tone (step away, step
+        // back to the SAME pitch) -- also legitimate, not just a passing
+        // tone between two DIFFERENT chord tones.
+        let m = Motif::from_degrees(&[
+            (1, Duration::quarter()),
+            (2, Duration::quarter()),
+            (1, Duration::quarter()),
+            (5, Duration::quarter()),
+        ]);
+        let notes = realize_over_progression(&[1], 4.0, |_| m.clone());
+        let degrees: Vec<Option<i32>> = notes.iter().map(|n| n.degree).collect();
+        assert_eq!(
+            degrees[1],
+            Some(2),
+            "the neighboring tone must be preserved"
+        );
+    }
+
+    #[test]
+    fn the_final_cadence_note_minimizes_the_leap_from_what_actually_precedes_it() {
+        // A hand-built line ending high (degree 8, an octave above tonic)
+        // then dropping to a far, unrelated register (degree -5) for its
+        // OWN pre-steering value at the very last note -- an artificial
+        // but representative stand-in for what a motif transform (e.g.
+        // inversion) can leave behind. Steering to an Authentic cadence's
+        // goal (tonic, degree 1) using the OLD reference (the final note's
+        // own prior value, -5) would pick octave -6 -- a 14-scale-step
+        // leap from the note that actually leads into it (degree 8). Using
+        // the real predecessor as the reference picks octave 8 instead --
+        // landing exactly on the tonic with ZERO leap.
+        let mut notes = vec![
+            crate::motif::MotifNote {
+                degree: Some(8),
+                duration: Duration::quarter(),
+            },
+            crate::motif::MotifNote {
+                degree: Some(-5),
+                duration: Duration::quarter(),
+            },
+        ];
+        steer_final_cadence(&mut notes, Cadence::Authentic);
+        assert_eq!(
+            notes[1].degree,
+            Some(8),
+            "the cadence goal's octave must minimize the leap from the true \
+             melodic predecessor (degree 8), not the final note's own prior \
+             (and musically irrelevant) value"
+        );
+    }
+
+    #[test]
+    fn a_prepared_strong_beat_dissonance_that_resolves_down_by_step_is_a_legitimate_suspension() {
+        // Bar 0 (chord I: tones {1,3,5,...}): a whole-note degree 5 -- the
+        // fifth of I, consonant. Bar 1 (chord vi: tones {6,8,10,-1,1,3,...}):
+        // the SAME pitch (degree 5) is prepared/carried into the new chord,
+        // where it is now dissonant (5 is not among vi's tones), then
+        // resolves DOWN by exactly one step to degree 4 on the very next
+        // note. That is the textbook suspension shape -- it must be left
+        // dissonant, not snapped to vi's nearest chord tone (6).
+        let m = Motif::from_degrees(&[(5, Duration::whole())]);
+        // `realize_over_progression` re-anchors whatever `variant_for`
+        // returns by `transpose(chord_deg - 1)` (degree 1 = "the current
+        // chord's root" in the motif's own frame) -- for chord vi (6) that's
+        // `transpose(5)`, so these degrees (0, -1) become the intended final
+        // degrees (5, 4) once re-anchored.
+        let resolution =
+            Motif::from_degrees(&[(0, Duration::quarter()), (-1, Duration::quarter())]);
+        let notes = realize_over_progression(&[1, 6], 4.0, |i| {
+            if i == 0 {
+                m.clone()
+            } else {
+                resolution.clone()
+            }
+        });
+        assert_eq!(
+            notes[1].degree,
+            Some(5),
+            "the prepared, step-resolving dissonance (the suspension) must \
+             survive unsnapped, not collapse to vi's nearest chord tone (6)"
+        );
+    }
+
+    #[test]
+    fn an_unprepared_strong_beat_dissonance_is_still_snapped_even_if_it_resolves_down_by_step() {
+        // Same chords as above, but the bar-0 note is degree 7 (not 5) --
+        // so bar 1's degree-5 note is NOT prepared (no identical predecessor
+        // pitch carried over), even though it still resolves down by step
+        // to degree 4. Without preparation there is no suspension -- it
+        // must be snapped to vi's nearest chord tone (6), the same as any
+        // other unjustified strong-beat dissonance.
+        let m = Motif::from_degrees(&[(7, Duration::whole())]);
+        // `realize_over_progression` re-anchors whatever `variant_for`
+        // returns by `transpose(chord_deg - 1)` (degree 1 = "the current
+        // chord's root" in the motif's own frame) -- for chord vi (6) that's
+        // `transpose(5)`, so these degrees (0, -1) become the intended final
+        // degrees (5, 4) once re-anchored.
+        let resolution =
+            Motif::from_degrees(&[(0, Duration::quarter()), (-1, Duration::quarter())]);
+        let notes = realize_over_progression(&[1, 6], 4.0, |i| {
+            if i == 0 {
+                m.clone()
+            } else {
+                resolution.clone()
+            }
+        });
+        assert_eq!(
+            notes[1].degree,
+            Some(6),
+            "an unprepared dissonance has no suspension justification and \
+             must be snapped to the nearest chord tone"
+        );
     }
 
     #[test]

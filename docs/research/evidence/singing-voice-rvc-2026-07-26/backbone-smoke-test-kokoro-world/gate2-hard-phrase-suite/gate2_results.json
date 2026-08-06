@@ -1,0 +1,62 @@
+[
+  {
+    "id": "positive_control",
+    "target": "wont you sing along with me",
+    "wer": 0.0,
+    "hypothesis": "Won't you sing along with me?"
+  },
+  {
+    "id": "conversational",
+    "target": "i love the summer breeze tonight",
+    "wer": 0.167,
+    "hypothesis": "I love this summer breeze tonight."
+  },
+  {
+    "id": "repeated_syllables",
+    "target": "bye bye bye bye baby",
+    "wer": 0.2,
+    "hypothesis": "Bye, bye, bye, bye, bye, baby."
+  },
+  {
+    "id": "rapid_letter_names",
+    "target": "a b c d e f g",
+    "wer": 1.0,
+    "hypothesis": "Oh, Lucy!"
+  },
+  {
+    "id": "phrase_final_stops",
+    "target": "turn off the light and lock it",
+    "wer": 0.143,
+    "hypothesis": "Turn off the light and lock."
+  },
+  {
+    "id": "fricative_heavy",
+    "target": "she sells seashells by the seashore",
+    "wer": 0.667,
+    "hypothesis": "She sells seashells for this  She sure"
+  },
+  {
+    "id": "consonant_clusters",
+    "target": "strong streams splashed strangely",
+    "wer": 0.25,
+    "hypothesis": "Strong streams flashed strangely."
+  },
+  {
+    "id": "long_sustained_vowels",
+    "target": "moon over the blue lagoon",
+    "wer": 0.8,
+    "hypothesis": "Moon, off for the blues looking!"
+  },
+  {
+    "id": "short_unstressed",
+    "target": "it is what it is to me",
+    "wer": 0.0,
+    "hypothesis": "It is what it is to me."
+  },
+  {
+    "id": "semantically_unusual",
+    "target": "the clock ate my umbrella",
+    "wer": 0.2,
+    "hypothesis": "the clock eat my umbrella"
+  }
+]

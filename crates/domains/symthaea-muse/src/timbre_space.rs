@@ -41,8 +41,17 @@ pub struct TimbrePoint {
 pub struct TimbreManifold {
     points: Vec<TimbrePoint>,
     /// Current timbre HV (smoothly interpolated).
+    ///
+    /// NOT WIRED (2026-07-28): initialised to zero and never read or
+    /// updated, so the manifold does not actually smooth transitions —
+    /// every lookup is a hard jump to the nearest point. Kept rather than
+    /// deleted because the smoothing is real intended behaviour; wiring it
+    /// changes timbre movement audibly and wants a listening check.
+    #[allow(dead_code)]
     current_hv: ContinuousHV,
     /// Interpolation rate (lower = smoother transitions).
+    /// NOT WIRED — see [`TimbreManifold::current_hv`].
+    #[allow(dead_code)]
     lerp_rate: f32,
 }
 

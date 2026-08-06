@@ -277,6 +277,15 @@ pub use export::{
     export_3mf_package_with_attestation, export_3mf_package_with_governance,
     export_3mf_package_with_manifest, export_stl,
 };
+// `fault_injection` was the only module with a public API and no root re-export block, so
+// `run_standard_fault_matrix` was unreachable as `symthaea_fabrication_kernel::…` even though
+// tests/operational_release_pipeline.rs imports it that way. Exporting the whole public surface
+// matches how every neighbouring module here is exported, and keeps the report/error types the
+// function returns reachable alongside it.
+pub use fault_injection::{
+    FaultInjectionError, FaultInjectionPlan, FaultInjectionReport, FaultObservation, FaultScenario,
+    run_fault_injection, run_standard_fault_matrix, verify_fault_injection_report,
+};
 pub use gateway_consensus::{
     GatewayConsensusError, GatewayConsensusPolicy, GatewayConsensusViolation, GatewayEndorsement,
     GatewayEndorsementSigner, GatewayEndorsementVerifier, SignedGatewayEndorsement,

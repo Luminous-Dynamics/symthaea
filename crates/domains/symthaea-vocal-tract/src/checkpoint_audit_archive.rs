@@ -13,9 +13,72 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
-use crate::{
-    CheckpointAuditError, CheckpointAuditExportDurability, CheckpointKeyAuditExportReceipt,
-};
+/// Whether an audit-log export's artifact has actually reached durable storage at its
+/// destination repository yet, or is still in flight. `Synced` is the only value a receipt
+/// may legitimately be sealed against (see `CheckpointAuditArchiveAuthority::seal_receipt`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CheckpointAuditExportDurability {
+    Pending,
+    Synced,
+}
+
+/// A local, unsigned claim from the key-audit-export process that one export of the audit log
+/// completed. This is the INPUT to [`CheckpointAuditArchiveAuthority::seal_receipt`], which
+/// turns it into an authenticated, retained archive receipt -- it carries no signature of its
+/// own, which is why `seal_receipt` independently re-derives everything it needs to trust
+/// rather than accepting these fields as already-authoritative.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CheckpointKeyAuditExportReceipt {
+    pub export_id: [u8; 16],
+    pub record_count: u64,
+    pub head_record_digest: [u8; 32],
+    pub artifact_digest: [u8; 32],
+    pub artifact_bytes: u64,
+    pub durability: CheckpointAuditExportDurability,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CheckpointAuditError {
+    InvalidKey,
+    EntropyUnavailable,
+    InvalidChain,
+    Encoding,
+    TooLarge,
+    AuthenticationFailed,
+    UnsafeFilesystemObject,
+    Unavailable(&'static str),
+    Io(std::io::ErrorKind),
+}
+
+impl From<std::io::Error> for CheckpointAuditError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(error.kind())
+    }
+}
+
+impl std::fmt::Display for CheckpointAuditError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidKey => f.write_str("invalid checkpoint audit archive key"),
+            Self::EntropyUnavailable => f.write_str("checkpoint audit archive entropy unavailable"),
+            Self::InvalidChain => f.write_str("invalid checkpoint audit archive receipt chain"),
+            Self::Encoding => f.write_str("checkpoint audit archive encoding failed"),
+            Self::TooLarge => f.write_str("checkpoint audit archive artifact exceeds its bound"),
+            Self::AuthenticationFailed => {
+                f.write_str("checkpoint audit archive authentication failed")
+            }
+            Self::UnsafeFilesystemObject => {
+                f.write_str("unsafe checkpoint audit archive filesystem object")
+            }
+            Self::Unavailable(reason) => {
+                write!(f, "checkpoint audit archive unavailable: {reason}")
+            }
+            Self::Io(kind) => write!(f, "checkpoint audit archive I/O failed: {kind}"),
+        }
+    }
+}
+
+impl std::error::Error for CheckpointAuditError {}
 
 pub const CHECKPOINT_AUDIT_ARCHIVE_RECEIPT_SCHEMA: &str =
     "symthaea.checkpoint-audit-archive-receipt.v1";
@@ -23,10 +86,8 @@ pub const CHECKPOINT_AUDIT_COMPACTION_PROOF_SCHEMA: &str =
     "symthaea.checkpoint-audit-compaction-proof.v1";
 pub const CHECKPOINT_AUDIT_RETENTION_COMMITMENT_SCHEMA: &str =
     "symthaea.checkpoint-audit-retention-commitment.v1";
-const ARCHIVE_RECEIPT_DOMAIN: &[u8] =
-    b"symthaea-checkpoint-audit-archive-receipt-v1\0";
-const RETENTION_COMMITMENT_DOMAIN: &[u8] =
-    b"symthaea-checkpoint-audit-retention-commitment-v1\0";
+const ARCHIVE_RECEIPT_DOMAIN: &[u8] = b"symthaea-checkpoint-audit-archive-receipt-v1\0";
+const RETENTION_COMMITMENT_DOMAIN: &[u8] = b"symthaea-checkpoint-audit-retention-commitment-v1\0";
 const MAX_ARCHIVE_RECEIPT_BYTES: u64 = 64 * 1024;
 
 pub struct CheckpointAuditArchiveKey([u8; 32]);
@@ -161,7 +222,7 @@ impl CheckpointAuditArchiveAuthority {
             export_id: export.export_id,
             export_artifact_digest: export.artifact_digest,
             export_head_record_digest: export.head_record_digest,
-            export_record_count: export.record_count as u64,
+            export_record_count: export.record_count,
             export_artifact_bytes: export.artifact_bytes,
         };
         let body = postcard::to_stdvec(&receipt).map_err(|_| CheckpointAuditError::Encoding)?;
@@ -216,7 +277,6 @@ impl CheckpointAuditArchiveAuthority {
         self.open_receipt(&encoded, expected_repository_binding)
     }
 
-
     pub fn seal_retention_commitment(
         &self,
         encoded_archive_receipt: &[u8],
@@ -226,10 +286,7 @@ impl CheckpointAuditArchiveAuthority {
         minimum_replicas: u16,
         storage_class_binding: [u8; 32],
     ) -> Result<Vec<u8>, CheckpointAuditError> {
-        let receipt = self.open_receipt(
-            encoded_archive_receipt,
-            expected_repository_binding,
-        )?;
+        let receipt = self.open_receipt(encoded_archive_receipt, expected_repository_binding)?;
         if commitment_id == [0u8; 16]
             || committed_until_unix_seconds <= receipt.retained_at_unix_seconds
             || minimum_replicas == 0
@@ -272,10 +329,7 @@ impl CheckpointAuditArchiveAuthority {
         if encoded.is_empty() || encoded.len() as u64 > MAX_ARCHIVE_RECEIPT_BYTES {
             return Err(CheckpointAuditError::TooLarge);
         }
-        let receipt = self.open_receipt(
-            encoded_archive_receipt,
-            expected_repository_binding,
-        )?;
+        let receipt = self.open_receipt(encoded_archive_receipt, expected_repository_binding)?;
         let wire: CheckpointAuditRetentionCommitmentWire =
             postcard::from_bytes(encoded).map_err(|_| CheckpointAuditError::Encoding)?;
         if !constant_time_equal(
@@ -296,8 +350,7 @@ impl CheckpointAuditArchiveAuthority {
             || commitment.committed_until_unix_seconds
                 < requirement.minimum_retained_until_unix_seconds
             || commitment.minimum_replicas < requirement.minimum_replicas
-            || commitment.storage_class_binding
-                != requirement.expected_storage_class_binding
+            || commitment.storage_class_binding != requirement.expected_storage_class_binding
         {
             return Err(CheckpointAuditError::InvalidChain);
         }
@@ -328,14 +381,10 @@ impl CheckpointAuditArchiveAuthority {
         expected_repository_binding: [u8; 32],
         requirement: CheckpointAuditRetentionRequirement,
     ) -> Result<CheckpointAuditRetentionCommitment, CheckpointAuditError> {
-        let commitment = read_bounded_regular_file(
-            commitment_path.as_ref(),
-            MAX_ARCHIVE_RECEIPT_BYTES,
-        )?;
-        let receipt = read_bounded_regular_file(
-            archive_receipt_path.as_ref(),
-            MAX_ARCHIVE_RECEIPT_BYTES,
-        )?;
+        let commitment =
+            read_bounded_regular_file(commitment_path.as_ref(), MAX_ARCHIVE_RECEIPT_BYTES)?;
+        let receipt =
+            read_bounded_regular_file(archive_receipt_path.as_ref(), MAX_ARCHIVE_RECEIPT_BYTES)?;
         self.open_retention_commitment(
             &commitment,
             &receipt,
@@ -389,10 +438,7 @@ fn authenticate_receipt(body: &[u8], key: &CheckpointAuditArchiveKey) -> [u8; 32
     *blake3::keyed_hash(&key.0, &input).as_bytes()
 }
 
-fn authenticate_retention_commitment(
-    body: &[u8],
-    key: &CheckpointAuditArchiveKey,
-) -> [u8; 32] {
+fn authenticate_retention_commitment(body: &[u8], key: &CheckpointAuditArchiveKey) -> [u8; 32] {
     let mut input = Vec::with_capacity(RETENTION_COMMITMENT_DOMAIN.len() + body.len());
     input.extend_from_slice(RETENTION_COMMITMENT_DOMAIN);
     input.extend_from_slice(body);
@@ -412,14 +458,17 @@ fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
 fn read_bounded_regular_file(path: &Path, maximum: u64) -> Result<Vec<u8>, CheckpointAuditError> {
     use std::os::unix::fs::OpenOptionsExt;
     let mut options = OpenOptions::new();
-    options.read(true).custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
-    let mut file = options.open(path)?;
+    options
+        .read(true)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
+    let file = options.open(path)?;
     let metadata = file.metadata()?;
     if !metadata.is_file() || metadata.len() == 0 || metadata.len() > maximum {
         return Err(CheckpointAuditError::UnsafeFilesystemObject);
     }
     let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    file.take(maximum.saturating_add(1)).read_to_end(&mut bytes)?;
+    file.take(maximum.saturating_add(1))
+        .read_to_end(&mut bytes)?;
     if bytes.is_empty() || bytes.len() as u64 > maximum {
         return Err(CheckpointAuditError::TooLarge);
     }
@@ -439,9 +488,9 @@ fn write_no_overwrite_atomic(path: &Path, bytes: &[u8]) -> Result<(), Checkpoint
         .filter(|name| !name.is_empty())
         .ok_or(CheckpointAuditError::UnsafeFilesystemObject)?;
     let mut directory_options = OpenOptions::new();
-    directory_options.read(true).custom_flags(
-        libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW,
-    );
+    directory_options
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW);
     let directory = directory_options.open(parent)?;
     let operation_parent = operation_parent(parent, &directory)?;
     let target = operation_parent.join(file_name);
@@ -477,6 +526,7 @@ fn operation_parent(parent: &Path, directory: &File) -> Result<PathBuf, Checkpoi
     #[cfg(target_os = "linux")]
     {
         use std::os::fd::AsRawFd;
+        let _ = parent;
         let path = PathBuf::from(format!("/proc/self/fd/{}", directory.as_raw_fd()));
         if !path.is_dir() {
             return Err(CheckpointAuditError::Unavailable(
@@ -495,7 +545,6 @@ fn operation_parent(parent: &Path, directory: &File) -> Result<PathBuf, Checkpoi
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::CheckpointAuditExportDurability;
 
     fn export_receipt() -> CheckpointKeyAuditExportReceipt {
         CheckpointKeyAuditExportReceipt {

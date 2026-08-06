@@ -14,7 +14,7 @@
 
 use crate::pitch::Pitch;
 use crate::rhythm::Duration;
-use crate::score::{Emphasis, Score, ScoreNote, VoiceRole};
+use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 use serde::{Deserialize, Serialize};
 
 /// A one-measure accompaniment figure. All variants realize the SAME voiced
@@ -145,6 +145,7 @@ impl Accompaniment {
         let bar = Duration::new(meter_beats as i64, 1);
         let push = |score: &mut Score, pitch: Pitch, onset: Duration, dur: Duration, vel: f32| {
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch,
                 onset,
                 duration: dur,

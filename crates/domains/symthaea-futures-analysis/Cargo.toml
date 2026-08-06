@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-futures-analysis"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Symthaea Futures Laboratory — failure taxonomy, branch-diversity, and model-disagreement analysis. Phase 2 scope, deliberately not designed until Phase 1 has real results to respond to. See SYMTHAEA_FUTURES_LABORATORY_PLAN_2026-07-25.md."
+
+[dependencies]
+symthaea-futures-core = { workspace = true }

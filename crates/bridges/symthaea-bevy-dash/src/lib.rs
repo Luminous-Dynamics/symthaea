@@ -123,6 +123,11 @@ impl Plugin for SymthaeaDashPlugin {
                             tracing::info!("Connected to gRPC server!");
                             let request = tonic::Request::new(symthaea_telemetry_grpc::TelemetryRequest {
                                 client_id: client_id.clone(),
+                                // Only relevant if the server has
+                                // SYMTHAEA_TELEMETRY_TOKEN set; see
+                                // symthaea-telemetry-grpc's lib.rs docs.
+                                auth_token: std::env::var("SYMTHAEA_TELEMETRY_TOKEN")
+                                    .unwrap_or_default(),
                             });
                             match client.stream_telemetry(request).await {
                                 Ok(response) => {

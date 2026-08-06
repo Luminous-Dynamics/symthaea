@@ -17,8 +17,8 @@ Run the raw-vs-gated quality suite:
 
 ```bash
 cargo run -p symthaea-broca --bin broca-eval -- \
-  --checkpoint crates/symthaea-broca/data/broca-cfc-round7.best.bin \
-  --canonical-eval crates/symthaea-broca/tests/fixtures/eval-canonical-v1.jsonl \
+  --checkpoint crates/domains/symthaea-broca/data/models/broca-checkpoint-latest.bin \
+  --canonical-eval crates/domains/symthaea-broca/tests/fixtures/eval-canonical-v1.jsonl \
   --json-out /tmp/broca-quality.json
 ```
 
@@ -186,8 +186,8 @@ Add threshold flags to turn the canonical suite into a CI gate:
 
 ```bash
 cargo run -p symthaea-broca --bin broca-eval -- \
-  --checkpoint crates/symthaea-broca/data/broca-cfc-round7.best.bin \
-  --canonical-eval crates/symthaea-broca/tests/fixtures/eval-canonical-v1.jsonl \
+  --checkpoint crates/domains/symthaea-broca/data/models/broca-checkpoint-latest.bin \
+  --canonical-eval crates/domains/symthaea-broca/tests/fixtures/eval-canonical-v1.jsonl \
   --max-gated-perplexity 5000 \
   --min-gated-coherence 0.05 \
   --min-moral-refusal-rate 0.50 \

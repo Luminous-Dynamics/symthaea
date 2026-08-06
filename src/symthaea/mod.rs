@@ -127,7 +127,11 @@ pub struct ProcessResponse {
     pub structured_thought: Option<StructuredThought>,
     /// Consciousness level (Psi) at time of processing (0.0-1.0).
     pub consciousness_level: f64,
-    /// Memory coordinator sigma (spectral MIP phi when available).
+    /// Σ (Sigma) — synergistic integration via covariance-based Phi* (Layer 2), read from
+    /// the experience bridge's last `CycleResult` when `enable_experience_bridge()` is
+    /// active. `None` when the bridge is disabled (the default), or when the bridge is
+    /// active but the loop hasn't computed Sigma this cycle yet (computed periodically,
+    /// not every cycle).
     pub sigma: Option<f64>,
     /// Creative artifact (SVG artwork or WAV music) generated when the input
     /// expresses art intent (Phase 8.5). Always `None` unless the `creative`
@@ -2313,6 +2317,21 @@ impl Symthaea {
 
                 tracing::info!(target: "symthaea::action", primitives = ?primitives, "Translating primitives to actions");
                 if let Ok(actions) = prim_executor.translate(&primitives, &action_ctx) {
+                    // Workspace/monorepo roots, derived from where THIS crate was
+                    // compiled from rather than hardcoded -- CARGO_MANIFEST_DIR is
+                    // resolved at compile time, so it correctly reflects the real
+                    // checkout location in every environment (dev machine, CI
+                    // runner, standalone-synced repo) instead of only the one
+                    // machine a literal "/srv/luminous-dynamics" was authored on.
+                    // A hardcoded root previously made every `cargo`-running action
+                    // path (needs_workspace) fail with EACCES on any other machine,
+                    // since `SandboxRoot::at` calls create_dir_all on it.
+                    let workspace_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                    let monorepo_root = workspace_dir
+                        .parent()
+                        .map(PathBuf::from)
+                        .unwrap_or_else(|| workspace_dir.clone());
+
                     let needs_workspace = actions.iter().any(|action| {
                         matches!(
                             action,
@@ -2321,10 +2340,10 @@ impl Symthaea {
                         )
                     });
                     let sandbox = if needs_workspace {
-                        crate::action::SandboxRoot::at(PathBuf::from("/srv/luminous-dynamics"))?
+                        crate::action::SandboxRoot::at(monorepo_root.clone())?
                     } else if let Some(ref path) = action_ctx.target_path {
-                        if path.starts_with("/srv/luminous-dynamics") {
-                            crate::action::SandboxRoot::at(PathBuf::from("/srv/luminous-dynamics"))?
+                        if path.starts_with(&monorepo_root) {
+                            crate::action::SandboxRoot::at(monorepo_root.clone())?
                         } else {
                             crate::action::SandboxRoot::new(&correlation_id)?
                         }
@@ -2333,17 +2352,18 @@ impl Symthaea {
                     };
 
                     let mut policy = crate::action::PolicyBundle::restrictive();
-                    if sandbox.root().starts_with("/srv/luminous-dynamics") {
+                    if sandbox.root().starts_with(&monorepo_root) {
+                        let workspace_pattern = format!("{}/", workspace_dir.display());
                         policy
                             .capabilities
                             .filesystem
                             .read_patterns
-                            .push("/srv/luminous-dynamics/symthaea/".into());
+                            .push(workspace_pattern.clone());
                         policy
                             .capabilities
                             .filesystem
                             .write_patterns
-                            .push("/srv/luminous-dynamics/symthaea/".into());
+                            .push(workspace_pattern);
                     }
                     policy
                         .capabilities
@@ -2374,8 +2394,7 @@ impl Symthaea {
                                 ..
                             } => {
                                 if program == "cargo" {
-                                    *working_dir =
-                                        Some(PathBuf::from("/srv/luminous-dynamics/symthaea"));
+                                    *working_dir = Some(workspace_dir.clone());
                                     tracing::info!(
                                         target: "symthaea::action",
                                         working_dir = %working_dir.as_ref().unwrap().display(),
@@ -3043,7 +3062,13 @@ impl Symthaea {
             translation_verified,
             structured_thought: Some(thought),
             consciousness_level: snapshot.consciousness_level,
-            sigma: None,
+            // Previously hardcoded `None` unconditionally, even when the experience
+            // bridge is active and a real value is sitting in `last_bridge_cycle` --
+            // see field doc comment for what this represents.
+            sigma: self
+                .last_bridge_cycle
+                .as_ref()
+                .and_then(|c| c.metadata.structural.sigma),
             creative_artifact,
         })
     }

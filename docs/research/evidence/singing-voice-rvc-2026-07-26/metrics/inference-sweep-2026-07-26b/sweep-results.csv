@@ -1,0 +1,8 @@
+condition,silence_frac,delta_vs_source,f0_correlation,note
+source,0.2680,0.0000,,12s clip
+baseline,0.3981,0.1301,0.9907,defaults (protect=0.33 rms_mix_rate=0.25 index_rate=0)
+protect_off,0.4002,0.1323,0.9923,protect=0.0
+protect_max,0.3970,0.1290,0.9913,protect=0.5
+index_on,0.3863,0.1183,0.9924,index_rate=0.5 with trained FAISS index
+rms_mix_high,0.3015,0.0335,0.9908,rms_mix_rate=1.0 -- CONFOUNDED by ~8.9dB loudness increase, see methodology.md
+rms_high_protect_max,0.3026,0.0346,0.9768,rms_mix_rate=1.0 + protect=0.5 -- same confound

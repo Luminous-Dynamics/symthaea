@@ -66,7 +66,10 @@ impl std::fmt::Display for CheckpointReplayError {
             Self::InvalidState => write!(formatter, "checkpoint replay state is invalid"),
             Self::TooLarge => write!(formatter, "checkpoint replay state exceeds its bound"),
             Self::Encoding => write!(formatter, "checkpoint replay state encoding failed"),
-            Self::Unavailable(reason) => write!(formatter, "checkpoint replay state is unavailable: {reason}"),
+            Self::Unavailable(reason) => write!(
+                formatter,
+                "checkpoint replay state is unavailable: {reason}"
+            ),
             Self::Io(error) => write!(formatter, "checkpoint replay-state I/O failed: {error}"),
         }
     }
@@ -83,10 +86,7 @@ impl From<std::io::Error> for CheckpointReplayError {
 pub trait CheckpointRequestReplayProtector: Send + Sync {
     fn protection_level(&self) -> CheckpointReplayProtectionLevel;
 
-    fn verify_and_record(
-        &self,
-        request_id: [u8; 16],
-    ) -> Result<(), CheckpointReplayError>;
+    fn verify_and_record(&self, request_id: [u8; 16]) -> Result<(), CheckpointReplayError>;
 }
 
 pub struct CheckpointReplayStateKey([u8; 32]);
@@ -101,8 +101,7 @@ impl CheckpointReplayStateKey {
 
     pub fn generate() -> Result<Self, CheckpointReplayError> {
         let mut bytes = [0u8; 32];
-        getrandom::fill(&mut bytes)
-            .map_err(|_| CheckpointReplayError::Unavailable("entropy"))?;
+        getrandom::fill(&mut bytes).map_err(|_| CheckpointReplayError::Unavailable("entropy"))?;
         let result = Self::new(bytes);
         bytes.zeroize();
         result
@@ -183,10 +182,7 @@ impl DurableCheckpointReplayGuard {
         Ok(self.read_state_locked()?.order.len())
     }
 
-    fn verify_and_record_locked(
-        &self,
-        request_id: [u8; 16],
-    ) -> Result<(), CheckpointReplayError> {
+    fn verify_and_record_locked(&self, request_id: [u8; 16]) -> Result<(), CheckpointReplayError> {
         if request_id == [0u8; 16] {
             return Err(CheckpointReplayError::ZeroRequestId);
         }
@@ -200,7 +196,7 @@ impl DurableCheckpointReplayGuard {
         let mut state = self.read_state_locked()?;
         match state.sorted_membership.binary_search(&request_id) {
             Ok(_) => return Err(CheckpointReplayError::Replay),
-            Err(insertion) => {
+            Err(_insertion) => {
                 if state.order.len() == self.capacity {
                     let expired = state.order.remove(0);
                     let index = state
@@ -222,7 +218,7 @@ impl DurableCheckpointReplayGuard {
 
     fn read_state_locked(&self) -> Result<DurableReplayState, CheckpointReplayError> {
         let path = self.operation_root_path()?.join(REPLAY_STATE_NAME);
-        let mut file = match open_regular_file(&path, false, false) {
+        let file = match open_regular_file(&path, false, false) {
             Ok(file) => file,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 return Ok(self.empty_state());
@@ -267,8 +263,7 @@ impl DurableCheckpointReplayGuard {
         let root = self.ensure_root()?;
         let operation_root = self.operation_root_path()?;
         let mut nonce = [0u8; 16];
-        getrandom::fill(&mut nonce)
-            .map_err(|_| CheckpointReplayError::Unavailable("entropy"))?;
+        getrandom::fill(&mut nonce).map_err(|_| CheckpointReplayError::Unavailable("entropy"))?;
         let suffix = nonce
             .iter()
             .map(|byte| format!("{byte:02x}"))
@@ -306,7 +301,7 @@ impl DurableCheckpointReplayGuard {
             || state.capacity as usize != self.capacity
             || state.order.len() > self.capacity
             || state.sorted_membership.len() != state.order.len()
-            || state.order.iter().any(|request_id| *request_id == [0u8; 16])
+            || state.order.contains(&[0u8; 16])
             || !state
                 .sorted_membership
                 .windows(2)
@@ -341,9 +336,9 @@ impl DurableCheckpointReplayGuard {
             use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
             fs::set_permissions(&self.root, fs::Permissions::from_mode(0o700))?;
             let mut options = OpenOptions::new();
-            options.read(true).custom_flags(
-                libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW,
-            );
+            options
+                .read(true)
+                .custom_flags(libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW);
             let root = Arc::new(options.open(&self.root)?);
             if !root.metadata()?.is_dir() {
                 return Err(CheckpointReplayError::InvalidState);
@@ -385,10 +380,7 @@ impl CheckpointRequestReplayProtector for DurableCheckpointReplayGuard {
         CheckpointReplayProtectionLevel::RestartDurable
     }
 
-    fn verify_and_record(
-        &self,
-        request_id: [u8; 16],
-    ) -> Result<(), CheckpointReplayError> {
+    fn verify_and_record(&self, request_id: [u8; 16]) -> Result<(), CheckpointReplayError> {
         self.verify_and_record_locked(request_id)
     }
 }
@@ -459,10 +451,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        std::env::temp_dir().join(format!(
-            "symthaea-{label}-{}-{suffix}",
-            std::process::id(),
-        ))
+        std::env::temp_dir().join(format!("symthaea-{label}-{}-{suffix}", std::process::id(),))
     }
 
     #[test]

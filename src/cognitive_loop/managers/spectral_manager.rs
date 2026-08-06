@@ -328,6 +328,20 @@ impl SpectralManager {
     }
 
     /// Current history length.
+    /// Recent states, oldest-to-newest, as `f64` rows for consumers that need a temporal window
+    /// (e.g. `consciousness_engine::topological_measure`, which cannot compute a correlation from
+    /// a single snapshot). Read-only; `history` stays private.
+    ///
+    /// Returns at most `max_len` of the most recent states.
+    pub fn recent_states_f64(&self, max_len: usize) -> Vec<Vec<f64>> {
+        let skip = self.history.len().saturating_sub(max_len);
+        self.history
+            .iter()
+            .skip(skip)
+            .map(|st| st.iter().map(|&v| v as f64).collect())
+            .collect()
+    }
+
     pub fn history_len(&self) -> usize {
         self.history.len()
     }

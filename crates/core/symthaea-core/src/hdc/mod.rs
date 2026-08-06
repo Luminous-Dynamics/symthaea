@@ -313,10 +313,15 @@ pub mod hdc_crypto;
 // HDC homomorphic computation (encrypted HVs, collective wisdom pool, privacy-preserving aggregation)
 pub mod hdc_fhe;
 // HDC treasury — privacy-preserving community finance (balance encoding, encrypted aggregation, threshold audit)
+// Gated behind `hdc-treasury` (off by default): its privacy/threshold claims
+// are not currently backed by real crypto -- see the feature's Cargo.toml
+// comment. Zero consumers anywhere in the codebase as of 2026-07-27.
+#[cfg(feature = "hdc-treasury")]
 pub mod hdc_treasury;
 
 // Consciousness topology and Φ measurement modules
 pub mod binary_hv;
+pub mod binding_algebra_audit; // Hard contract tests for ContinuousHV/BinaryHV binding algebra (2026-07-27 audit)
 pub mod consciousness_topology; // Consciousness topology structures
 pub mod consciousness_topology_generators; // 8 topology generators (Random, Star, Ring, Line, Tree, Dense, Modular, Lattice)
 pub mod hdc_trait;

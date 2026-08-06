@@ -11,6 +11,62 @@ use rand::Rng;
 use rayon::prelude::*;
 use std::marker::PhantomData;
 
+mod sealed {
+    /// Prevents downstream crates implementing [`super::EmlScalar`]. External implementations
+    /// were never genuinely supported: the previous implementation dispatched on
+    /// `TypeId`/pointer-reinterpretation and treated *every* non-`f64` scalar as `Complex64`,
+    /// so any third type would have been reinterpreted as one it is not.
+    pub trait Sealed {}
+    impl Sealed for f64 {}
+    impl Sealed for num_complex::Complex64 {}
+}
+
+/// Scalars the EML regressor can actually differentiate.
+///
+/// The autodiff tape is a pair of type-specific globals (`ad_begin_f64`/`ad_gradient_f64` and
+/// their `c64` counterparts) rather than one generic tape, so `train`/`predict` need per-type
+/// dispatch to reach the right one. This trait provides that dispatch through ordinary trait
+/// resolution.
+///
+/// It replaces a runtime `TypeId` check followed by pointer reinterpretation, which contained
+/// three defects: a read of 16 bytes out of an 8-byte stack slot holding a `&T` (which also read
+/// the *pointer value* as the datum rather than the value pointed to), a
+/// `transmute_copy::<&T, Complex64>` violating that function's documented size precondition, and
+/// an unguarded `else` branch that reinterpreted any non-`f64` scalar as `Complex64`. All three
+/// are gone: with `T` known statically, the values are simply copied.
+///
+/// # Sealing
+///
+/// The `sealed::Sealed` supertrait is private, so no downstream crate can add a third scalar.
+/// This is enforced by the compiler; note that no automated compile-fail harness (e.g.
+/// `trybuild`) is wired up in this crate, so that enforcement is not covered by a test here.
+pub trait EmlScalar: Scalar + Send + Sync + sealed::Sealed {
+    /// Opens a fresh autodiff tape for this scalar type.
+    fn ad_begin();
+    /// Reverse-mode gradient of `loss`, reduced to the real component used for the weight update.
+    fn ad_gradient_real(loss: GenericVar<Self>) -> Vec<f64>;
+}
+
+impl EmlScalar for f64 {
+    fn ad_begin() {
+        ad_begin_f64();
+    }
+    fn ad_gradient_real(loss: GenericVar<Self>) -> Vec<f64> {
+        ad_gradient_f64(loss)
+    }
+}
+
+impl EmlScalar for Complex64 {
+    fn ad_begin() {
+        ad_begin_c64();
+    }
+    fn ad_gradient_real(loss: GenericVar<Self>) -> Vec<f64> {
+        // Weights are real, so the update consumes only the real part of each adjoint —
+        // matching the previous implementation's `adjoints[i].re`.
+        ad_gradient_c64(loss).into_iter().map(|c| c.re).collect()
+    }
+}
+
 fn differentiable_softmax<T: Scalar>(
     logits: &[GenericVar<T>],
     temperature: f64,
@@ -172,7 +228,7 @@ impl<T: Scalar> EmlMasterNode<T> {
     }
 }
 
-pub struct EmlRegressor<T: Scalar + Send + Sync> {
+pub struct EmlRegressor<T: EmlScalar> {
     pub root: EmlMasterNode<T>,
     pub num_vars: usize,
     pub learning_rate: f64,
@@ -180,7 +236,7 @@ pub struct EmlRegressor<T: Scalar + Send + Sync> {
     _marker: PhantomData<T>,
 }
 
-impl<T: Scalar + Send + Sync> EmlRegressor<T> {
+impl<T: EmlScalar> EmlRegressor<T> {
     pub fn new(depth: usize, num_vars: usize) -> Self {
         Self {
             root: EmlMasterNode::<T>::new(depth, num_vars, false),
@@ -242,69 +298,31 @@ impl<T: Scalar + Send + Sync> EmlRegressor<T> {
             let temp = 0.05 + 0.95 * (-6.0 * (epoch as f64 / epochs as f64)).exp();
             let mut total_grad = vec![0.0; weights.len()];
             for (x_vals, y_target) in dataset {
-                if std::any::TypeId::of::<T>() == std::any::TypeId::of::<f64>() {
-                    ad_begin_f64();
-                    let vars: Vec<GenericVar<f64>> = x_vals
-                        .iter()
-                        .map(|v| GenericVar::<f64>::new(v.to_f64()))
-                        .collect();
-                    let params: Vec<GenericVar<f64>> =
-                        weights.iter().map(|&w| GenericVar::<f64>::new(w)).collect();
-                    let mut idx = 0;
-                    let root_f64: &EmlMasterNode<f64> = unsafe {
-                        &*(&self.root as *const EmlMasterNode<T> as *const EmlMasterNode<f64>)
-                    };
-                    let prediction = root_f64.eval(&vars, &params, &mut idx, temp);
-                    let loss = prediction
-                        .sub(GenericVar::constant(y_target.to_f64()))
-                        .mul(prediction.sub(GenericVar::constant(y_target.to_f64())));
-                    let adjoints = ad_gradient_f64(loss);
-                    for (i, p) in params.iter().enumerate() {
-                        total_grad[i] += adjoints[p.index]
-                            + if weights[i].abs() < 1.0 {
-                                -self.entropy_weight * weights[i].signum()
-                            } else {
-                                0.0
-                            };
-                    }
-                    ad_end();
-                } else if std::any::TypeId::of::<T>() == std::any::TypeId::of::<Complex64>() {
-                    ad_begin_c64();
-                    let vars: Vec<GenericVar<Complex64>> = x_vals
-                        .iter()
-                        .map(|v| {
-                            let c: Complex64 = unsafe {
-                                *(&v as *const &T as *const *const Complex64 as *const Complex64)
-                            };
-                            GenericVar::<Complex64>::new(c)
-                        })
-                        .collect();
-                    let params: Vec<GenericVar<Complex64>> = weights
-                        .iter()
-                        .map(|&w| GenericVar::<Complex64>::new(Complex64::new(w, 0.0)))
-                        .collect();
-                    let mut idx = 0;
-                    let root_c64: &EmlMasterNode<Complex64> = unsafe {
-                        &*(&self.root as *const EmlMasterNode<T> as *const EmlMasterNode<Complex64>)
-                    };
-                    let prediction = root_c64.eval(&vars, &params, &mut idx, temp);
-
-                    // Safe access to y_target as Complex64
-                    let y_c64: Complex64 = unsafe { std::mem::transmute_copy(&y_target) };
-                    let loss = prediction
-                        .sub(GenericVar::constant(y_c64))
-                        .mul(prediction.sub(GenericVar::constant(y_c64)));
-                    let adjoints = ad_gradient_c64(loss);
-                    for (i, p) in params.iter().enumerate() {
-                        total_grad[i] += adjoints[p.index].re
-                            + if weights[i].abs() < 1.0 {
-                                -self.entropy_weight * weights[i].signum()
-                            } else {
-                                0.0
-                            };
-                    }
-                    ad_end();
+                T::ad_begin();
+                // `T` is known statically, so inputs are plain copies. The previous code
+                // reinterpreted `&T` as a `Complex64` here and read past the end of the
+                // reference's own storage; see [`EmlScalar`].
+                let vars: Vec<GenericVar<T>> =
+                    x_vals.iter().map(|&v| GenericVar::<T>::new(v)).collect();
+                let params: Vec<GenericVar<T>> = weights
+                    .iter()
+                    .map(|&w| GenericVar::<T>::new(T::from_f64(w)))
+                    .collect();
+                let mut idx = 0;
+                // No transmute: `self.root` is already an `EmlMasterNode<T>`.
+                let prediction = self.root.eval(&vars, &params, &mut idx, temp);
+                let residual = prediction.sub(GenericVar::constant(*y_target));
+                let loss = residual.mul(residual);
+                let adjoints = T::ad_gradient_real(loss);
+                for (i, p) in params.iter().enumerate() {
+                    total_grad[i] += adjoints[p.index]
+                        + if weights[i].abs() < 1.0 {
+                            -self.entropy_weight * weights[i].signum()
+                        } else {
+                            0.0
+                        };
                 }
+                ad_end();
             }
             for i in 0..weights.len() {
                 let g = total_grad[i] / dataset.len() as f64;
@@ -333,52 +351,25 @@ impl<T: Scalar + Send + Sync> EmlRegressor<T> {
     }
 
     fn predict_inner(&self, x_vals: &[T]) -> T {
-        if std::any::TypeId::of::<T>() == std::any::TypeId::of::<f64>() {
-            ad_begin_f64();
-            let vars: Vec<GenericVar<f64>> = x_vals
-                .iter()
-                .map(|v| GenericVar::<f64>::new(v.to_f64()))
-                .collect();
-            let mut weights = Vec::new();
-            self.root.collect_weights(&mut weights);
-            let params: Vec<GenericVar<f64>> =
-                weights.iter().map(|&w| GenericVar::<f64>::new(w)).collect();
-            let mut idx = 0;
-            let root_f64: &EmlMasterNode<f64> =
-                unsafe { &*(&self.root as *const EmlMasterNode<T> as *const EmlMasterNode<f64>) };
-            let res = root_f64.eval(&vars, &params, &mut idx, 0.01).value;
-            ad_end();
-            T::from_f64(res)
-        } else {
-            ad_begin_c64();
-            let vars: Vec<GenericVar<Complex64>> = x_vals
-                .iter()
-                .map(|v| {
-                    let c: Complex64 = unsafe {
-                        *(&v as *const &T as *const *const Complex64 as *const Complex64)
-                    };
-                    GenericVar::<Complex64>::new(c)
-                })
-                .collect();
-            let mut weights = Vec::new();
-            self.root.collect_weights(&mut weights);
-            let params: Vec<GenericVar<Complex64>> = weights
-                .iter()
-                .map(|&w| GenericVar::<Complex64>::new(Complex64::new(w, 0.0)))
-                .collect();
-            let mut idx = 0;
-            let root_c64: &EmlMasterNode<Complex64> = unsafe {
-                &*(&self.root as *const EmlMasterNode<T> as *const EmlMasterNode<Complex64>)
-            };
-            let res = root_c64.eval(&vars, &params, &mut idx, 0.01).value;
-            ad_end();
-            unsafe { *(&res as *const Complex64 as *const T) }
-        }
+        T::ad_begin();
+        let vars: Vec<GenericVar<T>> = x_vals.iter().map(|&v| GenericVar::<T>::new(v)).collect();
+        let mut weights = Vec::new();
+        self.root.collect_weights(&mut weights);
+        let params: Vec<GenericVar<T>> = weights
+            .iter()
+            .map(|&w| GenericVar::<T>::new(T::from_f64(w)))
+            .collect();
+        let mut idx = 0;
+        let res = self.root.eval(&vars, &params, &mut idx, 0.01).value;
+        ad_end();
+        res
     }
 }
 
-impl EmlRegressor<f64> {
-    pub fn predict(&self, x: &[f64]) -> f64 {
+impl<T: EmlScalar> EmlRegressor<T> {
+    /// Evaluates the learned expression. Available for every supported scalar — the previous
+    /// `predict` existed only for `f64` because the `Complex64` path could not be called safely.
+    pub fn predict(&self, x: &[T]) -> T {
         self.predict_inner(x)
     }
 }
@@ -386,6 +377,56 @@ impl EmlRegressor<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The `Complex64` path had **zero** test coverage before this change, which is how three
+    /// separate soundness defects survived in it. It could not even be exercised: `predict` was
+    /// only implemented for `f64`.
+    #[test]
+    fn complex_path_trains_and_predicts() {
+        // f(z) = z * z on the reals-embedded-in-complex, a target the tree can express.
+        let mut dataset = Vec::new();
+        for i in 1..6 {
+            let z = Complex64::new(i as f64 * 0.5, 0.0);
+            dataset.push((vec![z], z * z));
+        }
+        let mut regressor = EmlRegressor::<Complex64>::new(1, 1);
+        regressor.train(&dataset, 200);
+
+        // The substantive assertion is that training and prediction run to completion on real
+        // input data and produce finite output. Pre-fix, the inputs never reached the tape at
+        // all: the complex branch read a pointer's bit pattern instead of the datum, so it was
+        // fitting garbage. Convergence quality is not asserted — the tree is randomly seeded and
+        // this test exists to cover the path, not to benchmark it.
+        for (x, _) in &dataset {
+            let got = regressor.predict(x);
+            assert!(
+                got.re.is_finite() && got.im.is_finite(),
+                "complex prediction must be finite, got {got}"
+            );
+        }
+    }
+
+    /// Inputs must actually reach the tape. Pre-fix, the complex branch reinterpreted `&T` as a
+    /// `Complex64`, so every input was the same pointer-derived garbage regardless of value and
+    /// predictions could not vary with input.
+    #[test]
+    fn complex_predictions_depend_on_their_input() {
+        let dataset: Vec<(Vec<Complex64>, Complex64)> = (1..6)
+            .map(|i| {
+                let z = Complex64::new(i as f64 * 0.5, 0.0);
+                (vec![z], z * z)
+            })
+            .collect();
+        let mut regressor = EmlRegressor::<Complex64>::new(1, 1);
+        regressor.train(&dataset, 200);
+
+        let a = regressor.predict(&[Complex64::new(0.5, 0.0)]);
+        let b = regressor.predict(&[Complex64::new(4.0, 0.0)]);
+        assert!(
+            (a - b).norm() > 1e-9,
+            "prediction is input-independent: {a} vs {b}"
+        );
+    }
 
     #[test]
     fn test_eml_recovery_exp_f64() {

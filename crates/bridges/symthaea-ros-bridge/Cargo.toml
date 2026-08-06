@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "ROS2 bridge for Symthaea: publishes consciousness telemetry and consumes sensor/proprioception data"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["ros2", "robotics", "consciousness", "telemetry"]
 categories = ["science", "simulation"]
 

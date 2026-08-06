@@ -416,6 +416,11 @@ fn main() {
             let guesses = args.get(3).expect("score <dir> <guesses>");
             score(Path::new(dir), guesses);
         }
+        Some("score-paired") => {
+            let dir = args.get(2).expect("score-paired <dir> <export.json>");
+            let export = args.get(3).expect("score-paired <dir> <export.json>");
+            score_paired(Path::new(dir), Path::new(export));
+        }
         Some("reanalyze-nuisance") => {
             let dir = args.get(2).expect("reanalyze-nuisance <pack-dir>");
             reanalyze_nuisance(Path::new(dir));
@@ -426,7 +431,7 @@ fn main() {
         }
         _ => {
             eprintln!(
-                "usage: muse152_listening_pack generate <pack> [out_dir] | study <development|validation|holdout> <ecological|structural|minimal-pairs|minimal-pairs-natural> <identity|complete> [out_dir] | score <dir> <guesses> | reanalyze-nuisance <pack-dir> | augment-evidence <pack-dir>"
+                "usage: muse152_listening_pack generate <pack> [out_dir] | study <development|validation|holdout> <ecological|structural|minimal-pairs|minimal-pairs-natural> <identity|complete> [out_dir] | score <dir> <guesses> | score-paired <dir> <export.json> | reanalyze-nuisance <pack-dir> | augment-evidence <pack-dir>"
             );
             std::process::exit(2);
         }
@@ -1842,6 +1847,188 @@ fn render(
     wav
 }
 
+/// One participant's exported response to a matched four-way block —
+/// mirrors `write_paired_participant_page`'s JS `export` button JSON
+/// exactly (`{presentation_label, clip, family, confidence, coherence,
+/// musical_interest, beauty, memorability, desire_to_replay}` per
+/// treatment). Optional rating fields can be `null` (the page's own
+/// `num()` helper returns `null` for an unanswered number input).
+#[derive(Debug, Deserialize)]
+struct PairedExportTreatment {
+    clip: String,
+    family: String,
+    confidence: f64,
+    #[serde(default)]
+    coherence: Option<f64>,
+    #[serde(default)]
+    musical_interest: Option<f64>,
+    #[serde(default)]
+    beauty: Option<f64>,
+    #[serde(default)]
+    memorability: Option<f64>,
+    #[serde(default)]
+    desire_to_replay: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PairedExportBlock {
+    block_id: String,
+    treatments: Vec<PairedExportTreatment>,
+    #[serde(default)]
+    most_similar_pair: Vec<String>,
+    #[serde(default)]
+    best_motif_preservation: String,
+    #[serde(default)]
+    most_musically_convincing: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct PairedExport {
+    #[serde(default)]
+    participant_id: String,
+    blocks: Vec<PairedExportBlock>,
+}
+
+/// A `clip name -> (correct?, confidence)` verdict, plus the descriptive
+/// (non-scored) tallies -- returned by [`score_paired_export`] so the
+/// scoring logic itself is testable without touching the filesystem or
+/// stdout. [`score_paired`] is the thin file-reading + printing wrapper.
+#[derive(Debug, Default, PartialEq)]
+struct PairedScoreSummary {
+    verdicts: Vec<(String, String, bool, String, f64)>, // (clip, block_id, hit, guess, confidence)
+    correct: usize,
+    total: usize,
+    correct_confidence: Vec<f64>,
+    incorrect_confidence: Vec<f64>,
+    convincing_by_family: BTreeMap<String, usize>,
+    preservation_by_family: BTreeMap<String, usize>,
+    similar_pair_families: Vec<(String, String)>,
+}
+
+fn paired_clip_name(clip: &str) -> String {
+    Path::new(clip)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(clip)
+        .to_string()
+}
+
+/// Score a participant's matched-four-way export (Test B, the identity-
+/// grammar recognition arm) against the SAME `answer_key.json` [`score`]
+/// uses for Test A -- every treatment's `clip` maps directly to a true
+/// grammar family. The comparison questions (most-similar-pair, best-
+/// motif-preservation, most-musically-convincing) have no ground truth by
+/// design (every treatment in a block shares the identical source motif),
+/// so those are reported as a descriptive distribution over the TRUE
+/// family each selection resolved to, not scored right/wrong.
+fn score_paired_export(
+    key: &BTreeMap<String, String>,
+    export: &PairedExport,
+) -> PairedScoreSummary {
+    let mut summary = PairedScoreSummary::default();
+    for block in &export.blocks {
+        let family_for_index = |idx: &str| -> Option<String> {
+            let i: usize = idx.trim().parse().ok()?;
+            let name = paired_clip_name(&block.treatments.get(i)?.clip);
+            key.get(&name).cloned()
+        };
+        for t in &block.treatments {
+            let name = paired_clip_name(&t.clip);
+            let Some(truth) = key.get(&name) else {
+                continue;
+            };
+            summary.total += 1;
+            let hit = truth.eq_ignore_ascii_case(t.family.trim());
+            summary.correct += usize::from(hit);
+            if hit {
+                summary.correct_confidence.push(t.confidence);
+            } else {
+                summary.incorrect_confidence.push(t.confidence);
+            }
+            summary.verdicts.push((
+                name,
+                block.block_id.clone(),
+                hit,
+                t.family.clone(),
+                t.confidence,
+            ));
+        }
+        if let Some(fam) = family_for_index(&block.most_musically_convincing) {
+            *summary.convincing_by_family.entry(fam).or_insert(0) += 1;
+        }
+        if let Some(fam) = family_for_index(&block.best_motif_preservation) {
+            *summary.preservation_by_family.entry(fam).or_insert(0) += 1;
+        }
+        if let [a, b] = &block.most_similar_pair[..]
+            && let (Some(fa), Some(fb)) = (family_for_index(a), family_for_index(b))
+        {
+            summary.similar_pair_families.push((fa, fb));
+        }
+    }
+    summary
+}
+
+fn score_paired(dir: &Path, export_path: &Path) {
+    let manifest: Manifest = serde_json::from_str(
+        &std::fs::read_to_string(dir.join("manifest.json")).expect("read manifest"),
+    )
+    .expect("parse manifest");
+    let answer_path = if dir.join("sealed/answer_key.json").is_file() {
+        dir.join("sealed/answer_key.json")
+    } else {
+        dir.join("answer_key.json")
+    };
+    let key: BTreeMap<String, String> =
+        serde_json::from_str(&std::fs::read_to_string(answer_path).expect("read answer key"))
+            .expect("parse answer key");
+    let export: PairedExport = serde_json::from_str(
+        &std::fs::read_to_string(export_path).expect("read participant export"),
+    )
+    .expect("parse participant export");
+
+    let summary = score_paired_export(&key, &export);
+    for (name, block_id, hit, guess, confidence) in &summary.verdicts {
+        println!(
+            "{name}: block {block_id}: {} (guess: {guess:?}, confidence {confidence})",
+            if *hit { "correct" } else { "wrong" }
+        );
+    }
+    let p = binomial_tail(summary.correct, summary.total, manifest.chance_probability);
+    println!(
+        "\n{}/{} correct ({:.1}%); chance {:.1}%; one-sided p={p:.5}",
+        summary.correct,
+        summary.total,
+        100.0 * summary.correct as f64 / summary.total.max(1) as f64,
+        100.0 * manifest.chance_probability
+    );
+    let mean = |v: &[f64]| {
+        if v.is_empty() {
+            f64::NAN
+        } else {
+            v.iter().sum::<f64>() / v.len() as f64
+        }
+    };
+    println!(
+        "confidence calibration: mean confidence when correct = {:.1} (n={}), when wrong = {:.1} (n={})",
+        mean(&summary.correct_confidence),
+        summary.correct_confidence.len(),
+        mean(&summary.incorrect_confidence),
+        summary.incorrect_confidence.len()
+    );
+    println!(
+        "most musically convincing, by true family: {:?}",
+        summary.convincing_by_family
+    );
+    println!(
+        "best motif preservation, by true family: {:?}",
+        summary.preservation_by_family
+    );
+    println!(
+        "most structurally similar pairs (true family, true family): {:?}",
+        summary.similar_pair_families
+    );
+}
+
 fn score(dir: &Path, guesses: &str) {
     let manifest: Manifest = serde_json::from_str(
         &std::fs::read_to_string(dir.join("manifest.json")).expect("read manifest"),
@@ -1899,6 +2086,93 @@ fn binomial_tail(hits: usize, trials: usize, probability: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn score_paired_export_tallies_recognition_and_descriptive_selections() {
+        let key: BTreeMap<String, String> = [
+            ("clip_00.wav".to_string(), "GrooveCycle".to_string()),
+            ("clip_01.wav".to_string(), "CallResponse".to_string()),
+            ("clip_02.wav".to_string(), "ModalArc".to_string()),
+            ("clip_03.wav".to_string(), "ProcessAdditive".to_string()),
+        ]
+        .into_iter()
+        .collect();
+        let treatment = |clip: &str, family: &str, confidence: f64| PairedExportTreatment {
+            clip: clip.to_string(),
+            family: family.to_string(),
+            confidence,
+            coherence: None,
+            musical_interest: None,
+            beauty: None,
+            memorability: None,
+            desire_to_replay: None,
+        };
+        let export = PairedExport {
+            participant_id: "p1".into(),
+            blocks: vec![PairedExportBlock {
+                block_id: "b0".into(),
+                treatments: vec![
+                    treatment("clip_00.wav", "GrooveCycle", 80.0), // correct
+                    treatment("clip_01.wav", "ModalArc", 40.0),    // wrong (truth: CallResponse)
+                    treatment("clip_02.wav", "ModalArc", 90.0),    // correct
+                    treatment("clip_03.wav", "GrooveCycle", 55.0), // wrong (truth: ProcessAdditive)
+                ],
+                most_similar_pair: vec!["0".into(), "2".into()],
+                best_motif_preservation: "1".into(),
+                most_musically_convincing: "3".into(),
+            }],
+        };
+        let summary = score_paired_export(&key, &export);
+        assert_eq!(summary.total, 4);
+        assert_eq!(summary.correct, 2);
+        assert_eq!(summary.correct_confidence, vec![80.0, 90.0]);
+        assert_eq!(summary.incorrect_confidence, vec![40.0, 55.0]);
+        // Index 1 -> clip_01.wav -> true family CallResponse.
+        assert_eq!(summary.preservation_by_family.get("CallResponse"), Some(&1));
+        // Index 3 -> clip_03.wav -> true family ProcessAdditive.
+        assert_eq!(
+            summary.convincing_by_family.get("ProcessAdditive"),
+            Some(&1)
+        );
+        // Indices 0, 2 -> GrooveCycle, ModalArc.
+        assert_eq!(
+            summary.similar_pair_families,
+            vec![("GrooveCycle".to_string(), "ModalArc".to_string())]
+        );
+    }
+
+    #[test]
+    fn score_paired_export_skips_clips_absent_from_the_answer_key() {
+        // A treatment whose clip isn't in the answer key (e.g. a stale
+        // export against a regenerated pack) must not be silently counted
+        // as either correct or wrong -- it's excluded from `total`.
+        let key: BTreeMap<String, String> =
+            [("clip_00.wav".to_string(), "GrooveCycle".to_string())]
+                .into_iter()
+                .collect();
+        let export = PairedExport {
+            participant_id: "p1".into(),
+            blocks: vec![PairedExportBlock {
+                block_id: "b0".into(),
+                treatments: vec![PairedExportTreatment {
+                    clip: "clip_99.wav".into(),
+                    family: "GrooveCycle".into(),
+                    confidence: 50.0,
+                    coherence: None,
+                    musical_interest: None,
+                    beauty: None,
+                    memorability: None,
+                    desire_to_replay: None,
+                }],
+                most_similar_pair: vec![],
+                best_motif_preservation: String::new(),
+                most_musically_convincing: String::new(),
+            }],
+        };
+        let summary = score_paired_export(&key, &export);
+        assert_eq!(summary.total, 0);
+        assert_eq!(summary.correct, 0);
+    }
 
     #[test]
     fn packs_are_balanced_and_statistic_has_known_edges() {

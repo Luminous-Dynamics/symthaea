@@ -4,7 +4,7 @@
 //!
 //! Maps common application names, abbreviations, and proprietary equivalents
 //! to their canonical nixpkgs attribute paths. Ported from
-//! `symthaea-nix::encoding::package_aliases` (~600 entries), trimmed to the
+//! `nixward::encoding::package_aliases` (~600 entries), trimmed to the
 //! most useful subset for the Sovereign Inoculation installer.
 //!
 //! WASM-compatible: no LazyLock, no HashMap, no strsim — pure static data

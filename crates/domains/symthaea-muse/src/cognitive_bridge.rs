@@ -723,6 +723,40 @@ mod tests {
     use super::*;
     use symthaea_music_theory::{CompositionalObligation, ObligationKind};
 
+    /// PINS THE HONEST CONTRACT: on the live studio path the proposed action is
+    /// decided by the caller's hardcoded goal, NOT by the cognitive session.
+    ///
+    /// `muse_studio.rs` calls `bridge_observation(..., Some(CognitiveGoal::Recapitulate), ...)`
+    /// with that goal as a literal, and `action_for` matches it before ever
+    /// reading the FEP inference. So every `MusicAction` the HDC/CfC session
+    /// could possibly infer collapses to the same `SymbolicAction`.
+    ///
+    /// This test exists so that stays TRUE-and-documented or becomes
+    /// FALSE-and-noticed. If someone wires the inference in, this fails — and
+    /// the correct response is to update `CognitiveSession::bridge_observation`'s
+    /// "provenance, not control" doc section rather than to weaken the test.
+    #[test]
+    fn studio_goal_pins_the_action_regardless_of_what_the_session_inferred() {
+        let obs = observation(Some(CognitiveGoal::Recapitulate));
+        let every_action = [
+            MusicAction::FollowHarmony,
+            MusicAction::ChromaticExplore,
+            MusicAction::RepeatMotif,
+            MusicAction::ModulateKey,
+            MusicAction::IncreaseComplexity,
+            MusicAction::Maintain,
+        ];
+        for a in every_action {
+            let trace = propose_symbolic_action(&inference(a), obs.clone());
+            assert_eq!(
+                trace.proposal.action,
+                SymbolicAction::ReturnOpeningMaterial,
+                "inference {a:?} changed the proposed action — the session now influences \
+                 output, so bridge_observation's 'provenance, not control' doc is stale"
+            );
+        }
+    }
+
     fn inference(action: MusicAction) -> MusicInferenceResult {
         MusicInferenceResult {
             action,

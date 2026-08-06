@@ -87,6 +87,31 @@ pub const BINARY_BYTES: usize = HDC_DIMENSION / 8;
 /// - Precision matters more than memory/speed
 ///
 /// # Memory: 64KB per vector (16,384 × 4 bytes)
+///
+/// # Binding algebra: this is NOT a bipolar VSA code — decision record (2026-07-27)
+/// If you need exact, self-inverse binding (`A⊗A` is exactly the identity;
+/// unbinding via a second bind with the same operand recovers the original
+/// exactly, not approximately), use [`BinaryHV`](super::binary_hv::BinaryHV)
+/// instead — its XOR-based binding is **algebraically isomorphic to bipolar
+/// (±1) Hadamard binding under the usual bit-to-sign mapping**, giving it the
+/// same self-inverse group structure. That isomorphism is about binding's
+/// *group structure*, not full representational equivalence: continuous
+/// amplitude, cosine geometry, bundling behavior, learning-rule updates, and
+/// serialization format all differ materially between the two types, so
+/// `BinaryHV` is not a drop-in replacement for every `ContinuousHV` use —
+/// only for the specific cases that actually need exact bipolar-style
+/// binding/unbinding.
+///
+/// `ContinuousHV`'s own `bind`, by contrast, only *approximately* satisfies
+/// bipolar-style properties, and does not satisfy self-inverse at all — see
+/// [`bind`](Self::bind)'s doc for the corrected, empirically-measured
+/// properties (`docs/BINDING_ALGEBRA_CHARACTERIZATION_REPORT.md` has the
+/// full data). No third HV type has been introduced to bridge this gap: as
+/// of this writing, no identified consumer needs continuous *amplitude*
+/// together with *exact* unbinding that neither existing type can serve —
+/// if one is found (see the workspace migration inventory in
+/// `symthaea/docs/` under the UAL/HDC-audit work), revisit this decision
+/// rather than assuming either existing type suffices.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContinuousHV {
     /// Vector components in [-1, 1]
@@ -191,25 +216,55 @@ impl ContinuousHV {
         self.values.len()
     }
 
-    /// Binding operation (element-wise multiplication)
-    ///
-    /// Creates an association between two vectors.
-    /// Result is dissimilar to both inputs.
-    ///
-    /// # Properties
-    /// - Commutative: A⊗B = B⊗A
-    /// - Self-inverse: A⊗A ≈ 1
-    /// - Preserves similarity: sim(A⊗C, B⊗C) = sim(A, B)
-    ///
-    /// Non-commutative temporal binding: ρ(self) ⊙ other.
-    ///
-    /// Cyclic permutation + Hadamard product for continuous domain.
-    /// `a.bind_temporal(&b) ≠ b.bind_temporal(&a)`, encoding temporal order.
+    /// Non-commutative temporal binding: `ρ(self) ⊙ other`, i.e. a cyclic
+    /// permutation of `self` composed with [`bind`](Self::bind).
+    /// `a.bind_temporal(&b) ≠ b.bind_temporal(&a)` — the permutation step is
+    /// what encodes temporal/sequential order, which plain [`bind`](Self::bind)
+    /// (commutative) cannot. See [`bind`](Self::bind)'s doc for the algebraic
+    /// properties this inherits (and does NOT inherit — see there for the
+    /// corrected claims).
     #[inline]
     pub fn bind_temporal(&self, other: &Self) -> Self {
         self.permute(1).bind(other)
     }
 
+    /// Binding operation (element-wise/Hadamard multiplication).
+    ///
+    /// Creates an association between two vectors; the result is dissimilar
+    /// to both inputs for independent random vectors.
+    ///
+    /// # Properties — corrected 2026-07-27 after a real defect was found
+    /// (see `binding_algebra_audit.rs` and
+    /// `docs/BINDING_ALGEBRA_CHARACTERIZATION_REPORT.md` for the full
+    /// empirical characterization this corrects against). An earlier version
+    /// of this doc comment claimed bipolar-VSA properties this operation
+    /// does not actually have for `ContinuousHV::random`'s real
+    /// uniform-`[-1,1]` component distribution:
+    ///
+    /// - **Commutative**: `A⊗B = B⊗A`. True (plain elementwise multiplication).
+    /// - **NOT self-inverse**: `A⊗A` is emphatically not ≈ the identity
+    ///   (all-ones) vector. Measured: `sim(A⊗A, ones) ≈ 0.745`, and this is a
+    ///   *stable distributional constant* (`E[A_i²]` for uniform`[-1,1]`
+    ///   components) — it does not approach 1.0 at any dimension tested
+    ///   (64–16,384). True self-inverse binding (`A⊗A` exactly recovers the
+    ///   identity) requires **bipolar (±1) components**, which this type does
+    ///   not have — use [`BinaryHV`](super::binary_hv::BinaryHV) (genuine XOR
+    ///   binding) if you need that property.
+    /// - **Preserves similarity — approximately, in the regimes tested**:
+    ///   `sim(A⊗C, B⊗C) ≈ sim(A, B)` held up well empirically for independent
+    ///   pairs (both ≈0) and for one tested high-correlation pair (≈0.97
+    ///   preserved to within <0.01 after binding), across all dimensions
+    ///   tested. Not falsified here, but only swept over a narrow slice of
+    ///   the correlation range — do not treat as an exact algebraic identity.
+    /// - **Real unbinding requires [`inverse`](Self::inverse), not a second
+    ///   `bind` with the same operand**: `bind(bind(A,B), inverse(B))`
+    ///   recovers `A` with mean similarity ≈0.92 (measured); binding again
+    ///   with `B` itself (`bind(bind(A,B), B) = A⊗B²`, a real but
+    ///   non-textbook pattern relying on `B²`'s non-negativity) only reaches
+    ///   ≈0.82 and is not genuine unbinding. See
+    ///   [`inverse`](Self::inverse)'s own doc for a numerical-stability
+    ///   caveat before relying on it component-wise.
+    ///
     /// # Performance
     /// Uses SIMD acceleration when the `simd` feature is enabled (4x+ speedup).
     #[inline]
@@ -603,10 +658,29 @@ impl ContinuousHV {
     ///
     /// For continuous hypervectors with binding as element-wise multiplication,
     /// the inverse is the element-wise reciprocal: inv(a_i) = 1/a_i.
-    /// Near-zero elements are mapped to zero to avoid division by zero.
+    /// Near-zero elements (|v| < 1e-7) are mapped to zero to avoid division
+    /// by zero (confirmed by a dedicated contract test in
+    /// `binding_algebra_audit.rs`).
     ///
     /// Property: `A.bind(&A.inverse())` should yield a vector near the identity
-    /// (all ones) for non-zero elements.
+    /// (all ones) for non-zero elements — confirmed empirically: mean
+    /// similarity ≈0.92 for `bind(bind(A,B), inverse(B))` recovering `A`
+    /// (see `bind`'s doc and `docs/BINDING_ALGEBRA_CHARACTERIZATION_REPORT.md`).
+    ///
+    /// # Numerical stability caveat (found 2026-07-27, not yet mitigated)
+    /// The elementwise reciprocal is **not bounded**, and gets WORSE as
+    /// dimension grows, not better: measured mean max-magnitude of the
+    /// output grows from ~356 (dim=64) to ~50,246 (dim=16,384), with an
+    /// observed extreme of 419,430 — higher dimensions mean more samples,
+    /// so a higher chance of hitting a near-(but-above)-epsilon component
+    /// whose reciprocal is huge. This never produces non-finite output (the
+    /// epsilon floor is a hard contract, tested), and whole-vector
+    /// reconstruction error stays negligible in aggregate — but any caller
+    /// reading this method's output component-wise, rather than only
+    /// through a full bind-and-compare, should not assume bounded magnitude.
+    /// No clipping/regularization has been added — this is a measured,
+    /// disclosed property, not yet a design decision about whether/how to
+    /// bound it.
     pub fn inverse(&self) -> Self {
         const EPSILON: f32 = 1e-7;
         Self {

@@ -25,6 +25,16 @@ use crate::rhythm::Duration;
 use crate::spec::{Attitude, DevelopmentDna, MelodicDna, PhraseRhetoric};
 use serde::{Deserialize, Serialize};
 
+/// `BaroqueSuite`'s progression BEFORE the 2026-07-26 harmonic-syntax pilot
+/// (see `HARMONIC_SYNTAX_REWORK_SCOPE_2026-07-26.md`) — plain I-IV-V-I,
+/// cycled to length. Deliberately kept as a named constant (not just a git-
+/// history footnote) after the pilot's A/B evidence favored the real
+/// functional-harmony generator (`ProgressionSpec::Grammar`) it replaced:
+/// a compatibility baseline for debugging, an Analyst A/B control, and a
+/// regression fixture proving the old behavior still composes cleanly.
+/// See `composer::tests::baroque_suite_compatibility_baseline_still_composes_and_genuinely_differs_from_the_new_route`.
+pub const BAROQUE_SUITE_COMPATIBILITY_PROGRESSION: [i32; 4] = [1, 4, 5, 1];
+
 /// A named genre/style bias. See the module docs for what this does and
 /// does not change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
@@ -538,23 +548,18 @@ impl Style {
     /// quartet.
     pub fn progression(self, bars: usize, seed: u64) -> Progression {
         let bars = bars.max(1);
-        match self {
-            Style::Classical => Progression::generate(bars, seed),
-            Style::Waltz => cycle_to_length(&Progression::pachelbel().degrees, bars),
-            Style::Folk => {
-                let pool: [&[i32]; 2] = [&[1, 4, 5, 1], &[1, 5, 4, 1]];
-                cycle_to_length(pool[(seed as usize) % pool.len()], bars)
-            }
-            Style::Cinematic => {
-                let pool: [&[i32]; 2] = [&[1, 6, 3, 4], &[1, 3, 6, 4]];
-                cycle_to_length(pool[(seed as usize) % pool.len()], bars)
-            }
-            Style::Playful => {
-                let pool: [&[i32]; 2] = [&[2, 5, 1], &[2, 5, 1, 4]];
-                cycle_to_length(pool[(seed as usize) % pool.len()], bars)
-            }
-            _ => self.spec().progression(bars, seed),
-        }
+        // Delegates entirely to the spec — the single source of truth.
+        //
+        // This used to hardcode five styles (Classical/Waltz/Folk/Cinematic/
+        // Playful) that duplicated what their own specs already said, making it
+        // a second, silently-divergable progression source: a style whose spec
+        // changed would keep returning the old progression here, and `live.rs`
+        // is a real consumer. Removed 2026-07-30 after proving the arms
+        // redundant — legacy and spec agreed on 0 divergences across all 29
+        // styles x 5 bar-lengths x 24 seeds — so this is a pure dedup, not a
+        // behaviour change. `style_progression_delegates_to_the_spec` keeps it
+        // that way.
+        self.spec().progression(bars, seed)
     }
 
     /// This style as a [`CompositionSpec`] — the built-in styles are nothing
@@ -682,7 +687,9 @@ impl Style {
                     vec![(1, 1, 2), (2, 1, 2), (3, 1, 2), (2, 1, 2), (1, 1, 1)],
                     vec![(5, 1, 2), (4, 1, 2), (3, 1, 2), (4, 1, 2), (5, 1, 1)],
                 ],
-                progression: ProgressionSpec::Archetype(vec![1, 5, 6, 3, 4, 1, 4, 5]),
+                progression: ProgressionSpec::GrammarWithPalette(
+                    crate::harmony::HarmonicPalette::waltz(),
+                ),
                 accompaniment_pool: vec![A::OomPah],
                 form_pool: vec![FormKind::Ternary, FormKind::Rondo],
                 ensemble_pool: s(&[
@@ -948,7 +955,9 @@ impl Style {
                     vec![(3, 1, 2), (4, 1, 2), (5, 1, 1), (6, 1, 1), (5, 1, 1)],
                     vec![(5, 1, 2), (4, 1, 2), (3, 1, 2), (2, 1, 2), (1, 2, 1)],
                 ],
-                progression: ProgressionSpec::Archetype(vec![1, 6, 2, 5]),
+                progression: ProgressionSpec::GrammarWithPalette(
+                    crate::harmony::HarmonicPalette::nocturne(),
+                ),
                 accompaniment_pool: vec![A::Arpeggio],
                 // Variations belongs here: a nocturne dwelling on one idea,
                 // darkening it (minore) and ornamenting it (figuration), is
@@ -1019,7 +1028,9 @@ impl Style {
                 // deliberately NOT the [1,4,5,1] the Classical grammar
                 // generates for seed 0, which made the two styles compose
                 // identical lines once the hook dominated the bar.
-                progression: ProgressionSpec::Archetype(vec![1, 5, 1, 4]),
+                progression: ProgressionSpec::GrammarWithPalette(
+                    crate::harmony::HarmonicPalette::march(),
+                ),
                 accompaniment_pool: vec![A::Block],
                 form_pool: vec![FormKind::Ternary, FormKind::Rondo],
                 ensemble_pool: s(&[["trumpet", "organ", "cello"]]),
@@ -1104,7 +1115,23 @@ impl Style {
                 form_pool: vec![FormKind::Ternary, FormKind::Variations],
                 ensemble_pool: s(&[["flute", "kalimba", "cello"]]),
                 counter_instrument: None,
-                melody: MelodicDna::default(),
+                // A lullaby's melodic identity is the narrowest in the
+                // catalogue: stepwise, descending, and repetitive — the tune
+                // settles rather than travels. Rhythms fill this style's meter
+                // of 3 with an unhurried rock (long-short and short-long), and
+                // the contours mirror the descending gestures its own
+                // `motifs_calm` already use ((3,2,1)->(1,1,1), (5,2,1)->(3,1,1)).
+                // No leaps: a lullaby that leaps is a different piece.
+                melody: MelodicDna {
+                    hook_rhythms: vec![
+                        vec![(1, 1), (1, 1), (1, 1)],
+                        vec![(2, 1), (1, 1)],
+                        vec![(1, 1), (2, 1)],
+                        vec![(1, 2), (1, 2), (1, 1), (1, 1)],
+                    ],
+                    hook_contours: vec![vec![3, 2, 1], vec![5, 3, 1], vec![1, 2, 1], vec![3, 2, 3]],
+                    ..MelodicDna::default()
+                },
                 meter_pool: vec![],
                 mode_pool: vec![],
                 rhetoric: PhraseRhetoric::Classic,
@@ -1501,10 +1528,24 @@ impl Style {
                         (1, 1, 1),
                     ],
                 ],
-                // The 12-bar chorus: I-I-I-I / IV-IV-I-I / V-IV-I-I. Purely
+                // Three real, standard 12-bar-blues chord variants (purely
                 // major-functional — the "blues" identity is entirely in
-                // the melody's blue notes, not in the chords.
-                progression: ProgressionSpec::Archetype(vec![1, 1, 1, 1, 4, 4, 1, 1, 5, 4, 1, 1]),
+                // the melody's blue notes, not the chords). `ArchetypePool`
+                // (not a single `Archetype`) so `realize_call_response`'s
+                // already-computed per-chorus `seed_variant` — threaded
+                // into `spec.progression(...)` since day one — actually
+                // varies the harmony chorus to chorus, not just the
+                // melody: a real gap where every chorus in a multi-chorus
+                // piece got matched melodic variation but byte-identical
+                // harmony every time.
+                progression: ProgressionSpec::ArchetypePool(vec![
+                    // Standard: I-I-I-I / IV-IV-I-I / V-IV-I-I.
+                    vec![1, 1, 1, 1, 4, 4, 1, 1, 5, 4, 1, 1],
+                    // Quick-change: bar 2 moves to IV and back.
+                    vec![1, 4, 1, 1, 4, 4, 1, 1, 5, 4, 1, 1],
+                    // Turnaround ending on V, setting up the next chorus.
+                    vec![1, 1, 1, 1, 4, 4, 1, 1, 5, 4, 1, 5],
+                ]),
                 accompaniment_pool: vec![A::Shuffle],
                 form_pool: vec![FormKind::Ternary, FormKind::Rondo],
                 ensemble_pool: s(&[
@@ -1840,9 +1881,69 @@ impl Style {
                         (2, 1, 2),
                     ],
                 ],
-                progression: ProgressionSpec::Archetype(vec![1, 4, 5, 1]),
+                // Harmonic-syntax pilot (2026-07-26, see
+                // HARMONIC_SYNTAX_REWORK_SCOPE_2026-07-26.md): this style's
+                // own doc already calls it "functional common-practice
+                // tonality, not an exotic mode" -- the SAME tonal world
+                // Classical's real T-PD-D-T generator lives in, with no
+                // documented reason (unlike Cinematic/Folk/Playful/
+                // ModalFolk/Impressionism/SacredChoral, all of which
+                // deliberately avoid or restrict specific chords) for
+                // staying on a fixed 4-chord loop instead of it.
+                //
+                // A/B evidence (2026-07-27, note-data + rendered-audio
+                // analysis, not a human listening session): across 2 seeds,
+                // same form/rhythm/instrumentation/tempo, the functional
+                // route showed lower estimated dissonance, fewer large
+                // melodic leaps, and more varied harmonic motion than
+                // BAROQUE_SUITE_COMPATIBILITY_PROGRESSION (the route it
+                // replaced, kept as a named constant -- a compatibility
+                // baseline, an Analyst A/B control, and a regression
+                // fixture, not deleted). One disclosed rough edge: seed 7's
+                // counter-voice realization didn't fully adapt to the new
+                // harmony (more angular leaps) -- a real follow-up target,
+                // not a reason to keep the old route.
+                progression: ProgressionSpec::GrammarWithPalette(
+                    crate::harmony::HarmonicPalette::baroque(),
+                ),
                 accompaniment_pool: vec![A::Arpeggio], // broken-chord continuo
-                form_pool: vec![FormKind::Ternary],
+                // Diversity-review finding (2026-07-28, note-data + rendered-
+                // audio analysis of 4 seeds): with a single-entry form_pool,
+                // every seed produced the same macro-architecture (same
+                // length/tempo/meter/texture/phrase layout), varying only
+                // local harmony -- "the same template with different notes,"
+                // not independently-conceived movements. `form_pool` already
+                // exists precisely to let the seed choose a genuinely
+                // different large-scale form (see `CompositionSpec::form_kind`);
+                // it just had nothing to choose from. Each addition below is
+                // a real, already-tested, historically-authentic Baroque
+                // movement type, not a parameter variation on the same note
+                // pipeline: `Rondo` (a rondeau, a genuine French-Baroque
+                // dance-suite form) and `Variations` (theme-and-figuration,
+                // e.g. a Handelian air with variations) both stay in the
+                // shared period pipeline, so they're zero-risk; `Fugue`
+                // (imitative counterpoint -- exposition, answer, stretto)
+                // and `Passacaglia` (a ground-bass movement, e.g. a Purcell-
+                // style lament) bypass that pipeline entirely for their own
+                // dedicated realizers (`crate::fugue`/`crate::passacaglia`),
+                // giving two seeds' worth of genuinely different note-
+                // generation logic, not just different chords over the same
+                // shape. `crate::fugue::realize_fugue`'s `meter: u8` is used
+                // generically (no 4/4 assumption, verified against source);
+                // `crate::passacaglia::realize_passacaglia`'s own tests
+                // already exercise meter=3 directly. Sonata/Renaissance/Opera
+                // (the other bypass forms) are deliberately left out -- their
+                // tonal-conflict-and-resolution / equal-voice / dual-theme-
+                // dialogue identities read as later or more specialized than
+                // a Baroque suite movement, a stylistic judgment call, not a
+                // technical constraint.
+                form_pool: vec![
+                    FormKind::Ternary,
+                    FormKind::Rondo,
+                    FormKind::Variations,
+                    FormKind::Fugue,
+                    FormKind::Passacaglia,
+                ],
                 ensemble_pool: s(&[["violin", "organ", "cello"]]), // trio-sonata continuo
                 counter_instrument: None,
                 melody: MelodicDna {
@@ -2655,14 +2756,6 @@ fn pick(bank: &[&[(i32, Duration)]], seed: u64) -> Motif {
     crate::form::oriented(&picked, orientation)
 }
 
-/// Cycle `pattern` to exactly `bars` degrees (repeating from the start once
-/// exhausted), so a fixed-length archetype can back a progression of any
-/// requested length.
-fn cycle_to_length(pattern: &[i32], bars: usize) -> Progression {
-    let degrees: Vec<i32> = (0..bars).map(|i| pattern[i % pattern.len()]).collect();
-    Progression::new(degrees)
-}
-
 fn waltz_motif(arousal: f32, seed: u64) -> Motif {
     let q = Duration::quarter();
     let h = Duration::half();
@@ -2801,6 +2894,205 @@ fn playful_motif(arousal: f32, seed: u64) -> Motif {
 mod tests {
     use super::*;
 
+    /// RATCHET: how many styles ship with NO melodic DNA of their own.
+    ///
+    /// Measured 2026-07-30: **15 of 29** styles have `hook_contours == []` and
+    /// `hook_rhythms == []`, so `HookCell::generate_with` falls back to the same
+    /// shared `CONTOURS`/`RHYTHMS` defaults for all of them — Lullaby, Fugue,
+    /// Passacaglia, Impressionism, SacredChoral, Minimalism, ProgFolk, Ambient,
+    /// Sonata, RenaissancePolyphony, AfroCuban, BossaNova, Opera,
+    /// IrishTraditional, HindustaniInspired.
+    ///
+    /// This is the structural cause of the 99.8% mean canonical duplicate rate
+    /// `motif_foundry_style_survey` reports: over half the catalogue draws its
+    /// hooks from one identical pool. A style with no melodic DNA is not
+    /// expressing a design choice — it is unfinished.
+    ///
+    /// CORRECTION (2026-07-31), from actually authoring one: this ratchet's
+    /// premise that empty DNA is "the structural cause of the 99.8% duplicate
+    /// rate" is WRONG. Giving Lullaby its own DNA left its duplicate rate at
+    /// 99.7% — unchanged — and made its FOUNDRY rate worse (76.2% -> 99.6%),
+    /// because a lullaby's authentic vocabulary is narrower than the generic
+    /// shared pool it replaced. Authoring DNA buys style IDENTITY, not variety.
+    /// The duplicate rate is driven by pool SIZE (<=24 cells), which is a
+    /// separate problem. This ratchet is still worth keeping — a style drawing
+    /// its tune from a generic pool is genuinely unfinished — but it should not
+    /// be sold as a variety fix.
+    ///
+    /// It also bounds what enabling `use_procedural_foundry` can achieve.
+    /// `motif_foundry::config_for_dna` biases generation toward a DNA's own
+    /// measured character, so for these 15 it has nothing to bias with: all
+    /// fifteen score an identical 76.2% foundry duplicate rate with an identical
+    /// (3,5) length range and max leap 5. Blanket-enabling the foundry would
+    /// give them procedurally-varied but mutually IDENTICAL melodies — the same
+    /// trap the harmonic-syntax batch hit on 2026-07-30, where converting styles
+    /// to a style-agnostic generator made them bit-identical to each other (see
+    /// `HARMONIC_SYNTAX_REWORK_SCOPE_2026-07-26.md`'s blocked-attempt note).
+    ///
+    /// The ratchet may only go DOWN. Authoring real melodic DNA for one of these
+    /// styles is a genuine, taste-dependent improvement; this test makes the gap
+    /// visible and stops it silently growing.
+    /// Which styles' `progression` field is INERT, and therefore must not be
+    /// "improved" — pinned so the set cannot drift unnoticed.
+    #[test]
+    fn styles_whose_progression_field_is_dead_are_known_and_documented() {
+        // A style whose every form bypasses the period pipeline
+        // (`FormKind::uses_progression_pipeline`) never consumes
+        // `CompositionSpec::progression` at all: fugue, passacaglia, sonata,
+        // renaissance, opera and prog-suite each build their own harmony
+        // internally. For those styles the progression field is INERT — its
+        // value cannot affect a single composed note.
+        //
+        // Measured 2026-07-30. This matters because the field still holds a
+        // plausible-looking value (`Fugue => Archetype([1, 4, 5, 1])`), so a
+        // reader naturally assumes it is the fugue's harmony. It is not, and
+        // "converting" any of these to a grammar palette would be pure theatre
+        // — the decorative-wiring pattern this codebase keeps having to catch.
+        const KNOWN_DEAD: [Style; 6] = [
+            Style::Fugue,
+            Style::Passacaglia,
+            Style::ProgFolk,
+            Style::Sonata,
+            Style::RenaissancePolyphony,
+            Style::Opera,
+        ];
+        let dead: Vec<Style> = Style::ALL
+            .iter()
+            .copied()
+            .filter(|s| {
+                let pool = &s.spec().form_pool;
+                !pool.is_empty() && !pool.iter().any(|f| f.uses_progression_pipeline())
+            })
+            .collect();
+        assert_eq!(
+            dead,
+            KNOWN_DEAD.to_vec(),
+            "the set of styles with an inert `progression` field changed.\n\
+             If a style GAINED one: its progression value has been ignored all along and is \
+             probably untuned — check it before trusting it.\n\
+             If a style LOST one: its progression is now live and its value suddenly matters."
+        );
+    }
+
+    /// `Style::progression` must stay a thin delegate to the spec.
+    ///
+    /// It used to hardcode five styles that duplicated their own specs, making
+    /// it a second progression source that could silently diverge — change a
+    /// style's spec and this method would keep returning the old progression,
+    /// while `live.rs` (a real consumer) kept using it. The arms were provably
+    /// redundant when removed (0 divergences over every style x 5 bar-lengths x
+    /// 24 seeds); this stops them growing back.
+    #[test]
+    fn style_progression_delegates_to_the_spec() {
+        for s in Style::ALL {
+            for bars in [1usize, 3, 4, 8, 12] {
+                for seed in 0..16u64 {
+                    assert_eq!(
+                        s.progression(bars, seed).degrees,
+                        s.spec().progression(bars, seed).degrees,
+                        "{s:?} bars={bars} seed={seed}: Style::progression diverged from its \
+                         own spec — the legacy method must not special-case styles"
+                    );
+                }
+            }
+        }
+    }
+
+    /// GUARD, added 2026-07-30 with `HarmonicPalette`.
+    ///
+    /// Converting a style to `ProgressionSpec::Grammar` gives it real per-seed
+    /// variety and simultaneously makes it produce BIT-IDENTICAL progressions to
+    /// every other Grammar style, because `Progression::generate` is
+    /// style-agnostic. Measured before the fix: Classical / BaroqueSuite / March
+    /// / Nocturne agreed on 96/96 style-pairs × seeds. That is the cross-style
+    /// bleed the diversity census fixed for Folk/Cinematic/Playful, reintroduced
+    /// at 100%, and it is what blocked the harmonic-syntax rework.
+    ///
+    /// The fix is `ProgressionSpec::GrammarWithPalette`, which supplies the
+    /// style's own vocabulary to the same universal grammar. After it, March
+    /// agrees with Classical on 1/32 seeds instead of 32/32.
+    ///
+    /// This test asserts BOTH halves of the trade, because either alone is a
+    /// regression: styles must not be interchangeable, AND each must still be
+    /// varied within itself.
+    #[test]
+    fn grammar_generated_styles_must_not_be_harmonically_interchangeable() {
+        use std::collections::BTreeSet;
+        // Every style whose progressions come from the grammar generator.
+        let generated: Vec<Style> = Style::ALL
+            .iter()
+            .copied()
+            .filter(|s| {
+                matches!(
+                    s.spec().progression,
+                    crate::spec::ProgressionSpec::Grammar
+                        | crate::spec::ProgressionSpec::GrammarWithPalette(_)
+                )
+            })
+            .collect();
+
+        for (i, a) in generated.iter().enumerate() {
+            for b in &generated[i + 1..] {
+                let identical = (0..32u64)
+                    .filter(|&seed| {
+                        a.spec().progression(8, seed).degrees
+                            == b.spec().progression(8, seed).degrees
+                    })
+                    .count();
+                assert!(
+                    identical < 24,
+                    "{a:?} and {b:?} produce identical progressions on {identical}/32 seeds — \
+                     they are harmonically interchangeable. Give one a HarmonicPalette; \
+                     ProgressionSpec::Grammar alone is style-agnostic, so every style using it \
+                     generates the SAME walk from the same seed."
+                );
+            }
+        }
+
+        // And each must still be varied WITHIN itself — the thing converting
+        // away from a fixed archetype was supposed to buy.
+        for s in &generated {
+            let distinct: BTreeSet<Vec<i32>> = (0..32u64)
+                .map(|seed| s.spec().progression(8, seed).degrees.clone())
+                .collect();
+            assert!(
+                distinct.len() >= 3,
+                "{s:?} generates only {} distinct progression(s) across 32 seeds — barely \
+                 better than the fixed archetype it replaced",
+                distinct.len()
+            );
+        }
+    }
+
+    #[test]
+    fn styles_without_their_own_melodic_dna_may_only_decrease() {
+        const KNOWN_EMPTY_MELODIC_DNA: usize = 14;
+        let empty: Vec<String> = Style::ALL
+            .iter()
+            .filter(|s| {
+                let d = &s.spec().melody;
+                d.hook_contours.is_empty() && d.hook_rhythms.is_empty()
+            })
+            .map(|s| format!("{s:?}"))
+            .collect();
+        assert!(
+            empty.len() <= KNOWN_EMPTY_MELODIC_DNA,
+            "styles with no melodic DNA rose from {KNOWN_EMPTY_MELODIC_DNA} to {}: {empty:?}. \
+             A new style must bring its own hook_contours/hook_rhythms, or it will draw from \
+             the same shared default pool as every other DNA-less style.",
+            empty.len()
+        );
+        if empty.len() < KNOWN_EMPTY_MELODIC_DNA {
+            panic!(
+                "GOOD NEWS, update the ratchet: only {} styles now lack melodic DNA (was \
+                 {KNOWN_EMPTY_MELODIC_DNA}). Lower KNOWN_EMPTY_MELODIC_DNA to {} to lock the \
+                 gain in. Remaining: {empty:?}",
+                empty.len(),
+                empty.len()
+            );
+        }
+    }
+
     const ALL_STYLES: [Style; 5] = [
         Style::Classical,
         Style::Waltz,
@@ -2832,7 +3124,7 @@ mod tests {
 
     #[test]
     fn new_styles_validate_compose_and_stay_distinct() {
-        use crate::composer::{compose_with_spec, MusicalIntent};
+        use crate::composer::{MusicalIntent, compose_with_spec};
         // Every new style's preset must validate, compose a full piece in
         // its own meter/tempo band, and differ audibly from Classical.
         let classical = compose_with_spec(&MusicalIntent::default(), &Style::Classical.spec());
@@ -2920,7 +3212,7 @@ mod tests {
 
     #[test]
     fn styled_scores_realize_their_accompaniment_rhythm() {
-        use crate::composer::{compose_styled, compose_with_spec, MusicalIntent};
+        use crate::composer::{MusicalIntent, compose_styled, compose_with_spec};
         use crate::score::VoiceRole;
         // Waltz BODY: no harmony tone on ANY barline (beat 1 belongs to the
         // bass) and the bass is a crisp quarter note, not a whole-bar drone.
@@ -3215,5 +3507,51 @@ mod tests {
             GrammarFamily::RagaModalArc
         );
         assert_eq!(Style::Fugue.grammar_family(), GrammarFamily::Contrapuntal);
+    }
+
+    #[test]
+    fn baroque_suite_form_pool_gives_the_seed_genuinely_different_premises() {
+        // 2026-07-28 diversity-review fix: a single-entry form_pool meant
+        // every seed produced the same macro-architecture ("the same
+        // template with different notes"). Ground truth this test locks
+        // in: across a real seed range, `form_kind` actually resolves to
+        // more than one FormKind, AND each of those FormKinds composes a
+        // valid, non-empty score under BaroqueSuite's own preset (key,
+        // tempo, meter, motif bank) -- not just in each engine's own
+        // dedicated test fixture.
+        use crate::composer::{MusicalIntent, compose_with_spec};
+        use crate::spec::FormKind;
+
+        let spec = Style::BaroqueSuite.spec();
+        assert!(
+            spec.form_pool.len() >= 4,
+            "expected several real movement premises, found {:?}",
+            spec.form_pool
+        );
+
+        // FormKind derives Eq but not Hash, so track seen kinds in a Vec.
+        let mut seen: Vec<FormKind> = Vec::new();
+        for seed in 0..spec.form_pool.len() as u64 * 3 {
+            let kind = spec.form_kind(seed);
+            if !seen.contains(&kind) {
+                seen.push(kind);
+            }
+            let intent = MusicalIntent {
+                seed,
+                ..MusicalIntent::default()
+            };
+            let score = compose_with_spec(&intent, &spec);
+            assert!(
+                !score.notes.is_empty(),
+                "seed {seed} (form {kind:?}) composed an empty score"
+            );
+        }
+        assert_eq!(
+            seen.len(),
+            spec.form_pool.len(),
+            "expected every pool entry to be reachable within {} seeds, saw {:?}",
+            spec.form_pool.len() * 3,
+            seen
+        );
     }
 }

@@ -83,6 +83,13 @@ struct Movie {
     semantic_coherence: f32,
 }
 
+/// Generous upper bound on a single "mental movie" frame's pixel count
+/// (far more than a telemetry visualization frame plausibly needs). The
+/// gateway URL is a user-editable text field, so a malicious or
+/// compromised gateway must not be able to drive an unbounded (or, on
+/// 32-bit wasm, integer-overflowing) allocation via `width`/`height`.
+const MAX_MOVIE_PIXELS: usize = 4096 * 4096;
+
 impl Movie {
     fn from_json(v: &Value) -> Option<Movie> {
         use base64::Engine as _;
@@ -91,14 +98,18 @@ impl Movie {
         let height = m["height"].as_u64()? as u32;
         let channels = m["channels"].as_u64()? as usize;
         let engine = base64::engine::general_purpose::STANDARD;
-        let px = (width as usize) * (height as usize);
+        let px = (width as usize).checked_mul(height as usize)?;
+        if px == 0 || px > MAX_MOVIE_PIXELS {
+            return None;
+        }
+        let rgba_capacity = px.checked_mul(4)?;
         let frames_rgba: Vec<Vec<u8>> = m["frames_b64"]
             .as_array()?
             .iter()
             .filter_map(|f| engine.decode(f.as_str()?).ok())
             .filter(|raw| raw.len() >= px * channels.max(1))
             .map(|raw| {
-                let mut rgba = Vec::with_capacity(px * 4);
+                let mut rgba = Vec::with_capacity(rgba_capacity);
                 for i in 0..px {
                     let (r, g, b) = if channels >= 3 {
                         (

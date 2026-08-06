@@ -1,0 +1,11 @@
+=== DiffSinger repo ===
+commit 753b7cc622aadf802b3145d7bb8f7df4afa213c4
+date Sun Jun 28 15:35:56 2026 +0800
+origin	https://github.com/openvpi/DiffSinger.git (fetch)
+origin	https://github.com/openvpi/DiffSinger.git (push)
+
+=== RVC repo ===
+commit 4338f12c3c28c80b3ac015e2d0df66c41592746d
+date Thu Jul 23 22:48:34 2026 +0800
+origin	https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI.git (fetch)
+origin	https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI.git (push)

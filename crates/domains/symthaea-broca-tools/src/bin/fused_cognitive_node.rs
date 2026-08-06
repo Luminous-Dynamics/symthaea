@@ -96,7 +96,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("└─────────────────────────────────────────────────────────");
 
     let genesis = GenesisSeed::from_phrase("symthaea-fused-node-2026");
-    let checkpoint_path = "data/models/broca-checkpoint-latest.bin";
+    // Repointed 2026-07-28. This used to read `data/models/broca-checkpoint-latest.bin`
+    // (relative to the symthaea crate root) — a *different file* from the one every other
+    // Broca consumer loads, and a pre-fix relic: its msgpack header declares only 415 token
+    // embeddings, versus 4,096 in the checkpoint below. It predates the 2026-07-25
+    // vocab-restore fix (commit 1016956a47), so anything generated from it decoded through a
+    // mismatched vocabulary. See SYMTHAEA_BROCA_IMPROVEMENT_PLAN_2026-07-28.md §2.
+    let checkpoint_path = "crates/domains/symthaea-broca/data/models/broca-checkpoint-latest.bin";
 
     let mut generator_instance = if Path::new(checkpoint_path).exists() {
         println!(

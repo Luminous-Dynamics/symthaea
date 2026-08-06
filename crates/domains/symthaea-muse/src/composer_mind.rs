@@ -341,7 +341,7 @@ mod tests {
     fn form_progresses_through_sections() {
         let mut mind = ComposerMind::new();
         mind.bars_per_section = 4.0; // short sections for testing
-        let mut state = MusicalState::default();
+        let state = MusicalState::default();
 
         // Advance through all sections
         for _ in 0..20 {

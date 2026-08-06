@@ -89,6 +89,23 @@ pub struct TemporalAblationConclusion {
 /// Execute one paired ablation with all variables except `temporal_blend` held
 /// fixed. The treatment blend is bounded by `CognitiveSessionConfig` and must
 /// remain strictly positive after bounding.
+/// # What this harness CAN and CANNOT show (audited 2026-07-30)
+///
+/// It is a well-built causal harness — matched seed, matched input, frozen input
+/// digest, a control arm with `temporal_blend = 0.0`. But its record holds two
+/// [`CognitiveSessionTrace`]s, **not two scores and not two audio buffers**.
+///
+/// So it can only ever demonstrate that HDC/CfC state differs between arms. It
+/// **cannot** detect whether that difference reaches the music — and on the live
+/// `muse_studio` path it does not: every state field
+/// [`CognitiveSession::bridge_observation`] writes has zero readers, and the one
+/// consumed output is pinned by a hardcoded caller argument. See that method's
+/// doc comment for the verified detail.
+///
+/// A positive result here is therefore **not** evidence that temporal influence
+/// shapes the output. To test that, the record would need a digest of the
+/// RENDERED SCORE per arm; the expectation on today's code is that the two
+/// digests would be identical.
 pub fn run_temporal_ablation_pair(
     trial_id: impl Into<String>,
     frozen_input_sha256: impl Into<String>,

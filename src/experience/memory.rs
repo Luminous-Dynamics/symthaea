@@ -5,7 +5,7 @@
 //!
 //! Implements memory structures for experience-based cognition:
 //!
-//! - **EpisodicMemory**: Individual experiences with context and outcomes
+//! - **ExperienceRecord**: Individual experiences with context and outcomes
 //! - **ThoughtTrace**: Internal reasoning traces for learning
 //! - **UserEpistemicMirror**: Theory of Mind for users (from GIS v3.0)
 
@@ -15,11 +15,19 @@ use std::collections::HashMap;
 use super::kosmic_state::KosmicSnapshot;
 use super::signals::PrincipledSignals;
 
-/// An episodic memory - a recorded experience
+/// A recorded experience (governance outcomes, promoted knowledge-graph facts) held in
+/// [`ExperienceBus`]'s in-process cache.
 ///
-/// Stored in vector database for similarity-based retrieval
+/// **Not the canonical episodic memory store.** That role belongs to
+/// `symthaea_memory::episodic_replay::EpisodicMemory`, which is Phi/Psi-weighted, retrains the
+/// live CfC network, and is partially persisted to SQLite — see its doc comment. This type was
+/// previously also named `EpisodicMemory`, creating a name collision with no reconciling owner
+/// (Symthaea Cognitive Core Reconciliation Plan, Phase 3 / Audit Overlap #1); it was renamed
+/// here to end that collision. As of this rename, nothing constructs one in production (its two
+/// former call sites were removed — see `ExperienceBus::generate_with_experience`'s doc comment
+/// for why the read side was already dead code before this change).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EpisodicMemory {
+pub struct ExperienceRecord {
     /// Unique identifier
     pub id: String,
 
@@ -57,7 +65,7 @@ pub struct EpisodicMemory {
     pub output_summary: String,
 }
 
-impl EpisodicMemory {
+impl ExperienceRecord {
     /// Create a new episodic memory
     pub fn new(id: &str, input_summary: &str) -> Self {
         Self {
@@ -526,7 +534,7 @@ mod tests {
 
     #[test]
     fn test_episodic_memory_creation() {
-        let mem = EpisodicMemory::new("test-001", "test input");
+        let mem = ExperienceRecord::new("test-001", "test input");
         assert_eq!(mem.id, "test-001");
         assert!(!mem.was_successful());
     }
@@ -534,7 +542,7 @@ mod tests {
     #[test]
     fn test_episodic_memory_with_outcome() {
         let mem =
-            EpisodicMemory::new("test-002", "test").with_outcome(ExperienceOutcome::success());
+            ExperienceRecord::new("test-002", "test").with_outcome(ExperienceOutcome::success());
         assert!(mem.was_successful());
     }
 

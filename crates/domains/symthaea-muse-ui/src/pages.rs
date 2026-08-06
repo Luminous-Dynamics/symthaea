@@ -14,10 +14,14 @@
 //! `ResearchPage` has a real Overview panel (the shared current piece's
 //! already-computed metrics — no new analysis, just exposing what
 //! `/api/compose` already returns), a real Score view
-//! (`score_view::ScoreView`, a piano roll from `/api/notes/{id}`), and a
-//! real Evidence panel (`evidence_view::EvidenceView`, motif/sonority/
+//! (`score_view::ScoreView`, a piano roll from `/api/notes/{id}`),
+//! Harmony (`harmony_view::HarmonyView`, the key's diatonic vocabulary
+//! from `/api/harmony/{id}`), Motifs (`motifs_view::MotifsView`, from
+//! `/api/motifs/{id}`), Orchestration (`orchestration_view::
+//! OrchestrationView`, `/api/notes/{id}` grouped by voice), and a real
+//! Evidence panel (`evidence_view::EvidenceView`, motif/sonority/
 //! cadence/orchestration/structural-activity from `/api/piece/{id}/
-//! listen-bundle`), but not yet the rest of Research Mode P0.
+//! listen-bundle`).
 //! `CreatePage` lives in `create_page.rs` and is re-exported below.
 
 use std::cell::Cell;
@@ -33,8 +37,11 @@ use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 use crate::api::{self, ListenCompositionBundle, MotifsSummary, SectionInfo};
 use crate::audio_reactivity;
 use crate::evidence_view::EvidenceView;
+use crate::harmony_view::HarmonyView;
 use crate::icons::{RadialIcon, StillIcon};
 use crate::journey::JourneyPolicy;
+use crate::motifs_view::MotifsView;
+use crate::orchestration_view::OrchestrationView;
 use crate::palette::{self, Palette};
 use crate::playback::PlaybackPhase;
 use crate::score_view::ScoreView;
@@ -914,8 +921,15 @@ fn draw_composition_evidence(
 
 /// Research Mode: Overview (the current shared piece's already-computed
 /// metrics — `/api/compose` returns all of these; nothing here triggers
-/// new analysis) plus a real Score view (`score_view::ScoreView`).
-/// Harmony/Motifs/Orchestration/etc. views are not built yet.
+/// new analysis) plus the Score, Harmony, Motifs, Orchestration, and
+/// Evidence views.
+///
+/// Each view below fetches independently from its own endpoint rather than
+/// sharing one bundle: Score/Orchestration both read `/api/notes/{id}`,
+/// Harmony reads `/api/harmony/{id}`, Motifs reads `/api/motifs/{id}`, and
+/// Evidence reads `/api/piece/{id}/listen-bundle`. That is more requests
+/// than strictly necessary, but keeps each view independently removable
+/// and matches how they were built.
 #[component]
 pub fn ResearchPage() -> impl IntoView {
     let muse = use_context::<MuseState>().expect("MuseState provided by App");
@@ -960,6 +974,21 @@ pub fn ResearchPage() -> impl IntoView {
         <div class="panel">
             <h2>"Score"</h2>
             <ScoreView muse=muse />
+        </div>
+
+        <div class="panel">
+            <h2>"Harmony"</h2>
+            <HarmonyView muse=muse />
+        </div>
+
+        <div class="panel">
+            <h2>"Motifs"</h2>
+            <MotifsView muse=muse />
+        </div>
+
+        <div class="panel">
+            <h2>"Orchestration"</h2>
+            <OrchestrationView muse=muse />
         </div>
 
         <div class="panel">

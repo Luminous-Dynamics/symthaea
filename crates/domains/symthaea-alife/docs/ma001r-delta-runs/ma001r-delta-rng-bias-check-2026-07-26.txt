@@ -1,0 +1,16 @@
+MA-001R-delta RNG bias check -- seed=0x9e3779b97f4a7c14 ticks=2000
+
+=== Joint distribution (random_context x true_tick_parity) over 2000 ticks ===
+  random=A, true=A-tick: 511 (25.55%)
+  random=A, true=B-tick: 494 (24.70%)
+  random=B, true=A-tick: 489 (24.45%)
+  random=B, true=B-tick: 506 (25.30%)
+  (expect ~25% each under a fair, uncorrelated coin)
+
+Marginal: random=A total = 1005 (50.25%), random=B total = 995 (49.75%)
+
+Pearson correlation(random_context_is_A, true_tick_is_A): 0.017000
+Longest run of identical low-bit values: 8 (expected ~11 for a fair coin over 2000 flips)
+Fraction where low-bit(t) == low-bit(t-2): 0.4955 (expect ~0.50 for no period-2 structure)
+
+VERDICT: NO MEANINGFUL BIAS -- correlation is near zero and the run-length/period-2 checks look like a fair coin. This specific seed's random context assignment is NOT correlated with the true outcome schedule, so it does not explain shuffled's residual movement beyond the balanced-decorrelated control. The residual must come from something else -- most plausibly, a single seed's necessarily-imperfect empirical balance is itself enough (with only 2000 samples, even a genuinely unbiased random assignment will show SOME nonzero sample correlation just by chance, and the delta rule's own accumulation over many steps could amplify a small per-tick imbalance into a visible aggregate effect) -- this would need averaging over multiple independent seeds to distinguish from a real, seed-independent mechanism, not tested here.

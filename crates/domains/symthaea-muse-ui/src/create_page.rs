@@ -15,6 +15,8 @@ use leptos::prelude::*;
 use leptos::task::spawn_local;
 use leptos_router::hooks::use_navigate;
 
+use symthaea_muse_protocol::catalog::{self, CanonicalStyle, Constellation};
+
 use crate::api::{self, Candidate, ComposeRequest};
 use crate::icons::HeartIcon;
 use crate::palette;
@@ -30,6 +32,34 @@ pub fn CreatePage() -> impl IntoView {
     let navigate = use_navigate();
 
     let style = RwSignal::new("Classical".to_string());
+
+    // The catalog entry for whatever engine style is currently selected, and
+    // the constellation it belongs to. Both are DERIVED from `style` rather
+    // than held as separate state: the compose request only ever carries an
+    // engine style name, so making that the single source of truth means the
+    // constellation picker cannot drift out of sync with it — including when
+    // Today's Discoveries or Surprise Me set `style` directly below.
+    //
+    // Reads the compile-time `CATALOG` const straight from the protocol crate
+    // this app already links; there is no /api/catalog round-trip (see the
+    // note in api.rs).
+    let selected_entry = Memo::new(move |_| -> Option<CanonicalStyle> {
+        let s = style.get();
+        catalog::CATALOG
+            .iter()
+            .find(|e| e.composer_style == Some(s.as_str()))
+            .copied()
+    });
+    let current_constellation = Memo::new(move |_| {
+        selected_entry
+            .get()
+            .map(|e| e.constellation)
+            // Defensive only: every engine Style has a catalog entry, and
+            // muse_studio's catalog_entries_all_resolve_to_real_engine_styles
+            // test enforces that 1:1 mapping.
+            .unwrap_or(Constellation::ClassicalLyricCharacter)
+    });
+
     let valence = RwSignal::new(0.0_f32);
     let arousal = RwSignal::new(0.5_f32);
     let energy = RwSignal::new(0.5_f32);
@@ -37,6 +67,8 @@ pub fn CreatePage() -> impl IntoView {
     let bars = RwSignal::new(4_usize);
     let n_candidates = RwSignal::new(3_u64);
     let prompt = RwSignal::new(String::new());
+    let use_motif_foundry = RwSignal::new(false);
+    let composition_lesson_id = RwSignal::new(String::new());
 
     let composing = RwSignal::new(false);
     let error = RwSignal::new(None::<String>);
@@ -106,6 +138,11 @@ pub fn CreatePage() -> impl IntoView {
             // (`api::compose_listen_piece`).
             vary_premise: false,
             renderer: muse.renderer_preference.get_untracked().map(str::to_string),
+            use_motif_foundry: use_motif_foundry.get_untracked(),
+            composition_lesson_id: {
+                let lesson = composition_lesson_id.get_untracked();
+                (!lesson.is_empty()).then_some(lesson)
+            },
         })
     };
 
@@ -238,16 +275,83 @@ pub fn CreatePage() -> impl IntoView {
 
             <form class="compose-form" on:submit=move |ev| { ev.prevent_default(); submit(()); }>
                 <label>
+                    "Constellation"
+                    <select
+                        prop:value=move || current_constellation.get().name().to_string()
+                        on:change=move |ev| {
+                            let picked = event_target_value(&ev);
+                            // Jump to the chosen constellation's first
+                            // routable style. `style` stays the single source
+                            // of truth — the constellation shown above is
+                            // derived from it, so Surprise Me and Today's
+                            // Discoveries can move `style` freely without the
+                            // two selects ever disagreeing.
+                            if let Some(c) = Constellation::ALL
+                                .into_iter()
+                                .find(|c| c.name() == picked)
+                                && let Some(first) = catalog::catalog_for_constellation(c)
+                                    .find(|e| e.is_composable())
+                                    .and_then(|e| e.composer_style)
+                            {
+                                style.set(first.to_string());
+                            }
+                        }
+                    >
+                        {Constellation::ALL.into_iter().map(|c| {
+                            let routable = catalog::catalog_for_constellation(c)
+                                .filter(|e| e.is_composable())
+                                .count();
+                            let name = c.name();
+                            view! {
+                                <option value=name disabled=routable == 0>
+                                    {format!("{name} ({routable} of 8 playable)")}
+                                </option>
+                            }
+                        }).collect_view()}
+                    </select>
+                </label>
+                <label>
                     "Style"
                     <select
                         prop:value=move || style.get()
                         on:change=move |ev| style.set(event_target_value(&ev))
                     >
-                        {palette::LISTEN_STYLES.iter().map(|s| view! {
-                            <option value=*s>{*s}</option>
-                        }).collect_view()}
+                        {move || catalog::catalog_for_constellation(current_constellation.get())
+                            .map(|entry| {
+                                // Research entries stay VISIBLE but unselectable.
+                                // That is the catalog's own design rule: a style
+                                // the engine cannot route should be honest about
+                                // existing rather than hidden, and honest about
+                                // not being playable rather than offered.
+                                let composable = entry.is_composable();
+                                let value = entry.composer_style.unwrap_or("").to_string();
+                                let label = if composable {
+                                    entry.display_name.to_string()
+                                } else {
+                                    format!("{} — {}", entry.display_name, entry.status.label())
+                                };
+                                view! {
+                                    <option value=value disabled=!composable>{label}</option>
+                                }
+                            })
+                            .collect_view()}
                     </select>
                 </label>
+                {move || selected_entry.get().map(|entry| {
+                    let a = entry.anatomy();
+                    view! {
+                        <dl class="style-anatomy">
+                            <dt>"Grammar"</dt><dd>{a.grammar}</dd>
+                            <dt>"Phrase behavior"</dt><dd>{a.phrase_behavior}</dd>
+                            <dt>"Harmonic system"</dt><dd>{a.harmonic_system}</dd>
+                            <dt>"Rhythm"</dt><dd>{a.rhythm}</dd>
+                            <dt>"Melodic language"</dt><dd>{a.melodic_language}</dd>
+                            <dt>"Ensemble"</dt><dd>{a.ensemble}</dd>
+                            <dt>"Performance dialect"</dt><dd>{a.performance_dialect}</dd>
+                            <dt>"Production environment"</dt><dd>{a.production_environment}</dd>
+                        </dl>
+                    }
+                })}
                 <label>
                     "Key"
                     <select on:change=move |ev| {
@@ -312,6 +416,31 @@ pub fn CreatePage() -> impl IntoView {
                         on:input=move |ev| prompt.set(event_target_value(&ev))
                     />
                 </label>
+                <fieldset class="create-research-options">
+                    <legend>"Musical research (optional)"</legend>
+                    <label class="authorship-confirmation">
+                        <input type="checkbox"
+                            prop:checked=move || use_motif_foundry.get()
+                            on:change=move |event| use_motif_foundry.set(event_target_checked(&event)) />
+                        <span>"Use Motif Foundry for the primary identity"</span>
+                    </label>
+                    <label>
+                        <span>"Composition lesson"</span>
+                        <select
+                            prop:value=move || composition_lesson_id.get()
+                            on:change=move |event| composition_lesson_id.set(event_target_value(&event))
+                        >
+                            <option value="">"No authored lesson"</option>
+                            <option value="etude:the-door-remembers">"The Door Remembers · altered return"</option>
+                            <option value="etude:the-missing-thread">"The Missing Thread · withholding and restoration"</option>
+                            <option value="etude:breath-between-stones">"Breath Between Stones · structural silence"</option>
+                            <option value="etude:held-ground">"Held Ground · harmonic stasis"</option>
+                        </select>
+                    </label>
+                    <small class="muted">
+                        "Lessons apply provenance-clean strategies only. Muse never copies the etude's notes."
+                    </small>
+                </fieldset>
 
                 <details class="spec-editor prompt-label">
                     <summary>
@@ -376,6 +505,7 @@ pub fn CreatePage() -> impl IntoView {
                             {rs.into_iter().map(|c| {
                                 let c_listen = c.clone();
                                 let c_keep = c.clone();
+                                let diversity_plan = c.diversity_plan.clone();
                                 let kept = RwSignal::new(false);
                                 // `listen_to` is Clone (it only closes over
                                 // Copy/Clone state), so each candidate card
@@ -391,7 +521,14 @@ pub fn CreatePage() -> impl IntoView {
                                             {c.card.map(|card| card.traits.join(" · ")).unwrap_or_default()}
                                         </p>
                                         <p class="why-this-piece">{c.why.join(" ")}</p>
-                                        <audio controls src=api::audio_url(api::DEFAULT_BACKEND, c.id)></audio>
+                                        {diversity_plan.map(|plan| view! {
+                                            <div class="candidate-plan" aria-label="Composition difference plan">
+                                                <span>{plan.formal_topology}</span>
+                                                <span>{plan.motif_development}</span>
+                                                <span>{plan.orchestration}</span>
+                                                <span>{plan.ending}</span>
+                                            </div>
+                                        })}
                                         <div class="candidate-actions">
                                             <button type="button" on:click=move |_| listen_to(c_listen.clone())>
                                                 "Listen"

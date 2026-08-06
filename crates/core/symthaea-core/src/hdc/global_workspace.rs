@@ -1055,6 +1055,14 @@ mod tests {
             ..Default::default()
         });
 
+        // Under `ctc_wiring`, activation is scaled by (0.5 + 0.5*pac_mi); with the
+        // default pac_mi=0 the 0.45 activations below would be halved to 0.225,
+        // falling below entry_threshold and never entering the workspace at all.
+        // Set pac_mi high so the CTC path still exercises coalition ignition at
+        // full activation — matching the non-ctc semantics this test asserts.
+        #[cfg(feature = "ctc_wiring")]
+        ws.set_pac_mi(1.0);
+
         // Activation 0.45 — below the sigmoid ignition knee at 0.65
         let content_a =
             WorkspaceContent::new(vec![BinaryHV::random(1)], 0.45, "modality_a".to_string());

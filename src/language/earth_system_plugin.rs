@@ -7,7 +7,7 @@ use crate::language::domain_plugin::{ComputedResult, DomainPlugin, Entity};
 use crate::language::plugin_parse::value_for_unit;
 use crate::mind::structured_thought::{ETier, EpistemicCube, MTier, NTier};
 use symthaea_earth_system::{
-    co2_radiative_forcing, warming_from_cumulative_carbon, warming_from_cumulative_co2,
+    co2_radiative_forcing_myhre1998, warming_from_cumulative_carbon, warming_from_cumulative_co2,
 };
 
 pub struct EarthSystemDomainPlugin;
@@ -76,7 +76,7 @@ impl DomainPlugin for EarthSystemDomainPlugin {
         }
         let lower = input.to_lowercase();
         if lower.contains("doubling") && lower.contains("co2") {
-            let df = co2_radiative_forcing(560.0, 280.0);
+            let df = co2_radiative_forcing_myhre1998(560.0, 280.0);
             return Some(result(format!(
                 "Doubling CO₂ gives a radiative forcing of {df:.2} W/m²."
             )));

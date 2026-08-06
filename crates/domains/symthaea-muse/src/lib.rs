@@ -601,6 +601,74 @@ pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composit
     );
     all_notes.extend(chord_notes);
 
+    // 3.75. Humanize — ADDED 2026-07-31.
+    //
+    // This path never called the humanizer. `performance::humanize_with_consciousness`
+    // has existed and been exercised all along, but only from `theory_realize` (the
+    // studio product path) and `streaming`. So the music Symthaea composes
+    // AUTONOMOUSLY — this function is what `cognitive_loop/creative_bridge.rs` and
+    // `symthaea/mod.rs` call — was emitted on an exact grid at exact velocities,
+    // while the human-driven studio path got Phi-dependent timing jitter, beat
+    // accents, phrase dynamics and legato. That asymmetry was not a decision anyone
+    // made; the two pipelines simply grew apart.
+    //
+    // Applied BEFORE `voice::arrange` so the arrangement and the synthesized audio
+    // both see the humanized notes, not just the `notes` field of the result.
+    //
+    // Note the interaction with the chord spread added in
+    // `generate_chord_accompaniment`: the spread is a deliberate ascending roll
+    // (pianists roll chords bottom-up), and this adds independent per-note jitter on
+    // top. Together they mean a chord is no longer a single simultaneous transient,
+    // which is the most recognisable signature of synthetic keyboard music.
+    {
+        let phi = state.consciousness_level;
+        for (i, note) in all_notes.iter_mut().enumerate() {
+            let beat_position = if beat_duration > 1e-6 {
+                note.start_time / beat_duration
+            } else {
+                0.0
+            };
+            let phrase_position = if config.duration_secs > 1e-6 {
+                (note.start_time / config.duration_secs).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            performance::humanize_with_consciousness(
+                note,
+                beat_position,
+                phrase_position,
+                (seed as u32)
+                    .wrapping_mul(2_654_435_761)
+                    .wrapping_add(i as u32),
+                phi,
+                state.arousal,
+            );
+        }
+        // Humanization jitters onsets, so the list is no longer in time order for
+        // any consumer that assumes it is.
+        all_notes.sort_by(|a, b| a.start_time.total_cmp(&b.start_time));
+
+        // De-tie EXACTLY simultaneous onsets.
+        //
+        // `humanize_with_consciousness` floors onsets at zero
+        // (`(start_time + jitter).max(0.0)`), so any two notes at t=0 that both
+        // draw negative jitter land on exactly 0.0 — reintroducing the single
+        // simultaneous transient this whole change exists to remove. Caught by
+        // `autonomous_path_emits_humanized_non_simultaneous_notes`, which reads the
+        // note stream directly; every benchmark metric reported the change as an
+        // improvement while this was still happening.
+        //
+        // Fixed here rather than in `performance` because that clamp is correct for
+        // its other callers (`streaming`, `theory_realize`) and negative onsets are
+        // genuinely invalid. Deterministic and sub-millisecond, so it is a roll, not
+        // a rhythm.
+        for i in 1..all_notes.len() {
+            if all_notes[i].start_time <= all_notes[i - 1].start_time {
+                all_notes[i].start_time = all_notes[i - 1].start_time + DETIE_SECS;
+            }
+        }
+    }
+
     // 4. Arrange voices (polyphony gated by consciousness level)
     let arrangement = voice::arrange(&all_notes, state);
 
@@ -622,6 +690,19 @@ pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composit
         section: overall_section,
     }
 }
+
+/// Minimum separation forced between two otherwise-identical onsets.
+///
+/// 1.5ms — below the ~2ms at which two attacks fuse perceptually, so this breaks
+/// exact sample-aligned simultaneity without being heard as a rhythm of its own.
+const DETIE_SECS: f32 = 0.0015;
+
+/// Milliseconds between successive chord tones, as a "roll".
+///
+/// 8ms per voice: a 4-note chord spans 24ms, comfortably under the ~30ms at which
+/// listeners stop hearing one chord and start hearing separate attacks, and within
+/// the range measured from real pianists' chord asynchrony.
+const CHORD_SPREAD_SECS: f32 = 0.008;
 
 /// Generate bass + harmony chord notes from a progression.
 ///
@@ -719,10 +800,18 @@ fn generate_chord_accompaniment(
                 } // root is in bass
                 let harm_freq = harmony_octave * root_ratio * ratio;
                 let harm_dur = chord_dur_secs * (1.0 - gesture.staccato * 0.4);
+                // Chord spread — ADDED 2026-07-31. Every chord tone used to start at
+                // the identical instant ("on the beat, not staggered"), which is the
+                // single most recognisable signature of synthetic keyboard music:
+                // real players roll a chord bottom-up over a few milliseconds. `i`
+                // ascends through the chord tones, so this is the correct direction.
+                // Kept well under the ~30ms at which two attacks stop being heard as
+                // one chord and start being heard as two events.
+                let spread = i as f32 * CHORD_SPREAD_SECS;
                 notes.push(Note {
                     frequency: harm_freq,
-                    start_time: time, // on the beat, not staggered
-                    duration: harm_dur.max(0.1),
+                    start_time: time + spread,
+                    duration: (harm_dur - spread).max(0.1),
                     velocity: harmony_vel * (1.0 - i as f32 * 0.05),
                 });
             }

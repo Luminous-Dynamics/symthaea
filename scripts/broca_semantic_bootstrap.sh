@@ -36,7 +36,7 @@ BASE_CORPUS="$BROCA_DATA_DIR/train-combined-v8.jsonl"
 EVAL_FILE="$BROCA_DATA_DIR/eval-creativity-v1.jsonl"
 CURRICULUM_DERIVED_DIR="$BROCA_DATA_DIR/curriculum-derived"
 CANDIDATES_ROOT="$BROCA_DATA_DIR/checkpoints/candidates"
-BASELINE_ROOT="${BROCA_BASELINE_ROOT:-target/broca-baselines}"
+BASELINE_ROOT="${BROCA_BASELINE_ROOT:-crates/domains/symthaea-broca/data/models/baselines}"
 BASELINE_POINTER="$BROCA_DATA_DIR/models/measurements/CURRENT_BASELINE"
 
 # The one real holdout batch with genuine semantic_hv, produced by the

@@ -35,6 +35,12 @@ pub struct MindConfig {
     /// Required for collective consciousness emergence under partial information.
     #[serde(default)]
     pub social_projection_enabled: bool,
+    /// Enable mesh peer name resolution (mirrors `CognitiveLoopConfig`'s
+    /// same-named toggle -- a separate field since `MindConfig` and
+    /// `CognitiveLoopConfig` are independent config structs).
+    #[cfg(feature = "mesh")]
+    #[serde(default)]
+    pub enable_name_resolution: bool,
 }
 
 impl Default for MindConfig {
@@ -50,6 +56,8 @@ impl Default for MindConfig {
             enable_social_coherence: false,
             timezone_offset_hours: 0.0,
             social_projection_enabled: false,
+            #[cfg(feature = "mesh")]
+            enable_name_resolution: false,
         }
     }
 }
@@ -116,6 +124,18 @@ pub struct MindState {
     /// Liquid-Mamba total generation/distillation cycles completed.
     #[cfg(feature = "liquid-mamba")]
     pub liquid_mamba_generation_count: u32,
+    /// Confidence in the current perception (0.0-1.0), consumed by the
+    /// neural-bridge epistemic-attenuation step in `tick.rs` to dampen the
+    /// Phi estimate when perception is uncertain. Not yet populated by any
+    /// real perception pathway -- defaults to 1.0 (fully confident) so
+    /// attenuation stays inert until something feeds it real data.
+    #[cfg(feature = "neural-bridge")]
+    pub perception_confidence: f32,
+    /// Uncertainty in the current perception, feeding the same
+    /// neural-bridge attenuation step's cognitive-load increment. Defaults
+    /// to 0.0 (no uncertainty) for the same reason as `perception_confidence`.
+    #[cfg(feature = "neural-bridge")]
+    pub perception_uncertainty: f32,
 }
 
 impl Default for MindState {
@@ -153,6 +173,10 @@ impl Default for MindState {
             liquid_mamba_rank: 0.0,
             #[cfg(feature = "liquid-mamba")]
             liquid_mamba_generation_count: 0,
+            #[cfg(feature = "neural-bridge")]
+            perception_confidence: 1.0,
+            #[cfg(feature = "neural-bridge")]
+            perception_uncertainty: 0.0,
         }
     }
 }

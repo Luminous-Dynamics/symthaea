@@ -20,14 +20,31 @@ use crate::hdc::ContinuousHV;
 /// - Yellow (0.3–0.6): reduced speed/force
 /// - Orange (0.1–0.3): retreat to safe pose
 /// - Red (< 0.1): emergency stop, power cut
+///
+/// ⚠️ **VARIANT ORDER IS LOAD-BEARING — DO NOT REORDER.**
+///
+/// `Ord` is *derived*, so it follows declaration order: `Green < Yellow < Orange < Red`.
+/// Every most-restrictive-wins composition in the fleet is written as `a.max(b)` and
+/// relies on that. Moving `Red` to the top — the natural instinct when marking it
+/// `#[default]` — would silently **invert** each of those, turning every safety
+/// composition into a fail-open one with no compile error and no failing test that
+/// exercises only Green paths. That is why `#[default]` is attached in place below
+/// rather than by reordering.
+///
+/// `#[default]` was `Green` until 2026-07-31 — i.e. a defaulted safety level meant
+/// *full authority*. `EmbodimentTelemetry` derives `Default` and holds a
+/// `safety_level`, so `EmbodimentTelemetry::default()` reported Green regardless of
+/// the platform's real state, and three call sites do exactly that
+/// (`helios_bridge.rs`, `detritivore_bridge.rs`, plus a test mock). A defaulted
+/// safety level must mean "unknown, assume the worst", not "cleared for full torque".
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize,
 )]
 pub enum MotorSafetyLevel {
-    #[default]
     Green,
     Yellow,
     Orange,
+    #[default]
     Red,
 }
 
@@ -618,6 +635,49 @@ impl Default for PlatformRegistry {
 mod tests {
     use super::*;
 
+    /// Enforces the invariant the type's doc comment describes, because a comment
+    /// cannot stop a reorder and this one is silently catastrophic.
+    ///
+    /// Derived `Ord` follows declaration order, and every most-restrictive-wins safety
+    /// composition in the fleet is `a.max(b)`. Moving `Red` to the top — the instinct
+    /// when marking it `#[default]` — inverts all of them into fail-open with no
+    /// compile error. Any test exercising only Green paths would still pass.
+    #[test]
+    fn safety_ordering_is_most_restrictive_wins() {
+        assert!(MotorSafetyLevel::Green < MotorSafetyLevel::Yellow);
+        assert!(MotorSafetyLevel::Yellow < MotorSafetyLevel::Orange);
+        assert!(MotorSafetyLevel::Orange < MotorSafetyLevel::Red);
+
+        // The property every composition site actually depends on.
+        assert_eq!(
+            MotorSafetyLevel::Green.max(MotorSafetyLevel::Red),
+            MotorSafetyLevel::Red,
+            "max() must select the MORE restrictive level; if this fails, every \
+             `phi_level.max(moral_level)` in the fleet has become fail-open"
+        );
+        assert_eq!(
+            MotorSafetyLevel::Orange.max(MotorSafetyLevel::Yellow),
+            MotorSafetyLevel::Orange
+        );
+    }
+
+    /// A defaulted safety level must mean "unknown, assume the worst".
+    ///
+    /// `EmbodimentTelemetry` derives `Default` and holds this field, and three call
+    /// sites return `Default::default()` outright — so this default is reachable, not
+    /// theoretical. It was `Green` (full authority) until 2026-07-31.
+    #[test]
+    fn default_safety_level_fails_closed() {
+        assert_eq!(MotorSafetyLevel::default(), MotorSafetyLevel::Red);
+        assert_eq!(
+            EmbodimentTelemetry::default().safety_level,
+            MotorSafetyLevel::Red,
+            "default telemetry must not report full authority"
+        );
+    }
+
+    use super::*;
+
     #[test]
     fn test_from_phi_thresholds() {
         assert_eq!(MotorSafetyLevel::from_phi(0.0), MotorSafetyLevel::Red);
@@ -675,6 +735,69 @@ mod tests {
     fn test_from_phi_negative_returns_red() {
         assert_eq!(MotorSafetyLevel::from_phi(-1.0), MotorSafetyLevel::Red);
         assert_eq!(MotorSafetyLevel::from_phi(-100.0), MotorSafetyLevel::Red);
+    }
+
+    /// `from_phi`'s non-finite fail-safe (above) is only *reachable* if callers
+    /// propagate a non-finite value to it. The main crate's composition does not:
+    /// it builds the gate scalar with `f64::max` chains
+    /// (`cognitive_loop/cycle_late_consciousness/integration.rs:988` and `:1147`),
+    /// and **`f64::max` silently discards NaN**. So a NaN from any single
+    /// contributing path (Psi, spectral MIP, structural Phi, MCE,
+    /// ConsciousnessEquationV2) is absorbed and the gate continues on whichever
+    /// path still returns a number — no `Red`, no tier change, no warning. The
+    /// fail-safe fires only when *every* path is simultaneously non-finite.
+    ///
+    /// This test pins that behaviour so that changing it becomes a deliberate act
+    /// with a failing test attached, rather than a silent shift. It asserts what
+    /// the code does today, **not** what it necessarily should do: "continue on a
+    /// surviving path" is arguably correct graceful degradation. The defensible
+    /// complaint is that it was never *chosen* — it is an artifact of `f64::max`'s
+    /// incidental NaN semantics.
+    ///
+    /// If you are here because this test failed: someone changed how non-finite
+    /// values flow into the motor-safety gate. Verify it was intentional, then
+    /// update this test and
+    /// `SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md`
+    /// ("Gate: invalid-value / fail-safe policy").
+    #[test]
+    fn test_max_composition_absorbs_partial_nan_so_failsafe_is_unreachable() {
+        let nan = f64::NAN;
+
+        // Shape of integration.rs:988 — phi_input = psi.max(spec).max(struc).clamp(0,1)
+        let psi_died = nan.max(0.5_f64).max(0.2_f64).clamp(0.0, 1.0);
+        let spec_died = 0.5_f64.max(nan).max(0.2_f64).clamp(0.0, 1.0);
+        assert_eq!(psi_died, 0.5, "a NaN Psi is silently dropped by f64::max");
+        assert_eq!(spec_died, 0.5, "a NaN spectral term is silently dropped");
+        assert_eq!(
+            MotorSafetyLevel::from_phi(psi_died),
+            MotorSafetyLevel::Yellow,
+            "partial failure does NOT reach the Red fail-safe — it degrades to \
+             whatever the surviving path says"
+        );
+
+        // Only total failure propagates.
+        assert!(
+            nan.max(nan).max(nan).clamp(0.0, 1.0).is_nan(),
+            "all-paths-NaN must stay NaN so the fail-safe can fire"
+        );
+        assert_eq!(
+            MotorSafetyLevel::from_phi(nan.max(nan).max(nan).clamp(0.0, 1.0)),
+            MotorSafetyLevel::Red,
+            "total failure is the ONLY case that reaches Red"
+        );
+
+        // Shape of integration.rs:1147 — level = level.max(v2_cached * 0.8), unclamped.
+        assert_eq!(
+            0.4_f64.max(nan * 0.8),
+            0.4,
+            "a NaN ConsciousnessEquationV2 reading is silently dropped"
+        );
+        assert_eq!(
+            0.4_f64.max(10.0_f64 * 0.8),
+            8.0,
+            "the final gate write is UNCLAMPED — an out-of-range V2 value \
+             propagates verbatim, so the gate is not guaranteed to be in [0,1]"
+        );
     }
 
     #[test]

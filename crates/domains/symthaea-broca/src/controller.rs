@@ -93,7 +93,13 @@ pub struct LanguageControllerConfig {
     /// CfC backbone time constant — controls state dependency for sequence coherence.
     #[serde(default = "default_backbone_tau")]
     pub backbone_tau: f32,
-    /// Gradient attenuation factor for earlier layers during BPTT (stability).
+    /// Per-layer gradient damping applied when walking backward through the stack.
+    ///
+    /// Applied as `gradient_attenuation.powi(depth)` in [`LanguageController::backward_step`].
+    /// This is a hand-tuned stability knob, **not** a chain-rule term — nothing here
+    /// differentiates the inter-layer transform. The doc used to say "during BPTT", which
+    /// overstated it twice over: there is no backpropagation through *time* in this trainer
+    /// either (see `backward_step`'s own docs).
     #[serde(default = "default_gradient_attenuation")]
     pub gradient_attenuation: f32,
     /// Vocab size threshold above which logit computation is parallelized.
@@ -1034,12 +1040,32 @@ impl LanguageController {
         self.rebuild_gpu_cache();
     }
 
-    /// Backpropagate a loss gradient through the CfC network.
+    /// Apply a loss gradient to the CfC network for a **single timestep**.
     ///
     /// Given the gradient of the loss w.r.t. the **normalized** network output HV (`d_output`),
     /// this projects the gradient onto the tangent plane of the unit sphere (to account for
     /// the normalize() in the forward pass), constructs a synthetic target for each neuron's
     /// backward() method, and applies gradients to CfC weights.
+    ///
+    /// # This is not backpropagation through time
+    ///
+    /// Callers invoke this once per generated position, and it reads only
+    /// `self.network.output()` — the state *right now*. No state history is retained and no
+    /// gradient flows from position `t` back to `t-1`; each step's update is local, derived
+    /// from `target = state - d_per_neuron`. `bptt_window` in `TrainingConfig` bounds how many
+    /// tokens are trained per pair, which makes the training regime truncated **teacher
+    /// forcing**, not truncated BPTT.
+    ///
+    /// Credit assignment across *layers* (as opposed to time) is likewise approximate: the
+    /// per-hop `gradient_attenuation.powi(depth)` factor is a tuned damping constant, not a
+    /// differentiated inter-layer transform.
+    ///
+    /// Documented 2026-07-28 after an audit found the call site labelled "CfC network BPTT",
+    /// which implied a sequence-learning capacity this does not provide. The gradient reaching
+    /// this function *is* correct — see `training::compute_ce_gradient_wrt_output` — so the
+    /// output layer learns properly; it is the recurrent core's temporal credit assignment
+    /// that is absent. Relevant to any work on Broca's capability ceiling: this is a plausible
+    /// binding constraint, and changing it is an experiment, not a cleanup.
     pub fn backward_step(
         &mut self,
         d_output: &ContinuousHV,

@@ -6,6 +6,9 @@ use crate::occupancy::{
     OccupancyAssessment, ReservationPriority, ReservationRejection, TunnelDirection,
     TunnelOccupancy, TunnelReservation,
 };
+use crate::peer_trust::{
+    PeerAuthenticationAssertion, PeerTrustPolicy, PeerTrustRejection, PeerTrustSupervisor,
+};
 use crate::relay_mesh::{MeshAssessment, MeshLink, MeshLinkRejection, MeshNodeId, RelayMesh};
 use crate::rescue::{
     RescueFeasibility, RescueHandoff, RescueHandoffState, RescueOffer, RescueRequest,
@@ -15,8 +18,14 @@ use crate::shared_map::{
     SharedMapRejection, SharedRouteKnowledge, SharedTunnelMap, SharedTunnelObservation,
 };
 use crate::team::{AgentId, HeartbeatRejection, TeamDirectory, TeamHeartbeat, TeamStatus};
+use crate::team_leadership::{
+    ByzantineContainmentAssessment, LeadershipLeaseVote, TeamLeadershipPolicy,
+    TeamLeadershipSupervisor, VoteRejection,
+};
 use crate::{ReturnPathAssessment, SubterraneanState};
 use serde::{Deserialize, Serialize};
+
+pub const DISTRIBUTED_RECOVERY_CHECKPOINT_SCHEMA_VERSION: u16 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TeamDirective {
@@ -24,6 +33,7 @@ pub enum TeamDirective {
     YieldTunnel,
     MaintainRelay,
     AssistPeer,
+    HoldForQuorum,
 }
 
 impl TeamDirective {
@@ -33,6 +43,7 @@ impl TeamDirective {
             Self::YieldTunnel => "yield_tunnel",
             Self::MaintainRelay => "maintain_relay",
             Self::AssistPeer => "assist_peer",
+            Self::HoldForQuorum => "hold_for_quorum",
         }
     }
 }
@@ -46,6 +57,7 @@ pub struct TeamOperationalAssessment {
     pub directive: TeamDirective,
     pub rescue_state: RescueHandoffState,
     pub distress_target: Option<AgentId>,
+    pub byzantine_containment: ByzantineContainmentAssessment,
 }
 
 impl TeamOperationalAssessment {
@@ -58,8 +70,16 @@ impl TeamOperationalAssessment {
             directive: TeamDirective::None,
             rescue_state: RescueHandoffState::Idle,
             distress_target: None,
+            byzantine_containment: ByzantineContainmentAssessment::nominal(),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DistributedRecoveryCheckpoint {
+    pub schema_version: u16,
+    pub peer_trust: PeerTrustSupervisor,
+    pub leadership: TeamLeadershipSupervisor,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -70,11 +90,17 @@ pub struct TeamCoordinator {
     occupancy: TunnelOccupancy,
     relay_mesh: RelayMesh,
     rescue: RescueHandoff,
+    peer_trust: PeerTrustSupervisor,
+    leadership: TeamLeadershipSupervisor,
     last_assessment: TeamOperationalAssessment,
 }
 
 impl TeamCoordinator {
     pub fn new(local_agent: AgentId) -> Self {
+        Self::new_with_deployment(local_agent, 0)
+    }
+
+    pub fn new_with_deployment(local_agent: AgentId, deployment_id: u64) -> Self {
         Self {
             local_agent,
             directory: TeamDirectory::new(
@@ -89,8 +115,48 @@ impl TeamCoordinator {
             ),
             relay_mesh: RelayMesh::default(),
             rescue: RescueHandoff::new(local_agent),
+            peer_trust: PeerTrustSupervisor::new(deployment_id),
+            leadership: TeamLeadershipSupervisor::default(),
             last_assessment: TeamOperationalAssessment::solo(),
         }
+    }
+
+    pub fn deployment_id(&self) -> u64 {
+        self.peer_trust.deployment_id()
+    }
+
+    pub fn ingest_peer_assertion(
+        &mut self,
+        assertion: PeerAuthenticationAssertion,
+    ) -> Result<(), PeerTrustRejection> {
+        self.peer_trust.ingest(assertion)
+    }
+
+    pub fn ingest_leadership_vote(
+        &mut self,
+        vote: LeadershipLeaseVote,
+    ) -> Result<(), VoteRejection> {
+        self.leadership.ingest(vote)
+    }
+
+    pub fn recovery_checkpoint(&self) -> DistributedRecoveryCheckpoint {
+        DistributedRecoveryCheckpoint {
+            schema_version: DISTRIBUTED_RECOVERY_CHECKPOINT_SCHEMA_VERSION,
+            peer_trust: self.peer_trust.clone(),
+            leadership: self.leadership.clone(),
+        }
+    }
+
+    pub fn load_recovery_checkpoint(&mut self, checkpoint: &DistributedRecoveryCheckpoint) -> bool {
+        if checkpoint.schema_version != DISTRIBUTED_RECOVERY_CHECKPOINT_SCHEMA_VERSION
+            || !checkpoint.peer_trust.validate()
+            || !checkpoint.leadership.validate()
+        {
+            return false;
+        }
+        self.peer_trust = checkpoint.peer_trust.clone();
+        self.leadership = checkpoint.leadership.clone();
+        true
     }
 
     pub fn ingest_heartbeat(
@@ -187,7 +253,19 @@ impl TeamCoordinator {
         priority: ReservationPriority,
         lookahead_m: f64,
         clearance_m: f64,
+        require_hardware_backed_peers: bool,
+        leadership_quorum_fraction: f64,
     ) -> TeamOperationalAssessment {
+        let byzantine_containment = self.leadership.assess(
+            current_step,
+            &self.peer_trust,
+            PeerTrustPolicy {
+                require_hardware_backed: require_hardware_backed_peers,
+            },
+            TeamLeadershipPolicy {
+                quorum_fraction: leadership_quorum_fraction,
+            },
+        );
         let status = self.directory.status(current_step);
         let occupancy = self.occupancy.assess(
             current_step,
@@ -205,7 +283,11 @@ impl TeamCoordinator {
             .directory
             .freshest_distress(current_step)
             .map(|record| record.heartbeat.agent_id);
-        let directive = if occupancy.conflict() && occupancy.must_yield {
+        let directive = if byzantine_containment.authority
+            == crate::team_leadership::ByzantineContainmentAuthority::HoldForQuorum
+        {
+            TeamDirective::HoldForQuorum
+        } else if occupancy.conflict() && occupancy.must_yield {
             TeamDirective::YieldTunnel
         } else if matches!(
             self.rescue.state(),
@@ -225,6 +307,7 @@ impl TeamCoordinator {
             directive,
             rescue_state: self.rescue.state(),
             distress_target,
+            byzantine_containment,
         };
         self.last_assessment
     }
@@ -255,6 +338,8 @@ impl TeamCoordinator {
         self.occupancy.clear();
         self.relay_mesh.clear();
         self.rescue.reset();
+        self.peer_trust.reset();
+        self.leadership.reset();
         self.last_assessment = TeamOperationalAssessment::solo();
     }
 }
@@ -270,6 +355,7 @@ mod tests {
     use super::*;
     use crate::occupancy::{ReservationPriority, TunnelDirection, TunnelReservation};
     use crate::team::{PeerCondition, TeamRole};
+    use crate::team_leadership::ByzantineContainmentAuthority;
 
     #[test]
     fn lower_priority_local_agent_is_directed_to_yield() {
@@ -294,6 +380,8 @@ mod tests {
             ReservationPriority::Routine,
             5.0,
             1.0,
+            false,
+            0.5,
         );
         assert_eq!(assessment.directive, TeamDirective::YieldTunnel);
     }
@@ -322,6 +410,8 @@ mod tests {
             ReservationPriority::Routine,
             2.0,
             1.0,
+            false,
+            0.5,
         );
         assert_eq!(assessment.distress_target, Some(AgentId::new(2)));
         assert_eq!(assessment.directive, TeamDirective::MaintainRelay);

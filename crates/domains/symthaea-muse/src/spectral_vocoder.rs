@@ -35,9 +35,9 @@ pub const CONTROL_RATE_HZ: f32 = 1000.0;
 
 /// Mel decoder: project 16,384D HV back to mel frequency bins.
 pub struct MelDecoder {
-    /// One projection vector per mel bin (genesis-seeded).
+    /// One projection vector per mel bin (genesis-seeded). Its length IS the
+    /// mel dimension — no separate `mel_dim` field to keep in sync.
     projections: Vec<ContinuousHV>,
-    mel_dim: usize,
 }
 
 impl MelDecoder {
@@ -46,10 +46,7 @@ impl MelDecoder {
         let projections = (0..mel_dim)
             .map(|i| genesis.hv(&format!("spectral_vocoder_mel_{i}"), HDC_DIMENSION))
             .collect();
-        Self {
-            projections,
-            mel_dim,
-        }
+        Self { projections }
     }
 
     /// Decode a 16,384D HV to mel frame via dot-product projection.

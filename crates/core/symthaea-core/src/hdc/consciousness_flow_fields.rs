@@ -2,17 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // ==================================================================================
-// Consciousness Flow Fields
+// Revolutionary Improvement #21: Consciousness Flow Fields
 // ==================================================================================
 //
-// Models this crate's computed consciousness metric (Phi) as a point moving
-// on a manifold, with a vector field describing its trajectory tendencies.
-// "Consciousness" throughout this file means that computed metric, not a
-// claim about subjective experience.
-//
-// This extends the static topology work (see the module referenced as #20
-// in comments below) with dynamics: not just the shape of the metric space,
-// but which direction the metric tends to move from a given point.
+// **The Ultimate Paradigm Shift**: Consciousness doesn't just have SHAPE (#20) -
+// it FLOWS on that shape like water on a landscape!
 //
 // **Core Realization**:
 // - #20 gave us TOPOLOGY (static geometry: holes, cycles, voids)

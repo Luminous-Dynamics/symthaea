@@ -15,7 +15,7 @@ cd "$ROOT"
 
 BROCA_DATA_DIR="${BROCA_DATA_DIR:-crates/domains/symthaea-broca/data}"
 PRODUCTION_CHECKPOINT="$BROCA_DATA_DIR/models/broca-checkpoint-latest.bin"
-BASELINE_ROOT="${BROCA_BASELINE_ROOT:-target/broca-baselines}"
+BASELINE_ROOT="${BROCA_BASELINE_ROOT:-crates/domains/symthaea-broca/data/models/baselines}"
 BASELINE_POINTER="$BROCA_DATA_DIR/models/measurements/CURRENT_BASELINE"
 PROMOTION_LOG="$BROCA_DATA_DIR/models/promotion-log.jsonl"
 

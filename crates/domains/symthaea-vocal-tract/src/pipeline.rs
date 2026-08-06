@@ -721,9 +721,12 @@ impl VocalTractPipeline {
                 self.fep_agent.learn(m);
                 let fep_result = self.fep_agent.tick(m);
                 self.controller.modulate_tau(fep_result.tau_factor);
-                let current_lr = self.controller.learning_rate();
+                // Derived from the immutable baseline, not the current
+                // (possibly already-modulated) rate -- see 2026-07-29
+                // verification ledger for the compounding bug this replaces.
+                let base_lr = self.controller.base_learning_rate();
                 self.controller
-                    .set_learning_rate(current_lr * fep_result.learning_rate_factor);
+                    .set_learning_rate(base_lr * fep_result.learning_rate_factor);
                 self.controller.set_emphasis(fep_result.emphasis_factor);
                 self.last_fep_result = Some(fep_result);
             }
@@ -812,25 +815,37 @@ impl VocalTractPipeline {
         frame.time = self.cumulative_time;
         self.cumulative_time += dt;
 
-        // Explicit caller maps remain authoritative, but the shared ARPAbet
-        // table provides a fail-closed production default so the live pipeline
-        // cannot silently render every unregistered consonant as a vowel.
+        // Explicit caller maps remain authoritative, then the shared ARPAbet
+        // table. A phoneme name matching NEITHER (unrecognized by both the
+        // caller and the canonical table) is explicitly routed to silence --
+        // per the 2026-07-29 verification ledger, the previous version of this
+        // block claimed to be "fail-closed" but actually left frame.source_type/
+        // voicing at whatever the network's own forward pass produced for an
+        // unrecognized symbol (fail-OPEN), the opposite of the stated intent.
         if let Some(ph) = phoneme {
             let metadata = canonical_arpabet_symbol(ph).map(|_| arpabet_articulation(ph));
-            if let Some(manner) = self
+            let recognized = metadata.is_some()
+                || self.phoneme_manner_map.contains_key(ph)
+                || self.phoneme_voicing_map.contains_key(ph);
+
+            let manner = self
                 .phoneme_manner_map
                 .get(ph)
                 .copied()
                 .or_else(|| metadata.map(|value| source_type_for_class(value.class)))
-            {
-                frame.source_type = manner;
-            }
+                .unwrap_or(if recognized {
+                    frame.source_type
+                } else {
+                    SourceType::Silent
+                });
+            frame.source_type = manner;
+
             let is_voiced = self
                 .phoneme_voicing_map
                 .get(ph)
                 .copied()
                 .or_else(|| metadata.map(|value| value.voiced));
-            if is_voiced == Some(false) {
+            if is_voiced == Some(false) || !recognized {
                 frame.voicing = 0.0;
             }
         }
@@ -884,9 +899,12 @@ impl VocalTractPipeline {
                 self.fep_agent.learn(m);
                 let fep_result = self.fep_agent.tick(m);
                 self.controller.modulate_tau(fep_result.tau_factor);
-                let current_lr = self.controller.learning_rate();
+                // Derived from the immutable baseline, not the current
+                // (possibly already-modulated) rate -- see 2026-07-29
+                // verification ledger for the compounding bug this replaces.
+                let base_lr = self.controller.base_learning_rate();
                 self.controller
-                    .set_learning_rate(current_lr * fep_result.learning_rate_factor);
+                    .set_learning_rate(base_lr * fep_result.learning_rate_factor);
                 self.controller.set_emphasis(fep_result.emphasis_factor);
                 self.last_fep_result = Some(fep_result);
             }
@@ -985,25 +1003,37 @@ impl VocalTractPipeline {
         frame.time = self.cumulative_time;
         self.cumulative_time += dt;
 
-        // Explicit caller maps remain authoritative, but the shared ARPAbet
-        // table provides a fail-closed production default so the live pipeline
-        // cannot silently render every unregistered consonant as a vowel.
+        // Explicit caller maps remain authoritative, then the shared ARPAbet
+        // table. A phoneme name matching NEITHER (unrecognized by both the
+        // caller and the canonical table) is explicitly routed to silence --
+        // per the 2026-07-29 verification ledger, the previous version of this
+        // block claimed to be "fail-closed" but actually left frame.source_type/
+        // voicing at whatever the network's own forward pass produced for an
+        // unrecognized symbol (fail-OPEN), the opposite of the stated intent.
         if let Some(ph) = phoneme {
             let metadata = canonical_arpabet_symbol(ph).map(|_| arpabet_articulation(ph));
-            if let Some(manner) = self
+            let recognized = metadata.is_some()
+                || self.phoneme_manner_map.contains_key(ph)
+                || self.phoneme_voicing_map.contains_key(ph);
+
+            let manner = self
                 .phoneme_manner_map
                 .get(ph)
                 .copied()
                 .or_else(|| metadata.map(|value| source_type_for_class(value.class)))
-            {
-                frame.source_type = manner;
-            }
+                .unwrap_or(if recognized {
+                    frame.source_type
+                } else {
+                    SourceType::Silent
+                });
+            frame.source_type = manner;
+
             let is_voiced = self
                 .phoneme_voicing_map
                 .get(ph)
                 .copied()
                 .or_else(|| metadata.map(|value| value.voiced));
-            if is_voiced == Some(false) {
+            if is_voiced == Some(false) || !recognized {
                 frame.voicing = 0.0;
             }
         }

@@ -25,6 +25,16 @@
 //! design (see above), and a client deserializing a subset of a larger
 //! JSON object is exactly the intended, supported use.
 
+/// The public Muse 152 style taxonomy.
+///
+/// Wired 2026-07-28. This module's file has existed since the commit that
+/// added it (`82330c0c0a`) but was never declared, so 1,257 lines — the
+/// whole `CATALOG` table plus its own validation tests, including
+/// `assert_eq!(CATALOG.len(), 152)` — had never once been compiled, while
+/// `MUSE_152_STYLE_CATALOG_2026-07-18.md` described the registry as
+/// shipped. Declaring it is step 4a of making that document true.
+pub mod catalog;
+
 use serde::{Deserialize, Serialize};
 
 /// Identifies one *rendered* audio artifact. Populated by `muse_studio`'s
@@ -61,6 +71,252 @@ pub struct ArtifactIdentity {
     pub rendition: RenditionArtifactId,
 }
 
+/// The permission boundary attached to musician-supplied material. Importing a
+/// work never implies permission to publish it, extract motifs from it, or use
+/// it to improve Muse globally.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContributionScope {
+    #[default]
+    PrivateProject,
+    SharedListening,
+    DerivativeUseAllowed,
+    FoundryContribution,
+    GrammarResearch,
+    GlobalMuseLearning,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MusicalContentLicense {
+    #[default]
+    AllRightsReserved,
+    Cc0,
+    CcBy,
+    CcBySa,
+    PublicDomain,
+    Custom,
+}
+
+/// What the importer is actually asserting about their relationship to the
+/// uploaded work — distinct from the single "authorized" checkbox the
+/// import form used to conflate. "I created this" and "I have permission
+/// to import someone else's work" are not the same claim, and only the
+/// former should ever set [`ContributionManifest::declared_authorship`].
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthorizationBasis {
+    /// The importer wrote this work themselves.
+    OwnWork,
+    /// The importer has permission to import and privately analyze someone
+    /// else's work, but did not write it.
+    AuthorizedImport,
+    /// This record predates `authorization_basis` entirely (the field
+    /// didn't exist yet) -- NOT the same claim as `AuthorizedImport`, which
+    /// is an active, currently-asserted claim a new import makes today.
+    /// Reusing `AuthorizedImport` as the deserialization default for old
+    /// records would silently manufacture a claim nobody actually made and
+    /// could read as consistent with an old record's stored
+    /// `declared_authorship: true` (itself unreliable -- the pre-this-fix
+    /// importer set it unconditionally, regardless of what the single old
+    /// checkbox actually meant). `LegacyUnspecified` keeps that
+    /// inconsistency visible instead of papering over it.
+    LegacyUnspecified,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SymbolicImportFormat {
+    Midi,
+    MusicXml,
+    MuseScore,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ImportedWorkId(pub String);
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ContributionManifest {
+    pub work_id: ImportedWorkId,
+    pub title: String,
+    pub contributor: String,
+    /// What the importer actually asserted (see [`AuthorizationBasis`]) --
+    /// `declared_authorship` below is DERIVED from this (true only for
+    /// `OwnWork`), never set independently of it, for every record written
+    /// since this field was introduced. Records written before it existed
+    /// deserialize to `AuthorizationBasis::LegacyUnspecified` (see that
+    /// variant's doc) and their stored `declared_authorship` should NOT be
+    /// read as consistent with it -- both fields on such a record are
+    /// historical artifacts of the old single-checkbox importer, not a
+    /// currently-asserted claim.
+    #[serde(default = "default_authorization_basis")]
+    pub authorization_basis: AuthorizationBasis,
+    pub declared_authorship: bool,
+    pub source_format: SymbolicImportFormat,
+    pub source_sha256: String,
+    pub score_sha256: String,
+    pub contribution_scope: ContributionScope,
+    pub content_license: MusicalContentLicense,
+    #[serde(default)]
+    pub attribution: Vec<String>,
+    pub imported_at_unix_ms: u64,
+}
+
+/// `serde(default)` fallback for manifests written before
+/// `authorization_basis` existed. `LegacyUnspecified`, not
+/// `AuthorizedImport` -- the latter is a claim a NEW import actively makes;
+/// defaulting old records to it would manufacture a claim nobody made and
+/// contradict the field's own invariant against an old record's stored
+/// `declared_authorship: true`.
+fn default_authorization_basis() -> AuthorizationBasis {
+    AuthorizationBasis::LegacyUnspecified
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImportedMotifSummary {
+    pub occurrence_count: usize,
+    pub midi_pitches: Vec<u8>,
+    pub identity_note: String,
+    pub confidence: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImportedSectionSummary {
+    pub label: String,
+    pub start_beat: f64,
+    pub end_beat: f64,
+    pub evidence: String,
+    pub confidence: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImportedWorkAnalysis {
+    pub source_native: bool,
+    pub inferred_territory: Option<String>,
+    pub tempo_bpm: f32,
+    pub meter: u8,
+    pub tonic: String,
+    pub note_count: usize,
+    pub voice_count: usize,
+    pub duration_seconds: f64,
+    pub motifs: Vec<ImportedMotifSummary>,
+    pub sections: Vec<ImportedSectionSummary>,
+    pub unresolved_interpretations: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImportedWorkSummary {
+    pub manifest: ContributionManifest,
+    pub analysis: ImportedWorkAnalysis,
+    pub audio_available: bool,
+    /// Which renderer produced `audition.wav` -- `"fluidsynth"` or
+    /// `"native"` (the same disclosed-fallback convention `/api/compose`
+    /// already uses). `#[serde(default)]` so summaries written before this
+    /// field existed still deserialize.
+    #[serde(default)]
+    pub audio_renderer: String,
+    /// Discloses that `audition.wav`'s TIMBRE is reconstructed, not
+    /// preserved from the source. `parse_symbolic` extracts pitch, rhythm,
+    /// tempo, meter, and voice roles into a plain `Score` -- it does not
+    /// carry the source file's own instrument/program assignments, so
+    /// there is nothing to "preserve." The audition is voiced with a fixed
+    /// instrument palette instead (currently a `Style::Classical`
+    /// string-trio pool in `theory_realize::instruments_for`); pitch,
+    /// rhythm, and voice-role assignment DO come from the source
+    /// unchanged. `#[serde(default)]` so summaries written before this
+    /// field existed still deserialize.
+    #[serde(default = "default_instrumentation_note")]
+    pub instrumentation_note: String,
+}
+
+/// `pub` so `muse_studio.rs` can reuse the exact same text at construction
+/// time -- one string, not a duplicated copy that could drift.
+pub fn default_instrumentation_note() -> String {
+    "reconstructed: fixed Classical-style instrument palette (source instrumentation is not \
+     preserved through parsing); pitch, rhythm, and voice roles are from the source unchanged"
+        .to_string()
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CompositionLessonStatus {
+    Authored,
+    Analyzed,
+    HumanApprovedAbstraction,
+    ShadowTested,
+    GeneralizationVerified,
+    ListeningPromising,
+    TrustedStrategy,
+    Rejected,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LessonArtifactIntegrity {
+    pub score_json: bool,
+    pub lesson_json: bool,
+    pub midi: bool,
+    pub audition_audio: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CompositionLessonSummary {
+    pub lesson_id: String,
+    pub title: String,
+    pub subtitle: String,
+    pub primary_dimension: String,
+    pub strategy: String,
+    pub abstract_rule: String,
+    pub expected_effects: Vec<String>,
+    pub applicable_grammars: Vec<String>,
+    pub prohibited_literal_reuse: Vec<String>,
+    pub status: CompositionLessonStatus,
+    pub first_shadow_wave: bool,
+    pub duration_seconds: f64,
+    pub note_count: usize,
+    pub section_count: usize,
+    pub score_content_sha256: String,
+    pub integrity: LessonArtifactIntegrity,
+    pub typed_shadow_mapping: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TeachingCorpusSummary {
+    pub protocol_version: String,
+    pub corpus_status: String,
+    pub validation_passed: bool,
+    pub exact_score_collisions: usize,
+    pub near_clone_pairs: usize,
+    pub lessons: Vec<CompositionLessonSummary>,
+}
+
+/// Server-owned deterministic Journey style choice. The browser supplies
+/// durable journey state; the server owns style/family policy semantics.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct JourneyNextRequest {
+    pub policy: String,
+    pub traversal_seed: u64,
+    pub step: u64,
+    #[serde(default)]
+    pub current_style: Option<String>,
+    #[serde(default)]
+    pub recent_styles: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct JourneyNextResponse {
+    pub style: String,
+    pub family: String,
+    pub relation: String,
+    pub traversal_seed: u64,
+    pub step: u64,
+    pub composition_seed: u64,
+    pub tonic: i32,
+    pub valence: f32,
+    pub arousal: f32,
+    pub energy: f32,
+    pub bars: usize,
+}
+
 /// Mirrors `IdentityCard` in `symthaea-music-theory/src/describe.rs`.
 /// Only `traits` is pulled in — `Candidate::title` already incorporates
 /// the card's own title when one exists (see `CandidateMeta::title`'s doc
@@ -83,6 +339,26 @@ pub struct TitleRecipeSummary {
     pub source_traits: Vec<String>,
     #[serde(default)]
     pub alternatives: Vec<String>,
+}
+
+/// Listener-facing, stable projection of the structural plan that made two
+/// candidates meaningfully different. Strings are deliberate: the authoritative
+/// typed enums stay in `symthaea-music-theory`, while this wasm-safe crate
+/// carries their version-tolerant display representation.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DiversityPlanSummary {
+    pub formal_topology: String,
+    pub selected_form: String,
+    pub motif_development: String,
+    pub harmony: String,
+    pub rhythm: String,
+    pub orchestration: String,
+    pub climax: String,
+    pub ending: String,
+    #[serde(default)]
+    pub applied: bool,
+    #[serde(default)]
+    pub lesson_id: Option<String>,
 }
 
 /// The fields of `CandidateMeta` (`muse_studio.rs`) that a client
@@ -121,6 +397,11 @@ pub struct Candidate {
     /// missing this field still deserializes.
     #[serde(default)]
     pub identity: Option<ArtifactIdentity>,
+    /// The resolved high-level difference plan used for this candidate.
+    /// Present even when the plan did not need to rewrite the score spec, so
+    /// Create/Listen can explain candidate contrast without reverse inference.
+    #[serde(default)]
+    pub diversity_plan: Option<DiversityPlanSummary>,
 }
 
 /// `POST /api/compose`'s response envelope.
@@ -185,6 +466,15 @@ pub struct ComposeRequest {
     /// always reports which one rendered, regardless of preference.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub renderer: Option<String>,
+    /// Explicit research opt-in for the procedural Motif Foundry generator.
+    /// It is never silently enabled for ordinary or imported music.
+    #[serde(default)]
+    pub use_motif_foundry: bool,
+    /// Optional authored-etude abstraction to apply in shadow mode. The
+    /// server accepts only lessons with a typed mapping and never copies the
+    /// etude's source notes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composition_lesson_id: Option<String>,
 }
 
 /// One performed note — the wire shape `/api/notes/{id}` returns per
@@ -577,6 +867,8 @@ pub struct PieceProvenanceBundle {
     pub renderer_binary_sha256: Option<String>,
     pub performance_model_sha256: Option<String>,
     pub render_environment_sha256: Option<String>,
+    #[serde(default)]
+    pub diversity_plan: Option<DiversityPlanSummary>,
     pub reproduction: ReproducibilityClaim,
     pub artifacts: Vec<ProvenanceArtifact>,
 }
@@ -707,6 +999,10 @@ pub struct AtlasPoint {
     /// `true` for a kept/liked piece, `false` for an in-session candidate
     /// that hasn't been kept.
     pub kept: bool,
+    /// Imported musician-owned work visible only inside this local/private
+    /// workspace.
+    #[serde(default)]
+    pub private: bool,
     /// This point's nearest neighbor by RAW (unweighted) structural
     /// fingerprint distance — deliberately independent of the active lens,
     /// so switching lenses doesn't change which piece is treated as
@@ -811,6 +1107,7 @@ mod atlas_tests {
                 title: "Copper Meridian".to_string(),
                 style: "Folk".to_string(),
                 duration_secs: 42.5,
+                private: false,
                 x: 0.125,
                 y: -0.5,
                 kept: false,
@@ -1362,6 +1659,714 @@ pub struct StyleFamily {
 /// compile-time data, not per-request state).
 pub const STYLE_FAMILIES_VERSION: u32 = 1;
 
+// ---------------------------------------------------------------------
+// Vocal performance schema (SYMTHAEA_VOCAL_ARCHITECTURE_DECISION_2026-07-27.md,
+// recommended-order step 3)
+//
+// The canonical, foundation-agnostic contract Muse hands to a
+// score-following vocal backbone (that decision doc's "Path 2": exact
+// singer + ACE-derived teacher). A candidate backbone is viable to the
+// extent it can consume a `VocalPerformancePlan` and deliver "correct
+// words, correct pitch, correct timing, deterministic rendering, clean
+// isolated vocals" — the architecture decision's own "exact-score
+// backbone guarantees" list. This schema states WHAT to sing, never HOW
+// to render it: no audio format, no renderer, no identity/timbre.
+//
+// Prior art, reused as a naming/shape reference rather than a dependency:
+// `symthaea-muse::singing_bridge::{SungSyllable, sing, syllabify}` is a
+// real, tested, *production* lyric-to-melody binder, but it (a) hardcodes
+// 1:1 syllable:note alignment with no melisma and no rests, (b) has no
+// intent/tolerance concept, and (c) renders to `FormantFrame` — a formant
+// vocoder, which is explicitly retired as anything a human listens to
+// (`feedback_no_formant_vocoder_voice.md`: "not pleasant", closed against
+// re-litigation). This schema is the generalized superset the split-layer
+// architecture needs; `singing_bridge.rs`'s G2P/syllabification/natural-
+// timing logic remains valid *symbolic* prior art even though its
+// FormantFrame render path is not eligible as a final backbone.
+//
+// This crate cannot depend on `symthaea-vocal-tract` (native G2P/formant
+// deps would break the wasm32/serde-only contract this whole file exists
+// to uphold — see the module doc comment), so phoneme/note shapes below
+// are deliberately redefined here rather than reused, following the same
+// pattern already used for `IdentityCard`/`SymbolicNoteEvent` elsewhere in
+// this file.
+// ---------------------------------------------------------------------
+
+/// Version of the [`VocalPhoneme`] classification taxonomy
+/// (`VocalPhoneClass`/`SyllableRole`), independent of
+/// `VOCAL_PERFORMANCE_SCHEMA_VERSION` — the schema's event/timing shape
+/// and the phone taxonomy can evolve on different schedules (e.g. a new
+/// G2P inventory mapping the same IPA differently, or `VoicedObstruent`
+/// splitting into finer classes, without the surrounding plan shape
+/// changing at all).
+pub const VOCAL_PHONE_TAXONOMY_VERSION: u32 = 1;
+
+/// Coarse phonetic-manner class, empirically promoted from the Kokoro+
+/// WORLD backbone research (`symthaea/docs/research/evidence/
+/// singing-voice-rvc-2026-07-26/backbone-smoke-test-kokoro-world/`), not
+/// a speculative taxonomy. Each variant corresponds to a class that
+/// already changed a real synthesis decision during that work: pitch
+/// eligibility (voiced vs. unvoiced), raw-waveform preservation
+/// eligibility, burst-detection strategy (stop), frication-core
+/// detection strategy (fricative/affricate), and search-window/
+/// crossfade policy. Deliberately NOT a full language-independent
+/// articulatory ontology yet — extend only when a second consumer
+/// actually needs a finer distinction (e.g. splitting `VoicedObstruent`
+/// by manner), per that research's own "don't build ahead of a second
+/// consumer" conclusion.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VocalPhoneClass {
+    Vowel,
+    Sonorant,
+    Stop,
+    Fricative,
+    Affricate,
+    VoicedObstruent,
+    Other,
+}
+
+/// A phoneme's structural position within its syllable. `Ambiguous`
+/// covers cases the source G2P/syllabifier can't cleanly resolve (or
+/// hasn't been asked to) — it deliberately does not participate in the
+/// onset/nucleus/coda ordering [`VocalSyllable::validate_phoneme_roles`]
+/// checks, so it's a safe default for callers not yet populating this
+/// field precisely.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SyllableRole {
+    Onset,
+    Nucleus,
+    Coda,
+    Ambiguous,
+}
+
+/// One phoneme within a sung syllable, independent of any renderer.
+/// Mirrors `symthaea_vocal_tract::speech::g2p::Phoneme`'s shape (`ipa`,
+/// `stress`, `base_duration_ms`) but is a separate type, not a reuse —
+/// see this section's banner comment for why.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VocalPhoneme {
+    pub ipa: String,
+    pub class: VocalPhoneClass,
+    pub syllable_role: SyllableRole,
+    /// Lexical stress: 0 = unstressed, 1 = primary, 2 = secondary (CMUdict
+    /// convention, matching the source g2p's own scale).
+    pub stress: u8,
+    /// Composer-pinned exact duration for this phoneme (e.g. a melisma
+    /// whose held vowel length is part of the intended performance).
+    /// `None` leaves the exact-score backbone free to derive a natural
+    /// duration itself — the same policy `symthaea-muse::singing_bridge::
+    /// render_sung_frames` already uses (brief natural consonants, vowel
+    /// absorbs the remaining note time) is reasonable default prior art,
+    /// even though that function's own render target is retired. How much
+    /// derivation slack is allowed is [`PerformanceTolerance::duration_fraction`]'s
+    /// job, not this field's.
+    #[serde(default)]
+    pub duration_seconds: Option<f64>,
+}
+
+/// One musical note a syllable (or one note of a melisma) is sung on.
+/// Field names deliberately mirror [`SymbolicNoteEvent`] so a vocal note
+/// reads as "the same kind of thing" as an instrumental note. Omits
+/// `voice_role`/`emphasis`/`section_intensity` — those describe an
+/// independently-analyzed instrumental score event and don't have a
+/// vocal-specific meaning here; this is a smaller, deliberately simpler
+/// type, not a renamed copy.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VocalNoteEvent {
+    pub id: String,
+    pub midi: u8,
+    pub pitch_name: String,
+    pub onset: MusicalTime,
+    pub duration_ticks: u64,
+    pub duration_beats: f64,
+    pub duration_seconds: f64,
+    pub velocity: f32,
+}
+
+/// One syllable of lyrics bound to one or more notes — more than one only
+/// for a melisma (the syllable's vowel ornamented or held across several
+/// pitches); ordinary syllabic singing binds exactly one. The vocal-schema
+/// analog of `symthaea-muse::singing_bridge::SungSyllable`, generalized
+/// with melisma support, an id, the literal text (a rehearsal/lyric-sheet
+/// view wants this, not just IPA), and explicit intent/tolerance. Never
+/// bound to zero notes — a silence is [`VocalEvent::Rest`], not a
+/// degenerate `VocalSyllable`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VocalSyllable {
+    pub id: String,
+    pub text: String,
+    pub phonemes: Vec<VocalPhoneme>,
+    pub notes: Vec<VocalNoteEvent>,
+    #[serde(default)]
+    pub intent: PerformanceIntent,
+    #[serde(default)]
+    pub tolerance: PerformanceTolerance,
+}
+
+impl VocalSyllable {
+    /// Checks the phoneme role/class invariants this schema depends on:
+    /// every [`VocalPhoneClass::Vowel`] phoneme is marked
+    /// [`SyllableRole::Nucleus`] (the reverse isn't required — a syllabic
+    /// consonant nucleus is a legitimate, if not yet exercised, case),
+    /// onset/nucleus/coda appear in a sane order (no onset after the
+    /// nucleus, no coda before it), and at least one nucleus exists when
+    /// the syllable has any phonemes at all. Returns the first violation
+    /// found — a smoke check, not a general-purpose linter.
+    pub fn validate_phoneme_roles(&self) -> Result<(), String> {
+        if self.phonemes.is_empty() {
+            return Ok(());
+        }
+        let mut seen_nucleus = false;
+        for p in &self.phonemes {
+            if p.class == VocalPhoneClass::Vowel && p.syllable_role != SyllableRole::Nucleus {
+                return Err(format!(
+                    "phoneme '{}' is class Vowel but role is {:?}, not Nucleus",
+                    p.ipa, p.syllable_role
+                ));
+            }
+            match p.syllable_role {
+                SyllableRole::Onset if seen_nucleus => {
+                    return Err(format!(
+                        "onset phoneme '{}' appears after the nucleus",
+                        p.ipa
+                    ));
+                }
+                SyllableRole::Nucleus => seen_nucleus = true,
+                SyllableRole::Coda if !seen_nucleus => {
+                    return Err(format!(
+                        "coda phoneme '{}' appears before any nucleus",
+                        p.ipa
+                    ));
+                }
+                _ => {}
+            }
+        }
+        if !seen_nucleus {
+            return Err("syllable has phonemes but no nucleus".to_string());
+        }
+        Ok(())
+    }
+}
+
+/// Distinguishes a metrical rest (part of the notated rhythm, must render
+/// silent for its exact duration) from a breath (a performer necessity
+/// that a backbone may realize as audible inhale, silence, or a shortened
+/// preceding note, depending on what it actually supports). This schema
+/// states the intent, not the rendering.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RestKind {
+    MetricalRest,
+    Breath,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VocalRest {
+    /// Named `rest_kind`, not `kind` — [`VocalEvent`]'s own
+    /// `#[serde(tag = "kind")]` discriminant is flattened into this same
+    /// JSON object on the wire, so a field literally named `kind` here
+    /// would collide with it (two `"kind"` keys in one object, which
+    /// serde's map deserializer correctly rejects as a duplicate field —
+    /// caught by `vocal_performance_plan_round_trips` before this fix).
+    pub rest_kind: RestKind,
+    pub onset: MusicalTime,
+    pub duration_seconds: f64,
+}
+
+/// One event in a vocal line's timeline, in onset order — a sung syllable
+/// or a silence. Unlike `symthaea-muse::singing_bridge::sing`'s
+/// `Vec<SungSyllable>` (which has no way to express a gap in the melody at
+/// all), rests and breaths are first-class here.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum VocalEvent {
+    Syllable(VocalSyllable),
+    Rest(VocalRest),
+}
+
+/// Vocal delivery/technique intent. Every field is optional because most
+/// events inherit their phrase's default ([`VocalPhrase::default_intent`])
+/// rather than overriding it, resolved per-field (a syllable can override
+/// just `dynamics` while still inheriting the phrase's `emotion`).
+/// `technique`/`emotion` are deliberately open-vocabulary strings, not a
+/// fixed enum: the real vocabulary (belt, head voice, falsetto, breathy,
+/// legato, portamento, ...) is wide and genre-dependent, and a closed enum
+/// enumerated up front would either be incomplete or a maintenance burden
+/// every time a new technique is wanted. Introduce a closed enum later
+/// only if/when a backbone needs to pattern-match on it exhaustively.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct PerformanceIntent {
+    /// Perceptual loudness/emphasis, 0.0-1.0. Distinct from
+    /// [`VocalNoteEvent::velocity`] (the note-level attribute an
+    /// instrumental renderer would read) — this is the singer's
+    /// expressive dynamic intent, which a backbone may realize as breath
+    /// support rather than raw amplitude.
+    #[serde(default)]
+    pub dynamics: Option<f32>,
+    /// 0.0 (none) - 1.0 (heavily breathy) vocal quality.
+    #[serde(default)]
+    pub breathiness: Option<f32>,
+    /// Override of the backbone's default vibrato rate in Hz. `None`
+    /// defers to the backbone's own default —
+    /// `symthaea-muse::singing_bridge::VIBRATO_RATE_HZ` (5.5 Hz) remains
+    /// reasonable default prior art even though that module's own render
+    /// path (`FormantFrame`) is retired; see this section's banner.
+    #[serde(default)]
+    pub vibrato_rate_hz: Option<f32>,
+    /// Override of the default vibrato depth in cents.
+    #[serde(default)]
+    pub vibrato_depth_cents: Option<f32>,
+    /// Free-text technique tag(s) — e.g. `"legato"`, `"staccato"`,
+    /// `"portamento"`, `"belt"`, `"head_voice"`, `"falsetto"`, `"spoken"`
+    /// (Sprechstimme). Open vocabulary, see struct doc.
+    #[serde(default)]
+    pub technique: Vec<String>,
+    /// Coarse emotional target, free text (e.g. "yearning", "defiant",
+    /// "tender"). Not a fixed taxonomy — a rendering backbone or teacher
+    /// model (e.g. ACE-derived reference performances, per the
+    /// architecture decision) should interpret this the same loose way
+    /// ACE-Step's own text prompts already are interpreted, never as a
+    /// control code with a guaranteed effect (see the Controllability
+    /// Audit's throughline finding).
+    #[serde(default)]
+    pub emotion: Option<String>,
+}
+
+/// How much a backbone or expression layer may deviate from an event's
+/// exact score values while still counting as a faithful performance.
+/// Mirrors the deviation-*reporting* fields already on
+/// [`PerformedNoteEvent`] (`onset_deviation_seconds`/
+/// `duration_deviation_seconds`), but states the allowance up front rather
+/// than only measuring it after the fact — the architecture decision's
+/// "exact-score backbone guarantees ... deterministic rendering" and "ACE
+/// contributes ... natural performance interpretation" are in tension
+/// unless something states how much interpretive slack is permitted
+/// where. `None` in every field means "backbone default," not "zero
+/// tolerance" — an explicit `Some(0.0)` is how a plan asks for genuinely
+/// strict, deterministic timing/pitch.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct PerformanceTolerance {
+    /// Allowed pitch deviation from the notated MIDI pitch, in cents.
+    #[serde(default)]
+    pub pitch_cents: Option<f32>,
+    /// Allowed onset-timing deviation, in seconds (rubato/expressive
+    /// push-pull).
+    #[serde(default)]
+    pub onset_seconds: Option<f64>,
+    /// Allowed duration deviation as a fraction of the notated duration
+    /// (e.g. `0.1` = the event may run up to 10% longer or shorter).
+    #[serde(default)]
+    pub duration_fraction: Option<f32>,
+}
+
+/// A breath-group / lyric phrase — the vocal-schema analog of
+/// [`PhraseRegion`], generalized with vocal-specific defaults its events
+/// can inherit. Distinct from `PhraseRegion` (phrasing recovered from a
+/// purely instrumental score's cadence/PhraseStart annotations): a vocal
+/// phrase additionally carries a default intent/tolerance and is
+/// explicitly the unit a singer breathes across, not merely a harmonic/
+/// structural grouping.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VocalPhrase {
+    pub id: String,
+    pub start: MusicalTime,
+    pub end: MusicalTime,
+    pub events: Vec<VocalEvent>,
+    #[serde(default)]
+    pub default_intent: PerformanceIntent,
+    #[serde(default)]
+    pub default_tolerance: PerformanceTolerance,
+}
+
+/// Version of the [`VocalPerformancePlan`] wire schema itself (event/
+/// timing shape), independent of [`VOCAL_PHONE_TAXONOMY_VERSION`]. This
+/// schema has not shipped to any external consumer yet, so an absent
+/// `schema_version` on the wire defaults to this value rather than
+/// failing to parse — tighten to a hard-required, explicitly-checked
+/// field once a persisted plan or a second consumer exists (see the
+/// backbone-research recommendation this was landed alongside).
+pub const VOCAL_PERFORMANCE_SCHEMA_VERSION: u32 = 1;
+
+fn default_vocal_performance_schema_version() -> u32 {
+    VOCAL_PERFORMANCE_SCHEMA_VERSION
+}
+
+/// The canonical, foundation-agnostic vocal-performance plan — see this
+/// section's banner comment. `duration_seconds` is a stored roll-up (the
+/// last phrase's `end.seconds`), not a derived-on-read value, matching
+/// this file's existing convention (`ListenCompositionBundle` does the
+/// same for its own `duration_*` fields) — deliberately redundant with
+/// `phrases` for a client that only wants total length.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VocalPerformancePlan {
+    #[serde(default = "default_vocal_performance_schema_version")]
+    pub schema_version: u32,
+    pub id: String,
+    pub title: String,
+    /// BCP-47-ish language tag (e.g. `"en"`, `"en-US"`) — which g2p/
+    /// phoneme inventory `phonemes` was produced against. No validation is
+    /// performed on this field by this crate.
+    pub language: String,
+    pub duration_seconds: f64,
+    pub tempo_map: Vec<TempoPoint>,
+    pub meter_map: Vec<MeterPoint>,
+    pub phrases: Vec<VocalPhrase>,
+    #[serde(default)]
+    pub default_intent: PerformanceIntent,
+    #[serde(default)]
+    pub default_tolerance: PerformanceTolerance,
+}
+
+#[cfg(test)]
+mod vocal_schema_tests {
+    use super::*;
+
+    fn t(seconds: f64) -> MusicalTime {
+        MusicalTime {
+            tick: (seconds * 960.0) as u64,
+            beats: seconds,
+            seconds,
+        }
+    }
+
+    fn sample_plan() -> VocalPerformancePlan {
+        let note = VocalNoteEvent {
+            id: "n0".to_string(),
+            midi: 69,
+            pitch_name: "A4".to_string(),
+            onset: t(0.0),
+            duration_ticks: 480,
+            duration_beats: 0.5,
+            duration_seconds: 0.5,
+            velocity: 0.8,
+        };
+        let syllable = VocalSyllable {
+            id: "syl0".to_string(),
+            text: "sing".to_string(),
+            phonemes: vec![
+                VocalPhoneme {
+                    ipa: "s".to_string(),
+                    class: VocalPhoneClass::Fricative,
+                    syllable_role: SyllableRole::Onset,
+                    stress: 0,
+                    duration_seconds: None,
+                },
+                VocalPhoneme {
+                    ipa: "\u{026a}".to_string(),
+                    class: VocalPhoneClass::Vowel,
+                    syllable_role: SyllableRole::Nucleus,
+                    stress: 1,
+                    duration_seconds: Some(0.4),
+                },
+                VocalPhoneme {
+                    ipa: "\u{014b}".to_string(),
+                    class: VocalPhoneClass::Sonorant,
+                    syllable_role: SyllableRole::Coda,
+                    stress: 0,
+                    duration_seconds: None,
+                },
+            ],
+            notes: vec![note],
+            intent: PerformanceIntent {
+                emotion: Some("tender".to_string()),
+                ..Default::default()
+            },
+            tolerance: PerformanceTolerance {
+                pitch_cents: Some(20.0),
+                ..Default::default()
+            },
+        };
+        let rest = VocalRest {
+            rest_kind: RestKind::Breath,
+            onset: t(0.5),
+            duration_seconds: 0.15,
+        };
+        let phrase = VocalPhrase {
+            id: "phrase0".to_string(),
+            start: t(0.0),
+            end: t(0.65),
+            events: vec![VocalEvent::Syllable(syllable), VocalEvent::Rest(rest)],
+            default_intent: PerformanceIntent::default(),
+            default_tolerance: PerformanceTolerance::default(),
+        };
+        VocalPerformancePlan {
+            schema_version: VOCAL_PERFORMANCE_SCHEMA_VERSION,
+            id: "plan0".to_string(),
+            title: "Test Phrase".to_string(),
+            language: "en".to_string(),
+            duration_seconds: 0.65,
+            tempo_map: vec![TempoPoint {
+                at: t(0.0),
+                bpm: 120.0,
+            }],
+            meter_map: vec![MeterPoint {
+                at: t(0.0),
+                numerator: 4,
+                denominator: 4,
+            }],
+            phrases: vec![phrase],
+            default_intent: PerformanceIntent::default(),
+            default_tolerance: PerformanceTolerance::default(),
+        }
+    }
+
+    #[test]
+    fn vocal_performance_plan_round_trips() {
+        let plan = sample_plan();
+        let json = serde_json::to_string(&plan).unwrap();
+        let back: VocalPerformancePlan = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.phrases.len(), 1);
+        assert_eq!(back.phrases[0].events.len(), 2);
+        match &back.phrases[0].events[0] {
+            VocalEvent::Syllable(syl) => {
+                assert_eq!(syl.text, "sing");
+                assert_eq!(syl.phonemes.len(), 3);
+                assert_eq!(syl.phonemes[1].duration_seconds, Some(0.4));
+                assert_eq!(syl.intent.emotion.as_deref(), Some("tender"));
+                assert_eq!(syl.tolerance.pitch_cents, Some(20.0));
+            }
+            other => panic!("expected a syllable event, got {other:?}"),
+        }
+        match &back.phrases[0].events[1] {
+            VocalEvent::Rest(rest) => {
+                assert_eq!(rest.rest_kind, RestKind::Breath);
+                assert!((rest.duration_seconds - 0.15).abs() < 1e-9);
+            }
+            other => panic!("expected a rest event, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn vocal_event_tag_distinguishes_syllable_from_rest_on_the_wire() {
+        let plan = sample_plan();
+        let json = serde_json::to_string(&plan.phrases[0].events[0]).unwrap();
+        assert!(json.starts_with(r#"{"kind":"syllable""#));
+        let json = serde_json::to_string(&plan.phrases[0].events[1]).unwrap();
+        assert!(json.starts_with(r#"{"kind":"rest""#));
+    }
+
+    #[test]
+    fn performance_intent_and_tolerance_default_to_none_when_absent() {
+        // A syllable with no explicit intent/tolerance keys at all must
+        // still deserialize -- both fields fall back to their all-`None`
+        // defaults, meaning "inherit the phrase/plan default," not a
+        // parse failure.
+        let json = r#"{
+            "id":"syl1","text":"la",
+            "phonemes":[{"ipa":"l","class":"sonorant","syllable_role":"onset","stress":0},
+                        {"ipa":"a","class":"vowel","syllable_role":"nucleus","stress":1}],
+            "notes":[]
+        }"#;
+        let syl: VocalSyllable = serde_json::from_str(json).unwrap();
+        assert!(syl.intent.dynamics.is_none());
+        assert!(syl.intent.technique.is_empty());
+        assert!(syl.tolerance.pitch_cents.is_none());
+        assert!(syl.phonemes[0].duration_seconds.is_none());
+    }
+
+    #[test]
+    fn explicit_zero_tolerance_is_distinct_from_absent_tolerance() {
+        // Some(0.0) ("no interpretive slack allowed") must round-trip
+        // distinctly from None ("use the backbone's default slack") --
+        // the whole point of PerformanceTolerance's Option fields.
+        let strict = PerformanceTolerance {
+            pitch_cents: Some(0.0),
+            onset_seconds: Some(0.0),
+            duration_fraction: Some(0.0),
+        };
+        let json = serde_json::to_string(&strict).unwrap();
+        let back: PerformanceTolerance = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.pitch_cents, Some(0.0));
+        assert_ne!(back, PerformanceTolerance::default());
+    }
+
+    #[test]
+    fn phone_taxonomy_survives_json_round_trip() {
+        for class in [
+            VocalPhoneClass::Vowel,
+            VocalPhoneClass::Sonorant,
+            VocalPhoneClass::Stop,
+            VocalPhoneClass::Fricative,
+            VocalPhoneClass::Affricate,
+            VocalPhoneClass::VoicedObstruent,
+            VocalPhoneClass::Other,
+        ] {
+            let json = serde_json::to_string(&class).unwrap();
+            let back: VocalPhoneClass = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, class);
+        }
+        for role in [
+            SyllableRole::Onset,
+            SyllableRole::Nucleus,
+            SyllableRole::Coda,
+            SyllableRole::Ambiguous,
+        ] {
+            let json = serde_json::to_string(&role).unwrap();
+            let back: SyllableRole = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, role);
+        }
+    }
+
+    #[test]
+    fn unknown_phone_class_fails_visibly_instead_of_silently_coercing() {
+        // A future/unrecognized class string must be a hard deserialize
+        // error, not a silent fallback to some default variant -- an
+        // unfamiliar class should never be misread as e.g. `Other`.
+        let err = serde_json::from_str::<VocalPhoneClass>(r#""nasalized_click""#);
+        assert!(err.is_err());
+        let err = serde_json::from_str::<SyllableRole>(r#""medial""#);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn schema_version_defaults_when_absent_and_round_trips_when_present() {
+        let plan = sample_plan();
+        let json = serde_json::to_string(&plan).unwrap();
+        assert!(json.contains(&format!(
+            "\"schema_version\":{VOCAL_PERFORMANCE_SCHEMA_VERSION}"
+        )));
+
+        // Absent on the wire (e.g. a plan authored before this field
+        // existed) must default to the current version, not fail to parse.
+        let json_no_version = json.replacen(
+            &format!("\"schema_version\":{VOCAL_PERFORMANCE_SCHEMA_VERSION},"),
+            "",
+            1,
+        );
+        let back: VocalPerformancePlan = serde_json::from_str(&json_no_version).unwrap();
+        assert_eq!(back.schema_version, VOCAL_PERFORMANCE_SCHEMA_VERSION);
+
+        // An explicit, different version round-trips faithfully rather
+        // than being silently coerced to the current one -- version
+        // *gating* (rejecting unsupported versions) is a caller
+        // responsibility until a second version actually exists to gate
+        // against.
+        let mut future = sample_plan();
+        future.schema_version = VOCAL_PERFORMANCE_SCHEMA_VERSION + 1;
+        let json = serde_json::to_string(&future).unwrap();
+        let back: VocalPerformancePlan = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.schema_version, VOCAL_PERFORMANCE_SCHEMA_VERSION + 1);
+    }
+
+    #[test]
+    fn validate_phoneme_roles_accepts_the_sample_syllable() {
+        let plan = sample_plan();
+        let VocalEvent::Syllable(syl) = &plan.phrases[0].events[0] else {
+            panic!("expected a syllable event");
+        };
+        assert!(syl.validate_phoneme_roles().is_ok());
+    }
+
+    #[test]
+    fn validate_phoneme_roles_rejects_a_vowel_not_marked_nucleus() {
+        let syl = VocalSyllable {
+            id: "syl_bad".to_string(),
+            text: "x".to_string(),
+            phonemes: vec![VocalPhoneme {
+                ipa: "a".to_string(),
+                class: VocalPhoneClass::Vowel,
+                syllable_role: SyllableRole::Onset,
+                stress: 0,
+                duration_seconds: None,
+            }],
+            notes: vec![],
+            intent: PerformanceIntent::default(),
+            tolerance: PerformanceTolerance::default(),
+        };
+        assert!(syl.validate_phoneme_roles().is_err());
+    }
+
+    #[test]
+    fn validate_phoneme_roles_rejects_missing_nucleus() {
+        let syl = VocalSyllable {
+            id: "syl_no_nucleus".to_string(),
+            text: "x".to_string(),
+            phonemes: vec![VocalPhoneme {
+                ipa: "s".to_string(),
+                class: VocalPhoneClass::Fricative,
+                syllable_role: SyllableRole::Onset,
+                stress: 0,
+                duration_seconds: None,
+            }],
+            notes: vec![],
+            intent: PerformanceIntent::default(),
+            tolerance: PerformanceTolerance::default(),
+        };
+        assert!(syl.validate_phoneme_roles().is_err());
+    }
+
+    #[test]
+    fn validate_phoneme_roles_rejects_onset_after_nucleus() {
+        let syl = VocalSyllable {
+            id: "syl_bad_order".to_string(),
+            text: "x".to_string(),
+            phonemes: vec![
+                VocalPhoneme {
+                    ipa: "a".to_string(),
+                    class: VocalPhoneClass::Vowel,
+                    syllable_role: SyllableRole::Nucleus,
+                    stress: 0,
+                    duration_seconds: None,
+                },
+                VocalPhoneme {
+                    ipa: "s".to_string(),
+                    class: VocalPhoneClass::Fricative,
+                    syllable_role: SyllableRole::Onset,
+                    stress: 0,
+                    duration_seconds: None,
+                },
+            ],
+            notes: vec![],
+            intent: PerformanceIntent::default(),
+            tolerance: PerformanceTolerance::default(),
+        };
+        assert!(syl.validate_phoneme_roles().is_err());
+    }
+
+    #[test]
+    fn validate_phoneme_roles_rejects_coda_before_nucleus() {
+        let syl = VocalSyllable {
+            id: "syl_bad_coda".to_string(),
+            text: "x".to_string(),
+            phonemes: vec![
+                VocalPhoneme {
+                    ipa: "\u{014b}".to_string(),
+                    class: VocalPhoneClass::Sonorant,
+                    syllable_role: SyllableRole::Coda,
+                    stress: 0,
+                    duration_seconds: None,
+                },
+                VocalPhoneme {
+                    ipa: "a".to_string(),
+                    class: VocalPhoneClass::Vowel,
+                    syllable_role: SyllableRole::Nucleus,
+                    stress: 0,
+                    duration_seconds: None,
+                },
+            ],
+            notes: vec![],
+            intent: PerformanceIntent::default(),
+            tolerance: PerformanceTolerance::default(),
+        };
+        assert!(syl.validate_phoneme_roles().is_err());
+    }
+
+    #[test]
+    fn validate_phoneme_roles_accepts_empty_phoneme_list() {
+        let syl = VocalSyllable {
+            id: "syl_empty".to_string(),
+            text: "".to_string(),
+            phonemes: vec![],
+            notes: vec![],
+            intent: PerformanceIntent::default(),
+            tolerance: PerformanceTolerance::default(),
+        };
+        assert!(syl.validate_phoneme_roles().is_ok());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1381,6 +2386,8 @@ mod tests {
             spec: None,
             vary_premise: false,
             renderer: None,
+            use_motif_foundry: false,
+            composition_lesson_id: None,
         };
         let json = serde_json::to_string(&req).unwrap();
         // `spec: None` must not appear in the wire payload at all — the
@@ -1421,6 +2428,8 @@ mod tests {
             spec: None,
             vary_premise: true,
             renderer: None,
+            use_motif_foundry: false,
+            composition_lesson_id: None,
         };
         let json = serde_json::to_string(&req).unwrap();
         assert!(json.contains("\"vary_premise\":true"));
@@ -1451,6 +2460,8 @@ mod tests {
             })),
             vary_premise: false,
             renderer: None,
+            use_motif_foundry: false,
+            composition_lesson_id: None,
         };
         let json = serde_json::to_string(&req).unwrap();
         let back: ComposeRequest = serde_json::from_str(&json).unwrap();

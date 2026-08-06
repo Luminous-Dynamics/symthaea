@@ -13,9 +13,6 @@
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::process::Stdio;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::seed_from_name;
@@ -776,6 +773,10 @@ pub struct CommandSolver {
 
 const MAX_SOLVER_TIMEOUT_MS: u64 = 24 * 60 * 60 * 1000;
 const MAX_SOLVER_OUTPUT_BYTES: usize = 64 * 1024 * 1024;
+/// How long to keep draining output after the direct child process exits.
+/// A solver can spawn descendants that inherit its pipes, so EOF may never
+/// arrive on its own -- this bounds that wait instead of blocking forever.
+const POST_EXIT_DRAIN: Duration = Duration::from_secs(2);
 
 const fn default_solver_timeout_ms() -> u64 {
     5 * 60 * 1000
@@ -785,44 +786,71 @@ const fn default_solver_output_limit() -> usize {
     1024 * 1024
 }
 
-fn capture_output<R: Read>(
-    mut reader: R,
-    limit: usize,
-    exceeded: Arc<AtomicBool>,
-) -> std::io::Result<Vec<u8>> {
-    let mut retained = Vec::with_capacity(limit.min(8192));
-    let mut buffer = [0u8; 8192];
-    loop {
-        let count = reader.read(&mut buffer)?;
-        if count == 0 {
-            break;
+/// Put a pipe file descriptor in non-blocking mode.
+///
+/// # Safety-relevant context (not `unsafe fn` -- the unsafety is contained)
+/// Calls `libc::fcntl` on `fd`, which must be a valid, open file
+/// descriptor for the duration of this call. Every caller in this module
+/// passes an `AsRawFd` borrow of a live `ChildStdout`/`ChildStderr` it
+/// owns, so this precondition always holds.
+///
+/// This crate is `#![deny(unsafe_code)]`; this is the one, tightly-scoped
+/// exception, needed because std has no safe API for putting an
+/// already-open pipe fd into non-blocking mode. Kept local to this single
+/// function (rather than reached via an external crate that wraps the
+/// same libc call) so the unsafety stays visible and auditable here
+/// instead of hidden behind a dependency boundary.
+#[allow(unsafe_code)]
+fn set_nonblocking(fd: std::os::fd::RawFd) -> std::io::Result<()> {
+    // SAFETY: `fd` is valid and open (see doc comment); `fcntl` with
+    // F_GETFL/F_SETFL cannot invalidate it or invoke UB on a valid fd.
+    unsafe {
+        let flags = libc::fcntl(fd, libc::F_GETFL, 0);
+        if flags < 0 {
+            return Err(std::io::Error::last_os_error());
         }
-        let keep = count.min(limit.saturating_sub(retained.len()));
-        retained.extend_from_slice(&buffer[..keep]);
-        if keep < count {
-            exceeded.store(true, Ordering::Relaxed);
+        if libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) < 0 {
+            return Err(std::io::Error::last_os_error());
         }
     }
-    Ok(retained)
+    Ok(())
 }
 
-fn receive_output(
-    receiver: mpsc::Receiver<std::io::Result<Vec<u8>>>,
-    stream: &str,
-    deadline: Instant,
-) -> Result<Vec<u8>, SimulationError> {
-    let remaining = deadline.saturating_duration_since(Instant::now());
-    match receiver.recv_timeout(remaining) {
-        Ok(Ok(output)) => Ok(output),
-        Ok(Err(error)) => Err(SimulationError::Adapter(format!(
-            "failed reading solver {stream}: {error}"
-        ))),
-        Err(mpsc::RecvTimeoutError::Timeout) => Err(SimulationError::Adapter(format!(
-            "solver {stream} remained open after the process exited"
-        ))),
-        Err(mpsc::RecvTimeoutError::Disconnected) => Err(SimulationError::Adapter(format!(
-            "solver {stream} reader terminated unexpectedly"
-        ))),
+/// Drain everything currently available from a non-blocking reader,
+/// retaining up to `limit` bytes total and discarding (but still
+/// consuming, so the pipe doesn't back up and block the writer) anything
+/// beyond that. Returns `Ok(true)` on EOF (the write end closed), `Ok(false)`
+/// if there was nothing more to read right now (`WouldBlock`), or `Err` on a
+/// real I/O error.
+///
+/// Deliberately synchronous/single-threaded: an earlier version of this
+/// function ran on a dedicated OS thread per stream so it could block on
+/// `read()`, but a solver that spawns a descendant inheriting its pipes
+/// could keep that thread blocked forever after the direct child exited --
+/// a slow, unbounded thread leak under repeated adversarial subprocess
+/// behavior. Polling a non-blocking fd from the same loop that polls
+/// `try_wait()` makes that leak structurally impossible: there is no
+/// blocking read left to leak a thread on.
+fn drain_nonblocking<R: Read>(
+    reader: &mut R,
+    buf: &mut Vec<u8>,
+    limit: usize,
+    exceeded: &mut bool,
+) -> std::io::Result<bool> {
+    let mut chunk = [0u8; 8192];
+    loop {
+        match reader.read(&mut chunk) {
+            Ok(0) => return Ok(true),
+            Ok(n) => {
+                let keep = n.min(limit.saturating_sub(buf.len()));
+                buf.extend_from_slice(&chunk[..keep]);
+                if keep < n {
+                    *exceeded = true;
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => return Ok(false),
+            Err(e) => return Err(e),
+        }
     }
 }
 
@@ -893,33 +921,90 @@ impl CommandSolver {
                 SimulationError::Adapter(format!("failed to spawn '{}': {e}", self.cmd))
             })?;
 
-        let stdout = child.stdout.take().ok_or_else(|| {
+        let mut stdout = child.stdout.take().ok_or_else(|| {
             SimulationError::Adapter(format!("failed to capture '{}' stdout", self.cmd))
         })?;
-        let stderr = child.stderr.take().ok_or_else(|| {
+        let mut stderr = child.stderr.take().ok_or_else(|| {
             SimulationError::Adapter(format!("failed to capture '{}' stderr", self.cmd))
         })?;
-        let output_exceeded = Arc::new(AtomicBool::new(false));
-        let (stdout_tx, stdout_rx) = mpsc::channel();
-        let (stderr_tx, stderr_rx) = mpsc::channel();
-        let stdout_exceeded = Arc::clone(&output_exceeded);
-        let stderr_exceeded = Arc::clone(&output_exceeded);
+        use std::os::fd::AsRawFd;
+        set_nonblocking(stdout.as_raw_fd()).map_err(|e| {
+            SimulationError::Adapter(format!(
+                "failed to set '{}' stdout non-blocking: {e}",
+                self.cmd
+            ))
+        })?;
+        set_nonblocking(stderr.as_raw_fd()).map_err(|e| {
+            SimulationError::Adapter(format!(
+                "failed to set '{}' stderr non-blocking: {e}",
+                self.cmd
+            ))
+        })?;
+
         let output_limit = self.max_output_bytes;
-        std::thread::spawn(move || {
-            let _ = stdout_tx.send(capture_output(stdout, output_limit, stdout_exceeded));
-        });
-        std::thread::spawn(move || {
-            let _ = stderr_tx.send(capture_output(stderr, output_limit, stderr_exceeded));
-        });
+        let mut stdout_buf = Vec::with_capacity(output_limit.min(8192));
+        let mut stderr_buf = Vec::with_capacity(output_limit.min(8192));
+        let mut stdout_exceeded = false;
+        let mut stderr_exceeded = false;
+        let mut stdout_eof = false;
+        let mut stderr_eof = false;
 
         let started = Instant::now();
         let timeout = Duration::from_millis(self.timeout_ms);
         let mut timed_out = false;
         let mut killed_for_output = false;
+
+        // Draining both streams alongside polling try_wait() (rather than on
+        // dedicated blocking-read threads) keeps the child's pipes from
+        // filling up and blocking its writes without ever risking a thread
+        // stuck on a read that a lingering grandchild process could hold
+        // open indefinitely -- see drain_nonblocking's doc comment.
+        macro_rules! drain_both {
+            () => {{
+                if !stdout_eof {
+                    match drain_nonblocking(
+                        &mut stdout,
+                        &mut stdout_buf,
+                        output_limit,
+                        &mut stdout_exceeded,
+                    ) {
+                        Ok(eof) => stdout_eof = eof,
+                        Err(e) => {
+                            let _ = child.kill();
+                            let _ = child.wait();
+                            return Err(SimulationError::Adapter(format!(
+                                "failed reading '{}' stdout: {e}",
+                                self.cmd
+                            )));
+                        }
+                    }
+                }
+                if !stderr_eof {
+                    match drain_nonblocking(
+                        &mut stderr,
+                        &mut stderr_buf,
+                        output_limit,
+                        &mut stderr_exceeded,
+                    ) {
+                        Ok(eof) => stderr_eof = eof,
+                        Err(e) => {
+                            let _ = child.kill();
+                            let _ = child.wait();
+                            return Err(SimulationError::Adapter(format!(
+                                "failed reading '{}' stderr: {e}",
+                                self.cmd
+                            )));
+                        }
+                    }
+                }
+            }};
+        }
+
         let status = loop {
+            drain_both!();
             match child.try_wait() {
                 Ok(Some(status)) => break status,
-                Ok(None) if output_exceeded.load(Ordering::Relaxed) => {
+                Ok(None) if stdout_exceeded || stderr_exceeded => {
                     killed_for_output = true;
                     let _ = child.kill();
                     break child.wait().map_err(|e| {
@@ -952,10 +1037,16 @@ impl CommandSolver {
         };
 
         // A solver can spawn descendants that inherit its pipes. Do not let
-        // those descendants make this API wait forever after the child exits.
-        let capture_deadline = Instant::now() + Duration::from_secs(2);
-        let stdout = receive_output(stdout_rx, "stdout", capture_deadline)?;
-        let stderr = receive_output(stderr_rx, "stderr", capture_deadline)?;
+        // those descendants make this API wait forever after the child
+        // exits -- drain for a bounded window and then stop, regardless of
+        // whether EOF ever arrives.
+        let capture_deadline = Instant::now() + POST_EXIT_DRAIN;
+        while Instant::now() < capture_deadline && (!stdout_eof || !stderr_eof) {
+            drain_both!();
+            if !stdout_eof || !stderr_eof {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        }
 
         if timed_out {
             return Err(SimulationError::Adapter(format!(
@@ -963,7 +1054,7 @@ impl CommandSolver {
                 self.cmd, self.timeout_ms
             )));
         }
-        if killed_for_output || output_exceeded.load(Ordering::Relaxed) {
+        if killed_for_output || stdout_exceeded || stderr_exceeded {
             return Err(SimulationError::Adapter(format!(
                 "'{}' exceeded the {} byte per-stream output limit",
                 self.cmd, self.max_output_bytes
@@ -975,11 +1066,11 @@ impl CommandSolver {
                 "'{}' exited with {}: {}",
                 self.cmd,
                 status,
-                String::from_utf8_lossy(&stderr)
+                String::from_utf8_lossy(&stderr_buf)
             )));
         }
 
-        Ok(String::from_utf8_lossy(&stdout).into_owned())
+        Ok(String::from_utf8_lossy(&stdout_buf).into_owned())
     }
 }
 

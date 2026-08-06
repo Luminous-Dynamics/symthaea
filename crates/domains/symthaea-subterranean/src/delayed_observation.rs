@@ -217,9 +217,7 @@ impl DelayedObservationSupervisor {
             ObservationAgeDisposition::HistoricalOnly => {
                 self.historical_only = self.historical_only.saturating_add(1)
             }
-            ObservationAgeDisposition::Rejected => {
-                self.rejected = self.rejected.saturating_add(1)
-            }
+            ObservationAgeDisposition::Rejected => self.rejected = self.rejected.saturating_add(1),
         }
         assessment
     }
@@ -296,11 +294,11 @@ mod tests {
     #[test]
     fn old_mapping_data_remains_historical_but_not_control_authority() {
         let mut supervisor = DelayedObservationSupervisor::default();
-        let result = supervisor.assess_one(
-            1_250,
-            observation(ObservationPurpose::Mapping, 1_000),
+        let result = supervisor.assess_one(1_250, observation(ObservationPurpose::Mapping, 1_000));
+        assert_eq!(
+            result.disposition,
+            ObservationAgeDisposition::HistoricalOnly
         );
-        assert_eq!(result.disposition, ObservationAgeDisposition::HistoricalOnly);
         assert!(!result.immediate_control_allowed());
         assert!(result.historical_use_allowed());
     }

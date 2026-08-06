@@ -35,23 +35,23 @@ cargo test -p symthaea-core --test fol_ext_stability_verification
 
 echo ""
 echo "5. Running Phase 2.7 — Active Inference / Epistemic Modulation Tests..."
-cargo test -p symthaea-nix --lib "mind::active_inference"
+cargo test -p nixward --lib "mind::active_inference"
 
 echo ""
 echo "6. Running Phase 2.8 — Causal Graph Hardening Tests..."
-cargo test -p symthaea-nix --lib "mind::causal_graph"
+cargo test -p nixward --lib "mind::causal_graph"
 
 echo ""
 echo "7. Running Phase 2.8 — Drift Detection Hardening Tests..."
-cargo test -p symthaea-nix --lib "mind::hdc_world_model"
+cargo test -p nixward --lib "mind::hdc_world_model"
 
 echo ""
 echo "8. Running Phase 2.9-A — World Model Transition Tests..."
-cargo test -p symthaea-nix --lib "mind::world_model"
+cargo test -p nixward --lib "mind::world_model"
 
 echo ""
 echo "9. Running Phase 2.9-C — End-to-End Cross-Layer Integration Harness..."
-cargo test -p symthaea-nix --test sensor_drift_causal_action_integration
+cargo test -p nixward --test sensor_drift_causal_action_integration
 
 echo ""
 echo "=== LTC Runtime Hardening Validation: SUCCESS ==="

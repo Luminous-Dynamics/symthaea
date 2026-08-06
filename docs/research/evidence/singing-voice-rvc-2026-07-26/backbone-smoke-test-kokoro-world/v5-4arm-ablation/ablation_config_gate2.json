@@ -1,0 +1,14 @@
+{
+  "phrases": [
+    {
+      "id": "consonant_clusters",
+      "text": "strong streams splashed strangely",
+      "melody_hz": [
+        261.63,
+        293.66,
+        329.63,
+        392.0
+      ]
+    }
+  ]
+}

@@ -410,28 +410,17 @@ impl CognitiveLoopService {
             }
         }
 
-        // ── Knowledge → Episodic memory bridge ───────────────────────────
-        // Promote high-confidence facts to episodic memory during dreams.
-        // Science: Tse et al. (2007) — schema-consistent facts consolidate rapidly
-        if let Some(ref km) = self.memory.knowledge_manager {
-            if let Some(ref mut bus) = self.experience_bus {
-                let signals = km.signals();
-                if signals.relevance > 0.3 {
-                    let top_facts =
-                        km.top_facts(super::super::thresholds::KNOWLEDGE_EPISODIC_MAX_PER_DREAM);
-                    for fact_text in &top_facts {
-                        let mut memory = crate::experience::EpisodicMemory::new(
-                            &format!("knowledge_fact_{}", self.stats.total_cycles),
-                            fact_text,
-                        );
-                        memory.salience =
-                            super::super::thresholds::KNOWLEDGE_EPISODIC_SALIENCE_BOOST;
-                        memory.prediction_error = 0.1;
-                        bus.record_experience(memory);
-                    }
-                }
-            }
-        }
+        // ── Knowledge → Episodic memory bridge: REMOVED (Reconciliation Plan Phase 3,
+        // 2026-07-28) ──────────────────────────────────────────────────────────────
+        // This used to promote high-confidence facts into `experience::memory::
+        // ExperienceRecord` (formerly name-colliding `EpisodicMemory`) during dreams, but that
+        // store had zero read consumers anywhere in the live cognitive loop — confirmed via
+        // `ExperienceBus::generate_with_experience`'s doc comment, the only reader, having
+        // zero callers. Removed rather than left computing-and-discarding real work (BLAKE3-
+        // adjacent fact promotion) on every dream cycle where `signals.relevance > 0.3`. The
+        // real episodic→semantic consolidation path is "Item 7" immediately below, which reads
+        // from the canonical `MemoryCoordinator`/`episodic_replay::EpisodicMemory` system, not
+        // this removed block — the two were unrelated despite similar naming.
 
         // ── Item 7: Episodic → semantic promotion ────────────────────────────
         // When episodic memories survive 3+ dream replays (tracked via coordinator

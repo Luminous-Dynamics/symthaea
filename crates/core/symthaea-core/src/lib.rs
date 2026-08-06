@@ -81,6 +81,9 @@ pub mod math;
 /// Metrics, tracing, and introspection.
 #[allow(missing_docs)]
 pub mod observability;
+/// Narrow Tier-1 observation contract for evidence-gathering consumers (CognitiveObservation).
+#[allow(missing_docs)]
+pub mod observation;
 /// Integrated Information (Phi) calculation engine.
 #[allow(missing_docs)]
 pub mod phi_engine;

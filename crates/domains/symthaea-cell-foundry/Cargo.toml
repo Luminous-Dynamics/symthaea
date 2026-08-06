@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Cell culture control, iPSC reprogramming, IVG, and SCNT with HDC + LTC multi-scale prediction"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["cell-culture", "ipsc", "hdc", "ivg", "stem-cells"]
 categories = ["science", "algorithms"]
 

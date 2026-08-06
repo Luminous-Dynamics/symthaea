@@ -24,6 +24,11 @@ use symthaea_core::hdc::ContinuousHV;
 
 use crate::types::{PatchGrid, ScaleHealth, VisionConfig};
 
+/// `(blended_hv, per_scale_hvs, per_scale_patches)` -- the result of a checked multi-scale
+/// frame encode. Named per clippy's `type_complexity` suggestion (reused at two call sites).
+type MultiScaleEncodeResult =
+    Result<(ContinuousHV, Vec<ContinuousHV>, Vec<Vec<ContinuousHV>>), String>;
+
 /// Confidence-aware per-patch stereo reconstruction.
 #[derive(Debug, Clone, PartialEq)]
 pub struct StereoDepthEstimate {
@@ -438,6 +443,10 @@ impl PatchHdcEncoder {
     /// Color features (+2 if enabled): [mean_cb, mean_cr]
     ///
     /// All values normalized to [0, 1].
+    // Genuinely needs this many parameters: the raw frame buffer plus its geometry
+    // (width/height/channels), the patch coordinates within it, and two cross-frame/
+    // cross-modal inputs (prev_mean_lum, depth_override) that only this call site has.
+    #[allow(clippy::too_many_arguments)]
     fn extract_patch_features(
         &self,
         pixels: &[u8],
@@ -1039,7 +1048,7 @@ impl MultiScaleEncoder {
         width: u32,
         height: u32,
         channels: usize,
-    ) -> Result<(ContinuousHV, Vec<ContinuousHV>, Vec<Vec<ContinuousHV>>), String> {
+    ) -> MultiScaleEncodeResult {
         self.validate_frame_input(pixels, width, height, channels)?;
         Ok(self.encode_frame(pixels, width, height, channels))
     }
@@ -1161,7 +1170,7 @@ impl MultiScaleEncoder {
         height: u32,
         channels: usize,
         per_scale_surprise: Option<&[f32]>,
-    ) -> Result<(ContinuousHV, Vec<ContinuousHV>, Vec<Vec<ContinuousHV>>), String> {
+    ) -> MultiScaleEncodeResult {
         self.validate_frame_input(pixels, width, height, channels)?;
         if let Some(surprise) = per_scale_surprise {
             if surprise.len() != self.encoders.len() {

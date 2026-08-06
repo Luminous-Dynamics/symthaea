@@ -1,0 +1,39 @@
+{
+  "phrases": [
+    {
+      "id": "phrase_final_stops",
+      "text": "turn off the light and lock it",
+      "melody_hz": [
+        261.63,
+        293.66,
+        329.63,
+        392.0,
+        440.0,
+        261.63,
+        293.66
+      ]
+    },
+    {
+      "id": "fricative_heavy",
+      "text": "she sells seashells by the seashore",
+      "melody_hz": [
+        261.63,
+        293.66,
+        329.63,
+        392.0,
+        440.0,
+        261.63
+      ]
+    },
+    {
+      "id": "consonant_clusters",
+      "text": "strong streams splashed strangely",
+      "melody_hz": [
+        261.63,
+        293.66,
+        329.63,
+        392.0
+      ]
+    }
+  ]
+}

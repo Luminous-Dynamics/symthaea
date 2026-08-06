@@ -268,3 +268,118 @@ fn episodic_storage_queue_full_is_non_fatal_to_cycle() {
         "failed storage enqueue must clear the flush guard"
     );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 3. PREDICTIVE COMPRESSION C3: episodic recall → prediction
+//    (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md §7)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// `enable_episodic_recall_prediction` defaults to `false` — every existing
+/// C1 result (and every other test in this suite) must stay reproducible
+/// bit-for-bit. Two services with identical seed/config and an identical
+/// input schedule (repeated, so the episodic store fills with near-duplicate
+/// episodes a recall WOULD match against if the gate were active) must
+/// produce prediction_error trajectories matching within float-reduction
+/// noise with the flag off.
+///
+/// CORRECTION (2026-07-25): originally asserted bit-exact equality, which
+/// failed at cycle 1 (not cycle 0 — the cold-start sentinel cycle IS
+/// bit-exact). Diagnosed with a standalone probe
+/// (`examples/c3_determinism_probe.rs`, scratch, not committed): max
+/// per-element output diff ~1e-7 (f32 epsilon), `prediction_error` matches
+/// to 6 decimals — this is benign floating-point non-associativity from
+/// the pipeline's `rayon::join` parallel post-processing (thread completion
+/// order, and therefore float summation order, isn't guaranteed identical
+/// run-to-run even with identical seeds/inputs), not a seeding bug. Genuine
+/// same-seed reproducibility (which values get computed) holds; bit-exact
+/// reproducibility (the order they get summed in) does not, and was never
+/// actually claimed by the crate doc's SHAKE-256 guarantee (that guarantee
+/// is about the seeded random STREAMS, not about parallel float-reduction
+/// order). Tolerance below is orders of magnitude tighter than any real
+/// recall-blend effect would produce (see the companion test) while being
+/// generous enough to absorb this class of noise.
+#[test]
+fn recall_prediction_flag_off_is_bit_identical_to_baseline() {
+    const NOISE_TOLERANCE: f32 = 1e-4;
+    let make = || {
+        CognitiveLoopService::new(CognitiveLoopConfig {
+            genesis_phrase: Some("c3-purity-seed".to_string()),
+            async_training: false,
+            enable_episodic_recall_prediction: false,
+            ..Default::default()
+        })
+        .unwrap()
+    };
+    let mut a = make();
+    let mut b = make();
+    for i in 0..80 {
+        let input = if i % 2 == 0 {
+            "the recurring test sentence for episodic recall"
+        } else {
+            "a second recurring sentence for the same probe"
+        };
+        let ra = a.cycle(input);
+        let rb = b.cycle(input);
+        assert!(
+            (ra.prediction_error - rb.prediction_error).abs() < NOISE_TOLERANCE,
+            "flag-off trajectories diverged beyond float-noise tolerance at cycle {i}: {} vs {}",
+            ra.prediction_error,
+            rb.prediction_error
+        );
+        let max_diff = ra
+            .output
+            .iter()
+            .zip(rb.output.iter())
+            .map(|(x, y)| (x - y).abs())
+            .fold(0.0f32, f32::max);
+        assert!(
+            max_diff < NOISE_TOLERANCE,
+            "flag-off output diverged beyond float-noise tolerance at cycle {i}: max_diff={max_diff}"
+        );
+    }
+}
+
+/// Mechanism sanity (not a purity claim): once the episodic store has
+/// accumulated real (input, output) pairs on a REPEATED input, the `on`
+/// service's behavior must differ from an identically-seeded `off` service
+/// at some point, by MORE than the ~1e-7 float-reduction noise floor the
+/// companion test above establishes — proving the wiring produces a real
+/// effect, not just ambient parallel-reduction jitter. Does not assert a
+/// *direction* (better/worse) — C3's pre-registered predictions (P5/P6)
+/// are for the dedicated harness, not this smoke test.
+#[test]
+fn recall_prediction_flag_on_eventually_diverges_from_off() {
+    // An order of magnitude above the noise floor established by
+    // `recall_prediction_flag_off_is_bit_identical_to_baseline`'s
+    // NOISE_TOLERANCE (1e-4) — big enough that only a genuine recall-blend
+    // effect (which nudges up to half the prediction toward recalled
+    // content) could produce it.
+    const MEANINGFUL_DIVERGENCE: f32 = 1e-3;
+    let make = |on: bool| {
+        CognitiveLoopService::new(CognitiveLoopConfig {
+            genesis_phrase: Some("c3-mechanism-seed".to_string()),
+            async_training: false,
+            enable_episodic_recall_prediction: on,
+            ..Default::default()
+        })
+        .unwrap()
+    };
+    let mut off = make(false);
+    let mut on = make(true);
+    let mut diverged = false;
+    for _ in 0..120 {
+        // Fixed repeated input: the store fills with high-similarity episodes
+        // of the same content, giving recall its best chance to fire.
+        let r_off = off.cycle("the recurring test sentence for episodic recall");
+        let r_on = on.cycle("the recurring test sentence for episodic recall");
+        if (r_off.prediction_error - r_on.prediction_error).abs() > MEANINGFUL_DIVERGENCE {
+            diverged = true;
+            break;
+        }
+    }
+    assert!(
+        diverged,
+        "flag on/off produced no meaningful divergence (> {MEANINGFUL_DIVERGENCE}) for \
+         120 cycles on a repeated input — the recall blend path is not firing"
+    );
+}

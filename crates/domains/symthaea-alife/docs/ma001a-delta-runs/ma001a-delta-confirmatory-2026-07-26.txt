@@ -1,0 +1,30 @@
+MA-001A-delta -- population=100, total_ticks=1200, burn_in=300, shuffle_epoch=100
+
+=== Ecological viability gate + calibration (seed 9999) ===
+Reference (original MA-001A, default learning): Bound alive=98 Shuffled alive=98 NoHistory alive=100
+
+Bound:     mean=0.0024 eligible=100 alive=100
+Shuffled:  mean=0.0024 eligible=100 alive=100
+NoHistory: mean=0.0025 eligible=100 alive=100
+Viability check (>=90% alive in all 3 conditions): PASS
+
+Calibrated margin (delta rule, freshly calibrated, NOT reused from MA-001A's original 0.0001) = 2 x |Shuffled - NoHistory| = 2 x 0.0000 = 0.0000
+
+=== Confirmatory MA-001A-delta (seeds 1..=10) ===
+seed  1: Bound=0.0024 (n=100) Shuffled=0.0024 (n=100) NoHistory=0.0024 (n=100) gap=-0.0000 fail
+seed  2: Bound=0.0024 (n=100) Shuffled=0.0024 (n=100) NoHistory=0.0024 (n=100) gap=-0.0000 fail
+seed  3: Bound=0.0024 (n=100) Shuffled=0.0024 (n=100) NoHistory=0.0025 (n=100) gap=-0.0000 fail
+seed  4: Bound=0.0024 (n=100) Shuffled=0.0024 (n=100) NoHistory=0.0025 (n=100) gap=-0.0000 fail
+seed  5: Bound=0.0024 (n=100) Shuffled=0.0024 (n=100) NoHistory=0.0025 (n=100) gap=-0.0000 fail
+seed  6: Bound=0.0024 (n=100) Shuffled=0.0024 (n=100) NoHistory=0.0025 (n=100) gap=-0.0000 fail
+seed  7: Bound=0.0024 (n=100) Shuffled=0.0024 (n=100) NoHistory=0.0025 (n=100) gap=-0.0000 fail
+seed  8: Bound=0.0024 (n=100) Shuffled=0.0024 (n=100) NoHistory=0.0024 (n=100) gap=-0.0000 fail
+seed  9: Bound=0.0024 (n=100) Shuffled=0.0024 (n=100) NoHistory=0.0024 (n=100) gap=-0.0000 fail
+seed 10: Bound=0.0024 (n=100) Shuffled=0.0024 (n=100) NoHistory=0.0024 (n=100) gap=-0.0000 fail
+Primary comparison: 0/10 seeds pass (gap >= calibrated margin 0.0000)
+
+=== Swap intervention (Bound, swap at tick 600, delta-rule mechanism) ===
+Across 10 seeds x 100 organisms: history-following=27, identity-following=15, ambiguous=203, ineligible=755 (of 245 classifiable)
+
+=== Interpretation ===
+NULL or ARCHITECTURE LIMITATION -- despite the validated delta rule, population-scale free-choice policy still does not differentiate by partner history. This would mean MA-001A's original null was NOT (fully) explained by the learning-rule limitation MA-001R/L/R-delta diagnosed; some other population-scale factor (ecology, free action selection under real EFE competition, or something not yet identified) is the actual bottleneck. See the plan's §7 addendum.

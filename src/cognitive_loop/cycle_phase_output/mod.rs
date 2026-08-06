@@ -470,7 +470,9 @@ impl CognitiveLoopService {
                     let msg = symthaea_swarm::SwarmStateMsg {
                         node_id: id,
                         platform_type:
-                            symtropy_robotics_bridge_core::platform::PlatformType::default(),
+                            symtropy_robotics_bridge_core::platform::PlatformType::default()
+                                .name()
+                                .to_string(),
                         local_phi: phi,
                         consciousness_hv: hv,
                         intent_hv: intent,
@@ -565,6 +567,9 @@ impl CognitiveLoopService {
             bits_saved_persist: perception.encoding.encoding_result.bits_saved_persist,
             bits_saved_zero: perception.encoding.encoding_result.bits_saved_zero,
             bits_kappa: perception.encoding.encoding_result.bits_kappa,
+            recall_fired: dynamics.core.recall_fired,
+            recall_similarity: dynamics.core.recall_similarity,
+            recall_matched_timestamp: dynamics.core.recall_matched_timestamp,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             metadata,
             thought_vector,

@@ -7,18 +7,13 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Psychological benchmark suite for Symthaea — WorM, CogBench, Butlin indicators, ToMBench, MemoryAgentBench"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["psychology", "benchmarks", "consciousness", "neuroscience", "cognitive-science"]
 categories = ["science", "algorithms"]
 
 [features]
 default = []
-# [standalone-stripped] `dep:symthaea` removed. The `symthaea` path dependency is stripped
-# from the standalone export (see the commented line in [dependencies] below), and Cargo
-# rejects outright a feature that references a dependency which does not exist — failing
-# `cargo metadata` for the WHOLE workspace before anything compiles. The feature stays
-# declared so downstream references still resolve; it simply cannot enable the backend here.
-symthaea-backend = ["symthaea-core/ctc_wiring"]
+symthaea-backend = ["symthaea-core/ctc_wiring", "dep:symthaea"]
 neuroevolution = ["dep:symthaea-neuroevolution"]
 neural_validation = ["symthaea-core/neural_validation"]  # TRIBE v2 fMRI comparison benchmark
 nuclear-benchmarks = ["dep:symthaea-nuclear"]            # Nuclear physics science benchmarks
@@ -26,8 +21,9 @@ materials-benchmarks = ["dep:symthaea-materials"]        # Materials design scie
 science-benchmarks = ["nuclear-benchmarks", "materials-benchmarks"]
 
 [dependencies]
-# [standalone-stripped] symthaea = { path = "../../..", optional = true }
+symthaea = { path = "../../..", optional = true }
 symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-evidence-plane = { path = "../../core/symthaea-evidence-plane" }
 symthaea-fep = { path = "../../core/symthaea-fep" }
 symthaea-ssm = { path = "../symthaea-ssm" }
 symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }

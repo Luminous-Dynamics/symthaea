@@ -12,8 +12,89 @@ use super::super::phase_results::PerceptionPhaseResult;
 #[cfg(feature = "cpg")]
 use super::super::thresholds::CPG_SYNC_TAU_FLOOR;
 use super::super::thresholds::*;
+use super::super::types::{EffectiveDimSource, RecurrentMaskEvent};
 
 impl CognitiveLoopService {
+    /// Apply a fixed-suffix lesion to the CfC recurrent state and record what
+    /// happened.
+    ///
+    /// **This is not a compute optimization.** The caller has already run
+    /// `temporal_network.step()` at full width; this reads the resulting state,
+    /// zeroes a trailing `(1 − frac)` of it, and re-injects. A fraction below
+    /// 1.0 costs a read, a scan, and an inject *on top of* an unchanged step.
+    /// `mask_overhead_us` exists to make that cost visible, not to claim a
+    /// saving. See [`RecurrentMaskEvent`].
+    ///
+    /// `applied >= 1.0` is an exact no-op: nothing is read, written, or injected.
+    ///
+    /// `requested` is what the calling controller asked for; `applied` is what
+    /// actually set the mask boundary. They differ when a controller's request
+    /// is overridden by another — at the spectral site the two fractions are
+    /// combined with `max`, so a more aggressive request can be softened by the
+    /// substrate fraction. Recording both keeps that visible.
+    fn apply_recurrent_mask(
+        &mut self,
+        requested: f32,
+        applied: f32,
+        source: EffectiveDimSource,
+        step_duration_us: u64,
+    ) -> RecurrentMaskEvent {
+        let mut event = RecurrentMaskEvent {
+            requested_fraction: requested,
+            applied_fraction: applied,
+            source,
+            executed: false,
+            step_duration_us,
+            ..Default::default()
+        };
+        let frac = applied;
+        if frac >= 1.0 {
+            return event;
+        }
+
+        let t_mask = Instant::now();
+        match self.temporal_network.read_state() {
+            Ok(mut state) => {
+                // Bound in a `match` rather than `unwrap_or(&mut [])` so no
+                // temporary needs to outlive the borrow.
+                match state.as_slice_mut() {
+                    Some(slice) => {
+                        let dims_total = slice.len();
+                        // Always the same trailing dimensions — the surviving
+                        // prefix was never trained to absorb what the suffix
+                        // carried.
+                        let mask_start = ((frac * dims_total as f32) as usize).min(dims_total);
+                        event.pre_mask_norm = slice.iter().map(|v| v * v).sum::<f32>().sqrt();
+                        for h in slice[mask_start..].iter_mut() {
+                            *h = 0.0;
+                        }
+                        event.post_mask_norm = slice.iter().map(|v| v * v).sum::<f32>().sqrt();
+                        event.dims_total = dims_total;
+                        event.dims_zeroed = dims_total - mask_start;
+                        event.executed = true;
+                    }
+                    None => {
+                        tracing::warn!(?source, "recurrent state is not contiguous — mask skipped");
+                    }
+                }
+                if event.executed {
+                    if let Err(e) = self.temporal_network.inject(&state) {
+                        tracing::warn!(err = %e, ?source, "recurrent mask inject failed");
+                        event.executed = false;
+                    }
+                }
+            }
+            _ => {
+                tracing::warn!(
+                    ?source,
+                    "CfC read_state failed during recurrent mask — skipping"
+                );
+            }
+        }
+        event.mask_overhead_us = t_mask.elapsed().as_micros() as u64;
+        event
+    }
+
     /// Semantic memory lookup, CfC temporal step, multi-scale prediction,
     /// uncertainty decomposition, and hierarchical world model update.
     ///
@@ -313,42 +394,38 @@ impl CognitiveLoopService {
             }
             self.train_history_snapshots.push_back(backup);
         }
+        let _t_step = Instant::now();
         if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
             tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");
         }
+        // The step is full-width regardless of any dimension fraction below.
+        // Recorded so the absence of a compute saving is observable, not assumed.
+        let step_duration_us = _t_step.elapsed().as_micros() as u64;
 
         // Phase 3: Scale-limited CfC hidden state masking.
-        // When substrate has fewer computational units than biological (negative
-        // scale_pressure), mask out a fraction of hidden state dimensions.
+        //
+        // NOT compute-efficient adaptive dimensionality. This is a fixed-suffix
+        // lesion applied AFTER the full-width step above: read the state, zero a
+        // contiguous tail, re-inject. A fraction < 1.0 therefore costs strictly
+        // more than 1.0 — it can never save work. It is a capacity-restriction /
+        // regularization probe only; do not derive metabolic-efficiency claims
+        // from it. See `RecurrentMaskEvent` for the full contract.
+        //
         // Science: Berry & Srivastava (2018) — HDC capacity ~ D^(5/3).
-        if self.config.enable_substrate_encoding_noise {
+        if self.config.enable_recurrent_dim_masking {
             let frac = self.substrate_manager.effective_dim_fraction();
-            if frac < 1.0 {
-                match self.temporal_network.read_state() {
-                    Ok(mut state) => {
-                        let mask_start = (frac * state.len() as f32) as usize;
-                        for h in state.as_slice_mut().unwrap_or(&mut [])[mask_start..].iter_mut() {
-                            *h = 0.0;
-                        }
-                        if let Err(e) = self.temporal_network.inject(&state) {
-                            tracing::warn!(err = %e, "substrate mask inject failed");
-                        }
-                    }
-                    _ => {
-                        tracing::warn!(
-                            "CfC read_state failed during substrate mask — skipping mask"
-                        );
-                    }
-                }
-            }
+            let source = self.substrate_manager.effective_dim_source(&self.config);
+            let event = self.apply_recurrent_mask(frac, frac, source, step_duration_us);
+            self.substrate_manager.record_mask_event(event);
         }
 
         // ── Spectral entropy → CfC hidden state masking (Phase B) ───────────────
         // High spectral entropy means the CfC dynamics are too broadband — mask
         // out a fraction of dimensions to force focused processing.
         // Science: Buzsáki (2006) — broadband entropy constrains processing depth.
+        // Same lesion mechanism and same cost caveat as the substrate mask above.
         #[cfg(feature = "spectral_state")]
-        if self.config.enable_substrate_encoding_noise {
+        if self.config.enable_spectral_entropy_masking {
             let spectral_entropy = self.spectral_manager.telemetry().spectral_entropy;
             if spectral_entropy > super::super::thresholds::SPECTRAL_ENTROPY_THRESHOLD {
                 let overflow = (spectral_entropy
@@ -360,26 +437,18 @@ impl CognitiveLoopService {
                 // Don't over-mask: use the maximum of substrate and spectral fractions
                 let substrate_frac = self.substrate_manager.effective_dim_fraction();
                 let frac = substrate_frac.max(spectral_frac);
-                if frac < 1.0 {
-                    match self.temporal_network.read_state() {
-                        Ok(mut state) => {
-                            let mask_start = (frac * state.len() as f32) as usize;
-                            for h in
-                                state.as_slice_mut().unwrap_or(&mut [])[mask_start..].iter_mut()
-                            {
-                                *h = 0.0;
-                            }
-                            if let Err(e) = self.temporal_network.inject(&state) {
-                                tracing::warn!(err = %e, "spectral entropy mask inject failed");
-                            }
-                        }
-                        _ => {
-                            tracing::warn!(
-                                "CfC read_state failed during spectral entropy mask — skipping mask"
-                            );
-                        }
-                    }
-                }
+                // Attribute to whichever controller supplied the value that was
+                // actually applied. `max` keeps the *larger* (less aggressive)
+                // fraction, so the winner is the larger one — not the more
+                // aggressive request, which may have been softened away.
+                let source = if spectral_frac >= substrate_frac {
+                    EffectiveDimSource::SpectralEntropy
+                } else {
+                    self.substrate_manager.effective_dim_source(&self.config)
+                };
+                let event =
+                    self.apply_recurrent_mask(spectral_frac, frac, source, step_duration_us);
+                self.substrate_manager.record_mask_event(event);
             }
         }
 
@@ -393,7 +462,63 @@ impl CognitiveLoopService {
         // diagnostics (Predictive Compression Program P0) — the registered C1
         // metric uses this, not the multi-horizon average. None on the
         // fallback paths that return no per-horizon predictions.
+        let mut prediction = prediction;
         let prediction_first_horizon = raw_predictions.first().map(|p| p.to_vec());
+
+        // Predictive Compression Program C3 (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md
+        // §7): explicit content-based recall, gated OFF by default — every existing C1 result
+        // stays reproducible bit-for-bit with this flag off. When on, look up the top-1
+        // episode whose stored `input` is most similar to THIS cycle's attended encoding, and
+        // — only above a similarity floor — blend its stored `output` into the multi-scale
+        // prediction. The blend weight is capped at 0.5: recall can nudge the CfC's own
+        // state-based estimate, never override it.
+        // CORRECTION (2026-07-25): episodes store the COMPRESSED CfC
+        // input/output (same dimension as `prediction`), not the full
+        // attended HDV — query with `compressed_state`, and use the
+        // recalled episode's `output` directly, no re-compression needed.
+        //
+        // EMPIRICAL STATUS as of C3f (2026-07-26): six sub-experiments (C3b-C3f) found this
+        // blend net-neutral-to-harmful on every schedule tested, and the KEY finding is that
+        // which content gets harmed flips depending on schedule structure (tier count /
+        // interleaving / per-tier frequency) — not a stable property of the content. Do not
+        // enable in production or hand-tune this blend formula (e.g. discount by
+        // `Episode.replay_count`) without a fresh causal experiment across multiple schedules;
+        // any single-schedule "improvement" here is unvalidatable by construction. See
+        // PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md §C3f "Headline finding" for the full
+        // reasoning.
+        // Telemetry (measurement-only, mirrors the P0 bits_saved pattern): whether
+        // recall actually fired this cycle and at what similarity — the C3
+        // manipulation check ("hit rate > 0 by rep 30+") needs this to be
+        // observable from outside, since it's otherwise an internal fact.
+        let mut recall_fired = false;
+        let mut recall_similarity: Option<f32> = None;
+        // C3c (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C3c): which
+        // episode (by write-cycle number) was matched, if any — lets an external harness
+        // that already knows what each cycle number "was" look up the matched episode's
+        // provenance, testing whether recall on ambiguous content preferentially matches
+        // the wrong kind of stored episode.
+        let mut recall_matched_timestamp: Option<u64> = None;
+        if self.config.enable_episodic_recall_prediction
+            && let Some(ref replay) = self.memory.episodic_persistence.replay
+        {
+            let recalled =
+                replay.retrieve_by_input_similarity(&perception.encoding.compressed_state, 1);
+            if let Some((episode, sim)) = recalled.into_iter().next() {
+                recall_similarity = Some(sim);
+                recall_matched_timestamp = Some(episode.timestamp);
+                if sim >= super::super::thresholds::RECALL_BLEND_SIM_THRESHOLD
+                    && episode.output.values.len() == prediction.len()
+                {
+                    recall_fired = true;
+                    let w = ((sim - super::super::thresholds::RECALL_BLEND_SIM_THRESHOLD)
+                        / (1.0 - super::super::thresholds::RECALL_BLEND_SIM_THRESHOLD))
+                        .clamp(0.0, 0.5);
+                    for (p, r) in prediction.iter_mut().zip(episode.output.values.iter()) {
+                        *p = (1.0 - w) * *p + w * *r;
+                    }
+                }
+            }
+        }
 
         // 5a. JEPA: parallel latent-space prediction alongside CfC.
         // Uses the CfC input as "current state" and the multi-scale prediction
@@ -597,6 +722,9 @@ impl CognitiveLoopService {
             output,
             prediction,
             prediction_first_horizon,
+            recall_fired,
+            recall_similarity,
+            recall_matched_timestamp,
             prediction_coherence,
             epistemic_uncertainty,
             aleatoric_uncertainty,

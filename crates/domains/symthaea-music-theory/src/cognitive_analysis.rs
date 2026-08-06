@@ -331,9 +331,11 @@ mod tests {
     use super::*;
     use crate::harmony::Key;
     use crate::pitch::{Pitch, PitchClass};
+    use crate::score::PartId;
 
     fn note(pitch: Pitch, onset: Duration, duration: Duration, role: VoiceRole) -> ScoreNote {
         ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch,
             onset,
             duration,

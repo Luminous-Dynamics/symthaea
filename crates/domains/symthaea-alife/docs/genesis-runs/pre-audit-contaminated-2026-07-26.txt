@@ -1,0 +1,25 @@
+Genesis v0 exploratory run -- descriptive only, no hypothesis, no statistical claim.
+
+=== Genesis 0A: lifetime only (mutation_rate = 0.0) ===
+  0A Random seed= 1 | pop  16-> 20 births= 293 deaths= 289 | forage=0.340 rest=0.321 transfer=0.339 | given_total= 721.15 avg_partners=35.9 max_enc=  30 max_single_given=0.75
+  0A Random seed= 2 | pop  16-> 24 births= 300 deaths= 292 | forage=0.341 rest=0.319 transfer=0.340 | given_total= 724.38 avg_partners=26.5 max_enc=  17 max_single_given=0.35
+  0A Random seed= 3 | pop  16-> 22 births= 311 deaths= 305 | forage=0.342 rest=0.318 transfer=0.340 | given_total= 723.80 avg_partners=29.0 max_enc=  26 max_single_given=0.45
+  0A Random seed= 4 | pop  16-> 22 births= 300 deaths= 294 | forage=0.341 rest=0.317 transfer=0.342 | given_total= 723.95 avg_partners=27.8 max_enc=  20 max_single_given=0.45
+  0A Random seed= 5 | pop  16-> 22 births= 299 deaths= 293 | forage=0.340 rest=0.322 transfer=0.337 | given_total= 715.12 avg_partners=29.8 max_enc=  24 max_single_given=0.50
+  0A FixedPartners seed= 1 | pop  16-> 19 births= 218 deaths= 215 | forage=0.340 rest=0.323 transfer=0.336 | given_total= 287.46 avg_partners= 1.0 max_enc= 195 max_single_given=2.85
+  0A FixedPartners seed= 2 | pop  16-> 23 births= 224 deaths= 217 | forage=0.340 rest=0.322 transfer=0.338 | given_total= 279.26 avg_partners= 1.0 max_enc= 147 max_single_given=2.45
+  0A FixedPartners seed= 3 | pop  16-> 26 births= 211 deaths= 201 | forage=0.339 rest=0.323 transfer=0.338 | given_total= 288.90 avg_partners= 1.0 max_enc= 178 max_single_given=2.75
+  0A FixedPartners seed= 4 | pop  16-> 21 births= 214 deaths= 209 | forage=0.339 rest=0.323 transfer=0.338 | given_total= 291.78 avg_partners= 1.0 max_enc= 178 max_single_given=2.95
+  0A FixedPartners seed= 5 | pop  16-> 22 births= 211 deaths= 205 | forage=0.338 rest=0.324 transfer=0.338 | given_total= 280.01 avg_partners= 1.0 max_enc= 225 max_single_given=3.65
+
+=== Genesis 0B: evolution enabled (mutation_rate = 0.1) ===
+  0B Random seed= 1 | pop  16-> 24 births= 329 deaths= 321 | forage=0.339 rest=0.321 transfer=0.339 | given_total= 777.53 avg_partners=37.5 max_enc=  17 max_single_given=0.45
+  0B Random seed= 2 | pop  16-> 21 births= 340 deaths= 335 | forage=0.339 rest=0.322 transfer=0.339 | given_total= 779.07 avg_partners=41.0 max_enc=  23 max_single_given=0.55
+  0B Random seed= 3 | pop  16-> 25 births= 342 deaths= 333 | forage=0.340 rest=0.320 transfer=0.340 | given_total= 798.87 avg_partners=32.4 max_enc=  19 max_single_given=0.40
+  0B Random seed= 4 | pop  16-> 28 births= 320 deaths= 308 | forage=0.339 rest=0.320 transfer=0.341 | given_total= 768.75 avg_partners=34.5 max_enc=  29 max_single_given=0.40
+  0B Random seed= 5 | pop  16-> 25 births= 307 deaths= 298 | forage=0.341 rest=0.321 transfer=0.337 | given_total= 755.56 avg_partners=31.0 max_enc=  19 max_single_given=0.35
+  0B FixedPartners seed= 1 | pop  16-> 23 births= 227 deaths= 220 | forage=0.339 rest=0.323 transfer=0.338 | given_total= 294.49 avg_partners= 1.0 max_enc= 205 max_single_given=3.25
+  0B FixedPartners seed= 2 | pop  16-> 26 births= 232 deaths= 222 | forage=0.338 rest=0.324 transfer=0.338 | given_total= 312.93 avg_partners= 1.0 max_enc= 168 max_single_given=2.75
+  0B FixedPartners seed= 3 | pop  16-> 21 births= 223 deaths= 218 | forage=0.338 rest=0.323 transfer=0.338 | given_total= 320.13 avg_partners= 1.0 max_enc= 175 max_single_given=2.75
+  0B FixedPartners seed= 4 | pop  16-> 27 births= 216 deaths= 205 | forage=0.341 rest=0.322 transfer=0.337 | given_total= 292.85 avg_partners= 1.0 max_enc= 165 max_single_given=2.55
+  0B FixedPartners seed= 5 | pop  16-> 30 births= 231 deaths= 217 | forage=0.339 rest=0.323 transfer=0.338 | given_total= 296.25 avg_partners= 1.0 max_enc= 171 max_single_given=2.70

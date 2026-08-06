@@ -49,6 +49,18 @@ impl CognitiveLoopService {
         /// Get CfC state dimension
         pub fn cfc_state_dim(&self) -> usize { self.config.cfc_config.num_neurons }
 
+        /// Read-only snapshot of the CfC recurrent hidden state.
+        ///
+        /// Returns `None` when the temporal network cannot produce a contiguous
+        /// state. Added for characterizing the recurrent-dimension masking
+        /// lever: the mask always amputates the same trailing dimensions, so
+        /// judging its severity requires comparing that choice against leading
+        /// and random dimension subsets, which needs the raw vector rather than
+        /// the pre/post norms the mask event records.
+        pub fn cfc_state_snapshot(&self) -> Option<Vec<f32>> {
+            self.temporal_network.read_state().ok().map(|s| s.to_vec())
+        }
+
         /// Get HDC bridge dimension (returns None if using CfC backend)
         pub fn hdc_bridge_dim(&self) -> Option<usize> { self.temporal_network.hdc_dim() }
 
@@ -577,10 +589,59 @@ impl CognitiveLoopService {
         self.substrate_manager.reconfigure_region(region, substrate);
     }
 
-    /// Get the effective HDC/CfC dimensionality fraction [0.1, 1.0].
-    /// 1.0 for substrates at or above biological scale.
+    /// Get the effective HDC/CfC dimensionality fraction.
+    ///
+    /// `effective_dim_fraction_override` when set (permitting 0.0), otherwise
+    /// derived from substrate scale pressure and floored at
+    /// `SUBSTRATE_MIN_DIM_FRACTION`. 1.0 for substrates at or above biological
+    /// scale — which is the default, by two independent routes.
     pub fn substrate_effective_dim_fraction(&self) -> f32 {
         self.substrate_manager.effective_dim_fraction()
+    }
+
+    /// Set the effective-dimension-fraction override at runtime.
+    ///
+    /// Updates both the config and the substrate manager's validated mirror so
+    /// they cannot drift. `None` restores substrate-pressure derivation.
+    ///
+    /// Added for the actuator-bandwidth measurement: contracting and then
+    /// expanding within one service instance is the only way to measure how long
+    /// previously-masked dimensions take to be repopulated by the dynamics.
+    /// Expansion is not the inverse of contraction — restored dimensions re-enter
+    /// at exactly zero — so that recovery time bounds how fast any controller
+    /// built on this lever can actually act.
+    pub fn set_effective_dim_fraction_override(&mut self, frac: Option<f32>) {
+        self.config.effective_dim_fraction_override = frac;
+        self.substrate_manager.set_dim_fraction_override(frac);
+    }
+
+    /// Measurement-only probe: drive one FEP perceive → select_action → act step
+    /// with explicit `(prediction_error, coherence)` and return the selected
+    /// action index and its probability vector.
+    ///
+    /// This is a **probe, not a control surface**. It exists so an out-of-crate
+    /// harness can measure whether action selection responds to its own inputs
+    /// at all, independently of whether perception moves those inputs — which is
+    /// what makes a null attributable to the actuator rather than the channel.
+    /// It mutates FEP state exactly as the live path does, so callers wanting a
+    /// clean input→action map should use a fresh service per point.
+    ///
+    /// Note what the action space is before reading anything into the result:
+    /// all four actions adjust internal learning hyperparameters (learning rate,
+    /// sensory precision, exploration, trust). None acts on the world.
+    pub fn probe_fep_action(&mut self, prediction_error: f32, coherence: f32) -> (usize, Vec<f64>) {
+        let (idx, probs, _surprised, _pragmatic) =
+            self.step_fep_active_inference(prediction_error, coherence);
+        (idx, probs)
+    }
+
+    /// Which controller supplied `substrate_effective_dim_fraction()`.
+    ///
+    /// `Disabled` when no recurrent masking flag is set. This is the configured
+    /// provider; the controller that actually masked in a given cycle is
+    /// `CycleMetadata.substrate.recurrent_mask.source`.
+    pub fn substrate_effective_dim_source(&self) -> super::super::types::EffectiveDimSource {
+        self.substrate_manager.effective_dim_source(&self.config)
     }
 
     /// Get the substrate transition history log.

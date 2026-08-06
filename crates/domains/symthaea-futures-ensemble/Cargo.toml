@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-futures-ensemble"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Symthaea Futures Laboratory — the baseline hierarchy (persistence through oracle upper bound) and competing TrajectoryGenerator implementations. See SYMTHAEA_FUTURES_LABORATORY_PLAN_2026-07-25.md Phase 1 deliverables."
+
+[dependencies]
+symthaea-futures-core = { workspace = true }
+symthaea-futures-state = { workspace = true }
+symthaea-futures-symtropy = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+symthaea-futures-analysis = { workspace = true }
+symthaea-futures-calibration = { workspace = true }
+symthaea-futures-ledger = { workspace = true }
+symthaea-alife = { workspace = true }
+serde_json = { workspace = true }

@@ -13,6 +13,8 @@ use symthaea_core::hdc::substrate_independence::{
     CorticalRegion, SubstrateRequirements, SubstrateType,
 };
 
+use super::types::{EffectiveDimSource, RecurrentMaskEvent};
+
 use super::config::CognitiveLoopConfig;
 use super::thresholds::{
     SUBSTRATE_MIN_DIM_FRACTION, SUBSTRATE_OPS_PER_CYCLE, SUBSTRATE_SCALE_DIM_DIVISOR,
@@ -67,6 +69,15 @@ pub(crate) struct SubstrateManager {
     /// Scale pressure: log10(substrate_max_scale / bio_max_scale).
     /// Telemetry-only. 0.0 when speed modulation is disabled.
     pub(crate) scale_pressure: f32,
+
+    /// Mirror of `CognitiveLoopConfig::effective_dim_fraction_override`, already
+    /// validated and clamped to [0.0, 1.0]. Refreshed from config in `new()` and
+    /// `recompute_substrate_dynamics()` so it cannot drift.
+    pub(crate) dim_fraction_override: Option<f32>,
+
+    /// Most recent recurrent-mask event, recorded by the mask site and drained
+    /// by `telemetry()`.
+    pub(crate) last_mask_event: Option<RecurrentMaskEvent>,
 
     /// Whether consciousness is still viable under energy constraints.
     /// False when energy budget is exhausted.
@@ -131,6 +142,10 @@ impl SubstrateManager {
             effective_feasibility: feasibility,
             tau_factor: 1.0,
             scale_pressure: 0.0,
+            dim_fraction_override: Self::validate_dim_override(
+                config.effective_dim_fraction_override,
+            ),
+            last_mask_event: None,
             consciousness_viable: true,
             total_energy_spent: 0.0,
             energy_per_cycle,
@@ -282,6 +297,11 @@ impl SubstrateManager {
     /// Called after any substrate change and at startup.
     /// When a composition is set, weight-blends speed/scale from all components.
     pub fn recompute_substrate_dynamics(&mut self, config: &CognitiveLoopConfig) {
+        // Refresh before any early return: the override must hold even on the
+        // speed-modulation-disabled path, which zeroes scale_pressure.
+        self.dim_fraction_override =
+            Self::validate_dim_override(config.effective_dim_fraction_override);
+
         if !config.enable_substrate_speed_modulation {
             // Even without speed modulation, compute substrate-aware tau_factor
             // so that substrate type affects dynamics proportionally.
@@ -367,19 +387,95 @@ impl SubstrateManager {
         self.tau_factor += alpha * (self.target_tau_factor - self.tau_factor);
     }
 
-    /// Compute effective HDC/CfC dimensionality fraction for this substrate.
+    /// Validate and clamp a configured dimension-fraction override.
     ///
-    /// Returns 1.0 for substrates at or above biological scale (positive scale_pressure).
-    /// Returns < 1.0 for scale-constrained substrates (negative scale_pressure),
-    /// clamped to [SUBSTRATE_MIN_DIM_FRACTION, 1.0].
+    /// Out-of-range values are clamped to [0.0, 1.0] with a warning rather than
+    /// silently accepted — a fraction outside that range would index the mask
+    /// boundary out of the state slice.
+    pub(crate) fn validate_dim_override(raw: Option<f32>) -> Option<f32> {
+        let f = raw?;
+        if !f.is_finite() {
+            tracing::warn!(
+                value = f,
+                "effective_dim_fraction_override is not finite — ignoring override"
+            );
+            return None;
+        }
+        if !(0.0..=1.0).contains(&f) {
+            let clamped = f.clamp(0.0, 1.0);
+            tracing::warn!(
+                requested = f,
+                clamped,
+                "effective_dim_fraction_override out of [0.0, 1.0] — clamped"
+            );
+            return Some(clamped);
+        }
+        Some(f)
+    }
+
+    /// Compute effective HDC/CfC dimensionality fraction.
+    ///
+    /// Precedence:
+    /// 1. `effective_dim_fraction_override`, when set — used verbatim, and
+    ///    explicitly *not* floored at `SUBSTRATE_MIN_DIM_FRACTION`, so `0.0`
+    ///    (full lesion) is reachable as a negative control.
+    /// 2. Otherwise substrate scale pressure: 1.0 at or above biological scale
+    ///    (positive scale_pressure), else `< 1.0` clamped to
+    ///    [SUBSTRATE_MIN_DIM_FRACTION, 1.0].
+    ///
+    /// Note the default configuration reaches 1.0 by *two* independent routes:
+    /// `SiliconDigital` has positive scale pressure, and speed modulation being
+    /// off zeroes scale pressure outright. Both mean "no masking" — which is why
+    /// exercising this mechanism at all requires the override.
     ///
     /// Science: Berry & Srivastava (2018) — HDC capacity scales with D^(5/3).
     pub fn effective_dim_fraction(&self) -> f32 {
+        if let Some(f) = self.dim_fraction_override {
+            return f;
+        }
         if self.scale_pressure >= 0.0 {
             return 1.0;
         }
         (1.0 + self.scale_pressure / SUBSTRATE_SCALE_DIM_DIVISOR)
             .clamp(SUBSTRATE_MIN_DIM_FRACTION, 1.0)
+    }
+
+    /// Which controller supplied the value `effective_dim_fraction()` returns.
+    ///
+    /// This is the *configured* provider. The controller that actually applied a
+    /// mask in a given cycle is `RecurrentMaskEvent::source`, which can differ
+    /// (spectral entropy may dominate substrate pressure at the mask site).
+    /// Returns `Disabled` when recurrent masking is switched off entirely, since
+    /// in that case no fraction is applied to anything.
+    pub fn effective_dim_source(&self, config: &CognitiveLoopConfig) -> EffectiveDimSource {
+        if !config.enable_recurrent_dim_masking && !config.enable_spectral_entropy_masking {
+            return EffectiveDimSource::Disabled;
+        }
+        if self.dim_fraction_override.is_some() {
+            return EffectiveDimSource::FixedOverride;
+        }
+        EffectiveDimSource::SubstratePressure
+    }
+
+    /// Set the effective-dimension-fraction override at runtime.
+    ///
+    /// Validated and clamped identically to the construction path. Exists so a
+    /// harness can contract and then expand *within one service instance* —
+    /// measuring how long previously-masked dimensions take to be repopulated
+    /// by the dynamics. That recovery time bounds the usable bandwidth of any
+    /// controller built on this lever: expansion is not the inverse of
+    /// contraction, because restored dimensions re-enter at zero.
+    pub fn set_dim_fraction_override(&mut self, raw: Option<f32>) {
+        self.dim_fraction_override = Self::validate_dim_override(raw);
+    }
+
+    /// Record a recurrent-mask event from the site that performed (or skipped)
+    /// the mask. Drained by `telemetry()`.
+    ///
+    /// When both mask sites run in one cycle the later one supersedes; its
+    /// `source` field identifies which controller's fraction was actually used.
+    pub fn record_mask_event(&mut self, event: RecurrentMaskEvent) {
+        self.last_mask_event = Some(event);
     }
 
     /// Access the transition history log.
@@ -511,6 +607,8 @@ impl SubstrateManager {
             energy_this_cycle: self.last_energy_spent,
             energy_throughput_multiplier: self.energy_throughput_multiplier,
             effective_dim_fraction: self.effective_dim_fraction(),
+            effective_dim_source: self.effective_dim_source(config),
+            recurrent_mask: self.last_mask_event.take(),
             transition_count: self.transition_history.len(),
         }
     }

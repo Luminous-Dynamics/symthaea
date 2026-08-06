@@ -92,16 +92,25 @@ pub fn melodic_coherence(notes: &[Note]) -> f32 {
     normalized.clamp(0.0, 1.0)
 }
 
-// ─── Rhythmic Regularity ─────────────────────────────────────────────────────
+// ─── Onset Evenness ──────────────────────────────────────────────────────────
 
-/// Evaluate rhythmic regularity: consistency of note onset intervals.
+/// Evenness of note onset intervals: `1 − CV(IOI)`, clamped to [0, 1].
 ///
-/// Uses coefficient of variation (CV = σ/μ). A perfectly metronomic melody
-/// scores 1.0; completely random onsets score near 0.0.
+/// **This is not a quality score, and higher is not better.** 1.0 means
+/// perfectly metronomic; 0.0 means onsets with no detectable pulse. Good music
+/// lives in the middle, so the only sound way to use this is a *band*.
 ///
-/// Note: some rhythmic variation is desirable (humanization); this measures
-/// whether the music has a detectable pulse at all.
-pub fn rhythmic_regularity(notes: &[Note]) -> f32 {
+/// Renamed from `rhythmic_regularity` on 2026-07-31. The old name read as a
+/// virtue and was treated as one: `creative_regression.rs` gated it with a
+/// one-sided FLOOR of 0.78, which — measured against MAESTRO with this very
+/// function — **90% of real recorded performances would fail**. Repertoire
+/// sits at a median of 0.607 (5th–95th percentile 0.36–0.82 at the gate's
+/// unit); see `examples/rhythm_gate_calibration.rs`.
+///
+/// Not to be confused with `critic::MusicVerdict::rhythmic_regularity`, which
+/// is a *different, unfiltered* computation of the same idea — it has no
+/// median×3 section-gap filter, so the two do not agree on music with pauses.
+pub fn onset_evenness(notes: &[Note]) -> f32 {
     if notes.len() < 3 {
         return 0.5;
     }
@@ -378,7 +387,7 @@ pub struct CreativeQualityScore {
     /// Melodic coherence: tonal interval transition quality.
     pub melodic_coherence: f32,
     /// Rhythmic regularity: consistency of note onset intervals.
-    pub rhythmic_regularity: f32,
+    pub onset_evenness: f32,
     /// Emotional alignment with the target VA state.
     pub emotional_alignment: f32,
     /// Form compliance: structural density variation.
@@ -393,19 +402,19 @@ impl CreativeQualityScore {
         // Extract melody voice for melodic analysis (filters out bass/harmony)
         let melody = extract_melody(&composition.notes);
         let melodic_coherence = melodic_coherence(&melody);
-        let rhythmic_regularity = rhythmic_regularity(&melody);
+        let onset_evenness = onset_evenness(&melody);
         let emotional_alignment = emotional_alignment(composition, target_va);
         let form_compliance = form_compliance(composition);
 
         // Weighting: melodic coherence most important for musical quality
         let composite = 0.35 * melodic_coherence
-            + 0.25 * rhythmic_regularity
+            + 0.25 * onset_evenness
             + 0.25 * emotional_alignment
             + 0.15 * form_compliance;
 
         Self {
             melodic_coherence,
-            rhythmic_regularity,
+            onset_evenness,
             emotional_alignment,
             form_compliance,
             composite: composite.clamp(0.0, 1.0),
@@ -418,13 +427,13 @@ impl CreativeQualityScore {
             "Creative Quality Report\n\
              ═══════════════════════\n\
              Melodic Coherence:   {:.3} (interval transition quality)\n\
-             Rhythmic Regularity: {:.3} (pulse consistency)\n\
+             Onset Evenness:      {:.3} (pulse consistency)\n\
              Emotional Alignment: {:.3} (VA space proximity)\n\
              Form Compliance:     {:.3} (structural variation)\n\
              ─────────────────────\n\
              Composite Score:     {:.3}",
             self.melodic_coherence,
-            self.rhythmic_regularity,
+            self.onset_evenness,
             self.emotional_alignment,
             self.form_compliance,
             self.composite,
@@ -776,7 +785,7 @@ pub fn run_benchmark(config: &MuseConfig, state: &MusicalState) -> BenchmarkResu
     let n = scores.len() as f32;
     BenchmarkResult {
         mean_melodic_coherence: scores.iter().map(|s| s.melodic_coherence).sum::<f32>() / n,
-        mean_rhythmic_regularity: scores.iter().map(|s| s.rhythmic_regularity).sum::<f32>() / n,
+        mean_onset_evenness: scores.iter().map(|s| s.onset_evenness).sum::<f32>() / n,
         mean_emotional_alignment: scores.iter().map(|s| s.emotional_alignment).sum::<f32>() / n,
         mean_form_compliance: scores.iter().map(|s| s.form_compliance).sum::<f32>() / n,
         mean_composite: scores.iter().map(|s| s.composite).sum::<f32>() / n,
@@ -796,7 +805,7 @@ pub fn run_benchmark(config: &MuseConfig, state: &MusicalState) -> BenchmarkResu
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BenchmarkResult {
     pub mean_melodic_coherence: f32,
-    pub mean_rhythmic_regularity: f32,
+    pub mean_onset_evenness: f32,
     pub mean_emotional_alignment: f32,
     pub mean_form_compliance: f32,
     pub mean_composite: f32,
@@ -819,7 +828,7 @@ impl BenchmarkResult {
             "Creative Benchmark Results (n={})\n\
              ══════════════════════════════════\n\
              Melodic Coherence:   {:.3}\n\
-             Rhythmic Regularity: {:.3}\n\
+             Onset Evenness:      {:.3}\n\
              Emotional Alignment: {:.3}\n\
              Form Compliance:     {:.3}\n\
              ──────────────────────────────────\n\
@@ -832,7 +841,7 @@ impl BenchmarkResult {
              Spectral Centroid:   {:.0} Hz",
             self.n_compositions,
             self.mean_melodic_coherence,
-            self.mean_rhythmic_regularity,
+            self.mean_onset_evenness,
             self.mean_emotional_alignment,
             self.mean_form_compliance,
             self.mean_composite,
@@ -924,7 +933,7 @@ mod tests {
                 velocity: 0.8,
             })
             .collect();
-        let score = rhythmic_regularity(&notes);
+        let score = onset_evenness(&notes);
         assert!(
             score > 0.8,
             "perfectly regular rhythm should score high: {score}"
@@ -943,8 +952,8 @@ mod tests {
                 velocity: 0.7,
             })
             .collect();
-        let reg_score = rhythmic_regularity(&ascending_scale_notes());
-        let irr_score = rhythmic_regularity(&notes);
+        let reg_score = onset_evenness(&ascending_scale_notes());
+        let irr_score = onset_evenness(&notes);
         // Irregular should be lower (though both are valid)
         assert!(
             irr_score <= reg_score + 0.1,
@@ -1026,7 +1035,7 @@ mod tests {
         let score = CreativeQualityScore::evaluate(&comp, ValenceArousal::neutral());
         assert!(score.composite >= 0.0 && score.composite <= 1.0);
         assert!(score.melodic_coherence >= 0.0 && score.melodic_coherence <= 1.0);
-        assert!(score.rhythmic_regularity >= 0.0 && score.rhythmic_regularity <= 1.0);
+        assert!(score.onset_evenness >= 0.0 && score.onset_evenness <= 1.0);
         assert!(score.emotional_alignment >= 0.0 && score.emotional_alignment <= 1.0);
         assert!(score.form_compliance >= 0.0 && score.form_compliance <= 1.0);
     }
@@ -1842,7 +1851,7 @@ mod external_validation_tests {
             eprintln!(
                 "  Creative:  mel={:.3} rhy={:.3} emo={:.3} form={:.3} -> {:.3}",
                 creative.melodic_coherence,
-                creative.rhythmic_regularity,
+                creative.onset_evenness,
                 creative.emotional_alignment,
                 creative.form_compliance,
                 creative.composite

@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Hardware abstraction layer for Symthaea: PCA9685 servo control, I2C sensors, safety interlocks"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["robotics", "hal", "i2c", "servo", "embedded"]
 categories = ["embedded", "hardware-support"]
 

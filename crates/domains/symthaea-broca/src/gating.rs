@@ -1714,6 +1714,13 @@ pub struct CoherenceFeedback {
     enable_algebraic: bool,
     /// Correction strength for algebraic mode (0.0-1.0). Default 0.3.
     algebraic_strength: f32,
+    /// Number of [`CoherenceFeedback::update`] calls since the last [`CoherenceFeedback::reset`].
+    ///
+    /// Exists so callers can tell a *measured* coherence of 1.0 from the constructor's
+    /// initial 1.0 that was never overwritten. Those were indistinguishable before
+    /// 2026-07-28, and the recorded Jul-10 eval evidence reported `avg_coherence: 1.0`
+    /// unchanged across a ~9,870x perplexity regression with no way to tell which it was.
+    samples: usize,
 }
 
 impl CoherenceFeedback {
@@ -1731,7 +1738,36 @@ impl CoherenceFeedback {
             veto_threshold,
             enable_algebraic: false,
             algebraic_strength: 0.3,
+            samples: 0,
         }
+    }
+
+    /// Clear per-generation measurement state.
+    ///
+    /// Call at the start of every generation. `current_coherence` is a *running* value that
+    /// used to persist across generations: a generation that recorded no samples (e.g. EOS at
+    /// position 0) would silently report the previous generation's coherence, or — on the
+    /// first generation — the constructor's initial 1.0. Correction/veto tuning
+    /// (`threshold`, `veto_threshold`, `enable_algebraic`, `algebraic_strength`) is
+    /// configuration, not measurement, and is deliberately preserved.
+    pub fn reset(&mut self) {
+        self.current_coherence = 1.0;
+        self.veto_triggered = false;
+        self.samples = 0;
+    }
+
+    /// Number of coherence measurements taken since the last [`Self::reset`].
+    pub fn samples(&self) -> usize {
+        self.samples
+    }
+
+    /// Current coherence, or `None` if nothing has been measured since the last reset.
+    ///
+    /// Prefer this over [`Self::coherence`] when recording evidence: it makes "we measured
+    /// 1.0" and "we never measured" distinguishable, which is the distinction the Jul-10
+    /// eval artifacts could not express.
+    pub fn measured_coherence(&self) -> Option<f32> {
+        (self.samples > 0).then_some(self.current_coherence)
     }
 
     /// Enable algebraic coherence correction (Phase 2).
@@ -1786,6 +1822,7 @@ impl CoherenceFeedback {
         thought_hv: &symthaea_core::hdc::ContinuousHV,
     ) -> f32 {
         self.current_coherence = output_hv.similarity(thought_hv);
+        self.samples += 1;
         self.veto_triggered = self.current_coherence < self.veto_threshold;
 
         if self.current_coherence < self.threshold {
@@ -2167,6 +2204,95 @@ mod tests {
                 "Sentence endings should be boosted under high arousal"
             );
         }
+    }
+
+    /// A fresh monitor must not claim to have measured anything.
+    ///
+    /// `current_coherence` initialises to 1.0 as a neutral starting value for the correction
+    /// logic. Before 2026-07-28 that was indistinguishable from a measured 1.0, and callers
+    /// reported it as one — the mechanism behind `avg_coherence: 1.0` appearing unchanged in
+    /// both halves of the Jul-10 eval, across a ~9,870x perplexity regression.
+    #[test]
+    fn test_unmeasured_coherence_is_not_reported_as_a_reading() {
+        let feedback = CoherenceFeedback::new(0.3);
+        assert_eq!(feedback.samples(), 0);
+        assert_eq!(
+            feedback.measured_coherence(),
+            None,
+            "a monitor that has never been updated must report None, not its initial 1.0",
+        );
+        // The raw accessor still returns the neutral value — that is what makes
+        // `measured_coherence()` necessary rather than merely convenient.
+        assert_eq!(feedback.coherence(), 1.0);
+    }
+
+    /// `reset()` must clear measurement state but preserve configuration.
+    #[test]
+    fn test_reset_clears_measurement_but_keeps_tuning() {
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("test-coherence-reset");
+        let thought_hv = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis,
+            "thought",
+            symthaea_core::hdc::HDC_DIMENSION,
+        );
+        let other_hv = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis,
+            "other",
+            symthaea_core::hdc::HDC_DIMENSION,
+        );
+
+        let mut feedback = CoherenceFeedback::new(0.3);
+        feedback.set_algebraic(true, 0.42);
+        feedback.update(&other_hv, &thought_hv);
+        assert_eq!(feedback.samples(), 1);
+        assert!(feedback.measured_coherence().is_some());
+
+        feedback.reset();
+
+        assert_eq!(feedback.samples(), 0, "reset must clear the sample count");
+        assert_eq!(
+            feedback.measured_coherence(),
+            None,
+            "after reset, a generation that measures nothing must not inherit the previous \
+             generation's coherence",
+        );
+        assert!(
+            feedback.is_algebraic(),
+            "reset must not clear correction configuration — only measurement",
+        );
+    }
+
+    /// Measurement state must not leak across generations.
+    #[test]
+    fn test_coherence_does_not_leak_between_generations() {
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("test-coherence-leak");
+        let thought_hv = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis,
+            "thought",
+            symthaea_core::hdc::HDC_DIMENSION,
+        );
+        let other_hv = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis,
+            "other",
+            symthaea_core::hdc::HDC_DIMENSION,
+        );
+
+        let mut feedback = CoherenceFeedback::new(0.3);
+        // Generation 1 measures a low, drifted coherence.
+        feedback.update(&other_hv, &thought_hv);
+        let generation_1 = feedback
+            .measured_coherence()
+            .expect("generation 1 took a measurement");
+
+        // Generation 2 starts and emits no tokens — so it measures nothing at all.
+        feedback.reset();
+
+        assert_eq!(
+            feedback.measured_coherence(),
+            None,
+            "generation 2 measured nothing, so it must report None rather than inheriting \
+             generation 1's {generation_1}",
+        );
     }
 
     #[test]

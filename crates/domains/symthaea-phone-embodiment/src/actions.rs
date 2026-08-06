@@ -3,7 +3,11 @@
 //! Phone action types with Phi-gated safety thresholds.
 
 /// Actions the phone embodiment can take via ADB.
-#[derive(Debug, Clone)]
+///
+/// `PartialEq` added 2026-07-31 so tests can pin a *specific* proposed action.
+/// Without it nothing in the crate could compare two `PhoneAction`s, which is
+/// why no existing test asserted which target was chosen — only that one was.
+#[derive(Debug, Clone, PartialEq)]
 pub enum PhoneAction {
     /// No action (always safe).
     NoOp,

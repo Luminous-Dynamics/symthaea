@@ -163,7 +163,7 @@ If you're a researcher:
 
 - Open a GitHub Discussion for general questions
 - Open an Issue for specific problems
-- Email: tristan.stoltz@evolvingresonantcocreationism.com
+- Email: research@luminousdynamics.org
 
 ## License
 

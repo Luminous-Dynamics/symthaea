@@ -119,10 +119,21 @@ pub fn compute_topological_consciousness(
 
     let sampled: Vec<f64> = (0..n).map(|i| hidden_state[i * step]).collect();
 
-    // Build correlation matrix from the sampled dimensions.
-    // Since we have a single snapshot, we use pairwise products as a
-    // proxy for connectivity strength (normalized by signal magnitude).
-    let correlation_matrix = build_correlation_matrix(&sampled);
+    // Build the correlation matrix. Prefer a real temporal correlation across the state window;
+    // fall back to the single-snapshot path only when no usable window exists.
+    //
+    // WHY THIS MATTERS (fixed 2026-07-30): the single-snapshot path is
+    // `(a*b) / (|a|*|b|)`, which is algebraically `sign(a) * sign(b)` — exactly ±1 for every
+    // non-zero pair. Against CORRELATION_THRESHOLD every pair therefore became an edge and every
+    // triple a triangle, making the complex the complete 2-skeleton and the Betti numbers a
+    // CONSTANT independent of cognitive state (β = [1, 0, C(n-1, 3)]). The art path consumed
+    // that constant while ~10^9 f64 ops per refresh computed it.
+    let correlation_matrix = match state_window {
+        Some(window) if window.len() >= MIN_TEMPORAL_SAMPLES => {
+            build_temporal_correlation_matrix(window, n, step)
+        }
+        _ => build_correlation_matrix(&sampled),
+    };
 
     // Construct simplicial complex
     let complex =
@@ -195,21 +206,83 @@ pub fn compute_topological_consciousness(
 /// Uses normalized outer products: corr(i,j) = x_i * x_j / (|x_i| * |x_j| + eps).
 /// This gives a symmetric matrix with values in [-1, 1] suitable for
 /// thresholding into a simplicial complex.
-fn build_correlation_matrix(state: &[f64]) -> Vec<Vec<f64>> {
-    let n = state.len();
-    let eps = 1e-12;
+/// Minimum number of time samples before a temporal correlation is meaningful.
+/// Pearson correlation over fewer than 3 samples is degenerate (2 points are always perfectly
+/// correlated or anti-correlated, which would reproduce the ±1 pathology this replaced).
+const MIN_TEMPORAL_SAMPLES: usize = 3;
 
-    // Compute magnitudes for normalization
-    let magnitudes: Vec<f64> = state.iter().map(|x| x.abs().max(eps)).collect();
+/// Pearson correlation between each pair of sampled dimensions, computed ACROSS TIME.
+///
+/// This is what a correlation matrix requires and what the single-snapshot path cannot provide:
+/// correlation is a statement about co-variation over samples, and one sample has no variation.
+///
+/// `window` is oldest-to-newest; each element is a full state vector. `n`/`step` mirror the
+/// caller's subsampling so the dimensions here are index-identical to `sampled`.
+fn build_temporal_correlation_matrix(window: &[Vec<f64>], n: usize, step: usize) -> Vec<Vec<f64>> {
+    let t = window.len();
+
+    // Gather each sampled dimension's trajectory over the window.
+    let mut series: Vec<Vec<f64>> = Vec::with_capacity(n);
+    for i in 0..n {
+        let idx = i * step;
+        series.push(
+            window
+                .iter()
+                .map(|st| st.get(idx).copied().unwrap_or(0.0))
+                .collect(),
+        );
+    }
+
+    let means: Vec<f64> = series
+        .iter()
+        .map(|v| v.iter().sum::<f64>() / t as f64)
+        .collect();
+    // Population standard deviation; only its ratio matters here.
+    let sds: Vec<f64> = series
+        .iter()
+        .zip(&means)
+        .map(|(v, &m)| (v.iter().map(|x| (x - m).powi(2)).sum::<f64>() / t as f64).sqrt())
+        .collect();
 
     let mut matrix = vec![vec![0.0; n]; n];
     for i in 0..n {
         matrix[i][i] = 1.0;
         for j in (i + 1)..n {
-            let corr = (state[i] * state[j]) / (magnitudes[i] * magnitudes[j]);
+            // A dimension that never varies has no correlation with anything — reporting 0 is
+            // correct and, importantly, keeps it OUT of the complex rather than fabricating an
+            // edge. The old code gave a constant dimension ±1 against every other dimension.
+            let corr = if sds[i] <= f64::EPSILON || sds[j] <= f64::EPSILON {
+                0.0
+            } else {
+                let cov = series[i]
+                    .iter()
+                    .zip(&series[j])
+                    .map(|(a, b)| (a - means[i]) * (b - means[j]))
+                    .sum::<f64>()
+                    / t as f64;
+                (cov / (sds[i] * sds[j])).clamp(-1.0, 1.0)
+            };
             matrix[i][j] = corr;
             matrix[j][i] = corr;
         }
+    }
+    matrix
+}
+
+/// Degenerate single-snapshot fallback, used only when no temporal window is available.
+///
+/// **This cannot compute a correlation.** A single sample has no variance, so there is nothing to
+/// correlate. It returns the identity matrix, which yields a fully disconnected complex
+/// (β = [n, 0, 0]) — an honest "no topological structure observed" rather than the previous
+/// behaviour, which returned `sign(a)*sign(b)` (always ±1) and therefore fabricated a COMPLETE
+/// graph on every call, producing a state-independent constant.
+///
+/// If you find yourself relying on this path, supply a real window instead.
+fn build_correlation_matrix(state: &[f64]) -> Vec<Vec<f64>> {
+    let n = state.len();
+    let mut matrix = vec![vec![0.0; n]; n];
+    for i in 0..n {
+        matrix[i][i] = 1.0;
     }
     matrix
 }
@@ -354,6 +427,88 @@ mod tests {
         assert!(
             result.manifold_curvature >= 0.0,
             "Manifold curvature should be non-negative for a smooth curve",
+        );
+    }
+
+    /// PAIRED CONTROL for the 2026-07-30 sign-collapse fix.
+    ///
+    /// The old `build_correlation_matrix` computed `(a*b)/(|a|*|b|)`, which is algebraically
+    /// `sign(a)*sign(b)` — exactly ±1 for every non-zero pair. Every pair therefore cleared
+    /// CORRELATION_THRESHOLD, the complex became the complete 2-skeleton, and the Betti numbers
+    /// were a CONSTANT regardless of input.
+    ///
+    /// This test would FAIL against that code: it asserts the Betti numbers actually VARY with
+    /// the state. A test that merely checked "returns numbers" would have passed on the bug.
+    #[test]
+    fn betti_numbers_vary_with_state_given_a_real_window() {
+        // Window A: two groups of dimensions moving in opposite phase -> real structure.
+        let mut window_a: Vec<Vec<f64>> = Vec::new();
+        for t in 0..12 {
+            let phase = t as f64 * 0.5;
+            window_a.push(
+                (0..64)
+                    .map(|d| {
+                        if d % 2 == 0 {
+                            phase.sin()
+                        } else {
+                            (phase + std::f64::consts::PI).sin()
+                        }
+                    })
+                    .collect(),
+            );
+        }
+        // Window B: every dimension follows an independent, unrelated ramp -> different structure.
+        let mut window_b: Vec<Vec<f64>> = Vec::new();
+        for t in 0..12 {
+            window_b.push(
+                (0..64)
+                    .map(|d| ((t * 7 + d * 13) % 23) as f64 / 23.0)
+                    .collect(),
+            );
+        }
+
+        let state = vec![0.5_f64; 64];
+        let a = compute_topological_consciousness(&state, Some(&window_a));
+        let b = compute_topological_consciousness(&state, Some(&window_b));
+
+        assert_ne!(
+            a.betti_numbers, b.betti_numbers,
+            "Betti numbers must depend on the state window. Identical values across structurally \
+             different windows is the signature of the sign-collapse bug (fixed 2026-07-30), \
+             which made them a constant."
+        );
+    }
+
+    /// The degenerate single-snapshot path must report NO structure rather than fabricate a
+    /// complete graph. Pre-fix this returned beta = [1, 0, C(n-1,3)]; now it returns a fully
+    /// disconnected complex, which is the honest answer when there is nothing to correlate.
+    #[test]
+    fn single_snapshot_path_reports_no_structure_not_a_complete_graph() {
+        let state: Vec<f64> = (0..64).map(|i| (i as f64 * 0.37).sin()).collect();
+        let r = compute_topological_consciousness(&state, None);
+        let n = 64usize.min(MAX_TOPO_DIMENSIONS);
+        assert_eq!(
+            r.betti_numbers[0], n,
+            "identity correlation must give one component per dimension (fully disconnected)"
+        );
+        assert_eq!(r.betti_numbers[1], 0, "no loops without edges");
+        assert_eq!(
+            r.betti_numbers[2], 0,
+            "no voids without triangles — pre-fix this was C(n-1,3) = 4495 for n=32"
+        );
+    }
+
+    /// A constant dimension has no variance and therefore no correlation with anything. Pre-fix it
+    /// received ±1 against every other dimension, which is how a flat signal fabricated edges.
+    #[test]
+    fn constant_dimensions_produce_no_edges() {
+        let window: Vec<Vec<f64>> = (0..10).map(|_| vec![1.0_f64; 64]).collect();
+        let state = vec![1.0_f64; 64];
+        let r = compute_topological_consciousness(&state, Some(&window));
+        let n = 64usize.min(MAX_TOPO_DIMENSIONS);
+        assert_eq!(
+            r.betti_numbers[0], n,
+            "a wholly constant window must yield no edges, hence n components"
         );
     }
 }

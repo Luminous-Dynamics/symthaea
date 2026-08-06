@@ -545,6 +545,26 @@ pub struct EpochMetrics {
     pub adaptive_dt_min: Option<f32>,
     /// Max adaptive dt observed this epoch.
     pub adaptive_dt_max: Option<f32>,
+    /// How many candidate tokens `avg_loss` was computed over.
+    ///
+    /// **`avg_loss` is meaningless without this.** Under sampled softmax the target competes
+    /// against only `negative_samples` distractors, so `avg_loss` measures discrimination over
+    /// `negative_samples + 1` candidates, not over the vocabulary — and is trivially small even
+    /// for a model that has not fit its data. Equals `vocab_size` when full softmax is used.
+    ///
+    /// Added 2026-07-29 after the production checkpoint's recorded `training_loss = 2.0535`
+    /// (ppl ≈ 7.8) was found to sit ~25 nats away from full-softmax CE on its *own* training
+    /// corpus (27.56, ppl 9.27e11). Reported "clean convergence" had been taken as evidence the
+    /// trainer worked. See `SYMTHAEA_BROCA_BASELINE_2026-07-29.md`.
+    pub loss_candidate_count: usize,
+}
+
+impl EpochMetrics {
+    /// Whether [`Self::avg_loss`] is a full-vocabulary cross-entropy, and so comparable to eval
+    /// perplexity. `false` when sampled softmax was used or the count was never recorded.
+    pub fn loss_is_full_vocab(&self, vocab_size: usize) -> bool {
+        self.loss_candidate_count > 0 && self.loss_candidate_count == vocab_size
+    }
 }
 
 /// Gradient flow diagnostics: tracks per-step L2 norms, clipping events,
@@ -1893,7 +1913,34 @@ pub fn train_with_adam(
                         result
                     };
 
-                    // CfC network BPTT: backpropagate CE gradient through the network
+                    // Apply the CE gradient to the CfC network.
+                    //
+                    // NOT backpropagation through time, despite what this comment said until
+                    // 2026-07-28 ("CfC network BPTT"). `backward_step` is invoked once per
+                    // position and reads only the network's *current* state — there is no
+                    // stored state history and no gradient carried from position t back to
+                    // t-1. `bptt_window` bounds how many tokens are trained per pair, so this
+                    // is truncated *teacher forcing* with a single-step local target rule.
+                    // Cross-layer credit inside `backward_step` is NOT absent, contrary to
+                    // an earlier version of this note (corrected 2026-07-31 by reading it):
+                    // `neuron.backward()` returns a real `d_input`, which is accumulated and
+                    // used to build the *target* for the next layer down. So a genuine
+                    // backward error signal does flow layer to layer. What it is not is
+                    // backprop's chain rule — the signal is converted to a local target
+                    // (`target = state - d_per_neuron`) and each layer does a local update,
+                    // which is closer to target propagation. `gradient_attenuation.powi(depth)`
+                    // is a hand-tuned damping applied ON TOP of that chain, to both the
+                    // propagated signal and the per-layer learning rate.
+                    //
+                    // The distinction matters for fixing this: DEPTH credit exists and is
+                    // heuristically damped; TIME credit does not exist at all. Only the
+                    // second is the blocker.
+                    //
+                    // The output layer IS correctly differentiated — see
+                    // `compute_ce_gradient_wrt_output`. The naming mattered: it implied a
+                    // sequence-learning capacity the trainer does not have, which is
+                    // consistent with the Keystone A/B result that training signal, not
+                    // architecture, is the binding constraint.
                     if let Some(ref d_out) = d_output {
                         let network_lr = lr * config.network_lr_scale;
                         let dt = generator.controller().config().dt_per_token;
@@ -2017,6 +2064,7 @@ pub fn train_with_adam(
                     generator.config(),
                     val_dataset,
                     config.bptt_window,
+                    generator.tokenizer().thought_id,
                 )
             } else {
                 compute_validation_loss(generator, val_dataset, config.bptt_window)
@@ -2044,6 +2092,13 @@ pub fn train_with_adam(
             adaptive_dt_mean: None,
             adaptive_dt_min: None,
             adaptive_dt_max: None,
+            // Sampled softmax scores the target against `negative_samples` distractors, so the
+            // candidate set is that plus the target itself; 0 negatives means full vocabulary.
+            loss_candidate_count: if config.negative_samples > 0 {
+                config.negative_samples + 1
+            } else {
+                generator.controller().vocab_size()
+            },
         });
 
         if (epoch + 1) % config.report_interval.max(1) == 0 || epoch == 0 {
@@ -2053,9 +2108,23 @@ pub fn train_with_adam(
             let coh_str = epoch_mean_coherence
                 .map(|c| format!(" coh={c:.4}"))
                 .unwrap_or_default();
+            // `loss_over` is not decoration. `avg_loss` under sampled softmax describes
+            // discrimination against `negative_samples` distractors, not the vocabulary, and
+            // reads as a healthy small number for a model that has not fit its data at all
+            // (measured: recorded 2.05 vs 27.56 full-softmax CE on the same corpus). Emitting
+            // the candidate count beside the loss makes that unmissable in the logs where the
+            // number is actually read.
+            let loss_candidates = if config.negative_samples > 0 {
+                config.negative_samples + 1
+            } else {
+                generator.controller().vocab_size()
+            };
+            let loss_sampled = config.negative_samples > 0;
             tracing::info!(
                 epoch = epoch,
                 avg_loss = avg_loss,
+                loss_over = loss_candidates,
+                loss_sampled = loss_sampled,
                 tokens = total_tokens,
                 "Broca training epoch"
             );
@@ -2064,8 +2133,13 @@ pub fn train_with_adam(
                 use std::io::Write;
                 let _ = writeln!(
                     std::io::stderr(),
-                    "[epoch] {epoch}/{} loss={avg_loss:.6}{val_str}{coh_str}{} tokens={total_tokens}",
+                    "[epoch] {epoch}/{} loss={avg_loss:.6}{}{val_str}{coh_str}{} tokens={total_tokens}",
                     config.epochs,
+                    if loss_sampled {
+                        format!("(SAMPLED/{loss_candidates})")
+                    } else {
+                        format!("(full/{loss_candidates})")
+                    },
                     if contrastive_count > 0 {
                         format!(
                             " contra={:.4}",
@@ -3515,10 +3589,35 @@ pub fn compute_validation_loss_sampled(
     }
 }
 
+/// Minimum fraction of eligible validation pairs that must complete on the GPU for
+/// [`compute_validation_loss_gpu`]'s result to be treated as a measurement rather than noise.
+///
+/// Set at 0.9 rather than something permissive: validation drives checkpoint promotion, and a
+/// loss averaged over a small surviving minority of pairs is not comparable to one averaged
+/// over the full set — the two differ in which examples they cover, not just in precision.
+#[cfg(feature = "gpu")]
+pub const GPU_VALIDATION_MIN_COVERAGE: f32 = 0.9;
+
 /// GPU-accelerated validation loss computation.
 ///
 /// Uses GpuTrainer for forward passes instead of CPU controller.
 /// ~10x faster than CPU validation on CUDA.
+///
+/// # Failure behaviour
+///
+/// Returns [`f32::INFINITY`] if too few pairs completed — see
+/// [`GPU_VALIDATION_MIN_COVERAGE`]. This is deliberately the *fail-closed* direction: callers
+/// use this value for early stopping and best-checkpoint selection, and `INFINITY` can never
+/// win either comparison, so a degraded GPU run cannot silently promote a checkpoint.
+///
+/// Before 2026-07-28 every GPU error was swallowed (`Err(_) => continue` / `break`) and the
+/// mean was taken over whatever survived — a run where most pairs failed reported a small,
+/// healthy-looking loss with no indication of how few tokens contributed. Same failure class
+/// as `memory/feedback_experiment_runner_must_fail_closed_on_backend_fallback.md`.
+///
+/// `thought_id` must come from the caller's tokenizer. It used to be hardcoded to `4`, which
+/// silently disagreed with the CPU path ([`compute_validation_loss`]) for any vocab whose
+/// `<thought>` token is not at index 4.
 #[cfg(feature = "gpu")]
 pub fn compute_validation_loss_gpu(
     trainer: &mut crate::gpu_cfc::GpuTrainer,
@@ -3526,14 +3625,22 @@ pub fn compute_validation_loss_gpu(
     broca_config: &crate::generator::BrocaConfig,
     dataset: &TrainingDataset,
     bptt_window: usize,
+    thought_id: u32,
 ) -> f32 {
     let mut total_loss = 0.0f32;
     let mut total_tokens = 0usize;
+    // Failure accounting — a validation number is only interpretable alongside its coverage.
+    let mut eligible_pairs = 0usize;
+    let mut completed_pairs = 0usize;
+    let mut tensor_failures = 0usize;
+    let mut reset_failures = 0usize;
+    let mut forward_failures = 0usize;
 
     for pair in &dataset.pairs {
         if pair.target_ids.is_empty() {
             continue;
         }
+        eligible_pairs += 1;
 
         let channels = pair.to_thought_channels();
         let thought_hv = semantic_blended_thought_hv_raw(
@@ -3550,28 +3657,72 @@ pub fn compute_validation_loss_gpu(
             &trainer.device,
         ) {
             Ok(t) => t,
-            Err(_) => continue,
+            Err(_) => {
+                tensor_failures += 1;
+                continue;
+            }
         };
 
         // Reset + seed
         if trainer.reset_states().is_err() {
+            reset_failures += 1;
             continue;
         }
         let _ = trainer.seed_from_thought(&thought_tensor);
 
-        let mut prev_token = 4u32; // thought_id
+        let mut prev_token = thought_id;
         let window_end = pair.target_ids.len().min(bptt_window);
 
+        let mut pair_completed = true;
         for (pos, &target_id) in pair.target_ids[..window_end].iter().enumerate() {
             let logits = match trainer.forward_step(&thought_tensor, prev_token, pos) {
                 Ok(l) => l,
-                Err(_) => break,
+                Err(_) => {
+                    forward_failures += 1;
+                    pair_completed = false;
+                    break;
+                }
             };
             let loss = cross_entropy_loss(&logits, target_id as usize);
             total_loss += loss;
             total_tokens += 1;
             prev_token = target_id;
         }
+        if pair_completed {
+            completed_pairs += 1;
+        }
+    }
+
+    let coverage = if eligible_pairs > 0 {
+        completed_pairs as f32 / eligible_pairs as f32
+    } else {
+        0.0
+    };
+    if coverage < GPU_VALIDATION_MIN_COVERAGE || total_tokens == 0 {
+        tracing::error!(
+            eligible_pairs,
+            completed_pairs,
+            total_tokens,
+            tensor_failures,
+            reset_failures,
+            forward_failures,
+            coverage,
+            min_coverage = GPU_VALIDATION_MIN_COVERAGE,
+            "GPU validation loss covered too few pairs to be meaningful; returning INFINITY so \
+             this epoch cannot win early-stopping or best-checkpoint selection. Check CUDA \
+             device health and memory."
+        );
+        return f32::INFINITY;
+    }
+    if completed_pairs < eligible_pairs {
+        tracing::warn!(
+            eligible_pairs,
+            completed_pairs,
+            tensor_failures,
+            reset_failures,
+            forward_failures,
+            "GPU validation loss is a partial measurement — some pairs failed on the device."
+        );
     }
 
     if total_tokens > 0 {
@@ -3633,6 +3784,25 @@ mod tests {
             sampling: SamplingStrategy::Greedy,
             enable_coherence_feedback: false,
             enable_semantic_veto: false,
+            // Explicitly ON, against the `BrocaConfig` default of `false`.
+            //
+            // Three tests in this module exist to verify that `semantic_hv` disambiguates
+            // colliding channels — the real production failure mode. They inherited the
+            // default `false`, so the blend was a no-op and they asserted a mechanism that
+            // was switched off. All three failed continuously and were filed as "pre-existing
+            // failures ... unrelated" (commit `1016956a47`); they were neither.
+            //
+            // Safe for every other test using this config: the blend is gated on
+            // `Some(semantic_hv)` as well as this flag, so tests that pass `None` — which is
+            // all of them — are unaffected.
+            //
+            // With this on, those three become a genuine POSITIVE CONTROL: they feed
+            // `ContinuousHV::random()` (mutually near-orthogonal, oracle-quality input) and
+            // assert the outputs differ. Passing shows the pipeline does learn thought→text
+            // given well-separated input, which is what justifies fixing the encoder. Failing
+            // would show a second defect downstream and that encoder work is premature.
+            // See `SYMTHAEA_BROCA_ENCODER_PLAN_2026-07-30.md`.
+            enable_nsm_semantic: true,
             ..Default::default()
         }
     }

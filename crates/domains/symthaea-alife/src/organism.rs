@@ -9,39 +9,62 @@
 //! non-perceiving *constant* belief as the baseline, not a crippled `Organism` — production
 //! code shouldn't carry a theater on/off switch even for testing purposes.
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use symthaea_fep::markov_blanket::{BlanketPermeability, MarkovBoundaryOperator, MarkovPartition};
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
 
+use crate::agent_id::AgentId;
+use crate::ledger::{InteractionRecord, compress_for_observation};
 use crate::metabolism::{
     landauer_minimum, perceptual_resolution_bits, prigogine_dissipation_cost, quantize_to_grain,
     shannon_entropy_bits,
 };
 use crate::types::BoundaryModulators;
 
-/// The two behaviors an [`Organism`] can select between.
+/// The behaviors an [`Organism`] can select between.
 ///
 /// Kept intentionally small and biology-plain rather than reusing `MotorCommandType`
 /// (`AttentionShift`, `ReflectionInitiate`, ...) — those are cognition-flavored labels from a
 /// different context; an organism's action space here is literally "spend effort gathering
-/// resources" vs "conserve."
+/// resources" vs "conserve" vs (Genesis v0 only) "give some energy to whoever I'm paired with."
+///
+/// `Transfer` is deliberately **not** paired with a `Cooperate`/`Defect` label anywhere in this
+/// crate (`ALIFE_MULTIAGENT_GENESIS_PLAN_2026-07-25.md`'s non-goals) — those are interpretations
+/// of *output*, never a choice handed to the agent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     Forage,
     Rest,
+    /// Genesis v0 only (`cfg.social_enabled`) — give a fixed quantum of energy to this tick's
+    /// encounter partner, if any. Structurally unreachable when `social_enabled` is false: that
+    /// path constructs the agent with `num_actions: Action::COUNT` (2), so `select_action()` can
+    /// never return this index at all, not merely by convention.
+    Transfer,
 }
 
 impl Action {
+    /// Action count for the pre-existing, asocial organism (Forage/Rest only) — unchanged since
+    /// before Genesis existed. Depended on directly by `tests/phase0_ground_truth.rs`'s
+    /// random-baseline generator; must stay exactly 2.
     pub const COUNT: usize = 2;
+    /// Action count when `OrganismConfig::social_enabled` is true (adds `Transfer`).
+    pub const SOCIAL_COUNT: usize = 3;
 
     pub fn from_index(i: usize) -> Self {
-        if i == 0 { Action::Forage } else { Action::Rest }
+        match i {
+            0 => Action::Forage,
+            1 => Action::Rest,
+            _ => Action::Transfer,
+        }
     }
 
     pub fn index(self) -> usize {
         match self {
             Action::Forage => 0,
             Action::Rest => 1,
+            Action::Transfer => 2,
         }
     }
 }
@@ -127,6 +150,20 @@ pub struct OrganismConfig {
     /// otherwise") can be tested without touching any existing organism's behavior. See
     /// `tests/hoffman_prior_recalibration.rs`.
     pub resource_prior: f64,
+    /// `false` (the default) reproduces this crate's exact pre-existing 2-channel, 2-action
+    /// behavior (Phases 0-7) -- no `Transfer` action, no interaction-ledger observation
+    /// channels. `true` activates `ALIFE_MULTIAGENT_GENESIS_PLAN_2026-07-25.md`'s Genesis v0
+    /// extension: `Action::Transfer` becomes selectable and three raw per-partner ledger
+    /// counters (`given_to_partner`, `received_from_partner`, `encounter_count`) plus a
+    /// partner-present flag are added to the observation/state vector. See that plan's Stage 0
+    /// "baseline equivalence" invariant, which this flag exists to satisfy: with it `false`,
+    /// `Organism` is byte-for-byte the pre-Genesis implementation, not just behaviorally similar.
+    /// Deliberately **not** a heritable `Genome` trait -- see the plan's non-goals.
+    pub social_enabled: bool,
+    /// Fixed quantum transferred by one `Transfer` action, when selected and a partner is
+    /// present. Deliberately not agent-selectable (`Transfer(amount)`) -- see the Genesis plan's
+    /// "keep Transfer stupidly simple" design note. Only meaningful when `social_enabled`.
+    pub transfer_quantum: f64,
 }
 
 impl Default for OrganismConfig {
@@ -148,6 +185,8 @@ impl Default for OrganismConfig {
             spoilage_sigma: None,
             resource_preference: 1.0,
             resource_prior: 0.5,
+            social_enabled: false,
+            transfer_quantum: 0.1,
         }
     }
 }
@@ -182,10 +221,41 @@ pub struct OrganismTick {
     pub physical_cost: f64,
     /// Whether the organism is dead after this tick (`energy <= death_energy_threshold`).
     pub is_dead: bool,
+    /// Actual amount debited from this organism's own energy this tick for a `Transfer` action
+    /// (`0.0` when the action wasn't `Transfer`, no partner was present, or `social_enabled` is
+    /// false). This is the exact value credited to the partner's energy by the caller
+    /// (`Population::step_social`) -- the Stage 0 "conservation" invariant.
+    pub transfer_given: f64,
+    /// The exact observation `perceive()` was actually driven by this tick -- after
+    /// blanket-permeability gating (`self.boundary.gate_observation`), before it enters
+    /// `agent.perceive()`'s own belief-update integration. Added for
+    /// `ALIFE_MA001L_CONTEXTUAL_TRANSITION_LEARNING_PLAN_2026-07-26.md` §12's diagnosed fix: this
+    /// is a single-tick, instantaneous signal (unlike `self.agent.belief`, which is a running,
+    /// inertial estimate blended across many ticks) -- a caller like `Ma001rProbe::
+    /// step_with_delta_rule` that needs to know "which social context was actually presented this
+    /// specific tick" should read this field, not `agent.belief`.
+    pub gated_observation: Vec<f64>,
+    /// The observation *before* `self.boundary.gate_observation` is applied -- the fully raw
+    /// signal, upstream of blanket-permeability attenuation. Added to test the disclosed,
+    /// untested hypothesis in `ALIFE_MA001L_CONTEXTUAL_TRANSITION_LEARNING_PLAN_2026-07-26.md`
+    /// §13 that permeability-based attenuation of `gated_observation` (a function of the
+    /// organism's physiological deficit, not present in MA-001L's idealized synthetic tuples) is
+    /// what's limiting MA-001R-delta v2's effect size, distinct from belief inertia. A caller
+    /// wanting the strongest possible replication of MA-001L's clean fixed-placeholder old_state
+    /// should read this field instead of `gated_observation`.
+    pub raw_observation: Vec<f64>,
+    /// The actual post-softmax action-selection probabilities this tick
+    /// (`ActiveInferenceAgent::select_action`'s own `ActionSelectionResult::action_probabilities`,
+    /// already computed and previously discarded). Added to directly test the reframed hypothesis
+    /// in `ALIFE_MA001A_DELTA_RERUN_PLAN_2026-07-26.md` §10: is action selection close to
+    /// state-insensitive (a near-uniform softmax) at the current `action_temperature`, rather than
+    /// genuinely differentiating between actions based on their expected free energy?
+    pub action_probabilities: Vec<f64>,
 }
 
 /// A living system modeled as a Markov blanket minimizing free energy.
 pub struct Organism {
+    pub id: AgentId,
     pub agent: ActiveInferenceAgent,
     pub boundary: MarkovBoundaryOperator,
     pub energy: f64,
@@ -194,20 +264,48 @@ pub struct Organism {
     /// Phase 2 coalition analysis can evaluate a pooled belief against a real observation
     /// without needing the caller to separately track it.
     pub last_resource_observed: f64,
+    /// Genesis v0 (G0c): raw per-partner interaction history, keyed by the partner's
+    /// [`AgentId`]. Empty and never read when `cfg.social_enabled` is false.
+    pub ledger: HashMap<AgentId, InteractionRecord>,
+    /// Genesis v0 event-log support: the founding ancestor's [`AgentId`] -- an organism's own
+    /// `id` for an original (non-offspring) individual, inherited unchanged from parent to
+    /// offspring at every reproduction. Lets a later analysis group events by family line
+    /// without needing a separate genealogy table.
+    pub lineage_id: AgentId,
+    /// Genesis v0 event-log support: `0` for the initial population, `parent.generation + 1` for
+    /// offspring.
+    pub generation: u32,
 }
 
 impl Organism {
-    /// Observation layout: `[resource_level, energy_level]` (exteroceptive + interoceptive).
-    /// Phase 0 gates both uniformly through the blanket for simplicity; a real
-    /// exteroceptive/interoceptive permeability asymmetry is left to a later phase.
+    /// Observation *and* state layout when `cfg.social_enabled` is false: `[resource_level,
+    /// energy_level]` (exteroceptive + interoceptive) -- this crate keeps state_dim == obs_dim
+    /// throughout, state mirroring observation directly (Phase 0 gates both uniformly through
+    /// the blanket for simplicity; a real exteroceptive/interoceptive permeability asymmetry is
+    /// left to a later phase). Unchanged since before Genesis existed.
     const OBS_DIM: usize = 2;
-    const STATE_DIM: usize = 2;
+    /// Observation/state layout when `cfg.social_enabled` is true: the two channels above, plus
+    /// `[partner_present, given_to_partner, received_from_partner, encounter_count]` for this
+    /// tick's encounter partner (all zero when unpaired) -- see `ledger` module docs for why
+    /// these are raw counters (numerically compressed for the belief substrate only) rather
+    /// than a synthesized signal.
+    const SOCIAL_DIM: usize = 6;
 
     pub fn new(cfg: OrganismConfig, seed: u64) -> Self {
+        let dim = if cfg.social_enabled {
+            Self::SOCIAL_DIM
+        } else {
+            Self::OBS_DIM
+        };
+        let num_actions = if cfg.social_enabled {
+            Action::SOCIAL_COUNT
+        } else {
+            Action::COUNT
+        };
         let agent_cfg = ActiveInferenceAgentConfig {
-            state_dim: Self::STATE_DIM,
-            obs_dim: Self::OBS_DIM,
-            num_actions: Action::COUNT,
+            state_dim: dim,
+            obs_dim: dim,
+            num_actions,
             action_temperature: cfg.action_temperature,
             ..Default::default()
         };
@@ -215,27 +313,71 @@ impl Organism {
         agent.set_rng_seed(seed);
         // Prefer a high resource reading and a high (near-set-point) energy reading -- see
         // `cfg.resource_preference`'s doc comment for why this replaced a hardcoded moderate 0.5.
-        agent.set_goals(
-            vec![cfg.resource_preference, cfg.set_point],
-            cfg.goal_precision,
-        );
+        let mut preferences = vec![0.5; dim];
+        preferences[0] = cfg.resource_preference;
+        preferences[1] = cfg.set_point;
+        if cfg.social_enabled {
+            // Genesis v0.1 audit Gate 5 (2026-07-26): a shared `goal_precision` across every
+            // dimension made the social channels' `0.5` preference a real, non-zero-precision
+            // pull, not the inert placeholder it was assumed to be -- `set_goals`'s single
+            // scalar precision can't express "no preference here." Real precision stays on
+            // resource/energy (indices 0-1); the four social channels (indices 2-5) get exactly
+            // zero precision, a genuine "observe but don't care" -- this crate must not bake in
+            // a bias toward or against social history, since whether that's fitness-relevant is
+            // exactly the open question Genesis exists to observe, not decide in advance.
+            let mut precisions = vec![0.0; dim];
+            precisions[0] = cfg.goal_precision;
+            precisions[1] = cfg.goal_precision;
+            agent.set_goals_with_precisions(preferences, precisions);
+        } else {
+            agent.set_goals(preferences, cfg.goal_precision);
+        }
         // See `cfg.resource_prior`'s doc comment -- at the default 0.5 this is an exact no-op
         // (matches `GenerativeModel::new`'s own defaults for both mean and precision).
-        agent.inject_priors(vec![cfg.resource_prior, 0.5], vec![1.0, 1.0]);
+        let mut prior_mean = vec![0.5; dim];
+        prior_mean[0] = cfg.resource_prior;
+        agent.inject_priors(prior_mean, vec![1.0; dim]);
 
         let boundary = MarkovBoundaryOperator::new(MarkovPartition {
-            internal_dim: Self::STATE_DIM,
+            internal_dim: dim,
             sensory_dim: 1,
             active_dim: 1,
         });
 
         Self {
+            id: AgentId::UNALLOCATED,
             agent,
             boundary,
             energy: cfg.set_point,
             cfg,
             last_resource_observed: 0.5,
+            ledger: HashMap::new(),
+            lineage_id: AgentId::UNALLOCATED,
+            generation: 0,
         }
+    }
+
+    /// Assign a persistent identity after construction -- used by [`crate::Population`], which
+    /// owns the [`crate::agent_id::AgentIdAllocator`] and knows the real allocation sequence.
+    /// `Organism::new` alone leaves `id` as [`AgentId::UNALLOCATED`], which is fine for
+    /// single-organism call sites (Phase 0-7 tests) that never reference identity.
+    ///
+    /// Also sets `lineage_id` to this same id (an organism is its own lineage founder,
+    /// `generation` 0, unless [`Self::with_lineage`] is called afterward to mark it as an
+    /// offspring instead) -- correct by default for `Population`'s initial population.
+    pub fn with_id(mut self, id: AgentId) -> Self {
+        self.id = id;
+        self.lineage_id = id;
+        self
+    }
+
+    /// Mark this organism as an offspring: inherits `lineage_id` from its parent and is one
+    /// generation deeper. Call after [`Self::with_id`] (which otherwise defaults a fresh
+    /// organism to founding its own lineage at generation 0).
+    pub fn with_lineage(mut self, lineage_id: AgentId, generation: u32) -> Self {
+        self.lineage_id = lineage_id;
+        self.generation = generation;
+        self
     }
 
     /// A hard, checkable constraint (Phase 3b) -- not an FEP preference that can be talked out
@@ -250,7 +392,121 @@ impl Organism {
     /// real-world consequence and the learning step — used only by Phase 0's ground-truth test
     /// comparing FEP-guided vs. uniform-random action selection. Perception and learning always
     /// run for real regardless of `forced_action`.
+    ///
+    /// Exactly `Self::tick_inner(resource_level, forced_action, None)` -- kept as its own method
+    /// (rather than inlined) so every Phase 0-7 call site keeps compiling and behaving
+    /// byte-for-byte unchanged. This is the Stage 0 "baseline equivalence" invariant by
+    /// construction, not merely by testing: this method's body never changed.
     pub fn tick(&mut self, resource_level: f64, forced_action: Option<usize>) -> OrganismTick {
+        self.tick_inner(resource_level, forced_action, None)
+    }
+
+    /// Genesis v0 (G0d/e) social-aware tick. `partner` is `Some((partner_id, ledger_snapshot))`
+    /// when the caller's encounter scheduler paired this organism this tick, `None` otherwise.
+    /// `ledger_snapshot` must be this organism's own pre-tick record for that partner (i.e. not
+    /// yet updated with anything that happens this tick) -- the Stage 0 "observation causality"
+    /// invariant. Only meaningful when `cfg.social_enabled`; if it's false this is exactly
+    /// `tick()` regardless of what's passed for `partner`.
+    ///
+    /// Learns immediately, from the *same* pre-action `partner` snapshot used for perception --
+    /// convenient for standalone-`Organism` tests, but this is exactly the Genesis v0.1 audit's
+    /// Gate 4 finding: an organism's own `Transfer` this tick is invisible to *this* learning
+    /// call, since the cross-organism consequence hasn't been applied yet. `Population::
+    /// step_social` doesn't use this method for that reason -- it uses [`Self::act_social`] /
+    /// [`Self::learn_from_realized_outcome`] instead, deferring the learning step until after the
+    /// real outcome is known.
+    pub fn tick_social(
+        &mut self,
+        resource_level: f64,
+        forced_action: Option<usize>,
+        partner: Option<(AgentId, InteractionRecord)>,
+    ) -> OrganismTick {
+        self.tick_inner(resource_level, forced_action, partner)
+    }
+
+    /// Genesis v0.1 audit Gate 4: the "act" half of a social tick, *without* learning from the
+    /// outcome yet. Returns the tick's telemetry plus an opaque [`PendingSocialLearning`] token
+    /// that must be passed to [`Self::learn_from_realized_outcome`] (with the *realized*
+    /// post-consequence partner ledger snapshot, once the caller knows it) to complete the
+    /// learning step. Used by `Population::step_social`, which applies the cross-organism
+    /// transfer consequence between these two calls.
+    pub fn act_social(
+        &mut self,
+        resource_level: f64,
+        forced_action: Option<usize>,
+        partner: Option<(AgentId, InteractionRecord)>,
+    ) -> (OrganismTick, PendingSocialLearning) {
+        self.act_phase(resource_level, forced_action, partner)
+    }
+
+    /// Genesis v0.1 audit Gate 4: complete the learning step for a tick started with
+    /// [`Self::act_social`], using `realized_partner` -- the partner ledger snapshot *after* this
+    /// tick's cross-organism consequence has been applied (e.g. by `Population::step_social`'s
+    /// Phase 3), not the pre-action snapshot `act_social` was given. This is what lets an
+    /// organism's own `Transfer` this tick actually be visible to its own learning update this
+    /// tick, closing the gap the original Genesis v0 exploratory run's flat action distribution
+    /// may have been caused by.
+    pub fn learn_from_realized_outcome(
+        &mut self,
+        pending: PendingSocialLearning,
+        realized_partner: Option<(AgentId, InteractionRecord)>,
+    ) {
+        self.learn_phase(pending, realized_partner)
+    }
+
+    fn tick_inner(
+        &mut self,
+        resource_level: f64,
+        forced_action: Option<usize>,
+        partner: Option<(AgentId, InteractionRecord)>,
+    ) -> OrganismTick {
+        let (mut tick, pending) = self.act_phase(resource_level, forced_action, partner);
+        self.learn_phase(pending, partner);
+        // `ActiveInferenceAgent::learn_from_outcome` internally calls `perceive()` a *second*
+        // time (on the realized observation), which updates both belief and
+        // `last_fe_components`. The original single-phase `tick_inner` built `OrganismTick`
+        // *after* that second perceive() ran, so these three fields reflected post-learning
+        // state -- re-read them here so the immediate-learn path (`tick`/`tick_social`) stays
+        // byte-for-byte identical to before the act/learn split. `act_social`'s caller
+        // (`Population::step_social`) never reads these fields off the pre-learn tick it gets
+        // back, so this doesn't need mirroring there.
+        tick.belief_resource = self.agent.belief.mean[0];
+        tick.belief_energy = self.agent.belief.mean[1];
+        tick.free_energy = self.agent.current_free_energy();
+        tick
+    }
+
+    /// Raw per-partner ledger slice, numerically compressed for the belief substrate only via
+    /// `compress_for_observation` -- the stored `self.ledger` entry itself stays exact; see
+    /// `ledger` module docs. `partner_present` is a plain factual signal ("is anyone paired with
+    /// me this tick"), not a social interpretation -- structurally the same kind of raw exogenous
+    /// fact as `resource_level`/`energy_level` already are. Shared by both the perceive-time and
+    /// learn-time observation construction (`act_phase`/`learn_phase`) so they can never drift
+    /// out of sync with each other.
+    fn social_channels(
+        social_enabled: bool,
+        partner: &Option<(AgentId, InteractionRecord)>,
+    ) -> (f64, f64, f64, f64) {
+        if !social_enabled {
+            return (0.0, 0.0, 0.0, 0.0);
+        }
+        match partner {
+            Some((_, record)) => (
+                1.0,
+                compress_for_observation(record.given_to_partner),
+                compress_for_observation(record.received_from_partner),
+                compress_for_observation(record.encounter_count as f64),
+            ),
+            None => (0.0, 0.0, 0.0, 0.0),
+        }
+    }
+
+    fn act_phase(
+        &mut self,
+        resource_level: f64,
+        forced_action: Option<usize>,
+        partner: Option<(AgentId, InteractionRecord)>,
+    ) -> (OrganismTick, PendingSocialLearning) {
         // 1. Boundary permeability from the organism's own physiological deficit.
         let deficit = (self.cfg.set_point - self.energy).max(0.0) / self.cfg.set_point.max(1e-6);
         let modulators = BoundaryModulators::from_energy_deficit(deficit);
@@ -273,7 +529,14 @@ impl Organism {
             ),
             None => (resource_level, 0.0),
         };
-        let raw_obs = Observation::new(vec![resource_percept, self.energy], 1.0, "resource+energy");
+
+        let (partner_present, given_c, received_c, count_c) =
+            Self::social_channels(self.cfg.social_enabled, &partner);
+        let mut obs_values = vec![resource_percept, self.energy];
+        if self.cfg.social_enabled {
+            obs_values.extend_from_slice(&[partner_present, given_c, received_c, count_c]);
+        }
+        let raw_obs = Observation::new(obs_values, 1.0, "resource+energy+social");
         let gated_obs = self.boundary.gate_observation(&raw_obs, &self.agent.belief);
 
         // 3. Perceive: update belief from the gated observation. Consumed via belief_resource
@@ -343,19 +606,22 @@ impl Organism {
                 self.cfg.dissipation_rate,
             );
 
-        self.energy =
+        // Genesis v0 (G0e): a `Transfer` debit is computed from what would remain *after* every
+        // other cost, and clamped to that (never "gives energy it doesn't have") -- this is what
+        // makes the Stage 0 "conservation" invariant exact: the caller credits the partner with
+        // exactly this method's `transfer_given`, not a flat configured quantum.
+        let energy_before_transfer =
             (self.energy + gained - self.cfg.metabolic_cost - activity_cost - physical_cost)
-                .clamp(0.0, 1.0);
+                .max(0.0);
+        let transferring = self.cfg.social_enabled && action_index == Action::Transfer.index();
+        let transfer_given = if transferring && partner.is_some() {
+            self.cfg.transfer_quantum.min(energy_before_transfer)
+        } else {
+            0.0
+        };
+        self.energy = (energy_before_transfer - transfer_given).clamp(0.0, 1.0);
 
-        // 7. Learn from the actual post-action outcome (internally perceives again with the
-        //    real consequence, per ActiveInferenceAgent::learn_from_outcome's own contract).
-        let actual_obs =
-            Observation::new(vec![resource_level, self.energy], 1.0, "resource+energy");
-        self.agent.learn_from_outcome(action_index, &actual_obs);
-
-        self.last_resource_observed = resource_level;
-
-        OrganismTick {
+        let tick = OrganismTick {
             resource_observed: resource_level,
             belief_resource: self.agent.belief.mean[0],
             belief_energy: self.agent.belief.mean[1],
@@ -367,8 +633,50 @@ impl Organism {
             bits_processed,
             physical_cost,
             is_dead: self.is_dead(),
-        }
+            transfer_given,
+            gated_observation: gated_obs.values.clone(),
+            raw_observation: raw_obs.values.clone(),
+            action_probabilities: selection.action_probabilities.clone(),
+        };
+        let pending = PendingSocialLearning {
+            action_index,
+            resource_level,
+        };
+        (tick, pending)
     }
+
+    /// 7. Learn from the actual post-action outcome (internally perceives again with the real
+    ///    consequence, per `ActiveInferenceAgent::learn_from_outcome`'s own contract). `partner` is
+    ///    whatever the caller supplies -- the *same* pre-action snapshot for `tick_inner`'s
+    ///    immediate path, or the *realized* post-consequence snapshot for
+    ///    `Population::step_social`'s deferred path (Genesis v0.1 audit Gate 4). Also finalizes
+    ///    `self.last_resource_observed`, matching the original single-phase `tick_inner`'s
+    ///    ordering.
+    fn learn_phase(
+        &mut self,
+        pending: PendingSocialLearning,
+        partner: Option<(AgentId, InteractionRecord)>,
+    ) {
+        let (partner_present, given_c, received_c, count_c) =
+            Self::social_channels(self.cfg.social_enabled, &partner);
+        let mut actual_values = vec![pending.resource_level, self.energy];
+        if self.cfg.social_enabled {
+            actual_values.extend_from_slice(&[partner_present, given_c, received_c, count_c]);
+        }
+        let actual_obs = Observation::new(actual_values, 1.0, "resource+energy+social");
+        self.agent
+            .learn_from_outcome(pending.action_index, &actual_obs);
+        self.last_resource_observed = pending.resource_level;
+    }
+}
+
+/// Opaque token carrying what [`Organism::learn_phase`] needs, bridging [`Organism::act_social`]
+/// and [`Organism::learn_from_realized_outcome`] across whatever a caller does in between (e.g.
+/// `Population::step_social` applying a cross-organism transfer consequence). Callers other than
+/// those two methods have no need to inspect its fields.
+pub struct PendingSocialLearning {
+    action_index: usize,
+    resource_level: f64,
 }
 
 #[cfg(test)]

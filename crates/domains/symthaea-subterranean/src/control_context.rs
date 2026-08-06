@@ -59,11 +59,27 @@ impl SubterraneanControlContextEncoder {
         intent: Option<&ContinuousHV>,
         mission: SubterraneanMissionIntent,
     ) -> ContinuousHV {
+        // Each role-bound term is normalized to unit magnitude before
+        // bundling so perception/intent/mission contribute equally to the
+        // context regardless of the raw magnitude of the vectors used to
+        // build them. `perception` is already unit-normalized by
+        // `SubterraneanHdcEncoder::encode`, but `intent`/`neutral_intent`
+        // (raw `ContinuousHV::random`/`from_genesis` output, component
+        // magnitude O(1)) and the mission symbols (same construction) have
+        // norm ~O(sqrt(DIM)) before binding -- roughly 70x larger than the
+        // perception term at DIM=16384. Left unnormalized, that imbalance
+        // makes the bundled context nearly blind to sensor state: two
+        // encodings that differ only in physical state end up with cosine
+        // similarity effectively 1.0, since intent+mission dominate the sum.
         let perception = self.perception_encoder.encode(state);
-        let mut context = perception.bind(&self.perception_role);
+        let mut context = perception.bind(&self.perception_role).normalize();
         let intent = intent.unwrap_or(&self.neutral_intent);
-        context.add_in_place(&intent.bind(&self.intent_role));
-        context.add_in_place(&self.mission_intents[mission.index()].bind(&self.mission_role));
+        context.add_in_place(&intent.bind(&self.intent_role).normalize());
+        context.add_in_place(
+            &self.mission_intents[mission.index()]
+                .bind(&self.mission_role)
+                .normalize(),
+        );
         context.normalize()
     }
 

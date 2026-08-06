@@ -189,6 +189,39 @@ impl CognitiveSessionTrace {
 
     /// Build the symbolic bridge observation from the state actually reached by
     /// the temporal session and the theory ledger at the decision boundary.
+    ///
+    /// # This is PROVENANCE, not control (audited 2026-07-30)
+    ///
+    /// The name and the surrounding machinery read like a controller. On the
+    /// live `muse_studio` sonata path they are not. Verified, not inferred:
+    ///
+    /// - **All six state-derived fields this writes have ZERO readers** anywhere
+    ///   in the crate — `valence`, `arousal`, `prediction_error`,
+    ///   `consciousness_level`, `dominant_harmony`,
+    ///   `dominant_harmony_activation`. Each was grepped individually; every
+    ///   count came back 0.
+    /// - **The one output that IS consumed is structurally pinned.**
+    ///   `muse_studio.rs` calls this with `Some(CognitiveGoal::Recapitulate)`
+    ///   hardcoded, and `cognitive_bridge.rs`'s selector matches
+    ///   `Some(CognitiveGoal::Recapitulate) => SymbolicAction::ReturnOpeningMaterial`
+    ///   *before* it ever reads the FEP inference. So the action is decided by
+    ///   the caller's literal argument, not by anything the HDC/CfC session
+    ///   computed.
+    ///
+    /// Consequence: **remove the whole session and the rendered audio has no
+    /// code path by which it could differ.** The `HdcLtcUnifiedNetwork` really
+    /// runs and its state really evolves — that part is not fake — but nothing
+    /// downstream of it reaches a speaker.
+    ///
+    /// `run_temporal_ablation_pair` cannot detect this, by construction: it
+    /// compares two `CognitiveSessionTrace`s, not two scores, so it can only
+    /// ever show that HDC state differs between arms — which it does, and which
+    /// says nothing about the music. See its own doc comment.
+    ///
+    /// Treat this as an evidence record attached to a decision made on symbolic
+    /// grounds. If it is ever wired to control output, delete this section and
+    /// say so — and note that `COGNITIVE_SESSION_HDC_DIMENSION = 64` versus the
+    /// production 16,384 becomes load-bearing at that moment, not before.
     pub fn bridge_observation(
         &self,
         obligations: &ObligationLedger,

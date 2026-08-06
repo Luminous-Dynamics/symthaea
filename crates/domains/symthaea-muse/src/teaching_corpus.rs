@@ -250,8 +250,34 @@ fn resolve_root() -> Option<PathBuf> {
 mod tests {
     use super::*;
 
+    /// Skips (loudly) when the optional Variety Etudes corpus is not installed.
+    ///
+    /// This used to `expect()`, so `cargo test -p symthaea-muse --lib` failed on
+    /// any machine without the corpus — including CI, where nothing sets
+    /// `MUSE_VARIETY_ETUDES_DIR` and no step installs it. The corpus is
+    /// genuinely optional by design (`corpus()` returns `Option`, and
+    /// muse_studio reports `teaching_corpus_available` from it), so a hard panic
+    /// made an optional asset behave like a required one and kept the suite
+    /// permanently red. Same fix pattern already applied to nixward's
+    /// config_writer tests when `nix-instantiate` is absent.
+    ///
+    /// The skip is deliberately noisy rather than silent, and it is gated on
+    /// `resolve_root()` — NOT on `corpus()` returning `Err`. That distinction is
+    /// the whole point: `corpus()` also returns `Err` for hash mismatches and
+    /// validation failures, which is exactly what this test exists to catch.
+    /// Skipping on any `Err` would turn a hash-verification test into one that
+    /// passes precisely when verification fails.
     #[test]
     fn supplied_corpus_is_hash_verified_and_never_auto_promoted() {
+        if resolve_root().is_none() {
+            eprintln!(
+                "SKIP supplied_corpus_is_hash_verified_and_never_auto_promoted: \
+                 Muse Variety Etudes v1 not installed. Set MUSE_VARIETY_ETUDES_DIR \
+                 (or place it at ~/Downloads/muse_variety_etudes_v1) to run it."
+            );
+            return;
+        }
+        // Installed: every assertion below must run, including hash verification.
         let corpus = corpus().expect("supplied teaching corpus");
         assert_eq!(corpus.summary.lessons.len(), 16);
         assert!(corpus.summary.validation_passed);

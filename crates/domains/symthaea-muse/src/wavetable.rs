@@ -243,6 +243,17 @@ mod tests {
             (sine_val - saw_val).abs() > 0.01,
             "morph should change output"
         );
+        // The endpoints differing is necessary but not sufficient for the
+        // property this test is named for: interpolation means the halfway
+        // morph lands BETWEEN its endpoints, which a hard table switch at
+        // some threshold would not do.
+        let lo = sine_val.min(saw_val);
+        let hi = sine_val.max(saw_val);
+        assert!(
+            tri_val >= lo && tri_val <= hi,
+            "halfway morph should interpolate between endpoints: \
+             {tri_val} not within [{lo}, {hi}]"
+        );
     }
 
     #[test]
@@ -254,6 +265,12 @@ mod tests {
         assert!(osc.phase > 0.0, "phase should advance");
         // At 440Hz/44100, phase advances ~0.01 per sample
         assert!((osc.phase - 440.0 * 2.0 / 44100.0).abs() < 0.001);
+        // Advancing phase must actually move the read position, not just the
+        // counter: two consecutive samples of a non-DC table differ.
+        assert!(
+            (s1 - s2).abs() > f32::EPSILON,
+            "consecutive samples should differ as phase advances: {s1} vs {s2}"
+        );
     }
 
     #[test]

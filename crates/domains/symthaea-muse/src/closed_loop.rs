@@ -93,12 +93,13 @@ mod tests {
     use crate::musical_inference::MusicAction;
     use crate::piece_recipe::RendererRecipe;
     use symthaea_music_theory::{
-        CompositionSpec, Emphasis, Key, MusicalIntent, Pitch, PitchClass, ScoreNote, Style,
+        CompositionSpec, Emphasis, Key, MusicalIntent, PartId, Pitch, PitchClass, ScoreNote, Style,
         VoiceRole,
     };
 
     fn note(pitch: Pitch, onset: Duration) -> ScoreNote {
         ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch,
             onset,
             duration: Duration::quarter(),

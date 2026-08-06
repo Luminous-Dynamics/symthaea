@@ -670,6 +670,20 @@ pub struct BrocaGenerationTelemetry {
     /// Science: Grice (1975) — cooperative principle; semantic coverage = communicative success.
     #[serde(default)]
     pub nsm_prime_coverage: f32,
+    /// Whether the generating `BrocaManager` loaded a real trained checkpoint.
+    ///
+    /// When `false`, the generator is a fresh genesis-random network and **every field above
+    /// describes token noise** — `quality`, `final_coherence`, and `nsm_*` are all still
+    /// computed, and all still meaningless. Read this before attributing any meaning to the
+    /// rest of this struct.
+    ///
+    /// Defaults to `false`, which is deliberately the pessimistic direction: telemetry that
+    /// never passed through a `BrocaManager` reports "untrained" rather than implying trained
+    /// output. It is also the historically correct value for records deserialized from before
+    /// 2026-07-28 — `BrocaManager::DEFAULT_CHECKPOINT` had been stale since the 2026-06-30
+    /// crate reorg, so those runs genuinely were untrained.
+    #[serde(default)]
+    pub trained_checkpoint_loaded: bool,
 }
 
 /// Broca→Mycelix factcheck bridge telemetry snapshot.
@@ -871,6 +885,21 @@ pub struct HarmonicMetrics {
 pub struct EthicalTelemetry {
     /// Moral judgment score for this cycle (-1.0 to 1.0). 0.0 when skipped.
     pub moral_score: f32,
+    /// Whether this cycle's moral evaluation flagged a concern: `moral_score` below
+    /// threshold, a consent violation, or any recorded violation. Text-content-driven
+    /// (sourced from the same-cycle `MoralParser` evaluation of the perceived input),
+    /// not an internal-metric proxy. Scoped to agent-action moral framing — see
+    /// `moral_violations` for the raw evidence behind this verdict.
+    #[serde(default)]
+    pub moral_concern_detected: bool,
+    /// Whether this cycle's moral evaluation detected a consent violation.
+    #[serde(default)]
+    pub consent_violation: bool,
+    /// Raw violation descriptions from this cycle's moral evaluation (empty when none).
+    /// Kept alongside the derived booleans above so consumers see the evidence, not
+    /// just the verdict.
+    #[serde(default)]
+    pub moral_violations: Vec<String>,
     /// Moral violation category that triggered specific steering (empty when none).
     pub moral_steering_category: String,
     /// Unified value evaluator overall score (0.0–1.0, 0.0 when off).
@@ -1261,6 +1290,77 @@ pub struct ModuleTimings {
 
 // ── Substrate Telemetry ─────────────────────────────────────────────────────
 
+/// Which controller supplied the effective recurrent-dimension fraction.
+///
+/// Recorded so that a later result can never be ambiguous about *what actually
+/// chose the fraction*. Without this, a run configured with several potential
+/// sources (substrate pressure, spectral entropy, a fixed override) produces
+/// numbers whose provenance has to be reconstructed from config archaeology.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub enum EffectiveDimSource {
+    /// Recurrent dimension masking is switched off — no fraction is applied and
+    /// the full recurrent state survives. This is the default.
+    #[default]
+    Disabled,
+    /// `CognitiveLoopConfig::effective_dim_fraction_override` supplied the value
+    /// directly, bypassing substrate scale pressure entirely.
+    FixedOverride,
+    /// Derived from substrate scale pressure
+    /// (`log10(substrate_max_scale / bio_max_scale)`).
+    SubstratePressure,
+    /// Derived from measured spectral entropy of the CfC dynamics.
+    SpectralEntropy,
+    /// Reserved. **Never constructed today** — no prediction-error controller
+    /// exists. Present so that adding one cannot silently reuse another
+    /// variant's label. Do not read a result as prediction-error-driven unless
+    /// this variant actually appears in its telemetry.
+    PredictionError,
+}
+
+/// One recurrent-state masking event, recorded at the site where it happened.
+///
+/// # What this mechanism is, precisely
+///
+/// A **fixed-suffix recurrent-state lesion applied after a full-width CfC step**.
+/// It is *not* compute-efficient adaptive dimensionality:
+///
+/// - `temporal_network.step()` always runs at full width; the mask reads the
+///   resulting state, zeroes a contiguous tail, and re-injects it. A fraction
+///   below 1.0 therefore **costs strictly more** compute than 1.0, never less.
+/// - The same trailing dimensions are removed every time. Surviving dimensions
+///   were never trained to absorb what the tail carried, so this is a lesion /
+///   capacity-restriction probe, not reallocation.
+///
+/// `mask_overhead_us` and `step_duration_us` are recorded to *confirm the
+/// absence* of a compute saving, not to demonstrate one. Any efficiency claim
+/// needs a genuinely narrowed computation path, which this is not.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct RecurrentMaskEvent {
+    /// Fraction requested by the controller before clamping/guarding.
+    pub requested_fraction: f32,
+    /// Fraction actually used to compute the mask boundary.
+    pub applied_fraction: f32,
+    /// Which controller supplied `applied_fraction`.
+    pub source: EffectiveDimSource,
+    /// Whether the mask actually ran. False when the fraction was >= 1.0 (no-op)
+    /// or the recurrent state could not be read.
+    pub executed: bool,
+    /// Total recurrent state dimensions seen this cycle.
+    pub dims_total: usize,
+    /// Number of trailing dimensions zeroed (0 when `executed` is false).
+    pub dims_zeroed: usize,
+    /// L2 norm of the recurrent state before masking.
+    pub pre_mask_norm: f32,
+    /// L2 norm of the recurrent state after masking.
+    pub post_mask_norm: f32,
+    /// Wall-clock cost of the read → mask → inject sequence (microseconds).
+    /// This is pure overhead added on top of the full-width step.
+    pub mask_overhead_us: u64,
+    /// Wall-clock cost of the full-width `temporal_network.step()` (microseconds).
+    /// Unaffected by `applied_fraction` — recorded to make that explicit.
+    pub step_duration_us: u64,
+}
+
 /// Substrate telemetry snapshot returned by `SubstrateManager::telemetry()`.
 ///
 /// Groups all substrate-related fields into a single struct for assignment
@@ -1302,8 +1402,22 @@ pub struct SubstrateTelemetry {
     pub energy_throughput_multiplier: f32,
     /// Effective HDC/CfC dimensionality fraction [0.1, 1.0].
     /// 1.0 for substrates at or above biological scale.
+    ///
+    /// This is the *configured* fraction. It says nothing about whether a mask
+    /// actually ran — read `recurrent_mask` for that.
     #[serde(default = "default_one_f32_substrate")]
     pub effective_dim_fraction: f32,
+    /// Which controller supplied `effective_dim_fraction`.
+    ///
+    /// Describes the *configured* provider. The controller that actually
+    /// applied a mask this cycle is `recurrent_mask.source`, which can differ
+    /// (e.g. spectral entropy dominating substrate pressure at the mask site).
+    #[serde(default)]
+    pub effective_dim_source: EffectiveDimSource,
+    /// The recurrent-state masking event for this cycle, if one was recorded.
+    /// `None` when masking is disabled or no mask site was reached.
+    #[serde(default)]
+    pub recurrent_mask: Option<RecurrentMaskEvent>,
     /// Number of substrate transitions recorded so far.
     #[serde(default)]
     pub transition_count: usize,

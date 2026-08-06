@@ -101,14 +101,16 @@ pub fn available() -> Option<(PathBuf, PathBuf)> {
     Some((binary, soundfont))
 }
 
-/// Render a Standard MIDI File to peak-normalized 16-bit stereo WAV bytes
-/// via FluidSynth. Returns `None` (caller falls back to the native
-/// renderer) when the environment lacks fluidsynth/soundfont, the render
-/// fails, or the result is silent.
+/// Render a Standard MIDI File to MASTERED 16-bit stereo WAV bytes via
+/// FluidSynth. Returns `None` (caller falls back to the native renderer) when
+/// the environment lacks fluidsynth/soundfont, the render fails, or the result
+/// is silent.
 ///
 /// FluidSynth's default gain (0.2) leaves our deliberately-soft velocities
-/// whisper-quiet, so the render runs at gain 0.8 and the PCM is then
-/// normalized to −1.5 dBFS peak — the same ceiling the native master uses.
+/// whisper-quiet, so the render runs at gain 0.8 and the PCM then goes through
+/// [`master_wav`] — the same BS.1770-4 chain and the same
+/// [`crate::auto_master::MasteringConfig`] the native path uses, so the two
+/// renderers are post-processed identically.
 pub fn render_midi_to_wav(
     midi_path: &Path,
     sample_rate: u32,
@@ -169,13 +171,44 @@ pub fn render_midi_to_wav(
         let _ = std::fs::remove_file(&out);
         return None;
     }
-    let result = normalize_wav(&out);
+    let result = master_wav(&out);
     let _ = std::fs::remove_file(&out);
     result
 }
 
-/// Read a WAV, peak-normalize to −1.5 dBFS, re-encode as 16-bit in memory.
-fn normalize_wav(path: &Path) -> Option<Vec<u8>> {
+/// Read a WAV, run the full mastering chain, re-encode as 16-bit in memory.
+///
+/// This used to be `normalize_wav`: a single peak scan and one gain multiply to
+/// −1.5 dBFS. That made the PREFERRED renderer the one with *strictly weaker*
+/// post-processing. The native path runs [`crate::auto_master::auto_master`] —
+/// real ITU-R BS.1770-4 K-weighting with both gates, corrective 3-band EQ,
+/// section leveling and a brick-wall limiter — at `theory_realize.rs:1643`,
+/// while FluidSynth output got none of it. Every one of `auto_master`'s
+/// listening-tuned defaults was inert on the renderer an A/B test had chosen.
+///
+/// Both paths now run the same chain with the same `MasteringConfig::default()`,
+/// so a FluidSynth-vs-native comparison measures the renderers rather than the
+/// mastering.
+///
+/// CORRECTION (2026-07-30). An earlier version of this comment claimed the
+/// original A/B listening test was confounded by the native arm being
+/// unmastered. **That was wrong, and the truth runs the other way.** Checked
+/// against history: `auto_master` was wired into `realize_core` on 2026-07-08
+/// (`4c613f9d49`), and this file — with its A/B claim — first appeared on
+/// 2026-07-10 (`c0fda87d0b`), with the `auto_master` call verified present in
+/// `theory_realize.rs` at that commit. So the native arm WAS mastered and the
+/// FluidSynth arm was peak-normalized only: FluidSynth won *despite* the weaker
+/// post-processing, which strengthens the preference rather than undermining it.
+///
+/// The error came from misreading `theory_realize.rs`'s own comment ("never
+/// called from ANY generation path before this") as describing the state at the
+/// time of the listening test, when it describes the state before 2026-07-08 —
+/// two days earlier.
+///
+/// What remains genuinely untested is narrower: now that both arms share one
+/// mastering chain, the comparison is FAIR for the first time (it was previously
+/// unfair AGAINST FluidSynth), so re-running it measures renderer timbre alone.
+fn master_wav(path: &Path) -> Option<Vec<u8>> {
     let mut reader = hound::WavReader::open(path).ok()?;
     let spec_in = reader.spec();
     let samples: Vec<f32> = match spec_in.sample_format {
@@ -193,9 +226,28 @@ fn normalize_wav(path: &Path) -> Option<Vec<u8>> {
     if peak < 1e-5 {
         return None; // silence — treat as a failed render
     }
-    let gain = 0.84 / peak; // −1.5 dBFS, matching the native master ceiling
+
+    // `auto_master` works on stereo frames. FluidSynth renders stereo, but
+    // handle mono defensively by duplicating the channel rather than failing.
+    let channels = spec_in.channels.max(1) as usize;
+    let mut frames: Vec<[f32; 2]> = match channels {
+        1 => samples.iter().map(|&s| [s, s]).collect(),
+        _ => samples
+            .chunks_exact(channels)
+            .map(|c| [c[0], c[1 % channels]])
+            .collect(),
+    };
+    crate::auto_master::auto_master(
+        &mut frames,
+        spec_in.sample_rate,
+        &crate::auto_master::MasteringConfig::default(),
+    );
+
+    // Re-encode as stereo regardless of input channel count: `frames` is always
+    // stereo after the conversion above, so writing `spec_in.channels` would
+    // mislabel a mono input's now-stereo data and halve its playback rate.
     let spec_out = hound::WavSpec {
-        channels: spec_in.channels,
+        channels: 2,
         sample_rate: spec_in.sample_rate,
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
@@ -203,9 +255,11 @@ fn normalize_wav(path: &Path) -> Option<Vec<u8>> {
     let mut cursor = std::io::Cursor::new(Vec::new());
     {
         let mut writer = hound::WavWriter::new(&mut cursor, spec_out).ok()?;
-        for s in &samples {
-            let v = (s * gain * 32767.0).clamp(-32768.0, 32767.0) as i16;
-            writer.write_sample(v).ok()?;
+        for f in &frames {
+            for s in f {
+                let v = (s * 32767.0).clamp(-32768.0, 32767.0) as i16;
+                writer.write_sample(v).ok()?;
+            }
         }
         writer.finalize().ok()?;
     }
@@ -269,7 +323,7 @@ mod tests {
     }
 
     #[test]
-    fn normalize_rejects_silence_and_scales_real_audio() {
+    fn masters_real_audio_to_the_loudness_target_and_rejects_silence() {
         let dir = std::env::temp_dir();
         let quiet = dir.join(format!("muse_norm_test_{}.wav", std::process::id()));
         let spec = hound::WavSpec {
@@ -278,23 +332,49 @@ mod tests {
             bits_per_sample: 16,
             sample_format: hound::SampleFormat::Int,
         };
-        // A very quiet sine must normalize up to the −1.5 dBFS ceiling.
+        // A very quiet sine must come back LOUDNESS-normalized to the
+        // mastering target, not merely peak-scaled. This assertion is the
+        // regression: the previous implementation peak-normalized to exactly
+        // 0.84 (−1.5 dBFS) and this test asserted that constant, which is
+        // precisely the weaker post-processing the FluidSynth path used to get
+        // while the native path ran the full BS.1770-4 chain. Asserting LUFS
+        // instead of peak is what makes the two paths' behaviour comparable.
         let mut w = hound::WavWriter::create(&quiet, spec).unwrap();
-        for i in 0..4410 {
+        for i in 0..44100 {
             let s = (i as f32 * 0.06).sin() * 0.01;
             w.write_sample((s * 32767.0) as i16).unwrap();
         }
         w.finalize().unwrap();
-        let bytes = normalize_wav(&quiet).expect("real audio normalizes");
+        let bytes = master_wav(&quiet).expect("real audio masters");
         let mut r = hound::WavReader::new(std::io::Cursor::new(bytes)).unwrap();
-        let peak = r
+        let out_spec = r.spec();
+        // `master_wav` always emits stereo: it upmixes mono before mastering,
+        // so writing the input channel count would mislabel the data.
+        assert_eq!(out_spec.channels, 2, "master_wav must emit stereo");
+        let frames: Vec<[f32; 2]> = r
             .samples::<i16>()
             .filter_map(Result::ok)
-            .fold(0i32, |m, s| m.max((s as i32).abs()));
+            .map(|s| s as f32 / 32767.0)
+            .collect::<Vec<_>>()
+            .chunks_exact(2)
+            .map(|c| [c[0], c[1]])
+            .collect();
+
+        let target = crate::auto_master::MasteringConfig::default().target_lufs;
+        let out = crate::auto_master::measure_lufs(&frames, out_spec.sample_rate);
         assert!(
-            (peak as f32 / 32767.0 - 0.84).abs() < 0.02,
-            "peak {} should sit at the -1.5dBFS ceiling",
-            peak
+            (out.integrated - target).abs() < 2.0,
+            "mastered output should land near {target} LUFS, got {} — a peak-only \
+             normalizer would not hit a loudness target at all",
+            out.integrated
+        );
+
+        let peak = frames.iter().flatten().fold(0.0f32, |m, s| m.max(s.abs()));
+        let ceiling =
+            10f32.powf(crate::auto_master::MasteringConfig::default().limiter_ceiling_db / 20.0);
+        assert!(
+            peak <= ceiling + 0.02,
+            "peak {peak} must stay under the limiter ceiling {ceiling}"
         );
         std::fs::remove_file(&quiet).ok();
 
@@ -305,7 +385,7 @@ mod tests {
             w.write_sample(0i16).unwrap();
         }
         w.finalize().unwrap();
-        assert!(normalize_wav(&silent).is_none());
+        assert!(master_wav(&silent).is_none());
         std::fs::remove_file(&silent).ok();
     }
 }

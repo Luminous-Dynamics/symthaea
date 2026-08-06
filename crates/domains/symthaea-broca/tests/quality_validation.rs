@@ -409,8 +409,23 @@ fn test_combined_gating_effects() {
 // 6. Intent Discrimination Quality
 // ===========================================================================
 
+/// Smoke test: distinct intents must not collapse to bit-identical token sequences.
+///
+/// **This is not a quality gate**, despite its former name
+/// (`test_intent_discrimination_quality`). It never trains: it constructs a generator from a
+/// `GenesisSeed` and generates immediately, so it measures *untrained, genesis-random*
+/// weights. Different intents produce different `ThoughtChannels` → different thought HVs →
+/// almost surely different token sequences, so the assertion below is near-automatic and
+/// passes regardless of whether Broca has learned anything.
+///
+/// Kept because it does catch a real failure mode — a generator that ignores its thought
+/// input entirely, or a channel-encoding bug that maps every intent to the same HV — but
+/// renamed 2026-07-28 so it stops being read as evidence of discrimination *quality*. A real
+/// quality gate has to train first and compare per-intent token distributions against an
+/// untrained control; that does not exist yet (Step 2 of
+/// `SYMTHAEA_BROCA_IMPROVEMENT_PLAN_2026-07-28.md`).
 #[test]
-fn test_intent_discrimination_quality() {
+fn test_intent_produces_distinct_sequences_untrained() {
     // For each of 8 intents, generate 3 times with different seeds.
     // Different intents should produce different token sequences.
     let seeds = [
@@ -447,15 +462,19 @@ fn test_intent_discrimination_quality() {
         }
     }
 
-    // At least half of intent pairs should produce different outputs
+    // At least half of intent pairs should produce different outputs.
+    // On an untrained network this is near-automatic — failing it means the generator is
+    // ignoring its thought input, not that it discriminates intents poorly.
     assert!(
         different_pairs > total_pairs / 2,
-        "Only {different_pairs}/{total_pairs} intent pairs produced different token sequences. \
-         Intent discrimination is too weak.",
+        "Only {different_pairs}/{total_pairs} intent pairs produced different token sequences \
+         on an UNTRAINED generator. Distinct intents give distinct thought HVs, so near-total \
+         collapse here points at the thought-input path (channel encoding, or the generator \
+         not conditioning on thought_hv at all) rather than at generation quality.",
     );
 
     eprintln!(
-        "Intent discrimination: {different_pairs}/{total_pairs} pairs differ ({}%)",
+        "Intent sequence distinctness (untrained): {different_pairs}/{total_pairs} pairs differ ({}%)",
         different_pairs * 100 / total_pairs
     );
 }
