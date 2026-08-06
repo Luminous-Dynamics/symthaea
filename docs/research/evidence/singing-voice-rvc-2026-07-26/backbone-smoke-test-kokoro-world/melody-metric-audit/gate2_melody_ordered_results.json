@@ -1,0 +1,470 @@
+[
+  {
+    "id": "positive_control",
+    "wer": 0.0,
+    "n_notes": 6,
+    "n_segments": 6,
+    "order_blind_median_cents": 4.1,
+    "ordered_median_cents": 3.9,
+    "ordered_frac_within_50c": 0.88,
+    "worst_note_cents": 15.6,
+    "per_note": [
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 7.4,
+        "observed_median_hz": 261.8,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 293.66,
+        "median_cents_err": 1.7,
+        "observed_median_hz": 293.8,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 329.63,
+        "median_cents_err": 5.0,
+        "observed_median_hz": 329.6,
+        "voiced_frames": 67
+      },
+      {
+        "target_hz": 392.0,
+        "median_cents_err": 4.0,
+        "observed_median_hz": 391.8,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 440.0,
+        "median_cents_err": 3.4,
+        "observed_median_hz": 440.3,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 15.6,
+        "observed_median_hz": 261.3,
+        "voiced_frames": 21
+      }
+    ]
+  },
+  {
+    "id": "conversational",
+    "wer": 0.167,
+    "n_notes": 6,
+    "n_segments": 6,
+    "order_blind_median_cents": 3.3,
+    "ordered_median_cents": 2.9,
+    "ordered_frac_within_50c": 0.887,
+    "worst_note_cents": 18.5,
+    "per_note": [
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 0.7,
+        "observed_median_hz": 261.6,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 293.66,
+        "median_cents_err": 1.0,
+        "observed_median_hz": 293.7,
+        "voiced_frames": 69
+      },
+      {
+        "target_hz": 329.63,
+        "median_cents_err": 4.1,
+        "observed_median_hz": 329.1,
+        "voiced_frames": 34
+      },
+      {
+        "target_hz": 392.0,
+        "median_cents_err": 3.7,
+        "observed_median_hz": 391.6,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 440.0,
+        "median_cents_err": 6.4,
+        "observed_median_hz": 440.3,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 18.5,
+        "observed_median_hz": 262.5,
+        "voiced_frames": 51
+      }
+    ]
+  },
+  {
+    "id": "repeated_syllables",
+    "wer": 0.2,
+    "n_notes": 5,
+    "n_segments": 5,
+    "order_blind_median_cents": 2.4,
+    "ordered_median_cents": 2.4,
+    "ordered_frac_within_50c": 0.926,
+    "worst_note_cents": 7.5,
+    "per_note": [
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 1.7,
+        "observed_median_hz": 261.6,
+        "voiced_frames": 69
+      },
+      {
+        "target_hz": 293.66,
+        "median_cents_err": 1.4,
+        "observed_median_hz": 293.7,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 329.63,
+        "median_cents_err": 3.3,
+        "observed_median_hz": 329.3,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 392.0,
+        "median_cents_err": 1.2,
+        "observed_median_hz": 391.9,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 440.0,
+        "median_cents_err": 7.5,
+        "observed_median_hz": 439.3,
+        "voiced_frames": 70
+      }
+    ]
+  },
+  {
+    "id": "rapid_letter_names",
+    "wer": 1.0,
+    "n_notes": 7,
+    "n_segments": 7,
+    "order_blind_median_cents": 3.0,
+    "ordered_median_cents": 2.4,
+    "ordered_frac_within_50c": 0.831,
+    "worst_note_cents": 49.9,
+    "per_note": [
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 1.3,
+        "observed_median_hz": 261.4,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 293.66,
+        "median_cents_err": 5.4,
+        "observed_median_hz": 293.8,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 329.63,
+        "median_cents_err": 28.2,
+        "observed_median_hz": 328.6,
+        "voiced_frames": 10
+      },
+      {
+        "target_hz": 392.0,
+        "median_cents_err": 1.8,
+        "observed_median_hz": 391.7,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 440.0,
+        "median_cents_err": 0.4,
+        "observed_median_hz": 440.0,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 19.8,
+        "observed_median_hz": 258.7,
+        "voiced_frames": 41
+      },
+      {
+        "target_hz": 293.66,
+        "median_cents_err": 49.9,
+        "observed_median_hz": 294.2,
+        "voiced_frames": 31
+      }
+    ]
+  },
+  {
+    "id": "phrase_final_stops",
+    "wer": 0.143,
+    "n_notes": 7,
+    "n_segments": 7,
+    "order_blind_median_cents": 2.2,
+    "ordered_median_cents": 2.0,
+    "ordered_frac_within_50c": 0.946,
+    "worst_note_cents": 5.8,
+    "per_note": [
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 5.8,
+        "observed_median_hz": 261.9,
+        "voiced_frames": 61
+      },
+      {
+        "target_hz": 293.66,
+        "median_cents_err": 0.5,
+        "observed_median_hz": 293.6,
+        "voiced_frames": 69
+      },
+      {
+        "target_hz": 329.63,
+        "median_cents_err": 2.3,
+        "observed_median_hz": 329.2,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 392.0,
+        "median_cents_err": 3.2,
+        "observed_median_hz": 392.0,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 440.0,
+        "median_cents_err": 1.1,
+        "observed_median_hz": 439.8,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 1.8,
+        "observed_median_hz": 261.8,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 293.66,
+        "median_cents_err": null,
+        "observed_median_hz": null,
+        "voiced_frames": 0
+      }
+    ]
+  },
+  {
+    "id": "fricative_heavy",
+    "wer": 0.667,
+    "n_notes": 6,
+    "n_segments": 6,
+    "order_blind_median_cents": 4.3,
+    "ordered_median_cents": 4.0,
+    "ordered_frac_within_50c": 0.742,
+    "worst_note_cents": 38.8,
+    "per_note": [
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 1.7,
+        "observed_median_hz": 261.4,
+        "voiced_frames": 50
+      },
+      {
+        "target_hz": 293.66,
+        "median_cents_err": 4.2,
+        "observed_median_hz": 293.1,
+        "voiced_frames": 68
+      },
+      {
+        "target_hz": 329.63,
+        "median_cents_err": 5.4,
+        "observed_median_hz": 328.8,
+        "voiced_frames": 102
+      },
+      {
+        "target_hz": 392.0,
+        "median_cents_err": 0.8,
+        "observed_median_hz": 391.9,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 440.0,
+        "median_cents_err": 2.6,
+        "observed_median_hz": 440.6,
+        "voiced_frames": 67
+      },
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 38.8,
+        "observed_median_hz": 261.4,
+        "voiced_frames": 100
+      }
+    ]
+  },
+  {
+    "id": "consonant_clusters",
+    "wer": 0.25,
+    "n_notes": 4,
+    "n_segments": 4,
+    "order_blind_median_cents": 6.8,
+    "ordered_median_cents": 7.2,
+    "ordered_frac_within_50c": 0.798,
+    "worst_note_cents": 13.7,
+    "per_note": [
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 3.1,
+        "observed_median_hz": 261.5,
+        "voiced_frames": 61
+      },
+      {
+        "target_hz": 293.66,
+        "median_cents_err": 5.0,
+        "observed_median_hz": 293.1,
+        "voiced_frames": 59
+      },
+      {
+        "target_hz": 329.63,
+        "median_cents_err": 13.7,
+        "observed_median_hz": 330.3,
+        "voiced_frames": 81
+      },
+      {
+        "target_hz": 392.0,
+        "median_cents_err": 8.4,
+        "observed_median_hz": 391.9,
+        "voiced_frames": 101
+      }
+    ]
+  },
+  {
+    "id": "long_sustained_vowels",
+    "wer": 0.8,
+    "n_notes": 5,
+    "n_segments": 5,
+    "order_blind_median_cents": 4.1,
+    "ordered_median_cents": 3.7,
+    "ordered_frac_within_50c": 0.873,
+    "worst_note_cents": 7.7,
+    "per_note": [
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 1.4,
+        "observed_median_hz": 261.7,
+        "voiced_frames": 69
+      },
+      {
+        "target_hz": 293.66,
+        "median_cents_err": 7.7,
+        "observed_median_hz": 293.2,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 329.63,
+        "median_cents_err": 4.4,
+        "observed_median_hz": 328.9,
+        "voiced_frames": 69
+      },
+      {
+        "target_hz": 392.0,
+        "median_cents_err": 2.4,
+        "observed_median_hz": 391.9,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 440.0,
+        "median_cents_err": 5.2,
+        "observed_median_hz": 439.7,
+        "voiced_frames": 91
+      }
+    ]
+  },
+  {
+    "id": "short_unstressed",
+    "wer": 0.0,
+    "n_notes": 7,
+    "n_segments": 7,
+    "order_blind_median_cents": 1.6,
+    "ordered_median_cents": 1.4,
+    "ordered_frac_within_50c": 0.945,
+    "worst_note_cents": 4.3,
+    "per_note": [
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 1.3,
+        "observed_median_hz": 261.7,
+        "voiced_frames": 68
+      },
+      {
+        "target_hz": 293.66,
+        "median_cents_err": 0.4,
+        "observed_median_hz": 293.7,
+        "voiced_frames": 67
+      },
+      {
+        "target_hz": 329.63,
+        "median_cents_err": 3.9,
+        "observed_median_hz": 330.3,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 392.0,
+        "median_cents_err": 1.0,
+        "observed_median_hz": 391.9,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 440.0,
+        "median_cents_err": 0.6,
+        "observed_median_hz": 439.9,
+        "voiced_frames": 66
+      },
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 4.3,
+        "observed_median_hz": 261.3,
+        "voiced_frames": 62
+      },
+      {
+        "target_hz": 293.66,
+        "median_cents_err": 1.6,
+        "observed_median_hz": 293.8,
+        "voiced_frames": 70
+      }
+    ]
+  },
+  {
+    "id": "semantically_unusual",
+    "wer": 0.2,
+    "n_notes": 5,
+    "n_segments": 5,
+    "order_blind_median_cents": 3.7,
+    "ordered_median_cents": 3.7,
+    "ordered_frac_within_50c": 0.885,
+    "worst_note_cents": 8.4,
+    "per_note": [
+      {
+        "target_hz": 261.63,
+        "median_cents_err": 3.1,
+        "observed_median_hz": 261.3,
+        "voiced_frames": 69
+      },
+      {
+        "target_hz": 293.66,
+        "median_cents_err": 3.1,
+        "observed_median_hz": 294.0,
+        "voiced_frames": 57
+      },
+      {
+        "target_hz": 329.63,
+        "median_cents_err": 4.1,
+        "observed_median_hz": 330.0,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 392.0,
+        "median_cents_err": 0.6,
+        "observed_median_hz": 392.1,
+        "voiced_frames": 70
+      },
+      {
+        "target_hz": 440.0,
+        "median_cents_err": 8.4,
+        "observed_median_hz": 438.9,
+        "voiced_frames": 82
+      }
+    ]
+  }
+]

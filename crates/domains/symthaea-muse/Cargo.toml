@@ -17,6 +17,7 @@ hound = { workspace = true }
 flacenc = "0.5.1"
 rustfft = { workspace = true }
 midly = "0.5"
+roxmltree = "0.20"
 serde_json = { workspace = true }
 sha2 = "0.10"
 bevy = { version = "0.18", default-features = false, optional = true }
@@ -41,13 +42,13 @@ anyhow = { workspace = true, optional = true }
 tokenizers = { version = "0.21", optional = true }
 
 # Muse Studio local web app (feature `studio`).
-axum = { workspace = true, optional = true }
+axum = { workspace = true, optional = true, features = ["multipart"] }
 tokio = { workspace = true, optional = true }
 tower-http = { version = "0.5", features = ["cors", "fs"], optional = true }
 # Genealogy ledger (src/genealogy.rs): structured/relational metadata only —
 # audio/MIDI bytes stay in the existing data/taste/audio/<key>/ content-
 # addressed layout, matching the workspace's established embedded-DB choice
-# (symthaea-memory, symthaea-nix also use rusqlite).
+# (symthaea-memory, nixward also use rusqlite).
 rusqlite = { workspace = true, optional = true }
 # Shared DTOs for Muse Studio's evidence-bundle endpoints (listen/performance/
 # provenance bundles) and title provenance. Also proves at compile time that
@@ -97,6 +98,10 @@ name = "clap_fad_compare"
 required-features = ["clap-fad"]
 
 [[example]]
+name = "baroque_campaign"
+required-features = ["theory"]
+
+[[example]]
 name = "prompt_steering"
 required-features = ["clap-fad", "theory"]
 
@@ -107,6 +112,14 @@ required-features = ["studio"]
 [[bin]]
 name = "listening_test"
 required-features = ["studio"]
+
+# Paired, level-matched, blind A/B listening pack -- the cheap loop that sits
+# between informal listening and the full `cognitive_study` apparatus. Only
+# needs LUFS measurement and WAV I/O, both in the default build, so it is
+# deliberately NOT gated on `studio`/`theory`: the point is that it is trivial
+# to run.
+[[bin]]
+name = "ab_listening_pack"
 
 [[bin]]
 name = "cognitive_study"
@@ -121,10 +134,6 @@ name = "muse152_listening_pack"
 required-features = ["theory"]
 
 [[bin]]
-name = "muse_motif_foundry_pilot"
-required-features = ["theory"]
-
-[[bin]]
 name = "cognitive_study_runner"
 required-features = ["studio"]
 
@@ -136,3 +145,23 @@ required-features = ["theory"]
 name = "render_ablation"
 required-features = ["theory"]
 
+
+[[example]]
+name = "renderer_ab_fair"
+required-features = ["theory"]
+
+[[example]]
+name = "validator_calibration"
+required-features = ["theory"]
+
+[[example]]
+name = "performance_calibration"
+required-features = ["theory"]
+
+[[example]]
+name = "vocabulary_calibration"
+required-features = ["theory"]
+
+[[example]]
+name = "rhythm_gate_calibration"
+required-features = ["theory"]

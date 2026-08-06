@@ -10,7 +10,7 @@ use wasm_bindgen_futures::JsFuture;
 
 use crate::components::glass_panel::GlassPanel;
 use crate::i18n::{self, Lang};
-use crate::pages::remote_install::RemoteInstallPanel;
+use crate::pages::remote_install::{MAX_RELAY_MESSAGE_BYTES, RemoteInstallPanel};
 use crate::worker::EngineWorker;
 use symthaea_app_db::config_gen;
 use symthaea_app_db::validation;
@@ -2019,6 +2019,19 @@ pub fn InstallPage() -> impl IntoView {
                         >::new(
                             move |e: web_sys::MessageEvent| {
                                 if let Some(text) = e.data().as_string() {
+                                    // sovereign-scan listens on a fixed
+                                    // local port, but anything able to
+                                    // write to it (another local process,
+                                    // a compromised --serve instance)
+                                    // must not be able to make this tab
+                                    // parse and hold an unbounded payload.
+                                    if text.len() > MAX_RELAY_MESSAGE_BYTES {
+                                        set_status.set(
+                                            "Scanner message exceeded the 1 MiB safety limit."
+                                                .into(),
+                                        );
+                                        return;
+                                    }
                                     if let Ok(msg) =
                                         serde_json::from_str::<serde_json::Value>(&text)
                                     {
@@ -3208,7 +3221,7 @@ pub fn InstallPage() -> impl IntoView {
                 <p>
                     <a href="https://github.com/Luminous-Dynamics/symthaea">{move || i18n::t(lang.get(), "footer_source")}</a>
                     " \u{00b7} "
-                    <a href="https://github.com/Luminous-Dynamics">"Luminous Dynamics"</a>
+                    <a href="https://luminousdynamics.org">"Luminous Dynamics"</a>
                     " \u{00b7} "
                     {move || i18n::t(lang.get(), "footer_no_tracking")}
                     " \u{00b7} "

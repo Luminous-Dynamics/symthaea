@@ -110,6 +110,25 @@ pub struct CognitiveLoopConfig {
     #[serde(default = "default_true")]
     pub memory_graduation: bool,
 
+    /// Predictive Compression Program C3 (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md
+    /// §7): when true, blend the top-1 episodic recall's stored `output` into the CfC's
+    /// prediction, gated on input-similarity ≥ `RECALL_BLEND_SIM_THRESHOLD`. Default: false —
+    /// a new capability starts inert (matches `training_frozen`/`reset_temporal_state`'s
+    /// pattern) so every existing C1 result stays reproducible bit-for-bit with this off.
+    ///
+    /// **Empirical status as of C3f (2026-07-26)**: across six sub-experiments, recall
+    /// blending measured net-neutral-to-harmful on every schedule tested, and — critically —
+    /// *which* content gets harmed is schedule-dependent (tier count / interleaving / per-tier
+    /// frequency), not a stable property of the content itself (see §C3f's "Headline finding").
+    /// Do not enable in production, and do not hand-tune the blend formula (e.g. a
+    /// `replay_count`-based discount) without a fresh causal experiment — any such change is
+    /// unvalidatable without re-running the full factorial, since the metric that would judge
+    /// "did this help" is itself schedule-dependent. One lead the program left open: a true
+    /// content-difficulty-controlled design (C3e's difficulty manipulation failed — see
+    /// §C3e's manipulation check).
+    #[serde(default)]
+    pub enable_episodic_recall_prediction: bool,
+
     /// Path to SQLite database for persistent memory storage.
     /// When `Some`, high-value episodes are periodically flushed to disk (every 199 cycles).
     /// On startup, existing episodes are rehydrated from the database.
@@ -465,8 +484,64 @@ pub struct CognitiveLoopConfig {
     /// units than biological neurons) degrade HDC encoding quality via bit-flip noise.
     /// This makes substrate differences *emergent* — constrained substrates produce
     /// noisier representations, leading to higher prediction error and lower Phi.
+    ///
+    /// Gates **only** the encoding-noise mechanism: the 16K `BinaryHV` bit-flip
+    /// and the mirrored 256D Gaussian noise on the compressed CfC input. Those
+    /// two are deliberately one switch — decoupling them would leave the CfC
+    /// network with a pristine input while the binary path was degraded, which
+    /// the noise mechanism's own call site notes would be "equivalent to faking
+    /// the robustness benchmark."
+    ///
+    /// Until 2026-07-29 this flag also gated recurrent dimension masking and
+    /// spectral-entropy masking. Those now have their own flags
+    /// (`enable_recurrent_dim_masking`, `enable_spectral_entropy_masking`) so a
+    /// controller comparison compares controllers rather than bundles.
     /// Default: false.
     pub enable_substrate_encoding_noise: bool,
+
+    /// Enable recurrent (CfC hidden state) dimension masking.
+    ///
+    /// Applies a **fixed-suffix lesion after a full-width step**: the CfC steps
+    /// at full width, then a trailing `(1 − fraction)` of the hidden state is
+    /// zeroed and re-injected. This *adds* compute; it never reduces it. Treat
+    /// it as a capacity-restriction / regularization probe, never as evidence
+    /// about metabolic efficiency. See [`RecurrentMaskEvent`] for the full
+    /// contract.
+    ///
+    /// The fraction comes from `effective_dim_fraction_override` when set,
+    /// otherwise from substrate scale pressure.
+    /// Default: false.
+    pub enable_recurrent_dim_masking: bool,
+
+    /// Enable spectral-entropy-driven recurrent dimension masking.
+    ///
+    /// A pre-existing controller: when measured spectral entropy of the CfC
+    /// dynamics exceeds its threshold, the retained fraction is reduced toward
+    /// a floor, then combined with the substrate fraction via `max` (least
+    /// aggressive wins). Requires the `spectral_state` feature to have any
+    /// effect. Same lesion mechanism and same cost caveat as
+    /// `enable_recurrent_dim_masking`.
+    /// Default: false.
+    pub enable_spectral_entropy_masking: bool,
+
+    /// Fixed override for the effective recurrent-dimension fraction.
+    ///
+    /// When `Some(f)`, `f` is used directly and takes precedence over substrate
+    /// scale pressure — independent of `substrate_type`, of
+    /// `enable_substrate_speed_modulation`, and of whether scale pressure was
+    /// ever computed. This exists so the masking mechanism can be exercised at
+    /// a chosen fraction without routing the experiment through substrate
+    /// constants that zero it out.
+    ///
+    /// Range `[0.0, 1.0]`; values outside are clamped with a warning. Unlike the
+    /// substrate-derived path (floored at `SUBSTRATE_MIN_DIM_FRACTION`), `0.0`
+    /// is permitted here and zeroes the entire recurrent state each cycle — a
+    /// full-lesion negative control. `1.0` is an exact no-op.
+    ///
+    /// Has no effect unless `enable_recurrent_dim_masking` is also true.
+    /// Default: `None`.
+    #[serde(default)]
+    pub effective_dim_fraction_override: Option<f32>,
 
     /// Enable Phi → tau feedback: SpectralMIP Phi modulates CfC delta_t.
     /// Higher Phi (more integrated information) → faster temporal dynamics,
@@ -903,6 +978,7 @@ impl Default for CognitiveLoopConfig {
             causal_discovery_interval: 100,
             episodic_replay_training: true,
             memory_graduation: true,
+            enable_episodic_recall_prediction: false,
             memory_db_path: None,
             aesthetic_memory_path: None,
             epistemic_auditor_db_path: None,
@@ -917,26 +993,42 @@ impl Default for CognitiveLoopConfig {
             enable_predictive_self: true,
             enable_attention_schema: true,
             enable_gwt: true,
-            enable_resonance: true,
-            enable_quantum_coherence: true,
-            enable_temporal_consciousness: true,
+            // Redesign (2026-07-26, SYMTHAEA_COGNITION_IMPROVEMENT_PLAN_2026-07-21.md
+            // Tier 2.1 decision): these 9 flags are the `ConsciousnessProfile::Full`-only
+            // additions on top of `Standard` (see config/consciousness.rs) -- and are 9 of
+            // the 15 subsystems `earn_or_demote.rs`'s "off15" arm and Keystone Phase 5
+            // ablated as a bundle. Evidence: Keystone found the full 15-subsystem bundle a
+            // net DRAG on prediction accuracy (worse PE than ablated, +~20% compute);
+            // earn-or-demote found ZERO measured difference on moral-judgment
+            // discrimination; the one dimension that might have justified keeping them
+            // (safety/threat discrimination) was never actually measured (harness bug, not
+            // a null result). Evidence is bundle-level, not per-subsystem, so this does NOT
+            // touch the other 6 of the 15 (surprise_exploration/prefrontal/meta_cognition/
+            // narrative_self/gwt/embodied_cognition above) -- those are `Standard`-tier,
+            // the project's own pre-existing foundational baseline, not something this
+            // session's aggregate-only evidence should unilaterally override. Callers that
+            // want the old always-on behavior back: `ConsciousnessProfile::Full.apply(&mut
+            // config)`, or flip these 9 fields individually.
+            enable_resonance: false,
+            enable_quantum_coherence: false,
+            enable_temporal_consciousness: false,
             enable_embodied_cognition: true,
             enable_narrative_gwt: true,
-            enable_dream_replay: true,
-            enable_predictive_processing: true,
+            enable_dream_replay: false,
+            enable_predictive_processing: false,
             enable_cross_modal_binding: true,
             enable_affective_bridge: true,
             enable_user_state_inference: true,
             enable_coherence_field: false,
-            enable_consciousness_thermodynamics: true,
-            enable_phenomenal_binding: true,
-            enable_hierarchical_free_energy: true,
+            enable_consciousness_thermodynamics: false,
+            enable_phenomenal_binding: false,
+            enable_hierarchical_free_energy: false,
             enable_trajectory_planning: true,
             trajectory_horizon_seconds: default_trajectory_horizon(),
             trajectory_planning_interval: default_trajectory_interval(),
             enable_hierarchical_bundling: true,
             enable_contextual_weights: true,
-            enable_phi_attention: true,
+            enable_phi_attention: false,
             enable_consciousness_engine: true,
             phi_measures_stimulus_only: false,
             enable_negation_detection: true,
@@ -967,6 +1059,9 @@ impl Default for CognitiveLoopConfig {
             validation_skepticism_floor: 0.5,
             enable_substrate_speed_modulation: false,
             enable_substrate_encoding_noise: false,
+            enable_recurrent_dim_masking: false,
+            enable_spectral_entropy_masking: false,
+            effective_dim_fraction_override: None,
             enable_phi_tau_feedback: true,
             substrate_type: SubstrateType::SiliconDigital,
             substrate_composition: None,
@@ -1285,9 +1380,17 @@ impl CognitiveLoopConfig {
     /// - HDC encoding degrades on scale-constrained substrates (bit-flip + Gaussian noise)
     /// - Consciousness feasibility is tempered by honest evidence confidence
     /// - Energy budget tracks cumulative joules per substrate
+    ///
+    /// This helper is the compatibility seam for the 2026-07-29 flag split: it
+    /// sets the masking flags too, so callers of `enable_substrate_simulation()`
+    /// keep exactly the behavior they had when one flag gated everything. Code
+    /// that wants masking *without* encoding noise (or vice versa) should set
+    /// the individual flags rather than calling this.
     pub fn enable_substrate_simulation(&mut self) -> &mut Self {
         self.enable_substrate_speed_modulation = true;
         self.enable_substrate_encoding_noise = true;
+        self.enable_recurrent_dim_masking = true;
+        self.enable_spectral_entropy_masking = true;
         self.enable_validation_overlay = true;
         self.enable_energy_budget = true;
         self.substrate_transition_alpha =

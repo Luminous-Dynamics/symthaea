@@ -11,7 +11,7 @@
 //! generation, version graph) that doesn't exist yet.
 
 use leptos::prelude::*;
-use leptos_router::components::{Route, Router, Routes, A};
+use leptos_router::components::{A, Route, Router, Routes};
 use leptos_router::hooks::use_location;
 use leptos_router::path;
 use web_sys::HtmlAudioElement;

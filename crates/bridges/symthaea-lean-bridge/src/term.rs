@@ -46,13 +46,27 @@ pub enum LeanTerm {
 
 impl LeanTerm {
     /// Pretty-print a term as Lean 4 source. Precedence-naive (fully parenthesized).
+    ///
+    /// Every identifier is routed through [`crate::sanitize::sanitize_ident`]
+    /// before interpolation -- `LeanTerm`'s fields are public and can be
+    /// constructed directly with arbitrary strings (e.g. from an
+    /// externally-sourced `Proposition::Atom` name), so this is the only
+    /// choke point that can guarantee no caller-supplied string breaks out
+    /// of the emitted declaration. See `sanitize` module docs for why.
     pub fn to_lean(&self) -> String {
+        use crate::sanitize::sanitize_ident;
         match self {
-            LeanTerm::Ident(s) => s.clone(),
+            LeanTerm::Ident(s) => sanitize_ident(s),
             LeanTerm::App(f, a) => format!("({} {})", f.to_lean(), a.to_lean()),
-            LeanTerm::Lambda(x, body) => format!("(fun {} => {})", x, body.to_lean()),
-            LeanTerm::Forall(x, body) => format!("(∀ {}, {})", x, body.to_lean()),
-            LeanTerm::Exists(x, body) => format!("(∃ {}, {})", x, body.to_lean()),
+            LeanTerm::Lambda(x, body) => {
+                format!("(fun {} => {})", sanitize_ident(x), body.to_lean())
+            }
+            LeanTerm::Forall(x, body) => {
+                format!("(∀ {}, {})", sanitize_ident(x), body.to_lean())
+            }
+            LeanTerm::Exists(x, body) => {
+                format!("(∃ {}, {})", sanitize_ident(x), body.to_lean())
+            }
             LeanTerm::Implies(a, b) => format!("({} → {})", a.to_lean(), b.to_lean()),
             LeanTerm::And(a, b) => format!("({} ∧ {})", a.to_lean(), b.to_lean()),
             LeanTerm::Or(a, b) => format!("({} ∨ {})", a.to_lean(), b.to_lean()),

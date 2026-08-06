@@ -1,0 +1,405 @@
+{
+  "a": {
+    "best": "ɑː",
+    "confidence": 0.7,
+    "total": 327,
+    "distribution": {
+      "ɑː": 229,
+      "ɔ": 42,
+      "ʌ": 42,
+      "æ": 10,
+      "ə": 4
+    }
+  },
+  "ae": {
+    "best": "æ",
+    "confidence": 0.89,
+    "total": 418,
+    "distribution": {
+      "æ": 372,
+      "p": 24,
+      "ɐ": 20,
+      "b": 2
+    }
+  },
+  "ai": {
+    "best": "aɪ",
+    "confidence": 0.99,
+    "total": 411,
+    "distribution": {
+      "aɪ": 407,
+      "aɪə": 4
+    }
+  },
+  "ao": {
+    "best": "ʌ",
+    "confidence": 0.903,
+    "total": 361,
+    "distribution": {
+      "ʌ": 326,
+      "ɔ": 17,
+      "ə": 8,
+      "ɔː": 8,
+      "ɐ": 2
+    }
+  },
+  "au": {
+    "best": "aʊ",
+    "confidence": 0.995,
+    "total": 193,
+    "distribution": {
+      "aʊ": 192,
+      "uː": 1
+    }
+  },
+  "b": {
+    "best": "b",
+    "confidence": 0.994,
+    "total": 348,
+    "distribution": {
+      "b": 346,
+      "ŋ": 2
+    }
+  },
+  "ch": {
+    "best": "tʃ",
+    "confidence": 0.875,
+    "total": 64,
+    "distribution": {
+      "tʃ": 56,
+      "s": 8
+    }
+  },
+  "d": {
+    "best": "d",
+    "confidence": 0.97,
+    "total": 940,
+    "distribution": {
+      "d": 912,
+      "j": 24,
+      "t": 4
+    }
+  },
+  "dh": {
+    "best": "ð",
+    "confidence": 0.996,
+    "total": 449,
+    "distribution": {
+      "ð": 447,
+      "k": 2
+    }
+  },
+  "e": {
+    "best": "ɛ",
+    "confidence": 0.978,
+    "total": 359,
+    "distribution": {
+      "ɛ": 351,
+      "ɪ": 4,
+      "ð": 2,
+      "ə": 2
+    }
+  },
+  "ei": {
+    "best": "eɪ",
+    "confidence": 0.976,
+    "total": 335,
+    "distribution": {
+      "eɪ": 327,
+      "ɐ": 8
+    }
+  },
+  "eo": {
+    "best": "ə",
+    "confidence": 0.482,
+    "total": 970,
+    "distribution": {
+      "ə": 468,
+      "ɐ": 193,
+      "æ": 181,
+      "ɪ": 42,
+      "n": 24,
+      "ᵻ": 22,
+      "ɚ": 12,
+      "ɜː": 12,
+      "ɪʲ": 8,
+      "ɔː": 6,
+      "ʌ": 2
+    }
+  },
+  "er": {
+    "best": "ɚ",
+    "confidence": 0.69,
+    "total": 239,
+    "distribution": {
+      "ɚ": 165,
+      "ɜː": 66,
+      "ɔːɹ": 8
+    }
+  },
+  "f": {
+    "best": "f",
+    "confidence": 1.0,
+    "total": 344,
+    "distribution": {
+      "f": 344
+    }
+  },
+  "g": {
+    "best": "ɡ",
+    "confidence": 1.0,
+    "total": 178,
+    "distribution": {
+      "ɡ": 178
+    }
+  },
+  "h": {
+    "best": "h",
+    "confidence": 0.912,
+    "total": 274,
+    "distribution": {
+      "h": 250,
+      "æ": 24
+    }
+  },
+  "i": {
+    "best": "ɪ",
+    "confidence": 0.964,
+    "total": 872,
+    "distribution": {
+      "ɪ": 841,
+      "ᵻ": 22,
+      "ɛ": 2,
+      "ɹ": 2,
+      "n": 2,
+      "aɪ": 2,
+      "ɪʲ": 1
+    }
+  },
+  "ii": {
+    "best": "iː",
+    "confidence": 0.448,
+    "total": 632,
+    "distribution": {
+      "iː": 283,
+      "i": 151,
+      "iːʲ": 86,
+      "ɪ": 54,
+      "æ": 24,
+      "iʲ": 20,
+      "ɪʲ": 12,
+      "ɛ": 2
+    }
+  },
+  "j": {
+    "best": "dʒ",
+    "confidence": 0.974,
+    "total": 78,
+    "distribution": {
+      "dʒ": 76,
+      "ɪʲ": 1,
+      "j": 1
+    }
+  },
+  "k": {
+    "best": "k",
+    "confidence": 0.996,
+    "total": 548,
+    "distribution": {
+      "k": 546,
+      "æ": 2
+    }
+  },
+  "l": {
+    "best": "l",
+    "confidence": 1.0,
+    "total": 738,
+    "distribution": {
+      "l": 738
+    }
+  },
+  "m": {
+    "best": "m",
+    "confidence": 0.997,
+    "total": 623,
+    "distribution": {
+      "m": 621,
+      "t": 2
+    }
+  },
+  "n": {
+    "best": "n",
+    "confidence": 0.961,
+    "total": 1286,
+    "distribution": {
+      "n": 1236,
+      "d": 24,
+      "oʊ": 24,
+      "z": 2
+    }
+  },
+  "ng": {
+    "best": "ŋ",
+    "confidence": 0.991,
+    "total": 227,
+    "distribution": {
+      "ŋ": 225,
+      "ɪ": 2
+    }
+  },
+  "oi": {
+    "best": "ɪ",
+    "confidence": 0.667,
+    "total": 36,
+    "distribution": {
+      "ɪ": 24,
+      "ɔɪ": 10,
+      "oʊ": 2
+    }
+  },
+  "oo": {
+    "best": "ɔː",
+    "confidence": 0.543,
+    "total": 210,
+    "distribution": {
+      "ɔː": 114,
+      "ɔ": 44,
+      "ɚ": 32,
+      "ɑː": 18,
+      "m": 2
+    }
+  },
+  "ou": {
+    "best": "oʊ",
+    "confidence": 0.997,
+    "total": 577,
+    "distribution": {
+      "oʊ": 575,
+      "ɔ": 2
+    }
+  },
+  "p": {
+    "best": "p",
+    "confidence": 0.904,
+    "total": 249,
+    "distribution": {
+      "p": 225,
+      "i": 24
+    }
+  },
+  "r": {
+    "best": "ɹ",
+    "confidence": 0.937,
+    "total": 476,
+    "distribution": {
+      "ɹ": 446,
+      "h": 24,
+      "ɛɹ": 2,
+      "ɔːɹ": 2,
+      "ɪɹ": 2
+    }
+  },
+  "s": {
+    "best": "s",
+    "confidence": 0.987,
+    "total": 775,
+    "distribution": {
+      "s": 765,
+      "z": 8,
+      "t": 2
+    }
+  },
+  "sh": {
+    "best": "ʃ",
+    "confidence": 1.0,
+    "total": 102,
+    "distribution": {
+      "ʃ": 102
+    }
+  },
+  "t": {
+    "best": "t",
+    "confidence": 0.927,
+    "total": 950,
+    "distribution": {
+      "t": 881,
+      "ɾ": 67,
+      "s": 2
+    }
+  },
+  "th": {
+    "best": "θ",
+    "confidence": 0.923,
+    "total": 26,
+    "distribution": {
+      "θ": 24,
+      "ð": 2
+    }
+  },
+  "u": {
+    "best": "ʊ",
+    "confidence": 0.885,
+    "total": 104,
+    "distribution": {
+      "ʊ": 92,
+      "ʊɹ": 12
+    }
+  },
+  "uu": {
+    "best": "uː",
+    "confidence": 0.679,
+    "total": 517,
+    "distribution": {
+      "uː": 351,
+      "ə": 113,
+      "n": 24,
+      "ʌ": 12,
+      "ʊɹ": 12,
+      "ʊ": 4,
+      "aʊ": 1
+    }
+  },
+  "v": {
+    "best": "v",
+    "confidence": 1.0,
+    "total": 175,
+    "distribution": {
+      "v": 175
+    }
+  },
+  "w": {
+    "best": "w",
+    "confidence": 1.0,
+    "total": 455,
+    "distribution": {
+      "w": 455
+    }
+  },
+  "y": {
+    "best": "j",
+    "confidence": 0.879,
+    "total": 215,
+    "distribution": {
+      "j": 189,
+      "uː": 24,
+      "ɪʲ": 2
+    }
+  },
+  "z": {
+    "best": "z",
+    "confidence": 0.993,
+    "total": 280,
+    "distribution": {
+      "z": 278,
+      "ɪ": 2
+    }
+  },
+  "zh": {
+    "best": "ʒ",
+    "confidence": 1.0,
+    "total": 2,
+    "distribution": {
+      "ʒ": 2
+    }
+  }
+}

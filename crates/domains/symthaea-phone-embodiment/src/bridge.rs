@@ -10,7 +10,8 @@
 
 use image::GenericImageView;
 use symthaea_core::embodiment::{
-    EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry, GROUNDING_TEMPORAL, MotorSafetyLevel,
+    EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry, GROUNDING_TEMPORAL, MoralGateInput,
+    MotorSafetyLevel,
 };
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_vision_manifold::{VisionConfig, VisionManifold};
@@ -35,6 +36,9 @@ pub struct PhoneBridge {
     /// Current safety level (from Phi + overrides).
     current_safety: MotorSafetyLevel,
     safety_override: Option<MotorSafetyLevel>,
+    /// Ethics-layer veto, set by `apply_moral_gate`. Composed into
+    /// `current_safety` exactly like `safety_override` (most-restrictive-wins).
+    moral_safety: Option<MotorSafetyLevel>,
     /// Last perception HV.
     last_perception: Option<ContinuousHV>,
     /// Last executed action.
@@ -49,6 +53,11 @@ pub struct PhoneBridge {
     confirmation_mode: bool,
     /// Last template match similarity (from goal-directed search).
     last_match_similarity: Option<f32>,
+    /// Φ most recently supplied to a proposer, used to gate [`Self::execute_action`].
+    ///
+    /// Starts at 0.0 so that executing without ever having proposed refuses every
+    /// mutating action — Φ can only ever *restrict* authority here, never grant it.
+    last_phi: f64,
 }
 
 impl PhoneBridge {
@@ -92,6 +101,7 @@ impl PhoneBridge {
             target_h,
             current_safety: MotorSafetyLevel::Red, // Start at Red until first Phi assessment
             safety_override: None,
+            moral_safety: None,
             last_perception: None,
             last_action: None,
             proposed_action: None,
@@ -99,6 +109,7 @@ impl PhoneBridge {
             last_prediction_error: 0.0,
             confirmation_mode: true,
             last_match_similarity: None,
+            last_phi: 0.0,
         }
     }
 
@@ -201,14 +212,47 @@ impl PhoneBridge {
     /// Propose an action based on current visual state and consciousness level.
     ///
     /// In confirmation mode, this stores the proposal without executing.
+    /// Apply an ethics-layer verdict to this bridge.
+    ///
+    /// ADDED 2026-07-31. This crate previously overrode nothing, so it inherited
+    /// `EmbodimentBridge::apply_moral_gate`'s no-op default and **silently discarded
+    /// every moral veto** while still executing taps, swipes and `OpenUrl` on a real
+    /// connected device. The Phi gate worked throughout; only the moral path was absent.
+    /// Found by extending `tests/embodiment_moral_contract.rs` to the platforms it did
+    /// not cover -- exactly the regression class that test exists to catch.
+    ///
+    /// Mirrors the ladder used by every other platform: ahimsa violation or a BLOCKED
+    /// verdict forces Red, a consent violation forces Orange, CAUTION caps at Yellow.
+    pub fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        self.moral_safety =
+            if gate.ahimsa_violated || gate.verdict == MoralGateInput::VERDICT_BLOCKED {
+                Some(MotorSafetyLevel::Red)
+            } else if gate.consent_violation {
+                Some(MotorSafetyLevel::Orange)
+            } else if gate.verdict == MoralGateInput::VERDICT_CAUTION {
+                Some(MotorSafetyLevel::Yellow)
+            } else {
+                None
+            };
+    }
+
     /// Call `confirm_and_execute()` to actually dispatch it.
     pub fn propose_action(&mut self, phi: f64) -> PhoneAction {
+        // Record Φ so execute_action can enforce required_phi() at the chokepoint.
+        self.last_phi = phi;
         // Update safety level
         let phi_level = MotorSafetyLevel::from_phi(phi);
-        self.current_safety = match self.safety_override {
-            Some(override_level) => phi_level.max(override_level),
-            None => phi_level,
-        };
+        // Most-restrictive-wins across Phi, operator override, and the ethics layer.
+        // `max` is conservative here because MotorSafetyLevel's derived Ord follows
+        // declaration order Green < Yellow < Orange < Red.
+        let mut level = phi_level;
+        if let Some(override_level) = self.safety_override {
+            level = level.max(override_level);
+        }
+        if let Some(moral_level) = self.moral_safety {
+            level = level.max(moral_level);
+        }
+        self.current_safety = level;
 
         // At Red: no action
         if self.current_safety >= MotorSafetyLevel::Red {
@@ -266,12 +310,21 @@ impl PhoneBridge {
         goal_hv: &ContinuousHV,
         threshold: f32,
     ) -> PhoneAction {
+        // Record Φ so execute_action can enforce required_phi() at the chokepoint.
+        self.last_phi = phi;
         // Update safety level
         let phi_level = MotorSafetyLevel::from_phi(phi);
-        self.current_safety = match self.safety_override {
-            Some(override_level) => phi_level.max(override_level),
-            None => phi_level,
-        };
+        // Most-restrictive-wins across Phi, operator override, and the ethics layer.
+        // `max` is conservative here because MotorSafetyLevel's derived Ord follows
+        // declaration order Green < Yellow < Orange < Red.
+        let mut level = phi_level;
+        if let Some(override_level) = self.safety_override {
+            level = level.max(override_level);
+        }
+        if let Some(moral_level) = self.moral_safety {
+            level = level.max(moral_level);
+        }
+        self.current_safety = level;
 
         if self.current_safety >= MotorSafetyLevel::Red {
             return PhoneAction::NoOp;
@@ -528,7 +581,67 @@ impl PhoneBridge {
     }
 
     /// Execute an action directly (bypasses confirmation mode).
+    ///
+    /// Enforces the safety envelope at the one chokepoint every path funnels
+    /// through. Before 2026-07-31 this method had **no Φ check, no safety-level
+    /// check and no confirmation check** — it dispatched straight to ADB, and
+    /// `required_phi()` had exactly one non-test call site in the whole crate
+    /// (covering only `Tap`), so the declared thresholds for `Back`/`Home`
+    /// (0.20), `OpenUrl` (0.30), `Swipe` (0.35) and `Type` (0.50) were metadata
+    /// nothing enforced.
+    ///
+    /// Mutating actions (`is_mutating()`) are now refused when the current
+    /// safety level is Orange or worse, or when the Φ last supplied to a
+    /// proposer is below the action's `required_phi()`. `last_phi` starts at
+    /// 0.0, so calling this without ever proposing refuses everything mutating:
+    /// Φ can only ever *restrict* authority here, never grant it.
+    ///
+    /// For a deliberate, visible bypass use [`Self::execute_action_unchecked`].
     pub fn execute_action(&mut self, action: &PhoneAction) -> Result<(), String> {
+        if action.is_mutating() {
+            if self.current_safety >= MotorSafetyLevel::Orange {
+                return Err(format!(
+                    "refused {}: safety level {:?}",
+                    action.label(),
+                    self.current_safety
+                ));
+            }
+            if self.last_phi < action.required_phi() {
+                return Err(format!(
+                    "refused {}: phi {:.3} < required {:.3}",
+                    action.label(),
+                    self.last_phi,
+                    action.required_phi()
+                ));
+            }
+        }
+        self.execute_action_unchecked(action)
+    }
+
+    /// Declare the Φ authority for subsequent direct [`Self::execute_action`]
+    /// calls, for callers that drive the bridge manually rather than through a
+    /// proposer.
+    ///
+    /// The proposers set this implicitly from the Φ they are given; this is the
+    /// explicit form for operator-driven tools. It does not skip the gate —
+    /// every action is still checked against `required_phi()` and the current
+    /// safety level. It only supplies the Φ the check reads, so the declared
+    /// authority is visible at the call site instead of being an unstated 0.0.
+    pub fn set_phi_authority(&mut self, phi: f64) {
+        self.last_phi = phi;
+    }
+
+    /// The Φ currently authorising direct execution.
+    pub fn phi_authority(&self) -> f64 {
+        self.last_phi
+    }
+
+    /// Execute an action with **no** Φ, safety-level or confirmation check.
+    ///
+    /// Exists so that deliberate bypasses are visible in the source rather than
+    /// implicit. Prefer [`Self::execute_action`]; reach for this only when the
+    /// caller is enforcing its own envelope and that is stated at the call site.
+    pub fn execute_action_unchecked(&mut self, action: &PhoneAction) -> Result<(), String> {
         match action {
             PhoneAction::NoOp => Ok(()),
             PhoneAction::Screenshot => {
@@ -621,10 +734,39 @@ impl PhoneBridge {
 // ── EmbodimentBridge Implementation ──────────────────────────────────
 
 impl PhoneBridge {
-    /// Step the embodiment: capture screen → propose action → execute if not confirmation mode.
+    /// Step the embodiment: capture screen → propose action → execute if not
+    /// in confirmation mode.
     ///
-    /// This is the EmbodimentBridge-compatible step that maps thought HV to phone actions.
-    /// The thought HV is used as a goal template for visual search when in Green safety.
+    /// **The thought HV is accepted and ignored.** Target selection is purely
+    /// bottom-up: [`Self::propose_action`] taps the centroid of the
+    /// highest-`saliency` working-memory slot, and that saliency derives only
+    /// from temporal patch surprise — `VisionManifold::refresh_hypothesis_saliency`
+    /// (`manifold.rs:1660`) is the sole writer and computes
+    /// `mean(attention_values[patch_indices]).max(0.05)`, where `attention_values`
+    /// is `(1 - similarity(current_patch, previous_patch))`. There is no goal,
+    /// task, or template term anywhere in that chain, so wiring a
+    /// `CognitiveGoalSignal` in here would not move a single tap coordinate.
+    /// (`VisionManifold` holds no goal state at all — it lives one layer up on
+    /// `VisionBridge`, which this struct does not hold, and the consumer
+    /// `apply_attention_boost` is both `&self` and private.)
+    ///
+    /// Goal-directed targeting *is* implemented — [`Self::propose_goal_action`]
+    /// + `find_on_screen` select by cosine over position-unbound patch
+    /// appearance HVs — but it needs a goal in **appearance space** (from
+    /// `learn_template_from_region` / `load_template`). A raw cognition-space
+    /// `thought_hv` scores at the 16,384-D noise floor (~0.01, vs 1/√16384 =
+    /// 0.0078) against appearance HVs, so routing it there would match nothing
+    /// and fall through to the exploratory-swipe fallback every cycle — which
+    /// is *worse* than the status quo, since `Swipe` has a lower
+    /// `required_phi` (0.35) than `Tap` (0.40) and would fire in a wider band.
+    /// Closing this loop needs a cognition→appearance grounding map that does
+    /// not exist yet. See `tests/cognition_to_appearance_gap.rs`, which pins
+    /// the measurement.
+    ///
+    /// Note also that the tap gate is **not** Green, contrary to what this
+    /// comment claimed before 2026-07-31: [`Self::propose_action`] blocks only
+    /// Orange and Red, and `Tap::required_phi()` is 0.40, so taps are proposed
+    /// across the whole upper Yellow band (φ ∈ [0.40, 0.60]).
     pub fn step_embodiment(
         &mut self,
         _thought_hv: &symthaea_core::hdc::ContinuousHV,
@@ -687,6 +829,10 @@ impl symthaea_core::embodiment::EmbodimentBridge for PhoneBridge {
         self.step_embodiment(thought_hv, dt, phi)
     }
 
+    fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        PhoneBridge::apply_moral_gate(self, gate)
+    }
+
     fn encode_perception(&mut self) -> symthaea_core::hdc::ContinuousHV {
         self.encode_perception_hv()
     }
@@ -694,6 +840,7 @@ impl symthaea_core::embodiment::EmbodimentBridge for PhoneBridge {
     fn reset(&mut self) {
         self.current_safety = MotorSafetyLevel::Red;
         self.safety_override = None;
+        self.moral_safety = None;
         self.last_perception = None;
         self.last_action = None;
         self.proposed_action = None;

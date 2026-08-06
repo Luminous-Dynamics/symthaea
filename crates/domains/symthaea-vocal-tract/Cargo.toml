@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "LTC-driven articulatory synthesis: HDC encoder, controller, FEP agent, metrics"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["vocal-tract", "articulatory-synthesis", "hdc", "ltc", "formant"]
 categories = ["science", "algorithms", "multimedia::audio"]
 
@@ -17,8 +17,32 @@ symthaea-fep = { path = "../../core/symthaea-fep" }
 serde = { workspace = true }
 hound = { workspace = true, optional = true }
 rustfft = { workspace = true, optional = true }
+ed25519-dalek = { workspace = true, optional = true }
+blake3 = { workspace = true, optional = true }
+libc = { workspace = true, optional = true }
+# getrandom is workspace-pinned to 0.2 (predates ::fill()); this crate needs the 0.3+ API, so
+# pin directly rather than via workspace = true. Does not conflict with other workspace
+# members' 0.2 usage -- multiple getrandom majors already coexist in this workspace's lockfile.
+getrandom = { version = "0.3", optional = true }
+# zeroize is declared in the ROOT symthaea package's own [dependencies], not
+# [workspace.dependencies], so it can't be pulled in via workspace = true from this crate.
+zeroize = { version = "1.8", optional = true }
+# use-std is required for postcard::to_stdvec -- NOT "alloc" (confirmed against postcard
+# 1.1.3's real source: to_stdvec is #[cfg(feature = "use-std")]).
+postcard = { version = "1.1", features = ["use-std"], optional = true }
 
 [features]
 default = []
 hound = ["dep:hound"]
 mel-conversion = ["dep:rustfft"]
+# Opt-in: the checkpoint-durability/attestation subsystem (see
+# TRACK_B_RECOVERY_PLAN_2026-07-30.md). Thematically unrelated to voice synthesis, so kept
+# off the default build for consumers who only want speech.
+checkpoint-durability = [
+    "dep:ed25519-dalek",
+    "dep:blake3",
+    "dep:libc",
+    "dep:getrandom",
+    "dep:zeroize",
+    "dep:postcard",
+]

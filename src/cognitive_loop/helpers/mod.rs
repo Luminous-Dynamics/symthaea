@@ -242,6 +242,9 @@ impl CognitiveLoopService {
             bits_saved_persist: None,
             bits_saved_zero: None,
             bits_kappa: None,
+            recall_fired: false,
+            recall_similarity: None,
+            recall_matched_timestamp: None,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             metadata: super::CycleMetadata::default(),
             thought_vector: vec![0.0; 32],
@@ -414,6 +417,11 @@ impl CognitiveLoopService {
                 pattern_confidence,
             ) as f64;
         self.carryover.history.consciousness_level = consciousness_level;
+        // Provenance (instrumentation only, nothing gates on it): this is the HV-path
+        // writer, whose formula shares NO inputs with the text path's composite.
+        self.carryover.history.consciousness_level_source =
+            crate::cognitive_loop::types::carryover::GateWriter::HvConfidenceCoherence;
+        self.carryover.history.consciousness_level_written_at = self.stats.total_cycles;
 
         // 11. Buffer PsiAttestation record if enabled (mirrors cycle.rs step 10h.0)
         // For the HV path, unified_psi is derived from temporal coherence since
@@ -447,6 +455,9 @@ impl CognitiveLoopService {
             bits_saved_persist: None,
             bits_saved_zero: None,
             bits_kappa: None,
+            recall_fired: false,
+            recall_similarity: None,
+            recall_matched_timestamp: None,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             metadata: super::CycleMetadata {
                 urgency,

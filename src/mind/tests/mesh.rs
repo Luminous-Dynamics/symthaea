@@ -135,7 +135,7 @@ fn test_process_mesh_drains_inbox() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xFF; 2048]),
     });
@@ -241,18 +241,22 @@ fn test_process_mesh_updates_registry() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xAA; 2048]),
     });
+    // Normal, not Critical: this test is about registry/phi tracking, not
+    // authentication, and an unsigned Critical packet is fail-closed
+    // dropped before it ever reaches the registry (see
+    // ContinuousMind::process_mesh's is_critical gate).
     mind.mesh_inbox.push(WisdomPacket {
         source_id: [0x22; 8],
         sequence: 1,
         phi: 0.9,
-        urgency: MeshUrgency::Critical,
+        urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::Heartbeat,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xBB; 2048]),
     });
@@ -316,13 +320,30 @@ fn test_swarm_phi_boosts_consciousness() {
     // collapsed toward the same value, making `swarm > solo` fail whenever
     // both landed at ~0.0. See src/mind/tests/core.rs's test_consciousness_update
     // for the same root cause.
+    //
+    // Tick count: ConsciousnessCore's min_samples is 5 (consciousness_core.rs),
+    // so with exactly 5 ticks the real spectral Phi computation only turns on
+    // for the very last one -- consciousness_level ends up reading its first-
+    // ever (structurally unstable) measurement rather than a settled one,
+    // which was observed to saturate both minds at exactly 1.0 with no
+    // headroom left for the swarm-phi boost. 10 ticks gives the spectral
+    // window several real measurements to settle before this test reads it.
+    const TICKS: usize = 10;
     let base = ContinuousHV::random(512, 42);
+
+    // ContinuousHV::perturb() draws its entropy from a process-global atomic
+    // counter, not a caller-supplied seed -- calling it fresh in each mind's
+    // loop gives solo and swarm genuinely different perturbation sequences,
+    // an uncontrolled confound on top of the swarm-phi boost this test is
+    // trying to isolate. Precompute one sequence and replay it identically
+    // for both minds so the boost is the only thing that differs.
+    let perturbed: Vec<ContinuousHV> = (0..TICKS).map(|_| base.perturb(0.2)).collect();
 
     // Mind without peers
     let mut mind_solo = ContinuousMind::default();
     mind_solo.activate();
-    for _ in 0..5 {
-        mind_solo.perceive(base.perturb(0.2));
+    for p in &perturbed {
+        mind_solo.perceive(p.clone());
         mind_solo.tick();
     }
     let solo_consciousness = mind_solo.state.consciousness_level;
@@ -338,12 +359,12 @@ fn test_swarm_phi_boosts_consciousness() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     });
-    for _ in 0..5 {
-        mind_swarm.perceive(base.perturb(0.2));
+    for p in &perturbed {
+        mind_swarm.perceive(p.clone());
         mind_swarm.tick();
     }
     let swarm_consciousness = mind_swarm.state.consciousness_level;
@@ -745,7 +766,7 @@ fn test_mesh_stats_count_receives() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xAA; 2048]),
     });
@@ -785,7 +806,7 @@ fn test_peer_expiry_cleans_social_coherence() {
         urgency: crate::swarm::mesh::MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: symthaea_core::hdc::BinaryHV([0xFF; 2048]),
     };
@@ -931,7 +952,7 @@ fn test_bandwidth_metering_receive() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xAA; 2048]),
     });
@@ -976,7 +997,7 @@ fn test_mesh_telemetry_snapshot() {
         urgency: crate::swarm::mesh::MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     });
@@ -1160,7 +1181,7 @@ fn test_lora_double_loss_graceful() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0x42; 2048]),
     };
@@ -1238,7 +1259,7 @@ fn test_four_minds_mesh_stress() {
                     urgency: MeshUrgency::Normal,
                     timestamp_s: tick as u32,
                     payload_type: PayloadType::WisdomVector,
-                    auth_mac: 0,
+                    auth_mac: [0u8; 32],
                     ttl: 0,
                     wisdom: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(
                         &minds[i].state.current_thought,
@@ -1323,7 +1344,7 @@ fn test_mesh_inbox_backpressure() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0xAA; 2048]),
         });
@@ -1366,7 +1387,7 @@ fn test_mesh_outbox_backpressure() {
                 urgency: MeshUrgency::Normal,
                 timestamp_s: 0,
                 payload_type: PayloadType::WisdomVector,
-                auth_mac: 0,
+                auth_mac: [0u8; 32],
                 ttl: 0,
                 wisdom: BinaryHV([0; 2048]),
             },
@@ -1403,7 +1424,7 @@ fn test_mesh_dedup_same_packet() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xAA; 2048]),
     };
@@ -1442,7 +1463,7 @@ fn test_mesh_dedup_different_sequence() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0xAA; 2048]),
         });
@@ -1478,7 +1499,7 @@ fn test_mesh_dedup_ring_eviction() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -1499,7 +1520,7 @@ fn test_mesh_dedup_ring_eviction() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     });
@@ -1534,7 +1555,7 @@ fn test_mesh_process_rate_limits_flood() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     });
@@ -1551,7 +1572,7 @@ fn test_mesh_process_rate_limits_flood() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -1582,7 +1603,7 @@ fn test_mesh_process_rate_limits_flood() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     });
@@ -1596,7 +1617,7 @@ fn test_mesh_process_rate_limits_flood() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -1611,7 +1632,7 @@ fn test_mesh_process_rate_limits_flood() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -1696,7 +1717,7 @@ fn test_health_urgency_allows_cruise_when_healthy() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -1741,7 +1762,7 @@ fn test_populate_mesh_metadata() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xAA; 2048]),
     });
@@ -1896,7 +1917,7 @@ fn test_mesh_auth_rejects_unsigned_when_key_set() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xAA; 2048]),
     });
@@ -1929,7 +1950,7 @@ fn test_mesh_auth_passes_signed_packet() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xAA; 2048]),
     };
@@ -1964,7 +1985,7 @@ fn test_mesh_no_auth_key_passes_all() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xAA; 2048]),
     });
@@ -2003,7 +2024,7 @@ fn test_inbox_backpressure_drops_gradients_first() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::Heartbeat,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -2016,7 +2037,7 @@ fn test_inbox_backpressure_drops_gradients_first() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::Gradient,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -2029,7 +2050,7 @@ fn test_inbox_backpressure_drops_gradients_first() {
             urgency: MeshUrgency::Normal,
             timestamp_s: 0,
             payload_type: PayloadType::WisdomVector,
-            auth_mac: 0,
+            auth_mac: [0u8; 32],
             ttl: 0,
             wisdom: BinaryHV([0; 2048]),
         });
@@ -2067,7 +2088,7 @@ fn test_outbox_backpressure_drops_gradients_first() {
                 urgency: MeshUrgency::Normal,
                 timestamp_s: 0,
                 payload_type: PayloadType::Heartbeat,
-                auth_mac: 0,
+                auth_mac: [0u8; 32],
                 ttl: 0,
                 wisdom: BinaryHV([0; 2048]),
             },
@@ -2082,7 +2103,7 @@ fn test_outbox_backpressure_drops_gradients_first() {
                 urgency: MeshUrgency::Normal,
                 timestamp_s: 0,
                 payload_type: PayloadType::Gradient,
-                auth_mac: 0,
+                auth_mac: [0u8; 32],
                 ttl: 0,
                 wisdom: BinaryHV([0; 2048]),
             },
@@ -2121,7 +2142,7 @@ fn test_mesh_forward_decrements_ttl() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xAA; 2048]),
     });
@@ -2160,7 +2181,7 @@ fn test_mesh_no_forward_ttl_zero() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xBB; 2048]),
     });
@@ -2190,7 +2211,7 @@ fn test_mesh_no_forward_ttl_one() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 1,
         wisdom: BinaryHV([0xCC; 2048]),
     });
@@ -2276,7 +2297,7 @@ fn test_replay_on_new_peer() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0xFF; 2048]),
     });
@@ -2315,7 +2336,7 @@ fn test_no_replay_on_known_peer() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     });
@@ -2328,7 +2349,7 @@ fn test_no_replay_on_known_peer() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: BinaryHV([0; 2048]),
     });
@@ -2366,7 +2387,7 @@ fn test_aimd_additive_increase() {
         urgency: crate::swarm::mesh::MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: symthaea_core::hdc::BinaryHV([0; 2048]),
     });
@@ -2449,7 +2470,7 @@ fn test_aimd_budget_ceiling() {
         urgency: crate::swarm::mesh::MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: symthaea_core::hdc::BinaryHV([0; 2048]),
     });
@@ -2548,7 +2569,7 @@ fn test_aimd_increase_counter() {
         urgency: crate::swarm::mesh::MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: symthaea_core::hdc::BinaryHV::zero(),
     };
@@ -2617,7 +2638,7 @@ fn test_not_partitioned_with_active_peers() {
         urgency: crate::swarm::mesh::MeshUrgency::Normal,
         timestamp_s: 0,
         payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 0,
         wisdom: symthaea_core::hdc::BinaryHV::zero(),
     };
@@ -2901,7 +2922,7 @@ fn test_xchacha_send_receive_roundtrip() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 12345,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xAB; 2048]),
     };
@@ -2962,7 +2983,7 @@ fn test_rapid_key_rotation_under_load() {
                 urgency: MeshUrgency::Normal,
                 timestamp_s: 1_700_000_000,
                 payload_type: PayloadType::WisdomVector,
-                auth_mac: 0,
+                auth_mac: [0u8; 32],
                 ttl: 3,
                 wisdom: BinaryHV([rotation; 2048]),
             };
@@ -3101,7 +3122,7 @@ fn test_fragment_swap_rejected() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xCC; 2048]),
     };
@@ -3177,7 +3198,7 @@ fn test_fragment_cross_stream_rejected() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xAA; 2048]),
     };
@@ -3189,7 +3210,7 @@ fn test_fragment_cross_stream_rejected() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xBB; 2048]),
     };
@@ -3264,7 +3285,7 @@ fn test_fragment_replay_after_completion() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xDD; 2048]),
     };
@@ -3325,7 +3346,7 @@ fn test_downgrade_unencrypted_rejected() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xEE; 2048]),
     };
@@ -3366,7 +3387,7 @@ fn test_downgrade_legacy_format_backward_compat() {
         urgency: MeshUrgency::Normal,
         timestamp_s: 1_700_000_000,
         payload_type: PayloadType::WisdomVector,
-        auth_mac: 0,
+        auth_mac: [0u8; 32],
         ttl: 3,
         wisdom: BinaryHV([0xFF; 2048]),
     };
@@ -3440,18 +3461,24 @@ fn test_moral_topology_packet_roundtrip() {
 fn test_process_mesh_dispatches_moral_topology() {
     use crate::swarm::mesh::WisdomPacket;
 
+    let key = [0x42u8; 32];
     let mut mind = ContinuousMind::default();
     mind.activate();
+    mind.set_mesh_auth_key(Some(key));
 
-    // Create a moral topology packet via the factory method
+    // Create a moral topology packet via the factory method. MoralTopology
+    // packets are always treated as safety-critical (fail-closed without a
+    // valid MAC, see ContinuousMind::process_mesh), so it must be signed.
     let summary = crate::hdc::moral_topology::MoralTopologySummary {
         beta_0: 5,
         unity: 0.9,
         scenario_count: 10,
         ..Default::default()
     };
-    let packet =
+    let mut packet =
         WisdomPacket::from_moral_topology([10, 20, 30, 40, 50, 60, 70, 80], 1, 0.5, &summary);
+    let bytes = packet.to_bytes();
+    packet.auth_mac = crate::swarm::mesh::compute_packet_mac(&bytes, &key);
 
     mind.mesh_inbox.push(packet);
     mind.tick();

@@ -228,7 +228,6 @@ pub fn render_arrangement(
             //   every note, that IS the walk;
             // - only bowed/blown instruments: plucked/struck timbres are
             //   their attack.
-            #[cfg(not(target_arch = "wasm32"))]
             let legato_from_prev = ni > 0
                 && voice.role != VoiceRole::Bass
                 && voice
@@ -245,7 +244,6 @@ pub fn render_arrangement(
             // (swell toward ~40%, relax after) — a flat-gain 3-second note
             // is a note PARKED, not played. The held-arrival cadence tones
             // and the held climax are exactly these notes.
-            #[cfg(not(target_arch = "wasm32"))]
             let sustained_shape = note.duration >= 1.2
                 && voice
                     .instrument
@@ -359,6 +357,8 @@ pub fn render_arrangement(
                     fm_ratio,
                     filter_open,
                     filter_close,
+                    legato_from_prev,
+                    sustained_shape,
                 );
                 if config.enable_sub_bass && (ir - 1.0).abs() < 0.01 {
                     let sf = freq * 0.5;
@@ -394,6 +394,8 @@ pub fn render_arrangement(
                             fm_ratio,
                             filter_open,
                             filter_close,
+                            legato_from_prev,
+                            sustained_shape,
                         );
                     }
                 }
@@ -593,6 +595,12 @@ fn render_tone(
     fm_ratio: f32,
     filter_open: f32,
     filter_close: f32,
+    // `legato_from_prev`: this note continues a slur from the previous one —
+    // soften the attack transient and skip the ADSR attack ramp so it does not
+    // re-articulate. `sustained_shape`: long bowed/blown note, apply
+    // `messa_di_voce_arch`.
+    legato_from_prev: bool,
+    sustained_shape: bool,
 ) {
     let start = (note.start_time * sr) as usize;
     let dur = (note.duration * sr) as usize;
@@ -636,7 +644,26 @@ fn render_tone(
             break;
         }
         let t = i as f32 / sr;
-        let env = envelope(adsr, t, note.duration);
+        // Legato: a slurred note must not re-articulate. Advance the envelope
+        // past the attack segment so it opens on the decay ramp rather than from
+        // zero — the additive analogue of the sampled path's 40 ms
+        // attack-skip-into-the-recording, which has no waveform to skip into.
+        //
+        // But NOT as an instant jump to full: that is a click. The sampled path
+        // crossfades over 15 ms for exactly this reason (`render_vcsl_note`'s
+        // `fade_in`), so mirror that here. Net effect: the note is already
+        // sounding within 15 ms instead of climbing the instrument's own attack
+        // (50 ms for a violin, 300 ms for organ/pad), and it never dips to
+        // silence mid-slur.
+        const LEGATO_FADE_SECS: f32 = 0.015;
+        let mut env = if legato_from_prev {
+            envelope(adsr, t + adsr.attack, note.duration) * (t / LEGATO_FADE_SECS).clamp(0.0, 1.0)
+        } else {
+            envelope(adsr, t, note.duration)
+        };
+        if sustained_shape && dur > 0 {
+            env *= messa_di_voce_arch(i as f32 / dur as f32);
+        }
 
         // Filter cutoff follows envelope: bright at attack, darker at sustain
         let filter_ratio = filter_close + (filter_open - filter_close) * env;
@@ -688,7 +715,19 @@ fn render_tone(
             noise_rng = noise_rng.wrapping_mul(1103515245).wrapping_add(12345);
             let n = (noise_rng >> 8) as f32 / 8388608.0 - 1.0; // [-1, 1)
             let ramp = 1.0 - i as f32 / attack_samples as f32;
-            o += timbre.attack_amp * n * ramp * note.velocity * vol * 0.2;
+            // Legato SOFTENS the bow bite / breath chiff rather than erasing it.
+            // The sampled path learned this the hard way: its first cut skipped
+            // 80 ms of the recording, which removed the note starts entirely and
+            // strings read as "not played properly" (see `render_vcsl_note`'s
+            // 40 ms comment). A slur still has an articulation, just a gentler
+            // one, so this attenuates instead of gating to zero.
+            const LEGATO_TRANSIENT_SCALE: f32 = 0.3;
+            let transient = if legato_from_prev {
+                timbre.attack_amp * LEGATO_TRANSIENT_SCALE
+            } else {
+                timbre.attack_amp
+            };
+            o += transient * n * ramp * note.velocity * vol * 0.2;
         }
         bl[si] += o * gl;
         br[si] += o * gr;
@@ -876,6 +915,22 @@ fn render_vcsl_note(
         0.0
     };
     let mut src_pos = attack_skip_secs * sample.sample_rate as f32;
+    // How many output samples this recording can actually supply at
+    // `ratio`'s playback speed before running out -- a note whose
+    // duration+release outlasts the recording used to hard-stop here with
+    // no fade at all (`idx + 1 >= sample.frames.len() { break; }` below),
+    // an audible dropout on exactly the long/held notes (arrival cadences,
+    // climaxes) that matter most. When exhaustion would land before the
+    // note's own natural end, ramp the envelope to zero over the last
+    // `FADE_TAIL_SAMPLES` instead of cutting off mid-sustain.
+    const FADE_TAIL_SECS: f32 = 0.01;
+    let i_exhaust = if ratio > 0.0 {
+        ((sample.frames.len() as f32 - 1.0 - src_pos).max(0.0) / ratio).floor() as usize
+    } else {
+        usize::MAX
+    };
+    let fade_tail = ((FADE_TAIL_SECS * sr) as usize).max(1);
+    let fade_out_start = i_exhaust.saturating_sub(fade_tail);
     for i in 0..out_len {
         let si = start + i;
         if si >= bl.len() {
@@ -894,17 +949,11 @@ fn render_vcsl_note(
         if i >= fade_start && out_len > fade_start {
             env *= 1.0 - (i - fade_start) as f32 / (out_len - fade_start) as f32;
         }
+        if i_exhaust < out_len && i >= fade_out_start {
+            env *= (1.0 - (i - fade_out_start) as f32 / fade_tail as f32).clamp(0.0, 1.0);
+        }
         if sustained_shape && fade_start > 0 {
-            // Messa di voce: 0.85 at the bow start, swelling to 1.12 at
-            // 40% of the written duration, relaxing to 0.85 by the end.
-            // Piecewise-linear, so it adds no discontinuities of its own.
-            let pos = (i as f32 / fade_start as f32).min(1.0);
-            let arch = if pos < 0.4 {
-                0.85 + 0.27 * (pos / 0.4)
-            } else {
-                1.12 - 0.27 * ((pos - 0.4) / 0.6)
-            };
-            env *= arch;
+            env *= messa_di_voce_arch(i as f32 / fade_start as f32);
         }
         let o = s * env * gain;
         bl[si] += o * gl;
@@ -1092,15 +1141,59 @@ pub(crate) fn compute_adsr(state: &MusicalState) -> Adsr {
     }
 }
 
-pub(crate) fn envelope(adsr: &Adsr, t: f32, dur: f32) -> f32 {
-    if t < adsr.attack {
-        t / adsr.attack
-    } else if t < adsr.attack + adsr.decay {
-        1.0 - (t - adsr.attack) / adsr.decay * (1.0 - adsr.sustain)
-    } else if t < dur {
-        adsr.sustain
+/// Messa di voce gain multiplier at `pos`, the fraction of the note's written
+/// duration elapsed (clamped to `[0, 1]`).
+///
+/// 0.85 at the bow start, swelling to 1.12 at 40% through, relaxing to 0.85 by
+/// the end. Piecewise-linear, so it adds no discontinuities of its own — a
+/// flat-gain three-second note is a note PARKED, not played, and the held
+/// arrival-cadence tones and the held climax are exactly those notes.
+///
+/// Shared by the sampled path ([`render_vcsl_note`]) and the additive path
+/// ([`render_tone`]) so the two cannot drift apart. It was originally inline in
+/// the sampled path only, which is why the synthesis renderers — the ones that
+/// actually run whenever an instrument is not VCSL-mapped — had no swell at all.
+pub(crate) fn messa_di_voce_arch(pos: f32) -> f32 {
+    let pos = pos.clamp(0.0, 1.0);
+    if pos < 0.4 {
+        0.85 + 0.27 * (pos / 0.4)
     } else {
-        adsr.sustain * (1.0 - (t - dur) / adsr.release).max(0.0)
+        1.12 - 0.27 * ((pos - 0.4) / 0.6)
+    }
+}
+
+/// ADSR envelope value at time `t` for a note held `dur` seconds.
+///
+/// The release ramp starts from the level the envelope had actually REACHED at
+/// note-off, not from `adsr.sustain`. Anchoring it to `sustain` produced a step
+/// discontinuity on every note shorter than `attack + decay`, because such a
+/// note is still on the decay ramp — above `sustain` — when it is released.
+///
+/// Measured on the real `default_adsr` table before the fix: the step landed at
+/// `t = attack + decay` (NOT at note-off, where the old branch order kept the
+/// note on the decay curve) and reached **−6.24 dB** for a 100 ms piano note
+/// (0.005/0.3/0.3/0.4: 0.3000 → 0.1462), −4.08 dB for organ/pad, −3.97 dB for
+/// sitar. One sample wide, so it reads as a click — diffuse "digital grit"
+/// across every short note. Notes longer than `attack + decay` were already
+/// continuous and are unaffected: for those `level_at(dur) == adsr.sustain`,
+/// which is exactly what the old code used, so their output is bit-identical.
+pub(crate) fn envelope(adsr: &Adsr, t: f32, dur: f32) -> f32 {
+    // Attack → decay → sustain, evaluated at an arbitrary time. Zero-length
+    // attack/decay fall through naturally: `x < 0.0` and `x < attack + 0.0`
+    // are both false, the same way the previous branch chain handled them.
+    let level_at = |x: f32| -> f32 {
+        if x < adsr.attack {
+            x / adsr.attack
+        } else if x < adsr.attack + adsr.decay {
+            1.0 - (x - adsr.attack) / adsr.decay * (1.0 - adsr.sustain)
+        } else {
+            adsr.sustain
+        }
+    };
+    if t < dur {
+        level_at(t)
+    } else {
+        level_at(dur) * (1.0 - (t - dur) / adsr.release).max(0.0)
     }
 }
 
@@ -1288,6 +1381,8 @@ mod tests {
                 2.0,
                 8.0,
                 4.0,
+                false,
+                false,
             );
             let s = (note.start_time * sr) as usize;
             bl[s..s + n].to_vec()
@@ -1332,6 +1427,7 @@ mod tests {
         };
         render_tone(
             &mut bl, &mut br, sr, &note, 220.0, 1.0, 0.7, 0.7, timbre, &adsr, 0.0, 2.0, 12.0, 8.0,
+            false, false,
         );
         bl
     }
@@ -1485,7 +1581,7 @@ mod tests {
             };
             render_tone(
                 &mut bl, &mut br, sr, &note, 880.0, 1.0, 0.7, 0.7, &timbre, &adsr, 0.0, 2.0, 12.0,
-                8.0,
+                8.0, false, false,
             );
             bl
         };
@@ -1640,6 +1736,230 @@ mod tests {
             y > 0.0 && y < 1.0,
             "mid-attack should be between 0 and 1: {y}"
         );
+    }
+
+    /// The envelope must be CONTINUOUS across the whole note, for every real
+    /// instrument in the shipped ADSR table and for notes shorter than
+    /// `attack + decay`.
+    ///
+    /// Regression for a one-sample step of up to −6.24 dB. The release ramp used
+    /// to start from `adsr.sustain` regardless of where the envelope actually
+    /// was at note-off, so a short note — still descending the decay ramp, above
+    /// sustain — jumped down the instant it reached `attack + decay`. Measured
+    /// before the fix: piano @100 ms 0.3000 → 0.1462 (−6.24 dB), organ/pad
+    /// −4.08 dB, sitar −3.97 dB. Audible as a click on every short note.
+    ///
+    /// Scans densely rather than probing one point: the discontinuity was NOT at
+    /// note-off (the old branch order kept a short note on the decay curve past
+    /// `dur`), so a test that only checked `t == dur` would have passed while the
+    /// bug was live. That is exactly the mistake this test exists to prevent.
+    /// `legato_from_prev` and `sustained_shape` must actually CHANGE the
+    /// synthesized audio, not just be accepted as parameters.
+    ///
+    /// Both were computed per note in `render_arrangement` and passed to exactly
+    /// one consumer — `render_vcsl_note`. The three synthesis renderers that run
+    /// whenever an instrument is not VCSL-mapped did not take them at all, so on
+    /// the live path every note re-attacked through a slur and every long note
+    /// played at flat sustain gain. The code's own comments name these as the
+    /// cure for "the MIDI preview sound" and "a note PARKED, not played", and
+    /// they were reaching neither.
+    ///
+    /// Asserts the DIRECTION of each effect, not just that bytes differ.
+    ///
+    /// For legato the measurable intent is "does not re-articulate": the note is
+    /// already sounding within the 15 ms crossfade instead of climbing the
+    /// instrument's own attack (50 ms for a violin), and it never dips to silence
+    /// mid-slur. My first attempt asserted a QUIETER onset and failed — slurred
+    /// RMS 0.0954 vs plain 0.0234 — which is correct behaviour, not a bug:
+    /// skipping the attack ramp necessarily makes the start louder. That failure
+    /// also caught a real flaw in the first implementation, which jumped to full
+    /// amplitude instantly (a click); hence the crossfade.
+    #[test]
+    fn legato_and_sustained_shape_change_the_synthesized_audio() {
+        let sr = 44_100.0f32;
+        let render = |legato: bool, sustained: bool, dur: f32| -> Vec<f32> {
+            let note = Note {
+                frequency: 440.0,
+                start_time: 0.0,
+                duration: dur,
+                velocity: 0.8,
+            };
+            let n = ((dur + 1.0) * sr) as usize;
+            let mut bl = vec![0.0f32; n];
+            let mut br = vec![0.0f32; n];
+            let timbre = &NoteTimbre::for_instrument(Instrument::Violin, &note);
+            let adsr = Adsr::from(Instrument::Violin.default_adsr());
+            render_tone(
+                &mut bl,
+                &mut br,
+                sr,
+                &note,
+                note.frequency,
+                1.0,
+                0.7,
+                0.7,
+                timbre,
+                &adsr,
+                0.0,
+                2.0,
+                12.0,
+                8.0,
+                legato,
+                sustained,
+            );
+            bl
+        };
+        let rms = |xs: &[f32]| -> f32 {
+            if xs.is_empty() {
+                return 0.0;
+            }
+            (xs.iter().map(|x| x * x).sum::<f32>() / xs.len() as f32).sqrt()
+        };
+
+        let plain = render(false, false, 0.5);
+        let slurred = render(true, false, 0.5);
+        assert!(plain != slurred, "legato must change the rendered audio");
+
+        // Violin attack is 50 ms. Time to reach 90% of each render's own peak:
+        // legato must get there within roughly the 15 ms crossfade, plain must
+        // take substantially longer because it climbs the instrument's attack.
+        // Smoothed envelope in 1 ms RMS windows, then time to reach 90% of that
+        // envelope's OWN maximum. Self-normalizing, so it compares shapes rather
+        // than levels — the two renders have different peak amplitudes by design.
+        let time_to_90 = |xs: &[f32]| -> f32 {
+            let window = (0.001 * sr) as usize;
+            let env: Vec<f32> = xs.chunks(window).map(rms).collect();
+            let max = env.iter().fold(0.0f32, |m, &x| m.max(x));
+            env.iter()
+                .position(|&x| x >= 0.9 * max)
+                .map(|i| i as f32 * window as f32 / sr)
+                .unwrap_or(f32::MAX)
+        };
+        let (t_plain, t_slurred) = (time_to_90(&plain), time_to_90(&slurred));
+        assert!(
+            t_slurred < t_plain,
+            "legato must reach steady level sooner than the instrument's own attack: \
+             slurred {t_slurred:.4}s vs plain {t_plain:.4}s"
+        );
+        assert!(
+            t_slurred <= 0.025,
+            "legato should be sounding within ~the 15ms crossfade, got {t_slurred:.4}s"
+        );
+
+        // ...but it must NOT start at full amplitude — that is a click. The first
+        // sample has to be near silence, then rise over the crossfade.
+        assert!(
+            slurred[0].abs() < 0.01,
+            "legato must crossfade in, not jump to full (first sample {:.5})",
+            slurred[0]
+        );
+
+        // Messa di voce: the arch peaks at 40% through the written duration, so
+        // a swelled long note carries more energy there than a flat one.
+        let dur = 2.0f32;
+        let flat = render(false, false, dur);
+        let swelled = render(false, true, dur);
+        let (lo, hi) = ((0.35 * dur * sr) as usize, (0.45 * dur * sr) as usize);
+        let (flat_mid, swelled_mid) = (rms(&flat[lo..hi]), rms(&swelled[lo..hi]));
+        assert!(
+            swelled_mid > flat_mid * 1.05,
+            "messa di voce must swell by ~40% through the note: swelled RMS {swelled_mid:.6} \
+             vs flat {flat_mid:.6}"
+        );
+        // And the shared arch must be the same curve the sampled path uses.
+        assert!(
+            (messa_di_voce_arch(0.4) - 1.12).abs() < 1e-5,
+            "arch peak must be 1.12 at 40%"
+        );
+        assert!(
+            (messa_di_voce_arch(0.0) - 0.85).abs() < 1e-5
+                && (messa_di_voce_arch(1.0) - 0.85).abs() < 1e-5,
+            "arch must start and end at 0.85"
+        );
+    }
+
+    #[test]
+    fn envelope_is_continuous_for_every_instrument_and_short_notes() {
+        for inst in [
+            Instrument::Piano,
+            Instrument::Violin,
+            Instrument::Flute,
+            Instrument::Organ,
+            Instrument::Sitar,
+            Instrument::Trumpet,
+            Instrument::Cello,
+            Instrument::Pad,
+        ] {
+            let adsr = Adsr::from(inst.default_adsr());
+            // Steepest slope any legitimate segment can have (full scale per
+            // second): attack rises 1.0 over `attack`, decay falls
+            // `1 - sustain` over `decay`, release falls from at most 1.0 over
+            // `release`. A real discontinuity is O(1) and independent of the
+            // step size, so it clears this bound by orders of magnitude; a fast
+            // ramp does not. Comparing against a fixed constant instead would
+            // flag piano's 5 ms attack as a jump.
+            let max_slope = (1.0 / adsr.attack)
+                .max((1.0 - adsr.sustain) / adsr.decay)
+                .max(1.0 / adsr.release);
+            for &dur in &[0.05f32, 0.1, 0.15, 0.25, 0.5, 1.0, 2.0] {
+                let end = dur + adsr.release + 0.05;
+                let steps = 4000;
+                let dt = end / steps as f32;
+                let tolerance = dt * max_slope * 1.5 + 1e-6;
+                let mut prev = envelope(&adsr, 0.0, dur);
+                for i in 1..=steps {
+                    let t = end * i as f32 / steps as f32;
+                    let y = envelope(&adsr, t, dur);
+                    assert!(
+                        (y - prev).abs() <= tolerance,
+                        "{inst:?} dur={dur}: envelope jumped {:.4} -> {:.4} at t={t:.5} \
+                         (attack+decay={:.4}, tolerance {tolerance:.5}) — a step here is \
+                         an audible click",
+                        prev,
+                        y,
+                        adsr.attack + adsr.decay
+                    );
+                    prev = y;
+                }
+            }
+        }
+    }
+
+    /// Notes at least `attack + decay` long must be BIT-IDENTICAL to the old
+    /// implementation: for those, `level_at(dur)` is exactly `adsr.sustain`,
+    /// which is what the old release ramp used. This pins the fix as strictly
+    /// additive so it cannot silently change existing renders.
+    #[test]
+    fn envelope_long_notes_are_unchanged_by_the_release_anchor_fix() {
+        let old = |adsr: &Adsr, t: f32, dur: f32| -> f32 {
+            if t < adsr.attack {
+                t / adsr.attack
+            } else if t < adsr.attack + adsr.decay {
+                1.0 - (t - adsr.attack) / adsr.decay * (1.0 - adsr.sustain)
+            } else if t < dur {
+                adsr.sustain
+            } else {
+                adsr.sustain * (1.0 - (t - dur) / adsr.release).max(0.0)
+            }
+        };
+        for inst in [
+            Instrument::Piano,
+            Instrument::Violin,
+            Instrument::Flute,
+            Instrument::Organ,
+        ] {
+            let adsr = Adsr::from(inst.default_adsr());
+            let dur = adsr.attack + adsr.decay + 0.5; // comfortably long
+            let end = dur + adsr.release + 0.05;
+            for i in 0..=2000 {
+                let t = end * i as f32 / 2000.0;
+                assert_eq!(
+                    envelope(&adsr, t, dur).to_bits(),
+                    old(&adsr, t, dur).to_bits(),
+                    "{inst:?} at t={t}: long-note envelope must not change"
+                );
+            }
+        }
     }
 
     #[test]

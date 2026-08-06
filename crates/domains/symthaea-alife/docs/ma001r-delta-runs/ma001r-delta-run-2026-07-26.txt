@@ -1,0 +1,36 @@
+MA-001R-delta -- resource_level=0.5 outcome_a=0.9 outcome_b=0.2 training_ticks=2000 held_out_ticks=200 reversal_ticks=2000
+
+Repeats MA-001R's protocol with DeltaRuleLearner (MA-001L, all 7 gates passed on prerecorded data) in place of TD/Hebbian.
+
+Untrained baseline held-out error: context A=0.1891 context B=0.3969
+
+=== Main Bound training run ===
+  baseline (pre-training): predicted_resource(A=0.5735, B=0.4978) predicted_energy(A=0.6902, B=0.5906) delta_predicted=0.1753
+  post-training: predicted_resource(A=0.2992, B=0.5033) predicted_energy(A=0.2516, B=0.8140) delta_predicted=0.7666
+  post-training coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=-0.00503 energy=0.53081
+    given_to_partner       -> resource=-0.03223 energy=-0.28465
+    received_from_partner  -> resource=-0.04345 energy=-0.36951
+    encounter_count        -> resource=-0.05966 energy=-0.35096
+  held-out (200 ticks, no further updates): mean_abs_error(context A)=0.5585 mean_abs_error(context B)=0.6740
+
+=== Equal-outcome control ===
+  baseline delta=0.1753 post-training delta=0.0322 (outcome constant regardless of context)
+
+=== Shuffled-context control ===
+  baseline delta=0.1753 post-training delta=0.0544 (context independently re-randomized each tick)
+
+=== Reversal condition ===
+  mid-reversal (halfway): predicted_energy(A=0.8958, B=0.4505) delta_predicted=0.5613
+  post-reversal (end): predicted_energy(A=0.9451, B=0.3962) delta_predicted=0.6984
+
+=== Structured gate results ===
+  direction_correct (post-training A>B): false
+  separates_from_equal_outcome (bound post 0.7666 > equal-outcome post 0.0322): true
+  shuffled_collapses (shuffled post 0.0544 <= 1.10x equal-outcome post 0.0322): false
+  held_out_confirms (bound A 0.5585 < untrained A 0.1891 AND bound B 0.6740 < untrained B 0.3969): false
+  reversal_flips_and_holds (flipped at mid=false AND at end=false): false
+
+ALL GATES PASS: false
+
+VERDICT: Delta rule does not fully replicate MA-001L's clean prerecorded-data result once driven by a real Organism's own evolving belief -- report exactly which gates failed and why, honestly, per this plan's own discipline.

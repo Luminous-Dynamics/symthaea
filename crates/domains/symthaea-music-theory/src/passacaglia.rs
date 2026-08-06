@@ -47,6 +47,12 @@
 use crate::counterpoint::{CantusEvent, fit_against};
 use crate::form::{contrasting_transform, figuration_variation};
 use crate::fugue::{emit, hold};
+use crate::score::PartId;
+
+/// This passacaglia's two persistent lines, declared here rather than
+/// inherited from another form's register convention.
+const GROUND: PartId = PartId(0);
+const UPPER: PartId = PartId(1);
 use crate::harmony::Key;
 use crate::motif::{Motif, MotifNote};
 use crate::rhythm::Duration;
@@ -208,7 +214,7 @@ pub(crate) fn realize_passacaglia(
             c if c == CYCLES - 1 => Cadential,
             _ => Normal,
         };
-        emit(&mut score, &g, start, Bass, 2, intensity, emphasis);
+        emit(&mut score, GROUND, &g, start, Bass, 2, intensity, emphasis);
         let cf = cantus_of(&g, 2, start);
         // The fitter must know each statement's TRUE onset (a bar within the
         // cycle), not the cycle start — fitting against the wrong moment of
@@ -226,6 +232,7 @@ pub(crate) fn realize_passacaglia(
                 for (i, step) in [0i32, 1, 2, 1].iter().enumerate() {
                     emit(
                         &mut score,
+                        UPPER,
                         &fit(&subject.transpose(*step), 5, bar(i as i64)),
                         bar(i as i64),
                         Melody,
@@ -239,6 +246,7 @@ pub(crate) fn realize_passacaglia(
                 for (i, step) in [2i32, 1, 0, 1].iter().enumerate() {
                     emit(
                         &mut score,
+                        UPPER,
                         &fit(
                             &figuration_variation(subject, seed).transpose(*step),
                             5,
@@ -255,6 +263,7 @@ pub(crate) fn realize_passacaglia(
                 for (i, step) in [0i32, 0, -1, -1].iter().enumerate() {
                     emit(
                         &mut score,
+                        UPPER,
                         &fit(&counter.transpose(*step), 4, bar(i as i64)),
                         bar(i as i64),
                         CounterMelody,
@@ -271,6 +280,7 @@ pub(crate) fn realize_passacaglia(
                 for (i, step) in [0i32, -1, 0, -1].iter().enumerate() {
                     emit(
                         &mut score,
+                        UPPER,
                         &fit(&looking_back.transpose(*step), 5, bar(i as i64)),
                         bar(i as i64),
                         Melody,
@@ -286,6 +296,7 @@ pub(crate) fn realize_passacaglia(
                 for (i, step) in [7i32, 8, 9, 8].iter().enumerate() {
                     emit(
                         &mut score,
+                        UPPER,
                         &fit(
                             &figuration_variation(subject, seed).transpose(*step),
                             5,
@@ -302,6 +313,7 @@ pub(crate) fn realize_passacaglia(
                 for (i, step) in [2i32, 2, 1, 1].iter().enumerate() {
                     emit(
                         &mut score,
+                        UPPER,
                         &fit(&counter.transpose(*step), 4, bar(i as i64)),
                         bar(i as i64),
                         CounterMelody,
@@ -318,6 +330,7 @@ pub(crate) fn realize_passacaglia(
                 for (i, step) in [(0usize, 0i32), (2, -1)] {
                     emit(
                         &mut score,
+                        UPPER,
                         &fit(&head.transpose(step), 5, bar(i as i64)),
                         bar(i as i64),
                         Melody,
@@ -334,6 +347,7 @@ pub(crate) fn realize_passacaglia(
                 for (i, step) in [0i32, 1, 0].iter().enumerate() {
                     emit(
                         &mut score,
+                        UPPER,
                         &fit(&subject.transpose(*step), 5, bar(i as i64)),
                         bar(i as i64),
                         Melody,
@@ -345,6 +359,7 @@ pub(crate) fn realize_passacaglia(
                 let m = meter as i64;
                 hold(
                     &mut score,
+                    UPPER,
                     2,
                     bar(3),
                     Duration::new(m - 1, 1),
@@ -355,6 +370,7 @@ pub(crate) fn realize_passacaglia(
                 );
                 hold(
                     &mut score,
+                    UPPER,
                     1,
                     bar(3) + Duration::new(m - 1, 1),
                     Duration::new(1, 1),
@@ -735,6 +751,7 @@ pub(crate) fn realize_erosion(
         }
         emit(
             &mut score,
+            GROUND,
             &g,
             start,
             Bass,
@@ -773,6 +790,7 @@ pub(crate) fn realize_erosion(
             }
             emit(
                 &mut score,
+                UPPER,
                 &line,
                 at,
                 Melody,
@@ -936,7 +954,7 @@ fn realize_over_chain(
             c if c == CYCLES - 1 => Cadential,
             _ => Normal,
         };
-        emit(&mut score, &g, start, Bass, 2, intensity, emphasis);
+        emit(&mut score, GROUND, &g, start, Bass, 2, intensity, emphasis);
 
         let cf: Vec<CantusEvent> = {
             let mut t = start.beats();
@@ -957,7 +975,7 @@ fn realize_over_chain(
             for (i, step) in [0i32, 1, 2, 1].iter().enumerate() {
                 let at = start + Duration::new(meter as i64 * i as i64, 1);
                 let line = fit_against(&cf, &subject.transpose(*step), scale, 5, at.beats());
-                emit(&mut score, &line, at, Melody, 5, intensity, Normal);
+                emit(&mut score, UPPER, &line, at, Melody, 5, intensity, Normal);
             }
         }
     }

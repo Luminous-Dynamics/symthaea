@@ -17,9 +17,9 @@ pub mod market;
 
 pub use error::{EconomicsError, Result};
 pub use finance::{
-    AmortizationPeriod, IrrAnalysis, IrrOptions, IrrStatus, amortization_schedule,
-    annuity_payment, compound_interest, effective_annual_rate, future_value, irr, irr_analysis,
-    mirr, nominal_annual_rate, npv, present_value,
+    AmortizationPeriod, IrrAnalysis, IrrOptions, IrrStatus, amortization_schedule, annuity_payment,
+    compound_interest, effective_annual_rate, future_value, irr, irr_analysis, mirr,
+    nominal_annual_rate, npv, present_value,
 };
 pub use game::{Game2x2, MixedNash};
 pub use inequality::{

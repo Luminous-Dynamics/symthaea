@@ -562,10 +562,18 @@ mod tests {
         let exact_copy = novelty_bonus(&a, &a);
         let different = make_notes(&[500.0, 600.0, 700.0, 800.0]);
         let novel = novelty_bonus(&different, &a);
-        // Exact copy should score lower than something different
         assert!(
             exact_copy < 0.5,
             "exact copy should be penalized: {exact_copy}"
+        );
+        // The relative property is the one this test is named for: an exact
+        // copy must score strictly lower than genuinely different material.
+        // The absolute bound above cannot catch a novelty_bonus that
+        // penalizes everything equally.
+        assert!(
+            exact_copy < novel,
+            "exact copy should score below novel material: \
+             copy={exact_copy}, novel={novel}"
         );
     }
 

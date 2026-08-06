@@ -58,8 +58,33 @@ pub use policy::{AuditVerdict, AxiomPolicy, Violation, audit};
 pub use spec::{normalize_statement, source_contains_sorry, statement_matches};
 
 /// Everything the gate needs to decide accept/reject for one proof.
+///
+/// # Not a security boundary
+///
+/// Every field here is plain caller-supplied data. In particular,
+/// `print_axioms_output` is trusted completely -- nothing in this struct or
+/// in [`gate`] verifies it actually came from running `lean` on the proof
+/// in question. A caller (including a future self-authoring
+/// code-generation pipeline -- see this crate's own module docs on why
+/// that's the threat model) can construct a `GateInput` with a
+/// hand-fabricated, clean-looking `print_axioms_output` and get
+/// `GateReport::accepted() == true` with no proof ever having been
+/// checked.
+///
+/// `gate()` exists to unit-test the audit/spec policy logic in isolation
+/// from the Lean toolchain (see this crate's doctest and
+/// `integration_tests` module, none of which run real Lean). **For any
+/// real accept/reject decision, use
+/// `symthaea_lean_bridge::axiom_gate::audit_lean_file` instead** -- it
+/// shells out to the actual `lean` binary and gates on the real captured
+/// stdout, which is the only place this guarantee can actually live: Rust's
+/// type system can't distinguish "text that came from a real subprocess"
+/// from "text a caller typed in" once both are plain `&str` crossing the
+/// same trust domain, so the verification has to happen in the code that
+/// runs the subprocess, not in a wrapper type here.
 pub struct GateInput<'a> {
-    /// Raw output of `#print axioms <name>` from Lean.
+    /// Raw output of `#print axioms <name>` from Lean. See the struct-level
+    /// warning: this is trusted as-is, not authenticated.
     pub print_axioms_output: &'a str,
     /// Exact theorem name expected in the Lean report.
     pub expected_theorem: &'a str,
@@ -76,7 +101,12 @@ pub struct GateInput<'a> {
 pub struct GateReport {
     pub audit: AuditVerdict,
     pub spec_conforms: bool,
-    /// Why the external Lean evidence could not be authenticated, if applicable.
+    /// Set when `print_axioms_output` failed to parse, or parsed but named
+    /// a different theorem than `expected_theorem` -- an internal
+    /// consistency check on the (trusted, unauthenticated) input, not
+    /// cryptographic or process-level authentication. See
+    /// [`GateInput`]'s doc comment for what this crate does and does not
+    /// guarantee about evidence provenance.
     pub evidence_error: Option<String>,
 }
 
@@ -89,6 +119,11 @@ impl GateReport {
 }
 
 /// Run the full provenance + spec-conformance gate on one proof.
+///
+/// See [`GateInput`]'s doc comment: this function trusts its input
+/// completely and is not a security boundary on its own. Use
+/// `symthaea_lean_bridge::axiom_gate::audit_lean_file` for a real
+/// accept/reject decision backed by an actual Lean invocation.
 pub fn gate(input: &GateInput) -> GateReport {
     let (report, evidence_error) = match AxiomReport::parse(input.print_axioms_output) {
         Ok(report) if report.theorem == input.expected_theorem => (report, None),

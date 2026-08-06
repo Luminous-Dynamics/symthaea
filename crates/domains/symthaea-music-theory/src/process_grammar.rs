@@ -10,7 +10,7 @@ use crate::composer::MusicalIntent;
 use crate::harmony::Key;
 use crate::motif::{Motif, MotifNote};
 use crate::rhythm::Duration;
-use crate::score::{Emphasis, Score, ScoreNote, VoiceRole};
+use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 use crate::spec::{Attitude, CompositionSpec};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -102,6 +102,7 @@ pub fn realize_additive_process(
         for (index, event) in cell.notes.iter().take(prefix_len).enumerate() {
             let duration = event.duration;
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: scale.degree_pitch(event.degree.unwrap(), 5),
                 onset,
                 duration,
@@ -130,6 +131,7 @@ pub fn realize_additive_process(
             Duration::eighth()
         };
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: scale.degree_pitch([1, 5, 8, 5][pulse_index % 4], 4),
             onset: pulse,
             duration,
@@ -150,6 +152,7 @@ pub fn realize_additive_process(
             bar
         };
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: scale.degree_pitch(1, 2),
             onset: bass_onset,
             duration,

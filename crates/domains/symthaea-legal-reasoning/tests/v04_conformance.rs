@@ -1,25 +1,20 @@
 use symthaea_legal_reasoning::{
-    ActionEvent, Atom, CanonicalEvidence, EventId, EventOrder, FactAssertion, FactBase,
-    FactChange, FormalRule, InferenceError, InferenceProfile, Jural, LegalDate, Literal,
-    Modality, NormEvent, NormState, PartyId, ProofGraph, QueryId, RuleDependencyIndex,
-    RuleId, RuleKind, RulePack, RulePackId, SemanticProfileId, StructuredNorm,
-    TemporalDimensions, TemporalRevision, TemporalScope, TimedNorm, WaiverEvent,
-    assess_lifecycle_with_order, explain_query, infer, infer_at,
+    ActionEvent, Atom, CanonicalEvidence, EventId, EventOrder, FactAssertion, FactBase, FactChange,
+    FormalRule, InferenceError, InferenceProfile, Jural, LegalDate, Literal, Modality, NormEvent,
+    NormState, PartyId, ProofGraph, QueryId, RuleDependencyIndex, RuleId, RuleKind, RulePack,
+    RulePackId, SemanticProfileId, StructuredNorm, TemporalDimensions, TemporalRevision,
+    TemporalScope, TimedNorm, WaiverEvent, assess_lifecycle_with_order, explain_query, infer,
+    infer_at,
 };
 use symthaea_legal_reasoning::{
-    ActionId, DeonticProposition, EvaluationSession, EvidenceEnvelope, EvidenceManifest,
-    RevisionId,
+    ActionId, DeonticProposition, EvaluationSession, EvidenceEnvelope, EvidenceManifest, RevisionId,
 };
 
 fn positive(value: &str) -> Literal {
     Literal::Positive(Atom::new(value).unwrap())
 }
 
-fn rule(
-    id: &str,
-    premises: impl IntoIterator<Item = Literal>,
-    conclusion: Literal,
-) -> FormalRule {
+fn rule(id: &str, premises: impl IntoIterator<Item = Literal>, conclusion: Literal) -> FormalRule {
     FormalRule::new(
         RuleId::new(id).unwrap(),
         RuleKind::Defeasible,
@@ -35,21 +30,19 @@ fn recursive_result_explanation_and_proof_are_canonical() {
         .with_exceptions([positive("penguin")])
         .unwrap();
     let exception = rule("exception", [positive("bird")], positive("penguin"));
-    let pack = RulePack::new(
-        RulePackId::new("birds").unwrap(),
-        [default, exception],
-        [],
-    )
-    .unwrap();
+    let pack = RulePack::new(RulePackId::new("birds").unwrap(), [default, exception], []).unwrap();
     let facts = FactBase::new([FactAssertion::stipulated(positive("bird"))]);
     let result = infer(&pack, &facts, &InferenceProfile::grounded_blocking_v1()).unwrap();
     let explanation = explain_query(&pack, &result, &positive("flies"));
     let proof = ProofGraph::from_result(&result).slice_for(&positive("penguin"));
 
     assert!(!result.supports(&positive("flies")));
-    assert!(explanation.blocked_support.iter().any(|blocked| {
-        blocked.active_exceptions == vec![positive("penguin")]
-    }));
+    assert!(
+        explanation
+            .blocked_support
+            .iter()
+            .any(|blocked| { blocked.active_exceptions == vec![positive("penguin")] })
+    );
     assert!(!proof.edges.is_empty());
 
     let envelope = EvidenceEnvelope::new(
@@ -103,12 +96,7 @@ fn session_failure_does_not_commit_an_oscillating_change() {
     let b = rule("b", [positive("trigger")], positive("b"))
         .with_exceptions([positive("a")])
         .unwrap();
-    let pack = RulePack::new(
-        RulePackId::new("transaction").unwrap(),
-        [a, b],
-        [],
-    )
-    .unwrap();
+    let pack = RulePack::new(RulePackId::new("transaction").unwrap(), [a, b], []).unwrap();
     let mut session = EvaluationSession::new(
         pack,
         FactBase::default(),
@@ -117,9 +105,7 @@ fn session_failure_does_not_commit_an_oscillating_change() {
     .unwrap();
 
     assert!(matches!(
-        session.apply(
-            FactChange::new().add(FactAssertion::observed(positive("trigger")))
-        ),
+        session.apply(FactChange::new().add(FactAssertion::observed(positive("trigger")))),
         Err(InferenceError::Oscillation { .. })
     ));
     assert!(session.facts().is_empty());
@@ -143,12 +129,7 @@ fn explicit_same_day_event_order_controls_lifecycle() {
             proposition,
             occurred_on: date,
         }),
-        NormEvent::Action(ActionEvent::new(
-            action_id.clone(),
-            bearer,
-            action,
-            date,
-        )),
+        NormEvent::Action(ActionEvent::new(action_id.clone(), bearer, action, date)),
     ];
     let order = EventOrder::new([(waiver_id, 1), (action_id, 2)]).unwrap();
 

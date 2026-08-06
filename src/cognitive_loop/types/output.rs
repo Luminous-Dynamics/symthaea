@@ -52,6 +52,16 @@ pub struct CycleResult {
     /// Shared concentration κ behind the bits fields — Δcos = bits·ln2/κ
     /// (the quantity C1 verdicts use; Amendment 3).
     pub bits_kappa: Option<f32>,
+    /// Predictive Compression C3 (§7): whether episodic recall blended into
+    /// the prediction this cycle. Always false when
+    /// `enable_episodic_recall_prediction` is off (the default).
+    pub recall_fired: bool,
+    /// C3: top-1 recall similarity this cycle, when a recall was attempted.
+    pub recall_similarity: Option<f32>,
+    /// C3c (§7 Experiment C3c): write-cycle number of the matched episode,
+    /// when a recall was attempted — lets an external harness that knows
+    /// what each cycle number "was" look up the matched episode's provenance.
+    pub recall_matched_timestamp: Option<u64>,
     pub cycle_time_us: u64,
     pub metadata: CycleMetadata,
     pub thought_vector: Vec<f32>,

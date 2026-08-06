@@ -157,12 +157,8 @@ fn main() {
     let cfg_default = GatingConfig::default(); // temperature mode, no hard mask
     let mut cfg_legacy = GatingConfig::default();
     cfg_legacy.epistemic_temperature_mode = false;
-    let mut cfg_hard = GatingConfig::default();
-    cfg_hard.enable_hard_mask = true;
-
     let gate_default = EpistemicGate::new(&tok, &cfg_default);
     let gate_legacy = EpistemicGate::new(&tok, &cfg_legacy);
-    let gate_hard = EpistemicGate::new(&tok, &cfg_hard);
 
     println!("Epistemic-gate strength experiment (E4a)");
     println!(
@@ -190,7 +186,7 @@ fn main() {
             let probs0 = softmax(&base_logits(profile, vocab, &sets));
             let p_assert0 = mass(&probs0, &sets.assertion);
 
-            let configs: [(&str, Box<dyn Fn(&mut Vec<f32>)>); 4] = [
+            let configs: [(&str, Box<dyn Fn(&mut Vec<f32>)>); 3] = [
                 ("gate off (bypass)", Box::new(|_l: &mut Vec<f32>| {})),
                 (
                     "cube gate (default)",
@@ -201,13 +197,6 @@ fn main() {
                     Box::new(|l: &mut Vec<f32>| {
                         cube_gate.apply(l, &ch);
                         gate_default.apply(l, ordinal);
-                    }),
-                ),
-                (
-                    "cube + 1D + hardmask",
-                    Box::new(|l: &mut Vec<f32>| {
-                        cube_gate.apply(l, &ch);
-                        gate_hard.apply(l, ordinal);
                     }),
                 ),
             ];

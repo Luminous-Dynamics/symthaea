@@ -19,25 +19,24 @@ let
   evalApi = pkgs.rustPlatform.buildRustPackage {
     pname = "symthaea-eval-api";
     version = "0.1.0";
-    # Symthaea lives in a monorepo and has optional path deps that point outside
-    # `symthaea/`. For Nix builds we include only the minimal sibling paths
-    # needed for Cargo to resolve manifests.
-    src = pkgs.lib.cleanSourceWith {
-      src = ../../../.;
-      filter =
-        path: _type:
-        let
-          p = toString path;
-          root = toString ../../../.;
-        in
-          pkgs.lib.hasPrefix "${root}/symthaea" p
-          || pkgs.lib.hasPrefix "${root}/crates" p
-          || pkgs.lib.hasPrefix "${root}/mycelix-identity" p
-          || pkgs.lib.hasPrefix "${root}/mycelix-finance" p
-          || pkgs.lib.hasPrefix "${root}/mycelix-workspace" p
-          || pkgs.lib.hasPrefix "${root}/mycelix-position" p;
-    };
-    sourceRoot = "source/symthaea";
+    # `../..` is the flake root -- this file lives at <flake-root>/nix/tests/.
+    #
+    # It MUST NOT reach above that. A flake's source tree is copied into the
+    # Nix store before evaluation, so a relative path that walks past the flake
+    # root does not land on the surrounding filesystem: it lands on the store
+    # itself. Concretely, `../../../.` from here resolved to `/nix/store`, and
+    # nix rejected it with `path '/nix/store/' is not in the Nix store` -- the
+    # error that failed the "Hardened Nix Regressions" CI job. That was true in
+    # both the monorepo and the standalone checkout; there is no layout in which
+    # an escaping path works under flakes.
+    #
+    # No `sourceRoot` either: this is the flake root, and in the standalone repo
+    # (github.com/Luminous-Dynamics/symthaea -- where CI runs) symthaea IS the
+    # repository root, so the old `sourceRoot = "source/symthaea"` pointed at a
+    # directory that does not exist. Letting stdenv auto-detect the unpacked
+    # source dir is correct for that layout. This matches how `packages.default`
+    # in flake.nix already declares its source (`src = ./.`, no sourceRoot).
+    src = ../..;
     cargoLock = {
       lockFile = ../../Cargo.lock;
       allowBuiltinFetchGit = true;

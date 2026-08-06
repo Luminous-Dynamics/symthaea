@@ -48,7 +48,7 @@ use crate::motif::{Motif, MotifNote};
 use crate::pitch::Pitch;
 use crate::rhythm::Duration;
 use crate::scale::Scale;
-use crate::score::{Emphasis, Score, ScoreNote, VoiceRole};
+use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 
 /// The answer: the subject transposed up a diatonic fifth (+4 degrees) —
 /// the defining move of a fugue exposition. This is a REAL answer (every
@@ -106,6 +106,7 @@ pub(crate) fn head_fragment(subject: &Motif, beats: Duration) -> Motif {
 /// entries are phrase starts; the stretto's last entry is the climax).
 pub(crate) fn emit(
     score: &mut Score,
+    part: PartId,
     motif: &Motif,
     start: Duration,
     role: VoiceRole,
@@ -125,6 +126,7 @@ pub(crate) fn emit(
             };
             first_pitched = false;
             score.push(ScoreNote {
+                part,
                 pitch: scale.degree_pitch(d, octave),
                 onset: t,
                 duration: n.duration,
@@ -185,6 +187,7 @@ fn fitted_bass_degree(
 /// One held tone (degree in octave) — bass roots and cadence tones.
 pub(crate) fn hold(
     score: &mut Score,
+    part: PartId,
     degree: i32,
     start: Duration,
     duration: Duration,
@@ -195,6 +198,7 @@ pub(crate) fn hold(
 ) {
     let scale = score.key.scale();
     score.push(ScoreNote {
+        part,
         pitch: scale.degree_pitch(degree, octave),
         onset: start,
         duration,
@@ -297,9 +301,19 @@ fn realize_fugue_inner(
     const FINAL: f32 = 0.95;
 
     // ── Exposition (bars 0-2) ────────────────────────────────────────────
-    emit(&mut score, subject, bar(0), Melody, 5, EXPO, PhraseStart);
     emit(
         &mut score,
+        PartId(0),
+        subject,
+        bar(0),
+        Melody,
+        5,
+        EXPO,
+        PhraseStart,
+    );
+    emit(
+        &mut score,
+        PartId(1),
         &ans,
         bar(1),
         CounterMelody,
@@ -313,6 +327,7 @@ fn realize_fugue_inner(
     let bar1_cf = cantus_of(&ans, 4, bar(1));
     emit(
         &mut score,
+        PartId(0),
         &fitted(&cs, &bar1_cf, 5, bar(1)),
         bar(1),
         Melody,
@@ -320,10 +335,20 @@ fn realize_fugue_inner(
         EXPO,
         Normal,
     );
-    emit(&mut score, subject, bar(2), Bass, 3, EXPO, PhraseStart);
+    emit(
+        &mut score,
+        PartId(2),
+        subject,
+        bar(2),
+        Bass,
+        3,
+        EXPO,
+        PhraseStart,
+    );
     let bar2_cf = cantus_of(subject, 3, bar(2));
     emit(
         &mut score,
+        PartId(1),
         &fitted(&cs, &bar2_cf, 4, bar(2)),
         bar(2),
         CounterMelody,
@@ -337,6 +362,7 @@ fn realize_fugue_inner(
     let free = figuration_variation(&cs.transpose(2), seed);
     emit(
         &mut score,
+        PartId(0),
         &fitted(&free, &bar2_cf, 5, bar(2)),
         bar(2),
         Melody,
@@ -358,6 +384,7 @@ fn realize_fugue_inner(
         ep1_sop.extend(cantus_of(&m, 5, slot));
         emit(
             &mut score,
+            PartId(0),
             &m,
             slot,
             Melody,
@@ -372,6 +399,7 @@ fn realize_fugue_inner(
         let slot = bar(3) + half(i as i64 + 1);
         emit(
             &mut score,
+            PartId(1),
             &frag.transpose(*step),
             slot,
             CounterMelody,
@@ -392,7 +420,15 @@ fn realize_fugue_inner(
             *deg - 7
         };
         hold(
-            &mut score, chosen, onset, half_bar, Bass, 3, EPISODE, Normal,
+            &mut score,
+            PartId(2),
+            chosen,
+            onset,
+            half_bar,
+            Bass,
+            3,
+            EPISODE,
+            Normal,
         );
     }
 
@@ -406,6 +442,7 @@ fn realize_fugue_inner(
     }];
     emit(
         &mut score,
+        PartId(1),
         &subject.invert(pivot).transpose(5),
         bar(5),
         CounterMelody,
@@ -415,6 +452,7 @@ fn realize_fugue_inner(
     );
     emit(
         &mut score,
+        PartId(0),
         &fitted(&cs.transpose(5), &mid_cf, 5, bar(5)),
         bar(5),
         Melody,
@@ -422,7 +460,17 @@ fn realize_fugue_inner(
         MIDDLE,
         Normal,
     );
-    hold(&mut score, 6 - 7, bar(5), bar(1), Bass, 3, MIDDLE, Normal);
+    hold(
+        &mut score,
+        PartId(2),
+        6 - 7,
+        bar(5),
+        bar(1),
+        Bass,
+        3,
+        MIDDLE,
+        Normal,
+    );
 
     // ── Episode 2 (bar 6): head sequenced up, toward the stretto ────────
     // Same governance as episode 1: fragments sacrosanct, bass bends.
@@ -433,6 +481,7 @@ fn realize_fugue_inner(
         ep2_sop.extend(cantus_of(&m, 5, slot));
         emit(
             &mut score,
+            PartId(0),
             &m,
             slot,
             Melody,
@@ -443,6 +492,7 @@ fn realize_fugue_inner(
     }
     emit(
         &mut score,
+        PartId(1),
         &frag.transpose(5),
         bar(6) + half(1),
         CounterMelody,
@@ -459,14 +509,32 @@ fn realize_fugue_inner(
             *deg - 7
         };
         hold(
-            &mut score, chosen, onset, half_bar, Bass, 3, EPISODE, Normal,
+            &mut score,
+            PartId(2),
+            chosen,
+            onset,
+            half_bar,
+            Bass,
+            3,
+            EPISODE,
+            Normal,
         );
     }
 
     // ── Stretto (bars 7-8): entries at HALF the subject's length ────────
-    emit(&mut score, subject, bar(7), Melody, 5, STRETTO, PhraseStart);
     emit(
         &mut score,
+        PartId(0),
+        subject,
+        bar(7),
+        Melody,
+        5,
+        STRETTO,
+        PhraseStart,
+    );
+    emit(
+        &mut score,
+        PartId(1),
         &ans,
         bar(7) + half_bar,
         CounterMelody,
@@ -474,7 +542,16 @@ fn realize_fugue_inner(
         STRETTO,
         PhraseStart,
     );
-    emit(&mut score, subject, bar(8), Bass, 3, STRETTO, Climax);
+    emit(
+        &mut score,
+        PartId(2),
+        subject,
+        bar(8),
+        Bass,
+        3,
+        STRETTO,
+        Climax,
+    );
 
     // ── Final entry (bars 9-10): augmented, in the bass, tail to tonic ──
     let mut augmented = subject.scale_rhythm(2, 1);
@@ -488,11 +565,31 @@ fn realize_fugue_inner(
         // final entry gets so the piece can actually cadence.
         last.degree = Some(1);
     }
-    emit(&mut score, &augmented, bar(9), Bass, 2, FINAL, PhraseStart);
+    emit(
+        &mut score,
+        PartId(2),
+        &augmented,
+        bar(9),
+        Bass,
+        2,
+        FINAL,
+        PhraseStart,
+    );
     // Simple cadence above: soprano 5 | 2-1, alto 3 | leading-tone-1.
-    hold(&mut score, 5, bar(9), bar(1), Melody, 5, FINAL, Normal);
     hold(
         &mut score,
+        PartId(0),
+        5,
+        bar(9),
+        bar(1),
+        Melody,
+        5,
+        FINAL,
+        Normal,
+    );
+    hold(
+        &mut score,
+        PartId(1),
         3,
         bar(9),
         bar(1),
@@ -501,9 +598,20 @@ fn realize_fugue_inner(
         FINAL,
         Normal,
     );
-    hold(&mut score, 2, bar(10), half_bar, Melody, 5, FINAL, Normal);
     hold(
         &mut score,
+        PartId(0),
+        2,
+        bar(10),
+        half_bar,
+        Melody,
+        5,
+        FINAL,
+        Normal,
+    );
+    hold(
+        &mut score,
+        PartId(0),
         1,
         bar(10) + half_bar,
         half_bar,
@@ -514,6 +622,7 @@ fn realize_fugue_inner(
     );
     hold(
         &mut score,
+        PartId(1),
         0,
         bar(10),
         half_bar,
@@ -524,6 +633,7 @@ fn realize_fugue_inner(
     );
     hold(
         &mut score,
+        PartId(1),
         1,
         bar(10) + half_bar,
         half_bar,
@@ -863,5 +973,119 @@ mod tests {
             v
         };
         assert_eq!(rhythm(&raw), rhythm(&fit));
+    }
+}
+
+#[cfg(test)]
+mod part_identity_tests {
+    use super::*;
+    use crate::MusicalIntent;
+    use crate::composer::compose_styled;
+    use crate::pitch::PitchClass;
+    use crate::style::Style;
+
+    fn intent(seed: u64) -> MusicalIntent {
+        MusicalIntent {
+            valence: 0.0,
+            arousal: 0.5,
+            energy: 0.5,
+            bars: 8,
+            seed,
+            tonic: PitchClass::C,
+        }
+    }
+
+    #[test]
+    fn fugue_carries_real_part_identity() {
+        for seed in [1u64, 7, 11] {
+            let score = compose_styled(&intent(seed), Style::Fugue);
+            assert!(
+                score.has_part_identity(),
+                "seed {seed}: fugue must assign every note a part"
+            );
+            assert_eq!(
+                score.parts().len(),
+                3,
+                "seed {seed}: a three-voice fughetta has three parts"
+            );
+        }
+    }
+
+    #[test]
+    fn each_form_declares_its_own_parts() {
+        for (style, want) in [
+            (Style::Fugue, 3usize),
+            (Style::Passacaglia, 2),
+            // RenaissancePolyphony is NOT here yet: it emits some notes
+            // outside emit/hold and still carries UNASSIGNED ones. Tracked by
+            // renaissance_is_known_incomplete below rather than quietly
+            // omitted, so the gap cannot be mistaken for coverage.
+        ] {
+            let s = compose_styled(&intent(7), style);
+            assert!(
+                s.has_part_identity(),
+                "{style:?} must assign every note a part"
+            );
+            assert_eq!(s.parts().len(), want, "{style:?} part count");
+        }
+    }
+
+    #[test]
+    fn renaissance_is_known_incomplete() {
+        // A deliberately failing-forward test: it asserts the CURRENT, partial
+        // state so that finishing the assignment makes it fail loudly and
+        // forces the record to be updated, instead of the gap persisting
+        // silently. Flip both assertions when renaissance.rs assigns fully.
+        let s = compose_styled(&intent(7), Style::RenaissancePolyphony);
+        assert!(
+            !s.has_part_identity(),
+            "renaissance now assigns every note a part — move it into              each_form_declares_its_own_parts and delete this test"
+        );
+        assert!(
+            !s.parts().is_empty(),
+            "it does assign SOME parts; only a subset is missing"
+        );
+    }
+
+    #[test]
+    fn part_and_role_are_currently_one_to_one_here() {
+        // Documents a REAL, checked fact rather than the divergence I assumed:
+        // in this fughetta each voice keeps one role throughout, so parts and
+        // roles happen to coincide.
+        //
+        // That means the earlier role-based stagger numbers were not wrong for
+        // Fugue specifically — they were only not ENTITLED to the claim made
+        // from them. The distinction still has to exist, because it is not
+        // guaranteed: any generator where a voice changes role (a subject
+        // becoming an accompanying line) or two voices share one role breaks
+        // the equivalence silently. This test pins the current state so that
+        // change is visible when it happens, rather than quietly invalidating
+        // analysis built on the coincidence.
+        let score = compose_styled(&intent(7), Style::Fugue);
+        let mut roles_per_part: std::collections::BTreeMap<
+            u16,
+            std::collections::BTreeSet<String>,
+        > = Default::default();
+        for n in &score.notes {
+            roles_per_part
+                .entry(n.part.0)
+                .or_default()
+                .insert(format!("{:?}", n.role));
+        }
+        assert_eq!(roles_per_part.len(), 3, "three voices: {roles_per_part:?}");
+        assert!(
+            roles_per_part.values().all(|roles| roles.len() == 1),
+            "if a voice has started changing role, part and role have diverged \
+             and any role-based voice analysis is now unsound: {roles_per_part:?}"
+        );
+    }
+
+    #[test]
+    fn generators_without_parts_say_so_instead_of_guessing() {
+        // A style that does not track parts must report no identity rather
+        // than let analysis mistake UNASSIGNED for a single shared voice.
+        let score = compose_styled(&intent(7), Style::Nocturne);
+        assert!(!score.has_part_identity());
+        assert!(score.parts().is_empty());
     }
 }

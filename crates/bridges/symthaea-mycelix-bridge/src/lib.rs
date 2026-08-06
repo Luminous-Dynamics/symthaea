@@ -615,6 +615,12 @@ pub struct SymthaeaBackend {
     memory: VectorStore,
     /// Per-node state for trend-aware connectivity tracking and anomaly counts.
     node_states: HashMap<String, NodeState>,
+    /// Insertion order of `node_states` keys, oldest first, used to evict
+    /// FIFO-style when `config.max_tracked_nodes` is reached. May contain
+    /// stale entries for node_ids already removed via `reset_node`/
+    /// `reset_all`; eviction skips those rather than assuming the deque and
+    /// map are perfectly in sync.
+    node_insertion_order: VecDeque<String>,
     /// Shared sparse projector for HyperGradient → ContinuousHV.
     projector: SparseProjector,
     /// True IIT Phi calculator for C-Vector computation.
@@ -635,6 +641,17 @@ pub struct SymthaeaBackendConfig {
     /// Optional cap on number of concepts stored in associative memory.
     /// `None` = unbounded (not recommended for long-running deployments).
     pub max_concepts: Option<usize>,
+    /// Optional cap on the number of distinct `node_id`s tracked in
+    /// `SymthaeaBackend::node_states`. `assess_update` inserts a fresh
+    /// `NodeState` for any never-seen `node_id` with no other gate on it
+    /// (`node_id` comes from the caller-supplied `HyperGradient`); in a
+    /// federated-learning deployment where participants aren't otherwise
+    /// authenticated, a Sybil participant submitting gradients under many
+    /// distinct `node_id`s could grow this map unboundedly. When set, the
+    /// oldest-inserted node is evicted (FIFO) to make room for a new one
+    /// once the cap is reached. `None` = unbounded (not recommended for
+    /// long-running or multi-tenant deployments).
+    pub max_tracked_nodes: Option<usize>,
 }
 
 impl Default for SymthaeaBackendConfig {
@@ -644,6 +661,7 @@ impl Default for SymthaeaBackendConfig {
             ambiguity_threshold: 0.75,
             connectivity_drop_threshold: 0.1,
             max_concepts: Some(10_000),
+            max_tracked_nodes: Some(10_000),
         }
     }
 }
@@ -656,6 +674,7 @@ impl SymthaeaBackendConfig {
             ambiguity_threshold: 0.8,
             connectivity_drop_threshold: 0.05,
             max_concepts: Some(5_000),
+            max_tracked_nodes: Some(5_000),
         }
     }
 
@@ -666,6 +685,7 @@ impl SymthaeaBackendConfig {
             ambiguity_threshold: 0.7,
             connectivity_drop_threshold: 0.15,
             max_concepts: Some(20_000),
+            max_tracked_nodes: Some(20_000),
         }
     }
 
@@ -676,6 +696,7 @@ impl SymthaeaBackendConfig {
             ambiguity_threshold: 0.6,
             connectivity_drop_threshold: 0.05,
             max_concepts: Some(2_000),
+            max_tracked_nodes: Some(2_000),
         }
     }
 }
@@ -779,6 +800,7 @@ impl SymthaeaBackend {
             mapper,
             memory: VectorStore::new(),
             node_states: HashMap::new(),
+            node_insertion_order: VecDeque::new(),
             projector: SparseProjector::new(8, HDC_DIMENSION),
             true_phi_calculator: TruePhiCalculator::new(),
             cvector_config,
@@ -788,12 +810,46 @@ impl SymthaeaBackend {
     /// Reset state for a single node (clears Φ history and anomaly count).
     pub fn reset_node(&mut self, node_id: &str) {
         self.node_states.remove(node_id);
+        // Leaves a possible stale entry in `node_insertion_order`; the
+        // eviction loop in `touch_or_insert_node` tolerates that (see its
+        // doc comment) rather than paying an O(n) deque scan here.
     }
 
     /// Reset all backend state, including node histories and associative memory.
     pub fn reset_all(&mut self) {
         self.node_states.clear();
+        self.node_insertion_order.clear();
         self.memory = VectorStore::new();
+    }
+
+    /// Look up (or create, evicting the oldest-inserted node first if
+    /// `config.max_tracked_nodes` is reached) the `NodeState` for `node_id`,
+    /// returning its `last_connectivity`. This is the sole insertion point
+    /// for `node_states` -- see `SymthaeaBackendConfig::max_tracked_nodes`
+    /// for why it's bounded rather than a bare `entry(...).or_insert_with`.
+    fn touch_or_insert_node(&mut self, node_id: &str) -> f32 {
+        if !self.node_states.contains_key(node_id) {
+            if let Some(max) = self.config.max_tracked_nodes {
+                while self.node_states.len() >= max {
+                    match self.node_insertion_order.pop_front() {
+                        Some(oldest) => {
+                            // Skip stale entries (already removed via
+                            // reset_node) without evicting anything real.
+                            self.node_states.remove(&oldest);
+                        }
+                        // Deque exhausted but map still at/over cap
+                        // shouldn't happen (every present key was pushed
+                        // exactly once), but don't loop forever if it does.
+                        None => break,
+                    }
+                }
+            }
+            self.node_insertion_order.push_back(node_id.to_string());
+        }
+        self.node_states
+            .entry(node_id.to_string())
+            .or_default()
+            .last_connectivity
     }
 
     /// Get a lightweight snapshot of a node's state (last connectivity, anomaly count).
@@ -1025,13 +1081,14 @@ impl ConsciousnessBackend for SymthaeaBackend {
             ));
         }
 
-        // 1. Identify node and load prior state (extract connectivity_before, drop borrow)
+        // 1. Identify node and load prior state (extract connectivity_before, drop borrow).
+        // Bounded insertion (evicts the oldest tracked node under
+        // config.max_tracked_nodes) -- node_id is caller-supplied and
+        // otherwise unauthenticated at this layer, so an unbounded
+        // `entry().or_insert_with()` here would let a Sybil-style caller
+        // grow `node_states` without limit.
         let node_id = update.node_id.to_string();
-        let connectivity_before = self
-            .node_states
-            .entry(node_id.clone())
-            .or_insert_with(NodeState::default)
-            .last_connectivity;
+        let connectivity_before = self.touch_or_insert_node(&node_id);
 
         // 2. Convert HyperGradient -> ContinuousHV, with recall-or-project semantics.
         let (hv, similarity) = self.recall_or_project(update)?;
@@ -1578,6 +1635,53 @@ mod tests {
         assert!(strict.max_concepts.is_some());
         assert!(lenient.max_concepts.is_some());
         assert!(diagnostic.max_concepts.is_some());
+        assert!(strict.max_tracked_nodes.is_some());
+        assert!(lenient.max_tracked_nodes.is_some());
+        assert!(diagnostic.max_tracked_nodes.is_some());
+    }
+
+    /// Regression test for the unbounded-node-state-map finding: `node_id`
+    /// is caller-supplied (via `HyperGradient`) and otherwise
+    /// unauthenticated at this layer, so a Sybil-style caller submitting
+    /// updates under many distinct `node_id`s must not be able to grow
+    /// `node_states` without bound. Exercises `touch_or_insert_node`
+    /// directly (the sole insertion point) rather than the full
+    /// `assess_update` pipeline, which needs more test scaffolding to
+    /// reach the same code path.
+    #[test]
+    fn node_states_map_is_bounded_under_many_distinct_node_ids() {
+        let mut config = SymthaeaBackendConfig::default();
+        config.max_tracked_nodes = Some(3);
+        let mut backend = SymthaeaBackend::with_config(config);
+
+        for i in 0..100 {
+            backend.touch_or_insert_node(&format!("node-{i}"));
+            assert!(
+                backend.node_states.len() <= 3,
+                "node_states must never exceed max_tracked_nodes, got {} after {} inserts",
+                backend.node_states.len(),
+                i + 1
+            );
+        }
+        assert_eq!(backend.node_states.len(), 3);
+
+        // The most recently touched node must survive (FIFO evicts oldest,
+        // not the one just inserted).
+        assert!(backend.node_states.contains_key("node-99"));
+    }
+
+    /// `max_tracked_nodes: None` must still behave as unbounded (existing
+    /// callers that opt out of the cap keep working unchanged).
+    #[test]
+    fn node_states_map_stays_unbounded_when_cap_is_none() {
+        let mut config = SymthaeaBackendConfig::default();
+        config.max_tracked_nodes = None;
+        let mut backend = SymthaeaBackend::with_config(config);
+
+        for i in 0..50 {
+            backend.touch_or_insert_node(&format!("node-{i}"));
+        }
+        assert_eq!(backend.node_states.len(), 50);
     }
 
     // ============================================================================

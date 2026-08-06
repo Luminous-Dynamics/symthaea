@@ -12,6 +12,24 @@ use symthaea_broca::{BrocaConfig, BrocaGenerator, GenerationResult, ThoughtChann
 #[cfg(feature = "ssm_language")]
 use symthaea_core::genesis::GenesisSeed;
 
+/// Canonical production Broca checkpoint, relative to the `symthaea` crate root.
+///
+/// **Single source of truth** — `creative_bridge.rs`'s poetry loader reads this same
+/// constant. The two used to carry independent hardcoded path lists, which is how they
+/// silently diverged: when the crate moved from `crates/symthaea-broca/` to
+/// `crates/domains/symthaea-broca/` in the 2026-06-30 tier reorg, the poetry loader was
+/// updated and [`BrocaManager::DEFAULT_CHECKPOINT`] was not. Since
+/// `CognitiveLoopConfig::broca_checkpoint_path` defaults to `None` and nothing in the repo
+/// ever sets it, every `ssm_language` build silently fell back to an *untrained*
+/// genesis-random generator from that reorg until 2026-07-28. Add new consumers here, not
+/// as another literal.
+///
+/// This file is the post-2026-07-25 vocab-restore checkpoint (4,096-token vocab). Do not
+/// point this at `symthaea/data/models/broca-checkpoint-latest.bin` — that is a pre-fix
+/// 415-token relic, see `SYMTHAEA_BROCA_IMPROVEMENT_PLAN_2026-07-28.md` §2.
+pub(crate) const BROCA_PRODUCTION_CHECKPOINT: &str =
+    "crates/domains/symthaea-broca/data/models/broca-checkpoint-latest.bin";
+
 /// Compact consciousness signals for language generation gating.
 #[derive(Debug, Clone, Default)]
 pub struct BrocaConsciousnessSignals {
@@ -149,6 +167,11 @@ impl Default for TheoryOfMindState {
 #[cfg(feature = "ssm_language")]
 pub struct BrocaManager {
     generator: BrocaGenerator,
+    /// Whether `generator` came from a real trained checkpoint. When `false`, the generator
+    /// is a fresh genesis-random network and every token it emits is noise — see
+    /// [`BrocaManager::new`]. Surfaced per-generation as
+    /// `BrocaGenerationTelemetry::trained_checkpoint_loaded`.
+    pub(crate) trained_checkpoint_loaded: bool,
     pub(crate) last_telemetry: BrocaGenerationTelemetry,
     /// Minimum consciousness level required to generate (default 0.1).
     pub(crate) consciousness_threshold: f32,
@@ -173,16 +196,20 @@ pub struct BrocaManager {
 #[cfg(feature = "ssm_language")]
 impl BrocaManager {
     /// Default checkpoint path relative to the symthaea crate root.
-    const DEFAULT_CHECKPOINT: &'static str = "crates/symthaea-broca/data/broca-cfc-v2.bin";
+    const DEFAULT_CHECKPOINT: &'static str = BROCA_PRODUCTION_CHECKPOINT;
 
     /// Create a new BrocaManager, optionally loading from a checkpoint.
     ///
     /// If `checkpoint_path` is `Some`, loads weights from that file.
-    /// If `None`, tries the default checkpoint at `crates/symthaea-broca/data/broca-cfc-v2.bin`.
-    /// If neither path exists, creates a fresh (untrained) generator.
+    /// If `None`, tries [`BROCA_PRODUCTION_CHECKPOINT`].
+    /// If neither path exists, creates a fresh **untrained** generator whose output is token
+    /// noise — this is a degraded fallback, not a normal mode. It is reported both as a
+    /// `warn!` and as `trained_checkpoint_loaded: false` in [`BrocaGenerationTelemetry`], so
+    /// downstream consumers can distinguish trained output from noise.
     pub fn new(genesis: &GenesisSeed, config: BrocaConfig, checkpoint_path: Option<&str>) -> Self {
-        let generator = Self::try_load_checkpoint(checkpoint_path, genesis)
-            .unwrap_or_else(|| BrocaGenerator::new(genesis, config));
+        let loaded = Self::try_load_checkpoint(checkpoint_path, genesis);
+        let trained_checkpoint_loaded = loaded.is_some();
+        let generator = loaded.unwrap_or_else(|| BrocaGenerator::new(genesis, config));
 
         let partner_belief_init = symthaea_core::hdc::ContinuousHV::from_genesis(
             genesis,
@@ -193,6 +220,7 @@ impl BrocaManager {
 
         Self {
             generator,
+            trained_checkpoint_loaded,
             last_telemetry: BrocaGenerationTelemetry::default(),
             consciousness_threshold: 0.1,
             multi_turn_depth: 4, // Default: preserve CfC context across 4 turns
@@ -221,9 +249,9 @@ impl BrocaManager {
             None => vec![Self::DEFAULT_CHECKPOINT],
         };
 
-        for path in paths_to_try {
+        for path in &paths_to_try {
             if !std::path::Path::new(path).exists() {
-                tracing::debug!("Broca checkpoint not found at {path}, skipping");
+                tracing::warn!(path = %path, "Broca checkpoint not found, skipping");
                 continue;
             }
             match BrocaGenerator::from_checkpoint(path, genesis) {
@@ -237,7 +265,18 @@ impl BrocaManager {
             }
         }
 
-        tracing::info!("No Broca checkpoint loaded, creating fresh generator");
+        // Deliberately `warn!`, not `info!`. This used to read "No Broca checkpoint loaded,
+        // creating fresh generator" at info level, which describes a total capability
+        // failure in the register of a routine outcome — an untrained generator emits token
+        // noise, not degraded language. Combined with a `DEFAULT_CHECKPOINT` left stale by
+        // the 2026-06-30 crate reorg, that phrasing let the condition go unnoticed for a
+        // month. Name the paths tried so the next occurrence is diagnosable from one line.
+        tracing::warn!(
+            paths_tried = ?paths_to_try,
+            "No Broca checkpoint could be loaded — falling back to an UNTRAINED generator; \
+             generated text will be token noise. Set CognitiveLoopConfig::broca_checkpoint_path \
+             or restore the checkpoint at the default path."
+        );
         None
     }
 
@@ -262,6 +301,7 @@ impl BrocaManager {
         if signals.ethics_blocked {
             self.last_telemetry = BrocaGenerationTelemetry {
                 ethics_gated: true,
+                trained_checkpoint_loaded: self.trained_checkpoint_loaded,
                 ..Default::default()
             };
             return None;
@@ -271,6 +311,7 @@ impl BrocaManager {
         if signals.consciousness_level < self.consciousness_threshold {
             self.last_telemetry = BrocaGenerationTelemetry {
                 consciousness_gated: true,
+                trained_checkpoint_loaded: self.trained_checkpoint_loaded,
                 ..Default::default()
             };
             return None;
@@ -502,6 +543,7 @@ impl BrocaManager {
             nsm_primitive_count: signals.detected_primitives.len(),
             nsm_grounding: signals.primitive_grounding,
             nsm_prime_coverage: result.nsm_prime_coverage,
+            trained_checkpoint_loaded: self.trained_checkpoint_loaded,
             ..Default::default()
         };
 
@@ -831,5 +873,57 @@ mod tests {
             mgr.theory_of_mind.alignment_score >= -1.0 && mgr.theory_of_mind.alignment_score <= 1.0
         );
         assert!(mgr.theory_of_mind.familiarity > 0.0);
+    }
+}
+
+/// Checkpoint-path integrity. Deliberately **not** gated on `ssm_language` — the bug this
+/// guards against (a stale `BROCA_PRODUCTION_CHECKPOINT` after a crate move) is invisible in
+/// default builds precisely because `ssm_language` is off by default, which is how it survived
+/// from the 2026-06-30 tier reorg to 2026-07-28.
+#[cfg(test)]
+mod checkpoint_path_tests {
+    use super::BROCA_PRODUCTION_CHECKPOINT;
+    use std::path::Path;
+
+    /// The checkpoint's `data/` directory must exist in-tree.
+    ///
+    /// We assert the **grandparent**, not the file: `models/` is gitignored
+    /// (`symthaea/.gitignore:106`) and the checkpoint is a ~1 GB binary that is not in git, so
+    /// neither exists in a fresh clone or CI checkout. `.../symthaea-broca/data/` *is* tracked
+    /// (it holds the vocab JSONs), and it is exactly the prefix a crate move invalidates —
+    /// which makes it the strongest invariant that holds without the binary present.
+    ///
+    /// Relative-path resolution here matches the runtime's: `cargo test` runs with the crate
+    /// root as cwd, which is the same base `BrocaManager::try_load_checkpoint` resolves against.
+    #[test]
+    fn broca_production_checkpoint_path_is_not_stale() {
+        let path = Path::new(BROCA_PRODUCTION_CHECKPOINT);
+        let data_dir = path
+            .parent()
+            .and_then(Path::parent)
+            .expect("checkpoint constant should be at least <crate>/data/models/<file>");
+
+        assert!(
+            data_dir.is_dir(),
+            "BROCA_PRODUCTION_CHECKPOINT points into '{}', which does not exist. The Broca \
+             crate was probably moved or renamed without updating the constant — this is the \
+             2026-06-30 reorg failure mode, where BrocaManager silently fell back to an \
+             UNTRAINED generator for a month. Update BROCA_PRODUCTION_CHECKPOINT in \
+             src/cognitive_loop/broca_bridge.rs.",
+            data_dir.display(),
+        );
+    }
+
+    /// The poetry loader must resolve to the same canonical constant, not its own literal.
+    #[cfg(all(feature = "creative", feature = "ssm_language"))]
+    #[test]
+    fn poetry_checkpoint_paths_share_the_canonical_constant() {
+        assert!(
+            super::super::creative_bridge::POETRY_CHECKPOINT_PATHS
+                .contains(&BROCA_PRODUCTION_CHECKPOINT),
+            "creative_bridge's poetry checkpoint list has drifted off \
+             BROCA_PRODUCTION_CHECKPOINT; these two diverged once already across the \
+             2026-06-30 crate reorg.",
+        );
     }
 }

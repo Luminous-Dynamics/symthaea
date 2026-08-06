@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "HDC-LTC + FEP Active Inference bipedal humanoid control on DMC Humanoid benchmark"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["humanoid", "active-inference", "hdc", "bipedal", "mujoco"]
 categories = ["science", "algorithms", "simulation"]
 
@@ -21,7 +21,11 @@ anyhow = { workspace = true }
 
 # MuJoCo bindings (optional — required for full contact dynamics)
 mujoco-rs = { version = "4.0.1", optional = true, features = ["auto-download-mujoco"] }
-symthaea-vision-manifold = { version = "0.1.0", path = "../symthaea-vision-manifold" }
+# NOTE: symthaea-vision-manifold is intentionally a DEV-dependency only (see below).
+# It used to be declared here as well, which silently defeated the review-P2.4 fix —
+# every default humanoid build still pulled the whole 27K-line vision stack. Only
+# examples/run_perception_climb.rs uses it; verified no src/, benches/ or tests/
+# reference exists (2026-07-31). Do not re-add it here.
 osqp = { version = "1.0.1", optional = true }
 
 [dev-dependencies]

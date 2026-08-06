@@ -12,7 +12,7 @@ use symthaea_muse_protocol::{
     ImportedMotifSummary, ImportedSectionSummary, ImportedWorkAnalysis, SymbolicImportFormat,
 };
 use symthaea_music_theory::{
-    Duration, Emphasis, Key, Pitch, PitchClass, Score, ScoreNote, VoiceRole,
+    Duration, Emphasis, Key, Pitch, PitchClass, Score, ScoreNote, VoiceRole, score::PartId,
 };
 
 #[derive(Clone, Debug)]
@@ -70,7 +70,8 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                             pending.insert((channel, key.as_int()), (tick, vel.as_int()));
                         }
                         MidiMessage::NoteOn { key, .. } | MidiMessage::NoteOff { key, .. } => {
-                            if let Some((onset, velocity)) = pending.remove(&(channel, key.as_int()))
+                            if let Some((onset, velocity)) =
+                                pending.remove(&(channel, key.as_int()))
                             {
                                 notes.push(RawNote {
                                     track: track_index,
@@ -103,15 +104,31 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
 
     let roles = roles_by_track(&notes);
     let tonic = PitchClass::new(i32::from(fifths) * 7 + if minor { 9 } else { 0 });
-    let key = if minor { Key::minor(tonic) } else { Key::major(tonic) };
+    let key = if minor {
+        Key::minor(tonic)
+    } else {
+        Key::major(tonic)
+    };
     let mut score = Score::new(key, tempo_bpm.clamp(20.0, 320.0), meter.clamp(1, 16));
     for note in notes {
         score.push(ScoreNote {
+            // Real part identity, taken from the source format rather than
+            // inferred: a MIDI track / MusicXML <part> IS the continuing line.
+            // `RawNote::track` survives to here (the role lookup below uses
+            // it), so this is the importer passing through what the file
+            // already stated. Tracks beyond u16 are refused rather than
+            // wrapped into a collision with a real part.
+            part: u16::try_from(note.track)
+                .map(PartId)
+                .unwrap_or(PartId::UNASSIGNED),
             pitch: Pitch::from_midi(note.pitch),
             onset: Duration::new(note.onset as i64, ticks_per_beat as i64),
             duration: Duration::new(note.duration as i64, ticks_per_beat as i64),
             velocity: (note.velocity as f32 / 127.0).clamp(0.05, 1.0),
-            role: roles.get(&note.track).copied().unwrap_or(VoiceRole::Harmony),
+            role: roles
+                .get(&note.track)
+                .copied()
+                .unwrap_or(VoiceRole::Harmony),
             emphasis: Emphasis::Normal,
             section_intensity: 1.0,
         });
@@ -225,7 +242,11 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
         return Err("MusicXML contains no pitched notes".into());
     }
     let tonic = PitchClass::new(fifths * 7 + if minor { 9 } else { 0 });
-    let key = if minor { Key::minor(tonic) } else { Key::major(tonic) };
+    let key = if minor {
+        Key::minor(tonic)
+    } else {
+        Key::major(tonic)
+    };
     let mut score = Score::new(key, tempo.clamp(20.0, 320.0), meter);
     let part_count = parts.len();
     for (part, midi, onset, duration) in raw {
@@ -239,6 +260,14 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
             VoiceRole::Harmony
         };
         score.push(ScoreNote {
+            // Real part identity, taken from the source format rather than
+            // inferred: a MIDI track / MusicXML <part> IS the continuing line.
+            // Here that is the MusicXML part index already in scope. Indices
+            // beyond u16 are refused rather than wrapped into a collision
+            // with a real part.
+            part: u16::try_from(part)
+                .map(PartId)
+                .unwrap_or(PartId::UNASSIGNED),
             pitch: Pitch::from_midi(midi),
             onset: Duration::new(onset, divisions),
             duration: Duration::new(duration, divisions),
@@ -257,7 +286,10 @@ fn node_i64(node: roxmltree::Node<'_, '_>) -> Option<i64> {
 
 fn musicxml_pitch(note: roxmltree::Node<'_, '_>) -> Option<u8> {
     let pitch = note.children().find(|node| node.has_tag_name("pitch"))?;
-    let step = pitch.children().find(|node| node.has_tag_name("step"))?.text()?;
+    let step = pitch
+        .children()
+        .find(|node| node.has_tag_name("step"))?
+        .text()?;
     let base = match step.trim() {
         "C" => 0,
         "D" => 2,
@@ -283,7 +315,11 @@ fn musicxml_pitch(note: roxmltree::Node<'_, '_>) -> Option<u8> {
 pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
     let melody = score.voice(VoiceRole::Melody);
     let motif_len = melody.len().clamp(0, 6);
-    let motif_pitches: Vec<u8> = melody.iter().take(motif_len).map(|n| n.pitch.midi()).collect();
+    let motif_pitches: Vec<u8> = melody
+        .iter()
+        .take(motif_len)
+        .map(|n| n.pitch.midi())
+        .collect();
     let motif_intervals: Vec<i16> = motif_pitches
         .windows(2)
         .map(|pair| i16::from(pair[1]) - i16::from(pair[0]))
@@ -305,7 +341,8 @@ pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
         .then(|| ImportedMotifSummary {
             occurrence_count: occurrences,
             midi_pitches: motif_pitches,
-            identity_note: "Reconstructed opening interval identity; contributor confirmation required".into(),
+            identity_note:
+                "Reconstructed opening interval identity; contributor confirmation required".into(),
             confidence: if occurrences > 1 { 0.72 } else { 0.42 },
         })
         .into_iter()
@@ -322,13 +359,18 @@ pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
             label: format!("Reconstructed region {index}"),
             start_beat: start,
             end_beat: end,
-            evidence: "Provisional eight-bar segmentation; not asserted as the contributor's form".into(),
+            evidence: "Provisional eight-bar segmentation; not asserted as the contributor's form"
+                .into(),
             confidence: 0.35,
         });
         start = end;
         index += 1;
     }
-    let voices: BTreeSet<_> = score.notes.iter().map(|note| format!("{:?}", note.role)).collect();
+    let voices: BTreeSet<_> = score
+        .notes
+        .iter()
+        .map(|note| format!("{:?}", note.role))
+        .collect();
     ImportedWorkAnalysis {
         source_native: true,
         inferred_territory: None,

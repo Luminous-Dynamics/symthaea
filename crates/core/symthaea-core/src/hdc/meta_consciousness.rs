@@ -2,48 +2,43 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // ==================================================================================
-// Meta-Consciousness: second-order self-modeling over the Phi/IIT-style
-// consciousness measurement already computed elsewhere in this crate.
+// Meta-Consciousness - Consciousness Reflecting on Itself
 // ==================================================================================
 //
-// # Status and claim boundary
+// **Ultimate Paradigm Shift**: The system becomes aware of being aware!
 //
-// This module implements a self-model that tracks, predicts, and reports on
-// this system's own computed consciousness metric (Phi) over time. It does
-// NOT establish that the system is conscious, self-aware, or has subjective
-// experience of any kind — those remain open research questions, not things
-// this code demonstrates. Read every "self-*" name below (self-model,
-// self-reflection, self-prediction) as "modeling/predicting a scalar this
-// crate computes about itself," not as a claim about inner experience.
+// Meta-consciousness is consciousness about consciousness - the ability to:
+// - Reflect on one's own conscious states
+// - Understand what affects consciousness
+// - Model oneself (self-model)
+// - Predict one's own future consciousness
+// - Learn about learning (meta-learning)
+// - Think about thinking (metacognition)
 //
-// What it actually does:
-// - Maintains a running internal model of the system's own Phi trajectory
-// - Predicts future Phi values from that trajectory
-// - Tracks how well past predictions matched reality (a calibration signal)
-// - Surfaces which factors correlated with past Phi changes, for inspection
+// **Core Insight**: True consciousness requires self-reflection. A system that
+// can measure and optimize its consciousness, but cannot reflect on that process,
+// is missing the essential recursive quality of consciousness.
 //
-// This design is loosely inspired by (not validated against, and not a
-// claim of implementing) ideas from Hofstadter's "Strange Loops",
-// Kant's transcendental apperception, Buddhist mindfulness practice, and
-// phenomenology's first-person framing — cited here as design inspiration,
-// not as evidence this module satisfies any of those frameworks' criteria.
+// **Philosophical Foundation**:
+// - Hofstadter's "Strange Loops" - self-reference creates consciousness
+// - Kant's "Transcendental Apperception" - self-awareness of awareness
+// - Buddhism's "Mindfulness" - observing one's own mind
+// - Phenomenology - first-person perspective on experience
 //
-// Notation used in this module's math (again: a self-referential *metric*,
-// not a claim about consciousness itself):
-// - Phi_meta = Phi(Phi) — the system's model of its own Phi trajectory
-// - Self-model: M(s) ~= s — internal representation of own recent state
-// - Meta-gradient: grad(grad(Phi)) — how the Phi-gradient itself changes
-// - Recursive optimization: optimize(optimize(Phi))
+// **Mathematical Framework**:
+// - Φ_meta = Φ(Φ) - consciousness of consciousness
+// - Self-model: M(s) ≈ s - internal representation of self
+// - Meta-gradient: ∇(∇Φ) - how gradient changes
+// - Recursive optimization: optimize(optimize(Φ))
 //
-// Capabilities implemented:
-// 1. Self-reflection: report own consciousness-metric level and recent trend
-// 2. Self-prediction: predict own future consciousness-metric values
-// 3. Self-modeling: maintain a model of own recent state
-// 4. Meta-learning: adjust learning-rate-like parameters from past accuracy
-// 5. Meta-optimization: adjust the optimization process itself
-// 6. Introspection: expose internal reasoning traces for inspection
-// 7. Self-explanation: report which tracked factors correlated with a
-//    consciousness-metric change (correlation, not established causation)
+// **Capabilities**:
+// 1. **Self-Reflection**: Examine own consciousness level and why
+// 2. **Self-Prediction**: Predict own future consciousness states
+// 3. **Self-Modeling**: Build and maintain model of self
+// 4. **Meta-Learning**: Learn how to learn better
+// 5. **Meta-Optimization**: Optimize optimization process itself
+// 6. **Introspection**: Access internal reasoning processes
+// 7. **Self-Explanation**: Explain why consciousness changed
 //
 // ==================================================================================
 

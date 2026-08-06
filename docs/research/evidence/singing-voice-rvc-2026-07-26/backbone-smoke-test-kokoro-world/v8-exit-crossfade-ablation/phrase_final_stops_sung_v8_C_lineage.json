@@ -1,0 +1,203 @@
+{
+  "sample_rate": 24000,
+  "crossfade_ms": 10.0,
+  "word_edge_fade_ms": 8.0,
+  "groups": [
+    {
+      "method": "raw",
+      "phonemes": "t",
+      "vclass": "voiceless_obstruent",
+      "output_start": 0,
+      "output_end": 1344,
+      "core_start": 0,
+      "core_end": 1104,
+      "entry_fade": null,
+      "exit_fade": [
+        1104,
+        1344
+      ],
+      "source_start_sample": 7200,
+      "source_end_sample": 8160,
+      "word_index": 0,
+      "word_text": "turn"
+    },
+    {
+      "method": "world",
+      "phonemes": "\u025c\u0279n",
+      "vclass": "sonorant",
+      "output_start": 1104,
+      "output_end": 6384,
+      "core_start": 1344,
+      "core_end": 6384,
+      "entry_fade": [
+        1104,
+        1344
+      ],
+      "exit_fade": null,
+      "word_index": 0,
+      "word_text": "turn"
+    },
+    {
+      "method": "world",
+      "phonemes": "\u0254",
+      "vclass": "sonorant",
+      "output_start": 7824,
+      "output_end": 13104,
+      "core_start": 7824,
+      "core_end": 12864,
+      "entry_fade": null,
+      "exit_fade": [
+        12864,
+        13104
+      ],
+      "word_index": 1,
+      "word_text": "off"
+    },
+    {
+      "method": "raw",
+      "phonemes": "f",
+      "vclass": "voiceless_obstruent",
+      "output_start": 12864,
+      "output_end": 14304,
+      "core_start": 13104,
+      "core_end": 14304,
+      "entry_fade": [
+        12864,
+        13104
+      ],
+      "exit_fade": null,
+      "source_start_sample": 13560,
+      "source_end_sample": 15000,
+      "word_index": 1,
+      "word_text": "off"
+    },
+    {
+      "method": "world",
+      "phonemes": "\u00f0\u0259",
+      "vclass": "voiced_obstruent",
+      "output_start": 15744,
+      "output_end": 22464,
+      "core_start": 15744,
+      "core_end": 22464,
+      "entry_fade": null,
+      "exit_fade": null,
+      "word_index": 2,
+      "word_text": "the"
+    },
+    {
+      "method": "world",
+      "phonemes": "lI",
+      "vclass": "sonorant",
+      "output_start": 23904,
+      "output_end": 29424,
+      "core_start": 23904,
+      "core_end": 29184,
+      "entry_fade": null,
+      "exit_fade": [
+        29184,
+        29424
+      ],
+      "word_index": 3,
+      "word_text": "light"
+    },
+    {
+      "method": "raw",
+      "phonemes": "t",
+      "vclass": "voiceless_obstruent",
+      "output_start": 29184,
+      "output_end": 30624,
+      "core_start": 29424,
+      "core_end": 30624,
+      "entry_fade": [
+        29184,
+        29424
+      ],
+      "exit_fade": null,
+      "source_start_sample": 23160,
+      "source_end_sample": 24600,
+      "word_index": 3,
+      "word_text": "light"
+    },
+    {
+      "method": "world",
+      "phonemes": "\u00e6nd",
+      "vclass": "sonorant",
+      "output_start": 32064,
+      "output_end": 38784,
+      "core_start": 32064,
+      "core_end": 38784,
+      "entry_fade": null,
+      "exit_fade": null,
+      "word_index": 4,
+      "word_text": "and"
+    },
+    {
+      "method": "world",
+      "phonemes": "l\u0251",
+      "vclass": "sonorant",
+      "output_start": 40224,
+      "output_end": 45504,
+      "core_start": 40224,
+      "core_end": 45264,
+      "entry_fade": null,
+      "exit_fade": [
+        45264,
+        45504
+      ],
+      "word_index": 5,
+      "word_text": "lock"
+    },
+    {
+      "method": "raw",
+      "phonemes": "k",
+      "vclass": "voiceless_obstruent",
+      "output_start": 45264,
+      "output_end": 46704,
+      "core_start": 45504,
+      "core_end": 46704,
+      "entry_fade": [
+        45264,
+        45504
+      ],
+      "exit_fade": null,
+      "source_start_sample": 32880,
+      "source_end_sample": 34320,
+      "word_index": 5,
+      "word_text": "lock"
+    },
+    {
+      "method": "world",
+      "phonemes": "\u026a",
+      "vclass": "sonorant",
+      "output_start": 48144,
+      "output_end": 53424,
+      "core_start": 48144,
+      "core_end": 53184,
+      "entry_fade": null,
+      "exit_fade": [
+        53184,
+        53424
+      ],
+      "word_index": 6,
+      "word_text": "it"
+    },
+    {
+      "method": "raw",
+      "phonemes": "t",
+      "vclass": "voiceless_obstruent",
+      "output_start": 53184,
+      "output_end": 54624,
+      "core_start": 53424,
+      "core_end": 54624,
+      "entry_fade": [
+        53184,
+        53424
+      ],
+      "exit_fade": null,
+      "source_start_sample": 37680,
+      "source_end_sample": 39120,
+      "word_index": 6,
+      "word_text": "it"
+    }
+  ]
+}

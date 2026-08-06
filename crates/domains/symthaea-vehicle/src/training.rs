@@ -1274,10 +1274,31 @@ mod tests {
         assert!(late_has_peer, "Episode 9 should have swarm peers");
     }
 
-    // ── Ablation Tests (Part A) ──
+    // ── Smoke tests for the road/swarm training paths ──
+    //
+    // These were previously headed "Ablation Tests (Part A)" and named
+    // `test_road_channels_improve_lateral` / `test_swarm_channels_improve_stability`.
+    // Neither name was accurate: both build two arms, train both, and then assert
+    // only `is_finite()` (plus one loose bound), never comparing the arms. Renamed
+    // 2026-07-31 so they cannot be cited as evidence for a claim they do not test.
+    //
+    // A REAL channel ablation cannot be built by varying the road or the swarm, as
+    // these do — that varies the *task*, not the *input representation*, so the arms
+    // are not comparable. It would hold the scenario fixed and zero the relevant
+    // channel group inside `VehicleEncoder` (see `encoder.rs:44-51`, 16 weighted
+    // groups), then compare the same metric across arms with a pre-registered
+    // threshold. Not attempted here — writing it half-way would recreate the problem
+    // these renames just fixed.
 
+    /// Smoke test: training with a curved-highway road model yields finite, bounded
+    /// lateral offset.
+    ///
+    /// Does NOT establish that road channels improve lateral tracking. The straight
+    /// arm is trained and then only checked for finiteness — and even a comparison
+    /// would be confounded, since lateral offset on a straight road is trivially near
+    /// zero while `gentle_highway` is curved.
     #[test]
-    fn test_road_channels_improve_lateral() {
+    fn test_road_training_produces_finite_bounded_lateral() {
         use crate::road::Road;
 
         let config = VehicleConfig {
@@ -1317,8 +1338,14 @@ mod tests {
         );
     }
 
+    /// Smoke test: both the swarm-enabled and solo training paths run to completion
+    /// with finite per-episode rewards.
+    ///
+    /// Does NOT establish that swarm channels improve stability. Both arms are
+    /// trained and each is checked only for `is_finite()`; the arms are never
+    /// compared to each other.
     #[test]
-    fn test_swarm_channels_improve_stability() {
+    fn test_swarm_and_solo_training_rewards_stay_finite() {
         use crate::swarm::SwarmConfig;
 
         let config = VehicleConfig {

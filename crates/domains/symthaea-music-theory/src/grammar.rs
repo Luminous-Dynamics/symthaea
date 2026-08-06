@@ -106,6 +106,8 @@ pub enum GrammarPlanEvidence {
     GrooveCycle(crate::groove_cycle::GrooveCyclePlan),
     AdditiveProcess(crate::process_grammar::ProcessPlan),
     ModalArc(crate::modal_arc::ModalArcPlan),
+    CallResponse(crate::call_response::CallResponsePlan),
+    JazzChorus(crate::jazz_chorus::JazzChorusPlan),
     Compatibility {
         family: GrammarFamily,
         form_available: bool,
@@ -263,6 +265,24 @@ pub fn compose_with_grammar_plan(
                 trace: Default::default(),
             }
         }
+        GrammarFamily::BluesCallResponse => {
+            let realized = crate::call_response::realize_call_response(intent, spec);
+            GrammarRealization {
+                score: realized.score,
+                form: None,
+                plan: GrammarPlanEvidence::CallResponse(realized.plan),
+                trace: Default::default(),
+            }
+        }
+        GrammarFamily::JazzChorus => {
+            let realized = crate::jazz_chorus::realize_jazz_chorus(intent, spec);
+            GrammarRealization {
+                score: realized.score,
+                form: None,
+                plan: GrammarPlanEvidence::JazzChorus(realized.plan),
+                trace: Default::default(),
+            }
+        }
         family => {
             let (score, form) = crate::composer::compose_with_spec_and_form_and_grammar(
                 intent,
@@ -280,12 +300,23 @@ pub fn compose_with_grammar_plan(
             }
         }
     };
+    // Universal safety net: every dedicated engine (GrooveCycle,
+    // ProcessAdditive, RagaModalArc, BluesCallResponse, the fugue/period
+    // pipeline) gets the same de-overlap/metadata-sync pass the shared
+    // pipeline applies internally, so the trace below and the debug gate
+    // after it both see the corrected score, not a pre-correction one.
+    crate::composer::deoverlap_all_voices(&mut realized.score);
+    crate::composer::sync_total_beats(&mut realized.score);
     realized.trace = crate::grammar_trace::build_grammar_trace(
         profile.family,
         &realized.score,
         realized.form.as_ref(),
         &realized.plan,
         &motif,
+    );
+    crate::score_validation::debug_assert_no_structural_defects(
+        &realized.score,
+        "compose_with_grammar_plan",
     );
     realized
 }

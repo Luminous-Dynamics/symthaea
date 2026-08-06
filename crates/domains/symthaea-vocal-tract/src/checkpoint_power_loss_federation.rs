@@ -13,12 +13,10 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
 use crate::{
-    CheckpointPowerLossCampaignEvidence, CheckpointPowerLossCampaignPlan,
-    CheckpointPowerLossLabId,
+    CheckpointPowerLossCampaignEvidence, CheckpointPowerLossCampaignPlan, CheckpointPowerLossLabId,
     CheckpointPowerLossOperationsError, CheckpointPowerLossOperationsEvidence,
     CheckpointPowerLossOperationsKeyId, CheckpointPowerLossOperationsPlan,
-    merge_checkpoint_power_loss_operations_evidence,
-    CheckpointStorageEvidenceError,
+    CheckpointStorageEvidenceError, merge_checkpoint_power_loss_operations_evidence,
 };
 
 pub const CHECKPOINT_POWER_LOSS_FEDERATION_MEMBER_SCHEMA: &str =
@@ -44,8 +42,7 @@ pub const MAX_CHECKPOINT_POWER_LOSS_FEDERATION_BYTES: usize = 8 * 1024 * 1024;
 pub const MAX_CHECKPOINT_POWER_LOSS_CLOCK_OFFSET_SECONDS: u64 = 24 * 60 * 60;
 pub const MAX_CHECKPOINT_POWER_LOSS_CLOCK_UNCERTAINTY_SECONDS: u64 = 60 * 60;
 
-const FEDERATION_PLAN_DIGEST_DOMAIN: &[u8] =
-    b"symthaea-power-loss-federation-plan-digest-v1\0";
+const FEDERATION_PLAN_DIGEST_DOMAIN: &[u8] = b"symthaea-power-loss-federation-plan-digest-v1\0";
 const FEDERATION_AUTH_DOMAIN: &[u8] = b"symthaea-power-loss-federation-auth-v1\0";
 const FEDERATION_ALLOCATION_DIGEST_DOMAIN: &[u8] =
     b"symthaea-power-loss-federation-allocation-digest-v1\0";
@@ -55,8 +52,7 @@ const FEDERATION_REVOCATION_DIGEST_DOMAIN: &[u8] =
     b"symthaea-power-loss-federation-revocation-digest-v1\0";
 const FEDERATION_REVOCATION_AUTH_DOMAIN: &[u8] =
     b"symthaea-power-loss-federation-revocation-auth-v1\0";
-const FEDERATION_CLOCK_DIGEST_DOMAIN: &[u8] =
-    b"symthaea-power-loss-federation-clock-digest-v1\0";
+const FEDERATION_CLOCK_DIGEST_DOMAIN: &[u8] = b"symthaea-power-loss-federation-clock-digest-v1\0";
 const FEDERATED_LAB_EVIDENCE_AUTH_DOMAIN: &[u8] =
     b"symthaea-power-loss-federated-lab-evidence-auth-v1\0";
 
@@ -354,7 +350,6 @@ impl CheckpointPowerLossFederationAuthority {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CheckpointPowerLossFederatedTrialAllocation {
     pub schema: String,
@@ -565,7 +560,8 @@ impl CheckpointPowerLossFederationAuthority {
         operations: &CheckpointPowerLossOperationsPlan,
         federation: &CheckpointPowerLossFederationPlan,
         encoded: &[u8],
-    ) -> Result<CheckpointPowerLossFederatedTrialAllocation, CheckpointPowerLossFederationError> {
+    ) -> Result<CheckpointPowerLossFederatedTrialAllocation, CheckpointPowerLossFederationError>
+    {
         let wire: CheckpointPowerLossFederationWire = bounded_decode(encoded)?;
         if wire.schema != CHECKPOINT_POWER_LOSS_FEDERATION_ALLOCATION_SCHEMA
             || wire.key_id != self.key_id()
@@ -607,7 +603,8 @@ impl CheckpointPowerLossFederationAuthority {
         operations: &CheckpointPowerLossOperationsPlan,
         federation: &CheckpointPowerLossFederationPlan,
         encoded: &[u8],
-    ) -> Result<CheckpointPowerLossFederationRevocationList, CheckpointPowerLossFederationError> {
+    ) -> Result<CheckpointPowerLossFederationRevocationList, CheckpointPowerLossFederationError>
+    {
         let wire: CheckpointPowerLossFederationWire = bounded_decode(encoded)?;
         if wire.schema != CHECKPOINT_POWER_LOSS_FEDERATION_REVOCATION_SCHEMA
             || wire.key_id != self.key_id()
@@ -623,7 +620,6 @@ impl CheckpointPowerLossFederationAuthority {
         Ok(revocations)
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CheckpointPowerLossLabClockAttestation {
@@ -771,10 +767,8 @@ impl CheckpointPowerLossFederatedLabEvidence {
             allocation.validate_against(campaign, operations, federation)?;
             if allocation.lab_id != self.lab_id
                 || allocation.lab_evidence_key_id != self.lab_evidence_key_id
-                || allocation.allocation_sequence
-                    < self.clock_attestation.first_allocation_sequence
-                || allocation.allocation_sequence
-                    > self.clock_attestation.last_allocation_sequence
+                || allocation.allocation_sequence < self.clock_attestation.first_allocation_sequence
+                || allocation.allocation_sequence > self.clock_attestation.last_allocation_sequence
                 || !allocation_ids.insert(allocation.allocation_id)
                 || !allocation_sequences.insert(allocation.allocation_sequence)
                 || !allocation_trials.insert(allocation.trial_id)
@@ -889,7 +883,6 @@ impl CheckpointPowerLossLabEvidenceAuthority {
     }
 }
 
-
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CheckpointPowerLossFederationSummary {
     pub verified_allocations: usize,
@@ -936,11 +929,8 @@ pub fn open_and_merge_checkpoint_power_loss_federation_evidence(
     {
         return Err(CheckpointPowerLossFederationError::InvalidMerge);
     }
-    let federation = federation_authority.open_plan(
-        campaign,
-        operations,
-        sealed_federation_plan,
-    )?;
+    let federation =
+        federation_authority.open_plan(campaign, operations, sealed_federation_plan)?;
     let revocations = federation_authority.open_revocations(
         campaign,
         operations,
@@ -954,12 +944,7 @@ pub fn open_and_merge_checkpoint_power_loss_federation_evidence(
     let mut allocations = sealed_allocations
         .iter()
         .map(|encoded| {
-            federation_authority.open_allocation(
-                campaign,
-                operations,
-                &federation,
-                encoded,
-            )
+            federation_authority.open_allocation(campaign, operations, &federation, encoded)
         })
         .collect::<Result<Vec<_>, _>>()?;
     allocations.sort_by_key(|allocation| allocation.allocation_sequence);
@@ -1045,9 +1030,7 @@ pub fn open_and_merge_checkpoint_power_loss_federation_evidence(
             .map(|evidence| evidence.operations_evidence.clone()),
     )
     .map_err(CheckpointPowerLossFederationError::Operations)?;
-    if merged_operations_evidence.sealed_result_evidence_digest
-        != sealed_result_evidence_digest
-    {
+    if merged_operations_evidence.sealed_result_evidence_digest != sealed_result_evidence_digest {
         return Err(CheckpointPowerLossFederationError::InvalidMerge);
     }
     let summary = CheckpointPowerLossFederationSummary {
@@ -1119,27 +1102,59 @@ impl std::fmt::Display for CheckpointPowerLossFederationError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidKey => formatter.write_str("invalid power-loss federation key"),
-            Self::InvalidFederation => formatter.write_str("invalid power-loss federation identifier"),
+            Self::InvalidFederation => {
+                formatter.write_str("invalid power-loss federation identifier")
+            }
             Self::InvalidMember => formatter.write_str("invalid power-loss federation member"),
             Self::DuplicateMember => formatter.write_str("duplicate power-loss federation member"),
-            Self::MissingMember => formatter.write_str("power-loss operations lab is missing from the federation"),
+            Self::MissingMember => {
+                formatter.write_str("power-loss operations lab is missing from the federation")
+            }
             Self::InvalidPlan => formatter.write_str("invalid power-loss federation plan"),
-            Self::InvalidAllocation => formatter.write_str("invalid federated power-loss trial allocation"),
-            Self::MissingAllocation => formatter.write_str("federated power-loss proof is missing its allocation"),
-            Self::InvalidClockAttestation => formatter.write_str("invalid federated lab clock attestation"),
-            Self::InvalidLabEvidence => formatter.write_str("invalid independently signed lab evidence"),
-            Self::InvalidMerge => formatter.write_str("invalid federated power-loss evidence merge"),
-            Self::InvalidAllocationOrder => formatter.write_str("invalid or duplicate federation allocation order"),
-            Self::MissingLabAuthority => formatter.write_str("missing independent lab evidence authority"),
-            Self::InsufficientLabCoverage => formatter.write_str("insufficient independently administered lab coverage"),
-            Self::RevokedEvidence => formatter.write_str("federated power-loss evidence was revoked"),
-            Self::InvalidRevocation => formatter.write_str("invalid power-loss federation revocation"),
-            Self::DuplicateRevocation => formatter.write_str("duplicate power-loss federation revocation"),
+            Self::InvalidAllocation => {
+                formatter.write_str("invalid federated power-loss trial allocation")
+            }
+            Self::MissingAllocation => {
+                formatter.write_str("federated power-loss proof is missing its allocation")
+            }
+            Self::InvalidClockAttestation => {
+                formatter.write_str("invalid federated lab clock attestation")
+            }
+            Self::InvalidLabEvidence => {
+                formatter.write_str("invalid independently signed lab evidence")
+            }
+            Self::InvalidMerge => {
+                formatter.write_str("invalid federated power-loss evidence merge")
+            }
+            Self::InvalidAllocationOrder => {
+                formatter.write_str("invalid or duplicate federation allocation order")
+            }
+            Self::MissingLabAuthority => {
+                formatter.write_str("missing independent lab evidence authority")
+            }
+            Self::InsufficientLabCoverage => {
+                formatter.write_str("insufficient independently administered lab coverage")
+            }
+            Self::RevokedEvidence => {
+                formatter.write_str("federated power-loss evidence was revoked")
+            }
+            Self::InvalidRevocation => {
+                formatter.write_str("invalid power-loss federation revocation")
+            }
+            Self::DuplicateRevocation => {
+                formatter.write_str("duplicate power-loss federation revocation")
+            }
             Self::UnknownTrial => formatter.write_str("unknown federated power-loss trial"),
-            Self::CampaignBindingMismatch => formatter.write_str("power-loss federation campaign binding mismatch"),
-            Self::AuthenticationFailed => formatter.write_str("power-loss federation authentication failed"),
+            Self::CampaignBindingMismatch => {
+                formatter.write_str("power-loss federation campaign binding mismatch")
+            }
+            Self::AuthenticationFailed => {
+                formatter.write_str("power-loss federation authentication failed")
+            }
             Self::Encoding => formatter.write_str("power-loss federation encoding failed"),
-            Self::TooLarge => formatter.write_str("power-loss federation artifact exceeds its bound"),
+            Self::TooLarge => {
+                formatter.write_str("power-loss federation artifact exceeds its bound")
+            }
             Self::Operations(error) => write!(formatter, "operations evidence failed: {error}"),
             Self::StorageEvidence(error) => write!(formatter, "storage evidence failed: {error}"),
         }
@@ -1152,8 +1167,8 @@ fn digest_serialized<T: Serialize>(
     domain: &[u8],
     value: &T,
 ) -> Result<[u8; 32], CheckpointPowerLossFederationError> {
-    let encoded = postcard::to_stdvec(value)
-        .map_err(|_| CheckpointPowerLossFederationError::Encoding)?;
+    let encoded =
+        postcard::to_stdvec(value).map_err(|_| CheckpointPowerLossFederationError::Encoding)?;
     if encoded.len() > MAX_CHECKPOINT_POWER_LOSS_FEDERATION_BYTES {
         return Err(CheckpointPowerLossFederationError::TooLarge);
     }
@@ -1163,11 +1178,9 @@ fn digest_serialized<T: Serialize>(
     Ok(*hasher.finalize().as_bytes())
 }
 
-fn bounded_encode<T: Serialize>(
-    value: &T,
-) -> Result<Vec<u8>, CheckpointPowerLossFederationError> {
-    let encoded = postcard::to_stdvec(value)
-        .map_err(|_| CheckpointPowerLossFederationError::Encoding)?;
+fn bounded_encode<T: Serialize>(value: &T) -> Result<Vec<u8>, CheckpointPowerLossFederationError> {
+    let encoded =
+        postcard::to_stdvec(value).map_err(|_| CheckpointPowerLossFederationError::Encoding)?;
     if encoded.len() > MAX_CHECKPOINT_POWER_LOSS_FEDERATION_BYTES {
         return Err(CheckpointPowerLossFederationError::TooLarge);
     }
@@ -1255,10 +1268,12 @@ pub fn decode_checkpoint_power_loss_federation_revocations(
 mod tests {
     use super::*;
     use crate::{
-        CHECKPOINT_POWER_LOSS_CAMPAIGN_SCHEMA, CHECKPOINT_POWER_LOSS_LAB_SCHEMA,
-        CHECKPOINT_POWER_LOSS_OPERATIONS_PLAN_SCHEMA, CheckpointDurabilityBoundary,
+        CHECKPOINT_POWER_LOSS_CAMPAIGN_SCHEMA, CHECKPOINT_POWER_LOSS_EVIDENCE_SCHEMA,
+        CHECKPOINT_POWER_LOSS_LAB_SCHEMA, CHECKPOINT_POWER_LOSS_OPERATIONS_PLAN_SCHEMA,
+        CHECKPOINT_POWER_LOSS_RESULT_SCHEMA, CheckpointDurabilityBoundary,
         CheckpointPowerLossEvidenceClass, CheckpointPowerLossEvidenceKeyId,
-        CheckpointPowerLossLabManifest, CheckpointPowerLossTrialPlan,
+        CheckpointPowerLossLabManifest, CheckpointPowerLossRecoveryOutcome,
+        CheckpointPowerLossTrialPlan, CheckpointPowerLossTrialResult,
         CheckpointStorageProfileAttestationKeyId,
     };
 
@@ -1282,7 +1297,8 @@ mod tests {
                     trial_id: [20; 16],
                     storage_profile_digest: [10; 32],
                     evidence_class: CheckpointPowerLossEvidenceClass::PhysicalDevicePowerCut,
-                    durability_boundary: CheckpointDurabilityBoundary::AfterFileSyncBeforePublication,
+                    durability_boundary:
+                        CheckpointDurabilityBoundary::AfterFileSyncBeforePublication,
                     workload_digest: [21; 32],
                     expected_pre_power_loss_digest: [22; 32],
                 },
@@ -1290,7 +1306,8 @@ mod tests {
                     trial_id: [30; 16],
                     storage_profile_digest: [11; 32],
                     evidence_class: CheckpointPowerLossEvidenceClass::PhysicalDevicePowerCut,
-                    durability_boundary: CheckpointDurabilityBoundary::AfterPublicationBeforeDirectorySync,
+                    durability_boundary:
+                        CheckpointDurabilityBoundary::AfterPublicationBeforeDirectorySync,
                     workload_digest: [31; 32],
                     expected_pre_power_loss_digest: [32; 32],
                 },
@@ -1405,11 +1422,8 @@ mod tests {
         let (campaign, operations, federation) = fixture();
         federation.validate_against(&campaign, &operations).unwrap();
         let authority = CheckpointPowerLossFederationAuthority::new(
-            CheckpointPowerLossFederationKey::new(
-                federation.federation_authority_key_id,
-                [90; 32],
-            )
-            .unwrap(),
+            CheckpointPowerLossFederationKey::new(federation.federation_authority_key_id, [90; 32])
+                .unwrap(),
         );
         let sealed = authority
             .seal_plan(&campaign, &operations, &federation)
@@ -1425,8 +1439,7 @@ mod tests {
     #[test]
     fn duplicate_administration_binding_is_rejected() {
         let (campaign, operations, mut federation) = fixture();
-        federation.members[1].administration_binding =
-            federation.members[0].administration_binding;
+        federation.members[1].administration_binding = federation.members[0].administration_binding;
         assert!(matches!(
             federation.validate_against(&campaign, &operations),
             Err(CheckpointPowerLossFederationError::DuplicateMember)
@@ -1483,5 +1496,241 @@ mod tests {
             clock.validate_against(&campaign, &operations, &federation),
             Err(CheckpointPowerLossFederationError::InvalidClockAttestation)
         ));
+    }
+
+    // ── End-to-end integration test for POWER_LOSS_CLUSTER_SEMANTICS_FREEZE_2026-07-30.md ──
+    //
+    // This is the REAL motivating scenario for validate_partial_against: one lab's evidence,
+    // covering only its own trial allocation (1 of the fixture's 2 campaign trials), must be
+    // accepted by CheckpointPowerLossFederatedLabEvidence::validate_against -- which internally
+    // calls operations_evidence.validate_partial_against(...), not the full validate_against.
+    #[test]
+    fn federated_lab_evidence_accepts_genuinely_partial_operations_evidence() {
+        use crate::checkpoint_power_loss_operations::{
+            CHECKPOINT_POWER_LOSS_OPERATIONS_EVIDENCE_SCHEMA, CheckpointPowerLossExecutionJournal,
+            CheckpointPowerLossExecutionReceipt, CheckpointPowerLossExecutionState,
+            CheckpointPowerLossOperationsAuthority, CheckpointPowerLossOperationsKey,
+        };
+
+        let (campaign, operations, federation) = fixture();
+        let authority = CheckpointPowerLossOperationsAuthority::new(
+            CheckpointPowerLossOperationsKey::new(operations.operations_authority_key_id, [95; 32])
+                .unwrap(),
+        );
+
+        // Build a real, fully-valid proof for trial[0] only (mirrors
+        // checkpoint_power_loss_operations.rs's own `completed_proof` test helper).
+        let sealed = authority
+            .issue_lease(
+                &campaign,
+                &operations,
+                federation.members[0].lab_id,
+                campaign.trials[0].trial_id,
+                [96; 16],
+                1,
+                // Must fall within `allocation()`'s own not_before/expires window (210..500)
+                // below, not just the lab manifest's broader validity window -- the
+                // FederatedLabEvidence-level RevokedEvidence check cross-validates the lease
+                // against the allocation specifically.
+                210,
+                500,
+            )
+            .unwrap();
+        let lease = authority
+            .open_lease(&campaign, &operations, &sealed)
+            .unwrap();
+        let result0 = CheckpointPowerLossTrialResult {
+            schema: CHECKPOINT_POWER_LOSS_RESULT_SCHEMA.to_owned(),
+            campaign_id: campaign.campaign_id,
+            campaign_digest: campaign.digest().unwrap(),
+            trial_id: campaign.trials[0].trial_id,
+            storage_profile_digest: campaign.trials[0].storage_profile_digest,
+            evidence_class: campaign.trials[0].evidence_class,
+            durability_boundary: campaign.trials[0].durability_boundary,
+            workload_digest: campaign.trials[0].workload_digest,
+            pre_power_loss_digest: campaign.trials[0].expected_pre_power_loss_digest,
+            recovered_state_digest: [220; 32],
+            power_event_evidence_digest: [221; 32],
+            outcome: CheckpointPowerLossRecoveryOutcome::CleanRecovery,
+            filesystem_consistency_verified: true,
+            application_consistency_verified: true,
+            completed_at_unix_seconds: 240,
+        };
+        let mut journal = CheckpointPowerLossExecutionJournal::new(
+            &campaign,
+            &operations,
+            &lease,
+            [30; 32],
+            [31; 32],
+            210,
+        )
+        .unwrap();
+        for (state, event_digest, at) in [
+            (CheckpointPowerLossExecutionState::Prepared, [40; 32], 220),
+            (CheckpointPowerLossExecutionState::Armed, [41; 32], 221),
+            (
+                CheckpointPowerLossExecutionState::PowerEventObserved,
+                result0.power_event_evidence_digest,
+                222,
+            ),
+            (
+                CheckpointPowerLossExecutionState::RecoveryStarted,
+                [43; 32],
+                223,
+            ),
+            (
+                CheckpointPowerLossExecutionState::RecoveryClassified,
+                result0.recovered_state_digest,
+                224,
+            ),
+        ] {
+            journal
+                .append(
+                    &campaign,
+                    &operations,
+                    &lease,
+                    state,
+                    event_digest,
+                    [30; 32],
+                    at,
+                )
+                .unwrap();
+        }
+        let sealed_result_digest = [51; 32];
+        journal
+            .append(
+                &campaign,
+                &operations,
+                &lease,
+                CheckpointPowerLossExecutionState::EvidenceSealed,
+                sealed_result_digest,
+                [30; 32],
+                230,
+            )
+            .unwrap();
+        journal
+            .append(
+                &campaign,
+                &operations,
+                &lease,
+                CheckpointPowerLossExecutionState::Completed,
+                [52; 32],
+                [30; 32],
+                240,
+            )
+            .unwrap();
+        let receipt = CheckpointPowerLossExecutionReceipt::new(
+            &campaign,
+            &operations,
+            &lease,
+            &journal,
+            &result0,
+            sealed_result_digest,
+            240,
+        )
+        .unwrap();
+        let proof = crate::checkpoint_power_loss_operations::CheckpointPowerLossExecutionProof {
+            lease,
+            journal,
+            receipt,
+        };
+
+        // Campaign-wide result evidence needs a result for BOTH trials -- this is what makes
+        // the lab's own 1-trial operations_evidence genuinely PARTIAL, not accidentally complete.
+        let result1 = CheckpointPowerLossTrialResult {
+            trial_id: campaign.trials[1].trial_id,
+            storage_profile_digest: campaign.trials[1].storage_profile_digest,
+            evidence_class: campaign.trials[1].evidence_class,
+            durability_boundary: campaign.trials[1].durability_boundary,
+            workload_digest: campaign.trials[1].workload_digest,
+            pre_power_loss_digest: campaign.trials[1].expected_pre_power_loss_digest,
+            recovered_state_digest: [230; 32],
+            power_event_evidence_digest: [231; 32],
+            ..result0.clone()
+        };
+        let result_evidence = CheckpointPowerLossCampaignEvidence {
+            schema: CHECKPOINT_POWER_LOSS_EVIDENCE_SCHEMA.to_owned(),
+            campaign_id: campaign.campaign_id,
+            campaign_digest: campaign.digest().unwrap(),
+            results: vec![result0, result1],
+        };
+
+        let operations_evidence = CheckpointPowerLossOperationsEvidence {
+            schema: CHECKPOINT_POWER_LOSS_OPERATIONS_EVIDENCE_SCHEMA.to_owned(),
+            campaign_id: campaign.campaign_id,
+            campaign_digest: campaign.digest().unwrap(),
+            operations_plan_digest: operations.digest(&campaign).unwrap(),
+            operations_authority_key_id: operations.operations_authority_key_id,
+            sealed_result_evidence_digest: sealed_result_digest,
+            proofs: vec![proof],
+            journal_concurrency_tests: Vec::new(),
+        };
+
+        // Confirms the fixture is genuinely partial: the FULL method must reject it (only 1 of
+        // 2 campaign trials is proven) -- this is the negative control for the assertion below.
+        assert!(
+            operations_evidence
+                .validate_against(&campaign, &operations, &result_evidence)
+                .is_err(),
+            "test setup sanity: this evidence covers only 1 of 2 trials, so the full \
+             validate_against must reject it for incompleteness"
+        );
+
+        let allocation = allocation(&campaign, &operations, &federation);
+        let revocations = CheckpointPowerLossFederationRevocationList {
+            schema: CHECKPOINT_POWER_LOSS_FEDERATION_REVOCATION_SCHEMA.to_owned(),
+            federation_id: federation.federation_id,
+            federation_plan_digest: federation.digest(&campaign, &operations).unwrap(),
+            federation_authority_key_id: federation.federation_authority_key_id,
+            epoch: federation.epoch,
+            sequence: 1,
+            issued_at_unix_seconds: 150,
+            revocations: Vec::new(),
+        };
+        let clock_attestation = CheckpointPowerLossLabClockAttestation {
+            schema: CHECKPOINT_POWER_LOSS_FEDERATION_CLOCK_SCHEMA.to_owned(),
+            federation_id: federation.federation_id,
+            federation_plan_digest: federation.digest(&campaign, &operations).unwrap(),
+            lab_id: federation.members[0].lab_id,
+            lab_evidence_key_id: federation.members[0].lab_evidence_key_id,
+            sample_id: [97; 16],
+            first_allocation_sequence: allocation.allocation_sequence,
+            last_allocation_sequence: allocation.allocation_sequence,
+            lab_unix_seconds: 500,
+            federation_unix_seconds: 500,
+            uncertainty_seconds: 2,
+            observed_at_unix_seconds: 500,
+        };
+        let lab_evidence = CheckpointPowerLossFederatedLabEvidence {
+            schema: CHECKPOINT_POWER_LOSS_FEDERATED_LAB_EVIDENCE_SCHEMA.to_owned(),
+            federation_id: federation.federation_id,
+            federation_plan_digest: federation.digest(&campaign, &operations).unwrap(),
+            revocation_list_digest: revocations
+                .digest(&campaign, &operations, &federation)
+                .unwrap(),
+            epoch: federation.epoch,
+            lab_id: federation.members[0].lab_id,
+            lab_evidence_key_id: federation.members[0].lab_evidence_key_id,
+            sealed_result_evidence_digest: sealed_result_digest,
+            clock_attestation,
+            allocations: vec![allocation],
+            operations_evidence,
+        };
+
+        // The real assertion: the FEDERATED wrapper, which internally validates its
+        // operations_evidence via validate_partial_against rather than the full method,
+        // accepts this genuinely-1-of-2-trials-complete evidence.
+        lab_evidence
+            .validate_against(
+                &campaign,
+                &operations,
+                &result_evidence,
+                &federation,
+                &revocations,
+            )
+            .expect(
+                "a single lab's evidence covering only its own trial allocation must be \
+                 accepted -- this is the entire point of validate_partial_against existing",
+            );
     }
 }

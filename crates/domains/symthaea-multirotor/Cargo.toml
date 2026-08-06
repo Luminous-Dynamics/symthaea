@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Unified HDC-LTC + FEP Active Inference multirotor flight control via MuJoCo"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["multirotor", "flight-control", "active-inference", "hdc", "mujoco"]
 categories = ["science", "algorithms", "simulation"]
 

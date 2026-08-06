@@ -349,11 +349,14 @@ mod tests {
             )),
         );
         let exp_expr = Expr::Func(UnaryFn::Exp, Box::new(Expr::Var("x".into())));
-        let unsupported = Expr::BinOp(
-            BinOp::Add,
-            Box::new(Expr::Var("x".into())),
-            Box::new(Expr::Var("y".into())),
-        );
+        // Genuinely unsupported by expr_to_egg_sexp: Add/Sub/Mul/Div/Pow and
+        // Exp/Log/Sin/Sqrt are all handled (its `other` arm only rejects
+        // Sum and the Cos/Abs/Floor unary functions). This used to be
+        // `x + y`, but BinOp::Add is fully supported (SymbolLang has an
+        // "add" op with its own rewrite rules), so it silently became its
+        // own real equivalence class instead of landing in
+        // `report.unsupported` -- breaking both assertions below.
+        let unsupported = Expr::Func(UnaryFn::Cos, Box::new(Expr::Var("x".into())));
 
         let report = collapse_expr_candidates(&[
             left_assoc.clone(),

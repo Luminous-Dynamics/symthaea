@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-futures-ledger"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Symthaea Futures Laboratory — replayable evidence records (provenance for every forecast: inputs, assumptions, model versions, scores). See SYMTHAEA_FUTURES_LABORATORY_PLAN_2026-07-25.md."
+
+[dependencies]
+symthaea-futures-core = { workspace = true }
+serde = { workspace = true }

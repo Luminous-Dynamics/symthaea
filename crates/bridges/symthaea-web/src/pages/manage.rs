@@ -6,6 +6,8 @@
 use leptos::prelude::*;
 use wasm_bindgen::JsCast;
 
+use crate::pages::remote_install::MAX_RELAY_MESSAGE_BYTES;
+
 fn save_to_storage(key: &str, value: &str) {
     if let Some(s) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) {
         let _ = s.set_item(key, value);
@@ -127,6 +129,16 @@ pub fn ManagePage() -> impl IntoView {
         let onmessage = wasm_bindgen::closure::Closure::<dyn Fn(web_sys::MessageEvent)>::new(
             move |ev: web_sys::MessageEvent| {
                 let data = ev.data().as_string().unwrap_or_default();
+                // Same 1 MiB cap remote_install.rs's relay handler enforces:
+                // relay_url is a user-editable, persisted setting, so a
+                // compromised/spoofed relay must not be able to make this
+                // tab parse and hold an unbounded JSON payload.
+                if data.len() > MAX_RELAY_MESSAGE_BYTES {
+                    conn.set(ConnState::Failed(
+                        "Relay message exceeded the 1 MiB safety limit".into(),
+                    ));
+                    return;
+                }
                 let msg: serde_json::Value = match serde_json::from_str(&data) {
                     Ok(v) => v,
                     Err(_) => return,

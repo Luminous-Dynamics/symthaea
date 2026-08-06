@@ -219,6 +219,16 @@ pub struct CycleMetadata {
     /// When true, the system used a fallback strategy instead.
     pub reasoning_gate_blocked: bool,
 
+    /// Whether the reasoning engine's tool gate actually ran this cycle (i.e. a
+    /// `ToolDescriptor` was present and `classifier::gate()` was invoked at least
+    /// once). Distinguishes "gate ran and passed" from "no gate ran" —
+    /// `reasoning_gate_blocked` alone cannot: it defaults to `false` both when the
+    /// gate passed AND when no gate was evaluated at all. Consumers that learn from
+    /// gate outcomes (e.g. posthoc calibration) must check this before treating
+    /// `!reasoning_gate_blocked` as "the gate passed."
+    #[serde(default)]
+    pub reasoning_gate_evaluated: bool,
+
     /// Fallback strategy selected when gating blocked an action (if any)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reasoning_fallback: Option<String>,

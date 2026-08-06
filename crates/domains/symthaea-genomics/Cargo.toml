@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "DNA assembly, damage modeling, and repair for degraded/ancient samples — HDC + LTC temporal degradation"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["genomics", "dna", "hdc", "ancient-dna", "assembly"]
 categories = ["science", "algorithms"]
 

@@ -154,10 +154,15 @@ fn smoke_butlin_indicators() {
     let result = ButlinIndicatorSuite.run(&smoke_config());
     assert!(!result.metrics.is_empty());
     assert_metrics_finite(&result);
-    // All 14 indicators should be evaluated
-    let total = result.metrics["present_count"].mean
-        + result.metrics["partial_count"].mean
-        + result.metrics["absent_count"].mean;
+    // All 14 indicators should be evaluated, across whichever evidence tiers
+    // they landed in.
+    let total = result.metrics["architectural_only_count"].mean
+        + result.metrics["observed_count"].mean
+        + result.metrics["causally_supported_count"].mean
+        + result.metrics["functionally_supported_count"].mean
+        + result.metrics["not_demonstrated_count"].mean
+        + result.metrics["contradicted_count"].mean
+        + result.metrics["inconclusive_count"].mean;
     assert_eq!(total, 14.0);
 }
 

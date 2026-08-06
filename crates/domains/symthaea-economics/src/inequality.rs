@@ -177,8 +177,8 @@ pub fn atkinson_index(values: &[f64], epsilon: f64) -> Result<f64> {
         0.0
     } else {
         let power = 1.0 - epsilon;
-        let moment = scaled.iter().map(|value| value.powf(power)).sum::<f64>()
-            / scaled.len() as f64;
+        let moment =
+            scaled.iter().map(|value| value.powf(power)).sum::<f64>() / scaled.len() as f64;
         moment.powf(1.0 / power)
     };
     let result = 1.0 - equally_distributed_equivalent / mean;
@@ -220,7 +220,11 @@ mod tests {
         assert_eq!(curve.first().unwrap().value_share, 0.0);
         assert_eq!(curve.last().unwrap().population_share, 1.0);
         assert_eq!(curve.last().unwrap().value_share, 1.0);
-        assert!(curve.windows(2).all(|pair| pair[0].value_share <= pair[1].value_share));
+        assert!(
+            curve
+                .windows(2)
+                .all(|pair| pair[0].value_share <= pair[1].value_share)
+        );
     }
 
     #[test]

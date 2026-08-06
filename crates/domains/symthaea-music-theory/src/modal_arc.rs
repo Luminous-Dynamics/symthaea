@@ -12,7 +12,7 @@ use crate::composer::MusicalIntent;
 use crate::harmony::Key;
 use crate::motif::Motif;
 use crate::rhythm::Duration;
-use crate::score::{Emphasis, Score, ScoreNote, VoiceRole};
+use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 use crate::spec::{Attitude, CompositionSpec};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -86,6 +86,7 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
             let duration = event.duration.scale(2, 1);
             if let Some(degree) = event.degree {
                 score.push(ScoreNote {
+                    part: PartId::UNASSIGNED,
                     pitch: scale.degree_pitch(degree, 4),
                     onset,
                     duration,
@@ -110,6 +111,7 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
             let duration = event.duration;
             if let Some(degree) = event.degree {
                 score.push(ScoreNote {
+                    part: PartId::UNASSIGNED,
                     pitch: scale.degree_pitch(degree, 4),
                     onset,
                     duration,
@@ -135,6 +137,7 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
             let duration = event.duration.scale(1, 2);
             if let Some(degree) = event.degree {
                 score.push(ScoreNote {
+                    part: PartId::UNASSIGNED,
                     pitch: scale.degree_pitch(degree + if repetition % 2 == 0 { 0 } else { 7 }, 4),
                     onset,
                     duration,
@@ -147,6 +150,7 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
             onset = onset + duration;
             let punctuation = duration.scale(1, 2);
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: scale.degree_pitch(if repetition % 2 == 0 { 1 } else { 5 }, 5),
                 onset,
                 duration: punctuation,
@@ -159,6 +163,7 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
         }
     }
     score.push(ScoreNote {
+        part: PartId::UNASSIGNED,
         pitch: scale.degree_pitch(1, 4),
         onset,
         duration: Duration::new(meter as i64, 1),
@@ -178,6 +183,7 @@ pub fn realize_modal_arc(intent: &MusicalIntent, spec: &CompositionSpec) -> Moda
         (VoiceRole::Harmony, 8, 3, 0.26),
     ] {
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: scale.degree_pitch(degree, octave),
             onset: Duration::zero(),
             duration: onset,

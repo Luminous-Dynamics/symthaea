@@ -1,0 +1,40 @@
+base_config:
+  - configs/csd_en_acoustic.yaml
+
+# Gate 4: generalization test. Trains on ~57s of real en001a content
+# (everything except the held-out target region), holds out "won't you
+# sing along with me" (60.0-63.8813s -- the exact phrase used in Gates
+# 2-3) as a genuinely UNSEEN validation-only example. Every phoneme in
+# the held-out phrase appears in training in other contexts (verified by
+# build_generalization_dataset.py), but this exact phoneme sequence never
+# does -- a real compositionality/generalization test, not memorization.
+dictionaries:
+  en: dictionaries/generalize-01.txt
+
+datasets:
+  - raw_data_dir: raw/generalize-01
+    speaker: csd-en
+    spk_id: 0
+    language: en
+    test_prefixes:
+      - heldout01
+
+binary_data_dir: data/generalize-01/binary
+
+augmentation_args:
+  random_pitch_shifting:
+    enabled: false
+  fixed_pitch_shifting:
+    enabled: false
+  random_time_stretching:
+    enabled: false
+
+# Single training utterance (~57s of real, varied content) -- more total
+# audio/phoneme diversity than Gate 3's single phrase, still cheap. Same
+# checkpoint cadence as Gate 3.
+max_updates: 4000
+val_check_interval: 1000
+num_valid_plots: 1
+permanent_ckpt_start: 1000
+permanent_ckpt_interval: 1000
+num_ckpt_keep: 4

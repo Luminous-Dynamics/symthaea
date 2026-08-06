@@ -1,16 +1,15 @@
+use symthaea_legal_reasoning::Atom;
 use symthaea_legal_reasoning::{
     AdjudicationOutcome, AdjudicationRequest, AuthorityId, AuthorityLedger, AuthorityRecord,
-    AuthorityRecordId, AuthorityWeight, BurdenPlan, BurdenStage, BurdenStageId,
-    CanonicalEvidence, ClaimDefinition, ClaimId, ClaimOutcome, ClaimSubmission, CurrencyId,
-    DecisionId, DocumentId, FactAssertion, FactBase, FormalRule, GrantedRemedy,
-    InferenceProfile, IssueId, IssueRequirement, JurisdictionId, LegalDate, Literal,
-    MonetaryRemedyPlan, Money, PartyId, ProvisionId, RemedyComponent, RemedyComponentId,
-    RemedyComponentKind, RemedyDefinition, RemedyEligibility, RemedyId, RemedyKind,
-    RemedyOutcome, RuleId, RuleKind, RulePack, RulePackId, SourceRef, adjudicate, infer,
-    validate_adjudication_record, validate_authority_ledger, validate_claim_definition,
-    validate_remedy_definition,
+    AuthorityRecordId, AuthorityWeight, BurdenPlan, BurdenStage, BurdenStageId, CanonicalEvidence,
+    ClaimDefinition, ClaimId, ClaimOutcome, ClaimSubmission, CurrencyId, DecisionId, DocumentId,
+    FactAssertion, FactBase, FormalRule, GrantedRemedy, InferenceProfile, IssueId,
+    IssueRequirement, JurisdictionId, LegalDate, Literal, MonetaryRemedyPlan, Money, PartyId,
+    ProvisionId, RemedyComponent, RemedyComponentId, RemedyComponentKind, RemedyDefinition,
+    RemedyEligibility, RemedyId, RemedyKind, RemedyOutcome, RuleId, RuleKind, RulePack, RulePackId,
+    SourceRef, adjudicate, infer, validate_adjudication_record, validate_authority_ledger,
+    validate_claim_definition, validate_remedy_definition,
 };
-use symthaea_legal_reasoning::Atom;
 
 fn positive(value: &str) -> Literal {
     Literal::Positive(Atom::new(value).unwrap())
@@ -150,12 +149,7 @@ fn record(reverse: bool) -> symthaea_legal_reasoning::AdjudicationRecord {
             FactAssertion::observed(positive("nonperformance")),
         ])
     };
-    let result = infer(
-        &pack,
-        &facts,
-        &InferenceProfile::grounded_blocking_v1(),
-    )
-    .unwrap();
+    let result = infer(&pack, &facts, &InferenceProfile::grounded_blocking_v1()).unwrap();
     let ledger = ledger();
     let authorities = ledger
         .select([AuthorityRecordId::new("binding-case").unwrap()], date())
@@ -204,5 +198,8 @@ fn v06_artifacts_validate_without_changing_outcomes() {
 
 #[test]
 fn canonical_adjudication_is_input_order_invariant() {
-    assert_eq!(record(false).canonical_bytes(), record(true).canonical_bytes());
+    assert_eq!(
+        record(false).canonical_bytes(),
+        record(true).canonical_bytes()
+    );
 }

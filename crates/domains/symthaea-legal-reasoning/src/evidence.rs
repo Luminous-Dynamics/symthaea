@@ -37,11 +37,7 @@ pub struct EvidenceManifest {
 }
 
 impl EvidenceManifest {
-    pub fn v1(
-        semantic_profile: SemanticProfileId,
-        rule_pack: RulePackId,
-        query: QueryId,
-    ) -> Self {
+    pub fn v1(semantic_profile: SemanticProfileId, rule_pack: RulePackId, query: QueryId) -> Self {
         Self {
             schema_version: 1,
             engine_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -71,11 +67,7 @@ impl<T: CanonicalEvidence> CanonicalEvidence for EvidenceEnvelope<T> {
         output.push_str("symthaea-legal-evidence\n");
         unsigned(output, "schema", u64::from(self.manifest.schema_version));
         text(output, "engine", &self.manifest.engine_version);
-        text(
-            output,
-            "profile",
-            self.manifest.semantic_profile.as_str(),
-        );
+        text(output, "profile", self.manifest.semantic_profile.as_str());
         text(output, "rule-pack", self.manifest.rule_pack.as_str());
         text(output, "query", self.manifest.query.as_str());
         output.push_str("payload-begin\n");
@@ -153,11 +145,7 @@ impl CanonicalEvidence for LifecycleAssessment {
         let mut decisive_events = self.decisive_events.clone();
         decisive_events.sort_unstable();
         decisive_events.dedup();
-        unsigned(
-            output,
-            "decisive-event-count",
-            decisive_events.len() as u64,
-        );
+        unsigned(output, "decisive-event-count", decisive_events.len() as u64);
         for event in &decisive_events {
             text(output, "decisive-event", event.as_str());
         }
@@ -343,11 +331,8 @@ mod tests {
             &["resident", "diplomat"],
         )
         .unwrap();
-        let right = try_derive_with_trace(
-            &[exception, default],
-            &["diplomat", "resident"],
-        )
-        .unwrap();
+        let right =
+            try_derive_with_trace(&[exception, default], &["diplomat", "resident"]).unwrap();
 
         assert_eq!(left.canonical_bytes(), right.canonical_bytes());
     }
@@ -393,11 +378,8 @@ mod tests {
 
     #[test]
     fn envelope_binds_semantics_pack_query_and_engine_version() {
-        let derivation = try_derive_with_trace(
-            &[Rule::new(&["adult"], &[], "capacity")],
-            &["adult"],
-        )
-        .unwrap();
+        let derivation =
+            try_derive_with_trace(&[Rule::new(&["adult"], &[], "capacity")], &["adult"]).unwrap();
         let envelope = EvidenceEnvelope::new(
             EvidenceManifest::v1(
                 SemanticProfileId::new("legacy-stratified-v1").unwrap(),
@@ -452,8 +434,8 @@ mod tests {
         let right = infer(&right_pack, &right_facts, &profile).unwrap();
 
         assert_eq!(left.canonical_bytes(), right.canonical_bytes());
-        let graph_text = String::from_utf8(ProofGraph::from_result(&left).canonical_bytes())
-            .unwrap();
+        let graph_text =
+            String::from_utf8(ProofGraph::from_result(&left).canonical_bytes()).unwrap();
         assert!(graph_text.contains("guard\n"));
         assert!(graph_text.contains("exception-atom"));
         assert!(graph_text.contains("exempt"));

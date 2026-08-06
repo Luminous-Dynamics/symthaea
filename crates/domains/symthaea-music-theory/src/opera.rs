@@ -44,7 +44,7 @@ use crate::harmony::{Key, Progression};
 use crate::motif::Motif;
 use crate::phrase::Period;
 use crate::rhythm::Duration;
-use crate::score::{Emphasis, Score, ScoreNote, VoiceRole};
+use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 
 /// Character one: confident, triadic, rising to the octave.
 pub(crate) fn theme_a() -> Motif {
@@ -161,6 +161,7 @@ fn push_theme(
         }
         if let Some(d) = n.degree {
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: scale.degree_pitch(d, octave),
                 onset: start + t,
                 duration: n.duration,
@@ -227,6 +228,21 @@ pub(crate) fn realize_opera(
     let mut prev_upper: Vec<crate::pitch::Pitch> = Vec::new();
     let mut prev_bass: Option<crate::pitch::Pitch> = None;
     let pattern = crate::accompaniment::Accompaniment::Block;
+    // Bass is realized BEFORE harmony so `realize_harmony_measures` can read the
+    // ACTUAL sounding bass from the score and voice the upper parts against it
+    // (rootless chords + bass-vs-upper parallel fifths, both measured 2026-07-30).
+    // Purely a reordering: the two use independent `prev_bass`/`prev_upper` chains
+    // and never read each other's state, so the emitted NOTES are unchanged.
+    crate::composer::realize_bass(
+        &mut score,
+        &form,
+        meter,
+        intent,
+        &mut prev_bass,
+        pattern,
+        false,
+        false,
+    );
     crate::composer::realize_harmony(
         &mut score,
         &form,
@@ -236,15 +252,6 @@ pub(crate) fn realize_opera(
         pattern,
         false,
         false,
-        false,
-    );
-    crate::composer::realize_bass(
-        &mut score,
-        &form,
-        meter,
-        intent,
-        &mut prev_bass,
-        pattern,
         false,
     );
 

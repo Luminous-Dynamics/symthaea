@@ -13,6 +13,43 @@ use crate::pitch::Pitch;
 use crate::rhythm::Duration;
 use serde::{Deserialize, Serialize};
 
+/// Which continuing musical line produced a note.
+///
+/// Deliberately separate from [`VoiceRole`], and the distinction is the point:
+///
+/// - `PartId` answers **"which persistent agent is playing this?"**
+/// - `VoiceRole` answers **"what function is that line performing here?"**
+///
+/// One part can change role (a fugue's answer becomes an accompanying line);
+/// two parts can share a role (two contrapuntal lines both labelled `Melody`).
+/// Grouping notes by role and calling the result "voices" conflates them — a
+/// mistake this codebase made in a style probe on 2026-07-29, reporting
+/// "textbook staggered exposition" from what was only role-class entry.
+///
+/// # Never infer this
+///
+/// A `PartId` must be assigned by the generator that knows which line it is
+/// writing. Reconstructing it afterwards from register, role, MIDI channel or
+/// temporal overlap produces a plausible answer that is wrong exactly when it
+/// matters — in dense counterpoint, which is the case you built it for.
+/// Generators that genuinely do not track parts must emit
+/// [`PartId::UNASSIGNED`] rather than a guess.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct PartId(pub u16);
+
+impl PartId {
+    /// "This generator does not track parts." NOT part zero.
+    ///
+    /// Analysis that needs real part identity must check for this and refuse
+    /// to answer, rather than treating every unassigned note as one shared
+    /// line — see [`Score::has_part_identity`].
+    pub const UNASSIGNED: PartId = PartId(u16::MAX);
+
+    pub const fn is_assigned(self) -> bool {
+        self.0 != u16::MAX
+    }
+}
+
 /// Which contrapuntal voice a note belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VoiceRole {
@@ -45,6 +82,9 @@ pub enum Emphasis {
 /// One note in the score, with absolute timing in beats from the start.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ScoreNote {
+    /// Which continuing line produced this note. [`PartId::UNASSIGNED`] means
+    /// the generator did not track parts — it does NOT mean "part zero".
+    pub part: PartId,
     pub pitch: Pitch,
     /// Onset in beats from the start of the score.
     pub onset: Duration,
@@ -82,6 +122,28 @@ impl Score {
             notes: Vec::new(),
             total_beats: Duration::zero(),
         }
+    }
+
+    /// Does every note carry a real part identity?
+    ///
+    /// Analysis that depends on knowing which line a note belongs to — fugue
+    /// subject recurrence, passacaglia ground invariance, true voice-entry
+    /// stagger — must gate on this and decline rather than answer from
+    /// [`VoiceRole`], which is a different thing.
+    pub fn has_part_identity(&self) -> bool {
+        !self.notes.is_empty() && self.notes.iter().all(|n| n.part.is_assigned())
+    }
+
+    /// The distinct parts present, in first-onset order. Empty when the score
+    /// carries no part identity at all.
+    pub fn parts(&self) -> Vec<PartId> {
+        let mut seen: Vec<PartId> = Vec::new();
+        for n in &self.notes {
+            if n.part.is_assigned() && !seen.contains(&n.part) {
+                seen.push(n.part);
+            }
+        }
+        seen
     }
 
     pub fn push(&mut self, note: ScoreNote) {
@@ -148,6 +210,7 @@ mod tests {
     fn push_tracks_total_length() {
         let mut s = Score::new(Key::major(PitchClass::C), 120.0, 4);
         s.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: c4(),
             onset: Duration::zero(),
             duration: Duration::half(),
@@ -157,6 +220,7 @@ mod tests {
             section_intensity: 1.0,
         });
         s.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: c4(),
             onset: Duration::half(),
             duration: Duration::whole(),
@@ -173,6 +237,7 @@ mod tests {
     fn voice_filters_and_sorts() {
         let mut s = Score::new(Key::major(PitchClass::C), 120.0, 4);
         s.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: c4(),
             onset: Duration::quarter(),
             duration: Duration::quarter(),
@@ -182,6 +247,7 @@ mod tests {
             section_intensity: 1.0,
         });
         s.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: c4(),
             onset: Duration::zero(),
             duration: Duration::quarter(),
@@ -200,6 +266,7 @@ mod tests {
     fn seconds_from_beats_and_tempo() {
         let mut s = Score::new(Key::major(PitchClass::C), 120.0, 4);
         s.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: c4(),
             onset: Duration::zero(),
             duration: Duration::whole(), // 4 beats

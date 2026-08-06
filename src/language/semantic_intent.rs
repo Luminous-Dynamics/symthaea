@@ -236,6 +236,37 @@ impl SemanticIntentClassifier {
         }
     }
 
+    /// Predictive Compression Program C4 (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md §9):
+    /// a genuine, probability-valued confidence, replacing `IntentClassification.confidence`'s
+    /// unbounded affine `similarity + keyword_boost` score. Softmax over `scores` at inverse-
+    /// temperature `beta`, returning the probability mass on the (already-sorted, index-0)
+    /// top category. Purely additive -- `classify()`'s own `confidence` field and every
+    /// existing caller of it are completely untouched by this method's existence.
+    ///
+    /// Higher `beta` sharpens the distribution (more confident); `beta` should be fit offline
+    /// against a held-out labeled set by minimizing Expected Calibration Error (see
+    /// `examples/calibrated_intent_confidence.rs`), not guessed.
+    pub fn confidence_calibrated(scores: &[(IntentCategory, f32)], beta: f32) -> f32 {
+        if scores.is_empty() {
+            return 0.0;
+        }
+        let max_score = scores
+            .iter()
+            .map(|(_, s)| *s)
+            .fold(f32::NEG_INFINITY, f32::max);
+        let exp_scores: Vec<f32> = scores
+            .iter()
+            .map(|(_, s)| ((s - max_score) * beta).exp())
+            .collect();
+        let sum_exp: f32 = exp_scores.iter().sum();
+        if sum_exp <= 0.0 {
+            return 0.0;
+        }
+        // `scores` is sorted descending by the caller (classify()), so index 0 is the top
+        // category's own softmax probability.
+        exp_scores[0] / sum_exp
+    }
+
     /// Keyword-based score boost for categories with unambiguous signals.
     ///
     /// HDC character n-gram encoding produces narrow margins (~0.01) between
@@ -356,6 +387,52 @@ mod tests {
             "Expected Programming for code query, got {:?} (scores: {:?})",
             result.category,
             result.scores
+        );
+    }
+
+    #[test]
+    fn test_confidence_calibrated_is_a_valid_probability() {
+        let mut classifier = SemanticIntentClassifier::new();
+        let result = classifier.classify("nixos-rebuild switch --flake");
+        for &beta in &[0.5, 1.0, 5.0, 20.0] {
+            let p = SemanticIntentClassifier::confidence_calibrated(&result.scores, beta);
+            assert!(
+                (0.0..=1.0).contains(&p),
+                "confidence_calibrated must be a probability at beta={beta}, got {p}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_confidence_calibrated_top_category_beats_uniform_baseline() {
+        // scores is sorted descending, so index 0 has the max score -- its softmax
+        // probability must therefore be >= the uniform baseline (1/n_categories), a property
+        // that holds for any positive beta regardless of the actual score margin.
+        let mut classifier = SemanticIntentClassifier::new();
+        let result = classifier.classify("write a python function to sort a list");
+        let n = result.scores.len();
+        let uniform = 1.0 / n as f32;
+        for &beta in &[0.5, 1.0, 5.0, 20.0] {
+            let top_prob = SemanticIntentClassifier::confidence_calibrated(&result.scores, beta);
+            assert!(
+                top_prob >= uniform - 1e-6,
+                "top category's probability ({top_prob}) should be >= uniform baseline \
+                 ({uniform}) at beta={beta}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_confidence_calibrated_higher_beta_sharpens_distribution() {
+        // A sharper (higher-beta) softmax should never make the winning class LESS
+        // confident than a flatter one, for the same score margin.
+        let mut classifier = SemanticIntentClassifier::new();
+        let result = classifier.classify("nixos-rebuild switch --flake");
+        let low = SemanticIntentClassifier::confidence_calibrated(&result.scores, 1.0);
+        let high = SemanticIntentClassifier::confidence_calibrated(&result.scores, 20.0);
+        assert!(
+            high >= low,
+            "higher beta should not reduce the top category's confidence: low={low} high={high}"
         );
     }
 

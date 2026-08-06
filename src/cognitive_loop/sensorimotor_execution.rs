@@ -122,6 +122,31 @@ pub(crate) struct SensoriMotorExecution {
         feature = "phone"
     ))]
     pub embodiment_telemetry: symthaea_core::embodiment::EmbodimentTelemetry,
+
+    /// Most recent [`crate::cognitive_loop::types::GateConsumption`] — what the safety
+    /// path actually consumed, for the produced/consumed join the Phase 4 protocol
+    /// requires (A1.1). Instrumentation only; nothing gates on it. Initialised to
+    /// `None` inline rather than via a constructor parameter, so no call site changes.
+    #[cfg(any(
+        feature = "humanoid",
+        feature = "helicopter",
+        feature = "flight",
+        feature = "vehicle",
+        feature = "auv",
+        feature = "manipulator",
+        feature = "exoskeleton",
+        feature = "surgical",
+        feature = "orbital",
+        feature = "quadruped",
+        feature = "subterranean",
+        feature = "infrastructure",
+        feature = "scavenger",
+        feature = "agribot",
+        feature = "biota",
+        feature = "clime",
+        feature = "phone"
+    ))]
+    pub last_gate_consumption: Option<crate::cognitive_loop::types::GateConsumption>,
 }
 
 impl SensoriMotorExecution {
@@ -264,6 +289,26 @@ impl SensoriMotorExecution {
                 feature = "phone"
             ))]
             embodiment_telemetry,
+            #[cfg(any(
+                feature = "humanoid",
+                feature = "helicopter",
+                feature = "flight",
+                feature = "vehicle",
+                feature = "auv",
+                feature = "manipulator",
+                feature = "exoskeleton",
+                feature = "surgical",
+                feature = "orbital",
+                feature = "quadruped",
+                feature = "subterranean",
+                feature = "infrastructure",
+                feature = "scavenger",
+                feature = "agribot",
+                feature = "biota",
+                feature = "clime",
+                feature = "phone"
+            ))]
+            last_gate_consumption: None,
         }
     }
 }

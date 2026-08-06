@@ -12,10 +12,7 @@
 
 use std::fmt;
 
-use crate::{
-    channel::Probability,
-    parameters::BlockCodeParameters,
-};
+use crate::{channel::Probability, parameters::BlockCodeParameters};
 
 /// Invalid analytical model or block-code dimensions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,7 +29,9 @@ pub enum ReliabilityError {
         minimum_distance: usize,
         codeword_symbols: usize,
     },
-    DistributionSizeOverflow { codeword_symbols: usize },
+    DistributionSizeOverflow {
+        codeword_symbols: usize,
+    },
 }
 
 impl fmt::Display for ReliabilityError {
@@ -47,7 +46,9 @@ impl fmt::Display for ReliabilityError {
                 f,
                 "error probability {error_numerator}/{error_denominator} plus erasure probability {erasure_numerator}/{erasure_denominator} exceeds one"
             ),
-            Self::ZeroCodewordSymbols => write!(f, "reliability analysis requires a non-empty codeword"),
+            Self::ZeroCodewordSymbols => {
+                write!(f, "reliability analysis requires a non-empty codeword")
+            }
             Self::ZeroMinimumDistance => write!(f, "minimum distance must be non-zero"),
             Self::MinimumDistanceExceedsSingletonBound {
                 minimum_distance,
@@ -111,9 +112,7 @@ impl IndependentErrataModel {
 
     #[must_use]
     pub fn clean_probability(self) -> f64 {
-        1.0
-            - self.unknown_error_probability.as_f64()
-            - self.known_erasure_probability.as_f64()
+        1.0 - self.unknown_error_probability.as_f64() - self.known_erasure_probability.as_f64()
     }
 
     /// Stable input-only description suitable for preregistration.
@@ -258,10 +257,10 @@ pub fn estimate_block_code_reliability(
     let guaranteed_recovery_probability =
         distribution.probability_within(parameters.minimum_distance - 1);
     let outside_guarantee_probability = (1.0 - guaranteed_recovery_probability).clamp(0.0, 1.0);
-    let expected_unknown_errors = parameters.codeword_symbols as f64
-        * model.unknown_error_probability().as_f64();
-    let expected_known_erasures = parameters.codeword_symbols as f64
-        * model.known_erasure_probability().as_f64();
+    let expected_unknown_errors =
+        parameters.codeword_symbols as f64 * model.unknown_error_probability().as_f64();
+    let expected_known_erasures =
+        parameters.codeword_symbols as f64 * model.known_erasure_probability().as_f64();
 
     Ok(BlockCodeReliabilityEstimate {
         parameters,

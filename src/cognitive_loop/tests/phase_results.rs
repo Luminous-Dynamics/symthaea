@@ -272,13 +272,16 @@ fn feedback_phase_result_default_all_subs() {
 /// If a field is added/removed, this test won't compile.
 /// Compile-time verification: exhaustive destructure ensures field count is correct.
 #[test]
-fn dyn_core_field_count_12() {
+fn dyn_core_field_count_15() {
     let d = DynCore::default();
     // Destructure to ensure compile-time verification of all fields
     let DynCore {
         output: _,
         prediction: _,
         prediction_first_horizon: _,
+        recall_fired: _,
+        recall_similarity: _,
+        recall_matched_timestamp: _,
         prediction_error: _,
         coherence: _,
         unified_psi: _,

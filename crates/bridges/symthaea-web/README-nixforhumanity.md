@@ -152,4 +152,4 @@ AGPL-3.0-or-later
 
 ---
 
-*Built by [Luminous Dynamics](https://github.com/Luminous-Dynamics) — consciousness-first technology serving all beings.*
+*Built by [Luminous Dynamics](https://luminousdynamics.org) — consciousness-first technology serving all beings.*

@@ -108,16 +108,20 @@ unsafe fn bind_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
 
         // 2048 bytes / 32 bytes = 64 iterations
         // Unroll by 4 for better instruction-level parallelism
-        // Source arrays are align(32) from BinaryHV, so use aligned loads
+        // Unaligned loads. These functions take `&[u8; 2048]`, whose alignment is 1 — the
+        // `#[repr(align(32))]` on `BinaryHV` does NOT travel through a bare-array parameter.
+        // `invert_simd` returns `[u8; 2048]` by value, so feeding its result back in produced a
+        // 16-byte-aligned pointer and `_mm256_load_si256` faulted. See
+        // docs/SIMD_ALIGNMENT_UNSOUNDNESS_2026-07-29.md.
         for i in (0..64).step_by(4) {
-            let a0 = _mm256_load_si256(a_ptr.add(i));
-            let b0 = _mm256_load_si256(b_ptr.add(i));
-            let a1 = _mm256_load_si256(a_ptr.add(i + 1));
-            let b1 = _mm256_load_si256(b_ptr.add(i + 1));
-            let a2 = _mm256_load_si256(a_ptr.add(i + 2));
-            let b2 = _mm256_load_si256(b_ptr.add(i + 2));
-            let a3 = _mm256_load_si256(a_ptr.add(i + 3));
-            let b3 = _mm256_load_si256(b_ptr.add(i + 3));
+            let a0 = _mm256_loadu_si256(a_ptr.add(i));
+            let b0 = _mm256_loadu_si256(b_ptr.add(i));
+            let a1 = _mm256_loadu_si256(a_ptr.add(i + 1));
+            let b1 = _mm256_loadu_si256(b_ptr.add(i + 1));
+            let a2 = _mm256_loadu_si256(a_ptr.add(i + 2));
+            let b2 = _mm256_loadu_si256(b_ptr.add(i + 2));
+            let a3 = _mm256_loadu_si256(a_ptr.add(i + 3));
+            let b3 = _mm256_loadu_si256(b_ptr.add(i + 3));
 
             let r0 = _mm256_xor_si256(a0, b0);
             let r1 = _mm256_xor_si256(a1, b1);
@@ -234,34 +238,38 @@ unsafe fn intersection_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 20
         let a_ptr = a.as_ptr() as *const __m256i;
         let b_ptr = b.as_ptr() as *const __m256i;
         let r_ptr = result.as_mut_ptr() as *mut __m256i;
-        // Source arrays are align(32) from BinaryHV, so use aligned loads
+        // Unaligned loads. These functions take `&[u8; 2048]`, whose alignment is 1 — the
+        // `#[repr(align(32))]` on `BinaryHV` does NOT travel through a bare-array parameter.
+        // `invert_simd` returns `[u8; 2048]` by value, so feeding its result back in produced a
+        // 16-byte-aligned pointer and `_mm256_load_si256` faulted. See
+        // docs/SIMD_ALIGNMENT_UNSOUNDNESS_2026-07-29.md.
         for i in (0..64).step_by(4) {
             _mm256_storeu_si256(
                 r_ptr.add(i),
                 _mm256_and_si256(
-                    _mm256_load_si256(a_ptr.add(i)),
-                    _mm256_load_si256(b_ptr.add(i)),
+                    _mm256_loadu_si256(a_ptr.add(i)),
+                    _mm256_loadu_si256(b_ptr.add(i)),
                 ),
             );
             _mm256_storeu_si256(
                 r_ptr.add(i + 1),
                 _mm256_and_si256(
-                    _mm256_load_si256(a_ptr.add(i + 1)),
-                    _mm256_load_si256(b_ptr.add(i + 1)),
+                    _mm256_loadu_si256(a_ptr.add(i + 1)),
+                    _mm256_loadu_si256(b_ptr.add(i + 1)),
                 ),
             );
             _mm256_storeu_si256(
                 r_ptr.add(i + 2),
                 _mm256_and_si256(
-                    _mm256_load_si256(a_ptr.add(i + 2)),
-                    _mm256_load_si256(b_ptr.add(i + 2)),
+                    _mm256_loadu_si256(a_ptr.add(i + 2)),
+                    _mm256_loadu_si256(b_ptr.add(i + 2)),
                 ),
             );
             _mm256_storeu_si256(
                 r_ptr.add(i + 3),
                 _mm256_and_si256(
-                    _mm256_load_si256(a_ptr.add(i + 3)),
-                    _mm256_load_si256(b_ptr.add(i + 3)),
+                    _mm256_loadu_si256(a_ptr.add(i + 3)),
+                    _mm256_loadu_si256(b_ptr.add(i + 3)),
                 ),
             );
         }
@@ -372,34 +380,38 @@ unsafe fn union_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
         let a_ptr = a.as_ptr() as *const __m256i;
         let b_ptr = b.as_ptr() as *const __m256i;
         let r_ptr = result.as_mut_ptr() as *mut __m256i;
-        // Source arrays are align(32) from BinaryHV, so use aligned loads
+        // Unaligned loads. These functions take `&[u8; 2048]`, whose alignment is 1 — the
+        // `#[repr(align(32))]` on `BinaryHV` does NOT travel through a bare-array parameter.
+        // `invert_simd` returns `[u8; 2048]` by value, so feeding its result back in produced a
+        // 16-byte-aligned pointer and `_mm256_load_si256` faulted. See
+        // docs/SIMD_ALIGNMENT_UNSOUNDNESS_2026-07-29.md.
         for i in (0..64).step_by(4) {
             _mm256_storeu_si256(
                 r_ptr.add(i),
                 _mm256_or_si256(
-                    _mm256_load_si256(a_ptr.add(i)),
-                    _mm256_load_si256(b_ptr.add(i)),
+                    _mm256_loadu_si256(a_ptr.add(i)),
+                    _mm256_loadu_si256(b_ptr.add(i)),
                 ),
             );
             _mm256_storeu_si256(
                 r_ptr.add(i + 1),
                 _mm256_or_si256(
-                    _mm256_load_si256(a_ptr.add(i + 1)),
-                    _mm256_load_si256(b_ptr.add(i + 1)),
+                    _mm256_loadu_si256(a_ptr.add(i + 1)),
+                    _mm256_loadu_si256(b_ptr.add(i + 1)),
                 ),
             );
             _mm256_storeu_si256(
                 r_ptr.add(i + 2),
                 _mm256_or_si256(
-                    _mm256_load_si256(a_ptr.add(i + 2)),
-                    _mm256_load_si256(b_ptr.add(i + 2)),
+                    _mm256_loadu_si256(a_ptr.add(i + 2)),
+                    _mm256_loadu_si256(b_ptr.add(i + 2)),
                 ),
             );
             _mm256_storeu_si256(
                 r_ptr.add(i + 3),
                 _mm256_or_si256(
-                    _mm256_load_si256(a_ptr.add(i + 3)),
-                    _mm256_load_si256(b_ptr.add(i + 3)),
+                    _mm256_loadu_si256(a_ptr.add(i + 3)),
+                    _mm256_loadu_si256(b_ptr.add(i + 3)),
                 ),
             );
         }
@@ -524,7 +536,11 @@ unsafe fn matching_bits_avx512_vpopcntdq(a: &[u8; 2048], b: &[u8; 2048]) -> u32 
 }
 
 /// AVX-512 with scalar POPCNT fallback
-/// SAFETY: BinaryHV is #[repr(align(32))] so u64 reads are naturally aligned.
+/// SAFETY: reads are `read_unaligned`, so no alignment precondition is imposed. The previous
+/// comment here claimed `BinaryHV`'s `#[repr(align(32))]` made plain `*ptr` reads sound — it
+/// does not, because the parameter type is `&[u8; 2048]` (alignment 1) and the attribute lives
+/// on a container that is absent from the signature. x86 tolerates misaligned integer loads in
+/// hardware, so this instance would not fault, but it was still UB.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f", enable = "popcnt")]
 #[inline]
@@ -538,14 +554,14 @@ unsafe fn matching_bits_avx512_popcnt(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
         // 2048 bytes / 8 bytes = 256 u64s
         // Process 8 at a time for better ILP
         for i in (0..256).step_by(8) {
-            let xor0 = *a_ptr.add(i) ^ *b_ptr.add(i);
-            let xor1 = *a_ptr.add(i + 1) ^ *b_ptr.add(i + 1);
-            let xor2 = *a_ptr.add(i + 2) ^ *b_ptr.add(i + 2);
-            let xor3 = *a_ptr.add(i + 3) ^ *b_ptr.add(i + 3);
-            let xor4 = *a_ptr.add(i + 4) ^ *b_ptr.add(i + 4);
-            let xor5 = *a_ptr.add(i + 5) ^ *b_ptr.add(i + 5);
-            let xor6 = *a_ptr.add(i + 6) ^ *b_ptr.add(i + 6);
-            let xor7 = *a_ptr.add(i + 7) ^ *b_ptr.add(i + 7);
+            let xor0 = a_ptr.add(i).read_unaligned() ^ b_ptr.add(i).read_unaligned();
+            let xor1 = a_ptr.add(i + 1).read_unaligned() ^ b_ptr.add(i + 1).read_unaligned();
+            let xor2 = a_ptr.add(i + 2).read_unaligned() ^ b_ptr.add(i + 2).read_unaligned();
+            let xor3 = a_ptr.add(i + 3).read_unaligned() ^ b_ptr.add(i + 3).read_unaligned();
+            let xor4 = a_ptr.add(i + 4).read_unaligned() ^ b_ptr.add(i + 4).read_unaligned();
+            let xor5 = a_ptr.add(i + 5).read_unaligned() ^ b_ptr.add(i + 5).read_unaligned();
+            let xor6 = a_ptr.add(i + 6).read_unaligned() ^ b_ptr.add(i + 6).read_unaligned();
+            let xor7 = a_ptr.add(i + 7).read_unaligned() ^ b_ptr.add(i + 7).read_unaligned();
 
             total += _popcnt64(xor0 as i64) as u64;
             total += _popcnt64(xor1 as i64) as u64;
@@ -563,7 +579,11 @@ unsafe fn matching_bits_avx512_popcnt(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
 
 /// AVX2 + POPCNT implementation
 /// XOR bytes together, then popcount to find differing bits.
-/// SAFETY: BinaryHV is #[repr(align(32))] so u64 reads are naturally aligned.
+/// SAFETY: reads are `read_unaligned`, so no alignment precondition is imposed. The previous
+/// comment here claimed `BinaryHV`'s `#[repr(align(32))]` made plain `*ptr` reads sound — it
+/// does not, because the parameter type is `&[u8; 2048]` (alignment 1) and the attribute lives
+/// on a container that is absent from the signature. x86 tolerates misaligned integer loads in
+/// hardware, so this instance would not fault, but it was still UB.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2", enable = "popcnt")]
 #[inline]
@@ -576,10 +596,10 @@ unsafe fn matching_bits_avx2_popcnt(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
 
         // 2048 bytes / 8 bytes = 256 u64s, process 4 at a time for ILP
         for i in (0..256).step_by(4) {
-            let xor0 = *a_ptr.add(i) ^ *b_ptr.add(i);
-            let xor1 = *a_ptr.add(i + 1) ^ *b_ptr.add(i + 1);
-            let xor2 = *a_ptr.add(i + 2) ^ *b_ptr.add(i + 2);
-            let xor3 = *a_ptr.add(i + 3) ^ *b_ptr.add(i + 3);
+            let xor0 = a_ptr.add(i).read_unaligned() ^ b_ptr.add(i).read_unaligned();
+            let xor1 = a_ptr.add(i + 1).read_unaligned() ^ b_ptr.add(i + 1).read_unaligned();
+            let xor2 = a_ptr.add(i + 2).read_unaligned() ^ b_ptr.add(i + 2).read_unaligned();
+            let xor3 = a_ptr.add(i + 3).read_unaligned() ^ b_ptr.add(i + 3).read_unaligned();
 
             // Count DIFFERING bits (popcount of XOR)
             // Matching = total bits - differing
@@ -652,12 +672,16 @@ unsafe fn invert_avx2(a: &[u8; 2048], result: &mut [u8; 2048]) {
         let r_ptr = result.as_mut_ptr() as *mut __m256i;
         let ones = _mm256_set1_epi8(-1i8); // All 1s
 
-        // Source array is align(32) from BinaryHV, so use aligned loads
+        // Unaligned loads. These functions take `&[u8; 2048]`, whose alignment is 1 — the
+        // `#[repr(align(32))]` on `BinaryHV` does NOT travel through a bare-array parameter.
+        // `invert_simd` returns `[u8; 2048]` by value, so feeding its result back in produced a
+        // 16-byte-aligned pointer and `_mm256_load_si256` faulted. See
+        // docs/SIMD_ALIGNMENT_UNSOUNDNESS_2026-07-29.md.
         for i in (0..64).step_by(4) {
-            let a0 = _mm256_load_si256(a_ptr.add(i));
-            let a1 = _mm256_load_si256(a_ptr.add(i + 1));
-            let a2 = _mm256_load_si256(a_ptr.add(i + 2));
-            let a3 = _mm256_load_si256(a_ptr.add(i + 3));
+            let a0 = _mm256_loadu_si256(a_ptr.add(i));
+            let a1 = _mm256_loadu_si256(a_ptr.add(i + 1));
+            let a2 = _mm256_loadu_si256(a_ptr.add(i + 2));
+            let a3 = _mm256_loadu_si256(a_ptr.add(i + 3));
 
             // XOR with all 1s = NOT
             let r0 = _mm256_xor_si256(a0, ones);
@@ -1188,6 +1212,53 @@ mod tests {
     }
 
     #[test]
+    /// Regression for the alignment unsoundness fixed 2026-07-29
+    /// (docs/SIMD_ALIGNMENT_UNSOUNDNESS_2026-07-29.md).
+    ///
+    /// Every public entry point here takes `&[u8; 2048]`, whose alignment is 1. The AVX2 paths
+    /// used to issue `_mm256_load_si256`, which faults below 32-byte alignment, justified by a
+    /// comment about `BinaryHV`'s `#[repr(align(32))]` — an attribute on a container that does
+    /// not appear in these signatures. `invert_simd` returns a bare `[u8; 2048]`, so safe code
+    /// could reach the faulting path.
+    ///
+    /// This test does not *hope* for a misaligned buffer: it constructs one whose address is
+    /// congruent to 16 mod 32, which is legal for the parameter type and was fatal before the
+    /// fix. Reverting `_mm256_loadu_si256` to `_mm256_load_si256` makes it SIGSEGV.
+    #[test]
+    fn simd_entry_points_accept_deliberately_misaligned_inputs() {
+        let mut backing = vec![0u8; 2048 + 64];
+        for (i, b) in backing.iter_mut().enumerate() {
+            *b = (i % 251) as u8;
+        }
+        let base = backing.as_ptr() as usize;
+        // Smallest offset making the slice start 16 mod 32 — 8-aligned (so the u64 popcount
+        // paths are exercised too) but deliberately not 32-aligned.
+        let off = (16 + 32 - (base % 32)) % 32;
+        assert_eq!(
+            (base + off) % 32,
+            16,
+            "buffer must be misaligned for this test to mean anything"
+        );
+
+        let a: &[u8; 2048] = backing[off..off + 2048].try_into().unwrap();
+        let b: &[u8; 2048] = backing[off..off + 2048].try_into().unwrap();
+
+        // Each of these previously issued an aligned load on `a`/`b`.
+        let bound = bind_simd(a, b);
+        assert_eq!(bound, [0u8; 2048], "x XOR x must be zero");
+        let _ = invert_simd(a);
+        let _ = hamming_distance_simd(a, b);
+        let _ = matching_bits_simd(a, b);
+
+        // The originally reported sequence: bare array straight back into a SIMD entry point.
+        let owner = BinaryHV::random(42);
+        let inv = invert_simd(&owner.0);
+        let xor = bind_simd(&owner.0, &inv);
+        for byte in xor.iter() {
+            assert_eq!(*byte, 0xFF, "XOR with inverse must be all ones");
+        }
+    }
+
     fn test_simd_inverse_properties() {
         let a = BinaryHV::random(42);
         let inv = invert_simd(&a.0);

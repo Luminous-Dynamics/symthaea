@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Telemetry sink — wires FEP, Phi-Oracle, and GWT metrics into the 2.5D Projection WaterfallBuffer"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["telemetry", "projection", "fep", "phi", "consciousness"]
 categories = ["science", "visualization"]
 

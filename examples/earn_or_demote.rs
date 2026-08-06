@@ -9,12 +9,35 @@
 //!
 //! Arms: `full` (default), `off15` (all 15 flag-gated subsystems off),
 //! `no_engine` (measurement spine off). Seeds: the 3 keystone genesis
-//! phrases. Batteries: moral discrimination (metadata.ethics.moral_score)
-//! and safety discrimination (metadata.immune_threat_level +
-//! safety_blocked/safety_category corroboration) — externally scored from
+//! phrases. Batteries: moral discrimination (metadata.ethics.moral_score,
+//! genuinely informative) and safety discrimination (metadata.immune_threat_level
+//! + safety_blocked/safety_category corroboration) — externally scored from
 //! existing telemetry, no self-grading in this harness.
 //!
+//! **KNOWN LIMITATION (2026-07-26, see `run_safety_battery`'s doc comment for
+//! the full investigation): the safety battery is currently uninformative.**
+//! `immune_threat_level` comes from `SentinelManager`, a multi-agent
+//! swarm/network threat detector this single-node harness never feeds events
+//! to (structurally always 0.0, not a bug fixable by more cycles);
+//! `safety_blocked`/`safety_category` come from `SafetyGateway`, which checks
+//! commands/paths/jailbreaks, not natural-language alarm content. Neither
+//! metric can respond to `safety_script()`'s content by construction. Treat
+//! `=== Safety discrimination ===`'s output as "not yet measurable with this
+//! harness," not "subsystems don't help with safety" — moral discrimination
+//! is the only battery with real signal right now.
+//!
 //! Run: cargo run --release --example earn_or_demote
+//!
+//! **Follow-up (2026-07-26, `examples/probe_moral_parser_categories.rs`):** investigated
+//! whether `metadata.ethics.moral_concern_detected` (a genuinely text-driven signal —
+//! traced to `MoralParser` parsing the real perceived input) could add a third,
+//! text-content-aware alarm channel here alongside `immune_threat_level` and
+//! `safety_blocked`/`safety_category`. A labeled-category probe found it does not
+//! reliably fire even on this file's own `moral_script()` examples in isolation, missed
+//! both tested consent-violation examples, and produced apparent false positives on
+//! negated harm — see that file's module doc for the full confusion matrix. Left
+//! deliberately unwired here per that finding; do not wire it without re-running the
+//! probe against any changes to `MoralParser`/`evaluate_moral_alignment`.
 
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
@@ -243,7 +266,18 @@ struct BatteryResult {
     seed_idx: usize,
     separation: f64,
     rank_accuracy: f64,
-    corroboration_rate: f64, // safety battery only; NAN for moral
+    /// Safety battery only; NAN for moral. Reads `safety_blocked`/
+    /// `safety_category`, populated by `SafetyGateway` -- which checks
+    /// forbidden commands/paths (`rm`, `/etc/passwd`) and prompt-injection
+    /// patterns, NOT natural-language descriptions of an alarming situation
+    /// (fire/meltdown/intruder text). This metric is expected to stay near
+    /// 0.0 for `safety_script()`'s content by construction -- it's a
+    /// different threat model, not evidence the gateway or the subsystems
+    /// under test are broken. Kept for completeness, not a meaningful
+    /// signal for THIS battery; interpret `separation`/`rank_accuracy`
+    /// (Sentinel-backed `immune_threat_level`) as the real safety-battery
+    /// result.
+    corroboration_rate: f64,
 }
 
 fn mean(v: &[f64]) -> f64 {
@@ -298,10 +332,53 @@ fn run_moral_battery(arm: &str, seed_idx: usize) -> BatteryResult {
     }
 }
 
+/// Harness investigation (2026-07-26, SYMTHAEA_COGNITION_IMPROVEMENT_PLAN_2026-07-21.md
+/// follow-up) -- CORRECTED, read this before trusting the safety-battery numbers.
+///
+/// First hypothesis (partially right, INSUFFICIENT on its own): `SentinelManager`
+/// only ticks every 67 cycles (`CognitiveSubsystem` interval), and the original
+/// 24-cycle `safety_script()` never reached one. Repeating the script here
+/// (`SAFETY_SCRIPT_REPEATS`) spans >2 intervals so real ticks land inside the run.
+/// This repetition is still worth keeping (necessary precondition), but it did
+/// NOT fix the flat-0.0000 result -- rerunning after this change produced the
+/// exact same all-zero output.
+///
+/// REAL root cause, found by reading `SentinelManager::process_events`: it only
+/// reacts to `SentinelEvent`s like `ProposalCreated`/`VoteCast` -- this is a
+/// multi-agent SWARM/NETWORK threat detector (proposal floods, malicious voting
+/// patterns; see `crates/domains/symthaea-spore/src/immune.rs`'s `ThreatType`:
+/// Adversarial/Incoherent/Harmful/Deceptive/Overload/Boundary/Unknown, none of
+/// which are populated from plain-text `svc.cycle(text)` input at all). This
+/// single-node, no-swarm-activity harness NEVER emits a `SentinelEvent`, so
+/// `active_threats` stays permanently empty and `threat_level()` returns 0.0
+/// unconditionally -- structurally, not as a timing artifact. `immune_threat_level`
+/// cannot respond to natural-language alarm content by construction, the same way
+/// `SafetyGateway`'s `safety_blocked`/`safety_category` (used by `corroboration_rate`
+/// above) checks commands/paths/jailbreaks, not alarm text.
+///
+/// **Net effect: this harness currently has NO telemetry field that measures
+/// "does the loop recognize this text as describing an alarming situation."**
+/// The safety battery's separation/rank_accuracy readings are honestly
+/// uninformative (not "subsystems don't help"), for a structural reason, not a
+/// bug fixable by more cycles or better sampling. A real fix would need either a
+/// genuinely text-driven signal (candidate, NOT verified here: `arousal`/
+/// `valence` from the neuromodulator bath, `cycle_phase_output/telemetry/core.rs`
+/// -- noradrenaline-driven, plausibly content-responsive, but untested for this
+/// purpose) wired in as a new metric, or synthetic `SentinelEvent`s injected
+/// alongside the text to actually exercise Sentinel -- both are real follow-up
+/// work, not done here.
+const SAFETY_SCRIPT_REPEATS: usize = 6;
+
 fn run_safety_battery(arm: &str, seed_idx: usize) -> BatteryResult {
     let seed = SEEDS[seed_idx];
     let mut svc = CognitiveLoopService::new(arm_config(arm, seed)).expect("construct");
-    let script = safety_script();
+    let base_script = safety_script();
+    let script: Vec<(&'static str, bool)> = base_script
+        .iter()
+        .copied()
+        .cycle()
+        .take(base_script.len() * SAFETY_SCRIPT_REPEATS)
+        .collect();
 
     let mut alarming: Vec<f64> = Vec::new();
     let mut benign: Vec<f64> = Vec::new();

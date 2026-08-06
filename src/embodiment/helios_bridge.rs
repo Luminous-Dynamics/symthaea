@@ -25,6 +25,9 @@ pub struct HeliosTelemetry {
 
 /// EmbodimentBridge for the Mk0-Helios solar microgrid.
 pub struct HeliosEmbodiment {
+    /// Ethics-layer veto set by `apply_moral_gate`, composed most-restrictive-wins
+    /// into `safety_level()`. Added 2026-07-31 -- see that method's note.
+    moral_safety: Option<MotorSafetyLevel>,
     pub genesis: GenesisSeed,
     pub telemetry: HeliosTelemetry,
     steps: usize,
@@ -34,6 +37,7 @@ impl HeliosEmbodiment {
     /// Create a new Helios embodiment.
     pub fn new(genesis: &GenesisSeed) -> Self {
         Self {
+            moral_safety: None,
             genesis: genesis.clone(),
             telemetry: HeliosTelemetry::default(),
             steps: 0,
@@ -89,13 +93,26 @@ impl EmbodimentBridge for HeliosEmbodiment {
         ContinuousHV::bundle(&refs)
     }
 
+    /// NOTE (2026-07-31): this is driven by solar microgrid (battery state-of-charge) ONLY -- it does **not**
+    /// consult the `phi` argument `step()` receives, which is bound as `_phi` and
+    /// discarded. That is a separate, deliberate-looking gap from the moral one fixed
+    /// here, and is NOT changed by this commit: whether a solar microgrid
+    /// should be Phi-gated at all is a design question, not a bug to patch silently.
+    /// The moral veto below composes most-restrictive-wins (derived Ord is
+    /// Green < Yellow < Orange < Red).
     fn safety_level(&self) -> MotorSafetyLevel {
-        if self.telemetry.battery_soc < 0.1 {
-            MotorSafetyLevel::Red // Critical reserve
-        } else if self.telemetry.battery_soc < 0.3 {
-            MotorSafetyLevel::Yellow // Low reserve
-        } else {
-            MotorSafetyLevel::Green
+        let base = {
+            if self.telemetry.battery_soc < 0.1 {
+                MotorSafetyLevel::Red // Critical reserve
+            } else if self.telemetry.battery_soc < 0.3 {
+                MotorSafetyLevel::Yellow // Low reserve
+            } else {
+                MotorSafetyLevel::Green
+            }
+        };
+        match self.moral_safety {
+            Some(m) => base.max(m),
+            None => base,
         }
     }
 
@@ -111,6 +128,10 @@ impl EmbodimentBridge for HeliosEmbodiment {
     }
     fn reset(&mut self) {
         self.steps = 0;
+        // Must clear the moral veto, or it persists across reset and the bridge stays
+        // gated forever. Caught by the contract's assertion 3, whose failure message
+        // names this exact omission.
+        self.moral_safety = None;
     }
 
     fn telemetry(&self) -> symthaea_core::embodiment::EmbodimentTelemetry {
@@ -119,7 +140,26 @@ impl EmbodimentBridge for HeliosEmbodiment {
 
     fn set_safety_override(&mut self, _level: MotorSafetyLevel) {}
     fn clear_safety_override(&mut self) {}
-    fn apply_moral_gate(&mut self, _gate: symthaea_core::embodiment::MoralGateInput) {}
+    /// Apply an ethics-layer verdict.
+    ///
+    /// FIXED 2026-07-31. This was an **explicitly empty override** -- literally
+    /// `fn apply_moral_gate(&mut self, _gate: ..) {}` -- which is worse than
+    /// inheriting the trait default, because a grep-based audit for
+    /// `fn apply_moral_gate` counts it as compliant. A static sweep of the fleet did
+    /// exactly that and reported this bridge as honouring the contract; only running
+    /// `tests/embodiment_moral_contract.rs` against it revealed otherwise.
+    fn apply_moral_gate(&mut self, gate: symthaea_core::embodiment::MoralGateInput) {
+        use symthaea_core::embodiment::MoralGateInput as MGI;
+        self.moral_safety = if gate.ahimsa_violated || gate.verdict == MGI::VERDICT_BLOCKED {
+            Some(MotorSafetyLevel::Red)
+        } else if gate.consent_violation {
+            Some(MotorSafetyLevel::Orange)
+        } else if gate.verdict == MGI::VERDICT_CAUTION {
+            Some(MotorSafetyLevel::Yellow)
+        } else {
+            None
+        };
+    }
     fn platform_telemetry_bytes(&self) -> Vec<u8> {
         Vec::new()
     }

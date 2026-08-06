@@ -1,0 +1,368 @@
+{
+  "positive_control": [
+    {
+      "label": "Arm B (v10, per-word + 60ms gaps)",
+      "path": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/positive_control_sung_v10full_b.wav",
+      "duration_s": 2.255,
+      "n_boundaries_measured": 6,
+      "sanity": {
+        "n_nan": 0,
+        "n_inf": 0,
+        "peak": 0.2905,
+        "clipped_samples": 0
+      },
+      "silence_duration_s": 0.48,
+      "boundary_rms": {
+        "median_interior_rms_db": -29.69,
+        "median_boundary_rms_db": -240.0,
+        "boundary_drop_db": 210.31
+      },
+      "envelope_discontinuity": {
+        "median_interior_sp_frame_dist": 24.4002,
+        "median_boundary_sp_frame_dist": 0.0,
+        "sp_discontinuity_ratio": 0.0,
+        "median_interior_ap_frame_dist": 1.8664,
+        "median_boundary_ap_frame_dist": 0.0,
+        "ap_discontinuity_ratio": 0.0
+      },
+      "melody": {
+        "median_cents_error_to_nearest_target_note": 11.0,
+        "fraction_frames_within_50_cents": 0.868
+      }
+    },
+    {
+      "label": "v12 (Arm B + Vocos resynth)",
+      "path": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/positive_control_sung_v12_vocos.wav",
+      "duration_s": 2.251,
+      "n_boundaries_measured": 6,
+      "sanity": {
+        "n_nan": 0,
+        "n_inf": 0,
+        "peak": 0.2914,
+        "clipped_samples": 0
+      },
+      "silence_duration_s": 0.54,
+      "boundary_rms": {
+        "median_interior_rms_db": -30.6,
+        "median_boundary_rms_db": -91.52,
+        "boundary_drop_db": 60.92
+      },
+      "envelope_discontinuity": {
+        "median_interior_sp_frame_dist": 24.4674,
+        "median_boundary_sp_frame_dist": 19.6126,
+        "sp_discontinuity_ratio": 0.802,
+        "median_interior_ap_frame_dist": 1.9907,
+        "median_boundary_ap_frame_dist": 6.711,
+        "ap_discontinuity_ratio": 3.371
+      },
+      "melody": {
+        "median_cents_error_to_nearest_target_note": 21.9,
+        "fraction_frames_within_50_cents": 0.72
+      }
+    },
+    {
+      "label": "v13 world-only (continuous trajectory, no Vocos)",
+      "path": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v13_continuous_trajectory/positive_control_sung_v13_world_only.wav",
+      "duration_s": 1.805,
+      "n_boundaries_measured": 5,
+      "sanity": {
+        "n_nan": 0,
+        "n_inf": 0,
+        "peak": 0.2632,
+        "clipped_samples": 0
+      },
+      "silence_duration_s": 0.18,
+      "boundary_rms": {
+        "median_interior_rms_db": -29.04,
+        "median_boundary_rms_db": -29.3,
+        "boundary_drop_db": 0.26
+      },
+      "envelope_discontinuity": {
+        "median_interior_sp_frame_dist": 24.1586,
+        "median_boundary_sp_frame_dist": 26.9114,
+        "sp_discontinuity_ratio": 1.114,
+        "median_interior_ap_frame_dist": 2.0776,
+        "median_boundary_ap_frame_dist": 1.5286,
+        "ap_discontinuity_ratio": 0.736
+      },
+      "melody": {
+        "median_cents_error_to_nearest_target_note": 13.1,
+        "fraction_frames_within_50_cents": 0.861
+      }
+    },
+    {
+      "label": "v13 + Vocos (continuous trajectory)",
+      "path": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v13_continuous_trajectory/positive_control_sung_v13_vocos.wav",
+      "duration_s": 1.803,
+      "n_boundaries_measured": 5,
+      "sanity": {
+        "n_nan": 0,
+        "n_inf": 0,
+        "peak": 0.2638,
+        "clipped_samples": 0
+      },
+      "silence_duration_s": 0.18,
+      "boundary_rms": {
+        "median_interior_rms_db": -30.22,
+        "median_boundary_rms_db": -30.43,
+        "boundary_drop_db": 0.21
+      },
+      "envelope_discontinuity": {
+        "median_interior_sp_frame_dist": 24.2004,
+        "median_boundary_sp_frame_dist": 35.08,
+        "sp_discontinuity_ratio": 1.45,
+        "median_interior_ap_frame_dist": 2.1277,
+        "median_boundary_ap_frame_dist": 3.499,
+        "ap_discontinuity_ratio": 1.644
+      },
+      "melody": {
+        "median_cents_error_to_nearest_target_note": 15.8,
+        "fraction_frames_within_50_cents": 0.827
+      }
+    }
+  ],
+  "fricative_heavy": [
+    {
+      "label": "Arm B (v10, per-word + 60ms gaps)",
+      "path": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/fricative_heavy_sung_v10full_b.wav",
+      "duration_s": 2.55,
+      "n_boundaries_measured": 9,
+      "sanity": {
+        "n_nan": 0,
+        "n_inf": 0,
+        "peak": 0.4036,
+        "clipped_samples": 0
+      },
+      "silence_duration_s": 0.58,
+      "boundary_rms": {
+        "median_interior_rms_db": -33.01,
+        "median_boundary_rms_db": -92.78,
+        "boundary_drop_db": 59.76
+      },
+      "envelope_discontinuity": {
+        "median_interior_sp_frame_dist": 25.3547,
+        "median_boundary_sp_frame_dist": 17.6532,
+        "sp_discontinuity_ratio": 0.696,
+        "median_interior_ap_frame_dist": 1.3215,
+        "median_boundary_ap_frame_dist": 0.0,
+        "ap_discontinuity_ratio": 0.0
+      },
+      "melody": {
+        "median_cents_error_to_nearest_target_note": 15.6,
+        "fraction_frames_within_50_cents": 0.725
+      }
+    },
+    {
+      "label": "v12 (Arm B + Vocos resynth)",
+      "path": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/fricative_heavy_sung_v12_vocos.wav",
+      "duration_s": 2.549,
+      "n_boundaries_measured": 10,
+      "sanity": {
+        "n_nan": 0,
+        "n_inf": 0,
+        "peak": 0.3896,
+        "clipped_samples": 0
+      },
+      "silence_duration_s": 0.62,
+      "boundary_rms": {
+        "median_interior_rms_db": -33.41,
+        "median_boundary_rms_db": -66.75,
+        "boundary_drop_db": 33.34
+      },
+      "envelope_discontinuity": {
+        "median_interior_sp_frame_dist": 25.8898,
+        "median_boundary_sp_frame_dist": 28.4837,
+        "sp_discontinuity_ratio": 1.1,
+        "median_interior_ap_frame_dist": 1.4747,
+        "median_boundary_ap_frame_dist": 0.3578,
+        "ap_discontinuity_ratio": 0.243
+      },
+      "melody": {
+        "median_cents_error_to_nearest_target_note": 30.1,
+        "fraction_frames_within_50_cents": 0.62
+      }
+    },
+    {
+      "label": "v13 world-only (continuous trajectory, no Vocos)",
+      "path": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v13_continuous_trajectory/fricative_heavy_sung_v13_world_only.wav",
+      "duration_s": 2.1,
+      "n_boundaries_measured": 5,
+      "sanity": {
+        "n_nan": 0,
+        "n_inf": 0,
+        "peak": 0.3628,
+        "clipped_samples": 0
+      },
+      "silence_duration_s": 0.28,
+      "boundary_rms": {
+        "median_interior_rms_db": -32.26,
+        "median_boundary_rms_db": -30.31,
+        "boundary_drop_db": -1.96
+      },
+      "envelope_discontinuity": {
+        "median_interior_sp_frame_dist": 25.7975,
+        "median_boundary_sp_frame_dist": 28.2096,
+        "sp_discontinuity_ratio": 1.094,
+        "median_interior_ap_frame_dist": 1.8711,
+        "median_boundary_ap_frame_dist": 0.0,
+        "ap_discontinuity_ratio": 0.0
+      },
+      "melody": {
+        "median_cents_error_to_nearest_target_note": 16.8,
+        "fraction_frames_within_50_cents": 0.679
+      }
+    },
+    {
+      "label": "v13 + Vocos (continuous trajectory)",
+      "path": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v13_continuous_trajectory/fricative_heavy_sung_v13_vocos.wav",
+      "duration_s": 2.091,
+      "n_boundaries_measured": 5,
+      "sanity": {
+        "n_nan": 0,
+        "n_inf": 0,
+        "peak": 0.3112,
+        "clipped_samples": 0
+      },
+      "silence_duration_s": 0.24,
+      "boundary_rms": {
+        "median_interior_rms_db": -33.09,
+        "median_boundary_rms_db": -30.82,
+        "boundary_drop_db": -2.26
+      },
+      "envelope_discontinuity": {
+        "median_interior_sp_frame_dist": 25.8647,
+        "median_boundary_sp_frame_dist": 34.1356,
+        "sp_discontinuity_ratio": 1.32,
+        "median_interior_ap_frame_dist": 1.7908,
+        "median_boundary_ap_frame_dist": 0.0,
+        "ap_discontinuity_ratio": 0.0
+      },
+      "melody": {
+        "median_cents_error_to_nearest_target_note": 17.4,
+        "fraction_frames_within_50_cents": 0.746
+      }
+    }
+  ],
+  "long_sustained_vowels": [
+    {
+      "label": "Arm B (v10, per-word + 60ms gaps)",
+      "path": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/long_sustained_vowels_sung_v10full_b.wav",
+      "duration_s": 2.2,
+      "n_boundaries_measured": 7,
+      "sanity": {
+        "n_nan": 0,
+        "n_inf": 0,
+        "peak": 0.2542,
+        "clipped_samples": 0
+      },
+      "silence_duration_s": 0.44,
+      "boundary_rms": {
+        "median_interior_rms_db": -30.34,
+        "median_boundary_rms_db": -240.0,
+        "boundary_drop_db": 209.66
+      },
+      "envelope_discontinuity": {
+        "median_interior_sp_frame_dist": 24.3398,
+        "median_boundary_sp_frame_dist": 0.0,
+        "sp_discontinuity_ratio": 0.0,
+        "median_interior_ap_frame_dist": 2.115,
+        "median_boundary_ap_frame_dist": 0.0,
+        "ap_discontinuity_ratio": 0.0
+      },
+      "melody": {
+        "median_cents_error_to_nearest_target_note": 16.3,
+        "fraction_frames_within_50_cents": 0.801
+      }
+    },
+    {
+      "label": "v12 (Arm B + Vocos resynth)",
+      "path": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/long_sustained_vowels_sung_v12_vocos.wav",
+      "duration_s": 2.197,
+      "n_boundaries_measured": 6,
+      "sanity": {
+        "n_nan": 0,
+        "n_inf": 0,
+        "peak": 0.2762,
+        "clipped_samples": 0
+      },
+      "silence_duration_s": 0.5,
+      "boundary_rms": {
+        "median_interior_rms_db": -31.34,
+        "median_boundary_rms_db": -92.58,
+        "boundary_drop_db": 61.25
+      },
+      "envelope_discontinuity": {
+        "median_interior_sp_frame_dist": 26.0158,
+        "median_boundary_sp_frame_dist": 11.1069,
+        "sp_discontinuity_ratio": 0.427,
+        "median_interior_ap_frame_dist": 2.4247,
+        "median_boundary_ap_frame_dist": 3.2882,
+        "ap_discontinuity_ratio": 1.356
+      },
+      "melody": {
+        "median_cents_error_to_nearest_target_note": 20.6,
+        "fraction_frames_within_50_cents": 0.791
+      }
+    },
+    {
+      "label": "v13 world-only (continuous trajectory, no Vocos)",
+      "path": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v13_continuous_trajectory/long_sustained_vowels_sung_v13_world_only.wav",
+      "duration_s": 1.84,
+      "n_boundaries_measured": 4,
+      "sanity": {
+        "n_nan": 0,
+        "n_inf": 0,
+        "peak": 0.2316,
+        "clipped_samples": 0
+      },
+      "silence_duration_s": 0.24,
+      "boundary_rms": {
+        "median_interior_rms_db": -29.07,
+        "median_boundary_rms_db": -33.88,
+        "boundary_drop_db": 4.81
+      },
+      "envelope_discontinuity": {
+        "median_interior_sp_frame_dist": 24.3471,
+        "median_boundary_sp_frame_dist": 28.5328,
+        "sp_discontinuity_ratio": 1.172,
+        "median_interior_ap_frame_dist": 2.273,
+        "median_boundary_ap_frame_dist": 1.9021,
+        "ap_discontinuity_ratio": 0.837
+      },
+      "melody": {
+        "median_cents_error_to_nearest_target_note": 16.4,
+        "fraction_frames_within_50_cents": 0.833
+      }
+    },
+    {
+      "label": "v13 + Vocos (continuous trajectory)",
+      "path": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v13_continuous_trajectory/long_sustained_vowels_sung_v13_vocos.wav",
+      "duration_s": 1.835,
+      "n_boundaries_measured": 4,
+      "sanity": {
+        "n_nan": 0,
+        "n_inf": 0,
+        "peak": 0.2107,
+        "clipped_samples": 0
+      },
+      "silence_duration_s": 0.18,
+      "boundary_rms": {
+        "median_interior_rms_db": -29.54,
+        "median_boundary_rms_db": -32.96,
+        "boundary_drop_db": 3.43
+      },
+      "envelope_discontinuity": {
+        "median_interior_sp_frame_dist": 24.7933,
+        "median_boundary_sp_frame_dist": 33.957,
+        "sp_discontinuity_ratio": 1.37,
+        "median_interior_ap_frame_dist": 2.2364,
+        "median_boundary_ap_frame_dist": 1.9774,
+        "ap_discontinuity_ratio": 0.884
+      },
+      "melody": {
+        "median_cents_error_to_nearest_target_note": 18.2,
+        "fraction_frames_within_50_cents": 0.809
+      }
+    }
+  ]
+}

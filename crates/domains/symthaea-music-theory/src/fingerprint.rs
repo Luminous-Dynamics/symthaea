@@ -692,6 +692,7 @@ pub fn project_2d(vectors: &[[f64; STRUCT_DIMS]]) -> Vec<(f64, f64)> {
 mod tests {
     use super::*;
     use crate::composer::compose_with_spec_and_form;
+    use crate::score::PartId;
     use crate::{Duration, MusicalIntent, Pitch, PitchClass, Style};
 
     #[test]
@@ -828,6 +829,7 @@ mod tests {
 
     fn note(pitch: Pitch, onset_beats: i64, dur_beats: i64, role: VoiceRole) -> ScoreNote {
         ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch,
             onset: Duration::new(onset_beats, 1),
             duration: Duration::new(dur_beats, 1),

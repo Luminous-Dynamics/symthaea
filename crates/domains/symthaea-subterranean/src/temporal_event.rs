@@ -74,7 +74,10 @@ impl CausalEvent {
     pub fn validate(&self) -> bool {
         self.interval.validate()
             && self.dependencies.len() <= MAX_EVENT_DEPENDENCIES
-            && self.dependencies.iter().all(|dependency| *dependency != self.id)
+            && self
+                .dependencies
+                .iter()
+                .all(|dependency| *dependency != self.id)
     }
 }
 
@@ -174,7 +177,10 @@ impl CausalEventLedger {
                 self.rejected_events = self.rejected_events.saturating_add(1);
                 return Err(EventAppendError::UnknownDependency);
             };
-            if dependency.interval.impossible_predecessor_of(event.interval) {
+            if dependency
+                .interval
+                .impossible_predecessor_of(event.interval)
+            {
                 self.rejected_events = self.rejected_events.saturating_add(1);
                 self.contradictory_events = self.contradictory_events.saturating_add(1);
                 return Err(EventAppendError::DependencyContradiction);

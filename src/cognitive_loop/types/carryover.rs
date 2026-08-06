@@ -411,6 +411,83 @@ impl Default for QualityMetrics {
     }
 }
 
+/// Which code path last wrote [`CycleHistory::consciousness_level`], the scalar the
+/// robotics motor-safety gate consumes.
+///
+/// Deliberately **not** named `ConsciousnessLevelKind` or modelled as variants of a
+/// single `ConsciousnessLevel` type: the two writers share no inputs, and naming them
+/// variants of one thing would assert exactly the coherence that is currently in
+/// question. This enum names *writers*, not *kinds of one quantity*.
+///
+/// See `SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md`, Phase 4 correction
+/// box (2026-07-29).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GateWriter {
+    /// Never written this run — still the cold-start floor (0.05), which is a prior,
+    /// not a measurement.
+    #[default]
+    ColdStartFloor,
+    /// `cycle_late_consciousness/integration.rs` on the `cycle(&str)` path:
+    /// `max(MCE(..max(unified_psi, spectral_boost, structural_boost)..), v2_cached * 0.8)`.
+    TextComposite,
+    /// `helpers/mod.rs` on the `cycle_with_hv()` path:
+    /// `compute_consciousness_level(prediction_confidence, coherence, flow_intensity,
+    /// pattern_confidence)` — contains no Phi, no Psi, and no spectral MIP.
+    HvConfidenceCoherence,
+}
+
+impl GateWriter {
+    /// Short label for telemetry/experiment output.
+    pub fn label(self) -> &'static str {
+        match self {
+            GateWriter::ColdStartFloor => "cold-start-floor",
+            GateWriter::TextComposite => "text-composite",
+            GateWriter::HvConfidenceCoherence => "hv-confidence-coherence",
+        }
+    }
+}
+
+/// What the robotics safety path **actually consumed**, recorded at the point the tier
+/// is selected — as distinct from what a writer *produced*.
+///
+/// Required by Amendment 1 (A1.1) of
+/// `SYMTHAEA_PHASE4_CHARACTERIZATION_PROTOCOL_2026-07-29.md`, which made
+/// consumption-boundary instrumentation a blocking precondition for any characterization
+/// run. Write-side provenance alone cannot establish what the safety path received: a
+/// value can be stale, re-clamped at an intermediate layer, misaligned by a cycle,
+/// cached, per-platform overridden, or defaulted.
+///
+/// Join with the write side on [`Self::cycle_index`]. **A produced/consumed mismatch is a
+/// primary finding**, not a measurement error — it would mean the characterized quantity
+/// is not the governing quantity.
+#[derive(Debug, Clone, Copy)]
+pub struct GateConsumption {
+    /// `stats.total_cycles` at the moment of consumption. Join key.
+    pub cycle_index: usize,
+    /// The scalar as actually received by the embodiment boundary.
+    pub consumed_value: f64,
+    /// Tier selected from `consumed_value` by the real production classifier
+    /// (`MotorSafetyLevel::from_phi`), never a reimplemented ladder.
+    pub resulting_tier: symthaea_core::embodiment::MotorSafetyLevel,
+    /// Which platform consumed it.
+    pub platform: symthaea_core::embodiment::EmbodimentPlatform,
+    /// Provenance of the consumed value: which formula produced it.
+    pub writer: GateWriter,
+    /// `stats.total_cycles` when that value was written.
+    pub written_at: usize,
+}
+
+impl GateConsumption {
+    /// Cycles between production and consumption. **Expected to be ≥1**: the embodiment
+    /// block runs in PHASE 2, before the feedback phase that rewrites the gate field, so
+    /// the gate consumes the *previous* cycle's value. A lag exceeding the 67-cycle
+    /// refresh interval means the tier was selected from a value no recent measurement
+    /// produced.
+    pub fn lag_cycles(&self) -> usize {
+        self.cycle_index.saturating_sub(self.written_at)
+    }
+}
+
 /// Historical state for cycle-to-cycle continuity.
 #[derive(Debug, Clone)]
 pub struct CycleHistory {
@@ -420,8 +497,26 @@ pub struct CycleHistory {
     pub(crate) body_arousal: f32,
     /// Resonance frequency (fed back into delta_t modulation)
     pub(crate) resonance_frequency: f64,
-    /// Last MCE consciousness level for learning gating
+    /// The scalar consumed as the robotics motor-safety gate (`cycle.rs` ->
+    /// `EmbodimentBridge::step(.., phi)`), and by robotics telemetry dispatch,
+    /// `motor_phi`, prediction confidence, `phi_trend`, and the Psi autoregression.
+    ///
+    /// **This field has two writers using unrelated formulas** — see
+    /// [`GateWriter`]. Its previous doc ("Last MCE consciousness level") was
+    /// accurate only for the text path. Read
+    /// `SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md`'s Phase 4
+    /// correction box before treating this as a single coherent quantity.
     pub(crate) consciousness_level: f64,
+    /// Which formula produced the current [`Self::consciousness_level`].
+    ///
+    /// Instrumentation only — nothing gates on it. Added 2026-07-29 to make the
+    /// two-writer ambiguity *observable* before deciding how to resolve it,
+    /// rather than picking a formula by fiat.
+    pub(crate) consciousness_level_source: GateWriter,
+    /// `stats.total_cycles` at the moment [`Self::consciousness_level`] was last
+    /// written. Lets a consumer see staleness, which matters because the two
+    /// writers fire on different entry points and at different rates.
+    pub(crate) consciousness_level_written_at: usize,
     /// Recent BinaryHV ring buffer for multi-component consciousness profile.
     /// Bounded: capacity 4, evict-before-push via pop_front (cycle_consciousness.rs).
     pub(crate) recent_hvs: std::collections::VecDeque<crate::hdc::BinaryHV>,
@@ -464,6 +559,8 @@ impl Default for CycleHistory {
             body_arousal: 0.5,
             resonance_frequency: 0.0,
             consciousness_level: 0.05, // Floor: prevents fully unconscious cold-start
+            consciousness_level_source: GateWriter::ColdStartFloor,
+            consciousness_level_written_at: 0,
             recent_hvs: std::collections::VecDeque::with_capacity(4),
             last_causal_relations: 0,
             last_causal_confidence: 0.0,

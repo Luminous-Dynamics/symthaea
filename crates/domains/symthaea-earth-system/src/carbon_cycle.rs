@@ -127,7 +127,7 @@ impl EmissionsProtocol {
             Self::Pulse {
                 baseline_gtc_per_year,
                 anomaly_gtc_per_year,
-                start_years,
+                start_years: _,
                 end_years,
             } if time_years == end_years => baseline_gtc_per_year + anomaly_gtc_per_year,
             Self::Pulse {

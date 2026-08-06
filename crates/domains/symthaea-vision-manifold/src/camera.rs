@@ -176,6 +176,12 @@ fn yuyv_min_stride(width: u32) -> Result<usize, String> {
         .ok_or_else(|| "YUYV row-stride overflow".to_string())
 }
 
+// The YUYV decode/validate helpers below (through decode_yuyv_rgb) have no caller under
+// clippy's default lib-only build: their real caller is the `camera` hardware-capture path
+// (gated `#[cfg(feature = "camera")]` below), and their test coverage lives in the general
+// `#[cfg(test)]` module further down -- both invisible to a plain `cargo clippy` lib check.
+// Genuinely used, not dead; suppressing rather than deleting real, tested logic.
+#[allow(dead_code)]
 fn validate_yuyv_stride(
     width: u32,
     height: u32,
@@ -203,11 +209,12 @@ fn validate_yuyv_stride(
 }
 
 /// Infer a uniform scanline stride from an owned buffer.
+#[allow(dead_code)]
 fn infer_yuyv_stride(buffer_len: usize, width: u32, height: u32) -> Result<usize, String> {
     if height == 0 {
         return Err("YUYV height must be non-zero".to_string());
     }
-    if buffer_len % height as usize != 0 {
+    if !buffer_len.is_multiple_of(height as usize) {
         return Err(format!(
             "YUYV buffer length {buffer_len} is not divisible by height {height}"
         ));
@@ -217,6 +224,7 @@ fn infer_yuyv_stride(buffer_len: usize, width: u32, height: u32) -> Result<usize
     Ok(stride)
 }
 
+#[allow(dead_code)]
 fn decode_yuyv_gray_with_stride(
     buffer: &[u8],
     width: u32,
@@ -244,11 +252,13 @@ fn decode_yuyv_gray_with_stride(
     Ok(pixels)
 }
 
+#[allow(dead_code)]
 fn decode_yuyv_gray(buffer: &[u8], width: u32, height: u32) -> Result<Vec<u8>, String> {
     let stride = infer_yuyv_stride(buffer.len(), width, height)?;
     decode_yuyv_gray_with_stride(buffer, width, height, stride)
 }
 
+#[allow(dead_code)]
 fn yuv_to_rgb(y: u8, u: u8, v: u8) -> [u8; 3] {
     let y = y as f32;
     let u = u as f32 - 128.0;
@@ -260,6 +270,7 @@ fn yuv_to_rgb(y: u8, u: u8, v: u8) -> [u8; 3] {
     ]
 }
 
+#[allow(dead_code)]
 fn decode_yuyv_rgb_with_stride(
     buffer: &[u8],
     width: u32,
@@ -296,6 +307,7 @@ fn decode_yuyv_rgb_with_stride(
     Ok(pixels)
 }
 
+#[allow(dead_code)]
 fn decode_yuyv_rgb(buffer: &[u8], width: u32, height: u32) -> Result<Vec<u8>, String> {
     let stride = infer_yuyv_stride(buffer.len(), width, height)?;
     decode_yuyv_rgb_with_stride(buffer, width, height, stride)

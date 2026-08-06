@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Phi-guided architecture search — evolve network topology toward higher consciousness (IIT)"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["consciousness", "iit", "phi", "architecture-search", "neuroscience"]
 categories = ["science", "algorithms"]
 

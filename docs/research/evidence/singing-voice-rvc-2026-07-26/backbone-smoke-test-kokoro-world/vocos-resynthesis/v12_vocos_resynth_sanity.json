@@ -1,0 +1,102 @@
+[
+  {
+    "phrase": "positive_control",
+    "peak": 0.29139822721481323,
+    "clipped_samples": 0,
+    "n_nan": 0,
+    "n_inf": 0,
+    "status": "OK",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/positive_control_sung_v10full_b.wav",
+    "out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/positive_control_sung_v12_vocos.wav"
+  },
+  {
+    "phrase": "conversational",
+    "peak": 0.2263466715812683,
+    "clipped_samples": 0,
+    "n_nan": 0,
+    "n_inf": 0,
+    "status": "OK",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/conversational_sung_v10full_b.wav",
+    "out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/conversational_sung_v12_vocos.wav"
+  },
+  {
+    "phrase": "repeated_syllables",
+    "peak": 0.30603912472724915,
+    "clipped_samples": 0,
+    "n_nan": 0,
+    "n_inf": 0,
+    "status": "OK",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/repeated_syllables_sung_v10full_b.wav",
+    "out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/repeated_syllables_sung_v12_vocos.wav"
+  },
+  {
+    "phrase": "rapid_letter_names",
+    "peak": 0.2682184875011444,
+    "clipped_samples": 0,
+    "n_nan": 0,
+    "n_inf": 0,
+    "status": "OK",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/rapid_letter_names_sung_v10full_b.wav",
+    "out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/rapid_letter_names_sung_v12_vocos.wav"
+  },
+  {
+    "phrase": "phrase_final_stops",
+    "peak": 0.21520453691482544,
+    "clipped_samples": 0,
+    "n_nan": 0,
+    "n_inf": 0,
+    "status": "OK",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/phrase_final_stops_sung_v10full_b.wav",
+    "out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/phrase_final_stops_sung_v12_vocos.wav"
+  },
+  {
+    "phrase": "fricative_heavy",
+    "peak": 0.3895986080169678,
+    "clipped_samples": 0,
+    "n_nan": 0,
+    "n_inf": 0,
+    "status": "OK",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/fricative_heavy_sung_v10full_b.wav",
+    "out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/fricative_heavy_sung_v12_vocos.wav"
+  },
+  {
+    "phrase": "consonant_clusters",
+    "peak": 0.2865614891052246,
+    "clipped_samples": 0,
+    "n_nan": 0,
+    "n_inf": 0,
+    "status": "OK",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/consonant_clusters_sung_v10full_b.wav",
+    "out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/consonant_clusters_sung_v12_vocos.wav"
+  },
+  {
+    "phrase": "long_sustained_vowels",
+    "peak": 0.27613893151283264,
+    "clipped_samples": 0,
+    "n_nan": 0,
+    "n_inf": 0,
+    "status": "OK",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/long_sustained_vowels_sung_v10full_b.wav",
+    "out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/long_sustained_vowels_sung_v12_vocos.wav"
+  },
+  {
+    "phrase": "short_unstressed",
+    "peak": 0.4608633816242218,
+    "clipped_samples": 0,
+    "n_nan": 0,
+    "n_inf": 0,
+    "status": "OK",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/short_unstressed_sung_v10full_b.wav",
+    "out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/short_unstressed_sung_v12_vocos.wav"
+  },
+  {
+    "phrase": "semantically_unusual",
+    "peak": 0.20061302185058594,
+    "clipped_samples": 0,
+    "n_nan": 0,
+    "n_inf": 0,
+    "status": "OK",
+    "src": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v10_4arm_matrix_full10/semantically_unusual_sung_v10full_b.wav",
+    "out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v12_vocos_resynth/semantically_unusual_sung_v12_vocos.wav"
+  }
+]

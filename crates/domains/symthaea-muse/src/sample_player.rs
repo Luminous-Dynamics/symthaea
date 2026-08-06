@@ -297,10 +297,6 @@ fn freq_to_midi(freq: f32) -> u8 {
     ((12.0 * (freq / 440.0).log2() + 69.0).round() as u8).clamp(0, 127)
 }
 
-fn midi_to_freq(note: u8) -> f32 {
-    440.0 * 2.0f32.powf((note as f32 - 69.0) / 12.0)
-}
-
 fn parse_sample_name(name: &str) -> Option<(InstrumentKey, u8)> {
     // Expected format: "piano_c4", "violin_a3", etc.
     let parts: Vec<&str> = name.split('_').collect();

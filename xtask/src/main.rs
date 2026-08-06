@@ -1,6 +1,8 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod crate_status;
+mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
 
@@ -12,6 +14,28 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Discovery check: flag a new crate that re-implements an existing symthaea-core module.
+    /// Fails only on an UNADJUDICATED collision; known ones live in docs/crate-status.toml.
+    DuplicateScan {
+        #[arg(long, default_value = "docs/crate-status.toml")]
+        registry: PathBuf,
+    },
+
+    /// Crate truth registry: join `cargo metadata` with `docs/crate-status.toml`.
+    /// A crate's existence does not imply endorsement.
+    CrateStatus {
+        /// Emit the generated markdown inventory instead of checking.
+        #[arg(long)]
+        report: bool,
+        /// Fail if any workspace member is unclassified.
+        #[arg(long)]
+        require_classified: bool,
+        /// Fail on evidence-gap findings, not just integrity errors.
+        #[arg(long)]
+        strict: bool,
+        #[arg(long, default_value = "docs/crate-status.toml")]
+        registry: PathBuf,
+    },
     RhnSweep {
         #[arg(long, default_value = "1024")]
         dims: String,
@@ -89,6 +113,40 @@ fn main() -> anyhow::Result<()> {
                 "Manifest generated at {}",
                 root.join("manifest.json").display()
             );
+        }
+        Commands::DuplicateScan { registry } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let registry_path = if registry.is_absolute() {
+                registry
+            } else {
+                root.join(registry)
+            };
+            duplicate_scan::scan(&root, &registry_path)?;
+        }
+        Commands::CrateStatus {
+            report,
+            require_classified,
+            strict,
+            registry,
+        } => {
+            // The workspace root is this manifest's parent; xtask always runs from inside it.
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask always lives one level below the workspace root")
+                .to_path_buf();
+            let registry_path = if registry.is_absolute() {
+                registry
+            } else {
+                root.join(registry)
+            };
+            if report {
+                crate_status::report(&root, &registry_path)?;
+            } else {
+                crate_status::check(&root, &registry_path, require_classified, strict)?;
+            }
         }
     }
     Ok(())

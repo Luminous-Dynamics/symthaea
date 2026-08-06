@@ -15,10 +15,22 @@ use std::fmt;
 pub enum InterleaverError {
     ZeroRows,
     ZeroColumns,
-    SizeOverflow { rows: usize, columns: usize },
-    InputLengthMismatch { expected: usize, actual: usize },
-    OutputLengthMismatch { expected: usize, actual: usize },
-    PositionOutOfRange { position: usize, symbols: usize },
+    SizeOverflow {
+        rows: usize,
+        columns: usize,
+    },
+    InputLengthMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    OutputLengthMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    PositionOutOfRange {
+        position: usize,
+        symbols: usize,
+    },
     FrameLengthMismatch {
         frame: usize,
         expected: usize,
@@ -194,7 +206,10 @@ impl BlockInterleaver {
     }
 
     /// Restore equal-length row frames from a column-major transmission.
-    pub fn deinterleave_frames<T: Clone>(self, input: &[T]) -> Result<Vec<Vec<T>>, InterleaverError> {
+    pub fn deinterleave_frames<T: Clone>(
+        self,
+        input: &[T],
+    ) -> Result<Vec<Vec<T>>, InterleaverError> {
         let flattened = self.deinterleave(input)?;
         Ok(flattened
             .chunks(self.columns)
@@ -285,7 +300,10 @@ mod tests {
     #[test]
     fn invalid_dimensions_lengths_and_frames_fail_closed() {
         assert_eq!(BlockInterleaver::new(0, 2), Err(InterleaverError::ZeroRows));
-        assert_eq!(BlockInterleaver::new(2, 0), Err(InterleaverError::ZeroColumns));
+        assert_eq!(
+            BlockInterleaver::new(2, 0),
+            Err(InterleaverError::ZeroColumns)
+        );
         let interleaver = BlockInterleaver::new(2, 3).unwrap();
         assert_eq!(
             interleaver.interleave(&[0u8; 5]),

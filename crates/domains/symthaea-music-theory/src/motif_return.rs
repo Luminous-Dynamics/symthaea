@@ -349,9 +349,11 @@ mod tests {
     use crate::harmony::Key;
     use crate::pitch::{Pitch, PitchClass};
     use crate::score::Emphasis;
+    use crate::score::PartId;
 
     fn note(midi: u8, onset: i64, duration: Duration) -> ScoreNote {
         ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: Pitch::from_midi(midi),
             onset: Duration::new(onset, 1),
             duration,

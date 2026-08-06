@@ -1,0 +1,104 @@
+[
+  {
+    "phrase": "positive_control",
+    "duration_s": 1.805,
+    "n_words": 6,
+    "n_boundaries": 5,
+    "boundary_sample_frames": [
+      6240,
+      12240,
+      18240,
+      30960,
+      36960
+    ],
+    "target_hz_sequence": [
+      261.63,
+      293.66,
+      329.63,
+      392.0,
+      440.0,
+      261.63,
+      293.66
+    ],
+    "world_out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v13_continuous_trajectory/positive_control_sung_v13_world_only.wav",
+    "world_peak": 0.2632649806389852,
+    "clipped_samples": 0,
+    "n_nan": 0,
+    "n_inf": 0,
+    "status": "OK",
+    "vocos_out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v13_continuous_trajectory/positive_control_sung_v13_vocos.wav",
+    "vocos_peak": 0.26374492049217224,
+    "vocos_clipped_samples": 0,
+    "vocos_n_nan": 0,
+    "vocos_n_inf": 0,
+    "vocos_status": "OK"
+  },
+  {
+    "phrase": "fricative_heavy",
+    "duration_s": 2.1,
+    "n_words": 6,
+    "n_boundaries": 5,
+    "boundary_sample_frames": [
+      6360,
+      12720,
+      25320,
+      31320,
+      37320
+    ],
+    "target_hz_sequence": [
+      329.63,
+      392.0,
+      440.0,
+      261.63,
+      293.66,
+      329.63,
+      392.0,
+      440.0
+    ],
+    "world_out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v13_continuous_trajectory/fricative_heavy_sung_v13_world_only.wav",
+    "world_peak": 0.3628136643823417,
+    "clipped_samples": 0,
+    "n_nan": 0,
+    "n_inf": 0,
+    "status": "OK",
+    "vocos_out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v13_continuous_trajectory/fricative_heavy_sung_v13_vocos.wav",
+    "vocos_peak": 0.31116536259651184,
+    "vocos_clipped_samples": 0,
+    "vocos_n_nan": 0,
+    "vocos_n_inf": 0,
+    "vocos_status": "OK"
+  },
+  {
+    "phrase": "long_sustained_vowels",
+    "duration_s": 1.84,
+    "n_words": 5,
+    "n_boundaries": 4,
+    "boundary_sample_frames": [
+      6360,
+      19080,
+      25080,
+      31080
+    ],
+    "target_hz_sequence": [
+      261.63,
+      293.66,
+      329.63,
+      392.0,
+      440.0,
+      261.63,
+      293.66
+    ],
+    "world_out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v13_continuous_trajectory/long_sustained_vowels_sung_v13_world_only.wav",
+    "world_peak": 0.23159784196284114,
+    "clipped_samples": 0,
+    "n_nan": 0,
+    "n_inf": 0,
+    "status": "OK",
+    "vocos_out": "/srv/luminous-dynamics/symthaea/audio_output/kokoro_world_vocoder_smoke_test_2026-07-28/v13_continuous_trajectory/long_sustained_vowels_sung_v13_vocos.wav",
+    "vocos_peak": 0.21068981289863586,
+    "vocos_clipped_samples": 0,
+    "vocos_n_nan": 0,
+    "vocos_n_inf": 0,
+    "vocos_status": "OK"
+  }
+]

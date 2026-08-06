@@ -29,6 +29,19 @@ macro_rules! palette {
 /// Every style Muse can compose in, in the order the Listen radio cycles
 /// them. Kept as a plain list (rather than iterating the palette map) so
 /// the "no style selected" default ordering matches the legacy page.
+///
+/// SECOND SOURCE OF THE SAME SET: Create Mode no longer reads this list — it
+/// navigates `symthaea_muse_protocol::catalog::CATALOG` by constellation and
+/// offers each entry's `composer_style`. Verified 2026-07-29 that the two
+/// agree exactly (both are the 29 `symthaea_music_theory::Style` Debug names),
+/// so the switch changed the picker without changing what gets composed.
+///
+/// They can still drift: adding an engine style updates the catalog (whose 1:1
+/// mapping IS enforced, by `catalog_entries_all_resolve_to_real_engine_styles`
+/// in muse_studio) but would silently leave this hand-maintained list behind,
+/// and Listen would then cycle a different set than Create offers. If that
+/// matters, derive this from `catalog::implemented_catalog()` and keep only the
+/// ordering here.
 pub const LISTEN_STYLES: &[&str] = &[
     "Classical",
     "Nocturne",

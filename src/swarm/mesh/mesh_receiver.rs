@@ -166,7 +166,7 @@ impl MeshReceiver {
             recently_completed: Vec::new(),
             peers: HashMap::new(),
             timeout: Duration::from_secs(30),
-            expected_payload_size: WISDOM_PACKET_SIZE + 64,
+            expected_payload_size: WISDOM_PACKET_SIZE,
             max_pending: 64,
             max_recent: 32,
             stats: ReceiverStats::default(),

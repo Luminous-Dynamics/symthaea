@@ -145,7 +145,12 @@ pub struct DiskInfo {
     pub partitions: Vec<PartitionInfo>,
 }
 
-const MAX_RELAY_MESSAGE_BYTES: usize = 1024 * 1024;
+/// Cap on a single relay/scanner WebSocket message. Shared with
+/// `manage.rs` and `install.rs`'s own relay/scanner connections -- all
+/// three talk to a locally-configured or user-editable relay URL, which
+/// must not be able to make a tab parse and hold an unbounded JSON
+/// payload.
+pub(crate) const MAX_RELAY_MESSAGE_BYTES: usize = 1024 * 1024;
 const MAX_DISKS: usize = 64;
 const MAX_PARTITIONS_PER_DISK: usize = 128;
 const MAX_DEVICE_NAME_BYTES: usize = 64;

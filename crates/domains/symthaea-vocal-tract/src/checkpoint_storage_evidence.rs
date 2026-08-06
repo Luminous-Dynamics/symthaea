@@ -11,19 +11,16 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
-pub const CHECKPOINT_STORAGE_PROFILE_SCHEMA: &str =
-    "symthaea.checkpoint-storage-profile.v1";
+pub const CHECKPOINT_STORAGE_PROFILE_SCHEMA: &str = "symthaea.checkpoint-storage-profile.v1";
 pub const CHECKPOINT_STORAGE_PROFILE_ATTESTATION_SCHEMA: &str =
     "symthaea.checkpoint-storage-profile-attestation.v1";
 pub const CHECKPOINT_POWER_LOSS_CAMPAIGN_SCHEMA: &str =
     "symthaea.checkpoint-power-loss-campaign.v1";
-pub const CHECKPOINT_POWER_LOSS_RESULT_SCHEMA: &str =
-    "symthaea.checkpoint-power-loss-result.v1";
+pub const CHECKPOINT_POWER_LOSS_RESULT_SCHEMA: &str = "symthaea.checkpoint-power-loss-result.v1";
 pub const CHECKPOINT_POWER_LOSS_EVIDENCE_SCHEMA: &str =
     "symthaea.checkpoint-power-loss-evidence.v1";
 
-const STORAGE_PROFILE_DIGEST_DOMAIN: &[u8] =
-    b"symthaea-checkpoint-storage-profile-digest-v1\0";
+const STORAGE_PROFILE_DIGEST_DOMAIN: &[u8] = b"symthaea-checkpoint-storage-profile-digest-v1\0";
 const STORAGE_PROFILE_ATTESTATION_DOMAIN: &[u8] =
     b"symthaea-checkpoint-storage-profile-attestation-v1\0";
 const POWER_LOSS_CAMPAIGN_DIGEST_DOMAIN: &[u8] =
@@ -254,8 +251,8 @@ impl CheckpointStorageProfileAuthority {
         profile: &CheckpointStorageProfileManifest,
     ) -> Result<Vec<u8>, CheckpointStorageEvidenceError> {
         profile.validate()?;
-        let body = postcard::to_stdvec(profile)
-            .map_err(|_| CheckpointStorageEvidenceError::Encoding)?;
+        let body =
+            postcard::to_stdvec(profile).map_err(|_| CheckpointStorageEvidenceError::Encoding)?;
         let wire = CheckpointStorageProfileAttestationWire {
             schema: CHECKPOINT_STORAGE_PROFILE_ATTESTATION_SCHEMA.to_owned(),
             key_id: self.key.id(),
@@ -319,11 +316,40 @@ impl CheckpointPowerLossTrialPlan {
     }
 }
 
+/// Identifies the authority key that signs power-loss evidence for a campaign. Only ever
+/// referenced by identifier -- no corresponding secret-key type exists anywhere in this
+/// crate (unlike `CheckpointStorageProfileAttestationKeyId`, which pairs with a real signing
+/// key), so this stays a bare identifier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CheckpointPowerLossEvidenceKeyId(pub [u8; 16]);
+
+impl CheckpointPowerLossEvidenceKeyId {
+    pub fn new(bytes: [u8; 16]) -> Result<Self, CheckpointStorageEvidenceError> {
+        if bytes == [0u8; 16] {
+            return Err(CheckpointStorageEvidenceError::InvalidKey);
+        }
+        Ok(Self(bytes))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CheckpointPowerLossCampaignPlan {
     pub schema: String,
     pub campaign_id: [u8; 16],
     pub storage_profiles: Vec<[u8; 32]>,
+    pub storage_profile_authority_key_id: CheckpointStorageProfileAttestationKeyId,
+    pub power_loss_evidence_authority_key_id: CheckpointPowerLossEvidenceKeyId,
+    /// Must match every participating lab's own
+    /// `CheckpointPowerLossLabManifest::test_harness_binding` (see
+    /// `checkpoint_power_loss_operations.rs::CheckpointPowerLossOperationsPlan::
+    /// validate_against`'s cross-check) -- scopes this campaign to one specific test harness.
+    pub test_harness_digest: [u8; 32],
+    /// Must match every participating lab's own
+    /// `CheckpointPowerLossLabManifest::power_controller_binding` -- scopes this campaign to
+    /// one specific power controller.
+    pub power_controller_binding: [u8; 32],
+    pub power_controller_calibration_digest: [u8; 32],
+    pub operator_protocol_digest: [u8; 32],
     pub trials: Vec<CheckpointPowerLossTrialPlan>,
     pub minimum_physical_trials: u32,
     pub require_all_durability_boundaries: bool,
@@ -335,15 +361,19 @@ impl CheckpointPowerLossCampaignPlan {
             || self.campaign_id == [0u8; 16]
             || self.storage_profiles.is_empty()
             || self.storage_profiles.len() > MAX_CHECKPOINT_STORAGE_PROFILES
+            || self.storage_profile_authority_key_id.0 == [0u8; 16]
+            || self.power_loss_evidence_authority_key_id.0 == [0u8; 16]
             || self.trials.is_empty()
             || self.trials.len() > MAX_CHECKPOINT_POWER_LOSS_TRIALS
+            || self.test_harness_digest == [0u8; 32]
+            || self.power_controller_binding == [0u8; 32]
+            || self.power_controller_calibration_digest == [0u8; 32]
+            || self.operator_protocol_digest == [0u8; 32]
         {
             return Err(CheckpointStorageEvidenceError::InvalidCampaign);
         }
         let profile_set: HashSet<[u8; 32]> = self.storage_profiles.iter().copied().collect();
-        if profile_set.len() != self.storage_profiles.len()
-            || profile_set.contains(&[0u8; 32])
-        {
+        if profile_set.len() != self.storage_profiles.len() || profile_set.contains(&[0u8; 32]) {
             return Err(CheckpointStorageEvidenceError::InvalidCampaign);
         }
         let mut trial_ids = HashSet::with_capacity(self.trials.len());
@@ -362,7 +392,7 @@ impl CheckpointPowerLossCampaignPlan {
             }
         }
         if trial_profiles != profile_set {
-                return Err(CheckpointStorageEvidenceError::InvalidCampaign);
+            return Err(CheckpointStorageEvidenceError::InvalidCampaign);
         }
         if self.minimum_physical_trials as usize > physical_trials {
             return Err(CheckpointStorageEvidenceError::InvalidCampaign);
@@ -398,6 +428,11 @@ pub struct CheckpointPowerLossTrialResult {
     pub workload_digest: [u8; 32],
     pub pre_power_loss_digest: [u8; 32],
     pub recovered_state_digest: [u8; 32],
+    /// Digest of the evidence proving the power-loss event itself was actually observed
+    /// (distinct from `recovered_state_digest`, which is evidence of the RECOVERY). Consumed
+    /// by `checkpoint_power_loss_operations.rs`'s execution-journal cross-check (the journal's
+    /// own `PowerEventObserved` entry must carry this same digest).
+    pub power_event_evidence_digest: [u8; 32],
     pub outcome: CheckpointPowerLossRecoveryOutcome,
     pub filesystem_consistency_verified: bool,
     pub application_consistency_verified: bool,
@@ -425,13 +460,13 @@ impl CheckpointPowerLossTrialResult {
             || self.workload_digest != trial.workload_digest
             || self.pre_power_loss_digest != trial.expected_pre_power_loss_digest
             || self.recovered_state_digest == [0u8; 32]
+            || self.power_event_evidence_digest == [0u8; 32]
             || self.completed_at_unix_seconds == 0
         {
             return Err(CheckpointStorageEvidenceError::TrialBindingMismatch);
         }
         if self.outcome == CheckpointPowerLossRecoveryOutcome::CleanRecovery
-            && (!self.filesystem_consistency_verified
-                || !self.application_consistency_verified)
+            && (!self.filesystem_consistency_verified || !self.application_consistency_verified)
         {
             return Err(CheckpointStorageEvidenceError::InvalidTrial);
         }
@@ -557,8 +592,8 @@ impl CheckpointStorageProfileAuthority {
         evidence: &CheckpointPowerLossCampaignEvidence,
     ) -> Result<Vec<u8>, CheckpointStorageEvidenceError> {
         evidence.validate_against(campaign)?;
-        let body = postcard::to_stdvec(evidence)
-            .map_err(|_| CheckpointStorageEvidenceError::Encoding)?;
+        let body =
+            postcard::to_stdvec(evidence).map_err(|_| CheckpointStorageEvidenceError::Encoding)?;
         let wire = CheckpointPowerLossEvidenceWire {
             schema: CHECKPOINT_POWER_LOSS_EVIDENCE_SCHEMA.to_owned(),
             key_id: self.key.id(),
@@ -623,7 +658,9 @@ impl std::fmt::Display for CheckpointStorageEvidenceError {
             Self::InvalidTrial => "invalid checkpoint power-loss trial",
             Self::UnknownTrial => "power-loss result references an unknown trial",
             Self::DuplicateTrial => "power-loss evidence contains a duplicate trial",
-            Self::TrialBindingMismatch => "power-loss result does not match its preregistered trial",
+            Self::TrialBindingMismatch => {
+                "power-loss result does not match its preregistered trial"
+            }
             Self::AuthenticationFailed => "storage evidence authentication failed",
             Self::Encoding => "storage evidence encoding failed",
             Self::TooLarge => "storage evidence exceeds its bounded size",
@@ -653,7 +690,8 @@ fn keyed_authenticate(domain: &[u8], body: &[u8], key: &[u8; 32]) -> [u8; 32] {
 }
 
 fn bounded_encode<T: Serialize>(value: &T) -> Result<Vec<u8>, CheckpointStorageEvidenceError> {
-    let encoded = postcard::to_stdvec(value).map_err(|_| CheckpointStorageEvidenceError::Encoding)?;
+    let encoded =
+        postcard::to_stdvec(value).map_err(|_| CheckpointStorageEvidenceError::Encoding)?;
     if encoded.is_empty() || encoded.len() > MAX_CHECKPOINT_POWER_LOSS_EVIDENCE_BYTES {
         return Err(CheckpointStorageEvidenceError::TooLarge);
     }
@@ -729,24 +767,36 @@ mod tests {
             schema: CHECKPOINT_POWER_LOSS_CAMPAIGN_SCHEMA.to_owned(),
             campaign_id: [0x31; 16],
             storage_profiles: vec![profile_digest],
+            storage_profile_authority_key_id: CheckpointStorageProfileAttestationKeyId::new(
+                [0x93; 16],
+            )
+            .unwrap(),
+            power_loss_evidence_authority_key_id: CheckpointPowerLossEvidenceKeyId::new([0x94; 16])
+                .unwrap(),
+            power_controller_calibration_digest: [0x95; 32],
+            operator_protocol_digest: [0x96; 32],
             trials: boundaries
                 .into_iter()
                 .enumerate()
-                .map(|(index, durability_boundary)| CheckpointPowerLossTrialPlan {
-                    trial_id: [0x40 + index as u8; 16],
-                    storage_profile_digest: profile_digest,
-                    evidence_class: if index < 2 {
-                        CheckpointPowerLossEvidenceClass::ProcessCrashSimulation
-                    } else {
-                        CheckpointPowerLossEvidenceClass::PhysicalDevicePowerCut
+                .map(
+                    |(index, durability_boundary)| CheckpointPowerLossTrialPlan {
+                        trial_id: [0x40 + index as u8; 16],
+                        storage_profile_digest: profile_digest,
+                        evidence_class: if index < 2 {
+                            CheckpointPowerLossEvidenceClass::ProcessCrashSimulation
+                        } else {
+                            CheckpointPowerLossEvidenceClass::PhysicalDevicePowerCut
+                        },
+                        durability_boundary,
+                        workload_digest: [0x51 + index as u8; 32],
+                        expected_pre_power_loss_digest: [0x61 + index as u8; 32],
                     },
-                    durability_boundary,
-                    workload_digest: [0x51 + index as u8; 32],
-                    expected_pre_power_loss_digest: [0x61 + index as u8; 32],
-                })
+                )
                 .collect(),
             minimum_physical_trials: 4,
             require_all_durability_boundaries: true,
+            test_harness_digest: [0x91; 32],
+            power_controller_binding: [0x92; 32],
         }
     }
 
@@ -812,6 +862,7 @@ mod tests {
                 workload_digest: first.workload_digest,
                 pre_power_loss_digest: first.expected_pre_power_loss_digest,
                 recovered_state_digest: [0x71; 32],
+                power_event_evidence_digest: [0x72; 32],
                 outcome: CheckpointPowerLossRecoveryOutcome::CleanRecovery,
                 filesystem_consistency_verified: true,
                 application_consistency_verified: true,

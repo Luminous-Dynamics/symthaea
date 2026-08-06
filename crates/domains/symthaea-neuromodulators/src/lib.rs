@@ -904,6 +904,11 @@ impl NeuromodulatorBath {
 impl NeuromodulatorBath {
     // ── #4: Anomaly Recovery (Turrigiano 2008) ───────────────────────
     /// Engage homeostatic recovery: boost all reuptake rates by 50%.
+    ///
+    /// ⚠️ **Currently has no effect on clearance dynamics.** It writes
+    /// `Transmitter::reuptake_rate`, which `Transmitter::reuptake()` no longer reads —
+    /// clearance is Michaelis-Menten (`mm_v_max` / `mm_k_m`). Making this real again
+    /// means scaling `mm_v_max`; that is a behaviour change and has not been made here.
     pub fn engage_anomaly_recovery(&mut self) {
         self.dopamine.boost_reuptake(1.5);
         self.noradrenaline.boost_reuptake(1.5);
@@ -2922,6 +2927,10 @@ mod tests {
 
     // ── #4: Personality drift recovery ───────────────────────────────
 
+    /// NOTE: this verifies the *setter* only. `reuptake_rate` is inert — clearance is
+    /// Michaelis-Menten and never reads it — so this is not evidence that anomaly
+    /// recovery changes how fast levels return to baseline. See
+    /// `NeuromodulatorBath::engage_anomaly_recovery`.
     #[test]
     fn test_anomaly_recovery_boosts_reuptake() {
         let mut bath = NeuromodulatorBath::default();
@@ -3465,29 +3474,94 @@ mod tests {
 
     // ── #1: Receptor Desensitization (Gainetdinov 2004) ───────────────
 
+    /// Negative control for the high-exposure threshold, **with a positive contrast arm**.
+    ///
+    /// Clearance is Michaelis-Menten and ignores `reuptake_rate`, so `mm_v_max: 0.0`
+    /// is what actually freezes the level now. Without a freeze, an unpinned level
+    /// decays below `baseline + tolerance_threshold` within ~4 cycles for *every*
+    /// admissible starting level (max reachable counter from full saturation is 4),
+    /// so `high_exposure_cycles == 0` after 30 cycles would hold no matter what the
+    /// threshold logic did — a probe that cannot fail.
+    ///
+    /// The two arms differ only in whether the frozen level sits below or above the
+    /// threshold, so any regression in the threshold comparison — or a future
+    /// clearance-model change that stops `mm_v_max: 0.0` from freezing the level —
+    /// breaks exactly one of them loudly instead of passing silently.
     #[test]
     fn test_tachyphylaxis_no_trigger_under_threshold() {
+        // ── Arm A (negative): frozen at baseline+0.15, below the +0.2 threshold ──
+        let mut below = Transmitter {
+            level: 0.65,
+            mm_v_max: 0.0, // freeze clearance (reuptake_rate is inert, see transmitter.rs)
+            baseline: 0.5,
+            ..Default::default()
+        };
+        for _ in 0..30 {
+            below.reuptake();
+        }
+        assert_eq!(
+            below.level, 0.65,
+            "Freeze must hold, else this probe is vacuous"
+        );
+        assert_eq!(
+            below.high_exposure_cycles, 0,
+            "Sub-threshold exposure must not accumulate"
+        );
+        assert!(!below.is_tolerant());
+
+        // ── Arm B (positive contrast): frozen at baseline+0.25, above the threshold ──
+        // Same duration, same freeze — only the level differs.
+        let mut above = Transmitter {
+            level: 0.75,
+            mm_v_max: 0.0,
+            baseline: 0.5,
+            ..Default::default()
+        };
+        for _ in 0..30 {
+            above.reuptake();
+        }
+        assert_eq!(
+            above.level, 0.75,
+            "Freeze must hold, else this probe is vacuous"
+        );
+        assert_eq!(
+            above.high_exposure_cycles, 30,
+            "Supra-threshold exposure must accumulate on every cycle"
+        );
+        assert!(above.is_tolerant());
+    }
+
+    /// Tolerance requires *sustained* exposure, not a single spike.
+    ///
+    /// Guards the property that motivated re-pinning the tests above: under free-running
+    /// Michaelis-Menten clearance a saturating spike is cleared back below the tolerance
+    /// threshold long before onset, so tolerance must NOT trigger. If a future change makes
+    /// a one-shot spike sufficient to induce tolerance, this fails.
+    #[test]
+    fn test_tachyphylaxis_single_spike_does_not_induce_tolerance() {
         let mut t = Transmitter {
-            level: 0.65, // baseline+0.15, below threshold of +0.2
-            reuptake_rate: 0.0,
+            level: 1.0, // saturated spike, then left to clear naturally
             baseline: 0.5,
             ..Default::default()
         };
         for _ in 0..30 {
             t.reuptake();
         }
+        assert!(
+            !t.is_tolerant(),
+            "A single cleared spike must not induce tolerance"
+        );
         assert_eq!(
             t.high_exposure_cycles, 0,
-            "Should not accumulate below threshold"
+            "Counter must reset once the spike clears below threshold"
         );
-        assert!(!t.is_tolerant());
     }
 
     #[test]
     fn test_tachyphylaxis_triggers_after_20_cycles() {
         let mut t = Transmitter {
-            level: 0.8,         // baseline+0.3 > threshold of +0.2
-            reuptake_rate: 0.0, // disable reuptake to keep level high
+            level: 0.8,    // baseline+0.3 > threshold of +0.2
+            mm_v_max: 0.0, // freeze clearance to sustain the exposure
             baseline: 0.5,
             ..Default::default()
         };
@@ -3515,7 +3589,7 @@ mod tests {
     fn test_tachyphylaxis_withdrawal_rebound() {
         let mut t = Transmitter {
             level: 0.8,
-            reuptake_rate: 0.0,
+            mm_v_max: 0.0, // freeze clearance to sustain the exposure
             baseline: 0.5,
             ..Default::default()
         };
@@ -3566,7 +3640,7 @@ mod tests {
     fn test_tachyphylaxis_clamp_bounds() {
         let mut t = Transmitter {
             level: 0.8,
-            reuptake_rate: 0.0,
+            mm_v_max: 0.0, // freeze clearance, else the level decays and never desensitizes
             baseline: 0.5,
             receptor_sensitivity: 0.52, // near lower bound
             ..Default::default()
@@ -3575,16 +3649,27 @@ mod tests {
         for _ in 0..500 {
             t.reuptake();
         }
+        // Without the freeze this passed vacuously: the level returned to baseline,
+        // no desensitization ran, and sensitivity simply stayed at its initial 0.52.
+        assert!(
+            t.is_tolerant(),
+            "Precondition: sustained high exposure must actually induce tolerance"
+        );
         assert!(
             t.receptor_sensitivity >= 0.5,
             "Should clamp at 0.5: {}",
+            t.receptor_sensitivity
+        );
+        assert!(
+            t.receptor_sensitivity < 0.52,
+            "Desensitization must have actually driven sensitivity down to the clamp: {}",
             t.receptor_sensitivity
         );
 
         // Withdrawal rebound should clamp at 2.0
         let mut t2 = Transmitter {
             level: 0.3,
-            reuptake_rate: 0.0,
+            mm_v_max: 0.0, // freeze clearance so the level stays below baseline
             baseline: 0.5,
             receptor_sensitivity: 1.98, // near upper bound
             withdrawal_cycles: 100,
@@ -3605,7 +3690,7 @@ mod tests {
         let mut bath = NeuromodulatorBath::default();
         // Push DA high and sustain
         bath.dopamine.level = 0.9;
-        bath.dopamine.reuptake_rate = 0.0;
+        bath.dopamine.mm_v_max = 0.0; // freeze clearance to sustain the exposure
         bath.dopamine.baseline = 0.5;
         for _ in 0..30 {
             bath.dopamine.reuptake();

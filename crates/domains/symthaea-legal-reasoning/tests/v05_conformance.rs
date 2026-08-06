@@ -1,11 +1,10 @@
 use symthaea_legal_reasoning::{
     ArgumentGraph, Atom, AuthorityId, BatchLimits, CanonicalEvidence, DecisionRecord,
-    DecisionReviewFlag, DocumentId, FactAssertion, FactConflictPolicy, FactIntervention,
-    FactKind, FactPolicy, FormalRule, InferenceProfile, LegalDate, LegalStatus, Literal,
-    ProvisionId, RuleId, RuleKind, RulePack, RulePackId, SemanticReview, SourceRef,
-    TemporalFactAssertion, TemporalFactBase, TemporalScope, analyze_counterfactuals,
-    evaluate_batch_with_limits, evaluate_case, preflight, validate_argument_graph,
-    validate_decision_record,
+    DecisionReviewFlag, DocumentId, FactAssertion, FactConflictPolicy, FactIntervention, FactKind,
+    FactPolicy, FormalRule, InferenceProfile, LegalDate, LegalStatus, Literal, ProvisionId, RuleId,
+    RuleKind, RulePack, RulePackId, SemanticReview, SourceRef, TemporalFactAssertion,
+    TemporalFactBase, TemporalScope, analyze_counterfactuals, evaluate_batch_with_limits,
+    evaluate_case, preflight, validate_argument_graph, validate_decision_record,
 };
 
 fn positive(value: &str) -> Literal {
@@ -83,7 +82,10 @@ fn temporal_intake_policy_and_inference_preserve_exclusions() {
         evaluation.intake.admission.rejected[0].assertion.kind,
         FactKind::Assumed
     );
-    assert_eq!(evaluation.result.status(&positive("register")), LegalStatus::Supported);
+    assert_eq!(
+        evaluation.result.status(&positive("register")),
+        LegalStatus::Supported
+    );
     assert!(!evaluation.canonical_bytes().is_empty());
 }
 
@@ -94,12 +96,9 @@ fn arguments_decisions_and_validation_form_one_review_chain() {
         positive("resident"),
         positive("exempt"),
     ]);
-    let result = symthaea_legal_reasoning::infer(
-        &pack,
-        &facts,
-        &InferenceProfile::grounded_blocking_v1(),
-    )
-    .unwrap();
+    let result =
+        symthaea_legal_reasoning::infer(&pack, &facts, &InferenceProfile::grounded_blocking_v1())
+            .unwrap();
     let graph = ArgumentGraph::from_result(&pack, &result).unwrap();
     let decision = DecisionRecord::from_result(&pack, &result, &positive("register")).unwrap();
 
@@ -138,7 +137,9 @@ fn semantic_review_counterfactual_batch_and_preflight_compose() {
         &facts,
         &InferenceProfile::grounded_blocking_v1(),
         &positive("register"),
-        [FactIntervention::Add(FactAssertion::observed(positive("exempt")))],
+        [FactIntervention::Add(FactAssertion::observed(positive(
+            "exempt",
+        )))],
     )
     .unwrap();
     assert_eq!(counterfactual.status_changing().len(), 1);

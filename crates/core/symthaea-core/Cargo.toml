@@ -25,6 +25,11 @@ required-features = ["abstract_thought"]
 [dependencies]
 wgpu = { workspace = true, features = ["spirv"], optional = true }
 bytemuck = { version = "1", features = ["derive"] }
+# NOTE: `symthaea-evidence-plane` was a dependency here for the Phase-2
+# `CognitiveObservation` trait's `mechanism_activation`/`run_identity` methods.
+# Those were removed 2026-07-29 per the trait's own kill-condition (see
+# src/observation.rs), leaving no consumer in this crate, so the dependency went
+# with them. Re-add it alongside a real consumer, not ahead of one.
 
 
 ndarray = { workspace = true }
@@ -186,6 +191,17 @@ geometric-algebra = ["dep:symtropy-math"]     # N-dimensional geometric algebra:
 _scaling_study = []                          # Gate for scaling_study_demo example
 epistemic = []                               # Epistemic substrate profiles and knowledge validation
 abstract_thought = []                        # Meta-HDC concept vectors, dynamic grammar generation, category theory discovery
+# hdc_treasury's doc comment claims privacy-preserving aggregation + k-of-n
+# threshold decrypt, but is built entirely on EncryptedHV/HdcThresholdSharing,
+# both explicitly #[deprecated] by their own authors as not providing those
+# properties (EncryptedHV: "no authentication, integrity, or misuse
+# resistance"; HdcThresholdSharing: "not threshold sharing: every HdcShare
+# includes enough data to recover the secret"). Zero consumers anywhere in
+# the codebase (verified 2026-07-27). Gated out of default so the module's
+# claims can only ever compile-and-be-true once real crypto backs it --
+# `-D warnings` will keep failing this feature specifically until then,
+# by design. Do not add #[allow(deprecated)] to silence this.
+hdc-treasury = []
 neural_validation = []                       # TRIBE v2 fMRI comparison: cortical activation maps, Glasser parcellation, HRF
 synthesis-trait = []                         # Unified CodeSynthesisBackend trait for cross-backend code generation
 cantor-hdc = []                              # Hierarchical Cantor Hypervectors (RHN)

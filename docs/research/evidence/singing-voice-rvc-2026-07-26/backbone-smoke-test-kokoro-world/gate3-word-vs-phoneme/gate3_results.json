@@ -1,0 +1,68 @@
+[
+  {
+    "id": "hello_world",
+    "target": "hello world",
+    "phoneme_level": {
+      "wer": 0.0,
+      "hyp": "Hello world.",
+      "melody": {
+        "median_cents_err": 4.2,
+        "frac_within_50c": 0.888
+      },
+      "max_click": 0.091
+    },
+    "word_level": {
+      "wer": 0.0,
+      "hyp": "Hello world.",
+      "melody": {
+        "median_cents_err": 4.0,
+        "frac_within_50c": 0.871
+      },
+      "max_click": 0.096
+    }
+  },
+  {
+    "id": "sun_rises",
+    "target": "the sun rises over the valley",
+    "phoneme_level": {
+      "wer": 0.0,
+      "hyp": "The sun rises over the valley.",
+      "melody": {
+        "median_cents_err": 3.4,
+        "frac_within_50c": 0.907
+      },
+      "max_click": 0.173
+    },
+    "word_level": {
+      "wer": 0.0,
+      "hyp": "The sun rises over the valley.",
+      "melody": {
+        "median_cents_err": 5.0,
+        "frac_within_50c": 0.886
+      },
+      "max_click": 0.216
+    }
+  },
+  {
+    "id": "quiet_morning",
+    "target": "a quiet morning walk",
+    "phoneme_level": {
+      "wer": 0.25,
+      "hyp": "The quiet morning walk!",
+      "melody": {
+        "median_cents_err": 4.3,
+        "frac_within_50c": 0.9
+      },
+      "max_click": 0.104
+    },
+    "word_level": {
+      "wer": 0.25,
+      "hyp": "The quiet morning walk.",
+      "melody": {
+        "median_cents_err": 4.3,
+        "frac_within_50c": 0.924
+      },
+      "max_click": 0.106
+    }
+  }
+]

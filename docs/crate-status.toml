@@ -1,0 +1,334 @@
+# Crate truth registry
+#
+# ============================================================================
+#  A CRATE'S EXISTENCE DOES NOT IMPLY ENDORSEMENT.
+# ============================================================================
+#
+# This workspace has ~200 packages. Their presence says nothing about whether any given one is
+# current, validated, safe to compose, or safe to put on a production path. This file records the
+# judgements that cannot be derived from the code; the inventory itself is derived from
+# `cargo metadata` and is never hand-maintained here.
+#
+#   cargo xtask crate-status --check     # integrity + coverage
+#   cargo xtask crate-status --report    # generated markdown inventory
+#
+# ---------------------------------------------------------------------------
+# Evidence ladder — what has been DEMONSTRATED, not how carefully it was built
+# ---------------------------------------------------------------------------
+#   E0  compiles / structurally exists
+#   E1  internal unit invariants
+#   E2  independent known-answer or reference comparison
+#   E3  controlled ablation with positive and negative controls
+#   E4  external dataset or simulator validation
+#   E5  prospective real-world validation
+#
+# State the level ACHIEVED, never the level aspired to. `evidence_note` is mandatory: an
+# evidence level with no stated basis is an assertion, not a record.
+#
+# ---------------------------------------------------------------------------
+# On the emptiness of this file
+# ---------------------------------------------------------------------------
+# Only crates somebody has actually assessed appear below. Everything else is reported as
+# `unclassified`, which is an honest statement that nobody has checked — materially different
+# from, and better than, a fabricated `E1` across 200 entries. The unclassified count is printed
+# on every run precisely so it stays visible and can be driven down deliberately.
+#
+# Seeded 2026-07-29 from the correctness-gate work unit (commits 3714f7a80b, 45608834f9,
+# 75ef598452). Six crates classified; the rest await assessment.
+
+[meta]
+schema_version = 1
+
+# ---------------------------------------------------------------------------
+# Futures Laboratory
+# ---------------------------------------------------------------------------
+
+[crates.symthaea-futures-core]
+lifecycle = "active-research"
+evidence = "E1"
+evidence_note = """
+18 tests covering the validation contract, with genuine negative controls: every malformed
+forecast shape (negative / >1 / NaN / infinite probability, inverted or nonfinite interval,
+negative unsupported mass, empty distribution, unnormalized mass, duplicate and overlapping
+regions) is asserted to produce a typed error, and the serde path is asserted not to bypass the
+constructor. Positive controls confirm valid forecasts still construct and round-trip with an
+unchanged wire format. Deliberately NOT E2: the pre-fix score table these tests were derived
+from was measured by this project against its own scorers, not against an independent reference
+implementation.
+"""
+last_verified_commit = "3714f7a80b"
+api_stability = "unstable"
+safety_criticality = "none"
+production_allowed = false
+ci_lane = "default"
+external_validation = ""
+consolidation_target = ""
+
+[crates.symthaea-futures-calibration]
+lifecycle = "active-research"
+evidence = "E2"
+evidence_note = """
+24 tests. Reaches E2 on the strength of known-answer comparisons against the published closed
+forms the module cites (Brier 1950; Gneiting & Raftery 2007): the multi-class Brier score is
+checked against hand-computed values (0.18 for p=0.7, 0.0 perfect, 2.0 maximally wrong) and the
+log score against -ln(p) exactly. A 4,242-point deterministic grid sweep over the validated
+input space confirms finite, nonnegative Brier and log scores everywhere. The CRPS estimator is
+NOT independently validated against a reference implementation and is the weakest part of this
+claim.
+"""
+last_verified_commit = "3714f7a80b"
+api_stability = "unstable"
+safety_criticality = "none"
+production_allowed = false
+ci_lane = "default"
+external_validation = ""
+consolidation_target = ""
+
+[crates.symthaea-futures-ensemble]
+lifecycle = "active-research"
+evidence = "E1"
+evidence_note = """
+53 internal tests pass. Covers mechanism integrity (zero-noise limit collapses to a point
+forecast; real spread appears under noise) but nothing here validates the ensemble's forecasts
+against an outside standard. Note the Futures Lab's own Phase 1 result: the evolutionary-rescue
+FEP gate FAILED and its confound was never fixed — so this crate's scientific conclusions are
+explicitly not established, independent of its code quality.
+"""
+last_verified_commit = "3714f7a80b"
+api_stability = "unstable"
+safety_criticality = "none"
+production_allowed = false
+ci_lane = "default"
+external_validation = ""
+consolidation_target = ""
+
+[crates.symthaea-futures-ledger]
+lifecycle = "skeleton"
+evidence = "E0"
+evidence_note = """
+A single `EvidenceRecord` struct definition with ZERO consumers anywhere in the workspace —
+verified by grep during the 2026-07-29 artifact audit. No forecast has ever been persisted
+through it. The Futures Lab's "replayable evidence record" capability is, as of this commit,
+a schema and nothing else. Recorded here rather than left to be discovered again.
+"""
+last_verified_commit = "3714f7a80b"
+api_stability = "experimental"
+safety_criticality = "none"
+production_allowed = false
+ci_lane = "default"
+external_validation = ""
+consolidation_target = ""
+
+# ---------------------------------------------------------------------------
+# Core substrate
+# ---------------------------------------------------------------------------
+
+[crates.symthaea-core]
+# `foundation` records how this crate is USED (~125 manifests depend on it), not the maturity of
+# its contents. Setting it to `active-research` would describe the code more flatteringly and
+# silence a finding that is true: the workspace leans on this crate as substrate without
+# foundation-grade evidence for it. The registry should surface that tension, not resolve it by
+# relabelling.
+lifecycle = "foundation"
+evidence = "E1"
+evidence_note = """
+NOT HONESTLY CLASSIFIABLE AS A UNIT — that is itself the finding. ~371K lines across 471 source
+files (295K in `hdc/` alone) spanning stable primitives, consciousness metrics, physics,
+symbolic regression, SIMD kernels and unrelated investigations, with ~125 manifests referencing
+it. A single evidence level cannot be true of all of it.
+
+`E1` is the floor that is defensible workspace-wide (5,165 lib tests). Individual subsystems
+sit both above and below it: `consciousness_metrics::SpectralMIPFinder` has a validated
+correlation against exhaustive search over the same Gaussian-MI proxy (E2 for that claim, and
+NOT against canonical TPM-based IIT), while `hdc_treasury`'s privacy claims are unbacked by real
+crypto per its own dependencies' deprecation notices.
+
+Directly verified at this commit: `hdc::eml_regressor` (3/3, unsafe generic dispatch removed —
+zero `unsafe`, zero `TypeId` remain) and `rt` (9/9, memory-lock failure now detectable). The
+other ~5,150 tests were not run start to finish in that work unit.
+
+Both findings this entry trips are real and correctly reported: it gates motor safety at E1,
+and it is depended on as foundation without E2. Extraction of stable seams is the intended
+resolution — not a higher number in this file.
+"""
+last_verified_commit = "75ef598452"
+api_stability = "unstable"
+safety_criticality = "high"
+production_allowed = false
+ci_lane = "default"
+external_validation = ""
+consolidation_target = ""
+
+[crates.symthaea-evidence-plane]
+lifecycle = "prototype"
+evidence = "E0"
+evidence_note = """
+Not assessed in the correctness-gate work unit; listed only because it is the intended
+reusable intervention-integrity contract and its adoption is worth tracking. Downgrade or raise
+this after an actual assessment — do not read E0 as a measured verdict on its quality.
+"""
+last_verified_commit = ""
+api_stability = "experimental"
+safety_criticality = "none"
+production_allowed = false
+ci_lane = "default"
+external_validation = ""
+consolidation_target = ""
+
+# ---------------------------------------------------------------------------
+# Prior extraction attempts (see SYMTHAEA_CORE_EXTRACTION_ANALYSIS_2026-07-29.md, Finding 8)
+# ---------------------------------------------------------------------------
+
+[crates.symthaea-hdc-ltc]
+lifecycle = "archived"
+evidence = "E1"
+evidence_note = """
+ORPHANED EXTRACTION — recorded so it is not rediscovered a third time. Created by commit
+`9baa58af21` ("extract symthaea-hdc-crypto + symthaea-hdc-ltc as independent crates"). The crate
+itself is clean: 2,660 lines, standalone, depends only on serde + rand, its own `ContinuousHV`
+and `HDC_DIMENSION`, its own tests.
+
+What did not happen was the migration. The in-core original (`symthaea-core/src/hdc/
+hdc_ltc_unified.rs`, 103,710 bytes) was left in place, kept being developed through 2026-07-18,
+and is what 86 crates actually use. This crate has ONE dependent (`symthaea-probe-stream`).
+
+The two have since diverged: of 58 public functions in-core and 45 here, only 16 names are
+shared. NOT a drop-in replacement — adopting it is a porting job.
+
+`archived` is a statement about its role, not its quality. Its fate is an open decision: adopt it
+as the migration target and delete the in-core copy, or retire it. Leaving both is the status quo
+that produced this entry.
+"""
+last_verified_commit = "4ef3a4e19d"
+api_stability = "unstable"
+safety_criticality = "none"
+production_allowed = false
+ci_lane = "default"
+external_validation = ""
+consolidation_target = "symthaea-core::hdc::hdc_ltc_unified (direction of consolidation UNDECIDED — could go either way)"
+
+[crates.symthaea-hdc-crypto]
+lifecycle = "archived"
+evidence = "E0"
+evidence_note = """
+ORPHANED EXTRACTION, the more complete case of the pair above: 1,877 lines, ZERO dependents
+anywhere in the workspace. Extracted by the same commit `9baa58af21`; the in-core original
+(`symthaea-core/src/hdc/hdc_crypto.rs`, 37,086 bytes) remains and is what is actually reachable.
+
+Not assessed for correctness — E0 reflects "nobody has evaluated this", not a measured verdict.
+A crate with no consumers has no evidence by construction.
+"""
+last_verified_commit = "4ef3a4e19d"
+api_stability = "experimental"
+safety_criticality = "none"
+production_allowed = false
+ci_lane = "default"
+external_validation = ""
+consolidation_target = "symthaea-core::hdc::hdc_crypto (or retire)"
+
+
+# ---------------------------------------------------------------------------
+# Adjudicated name collisions  (`cargo xtask duplicate-scan`)
+# ---------------------------------------------------------------------------
+# A collision between a symthaea-core module and a same-named crate is a QUESTION.
+# The 2026-07-29 audit measured this heuristic at ~22% precision: of nine suspected
+# pairs, SEVEN were never migrations. Recorded here so each is decided once, and so
+# a genuinely NEW collision fails CI instead of blending into the noise.
+
+[known_name_collisions.statistics]
+disposition = "independent-same-domain"
+note = """
+Two substantial parallel implementations, ~2,066 vs ~2,143 lines, only 6 shared public symbols.
+NOT interchangeable: core's `variance`/`std_dev` are POPULATION estimators, the crate's are
+SAMPLE estimators — a mechanical swap silently flips /n to /(n-1) with no compile error. The
+crate also holds exact Student's-t and chi-squared CDFs plus the PPV/base-rate layer the live
+StatisticsDomainPlugin depends on.
+"""
+
+[known_name_collisions.graph_theory]
+disposition = "independent-same-domain"
+note = """
+Core wins on capability and adoption: 3 live consumers, weighted edges, Dijkstra, the
+Laplacian/spectral suite, and `Graph::encode() -> BinaryHV` (HDC integration the crate cannot
+host under the pure-std domain-crate charter). 25 tests vs 8; the crate has zero consumers.
+Named as the low-risk migration candidate. HAZARD if merged: `Graph::bfs(&self, usize)` exists on
+both sides with an IDENTICAL signature and different meaning — core returns per-node distances
+(length n, usize::MAX sentinel), the crate returns traversal order. A mechanical import rewrite
+compiles clean and is silently wrong.
+"""
+
+[known_name_collisions.combinatorics]
+disposition = "independent-same-domain"
+note = """
+Least settled of the set. Core and crate share a VERBATIM comment line
+(`let k = k.min(n - k); // symmetry: C(n,k) = C(n,n-k)`) and a structurally identical
+multiplicative loop, so a reviewer could reasonably call `combinations` specifically a fork.
+The crate does hold real capability core lacks: exact u128 arithmetic where core silently
+saturates in u64.
+"""
+
+[known_name_collisions.complex]
+disposition = "independent-same-domain"
+note = """
+Zero dependents, one lifetime commit, and the delta over core is roughly one ~5-line function —
+so it is close to retirable. Held back deliberately: its `roots_of_unity`/FFT would be the only
+FFT available to the pure-std domain-crate charter, since core's superset `hdc/fft.rs` requires
+linking symthaea-core. That is a forward-looking design question, not a closable one.
+"""
+
+[known_name_collisions.game_theory]
+disposition = "independent-same-domain"
+note = """
+The inverse error to `projection`, and worth keeping as the counterexample: the two share exactly
+ONE identifier (`new`) yet implement the same abstraction. Judge duplicates by abstraction, not by
+identifier overlap — the mistake runs in both directions. Neither side has consumers. The crate
+holds a general-sum `mixed_nash_2x2` core lacks.
+"""
+
+[known_name_collisions.projection]
+disposition = "homonym"
+note = """
+NOT a duplicate in any sense — a pure homonym. Core implements trainable linear maps between HDC
+dimensionalities (`LearnedProjection` with Adam, `RandomProjection` with Johnson-Lindenstrauss).
+The crate is a serde/chrono DTO for rendering telemetry as 2.5D visualisations. Zero shared
+symbols in either direction, zero shared dependencies, and the crate does not depend on
+symthaea-core at all.
+"""
+
+[known_name_collisions.consciousness_topology]
+disposition = "false-pair"
+note = """
+The crate IS a successful extraction — of a DIFFERENT file (`src/consciousness/
+consciousness_topology.rs`, 97% rename in f53ccac34e, facade left behind). The same-named core
+module is a SIBLING that has coexisted since 2026-02-05 and survived that extraction untouched;
+the two never shared a blob. Production binds neither: `topological_measure` uses
+symthaea-hodge's own implementation. See CONSCIOUSNESS_TOPOLOGY notes in the 2026-07-29 audit.
+"""
+
+[known_name_collisions.hdc_crypto]
+disposition = "retired"
+note = """
+Genuine duplicate, resolved. The standalone crate was an extraction that COPIED rather than moved
+(commit 9baa58af21: 4,647 insertions, 0 deletions) and sat at zero dependents while the in-core
+original kept every consumer. Retired on the `retire/hdc-crypto-2026-07-30` branch, with its
+`insecure-experimental-crypto` feature gate ported to symthaea-core — the gate had been on the
+copy nobody used. Remove this entry once that branch merges and the collision disappears.
+"""
+
+[known_name_collisions.physics]
+disposition = "undecided"
+note = """
+FOUND BY THIS CHECK 2026-07-30, not by the earlier audit — the manual census scanned only
+`src/*.rs` and `src/hdc/*.rs` and missed directory modules, so this pair was never examined.
+Recorded as UNDECIDED rather than assigned a disposition I have not earned: nobody has compared
+`symthaea-core`'s `physics` module against the `symthaea-physics` crate. Adjudicate before
+treating either as canonical.
+"""
+
+[known_name_collisions.observability]
+disposition = "undecided"
+note = """
+FOUND BY THIS CHECK 2026-07-30, same blind spot as `physics` above — a directory module the
+manual census did not reach. Never audited. UNDECIDED is the honest value; do not read it as
+"benign".
+"""

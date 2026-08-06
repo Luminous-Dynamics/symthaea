@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-evidence-plane"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Shared evidence contract (declared mechanism vs. measured counters, hard-failing integrity check, canonical config hashing) for Symthaea's research/ablation harnesses -- extracted from examples/hdc_ltc_coupling_ablation.rs, second consumer is symthaea-psych-bench's Butlin AE-2 runner. See SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md Phase 1."
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

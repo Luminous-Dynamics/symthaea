@@ -31,10 +31,10 @@
 //! `SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md`'s non-goals (this tool stays a
 //! composer-specific instrument, not folded into the unified UI).
 
-use axum::extract::{Path as AxPath, State};
+use axum::extract::{DefaultBodyLimit, Multipart, Path as AxPath, State};
 use axum::http::{StatusCode, header};
 use axum::response::{Html, IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::{any, get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
@@ -57,21 +57,21 @@ use symthaea_muse::sonata_intervention::{
 };
 use symthaea_muse::{AudioData, MusicalState};
 use symthaea_muse_protocol::{
-    ANALYST_PIECE_BUNDLE_VERSION, BundleEnvelope, BundleWarning, CadenceEvent, EvidenceBasis,
-    EvidenceStatus, GrammarProvenance, LISTEN_COMPOSITION_BUNDLE_VERSION,
-    LISTEN_PERFORMANCE_BUNDLE_VERSION, ListenCompositionBundle, ListenPerformanceBundle,
-    MeterPoint, MotifDefinition, MotifOccurrence, MusicalTime, OrchestrationRegion,
-    PIECE_PROVENANCE_BUNDLE_VERSION, PerformanceVoiceSummary, PerformedNoteEvent, PhraseRegion,
-    PieceProvenanceBundle, ProvenanceArtifact, ReproducibilityClaim, ResonanceCurve,
-    ResonanceSample, SectionRegion, SonorityRegion, SymbolicNoteEvent, TempoPoint,
-    TitleRecipeSummary, VoiceActivity,
+    ANALYST_PIECE_BUNDLE_VERSION, BundleEnvelope, BundleWarning, CadenceEvent,
+    DiversityPlanSummary, EvidenceBasis, EvidenceStatus, GrammarProvenance,
+    LISTEN_COMPOSITION_BUNDLE_VERSION, LISTEN_PERFORMANCE_BUNDLE_VERSION, ListenCompositionBundle,
+    ListenPerformanceBundle, MeterPoint, MotifDefinition, MotifOccurrence, MusicalTime,
+    OrchestrationRegion, PIECE_PROVENANCE_BUNDLE_VERSION, PerformanceVoiceSummary,
+    PerformedNoteEvent, PhraseRegion, PieceProvenanceBundle, ProvenanceArtifact,
+    ReproducibilityClaim, ResonanceCurve, ResonanceSample, SectionRegion, SonorityRegion,
+    SymbolicNoteEvent, TempoPoint, TitleRecipeSummary, VoiceActivity,
 };
 use symthaea_music_theory::pitch::PitchClass;
 use symthaea_music_theory::{
     CompositionSpec, Duration, Emphasis, FormKind, GrammarFamily, GrammarPlanEvidence,
-    MusicalIntent, ObligationKind, ReturnTransformation, Score, ScoreNote, SonataRealization,
-    SonataSectionKind, Style, VoiceRole, compare_melodic_sequences, compose_sonata_with_plan,
-    profile_score_region, verify_sonata_obligations,
+    MusicalIntent, ObligationKind, PartId, ReturnTransformation, Score, ScoreNote,
+    SonataRealization, SonataSectionKind, Style, VoiceRole, compare_melodic_sequences,
+    compose_sonata_with_plan, profile_score_region, verify_sonata_obligations,
 };
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
@@ -80,6 +80,19 @@ const SAMPLE_RATE: u32 = 48_000;
 const TICKS_PER_BEAT: u32 = 960;
 const MAX_CANDIDATES: u64 = 12;
 const MAX_STORED: usize = 200;
+/// `ComposeRequest::bars` must fall in this range or `/api/compose`
+/// rejects the request outright (HTTP 400) rather than silently
+/// rescaling it. Upper bound raised to 36 (was a silent `clamp(2, 16)`)
+/// specifically to make Blues call-response's 3-chorus/36-bar case
+/// reachable live -- 36 bars was already the render workload this
+/// interactive endpoint was accidentally producing before the chorus-
+/// count fix, so this isn't new cost, just an honest ceiling for it.
+/// Interactive-render-budget concerns for engines that DON'T scale
+/// linearly with `bars` (see `groove_cycle.rs`/`modal_arc.rs`) remain a
+/// real, separate, not-yet-built per-engine cost estimate -- this range
+/// only restores "the request means what it says," not a full budget
+/// system.
+const COMPOSE_BARS_RANGE: std::ops::RangeInclusive<usize> = 2..=36;
 /// Pre-render novelty floor (`MUSE_DIVERSITY_TRUTH_PLAN_2026-07-18.md` Phase
 /// 2): below this, a batch candidate is close enough — to its nearest
 /// BATCH neighbor's `NoveltyBreakdown.overall`, or to a recent KEEPER's —
@@ -91,6 +104,19 @@ const MAX_STORED: usize = 200;
 /// on harmonic distance being honestly near-zero for Archetype-sourced
 /// styles), large enough to catch genuine near-twins.
 const NOVELTY_FLOOR: f64 = 0.5;
+const IMPORT_ROOT: &str = "data/music/imports";
+const MAX_SYMBOLIC_IMPORT_BYTES: usize = 12 * 1024 * 1024;
+
+/// A per-process, monotonically increasing nonce for temp file/dir names
+/// that must not collide across concurrently-running `spawn_blocking`
+/// tasks -- `std::process::id()` alone is identical for every request in
+/// the same server process and does NOT make a name unique.
+static IMPORT_TEMP_NONCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+fn unique_temp_suffix() -> String {
+    let nonce = IMPORT_TEMP_NONCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    format!("{}-{nonce}", std::process::id())
+}
 
 /// Evict entries with the smallest keys down to `max_stored`, one at a
 /// time. Generic over the value type so the eviction algorithm itself
@@ -235,6 +261,7 @@ mod wire_compat_tests {
                 composition: symthaea_muse_protocol::CompositionArtifactId("cmp".to_string()),
                 rendition: symthaea_muse_protocol::RenditionArtifactId("rnd".to_string()),
             },
+            diversity_plan: None,
         }
     }
 
@@ -302,6 +329,67 @@ mod wire_compat_tests {
         let round_tripped: Vec<symthaea_muse_protocol::StyleFamily> =
             serde_json::from_str(&json).unwrap();
         assert_eq!(round_tripped, entries);
+    }
+
+    /// The catalog lives in `symthaea-muse-protocol`, which deliberately does
+    /// NOT depend on `symthaea-music-theory` (it must stay serde-only so it
+    /// compiles for wasm32). So the catalog's own tests can only check it
+    /// against itself — they assert 29 unique `composer_style` values, but
+    /// cannot know whether those 29 strings name styles the engine actually
+    /// has. This test is the missing cross-crate half, and it belongs here
+    /// because this binary is the one place that depends on both.
+    ///
+    /// Worth having: catalog.rs was never compiled at all between the commit
+    /// that added it and 2026-07-28, so its mapping had drifted for weeks
+    /// with nothing able to notice. It happened to still be correct.
+    #[test]
+    fn catalog_entries_all_resolve_to_real_engine_styles() {
+        use std::collections::HashSet;
+        let engine: HashSet<String> = Style::ALL
+            .into_iter()
+            .map(|style| format!("{style:?}"))
+            .collect();
+
+        let mapped: Vec<&str> = symthaea_muse_protocol::catalog::CATALOG
+            .iter()
+            .filter_map(|entry| entry.composer_style)
+            .collect();
+
+        for name in &mapped {
+            assert!(
+                engine.contains(*name),
+                "catalog maps composer_style {name:?}, which is not a real \
+                 symthaea_music_theory::Style variant"
+            );
+        }
+        // Every engine style should be reachable through the catalog too,
+        // otherwise a style exists that the taxonomy cannot name.
+        let mapped_set: HashSet<&str> = mapped.iter().copied().collect();
+        for name in &engine {
+            assert!(
+                mapped_set.contains(name.as_str()),
+                "engine style {name:?} has no catalog entry"
+            );
+        }
+        assert_eq!(mapped.len(), engine.len(), "mapping must be 1:1");
+    }
+
+    /// Everything `/api/catalog` reports as composable must actually be
+    /// routable, and everything it reports as research must not be — that
+    /// distinction is the whole point of publishing all 152 entries.
+    #[test]
+    fn catalog_endpoint_marks_exactly_the_routable_entries_composable() {
+        let composable: Vec<_> = symthaea_muse_protocol::catalog::CATALOG
+            .iter()
+            .filter(|entry| entry.is_composable())
+            .collect();
+        assert_eq!(composable.len(), Style::ALL.len());
+        assert!(
+            composable
+                .iter()
+                .all(|entry| entry.composer_style.is_some()),
+            "a composable entry with no composer_style could not be routed"
+        );
     }
 
     #[test]
@@ -372,6 +460,18 @@ struct Candidate {
     /// one (Fugue/ProgSuite/Sonata/Renaissance/Opera/ground forms). Powers
     /// the Muse Atlas endpoint's structural fingerprint.
     form: Option<symthaea_music_theory::Form>,
+    /// The REAL grammar-plan evidence this candidate was composed with
+    /// (`compose_with_grammar_plan`'s own `GrammarRealization::plan`) --
+    /// `None` only for a candidate composed from a user-authored custom
+    /// spec, which has no `Style` to derive a `GrammarProfile` from.
+    /// Consumed by the Analyst endpoint (`analyst_bundle`) so its
+    /// verification reflects what actually produced this piece, not a
+    /// synthesized guess.
+    plan: Option<GrammarPlanEvidence>,
+    /// High-level diversity intent resolved before composition. Kept beside
+    /// the grammar plan because the former explains candidate contrast while
+    /// the latter proves which grammar engine actually owned the score.
+    diversity_plan: Option<DiversityPlanSummary>,
     /// Identity grammar + erosion ending (see CandidateMeta).
     grammar: &'static str,
     ending: Option<&'static str>,
@@ -432,6 +532,13 @@ struct ComposeRequest {
     /// Semitone 0-11 (0 = C).
     tonic: i32,
     style: Style,
+    /// Must be in `COMPOSE_BARS_RANGE` (currently 2-36) -- validated, not
+    /// silently clamped: a request outside that range comes back as
+    /// HTTP 400 rather than being silently rewritten to a different
+    /// value. Found necessary 2026-07-26 after a live listening/analysis
+    /// session: two DIFFERENT `bars` requests (24 and 36) were silently
+    /// collapsing to the same clamped value, so the returned evidence no
+    /// longer matched what was actually asked for.
     bars: usize,
     base_seed: u64,
     n_candidates: u64,
@@ -504,6 +611,15 @@ struct ComposeRequest {
     /// either way.
     #[serde(default)]
     renderer: Option<String>,
+    /// Explicit research opt-in; ordinary composition keeps the established
+    /// hook generator.
+    #[serde(default)]
+    use_motif_foundry: bool,
+    /// Optional provenance-clean authored-etude abstraction. Only the four
+    /// typed shadow mappings are accepted; source notes are never loaded into
+    /// the composition path.
+    #[serde(default)]
+    composition_lesson_id: Option<String>,
 }
 
 fn default_half() -> f32 {
@@ -520,6 +636,40 @@ fn default_stride() -> u64 {
 
 fn default_true() -> bool {
     true
+}
+
+fn lesson_strategy(
+    lesson_id: &str,
+) -> Option<symthaea_music_theory::diversity_plan::CompositionLessonStrategy> {
+    use symthaea_music_theory::diversity_plan::CompositionLessonStrategy;
+    match lesson_id {
+        "etude:the-door-remembers" => Some(CompositionLessonStrategy::AlteredReturn),
+        "etude:the-missing-thread" => {
+            Some(CompositionLessonStrategy::MotifWithholdingAndRoleTransfer)
+        }
+        "etude:breath-between-stones" => Some(CompositionLessonStrategy::StructuralSilence),
+        "etude:held-ground" => Some(CompositionLessonStrategy::HarmonicStasisWithChangingTexture),
+        _ => None,
+    }
+}
+
+fn diversity_plan_summary(
+    plan: &symthaea_music_theory::diversity_plan::DiversityPlan,
+    applied: bool,
+    lesson_id: Option<String>,
+) -> DiversityPlanSummary {
+    DiversityPlanSummary {
+        formal_topology: format!("{:?}", plan.formal_topology),
+        selected_form: format!("{:?}", plan.selected_form),
+        motif_development: format!("{:?}", plan.motif_development),
+        harmony: format!("{:?}", plan.harmony),
+        rhythm: format!("{:?}", plan.rhythm),
+        orchestration: format!("{:?}", plan.orchestration),
+        climax: format!("{:?}", plan.climax),
+        ending: format!("{:?}", plan.ending),
+        applied,
+        lesson_id,
+    }
 }
 
 fn load_adaptive_outcome_model() -> AdaptiveOutcomeModel {
@@ -639,6 +789,7 @@ struct CandidateMeta {
     /// with — the same hashes `piece_provenance`/the genealogy ledger use,
     /// just computed at compose time instead of keep time.
     identity: symthaea_muse_protocol::ArtifactIdentity,
+    diversity_plan: Option<DiversityPlanSummary>,
 }
 
 #[derive(Serialize)]
@@ -820,13 +971,26 @@ async fn main() {
     // comparison and are still exercised by `ui_asset_tests` below, but
     // this is the surface a browser actually gets at `/`.
     let dist_dir = std::path::Path::new("crates/domains/symthaea-muse-ui/dist");
-    let spa =
-        ServeDir::new(dist_dir).not_found_service(ServeFile::new(dist_dir.join("index.html")));
+    // `fallback` preserves the index file's 200 status. `not_found_service`
+    // forcibly rewrites it to 404, which makes a valid client-side route
+    // render in the browser while still failing health checks and refresh
+    // semantics.
+    let spa = ServeDir::new(dist_dir).fallback(ServeFile::new(dist_dir.join("index.html")));
     let app = Router::new()
         .route("/legacy", get(index))
         .route("/assets/muse-studio.css", get(studio_css))
         .route("/assets/muse-studio.js", get(studio_js))
+        .route("/api/health", get(health))
         .route("/api/compose", post(compose))
+        .route(
+            "/api/music/import",
+            post(import_music).layer(DefaultBodyLimit::max(MAX_SYMBOLIC_IMPORT_BYTES + 64 * 1024)),
+        )
+        .route("/api/music/imports", get(imported_works))
+        .route("/api/music/import/{id}", get(imported_work))
+        .route("/api/music/import/{id}/audio", get(imported_work_audio))
+        .route("/api/teaching", get(teaching_summary))
+        .route("/api/teaching/{lesson_id}/audio", get(teaching_audio))
         .route(
             "/api/cognitive/sonata-return",
             post(cognitive_sonata_return),
@@ -841,6 +1005,7 @@ async fn main() {
         .route("/api/audio/{id}", get(audio))
         .route("/api/midi/{id}", get(midi))
         .route("/api/notes/{id}", get(notes))
+        .route("/api/harmony/{id}", get(harmony_summary))
         .route("/api/piece/{id}/listen-bundle", get(listen_bundle))
         .route("/api/motifs/{id}", get(motifs_summary))
         .route(
@@ -853,6 +1018,8 @@ async fn main() {
         .route("/api/genealogy/{id}/children", get(genealogy_children))
         .route("/api/genealogy/{id}/ancestry", get(genealogy_ancestry))
         .route("/api/styles", get(listen_styles))
+        .route("/api/catalog", get(catalog))
+        .route("/api/journey/next", post(journey_next))
         .route("/api/atlas", get(atlas_summary))
         .route("/api/atlas/compare", get(atlas_compare))
         .route("/api/keeper/{id}", post(keeper))
@@ -861,6 +1028,10 @@ async fn main() {
         .route("/api/keeper-midi/{key}", get(keeper_midi))
         .route("/api/keeper-recipe/{key}", get(keeper_recipe))
         .route("/api/preview/{instrument}", get(instrument_preview))
+        // Keep the SPA history fallback out of the API namespace. Unknown
+        // client routes should boot Leptos, but an unknown API must remain
+        // an honest 404 rather than returning index.html with status 200.
+        .route("/api/{*path}", any(api_not_found))
         .fallback_service(spa)
         .layer(localhost_cors_layer())
         .with_state(studio);
@@ -1334,6 +1505,15 @@ async fn cognitive_sonata_return(
                 // entirely (see compose_with_spec_and_form's doc comment),
                 // so it never produces a Form.
                 form: None,
+                // This endpoint has its own dedicated, richer verification
+                // (theory_validation/preserved_invariants/obligation
+                // tracking, above) -- there's no matching
+                // `GrammarPlanEvidence` variant for it, so the Analyst
+                // endpoint's generic plan-based checks fall back to
+                // synthesizing `Compatibility` for this candidate, same as
+                // a user-authored custom spec.
+                plan: None,
+                diversity_plan: None,
                 grammar,
                 ending,
                 card: None,
@@ -1487,18 +1667,66 @@ async fn compose(
     State(studio): State<Arc<Studio>>,
     Json(req): Json<ComposeRequest>,
 ) -> Result<Json<ComposeResponse>, (StatusCode, String)> {
+    if !COMPOSE_BARS_RANGE.contains(&req.bars) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!(
+                "bars must be between {} and {} (got {}) -- requests outside \
+                 this range are rejected, never silently rescaled to a \
+                 different value",
+                COMPOSE_BARS_RANGE.start(),
+                COMPOSE_BARS_RANGE.end(),
+                req.bars
+            ),
+        ));
+    }
+    if let Some(lesson_id) = req.composition_lesson_id.as_deref()
+        && lesson_strategy(lesson_id).is_none()
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("composition lesson {lesson_id:?} has no typed shadow mapping"),
+        ));
+    }
+    if let Some(lesson_id) = req.composition_lesson_id.as_deref() {
+        let corpus = symthaea_muse::teaching_corpus::corpus()
+            .map_err(|error| (StatusCode::SERVICE_UNAVAILABLE, error))?;
+        if !corpus
+            .summary
+            .lessons
+            .iter()
+            .any(|lesson| lesson.lesson_id == lesson_id && lesson.typed_shadow_mapping)
+        {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("composition lesson {lesson_id:?} is not verified for shadow use"),
+            ));
+        }
+    }
     let n = req.n_candidates.clamp(1, MAX_CANDIDATES);
     let intent_base = MusicalIntent {
         valence: req.valence.clamp(-1.0, 1.0),
         arousal: req.arousal.clamp(0.0, 1.0),
         energy: req.energy.clamp(0.0, 1.0),
-        bars: req.bars.clamp(2, 16),
+        bars: req.bars,
         seed: req.base_seed,
         tonic: PitchClass::new(req.tonic),
     };
     let style = req.style;
     let stride = req.seed_stride.clamp(1, 1_000);
     let prompt = req.prompt.trim().to_string();
+    // Captured BEFORE `req.spec` is moved below: whether the CALLER
+    // submitted their own spec, as distinct from the `spec` local variable
+    // further down (which becomes `Some` unconditionally once the
+    // identity-grammar override branch runs, even for a plain preset
+    // request). Real grammar-family engines (GrooveCycle/ProcessAdditive/
+    // RagaModalArc/CallResponse, and every other family's cadence/phrase-
+    // grammar-aware routing) assume a `Style`-derived `GrammarProfile`
+    // whose invariants (e.g. CallResponse's 12-bar-multiple progression)
+    // a genuinely user-authored spec has no obligation to satisfy -- so
+    // this stays the deciding signal for whether it's safe to route
+    // through them below, not the post-override `spec` variable.
+    let is_custom_spec = req.spec.is_some();
     // A user-authored spec replaces the style preset entirely.
     let spec = req.spec;
     // The identity-grammar override rewrites the effective form pool (and
@@ -1559,7 +1787,18 @@ async fn compose(
     // never covers on its own.
     let vary_single = req.vary_premise && n == 1;
     let seeds: Vec<u64> = if exploring {
-        symthaea_music_theory::explorer::explore_identities(&spec_used, &intent_base, n as usize)
+        // Identity diversity and plan diversity are separate obligations.
+        // Ask the identity explorer for a wider pool, then choose a frontier
+        // whose high-level plans differ on at least three axes per pair.
+        let pool_size = (n as usize).saturating_mul(8).max(32);
+        let pool = symthaea_music_theory::explorer::explore_identities(
+            &spec_used,
+            &intent_base,
+            pool_size,
+        );
+        symthaea_music_theory::diversity_plan::select_plan_diverse_seeds(
+            &spec_used, &pool, n as usize, 3,
+        )
     } else {
         (0..n)
             .map(|i| intent_base.seed.wrapping_add(i.wrapping_mul(stride)))
@@ -1587,7 +1826,13 @@ async fn compose(
     // opted in). Plain single composes and "More like this" keep the
     // authored spec untouched: the premise diversifies an OFFER, it never
     // rewrites a deliberate choice.
-    let per_candidate: Vec<(u64, symthaea_music_theory::CompositionSpec, usize)> = seeds
+    let requested_lesson = req.composition_lesson_id.clone();
+    let per_candidate: Vec<(
+        u64,
+        symthaea_music_theory::CompositionSpec,
+        usize,
+        DiversityPlanSummary,
+    )> = seeds
         .iter()
         .enumerate()
         .map(|(i, &seed)| {
@@ -1619,11 +1864,33 @@ async fn compose(
                 .overall
                     < NOVELTY_FLOOR
             });
-            if below_batch_floor || below_history_floor {
-                symthaea_music_theory::diversity_plan::DiversityPlan::for_seed(&spec, seed)
-                    .apply(&mut spec);
+            if req.use_motif_foundry {
+                spec.melody.use_procedural_foundry = true;
             }
-            (seed, spec, bars_multiplier)
+            let mut diversity_plan =
+                symthaea_music_theory::diversity_plan::DiversityPlan::for_seed(&spec, seed);
+            let lesson_id = requested_lesson
+                .as_deref()
+                .and_then(lesson_strategy)
+                .map(|lesson| {
+                    diversity_plan.apply_shadow_lesson(lesson);
+                    requested_lesson.clone().unwrap_or_default()
+                });
+            // A multi-candidate exploration is now contractually a frontier of
+            // different compositional plans, rather than several note-level
+            // seeds. Listen explicitly opts into `vary_premise`, so each radio
+            // step also receives a plan; authored Create requests remain exact
+            // unless they ask for a lesson or cross the novelty floor.
+            let apply_plan = exploring
+                || vary_single
+                || below_batch_floor
+                || below_history_floor
+                || lesson_id.is_some();
+            if apply_plan {
+                diversity_plan.apply(&mut spec);
+            }
+            let summary = diversity_plan_summary(&diversity_plan, apply_plan, lesson_id);
+            (seed, spec, bars_multiplier, summary)
         })
         .collect();
     let per_candidate_render = per_candidate.clone();
@@ -1642,18 +1909,23 @@ async fn compose(
     let force_native = req.renderer.as_deref() == Some("native");
     let mut handles = Vec::with_capacity(n as usize);
     for i in 0..n {
-        let (seed, cand_spec, bars_mul) = per_candidate_render[i as usize].clone();
+        let (seed, cand_spec, bars_mul, _) = per_candidate_render[i as usize].clone();
         let intent = MusicalIntent {
             seed,
-            bars: (intent_base.bars * bars_mul).min(16),
+            // A SEPARATE cap from `COMPOSE_BARS_RANGE`'s input validation:
+            // `bars_mul` (from the premise layer) can INFLATE the
+            // validated `intent_base.bars` well past what the caller
+            // asked for, so this still needs its own ceiling -- just kept
+            // in sync with the same range's upper bound rather than a
+            // second, independent magic number (found out of sync
+            // 2026-07-26: this site was still hardcoded to the OLD 16-bar
+            // limit after `COMPOSE_BARS_RANGE` raised it to 36, silently
+            // re-clamping a validated 36-bar request back down to 16).
+            bars: (intent_base.bars * bars_mul).min(*COMPOSE_BARS_RANGE.end()),
             ..intent_base
         };
         let state = state.clone();
         handles.push(tokio::task::spawn_blocking(move || {
-            // Every candidate composes through the spec path under ITS
-            // spec (premise or authored); for presets this is equivalent
-            // to the styled path by the spec-identity tests.
-            //
             // Compose once, not twice: `compose_and_realize_spec` already
             // calls `compose_with_spec` internally and discards the score
             // it produced — a second, separate `compose_with_spec` call
@@ -1661,10 +1933,38 @@ async fn compose(
             // this handler's own use (phi/coherence analysis, /api/notes,
             // MIDI export). Composing is deterministic given the same
             // (intent, spec), so the second call was pure waste — every
-            // candidate was being composed twice. Call `compose_with_spec`
-            // once and pass its result into `realize_with_spec` directly.
-            let (score, form) =
-                symthaea_music_theory::compose_with_spec_and_form(&intent, &cand_spec);
+            // candidate was being composed twice. Compose once and pass
+            // the result into `realize_with_spec` directly.
+            //
+            // Route through `compose_with_grammar_plan` (the SAME entry
+            // point `compose_styled`/`compose` use) whenever the request
+            // is still preset-derived (`!is_custom_spec`) — this is what
+            // actually reaches GrooveCycle/ProcessAdditive/RagaModalArc/
+            // CallResponse's dedicated engines, and gives every OTHER
+            // style the Jul22-24 grammar-family cadence/phrase-grammar
+            // routing too. Found 2026-07-25: this handler previously
+            // called `compose_with_spec_and_form` unconditionally, which
+            // NEVER reaches `compose_with_grammar_plan`'s family dispatch
+            // at all — so every dedicated grammar engine in this crate
+            // was real, tested, and completely unreachable from the live
+            // product. For a genuinely user-authored spec (`is_custom_
+            // spec`), there is no `Style` to derive a `GrammarProfile`
+            // from, so the plain spec path remains correct — a dedicated
+            // engine's invariants (e.g. CallResponse's 12-bar-multiple
+            // progression) aren't something arbitrary user data is
+            // obligated to satisfy.
+            let (score, form, plan) = if is_custom_spec {
+                let (score, form) =
+                    symthaea_music_theory::compose_with_spec_and_form(&intent, &cand_spec);
+                (score, form, None)
+            } else {
+                let realized = symthaea_music_theory::compose_with_grammar_plan(
+                    style.grammar_profile(),
+                    &intent,
+                    &cand_spec,
+                );
+                (realized.score, realized.form, Some(realized.plan))
+            };
             let comp = symthaea_muse::theory_realize::realize_with_spec(
                 &score,
                 &cand_spec,
@@ -1682,7 +1982,7 @@ async fn compose(
             } else {
                 fluidsynth_candidate_wav(&score, &cand_spec, seed, &state)
             };
-            (seed, comp, score, fluid_wav, form)
+            (seed, comp, score, fluid_wav, form, plan)
         }));
     }
     let _ = (&spec, style); // kept alive for the request's lifetime; unused past dispatch
@@ -1709,7 +2009,7 @@ async fn compose(
     {
         let mut store = studio.candidates.lock().unwrap();
         evict_oldest_candidates(&mut store); // session-scale memory bound
-        for (idx, (seed, comp, score, fluid_wav, form)) in rendered.into_iter().enumerate() {
+        for (idx, (seed, comp, score, fluid_wav, form, plan)) in rendered.into_iter().enumerate() {
             let id = studio.next_id.fetch_add(1, Ordering::Relaxed);
             let fingerprint = symthaea_music_theory::fingerprint::exact_fingerprint(&score);
             let duplicate_of = mark_duplicate(&mut seen_fingerprints, fingerprint, id);
@@ -1729,9 +2029,14 @@ async fn compose(
                 analysis.mean_trigram_edge,
             );
             let cand_spec = per_candidate[idx].1.clone();
+            let diversity_plan = Some(per_candidate[idx].3.clone());
             let candidate_intent = MusicalIntent {
                 seed,
-                bars: (intent_base.bars * per_candidate[idx].2).min(16),
+                // Must match the spawn_blocking closure's own bars
+                // computation above exactly -- this reconstructs the same
+                // per-candidate intent for the metadata/title/novelty
+                // pipeline below, not a second independent decision.
+                bars: (intent_base.bars * per_candidate[idx].2).min(*COMPOSE_BARS_RANGE.end()),
                 ..intent_base
             };
             let ground =
@@ -1821,6 +2126,7 @@ async fn compose(
                 style: cand_spec.name.clone(),
                 duplicate_of,
                 identity,
+                diversity_plan: diversity_plan.clone(),
             });
             store.insert(
                 id,
@@ -1837,6 +2143,8 @@ async fn compose(
                     global_coherence,
                     ground,
                     form,
+                    plan,
+                    diversity_plan,
                     grammar,
                     ending,
                     card,
@@ -1870,6 +2178,7 @@ fn rank(
         Score,
         Option<Vec<u8>>,
         Option<symthaea_music_theory::Form>,
+        Option<GrammarPlanEvidence>,
     )],
 ) -> (Option<Vec<f32>>, String) {
     use symthaea_muse::clap_embed::{ClapEmbedder, ClapTextEmbedder, cosine_similarity};
@@ -1892,7 +2201,7 @@ fn rank(
         Err(e) => return (None, format!("prompt embedding failed: {e}")),
     };
     let mut sims = Vec::with_capacity(rendered.len());
-    for (_, comp, _, _, _) in rendered {
+    for (_, comp, _, _, _, _) in rendered {
         let mono: Vec<f64> = match &comp.audio {
             AudioData::StereoF32(frames) => {
                 frames.iter().map(|[l, r]| ((l + r) * 0.5) as f64).collect()
@@ -1920,6 +2229,7 @@ fn rank(
         Score,
         Option<Vec<u8>>,
         Option<symthaea_music_theory::Form>,
+        Option<GrammarPlanEvidence>,
     )],
 ) -> (Option<Vec<f32>>, String) {
     if prompt.is_empty() {
@@ -1992,6 +2302,353 @@ async fn audio(
         .into_response())
 }
 
+async fn health() -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "status": "ok",
+        "ui": "leptos",
+        "teaching_corpus_available": symthaea_muse::teaching_corpus::corpus().is_ok(),
+        "renderer": if symthaea_muse::fluid_render::available().is_some() {
+            "fluidsynth"
+        } else {
+            "native"
+        },
+    }))
+}
+
+async fn api_not_found() -> StatusCode {
+    StatusCode::NOT_FOUND
+}
+
+fn symbolic_import_format(filename: &str) -> Option<symthaea_muse_protocol::SymbolicImportFormat> {
+    use symthaea_muse_protocol::SymbolicImportFormat;
+    let extension = Path::new(filename)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    match extension.as_str() {
+        "mid" | "midi" => Some(SymbolicImportFormat::Midi),
+        "musicxml" | "xml" => Some(SymbolicImportFormat::MusicXml),
+        "json" => Some(SymbolicImportFormat::MuseScore),
+        _ => None,
+    }
+}
+
+/// Real FluidSynth render for an imported work's audition -- imported
+/// pieces have no `Style`/`CompositionSpec` of their own (they were
+/// PARSED, not composed), so this reuses `export_score_midi`'s clean-grid
+/// symbolic path with a fixed `Style::Classical` instrument palette purely
+/// for timbre (NOT a neutral/generic placeholder -- it's a genuine
+/// string-trio orchestration choice, see `instrumentation_note` on
+/// `ImportedWorkSummary` for the disclosure this implies); every note's
+/// pitch/rhythm/voice-role in the exported MIDI comes from the imported
+/// score unchanged. Falls back to the native in-crate synth (disclosed via
+/// the returned renderer name) when FluidSynth is unavailable, matching
+/// `/api/compose`'s own established fallback convention -- never silent,
+/// always disclosed.
+fn render_import_audition(
+    score: &symthaea_music_theory::Score,
+) -> Result<(Vec<u8>, &'static str), (StatusCode, String)> {
+    if symthaea_muse::fluid_render::available().is_some() {
+        let path =
+            std::env::temp_dir().join(format!("muse_import_audition_{}.mid", unique_temp_suffix()));
+        let fluid_wav = symthaea_muse::midi_export::export_score_midi(
+            score,
+            symthaea_music_theory::Style::Classical,
+            0,
+            &path,
+        )
+        .ok()
+        .and_then(|()| symthaea_muse::fluid_render::render_midi_to_wav(&path, SAMPLE_RATE, None));
+        let _ = std::fs::remove_file(&path);
+        if let Some(wav) = fluid_wav {
+            return Ok((wav, "fluidsynth"));
+        }
+    }
+    let rendered =
+        symthaea_muse::theory_realize::realize(score, &MusicalState::default(), SAMPLE_RATE);
+    Ok((wav_bytes(&rendered.audio).map_err(internal)?, "native"))
+}
+
+async fn import_music(
+    mut multipart: Multipart,
+) -> Result<Json<symthaea_muse_protocol::ImportedWorkSummary>, (StatusCode, String)> {
+    use symthaea_muse_protocol::{
+        AuthorizationBasis, ContributionManifest, ContributionScope, ImportedWorkId,
+        ImportedWorkSummary, MusicalContentLicense, default_instrumentation_note,
+    };
+
+    let mut title = None;
+    let mut contributor = None;
+    let mut authorization_basis_raw = None;
+    let mut content_license_raw = None;
+    let mut upload: Option<(String, Vec<u8>)> = None;
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|error| (StatusCode::BAD_REQUEST, error.to_string()))?
+    {
+        let name = field.name().unwrap_or_default().to_owned();
+        if name == "file" {
+            let filename = field.file_name().unwrap_or("score.mid").to_owned();
+            let bytes = field
+                .bytes()
+                .await
+                .map_err(|error| (StatusCode::BAD_REQUEST, error.to_string()))?;
+            if bytes.len() > MAX_SYMBOLIC_IMPORT_BYTES {
+                return Err((
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    "symbolic import exceeds 12 MiB".to_owned(),
+                ));
+            }
+            upload = Some((filename, bytes.to_vec()));
+        } else {
+            let value = field
+                .text()
+                .await
+                .map_err(|error| (StatusCode::BAD_REQUEST, error.to_string()))?;
+            match name.as_str() {
+                "title" => title = Some(value),
+                "contributor" => contributor = Some(value),
+                "authorization_basis" => authorization_basis_raw = Some(value),
+                // Back-compat with older clients that still send the single
+                // "authorized" checkbox: treat it as an authorized-import
+                // claim, never as an authorship claim -- the conservative
+                // reading, matching `default_authorization_basis`.
+                "authorized" if authorization_basis_raw.is_none() => {
+                    if value == "true" {
+                        authorization_basis_raw = Some("authorized_import".to_string());
+                    }
+                }
+                "content_license" => content_license_raw = Some(value),
+                _ => {}
+            }
+        }
+    }
+    let title = title
+        .filter(|value| !value.trim().is_empty() && value.chars().count() <= 160)
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "a valid title is required".to_owned(),
+            )
+        })?;
+    let contributor = contributor
+        .filter(|value| !value.trim().is_empty() && value.chars().count() <= 120)
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "a valid contributor is required".to_owned(),
+            )
+        })?;
+    let authorization_basis = match authorization_basis_raw.as_deref() {
+        Some("own_work") => AuthorizationBasis::OwnWork,
+        Some("authorized_import") => AuthorizationBasis::AuthorizedImport,
+        _ => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "authorship or import authorization must be confirmed".to_owned(),
+            ));
+        }
+    };
+    let content_license = match content_license_raw.as_deref() {
+        None => MusicalContentLicense::AllRightsReserved,
+        Some("all_rights_reserved") => MusicalContentLicense::AllRightsReserved,
+        Some("cc0") => MusicalContentLicense::Cc0,
+        Some("cc_by") => MusicalContentLicense::CcBy,
+        Some("cc_by_sa") => MusicalContentLicense::CcBySa,
+        Some("public_domain") => MusicalContentLicense::PublicDomain,
+        Some("custom") => MusicalContentLicense::Custom,
+        Some(_) => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "unrecognized content_license".to_owned(),
+            ));
+        }
+    };
+    let (filename, source) = upload.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            "a MIDI, MusicXML, or Muse score is required".to_owned(),
+        )
+    })?;
+    let format = symbolic_import_format(&filename).ok_or_else(|| {
+        (
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "supported formats are MIDI, MusicXML, and Muse score JSON".to_owned(),
+        )
+    })?;
+
+    // Everything from here is CPU/IO-bound (parsing, analysis, rendering,
+    // hashing, filesystem writes) -- matches this codebase's own
+    // established convention (the composition path already wraps its
+    // per-candidate render in spawn_blocking; see fluidsynth_candidate_wav's
+    // call site) so a large import can't stall unrelated Studio requests.
+    tokio::task::spawn_blocking(move || {
+        let score = symthaea_muse::symbolic_import::parse_symbolic(&source, format.clone())
+            .map_err(|error| (StatusCode::UNPROCESSABLE_ENTITY, error))?;
+        let analysis = symthaea_muse::symbolic_import::analyze(&score);
+        let source_sha256 = sha256_hex(&source);
+        let score_sha256 = serialized_sha256(&score)
+            .map_err(|status| (status, "could not serialize the imported score".to_owned()))?;
+        let identity_material = format!("{source_sha256}\0{title}\0{contributor}");
+        let work_id = ImportedWorkId(sha256_hex(identity_material.as_bytes()));
+
+        let root = Path::new(IMPORT_ROOT);
+        std::fs::create_dir_all(root).map_err(internal)?;
+        let destination = root.join(&work_id.0);
+        // A repeat import of an already-stored work must return that EXACT
+        // stored record, not a freshly-stamped one -- a fresh
+        // `imported_at_unix_ms` here previously diverged from what a
+        // subsequent GET (which reads the stored summary.json) reports for
+        // the same work.
+        if destination.exists() {
+            let stored = read_import_summary(&work_id.0).map_err(|status| {
+                (
+                    status,
+                    "could not read the existing import record".to_owned(),
+                )
+            })?;
+            return Ok(stored);
+        }
+
+        let manifest = ContributionManifest {
+            work_id: work_id.clone(),
+            title,
+            contributor,
+            declared_authorship: authorization_basis == AuthorizationBasis::OwnWork,
+            authorization_basis,
+            source_format: format,
+            source_sha256,
+            score_sha256,
+            contribution_scope: ContributionScope::PrivateProject,
+            content_license,
+            attribution: Vec::new(),
+            imported_at_unix_ms: unix_time_ms(),
+        };
+        // Imported music is never passed through Muse's compositional
+        // grammar/style-preset pipeline (progression, phrase structure,
+        // form) -- only `Style::Classical`'s fixed instrument palette is
+        // used, purely to pick a timbre for playback (see
+        // `render_import_audition`'s doc comment and
+        // `instrumentation_note` below for why this still isn't neutral).
+        let (wav, audio_renderer) = render_import_audition(&score)?;
+        let summary = ImportedWorkSummary {
+            manifest,
+            analysis,
+            audio_available: true,
+            audio_renderer: audio_renderer.to_string(),
+            instrumentation_note: default_instrumentation_note(),
+        };
+
+        // Unique per call (not just per-process) -- two concurrent imports
+        // of the SAME content-derived work_id (e.g. a double-submit) must
+        // not share a staging directory, or one request's in-flight writes
+        // could be clobbered by the other's before either renames.
+        let staging = root.join(format!(".{}.tmp-{}", work_id.0, unique_temp_suffix()));
+        std::fs::create_dir_all(&staging).map_err(internal)?;
+        let extension = Path::new(&filename)
+            .extension()
+            .and_then(|value| value.to_str())
+            .unwrap_or("bin");
+        let score_json = serde_json::to_vec_pretty(&score).map_err(internal)?;
+        let summary_json = serde_json::to_vec_pretty(&summary).map_err(internal)?;
+        let write_result = (|| -> Result<(), std::io::Error> {
+            std::fs::write(staging.join(format!("source.{extension}")), &source)?;
+            std::fs::write(staging.join("score.json"), score_json)?;
+            std::fs::write(staging.join("summary.json"), summary_json)?;
+            std::fs::write(staging.join("audition.wav"), &wav)?;
+            std::fs::rename(&staging, &destination)
+        })();
+        if let Err(error) = write_result {
+            let _ = std::fs::remove_dir_all(&staging);
+            // The earlier `destination.exists()` check is inherently
+            // check-then-act: a concurrent import of the identical work_id
+            // (same content-derived identity) can create `destination`
+            // between that check and this rename. Rather than surface a
+            // spurious error to the request that lost the race, treat the
+            // winner's already-persisted record as authoritative -- it is
+            // equally valid, since both requests derived from identical
+            // source content.
+            if destination.exists() {
+                return read_import_summary(&work_id.0).map_err(|status| {
+                    (
+                        status,
+                        "could not read the existing import record".to_owned(),
+                    )
+                });
+            }
+            return Err(internal(error));
+        }
+        Ok(summary)
+    })
+    .await
+    .map_err(internal)?
+    .map(Json)
+}
+
+fn read_import_summary(
+    id: &str,
+) -> Result<symthaea_muse_protocol::ImportedWorkSummary, StatusCode> {
+    if id.len() != 64 || !id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let bytes =
+        std::fs::read(Path::new(IMPORT_ROOT).join(id).join("summary.json")).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        })?;
+    serde_json::from_slice(&bytes).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+async fn imported_work(
+    AxPath(id): AxPath<String>,
+) -> Result<Json<symthaea_muse_protocol::ImportedWorkSummary>, StatusCode> {
+    read_import_summary(&id).map(Json)
+}
+
+async fn imported_works()
+-> Result<Json<Vec<symthaea_muse_protocol::ImportedWorkSummary>>, StatusCode> {
+    let root = Path::new(IMPORT_ROOT);
+    if !root.exists() {
+        return Ok(Json(Vec::new()));
+    }
+    let mut works = Vec::new();
+    for entry in std::fs::read_dir(root).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)? {
+        let entry = entry.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let id = entry.file_name().to_string_lossy().into_owned();
+        if let Ok(summary) = read_import_summary(&id) {
+            works.push(summary);
+        }
+    }
+    works.sort_by_key(|work| std::cmp::Reverse(work.manifest.imported_at_unix_ms));
+    Ok(Json(works))
+}
+
+async fn imported_work_audio(AxPath(id): AxPath<String>) -> Result<Response, StatusCode> {
+    read_import_summary(&id)?;
+    let bytes = std::fs::read(Path::new(IMPORT_ROOT).join(id).join("audition.wav"))
+        .map_err(|_| StatusCode::NOT_FOUND)?;
+    Ok(([(header::CONTENT_TYPE, "audio/wav")], bytes).into_response())
+}
+
+async fn teaching_summary()
+-> Result<Json<symthaea_muse_protocol::TeachingCorpusSummary>, (StatusCode, String)> {
+    symthaea_muse::teaching_corpus::corpus()
+        .map(|corpus| Json(corpus.summary.clone()))
+        .map_err(|error| (StatusCode::SERVICE_UNAVAILABLE, error))
+}
+
+async fn teaching_audio(AxPath(lesson_id): AxPath<String>) -> Result<Response, StatusCode> {
+    let path = symthaea_muse::teaching_corpus::audition_path(&lesson_id)
+        .map_err(|_| StatusCode::NOT_FOUND)?;
+    let bytes = std::fs::read(path).map_err(|_| StatusCode::NOT_FOUND)?;
+    Ok(([(header::CONTENT_TYPE, "audio/wav")], bytes).into_response())
+}
+
 async fn midi(
     State(studio): State<Arc<Studio>>,
     AxPath(id): AxPath<u64>,
@@ -2036,7 +2693,16 @@ fn fluidsynth_candidate_wav(
         std::process::id()
     ));
     symthaea_muse::midi_export::export_performance_midi(score, spec, seed, state, &path).ok()?;
-    let color = symthaea_muse::fluid_render::RenderColor::from_state(state);
+    // The state sliders stay authoritative; the piece's performance dialect only
+    // SHIFTS the room the way the tradition's recording practice would (wetter
+    // for ProcessExact, drier for DanceLocked/JazzLaidBack, bit-identical for
+    // ClassicalRubato/FolkLift). `room_for_dialect` was implemented and tested
+    // but had only test-only callers, so the dialect-conditioned room never
+    // reached audio — the production path used the unmodulated colour.
+    let color = symthaea_muse::fluid_render::room_for_dialect(
+        symthaea_muse::fluid_render::RenderColor::from_state(state),
+        symthaea_muse::theory_realize::dialect_for_spec(spec),
+    );
     let wav = symthaea_muse::fluid_render::render_midi_to_wav(&path, SAMPLE_RATE, Some(color));
     let _ = std::fs::remove_file(&path);
     wav
@@ -2347,6 +3013,7 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
         form,
         state,
         recipe,
+        diversity_plan,
     ) = {
         let store = studio.candidates.lock().unwrap();
         let c = store.get(&id).ok_or(StatusCode::NOT_FOUND)?;
@@ -2367,6 +3034,7 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
             c.form.clone(),
             c.state.clone(),
             c.recipe.clone(),
+            c.diversity_plan.clone(),
         )
     };
     if !recipe.is_valid() {
@@ -2463,6 +3131,7 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
         "ending": ending,
         "title": title,
         "novelty": novelty,
+        "diversity_plan": diversity_plan,
         "audio_key": audio_key.clone(),
         "artifact_layout": "keeper-directory-v1",
         "midi_available": midi_available,
@@ -2941,6 +3610,7 @@ fn recipe_motif_score_notes(score: &Score, recipe: &PieceRecipe) -> Vec<ScoreNot
     for (pitch, duration) in motif.render(score.key.scale(), 4) {
         if let Some(pitch) = pitch {
             notes.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch,
                 onset,
                 duration,
@@ -3486,11 +4156,12 @@ mod piece_bundle_tests {
         cadence_events, orchestration_regions, section_regions, sonority_regions, symbolic_notes,
     };
     use symthaea_music_theory::{
-        Duration, Emphasis, FormKind, Key, Pitch, PitchClass, Score, ScoreNote, VoiceRole,
+        Duration, Emphasis, FormKind, Key, PartId, Pitch, PitchClass, Score, ScoreNote, VoiceRole,
     };
 
     fn note(onset: i64, intensity: f32, emphasis: Emphasis) -> ScoreNote {
         ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: Pitch::new(PitchClass::C, 4),
             onset: Duration::new(onset, 1),
             duration: Duration::quarter(),
@@ -3537,6 +4208,7 @@ mod piece_bundle_tests {
             (67, VoiceRole::Harmony),
         ] {
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: Pitch::from_midi(midi),
                 onset: Duration::zero(),
                 duration: Duration::quarter(),
@@ -3556,6 +4228,7 @@ mod piece_bundle_tests {
         let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
         score.push(note(0, 0.85, Emphasis::Normal));
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: Pitch::from_midi(48),
             onset: Duration::zero(),
             duration: Duration::quarter(),
@@ -3639,7 +4312,7 @@ async fn piece_provenance(
     State(studio): State<Arc<Studio>>,
     AxPath(id): AxPath<u64>,
 ) -> Result<Json<BundleEnvelope<PieceProvenanceBundle>>, StatusCode> {
-    let (score, recipe, seed, style_name, created_at_unix_ms, wav) = {
+    let (score, recipe, seed, style_name, diversity_plan, created_at_unix_ms, wav) = {
         let store = studio.candidates.lock().unwrap();
         let candidate = store.get(&id).ok_or(StatusCode::NOT_FOUND)?;
         (
@@ -3647,6 +4320,7 @@ async fn piece_provenance(
             candidate.recipe.clone(),
             candidate.seed,
             candidate.spec.name.clone(),
+            candidate.diversity_plan.clone(),
             candidate.created_at_unix_ms,
             candidate.wav.clone(),
         )
@@ -3689,6 +4363,7 @@ async fn piece_provenance(
         renderer_binary_sha256: recipe.renderer.renderer_binary_sha256.clone(),
         performance_model_sha256: recipe.renderer.performance_model_sha256.clone(),
         render_environment_sha256: recipe.renderer.render_environment_sha256.clone(),
+        diversity_plan,
         reproduction: ReproducibilityClaim {
             symbolic_score_exact,
             midi_exact,
@@ -3741,11 +4416,57 @@ fn snake_case_variant<T: Serialize>(value: &T) -> String {
     }
 }
 
+/// `GrammarPlanEvidence`'s variants carry data, so they don't serialize to
+/// a bare string the way `snake_case_variant` expects (they'd become a
+/// JSON object like `{"call_response": {...}}`) — this names each variant
+/// directly instead.
+fn plan_kind_str(plan: &GrammarPlanEvidence) -> &'static str {
+    match plan {
+        GrammarPlanEvidence::PeriodSentence(_) => "period_sentence",
+        GrammarPlanEvidence::Contrapuntal(_) => "contrapuntal",
+        GrammarPlanEvidence::GrooveCycle(_) => "groove_cycle",
+        GrammarPlanEvidence::AdditiveProcess(_) => "additive_process",
+        GrammarPlanEvidence::ModalArc(_) => "modal_arc",
+        GrammarPlanEvidence::CallResponse(_) => "call_response",
+        GrammarPlanEvidence::JazzChorus(_) => "jazz_chorus",
+        GrammarPlanEvidence::Compatibility { .. } => "compatibility",
+    }
+}
+
 /// Every style Muse can compose in, each with its real
 /// `Style::grammar_family()` — lets `symthaea-muse-ui` make policy-aware
 /// style choices (`JourneyPolicy::Resonance`/`Contrast`) without
 /// depending on this crate's native `symthaea-music-theory`. Static for
 /// the process lifetime; the client fetches this once and caches it.
+/// `GET /api/catalog` — the full Muse 152 taxonomy: 19 constellations x 8
+/// canonical styles, each with its status, its eight-part anatomy, and
+/// (for the 29 the engine can actually route) its `composer_style`.
+///
+/// The point of exposing all 152 rather than only the 29 composable ones is
+/// the catalog's own design rule: a research entry stays *visible* without
+/// pretending to be implemented. `is_composable` is what a client must gate
+/// on — `/api/compose` rejects everything else, and
+/// `catalog_entries_all_resolve_to_real_engine_styles` below is what keeps
+/// that promise honest across the crate boundary.
+async fn catalog() -> Json<Vec<serde_json::Value>> {
+    Json(
+        symthaea_muse_protocol::catalog::CATALOG
+            .iter()
+            .map(|entry| {
+                let mut v = serde_json::to_value(entry).unwrap_or(serde_json::Value::Null);
+                // `is_composable()` is a method, not a field, so it does not
+                // survive serialization on its own — but it is the single
+                // thing a client most needs, so surface it explicitly rather
+                // than making every consumer re-derive the status rules.
+                if let Some(obj) = v.as_object_mut() {
+                    obj.insert("is_composable".into(), entry.is_composable().into());
+                }
+                v
+            })
+            .collect(),
+    )
+}
+
 async fn listen_styles() -> Json<Vec<symthaea_muse_protocol::StyleFamily>> {
     Json(
         Style::ALL
@@ -3758,26 +4479,100 @@ async fn listen_styles() -> Json<Vec<symthaea_muse_protocol::StyleFamily>> {
     )
 }
 
+fn journey_mix(mut value: u64) -> u64 {
+    value = value.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^ (value >> 31)
+}
+
+async fn journey_next(
+    Json(request): Json<symthaea_muse_protocol::JourneyNextRequest>,
+) -> Result<Json<symthaea_muse_protocol::JourneyNextResponse>, (StatusCode, String)> {
+    let styles: Vec<(String, String)> = Style::ALL
+        .into_iter()
+        .map(|style| {
+            (
+                format!("{style:?}"),
+                snake_case_variant(&style.grammar_family()),
+            )
+        })
+        .collect();
+    let current_family = request.current_style.as_deref().and_then(|current| {
+        styles
+            .iter()
+            .find(|(name, _)| name == current)
+            .map(|(_, family)| family.as_str())
+    });
+    let recent: BTreeSet<&str> = request.recent_styles.iter().map(String::as_str).collect();
+    let mut candidates: Vec<&(String, String)> = styles
+        .iter()
+        .filter(|(name, family)| match request.policy.as_str() {
+            "resonance" => current_family.is_none_or(|current| family == current),
+            "contrast" => current_family.is_none_or(|current| family != current),
+            "discovery" => !recent.contains(name.as_str()),
+            _ => true,
+        })
+        .collect();
+    if candidates.is_empty() {
+        candidates = styles.iter().collect();
+    }
+    candidates.sort_by(|a, b| a.0.cmp(&b.0));
+    let mixed =
+        journey_mix(request.traversal_seed ^ request.step.wrapping_mul(0xD6E8_FEB8_6659_FD93));
+    let selected = candidates[mixed as usize % candidates.len()];
+    let relation = match (request.current_style.as_deref(), request.policy.as_str()) {
+        (None, _) => "the opening piece".to_owned(),
+        (Some(_), "resonance") => format!("resonance within {}", selected.1),
+        (Some(_), "contrast") => format!("contrast through {}", selected.1),
+        (Some(_), "discovery") => format!("a less-recent path into {}", selected.1),
+        (Some(previous), _) if previous == selected.0 => "same territory, new plan".to_owned(),
+        _ => format!("a shift into {}", selected.0),
+    };
+    let bars = match selected.1.as_str() {
+        "call_response" => 12,
+        "jazz_chorus" => 16,
+        "modal_arc" => 12,
+        "additive_process" => 10,
+        _ => [6, 8, 10, 12, 16][(journey_mix(mixed) as usize) % 5],
+    };
+    Ok(Json(symthaea_muse_protocol::JourneyNextResponse {
+        style: selected.0.clone(),
+        family: selected.1.clone(),
+        relation,
+        traversal_seed: request.traversal_seed,
+        step: request.step,
+        composition_seed: mixed % 900_000 + 1,
+        tonic: ((mixed >> 20) % 12) as i32,
+        valence: (((mixed >> 28) & 0xffff) as f32 / 32767.5) - 1.0,
+        arousal: ((mixed >> 44) & 0x3ff) as f32 / 1023.0,
+        energy: ((journey_mix(mixed) >> 32) & 0x3ff) as f32 / 1023.0,
+        bars,
+    }))
+}
+
 /// The Analyst's independent, deterministic verification of a composed piece
 /// (`symthaea_muse::analyst::analyze_piece`) — turns the compiled-but-inert
 /// verification pipeline into something actually reachable.
 ///
-/// Honesty note: the live `/api/compose` handler always builds candidates via
-/// `compose_with_spec_and_form(..., grammar: None)` — none of the flagship
-/// bypass engines (`GrooveCycle`/`ProcessAdditive`/`RagaModalArc`/
-/// `Contrapuntal`) are actually reached from this server today, even for
-/// styles whose `grammar_family()` names one of them. Recomposing here via
-/// `compose_with_grammar_plan` would silently claim a dedicated-engine plan
-/// that never produced the piece actually rendered. Instead this reports the
-/// same `GrammarPlanEvidence::Compatibility` the analyst's own design uses
-/// for exactly this situation, so the Analyst correctly flags
-/// "dedicated-family-engine" as `InsufficientEvidence` rather than fabricating
-/// evidence — see `symthaea_muse::analyst::plan_checks`.
+/// Updated 2026-07-25: the live `/api/compose` handler now routes
+/// preset-derived candidates through `compose_with_grammar_plan` for real
+/// (previously it always called `compose_with_spec_and_form` directly,
+/// which never reached any dedicated grammar engine — see git history for
+/// that finding). The REAL `GrammarPlanEvidence` produced during
+/// composition is now stored on the `Candidate` and used here directly
+/// (`candidate.plan`), rather than always synthesizing a
+/// `GrammarPlanEvidence::Compatibility` fallback. That fallback still
+/// applies, correctly, for the one case where there genuinely is no
+/// dedicated-engine plan to report: a candidate composed from a
+/// user-authored custom spec (`ComposeRequest::spec`), which has no
+/// `Style` to derive a `GrammarProfile` from in the first place — see
+/// `symthaea_muse::analyst::plan_checks`.
 async fn analyst_bundle(
     State(studio): State<Arc<Studio>>,
     AxPath(id): AxPath<u64>,
 ) -> Result<Json<BundleEnvelope<symthaea_muse_protocol::AnalystPieceBundle>>, StatusCode> {
-    let (score, recipe, spec, seed, state, form_available, created_at_unix_ms, wav) = {
+    let (score, recipe, spec, seed, state, form_available, created_at_unix_ms, wav, real_plan) = {
         let store = studio.candidates.lock().unwrap();
         let candidate = store.get(&id).ok_or(StatusCode::NOT_FOUND)?;
         (
@@ -3789,6 +4584,7 @@ async fn analyst_bundle(
             candidate.form.is_some(),
             candidate.created_at_unix_ms,
             candidate.wav.clone(),
+            candidate.plan.clone(),
         )
     };
     // `spec.name` matches a `Style` variant exactly for every preset-style
@@ -3819,12 +4615,21 @@ async fn analyst_bundle(
         family,
         GrammarFamily::GrooveCycle | GrammarFamily::RagaModalArc
     );
+    // The REAL plan the candidate was actually composed with, when one was
+    // stored (every preset-derived candidate since the /api/compose fix
+    // above) -- falls back to synthesizing `Compatibility` only for
+    // candidates with no stored plan (a user-authored custom spec, which
+    // has no `Style` to derive a `GrammarProfile` from at all).
+    let plan = real_plan.unwrap_or(GrammarPlanEvidence::Compatibility {
+        family,
+        form_available,
+    });
     let provenance = GrammarProvenance {
         family: snake_case_variant(&family),
         phrase_grammar: snake_case_variant(&profile.phrase),
         harmonic_syntax: snake_case_variant(&profile.harmony),
         performance_dialect: snake_case_variant(&profile.performance),
-        plan_kind: "compatibility".to_string(),
+        plan_kind: plan_kind_str(&plan).to_string(),
         culturally_qualified,
         obligations: Vec::new(),
         supported_intent_axes: profile
@@ -3833,10 +4638,6 @@ async fn analyst_bundle(
             .map(snake_case_variant)
             .collect(),
         performance_features: None,
-    };
-    let plan = GrammarPlanEvidence::Compatibility {
-        family,
-        form_available,
     };
     let (composition, mut warnings) = composition_bundle(&score, &recipe);
     let (performance, perf_warnings) = performance_bundle_payload(&score, &spec, seed, &state);
@@ -3928,6 +4729,88 @@ async fn notes(
     Ok(axum::Json(voices))
 }
 
+/// Chord-symbol suffix for a triad quality. Only the three triad qualities
+/// `Key::diatonic_triad` can ever produce (Major/Minor/Diminished — see its
+/// doc comment: "the quality falls out of the scale", and no diatonic
+/// major/minor/modal scale ever yields an augmented triad on a natural
+/// degree) are handled; the rest exist on `ChordQuality` for other callers
+/// (sevenths, sus chords) this endpoint never constructs.
+fn triad_symbol_suffix(quality: symthaea_music_theory::ChordQuality) -> &'static str {
+    match quality {
+        symthaea_music_theory::ChordQuality::Major => "",
+        symthaea_music_theory::ChordQuality::Minor => "m",
+        symthaea_music_theory::ChordQuality::Diminished => "\u{00b0}",
+        symthaea_music_theory::ChordQuality::Augmented => "+",
+        _ => "?",
+    }
+}
+
+/// Roman numeral for scale degree 1..=7, cased by the diatonic triad's
+/// actual quality (major/augmented → upper, minor/diminished → lower),
+/// with a °/+ suffix for diminished/augmented — standard Roman-numeral
+/// harmonic-analysis notation.
+fn roman_numeral(degree: i32, quality: symthaea_music_theory::ChordQuality) -> String {
+    const UPPER: [&str; 7] = ["I", "II", "III", "IV", "V", "VI", "VII"];
+    const LOWER: [&str; 7] = ["i", "ii", "iii", "iv", "v", "vi", "vii"];
+    let idx = ((degree - 1).rem_euclid(7)) as usize;
+    let base = match quality {
+        symthaea_music_theory::ChordQuality::Major
+        | symthaea_music_theory::ChordQuality::Augmented => UPPER[idx],
+        _ => LOWER[idx],
+    };
+    let suffix = match quality {
+        symthaea_music_theory::ChordQuality::Diminished => "\u{00b0}",
+        symthaea_music_theory::ChordQuality::Augmented => "+",
+        _ => "",
+    };
+    format!("{base}{suffix}")
+}
+
+/// The harmonic vocabulary of a candidate's key: the tonic, tonality, and
+/// the 7 diatonic triads built via `Key::diatonic_triad` — real music
+/// theory (`Key`'s own scale-stacking, not a lookup table), but only the
+/// KEY's static vocabulary, not a chord-by-time analysis of the piece
+/// itself (the engine's real `Progression`/`Form` structure is computed
+/// mid-compose and discarded before reaching `Candidate` — surfacing THAT
+/// needs deeper work; this endpoint is the honest, smaller step: what
+/// chords does this key offer, not which ones this piece actually used).
+///
+/// Response shape mirrors `symthaea_muse_protocol::HarmonySummary` /
+/// `DiatonicChord`, the same server-emits-`json!`/client-reads-typed
+/// convention `motifs_summary` below uses.
+async fn harmony_summary(
+    State(studio): State<Arc<Studio>>,
+    AxPath(id): AxPath<u64>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let key = {
+        let store = studio.candidates.lock().unwrap();
+        let c = store.get(&id).ok_or(StatusCode::NOT_FOUND)?;
+        c.score.key
+    };
+    let tonality = match key.tonality {
+        symthaea_music_theory::Tonality::Major => "Major".to_string(),
+        symthaea_music_theory::Tonality::Minor => "Minor".to_string(),
+        symthaea_music_theory::Tonality::Modal(mode) => format!("{mode:?}"),
+    };
+    let chords: Vec<serde_json::Value> = (1..=7)
+        .map(|degree| {
+            let chord = key.diatonic_triad(degree);
+            let function = key.function(degree);
+            serde_json::json!({
+                "degree": degree,
+                "roman": roman_numeral(degree, chord.quality),
+                "symbol": format!("{}{}", chord.root.name(), triad_symbol_suffix(chord.quality)),
+                "function": format!("{function:?}"),
+            })
+        })
+        .collect();
+    Ok(axum::Json(serde_json::json!({
+        "tonic": key.tonic.name(),
+        "tonality": tonality,
+        "chords": chords,
+    })))
+}
+
 /// One piece's fingerprint-ready `(Score, Option<Form>)` plus the display
 /// metadata the Atlas needs, before 2D projection.
 struct AtlasSource {
@@ -3937,6 +4820,7 @@ struct AtlasSource {
     score: symthaea_music_theory::Score,
     form: Option<symthaea_music_theory::Form>,
     kept: bool,
+    private: bool,
 }
 
 fn duration_secs(score: &symthaea_music_theory::Score) -> f32 {
@@ -3967,6 +4851,7 @@ fn gather_atlas_sources(studio: &Studio) -> Vec<AtlasSource> {
                 score: c.score.clone(),
                 form: c.form.clone(),
                 kept: false,
+                private: false,
             });
         }
     }
@@ -4013,6 +4898,40 @@ fn gather_atlas_sources(studio: &Studio) -> Vec<AtlasSource> {
                 score,
                 form,
                 kept: true,
+                private: false,
+            });
+        }
+    }
+
+    // Private symbolic imports are first-class works in this user's Atlas,
+    // but remain unclassified and never enter another user's corpus.
+    let import_root = Path::new(IMPORT_ROOT);
+    if let Ok(entries) = std::fs::read_dir(import_root) {
+        for entry in entries.flatten() {
+            let directory = entry.path();
+            let Ok(summary_bytes) = std::fs::read(directory.join("summary.json")) else {
+                continue;
+            };
+            let Ok(summary) = serde_json::from_slice::<symthaea_muse_protocol::ImportedWorkSummary>(
+                &summary_bytes,
+            ) else {
+                continue;
+            };
+            let Ok(score_bytes) = std::fs::read(directory.join("score.json")) else {
+                continue;
+            };
+            let Ok(score) = serde_json::from_slice::<symthaea_music_theory::Score>(&score_bytes)
+            else {
+                continue;
+            };
+            sources.push(AtlasSource {
+                id: format!("import:{}", summary.manifest.work_id.0),
+                title: summary.manifest.title,
+                style: "Imported · unclassified".to_owned(),
+                score,
+                form: None,
+                kept: true,
+                private: true,
             });
         }
     }
@@ -4129,6 +5048,7 @@ mod atlas_dedup_tests {
         );
         if note {
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: Pitch::new(PitchClass::new(0), 4),
                 onset: Duration::zero(),
                 duration: Duration::whole(),
@@ -4145,6 +5065,7 @@ mod atlas_dedup_tests {
             score,
             form: None,
             kept,
+            private: false,
         }
     }
 
@@ -4264,6 +5185,7 @@ async fn atlas_summary(
                 "x": x,
                 "y": y,
                 "kept": s.kept,
+                "private": s.private,
                 "nearest_id": &nearest_ids[r],
                 "nearest_for_lens": &nearest_for_lens[r],
                 "multiplicity": multiplicity,
@@ -4441,5 +5363,101 @@ mod artifact_key_tests {
         assert_ne!(first, second);
         assert!(valid_artifact_key(&first));
         assert!(first.len() <= 80);
+    }
+}
+
+/// End-to-end tests for the `bars` request contract fixed 2026-07-26: the
+/// live `/api/compose` handler must neither silently rescale an
+/// out-of-range request nor lose track of what was actually asked for.
+/// Calls the real `compose` handler directly (not a mocked stand-in),
+/// forcing the native renderer so the test doesn't depend on FluidSynth
+/// being available in whatever environment runs `cargo test`.
+#[cfg(test)]
+mod compose_bars_contract_tests {
+    use super::{Candidate, ComposeRequest, Studio, compose};
+    use axum::Json;
+    use axum::extract::State;
+    use std::sync::Arc;
+    use symthaea_music_theory::{GrammarPlanEvidence, Style};
+
+    fn base_request(bars: usize) -> ComposeRequest {
+        ComposeRequest {
+            valence: 0.0,
+            arousal: 0.5,
+            energy: 0.6,
+            tonic: 0,
+            style: Style::Blues,
+            bars,
+            base_seed: 7,
+            n_candidates: 1,
+            prompt: String::new(),
+            explore: false,
+            grammar: None,
+            spec: None,
+            seed_stride: 1,
+            dopamine: 0.5,
+            serotonin: 0.5,
+            noradrenaline: 0.3,
+            consciousness: 0.5,
+            vary_premise: false,
+            renderer: Some("native".to_string()),
+            use_motif_foundry: false,
+            composition_lesson_id: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_36_bar_request_reaches_the_engine_with_intent_preserved() {
+        let studio = Arc::new(Studio::default());
+        let response = compose(State(studio.clone()), Json(base_request(36)))
+            .await
+            .expect("36 bars is within COMPOSE_BARS_RANGE");
+        let id = response.0.candidates[0].id;
+        let store = studio.candidates.lock().unwrap();
+        let candidate: &Candidate = store.get(&id).expect("candidate was stored");
+        let plan = candidate
+            .plan
+            .as_ref()
+            .expect("Blues is preset-derived, so a real plan must be stored");
+        match plan {
+            GrammarPlanEvidence::CallResponse(call_response_plan) => {
+                assert_eq!(
+                    call_response_plan.requested_bars, 36,
+                    "the server must not silently rewrite the request before \
+                     it reaches the engine"
+                );
+                assert_eq!(call_response_plan.realized_bars, 36);
+                assert_eq!(call_response_plan.choruses, 3);
+            }
+            other => panic!("expected GrammarPlanEvidence::CallResponse, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_request_above_the_maximum_is_rejected_not_rescaled() {
+        // Not `.expect_err(...)` -- `ComposeResponse` (the Ok side) has no
+        // Debug impl, which `.expect_err` needs to format the failure
+        // message if the call unexpectedly succeeds. Match explicitly
+        // instead.
+        let studio = Arc::new(Studio::default());
+        match compose(State(studio), Json(base_request(37))).await {
+            Err((status, message)) => {
+                assert_eq!(status, axum::http::StatusCode::BAD_REQUEST);
+                assert!(
+                    message.contains("37"),
+                    "the rejection message should name the offending value: {message}"
+                );
+            }
+            Ok(_) => panic!("37 bars exceeds COMPOSE_BARS_RANGE and must be rejected"),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_request_below_the_minimum_is_rejected_not_rescaled() {
+        let studio = Arc::new(Studio::default());
+        match compose(State(studio), Json(base_request(1))).await {
+            Err((status, _)) => assert_eq!(status, axum::http::StatusCode::BAD_REQUEST),
+            Ok(_) => panic!("1 bar is below COMPOSE_BARS_RANGE and must be rejected"),
+        }
     }
 }

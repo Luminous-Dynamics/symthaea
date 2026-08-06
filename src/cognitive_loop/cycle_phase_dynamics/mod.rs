@@ -321,6 +321,16 @@ struct CfcPlanningResult {
     prediction: Vec<f32>,
     /// Shortest-horizon raw prediction (bits-saved diagnostics only).
     prediction_first_horizon: Option<Vec<f32>>,
+    /// Predictive Compression C3: whether episodic recall blended into the
+    /// prediction this cycle (always false when the flag is off).
+    recall_fired: bool,
+    /// C3: top-1 recall similarity this cycle, when a recall was attempted
+    /// (`None` if the flag is off or the store was empty).
+    recall_similarity: Option<f32>,
+    /// C3c: write-cycle number of the matched episode, when a recall was
+    /// attempted — lets an external harness look up the matched episode's
+    /// provenance.
+    recall_matched_timestamp: Option<u64>,
     /// Cross-horizon prediction coherence (EMA'd).
     prediction_coherence: f32,
     /// Model uncertainty (reducible by exploration).
@@ -700,7 +710,7 @@ impl CognitiveLoopService {
                                                         urgency: crate::swarm::mesh::MeshUrgency::Cruise,
                                                         timestamp_s: *created_at as u32,
                                                         payload_type: crate::swarm::mesh::PayloadType::ContentAnnounce,
-                                                        auth_mac: 0,
+                                                        auth_mac: [0u8; 32],
                                                         ttl: crate::swarm::mesh::MESH_DEFAULT_TTL,
                                                         wisdom: announce.encode(),
                                                     };
@@ -853,7 +863,7 @@ impl CognitiveLoopService {
                                 let quality = CreativeQualityScore::evaluate(&comp, target_va);
                                 // Map creative quality → AestheticScore
                                 let aesthetic_score = symthaea_aesthetic::AestheticScore {
-                                    order: quality.rhythmic_regularity,
+                                    order: quality.onset_evenness,
                                     complexity: 1.0 - quality.form_compliance, // high form = low complexity
                                     surprise: (1.0 - quality.melodic_coherence).max(0.0), // low coherence = surprise
                                     harmony: quality.emotional_alignment,
@@ -953,6 +963,19 @@ impl CognitiveLoopService {
                 #[cfg(any(feature = "canvas", feature = "creative"))]
                 let art_topology: ([usize; 3], f32, u8) = {
                     const ART_TOPOLOGY_REFRESH_INTERVAL: u64 = 5;
+                    // Temporal window for the correlation matrix. 16 samples over a 5-cycle
+                    // refresh gives a stable Pearson estimate without materialising the whole
+                    // 128-deep spectral buffer (16 x 256 f64 = 32 KB per refresh).
+                    const ART_TOPOLOGY_WINDOW: usize = 16;
+                    // Built BEFORE the &mut borrow of self.sensorimotor below: these are
+                    // disjoint fields and NLL would likely allow the interleaving, but hoisting
+                    // removes the question rather than relying on it.
+                    #[cfg(feature = "spectral_state")]
+                    let art_window: Vec<Vec<f64>> =
+                        self.spectral_manager.recent_states_f64(ART_TOPOLOGY_WINDOW);
+                    #[cfg(not(feature = "spectral_state"))]
+                    let art_window: Vec<Vec<f64>> = Vec::new();
+
                     let mr = &mut self.sensorimotor.motor_rendering;
                     let due = mr.art_topology.is_none()
                         || cycle_num.wrapping_sub(mr.art_topology_cycle)
@@ -963,9 +986,22 @@ impl CognitiveLoopService {
                             .iter()
                             .map(|&v| v as f64)
                             .collect();
+                        // Supply a REAL temporal window. Passing `None` here meant the callee
+                        // fell back to its single-snapshot path, which could not compute a
+                        // correlation and instead fabricated a complete graph, making the Betti
+                        // numbers a state-independent constant (fixed 2026-07-30).
+                        //
+                        // `spectral_manager.history` is appended every cycle and is recorded
+                        // LATER in this same function, so at cycle N it holds cycles
+                        // [N-cap .. N-1] — genuinely prior states, current cycle excluded.
+                        let window_ref = if art_window.is_empty() {
+                            None
+                        } else {
+                            Some(art_window.as_slice())
+                        };
                         mr.art_topology = Some(
                             super::consciousness_engine::topological_measure::
-                                compute_topological_consciousness(&state_f64, None),
+                                compute_topological_consciousness(&state_f64, window_ref),
                         );
                         mr.art_topology_cycle = cycle_num;
                     }
@@ -1238,7 +1274,7 @@ impl CognitiveLoopService {
                             urgency: crate::swarm::mesh::MeshUrgency::Cruise,
                             timestamp_s: content_ref.created_at as u32,
                             payload_type: crate::swarm::mesh::PayloadType::ContentAnnounce,
-                            auth_mac: 0,
+                            auth_mac: [0u8; 32],
                             ttl: crate::swarm::mesh::MESH_DEFAULT_TTL,
                             wisdom: announce.encode(),
                         };
@@ -1640,7 +1676,7 @@ impl CognitiveLoopService {
                         urgency: crate::swarm::mesh::MeshUrgency::Cruise,
                         timestamp_s,
                         payload_type: crate::swarm::mesh::PayloadType::TimeBeacon,
-                        auth_mac: 0,
+                        auth_mac: [0u8; 32],
                         ttl: crate::swarm::mesh::MESH_DEFAULT_TTL,
                         wisdom: hv,
                     };
@@ -1987,6 +2023,9 @@ impl CognitiveLoopService {
         let output = cfc_plan.output;
         let prediction = cfc_plan.prediction;
         let prediction_first_horizon = cfc_plan.prediction_first_horizon;
+        let recall_fired = cfc_plan.recall_fired;
+        let recall_similarity = cfc_plan.recall_similarity;
+        let recall_matched_timestamp = cfc_plan.recall_matched_timestamp;
         let prediction_coherence = cfc_plan.prediction_coherence;
         let epistemic_uncertainty = cfc_plan.epistemic_uncertainty;
         let aleatoric_uncertainty = cfc_plan.aleatoric_uncertainty;
@@ -3574,6 +3613,9 @@ impl CognitiveLoopService {
                 output,
                 prediction,
                 prediction_first_horizon,
+                recall_fired,
+                recall_similarity,
+                recall_matched_timestamp,
                 prediction_error,
                 coherence,
                 unified_psi,

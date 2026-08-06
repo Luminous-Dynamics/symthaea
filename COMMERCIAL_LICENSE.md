@@ -72,7 +72,7 @@ the AGPL.
 For commercial licensing inquiries:
 
 - Email: tristan.stoltz@evolvingresonantcocreationism.com
-- Web: https://github.com/Luminous-Dynamics
+- Web: https://luminousdynamics.org
 
 ---
 

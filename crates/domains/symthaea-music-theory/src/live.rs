@@ -143,6 +143,21 @@ impl LiveComposer {
         // the piece's identity and should stay stable across live phrases,
         // like the motif — only retheme() changes it.
         let pattern = self.style.accompaniment(self.base_seed);
+        // Bass is realized BEFORE harmony so `realize_harmony_measures` can read the
+        // ACTUAL sounding bass from the score and voice the upper parts against it
+        // (rootless chords + bass-vs-upper parallel fifths, both measured 2026-07-30).
+        // Purely a reordering: the two use independent `prev_bass`/`prev_upper` chains
+        // and never read each other's state, so the emitted NOTES are unchanged.
+        crate::composer::realize_bass(
+            &mut score,
+            &form,
+            self.meter_beats,
+            intent,
+            &mut self.prev_bass,
+            pattern,
+            true,
+            false,
+        );
         crate::composer::realize_harmony(
             &mut score,
             &form,
@@ -153,15 +168,6 @@ impl LiveComposer {
             true, // single-section form: the B-thinning gate never fires
             true,
             self.style.spec().texture.seventh_chords,
-        );
-        crate::composer::realize_bass(
-            &mut score,
-            &form,
-            self.meter_beats,
-            intent,
-            &mut self.prev_bass,
-            pattern,
-            true,
         );
         score
     }

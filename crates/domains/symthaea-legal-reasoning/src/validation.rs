@@ -131,12 +131,7 @@ fn same_body(left: &FormalRule, right: &FormalRule) -> bool {
         && left.conclusion == right.conclusion
 }
 
-fn issue(
-    severity: Severity,
-    code: &'static str,
-    path: &str,
-    message: &str,
-) -> ValidationIssue {
+fn issue(severity: Severity, code: &'static str, path: &str, message: &str) -> ValidationIssue {
     ValidationIssue {
         severity,
         code,
@@ -181,10 +176,12 @@ mod tests {
         let report = validate_rule_pack(&pack);
 
         assert!(report.has_errors());
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.code == "LR006_CONTRADICTORY_STRICT_RULES"));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.code == "LR006_CONTRADICTORY_STRICT_RULES")
+        );
     }
 
     #[test]
@@ -212,12 +209,8 @@ mod tests {
             [],
         )
         .unwrap();
-        let reverse = RulePack::new(
-            RulePackId::new("reverse").unwrap(),
-            [right, left],
-            [],
-        )
-        .unwrap();
+        let reverse =
+            RulePack::new(RulePackId::new("reverse").unwrap(), [right, left], []).unwrap();
 
         assert_eq!(
             validate_rule_pack(&forward).issues,

@@ -12,7 +12,9 @@ pub struct ParametricEQ {
     high_gain: f32, // dB boost/cut at 5kHz
     low_state: [f32; 2],
     mid_state: [f32; 2],
-    high_state: [f32; 2],
+    // No `high_state`: this is a complementary-filter crossover, so the high
+    // band is derived by subtraction (`above_low - mid_band` in `process`)
+    // and carries no filter state of its own.
 }
 
 impl ParametricEQ {
@@ -23,7 +25,6 @@ impl ParametricEQ {
             high_gain: 10.0f32.powf(high_db / 20.0),
             low_state: [0.0; 2],
             mid_state: [0.0; 2],
-            high_state: [0.0; 2],
         }
     }
 
@@ -222,6 +223,15 @@ mod tests {
         // With -12dB threshold (~0.25) and 3:1 ratio, 0.8 should be compressed
         // Makeup gain (+3dB ~1.41) partially compensates
         assert!(l < 0.8 * 1.5, "should compress loud signal: {l}");
+        // It is a STEREO compressor driven by the RMS of the pair, so an
+        // identical input on both channels must come out identically
+        // compressed — checking only `l` would miss a gain applied to one
+        // side, which is the failure mode that actually matters here.
+        assert!(r < 0.8 * 1.5, "should compress the right channel too: {r}");
+        assert!(
+            (l - r).abs() < f32::EPSILON,
+            "identical stereo input should compress identically: {l} vs {r}"
+        );
     }
 
     #[test]

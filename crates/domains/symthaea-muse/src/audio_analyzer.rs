@@ -24,14 +24,13 @@ pub struct AudioSurpriseReport {
 pub struct AudioSurpriseMeter {
     extractor: MelExtractor,
     agent: ActiveInferenceAgent,
-    config: MelConfig,
 }
 
 impl AudioSurpriseMeter {
     pub fn new(config: MelConfig) -> Self {
         let n_mels = config.n_mels;
         Self {
-            extractor: MelExtractor::new(config.clone()),
+            extractor: MelExtractor::new(config),
             // FEP agent to track expectation in mel-space
             agent: ActiveInferenceAgent::new(symthaea_fep::ActiveInferenceAgentConfig {
                 state_dim: 16,
@@ -39,7 +38,6 @@ impl AudioSurpriseMeter {
                 num_actions: 1, // Passive observer
                 ..Default::default()
             }),
-            config,
         }
     }
 

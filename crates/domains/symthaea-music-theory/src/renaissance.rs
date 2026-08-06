@@ -38,11 +38,17 @@
 use crate::counterpoint::{CantusEvent, fit_against};
 use crate::form::figuration_variation;
 use crate::fugue::{emit, head_fragment, hold};
+/// This motet's three persistent voices, declared here rather than
+/// inherited from another form's register convention.
+const SUPERIUS: PartId = PartId(0);
+const ALTUS: PartId = PartId(1);
+const BASSUS: PartId = PartId(2);
+
 use crate::harmony::Key;
 use crate::motif::Motif;
 use crate::rhythm::Duration;
 use crate::scale::Scale;
-use crate::score::{Emphasis, Score, ScoreNote, VoiceRole};
+use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 
 /// Cantus events (absolute onsets) for a motif emitted at `start` in
 /// `octave` — the same bookkeeping [`crate::fugue`] does locally, needed
@@ -95,11 +101,21 @@ pub(crate) fn realize_renaissance(
     let point2 = point1.invert(pivot).transpose(2);
 
     // ── Point 1 (bars 0-2): bass -> alto -> soprano ─────────────────────
-    emit(&mut score, point1, bar(0), Bass, 3, POINT, PhraseStart);
+    emit(
+        &mut score,
+        BASSUS,
+        point1,
+        bar(0),
+        Bass,
+        3,
+        POINT,
+        PhraseStart,
+    );
     let bass_cf = cantus_of(scale, point1, 3, bar(0));
     let alto1 = fit_against(&bass_cf, point1, scale, 4, bar(1).beats());
     emit(
         &mut score,
+        ALTUS,
         &alto1,
         bar(1),
         CounterMelody,
@@ -109,12 +125,30 @@ pub(crate) fn realize_renaissance(
     );
     let alto_cf = cantus_of(scale, &alto1, 4, bar(1));
     let sop1 = fit_against(&alto_cf, point1, scale, 5, bar(2).beats());
-    emit(&mut score, &sop1, bar(2), Melody, 5, POINT, PhraseStart);
+    emit(
+        &mut score,
+        SUPERIUS,
+        &sop1,
+        bar(2),
+        Melody,
+        5,
+        POINT,
+        PhraseStart,
+    );
 
     // ── Bridge (bar 3): free figuration, each voice off the last ────────
     let bridge_len = Duration::new(s_beats, 1);
     let sop_frag = head_fragment(&figuration_variation(point1, seed), bridge_len);
-    emit(&mut score, &sop_frag, bar(3), Melody, 5, BRIDGE, Normal);
+    emit(
+        &mut score,
+        SUPERIUS,
+        &sop_frag,
+        bar(3),
+        Melody,
+        5,
+        BRIDGE,
+        Normal,
+    );
     let sop_frag_cf = cantus_of(scale, &sop_frag, 5, bar(3));
     let alto_frag = fit_against(
         &sop_frag_cf,
@@ -128,6 +162,7 @@ pub(crate) fn realize_renaissance(
     );
     emit(
         &mut score,
+        ALTUS,
         &alto_frag,
         bar(3),
         CounterMelody,
@@ -138,14 +173,33 @@ pub(crate) fn realize_renaissance(
 
     // ── Point 2 (bars 4-6): soprano -> bass -> alto ─────────────────────
     // Voice order rotates — no voice is always the leader.
-    emit(&mut score, &point2, bar(4), Melody, 5, POINT, PhraseStart);
+    emit(
+        &mut score,
+        SUPERIUS,
+        &point2,
+        bar(4),
+        Melody,
+        5,
+        POINT,
+        PhraseStart,
+    );
     let sop2_cf = cantus_of(scale, &point2, 5, bar(4));
     let bass2 = fit_against(&sop2_cf, &point2, scale, 3, bar(5).beats());
-    emit(&mut score, &bass2, bar(5), Bass, 3, POINT, PhraseStart);
+    emit(
+        &mut score,
+        BASSUS,
+        &bass2,
+        bar(5),
+        Bass,
+        3,
+        POINT,
+        PhraseStart,
+    );
     let bass2_cf = cantus_of(scale, &bass2, 3, bar(5));
     let alto2 = fit_against(&bass2_cf, &point2, scale, 4, bar(6).beats());
     emit(
         &mut score,
+        ALTUS,
         &alto2,
         bar(6),
         CounterMelody,
@@ -163,10 +217,21 @@ pub(crate) fn realize_renaissance(
     // THEN up to the octave — never a direct climb.
     let full_bar = Duration::new(s_beats, 1);
     let half_bar = Duration::new(s_beats, 2);
-    hold(&mut score, 4, bar(6), full_bar, Bass, 3, CADENCE, Normal); // predominant, sets up the approach
+    hold(
+        &mut score,
+        BASSUS,
+        4,
+        bar(6),
+        full_bar,
+        Bass,
+        3,
+        CADENCE,
+        Normal,
+    ); // predominant, sets up the approach
     // Alto: suspension prepared in bar 7 (deg 7 held through the bar
     // line), resolves to deg 6 at the top of bar 8.
     score.push(ScoreNote {
+        part: PartId::UNASSIGNED,
         pitch: scale.degree_pitch(7, 4),
         onset: bar(7),
         duration: full_bar + half_bar,
@@ -176,6 +241,7 @@ pub(crate) fn realize_renaissance(
         section_intensity: CADENCE,
     });
     score.push(ScoreNote {
+        part: PartId::UNASSIGNED,
         pitch: scale.degree_pitch(6, 4),
         onset: bar(7) + full_bar + half_bar,
         duration: half_bar,
@@ -187,6 +253,7 @@ pub(crate) fn realize_renaissance(
     // Bass: dominant under the suspension, tonic at the true close.
     hold(
         &mut score,
+        BASSUS,
         5,
         bar(7),
         full_bar,
@@ -197,6 +264,7 @@ pub(crate) fn realize_renaissance(
     );
     hold(
         &mut score,
+        BASSUS,
         1,
         bar(7) + full_bar,
         full_bar,
@@ -208,6 +276,7 @@ pub(crate) fn realize_renaissance(
     // Soprano: the under-third approach — 7, down to 6, up to the octave.
     hold(
         &mut score,
+        SUPERIUS,
         7,
         bar(7),
         half_bar,
@@ -218,6 +287,7 @@ pub(crate) fn realize_renaissance(
     );
     hold(
         &mut score,
+        SUPERIUS,
         6,
         bar(7) + half_bar,
         half_bar,
@@ -228,6 +298,7 @@ pub(crate) fn realize_renaissance(
     );
     hold(
         &mut score,
+        SUPERIUS,
         8,
         bar(7) + full_bar,
         full_bar,

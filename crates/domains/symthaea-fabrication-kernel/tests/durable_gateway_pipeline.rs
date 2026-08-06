@@ -8,10 +8,13 @@ use symthaea_fabrication_kernel::crypto_digest::{Sha256Digest, sha256};
 use symthaea_fabrication_kernel::execution_guard::{
     ContainmentAction, ExecutionGuard, ExecutionGuardPolicy,
 };
+use symthaea_fabrication_kernel::gateway_consensus_tracker::GatewayConsensusTracker;
 use symthaea_fabrication_kernel::gateway_replay::{
     build_gateway_replay_contract, verify_gateway_replay_contract,
 };
 use symthaea_fabrication_kernel::gateway_state::{FabricationGatewayState, GatewayStateEnvelope};
+use symthaea_fabrication_kernel::incident_ledger::IncidentLedger;
+use symthaea_fabrication_kernel::operator_command_tracker::OperatorCommandTracker;
 use symthaea_fabrication_kernel::reconciliation::{
     append_submission_event_audit, reconcile_submission_audit,
 };

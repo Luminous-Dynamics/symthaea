@@ -49,6 +49,11 @@ use crate::shared_map::{SharedMapRejection, SharedTunnelObservation};
 use crate::simulator::{SimpleSubterraneanSimulator, SubterraneanPhysicsSimulator};
 use crate::team::{AgentId, HeartbeatRejection, TeamHeartbeat};
 use crate::team_operations::{TeamCoordinator, TeamOperationalAssessment};
+use crate::temporal_assurance::{
+    TemporalAssuranceAssessment, TemporalAssuranceSupervisor, TemporalAuthority,
+    TemporalRuntimeFrame,
+};
+use crate::temporal_runtime::temporal_runtime_revisions;
 use crate::tunnel_graph::{TunnelEdge, TunnelNode, TunnelNodeId, TunnelNodeKind};
 use crate::types::{ConfigError, NUM_PHYSICAL_ACTUATORS, SubterraneanCommand, SubterraneanConfig};
 use crate::update_control::{
@@ -97,6 +102,8 @@ pub enum SubterraneanFallbackStage {
     PartitionReturn,
     PartitionHold,
     PartitionReconcile,
+    TemporalReturn,
+    TemporalHold,
     InvariantStop,
     PolicyStop,
 }
@@ -129,6 +136,8 @@ impl SubterraneanFallbackStage {
             Self::PartitionReturn => "partition_return",
             Self::PartitionHold => "partition_hold",
             Self::PartitionReconcile => "partition_reconcile",
+            Self::TemporalReturn => "temporal_return",
+            Self::TemporalHold => "temporal_hold",
             Self::InvariantStop => "invariant_stop",
             Self::PolicyStop => "policy_stop",
         }
@@ -222,6 +231,8 @@ pub struct SubterraneanEmbodiment {
     capability_profile: CapabilityProfile,
     partition_recovery: PartitionRecoverySupervisor,
     last_partition_recovery: PartitionRecoveryAssessment,
+    temporal: TemporalAssuranceSupervisor,
+    pending_temporal_frame: Option<TemporalRuntimeFrame>,
     cognitive_interval: usize,
     fep_tau_factor: f32,
     last_free_energy: f64,
@@ -314,6 +325,8 @@ impl SubterraneanEmbodiment {
             capability_profile: CapabilityProfile::nominal(),
             partition_recovery: PartitionRecoverySupervisor::default(),
             last_partition_recovery: PartitionRecoveryAssessment::connected(),
+            temporal: TemporalAssuranceSupervisor::default(),
+            pending_temporal_frame: None,
             cognitive_interval: config.cognitive_interval.max(1),
             fep_tau_factor: 1.0,
             last_free_energy: 0.0,
@@ -399,6 +412,7 @@ impl SubterraneanEmbodiment {
             actuator_isolation: self.actuator_isolation.clone(),
             field_envelope: self.field_envelope.clone(),
             partition_recovery: self.partition_recovery.clone(),
+            temporal: self.temporal.clone(),
         }
     }
 
@@ -440,6 +454,9 @@ impl SubterraneanEmbodiment {
         if !checkpoint.partition_recovery.validate() {
             return Err(OperationalCheckpointError::InvalidPartitionRecoveryState);
         }
+        if !checkpoint.temporal.validate() {
+            return Err(OperationalCheckpointError::InvalidTemporalState);
+        }
         // Validate every checkpoint domain before mutating any live state.
         let mut mission_probe = self.mission_executive.clone();
         mission_probe.load_checkpoint(&checkpoint.mission)?;
@@ -456,6 +473,8 @@ impl SubterraneanEmbodiment {
         self.last_field_envelope = self.field_envelope.last_assessment();
         self.partition_recovery = checkpoint.partition_recovery.clone();
         self.last_partition_recovery = self.partition_recovery.assessment();
+        self.temporal = checkpoint.temporal.clone();
+        self.pending_temporal_frame = None;
         self.capability_profile = CapabilityProfile::assess(
             self.last_sensor_fusion,
             self.last_actuator_isolation,
@@ -569,6 +588,7 @@ impl SubterraneanEmbodiment {
             .mission_override()
             .or_else(|| operator_constraint.mission_override())
             .or_else(|| self.last_partition_recovery.mode.mission_override())
+            .or_else(|| self.temporal.last().authority.mission_override())
             .or_else(|| self.capability_profile.disposition.mission_override())
             .unwrap_or_else(|| self.mission_manager.requested());
         self.last_team = self.team_coordinator.assess(
@@ -578,6 +598,8 @@ impl SubterraneanEmbodiment {
             requested_mission.reservation_priority(),
             5.0,
             1.0,
+            false,
+            0.5,
         );
         self.last_partition_recovery = self.partition_recovery.update(PartitionObservation {
             surface_reachable: self.last_team.status.known_peers == 0
@@ -614,6 +636,29 @@ impl SubterraneanEmbodiment {
         self.last_raw_hazard = self.hazard_supervisor.raw();
         if self.last_raw_hazard.primary == SubterraneanHazard::SensorFault {
             self.simulator.state_mut().sanitize_fail_closed();
+        }
+
+        // Temporal/causal assurance is opt-in per cycle: assessing an empty
+        // frame would report a missing clock sample and force HoldForReview
+        // on every step of every scenario that never calls
+        // `ingest_temporal_frame`. Absent a fresh frame, the previous cycle's
+        // cached authority (including any still-latched hold) simply carries
+        // forward via `self.temporal.last()` below.
+        if let Some(frame) = self.pending_temporal_frame.take() {
+            let revisions = temporal_runtime_revisions(
+                self.total_steps as u64,
+                self.last_hazard,
+                &self.mission_executive,
+                self.mission_manager.requested(),
+            );
+            self.temporal.assess(
+                dt,
+                self.total_steps as u64,
+                revisions,
+                &frame,
+                local_return_path_before.feasible,
+                self.simulator.state().depth_m() <= 0.1,
+            );
         }
 
         let phi_level = MotorSafetyLevel::from_phi(phi);
@@ -661,6 +706,7 @@ impl SubterraneanEmbodiment {
                 .mission_override()
                 .or_else(|| operator_constraint.mission_override())
                 .or_else(|| self.last_partition_recovery.mode.mission_override())
+                .or_else(|| self.temporal.last().authority.mission_override())
                 .or_else(|| self.capability_profile.disposition.mission_override())
                 .or_else(|| self.last_executive.directive.mission_override())
                 .or(self.last_executive.work_mission)
@@ -685,6 +731,7 @@ impl SubterraneanEmbodiment {
         cmd = runtime_constraint.constrain_nominal(cmd, self.simulator.state());
         if self.last_hazard.primary == SubterraneanHazard::None {
             cmd = self.last_partition_recovery.constrain_nominal(cmd);
+            cmd = self.temporal.constrain_command(cmd);
         }
 
         let recovery_plan = plan_command_with_portfolio_resources(
@@ -696,6 +743,15 @@ impl SubterraneanEmbodiment {
             self.simulator.recovery_resources(),
         );
         cmd = recovery_plan.command;
+        // Applied after recovery planning, not before: an elevated temporal
+        // floor here (rather than alongside the phi/moral/operator/degraded
+        // floors above) would otherwise feed into the None-hazard Orange/Red
+        // branch of `plan_command_with_portfolio_resources` and get overwritten
+        // by its generic PolicyStop fallback before this stage's own
+        // TemporalReturn/TemporalHold selection below ever runs.
+        if let Some(temporal_floor) = self.temporal.last().authority.safety_floor() {
+            self.current_safety = self.current_safety.max(temporal_floor);
+        }
         cmd = self.last_field_envelope.constrain(cmd);
         // Mechanical truth is applied after recovery planning: a failed pump or
         // track cannot receive authority merely because the desired fallback
@@ -746,27 +802,41 @@ impl SubterraneanEmbodiment {
         if self.last_hazard.primary == SubterraneanHazard::None
             && self.fallback_stage == SubterraneanFallbackStage::Nominal
         {
-            self.fallback_stage = match self.last_partition_recovery.mode {
-                PartitionRecoveryMode::ReturnToMesh => SubterraneanFallbackStage::PartitionReturn,
-                PartitionRecoveryMode::HoldAndBeacon => SubterraneanFallbackStage::PartitionHold,
-                PartitionRecoveryMode::Reconciling => SubterraneanFallbackStage::PartitionReconcile,
-                PartitionRecoveryMode::Connected
-                | PartitionRecoveryMode::Grace
-                | PartitionRecoveryMode::LocalAutonomy => {
-                    match self.capability_profile.disposition {
-                        CapabilityDisposition::ReturnOnly => {
-                            SubterraneanFallbackStage::CapabilityReturn
+            self.fallback_stage = match self.temporal.last().authority {
+                TemporalAuthority::HoldForReview => SubterraneanFallbackStage::TemporalHold,
+                TemporalAuthority::ReturnOnly => SubterraneanFallbackStage::TemporalReturn,
+                TemporalAuthority::Nominal | TemporalAuthority::ProbeOnly => {
+                    match self.last_partition_recovery.mode {
+                        PartitionRecoveryMode::ReturnToMesh => {
+                            SubterraneanFallbackStage::PartitionReturn
                         }
-                        CapabilityDisposition::HoldForRecovery => {
-                            SubterraneanFallbackStage::CapabilityHold
+                        PartitionRecoveryMode::HoldAndBeacon => {
+                            SubterraneanFallbackStage::PartitionHold
                         }
-                        CapabilityDisposition::ReducedWork
-                            if self.last_field_envelope.mode != FieldEnvelopeMode::Nominal =>
-                        {
-                            SubterraneanFallbackStage::FieldDerating
+                        PartitionRecoveryMode::Reconciling => {
+                            SubterraneanFallbackStage::PartitionReconcile
                         }
-                        CapabilityDisposition::FullMission | CapabilityDisposition::ReducedWork => {
-                            SubterraneanFallbackStage::Nominal
+                        PartitionRecoveryMode::Connected
+                        | PartitionRecoveryMode::Grace
+                        | PartitionRecoveryMode::LocalAutonomy => {
+                            match self.capability_profile.disposition {
+                                CapabilityDisposition::ReturnOnly => {
+                                    SubterraneanFallbackStage::CapabilityReturn
+                                }
+                                CapabilityDisposition::HoldForRecovery => {
+                                    SubterraneanFallbackStage::CapabilityHold
+                                }
+                                CapabilityDisposition::ReducedWork
+                                    if self.last_field_envelope.mode
+                                        != FieldEnvelopeMode::Nominal =>
+                                {
+                                    SubterraneanFallbackStage::FieldDerating
+                                }
+                                CapabilityDisposition::FullMission
+                                | CapabilityDisposition::ReducedWork => {
+                                    SubterraneanFallbackStage::Nominal
+                                }
+                            }
                         }
                     }
                 }
@@ -1050,6 +1120,8 @@ impl SubterraneanEmbodiment {
         self.capability_profile = CapabilityProfile::nominal();
         self.partition_recovery.reset_runtime();
         self.last_partition_recovery = PartitionRecoveryAssessment::connected();
+        self.temporal = TemporalAssuranceSupervisor::default();
+        self.pending_temporal_frame = None;
         self.fep_tau_factor = 1.0;
         self.last_free_energy = 0.0;
         self.last_perception = None;
@@ -1131,6 +1203,12 @@ impl SubterraneanEmbodiment {
     }
     pub fn partition_recovery_assessment(&self) -> PartitionRecoveryAssessment {
         self.last_partition_recovery
+    }
+    pub fn ingest_temporal_frame(&mut self, frame: TemporalRuntimeFrame) {
+        self.pending_temporal_frame = Some(frame);
+    }
+    pub fn temporal_assessment(&self) -> &TemporalAssuranceAssessment {
+        self.temporal.last()
     }
     pub fn set_safety_override(&mut self, level: MotorSafetyLevel) {
         self.safety_override = Some(level);
@@ -1480,6 +1558,7 @@ impl SafeFallback for SubterraneanEmbodiment {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::temporal_runtime::TemporalRuntimeInputs;
     fn operator_envelope(
         operator: u64,
         sequence: u64,

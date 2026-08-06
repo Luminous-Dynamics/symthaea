@@ -36,8 +36,19 @@ pub type SpecNote = (i32, i64, i64);
 /// Where the chord progression comes from.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProgressionSpec {
-    /// The functional-harmony grammar generator ([`Progression::generate`]).
+    /// The functional-harmony grammar generator ([`Progression::generate`]),
+    /// with the default (Classical) vocabulary.
     Grammar,
+    /// The same grammar generator with a style's OWN harmonic vocabulary
+    /// ([`Progression::generate_with`]).
+    ///
+    /// `Grammar` alone is style-agnostic: measured 2026-07-30, every style using
+    /// it produced bit-identical progressions at a matched seed (96/96 across
+    /// Classical/BaroqueSuite/March/Nocturne x 32 seeds). Converting a style to
+    /// `Grammar` therefore bought within-style variety at the cost of making it
+    /// indistinguishable from every other Grammar style. This variant is the fix:
+    /// the T-PD-D-T grammar stays universal, the vocabulary becomes the style's.
+    GrammarWithPalette(crate::harmony::HarmonicPalette),
     /// A fixed archetype of scale degrees, cycled to the requested length.
     Archetype(Vec<i32>),
     /// A seed-selected pool of archetypes, each cycled to the requested
@@ -121,6 +132,30 @@ pub enum FormKind {
     /// Bypasses the period pipeline — no single continuous melody voice
     /// can carry a dialogue between two characters. See [`crate::opera`].
     Opera,
+}
+
+impl FormKind {
+    /// True for the three forms realized by the shared period pipeline
+    /// (`crate::composer::compose_with_spec_and_form`), which consumes
+    /// `CompositionSpec::progression` (and therefore `MusicalIntent::bars`)
+    /// to build its harmonic skeleton. False for every dedicated-engine
+    /// form (`Fugue`/`Passacaglia`/`Erosion`/`Lineage`/`ProgSuite`/`Sonata`/
+    /// `Renaissance`/`Opera`), which bypasses that pipeline entirely and
+    /// builds its own harmony/length internally -- for those,
+    /// `CompositionSpec.progression` and `MusicalIntent.bars` have no
+    /// effect on the composed output.
+    ///
+    /// Exists so callers that compare or report on a spec's `progression`
+    /// field (e.g. an A/B harness) can tell, without duplicating
+    /// `compose_with_spec_and_form`'s own dispatch, when that comparison
+    /// is actually meaningful for a given seed -- see
+    /// `baroque_campaign.rs`'s `progression_intervention` field.
+    pub fn uses_progression_pipeline(self) -> bool {
+        matches!(
+            self,
+            FormKind::Ternary | FormKind::Rondo | FormKind::Variations
+        )
+    }
 }
 
 /// Drum policy, interpreted by the renderer (the symbolic layer only names
@@ -689,12 +724,44 @@ impl CompositionSpec {
         crate::form::oriented(&picked, orientation)
     }
 
+    /// Force every arousal tier's motif bank to a single, caller-supplied
+    /// motif — the minimal-pair listening-study control: presenting the
+    /// SAME melodic material through several different grammar families
+    /// isolates structural cues (form, harmony, phrase grammar) as what a
+    /// listener actually recognizes, rather than "I remember this tune."
+    /// Returns `false` (and changes nothing) if `source` doesn't fit one
+    /// bar of this spec's own meter — installing a motif the engine would
+    /// have to silently truncate or overrun defeats the point of a
+    /// controlled comparison. Also disables the hook-cell graft (`texture.
+    /// hook_cell`): grafting a DIFFERENT per-style hook onto the shared
+    /// motif would reintroduce exactly the per-family melodic variation
+    /// this method exists to eliminate.
+    pub fn install_primary_motif_for_seed(&mut self, source: &Motif, _seed: u64) -> bool {
+        let total_beats: f64 = source.notes.iter().map(|n| n.duration.beats()).sum();
+        if total_beats > self.meter as f64 + 1e-9 {
+            return false;
+        }
+        let spec_notes: Vec<SpecNote> = source
+            .notes
+            .iter()
+            .map(|n| (n.degree.unwrap_or(1), n.duration.num(), n.duration.den()))
+            .collect();
+        self.motifs_calm = vec![spec_notes.clone()];
+        self.motifs_medium = vec![spec_notes.clone()];
+        self.motifs_busy = vec![spec_notes];
+        self.texture.hook_cell = false;
+        true
+    }
+
     /// A progression `bars` measures long, from the grammar or the cycled
     /// archetype (same length contract as [`crate::style::Style`] had).
     pub fn progression(&self, bars: usize, seed: u64) -> Progression {
         let bars = bars.max(1);
         match &self.progression {
             ProgressionSpec::Grammar => Progression::generate(bars, seed),
+            ProgressionSpec::GrammarWithPalette(palette) => {
+                Progression::generate_with(bars, seed, palette)
+            }
             ProgressionSpec::Archetype(degrees) => {
                 let cycled: Vec<i32> = (0..bars).map(|i| degrees[i % degrees.len()]).collect();
                 Progression::new(cycled)

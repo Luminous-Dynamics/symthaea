@@ -37,6 +37,85 @@ enum MidiEventType {
     ControlChange { controller: u8, value: u8 },
 }
 
+/// One discrete note scheduled on a MIDI channel, prior to sanitization.
+#[derive(Debug, Clone, Copy)]
+struct ScheduledNote {
+    on: u64,
+    off: u64,
+    pitch: u8,
+    velocity: u8,
+}
+
+/// Build NoteOn/NoteOff events for `notes` on `channel`, resolving the
+/// hazards a real synth/DAW consuming the exported file would otherwise
+/// have to guess at:
+/// - a non-positive duration (defensive — callers already floor durations
+///   with `.max(on + 1)`; this is the safety net for any that don't)
+/// - two notes of the SAME pitch overlapping on the SAME channel (an
+///   ambiguous double-trigger some synths retrigger and some silently
+///   drop) — the earlier note is clipped to end exactly when the next one
+///   begins, turning an overlap into a clean back-to-back retrigger
+/// - an exact onset+pitch duplicate — collapses into the overlap case
+///   above, which then drops the now-zero-length earlier note entirely
+///
+/// Does NOT sort the returned events — callers combine these with their own
+/// leading meta events (ProgramChange/ControlChange) and must sort the
+/// combined list with [`event_ordering_key`] so a NoteOff sharing a tick
+/// with the next NoteOn is always ordered first.
+fn sanitized_note_events(channel: u8, mut notes: Vec<ScheduledNote>) -> Vec<MidiEvent> {
+    notes.retain(|n| n.off > n.on);
+    notes.sort_by_key(|n| n.on);
+
+    let mut sanitized: Vec<ScheduledNote> = Vec::with_capacity(notes.len());
+    let mut open_idx_by_pitch: std::collections::HashMap<u8, usize> = Default::default();
+    for note in notes {
+        if let Some(&idx) = open_idx_by_pitch.get(&note.pitch)
+            && note.on < sanitized[idx].off
+        {
+            // Still-sounding note of the same pitch — end it right where
+            // this one begins instead of letting both ring at once.
+            sanitized[idx].off = note.on;
+        }
+        let pitch = note.pitch;
+        sanitized.push(note);
+        open_idx_by_pitch.insert(pitch, sanitized.len() - 1);
+    }
+    // A note clipped down to (or past) its own onset by the loop above is
+    // now degenerate — drop it rather than emit a zero/negative-length event.
+    sanitized.retain(|n| n.off > n.on);
+
+    let mut events = Vec::with_capacity(sanitized.len() * 2);
+    for note in &sanitized {
+        events.push(MidiEvent {
+            tick: note.on,
+            channel,
+            event_type: MidiEventType::NoteOn {
+                note: note.pitch,
+                velocity: note.velocity,
+            },
+        });
+        events.push(MidiEvent {
+            tick: note.off,
+            channel,
+            event_type: MidiEventType::NoteOff { note: note.pitch },
+        });
+    }
+    events
+}
+
+/// Sort key that deterministically breaks ties AT THE SAME TICK: NoteOff
+/// before everything else before NoteOn. So a note ending and the next one
+/// (same or different pitch) beginning at the identical tick never risks a
+/// real-time consumer seeing the new NoteOn before the old NoteOff.
+fn event_ordering_key(e: &MidiEvent) -> (u64, u8) {
+    let rank = match e.event_type {
+        MidiEventType::NoteOff { .. } => 0,
+        MidiEventType::NoteOn { .. } => 2,
+        _ => 1,
+    };
+    (e.tick, rank)
+}
+
 /// CC7 value for a renderer volume gain in [0, 1].
 fn cc_volume(volume: f32) -> u8 {
     (volume * 127.0).round().clamp(0.0, 127.0) as u8
@@ -161,22 +240,22 @@ pub fn export_midi_voices(
         channel: 9,
         event_type: MidiEventType::ProgramChange(0), // GM drums
     });
-    for &(time, note, vel) in drum_hits {
-        let tick = secs_to_ticks(time, tempo_bpm);
-        drum_track.events.push(MidiEvent {
-            tick,
-            channel: 9,
-            event_type: MidiEventType::NoteOn {
-                note,
+    let scheduled: Vec<ScheduledNote> = drum_hits
+        .iter()
+        .map(|&(time, note, vel)| {
+            let on = secs_to_ticks(time, tempo_bpm);
+            ScheduledNote {
+                on,
+                off: on + 120, // short duration
+                pitch: note,
                 velocity: vel,
-            },
-        });
-        drum_track.events.push(MidiEvent {
-            tick: tick + 120,
-            channel: 9, // short duration
-            event_type: MidiEventType::NoteOff { note },
-        });
-    }
+            }
+        })
+        .collect();
+    drum_track
+        .events
+        .extend(sanitized_note_events(9, scheduled));
+    drum_track.events.sort_by_key(event_ordering_key);
 
     let tracks = vec![
         tempo_track,
@@ -224,8 +303,53 @@ pub fn export_performance_midi(
     state: &crate::MusicalState,
     output_path: &Path,
 ) -> Result<(), String> {
+    export_performance_midi_impl(score, spec, seed, state, None, output_path)
+}
+
+/// [`export_performance_midi`] with an explicit grammar-level
+/// [`symthaea_music_theory::PerformanceDialect`] override — same
+/// controlled-comparison rationale as
+/// [`crate::theory_realize::realize_with_spec_and_dialect`], applied to
+/// the MIDI-export path so a listening study's exported clips and its
+/// audio renders agree on which dialect was used.
+#[cfg(feature = "theory")]
+pub fn export_performance_midi_with_dialect(
+    score: &symthaea_music_theory::Score,
+    spec: &symthaea_music_theory::CompositionSpec,
+    seed: u64,
+    state: &crate::MusicalState,
+    dialect: symthaea_music_theory::PerformanceDialect,
+    output_path: &Path,
+) -> Result<(), String> {
+    export_performance_midi_impl(
+        score,
+        spec,
+        seed,
+        state,
+        Some(crate::theory_realize::map_grammar_dialect(dialect)),
+        output_path,
+    )
+}
+
+#[cfg(feature = "theory")]
+fn export_performance_midi_impl(
+    score: &symthaea_music_theory::Score,
+    spec: &symthaea_music_theory::CompositionSpec,
+    seed: u64,
+    state: &crate::MusicalState,
+    dialect_override: Option<crate::theory_realize::PerformanceDialect>,
+    output_path: &Path,
+) -> Result<(), String> {
     let ensemble = crate::theory_realize::resolve_spec_ensemble(spec, seed);
-    let voices = crate::theory_realize::performance_voices(score, ensemble, spec, state);
+    let dialect = dialect_override.unwrap_or_else(|| crate::theory_realize::dialect_for_spec(spec));
+    let voices = crate::theory_realize::performance_voices_with_dialect(
+        score,
+        ensemble,
+        spec.texture.swing as f64,
+        state,
+        spec.texture.return_color,
+        dialect,
+    );
     let usec_per_beat = (60_000_000.0 / score.tempo_bpm) as u32;
     let tempo_track = Track {
         name: "Tempo".into(),
@@ -277,25 +401,22 @@ pub fn export_performance_midi(
                 },
             },
         ];
-        for n in &voice.notes {
-            let on = secs_to_ticks(n.start_time, score.tempo_bpm);
-            let off = secs_to_ticks(n.start_time + n.duration, score.tempo_bpm).max(on + 1);
-            let note = freq_to_midi(n.frequency);
-            events.push(MidiEvent {
-                tick: on,
-                channel,
-                event_type: MidiEventType::NoteOn {
-                    note,
+        let scheduled: Vec<ScheduledNote> = voice
+            .notes
+            .iter()
+            .map(|n| {
+                let on = secs_to_ticks(n.start_time, score.tempo_bpm);
+                let off = secs_to_ticks(n.start_time + n.duration, score.tempo_bpm).max(on + 1);
+                ScheduledNote {
+                    on,
+                    off,
+                    pitch: freq_to_midi(n.frequency),
                     velocity: (n.velocity * 127.0).clamp(1.0, 127.0) as u8,
-                },
-            });
-            events.push(MidiEvent {
-                tick: off,
-                channel,
-                event_type: MidiEventType::NoteOff { note },
-            });
-        }
-        events.sort_by_key(|e| e.tick);
+                }
+            })
+            .collect();
+        events.extend(sanitized_note_events(channel, scheduled));
+        events.sort_by_key(event_ordering_key);
         tracks.push(Track {
             name: voice.name.into(),
             channel,
@@ -322,25 +443,24 @@ pub fn export_performance_midi(
                 value: 80,
             },
         }];
-        for hit in &drums {
-            let tick = secs_to_ticks(hit.time, score.tempo_bpm);
-            let note = hit.drum.gm_note();
-            events.push(MidiEvent {
-                tick,
-                channel: 9,
-                event_type: MidiEventType::NoteOn {
-                    note,
+        // Percussion is one-shot: a short fixed gate is standard. A fast
+        // roll on the SAME drum can still land two hits closer together
+        // than that gate — `sanitized_note_events` clips the earlier hit
+        // short instead of leaving two overlapping triggers on one key.
+        let scheduled: Vec<ScheduledNote> = drums
+            .iter()
+            .map(|hit| {
+                let on = secs_to_ticks(hit.time, score.tempo_bpm);
+                ScheduledNote {
+                    on,
+                    off: on + 120,
+                    pitch: hit.drum.gm_note(),
                     velocity: (hit.velocity * 127.0).clamp(1.0, 127.0) as u8,
-                },
-            });
-            // Percussion is one-shot: a short fixed gate is standard.
-            events.push(MidiEvent {
-                tick: tick + 120,
-                channel: 9,
-                event_type: MidiEventType::NoteOff { note },
-            });
-        }
-        events.sort_by_key(|e| e.tick);
+                }
+            })
+            .collect();
+        events.extend(sanitized_note_events(9, scheduled));
+        events.sort_by_key(event_ordering_key);
         tracks.push(Track {
             name: "Drums".into(),
             channel: 9,
@@ -444,25 +564,22 @@ pub fn export_score_midi(
             channel,
             event_type: MidiEventType::ProgramChange(instrument.gm_program()),
         }];
-        for n in score.voice(role) {
-            let on = beats_to_ticks(n.onset.beats());
-            let off = beats_to_ticks((n.onset + n.duration).beats()).max(on + 1);
-            let note = n.pitch.midi().clamp(0, 127);
-            events.push(MidiEvent {
-                tick: on,
-                channel,
-                event_type: MidiEventType::NoteOn {
-                    note,
+        let scheduled: Vec<ScheduledNote> = score
+            .voice(role)
+            .iter()
+            .map(|n| {
+                let on = beats_to_ticks(n.onset.beats());
+                let off = beats_to_ticks((n.onset + n.duration).beats()).max(on + 1);
+                ScheduledNote {
+                    on,
+                    off,
+                    pitch: n.pitch.midi(),
                     velocity: (n.velocity * 127.0).clamp(1.0, 127.0) as u8,
-                },
-            });
-            events.push(MidiEvent {
-                tick: off,
-                channel,
-                event_type: MidiEventType::NoteOff { note },
-            });
-        }
-        events.sort_by_key(|e| e.tick);
+                }
+            })
+            .collect();
+        events.extend(sanitized_note_events(channel, scheduled));
+        events.sort_by_key(event_ordering_key);
         tracks.push(Track {
             name: name.into(),
             channel,
@@ -474,38 +591,27 @@ pub fn export_score_midi(
 }
 
 fn notes_to_track(name: &str, channel: u8, program: u8, notes: &[&Note], tempo_bpm: f32) -> Track {
-    let mut events = Vec::new();
-
-    // Program change
-    events.push(MidiEvent {
+    let mut events = vec![MidiEvent {
         tick: 0,
         channel,
         event_type: MidiEventType::ProgramChange(program),
-    });
+    }];
 
-    for note in notes {
-        let midi_note = freq_to_midi(note.frequency).clamp(0, 127);
-        let velocity = (note.velocity * 127.0).clamp(1.0, 127.0) as u8;
-        let start_tick = secs_to_ticks(note.start_time, tempo_bpm);
-        let duration_ticks = secs_to_ticks(note.duration, tempo_bpm).max(1);
-
-        events.push(MidiEvent {
-            tick: start_tick,
-            channel,
-            event_type: MidiEventType::NoteOn {
-                note: midi_note,
-                velocity,
-            },
-        });
-        events.push(MidiEvent {
-            tick: start_tick + duration_ticks,
-            channel,
-            event_type: MidiEventType::NoteOff { note: midi_note },
-        });
-    }
-
-    // Sort by tick
-    events.sort_by_key(|e| e.tick);
+    let scheduled: Vec<ScheduledNote> = notes
+        .iter()
+        .map(|note| {
+            let on = secs_to_ticks(note.start_time, tempo_bpm);
+            let off = on + secs_to_ticks(note.duration, tempo_bpm).max(1);
+            ScheduledNote {
+                on,
+                off,
+                pitch: freq_to_midi(note.frequency),
+                velocity: (note.velocity * 127.0).clamp(1.0, 127.0) as u8,
+            }
+        })
+        .collect();
+    events.extend(sanitized_note_events(channel, scheduled));
+    events.sort_by_key(event_ordering_key);
 
     Track {
         name: name.into(),
@@ -652,6 +758,160 @@ mod tests {
     }
 
     #[test]
+    fn overlapping_same_pitch_notes_are_clipped_to_a_clean_retrigger() {
+        // Two same-pitch, same-channel notes whose intervals overlap
+        // (0..10 and 5..15) must never both sound at once: the earlier one
+        // is clipped to end exactly where the later one begins.
+        let notes = vec![
+            ScheduledNote {
+                on: 0,
+                off: 10,
+                pitch: 60,
+                velocity: 100,
+            },
+            ScheduledNote {
+                on: 5,
+                off: 15,
+                pitch: 60,
+                velocity: 90,
+            },
+        ];
+        let events = sanitized_note_events(0, notes);
+        // Both notes survive (neither collapses to zero length), so exactly
+        // 2 NoteOn + 2 NoteOff.
+        let ons: Vec<&MidiEvent> = events
+            .iter()
+            .filter(|e| matches!(e.event_type, MidiEventType::NoteOn { .. }))
+            .collect();
+        let offs: Vec<&MidiEvent> = events
+            .iter()
+            .filter(|e| matches!(e.event_type, MidiEventType::NoteOff { .. }))
+            .collect();
+        assert_eq!(ons.len(), 2, "{events:?}");
+        assert_eq!(offs.len(), 2, "{events:?}");
+        // The first note's off must have been clipped to the second's onset.
+        let first_off = offs.iter().find(|e| e.tick < 15).expect("clipped off");
+        assert_eq!(first_off.tick, 5, "{events:?}");
+        let second_off = offs.iter().find(|e| e.tick == 15).expect("unclipped off");
+        assert_eq!(second_off.tick, 15);
+    }
+
+    #[test]
+    fn exact_onset_and_pitch_duplicates_collapse_to_one_note() {
+        // Two notes sharing an onset AND a pitch (the same-pitch overlap
+        // case at its most extreme) must not both survive as independent
+        // triggers -- the earlier one collapses to zero length and is
+        // dropped entirely.
+        let notes = vec![
+            ScheduledNote {
+                on: 0,
+                off: 10,
+                pitch: 60,
+                velocity: 100,
+            },
+            ScheduledNote {
+                on: 0,
+                off: 8,
+                pitch: 60,
+                velocity: 90,
+            },
+        ];
+        let events = sanitized_note_events(0, notes);
+        let ons: Vec<&MidiEvent> = events
+            .iter()
+            .filter(|e| matches!(e.event_type, MidiEventType::NoteOn { .. }))
+            .collect();
+        assert_eq!(
+            ons.len(),
+            1,
+            "expected exactly one surviving note: {events:?}"
+        );
+        let offs: Vec<&MidiEvent> = events
+            .iter()
+            .filter(|e| matches!(e.event_type, MidiEventType::NoteOff { .. }))
+            .collect();
+        assert_eq!(offs.len(), 1);
+        assert_eq!(offs[0].tick, 8);
+    }
+
+    #[test]
+    fn distinct_pitches_overlap_freely() {
+        // The overlap guard is per-pitch, not a blanket "no simultaneous
+        // notes on this channel" rule -- a real chord/harmony voice must
+        // still be able to sound multiple distinct pitches at once.
+        let notes = vec![
+            ScheduledNote {
+                on: 0,
+                off: 20,
+                pitch: 60,
+                velocity: 100,
+            },
+            ScheduledNote {
+                on: 5,
+                off: 15,
+                pitch: 64,
+                velocity: 90,
+            },
+        ];
+        let events = sanitized_note_events(0, notes);
+        let offs: Vec<u64> = events
+            .iter()
+            .filter(|e| matches!(e.event_type, MidiEventType::NoteOff { .. }))
+            .map(|e| e.tick)
+            .collect();
+        // Neither note was clipped -- both offs are unchanged.
+        assert!(offs.contains(&20), "{offs:?}");
+        assert!(offs.contains(&15), "{offs:?}");
+    }
+
+    #[test]
+    fn zero_or_negative_duration_notes_are_dropped() {
+        let notes = vec![
+            ScheduledNote {
+                on: 10,
+                off: 10,
+                pitch: 60,
+                velocity: 100,
+            },
+            ScheduledNote {
+                on: 20,
+                off: 15,
+                pitch: 62,
+                velocity: 100,
+            },
+        ];
+        let events = sanitized_note_events(0, notes);
+        assert!(events.is_empty(), "{events:?}");
+    }
+
+    #[test]
+    fn note_off_is_ordered_before_note_on_at_the_same_tick() {
+        // A note ending and a different one beginning at the identical tick
+        // must always emit the NoteOff first, regardless of push order.
+        let mut events = vec![
+            MidiEvent {
+                tick: 100,
+                channel: 0,
+                event_type: MidiEventType::NoteOn {
+                    note: 64,
+                    velocity: 90,
+                },
+            },
+            MidiEvent {
+                tick: 100,
+                channel: 0,
+                event_type: MidiEventType::NoteOff { note: 60 },
+            },
+        ];
+        events.sort_by_key(event_ordering_key);
+        assert!(matches!(
+            events[0].event_type,
+            MidiEventType::NoteOff { .. }
+        ));
+        assert!(matches!(events[1].event_type, MidiEventType::NoteOn { .. }));
+    }
+
+    #[test]
     fn preview_midi_round_trips_and_uses_the_instruments_gm_program() {
         let path = std::env::temp_dir().join(format!(
             "muse_preview_export_test_{}.mid",
@@ -698,7 +958,15 @@ mod tests {
         let smf = midly::Smf::parse(&bytes).expect("exported file must be valid SMF");
         // Tempo track + melody + harmony + bass + counter-melody.
         assert_eq!(smf.tracks.len(), 5);
-        // Every score note becomes exactly one NoteOn (and its NoteOff).
+        // Every score note becomes one NoteOn (and its NoteOff) -- EXCEPT
+        // where `sanitized_note_events` correctly collapses a genuine
+        // same-onset-and-pitch duplicate within one voice (confirmed present
+        // in this exact score: CounterMelody has two pitch-67 notes both at
+        // onset 86.5 beats) into a single clean trigger rather than an
+        // ambiguous double NoteOn. So `ons`/`offs` may be slightly below
+        // `score.notes.len()`, never above it, and never collapse more than
+        // a handful of notes (a large gap would mean the sanitizer is
+        // over-eager, not doing its job).
         let count = |kind: fn(&midly::MidiMessage) -> bool| -> usize {
             smf.tracks
                 .iter()
@@ -715,8 +983,17 @@ mod tests {
             matches!(m, midly::MidiMessage::NoteOff { .. })
                 || matches!(m, midly::MidiMessage::NoteOn { vel, .. } if vel.as_int() == 0)
         });
-        assert_eq!(ons, score.notes.len());
-        assert_eq!(offs, score.notes.len());
+        assert_eq!(ons, offs, "every surviving NoteOn must have its NoteOff");
+        assert!(
+            ons <= score.notes.len(),
+            "ons={ons} > notes={}",
+            score.notes.len()
+        );
+        assert!(
+            ons >= score.notes.len() - 5,
+            "sanitizer collapsed too many notes: ons={ons} notes={}",
+            score.notes.len()
+        );
         std::fs::remove_file(&path).ok();
     }
 

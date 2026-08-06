@@ -20,6 +20,16 @@ pub enum ChordQuality {
     MinorMajor7,     // 0 3 7 11
     HalfDiminished7, // 0 3 6 10 (ø7)
     Diminished7,     // 0 3 6 9
+    /// Augmented-major seventh (0 4 8 11) — the "+M7" / maj7♯5 chord.
+    ///
+    /// Not exotic in this codebase: it is the diatonic seventh on ♭III of EVERY
+    /// minor key, because `Key::minor` builds chords from
+    /// [`crate::scale::Mode::HarmonicMinor`], whose degree 3 stacks to
+    /// (major third, AUGMENTED fifth, major seventh). Without this variant,
+    /// `classify_seventh`'s fallback labelled it `Dominant7`, which replaced the
+    /// augmented fifth with a perfect one and the major seventh with a minor —
+    /// in A minor, C–E–G♯–B became C–E–G–B♭, destroying the key's leading tone.
+    AugmentedMajor7, // 0 4 8 11
     Sus2,            // 0 2 7
     Sus4,            // 0 5 7
 }
@@ -38,6 +48,7 @@ impl ChordQuality {
             ChordQuality::MinorMajor7 => &[0, 3, 7, 11],
             ChordQuality::HalfDiminished7 => &[0, 3, 6, 10],
             ChordQuality::Diminished7 => &[0, 3, 6, 9],
+            ChordQuality::AugmentedMajor7 => &[0, 4, 8, 11],
             ChordQuality::Sus2 => &[0, 2, 7],
             ChordQuality::Sus4 => &[0, 5, 7],
         }
@@ -57,6 +68,13 @@ impl ChordQuality {
             ChordQuality::Sus2 | ChordQuality::Sus4 => 0.3,
             ChordQuality::Major7 | ChordQuality::Minor7 | ChordQuality::MinorMajor7 => 0.4,
             ChordQuality::Augmented => 0.6,
+            // Above Augmented (it adds a major-seventh dissonance to the same
+            // unstable augmented fifth), but below Dominant7 and
+            // HalfDiminished7: 0-4-8-11 contains NO tritone (its internal
+            // intervals are 3, 4, 4, 7, 8, 11), so it is unstable and floating
+            // rather than functionally directional — it does not demand a
+            // specific resolution the way a tritone-bearing chord does.
+            ChordQuality::AugmentedMajor7 => 0.65,
             ChordQuality::Dominant7 => 0.7,
             ChordQuality::HalfDiminished7 => 0.75,
             ChordQuality::Diminished => 0.8,

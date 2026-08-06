@@ -113,7 +113,9 @@ pub enum ReedSolomonError {
 impl fmt::Display for ReedSolomonError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ZeroParitySymbols => write!(f, "Reed-Solomon requires at least one parity symbol"),
+            Self::ZeroParitySymbols => {
+                write!(f, "Reed-Solomon requires at least one parity symbol")
+            }
             Self::TooManyParitySymbols { requested } => write!(
                 f,
                 "Reed-Solomon over GF(2^8) supports at most 254 parity symbols, got {requested}"
@@ -231,7 +233,10 @@ impl fmt::Display for ReedSolomonError {
                 "decoder corrected {corrected} unknown errors, exceeding caller policy maximum {maximum}"
             ),
             Self::CorrectionVerificationFailed => {
-                write!(f, "candidate Reed-Solomon correction failed syndrome verification")
+                write!(
+                    f,
+                    "candidate Reed-Solomon correction failed syndrome verification"
+                )
             }
         }
     }
@@ -442,20 +447,13 @@ impl ReedSolomonFrame {
         self.codec.encode(message)
     }
 
-    pub fn encode_into(
-        &self,
-        message: &[u8],
-        codeword: &mut [u8],
-    ) -> Result<(), ReedSolomonError> {
+    pub fn encode_into(&self, message: &[u8], codeword: &mut [u8]) -> Result<(), ReedSolomonError> {
         self.validate_message(message)?;
         self.validate_codeword(codeword)?;
         self.codec.encode_into(message, codeword)
     }
 
-    pub fn decode(
-        &self,
-        codeword: &[u8],
-    ) -> Result<ReedSolomonDecodeReport, ReedSolomonError> {
+    pub fn decode(&self, codeword: &[u8]) -> Result<ReedSolomonDecodeReport, ReedSolomonError> {
         self.validate_codeword(codeword)?;
         self.codec.decode(codeword)
     }
@@ -475,8 +473,7 @@ impl ReedSolomonFrame {
         erasure_positions: &[usize],
     ) -> Result<ReedSolomonDecodeReport, ReedSolomonError> {
         self.validate_codeword(codeword)?;
-        self.codec
-            .decode_with_erasures(codeword, erasure_positions)
+        self.codec.decode_with_erasures(codeword, erasure_positions)
     }
 
     /// Decode under a caller-selected correction envelope.
@@ -598,10 +595,7 @@ impl ReedSolomonShortenedFrame {
         self.frame.encode(message)
     }
 
-    pub fn decode(
-        &self,
-        codeword: &[u8],
-    ) -> Result<ReedSolomonDecodeReport, ReedSolomonError> {
+    pub fn decode(&self, codeword: &[u8]) -> Result<ReedSolomonDecodeReport, ReedSolomonError> {
         self.frame.decode(codeword)
     }
 
@@ -655,10 +649,7 @@ impl ReedSolomonShortenedFrame {
             .enumerate()
         {
             if value != 0 {
-                return Err(ReedSolomonError::NonZeroShorteningPrefix {
-                    position,
-                    value,
-                });
+                return Err(ReedSolomonError::NonZeroShorteningPrefix { position, value });
             }
         }
         Ok(parent_codeword[self.shortening_symbols..].to_vec())
@@ -684,13 +675,12 @@ impl ReedSolomonParityState<'_> {
     /// Length validation happens before mutation, so an overlong chunk leaves
     /// the accumulator unchanged.
     pub fn update(&mut self, symbols: &[u8]) -> Result<(), ReedSolomonError> {
-        let next_len = self
-            .message_symbols
-            .checked_add(symbols.len())
-            .ok_or(ReedSolomonError::MessageTooLong {
+        let next_len = self.message_symbols.checked_add(symbols.len()).ok_or(
+            ReedSolomonError::MessageTooLong {
                 message_len: usize::MAX,
                 parity_symbols: self.codec.config.parity_symbols,
-            })?;
+            },
+        )?;
         self.codec.encoded_len(next_len)?;
 
         for &symbol in symbols {
@@ -699,10 +689,7 @@ impl ReedSolomonParityState<'_> {
             let last = self.parity.len() - 1;
             self.parity[last] = 0;
             if feedback != 0 {
-                for (parity, &coefficient) in self
-                    .parity
-                    .iter_mut()
-                    .zip(&self.codec.generator[1..])
+                for (parity, &coefficient) in self.parity.iter_mut().zip(&self.codec.generator[1..])
                 {
                     *parity = add(*parity, mul(coefficient, feedback));
                 }
@@ -790,12 +777,12 @@ impl ReedSolomon {
 
     /// Required systematic codeword length for `message_len` source symbols.
     pub fn encoded_len(&self, message_len: usize) -> Result<usize, ReedSolomonError> {
-        let codeword_len = message_len
-            .checked_add(self.config.parity_symbols)
-            .ok_or(ReedSolomonError::MessageTooLong {
+        let codeword_len = message_len.checked_add(self.config.parity_symbols).ok_or(
+            ReedSolomonError::MessageTooLong {
                 message_len,
                 parity_symbols: self.config.parity_symbols,
-            })?;
+            },
+        )?;
         if codeword_len > MAX_CODEWORD_LEN {
             return Err(ReedSolomonError::MessageTooLong {
                 message_len,
@@ -853,11 +840,7 @@ impl ReedSolomon {
     /// This avoids the temporary work allocation used by simpler encoders.
     /// The buffer is used for synthetic division and the systematic message
     /// prefix is restored before return.
-    pub fn encode_into(
-        &self,
-        message: &[u8],
-        codeword: &mut [u8],
-    ) -> Result<(), ReedSolomonError> {
+    pub fn encode_into(&self, message: &[u8], codeword: &mut [u8]) -> Result<(), ReedSolomonError> {
         let expected = self.encoded_len(message.len())?;
         if codeword.len() != expected {
             return Err(ReedSolomonError::OutputLengthMismatch {
@@ -873,8 +856,7 @@ impl ReedSolomon {
             let coefficient = codeword[i];
             if coefficient != 0 {
                 for j in 1..self.generator.len() {
-                    codeword[i + j] =
-                        add(codeword[i + j], mul(self.generator[j], coefficient));
+                    codeword[i + j] = add(codeword[i + j], mul(self.generator[j], coefficient));
                 }
             }
         }
@@ -903,7 +885,10 @@ impl ReedSolomon {
                 parity_symbols: self.config.parity_symbols,
             });
         }
-        Ok(self.syndromes(codeword)?.iter().all(|&syndrome| syndrome == 0))
+        Ok(self
+            .syndromes(codeword)?
+            .iter()
+            .all(|&syndrome| syndrome == 0))
     }
 
     /// Recover up to `parity_symbols` symbol erasures when their positions are known.
@@ -1039,10 +1024,7 @@ impl ReedSolomon {
     /// Chien search to recover symbol positions, and an exact Vandermonde solve
     /// for magnitudes. The method returns data only after all configured
     /// syndromes have been recomputed and verified as zero.
-    pub fn decode(
-        &self,
-        codeword: &[u8],
-    ) -> Result<ReedSolomonDecodeReport, ReedSolomonError> {
+    pub fn decode(&self, codeword: &[u8]) -> Result<ReedSolomonDecodeReport, ReedSolomonError> {
         self.validate_codeword_len(codeword)?;
 
         let syndromes_before = self.syndromes(codeword)?;
@@ -1119,11 +1101,7 @@ impl ReedSolomon {
         Ok(positions)
     }
 
-    fn clean_report(
-        &self,
-        codeword: &[u8],
-        syndromes_before: Vec<u8>,
-    ) -> ReedSolomonDecodeReport {
+    fn clean_report(&self, codeword: &[u8], syndromes_before: Vec<u8>) -> ReedSolomonDecodeReport {
         let message_len = codeword.len() - self.config.parity_symbols;
         ReedSolomonDecodeReport {
             message: codeword[..message_len].to_vec(),
@@ -1248,10 +1226,7 @@ pub fn encode_checked(message: &[u8], nsym: usize) -> Result<Vec<u8>, ReedSolomo
 }
 
 /// Checked syndrome calculation using the crate's AES-field convention.
-pub fn syndromes_checked(
-    codeword: &[u8],
-    nsym: usize,
-) -> Result<Vec<u8>, ReedSolomonError> {
+pub fn syndromes_checked(codeword: &[u8], nsym: usize) -> Result<Vec<u8>, ReedSolomonError> {
     ReedSolomon::new(ReedSolomonConfig::aes(nsym))?.syndromes(codeword)
 }
 
@@ -1274,8 +1249,7 @@ pub fn decode_erasures_checked(
     nsym: usize,
     erasure_positions: &[usize],
 ) -> Result<ReedSolomonDecodeReport, ReedSolomonError> {
-    ReedSolomon::new(ReedSolomonConfig::aes(nsym))?
-        .decode_erasures(codeword, erasure_positions)
+    ReedSolomon::new(ReedSolomonConfig::aes(nsym))?.decode_erasures(codeword, erasure_positions)
 }
 
 /// Checked mixed unknown-error and known-erasure recovery using the default field convention.
@@ -1415,10 +1389,8 @@ fn solve_linear_system(
                 continue;
             }
             for entry in column..=size {
-                augmented[row][entry] = add(
-                    augmented[row][entry],
-                    mul(factor, augmented[column][entry]),
-                );
+                augmented[row][entry] =
+                    add(augmented[row][entry], mul(factor, augmented[column][entry]));
             }
         }
     }
@@ -1442,9 +1414,9 @@ fn gf_div(numerator: u8, denominator: u8) -> Result<u8, ReedSolomonError> {
 
 /// Evaluate a low-degree-first polynomial over GF(2⁸).
 fn poly_eval_ascending(poly: &[u8], x: u8) -> u8 {
-    poly.iter()
-        .rev()
-        .fold(0, |accumulator, &coefficient| add(mul(accumulator, x), coefficient))
+    poly.iter().rev().fold(0, |accumulator, &coefficient| {
+        add(mul(accumulator, x), coefficient)
+    })
 }
 
 fn has_order_255(element: u8) -> bool {
@@ -1479,8 +1451,9 @@ fn poly_mul(a: &[u8], b: &[u8]) -> Vec<u8> {
 
 /// Evaluate a polynomial with Horner's method over GF(2⁸).
 fn poly_eval(poly: &[u8], x: u8) -> u8 {
-    poly.iter()
-        .fold(0, |accumulator, &coefficient| add(mul(accumulator, x), coefficient))
+    poly.iter().fold(0, |accumulator, &coefficient| {
+        add(mul(accumulator, x), coefficient)
+    })
 }
 
 #[cfg(test)]
@@ -1540,27 +1513,24 @@ mod tests {
 
     #[test]
     fn shortened_encoding_matches_zero_prefixed_parent_code() {
-        let shortened = ReedSolomonShortenedFrame::new(
-            ReedSolomonConfig::aes(32),
-            223,
-            19,
-        )
-        .unwrap();
+        let shortened =
+            ReedSolomonShortenedFrame::new(ReedSolomonConfig::aes(32), 223, 19).unwrap();
         let message = (0u8..19).collect::<Vec<_>>();
         let short_codeword = shortened.encode(&message).unwrap();
         let parent_message = shortened.expand_message(&message).unwrap();
-        let parent_codeword = shortened
-            .frame()
-            .codec()
-            .encode(&parent_message)
-            .unwrap();
+        let parent_codeword = shortened.frame().codec().encode(&parent_message).unwrap();
 
         assert_eq!(shortened.shortening_symbols(), 204);
         assert!(parent_codeword[..204].iter().all(|&symbol| symbol == 0));
         assert_eq!(&parent_codeword[204..], short_codeword);
-        assert_eq!(shortened.expand_codeword(&short_codeword).unwrap(), parent_codeword);
         assert_eq!(
-            shortened.contract_parent_codeword(&parent_codeword).unwrap(),
+            shortened.expand_codeword(&short_codeword).unwrap(),
+            parent_codeword
+        );
+        assert_eq!(
+            shortened
+                .contract_parent_codeword(&parent_codeword)
+                .unwrap(),
             short_codeword
         );
         assert_eq!(shortened.parameters().minimum_distance, 33);
@@ -1577,9 +1547,7 @@ mod tests {
             })
         );
 
-        let shortened =
-            ReedSolomonShortenedFrame::new(ReedSolomonConfig::aes(8), 32, 12)
-                .unwrap();
+        let shortened = ReedSolomonShortenedFrame::new(ReedSolomonConfig::aes(8), 32, 12).unwrap();
         let mut parent = shortened
             .expand_codeword(&shortened.encode(&[0xA5; 12]).unwrap())
             .unwrap();
@@ -1596,8 +1564,7 @@ mod tests {
     #[test]
     fn shortened_frame_decodes_in_transmitted_coordinates() {
         let shortened =
-            ReedSolomonShortenedFrame::new(ReedSolomonConfig::aes(12), 200, 21)
-                .unwrap();
+            ReedSolomonShortenedFrame::new(ReedSolomonConfig::aes(12), 200, 21).unwrap();
         let message = b"shortened coordinates";
         let clean = shortened.encode(message).unwrap();
         let erasures = [0usize, clean.len() - 1];
@@ -1608,11 +1575,7 @@ mod tests {
         corrupted[7] ^= 0x5A;
 
         let report = shortened
-            .decode_with_policy(
-                &corrupted,
-                &erasures,
-                ReedSolomonDecodePolicy::new(1, 2),
-            )
+            .decode_with_policy(&corrupted, &erasures, ReedSolomonDecodePolicy::new(1, 2))
             .unwrap();
         assert_eq!(report.message, message);
         assert_eq!(report.corrected_codeword, clean);
@@ -1804,9 +1767,7 @@ mod tests {
             for message_len in [1usize, 3, 17, 63, 255 - parity_symbols] {
                 for error_count in 0..=parity_symbols / 2 {
                     for _case in 0..12 {
-                        let message = (0..message_len)
-                            .map(|_| rng.next_u8())
-                            .collect::<Vec<_>>();
+                        let message = (0..message_len).map(|_| rng.next_u8()).collect::<Vec<_>>();
                         let codeword = codec.encode(&message).unwrap();
                         let mut corrupted = codeword.clone();
                         let positions = unique_positions(&mut rng, codeword.len(), error_count);
@@ -1861,8 +1822,7 @@ mod tests {
                 for _case in 0..10 {
                     let message = (0..31).map(|_| rng.next_u8()).collect::<Vec<_>>();
                     let codeword = codec.encode(&message).unwrap();
-                    let positions =
-                        unique_positions(&mut rng, codeword.len(), erasure_count);
+                    let positions = unique_positions(&mut rng, codeword.len(), erasure_count);
                     let mut erased = codeword.clone();
                     for &position in &positions {
                         erased[position] = rng.next_u8();
@@ -1993,7 +1953,10 @@ mod tests {
             }
         }
 
-        assert!(observed_failure, "beyond-capacity corruption must not be universally accepted");
+        assert!(
+            observed_failure,
+            "beyond-capacity corruption must not be universally accepted"
+        );
     }
 
     #[test]
@@ -2019,11 +1982,7 @@ mod tests {
         corrupted[11] ^= 0xA6;
 
         assert_eq!(
-            codec.decode_with_policy(
-                &corrupted,
-                &[],
-                ReedSolomonDecodePolicy::new(1, 0),
-            ),
+            codec.decode_with_policy(&corrupted, &[], ReedSolomonDecodePolicy::new(1, 0),),
             Err(ReedSolomonError::PolicyUnknownErrorBudgetExceeded {
                 corrected: 2,
                 maximum: 1,
@@ -2031,11 +1990,7 @@ mod tests {
         );
 
         let accepted = codec
-            .decode_with_policy(
-                &corrupted,
-                &[],
-                ReedSolomonDecodePolicy::new(2, 0),
-            )
+            .decode_with_policy(&corrupted, &[], ReedSolomonDecodePolicy::new(2, 0))
             .unwrap();
         assert_eq!(accepted.corrected_codeword, clean);
         assert_eq!(accepted.corrected_unknown_errors(&[]), 2);
@@ -2053,11 +2008,7 @@ mod tests {
         corrupted[9] ^= 0x77;
 
         assert_eq!(
-            codec.decode_with_policy(
-                &corrupted,
-                &erasures,
-                ReedSolomonDecodePolicy::new(2, 1),
-            ),
+            codec.decode_with_policy(&corrupted, &erasures, ReedSolomonDecodePolicy::new(2, 1),),
             Err(ReedSolomonError::PolicyErasureBudgetExceeded {
                 declared: 2,
                 maximum: 1,
@@ -2065,11 +2016,7 @@ mod tests {
         );
 
         let report = codec
-            .decode_with_policy(
-                &corrupted,
-                &erasures,
-                ReedSolomonDecodePolicy::new(1, 2),
-            )
+            .decode_with_policy(&corrupted, &erasures, ReedSolomonDecodePolicy::new(1, 2))
             .unwrap();
         assert_eq!(report.corrected_unknown_errors(&erasures), 1);
         assert_eq!(report.corrected_erasures(&erasures), 2);

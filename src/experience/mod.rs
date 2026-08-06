@@ -44,7 +44,7 @@ use std::collections::HashMap;
 pub use kosmic_state::{
     EightHarmonies, GisState, GisType, HarmonicState, KosmicSong, MoralUncertainty,
 };
-pub use memory::{EpisodicMemory, ThoughtTrace, UserEpistemicMirror};
+pub use memory::{ExperienceRecord, ThoughtTrace, UserEpistemicMirror};
 pub use signals::{PrincipledSignals, SignalComputer};
 
 use crate::wisdom::WisdomState;
@@ -127,7 +127,7 @@ impl Default for SignalWeights {
 /// In-memory cache when databases aren't available
 #[derive(Debug, Default)]
 struct MemoryCache {
-    experiences: Vec<EpisodicMemory>,
+    experiences: Vec<ExperienceRecord>,
     user_mirrors: HashMap<String, UserEpistemicMirror>,
     primitive_stats: HashMap<String, PrimitiveStats>,
 }
@@ -246,7 +246,17 @@ impl ExperienceBus {
         self.wisdom.is_self_maintaining()
     }
 
-    /// Generate with full experience integration
+    /// Generate with full experience integration.
+    ///
+    /// **Dead code as of Reconciliation Plan Phase 3 (2026-07-28)**: confirmed via
+    /// `grep -rn "generate_with_experience" src/` to have zero callers anywhere in the
+    /// workspace outside its own definition and its own unit test. It is the only reader of
+    /// `MemoryCache.experiences` (via [`Self::retrieve_similar_experiences`]); since it is
+    /// itself unreachable, that read path never executes in the live cognitive loop. Left
+    /// in place rather than deleted here (its transitive dependencies on `compute_signals`/
+    /// `select_primitives_principled` weren't fully traced and deletion risk wasn't
+    /// justified for this pass) — flagged as a Phase 6 (dormant-tree disposition) candidate
+    /// in `SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md`.
     pub fn generate_with_experience(
         &mut self,
         _input: &str,
@@ -322,7 +332,7 @@ impl ExperienceBus {
     fn retrieve_similar_experiences(
         &self,
         input_hdv: &ContinuousHV,
-    ) -> Vec<(&EpisodicMemory, f32)> {
+    ) -> Vec<(&ExperienceRecord, f32)> {
         let mut results = Vec::new();
 
         for exp in &self.memory_cache.experiences {
@@ -362,7 +372,7 @@ impl ExperienceBus {
     fn compute_signals(
         &self,
         input_hdv: &ContinuousHV,
-        similar_experiences: &[(&EpisodicMemory, f32)],
+        similar_experiences: &[(&ExperienceRecord, f32)],
     ) -> PrincipledSignals {
         // Prediction Error: How different is this from expected?
         let prediction_error = if similar_experiences.is_empty() {
@@ -399,7 +409,7 @@ impl ExperienceBus {
     }
 
     /// Compute uncertainty from experiences and GIS state
-    fn compute_uncertainty(&self, experiences: &[(&EpisodicMemory, f32)]) -> f32 {
+    fn compute_uncertainty(&self, experiences: &[(&ExperienceRecord, f32)]) -> f32 {
         // Base uncertainty from GIS type
         let gis_uncertainty = match self.kosmic_state.gis_state.current_type {
             GisType::KnownKnown => 0.1,
@@ -533,8 +543,15 @@ impl ExperienceBus {
         (primitives, rules_applied)
     }
 
-    /// Record an experience for learning
-    pub fn record_experience(&mut self, experience: EpisodicMemory) {
+    /// Record an experience for learning.
+    ///
+    /// **Zero callers as of Reconciliation Plan Phase 3 (2026-07-28)**: its two production
+    /// call sites (governance-outcome recording, dream-phase knowledge-fact promotion) were
+    /// removed because their only reader, [`Self::generate_with_experience`], was itself
+    /// already unreachable — see that method's doc comment. Left in place as a general-purpose
+    /// API rather than deleted; a future consumer could legitimately call this again once
+    /// `generate_with_experience` (or a replacement reader) is wired to something live.
+    pub fn record_experience(&mut self, experience: ExperienceRecord) {
         // Update primitive stats before moving experience into cache
         let task_completed = experience
             .outcome

@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Holographic 2.5D Projection System — data model for Time-Waterfall, Stratified Stack, and Cross-Section projections"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["visualization", "projection", "telemetry", "consciousness", "holographic"]
 categories = ["science", "data-structures", "visualization"]
 

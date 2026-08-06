@@ -1,0 +1,15 @@
+2026-07-27 22:06:14.719 | INFO     | __main__:main:102 - wont_you_sing_along_seed111 OK -- 181.5s
+2026-07-27 22:09:17.728 | ERROR    | __main__:main:109 - wont_you_sing_along_seed222 FAILED -- 183.0s -- Error: Generation produced NaN or Inf latents (shape=[1, 375, 64], dtype=torch.float16, device=cuda:0, nan=24000, inf=0).
+2026-07-27 22:12:12.329 | ERROR    | __main__:main:109 - wont_you_sing_along_seed333 FAILED -- 174.6s -- Error: Generation produced NaN or Inf latents (shape=[1, 375, 64], dtype=torch.float16, device=cuda:0, nan=24000, inf=0).
+2026-07-27 22:16:00.124 | INFO     | __main__:main:102 - wont_you_sing_along_seed444 OK -- 227.8s
+2026-07-27 22:19:04.350 | INFO     | __main__:main:102 - wont_you_sing_along_seed555 OK -- 184.2s
+2026-07-27 22:21:14.133 | INFO     | __main__:main:102 - quick_brown_fox_seed111 OK -- 129.8s
+2026-07-27 22:22:50.285 | ERROR    | __main__:main:109 - quick_brown_fox_seed222 FAILED -- 96.1s -- Error: Generation produced NaN or Inf latents (shape=[1, 375, 64], dtype=torch.float16, device=cuda:0, nan=24000, inf=0).
+2026-07-27 22:24:35.081 | INFO     | __main__:main:102 - quick_brown_fox_seed333 OK -- 104.8s
+2026-07-27 22:26:23.289 | INFO     | __main__:main:102 - quick_brown_fox_seed444 OK -- 108.2s
+2026-07-27 22:27:44.812 | ERROR    | __main__:main:109 - quick_brown_fox_seed555 FAILED -- 81.5s -- Error: Generation produced NaN or Inf latents (shape=[1, 375, 64], dtype=torch.float16, device=cuda:0, nan=24000, inf=0).
+2026-07-27 22:29:40.034 | INFO     | __main__:main:102 - summer_breeze_seed111 OK -- 115.2s
+2026-07-27 22:31:08.731 | ERROR    | __main__:main:109 - summer_breeze_seed222 FAILED -- 88.7s -- Error: Generation produced NaN or Inf latents (shape=[1, 375, 64], dtype=torch.float16, device=cuda:0, nan=24000, inf=0).
+2026-07-27 22:33:07.636 | INFO     | __main__:main:102 - summer_breeze_seed333 OK -- 118.9s
+2026-07-27 22:35:19.017 | INFO     | __main__:main:102 - summer_breeze_seed444 OK -- 131.4s
+2026-07-27 22:37:28.653 | INFO     | __main__:main:102 - summer_breeze_seed555 OK -- 129.6s

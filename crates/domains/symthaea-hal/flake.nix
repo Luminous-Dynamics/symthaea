@@ -54,7 +54,7 @@
 
           meta = with pkgs.lib; {
             description = "Hardware abstraction layer for Symthaea humanoid robot";
-            homepage = "https://github.com/Luminous-Dynamics/symthaea";
+            homepage = "https://luminousdynamics.org";
             license = licenses.agpl3Plus;
           };
         };

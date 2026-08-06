@@ -2113,8 +2113,11 @@ impl BrocaLite {
     /// - Consciousness >= 0.15: autoregressive path with trained weights
     ///
     /// Without checkpoint (random init fallback):
-    /// - Consciousness < 0.5: structured grammar-based generation (varied, coherent)
-    /// - Consciousness >= 0.5: autoregressive path (random embeddings)
+    /// - Always structured (a random-init autoregressive model produces word soup)
+    ///
+    /// `max_tokens` bounds both paths: the returned text never carries more than
+    /// `max_tokens` tokens, and `GenerationResult::num_tokens` is the count actually
+    /// emitted (0 only when the text is empty).
     pub fn generate(&mut self, channels: &ThoughtChannels, max_tokens: usize) -> GenerationResult {
         let consciousness_level = channels.channels[7];
 
@@ -2125,7 +2128,7 @@ impl BrocaLite {
         let threshold = if self.checkpoint_loaded { 0.6 } else { 1.1 };
 
         if consciousness_level < threshold {
-            return self.generate_structured(channels);
+            return self.generate_structured(channels, max_tokens);
         }
 
         // Autoregressive path
@@ -2137,7 +2140,17 @@ impl BrocaLite {
     ///
     /// Produces 1-3 sentences depending on consciousness level, with optional
     /// metric observations and glyph echo phrases.
-    fn generate_structured(&mut self, channels: &ThoughtChannels) -> GenerationResult {
+    ///
+    /// `max_tokens` is honored the same way it is on the autoregressive path:
+    /// the returned text never contains more than `max_tokens` whitespace-separated
+    /// tokens, and `GenerationResult::num_tokens` reports the count actually emitted.
+    /// Whole clauses are dropped in preference to cutting one mid-way; only when the
+    /// very first sentence already exceeds the budget is it clamped at a word boundary.
+    fn generate_structured(
+        &mut self,
+        channels: &ThoughtChannels,
+        max_tokens: usize,
+    ) -> GenerationResult {
         let consciousness = channels.channels[7];
         let pe = channels.channels[8];
         let curiosity = channels.channels[0];
@@ -2174,13 +2187,41 @@ impl BrocaLite {
             sentences.push(glyph.echo_phrase.to_string());
         }
 
+        // Fit the assembled clauses into the caller's token budget. Clauses are
+        // whole grammatical units, so drop trailing ones rather than cutting a
+        // sentence in half; the sole exception is a first sentence that already
+        // overruns the budget, which is clamped at a word boundary so the caller
+        // still gets output without ever exceeding what it asked for.
+        let mut parts: Vec<String> = Vec::with_capacity(sentences.len());
+        let mut used = 0usize;
+        for sentence in sentences {
+            let len = sentence.split_whitespace().count();
+            if used + len <= max_tokens {
+                used += len;
+                parts.push(sentence);
+            } else {
+                if parts.is_empty() {
+                    let clamped: Vec<&str> = sentence.split_whitespace().take(max_tokens).collect();
+                    if !clamped.is_empty() {
+                        parts.push(clamped.join(" "));
+                    }
+                }
+                break;
+            }
+        }
+
         // Capitalize the first character of the first sentence.
-        let text = sentences.join(". ");
-        let text = capitalize_first(&text);
+        let text = capitalize_first(&parts.join(". "));
+
+        // Report the tokens actually emitted. This used to be hardcoded to 0, which
+        // reported "zero tokens" alongside a 20-30 word sentence for every consumer:
+        // `Engine::generate_text` forwards it verbatim, and `wasm_bindings` hands it
+        // straight to JS.
+        let num_tokens = text.split_whitespace().count();
 
         GenerationResult {
             text,
-            num_tokens: 0,
+            num_tokens,
             eos_terminated: true,
         }
     }

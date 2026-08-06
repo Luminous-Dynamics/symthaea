@@ -58,6 +58,16 @@ pub const SURPRISE_BOREDOM_DAMPEN: f32 = 0.7;
 /// Basis: Shiffrin & Steyvers (1997) — retrieval threshold in memory models.
 pub const MEMORY_RECALL_SIM_THRESHOLD: f32 = 0.3;
 
+/// Minimum full-dimension (16,384-D) input-HDC similarity before an episodic
+/// recall is blended into the CfC prediction — Predictive Compression
+/// Program C3 (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md §7).
+/// Distinct from `MEMORY_RECALL_SIM_THRESHOLD` above (a different recall
+/// path, `EpisodicMemoryBridge`, scored on a 64-float embedding sample, not
+/// the full vector) — registered value, chosen as the midpoint between
+/// "uncorrelated" (~0.0 for random full-dimension HDC vectors) and
+/// "near-duplicate" (~0.9+); revisit if C3's manipulation check fails.
+pub const RECALL_BLEND_SIM_THRESHOLD: f32 = 0.5;
+
 /// Default input similarity memoization threshold (cosine).
 /// Basis: Tulving & Schacter (1990) — repetition priming allows processing shortcuts.
 pub const INPUT_MEMO_THRESHOLD: f32 = 0.95;

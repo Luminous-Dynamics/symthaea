@@ -15,7 +15,7 @@ use crate::harmony::Key;
 use crate::motif::Motif;
 use crate::pitch::{Pitch, PitchClass};
 use crate::rhythm::Duration;
-use crate::score::{Emphasis, Score, ScoreNote, VoiceRole};
+use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 use serde::{Deserialize, Serialize};
 
 /// A muse-independent expressive intent. muse maps its cognitive state onto
@@ -350,6 +350,21 @@ pub fn compose_with_spec_and_form_and_grammar(
     spec: &crate::spec::CompositionSpec,
     grammar: Option<crate::grammar::GrammarProfile>,
 ) -> (Score, Option<Form>) {
+    let (mut score, form) = compose_with_spec_and_form_and_grammar_impl(intent, spec, grammar);
+    deoverlap_all_voices(&mut score);
+    sync_total_beats(&mut score);
+    crate::score_validation::debug_assert_no_structural_defects(
+        &score,
+        "compose_with_spec_and_form_and_grammar",
+    );
+    (score, form)
+}
+
+fn compose_with_spec_and_form_and_grammar_impl(
+    intent: &MusicalIntent,
+    spec: &crate::spec::CompositionSpec,
+    grammar: Option<crate::grammar::GrammarProfile>,
+) -> (Score, Option<Form>) {
     // The spec's mode override pins the tonality; otherwise valence maps
     // positive → major, negative → minor. (`validate()` already rejected
     // grammar-incompatible modes, so a `None` from `Key::modal` can only
@@ -583,6 +598,21 @@ pub fn compose_with_spec_and_form_and_grammar(
             attitude,
         );
     }
+    // Bass is realized BEFORE harmony so `realize_harmony_measures` can read the
+    // ACTUAL sounding bass from the score and voice the upper parts against it
+    // (rootless chords + bass-vs-upper parallel fifths, both measured 2026-07-30).
+    // Purely a reordering: the two use independent `prev_bass`/`prev_upper` chains
+    // and never read each other's state, so the emitted NOTES are unchanged.
+    realize_bass(
+        &mut score,
+        &form,
+        meter_beats,
+        intent,
+        &mut prev_bass,
+        pattern,
+        tx.cadential_harmonic_rhythm,
+        spec.development != crate::spec::DevelopmentDna::Classic,
+    );
     realize_harmony(
         &mut score,
         &form,
@@ -593,15 +623,6 @@ pub fn compose_with_spec_and_form_and_grammar(
         tx.thin_departure,
         tx.cadential_harmonic_rhythm,
         tx.seventh_chords,
-    );
-    realize_bass(
-        &mut score,
-        &form,
-        meter_beats,
-        intent,
-        &mut prev_bass,
-        pattern,
-        tx.cadential_harmonic_rhythm,
     );
     if tx.hook_cell {
         apply_hidden_bass_quote(
@@ -842,6 +863,7 @@ fn apply_parallel_planing(score: &mut Score, form: &Form, bars: i64, meter_beats
             let shift = midi - base_melody_midi;
             for &(base_midi, vel) in &base_shape {
                 score.push(ScoreNote {
+                    part: PartId::UNASSIGNED,
                     pitch: Pitch::from_midi((base_midi + shift).clamp(0, 127) as u8),
                     onset,
                     duration,
@@ -1064,6 +1086,7 @@ fn apply_development_style(
                         pitch = pitch.transpose(-12);
                     }
                     score.push(ScoreNote {
+                        part: PartId::UNASSIGNED,
                         pitch,
                         onset: t,
                         duration: note.duration,
@@ -1222,6 +1245,7 @@ fn apply_appoggiaturas(score: &mut Score, key: Key, dna: &crate::spec::MelodicDn
         note.duration = note.duration.saturating_sub(Duration::new(lean_480, 480));
         note.velocity *= 0.92; // the resolution releases
         additions.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: lean_pitch,
             onset,
             duration: Duration::new(lean_480, 480),
@@ -1291,6 +1315,7 @@ fn apply_grace_ornaments(score: &mut Score, key: Key, dna: &crate::spec::Melodic
         note.onset = onset + Duration::new(cut_480, 480);
         note.duration = note.duration.saturating_sub(Duration::new(cut_480, 480));
         additions.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: cut_pitch,
             onset,
             duration: Duration::new(cut_480, 480),
@@ -1388,6 +1413,7 @@ fn apply_roll_ornaments(score: &mut Score, key: Key, dna: &crate::spec::MelodicD
                 dur
             };
             chain.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch,
                 onset: t,
                 duration: this_dur,
@@ -1535,6 +1561,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
         let hold = Duration::new((hold_beats * 480.0).round() as i64, 480);
         resolved_indices.push(j_idx);
         additions.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: suspended_pitch,
             onset: onset2,
             duration: hold,
@@ -1544,6 +1571,7 @@ fn apply_suspensions(score: &mut Score, key: Key, rate: f32, seed: u64) {
             section_intensity: si2,
         });
         additions.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: resolved_pitch,
             onset: onset2 + hold,
             duration: dur2.saturating_sub(hold),
@@ -1750,6 +1778,7 @@ fn apply_additive_process(score: &mut Score, form: &Form, bars: i64, meter_beats
                     pitch = pitch.transpose(-12);
                 }
                 score.push(ScoreNote {
+                    part: PartId::UNASSIGNED,
                     pitch,
                     onset: Duration::new((t * 480.0).round() as i64, 480),
                     duration: Duration::new((this_dur * 480.0).round().max(1.0) as i64, 480),
@@ -1814,6 +1843,7 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
         let onset = bar.scale(m, 1);
         let si = intensity_near(onset.beats());
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: tonic,
             onset,
             duration: half,
@@ -1823,6 +1853,7 @@ fn apply_drone_pedal(score: &mut Score, key: Key) {
             section_intensity: si,
         });
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: fifth,
             onset: onset + half,
             duration: half,
@@ -1877,6 +1908,7 @@ fn apply_full_drone(score: &mut Score, key: Key) {
         let si = intensity_near(onset.beats());
         for pitch in [tonic, fifth, octave] {
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch,
                 onset,
                 duration: bar,
@@ -2020,6 +2052,7 @@ fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beat
         if !window_touched {
             for &pitch in &dom_voiced {
                 score.push(ScoreNote {
+                    part: PartId::UNASSIGNED,
                     pitch,
                     onset: win_onset,
                     duration: half,
@@ -2030,6 +2063,7 @@ fn apply_pivot_modulations(score: &mut Score, form: &Form, bars: i64, meter_beat
                 });
             }
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: dom_root_bass,
                 onset: win_onset,
                 duration: half,
@@ -2327,6 +2361,7 @@ fn apply_grief_suspensions(
             };
             let onset = bar.scale(measure + i as i64, 1);
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: sus,
                 onset,
                 duration: Duration::new(1, 1),
@@ -2336,6 +2371,7 @@ fn apply_grief_suspensions(
                 section_intensity: section.role.intensity(),
             });
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: resolution,
                 onset: onset + Duration::new(1, 1),
                 duration: Duration::new((meter_beats as i64 - 1).max(1), 1),
@@ -2488,7 +2524,6 @@ fn apply_damage(
             }
         }
     }
-
     // --- ≥0.35: the bass enters too low, too dark ---
     if fires(DamageDevice::DarkBassEntry)
         && let Some(first_bass) = score
@@ -2501,7 +2536,6 @@ fn apply_damage(
         first_bass.pitch = first_bass.pitch.transpose(-12);
         first_bass.velocity = (first_bass.velocity + 0.08).clamp(0.1, 1.0);
     }
-
     // --- ≥0.35: remove the downbeat the ear expects in the return ---
     if fires(DamageDevice::ExpectationHole)
         && let Some(ret) = sections.iter().find(|s| s.role == SectionRole::ReturnA)
@@ -2515,7 +2549,6 @@ fn apply_damage(
             score.notes.remove(idx);
         }
     }
-
     // --- ≥0.5: one chromatic "wait" tone in the departure ---
     if fires(DamageDevice::WaitTone)
         && let Some(b) = sections.iter().find(|s| s.role == SectionRole::B)
@@ -2539,16 +2572,34 @@ fn apply_damage(
         let pair = melody.windows(2).find_map(|w| {
             let (a, b) = (&score.notes[w[0]], &score.notes[w[1]]);
             let step = b.pitch.midi() as i32 - a.pitch.midi() as i32;
+            let gap_start = (a.onset + a.duration).beats();
+            let gap_end = b.onset.beats();
+            // `melody` only lists Normal-emphasis notes in the window, so a
+            // Cadential/Climax-emphasis melody note can sit chronologically
+            // between `a` and `b` without ever appearing as a pair here —
+            // but the passing tone below is placed purely from `a`/`b`'s
+            // own onsets, with no awareness of anything else. Require the
+            // gap to be genuinely empty of ANY other melody note before
+            // treating it as "room to steal a sixteenth from".
+            let gap_is_clear = !score.notes.iter().enumerate().any(|(idx, n)| {
+                idx != w[0]
+                    && idx != w[1]
+                    && n.role == VoiceRole::Melody
+                    && n.onset.beats() < gap_end - 1e-9
+                    && (n.onset + n.duration).beats() > gap_start + 1e-9
+            });
             // A whole-step move with room to steal a sixteenth from.
             (step.abs() == 2
-                && (a.onset + a.duration).beats() <= b.onset.beats() + 1e-6
-                && a.duration.beats() >= 0.5)
+                && gap_end - gap_start >= -1e-6
+                && a.duration.beats() >= 0.5
+                && gap_is_clear)
                 .then_some((w[0], w[1], step.signum()))
         });
         if let Some((ai, bi, dir)) = pair {
             let grace = Duration::sixteenth();
             let passing_onset = score.notes[bi].onset.saturating_sub(grace);
             let passing = ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: score.notes[ai].pitch.transpose(dir),
                 onset: passing_onset,
                 duration: grace,
@@ -2568,7 +2619,6 @@ fn apply_damage(
             score.notes.insert(bi, passing);
         }
     }
-
     // --- ≥0.5: the counterline stops agreeing ---
     if fires(DamageDevice::CounterShift) {
         let counter: Vec<usize> = score
@@ -2592,12 +2642,102 @@ fn apply_damage(
             }
         }
     }
+    // CounterShift moves notes later without checking what that collides
+    // with: the forced 0.5-beat floor (a few lines up) can LENGTHEN a short
+    // note past where the next counter-melody note (shifted or not) begins.
+    // De-overlap defensively rather than trying to reason about every
+    // shift/floor interaction inline.
+    deoverlap_voice(score, VoiceRole::CounterMelody);
 
     // Keep the melody line onset-ordered for downstream consumers.
     let _ = key; // key reserved for future harmonic damage devices
     score
         .notes
         .sort_by(|a, b| a.onset.beats().total_cmp(&b.onset.beats()));
+}
+
+/// De-overlap one voice's own notes: walking them in onset order, truncate
+/// any note whose end now runs past the very next same-voice note's onset
+/// to end EXACTLY there (exact rational arithmetic — no rounding, so this
+/// can never overshoot back into an overlap). A note with no usable room at
+/// all (an exact-duplicate onset, or a negative gap) is dropped entirely
+/// rather than forced to a degenerate/overlapping duration. A defensive
+/// pass for devices that shift/shorten/insert notes in ways too entangled
+/// to reason about neighbor-by-neighbor inline — see
+/// [`deoverlap_all_voices`] for why this is applied universally rather than
+/// chasing each device's own root cause.
+pub(crate) fn deoverlap_voice(score: &mut Score, role: VoiceRole) {
+    let mut idxs: Vec<usize> = score
+        .notes
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| n.role == role)
+        .map(|(i, _)| i)
+        .collect();
+    idxs.sort_by(|&a, &b| {
+        score.notes[a]
+            .onset
+            .beats()
+            .total_cmp(&score.notes[b].onset.beats())
+    });
+    let mut to_remove = Vec::new();
+    for w in idxs.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let a_end = (score.notes[a].onset + score.notes[a].duration).beats();
+        let b_onset_beats = score.notes[b].onset.beats();
+        if a_end > b_onset_beats + 1e-9 {
+            let gap = score.notes[b].onset.saturating_sub(score.notes[a].onset);
+            if gap.beats() <= 1e-9 {
+                to_remove.push(a);
+            } else {
+                score.notes[a].duration = gap;
+            }
+        }
+    }
+    to_remove.sort_unstable();
+    to_remove.dedup();
+    for i in to_remove.into_iter().rev() {
+        score.notes.remove(i);
+    }
+}
+
+/// Universal safety net: de-overlap EVERY voice, applied once at the very
+/// end of composition regardless of which grammar family/engine produced
+/// the score. Multiple independent devices across this crate (ornaments,
+/// attitude devices, damage devices, and each dedicated grammar engine)
+/// mutate or insert notes without cross-checking every other device that
+/// might have touched the same window — chasing each one's root cause
+/// individually is open-ended, while guaranteeing the invariant holds on
+/// the way out is not. See `debug_assert_no_structural_defects`'s call
+/// sites for where this runs.
+pub(crate) fn deoverlap_all_voices(score: &mut Score) {
+    // Matches `score_validation::validate_voice_monophony`'s own role set
+    // exactly: `Harmony` is deliberately excluded there (and here) because
+    // it's legitimately POLYPHONIC — a chord is multiple simultaneous
+    // Harmony-role notes by design, not an overlap bug.
+    for role in [VoiceRole::Melody, VoiceRole::Bass, VoiceRole::CounterMelody] {
+        deoverlap_voice(score, role);
+    }
+}
+
+/// Keep `Score::total_beats` honest after any pass that lengthens a note by
+/// mutating its `duration` field directly (bypassing `Score::push`, which
+/// is the only place that normally extends `total_beats`). Several
+/// attitude/damage devices do exactly this (e.g. `alter_statement`'s
+/// Curiosity case extends the second-to-last note), which silently let a
+/// note's end run past the score's own declared length — caught by
+/// `NoteBounds`' `end <= total_beats` check once the debug validation gate
+/// was wired in.
+pub(crate) fn sync_total_beats(score: &mut Score) {
+    if let Some(max_end) = score
+        .notes
+        .iter()
+        .map(|n| n.onset + n.duration)
+        .max_by(|a, b| a.beats().total_cmp(&b.beats()))
+        && max_end.beats() > score.total_beats.beats()
+    {
+        score.total_beats = max_end;
+    }
 }
 
 /// One injury the damage planner can choose. See [`apply_damage`] for what
@@ -2750,6 +2890,13 @@ fn apply_counter_hook_echoes(
     hook: &crate::hook::HookCell,
 ) {
     let vel = (0.30 + intent.energy.clamp(0.0, 1.0) * 0.25).clamp(0.15, 0.55);
+    // The echo's total span (constant across every hold — it's the same
+    // hook cell every time), needed to clear its own window in the
+    // counter-melody voice before answering into it (see the loop below).
+    let echo_span: Duration = hook
+        .notes
+        .iter()
+        .fold(Duration::zero(), |acc, &(_, dur)| acc + dur.scale(1, 2));
     // The last cadential melody note of the whole piece — exempt.
     let final_onset = score
         .notes
@@ -2786,7 +2933,29 @@ fn apply_counter_hook_echoes(
             .collect();
         for (hold_onset, held_midi) in holds {
             // The answer begins half a beat into the held tone.
-            let mut t = hold_onset + 0.5;
+            let echo_start = hold_onset + 0.5;
+            let echo_end = echo_start + echo_span.beats();
+            // Clear the counter-melody's own window before answering into
+            // it (mirrors `apply_hidden_bass_quote`'s overlap-aware
+            // clearing) — without this, whatever the base composition
+            // already placed here (e.g. a hidden-bass-quote-style
+            // counterline, or a prior echo) collides with the new hook
+            // notes: exact-duplicate onsets/pitches or straight overlap.
+            score.notes.retain(|n| {
+                !(n.role == VoiceRole::CounterMelody
+                    && n.onset.beats() >= echo_start - 1e-9
+                    && n.onset.beats() < echo_end - 1e-9)
+            });
+            for n in score.notes.iter_mut() {
+                if n.role == VoiceRole::CounterMelody
+                    && n.onset.beats() < echo_start - 1e-9
+                    && (n.onset + n.duration).beats() > echo_start + 1e-9
+                {
+                    let raw = ((echo_start - n.onset.beats()) * 4.0).round() as i64;
+                    n.duration = Duration::new(raw.max(1), 4);
+                }
+            }
+            let mut t = echo_start;
             for &(deg, dur) in &hook.notes {
                 let halved = dur.scale(1, 2);
                 let mut pitch = scale.degree_pitch(deg, 4);
@@ -2795,6 +2964,7 @@ fn apply_counter_hook_echoes(
                     pitch = pitch.transpose(-12);
                 }
                 score.push(ScoreNote {
+                    part: PartId::UNASSIGNED,
                     pitch,
                     onset: Duration::new((t * 4.0).round() as i64, 4),
                     duration: halved,
@@ -2954,6 +3124,7 @@ fn alter_statement(
                 let vel = (score.notes[peak].velocity * 0.8).clamp(0.1, 1.0);
                 let intensity = score.notes[peak].section_intensity;
                 score.notes.push(ScoreNote {
+                    part: PartId::UNASSIGNED,
                     pitch: above,
                     onset: peak_onset.saturating_sub(grace),
                     duration: grace,
@@ -3024,6 +3195,7 @@ fn apply_hidden_bass_quote(
     for &(deg, dur) in &hook.notes {
         let augmented = dur.scale(2, 1);
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: key.scale().degree_pitch(deg, 2),
             onset: Duration::new((t * 2.0).round() as i64, 2),
             duration: augmented,
@@ -3265,6 +3437,7 @@ fn prepend_intro(
                     SectionRole::A.intensity(),
                 );
                 score.push(ScoreNote {
+                    part: PartId::UNASSIGNED,
                     pitch: Pitch::new(home.tonic, 2),
                     onset,
                     duration: bar,
@@ -3280,6 +3453,7 @@ fn prepend_intro(
                 let swell = vel * (0.8 + 0.2 * (m as f32 + 1.0) / intro_bars.max(1) as f32);
                 for pitch in &voiced {
                     score.push(ScoreNote {
+                        part: PartId::UNASSIGNED,
                         pitch: *pitch,
                         onset,
                         duration: bar,
@@ -3356,6 +3530,7 @@ fn append_coda(
         let onset = start + bar.scale(m, 1);
         let chord = home.diatonic_triad(deg);
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: tonic_melody,
             onset,
             duration: bar,
@@ -3370,6 +3545,7 @@ fn append_coda(
         });
         for pitch in chord.voice(3) {
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch,
                 onset,
                 duration: bar,
@@ -3380,6 +3556,7 @@ fn append_coda(
             });
         }
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: chord.voice(2)[0],
             onset,
             duration: bar,
@@ -3479,6 +3656,7 @@ fn append_transformed_coda(
         };
         let fade = 0.9 - 0.25 * (onset_beats / total_beats) as f32;
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch,
             onset: start + Duration::new((onset_beats * 2.0) as i64, 2),
             duration: Duration::new((dur_beats * 2.0) as i64, 2),
@@ -3505,6 +3683,7 @@ fn append_transformed_coda(
         let onset = start + bar.scale(m, 1);
         for pitch in chord.voice(3) {
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch,
                 onset,
                 duration: bar,
@@ -3518,6 +3697,7 @@ fn append_transformed_coda(
             });
         }
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: chord.voice(2)[0],
             onset,
             duration: bar,
@@ -3844,6 +4024,7 @@ pub(crate) fn realize_melody(
                     *dur
                 };
                 score.push(ScoreNote {
+                    part: PartId::UNASSIGNED,
                     pitch: *p,
                     onset,
                     duration: sounded,
@@ -3906,6 +4087,7 @@ pub(crate) fn realize_melody(
                 score.notes.insert(
                     ci,
                     ScoreNote {
+                        part: PartId::UNASSIGNED,
                         pitch: below,
                         onset: climax_onset.saturating_sub(grace),
                         duration: grace,
@@ -4034,7 +4216,19 @@ fn realize_harmony_measures(
             continue;
         }
 
-        let voiced = crate::voicing::lead_upper(prev_upper, chord, harmony_octave);
+        // The bass is already emitted (realize_bass precedes realize_harmony),
+        // so the harmony can be kept above it -- 1542 of 1550 measured voice
+        // crossings are bass-vs-Harmony.
+        let voiced = crate::voicing::lead_upper_above_bass(
+            prev_upper,
+            chord,
+            harmony_octave,
+            crate::score_validation::sounding_pitch(
+                score,
+                crate::score::VoiceRole::Bass,
+                onset.beats(),
+            ),
+        );
         // The pattern decides WHEN the voiced tones sound within the bar
         // (block pad, arpeggio, Alberti, oom-pah, comp stabs); WHICH tones
         // exist is decided above by the voice leading and is identical for
@@ -4184,6 +4378,7 @@ pub(crate) fn realize_counter_melody(
                         1.1 - 0.3 * ((pos - 0.65) / 0.35)
                     };
                     score.push(ScoreNote {
+                        part: PartId::UNASSIGNED,
                         pitch: p,
                         onset,
                         duration: tone_dur,
@@ -4218,6 +4413,10 @@ fn realize_bass_measures(
     section_intensity: f32,
     pattern: crate::accompaniment::Accompaniment,
     cadential_split: bool,
+    // `melody_aware`: choose each bass note against the melody already in the
+    // score. Only set where nothing downstream re-fits the melody FROM this
+    // bass — see `voicing::lead_bass`'s doc.
+    melody_aware: bool,
 ) {
     let bass_octave = 2;
     // Bass sits clearly BELOW the melody's peak (the old formula let it
@@ -4276,7 +4475,29 @@ fn realize_bass_measures(
         };
         let bar_onset = bar.scale(start_measure + i as i64, 1);
         let force_root = force_root_at(i);
-        let bass = crate::voicing::lead_bass(*prev_bass, chord, bass_octave, force_root);
+        let bass = if melody_aware {
+            // The melody is already emitted (`realize_melody` precedes
+            // `realize_bass`), so the bass can choose against the line it will
+            // actually sound with instead of blind.
+            crate::voicing::lead_bass_against_melody(
+                *prev_bass,
+                chord,
+                bass_octave,
+                force_root,
+                crate::score_validation::sounding_pitch(
+                    score,
+                    crate::score::VoiceRole::Melody,
+                    bar_onset.beats() - meter_beats,
+                ),
+                crate::score_validation::sounding_pitch(
+                    score,
+                    crate::score::VoiceRole::Melody,
+                    bar_onset.beats(),
+                ),
+            )
+        } else {
+            crate::voicing::lead_bass(*prev_bass, chord, bass_octave, force_root)
+        };
 
         // Cadence approach (matches realize_harmony_measures' harmonic-
         // rhythm split): in the bar BEFORE the dominant, the bass steps to
@@ -4297,6 +4518,7 @@ fn realize_bass_measures(
             let quarter = Duration::quarter();
             let hold = bar.saturating_sub(quarter);
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: bass,
                 onset: bar_onset,
                 duration: if meter_beats > 1.0 { hold } else { bar },
@@ -4311,6 +4533,7 @@ fn realize_bass_measures(
                 // lesson: cross-bar sustain risks colliding with the next
                 // bar's own freshly-voiced chord).
                 score.push(ScoreNote {
+                    part: PartId::UNASSIGNED,
                     pitch: bass,
                     onset: bar_onset + hold,
                     duration: quarter,
@@ -4333,6 +4556,7 @@ fn realize_bass_measures(
                 bar
             };
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: bass,
                 onset: bar_onset,
                 duration: anchor_dur,
@@ -4367,6 +4591,7 @@ fn realize_bass_measures(
                     continue;
                 }
                 score.push(ScoreNote {
+                    part: PartId::UNASSIGNED,
                     pitch: if is_fifth { fifth } else { bass },
                     onset: bar_onset + Duration::new((beat * 2.0).round() as i64, 2),
                     duration: eighth,
@@ -4382,6 +4607,7 @@ fn realize_bass_measures(
         if approaches_dominant {
             let third = chord.voice(bass_octave)[1];
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: bass,
                 onset: bar_onset,
                 duration: half_bar,
@@ -4391,6 +4617,7 @@ fn realize_bass_measures(
                 section_intensity,
             });
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: third,
                 onset: bar_onset + half_bar,
                 duration: half_bar,
@@ -4404,6 +4631,7 @@ fn realize_bass_measures(
         }
 
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: bass,
             onset: bar_onset,
             duration: if five_gait {
@@ -4427,6 +4655,7 @@ fn realize_bass_measures(
         if walking {
             let fifth = chord.voice(bass_octave)[2];
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: fifth,
                 onset: bar_onset + half_bar,
                 duration: half_bar,
@@ -4439,6 +4668,7 @@ fn realize_bass_measures(
         } else if five_gait {
             // The TWO group's anchor: the root again at beat 3, two beats.
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: bass,
                 onset: bar_onset + Duration::new(3, 1),
                 duration: Duration::new(2, 1),
@@ -4469,6 +4699,10 @@ pub(crate) fn realize_bass(
     prev_bass: &mut Option<Pitch>,
     pattern: crate::accompaniment::Accompaniment,
     cadential_split: bool,
+    // `refits_melody_in_bc`: true when this caller will later run
+    // `apply_development_style`, which re-fits the MELODY against this bass in
+    // B/C sections. Only `composer::compose` does; all others pass `false`.
+    refits_melody_in_bc: bool,
 ) {
     let mut measure: i64 = 0;
     let total_measures: usize = form
@@ -4481,6 +4715,14 @@ pub(crate) fn realize_bass(
         degrees.extend(section.period.consequent.progression.iter().copied());
         let n = degrees.len();
         let base_measure = measure;
+        // The melody may be re-derived FROM this bass in B/C sections (see
+        // `apply_development_style`), so optimizing the bass against the melody
+        // there would fight a pass that runs later. Everywhere else it is safe.
+        let melody_aware = !(refits_melody_in_bc
+            && matches!(
+                section.role,
+                crate::form::SectionRole::B | crate::form::SectionRole::C
+            ));
         realize_bass_measures(
             score,
             &degrees,
@@ -4496,6 +4738,7 @@ pub(crate) fn realize_bass(
             section.role.intensity(),
             pattern,
             cadential_split,
+            melody_aware,
         );
         measure += n as i64;
     }
@@ -4506,6 +4749,37 @@ mod tests {
     use super::*;
     use crate::harmony::{Progression, Tonality};
     use crate::score::VoiceRole;
+
+    /// Regression test for the counter-melody overlap bugs fixed in
+    /// `apply_counter_hook_echoes` and `DamageDevice::CounterShift`: a
+    /// 300-seed sweep of `Style::Classical`'s default composition — the
+    /// exact reproduction that originally found 750 Fatal `VoiceMonophony`
+    /// violations — found in the muse improvement-roadmap audit. This test
+    /// doesn't need to call `validate_score` itself: `compose_styled` routes
+    /// through `compose_with_grammar_plan`, which now calls
+    /// `debug_assert_no_structural_defects` on every composed score, so any
+    /// regression of this bug class panics right here under `cargo test`
+    /// (debug_assertions are on). Also sweeps every other style at a handful
+    /// of seeds so the gate isn't only exercised for Classical.
+    #[test]
+    fn no_style_produces_a_structurally_defective_score_across_many_seeds() {
+        for seed in 0..300u64 {
+            let intent = MusicalIntent {
+                seed,
+                ..MusicalIntent::default()
+            };
+            let _ = compose_styled(&intent, crate::style::Style::Classical);
+        }
+        for style in crate::style::Style::ALL {
+            for seed in 0..8u64 {
+                let intent = MusicalIntent {
+                    seed,
+                    ..MusicalIntent::default()
+                };
+                let _ = compose_styled(&intent, style);
+            }
+        }
+    }
 
     #[test]
     fn use_sentence_for_period_sentence_keeps_the_arousal_heuristic() {
@@ -4627,17 +4901,33 @@ mod tests {
 
     #[test]
     fn archetype_progression_period_sentence_styles_do_diverge_through_the_grammar_pipeline() {
-        // The flip side of the above: Waltz is PeriodSentence-mapped but
-        // uses `ProgressionSpec::Archetype`, not `Grammar` -- its B section
-        // in Ternary/Rondo form should now honor Waltz's own progression
-        // instead of the generic classical grammar, end-to-end through the
-        // real `compose_with_spec_and_form_and_grammar` production path
-        // (not just the `Form::ternary`/`rondo` unit tests in `form.rs`).
-        let spec = crate::style::Style::Waltz.spec();
-        assert_eq!(
-            spec.progression,
-            crate::spec::ProgressionSpec::Archetype(vec![1, 5, 6, 3, 4, 1, 4, 5])
-        );
+        // The flip side of the above: a PeriodSentence-mapped style that uses a
+        // fixed `ProgressionSpec::Archetype` rather than the grammar generator
+        // should have its B section in Ternary/Rondo form honor ITS OWN
+        // progression instead of the generic classical grammar, end-to-end
+        // through the real `compose_with_spec_and_form_and_grammar` production
+        // path (not just the `Form::ternary`/`rondo` unit tests in `form.rs`).
+        //
+        // The exemplar is DISCOVERED, not hardcoded. This test named Waltz until
+        // 2026-07-30, when Waltz moved to `GrammarWithPalette` and the fixture
+        // broke — the assertion was about a *category* of style, so pinning one
+        // member made it fail on an unrelated, correct change. Picking the first
+        // qualifying style keeps testing the real invariant as styles migrate.
+        let spec = crate::style::Style::ALL
+            .iter()
+            .find(|s| {
+                s.grammar_family() == crate::grammar::GrammarFamily::PeriodSentence
+                    && !matches!(
+                        s.spec().progression,
+                        crate::spec::ProgressionSpec::Grammar
+                            | crate::spec::ProgressionSpec::GrammarWithPalette(_)
+                    )
+            })
+            .map(|s| s.spec())
+            .expect(
+                "expected at least one PeriodSentence style still on a fixed archetype; if \
+                 every style has migrated to the grammar generator this test is obsolete",
+            );
         let profile = crate::grammar::GrammarFamily::PeriodSentence.profile();
         let diverged = (0..20u64).any(|seed| {
             let intent = MusicalIntent {
@@ -4748,6 +5038,7 @@ mod tests {
             1.0,
             crate::accompaniment::Accompaniment::Block,
             true,
+            false,
         );
         let bass = bass_score.voice(VoiceRole::Bass);
         assert_eq!(bass[0].pitch.midi() % 12, 5, "IV root F on beat 1");
@@ -5620,6 +5911,7 @@ mod tests {
             for beat in 0..4i64 {
                 let midi = 60 + (beat as u8 % 2) * 2; // C-D-C-D forever
                 score.push(ScoreNote {
+                    part: PartId::UNASSIGNED,
                     pitch: crate::pitch::Pitch::from_midi(midi),
                     onset: Duration::new(bar * 4 + beat, 1),
                     duration: Duration::new(1, 1),
@@ -6714,6 +7006,7 @@ mod tests {
         let bar = Duration::new(4, 1);
         for pitch in key.diatonic_triad(1).voice(4) {
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch,
                 onset: Duration::zero(),
                 duration: bar,
@@ -6725,6 +7018,7 @@ mod tests {
         }
         for pitch in key.diatonic_triad(4).voice(4) {
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch,
                 onset: bar,
                 duration: bar,
@@ -6801,6 +7095,7 @@ mod tests {
         for bar_idx in 0..3 {
             for pitch in key.diatonic_triad(1).voice(4) {
                 score.push(ScoreNote {
+                    part: PartId::UNASSIGNED,
                     pitch,
                     onset: bar.scale(bar_idx, 1),
                     duration: bar,
@@ -6814,6 +7109,7 @@ mod tests {
         // A fourth bar changes chord — this boundary must NOT merge.
         for pitch in key.diatonic_triad(4).voice(4) {
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch,
                 onset: bar.scale(3, 1),
                 duration: bar,
@@ -7012,6 +7308,7 @@ mod tests {
         let fifth = scale.degree_pitch(5, 4); // G4 — NOT eligible
         for (i, pitch) in [third, seventh, fifth].into_iter().enumerate() {
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch,
                 onset: Duration::new(i as i64, 1),
                 duration: Duration::new(1, 1),
@@ -7024,6 +7321,7 @@ mod tests {
         // A harmony note at the SAME pitch class as the third — must
         // never be touched; the pass is melody-only by construction.
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: third,
             onset: Duration::zero(),
             duration: Duration::new(1, 1),
@@ -7072,13 +7370,88 @@ mod tests {
             spec.mode, None,
             "blues stays major — the color is melodic, not modal"
         );
-        assert_eq!(
-            spec.progression,
-            crate::spec::ProgressionSpec::Archetype(vec![1, 1, 1, 1, 4, 4, 1, 1, 5, 4, 1, 1])
-        );
+        // A pool of real 12-bar-blues variants (not a single fixed
+        // Archetype) since `realize_call_response` gives each chorus in a
+        // multi-chorus piece its own seed_variant -- see
+        // call_response::harmony_genuinely_varies_chorus_to_chorus_not_just_the_melody.
+        // Index 0 (seed 0 % pool.len()) is still the exact standard
+        // turnaround this test always asserted.
+        let crate::spec::ProgressionSpec::ArchetypePool(pool) = &spec.progression else {
+            panic!("expected an ArchetypePool: {:?}", spec.progression);
+        };
+        assert_eq!(pool[0], vec![1, 1, 1, 1, 4, 4, 1, 1, 5, 4, 1, 1]);
         let s = compose_with_spec(&MusicalIntent::default(), &spec);
         assert!(!s.notes.is_empty());
         assert_eq!(s.key.tonality, crate::harmony::Tonality::Major);
+    }
+
+    #[test]
+    fn baroque_suite_compatibility_baseline_still_composes_and_genuinely_differs_from_the_new_route()
+     {
+        // The 2026-07-26/27 harmonic-syntax pilot moved BaroqueSuite from a
+        // fixed I-IV-V-I loop to the real functional-harmony generator
+        // (ProgressionSpec::Grammar) -- A/B evidence (note-data + rendered-
+        // audio analysis across 2 seeds) favored the new route, but per
+        // that review's own recommendation the old route is preserved as
+        // a named constant (`style::BAROQUE_SUITE_COMPATIBILITY_PROGRESSION`),
+        // not deleted: a compatibility baseline, an Analyst A/B control,
+        // and this regression fixture proving it still composes cleanly.
+        //
+        // Updated 2026-07-30: the landed route is now
+        // `GrammarWithPalette(baroque())`, not bare `Grammar`. The pilot's
+        // conclusion is unchanged — BaroqueSuite still generates from the
+        // functional-harmony grammar rather than the fixed loop — but bare
+        // `Grammar` is style-agnostic, which made BaroqueSuite produce
+        // progressions IDENTICAL to Classical on 32/32 seeds. That defect
+        // shipped with the pilot and was caught by
+        // `style::tests::grammar_generated_styles_must_not_be_harmonically_interchangeable`.
+        // The assertion checks the grammar FAMILY, so it keeps testing what it
+        // meant to test (generator, not archetype) without pinning a variant
+        // shape that per-style character has to change.
+        let new_spec = crate::style::Style::BaroqueSuite.spec();
+        assert!(
+            matches!(
+                new_spec.progression,
+                crate::spec::ProgressionSpec::Grammar
+                    | crate::spec::ProgressionSpec::GrammarWithPalette(_)
+            ),
+            "the pilot's landed route: grammar-generated, not the fixed archetype (got {:?})",
+            new_spec.progression
+        );
+        let mut old_spec = new_spec.clone();
+        old_spec.progression = crate::spec::ProgressionSpec::Archetype(
+            crate::style::BAROQUE_SUITE_COMPATIBILITY_PROGRESSION.to_vec(),
+        );
+
+        // The compatibility baseline must still compose a valid, non-empty
+        // piece -- it's a real fallback, not a fossil.
+        let old_score = compose_with_spec(&MusicalIntent::default(), &old_spec);
+        assert!(!old_score.notes.is_empty());
+
+        // And the two routes must genuinely differ in at least one real
+        // seed's harmony-voice pitch sequence -- the actual A/B evidence
+        // this pilot was judged on, now codified rather than left as a
+        // one-off example script.
+        let differs = (0..10u64).any(|seed| {
+            let intent = MusicalIntent {
+                seed,
+                ..MusicalIntent::default()
+            };
+            let old = compose_with_spec(&intent, &old_spec);
+            let new = compose_with_spec(&intent, &new_spec);
+            let harmony_pitches = |s: &crate::score::Score| -> Vec<u8> {
+                s.voice(VoiceRole::Harmony)
+                    .iter()
+                    .map(|n| n.pitch.midi())
+                    .collect()
+            };
+            harmony_pitches(&old) != harmony_pitches(&new)
+        });
+        assert!(
+            differs,
+            "expected at least one seed among 0..10 where the compatibility \
+             baseline and the new functional route produce different harmony"
+        );
     }
 
     #[test]
@@ -7607,6 +7980,7 @@ mod tests {
             1.0,
             crate::accompaniment::Accompaniment::Block,
             true,
+            false,
         );
         let mut bass_applied = Score::new(key, 100.0, 4);
         realize_bass_measures(
@@ -7621,6 +7995,7 @@ mod tests {
             1.0,
             crate::accompaniment::Accompaniment::Block,
             true,
+            false,
         );
         // Both force the root at measure 0 -- root pitch class must be
         // IDENTICAL between plain ii and V7/V (same root, per design).
@@ -7731,6 +8106,7 @@ mod tests {
                 |_| true,
                 1.0,
                 crate::accompaniment::Accompaniment::Montuno,
+                false,
                 false,
             );
             let bar_start = start_measure as f64 * 4.0;
@@ -7846,6 +8222,7 @@ mod tests {
             1.0,
             crate::accompaniment::Accompaniment::CompasGait,
             false,
+            false,
         );
         let bass = score.voice(VoiceRole::Bass);
         assert_eq!(bass.len(), 1, "one grounding anchor per cycle");
@@ -7911,6 +8288,7 @@ mod tests {
             |_| true,
             1.0,
             crate::accompaniment::Accompaniment::BossaComp,
+            false,
             false,
         );
         let bass = score.voice(VoiceRole::Bass);
@@ -7991,6 +8369,7 @@ mod tests {
         let onset = Duration::zero();
         let dur = Duration::new(2, 1); // a half note — well above the 0.9-beat threshold
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: key.scale().degree_pitch(3, 4),
             onset,
             duration: dur,
@@ -8042,6 +8421,7 @@ mod tests {
         let mut score = Score::new(key, 100.0, 4);
         // Short note (below threshold).
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: key.scale().degree_pitch(3, 4),
             onset: Duration::zero(),
             duration: Duration::eighth(),
@@ -8052,6 +8432,7 @@ mod tests {
         });
         // Long note but marked Climax.
         score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: key.scale().degree_pitch(5, 4),
             onset: Duration::new(1, 1),
             duration: Duration::new(2, 1),
@@ -8126,6 +8507,7 @@ mod tests {
         for (m, &deg) in [1, 4, 5, 6, 2, 1].iter().enumerate() {
             for pitch in key.diatonic_triad(deg).voice(3) {
                 score.push(ScoreNote {
+                    part: PartId::UNASSIGNED,
                     pitch,
                     onset: bar.scale(m as i64, 1),
                     duration: bar,
@@ -8136,6 +8518,7 @@ mod tests {
                 });
             }
             score.push(ScoreNote {
+                part: PartId::UNASSIGNED,
                 pitch: key.diatonic_triad(deg).voice(2)[0],
                 onset: bar.scale(m as i64, 1),
                 duration: bar,

@@ -1,0 +1,46 @@
+base_config:
+  - configs/csd_en_acoustic.yaml
+
+# Minimal dictionary covering only the phonemes used in this one phrase --
+# the full csd-en.txt dictionary requires every phoneme to appear at least
+# once in the training data (check_coverage), which a single 3.88s clip
+# can't satisfy. This changes only the embedding-table size, not what's
+# being tested (memorization capacity, not phoneme generalization).
+dictionaries:
+  en: dictionaries/overfit-01.txt
+
+# Memorization/overfit gate (2026-07-26): can the acoustic model learn to
+# reproduce ONE real phrase to intelligibility at all, before assuming
+# Gate 2's finding ("predicted mel lacks structure") is explained by
+# under-training on the full 100-song/2000-step run? train and valid sets
+# are literally the same 3.88s clip (see build_overfit_dataset.py) --
+# train==val by design, this is not a generalization test.
+datasets:
+  - raw_data_dir: raw/overfit-01
+    speaker: csd-en
+    spk_id: 0
+    language: en
+    test_prefixes:
+      - overfit01_val
+
+binary_data_dir: data/overfit-01/binary
+
+# Augmentation would confound "can it memorize" with "can it memorize
+# across synthetic pitch variance" -- off for this test.
+augmentation_args:
+  random_pitch_shifting:
+    enabled: false
+  fixed_pitch_shifting:
+    enabled: false
+  random_time_stretching:
+    enabled: false
+
+# Single-item train/valid set -- checkpoint ladder at 1k/2k/4k/6k, well
+# past the original run's 2000 steps, to see whether intelligibility
+# emerges with more optimization on trivially little data.
+max_updates: 6000
+val_check_interval: 1000
+num_valid_plots: 1
+permanent_ckpt_start: 1000
+permanent_ckpt_interval: 1000
+num_ckpt_keep: 6

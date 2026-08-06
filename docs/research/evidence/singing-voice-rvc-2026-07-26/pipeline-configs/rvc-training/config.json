@@ -1,0 +1,78 @@
+{
+    "data": {
+        "filter_length": 2048,
+        "hop_length": 400,
+        "max_wav_value": 32768.0,
+        "mel_fmax": null,
+        "mel_fmin": 0.0,
+        "n_mel_channels": 125,
+        "sampling_rate": 40000,
+        "win_length": 2048
+    },
+    "model": {
+        "filter_channels": 768,
+        "gin_channels": 256,
+        "hidden_channels": 192,
+        "inter_channels": 192,
+        "kernel_size": 3,
+        "n_heads": 2,
+        "n_layers": 6,
+        "p_dropout": 0,
+        "resblock": "1",
+        "resblock_dilation_sizes": [
+            [
+                1,
+                3,
+                5
+            ],
+            [
+                1,
+                3,
+                5
+            ],
+            [
+                1,
+                3,
+                5
+            ]
+        ],
+        "resblock_kernel_sizes": [
+            3,
+            7,
+            11
+        ],
+        "spk_embed_dim": 109,
+        "upsample_initial_channel": 512,
+        "upsample_kernel_sizes": [
+            16,
+            16,
+            4,
+            4
+        ],
+        "upsample_rates": [
+            10,
+            10,
+            2,
+            2
+        ],
+        "use_spectral_norm": false
+    },
+    "train": {
+        "batch_size": 4,
+        "betas": [
+            0.8,
+            0.99
+        ],
+        "c_kl": 1.0,
+        "c_mel": 45,
+        "epochs": 20000,
+        "eps": 1e-09,
+        "init_lr_ratio": 1,
+        "learning_rate": 0.0001,
+        "log_interval": 200,
+        "lr_decay": 0.999875,
+        "seed": 1234,
+        "segment_size": 12800,
+        "warmup_epochs": 0
+    }
+}

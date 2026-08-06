@@ -1,0 +1,23 @@
+MA-001A-delta action-frequency diagnostic -- population=100 total_ticks=1200 burn_in=300
+
+alive=100/100
+
+=== Aggregate action frequency across the whole population (analysis window) ===
+  Forage:      30752 (34.17%)
+  Rest:        29274 (32.53%)
+  Transfer:    29974 (33.30%)
+  Total: 90000
+
+=== Per-organism Transfer-selection rate (fraction of this organism's own actions that were Transfer) ===
+  mean:   0.3330
+  median: 0.3344
+  min:    0.2844
+  max:    0.3656
+  organisms with ZERO Transfer selections: 0/100 (0.0%)
+
+=== Within-organism, across-partner Transfer-rate spread (eligible partners only) ===
+  max spread observed across the whole population: 0.1067
+  organisms with >10 percentage-point spread across their eligible partners: 1
+
+=== Interpretation ===
+VERDICT: Transfer selection is common enough and shows real within-organism spread across partners -- this does NOT obviously support the policy-gap hypothesis as stated. The null may have a different explanation than action-selection frequency alone; report these numbers honestly and reconsider.

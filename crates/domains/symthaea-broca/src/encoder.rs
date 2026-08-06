@@ -784,6 +784,19 @@ pub struct ThoughtLanguageEncoder {
     level_vectors: Vec<ContinuousHV>,
     /// Number of levels in the codebook.
     num_levels: usize,
+    /// Per-channel weights for the final bundle. `None` = uniform (all 1.0), which is
+    /// bit-for-bit the historical behaviour and keeps every existing checkpoint valid.
+    ///
+    /// `encode()` sums 43 role⊗level bindings. An *unweighted* sum gives each channel ~1/43
+    /// of the representation, so no channel can dominate however semantically important it is
+    /// — measured: one-hot-per-channel similarity 0.977, `with_intent(0..8)` 0.9675, i.e. the
+    /// eight intents differ by ~3% of the vector. See
+    /// `SYMTHAEA_BROCA_ENCODER_PLAN_2026-07-30.md`.
+    ///
+    /// Setting weights changes the representation and therefore **invalidates trained
+    /// checkpoints**. Left `None` by default so this can be measured before anything commits
+    /// to a retraining cycle.
+    channel_weights: Option<Vec<f32>>,
 }
 
 impl ThoughtLanguageEncoder {
@@ -820,7 +833,36 @@ impl ThoughtLanguageEncoder {
             base_vectors,
             level_vectors,
             num_levels,
+            channel_weights: None,
         }
+    }
+
+    /// Set per-channel bundle weights. Length must be [`NUM_CHANNELS`]; otherwise this is a
+    /// no-op and the encoder stays uniform (fail-safe: a wrong-length table silently changing
+    /// the representation would be worse than ignoring it).
+    ///
+    /// Non-finite or negative weights are clamped to 0.0. All-zero is rejected (it would
+    /// produce a zero vector for every input).
+    ///
+    /// **Changes the representation — invalidates trained checkpoints.**
+    pub fn set_channel_weights(&mut self, weights: &[f32]) -> bool {
+        if weights.len() != NUM_CHANNELS {
+            return false;
+        }
+        let cleaned: Vec<f32> = weights
+            .iter()
+            .map(|w| if w.is_finite() && *w > 0.0 { *w } else { 0.0 })
+            .collect();
+        if cleaned.iter().sum::<f32>() <= 0.0 {
+            return false;
+        }
+        self.channel_weights = Some(cleaned);
+        true
+    }
+
+    /// Whether non-uniform channel weights are active.
+    pub fn has_channel_weights(&self) -> bool {
+        self.channel_weights.is_some()
     }
 
     /// Normalize a raw channel value to [0, 1] using known ranges.
@@ -866,7 +908,11 @@ impl ThoughtLanguageEncoder {
         }
 
         let refs: Vec<&ContinuousHV> = bound_hvs.iter().collect();
-        ContinuousHV::bundle(&refs)
+        match &self.channel_weights {
+            // Uniform: exactly the historical path, byte-for-byte.
+            None => ContinuousHV::bundle(&refs),
+            Some(w) => ContinuousHV::weighted_bundle(&refs, w),
+        }
     }
 
     /// Number of levels in the codebook.

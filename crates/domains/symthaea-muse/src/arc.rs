@@ -20,8 +20,7 @@ use serde::{Deserialize, Serialize};
 use symthaea_aesthetic::ValenceArousal;
 
 use crate::{
-    AudioData, Composition, MuseConfig, MusicalState, Note, pitch::TuningSystem,
-    structure::SectionType,
+    Composition, MuseConfig, MusicalState, Note, pitch::TuningSystem, structure::SectionType,
 };
 
 // ─── Bar Directive ────────────────────────────────────────────────────────────

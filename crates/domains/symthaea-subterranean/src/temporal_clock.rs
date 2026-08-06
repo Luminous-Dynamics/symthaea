@@ -310,7 +310,9 @@ mod tests {
     fn replay_and_time_regression_are_rejected() {
         let mut clock = TemporalClockSupervisor::default();
         assert_eq!(
-            clock.observe(100_000_000, sample(1, 100_000_000)).disposition,
+            clock
+                .observe(100_000_000, sample(1, 100_000_000))
+                .disposition,
             ClockDisposition::Accepted
         );
         assert_eq!(

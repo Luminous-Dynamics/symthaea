@@ -5,16 +5,41 @@
 
 ## Implementation snapshot
 
-The catalog architecture landed on 2026-07-18:
+> **Correction (2026-07-29).** The four bullets below marked ✅ describe the state
+> as of that date. They did **not** describe 2026-07-18, when this section was
+> written — the registry file landed then, but `pub mod catalog;` was never added
+> to the protocol crate's `lib.rs`, so those 1,257 lines were **never compiled**:
+> not by the server, not by the UI, not by CI. Its own
+> `assert_eq!(CATALOG.len(), 152)` had never executed. `GET /api/catalog` did not
+> exist, and Create Mode presented a flat 29-entry dropdown. The claims were
+> written against intent rather than against a build. See
+> `33a3c7d1f8`/`153d48023e` and the plan at
+> `~/.claude/plans/immutable-wishing-brook.md` phases 4a–4d. Nothing was wrong
+> with the registry itself — every one of its 7 tests passed unmodified the first
+> time it was compiled — but it was inert, and this document said otherwise for
+> eleven days.
 
-- one validated 152-entry registry shared by native server and WebAssembly UI;
+The catalog architecture:
+
+- ✅ one validated 152-entry registry, compiled into both the native server and the
+  WebAssembly UI (both link `symthaea-muse-protocol`, so they share the `const`
+  itself rather than a copy);
 - stable IDs, 19 constellations, canonical/display names, status, cultural-review
   requirements, composer routing, and eight-part style anatomy;
-- all 29 current composer presets mapped exactly once; the other 123 entries are
-  visible research targets and cannot be sent to `/api/compose`;
-- `GET /api/catalog` exposes the full taxonomy;
-- Create Mode navigates constellation → canonical style → advanced anatomy rather
-  than presenting a flat 152-entry dropdown;
+- ✅ all 29 current composer presets mapped exactly once; the other 123 entries are
+  visible research targets and cannot be sent to `/api/compose`. The 1:1 mapping is
+  now *enforced* across the crate boundary by
+  `catalog_entries_all_resolve_to_real_engine_styles` in `muse_studio.rs` — the
+  catalog crate is serde-only by design and cannot depend on
+  `symthaea-music-theory`, so its own tests could only ever check it against itself;
+- ✅ `GET /api/catalog` exposes the full taxonomy, for non-Rust consumers. The Rust
+  UI does **not** use it: `CanonicalStyle`'s `&'static str` fields make the type
+  serialize-only (a client-side `fetch_catalog` cannot compile), and the UI already
+  has the `const` linked in, so it reads it directly;
+- ✅ Create Mode navigates constellation → canonical style → eight-part anatomy
+  rather than presenting a flat dropdown. Research entries appear in the style list
+  but are `disabled` and labelled with their status — visible without being
+  offered, which is this catalog's stated design rule;
 - first-class grammar, phrase, harmonic, intent-axis, and performance-dialect
   profiles route styles independently of the catalog taxonomy;
 - the Groove-cycle route formalizes the existing cycle-continuous,

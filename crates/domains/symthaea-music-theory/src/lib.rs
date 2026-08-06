@@ -32,6 +32,7 @@ pub const MUSIC_THEORY_ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub mod accompaniment;
 pub mod cadence;
+pub mod call_response;
 pub mod chord;
 pub mod cognitive_analysis;
 pub mod composer;
@@ -39,7 +40,6 @@ pub mod contrapuntal_foundry;
 pub mod counterpoint;
 pub mod describe;
 pub mod diversity_plan;
-pub mod evidence_calibration;
 pub mod explorer;
 pub mod fingerprint;
 pub mod form;
@@ -49,8 +49,10 @@ pub mod grammar;
 pub mod grammar_trace;
 pub mod groove_cycle;
 pub mod harmony;
+pub mod harmony_verifier;
 pub mod hook;
 pub mod integration;
+pub mod jazz_chorus;
 pub mod live;
 pub mod melodic_contour_identity;
 pub mod meter;
@@ -124,7 +126,7 @@ pub use pitch::{Interval, IntervalQuality, Pitch, PitchClass};
 pub use rhythm::Duration;
 pub use rhythmic_identity::{RhythmicIdentityReport, rhythmic_identity_report};
 pub use scale::{Mode, Scale};
-pub use score::{Emphasis, Score, ScoreNote, VoiceRole};
+pub use score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
 pub use score_validation::{
     ScoreValidationConfig, ScoreValidationIssue, ScoreValidationRule, THEORY_VALIDATION_VERSION,
     TheoryValidationReport, ValidationSeverity, validate_score,

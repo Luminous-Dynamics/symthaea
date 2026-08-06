@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Bowlby attachment theory, co-regulation, developmental milestones, and nurturing AI via HDC + LTC"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["attachment", "bowlby", "developmental-psychology", "hdc", "nurture"]
 categories = ["science", "algorithms"]
 

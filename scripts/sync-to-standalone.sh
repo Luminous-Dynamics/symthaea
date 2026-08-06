@@ -19,12 +19,39 @@
 
 set -euo pipefail
 
+# --- SAFETY: disabled pending sync-integrity fix (2026-07-26) ---------------
+#
+# DO NOT REMOVE THIS GUARD WITHOUT READING
+# https://github.com/Luminous-Dynamics/luminous-dynamics/issues/25 FIRST.
+#
+# Found 2026-07-26: symthaea standalone `main`'s own last sync commit cites a
+# monorepo SHA that, checked directly, does not contain the content actually
+# published. This script's copy step appears to operate on the monorepo's
+# live working-tree contents rather than a clean export of a specific commit
+# — a sync run initiated while any concurrent session had uncommitted or
+# differently-branched work sitting in this shared monorepo tree can publish
+# that content to the public repo's `main`, labeled with whatever commit
+# happened to be current at that moment, with no real link between the two.
+# Evidence: docs/release/evidence/sync-integrity/2026-07-26-symthaea-standalone/
+# (this monorepo, branch review/symthaea-bridges-security, commit a2ddde71fb).
+#
+# This script's implementation below is unchanged and preserved in git
+# history — the fix is a replacement exporter (accepts an explicit source
+# commit, requires a clean source tree, exports via `git archive`/a temporary
+# checkout of that exact commit, opens a PR rather than pushing `main`
+# directly), not a patch to this file. Until that exists, this script must
+# not run.
+echo "sync-to-standalone.sh is disabled pending a sync-integrity fix." >&2
+echo "See https://github.com/Luminous-Dynamics/luminous-dynamics/issues/25" >&2
+exit 1
+
 # --- Configuration -----------------------------------------------------------
 
 MONOREPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SYMTHAEA_DIR="${MONOREPO_ROOT}/symthaea"
 STANDALONE_REPO="/tmp/symthaea-standalone-sync"
 STANDALONE_REMOTE="git@github.com:Luminous-Dynamics/symthaea.git"
+LOCK_FILE="/tmp/symthaea-standalone-sync.lock"
 
 DRY_RUN=false
 SKIP_CHECK=false
@@ -65,6 +92,23 @@ info "Standalone:    ${STANDALONE_REPO}"
 if $DRY_RUN; then
     warn "DRY RUN — no commits or pushes will be made"
 fi
+echo
+
+# --- Acquire lock --------------------------------------------------------------
+#
+# STANDALONE_REPO is a fixed shared path under /tmp. This monorepo routinely
+# runs 10+ concurrent Claude sessions (see .claude/rules/CONCURRENT_SESSIONS.md),
+# and this script is documented as a routine, session-initiated workflow -- two
+# sessions running it at once would race on the same clone (one's
+# `reset --hard origin/main` can yank the tree out from under the other
+# mid-sync). Hold an flock on a sibling lock file for the rest of the script.
+
+exec 200>"${LOCK_FILE}"
+info "Acquiring sync lock (${LOCK_FILE})..."
+if ! flock -w 600 200; then
+    error "Could not acquire ${LOCK_FILE} within 10 minutes -- another sync-to-standalone.sh is likely running. Wait for it to finish, or if you're sure none is running, 'rm -f ${LOCK_FILE}' and retry."
+fi
+ok "Lock acquired"
 echo
 
 # --- Clone or update standalone repo ------------------------------------------
@@ -573,7 +617,7 @@ voice-tts,voice-stt,audio,vocal-tract,neural-vocoder,\
 embeddings,vision,perception,vision-manifold,foveation,\
 integrity,semantic-encoder,neural-bridge,webcam,\
 mesh,mesh-encryption,mesh-key-exchange,swarm,notifications,\
-nix-mind,identity,physics,physics-bridge,\
+nixward,identity,physics,physics-bridge,\
 flight,humanoid,hal,ssm-power,ssm_language,\
 lancedb-backend,multi_agent,full_consciousness,full_perception,\
 full_language,magi_loop,reasoning_engine,code_generation,\

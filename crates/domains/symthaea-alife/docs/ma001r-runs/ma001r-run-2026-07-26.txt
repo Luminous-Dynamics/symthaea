@@ -1,0 +1,114 @@
+MA-001R -- resource_level=0.5 outcome_a=0.9 outcome_b=0.2 training_ticks=2000 held_out_ticks=200 reversal_ticks=2000
+
+Gate 0 (crates/core/symthaea-fep/tests/ma001r_gate0_td_learning_cross_dimension.rs): both tests pass, see plan doc sec 2.
+
+=== Learning-pathway ablations (plan sec 7, corrected) ===
+
+--- Arm: Hebbian-only (enable_model_learning=true, enable_td_learning=false) ---
+  baseline (pre-training): predicted_resource(A=0.5735, B=0.4978) predicted_energy(A=0.6902, B=0.5906) delta_predicted=0.1753
+  baseline coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=0.02500 energy=0.20000
+    given_to_partner       -> resource=0.02500 energy=0.02500
+    received_from_partner  -> resource=0.02500 energy=0.02500
+    encounter_count        -> resource=0.02500 energy=0.02500
+  post-training: predicted_resource(A=0.6406, B=0.5656) predicted_energy(A=1.0411, B=0.1360) delta_predicted=0.9800
+  post-training coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=0.02298 energy=0.18388
+    given_to_partner       -> resource=0.02417 energy=0.02417
+    received_from_partner  -> resource=0.02303 energy=0.02303
+    encounter_count        -> resource=0.02207 energy=0.02207
+  held-out (200 ticks, no further updates): mean_abs_error(context A)=0.0880 mean_abs_error(context B)=0.0830
+
+--- Arm: TD-only (enable_model_learning=false, enable_td_learning=true) ---
+  baseline (pre-training): predicted_resource(A=0.5735, B=0.4978) predicted_energy(A=0.6902, B=0.5906) delta_predicted=0.1753
+  baseline coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=0.02500 energy=0.20000
+    given_to_partner       -> resource=0.02500 energy=0.02500
+    received_from_partner  -> resource=0.02500 energy=0.02500
+    encounter_count        -> resource=0.02500 energy=0.02500
+  post-training: predicted_resource(A=0.0000, B=0.0000) predicted_energy(A=0.5757, B=0.2708) delta_predicted=0.3050
+  post-training coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=0.16667 energy=0.16667
+    given_to_partner       -> resource=0.16667 energy=0.16667
+    received_from_partner  -> resource=0.16667 energy=0.16667
+    encounter_count        -> resource=0.16667 energy=0.16667
+  held-out (200 ticks, no further updates): mean_abs_error(context A)=0.3679 mean_abs_error(context B)=0.0566
+
+--- Arm: Both (crate default) (enable_model_learning=true, enable_td_learning=true) ---
+  baseline (pre-training): predicted_resource(A=0.5735, B=0.4978) predicted_energy(A=0.6902, B=0.5906) delta_predicted=0.1753
+  baseline coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=0.02500 energy=0.20000
+    given_to_partner       -> resource=0.02500 energy=0.02500
+    received_from_partner  -> resource=0.02500 energy=0.02500
+    encounter_count        -> resource=0.02500 energy=0.02500
+  post-training: predicted_resource(A=0.1299, B=0.0623) predicted_energy(A=0.7149, B=0.3325) delta_predicted=0.4500
+  post-training coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=0.16536 energy=0.16234
+    given_to_partner       -> resource=0.16544 energy=0.16239
+    received_from_partner  -> resource=0.16544 energy=0.16239
+    encounter_count        -> resource=0.15217 energy=0.14288
+  held-out (200 ticks, no further updates): mean_abs_error(context A)=0.4701 mean_abs_error(context B)=0.0731
+
+--- Arm: Neither (learning-disabled control) (enable_model_learning=false, enable_td_learning=false) ---
+  baseline (pre-training): predicted_resource(A=0.5735, B=0.4978) predicted_energy(A=0.6902, B=0.5906) delta_predicted=0.1753
+  baseline coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=0.02500 energy=0.20000
+    given_to_partner       -> resource=0.02500 energy=0.02500
+    received_from_partner  -> resource=0.02500 energy=0.02500
+    encounter_count        -> resource=0.02500 energy=0.02500
+  post-training: predicted_resource(A=0.5422, B=0.4665) predicted_energy(A=0.6060, B=0.5063) delta_predicted=0.1753
+  post-training coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=0.02500 energy=0.20000
+    given_to_partner       -> resource=0.02500 energy=0.02500
+    received_from_partner  -> resource=0.02500 energy=0.02500
+    encounter_count        -> resource=0.02500 energy=0.02500
+  held-out (200 ticks, no further updates): mean_abs_error(context A)=0.2019 mean_abs_error(context B)=0.3643
+
+=== Essential controls (plan sec 6), run under the 'Both' pathway (crate default) ===
+
+--- Equal-outcome control ---
+  baseline: predicted_resource(A=0.5735, B=0.4978) predicted_energy(A=0.6902, B=0.5906) delta_predicted=0.1753
+  post-training (outcome constant regardless of context): predicted_resource(A=0.0262, B=0.0125) predicted_energy(A=0.6112, B=0.2891) delta_predicted=0.3359
+
+--- Shuffled-context control ---
+  baseline: predicted_resource(A=0.5735, B=0.4978) predicted_energy(A=0.6902, B=0.5906) delta_predicted=0.1753
+  post-training (context independently re-randomized each tick): predicted_resource(A=0.5413, B=0.2990) predicted_energy(A=0.8124, B=0.4295) delta_predicted=0.6252
+
+Learning-disabled control == the 'Neither' arm above: baseline delta=0.1753, post-training delta=0.1753 (expect == baseline, no learning occurred)
+
+=== Reversal condition (plan sec 6), continuing the 'Both' arm's trained organism ===
+
+  pre-reversal (end of main training): predicted_resource(A=0.1299, B=0.0623) predicted_energy(A=0.7149, B=0.3325) delta_predicted=0.4500
+  pre-reversal coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=0.16536 energy=0.16234
+    given_to_partner       -> resource=0.16544 energy=0.16239
+    received_from_partner  -> resource=0.16544 energy=0.16239
+    encounter_count        -> resource=0.15217 energy=0.14288
+  mid-reversal (halfway through reversal_ticks): predicted_resource(A=0.0596, B=0.0286) predicted_energy(A=0.6401, B=0.3044) delta_predicted=0.3668
+  post-reversal (end of reversal_ticks): predicted_resource(A=0.0224, B=0.0108) predicted_energy(A=0.6686, B=0.3190) delta_predicted=0.3613
+  post-reversal coefficients (transition_matrices[Transfer][social_dim][physical_dim]):
+    partner_present        -> resource=0.16422 energy=0.16518
+    given_to_partner       -> resource=0.16422 energy=0.16518
+    received_from_partner  -> resource=0.16422 energy=0.16518
+    encounter_count        -> resource=0.17467 energy=0.17713
+
+=== Interpretation (plan sec 8) ===
+
+delta_predicted shift (|post - baseline|):
+  Hebbian-only: 0.8047
+  TD-only:      0.1297
+  Both:         0.2747
+  Neither:      0.0000
+  Equal-outcome control: 0.1605
+  Shuffled-context control: 0.4499
+  Reversal: pre=0.4500 mid=0.3668 post=0.3613 (direction should invert if genuinely tracking current evidence)
+
+held-out mean abs error (context A / context B):
+  Hebbian-only: 0.0880 / 0.0830
+  TD-only:      0.3679 / 0.0566
+  Both:         0.4701 / 0.0731
+  Neither:      0.2019 / 0.3643
+
+Calibrated real-effect bar = 2 x max(Neither, Equal-outcome, Hebbian-only) = 1.6094
+
+VERDICT: LEARNING-RULE LIMITATION -- TD-only shows no coefficient movement above the calibrated noise floor despite Gate 0 passing in isolation: the linear model could represent the relationship, but the update rule as applied here (competing dimensions, real belief dynamics) cannot reliably acquire it under this protocol.

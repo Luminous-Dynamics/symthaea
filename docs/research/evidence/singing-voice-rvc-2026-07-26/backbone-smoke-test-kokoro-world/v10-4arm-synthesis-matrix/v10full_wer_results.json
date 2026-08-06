@@ -1,0 +1,182 @@
+{
+  "positive_control": {
+    "a": {
+      "wer": 0.5,
+      "hyp": "I want you to sing along with me."
+    },
+    "b": {
+      "wer": 0.0,
+      "hyp": "Won't you sing along with me?"
+    },
+    "c": {
+      "wer": 0.0,
+      "hyp": "Won't you sing along with me?"
+    },
+    "d": {
+      "wer": 0.0,
+      "hyp": "Won't you sing along with me?"
+    }
+  },
+  "conversational": {
+    "a": {
+      "wer": 0.0,
+      "hyp": "I love the summer breeze tonight."
+    },
+    "b": {
+      "wer": 0.0,
+      "hyp": "I love the summer breeze tonight."
+    },
+    "c": {
+      "wer": 0.0,
+      "hyp": "I love the summer breeze tonight."
+    },
+    "d": {
+      "wer": 0.0,
+      "hyp": "I love the summer breeze tonight."
+    }
+  },
+  "repeated_syllables": {
+    "a": {
+      "wer": 0.0,
+      "hyp": "Bye, bye, bye, bye, baby."
+    },
+    "b": {
+      "wer": 0.0,
+      "hyp": "Bye, bye, bye, bye, baby."
+    },
+    "c": {
+      "wer": 0.0,
+      "hyp": "Bye, bye, bye, bye, baby."
+    },
+    "d": {
+      "wer": 0.0,
+      "hyp": "Bye, bye, bye, bye, baby."
+    }
+  },
+  "rapid_letter_names": {
+    "a": {
+      "wer": 1.0,
+      "hyp": ""
+    },
+    "b": {
+      "wer": 0.8571428571428571,
+      "hyp": "A deep..."
+    },
+    "c": {
+      "wer": 1.0,
+      "hyp": ""
+    },
+    "d": {
+      "wer": 1.0,
+      "hyp": "but see"
+    }
+  },
+  "phrase_final_stops": {
+    "a": {
+      "wer": 0.14285714285714285,
+      "hyp": "Turn off the light and lock."
+    },
+    "b": {
+      "wer": 0.0,
+      "hyp": "Turn off the light and lock it."
+    },
+    "c": {
+      "wer": 0.14285714285714285,
+      "hyp": "Turn off the light and lock."
+    },
+    "d": {
+      "wer": 0.14285714285714285,
+      "hyp": "Turn off the light and lock."
+    }
+  },
+  "fricative_heavy": {
+    "a": {
+      "wer": 0.3333333333333333,
+      "hyp": "She sells seashells by the sea shore."
+    },
+    "b": {
+      "wer": 0.3333333333333333,
+      "hyp": "She sells seashells by the sea shore."
+    },
+    "c": {
+      "wer": 0.6666666666666666,
+      "hyp": "She sells heat shells by the sea shore."
+    },
+    "d": {
+      "wer": 0.3333333333333333,
+      "hyp": "She sells seashells by the sea shore."
+    }
+  },
+  "consonant_clusters": {
+    "a": {
+      "wer": 0.0,
+      "hyp": "Strong streams splashed strangely."
+    },
+    "b": {
+      "wer": 0.25,
+      "hyp": "Strong streams slash strangely."
+    },
+    "c": {
+      "wer": 0.75,
+      "hyp": "Strong screams to last strangely."
+    },
+    "d": {
+      "wer": 0.25,
+      "hyp": "Strong streams slash strangely."
+    }
+  },
+  "long_sustained_vowels": {
+    "a": {
+      "wer": 1.0,
+      "hyp": "Moon, all for the blues we can't."
+    },
+    "b": {
+      "wer": 1.0,
+      "hyp": "Moon, all fris, the blues we can't."
+    },
+    "c": {
+      "wer": 0.8,
+      "hyp": "Moons for the blues weekend!"
+    },
+    "d": {
+      "wer": 1.0,
+      "hyp": "Moon, all fris, the blues we can't."
+    }
+  },
+  "short_unstressed": {
+    "a": {
+      "wer": 0.0,
+      "hyp": "It is what it is to me."
+    },
+    "b": {
+      "wer": 0.0,
+      "hyp": "It is what it is to me."
+    },
+    "c": {
+      "wer": 0.14285714285714285,
+      "hyp": "It is what it is for me."
+    },
+    "d": {
+      "wer": 0.0,
+      "hyp": "It is what it is to me."
+    }
+  },
+  "semantically_unusual": {
+    "a": {
+      "wer": 0.6,
+      "hyp": "Through clocky my umbrella."
+    },
+    "b": {
+      "wer": 0.4,
+      "hyp": "The clocky, my umbrella."
+    },
+    "c": {
+      "wer": 0.4,
+      "hyp": "The clocky, my umbrella."
+    },
+    "d": {
+      "wer": 0.6,
+      "hyp": "Through clocky my umbrella"
+    }
+  }
+}

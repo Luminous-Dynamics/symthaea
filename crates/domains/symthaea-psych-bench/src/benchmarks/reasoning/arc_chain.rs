@@ -27,6 +27,32 @@
 //! - chain_3_accuracy: ~0.50 (SD~0.18) — 3-step composition
 //! - chain_4_accuracy: ~0.38 (SD~0.20) — 4-step composition
 //! - chain_degradation: ~0.09 (SD~0.05) — accuracy drop per added step
+//!
+//! ## ⚠️ `chain_degradation` and the per-length ordering are NOT interpretable as
+//! "degradation with chain length"
+//!
+//! Measured 2026-07-31, per chain (2-AFC, chance 0.50):
+//!
+//! | chain | transforms | accuracy |
+//! |-------|------------|----------|
+//! | c0 (len 2) | ReflectX, TranslateRight | 1.000 |
+//! | c1 (len 2) | ColorReplace, ReflectY | 1.000 |
+//! | c2 (len 3) | ReflectX, TranslateDown, ColorReplace | 0.700 |
+//! | c3 (len 3) | TranslateRight, ReflectY, **Rotate90** | 0.533 |
+//! | c4 (len 4) | ReflectX, ColorReplace, TranslateRight, ReflectY | 0.867 |
+//! | c5 (len 4) | TranslateDown, **Rotate90**, ColorReplace, ReflectX | 0.567 |
+//!
+//! The two weakest chains are exactly the two containing `Rotate90`, independent of length,
+//! and a 4-step chain (c4, 0.867) outscores both 3-step chains. So the length groups are
+//! **confounded by transform difficulty**: they are not matched on anything except length, and
+//! `get_chains` does not nest them (a 3-step chain is not its 2-step counterpart plus a step).
+//!
+//! Consequence: a per-length ordering that is not monotone is *expected* here and is not
+//! evidence of a scoring defect. To actually measure degradation-with-length the chains would
+//! have to be nested — chain_3 = chain_2 + 1 step, chain_4 = chain_3 + 1 step — so that length
+//! is the only variable. That change would alter every recorded value and has not been made.
+//! Until it is, treat `chain_degradation` as descriptive of *this specific chain set*, not as a
+//! measurement of compositional depth.
 
 use crate::benchmarks::reasoning::arc_dataset::fair_distractor_grid;
 use crate::harness::config::BenchmarkConfig;
@@ -132,6 +158,20 @@ fn get_chains(param: u64, num_colors: u8) -> Vec<Vec<AtomicTransform>> {
 struct TrialResult {
     /// Accuracy per chain length: [chain_2, chain_3, chain_4]
     accuracy_by_length: [f64; 3],
+    /// Mean similarity between the prediction and the *unchanged test input*, per chain.
+    ///
+    /// This is an honesty metric: a rule that fails to generalise leaves `apply_rule` close to
+    /// the identity, so the prediction stays near the input. If this is high while
+    /// `similarity_by_length` is low, the model is echoing the input rather than composing the
+    /// rule -- and any 2-AFC whose distractor is also near the input will then be scored
+    /// systematically *below* chance rather than at it.
+    identity_similarity_by_chain: [f64; 6],
+    /// Accuracy for each individual chain, in `get_chains` order.
+    ///
+    /// Length-group aggregates hide *which* chain fails, and that mattered: a 2026-07-30
+    /// investigation into `chain_3` scoring below `chain_4` could not be finished because the
+    /// benchmark only reported per-length means. Attribution needs per-chain resolution.
+    accuracy_by_chain: [f64; 6],
     /// Mean similarity per chain length
     similarity_by_length: [f64; 3],
     /// Overall accuracy
@@ -166,13 +206,19 @@ impl ArcChainBenchmark {
 
         let mut hits_by_length = [0u32; 3];
         let mut total_by_length = [0u32; 3];
+        let mut hits_by_chain = [0u32; 6];
+        let mut total_by_chain = [0u32; 6];
+        let mut identity_sim_by_chain = [0.0f64; 6];
         let mut sim_by_length = [0.0f64; 3];
         let mut sim_count_by_length = [0u32; 3];
         let mut total_ticks = 0.0f64;
         let mut total_tasks = 0u32;
 
         for (group_idx, (_chain_len, chain_set)) in chain_groups.iter().enumerate() {
-            for chain in *chain_set {
+            for (within_group, chain) in chain_set.iter().enumerate() {
+                // chain_groups slices `chains` as 0..2, 2..4, 4..6, so this recovers the
+                // original index into `get_chains`.
+                let chain_idx = group_idx * 2 + within_group;
                 // Need encoder sized for rotate_90 output
                 let enc_size = grid_size; // 5×5 stays 5×5 for all our transforms
                 let encoder = BinaryGridEncoder::new(enc_size, enc_size, num_colors as usize, rng);
@@ -209,19 +255,46 @@ impl ArcChainBenchmark {
                     let predicted = encoder.apply_rule(&test_in_hv, &consensus);
 
                     let pred_sim = predicted.similarity(&test_out_hv) as f64;
+                    identity_sim_by_chain[chain_idx] += predicted.similarity(&test_in_hv) as f64;
                     sim_by_length[group_idx] += pred_sim;
                     sim_count_by_length[group_idx] += 1;
 
-                    // 2-AFC: predicted vs a fair (equally structured) distractor
+                    // 2-AFC: predicted vs a distractor that is the output of a DIFFERENT chain
+                    // of the SAME length, applied to the same input.
+                    //
+                    // Why not `fair_distractor_grid` (used here until 2026-07-31): it returns a
+                    // single-transform variation of the input, so its distance from the input is
+                    // CONSTANT while the true output moves further from the input with every
+                    // additional chain step. Measured on this benchmark, `apply_rule` sits ~0.78
+                    // similar to the input but only ~0.55 to a 3-4 step target, so the
+                    // input-adjacent distractor won almost every long-chain trial. That produced
+                    // scores far BELOW 2-AFC chance (chain_3 = 0.0167, i.e. 1/60) and an
+                    // impossible ordering in which 3-step chains scored below 4-step ones.
+                    //
+                    // Using the sibling chain from the same length group makes both options
+                    // equidistant from the input by construction, so the comparison isolates
+                    // "did the model learn THIS rule" instead of "did the prediction move away
+                    // from the input at all". Each group holds exactly 2 chains, so the sibling
+                    // is the other one.
                     xor_shift(&mut rng);
-                    let distractor_grid = fair_distractor_grid(&test_input, &test_output)
-                        .unwrap_or_else(|| test_input.clone());
+                    let sibling = &chain_set[1 - within_group];
+                    let sibling_output = apply_chain(&test_input, sibling);
+                    let distractor_grid = if sibling_output == test_output {
+                        // The two chains agreed on this input; fall back to the generic
+                        // distractor rather than scoring against the correct answer.
+                        fair_distractor_grid(&test_input, &test_output)
+                            .unwrap_or_else(|| test_input.clone())
+                    } else {
+                        sibling_output
+                    };
                     let distractor = encoder.encode_grid(&distractor_grid);
                     let dist_sim = predicted.similarity(&distractor) as f64;
 
                     total_by_length[group_idx] += 1;
+                    total_by_chain[chain_idx] += 1;
                     if pred_sim > dist_sim {
                         hits_by_length[group_idx] += 1;
+                        hits_by_chain[chain_idx] += 1;
                     }
 
                     xor_shift(&mut rng);
@@ -278,8 +351,20 @@ impl ArcChainBenchmark {
             0.0
         };
 
+        let mut accuracy_by_chain = [0.0f64; 6];
+        let mut identity_similarity_by_chain = [0.0f64; 6];
+        for i in 0..6 {
+            if total_by_chain[i] > 0 {
+                accuracy_by_chain[i] = hits_by_chain[i] as f64 / total_by_chain[i] as f64;
+                identity_similarity_by_chain[i] =
+                    identity_sim_by_chain[i] / total_by_chain[i] as f64;
+            }
+        }
+
         TrialResult {
             accuracy_by_length,
+            accuracy_by_chain,
+            identity_similarity_by_chain,
             similarity_by_length,
             overall_accuracy,
             rt_ticks,
@@ -314,12 +399,18 @@ impl PsychBenchmark for ArcChainBenchmark {
         let mut chain_4_sims = Vec::new();
         let mut overall_accs = Vec::new();
         let mut rts = Vec::new();
+        let mut per_chain_accs: [Vec<f64>; 6] = Default::default();
+        let mut per_chain_ident: [Vec<f64>; 6] = Default::default();
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
             chain_2_accs.push(r.accuracy_by_length[0]);
             chain_3_accs.push(r.accuracy_by_length[1]);
             chain_4_accs.push(r.accuracy_by_length[2]);
+            for (i, acc) in r.accuracy_by_chain.iter().enumerate() {
+                per_chain_accs[i].push(*acc);
+                per_chain_ident[i].push(r.identity_similarity_by_chain[i]);
+            }
             chain_2_sims.push(r.similarity_by_length[0]);
             chain_3_sims.push(r.similarity_by_length[1]);
             chain_4_sims.push(r.similarity_by_length[2]);
@@ -354,6 +445,31 @@ impl PsychBenchmark for ArcChainBenchmark {
             "chain_4_similarity",
             MetricValue::from_samples(&chain_4_sims),
         );
+        // Per-chain accuracy, named for its position in `get_chains`. These exist so a future
+        // anomaly can be attributed to a specific transform sequence rather than only to a
+        // length group -- see the `accuracy_by_chain` doc comment.
+        const CHAIN_METRIC_NAMES: [&str; 6] = [
+            "chain_c0_accuracy",
+            "chain_c1_accuracy",
+            "chain_c2_accuracy",
+            "chain_c3_accuracy",
+            "chain_c4_accuracy",
+            "chain_c5_accuracy",
+        ];
+        const IDENT_METRIC_NAMES: [&str; 6] = [
+            "chain_c0_identity_similarity",
+            "chain_c1_identity_similarity",
+            "chain_c2_identity_similarity",
+            "chain_c3_identity_similarity",
+            "chain_c4_identity_similarity",
+            "chain_c5_identity_similarity",
+        ];
+        for (name, samples) in CHAIN_METRIC_NAMES.iter().zip(per_chain_accs.iter()) {
+            result.insert(*name, MetricValue::from_samples(samples));
+        }
+        for (name, samples) in IDENT_METRIC_NAMES.iter().zip(per_chain_ident.iter()) {
+            result.insert(*name, MetricValue::from_samples(samples));
+        }
         result.insert("chain_accuracy", MetricValue::from_samples(&overall_accs));
         result.insert("rt_ticks", MetricValue::from_samples(&rts));
 
@@ -439,14 +555,26 @@ mod tests {
             ..Default::default()
         };
         let result = ArcChainBenchmark.run(&config);
-        let sim_2 = result.metrics["chain_2_similarity"].mean;
-        let sim_4 = result.metrics["chain_4_similarity"].mean;
-        // Longer chains should generally have lower similarity (more noise accumulation)
-        // But allow tolerance since HDC can be noisy at lower dims
-        assert!(sim_2.is_finite() && sim_4.is_finite());
-        // Just verify non-negative degradation is plausible
+
+        // This test used to read chain_2/chain_4 similarity and assert only that both were
+        // finite, never comparing them. It therefore passed while chain_3 accuracy sat at
+        // 0.0167 against chain_4's 0.1500 — a full inversion — and is the reason that defect
+        // went unnoticed. It cannot assert monotonicity instead, because the chain set is
+        // confounded by transform difficulty (see this module's docs). What it CAN assert, and
+        // now does, is that the derived metric is consistent with the values it is derived from.
+        let acc_2 = result.metrics["chain_2_accuracy"].mean;
+        let acc_4 = result.metrics["chain_4_accuracy"].mean;
         let deg = result.metrics["chain_degradation"].mean;
-        assert!(deg.is_finite(), "degradation should be finite");
+
+        // chain_degradation is defined as (chain_2 - chain_4) / 2 per trial; means are linear,
+        // so the identity must hold exactly up to float error.
+        let expected = (acc_2 - acc_4) / 2.0;
+        assert!(
+            (deg - expected).abs() < 1e-9,
+            "chain_degradation ({deg:.6}) does not match its own definition \
+             (chain_2 {acc_2:.6} - chain_4 {acc_4:.6}) / 2 = {expected:.6}. Either the metric \
+             changed definition or the samples it aggregates are not the ones reported."
+        );
     }
 
     #[test]

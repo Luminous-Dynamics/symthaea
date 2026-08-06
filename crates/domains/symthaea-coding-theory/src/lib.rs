@@ -35,8 +35,8 @@
 pub mod channel;
 pub mod experiments;
 pub mod hamming;
-pub mod interoperability;
 pub mod interleaving;
+pub mod interoperability;
 pub mod parameters;
 pub mod reed_solomon;
 pub mod reliability;

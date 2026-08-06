@@ -1999,11 +1999,17 @@ pub struct ReplVoiceOutput {
     /// Whether audio output is available
     audio_available: bool,
 
-    /// Audio output stream (rodio)
-    #[cfg(feature = "audio")]
-    _audio_stream: Option<rodio::OutputStream>,
-
-    /// Audio sink for playback (rodio)
+    /// Audio sink for playback (rodio). The underlying `rodio::OutputStream`
+    /// is deliberately NOT stored as a field here: on some platforms (e.g.
+    /// cpal's ALSA backend) it wraps a `PhantomData<*mut ()>` and is `!Send`.
+    /// Storing it propagated non-Send through `VoiceConversation` ->
+    /// `ServiceState` -> `HttpGatewayCtx`, breaking axum's `Router<S>: Send +
+    /// Sync` bound whenever `service` and `audio` were both enabled (found
+    /// exporting to the public standalone, `service`+`audio` had never been
+    /// combined in one compiled binary before). Leaked once at init time
+    /// instead (`init_audio`): the stream must live exactly as long as the
+    /// process anyway, and nothing needs to touch it again once the `Sink`
+    /// is built from it.
     #[cfg(feature = "audio")]
     audio_sink: Option<rodio::Sink>,
 
@@ -2070,7 +2076,7 @@ impl ReplVoiceOutput {
         let g2p = SimpleG2P::new();
 
         // Try to initialize audio
-        let (audio_available, _audio_stream, audio_sink) = Self::init_audio(&config);
+        let (audio_available, audio_sink) = Self::init_audio(&config);
 
         // Initialize LTC pipeline if requested and feature-enabled
         #[cfg(feature = "vocal-tract")]
@@ -2141,8 +2147,6 @@ impl ReplVoiceOutput {
             current_pacing: initial_pacing,
             audio_available,
             #[cfg(feature = "audio")]
-            _audio_stream,
-            #[cfg(feature = "audio")]
             audio_sink,
             #[cfg(feature = "vocal-tract")]
             ltc_pipeline,
@@ -2160,9 +2164,7 @@ impl ReplVoiceOutput {
 
     /// Initialize audio output
     #[cfg(feature = "audio")]
-    fn init_audio(
-        config: &ReplVoiceConfig,
-    ) -> (bool, Option<rodio::OutputStream>, Option<rodio::Sink>) {
+    fn init_audio(config: &ReplVoiceConfig) -> (bool, Option<rodio::Sink>) {
         use rodio::{OutputStream, Sink};
 
         // Try to get output stream
@@ -2189,25 +2191,31 @@ impl ReplVoiceOutput {
             Ok((stream, handle)) => match Sink::try_new(&handle) {
                 Ok(sink) => {
                     info!("Audio output initialized successfully");
-                    (true, Some(stream), Some(sink))
+                    // Leaked deliberately: the stream must live exactly as
+                    // long as the process anyway (nothing ever tears audio
+                    // output down early), and nothing needs to touch it again
+                    // once `sink` is built from it. See the doc comment on
+                    // the `audio_sink` field for why it isn't stored.
+                    Box::leak(Box::new(stream));
+                    (true, Some(sink))
                 }
                 Err(e) => {
                     warn!("Failed to create audio sink: {}", e);
-                    (false, None, None)
+                    (false, None)
                 }
             },
             Err(e) => {
                 warn!("Failed to initialize audio output: {}", e);
-                (false, None, None)
+                (false, None)
             }
         }
     }
 
     /// Initialize audio output (stub when audio feature disabled)
     #[cfg(not(feature = "audio"))]
-    fn init_audio(_config: &ReplVoiceConfig) -> (bool, (), ()) {
+    fn init_audio(_config: &ReplVoiceConfig) -> (bool, ()) {
         warn!("Audio playback disabled (audio feature not enabled)");
-        (false, (), ())
+        (false, ())
     }
 
     /// Update pacing from consciousness state

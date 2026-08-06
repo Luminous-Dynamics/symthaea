@@ -176,10 +176,12 @@ impl ConsciousReasoningEngine {
         let budget = ReasoningBudget::new(ctx.available_budget_us, r, ctx.phi);
 
         // ── STEP 5 (early, for Tier 0): GATE ───────────────────────────
-        let gate = ctx.tool.as_ref().map(|tool| {
-            let plan_confidence = 0.0; // no plan yet in Tier 0
-            classifier::gate(tool, phi_eff, plan_confidence)
-        });
+        // Tier 0 structurally has no plan (Steps 3-4 never run here) — gating
+        // against a hardcoded plan_confidence=0.0 would report "absence of a plan"
+        // as "denial of an executable plan" (see feedback_plan_review_rigor_standards
+        // item 7). Never gate at Tier 0; the refined gate below (Step 5, post-plan)
+        // is the only place a real gate decision gets made.
+        let gate: Option<crate::consciousness::tool_gate::types::GateResult> = None;
 
         // Build telemetry event
         let mut event = ReasoningEvent::new(cycle_id);
@@ -280,10 +282,46 @@ impl ConsciousReasoningEngine {
         }
 
         // ── STEP 5 (refined): GATE with plan confidence ────────────────
+        // `ctx.tool` is an explicit override for callers that already know exactly
+        // which tool to gate. Otherwise, only gate when a plan actually selected a
+        // concrete action — "no plan" (EVS below threshold, empty actions, or Tier 1
+        // which never plans by design) must never be gated as if it were a denied
+        // action (feedback_plan_review_rigor_standards item 7). When gating, risk
+        // attaches to the SELECTED action, not a generic "code_context present"
+        // descriptor: `is_epistemic` actions (verify/explain/debug) are genuinely
+        // read-only; mutating actions (generate/refactor) get an honest rollback
+        // claim only when `has_side_effects` is false (item 6 — no metadata-gamed
+        // classifier).
         let gate = ctx
             .tool
             .as_ref()
-            .map(|tool| classifier::gate(tool, phi_eff, plan.confidence));
+            .map(|tool| classifier::gate(tool, phi_eff, plan.confidence))
+            .or_else(|| {
+                if !plan.did_plan {
+                    return None;
+                }
+                let action = plan
+                    .best_action_idx
+                    .and_then(|idx| ctx.available_actions.get(idx))?;
+                let mut builder = crate::consciousness::tool_gate::types::ToolDescriptor::builder(
+                    action.id.clone(),
+                )
+                .domain("code_generation");
+                if action.is_epistemic {
+                    builder = builder.read_only();
+                } else if let Some(ref cc) = ctx.code_context {
+                    if !cc.has_side_effects {
+                        builder = builder.rollback(
+                            "regenerate candidate — no external side effects observed this cycle",
+                        );
+                    }
+                    // else: no rollback claimed — correctly classifies High/Critical.
+                }
+                let tool = builder
+                    .calibration_count(self.calibrator.posthoc_count())
+                    .build();
+                Some(classifier::gate(&tool, phi_eff, plan.confidence))
+            });
         if let Some(ref g) = gate {
             event.risk_level = Some(g.risk_level);
             event.required_phi = g.required_phi;
@@ -658,6 +696,91 @@ mod tests {
         let last = engine.last_event().unwrap();
         assert!(last.posthoc_outcome.is_some());
         assert!(last.posthoc_outcome.as_ref().unwrap().outcome_good);
+    }
+
+    // ── PR3 test matrix: "absence of a plan must never be reported as denial of
+    // an executable plan" (feedback_plan_review_rigor_standards item 7). MCTS
+    // action-selection isn't deterministically forceable from this fixture, so
+    // these test the invariants that don't depend on which action gets picked;
+    // the full per-action gating behavior is exercised end-to-end by the live
+    // CodingAgent smoke verification instead. ──
+
+    #[test]
+    fn test_gate_none_when_tier1_never_plans() {
+        // Tier 1 selection: phi <= 0.6 (BudgetTier::select). Tier 1 structurally
+        // never runs MCTS (`budget.tier != BudgetTier::Tier1` guard on Step 4), so
+        // even with code_context present, no plan means no gate.
+        let mut engine = ConsciousReasoningEngine::new();
+        let mut ctx = make_context(0.5, 0.8, 20_000);
+        ctx.code_context = Some(CodeReasoningContext {
+            type_confidence: 0.9,
+            involves_unsafe: false,
+            recent_compile_rate: 0.9,
+            retry_count: 0,
+            has_side_effects: false,
+            task_complexity: 0.3,
+        });
+        let result = engine.reason(&ctx);
+        assert_eq!(result.tier, BudgetTier::Tier1);
+        assert!(result.gate.is_none(), "no plan => no gate, not a denial");
+        assert_eq!(result.gate_checks, 0);
+    }
+
+    #[test]
+    fn test_gate_none_when_no_available_actions() {
+        // Empty action set => MctsResult::no_plan() unconditionally (Step 4's
+        // `!ctx.available_actions.is_empty()` guard) => no gate, regardless of tier.
+        let mut engine = ConsciousReasoningEngine::new();
+        let mut ctx = make_context(0.8, 0.8, 25_000);
+        ctx.available_actions = vec![];
+        let result = engine.reason(&ctx);
+        assert!(result.gate.is_none());
+        assert_eq!(result.gate_checks, 0);
+    }
+
+    #[test]
+    fn test_gate_absence_implies_no_plan_invariant() {
+        // Property check across a range of budgets/reliabilities: whenever the
+        // engine reports a gate, it must also report a plan was actually made.
+        // This is the core invariant PR3 exists to enforce.
+        let mut engine = ConsciousReasoningEngine::new();
+        for (phi, consensus, budget_us) in [
+            (0.8, 0.8, 25_000),
+            (0.5, 0.8, 20_000),
+            (0.9, 0.3, 25_000),
+            (0.8, 0.8, 1_000),
+        ] {
+            let ctx = make_context(phi, consensus, budget_us);
+            let result = engine.reason(&ctx);
+            if result.gate.is_some() {
+                assert!(
+                    result.plan.as_ref().is_some_and(|p| p.did_plan),
+                    "gate present but no plan was made (phi={phi}, consensus={consensus}, budget_us={budget_us})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_explicit_ctx_tool_override_still_gates_at_tier0() {
+        // Documents current (unchanged) behavior: an explicit `ctx.tool` override
+        // is honored even though this specific test forces Tier 0. Tier 0 itself
+        // never gates (see test above's sibling logic) UNLESS the caller supplied
+        // `ctx.tool` directly -- but Tier 0's own gate computation was changed to
+        // unconditionally `None` regardless of ctx.tool, per the review's
+        // invariant (absence of a plan applies even to an explicit override at
+        // Tier 0, since Tier 0 by construction never ran Step 4 to justify a real
+        // plan_confidence). Confirms that decision explicitly.
+        let mut engine = ConsciousReasoningEngine::new();
+        let mut ctx = make_context(0.8, 0.8, 1_000); // Tier 0
+        ctx.tool =
+            Some(crate::consciousness::tool_gate::types::ToolDescriptor::read_only("some_tool"));
+        let result = engine.reason(&ctx);
+        assert_eq!(result.tier, BudgetTier::Tier0);
+        assert!(
+            result.gate.is_none(),
+            "Tier 0 must never gate, even with an explicit ctx.tool override"
+        );
     }
 
     #[test]

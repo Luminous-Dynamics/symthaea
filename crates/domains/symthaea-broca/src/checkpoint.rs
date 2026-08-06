@@ -102,6 +102,47 @@ pub struct BrocaCheckpointMetadata {
     pub feature_set: Vec<String>,
     #[serde(default)]
     pub backend: String,
+    /// How many candidate tokens `BrocaCheckpoint::training_loss` was computed over.
+    ///
+    /// **Read this before interpreting `training_loss`.** With sampled softmax the trainer
+    /// scores the target against only `negative_samples` distractors, so the loss describes
+    /// discrimination over `negative_samples + 1` candidates — *not* over the vocabulary. Such
+    /// a number is not comparable to any eval perplexity and is trivially small even for a
+    /// model that has not fit its data.
+    ///
+    /// - `0` — unknown (legacy checkpoint written before 2026-07-29, or a caller that did not
+    ///   set it). Treat `training_loss` as uninterpretable.
+    /// - `== vocab_size` — full softmax; `training_loss` IS comparable to eval CE.
+    /// - anything else — sampled; comparable only to another run with the same count.
+    ///
+    /// Added because the production checkpoint recorded `training_loss = 2.0535` (ppl ≈ 7.8)
+    /// while full-softmax CE on its *own training corpus* measured 27.56 (ppl 9.27e11) — a
+    /// ~25-nat gap. "Loss 12→2, clean convergence" had been read as evidence the trainer
+    /// worked for months. See `SYMTHAEA_BROCA_BASELINE_2026-07-29.md`.
+    #[serde(default)]
+    pub train_loss_candidate_count: usize,
+}
+
+impl BrocaCheckpointMetadata {
+    /// Whether [`BrocaCheckpoint::training_loss`] is a full-vocabulary cross-entropy and
+    /// therefore comparable to eval perplexity. `false` when sampled or unknown.
+    pub fn train_loss_is_full_vocab(&self) -> bool {
+        self.train_loss_candidate_count > 0 && self.train_loss_candidate_count == self.vocab_size
+    }
+
+    /// Human-readable provenance for `training_loss`, for logs and reports.
+    pub fn train_loss_provenance(&self) -> String {
+        match self.train_loss_candidate_count {
+            0 => "UNKNOWN candidate count — training_loss is uninterpretable".to_string(),
+            n if n == self.vocab_size => {
+                format!("full softmax over {n} tokens — comparable to eval CE")
+            }
+            n => format!(
+                "SAMPLED softmax over {n} candidates (vocab {}) — NOT comparable to eval CE",
+                self.vocab_size
+            ),
+        }
+    }
 }
 
 /// A complete Broca checkpoint: model weights, config, and training state.
@@ -149,6 +190,10 @@ impl BrocaCheckpoint {
             } else {
                 "cfc-hdc".to_string()
             },
+            // Cannot be derived from the tensors — only the trainer knows whether its loss was
+            // sampled. `save_to_file` restores any caller-set value over this default, so 0
+            // ("unknown") persists only when nobody recorded it.
+            train_loss_candidate_count: 0,
         }
     }
 
@@ -166,12 +211,18 @@ impl BrocaCheckpoint {
     }
 
     pub fn save_to_file<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        // `metadata_for` rebuilds metadata from the tensors, so it cannot know anything the
+        // *caller* recorded. Carry caller-supplied provenance across that rebuild explicitly —
+        // otherwise setting `train_loss_candidate_count` before saving would be silently
+        // discarded here, which is exactly the class of silent loss this field exists to fix.
+        let caller_train_loss_candidates = self.metadata.train_loss_candidate_count;
         self.metadata = Self::metadata_for(
             &self.token_embeddings,
             &self.vocab,
             &self.projection_weights,
             &self.liquid_mamba_config,
         );
+        self.metadata.train_loss_candidate_count = caller_train_loss_candidates;
         self.checksum = [0u8; 32];
         let payload = rmp_serde::to_vec(self).context("Failed to serialize BrocaCheckpoint")?;
         self.checksum = *blake3::hash(&payload).as_bytes();

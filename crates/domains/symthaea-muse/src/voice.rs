@@ -62,6 +62,48 @@ pub struct Arrangement {
     pub voices: Vec<Voice>,
 }
 
+/// Default instrument for a voice role on the AUTONOMOUS path.
+///
+/// Completes a migration started on 2026-07-08 by `3ea0df1499`
+/// ("give melody/harmony/bass real distinct instruments") and never finished.
+/// That commit added `Voice::instrument`, wired `theory_realize` (the studio
+/// path) to populate it from the performance plan, and left every construction
+/// site in this file at `None` as a backward-compatible default. `None` has two
+/// consequences, both stated in that field's own doc comment:
+///
+///  1. `synth::render_arrangement` falls back to a single mood-derived timbre
+///     shared by every voice — "one chiptune voice in three registers".
+///  2. `synth.rs:252` gates the ENTIRE sampled-instrument path on
+///     `if let Some(instrument) = voice.instrument`, so the 14.8 GB of real
+///     recordings under `data/samples/` were unreachable from the path Symthaea
+///     composes on. `SYMTHAEA_VCSL_DIR` was a no-op here.
+///
+/// Roles are given DISTINCT families rather than one shared patch, because one
+/// shared patch is the defect being repaired — an all-piano default would not
+/// fix it. Every instrument here has a real sample bank (`vcsl.rs:93-141`,
+/// sustain and staccato), so each resolves to a recording rather than silently
+/// falling back to synthesis.
+///
+/// These are DEFAULTS, not musical law: one line each, and the studio path is
+/// unaffected because it sets `Some(_)` explicitly.
+fn default_instrument(role: VoiceRole) -> Instrument {
+    match role {
+        // Carries the tune; the widest-range sampled instrument we have.
+        VoiceRole::Lead => Instrument::Piano,
+        // Wants weight and sustain under the texture.
+        VoiceRole::Bass => Instrument::Cello,
+        // Pads behind the lead without competing for its register.
+        //
+        // Viola rather than the tempting `StringEnsemble`: that variant exists in
+        // `instruments.rs` but has NO entry in `vcsl.rs`, so it would silently fall
+        // back to synthesis and quietly reintroduce the very defect this repairs.
+        // Checked, not assumed.
+        VoiceRole::Harmony => Instrument::Viola,
+        // Short repeating figures read best with a clear plucked attack.
+        VoiceRole::Ostinato => Instrument::Harp,
+    }
+}
+
 /// Derive polyphonic voices from a lead melody and cognitive state.
 ///
 /// The lead melody is always included. Additional voices are consciousness-gated:
@@ -79,7 +121,7 @@ pub fn arrange(lead_notes: &[Note], state: &MusicalState) -> Arrangement {
         pitch_range: (130.0, 1000.0),
         volume: 1.0,
         pan: 0.0,
-        instrument: None,
+        instrument: Some(default_instrument(VoiceRole::Lead)),
     });
 
     // Bass voice: root motion, octave below lead
@@ -120,7 +162,7 @@ fn derive_bass(lead: &[Note], state: &MusicalState) -> Voice {
         pitch_range: (55.0, 500.0),
         volume: 0.7,
         pan: -0.2, // slight left
-        instrument: None,
+        instrument: Some(default_instrument(VoiceRole::Bass)),
     }
 }
 
@@ -156,7 +198,7 @@ fn derive_harmony(lead: &[Note], state: &MusicalState) -> Voice {
         pitch_range: (200.0, 2000.0),
         volume: 0.5,
         pan: 0.4, // right
-        instrument: None,
+        instrument: Some(default_instrument(VoiceRole::Harmony)),
     }
 }
 
@@ -175,7 +217,7 @@ fn derive_ostinato(lead: &[Note], state: &MusicalState) -> Voice {
             pitch_range: (100.0, 800.0),
             volume: 0.3,
             pan: -0.3,
-            instrument: None,
+            instrument: Some(default_instrument(VoiceRole::Ostinato)),
         };
     }
 
@@ -214,7 +256,7 @@ fn derive_ostinato(lead: &[Note], state: &MusicalState) -> Voice {
         pitch_range: (100.0, 800.0),
         volume: 0.3,
         pan: -0.3, // left
-        instrument: None,
+        instrument: Some(default_instrument(VoiceRole::Ostinato)),
     }
 }
 
@@ -410,5 +452,74 @@ mod tests {
         };
         let arr = arrange(&[], &state);
         assert_eq!(arr.voices.len(), 1); // only empty lead
+    }
+}
+
+#[cfg(test)]
+mod default_instrument_tests {
+    use super::*;
+
+    /// Every voice the autonomous path emits must name an instrument.
+    ///
+    /// `synth.rs:252` gates the entire sampled-instrument path on
+    /// `if let Some(instrument) = voice.instrument`, so a single `None` here
+    /// silently returns that voice to the shared mood-derived patch — "one
+    /// chiptune voice in three registers", in this file's own words — and makes
+    /// 14.8 GB of recordings unreachable for it. A new voice role added without
+    /// an instrument would reintroduce that quietly; this makes it loud.
+    #[test]
+    fn every_arranged_voice_names_an_instrument() {
+        let notes: Vec<Note> = (0..16)
+            .map(|i| Note {
+                frequency: 440.0 * 2f32.powf(i as f32 / 12.0),
+                start_time: i as f32 * 0.25,
+                duration: 0.2,
+                velocity: 0.7,
+            })
+            .collect();
+        // Psi high enough to gate ON every optional voice (bass > 0.4,
+        // harmony > 0.6, ostinato > 0.7), so all roles are exercised.
+        let state = MusicalState {
+            consciousness_level: 0.95,
+            ..MusicalState::default()
+        };
+        let arrangement = arrange(&notes, &state);
+        assert!(
+            arrangement.voices.len() >= 2,
+            "psi=0.95 should gate on more than the lead; got {}",
+            arrangement.voices.len(),
+        );
+        for v in &arrangement.voices {
+            assert!(
+                v.instrument.is_some(),
+                "{:?} voice has instrument: None — it will fall back to the shared \
+                 patch and cannot reach a sample bank.",
+                v.role,
+            );
+        }
+    }
+
+    /// The roles must not all collapse to one timbre. One shared patch across
+    /// melody/harmony/bass is precisely the defect `Voice::instrument` was added
+    /// to fix, so an all-piano default would satisfy the test above while
+    /// changing nothing audible.
+    #[test]
+    fn roles_get_distinct_timbres() {
+        use std::collections::BTreeSet;
+        let distinct: BTreeSet<String> = [
+            VoiceRole::Lead,
+            VoiceRole::Bass,
+            VoiceRole::Harmony,
+            VoiceRole::Ostinato,
+        ]
+        .into_iter()
+        .map(|r| format!("{:?}", default_instrument(r)))
+        .collect();
+        assert_eq!(
+            distinct.len(),
+            4,
+            "roles share a timbre: {distinct:?} — that is the 'one chiptune voice \
+             in three registers' failure this mapping exists to remove.",
+        );
     }
 }

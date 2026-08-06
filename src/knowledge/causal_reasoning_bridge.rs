@@ -19,6 +19,13 @@ use symthaea_causal_reasoning::causal_calculus::{CausalDAG, StructuralCausalMode
 // by `ConsciousReasoningEngine::analyze_counterfactual`). They do not interoperate
 // without conversion — see `to_identification_dag()` below (AGW plan Phase 5.3,
 // found 2026-07-10 when the un-islanding attempt discovered this mismatch).
+//
+// Gated: `symthaea-causal-reasoning` is declared `default-features = false`, and its
+// `counterfactual` module only exists when that crate's `counterfactual` feature is on —
+// which only `reasoning_engine` turns on (`Cargo.toml:825`). Without this gate the import
+// is unresolved in any build lacking `reasoning_engine`, e.g. the CI leg
+// `--no-default-features --features safety-agents,ssm_language`. Found 2026-07-31.
+#[cfg(feature = "reasoning_engine")]
 use symthaea_causal_reasoning::counterfactual::CausalDAG as IdentificationCausalDAG;
 
 /// Bridge from knowledge engine causal edges to full CausalDAG.
@@ -192,6 +199,9 @@ impl CausalReasoningBridge {
     /// (see `add_node`), which is exactly the implicit index
     /// `identification::CausalDAG` uses — so edge index pairs carry over
     /// unchanged and only node names need projecting out.
+    ///
+    /// Gated to match its return type's import (see the `use` at the top of this file).
+    #[cfg(feature = "reasoning_engine")]
     pub fn to_identification_dag(&self) -> IdentificationCausalDAG {
         let names: Vec<String> = self.dag.nodes.iter().map(|n| n.name.clone()).collect();
         IdentificationCausalDAG::new(names, self.dag.edges.clone())
@@ -319,6 +329,9 @@ mod tests {
     // -> CausalReasoningBridge::sync_from_bridge -> to_identification_dag() ->
     // the exact type ConsciousReasoningEngine::analyze_counterfactual() expects.
 
+    // Gated for the same reason as the test below: `to_identification_dag()` only exists
+    // when `reasoning_engine` is on.
+    #[cfg(feature = "reasoning_engine")]
     #[test]
     fn identification_dag_conversion_preserves_topology() {
         let bridge = make_bridge_with_chain();
@@ -345,6 +358,15 @@ mod tests {
         );
     }
 
+    // Gated to match its imports: `consciousness::counterfactual` and
+    // `consciousness::reasoning_engine` are both `#[cfg(feature = "reasoning_engine")]`
+    // (`consciousness/mod.rs:237,240`), but this test used them unconditionally. That made
+    // `cargo test` fail to compile the whole lib-test target for any configuration without
+    // that feature — e.g. `--no-default-features --features profile-voice,creative,ssm_language`,
+    // the documented poetry build. It went unnoticed because the combo was only ever
+    // exercised with `cargo check`, which does not build test targets.
+    // Found 2026-07-28 while verifying unrelated Broca work.
+    #[cfg(feature = "reasoning_engine")]
     #[test]
     fn end_to_end_counterfactual_query_through_the_unislanded_pipeline() {
         use crate::consciousness::counterfactual::{CausalQuery, CausalQueryOutcome};

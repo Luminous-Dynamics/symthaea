@@ -91,8 +91,14 @@ pub struct TimedNorm {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LifecycleError {
     DeadlineRequiresObligation,
-    DueBeforeEffective { due_on: LegalDate, effective_from: LegalDate },
-    DueAfterExpiry { due_on: LegalDate, effective_until: LegalDate },
+    DueBeforeEffective {
+        due_on: LegalDate,
+        effective_from: LegalDate,
+    },
+    DueAfterExpiry {
+        due_on: LegalDate,
+        effective_until: LegalDate,
+    },
 }
 
 impl fmt::Display for LifecycleError {
@@ -274,11 +280,7 @@ fn assess_obligation(
                     norm.reparation.clone(),
                 );
             }
-            return assessment(
-                NormState::Violated,
-                Vec::new(),
-                norm.reparation.clone(),
-            );
+            return assessment(NormState::Violated, Vec::new(), norm.reparation.clone());
         }
     }
 
@@ -315,11 +317,9 @@ fn resolve_action_waiver(
     action_reparation: Option<StructuredNorm>,
 ) -> LifecycleAssessment {
     match (action, waiver) {
-        (Some(action), Some(waiver)) if action.occurred_on < waiver.occurred_on => assessment(
-            action_state,
-            vec![action.id.clone()],
-            action_reparation,
-        ),
+        (Some(action), Some(waiver)) if action.occurred_on < waiver.occurred_on => {
+            assessment(action_state, vec![action.id.clone()], action_reparation)
+        }
         (Some(action), Some(waiver)) if waiver.occurred_on < action.occurred_on => {
             assessment(NormState::Waived, vec![waiver.id.clone()], None)
         }
@@ -328,14 +328,10 @@ fn resolve_action_waiver(
             vec![action.id.clone(), waiver.id.clone()],
             None,
         ),
-        (Some(action), None) => assessment(
-            action_state,
-            vec![action.id.clone()],
-            action_reparation,
-        ),
-        (None, Some(waiver)) => {
-            assessment(NormState::Waived, vec![waiver.id.clone()], None)
+        (Some(action), None) => {
+            assessment(action_state, vec![action.id.clone()], action_reparation)
         }
+        (None, Some(waiver)) => assessment(NormState::Waived, vec![waiver.id.clone()], None),
         (None, None) => assessment(NormState::Active, Vec::new(), None),
     }
 }
@@ -422,11 +418,7 @@ mod tests {
         .with_deadline(due)
         .unwrap()
         .with_reparation(reparation.clone());
-        let result = assess_lifecycle(
-            &norm,
-            &[action_event("late-payment", "pay", paid)],
-            paid,
-        );
+        let result = assess_lifecycle(&norm, &[action_event("late-payment", "pay", paid)], paid);
 
         assert_eq!(result.state, NormState::FulfilledLate);
         assert_eq!(result.activated_reparation, Some(reparation));
@@ -485,11 +477,7 @@ mod tests {
         .with_deadline(due)
         .unwrap()
         .with_reparation(reparation.clone());
-        let result = assess_lifecycle(
-            &norm,
-            &[],
-            LegalDate::new(2026, 7, 11).unwrap(),
-        );
+        let result = assess_lifecycle(&norm, &[], LegalDate::new(2026, 7, 11).unwrap());
 
         assert_eq!(result.state, NormState::Violated);
         assert_eq!(result.activated_reparation, Some(reparation));
@@ -502,14 +490,13 @@ mod tests {
             StructuredNorm::new(Modality::Forbidden, proposition("disclose")),
             TemporalScope::unbounded(),
         );
-        let result = assess_lifecycle(
-            &norm,
-            &[action_event("disclosure", "disclose", date)],
-            date,
-        );
+        let result = assess_lifecycle(&norm, &[action_event("disclosure", "disclose", date)], date);
 
         assert_eq!(result.state, NormState::Violated);
-        assert_eq!(result.decisive_events, vec![EventId::new("disclosure").unwrap()]);
+        assert_eq!(
+            result.decisive_events,
+            vec![EventId::new("disclosure").unwrap()]
+        );
     }
 
     #[test]

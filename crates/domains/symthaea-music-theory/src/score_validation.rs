@@ -114,6 +114,51 @@ pub fn validate_score(score: &Score, config: &ScoreValidationConfig) -> TheoryVa
     }
 }
 
+/// Rules that represent a genuinely MALFORMED score, regardless of style or
+/// grammar family — collisions, out-of-range notes, missing metadata.
+/// Deliberately excludes `StrongBeatConsonance`/`ParallelPerfectMotion`/
+/// `VoiceCrossing`/`FinalTonicArrival`/`MelodicLeap`: those are real
+/// music-theoretic judgments, but they're style-dependent (a raga arc, a
+/// blues turnaround, or a groove cycle has no obligation to satisfy
+/// classical-tonal voice-leading rules it was never designed against), so
+/// gating production on them would either mask genuine stylistic idioms as
+/// "fatal" or force every grammar-family engine to a tonal common
+/// denominator it doesn't share.
+pub fn is_universal_invariant(rule: ScoreValidationRule) -> bool {
+    matches!(
+        rule,
+        ScoreValidationRule::ScoreMetadata
+            | ScoreValidationRule::NoteBounds
+            | ScoreValidationRule::VoiceMonophony
+    )
+}
+
+/// Debug-only production gate: panics if `score` has any Fatal issue among
+/// the universal-invariant rules (see [`is_universal_invariant`]), under the
+/// default validation config. Compiles to nothing in release builds — a
+/// development/test-time safety net against a score that collides or
+/// malforms itself, not a claim that the score is musically "correct" (the
+/// excluded voice-leading rules can and do still fail; see that function's
+/// doc for why they're deliberately not gated here).
+pub fn debug_assert_no_structural_defects(score: &Score, label: &str) {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+    let report = validate_score(score, &ScoreValidationConfig::default());
+    let defects: Vec<&ScoreValidationIssue> = report
+        .issues
+        .iter()
+        .filter(|i| i.severity == ValidationSeverity::Fatal && is_universal_invariant(i.rule))
+        .collect();
+    assert!(
+        defects.is_empty(),
+        "{label}: composed score has {} structural defect(s) (collision/malformation \
+         within a single voice — not a voice-leading judgment call):\n{:#?}",
+        defects.len(),
+        defects
+    );
+}
+
 fn validate_metadata(score: &Score, issues: &mut Vec<ScoreValidationIssue>) {
     if !score.tempo_bpm.is_finite() || score.tempo_bpm <= 0.0 {
         issue(
@@ -282,8 +327,28 @@ fn validate_melodic_leaps(
 
 fn validate_strong_beats(score: &Score, issues: &mut Vec<ScoreValidationIssue>) {
     let last = score.total_beats.beats().floor().max(0.0) as usize;
+    // Only METRICALLY strong beats — the downbeat and the mid-measure accent
+    // (beats 1 and 3 of 4/4), per the crate's canonical
+    // [`crate::phrase::is_strong_beat`].
+    //
+    // This used to iterate EVERY integer beat, so beats 2 and 4 of 4/4 counted
+    // as strong and an ordinary passing or neighbour tone there was reported
+    // Fatal. Measured before the fix: 7,336 StrongBeatConsonance issues across
+    // 29 styles x 12 seeds, with every single style implicated — including
+    // RenaissancePolyphony, whose entire identity is species counterpoint.
+    // A rule that flags everything measures nothing, which is why that count
+    // could not be used as evidence about musical quality.
+    //
+    // Sharing `phrase::is_strong_beat` rather than reimplementing it is
+    // deliberate: a second, silently-divergable definition of "strong beat" is
+    // the same defect class as the duplicate progression source removed from
+    // `Style::progression` on 2026-07-30.
+    let meter = f64::from(score.meter.max(1));
     for beat in 0..=last {
         let time = beat as f64;
+        if !crate::phrase::is_strong_beat(time, meter) {
+            continue;
+        }
         let Some((bass_index, bass)) = sounding(score, VoiceRole::Bass, time) else {
             continue;
         };
@@ -395,6 +460,21 @@ fn validate_final_tonic(score: &Score, issues: &mut Vec<ScoreValidationIssue>) {
     }
 }
 
+/// The pitch of `role` sounding at `time`, if any.
+///
+/// `pub(crate)` so the composer can choose the bass against the melody that is
+/// ALREADY in the score (`realize_melody` runs before `realize_bass`) — see
+/// [`crate::voicing::lead_bass_against_melody`]. Shares this module's
+/// `sounding` rather than reimplementing the overlap test, for the same reason
+/// `validate_strong_beats` shares `phrase::is_strong_beat`.
+pub(crate) fn sounding_pitch(
+    score: &Score,
+    role: VoiceRole,
+    time: f64,
+) -> Option<crate::pitch::Pitch> {
+    sounding(score, role, time).map(|(_, note)| note.pitch)
+}
+
 fn sounding(score: &Score, role: VoiceRole, time: f64) -> Option<(usize, &ScoreNote)> {
     sounding_all(score, role, time)
         .into_iter()
@@ -446,10 +526,12 @@ fn issue(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::score::PartId;
     use crate::{Duration, Emphasis, Key, Pitch, PitchClass, ScoreNote};
 
     fn note(midi: u8, onset: i64, duration: i64, role: VoiceRole) -> ScoreNote {
         ScoreNote {
+            part: PartId::UNASSIGNED,
             pitch: Pitch::from_midi(midi),
             onset: Duration::new(onset, 1),
             duration: Duration::new(duration, 1),
@@ -500,6 +582,62 @@ mod tests {
                 .issues
                 .iter()
                 .any(|issue| { issue.rule == ScoreValidationRule::FinalTonicArrival })
+        );
+    }
+
+    #[test]
+    fn universal_invariant_excludes_style_dependent_voice_leading_rules() {
+        assert!(is_universal_invariant(ScoreValidationRule::ScoreMetadata));
+        assert!(is_universal_invariant(ScoreValidationRule::NoteBounds));
+        assert!(is_universal_invariant(ScoreValidationRule::VoiceMonophony));
+        assert!(!is_universal_invariant(ScoreValidationRule::VoiceCrossing));
+        assert!(!is_universal_invariant(
+            ScoreValidationRule::StrongBeatConsonance
+        ));
+        assert!(!is_universal_invariant(
+            ScoreValidationRule::ParallelPerfectMotion
+        ));
+        assert!(!is_universal_invariant(ScoreValidationRule::MelodicLeap));
+        assert!(!is_universal_invariant(
+            ScoreValidationRule::FinalTonicArrival
+        ));
+    }
+
+    #[test]
+    fn debug_gate_panics_on_a_same_voice_overlap_but_not_on_a_missing_tonic() {
+        // A genuine same-voice collision (VoiceMonophony, a universal
+        // invariant) must panic -- this is exactly the bug class fixed in
+        // composer.rs's apply_counter_hook_echoes/CounterShift.
+        let mut colliding = valid_score();
+        colliding.notes[2].role = VoiceRole::Melody;
+        colliding.notes[2].onset = Duration::new(0, 1);
+        colliding.notes[2].duration = Duration::new(2, 1);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            debug_assert_no_structural_defects(&colliding, "test");
+        }));
+        assert!(result.is_err(), "expected a panic on a colliding score");
+
+        // A score whose ONLY fatal issue is a non-universal, style-dependent
+        // rule (missing final-tonic arrival) must NOT panic -- see
+        // `is_universal_invariant`'s doc for why.
+        let mut no_tonic = valid_score();
+        no_tonic.notes.last_mut().unwrap().pitch = Pitch::from_midi(62);
+        let report = validate_score(&no_tonic, &ScoreValidationConfig::default());
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|i| i.rule == ScoreValidationRule::FinalTonicArrival
+                    && i.severity == ValidationSeverity::Fatal),
+            "test setup must actually produce a FinalTonicArrival fatal: {:?}",
+            report.issues
+        );
+        let result2 = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            debug_assert_no_structural_defects(&no_tonic, "test");
+        }));
+        assert!(
+            result2.is_ok(),
+            "must not panic on a non-universal-rule fatal issue"
         );
     }
 }

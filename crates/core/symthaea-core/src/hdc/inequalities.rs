@@ -83,7 +83,9 @@ pub fn amgm_gap(xs: &[f64]) -> f64 {
 
 /// Verify the Cauchy–Schwarz inequality for two equal-length slices:
 ///
-///     (Σ aᵢbᵢ)² ≤ (Σ aᵢ²) · (Σ bᵢ²)
+/// ```text
+/// (Σ aᵢbᵢ)² ≤ (Σ aᵢ²) · (Σ bᵢ²)
+/// ```
 ///
 /// Equality iff the slices are proportional.
 pub fn cauchy_schwarz_holds(a: &[f64], b: &[f64]) -> bool {
@@ -107,8 +109,10 @@ pub fn cauchy_schwarz_slack(a: &[f64], b: &[f64]) -> f64 {
 
 /// Power mean of order `p` for non-negative inputs.
 ///
-///     M_p(x) = (1/n · Σ xᵢᵖ)^(1/p)     for p ≠ 0
-///     M_0(x) = geometric mean           (limit as p → 0)
+/// ```text
+/// M_p(x) = (1/n · Σ xᵢᵖ)^(1/p)     for p ≠ 0
+/// M_0(x) = geometric mean           (limit as p → 0)
+/// ```
 ///
 /// Returns None if p = 0 and any input is 0 (GM is 0), or if p < 0 and any
 /// input is 0 (harmonic-style divergence).
@@ -157,7 +161,9 @@ pub fn power_mean_inequality_holds(xs: &[f64], p: f64, q: f64) -> bool {
 /// Numerical convexity check on sample points: given f and weights wᵢ ≥ 0
 /// summing to 1 and sample points xᵢ, verify
 ///
-///     f(Σ wᵢxᵢ) ≤ Σ wᵢf(xᵢ)     (Jensen's inequality for convex f)
+/// ```text
+/// f(Σ wᵢxᵢ) ≤ Σ wᵢf(xᵢ)     (Jensen's inequality for convex f)
+/// ```
 ///
 /// Returns true iff the inequality holds. Requires f to be callable.
 pub fn jensen_convex_holds<F>(f: F, weights: &[f64], points: &[f64]) -> bool
@@ -181,7 +187,9 @@ where
 
 /// Schur's inequality for three non-negative reals at exponent t = 1:
 ///
-///     a(a − b)(a − c) + b(b − a)(b − c) + c(c − a)(c − b) ≥ 0
+/// ```text
+/// a(a − b)(a − c) + b(b − a)(b − c) + c(c − a)(c − b) ≥ 0
+/// ```
 ///
 /// Holds for all (a, b, c) ≥ 0. Returns true if the numerical evaluation
 /// is ≥ 0 within tolerance.
@@ -193,7 +201,9 @@ pub fn schur_t1_holds(a: f64, b: f64, c: f64) -> bool {
 
 /// Schur's inequality at exponent t = 2:
 ///
-///     a²(a − b)(a − c) + b²(b − a)(b − c) + c²(c − a)(c − b) ≥ 0
+/// ```text
+/// a²(a − b)(a − c) + b²(b − a)(b − c) + c²(c − a)(c − b) ≥ 0
+/// ```
 pub fn schur_t2_holds(a: f64, b: f64, c: f64) -> bool {
     assert!(a >= -INEQ_EPS && b >= -INEQ_EPS && c >= -INEQ_EPS);
     let s = a * a * (a - b) * (a - c) + b * b * (b - a) * (b - c) + c * c * (c - a) * (c - b);

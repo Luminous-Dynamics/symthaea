@@ -536,7 +536,12 @@ mod tests {
         for _ in 0..20 {
             engine.infer(&steady);
         }
-        let prior_after_steady = engine.last_result().unwrap().prior_precision;
+        // Copy the scalars out rather than holding `last_result()`'s borrow —
+        // `engine.infer()` below needs `&mut engine`.
+        let (prior_after_steady, sensory_after_steady) = {
+            let r = engine.last_result().unwrap();
+            (r.prior_precision, r.sensory_precision)
+        };
 
         // Then feed surprising input
         let surprise = AudioFeatures {
@@ -547,17 +552,60 @@ mod tests {
             rms_energy: 0.9,
             zero_crossing_rate: 0.7,
         };
-        for _ in 0..20 {
+        // Sample the TRANSIENT (first surprising frame) separately from the
+        // settled state: 20 identical "surprise" frames stop being surprising
+        // once the agent has re-learned them, so the documented prior-precision
+        // dip is a property of the transition, not of the new steady state.
+        engine.infer(&surprise);
+        let (prior_at_transient, sensory_at_transient) = {
+            let r = engine.last_result().unwrap();
+            (r.prior_precision, r.sensory_precision)
+        };
+        for _ in 0..19 {
             engine.infer(&surprise);
         }
-        let sensory_after_surprise = engine.last_result().unwrap().sensory_precision;
+        let surprise_result = engine.last_result().unwrap();
+        let prior_after_surprise = surprise_result.prior_precision;
+        let sensory_after_surprise = surprise_result.sensory_precision;
 
-        // After surprise, sensory precision should increase (pay attention to new input)
-        // and prior precision should decrease (predictions are wrong)
-        // These dynamics are handled by PrecisionEstimator in symthaea-fep
         assert!(
-            engine.last_result().unwrap().prediction_error > 0.0,
+            surprise_result.prediction_error > 0.0,
             "surprise should produce prediction error"
+        );
+
+        // Under surprise, sensory precision rises (pay attention to new input)
+        // and prior precision falls (predictions are wrong). These dynamics
+        // come from PrecisionEstimator in symthaea-fep; this test is the only
+        // thing checking muse observes them through `MusicalInferenceEngine`.
+        assert!(
+            sensory_after_surprise > sensory_after_steady,
+            "sensory precision should rise under surprise: \
+             {sensory_after_steady} -> {sensory_after_surprise}"
+        );
+        // Measured 2026-07-28, the first time this test asserted anything:
+        //   prior:   steady 1.7851 -> transient 1.7405 -> settled 2.5858
+        //   sensory: steady 1.0069 -> transient 1.0302 -> settled 1.1057
+        // The prior-precision DIP is real but transient-only. Asserting it on
+        // the settled value fails, and that is correct behaviour rather than a
+        // bug: 20 identical "surprise" frames stop being surprising once the
+        // agent has learned them, so prior precision recovers past where it
+        // started. The original version of this test sampled only the settled
+        // value, so it could not have observed the property its own comment
+        // described even if it had asserted -- which it also did not.
+        assert!(
+            sensory_at_transient > sensory_after_steady,
+            "sensory precision should rise on the surprising frame: \
+             {sensory_after_steady} -> {sensory_at_transient}"
+        );
+        assert!(
+            prior_at_transient < prior_after_steady,
+            "prior precision should fall on the surprising frame: \
+             {prior_after_steady} -> {prior_at_transient}"
+        );
+        assert!(
+            prior_after_surprise > prior_at_transient,
+            "prior precision should recover as the new input is learned: \
+             {prior_at_transient} -> {prior_after_surprise}"
         );
     }
 

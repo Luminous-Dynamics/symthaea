@@ -40,10 +40,7 @@ impl Game2x2 {
     /// Canonical Prisoner's Dilemma (`0=cooperate`, `1=defect`).
     pub fn prisoners_dilemma() -> Self {
         Self {
-            payoffs: [
-                [(-1.0, -1.0), (-3.0, 0.0)],
-                [(0.0, -3.0), (-2.0, -2.0)],
-            ],
+            payoffs: [[(-1.0, -1.0), (-3.0, 0.0)], [(0.0, -3.0), (-2.0, -2.0)]],
         }
     }
 
@@ -95,10 +92,8 @@ impl Game2x2 {
         let mut equilibria = Vec::new();
         for row in 0..2 {
             for column in 0..2 {
-                let row_is_best =
-                    self.payoffs[row][column].0 >= self.payoffs[1 - row][column].0;
-                let column_is_best =
-                    self.payoffs[row][column].1 >= self.payoffs[row][1 - column].1;
+                let row_is_best = self.payoffs[row][column].0 >= self.payoffs[1 - row][column].0;
+                let column_is_best = self.payoffs[row][column].1 >= self.payoffs[row][1 - column].1;
                 if row_is_best && column_is_best {
                     equilibria.push((row, column));
                 }
@@ -111,9 +106,7 @@ impl Game2x2 {
     pub fn row_dominant_strategy(&self) -> Option<usize> {
         if (0..2).all(|column| self.payoffs[0][column].0 > self.payoffs[1][column].0) {
             Some(0)
-        } else if (0..2)
-            .all(|column| self.payoffs[1][column].0 > self.payoffs[0][column].0)
-        {
+        } else if (0..2).all(|column| self.payoffs[1][column].0 > self.payoffs[0][column].0) {
             Some(1)
         } else {
             None
@@ -152,11 +145,10 @@ impl Game2x2 {
         (0..2)
             .filter(|&candidate| {
                 let alternative = 1 - candidate;
-                (0..2).all(|row| {
-                    self.payoffs[row][candidate].1 >= self.payoffs[row][alternative].1
-                }) && (0..2).any(|row| {
-                    self.payoffs[row][candidate].1 > self.payoffs[row][alternative].1
-                })
+                (0..2).all(|row| self.payoffs[row][candidate].1 >= self.payoffs[row][alternative].1)
+                    && (0..2).any(|row| {
+                        self.payoffs[row][candidate].1 > self.payoffs[row][alternative].1
+                    })
             })
             .collect()
     }
@@ -293,11 +285,7 @@ mod tests {
 
     #[test]
     fn matching_pennies_has_interior_mixed_nash() {
-        let game = Game2x2::new([
-            [(1.0, -1.0), (-1.0, 1.0)],
-            [(-1.0, 1.0), (1.0, -1.0)],
-        ])
-        .unwrap();
+        let game = Game2x2::new([[(1.0, -1.0), (-1.0, 1.0)], [(-1.0, 1.0), (1.0, -1.0)]]).unwrap();
         assert!(game.pure_nash_equilibria().is_empty());
         let mixed = game.interior_mixed_nash().unwrap();
         assert!((mixed.row_strategy_0_probability - 0.5).abs() < 1e-12);
@@ -311,17 +299,19 @@ mod tests {
     fn transpose_swaps_player_analysis() {
         let game = Game2x2::prisoners_dilemma();
         let transposed = game.transpose();
-        assert_eq!(game.column_dominant_strategy(), transposed.row_dominant_strategy());
-        assert_eq!(game.pure_nash_equilibria(), transposed.pure_nash_equilibria());
+        assert_eq!(
+            game.column_dominant_strategy(),
+            transposed.row_dominant_strategy()
+        );
+        assert_eq!(
+            game.pure_nash_equilibria(),
+            transposed.pure_nash_equilibria()
+        );
     }
 
     #[test]
     fn weak_dominance_allows_ties() {
-        let game = Game2x2::new([
-            [(2.0, 1.0), (1.0, 2.0)],
-            [(2.0, 0.0), (0.0, 2.0)],
-        ])
-        .unwrap();
+        let game = Game2x2::new([[(2.0, 1.0), (1.0, 2.0)], [(2.0, 0.0), (0.0, 2.0)]]).unwrap();
         assert_eq!(game.row_dominant_strategy(), None);
         assert_eq!(game.row_weakly_dominant_strategies(), vec![0]);
     }

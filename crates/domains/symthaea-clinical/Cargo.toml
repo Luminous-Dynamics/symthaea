@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Clinical Knowledge Ontology — DSM-5/ICD-11/RDoC taxonomies as HDC hypervectors"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["consciousness", "clinical", "psychology", "hdc", "therapeutic"]
 categories = ["science", "algorithms"]
 

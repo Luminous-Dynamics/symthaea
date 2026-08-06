@@ -1,0 +1,38 @@
+{
+  "methodology_ref": "methodology.md",
+  "results": [
+    {
+      "pair": "ep50_vs_source_12s",
+      "source_file": "en001a_clip12s_ORIGINAL_diffsinger.wav",
+      "compare_file": "en001a_af_heart_ep50_12s.wav",
+      "f0_correlation_pearson_no_dtw": 0.9935675147572774,
+      "f0_co_voiced_frames": 275,
+      "silence_fraction_below_-50dB": {
+        "source": 0.268,
+        "compare": 0.412
+      }
+    },
+    {
+      "pair": "ep75_vs_source_12s",
+      "source_file": "en001a_clip12s_ORIGINAL_diffsinger.wav",
+      "compare_file": "en001a_af_heart_ep75_12s.wav",
+      "f0_correlation_pearson_no_dtw": 0.9938899538544186,
+      "f0_co_voiced_frames": 278,
+      "silence_fraction_below_-50dB": {
+        "source": 0.268,
+        "compare": 0.4142
+      }
+    },
+    {
+      "pair": "final_ep200_vs_source_64s",
+      "source_file": "en001a-step2000-final.wav",
+      "compare_file": "en001a_af_heart_FINAL_ep200.wav",
+      "f0_correlation_pearson_no_dtw": 0.8681985480946455,
+      "f0_co_voiced_frames": 1622,
+      "silence_fraction_below_-50dB": {
+        "source": 0.248,
+        "compare": 0.3427
+      }
+    }
+  ]
+}

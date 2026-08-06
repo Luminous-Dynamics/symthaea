@@ -1,11 +1,44 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! EmbodimentBridge implementation for the gravcraft platform.
+//! Phi-gated metric-perturbation bridge for the gravcraft platform.
 //!
 //! Unlike all other platforms that apply forces, this applies metric
 //! perturbations to spacetime. Consciousness (Phi) directly gates
 //! how much spacetime warping is allowed.
+//!
+//! # This is NOT an `EmbodimentBridge` implementation
+//!
+//! This module's doc previously claimed to be one. It is not, and correcting that
+//! matters because the false claim is exactly how this would get wired up by mistake
+//! (corrected 2026-07-29 during the Phase 4 platform audit,
+//! `SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md`). Concretely:
+//! there is no `impl EmbodimentBridge for ...` anywhere in this crate, no
+//! `src/plugin.rs`, no `EmbodimentPlatform` enum variant, and no workspace crate
+//! depends on it. It is a duck-typed lookalike that reuses `MotorSafetyLevel`.
+//!
+//! The 2026-07-29 audit found two safety gaps here. **One is now closed; one
+//! remains and needs a design decision before this is wired into the fleet.**
+//!
+//! 1. ~~No safety-override path and no moral gate.~~ **CLOSED 2026-07-29.** This
+//!    was the only Phi-consuming platform in the workspace where a `SafetyAgent`
+//!    override or an ahimsa/consent verdict had *no route to the actuators*. It
+//!    now composes `max(phi_level, safety_override, moral_safety)` on the derived
+//!    `Ord` — the same convention as the other 15 platforms — via
+//!    [`GravcraftEmbodiment::set_safety_override`] and
+//!    [`GravcraftEmbodiment::apply_moral_gate`]. Enforced by
+//!    `scripts/check-embodiment-safety-composition.sh`, so a future platform
+//!    cannot silently repeat the omission.
+//! 2. **STILL OPEN: Orange collapses into Red** — both yield
+//!    `MetricCommand::default()`. That hard cliff is the same shape already found
+//!    and unified away for the orbital and surgical platforms; this crate was
+//!    missed because it sits outside the trait's orbit. **Deliberately not fixed
+//!    here**, because unlike gap 1 it is not a missing-wiring defect with an
+//!    obvious fleet convention to copy — it requires deciding what a *partially*
+//!    restricted metric authority should physically mean for spacetime
+//!    perturbation (a reduced-amplitude single amplifier? a different amplifier
+//!    set? drift-only with a nonzero floor?). That is a platform-physics
+//!    question for an owner, not a mechanical fix.
 
 use crate::controller::MetricController;
 use crate::encoder::GravcraftHdcEncoder;
@@ -15,8 +48,8 @@ use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 pub use symthaea_core::embodiment::{
-    EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MotorSafetyLevel,
-    grounding_from_prediction_error, grounding_label,
+    EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
+    MotorSafetyLevel, grounding_from_prediction_error, grounding_label,
 };
 
 /// Gravcraft embodiment bridge.
@@ -33,6 +66,8 @@ pub struct GravcraftEmbodiment {
     last_perception: Option<ContinuousHV>,
     total_steps: usize,
     current_safety: MotorSafetyLevel,
+    safety_override: Option<MotorSafetyLevel>,
+    moral_safety: Option<MotorSafetyLevel>,
     last_control_effort: f32,
     last_prediction_error: f32,
 }
@@ -47,13 +82,54 @@ impl GravcraftEmbodiment {
             last_perception: None,
             total_steps: 0,
             current_safety: MotorSafetyLevel::Green,
+            safety_override: None,
+            moral_safety: None,
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
         }
     }
 
+    /// Apply a moral gate from the ethics engine, matching the fleet convention
+    /// (see `symthaea-scavenger`, `symthaea-biota`, and 13 others): ahimsa or a
+    /// BLOCKED verdict forces Red, a consent violation forces Orange, caution caps
+    /// at Yellow. Added 2026-07-29 -- this crate previously had no route at all
+    /// from an ethics verdict to its metric amplifiers.
+    pub fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        self.moral_safety =
+            if gate.ahimsa_violated || gate.verdict == MoralGateInput::VERDICT_BLOCKED {
+                Some(MotorSafetyLevel::Red)
+            } else if gate.consent_violation {
+                Some(MotorSafetyLevel::Orange)
+            } else if gate.verdict == MoralGateInput::VERDICT_CAUTION {
+                Some(MotorSafetyLevel::Yellow)
+            } else {
+                None
+            };
+    }
+
+    /// Force a lower (more restrictive) tier from an external `SafetyAgent`.
+    /// Composed via `max` on the derived `Ord`, so an override can only ever
+    /// restrict, never grant, authority.
+    pub fn set_safety_override(&mut self, level: MotorSafetyLevel) {
+        self.safety_override = Some(level);
+    }
+
+    /// Clear the external safety override.
+    pub fn clear_safety_override(&mut self) {
+        self.safety_override = None;
+    }
+
     pub fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
-        self.current_safety = MotorSafetyLevel::from_phi(phi);
+        // Fleet convention: max(phi_level, safety_override, moral_safety) on the
+        // derived Ord -- any input can only make the tier MORE restrictive.
+        let phi_level = MotorSafetyLevel::from_phi(phi);
+        self.current_safety = match self.safety_override {
+            Some(o) => phi_level.max(o),
+            None => phi_level,
+        };
+        if let Some(m) = self.moral_safety {
+            self.current_safety = self.current_safety.max(m);
+        }
 
         // Get raw command from controller (Phi already gates amplitude internally)
         let mut cmd = self.controller.forward(thought_hv, phi);
@@ -151,6 +227,60 @@ mod tests {
         assert!(result.success);
         assert_eq!(result.num_actuators, 12);
         assert!(result.control_effort.is_finite());
+    }
+
+    /// The gap closed on 2026-07-29: before this, a `SafetyAgent` override and an
+    /// ethics verdict had NO route to the metric amplifiers on this platform. These
+    /// assert the route exists and is restrictive-only, matching the fleet's
+    /// `max(phi_level, safety_override, moral_safety)` convention.
+    #[test]
+    fn test_safety_override_restricts_high_phi() {
+        let genesis = GenesisSeed::from_phrase("override test");
+        let mut emb = GravcraftEmbodiment::new(&genesis);
+        let thought = ContinuousHV::random(HDC_DIMENSION, 0xF00D);
+
+        // Phi alone would be Green (full authority, all 3 amplifiers).
+        emb.step(&thought, 0.01, 0.9);
+        assert_eq!(emb.current_safety, MotorSafetyLevel::Green);
+
+        // An external override must be able to force a lower tier.
+        emb.set_safety_override(MotorSafetyLevel::Orange);
+        let r = emb.step(&thought, 0.01, 0.9);
+        assert_eq!(
+            emb.current_safety,
+            MotorSafetyLevel::Orange,
+            "a SafetyAgent override must reach this platform's actuators"
+        );
+        assert_eq!(
+            r.control_effort, 0.0,
+            "Orange means flat metric -- the override must actually zero authority"
+        );
+
+        // Clearing it restores phi-derived authority (override restricts, never grants).
+        emb.clear_safety_override();
+        emb.step(&thought, 0.01, 0.9);
+        assert_eq!(emb.current_safety, MotorSafetyLevel::Green);
+    }
+
+    #[test]
+    fn test_moral_gate_forces_red_on_ahimsa() {
+        let genesis = GenesisSeed::from_phrase("moral gate test");
+        let mut emb = GravcraftEmbodiment::new(&genesis);
+        let thought = ContinuousHV::random(HDC_DIMENSION, 0xBEEE);
+
+        emb.apply_moral_gate(MoralGateInput {
+            verdict: MoralGateInput::VERDICT_SAFE,
+            consent_violation: false,
+            ahimsa_violated: true,
+        });
+
+        let r = emb.step(&thought, 0.01, 0.95);
+        assert_eq!(
+            emb.current_safety,
+            MotorSafetyLevel::Red,
+            "an ahimsa violation must override even a maximal phi"
+        );
+        assert_eq!(r.control_effort, 0.0, "Red means metric neutralization");
     }
 
     #[test]

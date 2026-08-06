@@ -163,6 +163,7 @@ impl MissionManager {
                 TeamDirective::YieldTunnel => SubterraneanMissionIntent::YieldTunnel,
                 TeamDirective::MaintainRelay => SubterraneanMissionIntent::MaintainRelay,
                 TeamDirective::AssistPeer => SubterraneanMissionIntent::AssistPeer,
+                TeamDirective::HoldForQuorum => SubterraneanMissionIntent::HoldPosition,
             },
         };
         self.effective

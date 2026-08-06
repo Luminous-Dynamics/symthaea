@@ -54,4 +54,4 @@ Public: `github.com/Luminous-Dynamics/symthaea`
 ### Contact
 
 Tristan Stoltz — tristan.stoltz@evolvingresonantcocreationism.com
-Luminous Dynamics — github.com/Luminous-Dynamics
+Luminous Dynamics — luminousdynamics.org

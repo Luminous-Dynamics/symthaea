@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "HDC semantic search engine for mathematical physics — encodes equations, tensors, symmetry groups as ContinuousHV for structural analogy discovery"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["physics", "hdc", "equations", "symmetry", "analogy"]
 categories = ["science", "algorithms"]
 

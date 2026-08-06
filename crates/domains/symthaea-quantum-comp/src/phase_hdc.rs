@@ -49,11 +49,25 @@ impl PhaseHypervector {
         Self { phases }
     }
 
-    /// Quantizes the phase vector back into a binary hypervector by phase half-plane.
+    /// Quantizes the phase vector back into a binary hypervector by nearest-symbol decision.
+    ///
+    /// `from_binary` encodes bit `0` at phase `0` and bit `1` at phase `π`.
+    /// The decode boundary must sit at the *midpoints* between those symbols
+    /// (`π/2` and `3π/2`), not at the symbols themselves — deciding by
+    /// `phase >= π` (as an earlier version of this function did) put the
+    /// boundary exactly on top of both symbol points, so any infinitesimal
+    /// noise in the "wrong" direction flipped the bit regardless of noise
+    /// magnitude, and BER jumped to ~0.5 as soon as any noise was applied at
+    /// all. `cos(phase) < 0` is the correct nearest-symbol rule for
+    /// antipodal symbols at `0`/`π`: it is the sign of the projection onto
+    /// the symbol axis, positive near `0`, negative near `π`. Found via
+    /// `symthaea-quantum-comp`'s calibrated cross-representation comparison
+    /// (`calibrated_comparison.rs`), which was the first code in this crate
+    /// to actually exercise this function.
     pub fn to_binary_halfplane(&self) -> Result<BinaryHypervector> {
         let mut out = BinaryHypervector::zeros(self.dimension())?;
         for (i, phase) in self.phases.iter().enumerate() {
-            let bit = *phase >= core::f32::consts::PI;
+            let bit = phase.cos() < 0.0;
             out.set_bit(i, bit)?;
         }
         Ok(out)
@@ -117,6 +131,57 @@ impl PhaseHypervector {
         (sin_sum.mul_add(sin_sum, cos_sum * cos_sum)).sqrt() / n
     }
 
+    /// Circular mean angle across this hypervector's dimensions, in `[0, 2π)`.
+    ///
+    /// Collapses this vector's `dimension` per-dimension angle readings into
+    /// a single scalar estimate — the phase-representation analog of
+    /// collapsing `dimension` popcounts into a fraction in
+    /// `BinaryHypervector::thermometer_decode`. Meant for vectors where every
+    /// dimension carries a (possibly noisy) reading of the *same* underlying
+    /// quantity, e.g. a constant-angle vector built with `from_phases` and
+    /// then perturbed by `with_phase_noise`.
+    pub fn circular_mean(&self) -> f32 {
+        let sin_sum: f32 = self.phases.iter().map(|p| p.sin()).sum();
+        let cos_sum: f32 = self.phases.iter().map(|p| p.cos()).sum();
+        wrap_phase(sin_sum.atan2(cos_sum))
+    }
+
+    /// Bundles a nonempty slice of phase hypervectors via per-dimension circular mean.
+    ///
+    /// This is the phase-representation analog of
+    /// `BinaryHypervector::majority_bundle`: each output dimension's angle is
+    /// the circular mean (mean resultant direction) of that dimension's angle
+    /// across all input vectors — the natural continuous generalization of a
+    /// per-dimension majority vote for angles, and the standard bundling rule
+    /// for phase/holographic representations.
+    pub fn circular_bundle(vectors: &[Self]) -> Result<Self> {
+        if vectors.is_empty() {
+            return Err(QuantumCompError::InvalidConfig(
+                "bundle requires at least one vector",
+            ));
+        }
+        let dimension = vectors[0].dimension();
+        for v in vectors {
+            if v.dimension() != dimension {
+                return Err(QuantumCompError::DimensionMismatch {
+                    expected: dimension,
+                    actual: v.dimension(),
+                });
+            }
+        }
+        let mut phases = Vec::with_capacity(dimension);
+        for d in 0..dimension {
+            let mut sin_sum = 0.0f32;
+            let mut cos_sum = 0.0f32;
+            for v in vectors {
+                sin_sum += v.phases[d].sin();
+                cos_sum += v.phases[d].cos();
+            }
+            phases.push(wrap_phase(sin_sum.atan2(cos_sum)));
+        }
+        Ok(Self { phases })
+    }
+
     /// Adds Gaussian-like phase jitter using a cheap sum-of-uniforms approximation.
     pub fn with_phase_noise(&self, sigma: f32, seed: u64) -> Self {
         let mut rng = XorShift64::new(seed);
@@ -161,5 +226,92 @@ mod tests {
         let bound = a.bind_phase(&key).unwrap();
         let recovered = bound.unbind_phase(&key).unwrap();
         assert!(a.circular_similarity(&recovered).unwrap() > 0.999);
+    }
+
+    #[test]
+    fn circular_mean_of_a_constant_vector_recovers_the_constant() {
+        for theta in [0.0f32, 1.0, core::f32::consts::PI, 5.5] {
+            let v = PhaseHypervector::from_phases(vec![theta; 512]).unwrap();
+            let mean = v.circular_mean();
+            let diff = (mean - wrap_phase(theta)).abs();
+            assert!(
+                diff < 1e-4 || (TAU - diff) < 1e-4,
+                "theta={theta} mean={mean}"
+            );
+        }
+    }
+
+    #[test]
+    fn circular_mean_averages_out_small_symmetric_noise() {
+        let base = PhaseHypervector::from_phases(vec![core::f32::consts::PI; 4096]).unwrap();
+        let noisy = base.with_phase_noise(0.3, 42);
+        let mean = noisy.circular_mean();
+        assert!(
+            (mean - core::f32::consts::PI).abs() < 0.05,
+            "mean={mean} should be close to PI after averaging 4096 noisy readings"
+        );
+    }
+
+    #[test]
+    fn circular_bundle_of_identical_copies_reproduces_the_vector() {
+        let a = PhaseHypervector::random(128, 3).unwrap();
+        let bundled =
+            PhaseHypervector::circular_bundle(&[a.clone(), a.clone(), a.clone()]).unwrap();
+        assert!(a.circular_similarity(&bundled).unwrap() > 0.999);
+    }
+
+    #[test]
+    fn circular_bundle_rejects_empty_and_mismatched_dimensions() {
+        assert!(PhaseHypervector::circular_bundle(&[]).is_err());
+        let a = PhaseHypervector::random(64, 1).unwrap();
+        let b = PhaseHypervector::random(32, 2).unwrap();
+        assert!(PhaseHypervector::circular_bundle(&[a, b]).is_err());
+    }
+
+    #[test]
+    fn circular_bundle_member_is_more_similar_than_a_random_foil() {
+        let members: Vec<_> = (0..8)
+            .map(|i| PhaseHypervector::random(1024, 100 + i))
+            .collect::<Result<_>>()
+            .unwrap();
+        let bundle = PhaseHypervector::circular_bundle(&members).unwrap();
+        let foil = PhaseHypervector::random(1024, 999).unwrap();
+        let member_sim = members[0].circular_similarity(&bundle).unwrap();
+        let foil_sim = foil.circular_similarity(&bundle).unwrap();
+        assert!(
+            member_sim > foil_sim,
+            "member_sim={member_sim} foil_sim={foil_sim}"
+        );
+    }
+
+    #[test]
+    fn to_binary_halfplane_decodes_clean_symbols_exactly() {
+        let original = BinaryHypervector::random(1024, 42).unwrap();
+        let phases = PhaseHypervector::from_binary(&original);
+        let decoded = phases.to_binary_halfplane().unwrap();
+        assert_eq!(original, decoded);
+    }
+
+    #[test]
+    fn to_binary_halfplane_tolerates_small_noise_near_either_symbol() {
+        // Regression test: an earlier version of `to_binary_halfplane` decided
+        // `bit = phase >= PI`, putting the decode boundary exactly on top of
+        // both encoded symbols (0 and PI), so *any* nonzero noise in the
+        // "wrong" direction flipped the bit regardless of magnitude. The
+        // correct boundary sits at the symbol midpoints (PI/2, 3*PI/2).
+        let small_noise = 0.01_f32; // well within either symbol's basin
+        for &phase in &[0.0_f32, core::f32::consts::PI] {
+            for &delta in &[-small_noise, small_noise] {
+                let noisy = PhaseHypervector::from_phases(vec![phase + delta]).unwrap();
+                let decoded = noisy.to_binary_halfplane().unwrap();
+                let expected = (core::f32::consts::FRAC_PI_2..3.0 * core::f32::consts::FRAC_PI_2)
+                    .contains(&phase);
+                assert_eq!(
+                    decoded.bit(0).unwrap(),
+                    expected,
+                    "phase={phase} delta={delta} should not flip on tiny noise"
+                );
+            }
+        }
     }
 }

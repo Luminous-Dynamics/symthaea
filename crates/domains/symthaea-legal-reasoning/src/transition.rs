@@ -198,12 +198,7 @@ mod tests {
     use super::*;
     use crate::model::{ActionId, PartyId};
 
-    fn relation(
-        holder: &str,
-        counterparty: &str,
-        position: Jural,
-        action: &str,
-    ) -> JuralRelation {
+    fn relation(holder: &str, counterparty: &str, position: Jural, action: &str) -> JuralRelation {
         JuralRelation::new(
             PartyId::new(holder).unwrap(),
             PartyId::new(counterparty).unwrap(),

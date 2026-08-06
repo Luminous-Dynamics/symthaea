@@ -461,6 +461,15 @@ impl ActiveInferenceAgent {
         self.efe_computer.set_preferences(preferences, precision);
     }
 
+    /// Set goal preferences with an explicit per-dimension precision -- see
+    /// [`super::free_energy::ExpectedFreeEnergyComputer::set_preferences_with_precisions`] for
+    /// why this exists (a shared scalar precision can't express "no preference on this specific
+    /// channel").
+    pub fn set_goals_with_precisions(&mut self, preferences: Vec<f64>, precisions: Vec<f64>) {
+        self.efe_computer
+            .set_preferences_with_precisions(preferences, precisions);
+    }
+
     /// Get current free energy
     pub fn current_free_energy(&self) -> f64 {
         self.last_fe_components

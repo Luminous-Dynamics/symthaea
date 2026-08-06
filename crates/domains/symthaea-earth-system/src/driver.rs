@@ -319,14 +319,14 @@ where
     for (index, (time_seconds, temperature)) in values.into_iter().enumerate() {
         crate::error::require_non_negative("time_seconds", time_seconds)?;
         require_positive("temperature", temperature)?;
-        if let Some(previous) = previous_time {
-            if time_seconds <= previous {
-                return Err(ModelError::NonMonotonicTime {
-                    index,
-                    previous,
-                    current: time_seconds,
-                });
-            }
+        if let Some(previous) = previous_time
+            && time_seconds <= previous
+        {
+            return Err(ModelError::NonMonotonicTime {
+                index,
+                previous,
+                current: time_seconds,
+            });
         }
         previous_time = Some(time_seconds);
         output.push(TemperatureDriverSample {

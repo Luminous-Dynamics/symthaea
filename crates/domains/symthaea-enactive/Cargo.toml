@@ -7,7 +7,7 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "Enactive cognition — sense-making through action, autopoietic autonomy, and participatory world-making"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
-homepage = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
 keywords = ["enactivism", "embodied-cognition", "autopoiesis", "consciousness", "neuroscience"]
 categories = ["science", "algorithms"]
 

@@ -13,7 +13,7 @@
 //! ## Usage
 //!
 //! ```rust
-//! use symthaea::z3_bridge::{Z3Bridge, VerificationResult};
+//! use symthaea_runtime::formal::z3_bridge::{Z3Bridge, VerificationResult};
 //!
 //! let bridge = Z3Bridge::new();
 //! let smt = "(declare-const x Real)\n(assert (> x 0))\n(check-sat)";

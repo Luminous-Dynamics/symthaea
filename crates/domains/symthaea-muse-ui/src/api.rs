@@ -15,8 +15,9 @@ use symthaea_muse_protocol::ComposeResponse;
 // Candidate.card) — re-export it once a view actually needs to name it.
 pub use symthaea_muse_protocol::{
     AtlasCompareResponse, AtlasPoint, AtlasSummary, BundleEnvelope, Candidate, ComposeRequest,
-    EvidenceBasis, EvidenceStatus, KeeperEntry, ListenCompositionBundle, MotifsSummary,
-    MusicalTime, PerformedVoice, ResonanceCurve, SectionInfo, StyleFamily,
+    EvidenceBasis, EvidenceStatus, HarmonySummary, ImportedWorkSummary, JourneyNextRequest,
+    JourneyNextResponse, KeeperEntry, ListenCompositionBundle, MotifsSummary, MusicalTime,
+    PerformedVoice, ResonanceCurve, SectionInfo, StyleFamily, TeachingCorpusSummary,
 };
 
 /// Default origin for the `muse_studio` backend this app talks to.
@@ -60,29 +61,17 @@ pub async fn compose(backend: &str, req: &ComposeRequest) -> Result<Vec<Candidat
 /// to force one, or `None` for the server's own default.
 pub async fn compose_listen_piece(
     backend: &str,
-    style: &str,
+    choice: &JourneyNextResponse,
     renderer: Option<&str>,
 ) -> Result<Candidate, String> {
-    let seed = (js_sys::Math::random() * 900_000.0) as u64 + 1;
-    let tonic = (js_sys::Math::random() * 12.0) as i32;
-    // Randomized within Create Mode's own slider bounds (valence -1..1,
-    // arousal/energy 0..1) rather than fixed at one neutral triple
-    // (0.15/0.45/0.5) for every single piece — real, separate from
-    // `vary_premise` (which varies tempo/texture/phrase/ensemble/mode):
-    // this is the emotional-intent axis, still the same style. Fixing
-    // one intent forever was a real, avoidable share of "the songs sound
-    // the same" independent of everything the premise layer covers.
-    let valence = (js_sys::Math::random() * 2.0 - 1.0) as f32;
-    let arousal = js_sys::Math::random() as f32;
-    let energy = js_sys::Math::random() as f32;
     let req = ComposeRequest {
-        valence,
-        arousal,
-        energy,
-        tonic,
-        style: style.to_string(),
-        bars: 4,
-        base_seed: seed,
+        valence: choice.valence,
+        arousal: choice.arousal,
+        energy: choice.energy,
+        tonic: choice.tonic,
+        style: choice.style.clone(),
+        bars: choice.bars,
+        base_seed: choice.composition_seed,
         n_candidates: 1,
         prompt: String::new(),
         spec: None,
@@ -91,6 +80,8 @@ pub async fn compose_listen_piece(
         // so an exact spec/style stays exactly what the user asked for.
         vary_premise: true,
         renderer: renderer.map(str::to_string),
+        use_motif_foundry: false,
+        composition_lesson_id: None,
     };
     compose(backend, &req)
         .await?
@@ -170,6 +161,138 @@ pub fn keeper_recipe_url(backend: &str, audio_key: &str) -> String {
         "{}/api/keeper-recipe/{audio_key}",
         backend.trim_end_matches('/')
     )
+}
+
+/// Which claim the contributor is making about an imported score. Mirrors
+/// `symthaea_muse_protocol::AuthorizationBasis` — kept as a plain string here
+/// (not the protocol enum) since this is form-encoded multipart, not JSON.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ImportAuthorization {
+    /// "I created this work" -- becomes `declared_authorship: true` server-side.
+    OwnWork,
+    /// "I'm authorized to import and privately analyze someone else's work" --
+    /// the conservative default; never implies an authorship claim.
+    AuthorizedImport,
+}
+
+impl ImportAuthorization {
+    fn as_wire(self) -> &'static str {
+        match self {
+            ImportAuthorization::OwnWork => "own_work",
+            ImportAuthorization::AuthorizedImport => "authorized_import",
+        }
+    }
+}
+
+/// Private-first symbolic import. The server persists an immutable permission
+/// receipt and never projects this operation into Foundry/global learning.
+pub async fn import_music(
+    backend: &str,
+    file: web_sys::File,
+    title: &str,
+    contributor: &str,
+    authorization: ImportAuthorization,
+) -> Result<ImportedWorkSummary, String> {
+    let form = web_sys::FormData::new().map_err(|_| "could not create upload form")?;
+    form.append_with_blob_and_filename("file", &file, &file.name())
+        .map_err(|_| "could not attach score")?;
+    form.append_with_str("title", title)
+        .map_err(|_| "could not attach title")?;
+    form.append_with_str("contributor", contributor)
+        .map_err(|_| "could not attach contributor")?;
+    form.append_with_str("authorization_basis", authorization.as_wire())
+        .map_err(|_| "could not attach authorization")?;
+    let url = format!("{}/api/music/import", backend.trim_end_matches('/'));
+    let resp = Request::post(&url)
+        .body(form)
+        .map_err(|error| format!("could not prepare import: {error}"))?
+        .send()
+        .await
+        .map_err(|error| format!("import failed: {error}"))?;
+    if !resp.ok() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(if body.is_empty() {
+            format!("backend returned HTTP {status}")
+        } else {
+            body
+        });
+    }
+    resp.json()
+        .await
+        .map_err(|error| format!("could not read import receipt: {error}"))
+}
+
+pub fn imported_audio_url(backend: &str, work_id: &str) -> String {
+    format!(
+        "{}/api/music/import/{work_id}/audio",
+        backend.trim_end_matches('/')
+    )
+}
+
+pub async fn fetch_imported_works(backend: &str) -> Result<Vec<ImportedWorkSummary>, String> {
+    let url = format!("{}/api/music/imports", backend.trim_end_matches('/'));
+    let response = Request::get(&url)
+        .send()
+        .await
+        .map_err(|error| format!("request failed: {error}"))?;
+    if !response.ok() {
+        return Err(format!("backend returned HTTP {}", response.status()));
+    }
+    response
+        .json()
+        .await
+        .map_err(|error| format!("could not read imported works: {error}"))
+}
+
+pub async fn fetch_teaching_corpus(backend: &str) -> Result<TeachingCorpusSummary, String> {
+    let url = format!("{}/api/teaching", backend.trim_end_matches('/'));
+    let resp = Request::get(&url)
+        .send()
+        .await
+        .map_err(|error| format!("request failed: {error}"))?;
+    if !resp.ok() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(if body.is_empty() {
+            "the etude corpus is not installed".to_owned()
+        } else {
+            body
+        });
+    }
+    resp.json()
+        .await
+        .map_err(|error| format!("could not read teaching corpus: {error}"))
+}
+
+pub fn teaching_audio_url(backend: &str, lesson_id: &str) -> String {
+    format!(
+        "{}/api/teaching/{lesson_id}/audio",
+        backend.trim_end_matches('/')
+    )
+}
+
+pub async fn choose_journey_style(
+    backend: &str,
+    request: &JourneyNextRequest,
+) -> Result<JourneyNextResponse, String> {
+    let url = format!("{}/api/journey/next", backend.trim_end_matches('/'));
+    let response = Request::post(&url)
+        .header("content-type", "application/json")
+        .json(request)
+        .map_err(|error| format!("could not encode journey request: {error}"))?
+        .send()
+        .await
+        .map_err(|error| format!("journey request failed: {error}"))?;
+    if !response.ok() {
+        return Err(format!(
+            "journey service returned HTTP {}",
+            response.status()
+        ));
+    }
+    response
+        .json()
+        .await
+        .map_err(|error| format!("could not read journey choice: {error}"))
 }
 
 /// `GET /api/atlas?lens=...` — every in-session candidate plus persisted
@@ -276,6 +399,29 @@ pub async fn fetch_motifs(backend: &str, id: u64) -> Result<MotifsSummary, Strin
         .map_err(|e| format!("failed to parse response: {e}"))
 }
 
+/// `GET /api/harmony/{id}` — the harmonic *vocabulary* of the piece's key:
+/// tonic, tonality, and the 7 diatonic triads with Roman numerals, chord
+/// symbols, and Tonic/Predominant/Dominant function.
+///
+/// Deliberately the key's static vocabulary, not a chord-by-time analysis:
+/// the engine's real per-piece `Progression` is computed mid-compose and
+/// discarded before reaching `Candidate`, so "which chords did this piece
+/// actually use, when" is not answerable from the server's stored state
+/// today. See `harmony_summary()` in `muse_studio.rs`.
+pub async fn fetch_harmony(backend: &str, id: u64) -> Result<HarmonySummary, String> {
+    let url = format!("{}/api/harmony/{id}", backend.trim_end_matches('/'));
+    let resp = Request::get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("request failed: {e}"))?;
+    if !resp.ok() {
+        return Err(format!("backend returned HTTP {}", resp.status()));
+    }
+    resp.json::<HarmonySummary>()
+        .await
+        .map_err(|e| format!("failed to parse response: {e}"))
+}
+
 /// `GET /api/styles` — every style Muse can compose in, each with its
 /// real `Style::grammar_family()`. Fetched once and cached by
 /// `MuseState::load_style_families`, not refetched per-compose.
@@ -292,6 +438,24 @@ pub async fn fetch_style_families(backend: &str) -> Result<Vec<StyleFamily>, Str
         .await
         .map_err(|e| format!("failed to parse response: {e}"))
 }
+
+// There is deliberately no `fetch_catalog` here. The Muse 152 taxonomy is a
+// compile-time `const CATALOG: [CanonicalStyle; 152]` in the protocol crate,
+// which this app already links — so a view that needs it imports
+// `symthaea_muse_protocol::catalog` directly rather than fetching 152 entries
+// the binary already contains. Same data by construction, no round-trip, and
+// no chance of the two sides disagreeing. (Not re-exported here ahead of that
+// first consumer, per this crate's own rule about not adding surface
+// speculatively.)
+//
+// A fetch is also not merely unnecessary but impossible as written:
+// `CanonicalStyle`'s fields are `&'static str`, so its derived `Deserialize`
+// only satisfies `Deserialize<'de>` for a borrowed-from-'static input and
+// cannot deserialize an owned response body ("implementation of `Deserialize`
+// is not general enough"). Deserializing it would require an owned mirror
+// type with `String` fields — worth adding only if a non-Rust client or a
+// server-authoritative catalog ever needs one. `GET /api/catalog` still
+// exists server-side for exactly those consumers.
 
 /// `GET /api/spec/{style}` — the style's preset composition spec as raw
 /// JSON text, for the Create Mode spec editor's "load preset" action.

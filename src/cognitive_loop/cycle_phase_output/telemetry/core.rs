@@ -24,6 +24,7 @@ impl CognitiveLoopService {
         metadata.reasoning_confidence = dynamics.reasoning.reasoning_confidence;
         metadata.exploration_action = mem::take(&mut perception.exploration.exploration_action);
         metadata.reasoning_gate_blocked = dynamics.reasoning.reasoning_gate_blocked;
+        metadata.reasoning_gate_evaluated = dynamics.reasoning.re_gate_checks > 0;
         metadata.reasoning_fallback = mem::take(&mut dynamics.reasoning.reasoning_fallback);
         metadata.reasoning_plan_action = dynamics.reasoning.reasoning_plan_action;
         metadata.reasoning_plan_confidence = dynamics.reasoning.reasoning_plan_confidence;
@@ -253,6 +254,9 @@ impl CognitiveLoopService {
 
         metadata.ethics = super::super::super::EthicalTelemetry {
             moral_score: perception.moral.moral_score,
+            moral_concern_detected: perception.moral.moral_concern_detected,
+            consent_violation: perception.moral.moral_judgment.consent_violation,
+            moral_violations: perception.moral.moral_judgment.violations.clone(),
             moral_steering_category: mem::take(&mut dynamics.guidance.moral_steering_category),
             value_evaluator_score: feedback.ethics.value_evaluator_score,
             value_evaluator_decision: mem::take(&mut feedback.ethics.value_evaluator_decision),

@@ -127,6 +127,13 @@ fn main() {
     // Safety is enforced by Phi-gated actions (NRC 4-tier model).
     phone.set_confirmation_mode(interactive);
 
+    // Declare this demo's operating Φ up front. Several arms below call
+    // `execute_action` with hand-built actions (Back/Home/Type) before any
+    // proposer has run; without this the gate added 2026-07-31 would read the
+    // fail-closed default of 0.0 and refuse them. This does NOT skip the gate —
+    // each action is still checked against its `required_phi()`.
+    phone.set_phi_authority(phi);
+
     let stdin = io::stdin();
     let mut stdout = io::stdout();
 

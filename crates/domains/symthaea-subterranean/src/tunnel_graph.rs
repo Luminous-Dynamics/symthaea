@@ -90,7 +90,7 @@ impl TunnelEdge {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct RouteCostPolicy {
     pub distance_weight: f64,
     pub energy_weight: f64,

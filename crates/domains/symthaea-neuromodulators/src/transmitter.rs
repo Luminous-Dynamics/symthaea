@@ -30,7 +30,17 @@ pub struct Transmitter {
     /// Receptor sensitivity (adapts to sustained high/low levels).
     /// Range: [0.5, 2.0]. Down-regulates under sustained high level, up-regulates under low.
     pub receptor_sensitivity: f32,
-    /// Reuptake rate: fraction cleared per cycle (higher = faster return to baseline)
+    /// Legacy linear clearance rate. **This field no longer drives clearance.**
+    ///
+    /// Clearance is now Michaelis-Menten — see `mm_v_max` / `mm_k_m`. `reuptake()`
+    /// does not read this field at all, so writing it (including setting it to 0.0)
+    /// has **no effect on level dynamics**. It is retained only because
+    /// `boost_reuptake()` / `reset_reuptake()` — and therefore
+    /// `NeuromodulatorBath::engage_anomaly_recovery()` — still write it, and because
+    /// it is part of the serialized form.
+    ///
+    /// To hold a level constant in a test, re-assert `level` each cycle (model-agnostic)
+    /// or set `mm_v_max: 0.0`. Setting `reuptake_rate: 0.0` will silently do nothing.
     pub(crate) reuptake_rate: f32,
     /// Tonic baseline level (what the system returns to at rest)
     pub(crate) baseline: f32,
@@ -168,7 +178,10 @@ impl Transmitter {
     /// Phasic component decays fast (×(1-phasic_decay) per cycle, ~5-cycle half-life).
     pub fn reuptake(&mut self) {
         // Michaelis-Menten clearance toward baseline (Torres et al. 2003).
-        // At low deviation: linear (backward-compatible with old reuptake_rate).
+        // At low deviation this is ~linear with slope mm_v_max/mm_k_m (0.375 at
+        // defaults). That is NOT the old `reuptake_rate` default of 0.1 — clearance
+        // near baseline is ~3.75x faster than the pre-MM model, so this is not
+        // backward-compatible with it. `reuptake_rate` is not read here at all.
         // At high deviation: saturates at V_max (transporters fully occupied).
         let delta = self.level - self.baseline;
         let abs_delta = delta.abs();
@@ -235,11 +248,19 @@ impl Transmitter {
 
     /// Boost reuptake rate by factor (clamped 0.01–0.5).
     /// Science: Turrigiano (2008) — homeostatic plasticity adjusts clearance.
+    ///
+    /// ⚠️ **Currently inert.** This writes `reuptake_rate`, which `reuptake()` no
+    /// longer reads (clearance is Michaelis-Menten). Calling this does not change
+    /// how fast the level actually returns to baseline. To make homeostatic
+    /// recovery real again it would need to scale `mm_v_max` instead — a behaviour
+    /// change that has not been made here.
     pub fn boost_reuptake(&mut self, factor: f32) {
         self.reuptake_rate = (self.reuptake_rate * factor).clamp(0.01, 0.5);
     }
 
     /// Reset reuptake rate to default (0.1).
+    ///
+    /// ⚠️ **Currently inert** — see [`Transmitter::boost_reuptake`].
     pub fn reset_reuptake(&mut self) {
         self.reuptake_rate = 0.1;
     }

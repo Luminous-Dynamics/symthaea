@@ -1,0 +1,42 @@
+{
+  "positive_control": {
+    "dnsmos_ovr": 2.1486431751811175,
+    "utmos": 1.7294270992279053
+  },
+  "conversational": {
+    "dnsmos_ovr": 1.8013005360343641,
+    "utmos": 2.1107277870178223
+  },
+  "repeated_syllables": {
+    "dnsmos_ovr": 1.9959800324233357,
+    "utmos": 1.4304523468017578
+  },
+  "rapid_letter_names": {
+    "dnsmos_ovr": 1.9993034619868104,
+    "utmos": 2.2005560398101807
+  },
+  "phrase_final_stops": {
+    "dnsmos_ovr": 1.8148106176800436,
+    "utmos": 2.118370294570923
+  },
+  "fricative_heavy": {
+    "dnsmos_ovr": 1.45202356415148,
+    "utmos": 1.7654478549957275
+  },
+  "consonant_clusters": {
+    "dnsmos_ovr": 2.0799334094226336,
+    "utmos": 2.8875927925109863
+  },
+  "long_sustained_vowels": {
+    "dnsmos_ovr": 1.42405830159977,
+    "utmos": 1.4560661315917969
+  },
+  "short_unstressed": {
+    "dnsmos_ovr": 1.9226861686478807,
+    "utmos": 1.5397210121154785
+  },
+  "semantically_unusual": {
+    "dnsmos_ovr": 1.876451641031873,
+    "utmos": 1.8889983892440796
+  }
+}

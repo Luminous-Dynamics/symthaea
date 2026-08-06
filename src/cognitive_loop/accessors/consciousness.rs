@@ -185,6 +185,107 @@ impl CognitiveLoopService {
         )
     }
 
+    /// The exact scalar handed to `EmbodimentBridge::step(..., phi)` as the robotics
+    /// motor-safety gate — i.e. the value `MotorSafetyLevel::from_phi` thresholds into
+    /// Green/Yellow/Orange/Red.
+    ///
+    /// **This is NOT [`Self::consciousness_level`]**, despite the similar name. That method
+    /// computes a fresh value from prediction confidence, voice coherence, and flow state.
+    /// This one returns the stored `carryover.history.consciousness_level` field, read verbatim
+    /// by `cycle.rs` when driving embodiment. It is also **not** the `consciousness_level` that
+    /// appears in `CycleMetadata`: that one has a `social_mod` (~±5%) applied after this field is
+    /// written, and decays by 0.98 on non-MCE cycles, so telemetry and the gate can differ by
+    /// several percent — enough to matter near the 0.3/0.6 tier boundaries.
+    ///
+    /// # ⚠️ The field this returns has TWO writers with unrelated formulas
+    ///
+    /// Do not read this as "the Φ/Ψ safety signal". Its meaning depends on which entry point
+    /// wrote last:
+    ///
+    /// | Writer | Entry point | Formula |
+    /// |---|---|---|
+    /// | `cycle_late_consciousness/integration.rs:1150` | `cycle(&str)` | `max(MCE(…max(unified_psi, spectral_boost, structural_boost)…), v2_cached × 0.8)` |
+    /// | `helpers/mod.rs:419` | `cycle_with_hv()` | `compute_consciousness_level(prediction_confidence, coherence, flow_intensity, pattern_confidence)` — no Φ, no Ψ, no spectral MIP |
+    ///
+    /// They share no inputs. Interleaving the two call types yields order-dependent motor
+    /// authority, and this accessor cannot tell you which formula produced the value it returns.
+    /// The ambiguity propagates beyond embodiment: the same field feeds robotics telemetry
+    /// dispatch (`accessors/behavior.rs:548`), `motor_phi`
+    /// (`cycle_phase_dynamics/mod.rs:3022`), prediction confidence (`prediction.rs:49`),
+    /// `phi_trend` (`cycle_consciousness.rs:648-651`), and the Ψ autoregression
+    /// (`helpers/cycle_extracted.rs:588`) — so the HV formula feeds back into `unified_psi`,
+    /// an input to the *other* formula.
+    ///
+    /// Adding provenance (source, written_at_cycle, freshness) is scoped in
+    /// `SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md`, Phase 4 correction box.
+    /// Until then, callers should treat the value as unattributed.
+    ///
+    /// Read-only; added for Phase 4 safety-signal characterization
+    /// (`SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md`) after measurement via
+    /// telemetry proved insufficient to characterize the gate accurately. Adds no state and
+    /// changes no behavior.
+    pub fn safety_gate_phi(&self) -> f64 {
+        self.carryover.history.consciousness_level
+    }
+
+    /// Which formula produced the value [`Self::safety_gate_phi`] currently returns,
+    /// and `stats.total_cycles` when it was written.
+    ///
+    /// Instrumentation for the Phase 4 falsification (see
+    /// `SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md`). Nothing gates on
+    /// this — it exists so an experiment can report *what a consumer actually
+    /// received* under a realistic schedule, rather than assuming the text-path
+    /// composite is what robots see.
+    ///
+    /// A large `total_cycles - written_at` means the gate is running on a value no
+    /// recent cycle produced; a `source` that flips between arms means last-writer
+    /// ordering is determining motor authority.
+    pub fn safety_gate_provenance(
+        &self,
+    ) -> (crate::cognitive_loop::types::carryover::GateWriter, usize) {
+        (
+            self.carryover.history.consciousness_level_source,
+            self.carryover.history.consciousness_level_written_at,
+        )
+    }
+
+    /// The most recent consumption-boundary record: what the robotics safety path
+    /// **actually consumed**, versus what a writer produced.
+    ///
+    /// `None` until an embodiment step has run (it is gated on a robotics feature AND
+    /// on `total_cycles % embodiment_step_interval == 0`, so consumption can be
+    /// strictly sparser than production).
+    ///
+    /// This closes A1.1 of `SYMTHAEA_PHASE4_CHARACTERIZATION_PROTOCOL_2026-07-29.md`.
+    /// Join it against [`Self::safety_gate_provenance`] on `cycle_index`:
+    /// `lag_cycles()` ≥ 1 is expected (the embodiment block precedes the feedback
+    /// phase that rewrites the field), but a lag beyond the 67-cycle refresh interval
+    /// means the tier was selected from a value no recent measurement produced, and a
+    /// `consumed_value` differing from the field is a **primary finding** — it would
+    /// mean the characterized quantity is not the governing one.
+    #[cfg(any(
+        feature = "humanoid",
+        feature = "helicopter",
+        feature = "flight",
+        feature = "vehicle",
+        feature = "auv",
+        feature = "manipulator",
+        feature = "exoskeleton",
+        feature = "surgical",
+        feature = "orbital",
+        feature = "quadruped",
+        feature = "subterranean",
+        feature = "infrastructure",
+        feature = "scavenger",
+        feature = "agribot",
+        feature = "biota",
+        feature = "clime",
+        feature = "phone"
+    ))]
+    pub fn last_gate_consumption(&self) -> Option<crate::cognitive_loop::types::GateConsumption> {
+        self.sensorimotor.last_gate_consumption
+    }
+
     /// Check if current state matches a specific consciousness pattern
     pub fn is_consciousness_state(&self, pattern: ConsciousnessPattern) -> bool {
         self.language_comm

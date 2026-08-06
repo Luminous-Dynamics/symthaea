@@ -952,9 +952,17 @@ impl CognitiveLoopService {
 
             // Blend multiple Phi estimates into the MCE's Φ input.
             // unified_psi is a lightweight proxy (~0.22) that underestimates actual
-            // information integration. SpectralMIP (expensive, every ~97 cycles) and
-            // structural Phi (every ~194 cycles) are higher-fidelity measures.
+            // information integration. SpectralMIP and structural Phi are higher-fidelity
+            // measures, both refreshed every 67 cycles (see
+            // `consciousness_engine/measure.rs:63` — structural hierarchy is computed
+            // inside the same `% 67` block; the separate `% 134` gate there covers only
+            // `adapt()` + hierarchical MIP, NOT structural Phi).
             // Use the best available, discounted for conservatism.
+            //
+            // NOTE (2026-07-28): this comment previously read "~97 cycles" / "~194 cycles",
+            // which was wrong and was propagated into two architecture documents by a survey
+            // that trusted the comment instead of reading measure.rs. Corrected here at the
+            // source. If you change the cadence in measure.rs, change it here too.
             // Science: Tononi (2004) — Φ should reflect the system's best available
             // estimate of information integration, not just the cheapest proxy.
             let spectral_boost = self
@@ -1140,6 +1148,12 @@ impl CognitiveLoopService {
 
             // Track consciousness level for learning gating (Task C)
             self.carryover.history.consciousness_level = level;
+            // Provenance (instrumentation only, nothing gates on it): this is the
+            // TEXT-path writer. The HV path (helpers/mod.rs) writes the same field
+            // with an unrelated formula -- see GateWriter.
+            self.carryover.history.consciousness_level_source =
+                crate::cognitive_loop::types::carryover::GateWriter::TextComposite;
+            self.carryover.history.consciousness_level_written_at = self.stats.total_cycles;
 
             // FEEDBACK: MCE consciousness level boosts learning rate (decaying)
             // Science: Dehaene (2014) — conscious access improves encoding
