@@ -12,13 +12,17 @@
 
 #![forbid(unsafe_code)]
 
+pub mod delta;
 pub mod hdc;
+pub mod negotiation;
 pub mod protocol;
 
+pub use delta::{HdcDeltaEntry, SparseHdcDelta};
 pub use hdc::{
     GroundedHdcCodec, ProjectionVerification, SCIP_HDC_ALGEBRA_V1,
     SCIP_HDC_ATOM_DERIVATION_V1, SCIP_HDC_NAMESPACE_V1, profile_fingerprint,
 };
+pub use negotiation::{NegotiatedSession, PeerCapabilities, negotiate};
 pub use protocol::{
     CognitiveEnvelope, GROUNDED_GRAPH_SCHEMA_V1, HdcPayload, HdcProfile, InterchangeError,
     InterchangePayload, InterchangeRepresentation, ProtocolVersion, SCIP_PROTOCOL_ID, SCIP_V1,
