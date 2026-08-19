@@ -12,8 +12,13 @@
 
 #![forbid(unsafe_code)]
 
+pub mod hdc;
 pub mod protocol;
 
+pub use hdc::{
+    GroundedHdcCodec, ProjectionVerification, SCIP_HDC_ALGEBRA_V1,
+    SCIP_HDC_ATOM_DERIVATION_V1, SCIP_HDC_NAMESPACE_V1, profile_fingerprint,
+};
 pub use protocol::{
     CognitiveEnvelope, GROUNDED_GRAPH_SCHEMA_V1, HdcPayload, HdcProfile, InterchangeError,
     InterchangePayload, InterchangeRepresentation, ProtocolVersion, SCIP_PROTOCOL_ID, SCIP_V1,
