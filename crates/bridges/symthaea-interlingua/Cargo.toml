@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-interlingua"
+version = "0.1.0"
+edition = "2024"
+description = "SCIP bridge between grounded semantic graphs, HDC, and heterogeneous cognitive models"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-core = { workspace = true }
+symthaea-communication = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+blake3 = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
