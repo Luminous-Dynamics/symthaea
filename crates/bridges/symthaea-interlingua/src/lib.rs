@@ -16,6 +16,7 @@ pub mod delta;
 pub mod hdc;
 pub mod negotiation;
 pub mod protocol;
+pub mod text_fallback;
 
 pub use delta::{HdcDeltaEntry, SparseHdcDelta};
 pub use hdc::{
@@ -23,6 +24,7 @@ pub use hdc::{
     SCIP_HDC_ATOM_DERIVATION_V1, SCIP_HDC_NAMESPACE_V1, profile_fingerprint,
 };
 pub use negotiation::{NegotiatedSession, PeerCapabilities, negotiate};
+pub use text_fallback::{LlmFallbackMode, LlmFallbackPacket, LlmTextFallback};
 pub use protocol::{
     CognitiveEnvelope, GROUNDED_GRAPH_SCHEMA_V1, HdcPayload, HdcProfile, InterchangeError,
     InterchangePayload, InterchangeRepresentation, ProtocolVersion, SCIP_PROTOCOL_ID, SCIP_V1,
