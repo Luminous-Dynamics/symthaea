@@ -48,4 +48,4 @@ jobs:
         run: cargo test -p symthaea-interlingua --all-targets
 
       - name: Clippy SCIP bridge
-        run: cargo clippy -p symthaea-interlingua --all-targets -- -D warnings
+        run: cargo clippy -p symthaea-interlingua --all-targets --no-deps -- -D warnings
