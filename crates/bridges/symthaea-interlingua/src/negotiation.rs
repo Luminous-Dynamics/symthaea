@@ -84,23 +84,23 @@ pub fn negotiate(
             && remote.representations.contains(representation)
     };
 
-    if supports(&InterchangeRepresentation::Hdc) {
-        if let Some(profile) = local.hdc_profiles.iter().find(|local_profile| {
+    if supports(&InterchangeRepresentation::Hdc)
+        && let Some(profile) = local.hdc_profiles.iter().find(|local_profile| {
             remote.hdc_profiles.iter().any(|remote_profile| {
                 remote_profile.codebook_fingerprint == local_profile.codebook_fingerprint
                     && remote_profile.dimension == local_profile.dimension
                     && remote_profile.algebra == local_profile.algebra
                     && remote_profile.atom_derivation == local_profile.atom_derivation
             })
-        }) {
-            return Ok(NegotiatedSession {
-                version,
-                representation: InterchangeRepresentation::Hdc,
-                hdc_profile: Some(profile.clone()),
-                sparse_hdc_deltas: local.sparse_hdc_deltas && remote.sparse_hdc_deltas,
-                semantic_references: local.semantic_references && remote.semantic_references,
-            });
-        }
+        })
+    {
+        return Ok(NegotiatedSession {
+            version,
+            representation: InterchangeRepresentation::Hdc,
+            hdc_profile: Some(profile.clone()),
+            sparse_hdc_deltas: local.sparse_hdc_deltas && remote.sparse_hdc_deltas,
+            semantic_references: local.semantic_references && remote.semantic_references,
+        });
     }
 
     for representation in [
