@@ -14,6 +14,7 @@
 
 pub mod delta;
 pub mod hdc;
+pub mod metrics;
 pub mod negotiation;
 pub mod protocol;
 pub mod text_fallback;
@@ -23,6 +24,7 @@ pub use hdc::{
     GroundedHdcCodec, ProjectionVerification, SCIP_HDC_ALGEBRA_V1,
     SCIP_HDC_ATOM_DERIVATION_V1, SCIP_HDC_NAMESPACE_V1, profile_fingerprint,
 };
+pub use metrics::{DeltaMetrics, ProjectionMetrics, measure_delta, measure_projection};
 pub use negotiation::{NegotiatedSession, PeerCapabilities, negotiate};
 pub use text_fallback::{LlmFallbackMode, LlmFallbackPacket, LlmTextFallback};
 pub use protocol::{
