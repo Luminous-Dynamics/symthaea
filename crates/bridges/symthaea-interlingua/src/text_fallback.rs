@@ -6,9 +6,7 @@
 //! It serializes the grounded semantic graph compactly while preserving the
 //! envelope's confidence, evidence references, provenance and semantic hash.
 
-use crate::{
-    CognitiveEnvelope, InterchangeError, InterchangePayload, graph_semantic_hash,
-};
+use crate::{CognitiveEnvelope, InterchangeError, InterchangePayload, graph_semantic_hash};
 use serde::{Deserialize, Serialize};
 use symthaea_communication::GroundedConceptGraph;
 
@@ -91,11 +89,11 @@ fn resolve_graph<'a>(
             }
             Ok(graph)
         }
-        InterchangePayload::StructuredJson(_) | InterchangePayload::HumanText(_) => Err(
-            InterchangeError::MissingSemanticReference(
+        InterchangePayload::StructuredJson(_) | InterchangePayload::HumanText(_) => {
+            Err(InterchangeError::MissingSemanticReference(
                 "text fallback requires a grounded concept graph".into(),
-            ),
-        ),
+            ))
+        }
     }
 }
 
@@ -161,19 +159,13 @@ mod tests {
             .envelope_from_graph(&graph, 0.9, provenance())
             .unwrap();
 
-        assert!(LlmTextFallback::compile(
-            &envelope,
-            None,
-            LlmFallbackMode::GroundedReasoning
-        )
-        .is_err());
+        assert!(
+            LlmTextFallback::compile(&envelope, None, LlmFallbackMode::GroundedReasoning).is_err()
+        );
 
-        let packet = LlmTextFallback::compile(
-            &envelope,
-            Some(&graph),
-            LlmFallbackMode::GroundedReasoning,
-        )
-        .unwrap();
+        let packet =
+            LlmTextFallback::compile(&envelope, Some(&graph), LlmFallbackMode::GroundedReasoning)
+                .unwrap();
         assert_eq!(packet.semantic_hash, graph_semantic_hash(&graph).unwrap());
     }
 }

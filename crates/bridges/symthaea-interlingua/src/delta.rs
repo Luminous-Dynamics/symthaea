@@ -28,7 +28,9 @@ impl SparseHdcDelta {
         epsilon: f32,
     ) -> Result<Self, InterchangeError> {
         if !epsilon.is_finite() || epsilon < 0.0 {
-            return Err(InterchangeError::InvalidDelta("epsilon must be finite and >= 0".into()));
+            return Err(InterchangeError::InvalidDelta(
+                "epsilon must be finite and >= 0".into(),
+            ));
         }
         if base.values.len() != target.values.len()
             || base.profile_fingerprint != target.profile_fingerprint
@@ -38,7 +40,12 @@ impl SparseHdcDelta {
                 "base and target HDC profiles/dimensions differ".into(),
             ));
         }
-        if base.values.iter().chain(&target.values).any(|value| !value.is_finite()) {
+        if base
+            .values
+            .iter()
+            .chain(&target.values)
+            .any(|value| !value.is_finite())
+        {
             return Err(InterchangeError::InvalidDelta(
                 "base or target contains non-finite values".into(),
             ));
@@ -83,7 +90,9 @@ impl SparseHdcDelta {
         for change in &self.changes {
             let index = change.index as usize;
             if index >= values.len() || !change.delta.is_finite() {
-                return Err(InterchangeError::InvalidDelta("invalid delta component".into()));
+                return Err(InterchangeError::InvalidDelta(
+                    "invalid delta component".into(),
+                ));
             }
             if previous.is_some_and(|previous| index <= previous) {
                 return Err(InterchangeError::InvalidDelta(

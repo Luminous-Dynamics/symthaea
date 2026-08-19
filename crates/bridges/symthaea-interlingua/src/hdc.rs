@@ -67,7 +67,10 @@ impl GroundedHdcCodec {
         &self.profile
     }
 
-    pub fn encode_graph(&self, graph: &GroundedConceptGraph) -> Result<HdcPayload, InterchangeError> {
+    pub fn encode_graph(
+        &self,
+        graph: &GroundedConceptGraph,
+    ) -> Result<HdcPayload, InterchangeError> {
         validate_graph(graph)?;
         if self.profile.dimension == 0 {
             return Err(InterchangeError::InvalidHdcPayload);

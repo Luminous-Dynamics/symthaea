@@ -156,9 +156,6 @@ mod tests {
             &PeerCapabilities::text_only(),
         )
         .unwrap();
-        assert_eq!(
-            session.representation,
-            InterchangeRepresentation::HumanText
-        );
+        assert_eq!(session.representation, InterchangeRepresentation::HumanText);
     }
 }

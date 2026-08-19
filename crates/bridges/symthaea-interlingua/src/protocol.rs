@@ -7,9 +7,7 @@
 //! An HDC vector alone is never evidence that a particular meaning is grounded.
 
 use serde::{Deserialize, Serialize};
-use symthaea_communication::{
-    GroundedConceptGraph, Provenance, content_hash, valid_confidence,
-};
+use symthaea_communication::{GroundedConceptGraph, Provenance, content_hash, valid_confidence};
 
 pub const SCIP_PROTOCOL_ID: &str = "symthaea-cognitive-interchange";
 pub const SCIP_V1: ProtocolVersion = ProtocolVersion { major: 1, minor: 0 };
@@ -179,7 +177,9 @@ impl CognitiveEnvelope {
             return Err(InterchangeError::UnsupportedVersion(self.version));
         }
         if self.profile.schema_id != GROUNDED_GRAPH_SCHEMA_V1 {
-            return Err(InterchangeError::UnsupportedSchema(self.profile.schema_id.clone()));
+            return Err(InterchangeError::UnsupportedSchema(
+                self.profile.schema_id.clone(),
+            ));
         }
         if !valid_confidence(self.confidence) {
             return Err(InterchangeError::InvalidConfidence);
@@ -190,17 +190,17 @@ impl CognitiveEnvelope {
             return Err(InterchangeError::InvalidProvenance);
         }
 
-        match (&self.profile.representation, &self.profile.hdc, &self.payload) {
+        match (
+            &self.profile.representation,
+            &self.profile.hdc,
+            &self.payload,
+        ) {
             (
                 InterchangeRepresentation::GroundedGraph,
                 None,
                 InterchangePayload::GroundedGraph(graph),
             ) => validate_graph(graph)?,
-            (
-                InterchangeRepresentation::Hdc,
-                Some(profile),
-                InterchangePayload::Hdc(payload),
-            ) => {
+            (InterchangeRepresentation::Hdc, Some(profile), InterchangePayload::Hdc(payload)) => {
                 if profile.dimension == 0
                     || payload.values.len() != profile.dimension
                     || payload.profile_fingerprint != profile.codebook_fingerprint
@@ -215,11 +215,7 @@ impl CognitiveEnvelope {
                 None,
                 InterchangePayload::StructuredJson(_),
             )
-            | (
-                InterchangeRepresentation::HumanText,
-                None,
-                InterchangePayload::HumanText(_),
-            ) => {}
+            | (InterchangeRepresentation::HumanText, None, InterchangePayload::HumanText(_)) => {}
             (_, _, InterchangePayload::Reference(reference))
                 if !reference.semantic_hash.trim().is_empty() => {}
             _ => return Err(InterchangeError::ProfilePayloadMismatch),
@@ -242,7 +238,9 @@ pub fn validate_graph(graph: &GroundedConceptGraph) -> Result<(), InterchangeErr
     let mut ids = std::collections::BTreeSet::new();
     for node in &graph.nodes {
         if node.id.trim().is_empty() || !ids.insert(node.id.as_str()) {
-            return Err(InterchangeError::InvalidGraph("empty or duplicate node id".into()));
+            return Err(InterchangeError::InvalidGraph(
+                "empty or duplicate node id".into(),
+            ));
         }
         if !valid_confidence(node.confidence) {
             return Err(InterchangeError::InvalidGraph(format!(
@@ -306,7 +304,11 @@ impl std::fmt::Display for InterchangeError {
             Self::Serialization(message) => write!(f, "serialization error: {message}"),
             Self::UnsupportedProtocol(value) => write!(f, "unsupported protocol: {value}"),
             Self::UnsupportedVersion(value) => {
-                write!(f, "unsupported SCIP version: {}.{}", value.major, value.minor)
+                write!(
+                    f,
+                    "unsupported SCIP version: {}.{}",
+                    value.major, value.minor
+                )
             }
             Self::UnsupportedSchema(value) => write!(f, "unsupported schema: {value}"),
             Self::InvalidGraph(value) => write!(f, "invalid grounded graph: {value}"),
