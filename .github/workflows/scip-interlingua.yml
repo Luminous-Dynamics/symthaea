@@ -7,7 +7,6 @@ on:
       - 'crates/bridges/symthaea-interlingua/**'
       - '.github/workflows/scip-interlingua.yml'
   pull_request:
-    branches: [main]
     paths:
       - 'crates/bridges/symthaea-interlingua/**'
       - '.github/workflows/scip-interlingua.yml'
