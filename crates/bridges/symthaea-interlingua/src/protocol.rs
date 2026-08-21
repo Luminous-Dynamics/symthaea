@@ -419,14 +419,14 @@ pub fn validate_graph_with_limits(
                 node.id
             )));
         }
-        if let Some(label) = &node.label {
-            if label.len() > limits.max_label_bytes {
-                return Err(InterchangeError::ResourceLimitExceeded(format!(
-                    "node label is {} bytes; maximum is {}",
-                    label.len(),
-                    limits.max_label_bytes
-                )));
-            }
+        if let Some(label) = &node.label
+            && label.len() > limits.max_label_bytes
+        {
+            return Err(InterchangeError::ResourceLimitExceeded(format!(
+                "node label is {} bytes; maximum is {}",
+                label.len(),
+                limits.max_label_bytes
+            )));
         }
         if !valid_confidence(node.confidence) {
             return Err(InterchangeError::InvalidGraph(format!(
