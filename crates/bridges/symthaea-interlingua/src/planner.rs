@@ -100,10 +100,10 @@ pub fn plan_transfer(
         SemanticTransferMode::GroundedGraph,
         input.grounded_graph_bytes,
     ));
-    if !policy.require_grounded_semantics {
-        if let Some(bytes) = input.human_text_bytes {
-            semantic_candidates.push((SemanticTransferMode::HumanTextFallback, bytes));
-        }
+    if !policy.require_grounded_semantics
+        && let Some(bytes) = input.human_text_bytes
+    {
+        semantic_candidates.push((SemanticTransferMode::HumanTextFallback, bytes));
     }
 
     semantic_candidates.sort_by_key(|(_, bytes)| *bytes);
