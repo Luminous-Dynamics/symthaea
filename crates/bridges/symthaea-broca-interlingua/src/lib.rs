@@ -1,13 +1,16 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! One-way bridge from Symthaea's internal `StructuredThought` IR into SCIP.
+//! Root-independent Broca translation-plan bridge into SCIP.
 //!
-//! Semantic data and trusted renderer control are kept separate. Native Broca
-//! SSM/L-SSM generation does not use this crate and retains its direct
-//! ThoughtChannels path.
+//! Semantic data and trusted renderer control are kept separate. The root
+//! `symthaea` crate can map `StructuredThought` into [`BrocaTranslationPlan`]
+//! without this bridge depending back on the root crate, avoiding a dependency
+//! cycle when `LLMOrgan` integration is added later.
 
 #![forbid(unsafe_code)]
 
-mod adapter;
+mod bridge;
+mod plan;
 
-pub use adapter::*;
+pub use bridge::*;
+pub use plan::*;
