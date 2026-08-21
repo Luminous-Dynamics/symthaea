@@ -36,8 +36,11 @@ pub use planner::{
 };
 pub use protocol::{
     CognitiveEnvelope, GROUNDED_GRAPH_SCHEMA_V1, HdcPayload, HdcProfile, InterchangeError,
-    InterchangePayload, InterchangeRepresentation, ProtocolVersion, SCIP_PROTOCOL_ID, SCIP_V1,
-    SemanticProfile, SemanticReference, canonical_graph_bytes, graph_semantic_hash, validate_graph,
+    InterchangePayload, InterchangeRepresentation, ProtocolVersion, SCIP_CONTENT_HASH_HEX_LEN,
+    SCIP_PROTOCOL_ID, SCIP_V1, ScipLimits, SemanticProfile, SemanticReference,
+    StructuredJsonPayload, canonical_graph_bytes, canonical_graph_bytes_with_limits,
+    canonicalize_graph, canonicalize_graph_with_limits, graph_semantic_hash, validate_graph,
+    validate_graph_with_limits,
 };
 pub use text_fallback::{LlmFallbackMode, LlmFallbackPacket, LlmTextFallback};
 pub use wire::{
