@@ -93,7 +93,7 @@ fn plan_from_structured_thought(thought: &StructuredThought) -> BrocaTranslation
             .collect(),
         original_input: thought.original_input.clone(),
         code_bearing: thought.code_context.is_some()
-            || matches!(thought.structured_data, Some(StructuredData::Code { .. })),
+            || matches!(&thought.structured_data, Some(StructuredData::Code { .. })),
     }
 }
 
