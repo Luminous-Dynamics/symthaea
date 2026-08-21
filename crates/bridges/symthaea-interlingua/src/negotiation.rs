@@ -91,15 +91,15 @@ impl PeerCapabilities {
             if !representations.insert(key) {
                 return Err(InterchangeError::NegotiationFailed);
             }
-            if let InterchangeRepresentation::Custom(value) = representation {
-                if value.trim().is_empty() || value.len() > limits.max_identifier_bytes {
-                    return Err(InterchangeError::NegotiationFailed);
-                }
+            if let InterchangeRepresentation::Custom(value) = representation
+                && (value.trim().is_empty() || value.len() > limits.max_identifier_bytes)
+            {
+                return Err(InterchangeError::NegotiationFailed);
             }
         }
 
         let advertises_hdc = self.representations.contains(&InterchangeRepresentation::Hdc);
-        if advertises_hdc != !self.hdc_profiles.is_empty() {
+        if advertises_hdc == self.hdc_profiles.is_empty() {
             return Err(InterchangeError::NegotiationFailed);
         }
 
