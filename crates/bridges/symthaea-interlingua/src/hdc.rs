@@ -8,8 +8,8 @@
 //! grounded graph known to the receiver.
 
 use crate::protocol::{
-    CognitiveEnvelope, HdcPayload, HdcProfile, InterchangeError, InterchangePayload,
-    SemanticProfile, graph_semantic_hash, validate_graph,
+    CognitiveEnvelope, HdcPayload, HdcProfile, InterchangeError, InterchangePayload, ScipLimits,
+    SemanticProfile, canonicalize_graph, graph_semantic_hash, validate_graph,
 };
 use symthaea_communication::{ConceptKind, GroundedConceptGraph, Provenance};
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
@@ -27,14 +27,28 @@ pub struct GroundedHdcCodec {
 pub struct ProjectionVerification {
     pub semantic_hash_matches: bool,
     pub profile_matches: bool,
+    /// Associative similarity diagnostic. Useful for retrieval, not identity.
     pub cosine_similarity: f32,
+    /// True only when every f32 component matches the deterministic projection.
+    pub exact_vector_match: bool,
+    /// Largest absolute component deviation from the deterministic projection.
+    pub max_abs_error: f32,
 }
 
 impl ProjectionVerification {
+    /// Approximate projection acceptance. This is suitable for explicitly lossy
+    /// adapters, never for proving exact projection identity.
     pub fn is_valid(self, minimum_similarity: f32) -> bool {
-        self.semantic_hash_matches
+        minimum_similarity.is_finite()
+            && (-1.0..=1.0).contains(&minimum_similarity)
+            && self.semantic_hash_matches
             && self.profile_matches
             && self.cosine_similarity >= minimum_similarity
+    }
+
+    /// Exact deterministic projection identity.
+    pub fn is_exact(self) -> bool {
+        self.semantic_hash_matches && self.profile_matches && self.exact_vector_match
     }
 }
 
@@ -72,16 +86,16 @@ impl GroundedHdcCodec {
         graph: &GroundedConceptGraph,
     ) -> Result<HdcPayload, InterchangeError> {
         validate_graph(graph)?;
-        if self.profile.dimension == 0 {
+        if self.profile.dimension == 0
+            || self.profile.dimension > ScipLimits::default().max_hdc_dimension
+        {
             return Err(InterchangeError::InvalidHdcPayload);
         }
 
-        let mut graph = graph.clone();
-        graph.nodes.sort_by(|a, b| a.id.cmp(&b.id));
-        graph.edges.sort_by(|a, b| {
-            (&a.source, &a.relation, &a.target).cmp(&(&b.source, &b.relation, &b.target))
-        });
-
+        // Use the same total ordering as the canonical semantic hash. Besides
+        // semantic determinism this also prevents floating-point accumulation
+        // order from changing the exact projected vector for parallel edges.
+        let graph = canonicalize_graph(graph)?;
         let mut records = Vec::with_capacity(graph.nodes.len() + graph.edges.len());
 
         for node in &graph.nodes {
@@ -95,10 +109,8 @@ impl GroundedHdcCodec {
                 fields.push(self.field("node/label", label));
             }
 
-            let mut grounding = node.grounded_by.clone();
-            grounding.sort();
             fields.extend(
-                grounding
+                node.grounded_by
                     .iter()
                     .map(|value| self.field("node/grounded-by", value)),
             );
@@ -113,10 +125,8 @@ impl GroundedHdcCodec {
                 self.field("edge/target", &edge.target),
                 self.field("edge/confidence", &confidence_bucket(edge.confidence)),
             ];
-            let mut evidence = edge.evidence_ids.clone();
-            evidence.sort();
             fields.extend(
-                evidence
+                edge.evidence_ids
                     .iter()
                     .map(|value| self.field("edge/evidence", value)),
             );
@@ -153,13 +163,25 @@ impl GroundedHdcCodec {
         payload: &HdcPayload,
     ) -> Result<ProjectionVerification, InterchangeError> {
         let expected = self.encode_graph(graph)?;
-        if payload.values.len() != self.profile.dimension {
+        if payload.values.len() != self.profile.dimension
+            || payload.values.iter().any(|value| !value.is_finite())
+        {
             return Err(InterchangeError::InvalidHdcPayload);
         }
+
+        let max_abs_error = expected
+            .values
+            .iter()
+            .zip(&payload.values)
+            .map(|(expected, actual)| (expected - actual).abs())
+            .fold(0.0f32, f32::max);
+
         Ok(ProjectionVerification {
             semantic_hash_matches: payload.semantic_hash == expected.semantic_hash,
             profile_matches: payload.profile_fingerprint == self.profile.codebook_fingerprint,
             cosine_similarity: cosine_similarity(&expected.values, &payload.values),
+            exact_vector_match: payload.values == expected.values,
+            max_abs_error,
         })
     }
 
@@ -315,12 +337,21 @@ mod tests {
     }
 
     #[test]
-    fn verification_binds_vector_to_grounded_hash() {
+    fn verification_distinguishes_exact_identity_from_similarity() {
         let codec = GroundedHdcCodec::new(1024, SCIP_HDC_NAMESPACE_V1);
         let graph = graph();
         let payload = codec.encode_graph(&graph).unwrap();
         let verification = codec.verify_projection(&graph, &payload).unwrap();
         assert!(verification.is_valid(0.9999));
+        assert!(verification.is_exact());
+        assert_eq!(verification.max_abs_error, 0.0);
+
+        let mut approximate = payload.clone();
+        approximate.values[0] += 0.001;
+        let verification = codec.verify_projection(&graph, &approximate).unwrap();
+        assert!(verification.is_valid(0.99));
+        assert!(!verification.is_exact());
+        assert!(verification.max_abs_error > 0.0);
 
         let mut changed = graph;
         changed.edges[0].confidence = 0.25;
