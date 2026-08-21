@@ -51,19 +51,21 @@ impl SparseHdcDelta {
             ));
         }
 
-        let changes = base
-            .values
-            .iter()
-            .zip(&target.values)
-            .enumerate()
-            .filter_map(|(index, (&before, &after))| {
-                let delta = after - before;
-                (delta.abs() > epsilon).then_some(HdcDeltaEntry {
+        let mut changes = Vec::new();
+        for (index, (&before, &after)) in base.values.iter().zip(&target.values).enumerate() {
+            let delta = after - before;
+            if !delta.is_finite() {
+                return Err(InterchangeError::InvalidDelta(
+                    "delta arithmetic overflowed to a non-finite value".into(),
+                ));
+            }
+            if delta.abs() > epsilon {
+                changes.push(HdcDeltaEntry {
                     index: index as u32,
                     delta,
-                })
-            })
-            .collect();
+                });
+            }
+        }
 
         Ok(Self {
             base_semantic_hash: base.semantic_hash.clone(),
@@ -84,6 +86,11 @@ impl SparseHdcDelta {
                 "delta base hash/profile/dimension mismatch".into(),
             ));
         }
+        if base.values.iter().any(|value| !value.is_finite()) {
+            return Err(InterchangeError::InvalidDelta(
+                "delta base contains a non-finite component".into(),
+            ));
+        }
 
         let mut values = base.values.clone();
         let mut previous = None;
@@ -99,7 +106,13 @@ impl SparseHdcDelta {
                     "delta component indices must be strictly increasing".into(),
                 ));
             }
-            values[index] += change.delta;
+            let updated = values[index] + change.delta;
+            if !updated.is_finite() {
+                return Err(InterchangeError::InvalidDelta(
+                    "delta application overflowed to a non-finite value".into(),
+                ));
+            }
+            values[index] = updated;
             previous = Some(index);
         }
 
@@ -153,5 +166,29 @@ mod tests {
         let delta = SparseHdcDelta::between(&base, &target, 0.0).unwrap();
         let wrong = payload(vec![0.0, 1.0], "wrong");
         assert!(delta.apply(&wrong).is_err());
+    }
+
+    #[test]
+    fn delta_creation_rejects_finite_operand_overflow() {
+        let base = payload(vec![-f32::MAX], "a");
+        let target = payload(vec![f32::MAX], "b");
+        assert!(SparseHdcDelta::between(&base, &target, 0.0).is_err());
+    }
+
+    #[test]
+    fn delta_application_rejects_finite_operand_overflow() {
+        let base = payload(vec![f32::MAX], "a");
+        let delta = SparseHdcDelta {
+            base_semantic_hash: "a".into(),
+            semantic_hash: "b".into(),
+            profile_fingerprint: "profile".into(),
+            dimension: 1,
+            epsilon: 0.0,
+            changes: vec![HdcDeltaEntry {
+                index: 0,
+                delta: f32::MAX,
+            }],
+        };
+        assert!(delta.apply(&base).is_err());
     }
 }
