@@ -2,11 +2,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Capability negotiation for heterogeneous SCIP peers.
 
+use crate::protocol::require_content_hash;
 use crate::{
     GroundedHdcCodec, HdcProfile, InterchangeError, InterchangeRepresentation, ProtocolVersion,
-    SCIP_V1,
+    SCIP_V1, ScipLimits,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+
+const MAX_ADVERTISED_VERSIONS: usize = 32;
+const MAX_ADVERTISED_REPRESENTATIONS: usize = 64;
+const MAX_ADVERTISED_HDC_PROFILES: usize = 64;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PeerCapabilities {
@@ -56,70 +62,205 @@ impl PeerCapabilities {
             semantic_references: false,
         }
     }
+
+    pub fn validate(&self) -> Result<(), InterchangeError> {
+        self.validate_with_limits(&ScipLimits::default())
+    }
+
+    pub fn validate_with_limits(&self, limits: &ScipLimits) -> Result<(), InterchangeError> {
+        if self.versions.is_empty() || self.versions.len() > MAX_ADVERTISED_VERSIONS {
+            return Err(InterchangeError::NegotiationFailed);
+        }
+        if self.representations.is_empty()
+            || self.representations.len() > MAX_ADVERTISED_REPRESENTATIONS
+        {
+            return Err(InterchangeError::NegotiationFailed);
+        }
+        if self.hdc_profiles.len() > MAX_ADVERTISED_HDC_PROFILES {
+            return Err(InterchangeError::NegotiationFailed);
+        }
+
+        let mut versions = BTreeSet::new();
+        if self.versions.iter().any(|version| !versions.insert(*version)) {
+            return Err(InterchangeError::NegotiationFailed);
+        }
+
+        let mut representations = BTreeSet::new();
+        for representation in &self.representations {
+            let key = representation_key(representation);
+            if !representations.insert(key) {
+                return Err(InterchangeError::NegotiationFailed);
+            }
+            if let InterchangeRepresentation::Custom(value) = representation {
+                if value.trim().is_empty() || value.len() > limits.max_identifier_bytes {
+                    return Err(InterchangeError::NegotiationFailed);
+                }
+            }
+        }
+
+        let advertises_hdc = self.representations.contains(&InterchangeRepresentation::Hdc);
+        if advertises_hdc != !self.hdc_profiles.is_empty() {
+            return Err(InterchangeError::NegotiationFailed);
+        }
+
+        let mut fingerprints = BTreeSet::new();
+        for profile in &self.hdc_profiles {
+            if profile.dimension == 0 || profile.dimension > limits.max_hdc_dimension {
+                return Err(InterchangeError::NegotiationFailed);
+            }
+            for value in [&profile.algebra, &profile.atom_derivation, &profile.namespace] {
+                if value.trim().is_empty() || value.len() > limits.max_identifier_bytes {
+                    return Err(InterchangeError::NegotiationFailed);
+                }
+            }
+            require_content_hash(&profile.codebook_fingerprint, "HDC codebook fingerprint")?;
+            if !fingerprints.insert(profile.codebook_fingerprint.as_str()) {
+                return Err(InterchangeError::NegotiationFailed);
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NegotiationPolicy {
+    /// Fail instead of silently selecting a non-HDC representation when both
+    /// peers advertise HDC but no exact profile is shared.
+    pub require_hdc: bool,
+    /// Permit presentation-only text fallback when no grounded representation
+    /// is shared.
+    pub allow_human_text_fallback: bool,
+}
+
+impl Default for NegotiationPolicy {
+    fn default() -> Self {
+        Self {
+            require_hdc: false,
+            allow_human_text_fallback: true,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NegotiatedSession {
     pub version: ProtocolVersion,
+    /// Backward-compatible preferred representation. Per-message transfer should
+    /// use `shared_representations` rather than assuming this is mandatory.
     pub representation: InterchangeRepresentation,
     pub hdc_profile: Option<HdcProfile>,
     pub sparse_hdc_deltas: bool,
     pub semantic_references: bool,
+    /// Complete common representation set, ordered by SCIP preference.
+    pub shared_representations: Vec<InterchangeRepresentation>,
+    /// True when both peers advertised HDC but no exact HDC profile was shared.
+    pub hdc_downgraded: bool,
 }
 
 pub fn negotiate(
     local: &PeerCapabilities,
     remote: &PeerCapabilities,
 ) -> Result<NegotiatedSession, InterchangeError> {
-    let version = local
-        .versions
-        .iter()
-        .filter(|version| remote.versions.contains(version))
-        .copied()
-        .max()
-        .ok_or(InterchangeError::NegotiationFailed)?;
+    negotiate_with_policy(local, remote, NegotiationPolicy::default())
+}
+
+pub fn negotiate_with_policy(
+    local: &PeerCapabilities,
+    remote: &PeerCapabilities,
+    policy: NegotiationPolicy,
+) -> Result<NegotiatedSession, InterchangeError> {
+    local.validate()?;
+    remote.validate()?;
+
+    // This implementation speaks SCIP 1.0 only. Never negotiate a version just
+    // because two peers happen to advertise the same future value.
+    if !local.versions.contains(&SCIP_V1) || !remote.versions.contains(&SCIP_V1) {
+        return Err(InterchangeError::NegotiationFailed);
+    }
+    let version = SCIP_V1;
 
     let supports = |representation: &InterchangeRepresentation| {
         local.representations.contains(representation)
             && remote.representations.contains(representation)
     };
 
-    if supports(&InterchangeRepresentation::Hdc)
-        && let Some(profile) = local.hdc_profiles.iter().find(|local_profile| {
+    let both_advertise_hdc = supports(&InterchangeRepresentation::Hdc);
+    let shared_hdc_profile = if both_advertise_hdc {
+        local.hdc_profiles.iter().find(|local_profile| {
             remote.hdc_profiles.iter().any(|remote_profile| {
-                remote_profile.codebook_fingerprint == local_profile.codebook_fingerprint
-                    && remote_profile.dimension == local_profile.dimension
-                    && remote_profile.algebra == local_profile.algebra
-                    && remote_profile.atom_derivation == local_profile.atom_derivation
+                profiles_match(local_profile, remote_profile)
             })
         })
-    {
-        return Ok(NegotiatedSession {
-            version,
-            representation: InterchangeRepresentation::Hdc,
-            hdc_profile: Some(profile.clone()),
-            sparse_hdc_deltas: local.sparse_hdc_deltas && remote.sparse_hdc_deltas,
-            semantic_references: local.semantic_references && remote.semantic_references,
-        });
+    } else {
+        None
+    };
+
+    if policy.require_hdc && shared_hdc_profile.is_none() {
+        return Err(InterchangeError::NegotiationFailed);
     }
 
+    let mut shared_representations = Vec::new();
+    if shared_hdc_profile.is_some() {
+        shared_representations.push(InterchangeRepresentation::Hdc);
+    }
     for representation in [
         InterchangeRepresentation::GroundedGraph,
         InterchangeRepresentation::StructuredJson,
-        InterchangeRepresentation::HumanText,
     ] {
         if supports(&representation) {
-            return Ok(NegotiatedSession {
-                version,
-                representation,
-                hdc_profile: None,
-                sparse_hdc_deltas: false,
-                semantic_references: local.semantic_references && remote.semantic_references,
-            });
+            shared_representations.push(representation);
+        }
+    }
+    if policy.allow_human_text_fallback && supports(&InterchangeRepresentation::HumanText) {
+        shared_representations.push(InterchangeRepresentation::HumanText);
+    }
+
+    // Preserve mutually supported custom representations without letting them
+    // outrank the standardized SCIP representations.
+    for representation in &local.representations {
+        if matches!(representation, InterchangeRepresentation::Custom(_))
+            && remote.representations.contains(representation)
+        {
+            shared_representations.push(representation.clone());
         }
     }
 
-    Err(InterchangeError::NegotiationFailed)
+    let representation = shared_representations
+        .first()
+        .cloned()
+        .ok_or(InterchangeError::NegotiationFailed)?;
+    let hdc_profile = shared_hdc_profile.cloned();
+    let hdc_downgraded = both_advertise_hdc && hdc_profile.is_none();
+
+    Ok(NegotiatedSession {
+        version,
+        representation,
+        hdc_profile,
+        sparse_hdc_deltas: shared_hdc_profile.is_some()
+            && local.sparse_hdc_deltas
+            && remote.sparse_hdc_deltas,
+        semantic_references: local.semantic_references && remote.semantic_references,
+        shared_representations,
+        hdc_downgraded,
+    })
+}
+
+fn profiles_match(left: &HdcProfile, right: &HdcProfile) -> bool {
+    left.codebook_fingerprint == right.codebook_fingerprint
+        && left.dimension == right.dimension
+        && left.algebra == right.algebra
+        && left.atom_derivation == right.atom_derivation
+        && left.namespace == right.namespace
+}
+
+fn representation_key(representation: &InterchangeRepresentation) -> String {
+    match representation {
+        InterchangeRepresentation::GroundedGraph => "grounded-graph".into(),
+        InterchangeRepresentation::Hdc => "hdc".into(),
+        InterchangeRepresentation::StructuredJson => "structured-json".into(),
+        InterchangeRepresentation::HumanText => "human-text".into(),
+        InterchangeRepresentation::Custom(value) => format!("custom:{value}"),
+    }
 }
 
 #[cfg(test)]
@@ -133,13 +274,19 @@ mod tests {
         assert_eq!(session.representation, InterchangeRepresentation::Hdc);
         assert!(session.hdc_profile.is_some());
         assert!(session.sparse_hdc_deltas);
+        assert!(!session.hdc_downgraded);
+        assert!(
+            session
+                .shared_representations
+                .contains(&InterchangeRepresentation::GroundedGraph)
+        );
     }
 
     #[test]
-    fn profile_mismatch_falls_back_without_guessing() {
+    fn profile_mismatch_falls_back_and_records_downgrade() {
         let local = PeerCapabilities::symthaea_default();
         let mut remote = PeerCapabilities::symthaea_default();
-        remote.hdc_profiles[0].codebook_fingerprint = "different".into();
+        remote.hdc_profiles[0].codebook_fingerprint = "f".repeat(64);
 
         let session = negotiate(&local, &remote).unwrap();
         assert_eq!(
@@ -147,15 +294,75 @@ mod tests {
             InterchangeRepresentation::GroundedGraph
         );
         assert!(session.hdc_profile.is_none());
+        assert!(session.hdc_downgraded);
     }
 
     #[test]
-    fn text_peer_gets_text_fallback() {
-        let session = negotiate(
-            &PeerCapabilities::symthaea_default(),
-            &PeerCapabilities::text_only(),
-        )
-        .unwrap();
+    fn strict_hdc_policy_fails_closed_on_profile_mismatch() {
+        let local = PeerCapabilities::symthaea_default();
+        let mut remote = PeerCapabilities::symthaea_default();
+        remote.hdc_profiles[0].codebook_fingerprint = "f".repeat(64);
+
+        assert!(
+            negotiate_with_policy(
+                &local,
+                &remote,
+                NegotiationPolicy {
+                    require_hdc: true,
+                    ..Default::default()
+                }
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn namespace_mismatch_never_negotiates_hdc() {
+        let local = PeerCapabilities::symthaea_default();
+        let mut remote = PeerCapabilities::symthaea_default();
+        remote.hdc_profiles[0].namespace = "different.namespace".into();
+        // A malicious or buggy peer might retain the old fingerprint. Explicit
+        // namespace comparison still prevents accepting the profile.
+
+        let session = negotiate(&local, &remote).unwrap();
+        assert_ne!(session.representation, InterchangeRepresentation::Hdc);
+        assert!(session.hdc_downgraded);
+    }
+
+    #[test]
+    fn text_peer_gets_text_fallback_only_when_policy_allows_it() {
+        let local = PeerCapabilities::symthaea_default();
+        let remote = PeerCapabilities::text_only();
+        let session = negotiate(&local, &remote).unwrap();
         assert_eq!(session.representation, InterchangeRepresentation::HumanText);
+
+        assert!(
+            negotiate_with_policy(
+                &local,
+                &remote,
+                NegotiationPolicy {
+                    allow_human_text_fallback: false,
+                    ..Default::default()
+                }
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn future_version_is_not_accidentally_negotiated() {
+        let mut local = PeerCapabilities::structured_only();
+        let mut remote = PeerCapabilities::structured_only();
+        let future = ProtocolVersion { major: 9, minor: 0 };
+        local.versions = vec![future];
+        remote.versions = vec![future];
+        assert!(negotiate(&local, &remote).is_err());
+    }
+
+    #[test]
+    fn malformed_capability_advertisement_is_rejected() {
+        let mut caps = PeerCapabilities::symthaea_default();
+        caps.representations.push(InterchangeRepresentation::Hdc);
+        assert!(caps.validate().is_err());
     }
 }
