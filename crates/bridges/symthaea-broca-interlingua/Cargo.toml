@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-broca-interlingua"
+version = "0.1.0"
+edition = "2024"
+description = "One-way bridge from Symthaea StructuredThought into grounded SCIP translation packets"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea = { path = "../../..", default-features = false }
+symthaea-communication = { workspace = true }
+symthaea-interlingua = { path = "../symthaea-interlingua" }
+serde_json = { workspace = true }
