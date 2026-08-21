@@ -29,7 +29,9 @@ pub use hdc::{
     SCIP_HDC_NAMESPACE_V1, profile_fingerprint,
 };
 pub use metrics::{DeltaMetrics, ProjectionMetrics, measure_delta, measure_projection};
-pub use negotiation::{NegotiatedSession, PeerCapabilities, negotiate};
+pub use negotiation::{
+    NegotiatedSession, NegotiationPolicy, PeerCapabilities, negotiate, negotiate_with_policy,
+};
 pub use planner::{
     ProjectionAttachment, ProjectionCandidate, ProjectionPolicy, SemanticTransferMode, TransferPlan,
     TransferPlanningInput, TransferPolicy, plan_transfer,
