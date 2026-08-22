@@ -1,12 +1,14 @@
 use symthaea::mind::{
-    ConstraintType, EpistemicStatus, ResponseType, SemanticIntent, StructuredData,
-    StructuredThought,
+    ConstraintType, DomainContext, ETier, EpistemicCube, EpistemicStatus, HTier, MTier, NTier,
+    ResponseType, SemanticIntent, StructuredData, StructuredThought,
 };
 use symthaea_broca_interlingua::{
-    BrocaConcept, BrocaConstraint, BrocaConstraintKind, BrocaDomainContext, BrocaEntity,
-    BrocaStructuredData, BrocaTranslationPlan, RendererEpistemicStatus, RendererIntent,
-    RendererResponseType, StructuredThoughtScipAdapter, StructuredThoughtScipPolicy,
+    BrocaCognitiveContext, BrocaConcept, BrocaConstraint, BrocaConstraintKind, BrocaDomainContext,
+    BrocaEntity, BrocaEpistemicCube, BrocaFidelityPlan, BrocaRelationMode, BrocaRelationshipStage,
+    BrocaStructuredData, BrocaTranslationPlan, FidelityBrocaScipAdapter, RendererEpistemicStatus,
+    RendererIntent, RendererResponseType, StructuredThoughtScipAdapter, StructuredThoughtScipPolicy,
 };
+use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationshipStage};
 use symthaea_interlingua::graph_semantic_hash;
 
 /// Reference mapping for the future root-side LLMOrgan integration.
@@ -103,6 +105,76 @@ fn plan_from_structured_thought(thought: &StructuredThought) -> BrocaTranslation
     }
 }
 
+fn fidelity_plan_from_structured_thought(thought: &StructuredThought) -> BrocaFidelityPlan {
+    BrocaFidelityPlan {
+        base: plan_from_structured_thought(thought),
+        context: BrocaCognitiveContext {
+            psi: thought.psi,
+            valence: thought.emotional_tone.valence,
+            arousal: thought.emotional_tone.arousal,
+            relationship_stage: map_relationship_stage(thought.relationship_stage),
+            relation_mode: map_relation_mode(thought.relation_mode),
+            trust: thought.trust,
+            primitive_tiers: thought.primitive_tiers.clone(),
+            domain_epistemic_cube: thought
+                .domain_context
+                .as_ref()
+                .and_then(|domain| domain.cube)
+                .map(map_epistemic_cube),
+            domain_psi: thought.domain_context.as_ref().and_then(|domain| domain.psi),
+        },
+    }
+}
+
+fn map_relationship_stage(value: RelationshipStage) -> BrocaRelationshipStage {
+    match value {
+        RelationshipStage::NoRelation => BrocaRelationshipStage::NoRelation,
+        RelationshipStage::Awareness => BrocaRelationshipStage::Awareness,
+        RelationshipStage::Contact => BrocaRelationshipStage::Contact,
+        RelationshipStage::Attunement => BrocaRelationshipStage::Attunement,
+        RelationshipStage::Bonding => BrocaRelationshipStage::Bonding,
+        RelationshipStage::Unity => BrocaRelationshipStage::Unity,
+    }
+}
+
+fn map_relation_mode(value: RelationMode) -> BrocaRelationMode {
+    match value {
+        RelationMode::IIt => BrocaRelationMode::IIt,
+        RelationMode::IThou => BrocaRelationMode::IThou,
+    }
+}
+
+fn map_epistemic_cube(cube: EpistemicCube) -> BrocaEpistemicCube {
+    BrocaEpistemicCube {
+        empirical: match cube.e {
+            ETier::E0 => 0,
+            ETier::E1 => 1,
+            ETier::E2 => 2,
+            ETier::E3 => 3,
+            ETier::E4 => 4,
+        },
+        normative: match cube.n {
+            NTier::N0 => 0,
+            NTier::N1 => 1,
+            NTier::N2 => 2,
+            NTier::N3 => 3,
+        },
+        materiality: match cube.m {
+            MTier::M0 => 0,
+            MTier::M1 => 1,
+            MTier::M2 => 2,
+            MTier::M3 => 3,
+        },
+        harmonic: cube.h.map(|value| match value {
+            HTier::H0 => 0,
+            HTier::H1 => 1,
+            HTier::H2 => 2,
+            HTier::H3 => 3,
+            HTier::H4 => 4,
+        }),
+    }
+}
+
 fn thought() -> StructuredThought {
     StructuredThought {
         semantic_intent: SemanticIntent::Answer,
@@ -164,4 +236,53 @@ fn real_code_structured_data_maps_to_native_path_marker() {
         StructuredThoughtScipAdapter::graph(&plan, &StructuredThoughtScipPolicy::default())
             .is_err()
     );
+}
+
+#[test]
+fn real_structured_thought_preserves_fidelity_context() {
+    let mut thought = thought();
+    thought.psi = 0.67;
+    thought.emotional_tone.valence = -0.22;
+    thought.emotional_tone.arousal = 0.36;
+    thought.emotional_tone.warmth = 0.81;
+    thought.relationship_stage = RelationshipStage::Attunement;
+    thought.relation_mode = RelationMode::IThou;
+    thought.trust = 0.79;
+    thought.primitive_tiers = vec!["Strategic".into(), "MetaCognitive".into()];
+    thought.domain_context = Some(DomainContext {
+        domain: "engineering".into(),
+        entities: vec![],
+        computed_answer: Some("Remain offline.".into()),
+        cube: Some(EpistemicCube::with_harmonic(
+            ETier::E3,
+            NTier::N1,
+            MTier::M2,
+            HTier::H3,
+        )),
+        psi: Some(0.59),
+    });
+
+    let plan = fidelity_plan_from_structured_thought(&thought);
+    let packet = FidelityBrocaScipAdapter::compile_for_text_peer(
+        &plan,
+        1.0,
+        symthaea_communication::Provenance {
+            provider: "real-thought-fidelity-test".into(),
+            provider_version: "1".into(),
+            model_hash: "root-structured-thought".into(),
+            feature_flags: vec![],
+            transformations: vec![],
+        },
+        &StructuredThoughtScipPolicy::default(),
+    )
+    .unwrap();
+
+    let content = &packet.packet.fallback.content;
+    assert!(content.contains("attunement"));
+    assert!(content.contains("i-thou"));
+    assert!(content.contains("Strategic"));
+    assert!(content.contains("MetaCognitive"));
+    assert!(content.contains("E3/N1/M2/H3"));
+    assert!(packet.packet.fallback.system_prompt.contains("AFFECT CONTROL"));
+    assert!(packet.packet.fallback.system_prompt.contains("RELATION CONTROL"));
 }
