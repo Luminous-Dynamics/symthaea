@@ -16,6 +16,9 @@
 
 mod bridge;
 mod fidelity;
+// Security-sensitive export policy defaults stay explicit rather than derived:
+// adding a future policy field must force a conscious fail-closed default choice.
+#[allow(clippy::derivable_impls)]
 mod fidelity_hardened;
 mod hardened;
 mod plan;
