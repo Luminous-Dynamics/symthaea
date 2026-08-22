@@ -6,7 +6,8 @@ use symthaea_broca_interlingua::{
     BrocaCognitiveContext, BrocaConcept, BrocaConstraint, BrocaConstraintKind, BrocaDomainContext,
     BrocaEntity, BrocaEpistemicCube, BrocaFidelityPlan, BrocaRelationMode, BrocaRelationshipStage,
     BrocaStructuredData, BrocaTranslationPlan, FidelityBrocaScipAdapter, RendererEpistemicStatus,
-    RendererIntent, RendererResponseType, StructuredThoughtScipAdapter, StructuredThoughtScipPolicy,
+    RendererIntent, RendererResponseType, StructuredThoughtScipAdapter,
+    StructuredThoughtScipPolicy,
 };
 use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationshipStage};
 use symthaea_interlingua::graph_semantic_hash;
@@ -121,7 +122,10 @@ fn fidelity_plan_from_structured_thought(thought: &StructuredThought) -> BrocaFi
                 .as_ref()
                 .and_then(|domain| domain.cube)
                 .map(map_epistemic_cube),
-            domain_psi: thought.domain_context.as_ref().and_then(|domain| domain.psi),
+            domain_psi: thought
+                .domain_context
+                .as_ref()
+                .and_then(|domain| domain.psi),
         },
     }
 }
@@ -283,6 +287,18 @@ fn real_structured_thought_preserves_fidelity_context() {
     assert!(content.contains("Strategic"));
     assert!(content.contains("MetaCognitive"));
     assert!(content.contains("E3/N1/M2/H3"));
-    assert!(packet.packet.fallback.system_prompt.contains("AFFECT CONTROL"));
-    assert!(packet.packet.fallback.system_prompt.contains("RELATION CONTROL"));
+    assert!(
+        packet
+            .packet
+            .fallback
+            .system_prompt
+            .contains("AFFECT CONTROL")
+    );
+    assert!(
+        packet
+            .packet
+            .fallback
+            .system_prompt
+            .contains("RELATION CONTROL")
+    );
 }
