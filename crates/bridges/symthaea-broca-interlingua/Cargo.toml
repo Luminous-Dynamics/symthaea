@@ -11,6 +11,7 @@ symthaea-interlingua = { path = "../symthaea-interlingua" }
 serde_json = { workspace = true }
 
 [dev-dependencies]
-# Test-only dependency proves real StructuredThought can map into the acyclic
-# BrocaTranslationPlan contract without making the production bridge depend on root.
+# Test-only dependencies prove real StructuredThought can map into the acyclic
+# interchange contracts without making the production bridge depend on root.
 symthaea = { path = "../../..", default-features = false }
+symthaea-core = { workspace = true }
