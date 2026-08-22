@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-broca-interlingua"
+version = "0.1.0"
+edition = "2024"
+description = "Root-independent Broca translation-plan bridge into grounded SCIP packets"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-communication = { workspace = true }
+symthaea-interlingua = { path = "../symthaea-interlingua" }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+# Test-only dependency proves real StructuredThought can map into the acyclic
+# BrocaTranslationPlan contract without making the production bridge depend on root.
+symthaea = { path = "../../..", default-features = false }
