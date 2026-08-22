@@ -247,7 +247,9 @@ pub(crate) fn enrich_graph_with_fidelity(
             grounded_by: vec![format!("broca-cognitive-context:primitive-tier:{index}")],
             confidence: 1.0,
         });
-        graph.edges.push(edge("thought", "has-primitive-tier", &id, 1.0));
+        graph
+            .edges
+            .push(edge("thought", "has-primitive-tier", &id, 1.0));
     }
 
     if let Some(cube) = plan.context.domain_epistemic_cube {
@@ -260,12 +262,7 @@ pub(crate) fn enrich_graph_with_fidelity(
         );
     }
     if let Some(domain_psi) = plan.context.domain_psi {
-        add_numeric_property(
-            graph,
-            "context-domain-psi",
-            domain_psi,
-            "has-domain-psi",
-        )?;
+        add_numeric_property(graph, "context-domain-psi", domain_psi, "has-domain-psi")?;
     }
 
     refresh_auto_grounding(graph)?;
@@ -341,9 +338,7 @@ fn add_numeric_property(
     relation: &str,
 ) -> Result<(), BrocaScipError> {
     if !value.is_finite() {
-        return Err(BrocaScipError::InvalidPlan(format!(
-            "{id} must be finite"
-        )));
+        return Err(BrocaScipError::InvalidPlan(format!("{id} must be finite")));
     }
     let label = serde_json::to_string(&value)?;
     add_property(graph, id, &label, relation, 1.0);
@@ -486,11 +481,9 @@ mod tests {
 
     #[test]
     fn fidelity_graph_preserves_cognitive_context() {
-        let graph = FidelityBrocaScipAdapter::graph(
-            &plan(),
-            &StructuredThoughtScipPolicy::default(),
-        )
-        .unwrap();
+        let graph =
+            FidelityBrocaScipAdapter::graph(&plan(), &StructuredThoughtScipPolicy::default())
+                .unwrap();
         let labels = graph
             .nodes
             .iter()
@@ -512,16 +505,38 @@ mod tests {
             &StructuredThoughtScipPolicy::default(),
         )
         .unwrap();
-        assert!(packet.packet.fallback.system_prompt.contains("AFFECT CONTROL"));
-        assert!(packet.packet.fallback.system_prompt.contains("RELATION CONTROL"));
-        assert!(packet.packet.fallback.system_prompt.contains("stage=attunement"));
+        assert!(
+            packet
+                .packet
+                .fallback
+                .system_prompt
+                .contains("AFFECT CONTROL")
+        );
+        assert!(
+            packet
+                .packet
+                .fallback
+                .system_prompt
+                .contains("RELATION CONTROL")
+        );
+        assert!(
+            packet
+                .packet
+                .fallback
+                .system_prompt
+                .contains("stage=attunement")
+        );
         assert!(packet.packet.fallback.system_prompt.contains("mode=i-thou"));
     }
 
     #[test]
     fn invalid_epistemic_cube_is_rejected() {
         let mut plan = plan();
-        plan.context.domain_epistemic_cube.as_mut().unwrap().empirical = 5;
+        plan.context
+            .domain_epistemic_cube
+            .as_mut()
+            .unwrap()
+            .empirical = 5;
         assert!(
             FidelityBrocaScipAdapter::graph(&plan, &StructuredThoughtScipPolicy::default())
                 .is_err()
