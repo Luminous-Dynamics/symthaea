@@ -127,6 +127,7 @@ impl HardenedFidelityBrocaScipAdapter {
         let mut fallback =
             LlmTextFallback::compile(&envelope, None, LlmFallbackMode::FaithfulTranslation)?;
         append_renderer_directives(&mut fallback.system_prompt, renderer, renderer_context);
+        append_semantic_loss_directive(&mut fallback.system_prompt, &losses);
         base_audit.semantic_hash = fallback.semantic_hash.clone();
 
         Ok(HardenedBrocaFidelityPacket {
@@ -312,6 +313,32 @@ fn reject_unapproved_losses(
     Ok(())
 }
 
+/// Make explicitly approved loss visible to the receiving text peer as trusted,
+/// fixed-vocabulary control metadata. No plan/user string is interpolated here.
+fn append_semantic_loss_directive(system_prompt: &mut String, losses: &[BrocaSemanticLoss]) {
+    if losses.is_empty() {
+        return;
+    }
+
+    system_prompt.push_str(
+        "\nSEMANTIC LOSS CONTROL: This packet is an intentionally lossy projection. \
+         Do not describe it as a complete or fully faithful rendering of the source cognitive state. \
+         Omitted semantic classes: ",
+    );
+    for (index, loss) in losses.iter().enumerate() {
+        if index > 0 {
+            system_prompt.push_str(", ");
+        }
+        system_prompt.push_str(match loss {
+            BrocaSemanticLoss::LegacyConstraintSemantics { .. } => "legacy-constraint-semantics",
+            BrocaSemanticLoss::ActivatedConceptsTruncated { .. } => "activated-concepts",
+            BrocaSemanticLoss::StructuredDataOmitted => "structured-data",
+            BrocaSemanticLoss::DomainContextOmitted => "domain-context",
+        });
+    }
+    system_prompt.push_str(".\n");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -374,6 +401,14 @@ mod tests {
             result.audit.base.semantic_hash,
             result.packet.packet.fallback.semantic_hash
         );
+        assert!(
+            !result
+                .packet
+                .packet
+                .fallback
+                .system_prompt
+                .contains("SEMANTIC LOSS CONTROL")
+        );
     }
 
     #[test]
@@ -396,7 +431,7 @@ mod tests {
     }
 
     #[test]
-    fn explicitly_allowed_constraint_loss_is_audited_as_non_faithful() {
+    fn explicitly_allowed_constraint_loss_is_audited_and_peer_visible() {
         let mut plan = plan();
         plan.base.constraints.push(BrocaConstraint {
             kind: BrocaConstraintKind::MustInclude,
@@ -418,6 +453,22 @@ mod tests {
         assert_eq!(
             result.audit.semantic_losses,
             vec![BrocaSemanticLoss::LegacyConstraintSemantics { count: 1 }]
+        );
+        assert!(
+            result
+                .packet
+                .packet
+                .fallback
+                .system_prompt
+                .contains("SEMANTIC LOSS CONTROL")
+        );
+        assert!(
+            result
+                .packet
+                .packet
+                .fallback
+                .system_prompt
+                .contains("legacy-constraint-semantics")
         );
     }
 
@@ -467,7 +518,7 @@ mod tests {
     }
 
     #[test]
-    fn explicitly_allowed_domain_omission_is_audited_as_non_faithful() {
+    fn explicitly_allowed_domain_omission_is_audited_and_peer_visible() {
         let mut plan = plan();
         plan.base.domain_context = Some(BrocaDomainContext {
             domain: "engineering".into(),
@@ -494,6 +545,22 @@ mod tests {
         assert_eq!(
             result.audit.semantic_losses,
             vec![BrocaSemanticLoss::DomainContextOmitted]
+        );
+        assert!(
+            result
+                .packet
+                .packet
+                .fallback
+                .system_prompt
+                .contains("SEMANTIC LOSS CONTROL")
+        );
+        assert!(
+            result
+                .packet
+                .packet
+                .fallback
+                .system_prompt
+                .contains("domain-context")
         );
     }
 
