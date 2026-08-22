@@ -1,7 +1,9 @@
 use std::fmt;
 
 use symthaea_communication::Provenance;
-use symthaea_interlingua::{CognitiveEnvelope, InterchangePayload, LlmFallbackMode, LlmTextFallback};
+use symthaea_interlingua::{
+    CognitiveEnvelope, InterchangePayload, LlmFallbackMode, LlmTextFallback,
+};
 
 use crate::fidelity::{
     append_fidelity_transforms, append_renderer_directives, enrich_graph_with_fidelity,
@@ -271,18 +273,16 @@ fn reject_unapproved_losses(
             BrocaSemanticLoss::LegacyConstraintSemantics { count }
                 if !policy.allow_legacy_constraint_loss =>
             {
-                return Err(HardenedBrocaFidelityError::SemanticLossRejected(
-                    format!(
-                        "{count} legacy free-form constraint(s) cannot be promoted to trusted renderer control"
-                    ),
-                ));
+                return Err(HardenedBrocaFidelityError::SemanticLossRejected(format!(
+                    "{count} legacy free-form constraint(s) cannot be promoted to trusted renderer control"
+                )));
             }
             BrocaSemanticLoss::ActivatedConceptsTruncated { omitted }
                 if !policy.allow_concept_truncation =>
             {
-                return Err(HardenedBrocaFidelityError::SemanticLossRejected(
-                    format!("{omitted} activated concept(s) would be truncated"),
-                ));
+                return Err(HardenedBrocaFidelityError::SemanticLossRejected(format!(
+                    "{omitted} activated concept(s) would be truncated"
+                )));
             }
             _ => {}
         }
@@ -401,11 +401,13 @@ mod tests {
     #[test]
     fn concept_truncation_fails_closed_by_default() {
         let mut plan = plan();
-        plan.base.activated_concepts.extend((0..20).map(|index| BrocaConcept {
-            name: format!("concept-{index}"),
-            activation: 0.5,
-            relevance: 0.5,
-        }));
+        plan.base
+            .activated_concepts
+            .extend((0..20).map(|index| BrocaConcept {
+                name: format!("concept-{index}"),
+                activation: 0.5,
+                relevance: 0.5,
+            }));
         assert!(matches!(
             HardenedFidelityBrocaScipAdapter::compile_for_text_peer(
                 &plan,
