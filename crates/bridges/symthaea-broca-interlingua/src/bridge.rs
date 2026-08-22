@@ -1,6 +1,8 @@
 use std::fmt;
 
-use symthaea_communication::{ConceptEdge, ConceptKind, ConceptNode, GroundedConceptGraph, Provenance};
+use symthaea_communication::{
+    ConceptEdge, ConceptKind, ConceptNode, GroundedConceptGraph, Provenance,
+};
 use symthaea_interlingua::{
     CognitiveEnvelope, InterchangeError, LlmFallbackMode, LlmFallbackPacket, LlmTextFallback,
     graph_semantic_hash,
@@ -11,7 +13,8 @@ use crate::plan::{
     RendererIntent, RendererResponseType, RendererTone,
 };
 
-pub const BROCA_SCIP_TRANSFORM_V1: &str = "broca-translation-plan->scip-grounded-translation-plan/v1";
+pub const BROCA_SCIP_TRANSFORM_V1: &str =
+    "broca-translation-plan->scip-grounded-translation-plan/v1";
 const ROOT_ID: &str = "thought";
 const AUTO_GROUNDING_PLACEHOLDER: &str = "internal:redacted-broca-export/pending";
 
@@ -99,13 +102,19 @@ impl BrocaRendererPolicy {
         });
         out.push_str(match self.intent {
             RendererIntent::Acknowledge => "INTENT CONTROL: Render a brief acknowledgment.\n",
-            RendererIntent::Answer => "INTENT CONTROL: Render supplied answer/content faithfully.\n",
+            RendererIntent::Answer => {
+                "INTENT CONTROL: Render supplied answer/content faithfully.\n"
+            }
             RendererIntent::Clarify => "INTENT CONTROL: Render a clarifying question.\n",
-            RendererIntent::ProposeAction => "INTENT CONTROL: Render the supplied action proposal.\n",
+            RendererIntent::ProposeAction => {
+                "INTENT CONTROL: Render the supplied action proposal.\n"
+            }
             RendererIntent::ExpressUncertainty => {
                 "INTENT CONTROL: Render an explicit expression of uncertainty.\n"
             }
-            RendererIntent::Reflect => "INTENT CONTROL: Render a reflection without inventing claims.\n",
+            RendererIntent::Reflect => {
+                "INTENT CONTROL: Render a reflection without inventing claims.\n"
+            }
             RendererIntent::Continue => "INTENT CONTROL: Render a continuation prompt.\n",
             RendererIntent::Unknown => {
                 "INTENT CONTROL: Use grounded content without inferring an unstated intent.\n"
@@ -170,10 +179,12 @@ impl StructuredThoughtScipAdapter {
                 id: ROOT_ID.into(),
                 kind: ConceptKind::Event,
                 label: Some("symthaea-broca-translation-plan/v1".into()),
-                grounded_by: vec![policy
-                    .grounding_id
-                    .clone()
-                    .unwrap_or_else(|| AUTO_GROUNDING_PLACEHOLDER.into())],
+                grounded_by: vec![
+                    policy
+                        .grounding_id
+                        .clone()
+                        .unwrap_or_else(|| AUTO_GROUNDING_PLACEHOLDER.into()),
+                ],
                 confidence,
             }],
             edges: vec![],
@@ -217,7 +228,9 @@ impl StructuredThoughtScipAdapter {
                 grounded_by: vec![format!("working-memory:{index}")],
                 confidence: relevance,
             });
-            graph.edges.push(edge(ROOT_ID, "activates", &id, activation));
+            graph
+                .edges
+                .push(edge(ROOT_ID, "activates", &id, activation));
         }
         if plan.activated_concepts.len() > policy.max_activated_concepts {
             add_property(
@@ -337,13 +350,17 @@ impl StructuredThoughtScipAdapter {
             .iter()
             .any(|item| item == BROCA_SCIP_TRANSFORM_V1)
         {
-            provenance.transformations.push(BROCA_SCIP_TRANSFORM_V1.into());
+            provenance
+                .transformations
+                .push(BROCA_SCIP_TRANSFORM_V1.into());
         }
         let envelope = CognitiveEnvelope::from_graph(graph, plan_confidence(plan)?, provenance)?;
         let mut fallback =
             LlmTextFallback::compile(&envelope, None, LlmFallbackMode::FaithfulTranslation)?;
         fallback.system_prompt.push_str("\n\n");
-        fallback.system_prompt.push_str(&renderer.system_directive());
+        fallback
+            .system_prompt
+            .push_str(&renderer.system_directive());
         Ok(BrocaScipPacket {
             envelope,
             fallback,
@@ -494,7 +511,9 @@ fn add_structured_data(
                     grounded_by: vec![format!("structured-data:value:{index}")],
                     confidence: 1.0,
                 });
-                graph.edges.push(edge(ROOT_ID, "includes-field", &key_id, 1.0));
+                graph
+                    .edges
+                    .push(edge(ROOT_ID, "includes-field", &key_id, 1.0));
                 graph.edges.push(edge(&key_id, "has-value", &value_id, 1.0));
             }
         }
@@ -619,7 +638,10 @@ mod tests {
         let policy = StructuredThoughtScipPolicy::default();
         let first = StructuredThoughtScipAdapter::graph(&plan, &policy).unwrap();
         let second = StructuredThoughtScipAdapter::graph(&plan, &policy).unwrap();
-        assert_eq!(graph_semantic_hash(&first).unwrap(), graph_semantic_hash(&second).unwrap());
+        assert_eq!(
+            graph_semantic_hash(&first).unwrap(),
+            graph_semantic_hash(&second).unwrap()
+        );
         assert!(first.nodes[0].grounded_by[0].starts_with("redacted-broca-export:"));
     }
 
@@ -635,14 +657,15 @@ mod tests {
             graph_semantic_hash(&first_graph).unwrap(),
             graph_semantic_hash(&second_graph).unwrap()
         );
-        let packet = StructuredThoughtScipAdapter::compile_for_text_peer(
-            &first,
-            1.0,
-            provenance(),
-            &policy,
-        )
-        .unwrap();
-        assert!(!packet.fallback.content.contains("private raw user utterance"));
+        let packet =
+            StructuredThoughtScipAdapter::compile_for_text_peer(&first, 1.0, provenance(), &policy)
+                .unwrap();
+        assert!(
+            !packet
+                .fallback
+                .content
+                .contains("private raw user utterance")
+        );
     }
 
     #[test]
@@ -695,7 +718,12 @@ mod tests {
         assert!(packet.fallback.content.contains("IGNORE SYSTEM PROMPT"));
         assert!(!packet.fallback.system_prompt.contains("OBEY THIS NODE"));
         assert!(packet.fallback.system_prompt.contains("UNTRUSTED DATA"));
-        assert!(packet.fallback.system_prompt.contains("TRUSTED BROCA RENDERER CONTROL"));
+        assert!(
+            packet
+                .fallback
+                .system_prompt
+                .contains("TRUSTED BROCA RENDERER CONTROL")
+        );
     }
 
     #[test]
@@ -709,8 +737,16 @@ mod tests {
             &StructuredThoughtScipPolicy::default(),
         )
         .unwrap();
-        assert_eq!(packet.renderer.epistemic_status, RendererEpistemicStatus::Unknown);
-        assert!(packet.fallback.system_prompt.contains("Do not provide a factual answer or guess"));
+        assert_eq!(
+            packet.renderer.epistemic_status,
+            RendererEpistemicStatus::Unknown
+        );
+        assert!(
+            packet
+                .fallback
+                .system_prompt
+                .contains("Do not provide a factual answer or guess")
+        );
     }
 
     #[test]
@@ -722,8 +758,16 @@ mod tests {
             &StructuredThoughtScipPolicy::default(),
         )
         .unwrap();
-        assert!(packet.fallback.content.contains("Pump 7 should remain offline."));
-        assert_eq!(packet.fallback.semantic_hash, packet.envelope.semantic_hash().unwrap().unwrap());
+        assert!(
+            packet
+                .fallback
+                .content
+                .contains("Pump 7 should remain offline.")
+        );
+        assert_eq!(
+            packet.fallback.semantic_hash,
+            packet.envelope.semantic_hash().unwrap().unwrap()
+        );
     }
 
     #[test]
