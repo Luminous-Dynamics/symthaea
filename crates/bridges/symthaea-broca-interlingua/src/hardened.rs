@@ -91,12 +91,16 @@ impl HardenedBrocaScipAdapter {
         } else {
             0
         };
-        let original_input_exported = policy.include_original_input && plan.original_input.is_some();
+        let original_input_exported =
+            policy.include_original_input && plan.original_input.is_some();
 
         Ok(HardenedBrocaScipPacket {
             audit: BrocaExportAudit {
                 exported_concepts,
-                omitted_concepts: plan.activated_concepts.len().saturating_sub(exported_concepts),
+                omitted_concepts: plan
+                    .activated_concepts
+                    .len()
+                    .saturating_sub(exported_concepts),
                 exported_constraint_kinds: plan.constraints.len(),
                 exported_constraint_texts,
                 omitted_constraint_texts: plan
@@ -160,7 +164,8 @@ fn validate_export(
     if plan.constraints.len() > limits.max_constraints {
         return Err(HardenedBrocaError::ResourceLimitExceeded(format!(
             "{} constraints; maximum is {}",
-            plan.constraints.len(), limits.max_constraints
+            plan.constraints.len(),
+            limits.max_constraints
         )));
     }
 
@@ -211,17 +216,13 @@ fn validate_export(
         if domain.entities.len() > limits.max_domain_entities {
             return Err(HardenedBrocaError::ResourceLimitExceeded(format!(
                 "{} domain entities; maximum is {}",
-                domain.entities.len(), limits.max_domain_entities
+                domain.entities.len(),
+                limits.max_domain_entities
             )));
         }
         charge_string(&domain.domain, "domain", limits, &mut text_bytes)?;
         for entity in &domain.entities {
-            charge_string(
-                &entity.entity_type,
-                "entity type",
-                limits,
-                &mut text_bytes,
-            )?;
+            charge_string(&entity.entity_type, "entity type", limits, &mut text_bytes)?;
             charge_string(&entity.value, "entity value", limits, &mut text_bytes)?;
         }
         if let Some(answer) = &domain.computed_answer {
@@ -263,7 +264,8 @@ fn validate_structured_data(
             if items.len() > limits.max_list_items {
                 return Err(HardenedBrocaError::ResourceLimitExceeded(format!(
                     "{} list items; maximum is {}",
-                    items.len(), limits.max_list_items
+                    items.len(),
+                    limits.max_list_items
                 )));
             }
             for item in items {
@@ -274,7 +276,8 @@ fn validate_structured_data(
             if pairs.len() > limits.max_key_value_pairs {
                 return Err(HardenedBrocaError::ResourceLimitExceeded(format!(
                     "{} key/value pairs; maximum is {}",
-                    pairs.len(), limits.max_key_value_pairs
+                    pairs.len(),
+                    limits.max_key_value_pairs
                 )));
             }
             for (key, value) in pairs {
@@ -301,7 +304,8 @@ fn charge_string(
     if value.len() > limits.max_string_bytes {
         return Err(HardenedBrocaError::ResourceLimitExceeded(format!(
             "{field} is {} bytes; maximum is {}",
-            value.len(), limits.max_string_bytes
+            value.len(),
+            limits.max_string_bytes
         )));
     }
     *total = total.checked_add(value.len()).ok_or_else(|| {
@@ -320,8 +324,8 @@ fn charge_string(
 mod tests {
     use super::*;
     use crate::{
-        BrocaConcept, BrocaConstraint, BrocaConstraintKind, BrocaDomainContext, RendererIntent,
-        RendererResponseType, RendererEpistemicStatus,
+        BrocaConcept, BrocaConstraint, BrocaConstraintKind, BrocaDomainContext,
+        RendererEpistemicStatus, RendererIntent, RendererResponseType,
     };
 
     fn provenance() -> Provenance {
@@ -377,7 +381,10 @@ mod tests {
         assert_eq!(result.audit.exported_constraint_kinds, 1);
         assert_eq!(result.audit.exported_constraint_texts, 0);
         assert_eq!(result.audit.omitted_constraint_texts, 1);
-        assert_eq!(result.audit.semantic_hash, result.packet.fallback.semantic_hash);
+        assert_eq!(
+            result.audit.semantic_hash,
+            result.packet.fallback.semantic_hash
+        );
     }
 
     #[test]
@@ -389,14 +396,16 @@ mod tests {
             max_export_text_bytes: 512,
             ..Default::default()
         };
-        assert!(HardenedBrocaScipAdapter::compile_for_text_peer(
-            &plan,
-            1.0,
-            provenance(),
-            &StructuredThoughtScipPolicy::default(),
-            &limits,
-        )
-        .is_ok());
+        assert!(
+            HardenedBrocaScipAdapter::compile_for_text_peer(
+                &plan,
+                1.0,
+                provenance(),
+                &StructuredThoughtScipPolicy::default(),
+                &limits,
+            )
+            .is_ok()
+        );
     }
 
     #[test]
