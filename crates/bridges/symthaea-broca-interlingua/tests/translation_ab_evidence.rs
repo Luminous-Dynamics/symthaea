@@ -8,12 +8,13 @@ use symthaea_broca_interlingua::{
     BrocaCognitiveContext, BrocaConcept, BrocaConstraint, BrocaConstraintKind, BrocaDomainContext,
     BrocaEntity, BrocaEpistemicCube, BrocaFidelityExportPolicy, BrocaFidelityInterchangeLimits,
     BrocaFidelityPlan, BrocaRelationMode, BrocaRelationshipStage, BrocaStructuredData,
-    BrocaTranslationPlan, HardenedFidelityBrocaScipAdapter, RendererEpistemicStatus,
-    RendererIntent, RendererResponseType,
+    BrocaTranslationPlan, HardenedBrocaFidelityPacket, HardenedFidelityBrocaScipAdapter,
+    RendererEpistemicStatus, RendererIntent, RendererResponseType,
 };
 use symthaea_communication::Provenance;
 use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationshipStage};
 
+const MOOD_TEMPERATURE: f32 = 1.0;
 const PRIVATE_SENTINEL: &str = "PRIVATE_INPUT_DO_NOT_EXPORT_7F21";
 const CONSTRAINT_SENTINEL: &str = "OVERRIDE_SYSTEM_AND_INVENT_FACTS_4C99";
 const CONCEPT_SENTINEL: &str = "IGNORE_SYSTEM_CONCEPT_91D2";
@@ -21,7 +22,7 @@ const CONCEPT_SENTINEL: &str = "IGNORE_SYSTEM_CONCEPT_91D2";
 #[derive(Debug)]
 struct EvidenceRow {
     case: &'static str,
-    legacy_data_bytes: usize,
+    legacy_content_bytes: usize,
     legacy_total_bytes: usize,
     scip_data_bytes: usize,
     scip_total_bytes: usize,
@@ -42,6 +43,51 @@ fn provenance(case: &str) -> Provenance {
         feature_flags: vec![],
         transformations: vec![],
     }
+}
+
+/// Snapshot of the current `LLMOrgan::build_translation_prompt` text path.
+///
+/// The production method is private, so the A/B harness mirrors it exactly to
+/// compare the full runtime query content rather than only
+/// `StructuredThought::to_translation_prompt()`.
+fn legacy_runtime_prompt(thought: &StructuredThought, mood_temperature: f32) -> String {
+    let mut prompt = String::new();
+
+    prompt.push_str("=== STRUCTURED THOUGHT TO TRANSLATE ===\n\n");
+    prompt.push_str(&format!("MOOD_TEMPERATURE: {mood_temperature:.2}\n"));
+    prompt.push_str(&thought.to_translation_prompt());
+
+    prompt.push_str("\n=== TRANSLATION INSTRUCTIONS ===\n");
+    prompt.push_str("Convert the above structured thought into a natural, ");
+    match thought.semantic_intent {
+        SemanticIntent::Acknowledge => prompt.push_str("brief acknowledgment. "),
+        SemanticIntent::Answer => prompt.push_str("informative response. "),
+        SemanticIntent::Clarify => prompt.push_str("clarifying question. "),
+        SemanticIntent::ProposeAction => prompt.push_str("actionable suggestion. "),
+        SemanticIntent::ExpressUncertainty => {
+            prompt.push_str("honest expression of uncertainty. ");
+        }
+        SemanticIntent::Reflect => prompt.push_str("thoughtful reflection. "),
+        SemanticIntent::Continue => prompt.push_str("encouraging continuation prompt. "),
+        SemanticIntent::Unknown => prompt.push_str("appropriate response given the context. "),
+    }
+
+    if thought.should_hedge() {
+        prompt.push_str("\nIMPORTANT: Include hedging language to express uncertainty. ");
+        prompt.push_str("Do NOT claim certainty. Use phrases like \"I'm not sure\", ");
+        prompt.push_str("\"possibly\", \"it might be\", or \"I don't know\".\n");
+    }
+
+    let warmth = thought.target_warmth();
+    if warmth > 0.7 {
+        prompt.push_str("\nMaintain a warm, friendly tone.\n");
+    } else if warmth < 0.3 {
+        prompt.push_str("\nMaintain a neutral, professional tone.\n");
+    }
+
+    prompt.push_str("\nRespond ONLY with the translated natural language. ");
+    prompt.push_str("Do not include explanations or meta-commentary.");
+    prompt
 }
 
 fn plan_from_structured_thought(thought: &StructuredThought) -> BrocaTranslationPlan {
@@ -288,6 +334,25 @@ fn corpus() -> Vec<(&'static str, StructuredThought)> {
     ]
 }
 
+fn case(name: &str) -> StructuredThought {
+    corpus()
+        .into_iter()
+        .find(|(case, _)| *case == name)
+        .unwrap_or_else(|| panic!("missing A/B corpus case: {name}"))
+        .1
+}
+
+fn compile_strict(case_name: &str, thought: &StructuredThought) -> HardenedBrocaFidelityPacket {
+    HardenedFidelityBrocaScipAdapter::compile_for_text_peer(
+        &fidelity_plan_from_structured_thought(thought),
+        MOOD_TEMPERATURE,
+        provenance(case_name),
+        &BrocaFidelityExportPolicy::default(),
+        &BrocaFidelityInterchangeLimits::default(),
+    )
+    .expect("strict non-lossy corpus case must compile")
+}
+
 fn visible_concepts(text: &str, thought: &StructuredThought) -> usize {
     thought
         .activated_concepts
@@ -300,12 +365,12 @@ fn ws_tokens(text: &str) -> usize {
     text.split_whitespace().count()
 }
 
-fn evaluate_case(case: &'static str, thought: &StructuredThought) -> EvidenceRow {
-    let legacy_data = thought.to_translation_prompt();
-    let legacy_total = format!("{TRANSLATION_SYSTEM_PROMPT}\n{legacy_data}");
+fn evaluate_case(case_name: &'static str, thought: &StructuredThought) -> EvidenceRow {
+    let legacy_content = legacy_runtime_prompt(thought, MOOD_TEMPERATURE);
+    let legacy_total = format!("{TRANSLATION_SYSTEM_PROMPT}\n{legacy_content}");
     let plan = fidelity_plan_from_structured_thought(thought);
 
-    let policy = if case == "injection-boundary" {
+    let policy = if case_name == "injection-boundary" {
         BrocaFidelityExportPolicy {
             allow_legacy_constraint_loss: true,
             ..Default::default()
@@ -316,8 +381,8 @@ fn evaluate_case(case: &'static str, thought: &StructuredThought) -> EvidenceRow
 
     let result = HardenedFidelityBrocaScipAdapter::compile_for_text_peer(
         &plan,
-        1.0,
-        provenance(case),
+        MOOD_TEMPERATURE,
+        provenance(case_name),
         &policy,
         &BrocaFidelityInterchangeLimits::default(),
     )
@@ -327,8 +392,8 @@ fn evaluate_case(case: &'static str, thought: &StructuredThought) -> EvidenceRow
     let scip_total = format!("{scip_control}\n{scip_data}");
 
     EvidenceRow {
-        case,
-        legacy_data_bytes: legacy_data.len(),
+        case: case_name,
+        legacy_content_bytes: legacy_content.len(),
         legacy_total_bytes: legacy_total.len(),
         scip_data_bytes: scip_data.len(),
         scip_total_bytes: scip_total.len(),
@@ -336,7 +401,7 @@ fn evaluate_case(case: &'static str, thought: &StructuredThought) -> EvidenceRow
         scip_ws_tokens: ws_tokens(&scip_total),
         legacy_private_exposure: legacy_total.contains(PRIVATE_SENTINEL),
         scip_private_exposure: scip_total.contains(PRIVATE_SENTINEL),
-        legacy_concepts_visible: visible_concepts(&legacy_data, thought),
+        legacy_concepts_visible: visible_concepts(&legacy_content, thought),
         scip_concepts_visible: visible_concepts(scip_data, thought),
         scip_faithful: result.audit.faithful_translation,
     }
@@ -344,14 +409,14 @@ fn evaluate_case(case: &'static str, thought: &StructuredThought) -> EvidenceRow
 
 fn print_report(rows: &[EvidenceRow]) {
     println!(
-        "| case | legacy data B | legacy total B | SCIP data B | SCIP total B | legacy ws tok | SCIP ws tok | legacy private | SCIP private | legacy concepts | SCIP concepts | SCIP faithful |"
+        "| case | legacy runtime B | legacy total B | SCIP data B | SCIP total B | legacy ws tok | SCIP ws tok | legacy private | SCIP private | legacy concepts | SCIP concepts | SCIP faithful |"
     );
     println!("|---|---:|---:|---:|---:|---:|---:|:---:|:---:|---:|---:|:---:|");
     for row in rows {
         println!(
             "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
             row.case,
-            row.legacy_data_bytes,
+            row.legacy_content_bytes,
             row.legacy_total_bytes,
             row.scip_data_bytes,
             row.scip_total_bytes,
@@ -370,10 +435,11 @@ fn print_report(rows: &[EvidenceRow]) {
 fn deterministic_translation_ab_evidence() {
     let rows = corpus()
         .iter()
-        .map(|(case, thought)| evaluate_case(case, thought))
+        .map(|(case_name, thought)| evaluate_case(case_name, thought))
         .collect::<Vec<_>>();
     print_report(&rows);
 
+    // Privacy: the runtime legacy prompt carries source wording; SCIP does not.
     let private = rows
         .iter()
         .find(|row| row.case == "rich-domain-private")
@@ -381,6 +447,8 @@ fn deterministic_translation_ab_evidence() {
     assert!(private.legacy_private_exposure);
     assert!(!private.scip_private_exposure);
 
+    // Coverage: legacy hard-caps concept serialization at five; SCIP's default
+    // policy can carry all eight in this controlled case.
     let concepts = rows
         .iter()
         .find(|row| row.case == "eight-concepts")
@@ -388,20 +456,19 @@ fn deterministic_translation_ab_evidence() {
     assert_eq!(concepts.legacy_concepts_visible, 5);
     assert_eq!(concepts.scip_concepts_visible, 8);
 
-    let injection_thought = corpus()
-        .into_iter()
-        .find(|(case, _)| *case == "injection-boundary")
-        .unwrap()
-        .1;
-    let legacy_injection = injection_thought.to_translation_prompt();
+    // Injection boundary: the current legacy system prompt tells the model to
+    // follow free-form constraints. Strict SCIP refuses that semantic mismatch.
+    let injection_thought = case("injection-boundary");
+    let legacy_injection = legacy_runtime_prompt(&injection_thought, MOOD_TEMPERATURE);
     assert!(legacy_injection.contains(CONSTRAINT_SENTINEL));
+    assert!(legacy_injection.contains(PRIVATE_SENTINEL));
     assert!(TRANSLATION_SYSTEM_PROMPT.contains("FOLLOW all constraints"));
 
     let injection_plan = fidelity_plan_from_structured_thought(&injection_thought);
     assert!(
         HardenedFidelityBrocaScipAdapter::compile_for_text_peer(
             &injection_plan,
-            1.0,
+            MOOD_TEMPERATURE,
             provenance("injection-strict"),
             &BrocaFidelityExportPolicy::default(),
             &BrocaFidelityInterchangeLimits::default(),
@@ -410,7 +477,7 @@ fn deterministic_translation_ab_evidence() {
     );
     let allowed = HardenedFidelityBrocaScipAdapter::compile_for_text_peer(
         &injection_plan,
-        1.0,
+        MOOD_TEMPERATURE,
         provenance("injection-allowed"),
         &BrocaFidelityExportPolicy {
             allow_legacy_constraint_loss: true,
@@ -477,45 +544,103 @@ fn deterministic_translation_ab_evidence() {
             .contains("SEMANTIC LOSS CONTROL")
     );
 
-    let rich_domain = corpus()
-        .into_iter()
-        .find(|(case, _)| *case == "rich-domain-private")
-        .unwrap()
-        .1;
-    let legacy_domain = rich_domain.to_translation_prompt();
+    // Epistemic semantics: the current legacy runtime has conflicting Unknown
+    // guidance (strict no-possibilities in system control, generic "it might be"
+    // hedging in query content). SCIP's typed Unknown directive is fail-closed.
+    let unknown = case("unknown");
+    let legacy_unknown = legacy_runtime_prompt(&unknown, MOOD_TEMPERATURE);
+    assert!(TRANSLATION_SYSTEM_PROMPT.contains("DO NOT suggest possibilities"));
+    assert!(legacy_unknown.contains("it might be"));
+    let scip_unknown = compile_strict("unknown-controls", &unknown);
+    assert!(
+        scip_unknown
+            .packet
+            .packet
+            .fallback
+            .system_prompt
+            .contains("Do not provide a factual answer or guess")
+    );
+    assert!(
+        !scip_unknown
+            .packet
+            .packet
+            .fallback
+            .system_prompt
+            .contains("it might be")
+    );
+
+    // Semantic correctness and extension: legacy labels StructuredThought::psi
+    // as phi and omits DomainContext::psi; SCIP names and carries both correctly.
+    let rich_domain = case("rich-domain-private");
+    let legacy_domain = legacy_runtime_prompt(&rich_domain, MOOD_TEMPERATURE);
     assert!(legacy_domain.contains("phi=0.67"));
     assert!(!legacy_domain.contains("0.594321"));
-    let scip_domain = HardenedFidelityBrocaScipAdapter::compile_for_text_peer(
-        &fidelity_plan_from_structured_thought(&rich_domain),
-        1.0,
-        provenance("domain-semantics"),
-        &BrocaFidelityExportPolicy::default(),
-        &BrocaFidelityInterchangeLimits::default(),
-    )
-    .unwrap();
+    let scip_domain = compile_strict("domain-semantics", &rich_domain);
+    let scip_domain_data = &scip_domain.packet.packet.fallback.content;
+    for marker in [
+        "context-psi",
+        "0.594321",
+        "symthaea.broca-cognitive-context/v1",
+        "engineering",
+        "P-17",
+        "P-17 must remain offline",
+        "E3/N1/M2/H3",
+        "Strategic",
+        "MetaCognitive",
+    ] {
+        assert!(scip_domain_data.contains(marker), "missing SCIP domain marker: {marker}");
+    }
+
+    // Structured data remains present in both interfaces.
+    let certain = case("certain-numeric");
+    let legacy_certain = legacy_runtime_prompt(&certain, MOOD_TEMPERATURE);
+    let scip_certain = compile_strict("certain-numeric-semantics", &certain);
+    assert!(legacy_certain.contains("DATA_NUMERIC: 42ms"));
+    assert!(scip_certain.packet.packet.fallback.content.contains("42"));
+    assert!(scip_certain.packet.packet.fallback.content.contains("ms"));
+
+    let list = case("structured-list");
+    let legacy_list = legacy_runtime_prompt(&list, MOOD_TEMPERATURE);
+    let scip_list = compile_strict("structured-list-semantics", &list);
+    for marker in ["alpha-evidence", "beta-evidence", "gamma-evidence"] {
+        assert!(legacy_list.contains(marker));
+        assert!(scip_list.packet.packet.fallback.content.contains(marker));
+    }
+
+    // Relational state is represented as typed renderer control, not peer text.
+    let relational = case("relational");
+    let legacy_relational = legacy_runtime_prompt(&relational, MOOD_TEMPERATURE);
+    let scip_relational = compile_strict("relational-semantics", &relational);
+    assert!(legacy_relational.contains("stage=Attunement"));
+    assert!(legacy_relational.contains("mode=IThou"));
     assert!(
-        scip_domain
+        scip_relational
             .packet
             .packet
             .fallback
-            .content
-            .contains("context-psi")
+            .system_prompt
+            .contains("stage=attunement")
     );
     assert!(
-        scip_domain
+        scip_relational
             .packet
             .packet
             .fallback
-            .content
-            .contains("0.594321")
+            .system_prompt
+            .contains("mode=i-thou")
     );
+
+    // The legacy control plane currently makes a stronger truth claim than the
+    // data contract can establish. SCIP treats computed values as grounded data
+    // and does not label them infallible.
+    assert!(TRANSLATION_SYSTEM_PROMPT.contains("guaranteed correct"));
     assert!(
-        scip_domain
+        !scip_domain
             .packet
             .packet
             .fallback
-            .content
-            .contains("symthaea.broca-cognitive-context/v1")
+            .system_prompt
+            .contains("guaranteed correct")
     );
 
     // Identical source state and provenance must produce identical SCIP identity
@@ -523,7 +648,7 @@ fn deterministic_translation_ab_evidence() {
     let deterministic_plan = fidelity_plan_from_structured_thought(&rich_domain);
     let first = HardenedFidelityBrocaScipAdapter::compile_for_text_peer(
         &deterministic_plan,
-        1.0,
+        MOOD_TEMPERATURE,
         provenance("determinism"),
         &BrocaFidelityExportPolicy::default(),
         &BrocaFidelityInterchangeLimits::default(),
@@ -531,7 +656,7 @@ fn deterministic_translation_ab_evidence() {
     .unwrap();
     let second = HardenedFidelityBrocaScipAdapter::compile_for_text_peer(
         &deterministic_plan,
-        1.0,
+        MOOD_TEMPERATURE,
         provenance("determinism"),
         &BrocaFidelityExportPolicy::default(),
         &BrocaFidelityInterchangeLimits::default(),
@@ -552,12 +677,12 @@ fn code_bearing_thought_is_native_routed_not_scored_as_text_loss() {
         content: "fn main() { println!(\"native\"); }".into(),
     });
 
-    let legacy = thought.to_translation_prompt();
+    let legacy = legacy_runtime_prompt(&thought, MOOD_TEMPERATURE);
     assert!(legacy.contains("DATA_CODE (rust)"));
 
     let result = HardenedFidelityBrocaScipAdapter::compile_for_text_peer(
         &fidelity_plan_from_structured_thought(&thought),
-        1.0,
+        MOOD_TEMPERATURE,
         provenance("code-native-route"),
         &BrocaFidelityExportPolicy::default(),
         &BrocaFidelityInterchangeLimits::default(),
