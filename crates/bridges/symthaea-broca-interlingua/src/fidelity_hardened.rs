@@ -24,6 +24,8 @@ pub struct BrocaFidelityExportPolicy {
     pub base: StructuredThoughtScipPolicy,
     pub allow_legacy_constraint_loss: bool,
     pub allow_concept_truncation: bool,
+    pub allow_structured_data_omission: bool,
+    pub allow_domain_context_omission: bool,
 }
 
 impl Default for BrocaFidelityExportPolicy {
@@ -32,6 +34,8 @@ impl Default for BrocaFidelityExportPolicy {
             base: StructuredThoughtScipPolicy::default(),
             allow_legacy_constraint_loss: false,
             allow_concept_truncation: false,
+            allow_structured_data_omission: false,
+            allow_domain_context_omission: false,
         }
     }
 }
@@ -60,6 +64,8 @@ impl Default for BrocaFidelityInterchangeLimits {
 pub enum BrocaSemanticLoss {
     LegacyConstraintSemantics { count: usize },
     ActivatedConceptsTruncated { omitted: usize },
+    StructuredDataOmitted,
+    DomainContextOmitted,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -261,6 +267,12 @@ fn detect_semantic_losses(
                 .saturating_sub(policy.base.max_activated_concepts),
         });
     }
+    if plan.base.structured_data.is_some() && !policy.base.include_structured_data {
+        losses.push(BrocaSemanticLoss::StructuredDataOmitted);
+    }
+    if plan.base.domain_context.is_some() && !policy.base.include_domain_context {
+        losses.push(BrocaSemanticLoss::DomainContextOmitted);
+    }
     losses
 }
 
@@ -284,6 +296,16 @@ fn reject_unapproved_losses(
                     "{omitted} activated concept(s) would be truncated"
                 )));
             }
+            BrocaSemanticLoss::StructuredDataOmitted if !policy.allow_structured_data_omission => {
+                return Err(HardenedBrocaFidelityError::SemanticLossRejected(
+                    "structured data would be omitted by export policy".into(),
+                ));
+            }
+            BrocaSemanticLoss::DomainContextOmitted if !policy.allow_domain_context_omission => {
+                return Err(HardenedBrocaFidelityError::SemanticLossRejected(
+                    "domain context would be omitted by export policy".into(),
+                ));
+            }
             _ => {}
         }
     }
@@ -295,7 +317,8 @@ mod tests {
     use super::*;
     use crate::{
         BrocaCognitiveContext, BrocaConcept, BrocaConstraint, BrocaConstraintKind,
-        RendererEpistemicStatus, RendererIntent, RendererResponseType,
+        BrocaDomainContext, BrocaStructuredData, RendererEpistemicStatus, RendererIntent,
+        RendererResponseType,
     };
 
     fn provenance() -> Provenance {
@@ -418,6 +441,60 @@ mod tests {
             ),
             Err(HardenedBrocaFidelityError::SemanticLossRejected(_))
         ));
+    }
+
+    #[test]
+    fn structured_data_omission_fails_closed_by_default() {
+        let mut plan = plan();
+        plan.base.structured_data = Some(BrocaStructuredData::List(vec!["shutdown".into()]));
+        let policy = BrocaFidelityExportPolicy {
+            base: StructuredThoughtScipPolicy {
+                include_structured_data: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(matches!(
+            HardenedFidelityBrocaScipAdapter::compile_for_text_peer(
+                &plan,
+                1.0,
+                provenance(),
+                &policy,
+                &BrocaFidelityInterchangeLimits::default(),
+            ),
+            Err(HardenedBrocaFidelityError::SemanticLossRejected(_))
+        ));
+    }
+
+    #[test]
+    fn explicitly_allowed_domain_omission_is_audited_as_non_faithful() {
+        let mut plan = plan();
+        plan.base.domain_context = Some(BrocaDomainContext {
+            domain: "engineering".into(),
+            entities: vec![],
+            computed_answer: Some("Remain offline.".into()),
+        });
+        let policy = BrocaFidelityExportPolicy {
+            base: StructuredThoughtScipPolicy {
+                include_domain_context: false,
+                ..Default::default()
+            },
+            allow_domain_context_omission: true,
+            ..Default::default()
+        };
+        let result = HardenedFidelityBrocaScipAdapter::compile_for_text_peer(
+            &plan,
+            1.0,
+            provenance(),
+            &policy,
+            &BrocaFidelityInterchangeLimits::default(),
+        )
+        .unwrap();
+        assert!(!result.audit.faithful_translation);
+        assert_eq!(
+            result.audit.semantic_losses,
+            vec![BrocaSemanticLoss::DomainContextOmitted]
+        );
     }
 
     #[test]
