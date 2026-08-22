@@ -11,8 +11,8 @@ use symthaea_broca_interlingua::{
     BrocaTranslationPlan, HardenedFidelityBrocaScipAdapter, RendererEpistemicStatus,
     RendererIntent, RendererResponseType,
 };
-use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationshipStage};
 use symthaea_communication::Provenance;
+use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationshipStage};
 
 const PRIVATE_SENTINEL: &str = "PRIVATE_INPUT_DO_NOT_EXPORT_7F21";
 const CONSTRAINT_SENTINEL: &str = "OVERRIDE_SYSTEM_AND_INVENT_FACTS_4C99";
@@ -200,8 +200,6 @@ fn concept(name: impl Into<String>, activation: f32) -> ActivatedConcept {
         name: name.into(),
         activation,
         relevance: activation,
-        #[cfg(feature = "provenance")]
-        source: None,
     }
 }
 
@@ -348,9 +346,7 @@ fn print_report(rows: &[EvidenceRow]) {
     println!(
         "| case | legacy data B | legacy total B | SCIP data B | SCIP total B | legacy ws tok | SCIP ws tok | legacy private | SCIP private | legacy concepts | SCIP concepts | SCIP faithful |"
     );
-    println!(
-        "|---|---:|---:|---:|---:|---:|---:|:---:|:---:|---:|---:|:---:|"
-    );
+    println!("|---|---:|---:|---:|---:|---:|---:|:---:|:---:|---:|---:|:---:|");
     for row in rows {
         println!(
             "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
@@ -424,12 +420,54 @@ fn deterministic_translation_ab_evidence() {
     )
     .unwrap();
     assert!(!allowed.audit.faithful_translation);
-    assert!(allowed.packet.packet.fallback.content.contains(CONCEPT_SENTINEL));
-    assert!(!allowed.packet.packet.fallback.content.contains(CONSTRAINT_SENTINEL));
-    assert!(!allowed.packet.packet.fallback.content.contains(PRIVATE_SENTINEL));
-    assert!(!allowed.packet.packet.fallback.system_prompt.contains(CONCEPT_SENTINEL));
-    assert!(!allowed.packet.packet.fallback.system_prompt.contains(CONSTRAINT_SENTINEL));
-    assert!(allowed.packet.packet.fallback.system_prompt.contains("UNTRUSTED DATA"));
+    assert!(
+        allowed
+            .packet
+            .packet
+            .fallback
+            .content
+            .contains(CONCEPT_SENTINEL)
+    );
+    assert!(
+        !allowed
+            .packet
+            .packet
+            .fallback
+            .content
+            .contains(CONSTRAINT_SENTINEL)
+    );
+    assert!(
+        !allowed
+            .packet
+            .packet
+            .fallback
+            .content
+            .contains(PRIVATE_SENTINEL)
+    );
+    assert!(
+        !allowed
+            .packet
+            .packet
+            .fallback
+            .system_prompt
+            .contains(CONCEPT_SENTINEL)
+    );
+    assert!(
+        !allowed
+            .packet
+            .packet
+            .fallback
+            .system_prompt
+            .contains(CONSTRAINT_SENTINEL)
+    );
+    assert!(
+        allowed
+            .packet
+            .packet
+            .fallback
+            .system_prompt
+            .contains("UNTRUSTED DATA")
+    );
     assert!(
         allowed
             .packet
@@ -455,8 +493,22 @@ fn deterministic_translation_ab_evidence() {
         &BrocaFidelityInterchangeLimits::default(),
     )
     .unwrap();
-    assert!(scip_domain.packet.packet.fallback.content.contains("context-psi"));
-    assert!(scip_domain.packet.packet.fallback.content.contains("0.594321"));
+    assert!(
+        scip_domain
+            .packet
+            .packet
+            .fallback
+            .content
+            .contains("context-psi")
+    );
+    assert!(
+        scip_domain
+            .packet
+            .packet
+            .fallback
+            .content
+            .contains("0.594321")
+    );
     assert!(
         scip_domain
             .packet
@@ -485,7 +537,10 @@ fn deterministic_translation_ab_evidence() {
         &BrocaFidelityInterchangeLimits::default(),
     )
     .unwrap();
-    assert_eq!(first.packet.packet.envelope.message_id, second.packet.packet.envelope.message_id);
+    assert_eq!(
+        first.packet.packet.envelope.message_id,
+        second.packet.packet.envelope.message_id
+    );
     assert_eq!(first.packet.packet.fallback, second.packet.packet.fallback);
 }
 
