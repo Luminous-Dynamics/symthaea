@@ -186,6 +186,13 @@ pub(crate) fn enrich_graph_with_fidelity(
 ) -> Result<(), BrocaScipError> {
     validate_fidelity_context(plan)?;
 
+    add_property(
+        graph,
+        "context-profile",
+        BROCA_FIDELITY_CONTEXT_V1,
+        "has-cognitive-context-profile",
+        1.0,
+    );
     add_numeric_property(graph, "context-psi", plan.context.psi, "has-psi")?;
     add_numeric_property(
         graph,
@@ -489,6 +496,7 @@ mod tests {
             .iter()
             .filter_map(|node| node.label.as_deref())
             .collect::<Vec<_>>();
+        assert!(labels.contains(&BROCA_FIDELITY_CONTEXT_V1));
         assert!(labels.contains(&"attunement"));
         assert!(labels.contains(&"i-thou"));
         assert!(labels.contains(&"Strategic"));
