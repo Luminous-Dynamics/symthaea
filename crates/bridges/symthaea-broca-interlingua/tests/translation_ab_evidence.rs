@@ -588,7 +588,10 @@ fn deterministic_translation_ab_evidence() {
         "Strategic",
         "MetaCognitive",
     ] {
-        assert!(scip_domain_data.contains(marker), "missing SCIP domain marker: {marker}");
+        assert!(
+            scip_domain_data.contains(marker),
+            "missing SCIP domain marker: {marker}"
+        );
     }
 
     // Structured data remains present in both interfaces.
