@@ -48,7 +48,10 @@ pub struct BrocaConcept {
 pub enum BrocaStructuredData {
     List(Vec<String>),
     KeyValue(Vec<(String, String)>),
-    Numeric { value: f64, unit: Option<String> },
+    Numeric {
+        value: f64,
+        unit: Option<String>,
+    },
     /// Marker only. Code itself remains on the existing code path.
     Code,
 }
