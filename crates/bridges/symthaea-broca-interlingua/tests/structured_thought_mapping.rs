@@ -98,15 +98,19 @@ fn plan_from_structured_thought(thought: &StructuredThought) -> BrocaTranslation
 }
 
 fn thought() -> StructuredThought {
-    let mut thought = StructuredThought::default();
-    thought.semantic_intent = SemanticIntent::Answer;
-    thought.response_type = ResponseType::Statement;
-    thought.epistemic_status = EpistemicStatus::Probable;
-    thought.meta_awareness = 0.8;
-    thought.coherence = 0.9;
-    thought.emotional_tone.warmth = 0.75;
-    thought.original_input = Some("private utterance A".into());
-    thought
+    StructuredThought {
+        semantic_intent: SemanticIntent::Answer,
+        response_type: ResponseType::Statement,
+        epistemic_status: EpistemicStatus::Probable,
+        meta_awareness: 0.8,
+        coherence: 0.9,
+        emotional_tone: symthaea::mind::EmotionalTone {
+            warmth: 0.75,
+            ..Default::default()
+        },
+        original_input: Some("private utterance A".into()),
+        ..Default::default()
+    }
 }
 
 #[test]
