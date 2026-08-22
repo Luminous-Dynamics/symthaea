@@ -7,16 +7,19 @@
 //! without this bridge depending back on the root crate, avoiding a dependency
 //! cycle when `LLMOrgan` integration is added later.
 //!
-//! Prefer [`HardenedBrocaScipAdapter`] at peer-facing boundaries. It applies
-//! pre-allocation resource ceilings and returns an explicit export/redaction
-//! audit in addition to the SCIP packet.
+//! Prefer [`HardenedBrocaScipAdapter`] at the v1 peer-facing boundary. Richer
+//! cognitive state is layered additively through [`BrocaFidelityPlan`] and
+//! [`FidelityBrocaScipAdapter`] so the stable v1 plan does not need a breaking
+//! expansion.
 
 #![forbid(unsafe_code)]
 
 mod bridge;
+mod fidelity;
 mod hardened;
 mod plan;
 
 pub use bridge::*;
+pub use fidelity::*;
 pub use hardened::*;
 pub use plan::*;
