@@ -14,16 +14,19 @@ use symthaea_interlingua::graph_semantic_hash;
 /// It intentionally lives in tests today: production dependency direction stays
 /// `symthaea -> bridge`-capable instead of `bridge -> symthaea`.
 fn plan_from_structured_thought(thought: &StructuredThought) -> BrocaTranslationPlan {
-    let structured_data = thought.structured_data.as_ref().and_then(|data| match data {
-        StructuredData::List(items) => Some(BrocaStructuredData::List(items.clone())),
-        StructuredData::KeyValue(items) => Some(BrocaStructuredData::KeyValue(items.clone())),
-        StructuredData::Numeric { value, unit } => Some(BrocaStructuredData::Numeric {
-            value: *value,
-            unit: unit.clone(),
-        }),
-        StructuredData::Code { .. } => Some(BrocaStructuredData::Code),
-        StructuredData::None => None,
-    });
+    let structured_data = thought
+        .structured_data
+        .as_ref()
+        .and_then(|data| match data {
+            StructuredData::List(items) => Some(BrocaStructuredData::List(items.clone())),
+            StructuredData::KeyValue(items) => Some(BrocaStructuredData::KeyValue(items.clone())),
+            StructuredData::Numeric { value, unit } => Some(BrocaStructuredData::Numeric {
+                value: *value,
+                unit: unit.clone(),
+            }),
+            StructuredData::Code { .. } => Some(BrocaStructuredData::Code),
+            StructuredData::None => None,
+        });
 
     BrocaTranslationPlan {
         intent: match thought.semantic_intent {
@@ -64,19 +67,22 @@ fn plan_from_structured_thought(thought: &StructuredThought) -> BrocaTranslation
             })
             .collect(),
         structured_data,
-        domain_context: thought.domain_context.as_ref().map(|domain| BrocaDomainContext {
-            domain: domain.domain.clone(),
-            entities: domain
-                .entities
-                .iter()
-                .map(|(entity_type, value, confidence)| BrocaEntity {
-                    entity_type: entity_type.clone(),
-                    value: value.clone(),
-                    confidence: *confidence,
-                })
-                .collect(),
-            computed_answer: domain.computed_answer.clone(),
-        }),
+        domain_context: thought
+            .domain_context
+            .as_ref()
+            .map(|domain| BrocaDomainContext {
+                domain: domain.domain.clone(),
+                entities: domain
+                    .entities
+                    .iter()
+                    .map(|(entity_type, value, confidence)| BrocaEntity {
+                        entity_type: entity_type.clone(),
+                        value: value.clone(),
+                        confidence: *confidence,
+                    })
+                    .collect(),
+                computed_answer: domain.computed_answer.clone(),
+            }),
         constraints: thought
             .constraints
             .iter()
@@ -118,7 +124,12 @@ fn real_structured_thought_maps_to_valid_grounded_plan() {
     let plan = plan_from_structured_thought(&thought());
     let graph = StructuredThoughtScipAdapter::graph(&plan, &StructuredThoughtScipPolicy::default())
         .expect("mapped real StructuredThought should produce a grounded graph");
-    assert!(graph.nodes.iter().any(|node| node.label.as_deref() == Some("answer")));
+    assert!(
+        graph
+            .nodes
+            .iter()
+            .any(|node| node.label.as_deref() == Some("answer"))
+    );
     assert!(graph.nodes[0].grounded_by[0].starts_with("redacted-broca-export:"));
 }
 
@@ -128,16 +139,12 @@ fn redacted_real_thought_input_does_not_change_semantic_hash() {
     let mut second = first.clone();
     second.original_input = Some("private utterance B".into());
     let policy = StructuredThoughtScipPolicy::default();
-    let first_graph = StructuredThoughtScipAdapter::graph(
-        &plan_from_structured_thought(&first),
-        &policy,
-    )
-    .unwrap();
-    let second_graph = StructuredThoughtScipAdapter::graph(
-        &plan_from_structured_thought(&second),
-        &policy,
-    )
-    .unwrap();
+    let first_graph =
+        StructuredThoughtScipAdapter::graph(&plan_from_structured_thought(&first), &policy)
+            .unwrap();
+    let second_graph =
+        StructuredThoughtScipAdapter::graph(&plan_from_structured_thought(&second), &policy)
+            .unwrap();
     assert_eq!(
         graph_semantic_hash(&first_graph).unwrap(),
         graph_semantic_hash(&second_graph).unwrap()
@@ -153,9 +160,8 @@ fn real_code_structured_data_maps_to_native_path_marker() {
     });
     let plan = plan_from_structured_thought(&thought);
     assert!(plan.code_bearing);
-    assert!(StructuredThoughtScipAdapter::graph(
-        &plan,
-        &StructuredThoughtScipPolicy::default()
-    )
-    .is_err());
+    assert!(
+        StructuredThoughtScipAdapter::graph(&plan, &StructuredThoughtScipPolicy::default())
+            .is_err()
+    );
 }
