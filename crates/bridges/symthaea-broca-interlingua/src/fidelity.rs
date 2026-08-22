@@ -1,6 +1,8 @@
 use std::fmt::Write as _;
 
-use symthaea_communication::{ConceptEdge, ConceptKind, ConceptNode, GroundedConceptGraph, Provenance};
+use symthaea_communication::{
+    ConceptEdge, ConceptKind, ConceptNode, GroundedConceptGraph, Provenance,
+};
 use symthaea_interlingua::{
     CognitiveEnvelope, LlmFallbackMode, LlmTextFallback, graph_semantic_hash,
 };
@@ -98,7 +100,7 @@ pub struct BrocaFidelityRendererContext {
 }
 
 impl BrocaFidelityRendererContext {
-    fn from_plan(plan: &BrocaFidelityPlan) -> Result<Self, BrocaScipError> {
+    pub(crate) fn from_plan(plan: &BrocaFidelityPlan) -> Result<Self, BrocaScipError> {
         validate_fidelity_context(plan)?;
         Ok(Self {
             valence: plan.context.valence,
@@ -142,92 +144,8 @@ impl FidelityBrocaScipAdapter {
         plan: &BrocaFidelityPlan,
         policy: &StructuredThoughtScipPolicy,
     ) -> Result<GroundedConceptGraph, BrocaScipError> {
-        validate_fidelity_context(plan)?;
         let mut graph = StructuredThoughtScipAdapter::graph(&plan.base, policy)?;
-
-        add_numeric_property(&mut graph, "context-psi", plan.context.psi, "has-psi")?;
-        add_numeric_property(
-            &mut graph,
-            "context-meta-awareness",
-            plan.base.meta_awareness,
-            "has-meta-awareness",
-        )?;
-        add_numeric_property(
-            &mut graph,
-            "context-coherence",
-            plan.base.coherence,
-            "has-coherence",
-        )?;
-        add_numeric_property(
-            &mut graph,
-            "context-affect-valence",
-            plan.context.valence,
-            "has-affect-valence",
-        )?;
-        add_numeric_property(
-            &mut graph,
-            "context-affect-arousal",
-            plan.context.arousal,
-            "has-affect-arousal",
-        )?;
-        add_numeric_property(
-            &mut graph,
-            "context-affect-warmth",
-            plan.base.warmth,
-            "has-affect-warmth",
-        )?;
-        add_property(
-            &mut graph,
-            "context-relationship-stage",
-            relationship_stage_name(plan.context.relationship_stage),
-            "has-relationship-stage",
-            1.0,
-        );
-        add_property(
-            &mut graph,
-            "context-relation-mode",
-            relation_mode_name(plan.context.relation_mode),
-            "has-relation-mode",
-            1.0,
-        );
-        add_numeric_property(
-            &mut graph,
-            "context-trust",
-            f64::from(plan.context.trust),
-            "has-trust",
-        )?;
-
-        for (index, tier) in plan.context.primitive_tiers.iter().enumerate() {
-            let id = format!("context-primitive-tier-{index:04}");
-            graph.nodes.push(ConceptNode {
-                id: id.clone(),
-                kind: ConceptKind::Property,
-                label: Some(tier.clone()),
-                grounded_by: vec![format!("broca-cognitive-context:primitive-tier:{index}")],
-                confidence: 1.0,
-            });
-            graph.edges.push(edge("thought", "has-primitive-tier", &id, 1.0));
-        }
-
-        if let Some(cube) = plan.context.domain_epistemic_cube {
-            add_property(
-                &mut graph,
-                "context-domain-epistemic-cube",
-                &epistemic_cube_label(cube),
-                "has-domain-epistemic-cube",
-                1.0,
-            );
-        }
-        if let Some(domain_psi) = plan.context.domain_psi {
-            add_numeric_property(
-                &mut graph,
-                "context-domain-psi",
-                domain_psi,
-                "has-domain-psi",
-            )?;
-        }
-
-        refresh_auto_grounding(&mut graph)?;
+        enrich_graph_with_fidelity(plan, &mut graph)?;
         Ok(graph)
     }
 
@@ -240,36 +158,13 @@ impl FidelityBrocaScipAdapter {
         let renderer = BrocaRendererPolicy::from_plan(&plan.base, mood_temperature)?;
         let renderer_context = BrocaFidelityRendererContext::from_plan(plan)?;
         let graph = Self::graph(plan, policy)?;
-        if !provenance
-            .transformations
-            .iter()
-            .any(|item| item == BROCA_SCIP_TRANSFORM_V1)
-        {
-            provenance
-                .transformations
-                .push(BROCA_SCIP_TRANSFORM_V1.into());
-        }
-        if !provenance
-            .transformations
-            .iter()
-            .any(|item| item == BROCA_FIDELITY_TRANSFORM_V1)
-        {
-            provenance
-                .transformations
-                .push(BROCA_FIDELITY_TRANSFORM_V1.into());
-        }
+        append_fidelity_transforms(&mut provenance);
 
         let confidence = plan.base.meta_awareness.min(plan.base.coherence) as f32;
         let envelope = CognitiveEnvelope::from_graph(graph, confidence, provenance)?;
         let mut fallback =
             LlmTextFallback::compile(&envelope, None, LlmFallbackMode::FaithfulTranslation)?;
-        fallback.system_prompt.push_str("\n\n");
-        fallback
-            .system_prompt
-            .push_str(&renderer.system_directive());
-        fallback
-            .system_prompt
-            .push_str(&renderer_context.system_directive());
+        append_renderer_directives(&mut fallback.system_prompt, renderer, renderer_context);
 
         Ok(BrocaFidelityPacket {
             packet: BrocaScipPacket {
@@ -282,7 +177,124 @@ impl FidelityBrocaScipAdapter {
     }
 }
 
-fn validate_fidelity_context(plan: &BrocaFidelityPlan) -> Result<(), BrocaScipError> {
+/// Enrich a graph that has already been constructed and bounded by the v1
+/// adapter. This is `pub(crate)` so the hardened fidelity wrapper can reuse the
+/// exact graph rather than allocating/building it twice.
+pub(crate) fn enrich_graph_with_fidelity(
+    plan: &BrocaFidelityPlan,
+    graph: &mut GroundedConceptGraph,
+) -> Result<(), BrocaScipError> {
+    validate_fidelity_context(plan)?;
+
+    add_numeric_property(graph, "context-psi", plan.context.psi, "has-psi")?;
+    add_numeric_property(
+        graph,
+        "context-meta-awareness",
+        plan.base.meta_awareness,
+        "has-meta-awareness",
+    )?;
+    add_numeric_property(
+        graph,
+        "context-coherence",
+        plan.base.coherence,
+        "has-coherence",
+    )?;
+    add_numeric_property(
+        graph,
+        "context-affect-valence",
+        plan.context.valence,
+        "has-affect-valence",
+    )?;
+    add_numeric_property(
+        graph,
+        "context-affect-arousal",
+        plan.context.arousal,
+        "has-affect-arousal",
+    )?;
+    add_numeric_property(
+        graph,
+        "context-affect-warmth",
+        plan.base.warmth,
+        "has-affect-warmth",
+    )?;
+    add_property(
+        graph,
+        "context-relationship-stage",
+        relationship_stage_name(plan.context.relationship_stage),
+        "has-relationship-stage",
+        1.0,
+    );
+    add_property(
+        graph,
+        "context-relation-mode",
+        relation_mode_name(plan.context.relation_mode),
+        "has-relation-mode",
+        1.0,
+    );
+    add_numeric_property(
+        graph,
+        "context-trust",
+        f64::from(plan.context.trust),
+        "has-trust",
+    )?;
+
+    for (index, tier) in plan.context.primitive_tiers.iter().enumerate() {
+        let id = format!("context-primitive-tier-{index:04}");
+        graph.nodes.push(ConceptNode {
+            id: id.clone(),
+            kind: ConceptKind::Property,
+            label: Some(tier.clone()),
+            grounded_by: vec![format!("broca-cognitive-context:primitive-tier:{index}")],
+            confidence: 1.0,
+        });
+        graph.edges.push(edge("thought", "has-primitive-tier", &id, 1.0));
+    }
+
+    if let Some(cube) = plan.context.domain_epistemic_cube {
+        add_property(
+            graph,
+            "context-domain-epistemic-cube",
+            &epistemic_cube_label(cube),
+            "has-domain-epistemic-cube",
+            1.0,
+        );
+    }
+    if let Some(domain_psi) = plan.context.domain_psi {
+        add_numeric_property(
+            graph,
+            "context-domain-psi",
+            domain_psi,
+            "has-domain-psi",
+        )?;
+    }
+
+    refresh_auto_grounding(graph)?;
+    Ok(())
+}
+
+pub(crate) fn append_fidelity_transforms(provenance: &mut Provenance) {
+    for transform in [BROCA_SCIP_TRANSFORM_V1, BROCA_FIDELITY_TRANSFORM_V1] {
+        if !provenance
+            .transformations
+            .iter()
+            .any(|item| item == transform)
+        {
+            provenance.transformations.push(transform.into());
+        }
+    }
+}
+
+pub(crate) fn append_renderer_directives(
+    system_prompt: &mut String,
+    renderer: BrocaRendererPolicy,
+    renderer_context: BrocaFidelityRendererContext,
+) {
+    system_prompt.push_str("\n\n");
+    system_prompt.push_str(&renderer.system_directive());
+    system_prompt.push_str(&renderer_context.system_directive());
+}
+
+pub(crate) fn validate_fidelity_context(plan: &BrocaFidelityPlan) -> Result<(), BrocaScipError> {
     checked_unit(plan.context.psi, "psi")?;
     checked_range(plan.context.valence, -1.0, 1.0, "affective valence")?;
     checked_unit(plan.context.arousal, "affective arousal")?;
@@ -290,16 +302,15 @@ fn validate_fidelity_context(plan: &BrocaFidelityPlan) -> Result<(), BrocaScipEr
     if let Some(domain_psi) = plan.context.domain_psi {
         checked_unit(domain_psi, "domain psi")?;
     }
-    if let Some(cube) = plan.context.domain_epistemic_cube {
-        if cube.empirical > 4
+    if let Some(cube) = plan.context.domain_epistemic_cube
+        && (cube.empirical > 4
             || cube.normative > 3
             || cube.materiality > 3
-            || cube.harmonic.is_some_and(|value| value > 4)
-        {
-            return Err(BrocaScipError::InvalidPlan(
-                "epistemic cube tier is outside its defined range".into(),
-            ));
-        }
+            || cube.harmonic.is_some_and(|value| value > 4))
+    {
+        return Err(BrocaScipError::InvalidPlan(
+            "epistemic cube tier is outside its defined range".into(),
+        ));
     }
     Ok(())
 }
@@ -511,21 +522,19 @@ mod tests {
     fn invalid_epistemic_cube_is_rejected() {
         let mut plan = plan();
         plan.context.domain_epistemic_cube.as_mut().unwrap().empirical = 5;
-        assert!(FidelityBrocaScipAdapter::graph(
-            &plan,
-            &StructuredThoughtScipPolicy::default()
-        )
-        .is_err());
+        assert!(
+            FidelityBrocaScipAdapter::graph(&plan, &StructuredThoughtScipPolicy::default())
+                .is_err()
+        );
     }
 
     #[test]
     fn invalid_affect_is_rejected_before_export() {
         let mut plan = plan();
         plan.context.valence = f64::NAN;
-        assert!(FidelityBrocaScipAdapter::graph(
-            &plan,
-            &StructuredThoughtScipPolicy::default()
-        )
-        .is_err());
+        assert!(
+            FidelityBrocaScipAdapter::graph(&plan, &StructuredThoughtScipPolicy::default())
+                .is_err()
+        );
     }
 }
