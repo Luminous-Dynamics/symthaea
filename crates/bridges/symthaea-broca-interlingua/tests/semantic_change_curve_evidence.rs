@@ -269,7 +269,11 @@ fn measure_case(base_graph: &GroundedConceptGraph, case: ChangeCase) -> ChangeRo
 
     let base_hash = graph_semantic_hash(base_graph).unwrap();
     let target_hash = graph_semantic_hash(&target_graph).unwrap();
-    assert_ne!(base_hash, target_hash, "{} must change semantic state", case.name);
+    assert_ne!(
+        base_hash, target_hash,
+        "{} must change semantic state",
+        case.name
+    );
 
     let graph_bytes = canonical_graph_bytes(&target_graph).unwrap().len();
     let delta = GraphDelta::between(base_graph, &target_graph).unwrap();
@@ -376,7 +380,9 @@ fn deterministic_semantic_change_curve_evidence() {
         .map(|case| measure_case(&base_graph, case))
         .collect::<Vec<_>>();
 
-    println!("| semantic change | graph B | delta B | delta/full | -nodes | +nodes | -edges | +edges | planner |");
+    println!(
+        "| semantic change | graph B | delta B | delta/full | -nodes | +nodes | -edges | +edges | planner |"
+    );
     println!("|---|---:|---:|---:|---:|---:|---:|---:|---|");
     for row in &rows {
         println!(
