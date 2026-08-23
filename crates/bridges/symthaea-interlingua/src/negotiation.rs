@@ -20,6 +20,13 @@ pub struct PeerCapabilities {
     pub representations: Vec<InterchangeRepresentation>,
     pub hdc_profiles: Vec<HdcProfile>,
     pub sparse_hdc_deltas: bool,
+    /// Support exact `GraphDelta` synchronization when an exact grounded
+    /// representation is also shared by the session.
+    ///
+    /// `serde(default)` keeps older SCIP v1 capability advertisements readable;
+    /// absence means the peer did not advertise this optional capability.
+    #[serde(default)]
+    pub exact_graph_deltas: bool,
     pub semantic_references: bool,
 }
 
@@ -35,6 +42,7 @@ impl PeerCapabilities {
             ],
             hdc_profiles: vec![GroundedHdcCodec::standard().profile().clone()],
             sparse_hdc_deltas: true,
+            exact_graph_deltas: true,
             semantic_references: true,
         }
     }
@@ -49,6 +57,7 @@ impl PeerCapabilities {
             ],
             hdc_profiles: vec![],
             sparse_hdc_deltas: false,
+            exact_graph_deltas: true,
             semantic_references: true,
         }
     }
@@ -59,6 +68,7 @@ impl PeerCapabilities {
             representations: vec![InterchangeRepresentation::HumanText],
             hdc_profiles: vec![],
             sparse_hdc_deltas: false,
+            exact_graph_deltas: false,
             semantic_references: false,
         }
     }
@@ -150,6 +160,10 @@ pub struct NegotiatedSession {
     pub representation: InterchangeRepresentation,
     pub hdc_profile: Option<HdcProfile>,
     pub sparse_hdc_deltas: bool,
+    /// Exact canonical graph deltas are available only when both peers advertise
+    /// them and the session shares at least one exact grounded representation.
+    #[serde(default)]
+    pub exact_graph_deltas: bool,
     pub semantic_references: bool,
     /// Complete common representation set, ordered by SCIP preference.
     pub shared_representations: Vec<InterchangeRepresentation>,
@@ -187,9 +201,10 @@ pub fn negotiate_with_policy(
     let both_advertise_hdc = supports(&InterchangeRepresentation::Hdc);
     let shared_hdc_profile = if both_advertise_hdc {
         local.hdc_profiles.iter().find(|local_profile| {
-            remote.hdc_profiles.iter().any(|remote_profile| {
-                profiles_match(local_profile, remote_profile)
-            })
+            remote
+                .hdc_profiles
+                .iter()
+                .any(|remote_profile| profiles_match(local_profile, remote_profile))
         })
     } else {
         None
@@ -231,6 +246,12 @@ pub fn negotiate_with_policy(
         .ok_or(InterchangeError::NegotiationFailed)?;
     let hdc_profile = shared_hdc_profile.cloned();
     let hdc_downgraded = both_advertise_hdc && hdc_profile.is_none();
+    let shares_exact_grounded_representation = shared_representations.iter().any(|representation| {
+        matches!(
+            representation,
+            InterchangeRepresentation::GroundedGraph | InterchangeRepresentation::StructuredJson
+        )
+    });
 
     Ok(NegotiatedSession {
         version,
@@ -239,6 +260,9 @@ pub fn negotiate_with_policy(
         sparse_hdc_deltas: shared_hdc_profile.is_some()
             && local.sparse_hdc_deltas
             && remote.sparse_hdc_deltas,
+        exact_graph_deltas: shares_exact_grounded_representation
+            && local.exact_graph_deltas
+            && remote.exact_graph_deltas,
         semantic_references: local.semantic_references && remote.semantic_references,
         shared_representations,
         hdc_downgraded,
@@ -268,18 +292,66 @@ mod tests {
     use super::*;
 
     #[test]
-    fn identical_symthaea_peers_choose_hdc() {
+    fn identical_symthaea_peers_choose_hdc_and_exact_graph_delta_support() {
         let caps = PeerCapabilities::symthaea_default();
         let session = negotiate(&caps, &caps).unwrap();
         assert_eq!(session.representation, InterchangeRepresentation::Hdc);
         assert!(session.hdc_profile.is_some());
         assert!(session.sparse_hdc_deltas);
+        assert!(session.exact_graph_deltas);
         assert!(!session.hdc_downgraded);
         assert!(
             session
                 .shared_representations
                 .contains(&InterchangeRepresentation::GroundedGraph)
         );
+    }
+
+    #[test]
+    fn structured_peers_negotiate_exact_graph_deltas_without_hdc_deltas() {
+        let caps = PeerCapabilities::structured_only();
+        let session = negotiate(&caps, &caps).unwrap();
+        assert_eq!(
+            session.representation,
+            InterchangeRepresentation::GroundedGraph
+        );
+        assert!(!session.sparse_hdc_deltas);
+        assert!(session.exact_graph_deltas);
+    }
+
+    #[test]
+    fn exact_graph_deltas_require_an_exact_grounded_shared_representation() {
+        let mut local = PeerCapabilities::symthaea_default();
+        local.representations = vec![InterchangeRepresentation::Hdc];
+        let mut remote = local.clone();
+        remote.exact_graph_deltas = true;
+
+        let session = negotiate(&local, &remote).unwrap();
+        assert_eq!(session.representation, InterchangeRepresentation::Hdc);
+        assert!(session.sparse_hdc_deltas);
+        assert!(!session.exact_graph_deltas);
+    }
+
+    #[test]
+    fn exact_graph_deltas_require_bilateral_advertisement() {
+        let local = PeerCapabilities::structured_only();
+        let mut remote = PeerCapabilities::structured_only();
+        remote.exact_graph_deltas = false;
+
+        let session = negotiate(&local, &remote).unwrap();
+        assert!(!session.exact_graph_deltas);
+    }
+
+    #[test]
+    fn missing_exact_graph_delta_field_defaults_to_not_advertised() {
+        let mut encoded = serde_json::to_value(PeerCapabilities::structured_only()).unwrap();
+        encoded
+            .as_object_mut()
+            .unwrap()
+            .remove("exact_graph_deltas");
+
+        let decoded: PeerCapabilities = serde_json::from_value(encoded).unwrap();
+        assert!(!decoded.exact_graph_deltas);
     }
 
     #[test]
@@ -295,6 +367,7 @@ mod tests {
         );
         assert!(session.hdc_profile.is_none());
         assert!(session.hdc_downgraded);
+        assert!(session.exact_graph_deltas);
     }
 
     #[test]
@@ -335,6 +408,7 @@ mod tests {
         let remote = PeerCapabilities::text_only();
         let session = negotiate(&local, &remote).unwrap();
         assert_eq!(session.representation, InterchangeRepresentation::HumanText);
+        assert!(!session.exact_graph_deltas);
 
         assert!(
             negotiate_with_policy(
