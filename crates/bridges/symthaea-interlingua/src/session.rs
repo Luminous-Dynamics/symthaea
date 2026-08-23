@@ -10,8 +10,9 @@
 
 use crate::protocol::require_content_hash;
 use crate::{
-    GraphDelta, InterchangeError, InterchangeRepresentation, NegotiatedSession, ProjectionCandidate,
-    SemanticReference, TransferPlanningInput, canonical_graph_bytes, graph_semantic_hash,
+    GraphDelta, InterchangeError, InterchangeRepresentation, NegotiatedSession,
+    ProjectionCandidate, SemanticReference, TransferPlanningInput, canonical_graph_bytes,
+    graph_semantic_hash,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -103,10 +104,6 @@ impl PeerSemanticInventory {
         Ok(self.semantic_hashes.insert(ack.semantic_hash.clone()))
     }
 
-    pub fn record_graph(&mut self, graph: &GroundedConceptGraph) -> Result<bool, InterchangeError> {
-        self.record_ack(&SemanticCacheAck::from_graph(graph)?)
-    }
-
     pub fn contains(&self, semantic_hash: &str) -> bool {
         self.semantic_hashes.contains(semantic_hash)
     }
@@ -192,15 +189,14 @@ pub fn build_grounded_transfer_input(
         None
     };
 
-    let human_text_bytes = human_text_bytes
-        .filter(|_| shares(&InterchangeRepresentation::HumanText));
-    let projection_candidates = if session.hdc_profile.is_some()
-        && shares(&InterchangeRepresentation::Hdc)
-    {
-        projection_candidates
-    } else {
-        Vec::new()
-    };
+    let human_text_bytes =
+        human_text_bytes.filter(|_| shares(&InterchangeRepresentation::HumanText));
+    let projection_candidates =
+        if session.hdc_profile.is_some() && shares(&InterchangeRepresentation::Hdc) {
+            projection_candidates
+        } else {
+            Vec::new()
+        };
 
     Ok(TransferPlanningInput {
         semantic_reference_bytes,
@@ -252,6 +248,15 @@ mod tests {
         let mut target = graph();
         target.nodes[0].confidence = 0.82;
         target
+    }
+
+    fn acknowledge(
+        inventory: &mut PeerSemanticInventory,
+        graph: &GroundedConceptGraph,
+    ) -> Result<(), InterchangeError> {
+        let ack = SemanticCacheAck::from_graph(graph)?;
+        inventory.record_ack(&ack)?;
+        Ok(())
     }
 
     #[test]
@@ -309,7 +314,7 @@ mod tests {
         let target = target_graph();
         let delta = GraphDelta::between(&base, &target).unwrap();
         let mut inventory = PeerSemanticInventory::default();
-        inventory.record_graph(&base).unwrap();
+        acknowledge(&mut inventory, &base).unwrap();
 
         let delta_input = build_grounded_transfer_input(
             &session,
@@ -329,7 +334,7 @@ mod tests {
             SemanticTransferMode::GraphDelta
         );
 
-        inventory.record_graph(&target).unwrap();
+        acknowledge(&mut inventory, &target).unwrap();
         let reference_input = build_grounded_transfer_input(
             &session,
             &inventory,
@@ -360,7 +365,7 @@ mod tests {
         other_target.nodes[1].confidence = 0.55;
         let delta = GraphDelta::between(&base, &other_target).unwrap();
         let mut inventory = PeerSemanticInventory::default();
-        inventory.record_graph(&base).unwrap();
+        acknowledge(&mut inventory, &base).unwrap();
 
         assert!(matches!(
             build_grounded_transfer_input(
@@ -383,7 +388,7 @@ mod tests {
         let target = target_graph();
         let delta = GraphDelta::between(&base, &target).unwrap();
         let mut inventory = PeerSemanticInventory::default();
-        inventory.record_graph(&base).unwrap();
+        acknowledge(&mut inventory, &base).unwrap();
 
         let input = build_grounded_transfer_input(
             &session,
