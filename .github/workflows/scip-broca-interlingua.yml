@@ -52,5 +52,8 @@ jobs:
       - name: Emit deterministic translation A/B evidence
         run: cargo test -p symthaea-broca-interlingua --test translation_ab_evidence -- --nocapture
 
+      - name: Emit deterministic transport-regime evidence
+        run: cargo test -p symthaea-broca-interlingua --test transport_regime_evidence -- --nocapture
+
       - name: Clippy Broca SCIP bridge
         run: cargo clippy -p symthaea-broca-interlingua --all-targets --no-deps -- -D warnings
