@@ -153,9 +153,7 @@ fn deterministic_transport_regime_evidence() {
     );
     println!("| graph-delta | {delta_bytes} | true | exact base graph already cached |");
     println!("| grounded-graph | {graph_bytes} | true | none |");
-    println!(
-        "| text-fallback | {text_total_bytes} | false | human/model presentation path |"
-    );
+    println!("| text-fallback | {text_total_bytes} | false | human/model presentation path |");
 
     // HDC is a separate associative projection of the exact grounded graph.
     // F32 is exact projection identity; Q8/Q4 intentionally trade projection
@@ -180,9 +178,7 @@ fn deterministic_transport_regime_evidence() {
     assert!(q4_fidelity.cosine_similarity.is_finite());
 
     println!();
-    println!(
-        "| HDC projection | body bytes | cosine vs f32 | max abs error | exact projection |"
-    );
+    println!("| HDC projection | body bytes | cosine vs f32 | max abs error | exact projection |");
     println!("|---|---:|---:|---:|:---:|");
     println!(
         "| F32 | {} | {:.6} | {:.6} | {} |",
