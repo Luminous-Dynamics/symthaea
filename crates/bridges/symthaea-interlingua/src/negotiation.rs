@@ -91,7 +91,11 @@ impl PeerCapabilities {
         }
 
         let mut versions = BTreeSet::new();
-        if self.versions.iter().any(|version| !versions.insert(*version)) {
+        if self
+            .versions
+            .iter()
+            .any(|version| !versions.insert(*version))
+        {
             return Err(InterchangeError::NegotiationFailed);
         }
 
@@ -108,7 +112,9 @@ impl PeerCapabilities {
             }
         }
 
-        let advertises_hdc = self.representations.contains(&InterchangeRepresentation::Hdc);
+        let advertises_hdc = self
+            .representations
+            .contains(&InterchangeRepresentation::Hdc);
         if advertises_hdc == self.hdc_profiles.is_empty() {
             return Err(InterchangeError::NegotiationFailed);
         }
@@ -118,7 +124,11 @@ impl PeerCapabilities {
             if profile.dimension == 0 || profile.dimension > limits.max_hdc_dimension {
                 return Err(InterchangeError::NegotiationFailed);
             }
-            for value in [&profile.algebra, &profile.atom_derivation, &profile.namespace] {
+            for value in [
+                &profile.algebra,
+                &profile.atom_derivation,
+                &profile.namespace,
+            ] {
                 if value.trim().is_empty() || value.len() > limits.max_identifier_bytes {
                     return Err(InterchangeError::NegotiationFailed);
                 }
@@ -246,12 +256,14 @@ pub fn negotiate_with_policy(
         .ok_or(InterchangeError::NegotiationFailed)?;
     let hdc_profile = shared_hdc_profile.cloned();
     let hdc_downgraded = both_advertise_hdc && hdc_profile.is_none();
-    let shares_exact_grounded_representation = shared_representations.iter().any(|representation| {
-        matches!(
-            representation,
-            InterchangeRepresentation::GroundedGraph | InterchangeRepresentation::StructuredJson
-        )
-    });
+    let shares_exact_grounded_representation =
+        shared_representations.iter().any(|representation| {
+            matches!(
+                representation,
+                InterchangeRepresentation::GroundedGraph
+                    | InterchangeRepresentation::StructuredJson
+            )
+        });
 
     Ok(NegotiatedSession {
         version,
