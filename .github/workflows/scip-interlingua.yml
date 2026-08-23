@@ -21,16 +21,18 @@ env:
 
 jobs:
   test:
-    name: Test and lint SCIP bridge
+    name: Format, test and lint SCIP bridge
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
-          components: clippy
+          components: clippy, rustfmt
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -42,6 +44,20 @@ jobs:
           key: ${{ runner.os }}-cargo-scip-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-scip-
+
+      - name: Format changed SCIP Rust files
+        shell: bash
+        run: |
+          mapfile -t files < <(
+            git diff --diff-filter=ACMR --name-only HEAD^1 HEAD -- crates/bridges/symthaea-interlingua \
+              | grep -E '\.rs$' || true
+          )
+          if ((${#files[@]})); then
+            printf 'rustfmt checking %s\n' "${files[@]}"
+            rustfmt --edition 2024 --check "${files[@]}"
+          else
+            echo 'No changed SCIP Rust files to format-check.'
+          fi
 
       - name: Test SCIP bridge
         run: cargo test -p symthaea-interlingua --all-targets
