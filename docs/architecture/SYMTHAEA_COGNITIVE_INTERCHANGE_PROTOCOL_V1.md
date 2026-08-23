@@ -87,7 +87,8 @@ Peers advertise:
 - protocol versions;
 - supported representations;
 - HDC profiles;
-- sparse-delta support;
+- sparse HDC-delta support;
+- exact graph-delta support;
 - semantic-reference support.
 
 v1 requires an exact common protocol version.
@@ -103,7 +104,52 @@ A peer that advertises HDC but has a different codebook/profile does **not**
 guess or reinterpret the vector. It falls back to the next shared
 representation.
 
+Negotiation also records the complete ordered `shared_representations` set.
+The first entry is a backward-compatible preferred representation, not a mandate
+that every message use the same transfer form. Per-message transfer planning may
+choose any negotiated representation whose prerequisites are satisfied.
+
+Sparse HDC deltas and exact graph deltas are independent capabilities:
+
+- `sparse_hdc_deltas` requires an exact shared HDC profile;
+- `exact_graph_deltas` requires bilateral advertisement and at least one shared
+  exact grounded representation (`GroundedGraph` or canonical `StructuredJson`).
+
+Therefore an HDC-preferred session can still use exact graph deltas when it also
+shares a grounded representation. Conversely, an HDC-only session cannot claim
+exact semantic graph-delta reconstruction merely because it supports sparse
+vector updates.
+
+The optional `exact_graph_deltas` field uses a fail-closed compatibility rule:
+an older capability advertisement that omits the field is interpreted as not
+advertising exact graph-delta support.
+
 ## Persistent sessions
+
+### Exact semantic graph synchronization
+
+`GraphDelta` is an exact edit set from one canonical grounded graph to another.
+Both endpoints are content-addressed:
+
+- the receiver must possess the exact `base_semantic_hash` graph;
+- applying the delta to any other base fails;
+- the reconstructed graph must equal the declared `target_semantic_hash` before
+  it is accepted;
+- node removals/upserts and edge removals/additions are canonicalized for stable
+  wire-size measurement.
+
+Negotiating `exact_graph_deltas` does **not** mean every message should use a
+delta. The transfer planner must compare the actual canonical delta bytes with
+the complete grounded-graph bytes and choose the smaller exact representation.
+A very broad semantic change may legitimately fall back to a full graph.
+
+Controlled Broca-to-SCIP evidence currently shows exact graph deltas smaller than
+the full graph in all 11 measured mutation classes, with localized/medium
+changes at 6.57–16.29% of full-graph size and one broad multi-field transition at
+72.88%. This is evidence for capability negotiation, not a universal compression
+claim.
+
+### Associative HDC synchronization
 
 `SparseHdcDelta` can represent component changes relative to a known HDC
 payload. A delta is valid only when:
@@ -118,8 +164,16 @@ SCIP does not assume that HDC deltas are smaller. Semantic changes may alter mos
 dimensions. `DeltaMetrics` reports the changed fraction and estimated bytes so a
 session can choose a dense frame whenever a delta is not economical.
 
-Semantic references similarly require the receiver to possess the grounded
-graph identified by the referenced semantic hash.
+Sparse HDC synchronization updates an associative projection; it is not a
+substitute for exact grounded semantic reconstruction.
+
+### Semantic references
+
+Semantic references require the receiver to possess the grounded graph
+identified by the referenced semantic hash. A reference is the smallest exact
+semantic transfer when that target is already cached, but cache possession must
+be established by the surrounding session/synchronization protocol rather than
+assumed from the reference itself.
 
 ## LLM compatibility
 
@@ -167,8 +221,9 @@ guess its contents.
 
 ### Delta poisoning
 
-Deltas are bound to base semantic hash, profile, and dimension. Applying a delta
-to a different base is rejected.
+Exact graph deltas are bound to both base and target semantic hashes. Sparse HDC
+deltas are bound to base semantic hash, HDC profile, and dimension. Applying
+either delta type to an incompatible base is rejected.
 
 ### Replay and peer authentication
 
@@ -187,6 +242,7 @@ SCIP v1 does **not** claim:
 
 - that HDC communication is always smaller than text;
 - that HDC deltas are always sparse;
+- that exact graph deltas are always smaller than full grounded graphs;
 - that an LLM can natively consume SCIP HDC vectors;
 - that cosine similarity establishes semantic truth;
 - lossless decoding of arbitrary graphs from a lone HDC vector;
@@ -205,12 +261,13 @@ Before describing SCIP as more efficient than text, measure at least:
 4. projection similarity under independent implementations;
 5. canonical graph bytes;
 6. dense HDC bytes;
-7. delta bytes and changed fraction;
-8. model-specific token counts;
-9. encode/decode/adapter latency;
-10. task accuracy with text vs structured vs HDC/latent adapters;
-11. profile/version mismatch rejection;
-12. corrupted/stale reference rejection.
+7. exact graph-delta bytes and operation counts;
+8. sparse HDC-delta bytes and changed fraction;
+9. model-specific token counts;
+10. encode/decode/adapter latency;
+11. task accuracy with text vs structured vs HDC/latent adapters;
+12. profile/version/capability mismatch rejection;
+13. corrupted/stale reference and wrong-base delta rejection.
 
 Token counts must be measured with each concrete model tokenizer.
 
@@ -218,13 +275,14 @@ Token counts must be measured with each concrete model tokenizer.
 
 ### Phase A — protocol foundation
 
-Current PR:
+Current work includes:
 
 - SCIP v1 contracts;
 - canonical semantic hashing;
 - deterministic grounded HDC projection;
-- profile negotiation;
+- profile and representation negotiation;
 - semantic references;
+- exact content-addressed graph deltas and explicit capability negotiation;
 - sparse HDC deltas;
 - current-API LLM text fallback;
 - fidelity/wire metrics.
@@ -240,6 +298,10 @@ language module the canonical semantic substrate.
 Define a transport-neutral SCIP frame codec and then bind it to authenticated
 Xenia sessions. Keep cryptography, identities, replay controls, and capability
 authorization in Xenia.
+
+The session layer also needs explicit cache/base acknowledgement so semantic
+references and exact graph deltas are sent only when the receiver has confirmed
+possession of the required content-addressed graph.
 
 ### Phase D — native latent adapters
 
