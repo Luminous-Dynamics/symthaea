@@ -159,22 +159,24 @@ pub fn build_grounded_transfer_input(
     let target_semantic_hash = graph_semantic_hash(target_graph)?;
     let grounded_graph_bytes = canonical_graph_bytes(target_graph)?.len();
 
-    let semantic_reference_bytes = if session.semantic_references
-        && peer_inventory.contains(&target_semantic_hash)
-    {
-        Some(
-            serde_json::to_vec(&SemanticReference {
-                semantic_hash: target_semantic_hash.clone(),
-            })?
-            .len(),
-        )
-    } else {
-        None
-    };
+    let semantic_reference_bytes =
+        if session.semantic_references && peer_inventory.contains(&target_semantic_hash) {
+            Some(
+                serde_json::to_vec(&SemanticReference {
+                    semantic_hash: target_semantic_hash.clone(),
+                })?
+                .len(),
+            )
+        } else {
+            None
+        };
 
     let graph_delta_bytes = if let Some(delta) = delta {
         require_content_hash(&delta.base_semantic_hash, "graph delta base semantic hash")?;
-        require_content_hash(&delta.target_semantic_hash, "graph delta target semantic hash")?;
+        require_content_hash(
+            &delta.target_semantic_hash,
+            "graph delta target semantic hash",
+        )?;
         if delta.target_semantic_hash != target_semantic_hash {
             return Err(InterchangeError::InvalidDelta(
                 "graph delta target does not match transfer target".into(),
