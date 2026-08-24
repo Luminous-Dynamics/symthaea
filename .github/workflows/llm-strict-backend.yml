@@ -6,11 +6,13 @@ on:
     paths:
       - 'src/language/llm_organ.rs'
       - 'src/language/llm_backend.rs'
+      - 'tests/llm_strict_backend.rs'
       - '.github/workflows/llm-strict-backend.yml'
   pull_request:
     paths:
       - 'src/language/llm_organ.rs'
       - 'src/language/llm_backend.rs'
+      - 'tests/llm_strict_backend.rs'
       - '.github/workflows/llm-strict-backend.yml'
 
 concurrency:
@@ -49,14 +51,17 @@ jobs:
             ${{ runner.os }}-cargo-scip-llm-
             ${{ runner.os }}-cargo-scip-
 
-      - name: Format changed root language Rust files
+      - name: Format changed strict language Rust files
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           base="${BASE_SHA:-HEAD^1}"
           mapfile -t files < <(
-            git diff --diff-filter=ACMR --name-only "$base" HEAD -- src/language/llm_organ.rs src/language/llm_backend.rs \
+            git diff --diff-filter=ACMR --name-only "$base" HEAD -- \
+              src/language/llm_organ.rs \
+              src/language/llm_backend.rs \
+              tests/llm_strict_backend.rs \
               | grep -E '\.rs$' || true
           )
           if ((${#files[@]})); then
@@ -68,6 +73,9 @@ jobs:
 
       - name: Test LLMOrgan language module
         run: cargo test -p symthaea --lib language::llm_organ::tests
+
+      - name: Test strict backend public contract
+        run: cargo test -p symthaea --test llm_strict_backend
 
       - name: Check root library
         run: cargo check -p symthaea --lib
