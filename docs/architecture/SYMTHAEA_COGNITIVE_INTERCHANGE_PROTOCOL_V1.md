@@ -175,6 +175,28 @@ semantic transfer when that target is already cached, but cache possession must
 be established by the surrounding session/synchronization protocol rather than
 assumed from the reference itself.
 
+### Peer semantic inventory and recovery
+
+`PeerSemanticInventory` records only content-addressed graphs that an
+authenticated peer has explicitly acknowledged possessing. This keeps reference
+and exact-delta eligibility separate from optimistic caller assumptions.
+
+`SemanticCacheAck` adds one possession claim. `SemanticCacheMiss` and
+`SemanticCacheRevoke` retract one claim when a reference target or graph-delta
+base is unavailable or proactively evicted. All three forms are transport-neutral
+SCIP session feedback: they validate content addresses but do not authenticate
+who sent them.
+
+A cache miss does not introduce a special recovery representation. After the
+surrounding authenticated session accepts the feedback, SCIP removes only the
+named stale hash, rebuilds the ordinary transfer candidates, and lets
+`plan_transfer` choose the smallest remaining exact form. A missing reference
+may therefore fall back to a still-valid graph delta; a missing delta base falls
+back to the full canonical graph when no cheaper exact prerequisite remains.
+
+Repeated miss/revoke feedback is idempotent. A later fresh acknowledgement can
+restore eligibility.
+
 ## LLM compatibility
 
 Most hosted LLM APIs currently expose text/token interfaces rather than latent
@@ -217,7 +239,8 @@ preference. Applications should log fallback/downgrade decisions.
 ### Stale reference
 
 A semantic reference that cannot be resolved is an error, not permission to
-guess its contents.
+guess its contents. Authenticated cache-miss feedback retracts the stale
+possession claim before replanning.
 
 ### Delta poisoning
 
@@ -225,16 +248,23 @@ Exact graph deltas are bound to both base and target semantic hashes. Sparse HDC
 deltas are bound to base semantic hash, HDC profile, and dimension. Applying
 either delta type to an incompatible base is rejected.
 
+### Cache-feedback amplification
+
+An authenticated but uncooperative peer can repeatedly report cache misses or
+revoke state and force larger exact transfers. SCIP preserves correctness by
+withdrawing the cached candidate; Xenia/session policy should separately enforce
+rate limits, recovery budgets, and repeated-miss telemetry.
+
 ### Replay and peer authentication
 
 SCIP itself is a semantic protocol, not a secure transport. Replay prevention,
-peer authentication, confidentiality, authorization, and channel integrity
-belong to the transport/session layer. For Symthaea/Mycelix deployment, Xenia is
-the intended integration boundary.
+peer authentication, confidentiality, authorization, feedback ordering, and
+channel integrity belong to the transport/session layer. For Symthaea/Mycelix
+deployment, Xenia is the intended integration boundary.
 
 A future Xenia binding should include SCIP `message_id`, protocol/profile
-fingerprints, parent/session identifiers, and transport transcript identity in
-the authenticated transcript.
+fingerprints, parent/session identifiers, semantic cache-feedback kind/hash, and
+transport transcript identity/position in the authenticated transcript.
 
 ## What v1 does not claim
 
@@ -243,6 +273,7 @@ SCIP v1 does **not** claim:
 - that HDC communication is always smaller than text;
 - that HDC deltas are always sparse;
 - that exact graph deltas are always smaller than full grounded graphs;
+- that cache feedback authenticates its sender or guarantees cheap recovery;
 - that an LLM can natively consume SCIP HDC vectors;
 - that cosine similarity establishes semantic truth;
 - lossless decoding of arbitrary graphs from a lone HDC vector;
@@ -267,7 +298,8 @@ Before describing SCIP as more efficient than text, measure at least:
 10. encode/decode/adapter latency;
 11. task accuracy with text vs structured vs HDC/latent adapters;
 12. profile/version/capability mismatch rejection;
-13. corrupted/stale reference and wrong-base delta rejection.
+13. corrupted/stale reference and wrong-base delta rejection;
+14. cache miss/revoke recovery and repeated-feedback behavior.
 
 Token counts must be measured with each concrete model tokenizer.
 
@@ -283,6 +315,7 @@ Current work includes:
 - profile and representation negotiation;
 - semantic references;
 - exact content-addressed graph deltas and explicit capability negotiation;
+- peer semantic inventory with cache acknowledgement/miss/revoke recovery;
 - sparse HDC deltas;
 - current-API LLM text fallback;
 - fidelity/wire metrics.
@@ -296,12 +329,11 @@ language module the canonical semantic substrate.
 ### Phase C — Xenia session binding
 
 Define a transport-neutral SCIP frame codec and then bind it to authenticated
-Xenia sessions. Keep cryptography, identities, replay controls, and capability
-authorization in Xenia.
+Xenia sessions. Keep cryptography, identities, replay controls, feedback
+ordering, rate limits, and capability authorization in Xenia.
 
-The session layer also needs explicit cache/base acknowledgement so semantic
-references and exact graph deltas are sent only when the receiver has confirmed
-possession of the required content-addressed graph.
+The Xenia binding should authenticate and transcript-bind cache acknowledgement,
+miss, and revocation feedback before any mutation of `PeerSemanticInventory`.
 
 ### Phase D — native latent adapters
 
