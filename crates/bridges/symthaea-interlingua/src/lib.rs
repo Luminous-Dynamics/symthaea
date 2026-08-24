@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 pub mod cache_feedback;
+pub mod cache_wire;
 pub mod delta;
 pub mod graph_delta;
 pub mod hdc;
@@ -27,6 +28,9 @@ pub mod wire;
 pub use cache_feedback::{
     InventoryUpdate, SemanticCacheFeedback, SemanticCacheMiss, SemanticCacheMissKind,
     SemanticCacheRevoke, apply_cache_feedback,
+};
+pub use cache_wire::{
+    CACHE_FEEDBACK_WIRE_LEN, CACHE_FEEDBACK_WIRE_MAGIC, CACHE_FEEDBACK_WIRE_VERSION,
 };
 pub use delta::{HdcDeltaEntry, SparseHdcDelta};
 pub use graph_delta::{GraphDelta, canonical_edge_bytes, edge_semantic_hash};
