@@ -25,6 +25,8 @@ LlmTextFallback::compile
         v
 immutable ScipLlmRequest
         |
+        +-- domain-separated request digest
+        |
         v
 LLMOrgan::get_backend
         |
@@ -33,9 +35,12 @@ LLMOrgan::get_backend
         v
 LLMBackend::generate (one call)
         |
-        +-- backend error -------> explicit BackendFailure error
+        +-- backend error -------> explicit redacted BackendFailure error
         +-- empty output --------> explicit EmptyOutput error
         +-- oversized output ----> explicit OutputTooLarge error
+        |
+        v
+exact surface-text digest
         |
         v
 ScipLlmOutput
@@ -47,8 +52,11 @@ There is no simulation fallback inside this path.
 
 `GroundedConceptGraph` remains canonical. Model-produced text is a surface realization, not new grounded truth.
 
-`ScipLlmOutput` carries the source:
+`ScipLlmOutput` carries:
 
+- adapter profile (`symthaea.scip-llm-adapter/v1`)
+- deterministic request digest
+- deterministic exact-text surface digest
 - SCIP message ID
 - semantic hash
 - source confidence
@@ -57,7 +65,33 @@ There is no simulation fallback inside this path.
 - backend name
 - fallback mode
 
-alongside the generated text. This makes the surface output auditable without claiming that the language model has independently verified its own translation.
+alongside the generated text. This makes the execution auditable without claiming that the language model has independently verified its own translation.
+
+A successful backend call is therefore evidence of **which exact request produced which exact UTF-8 surface bytes**, not evidence that the surface text is semantically faithful.
+
+## Deterministic audit binding
+
+The v1 request digest is domain-separated BLAKE3 over:
+
+1. `symthaea-scip-llm-request-v1\0`
+2. fallback-mode code (`0 = FaithfulTranslation`, `1 = GroundedReasoning`)
+3. IEEE-754 `f32` temperature bits in little-endian order
+4. `max_tokens` as little-endian `u64`
+5. one byte binding `consciousness_context = None`
+6. length-prefixed UTF-8 system prompt
+7. length-prefixed UTF-8 grounded data content
+
+Every variable-length field is prefixed by its byte length encoded as little-endian `u64`.
+
+The accepted surface-text digest is domain-separated BLAKE3 over:
+
+1. `symthaea-scip-llm-surface-v1\0`
+2. little-endian `u64` UTF-8 byte length
+3. exact returned UTF-8 bytes, without trimming or normalization
+
+Changing request construction or privileged generation policy requires a new adapter-profile/digest version rather than silently reusing the v1 audit identity.
+
+These digests are suitable inputs to later Xenia/transcript evidence binding. They do **not** authenticate the backend by themselves.
 
 ## Instruction/data boundary
 
@@ -74,7 +108,7 @@ Current parameters:
 | FaithfulTranslation | 0.2 | 512 |
 | GroundedReasoning | 0.3 | 768 |
 
-These are adapter policy, not protocol semantics, and may be revisited independently of SCIP's canonical graph representation.
+These are adapter policy, not protocol semantics, and may be revisited independently of SCIP's canonical graph representation. A change must also advance the request-digest profile if it changes exact backend inputs.
 
 ## Backend execution
 
@@ -84,9 +118,17 @@ It intentionally does **not** call `LLMBackend::is_available` first. A preflight
 
 An explicitly configured `SimulatedBackend` is still legal for tests. The safety invariant is not “simulation can never exist”; it is “simulation can never be selected silently because a supposedly faithful SCIP backend call failed.”
 
+### Backend error privacy
+
+Arbitrary provider/backend error strings do not cross the strict adapter error boundary. They may contain URLs, headers, request fragments, infrastructure details, or provider-specific data that should not automatically become part of a semantic-layer failure object.
+
+`BackendFailure` therefore exposes the configured backend name but not `error.to_string()`. Operator-specific diagnostics remain the responsibility of the backend/runtime observability layer.
+
 ## Output resource limit
 
-v1 rejects backend output larger than 1 MiB. Provider token limits are advisory and backend-specific; the byte ceiling is a local defensive boundary against a broken or hostile backend returning unbounded surface text.
+v1 rejects backend output larger than 1 MiB.
+
+This is a **post-generation acceptance ceiling**, not an allocation guarantee: the current `LLMBackend::generate` trait returns a completed `String`, so an adapter cannot prevent a custom backend from allocating more internally before returning. The ceiling prevents oversized text from being accepted or propagated farther through this boundary. A future streaming/size-aware backend primitive can enforce an earlier hard cap.
 
 ## Accounting limitation
 
@@ -94,7 +136,7 @@ This first bridge depends only on public root APIs. Directly calling the backend
 
 That is intentional for Phase B1. It proves the strict semantic and failure boundary before changing root internals.
 
-A later root-side integration may add a private strict execution primitive that preserves normal accounting while retaining all of these fail-closed properties. It must not reintroduce `query_async` simulation fallback.
+A later root-side integration may add a generic strict execution primitive that preserves normal accounting while retaining all of these fail-closed properties. It must not reintroduce `query_async` simulation fallback and should remain protocol-agnostic so `LLMOrgan` does not depend on SCIP.
 
 ## Required validation
 
@@ -104,10 +146,12 @@ The adapter test suite must prove at least:
 2. HDC/reference-derived requests require the exact matching grounded graph;
 3. instruction-like graph strings remain data, not system instructions;
 4. missing backend is an error;
-5. backend failure is an error and never reaches organ simulation;
+5. backend failure is redacted and never reaches organ simulation;
 6. explicit simulated backends remain explicit test choices;
 7. empty and oversized outputs fail closed;
-8. strict execution does not mutate legacy `LLMOrgan` accounting through a hidden fallback path.
+8. strict execution does not mutate legacy `LLMOrgan` accounting through a hidden fallback path;
+9. request digests are deterministic and change with semantic/policy changes;
+10. accepted surface digests bind the exact returned UTF-8 bytes.
 
 ## Non-claims
 
@@ -116,8 +160,9 @@ This adapter does not claim:
 - that model output is semantically faithful merely because generation succeeded;
 - that the LLM independently grounds or verifies graph contents;
 - that generated text can replace the canonical graph;
-- that the adapter authenticates the backend or transport;
+- that request/surface digests authenticate the backend or transport;
 - that it preserves `LLMOrgan` conversation/statistics accounting yet;
+- that the post-generation output ceiling constrains backend-internal allocation;
 - that hosted LLMs natively consume HDC vectors.
 
 The adapter is a compatibility execution boundary for today's text-oriented language models, not the final native cognitive interchange path.
