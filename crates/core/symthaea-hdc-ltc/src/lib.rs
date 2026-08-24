@@ -51,8 +51,12 @@ pub mod config;
 pub mod continuous_hv;
 pub mod network;
 pub mod neuron;
+#[cfg(feature = "simd")]
+pub mod simd;
 
 pub use config::{Activation, NetworkConfig, NeuronConfig};
 pub use continuous_hv::{ContinuousHV, HDC_DIMENSION};
 pub use network::{HdcLtcUnifiedNetwork, StepTimingConfig};
 pub use neuron::HdcLtcUnifiedNeuron;
+#[cfg(feature = "simd")]
+pub use simd::{ContinuousHvSimdExt, SimdBackend, simd_backend};
