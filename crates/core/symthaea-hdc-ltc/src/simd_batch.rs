@@ -8,9 +8,9 @@
 //! [`ContinuousHV`](crate::ContinuousHV)'s reference scalar methods.
 //!
 //! The main optimization is to prepare immutable candidate hypervectors once in
-//! contiguous row-major storage and cache their squared norms. A query then
-//! computes its norm once and scores all candidates without rebuilding vectors,
-//! labels, or candidate norms on every lookup.
+//! contiguous row-major storage and cache their inverse norms. A query then
+//! computes its inverse norm once and scores all candidates without rebuilding
+//! vectors, labels, candidate norms, or per-candidate square roots.
 
 use crate::ContinuousHV;
 
@@ -19,11 +19,11 @@ use crate::ContinuousHV;
 pub struct PreparedContinuousHvSet {
     dim: usize,
     rows: Vec<f32>,
-    norms_sq: Vec<f32>,
+    inv_norms: Vec<f32>,
 }
 
 impl PreparedContinuousHvSet {
-    /// Copy candidates into contiguous row-major storage and cache squared norms.
+    /// Copy candidates into contiguous row-major storage and cache inverse norms.
     ///
     /// Empty candidate sets are valid and have dimension zero.
     pub fn new(candidates: &[ContinuousHV]) -> Self {
@@ -31,37 +31,42 @@ impl PreparedContinuousHvSet {
             return Self {
                 dim: 0,
                 rows: Vec::new(),
-                norms_sq: Vec::new(),
+                inv_norms: Vec::new(),
             };
         }
 
         let dim = candidates[0].values.len();
         let mut rows = Vec::with_capacity(candidates.len() * dim);
-        let mut norms_sq = Vec::with_capacity(candidates.len());
+        let mut inv_norms = Vec::with_capacity(candidates.len());
 
         for candidate in candidates {
             assert_eq!(candidate.values.len(), dim, "Candidate dimension mismatch");
-            norms_sq.push(dot_dispatch(&candidate.values, &candidate.values));
+            let norm_sq = dot_dispatch(&candidate.values, &candidate.values);
+            inv_norms.push(if norm_sq < 1e-20 {
+                0.0
+            } else {
+                norm_sq.sqrt().recip()
+            });
             rows.extend_from_slice(&candidate.values);
         }
 
         Self {
             dim,
             rows,
-            norms_sq,
+            inv_norms,
         }
     }
 
     /// Number of prepared candidates.
     #[inline]
     pub fn len(&self) -> usize {
-        self.norms_sq.len()
+        self.inv_norms.len()
     }
 
     /// Whether the prepared set contains no candidates.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.norms_sq.is_empty()
+        self.inv_norms.is_empty()
     }
 
     /// Hypervector dimension shared by all candidates, or zero when empty.
@@ -74,13 +79,13 @@ impl PreparedContinuousHvSet {
     #[inline]
     pub fn payload_bytes(&self) -> usize {
         self.rows.len() * std::mem::size_of::<f32>()
-            + self.norms_sq.len() * std::mem::size_of::<f32>()
+            + self.inv_norms.len() * std::mem::size_of::<f32>()
     }
 
     /// Score one query against every prepared candidate into caller-owned output.
     ///
-    /// This performs no heap allocation. Candidate norms are reused and the query
-    /// norm is computed once for the whole candidate set.
+    /// This performs no heap allocation. Candidate inverse norms are reused and
+    /// the query inverse norm is computed once for the whole candidate set.
     pub fn similarities_into(&self, query: &ContinuousHV, out: &mut [f32]) {
         assert_eq!(out.len(), self.len(), "Output length mismatch");
         if self.is_empty() {
@@ -93,15 +98,17 @@ impl PreparedContinuousHvSet {
             out.fill(0.0);
             return;
         }
+        let query_inv_norm = query_norm_sq.sqrt().recip();
 
         for (index, score) in out.iter_mut().enumerate() {
             let start = index * self.dim;
             let candidate = &self.rows[start..start + self.dim];
-            let denom = (query_norm_sq * self.norms_sq[index]).sqrt();
-            *score = if denom < 1e-10 {
+            let candidate_inv_norm = self.inv_norms[index];
+            *score = if candidate_inv_norm == 0.0 {
                 0.0
             } else {
-                (dot_dispatch(&query.values, candidate) / denom).clamp(-1.0, 1.0)
+                (dot_dispatch(&query.values, candidate) * query_inv_norm * candidate_inv_norm)
+                    .clamp(-1.0, 1.0)
             };
         }
     }
@@ -115,6 +122,7 @@ impl PreparedContinuousHvSet {
 
     /// Return the row-major candidate vector at `index` without allocating.
     pub fn row(&self, index: usize) -> &[f32] {
+        assert!(index < self.len(), "Candidate index out of range");
         let start = index
             .checked_mul(self.dim)
             .expect("Candidate row offset overflow");
@@ -259,7 +267,7 @@ mod tests {
 
             assert_eq!(accelerated.len(), reference.len());
             for (&fast, &slow) in accelerated.iter().zip(&reference) {
-                assert_close(fast, slow, 2e-5);
+                assert_close(fast, slow, 3e-5);
             }
 
             let fast_winner = accelerated
@@ -286,6 +294,14 @@ mod tests {
         let mut out = vec![f32::NAN; candidates.len()];
         prepared.similarities_into(&query, &mut out);
         assert!(out.iter().all(|score| score.is_finite()));
+    }
+
+    #[test]
+    fn zero_candidate_scores_zero() {
+        let zero = ContinuousHV::new(64);
+        let prepared = PreparedContinuousHvSet::new(&[zero]);
+        let query = ContinuousHV::new_random(64, 77);
+        assert_eq!(prepared.similarities(&query), vec![0.0]);
     }
 
     #[test]
