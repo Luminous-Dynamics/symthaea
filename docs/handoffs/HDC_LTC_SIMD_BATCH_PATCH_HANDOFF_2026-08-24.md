@@ -17,15 +17,16 @@ The public GitHub export does not yet contain the August 24 local `symthaea-broc
 
 ### `PreparedContinuousHvSet`
 
-Immutable candidate hypervectors are copied once into contiguous row-major `f32` storage. Candidate squared norms are cached once.
+Immutable candidate hypervectors are copied once into contiguous row-major `f32` storage. Candidate inverse norms are cached once.
 
 For each query:
 
-1. compute the query squared norm once;
+1. compute the query inverse norm once;
 2. score every prepared candidate with runtime-dispatched AVX2 dot products (portable scalar fallback otherwise);
-3. write scores into a caller-owned buffer with no per-query heap allocation.
+3. multiply by the cached candidate inverse norm, avoiding a per-candidate square root;
+4. write scores into a caller-owned buffer with no per-query heap allocation.
 
-This removes repeated candidate-vector construction and repeated candidate norm reductions from the retrieval hot path.
+This removes repeated candidate-vector construction, repeated candidate norm reductions, and per-candidate square roots from the retrieval hot path.
 
 ### `ContinuousHvFusedSimdExt::bind_add_scaled_simd`
 
@@ -45,7 +46,7 @@ in one traversal, avoiding a temporary bound hypervector and a second scale/add 
 - candidate counts = 32, 128, 512;
 - 64 repeated queries per cell.
 
-The benchmark reports winner agreement and does not make scientific claims.
+The benchmark reports winner agreement and does not make scientific claims. Its SIMD-only imports are feature-gated so default-feature builds remain valid.
 
 ## Scientific boundary
 
