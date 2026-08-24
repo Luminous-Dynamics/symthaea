@@ -280,6 +280,51 @@ pub struct LLMOrganStats {
     pub errors: u64,
 }
 
+/// Explicit failure from the real backend path without simulation fallback.
+///
+/// Default Display/Debug deliberately redact the provider's arbitrary error
+/// string. Operator code can intentionally inspect [`std::error::Error::source`]
+/// when backend diagnostics are needed.
+pub enum LLMBackendExecutionError {
+    /// No backend is configured on this organ.
+    MissingBackend,
+    /// A configured backend returned an error.
+    Generation {
+        backend: String,
+        source: anyhow::Error,
+    },
+}
+
+impl std::fmt::Debug for LLMBackendExecutionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingBackend => f.write_str("LLMBackendExecutionError::MissingBackend"),
+            Self::Generation { backend, .. } => f
+                .debug_struct("LLMBackendExecutionError::Generation")
+                .field("backend", backend)
+                .finish_non_exhaustive(),
+        }
+    }
+}
+
+impl std::fmt::Display for LLMBackendExecutionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingBackend => f.write_str("no LLM backend is configured"),
+            Self::Generation { backend, .. } => write!(f, "LLM backend {backend} failed"),
+        }
+    }
+}
+
+impl std::error::Error for LLMBackendExecutionError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::MissingBackend => None,
+            Self::Generation { source, .. } => Some(source.as_ref()),
+        }
+    }
+}
+
 impl LLMOrgan {
     /// Create a new LLM organ (simulation-only, no backend).
     pub fn new(config: LLMOrganConfig) -> Self {
@@ -321,69 +366,111 @@ impl LLMOrgan {
         }
     }
 
+    /// Execute only the configured real backend path.
+    ///
+    /// Unlike [`Self::query_async`], this method never falls back to simulated
+    /// generation. Successful calls receive the same statistics, embedding-cache
+    /// and conversation-history accounting as the real-backend branch of
+    /// `query_async`. Backend generation failure increments `stats.errors` and is
+    /// returned directly. Missing backend is returned without mutating counters,
+    /// matching legacy `query_async` behavior when no backend is configured.
+    pub async fn execute_backend_strict(
+        &mut self,
+        query: &LLMQuery,
+    ) -> Result<LLMGenerationResult, LLMBackendExecutionError> {
+        let backend = self
+            .backend
+            .clone()
+            .ok_or(LLMBackendExecutionError::MissingBackend)?;
+        let backend_name = backend.name().to_owned();
+        let params = self.generation_params_for_query(query);
+        let start = std::time::Instant::now();
+
+        match backend.generate(&query.content, &params).await {
+            Ok(text) => {
+                let generation_time_ms = start.elapsed().as_secs_f64() * 1000.0;
+                Ok(self.finish_backend_generation(query, text, generation_time_ms))
+            }
+            Err(source) => {
+                self.stats.errors += 1;
+                Err(LLMBackendExecutionError::Generation {
+                    backend: backend_name,
+                    source,
+                })
+            }
+        }
+    }
+
+    fn generation_params_for_query(&self, query: &LLMQuery) -> super::llm_backend::GenerationParams {
+        super::llm_backend::GenerationParams {
+            temperature: query
+                .params
+                .as_ref()
+                .and_then(|p| p.temperature)
+                .unwrap_or(self.config.temperature),
+            max_tokens: query
+                .params
+                .as_ref()
+                .and_then(|p| p.max_length)
+                .unwrap_or(self.config.max_generation_length),
+            system_prompt: query.system_prompt.clone(),
+            consciousness_context: None,
+        }
+    }
+
+    fn finish_backend_generation(
+        &mut self,
+        query: &LLMQuery,
+        text: String,
+        generation_time_ms: f64,
+    ) -> LLMGenerationResult {
+        self.stats.queries_processed += 1;
+        let tokens_generated = text.split_whitespace().count();
+        self.stats.tokens_generated += tokens_generated as u64;
+
+        let n = self.stats.queries_processed as f64;
+        self.stats.avg_generation_time_ms =
+            (self.stats.avg_generation_time_ms * (n - 1.0) + generation_time_ms) / n;
+
+        let embedding = self.text_to_embedding(&text);
+
+        if self.config.memory_enabled {
+            self.conversation_history
+                .push_back(ConversationMessage::user(&query.content));
+            self.conversation_history
+                .push_back(ConversationMessage::assistant(&text));
+            while self.conversation_history.len() > 100 {
+                self.conversation_history.pop_front();
+            }
+        }
+
+        LLMGenerationResult {
+            text,
+            confidence: 0.9,
+            tokens_generated,
+            generation_time_ms,
+            embedding,
+            finish_reason: FinishReason::EndOfSequence,
+        }
+    }
+
     /// Async query that tries the LLM backend first, falls back to simulation.
     ///
     /// This is the preferred entry point when running in an async context.
     /// If no backend is configured or the backend fails, falls back to
     /// the simulated response path.
     pub async fn query_async(&mut self, query: LLMQuery) -> LLMGenerationResult {
-        use super::llm_backend::GenerationParams;
-
-        // Try backend first if available
-        if let Some(ref backend) = self.backend {
-            let start = std::time::Instant::now();
-            let params = GenerationParams {
-                temperature: query
-                    .params
-                    .as_ref()
-                    .and_then(|p| p.temperature)
-                    .unwrap_or(self.config.temperature),
-                max_tokens: query
-                    .params
-                    .as_ref()
-                    .and_then(|p| p.max_length)
-                    .unwrap_or(self.config.max_generation_length),
-                system_prompt: query.system_prompt.clone(),
-                consciousness_context: None,
-            };
-
-            match backend.generate(&query.content, &params).await {
-                Ok(text) => {
-                    let generation_time_ms = start.elapsed().as_secs_f64() * 1000.0;
-                    self.stats.queries_processed += 1;
-                    let tokens_generated = text.split_whitespace().count();
-                    self.stats.tokens_generated += tokens_generated as u64;
-
-                    // Update average generation time
-                    let n = self.stats.queries_processed as f64;
-                    self.stats.avg_generation_time_ms =
-                        (self.stats.avg_generation_time_ms * (n - 1.0) + generation_time_ms) / n;
-
-                    let embedding = self.text_to_embedding(&text);
-
-                    if self.config.memory_enabled {
-                        self.conversation_history
-                            .push_back(ConversationMessage::user(&query.content));
-                        self.conversation_history
-                            .push_back(ConversationMessage::assistant(&text));
-                        while self.conversation_history.len() > 100 {
-                            self.conversation_history.pop_front();
-                        }
+        if self.backend.is_some() {
+            match self.execute_backend_strict(&query).await {
+                Ok(result) => return result,
+                Err(error) => {
+                    // Preserve legacy operator diagnostics while keeping the
+                    // strict error's default Display/Debug redacted.
+                    if let Some(source) = std::error::Error::source(&error) {
+                        eprintln!("LLM backend error, falling back to simulation: {source}");
+                    } else {
+                        eprintln!("LLM backend error, falling back to simulation: {error}");
                     }
-
-                    return LLMGenerationResult {
-                        text,
-                        confidence: 0.9,
-                        tokens_generated,
-                        generation_time_ms,
-                        embedding,
-                        finish_reason: FinishReason::EndOfSequence,
-                    };
-                }
-                Err(e) => {
-                    // Fall through to simulation
-                    self.stats.errors += 1;
-                    eprintln!("LLM backend error, falling back to simulation: {e}");
                 }
             }
         }
@@ -1076,6 +1163,64 @@ impl Default for LLMOrgan {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Result;
+
+    struct StrictTestBackend {
+        response: String,
+        fail: bool,
+    }
+
+    impl StrictTestBackend {
+        fn success(response: &str) -> Self {
+            Self {
+                response: response.to_string(),
+                fail: false,
+            }
+        }
+
+        fn failure() -> Self {
+            Self {
+                response: String::new(),
+                fail: true,
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl super::super::llm_backend::LLMBackend for StrictTestBackend {
+        async fn generate(
+            &self,
+            _prompt: &str,
+            _params: &super::super::llm_backend::GenerationParams,
+        ) -> Result<String> {
+            if self.fail {
+                anyhow::bail!("operator-only strict backend detail");
+            }
+            Ok(self.response.clone())
+        }
+
+        async fn is_available(&self) -> bool {
+            true
+        }
+
+        fn name(&self) -> &str {
+            "strict-test-backend"
+        }
+    }
+
+    fn strict_query() -> LLMQuery {
+        LLMQuery {
+            query_type: QueryType::Translation,
+            content: "strict grounded request".to_string(),
+            context: Vec::new(),
+            system_prompt: Some("trusted strict system".to_string()),
+            params: Some(LLMQueryParams {
+                temperature: Some(0.2),
+                max_length: Some(64),
+                stop_sequences: vec![],
+            }),
+        }
+    }
 
     // =========================================================================
     // LLMOrganConfig Tests
@@ -1133,6 +1278,87 @@ mod tests {
         let config = LLMOrganConfig::default();
         let organ = LLMOrgan::new(config);
         assert_eq!(organ.stats.queries_processed, 0);
+    }
+
+    #[tokio::test]
+    async fn test_strict_backend_success_preserves_normal_accounting() {
+        let backend = Arc::new(StrictTestBackend::success("strict surface response"));
+        let mut organ = LLMOrgan::with_backend(LLMOrganConfig::default(), backend);
+        let query = strict_query();
+
+        let result = organ.execute_backend_strict(&query).await.unwrap();
+        assert_eq!(result.text, "strict surface response");
+        assert_eq!(organ.stats().queries_processed, 1);
+        assert_eq!(organ.stats().errors, 0);
+        assert_eq!(organ.stats().tokens_generated, 3);
+        assert!(organ.stats().avg_generation_time_ms >= 0.0);
+        assert_eq!(organ.conversation_history().len(), 2);
+        assert_eq!(organ.conversation_history()[0].role, MessageRole::User);
+        assert_eq!(organ.conversation_history()[0].content, query.content);
+        assert_eq!(organ.conversation_history()[1].role, MessageRole::Assistant);
+        assert_eq!(organ.conversation_history()[1].content, result.text);
+
+        let initial_hits = organ.stats().cache_hits;
+        organ.execute_backend_strict(&query).await.unwrap();
+        assert!(organ.stats().cache_hits > initial_hits);
+    }
+
+    #[tokio::test]
+    async fn test_strict_backend_failure_counts_error_and_never_simulates() {
+        let backend = Arc::new(StrictTestBackend::failure());
+        let mut organ = LLMOrgan::with_backend(LLMOrganConfig::default(), backend);
+        let query = strict_query();
+
+        let error = organ.execute_backend_strict(&query).await.unwrap_err();
+        assert!(matches!(
+            error,
+            LLMBackendExecutionError::Generation { .. }
+        ));
+        assert_eq!(organ.stats().queries_processed, 0);
+        assert_eq!(organ.stats().errors, 1);
+        assert!(organ.conversation_history().is_empty());
+
+        let rendered = error.to_string();
+        let debugged = format!("{error:?}");
+        assert!(rendered.contains("strict-test-backend"));
+        assert!(!rendered.contains("operator-only strict backend detail"));
+        assert!(!debugged.contains("operator-only strict backend detail"));
+        assert_eq!(
+            std::error::Error::source(&error).unwrap().to_string(),
+            "operator-only strict backend detail"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_strict_missing_backend_does_not_mutate_or_simulate() {
+        let mut organ = LLMOrgan::default();
+        let query = strict_query();
+
+        assert!(matches!(
+            organ.execute_backend_strict(&query).await,
+            Err(LLMBackendExecutionError::MissingBackend)
+        ));
+        assert_eq!(organ.stats().queries_processed, 0);
+        assert_eq!(organ.stats().errors, 0);
+        assert!(organ.conversation_history().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_query_async_keeps_legacy_fallback_policy() {
+        let backend = Arc::new(StrictTestBackend::failure());
+        let mut organ = LLMOrgan::with_backend(LLMOrganConfig::default(), backend);
+        let query = LLMQuery {
+            query_type: QueryType::Generation,
+            content: "legacy fallback request".to_string(),
+            context: Vec::new(),
+            system_prompt: None,
+            params: None,
+        };
+
+        let result = organ.query_async(query).await;
+        assert!(result.text.contains("simulated response"));
+        assert_eq!(organ.stats().errors, 1);
+        assert_eq!(organ.stats().queries_processed, 1);
     }
 
     // =========================================================================
