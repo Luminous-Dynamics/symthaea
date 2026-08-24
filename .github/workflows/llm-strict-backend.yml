@@ -1,0 +1,73 @@
+name: LLM Strict Backend Execution
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/language/llm_organ.rs'
+      - 'src/language/llm_backend.rs'
+      - '.github/workflows/llm-strict-backend.yml'
+  pull_request:
+    paths:
+      - 'src/language/llm_organ.rs'
+      - 'src/language/llm_backend.rs'
+      - '.github/workflows/llm-strict-backend.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  strict-backend:
+    name: Format and test strict LLM backend execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-llm-strict-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-llm-strict-
+            ${{ runner.os }}-cargo-scip-llm-
+            ${{ runner.os }}-cargo-scip-
+
+      - name: Format changed root language Rust files
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base="${BASE_SHA:-HEAD^1}"
+          mapfile -t files < <(
+            git diff --diff-filter=ACMR --name-only "$base" HEAD -- src/language/llm_organ.rs src/language/llm_backend.rs \
+              | grep -E '\.rs$' || true
+          )
+          if ((${#files[@]})); then
+            printf 'rustfmt checking %s\n' "${files[@]}"
+            rustfmt --edition 2024 --config skip_children=true --check "${files[@]}"
+          else
+            echo 'No changed strict language Rust files to format-check.'
+          fi
+
+      - name: Test LLMOrgan language module
+        run: cargo test -p symthaea --lib language::llm_organ::tests
+
+      - name: Check root library
+        run: cargo check -p symthaea --lib
