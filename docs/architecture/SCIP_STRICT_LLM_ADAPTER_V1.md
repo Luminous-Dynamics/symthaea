@@ -111,7 +111,9 @@ The accepted surface-text digest is domain-separated BLAKE3 over:
 
 Changing request construction or privileged generation policy requires a new adapter-profile/digest version rather than silently reusing the v1 audit identity.
 
-These digests are suitable inputs to later Xenia/transcript evidence binding. They do **not** authenticate the backend by themselves.
+These digests are suitable inputs to later Xenia/transcript evidence binding. They do **not** authenticate the backend by themselves and do **not** provide confidentiality. Deterministic digests are equality/correlation identifiers; exposing them can reveal that two executions used the same request or output. Encryption, access control and disclosure policy remain transport/session concerns.
+
+`LLMBackend::name()` is likewise only a human-readable runtime label. v1 does not cryptographically bind exact model weights, provider deployment, runtime configuration or inference implementation. A later protocol-agnostic backend-attestation seam can add that information without making `LLMOrgan` depend on SCIP.
 
 ## Instruction/data boundary
 
@@ -129,6 +131,25 @@ Current parameters:
 | GroundedReasoning | 0.3 | 768 |
 
 These are adapter policy, not protocol semantics, and may be revisited independently of SCIP's canonical graph representation. A change must also advance the request-digest profile if it changes exact backend inputs.
+
+## Diagnostic privacy
+
+`ScipLlmRequest` and `ScipLlmOutput` implement custom redacted `Debug` views.
+
+Ordinary structured/log debugging does **not** expose:
+
+- grounded compatibility content;
+- trusted system instructions;
+- generated surface text;
+- source message IDs;
+- semantic hashes;
+- request digests;
+- surface digests;
+- provenance strings.
+
+The debug views expose only non-content operational metadata such as mode, byte counts, confidence, evidence/provenance entry counts, backend label and elapsed time. Callers that intentionally need sensitive values must request them through explicit fields/accessors and apply their own disclosure policy.
+
+This does not make the objects confidential in memory; it prevents accidental disclosure through the normal `Debug` path.
 
 ## Backend execution
 
@@ -173,7 +194,8 @@ The adapter test suite must prove at least:
 9. empty and oversized outputs fail closed;
 10. strict execution does not mutate legacy `LLMOrgan` accounting through a hidden fallback path;
 11. request digests are deterministic and change with semantic/policy changes;
-12. accepted surface digests bind the exact returned UTF-8 bytes.
+12. accepted surface digests bind the exact returned UTF-8 bytes;
+13. default `Debug` output redacts prompt/surface content and correlatable content-address identifiers.
 
 ## Non-claims
 
@@ -183,6 +205,8 @@ This adapter does not claim:
 - that the LLM independently grounds or verifies graph contents;
 - that generated text can replace the canonical graph;
 - that request/surface digests authenticate the backend or transport;
+- that deterministic digests provide confidentiality;
+- that backend name proves exact model/runtime identity;
 - that it preserves `LLMOrgan` conversation/statistics accounting yet;
 - that the post-generation output ceiling constrains backend-internal allocation;
 - that hosted LLMs natively consume HDC vectors.
