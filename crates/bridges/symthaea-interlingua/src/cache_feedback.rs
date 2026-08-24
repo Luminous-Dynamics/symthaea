@@ -9,9 +9,9 @@
 //! or authorize feedback; those responsibilities remain with Xenia or another
 //! surrounding session/transport layer.
 
+use crate::InterchangeError;
 use crate::protocol::require_content_hash;
 use crate::session::{PeerSemanticInventory, SemanticCacheAck};
-use crate::InterchangeError;
 use serde::{Deserialize, Serialize};
 
 /// Which exact prerequisite was missing when a transfer could not be resolved.
@@ -202,11 +202,7 @@ mod tests {
     #[test]
     fn malformed_miss_and_revoke_are_rejected() {
         assert!(
-            SemanticCacheMiss::new(
-                "bad",
-                SemanticCacheMissKind::SemanticReferenceTarget,
-            )
-            .is_err()
+            SemanticCacheMiss::new("bad", SemanticCacheMissKind::SemanticReferenceTarget,).is_err()
         );
         assert!(SemanticCacheRevoke::new("also-bad").is_err());
     }
@@ -354,11 +350,8 @@ mod tests {
         apply_cache_feedback(&mut inventory, &ack(&target)).unwrap();
 
         let miss = SemanticCacheFeedback::Miss(
-            SemanticCacheMiss::new(
-                target_hash,
-                SemanticCacheMissKind::SemanticReferenceTarget,
-            )
-            .unwrap(),
+            SemanticCacheMiss::new(target_hash, SemanticCacheMissKind::SemanticReferenceTarget)
+                .unwrap(),
         );
         apply_cache_feedback(&mut inventory, &miss).unwrap();
         assert_eq!(
