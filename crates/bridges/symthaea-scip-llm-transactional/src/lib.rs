@@ -294,6 +294,7 @@ mod tests {
         assert_eq!(output.backend_name, "transaction-test-backend");
         assert_eq!(organ.stats().queries_processed, 1);
         assert_eq!(organ.stats().errors, 0);
+        assert!(organ.stats().avg_generation_time_ms >= 0.0);
         assert_eq!(organ.conversation_history().len(), 2);
         assert_eq!(organ.conversation_history()[1].content, "Sensor S17.");
     }
@@ -312,6 +313,7 @@ mod tests {
         assert_eq!(organ.stats().tokens_generated, 0);
         assert_eq!(organ.stats().cache_hits, 0);
         assert_eq!(organ.stats().errors, 0);
+        assert_eq!(organ.stats().avg_generation_time_ms.to_bits(), 0.0f64.to_bits());
         assert!(organ.conversation_history().is_empty());
     }
 
@@ -332,6 +334,7 @@ mod tests {
         assert_eq!(organ.stats().tokens_generated, 0);
         assert_eq!(organ.stats().cache_hits, 0);
         assert_eq!(organ.stats().errors, 0);
+        assert_eq!(organ.stats().avg_generation_time_ms.to_bits(), 0.0f64.to_bits());
         assert!(organ.conversation_history().is_empty());
     }
 
@@ -348,7 +351,9 @@ mod tests {
         assert_eq!(calls.lock().unwrap().len(), 1);
         assert_eq!(organ.stats().queries_processed, 0);
         assert_eq!(organ.stats().tokens_generated, 0);
+        assert_eq!(organ.stats().cache_hits, 0);
         assert_eq!(organ.stats().errors, 1);
+        assert_eq!(organ.stats().avg_generation_time_ms.to_bits(), 0.0f64.to_bits());
         assert!(organ.conversation_history().is_empty());
         assert!(!error.to_string().contains("operator-only transactional"));
     }
@@ -363,7 +368,10 @@ mod tests {
             Err(ScipLlmError::MissingBackend)
         ));
         assert_eq!(organ.stats().queries_processed, 0);
+        assert_eq!(organ.stats().tokens_generated, 0);
+        assert_eq!(organ.stats().cache_hits, 0);
         assert_eq!(organ.stats().errors, 0);
+        assert_eq!(organ.stats().avg_generation_time_ms.to_bits(), 0.0f64.to_bits());
         assert!(organ.conversation_history().is_empty());
     }
 }
