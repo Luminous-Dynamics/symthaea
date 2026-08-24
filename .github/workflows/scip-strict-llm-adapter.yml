@@ -33,7 +33,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          # The formatting ratchet compares the whole PR with its stacked base,
+          # not merely the final commit. Full history guarantees the base SHA is
+          # locally available even for multi-commit stacked pull requests.
+          fetch-depth: 0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -52,11 +55,17 @@ jobs:
             ${{ runner.os }}-cargo-scip-llm-
             ${{ runner.os }}-cargo-scip-
 
-      - name: Format changed adapter Rust files
+      - name: Format all adapter Rust files changed by this tranche
         shell: bash
         run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="$(git rev-parse HEAD^1)"
+          fi
+          echo "Formatting diff base: $base"
           mapfile -t files < <(
-            git diff --diff-filter=ACMR --name-only HEAD^1 HEAD -- crates/bridges/symthaea-scip-llm-adapter \
+            git diff --diff-filter=ACMR --name-only "$base" HEAD -- crates/bridges/symthaea-scip-llm-adapter \
               | grep -E '\.rs$' || true
           )
           if ((${#files[@]})); then
