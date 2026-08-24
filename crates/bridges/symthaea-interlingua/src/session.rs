@@ -306,7 +306,7 @@ mod tests {
     }
 
     #[test]
-    fn base_ack_enables_exact_delta_and_target_ack_enables_reference() {
+    fn acknowledgements_enable_candidates_without_overriding_size_planning() {
         let session = negotiate(
             &PeerCapabilities::structured_only(),
             &PeerCapabilities::structured_only(),
@@ -327,13 +327,19 @@ mod tests {
             vec![],
         )
         .unwrap();
-        assert!(delta_input.graph_delta_bytes.is_some());
+        let delta_bytes = delta_input.graph_delta_bytes.unwrap();
         assert_eq!(delta_input.semantic_reference_bytes, None);
-        assert_eq!(
-            plan_transfer(&delta_input, TransferPolicy::default())
-                .unwrap()
-                .semantic,
+
+        let delta_plan = plan_transfer(&delta_input, TransferPolicy::default()).unwrap();
+        let expected_delta_mode = if delta_bytes <= delta_input.grounded_graph_bytes {
             SemanticTransferMode::GraphDelta
+        } else {
+            SemanticTransferMode::GroundedGraph
+        };
+        assert_eq!(delta_plan.semantic, expected_delta_mode);
+        assert_eq!(
+            delta_plan.semantic_bytes,
+            delta_bytes.min(delta_input.grounded_graph_bytes)
         );
 
         acknowledge(&mut inventory, &target).unwrap();
@@ -346,13 +352,22 @@ mod tests {
             vec![],
         )
         .unwrap();
-        assert!(reference_input.semantic_reference_bytes.is_some());
-        assert_eq!(
-            plan_transfer(&reference_input, TransferPolicy::default())
-                .unwrap()
-                .semantic,
-            SemanticTransferMode::SemanticReference
-        );
+        let reference_bytes = reference_input.semantic_reference_bytes.unwrap();
+        let graph_delta_bytes = reference_input.graph_delta_bytes.unwrap();
+        let expected_reference_mode = [
+            (SemanticTransferMode::SemanticReference, reference_bytes),
+            (SemanticTransferMode::GraphDelta, graph_delta_bytes),
+            (
+                SemanticTransferMode::GroundedGraph,
+                reference_input.grounded_graph_bytes,
+            ),
+        ]
+        .into_iter()
+        .min_by_key(|(_, bytes)| *bytes)
+        .unwrap();
+        let reference_plan = plan_transfer(&reference_input, TransferPolicy::default()).unwrap();
+        assert_eq!(reference_plan.semantic, expected_reference_mode.0);
+        assert_eq!(reference_plan.semantic_bytes, expected_reference_mode.1);
     }
 
     #[test]
