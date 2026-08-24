@@ -62,11 +62,12 @@ impl ScipLlmRequest {
     /// Compile an envelope into the strict text-only LLM compatibility path.
     ///
     /// `resolved_graph` is required for representations whose exact grounded
-    /// graph is external to the envelope (for example HDC and semantic
-    /// references). The adapter canonicalizes semantically unordered graph,
-    /// evidence and provenance collections before text compilation, so the same
-    /// grounded state produces the same request bytes independent of insertion
-    /// order. `LlmTextFallback` then verifies exact semantic binding.
+    /// graph is external to the envelope (HDC and semantic references). It is
+    /// ignored for self-contained GroundedGraph and StructuredJson payloads.
+    /// The adapter canonicalizes semantically unordered graph, evidence and
+    /// provenance collections before text compilation, so the same grounded
+    /// state produces the same request bytes independent of insertion order.
+    /// `LlmTextFallback` then verifies exact semantic binding.
     pub fn compile(
         envelope: &CognitiveEnvelope,
         resolved_graph: Option<&GroundedConceptGraph>,
@@ -79,7 +80,12 @@ impl ScipLlmRequest {
         if let InterchangePayload::GroundedGraph(graph) = &mut canonical_envelope.payload {
             *graph = canonicalize_graph(graph)?;
         }
-        let canonical_resolved = resolved_graph.map(canonicalize_graph).transpose()?;
+        let canonical_resolved = match &canonical_envelope.payload {
+            InterchangePayload::Hdc(_) | InterchangePayload::Reference(_) => {
+                resolved_graph.map(canonicalize_graph).transpose()?
+            }
+            _ => None,
+        };
 
         let packet = LlmTextFallback::compile(
             &canonical_envelope,
@@ -469,7 +475,9 @@ mod tests {
         let first_graph = orderable_graph();
         let mut second_graph = first_graph.clone();
         second_graph.nodes.reverse();
-        second_graph.nodes[0].grounded_by.reverse();
+        for node in &mut second_graph.nodes {
+            node.grounded_by.reverse();
+        }
         second_graph.edges[0].evidence_ids.reverse();
 
         let mut first_provenance = provenance();
@@ -497,9 +505,40 @@ mod tests {
 
         assert_eq!(first_request.content(), second_request.content());
         assert_eq!(first_request.request_digest(), second_request.request_digest());
-        assert_eq!(first_request.source_evidence_ids(), &["a", "z"]);
-        assert_eq!(first_request.source_evidence_ids(), second_request.source_evidence_ids());
-        assert_eq!(first_request.source_provenance(), second_request.source_provenance());
+        assert_eq!(
+            first_request.source_evidence_ids(),
+            &[String::from("a"), String::from("z")]
+        );
+        assert_eq!(
+            first_request.source_evidence_ids(),
+            second_request.source_evidence_ids()
+        );
+        assert_eq!(
+            first_request.source_provenance(),
+            second_request.source_provenance()
+        );
+    }
+
+    #[test]
+    fn self_contained_payload_ignores_irrelevant_resolved_graph() {
+        let envelope = CognitiveEnvelope::from_graph(graph("S17"), 0.9, provenance()).unwrap();
+        let mut irrelevant = graph("irrelevant");
+        irrelevant.edges.push(ConceptEdge {
+            source: "sensor".into(),
+            relation: "points-to".into(),
+            target: "missing".into(),
+            evidence_ids: vec![],
+            confidence: 1.0,
+        });
+
+        assert!(
+            ScipLlmRequest::compile(
+                &envelope,
+                Some(&irrelevant),
+                LlmFallbackMode::FaithfulTranslation,
+            )
+            .is_ok()
+        );
     }
 
     #[test]
