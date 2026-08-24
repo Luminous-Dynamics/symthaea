@@ -20,7 +20,8 @@ use blake3::Hasher;
 use symthaea::language::{llm_backend::GenerationParams, llm_organ::LLMOrgan};
 use symthaea_communication::{GroundedConceptGraph, Provenance};
 use symthaea_interlingua::{
-    CognitiveEnvelope, InterchangeError, LlmFallbackMode, LlmTextFallback,
+    CognitiveEnvelope, InterchangeError, InterchangePayload, LlmFallbackMode, LlmTextFallback,
+    canonicalize_graph,
 };
 
 /// Versioned adapter profile bound into deterministic request digests.
@@ -62,25 +63,40 @@ impl ScipLlmRequest {
     ///
     /// `resolved_graph` is required for representations whose exact grounded
     /// graph is external to the envelope (for example HDC and semantic
-    /// references). `LlmTextFallback` verifies the graph's semantic hash before
-    /// this request can be constructed.
+    /// references). The adapter canonicalizes semantically unordered graph,
+    /// evidence and provenance collections before text compilation, so the same
+    /// grounded state produces the same request bytes independent of insertion
+    /// order. `LlmTextFallback` then verifies exact semantic binding.
     pub fn compile(
         envelope: &CognitiveEnvelope,
         resolved_graph: Option<&GroundedConceptGraph>,
         mode: LlmFallbackMode,
     ) -> Result<Self, ScipLlmError> {
-        let packet = LlmTextFallback::compile(envelope, resolved_graph, mode)?;
+        let mut canonical_envelope = envelope.clone();
+        canonical_envelope.evidence_ids.sort();
+        canonical_envelope.provenance.feature_flags.sort();
+        canonical_envelope.provenance.transformations.sort();
+        if let InterchangePayload::GroundedGraph(graph) = &mut canonical_envelope.payload {
+            *graph = canonicalize_graph(graph)?;
+        }
+        let canonical_resolved = resolved_graph.map(canonicalize_graph).transpose()?;
+
+        let packet = LlmTextFallback::compile(
+            &canonical_envelope,
+            canonical_resolved.as_ref(),
+            mode,
+        )?;
         let request_digest = request_digest_v1(mode, &packet.content, &packet.system_prompt);
         Ok(Self {
             mode,
             content: packet.content,
             system_prompt: packet.system_prompt,
             request_digest,
-            source_message_id: envelope.message_id.clone(),
+            source_message_id: canonical_envelope.message_id.clone(),
             source_semantic_hash: packet.semantic_hash,
-            source_confidence: envelope.confidence,
-            source_evidence_ids: envelope.evidence_ids.clone(),
-            source_provenance: envelope.provenance.clone(),
+            source_confidence: canonical_envelope.confidence,
+            source_evidence_ids: canonical_envelope.evidence_ids.clone(),
+            source_provenance: canonical_envelope.provenance.clone(),
         })
     }
 
@@ -99,11 +115,12 @@ impl ScipLlmRequest {
         // Do not propagate arbitrary backend/provider error text across the
         // strict semantic boundary. Provider diagnostics can contain URLs,
         // headers, request bodies, or other operator-sensitive details.
-        let text = backend.generate(&self.content, &params).await.map_err(|_| {
-            ScipLlmError::BackendFailure {
+        let text = backend
+            .generate(&self.content, &params)
+            .await
+            .map_err(|_| ScipLlmError::BackendFailure {
                 backend: backend_name.clone(),
-            }
-        })?;
+            })?;
 
         if text.trim().is_empty() {
             return Err(ScipLlmError::EmptyOutput {
@@ -297,7 +314,7 @@ mod tests {
         llm_backend::{GenerationParams, LLMBackend, simulated_backend},
         llm_organ::LLMOrganConfig,
     };
-    use symthaea_communication::{ConceptKind, ConceptNode};
+    use symthaea_communication::{ConceptEdge, ConceptKind, ConceptNode};
     use symthaea_interlingua::{GroundedHdcCodec, graph_semantic_hash};
 
     fn graph(label: &str) -> GroundedConceptGraph {
@@ -310,6 +327,34 @@ mod tests {
                 confidence: 0.9,
             }],
             edges: vec![],
+        }
+    }
+
+    fn orderable_graph() -> GroundedConceptGraph {
+        GroundedConceptGraph {
+            nodes: vec![
+                ConceptNode {
+                    id: "b".into(),
+                    kind: ConceptKind::Object,
+                    label: Some("reactor".into()),
+                    grounded_by: vec!["obs-2".into(), "obs-1".into()],
+                    confidence: 0.8,
+                },
+                ConceptNode {
+                    id: "a".into(),
+                    kind: ConceptKind::Agent,
+                    label: Some("alice".into()),
+                    grounded_by: vec!["obs-0".into()],
+                    confidence: 0.9,
+                },
+            ],
+            edges: vec![ConceptEdge {
+                source: "a".into(),
+                relation: "observes".into(),
+                target: "b".into(),
+                evidence_ids: vec!["ev-2".into(), "ev-1".into()],
+                confidence: 0.7,
+            }],
         }
     }
 
@@ -420,6 +465,44 @@ mod tests {
     }
 
     #[test]
+    fn semantically_equivalent_order_compiles_to_identical_request() {
+        let first_graph = orderable_graph();
+        let mut second_graph = first_graph.clone();
+        second_graph.nodes.reverse();
+        second_graph.nodes[0].grounded_by.reverse();
+        second_graph.edges[0].evidence_ids.reverse();
+
+        let mut first_provenance = provenance();
+        first_provenance.feature_flags = vec!["zeta".into(), "alpha".into()];
+        first_provenance.transformations = vec!["second".into(), "first".into()];
+        let mut second_provenance = first_provenance.clone();
+        second_provenance.feature_flags.reverse();
+        second_provenance.transformations.reverse();
+
+        let mut first =
+            CognitiveEnvelope::from_graph(first_graph, 0.9, first_provenance).unwrap();
+        first.evidence_ids = vec!["z".into(), "a".into()];
+        first.refresh_id().unwrap();
+
+        let mut second =
+            CognitiveEnvelope::from_graph(second_graph, 0.9, second_provenance).unwrap();
+        second.evidence_ids = vec!["a".into(), "z".into()];
+        second.refresh_id().unwrap();
+
+        assert_eq!(first.message_id, second.message_id);
+        let first_request =
+            ScipLlmRequest::compile(&first, None, LlmFallbackMode::FaithfulTranslation).unwrap();
+        let second_request =
+            ScipLlmRequest::compile(&second, None, LlmFallbackMode::FaithfulTranslation).unwrap();
+
+        assert_eq!(first_request.content(), second_request.content());
+        assert_eq!(first_request.request_digest(), second_request.request_digest());
+        assert_eq!(first_request.source_evidence_ids(), &["a", "z"]);
+        assert_eq!(first_request.source_evidence_ids(), second_request.source_evidence_ids());
+        assert_eq!(first_request.source_provenance(), second_request.source_provenance());
+    }
+
+    #[test]
     fn request_digest_is_deterministic_and_mode_sensitive() {
         let envelope = CognitiveEnvelope::from_graph(graph("S17"), 0.9, provenance()).unwrap();
         let first =
@@ -431,8 +514,7 @@ mod tests {
         assert_eq!(first.request_digest(), second.request_digest());
         assert_ne!(first.request_digest(), reasoning.request_digest());
 
-        let changed =
-            CognitiveEnvelope::from_graph(graph("S18"), 0.9, provenance()).unwrap();
+        let changed = CognitiveEnvelope::from_graph(graph("S18"), 0.9, provenance()).unwrap();
         let changed =
             ScipLlmRequest::compile(&changed, None, LlmFallbackMode::FaithfulTranslation).unwrap();
         assert_ne!(first.request_digest(), changed.request_digest());
