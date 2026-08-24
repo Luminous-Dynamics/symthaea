@@ -19,6 +19,7 @@ pub mod metrics;
 pub mod negotiation;
 pub mod planner;
 pub mod protocol;
+pub mod session;
 pub mod text_fallback;
 pub mod wire;
 
@@ -33,8 +34,8 @@ pub use negotiation::{
     NegotiatedSession, NegotiationPolicy, PeerCapabilities, negotiate, negotiate_with_policy,
 };
 pub use planner::{
-    ProjectionAttachment, ProjectionCandidate, ProjectionPolicy, SemanticTransferMode, TransferPlan,
-    TransferPlanningInput, TransferPolicy, plan_transfer,
+    ProjectionAttachment, ProjectionCandidate, ProjectionPolicy, SemanticTransferMode,
+    TransferPlan, TransferPlanningInput, TransferPolicy, plan_transfer,
 };
 pub use protocol::{
     CognitiveEnvelope, GROUNDED_GRAPH_SCHEMA_V1, HdcPayload, HdcProfile, InterchangeError,
@@ -43,6 +44,10 @@ pub use protocol::{
     StructuredJsonPayload, canonical_graph_bytes, canonical_graph_bytes_with_limits,
     canonicalize_graph, canonicalize_graph_with_limits, graph_semantic_hash, validate_graph,
     validate_graph_with_limits,
+};
+pub use session::{
+    MAX_PEER_SEMANTIC_INVENTORY_ENTRIES, PeerSemanticInventory, SemanticCacheAck,
+    build_grounded_transfer_input,
 };
 pub use text_fallback::{LlmFallbackMode, LlmFallbackPacket, LlmTextFallback};
 pub use wire::{
