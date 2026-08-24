@@ -31,8 +31,6 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@1.96.0
-        with:
-          components: rustfmt, clippy
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -45,10 +43,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sym-arch-001-
 
-      - name: Format check for experiment files
-        run: |
-          cargo fmt --all -- --check
-
+      # Formatting remains the responsibility of normal repository CI. Keep
+      # the research workflow focused on whether the preregistered experiment
+      # compiles, executes, and emits valid evidence.
       - name: Compile and run experiment unit tests
         run: |
           cargo test -p symthaea-psych-bench --lib benchmarks::architecture -- --nocapture
