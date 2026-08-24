@@ -5,53 +5,39 @@
 //! Opt-in SIMD acceleration for [`ContinuousHV`](crate::ContinuousHV).
 //!
 //! This module deliberately does **not** replace the crate's existing scalar
-//! methods.  The scalar implementation remains the reference path used by
-//! frozen experiments.  Callers may opt into these methods after proving
-//! semantic equivalence for their workload.
+//! methods. The scalar implementation remains the reference path used by frozen
+//! experiments. Callers opt in explicitly through [`ContinuousHvSimdExt`].
 //!
-//! The x86_64 path uses AVX2 with unaligned loads/stores.  The aarch64 path uses
-//! NEON.  Other targets fall back to the scalar kernels in this module.
-//!
-//! FMA is intentionally not used in state-changing kernels so the accelerated
-//! path stays as close as practical to scalar IEEE-754 operation structure.
+//! On x86_64, AVX2 is selected at runtime and uses unaligned loads/stores. Other
+//! targets use the portable scalar fallback in this module. FMA is deliberately
+//! not used in state-changing kernels so the accelerated path stays as close as
+//! practical to the scalar IEEE-754 operation structure.
 
 use crate::ContinuousHV;
 
-/// Runtime-selected SIMD implementation.
+/// Runtime-selected implementation for the accelerated extension methods.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SimdBackend {
     /// Portable scalar fallback.
     Scalar,
     /// x86_64 AVX2 (8 x f32 lanes).
     Avx2,
-    /// aarch64 NEON / AdvSIMD (4 x f32 lanes).
-    Neon,
 }
 
-/// Return the backend that the accelerated methods will use on this process.
+/// Return the backend used by the accelerated extension methods.
 #[inline]
 pub fn simd_backend() -> SimdBackend {
     #[cfg(target_arch = "x86_64")]
-    {
-        if std::arch::is_x86_feature_detected!("avx2") {
-            return SimdBackend::Avx2;
-        }
+    if std::arch::is_x86_feature_detected!("avx2") {
+        return SimdBackend::Avx2;
     }
-
-    #[cfg(target_arch = "aarch64")]
-    {
-        return SimdBackend::Neon;
-    }
-
-    #[allow(unreachable_code)]
     SimdBackend::Scalar
 }
 
 /// Explicit accelerated operations for continuous hypervectors.
 ///
-/// Existing `ContinuousHV` methods remain untouched, so enabling the `simd`
-/// Cargo feature alone cannot change a frozen experiment.  A caller must opt in
-/// by invoking the methods on this trait.
+/// Enabling the `simd` Cargo feature alone cannot alter an existing experiment:
+/// a caller must explicitly invoke these methods.
 pub trait ContinuousHvSimdExt {
     /// Element-wise HDC binding using the selected accelerated kernel.
     fn bind_simd(&self, other: &ContinuousHV) -> ContinuousHV;
@@ -106,14 +92,12 @@ impl ContinuousHvSimdExt for ContinuousHV {
 
     #[inline]
     fn add_scaled_simd(&mut self, other: &ContinuousHV, scale: f32) {
-        debug_assert_eq!(self.values.len(), other.values.len());
         assert_eq!(self.values.len(), other.values.len(), "Dimension mismatch");
         add_scaled_in_place(&mut self.values, &other.values, scale);
     }
 
     #[inline]
     fn lerp_in_place_simd(&mut self, target: &ContinuousHV, alpha: f32) {
-        debug_assert_eq!(self.values.len(), target.values.len());
         assert_eq!(self.values.len(), target.values.len(), "Dimension mismatch");
         lerp_in_place(&mut self.values, &target.values, alpha);
     }
@@ -130,13 +114,6 @@ fn bind_into(a: &[f32], b: &[f32], out: &mut [f32]) {
         unsafe { return bind_avx2(a, b, out) };
     }
 
-    #[cfg(target_arch = "aarch64")]
-    {
-        // SAFETY: AdvSIMD/NEON is part of the AArch64 architecture baseline.
-        unsafe { return bind_neon(a, b, out) };
-    }
-
-    #[allow(unreachable_code)]
     for i in 0..a.len() {
         out[i] = a[i] * b[i];
     }
@@ -146,17 +123,10 @@ fn bind_into(a: &[f32], b: &[f32], out: &mut [f32]) {
 fn scale_in_place(values: &mut [f32], factor: f32) {
     #[cfg(target_arch = "x86_64")]
     if std::arch::is_x86_feature_detected!("avx2") {
-        // SAFETY: AVX2 was detected at runtime and `values` is a valid mutable slice.
+        // SAFETY: AVX2 was detected at runtime and `values` is valid.
         unsafe { return scale_avx2(values, factor) };
     }
 
-    #[cfg(target_arch = "aarch64")]
-    {
-        // SAFETY: AdvSIMD/NEON is part of the AArch64 architecture baseline.
-        unsafe { return scale_neon(values, factor) };
-    }
-
-    #[allow(unreachable_code)]
     for value in values {
         *value *= factor;
     }
@@ -172,13 +142,6 @@ fn add_scaled_in_place(dst: &mut [f32], src: &[f32], scale: f32) {
         unsafe { return add_scaled_avx2(dst, src, scale) };
     }
 
-    #[cfg(target_arch = "aarch64")]
-    {
-        // SAFETY: AdvSIMD/NEON is part of the AArch64 architecture baseline.
-        unsafe { return add_scaled_neon(dst, src, scale) };
-    }
-
-    #[allow(unreachable_code)]
     for (d, &s) in dst.iter_mut().zip(src) {
         *d += s * scale;
     }
@@ -195,13 +158,6 @@ fn lerp_in_place(dst: &mut [f32], target: &[f32], alpha: f32) {
         unsafe { return lerp_avx2(dst, target, alpha, one_minus) };
     }
 
-    #[cfg(target_arch = "aarch64")]
-    {
-        // SAFETY: AdvSIMD/NEON is part of the AArch64 architecture baseline.
-        unsafe { return lerp_neon(dst, target, alpha, one_minus) };
-    }
-
-    #[allow(unreachable_code)]
     for (d, &t) in dst.iter_mut().zip(target) {
         *d = one_minus * *d + alpha * t;
     }
@@ -217,13 +173,6 @@ fn dot(a: &[f32], b: &[f32]) -> f32 {
         unsafe { return dot_avx2(a, b) };
     }
 
-    #[cfg(target_arch = "aarch64")]
-    {
-        // SAFETY: AdvSIMD/NEON is part of the AArch64 architecture baseline.
-        unsafe { return dot_neon(a, b) };
-    }
-
-    #[allow(unreachable_code)]
     a.iter().zip(b).map(|(&x, &y)| x * y).sum()
 }
 
@@ -237,24 +186,15 @@ fn cosine_stats(a: &[f32], b: &[f32]) -> (f32, f32, f32) {
         unsafe { return cosine_stats_avx2(a, b) };
     }
 
-    #[cfg(target_arch = "aarch64")]
-    {
-        // SAFETY: AdvSIMD/NEON is part of the AArch64 architecture baseline.
-        unsafe { return cosine_stats_neon(a, b) };
+    let mut dot = 0.0;
+    let mut norm_a = 0.0;
+    let mut norm_b = 0.0;
+    for (&x, &y) in a.iter().zip(b) {
+        dot += x * y;
+        norm_a += x * x;
+        norm_b += y * y;
     }
-
-    #[allow(unreachable_code)]
-    {
-        let mut dot = 0.0;
-        let mut norm_a = 0.0;
-        let mut norm_b = 0.0;
-        for (&x, &y) in a.iter().zip(b) {
-            dot += x * y;
-            norm_a += x * x;
-            norm_b += y * y;
-        }
-        (dot, norm_a, norm_b)
-    }
+    (dot, norm_a, norm_b)
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -262,14 +202,13 @@ fn cosine_stats(a: &[f32], b: &[f32]) -> (f32, f32, f32) {
 unsafe fn bind_avx2(a: &[f32], b: &[f32], out: &mut [f32]) {
     use std::arch::x86_64::*;
     unsafe {
-        let width = 8;
-        let simd_len = a.len() / width * width;
+        let simd_len = a.len() / 8 * 8;
         let mut i = 0;
         while i < simd_len {
             let av = _mm256_loadu_ps(a.as_ptr().add(i));
             let bv = _mm256_loadu_ps(b.as_ptr().add(i));
             _mm256_storeu_ps(out.as_mut_ptr().add(i), _mm256_mul_ps(av, bv));
-            i += width;
+            i += 8;
         }
         while i < a.len() {
             out[i] = a[i] * b[i];
@@ -283,16 +222,16 @@ unsafe fn bind_avx2(a: &[f32], b: &[f32], out: &mut [f32]) {
 unsafe fn scale_avx2(values: &mut [f32], factor: f32) {
     use std::arch::x86_64::*;
     unsafe {
-        let factor = _mm256_set1_ps(factor);
+        let factor_vec = _mm256_set1_ps(factor);
         let simd_len = values.len() / 8 * 8;
         let mut i = 0;
         while i < simd_len {
             let v = _mm256_loadu_ps(values.as_ptr().add(i));
-            _mm256_storeu_ps(values.as_mut_ptr().add(i), _mm256_mul_ps(v, factor));
+            _mm256_storeu_ps(values.as_mut_ptr().add(i), _mm256_mul_ps(v, factor_vec));
             i += 8;
         }
         while i < values.len() {
-            values[i] *= _mm256_cvtss_f32(factor);
+            values[i] *= factor;
             i += 1;
         }
     }
@@ -360,9 +299,7 @@ unsafe fn dot_avx2(a: &[f32], b: &[f32]) -> f32 {
             sum = _mm256_add_ps(sum, _mm256_mul_ps(av, bv));
             i += 8;
         }
-        let mut lanes = [0.0f32; 8];
-        _mm256_storeu_ps(lanes.as_mut_ptr(), sum);
-        let mut total = lanes.into_iter().sum::<f32>();
+        let mut total = reduce_m256(sum);
         while i < a.len() {
             total += a[i] * b[i];
             i += 1;
@@ -389,15 +326,9 @@ unsafe fn cosine_stats_avx2(a: &[f32], b: &[f32]) -> (f32, f32, f32) {
             norm_b = _mm256_add_ps(norm_b, _mm256_mul_ps(bv, bv));
             i += 8;
         }
-
-        let reduce = |value: __m256| {
-            let mut lanes = [0.0f32; 8];
-            _mm256_storeu_ps(lanes.as_mut_ptr(), value);
-            lanes.into_iter().sum::<f32>()
-        };
-        let mut dot_total = reduce(dot);
-        let mut norm_a_total = reduce(norm_a);
-        let mut norm_b_total = reduce(norm_b);
+        let mut dot_total = reduce_m256(dot);
+        let mut norm_a_total = reduce_m256(norm_a);
+        let mut norm_b_total = reduce_m256(norm_b);
         while i < a.len() {
             let x = a[i];
             let y = b[i];
@@ -410,138 +341,14 @@ unsafe fn cosine_stats_avx2(a: &[f32], b: &[f32]) -> (f32, f32, f32) {
     }
 }
 
-#[cfg(target_arch = "aarch64")]
-unsafe fn bind_neon(a: &[f32], b: &[f32], out: &mut [f32]) {
-    use std::arch::aarch64::*;
+#[cfg(target_arch = "x86_64")]
+#[inline]
+unsafe fn reduce_m256(value: std::arch::x86_64::__m256) -> f32 {
+    use std::arch::x86_64::_mm256_storeu_ps;
     unsafe {
-        let simd_len = a.len() / 4 * 4;
-        let mut i = 0;
-        while i < simd_len {
-            let av = vld1q_f32(a.as_ptr().add(i));
-            let bv = vld1q_f32(b.as_ptr().add(i));
-            vst1q_f32(out.as_mut_ptr().add(i), vmulq_f32(av, bv));
-            i += 4;
-        }
-        while i < a.len() {
-            out[i] = a[i] * b[i];
-            i += 1;
-        }
-    }
-}
-
-#[cfg(target_arch = "aarch64")]
-unsafe fn scale_neon(values: &mut [f32], factor: f32) {
-    use std::arch::aarch64::*;
-    unsafe {
-        let factor_vec = vdupq_n_f32(factor);
-        let simd_len = values.len() / 4 * 4;
-        let mut i = 0;
-        while i < simd_len {
-            let v = vld1q_f32(values.as_ptr().add(i));
-            vst1q_f32(values.as_mut_ptr().add(i), vmulq_f32(v, factor_vec));
-            i += 4;
-        }
-        while i < values.len() {
-            values[i] *= factor;
-            i += 1;
-        }
-    }
-}
-
-#[cfg(target_arch = "aarch64")]
-unsafe fn add_scaled_neon(dst: &mut [f32], src: &[f32], scale: f32) {
-    use std::arch::aarch64::*;
-    unsafe {
-        let scale_vec = vdupq_n_f32(scale);
-        let simd_len = dst.len() / 4 * 4;
-        let mut i = 0;
-        while i < simd_len {
-            let d = vld1q_f32(dst.as_ptr().add(i));
-            let s = vld1q_f32(src.as_ptr().add(i));
-            vst1q_f32(dst.as_mut_ptr().add(i), vaddq_f32(d, vmulq_f32(s, scale_vec)));
-            i += 4;
-        }
-        while i < dst.len() {
-            dst[i] += src[i] * scale;
-            i += 1;
-        }
-    }
-}
-
-#[cfg(target_arch = "aarch64")]
-unsafe fn lerp_neon(dst: &mut [f32], target: &[f32], alpha: f32, one_minus: f32) {
-    use std::arch::aarch64::*;
-    unsafe {
-        let alpha_vec = vdupq_n_f32(alpha);
-        let one_minus_vec = vdupq_n_f32(one_minus);
-        let simd_len = dst.len() / 4 * 4;
-        let mut i = 0;
-        while i < simd_len {
-            let d = vld1q_f32(dst.as_ptr().add(i));
-            let t = vld1q_f32(target.as_ptr().add(i));
-            let next = vaddq_f32(vmulq_f32(d, one_minus_vec), vmulq_f32(t, alpha_vec));
-            vst1q_f32(dst.as_mut_ptr().add(i), next);
-            i += 4;
-        }
-        while i < dst.len() {
-            dst[i] = one_minus * dst[i] + alpha * target[i];
-            i += 1;
-        }
-    }
-}
-
-#[cfg(target_arch = "aarch64")]
-unsafe fn dot_neon(a: &[f32], b: &[f32]) -> f32 {
-    use std::arch::aarch64::*;
-    unsafe {
-        let simd_len = a.len() / 4 * 4;
-        let mut sum = vdupq_n_f32(0.0);
-        let mut i = 0;
-        while i < simd_len {
-            sum = vaddq_f32(
-                sum,
-                vmulq_f32(vld1q_f32(a.as_ptr().add(i)), vld1q_f32(b.as_ptr().add(i))),
-            );
-            i += 4;
-        }
-        let mut total = vaddvq_f32(sum);
-        while i < a.len() {
-            total += a[i] * b[i];
-            i += 1;
-        }
-        total
-    }
-}
-
-#[cfg(target_arch = "aarch64")]
-unsafe fn cosine_stats_neon(a: &[f32], b: &[f32]) -> (f32, f32, f32) {
-    use std::arch::aarch64::*;
-    unsafe {
-        let simd_len = a.len() / 4 * 4;
-        let mut dot = vdupq_n_f32(0.0);
-        let mut norm_a = vdupq_n_f32(0.0);
-        let mut norm_b = vdupq_n_f32(0.0);
-        let mut i = 0;
-        while i < simd_len {
-            let av = vld1q_f32(a.as_ptr().add(i));
-            let bv = vld1q_f32(b.as_ptr().add(i));
-            dot = vaddq_f32(dot, vmulq_f32(av, bv));
-            norm_a = vaddq_f32(norm_a, vmulq_f32(av, av));
-            norm_b = vaddq_f32(norm_b, vmulq_f32(bv, bv));
-            i += 4;
-        }
-        let mut dot_total = vaddvq_f32(dot);
-        let mut norm_a_total = vaddvq_f32(norm_a);
-        let mut norm_b_total = vaddvq_f32(norm_b);
-        while i < a.len() {
-            let x = a[i];
-            let y = b[i];
-            dot_total += x * y;
-            norm_a_total += x * x;
-            norm_b_total += y * y;
-            i += 1;
-        }
-        (dot_total, norm_a_total, norm_b_total)
+        let mut lanes = [0.0f32; 8];
+        _mm256_storeu_ps(lanes.as_mut_ptr(), value);
+        lanes.into_iter().sum()
     }
 }
 
