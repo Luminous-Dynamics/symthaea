@@ -10,11 +10,19 @@
 //! This is not a scientific result. It compares the existing scalar query loop
 //! with a candidate set prepared once using contiguous storage and cached norms.
 
-use std::hint::black_box;
-use std::time::Instant;
-use symthaea_hdc_ltc::{ContinuousHV, PreparedContinuousHvSet, simd_backend};
-
+#[cfg(not(feature = "simd"))]
 fn main() {
+    eprintln!(
+        "re-run with: cargo run -p symthaea-hdc-ltc --example simd_batch_bench --release --features simd"
+    );
+}
+
+#[cfg(feature = "simd")]
+fn main() {
+    use std::hint::black_box;
+    use std::time::Instant;
+    use symthaea_hdc_ltc::{ContinuousHV, PreparedContinuousHvSet, simd_backend};
+
     println!("backend={:?}", simd_backend());
     println!("dim,candidates,queries,scalar_ms,prepared_ms,speedup,winner_match");
 
@@ -23,7 +31,7 @@ fn main() {
             let candidates: Vec<_> = (0..candidate_count)
                 .map(|i| ContinuousHV::new_random(dim, 10_000 + i as u64))
                 .collect();
-            let queries: Vec<_> = (0..64)
+            let queries: Vec<_> = (0..64u64)
                 .map(|i| ContinuousHV::new_random(dim, 50_000 + i))
                 .collect();
             let prepared = PreparedContinuousHvSet::new(&candidates);
