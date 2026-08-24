@@ -9,6 +9,7 @@ license = "AGPL-3.0-or-later"
 symthaea = { path = "../../..", default-features = false }
 symthaea-communication = { workspace = true }
 symthaea-interlingua = { path = "../symthaea-interlingua" }
+blake3 = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
