@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-scip-llm-adapter"
+version = "0.1.0"
+edition = "2024"
+description = "Strict SCIP execution adapter for Symthaea LLM backends"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea = { path = "../../..", default-features = false }
+symthaea-communication = { workspace = true }
+symthaea-interlingua = { path = "../symthaea-interlingua" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+async-trait = "0.1"
+tokio = { workspace = true }
