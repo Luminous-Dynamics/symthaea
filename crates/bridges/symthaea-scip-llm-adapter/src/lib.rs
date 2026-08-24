@@ -14,7 +14,7 @@
 
 #![forbid(unsafe_code)]
 
-use std::time::Instant;
+use std::{fmt, time::Instant};
 
 use blake3::Hasher;
 use symthaea::language::{llm_backend::GenerationParams, llm_organ::LLMOrgan};
@@ -45,7 +45,7 @@ const SURFACE_DIGEST_DOMAIN_V1: &[u8] = b"symthaea-scip-llm-surface-v1\0";
 ///
 /// The prompt fields are private so the adapter's trusted instruction/data
 /// boundary cannot be modified through this type after compilation.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct ScipLlmRequest {
     mode: LlmFallbackMode,
     content: String,
@@ -56,6 +56,31 @@ pub struct ScipLlmRequest {
     source_confidence: f32,
     source_evidence_ids: Vec<String>,
     source_provenance: Provenance,
+}
+
+/// Deliberately redacted debug view.
+///
+/// Prompt bytes, privileged instructions, content-address identifiers and
+/// provenance strings can all be sensitive or correlatable. Callers must use
+/// explicit accessors when they intentionally need those values.
+impl fmt::Debug for ScipLlmRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ScipLlmRequest")
+            .field("mode", &self.mode)
+            .field("content_bytes", &self.content.len())
+            .field("system_prompt_bytes", &self.system_prompt.len())
+            .field("source_confidence", &self.source_confidence)
+            .field("source_evidence_count", &self.source_evidence_ids.len())
+            .field(
+                "source_provenance_feature_count",
+                &self.source_provenance.feature_flags.len(),
+            )
+            .field(
+                "source_provenance_transformation_count",
+                &self.source_provenance.transformations.len(),
+            )
+            .finish()
+    }
 }
 
 impl ScipLlmRequest {
@@ -214,7 +239,7 @@ impl ScipLlmRequest {
 /// named by `source_semantic_hash` remains authoritative; this wrapper preserves
 /// the exact source identity, exact request digest, exact surface-text digest,
 /// and provenance alongside model output for later transcript/evidence binding.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct ScipLlmOutput {
     pub text: String,
     pub adapter_profile: &'static str,
@@ -228,6 +253,21 @@ pub struct ScipLlmOutput {
     pub backend_name: String,
     pub mode: LlmFallbackMode,
     pub generation_time_ms: f64,
+}
+
+/// Deliberately redacted debug view for backend-produced text.
+impl fmt::Debug for ScipLlmOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ScipLlmOutput")
+            .field("adapter_profile", &self.adapter_profile)
+            .field("text_bytes", &self.text.len())
+            .field("source_confidence", &self.source_confidence)
+            .field("source_evidence_count", &self.source_evidence_ids.len())
+            .field("backend_name", &self.backend_name)
+            .field("mode", &self.mode)
+            .field("generation_time_ms", &self.generation_time_ms)
+            .finish()
+    }
 }
 
 /// Compile and execute one envelope through the strict adapter.
@@ -468,6 +508,46 @@ mod tests {
         // accounting; importantly, it also cannot enter `query_async` fallback.
         assert_eq!(organ.stats().queries_processed, 0);
         assert_eq!(organ.stats().errors, 0);
+    }
+
+    #[test]
+    fn debug_views_redact_prompt_surface_and_correlatable_ids() {
+        let secret = "PRIVATE-SEMANTIC-PAYLOAD-7f6b";
+        let envelope = CognitiveEnvelope::from_graph(graph(secret), 0.9, provenance()).unwrap();
+        let request =
+            ScipLlmRequest::compile(&envelope, None, LlmFallbackMode::FaithfulTranslation).unwrap();
+        let request_debug = format!("{request:?}");
+
+        assert!(!request_debug.contains(secret));
+        assert!(!request_debug.contains(request.system_prompt()));
+        assert!(!request_debug.contains(request.request_digest()));
+        assert!(!request_debug.contains(request.source_message_id()));
+        assert!(!request_debug.contains(request.source_semantic_hash()));
+        assert!(request_debug.contains("content_bytes"));
+        assert!(request_debug.contains("source_evidence_count"));
+
+        let output = ScipLlmOutput {
+            text: "PRIVATE-SURFACE-OUTPUT-a43d".into(),
+            adapter_profile: SCIP_LLM_ADAPTER_PROFILE_V1,
+            request_digest: request.request_digest().into(),
+            surface_digest: digest_surface_text("PRIVATE-SURFACE-OUTPUT-a43d"),
+            source_message_id: request.source_message_id().into(),
+            source_semantic_hash: request.source_semantic_hash().into(),
+            source_confidence: request.source_confidence(),
+            source_evidence_ids: request.source_evidence_ids().to_vec(),
+            source_provenance: request.source_provenance().clone(),
+            backend_name: "recording-test-backend".into(),
+            mode: request.mode(),
+            generation_time_ms: 1.25,
+        };
+        let output_debug = format!("{output:?}");
+        assert!(!output_debug.contains(&output.text));
+        assert!(!output_debug.contains(&output.request_digest));
+        assert!(!output_debug.contains(&output.surface_digest));
+        assert!(!output_debug.contains(&output.source_message_id));
+        assert!(!output_debug.contains(&output.source_semantic_hash));
+        assert!(output_debug.contains("text_bytes"));
+        assert!(output_debug.contains("recording-test-backend"));
     }
 
     #[test]
