@@ -16,27 +16,29 @@
 
 use std::time::Instant;
 
-use symthaea::language::{
-    llm_backend::GenerationParams,
-    llm_organ::LLMOrgan,
-};
+use blake3::Hasher;
+use symthaea::language::{llm_backend::GenerationParams, llm_organ::LLMOrgan};
 use symthaea_communication::{GroundedConceptGraph, Provenance};
 use symthaea_interlingua::{
     CognitiveEnvelope, InterchangeError, LlmFallbackMode, LlmTextFallback,
 };
 
-/// Defensive ceiling for backend-produced surface text.
+/// Versioned adapter profile bound into deterministic request digests.
+pub const SCIP_LLM_ADAPTER_PROFILE_V1: &str = "symthaea.scip-llm-adapter/v1";
+
+/// Post-generation acceptance ceiling for backend-produced surface text.
 ///
-/// The canonical semantic state is the SCIP graph, not the model output. This
-/// bound therefore protects callers from a broken or hostile backend returning
-/// an unexpectedly large string without pretending token limits are enforced by
-/// every provider.
+/// `LLMBackend::generate` returns a completed `String`, so this cannot bound
+/// allocation *inside* a backend. It prevents oversized output from being
+/// accepted or propagated farther through the SCIP compatibility boundary.
 pub const MAX_SCIP_LLM_OUTPUT_BYTES: usize = 1024 * 1024;
 
 const FAITHFUL_TRANSLATION_TEMPERATURE: f32 = 0.2;
 const FAITHFUL_TRANSLATION_MAX_TOKENS: usize = 512;
 const GROUNDED_REASONING_TEMPERATURE: f32 = 0.3;
 const GROUNDED_REASONING_MAX_TOKENS: usize = 768;
+const REQUEST_DIGEST_DOMAIN_V1: &[u8] = b"symthaea-scip-llm-request-v1\0";
+const SURFACE_DIGEST_DOMAIN_V1: &[u8] = b"symthaea-scip-llm-surface-v1\0";
 
 /// Immutable backend request compiled from one validated SCIP envelope.
 ///
@@ -47,6 +49,7 @@ pub struct ScipLlmRequest {
     mode: LlmFallbackMode,
     content: String,
     system_prompt: String,
+    request_digest: String,
     source_message_id: String,
     source_semantic_hash: String,
     source_confidence: f32,
@@ -67,10 +70,12 @@ impl ScipLlmRequest {
         mode: LlmFallbackMode,
     ) -> Result<Self, ScipLlmError> {
         let packet = LlmTextFallback::compile(envelope, resolved_graph, mode)?;
+        let request_digest = request_digest_v1(mode, &packet.content, &packet.system_prompt);
         Ok(Self {
             mode,
             content: packet.content,
             system_prompt: packet.system_prompt,
+            request_digest,
             source_message_id: envelope.message_id.clone(),
             source_semantic_hash: packet.semantic_hash,
             source_confidence: envelope.confidence,
@@ -91,13 +96,14 @@ impl ScipLlmRequest {
         let params = self.generation_params();
         let start = Instant::now();
 
-        let text = backend
-            .generate(&self.content, &params)
-            .await
-            .map_err(|error| ScipLlmError::BackendFailure {
+        // Do not propagate arbitrary backend/provider error text across the
+        // strict semantic boundary. Provider diagnostics can contain URLs,
+        // headers, request bodies, or other operator-sensitive details.
+        let text = backend.generate(&self.content, &params).await.map_err(|_| {
+            ScipLlmError::BackendFailure {
                 backend: backend_name.clone(),
-                message: error.to_string(),
-            })?;
+            }
+        })?;
 
         if text.trim().is_empty() {
             return Err(ScipLlmError::EmptyOutput {
@@ -112,8 +118,12 @@ impl ScipLlmRequest {
             });
         }
 
+        let surface_digest = digest_surface_text(&text);
         Ok(ScipLlmOutput {
             text,
+            adapter_profile: SCIP_LLM_ADAPTER_PROFILE_V1,
+            request_digest: self.request_digest.clone(),
+            surface_digest,
             source_message_id: self.source_message_id.clone(),
             source_semantic_hash: self.source_semantic_hash.clone(),
             source_confidence: self.source_confidence,
@@ -133,6 +143,11 @@ impl ScipLlmRequest {
     /// Trusted SCIP adapter instruction supplied as the backend system prompt.
     pub fn system_prompt(&self) -> &str {
         &self.system_prompt
+    }
+
+    /// Deterministic BLAKE3 digest over exact adapter inputs and generation policy.
+    pub fn request_digest(&self) -> &str {
+        &self.request_digest
     }
 
     pub fn mode(&self) -> LlmFallbackMode {
@@ -160,16 +175,7 @@ impl ScipLlmRequest {
     }
 
     fn generation_params(&self) -> GenerationParams {
-        let (temperature, max_tokens) = match self.mode {
-            LlmFallbackMode::FaithfulTranslation => (
-                FAITHFUL_TRANSLATION_TEMPERATURE,
-                FAITHFUL_TRANSLATION_MAX_TOKENS,
-            ),
-            LlmFallbackMode::GroundedReasoning => (
-                GROUNDED_REASONING_TEMPERATURE,
-                GROUNDED_REASONING_MAX_TOKENS,
-            ),
-        };
+        let (temperature, max_tokens) = generation_policy(self.mode);
         GenerationParams {
             temperature,
             max_tokens,
@@ -182,11 +188,15 @@ impl ScipLlmRequest {
 /// Backend-produced surface realization bound to the SCIP source identity.
 ///
 /// `text` is **not** promoted to canonical grounded truth. The grounded graph
-/// named by `source_semantic_hash` remains authoritative; this wrapper merely
-/// preserves the exact source identity and provenance alongside model output.
+/// named by `source_semantic_hash` remains authoritative; this wrapper preserves
+/// the exact source identity, exact request digest, exact surface-text digest,
+/// and provenance alongside model output for later transcript/evidence binding.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScipLlmOutput {
     pub text: String,
+    pub adapter_profile: &'static str,
+    pub request_digest: String,
+    pub surface_digest: String,
     pub source_message_id: String,
     pub source_semantic_hash: String,
     pub source_confidence: f32,
@@ -209,14 +219,65 @@ pub async fn execute_envelope(
         .await
 }
 
+/// Domain-separated BLAKE3 digest of the exact accepted UTF-8 surface text.
+///
+/// This makes model output content-addressable for transcript/evidence binding;
+/// it does not make the output semantically grounded or correct.
+pub fn digest_surface_text(text: &str) -> String {
+    let mut hasher = Hasher::new();
+    hasher.update(SURFACE_DIGEST_DOMAIN_V1);
+    update_len_prefixed(&mut hasher, text.as_bytes());
+    hasher.finalize().to_hex().to_string()
+}
+
+fn request_digest_v1(mode: LlmFallbackMode, content: &str, system_prompt: &str) -> String {
+    let (temperature, max_tokens) = generation_policy(mode);
+    let mut hasher = Hasher::new();
+    hasher.update(REQUEST_DIGEST_DOMAIN_V1);
+    hasher.update(&[mode_code(mode)]);
+    hasher.update(&temperature.to_bits().to_le_bytes());
+    hasher.update(&(max_tokens as u64).to_le_bytes());
+    // v1 fixes consciousness_context=None. Bind that policy choice so a future
+    // profile cannot add privileged context while retaining the same digest.
+    hasher.update(&[0]);
+    update_len_prefixed(&mut hasher, system_prompt.as_bytes());
+    update_len_prefixed(&mut hasher, content.as_bytes());
+    hasher.finalize().to_hex().to_string()
+}
+
+fn generation_policy(mode: LlmFallbackMode) -> (f32, usize) {
+    match mode {
+        LlmFallbackMode::FaithfulTranslation => (
+            FAITHFUL_TRANSLATION_TEMPERATURE,
+            FAITHFUL_TRANSLATION_MAX_TOKENS,
+        ),
+        LlmFallbackMode::GroundedReasoning => (
+            GROUNDED_REASONING_TEMPERATURE,
+            GROUNDED_REASONING_MAX_TOKENS,
+        ),
+    }
+}
+
+fn mode_code(mode: LlmFallbackMode) -> u8 {
+    match mode {
+        LlmFallbackMode::FaithfulTranslation => 0,
+        LlmFallbackMode::GroundedReasoning => 1,
+    }
+}
+
+fn update_len_prefixed(hasher: &mut Hasher, value: &[u8]) {
+    hasher.update(&(value.len() as u64).to_le_bytes());
+    hasher.update(value);
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ScipLlmError {
     #[error(transparent)]
     Interchange(#[from] InterchangeError),
     #[error("LLMOrgan has no explicitly configured backend")]
     MissingBackend,
-    #[error("SCIP LLM backend {backend} failed: {message}")]
-    BackendFailure { backend: String, message: String },
+    #[error("SCIP LLM backend {backend} failed")]
+    BackendFailure { backend: String },
     #[error("SCIP LLM backend {backend} returned empty output")]
     EmptyOutput { backend: String },
     #[error("SCIP LLM backend {backend} returned {bytes} bytes; maximum is {maximum}")]
@@ -297,7 +358,7 @@ mod tests {
                 .unwrap()
                 .push((prompt.to_owned(), params.clone()));
             if self.fail {
-                anyhow::bail!("synthetic backend failure");
+                anyhow::bail!("synthetic backend failure with operator-only detail");
             }
             Ok(self.response.clone())
         }
@@ -329,6 +390,9 @@ mod tests {
 
         let output = request.execute(&organ).await.unwrap();
         assert_eq!(output.text, "Sensor S17.");
+        assert_eq!(output.adapter_profile, SCIP_LLM_ADAPTER_PROFILE_V1);
+        assert_eq!(output.request_digest, request.request_digest());
+        assert_eq!(output.surface_digest, digest_surface_text("Sensor S17."));
         assert_eq!(output.source_message_id, envelope.message_id);
         assert_eq!(
             output.source_semantic_hash,
@@ -355,6 +419,25 @@ mod tests {
         assert_eq!(organ.stats().errors, 0);
     }
 
+    #[test]
+    fn request_digest_is_deterministic_and_mode_sensitive() {
+        let envelope = CognitiveEnvelope::from_graph(graph("S17"), 0.9, provenance()).unwrap();
+        let first =
+            ScipLlmRequest::compile(&envelope, None, LlmFallbackMode::FaithfulTranslation).unwrap();
+        let second =
+            ScipLlmRequest::compile(&envelope, None, LlmFallbackMode::FaithfulTranslation).unwrap();
+        let reasoning =
+            ScipLlmRequest::compile(&envelope, None, LlmFallbackMode::GroundedReasoning).unwrap();
+        assert_eq!(first.request_digest(), second.request_digest());
+        assert_ne!(first.request_digest(), reasoning.request_digest());
+
+        let changed =
+            CognitiveEnvelope::from_graph(graph("S18"), 0.9, provenance()).unwrap();
+        let changed =
+            ScipLlmRequest::compile(&changed, None, LlmFallbackMode::FaithfulTranslation).unwrap();
+        assert_ne!(first.request_digest(), changed.request_digest());
+    }
+
     #[tokio::test]
     async fn missing_backend_is_explicit_and_never_simulates() {
         let envelope = CognitiveEnvelope::from_graph(graph("S17"), 0.9, provenance()).unwrap();
@@ -370,7 +453,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn backend_failure_is_explicit_and_never_enters_organ_fallback() {
+    async fn backend_failure_is_explicit_redacted_and_never_enters_organ_fallback() {
         let envelope = CognitiveEnvelope::from_graph(graph("S17"), 0.9, provenance()).unwrap();
         let request =
             ScipLlmRequest::compile(&envelope, None, LlmFallbackMode::FaithfulTranslation).unwrap();
@@ -379,6 +462,9 @@ mod tests {
 
         let error = request.execute(&organ).await.unwrap_err();
         assert!(matches!(error, ScipLlmError::BackendFailure { .. }));
+        let rendered = error.to_string();
+        assert!(rendered.contains("recording-test-backend"));
+        assert!(!rendered.contains("operator-only detail"));
         assert_eq!(calls.lock().unwrap().len(), 1);
         assert_eq!(organ.stats().queries_processed, 0);
         assert_eq!(organ.stats().errors, 0);
@@ -441,6 +527,7 @@ mod tests {
 
         assert_eq!(output.backend_name, "Simulated");
         assert!(!output.text.trim().is_empty());
+        assert_eq!(output.surface_digest, digest_surface_text(&output.text));
         assert_eq!(organ.stats().queries_processed, 0);
     }
 
