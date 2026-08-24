@@ -1,0 +1,114 @@
+name: SYM-ARCH-001 Architecture Discrimination
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/sym-arch-001.yml'
+      - 'crates/domains/symthaea-psych-bench/**'
+      - 'crates/domains/symthaea-ssm/**'
+      - 'crates/core/symthaea-core/src/hdc/**'
+      - 'docs/research/SYM_ARCH_001_PREREGISTRATION_2026-08-24.md'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  sym-arch-001:
+    name: Preregistered continual/compositional campaign
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-sym-arch-001-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-sym-arch-001-
+
+      - name: Format check for experiment files
+        run: |
+          cargo fmt --all -- --check
+
+      - name: Compile and run experiment unit tests
+        run: |
+          cargo test -p symthaea-psych-bench --lib benchmarks::architecture -- --nocapture
+
+      - name: Run preregistered SYM-ARCH-001 campaign
+        run: |
+          cargo run -p symthaea-psych-bench --bin sym_arch_001 --release -- \
+            --output artifacts/sym-arch-001/report.json
+
+      - name: Validate and summarize evidence
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('artifacts/sym-arch-001/report.json')
+          report = json.loads(path.read_text())
+          assert report['schema'] == 'symthaea.sym-arch-001.v1'
+          assert report['decision']['verdict'] in {'PASS', 'MIXED', 'NULL', 'NEGATIVE'}
+          assert len(report['agents']) == 5
+          assert all(len(a['per_seed']) == 16 for a in report['agents'])
+
+          print('=== SYM-ARCH-001 ===')
+          print('verdict:', report['decision']['verdict'])
+          for a in report['agents']:
+              print(
+                  f"{a['agent']:20s} "
+                  f"retention={a['retention']['mean']:.3f} "
+                  f"composition={a['compositional']['mean']:.3f} "
+                  f"forgetting={a['forgetting']['mean']:.3f} "
+                  f"reversal={a['reversal_final']['mean']:.3f} "
+                  f"latency={a['reversal_latency']['mean']:.1f}"
+              )
+
+          summary = Path(__import__('os').environ['GITHUB_STEP_SUMMARY'])
+          with summary.open('a') as f:
+              f.write('## SYM-ARCH-001 result\n\n')
+              f.write(f"**Verdict:** `{report['decision']['verdict']}`\n\n")
+              f.write('| agent | retention | composition | forgetting ↓ | reversal | latency ↓ |\n')
+              f.write('|---|---:|---:|---:|---:|---:|\n')
+              for a in report['agents']:
+                  f.write(
+                      f"| `{a['agent']}` | {a['retention']['mean']:.3f} | "
+                      f"{a['compositional']['mean']:.3f} | {a['forgetting']['mean']:.3f} | "
+                      f"{a['reversal_final']['mean']:.3f} | {a['reversal_latency']['mean']:.1f} |\n"
+                  )
+              d = report['decision']
+              f.write('\nCandidate deltas vs strongest control: ')
+              f.write(
+                  f"retention `{d['retention_delta_vs_best_control']:+.3f}`, "
+                  f"composition `{d['compositional_delta_vs_best_control']:+.3f}`, "
+                  f"reversal `{d['reversal_delta_vs_best_control']:+.3f}`, "
+                  f"forgetting `{d['forgetting_delta_vs_best_control']:+.3f}`.\n"
+              )
+          PY
+          sha256sum artifacts/sym-arch-001/report.json | tee artifacts/sym-arch-001/SHA256SUMS
+
+      - name: Upload evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sym-arch-001-${{ github.sha }}
+          path: artifacts/sym-arch-001/
+          retention-days: 90
