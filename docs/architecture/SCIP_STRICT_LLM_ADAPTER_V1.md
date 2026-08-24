@@ -15,6 +15,8 @@ Its execution path is:
 ```text
 validated CognitiveEnvelope
         |
+        +-- canonicalize semantically unordered collections
+        |
         v
 LlmTextFallback::compile
         |
@@ -68,6 +70,24 @@ There is no simulation fallback inside this path.
 alongside the generated text. This makes the execution auditable without claiming that the language model has independently verified its own translation.
 
 A successful backend call is therefore evidence of **which exact request produced which exact UTF-8 surface bytes**, not evidence that the surface text is semantically faithful.
+
+## Canonical request construction
+
+SCIP semantic identity is insensitive to ordering that does not change meaning. The strict text adapter mirrors that rule before it creates model-facing bytes.
+
+Before `LlmTextFallback::compile`, v1 canonicalizes:
+
+- grounded graph node order;
+- per-node grounding-reference order;
+- edge order;
+- per-edge evidence-reference order;
+- envelope evidence-ID order;
+- provenance feature-flag order;
+- provenance transformation order.
+
+This means two valid envelopes representing the same grounded state cannot acquire different strict request digests merely because vectors were populated in a different order.
+
+`resolved_graph` is consumed only for payloads whose exact semantics are external to the envelope (`Hdc` and `Reference`). GroundedGraph and canonical StructuredJson are self-contained, so irrelevant caller-supplied resolution state is ignored rather than allowed to introduce a new failure path.
 
 ## Deterministic audit binding
 
@@ -144,14 +164,16 @@ The adapter test suite must prove at least:
 
 1. direct grounded envelopes preserve source identity through successful execution;
 2. HDC/reference-derived requests require the exact matching grounded graph;
-3. instruction-like graph strings remain data, not system instructions;
-4. missing backend is an error;
-5. backend failure is redacted and never reaches organ simulation;
-6. explicit simulated backends remain explicit test choices;
-7. empty and oversized outputs fail closed;
-8. strict execution does not mutate legacy `LLMOrgan` accounting through a hidden fallback path;
-9. request digests are deterministic and change with semantic/policy changes;
-10. accepted surface digests bind the exact returned UTF-8 bytes.
+3. semantically equivalent graph/evidence/provenance ordering yields identical strict request bytes and digests;
+4. self-contained payloads ignore irrelevant external graph resolution state;
+5. instruction-like graph strings remain data, not system instructions;
+6. missing backend is an error;
+7. backend failure is redacted and never reaches organ simulation;
+8. explicit simulated backends remain explicit test choices;
+9. empty and oversized outputs fail closed;
+10. strict execution does not mutate legacy `LLMOrgan` accounting through a hidden fallback path;
+11. request digests are deterministic and change with semantic/policy changes;
+12. accepted surface digests bind the exact returned UTF-8 bytes.
 
 ## Non-claims
 
