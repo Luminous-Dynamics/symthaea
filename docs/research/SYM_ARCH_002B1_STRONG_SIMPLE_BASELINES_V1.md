@@ -119,13 +119,13 @@ Random and HDC encoder state is a deterministic function of:
 
 The one-hot condition has no random representation. Its `encoded_dimension` and `representation_seed` fields are required to be exactly zero so irrelevant parameters cannot create fake experimental variants or degrees of freedom.
 
-Each baseline spec has a domain-separated BLAKE3 digest for provenance binding.
+Each emitted baseline spec has a domain-separated BLAKE3 digest for provenance binding.
 
 ## What must be frozen before CONFIRM
 
 At minimum:
 
-- baseline family/spec digests;
+- all emitted baseline spec digests;
 - exact categorical schema;
 - encoded dimension for random/HDC;
 - representation-seed manifest;
