@@ -56,6 +56,8 @@ pub mod benchmarks;
 pub mod experiment;
 #[path = "experiment/baseline_fairness.rs"]
 pub mod experiment_baseline_fairness;
+#[path = "experiment/baseline_panel.rs"]
+pub mod experiment_baseline_panel;
 #[path = "experiment/baselines.rs"]
 pub mod experiment_baselines;
 #[path = "experiment/confirmatory.rs"]
