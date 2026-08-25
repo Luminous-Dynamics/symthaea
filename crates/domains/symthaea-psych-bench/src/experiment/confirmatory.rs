@@ -8,9 +8,11 @@
 //! paired inference, and practical effect claims must be interpreted relative
 //! to a predeclared smallest effect size of interest (SESOI).
 
-use crate::experiment::{PairedEstimate, TaskProgram, paired_delta_bca};
+use crate::experiment::{ClaimLedgerEntry, PairedEstimate, TaskProgram, paired_delta_bca};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
+
+pub const CLAIM_EVIDENCE_BINDING_SCHEMA_V1: &str = "symthaea.claim-evidence-binding/v1";
 
 fn looks_like_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit())
@@ -158,11 +160,63 @@ pub fn validate_task_support(
     Ok(())
 }
 
+/// Cryptographic provenance binding for one claim-ledger entry.
+///
+/// A claim is not considered provenance-complete merely because it contains a
+/// `ProvenanceStatus::Valid` flag. This binding ties the claim identifier to the
+/// exact experiment manifest, task programs, result artifact, and analysis code
+/// revision used to produce the claim.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClaimEvidenceBinding {
+    pub schema: String,
+    pub claim_id: String,
+    pub manifest_digest: String,
+    pub task_program_digests: Vec<String>,
+    pub result_digest: String,
+    pub analysis_code_revision: String,
+}
+
+impl ClaimEvidenceBinding {
+    pub fn validate_for_claim(&self, claim: &ClaimLedgerEntry) -> Result<(), String> {
+        claim.validate()?;
+        if self.schema != CLAIM_EVIDENCE_BINDING_SCHEMA_V1 {
+            return Err(format!(
+                "unsupported claim-evidence binding schema: {}",
+                self.schema
+            ));
+        }
+        if self.claim_id != claim.claim_id {
+            return Err("claim-evidence binding claim id does not match the ledger entry".into());
+        }
+        if !looks_like_digest(&self.manifest_digest) || !looks_like_digest(&self.result_digest) {
+            return Err("manifest/result digests must be 32-byte hex digests".into());
+        }
+        if self.task_program_digests.is_empty() {
+            return Err("at least one task-program digest must be bound to a claim".into());
+        }
+        let mut tasks = BTreeSet::new();
+        for digest in &self.task_program_digests {
+            if !looks_like_digest(digest) {
+                return Err("task-program digests must be 32-byte hex digests".into());
+            }
+            if !tasks.insert(digest.to_ascii_lowercase()) {
+                return Err("duplicate task-program digest in claim evidence binding".into());
+            }
+        }
+        if self.analysis_code_revision.trim().is_empty() {
+            return Err("analysis code revision must be recorded".into());
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::experiment::{
-        ContextVisibility, RuleExpr, TASK_PROGRAM_SCHEMA_V1, TimingRegime,
+        CLAIM_LEDGER_SCHEMA_V1, ContextVisibility, EvidenceOutcome, GeneralizationLevel,
+        ProvenanceStatus, ReplicationState, ResourceStatus, RuleExpr, SupportKind,
+        TASK_PROGRAM_SCHEMA_V1, TimingRegime,
     };
 
     fn digest(n: u64) -> String {
@@ -185,6 +239,32 @@ mod tests {
             train_support: train.iter().map(|v| (*v).to_string()).collect(),
             eval_support: eval.iter().map(|v| (*v).to_string()).collect(),
             oracle_digest: digest(99),
+        }
+    }
+
+    fn claim() -> ClaimLedgerEntry {
+        ClaimLedgerEntry {
+            schema: CLAIM_LEDGER_SCHEMA_V1.into(),
+            claim_id: "retention-advantage".into(),
+            statement: "candidate reduces forgetting".into(),
+            outcome: EvidenceOutcome::Supported,
+            support_kind: SupportKind::Observed,
+            generalization: GeneralizationLevel::IidConfirm,
+            replication: ReplicationState::Unreplicated,
+            resources: ResourceStatus::NotAssessed,
+            provenance: ProvenanceStatus::Valid,
+            qualifiers: Vec::new(),
+        }
+    }
+
+    fn binding() -> ClaimEvidenceBinding {
+        ClaimEvidenceBinding {
+            schema: CLAIM_EVIDENCE_BINDING_SCHEMA_V1.into(),
+            claim_id: "retention-advantage".into(),
+            manifest_digest: digest(10),
+            task_program_digests: vec![digest(11), digest(12)],
+            result_digest: digest(13),
+            analysis_code_revision: "deadbeef".into(),
         }
     }
 
@@ -279,5 +359,20 @@ mod tests {
         assert!(
             validate_task_support(&program, SupportOverlapPolicy::AllowDeclaredOverlap).is_err()
         );
+    }
+
+    #[test]
+    fn claim_evidence_binding_requires_exact_claim_and_artifact_identity() {
+        let claim = claim();
+        let binding = binding();
+        binding.validate_for_claim(&claim).unwrap();
+
+        let mut wrong_claim = binding.clone();
+        wrong_claim.claim_id = "different-claim".into();
+        assert!(wrong_claim.validate_for_claim(&claim).is_err());
+
+        let mut duplicate_task = binding;
+        duplicate_task.task_program_digests = vec![digest(11), digest(11)];
+        assert!(duplicate_task.validate_for_claim(&claim).is_err());
     }
 }
