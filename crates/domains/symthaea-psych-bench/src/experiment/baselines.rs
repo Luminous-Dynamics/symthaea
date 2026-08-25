@@ -19,6 +19,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use symthaea_core::hdc::ContinuousHV;
 
 pub const SIMPLE_BASELINE_SCHEMA_V1: &str = "symthaea.simple-baseline/v1";
+/// Hard safety ceiling for a full f64 RLS inverse-covariance matrix.
+///
+/// This is not a model-selection knob. It prevents accidental multi-gigabyte
+/// allocation when a caller tries to pair full-covariance RLS with Symthaea's
+/// normal 16K+ HDC dimensions. Larger comparisons need a different analytic
+/// readout (diagonal/low-rank/block) rather than silently exhausting memory.
+pub const MAX_RLS_COVARIANCE_BYTES: usize = 512 * 1024 * 1024;
+
 const BASELINE_SPEC_HASH_DOMAIN: &[u8] = b"symthaea.simple-baseline.spec.hash/v1";
 const RANDOM_FEATURE_DOMAIN: &[u8] = b"symthaea.simple-baseline.random-feature/v1";
 const HDC_ROLE_DOMAIN: &[u8] = b"symthaea.simple-baseline.hdc-role/v1";
@@ -233,6 +241,14 @@ impl OnlineRlsBinary {
         let covariance_len = state_dimension
             .checked_mul(state_dimension)
             .ok_or_else(|| "RLS covariance allocation overflow".to_string())?;
+        let covariance_bytes = covariance_len
+            .checked_mul(std::mem::size_of::<f64>())
+            .ok_or_else(|| "RLS covariance byte count overflow".to_string())?;
+        if covariance_bytes > MAX_RLS_COVARIANCE_BYTES {
+            return Err(format!(
+                "full RLS covariance would require {covariance_bytes} bytes, above hard ceiling {MAX_RLS_COVARIANCE_BYTES}; use a smaller encoded dimension or a bounded-state analytic readout"
+            ));
+        }
         let mut inverse_covariance = vec![0.0; covariance_len];
         let diagonal = 1.0 / config.ridge;
         for index in 0..state_dimension {
@@ -358,9 +374,9 @@ pub struct SimpleBaselineSpec {
     pub schema: String,
     pub kind: SimpleBaselineKind,
     pub feature_schema: CategoricalFeatureSchema,
-    /// Used by fixed-random and HDC encoders. The one-hot baseline uses its
-    /// frozen categorical one-hot dimension instead.
+    /// Used by fixed-random and HDC encoders. Must be zero for one-hot RLS.
     pub encoded_dimension: usize,
+    /// Used by fixed-random and HDC encoders. Must be zero for one-hot RLS.
     pub representation_seed: u64,
     pub rls: RlsConfig,
 }
@@ -373,7 +389,14 @@ impl SimpleBaselineSpec {
         self.feature_schema.validate()?;
         self.rls.validate()?;
         match self.kind {
-            SimpleBaselineKind::OneHotRls => {}
+            SimpleBaselineKind::OneHotRls => {
+                if self.encoded_dimension != 0 || self.representation_seed != 0 {
+                    return Err(
+                        "one-hot RLS must zero irrelevant encoded-dimension/representation-seed fields"
+                            .into(),
+                    );
+                }
+            }
             SimpleBaselineKind::FixedRandomTanhRls | SimpleBaselineKind::VanillaHdcRls => {
                 if self.encoded_dimension == 0 {
                     return Err("encoded dimension must be positive".into());
@@ -386,6 +409,70 @@ impl SimpleBaselineSpec {
     pub fn digest(&self) -> Result<String, String> {
         self.validate()?;
         canonical_hash(BASELINE_SPEC_HASH_DOMAIN, self)
+    }
+}
+
+/// One frozen contract that emits all readout-matched B1 controls.
+///
+/// Using this type is preferred to hand-constructing three specs because it
+/// prevents accidental changes in schema/RLS settings between conditions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MatchedBaselineFamilySpec {
+    pub feature_schema: CategoricalFeatureSchema,
+    pub encoded_dimension: usize,
+    pub representation_seed: u64,
+    pub rls: RlsConfig,
+}
+
+impl MatchedBaselineFamilySpec {
+    pub fn validate(&self) -> Result<(), String> {
+        self.feature_schema.validate()?;
+        self.rls.validate()?;
+        if self.encoded_dimension == 0 {
+            return Err("matched random/HDC dimension must be positive".into());
+        }
+        // Validate allocation feasibility before any baseline is constructed.
+        let _ = OnlineRlsBinary::new(self.encoded_dimension, self.rls.clone())?;
+        let one_hot_dimension = self.feature_schema.one_hot_dimension()?;
+        let _ = OnlineRlsBinary::new(one_hot_dimension, self.rls.clone())?;
+        Ok(())
+    }
+
+    pub fn specs(&self) -> Result<Vec<SimpleBaselineSpec>, String> {
+        self.validate()?;
+        Ok(vec![
+            SimpleBaselineSpec {
+                schema: SIMPLE_BASELINE_SCHEMA_V1.into(),
+                kind: SimpleBaselineKind::OneHotRls,
+                feature_schema: self.feature_schema.clone(),
+                encoded_dimension: 0,
+                representation_seed: 0,
+                rls: self.rls.clone(),
+            },
+            SimpleBaselineSpec {
+                schema: SIMPLE_BASELINE_SCHEMA_V1.into(),
+                kind: SimpleBaselineKind::FixedRandomTanhRls,
+                feature_schema: self.feature_schema.clone(),
+                encoded_dimension: self.encoded_dimension,
+                representation_seed: self.representation_seed,
+                rls: self.rls.clone(),
+            },
+            SimpleBaselineSpec {
+                schema: SIMPLE_BASELINE_SCHEMA_V1.into(),
+                kind: SimpleBaselineKind::VanillaHdcRls,
+                feature_schema: self.feature_schema.clone(),
+                encoded_dimension: self.encoded_dimension,
+                representation_seed: self.representation_seed,
+                rls: self.rls.clone(),
+            },
+        ])
+    }
+
+    pub fn agents(&self) -> Result<Vec<SimpleBaselineAgent>, String> {
+        self.specs()?
+            .into_iter()
+            .map(SimpleBaselineAgent::new)
+            .collect()
     }
 }
 
@@ -609,6 +696,10 @@ impl SimpleBaselineAgent {
         self.spec.kind
     }
 
+    pub fn spec(&self) -> &SimpleBaselineSpec {
+        &self.spec
+    }
+
     pub fn spec_digest(&self) -> &str {
         &self.spec_digest
     }
@@ -688,9 +779,26 @@ mod tests {
     }
 
     fn spec(kind: SimpleBaselineKind, dimension: usize, seed: u64) -> SimpleBaselineSpec {
+        let (encoded_dimension, representation_seed) = match kind {
+            SimpleBaselineKind::OneHotRls => (0, 0),
+            _ => (dimension, seed),
+        };
         SimpleBaselineSpec {
             schema: SIMPLE_BASELINE_SCHEMA_V1.into(),
             kind,
+            feature_schema: schema(),
+            encoded_dimension,
+            representation_seed,
+            rls: RlsConfig {
+                ridge: 1.0,
+                forgetting_factor: 1.0,
+                include_bias: true,
+            },
+        }
+    }
+
+    fn family(dimension: usize, seed: u64) -> MatchedBaselineFamilySpec {
+        MatchedBaselineFamilySpec {
             feature_schema: schema(),
             encoded_dimension: dimension,
             representation_seed: seed,
@@ -736,6 +844,22 @@ mod tests {
         assert!(rls.predict(&[1.0]).unwrap());
         assert_eq!(rls.updates(), 24);
         assert!(rls.covariance_bytes() > rls.weight_bytes());
+    }
+
+    #[test]
+    fn full_rls_rejects_multi_gigabyte_covariance_before_allocation() {
+        let error = OnlineRlsBinary::new(16_384, RlsConfig::default()).unwrap_err();
+        assert!(error.contains("hard ceiling"));
+    }
+
+    #[test]
+    fn one_hot_spec_rejects_irrelevant_randomness_knobs() {
+        let mut invalid = spec(SimpleBaselineKind::OneHotRls, 64, 7);
+        invalid.representation_seed = 7;
+        assert!(invalid.validate().is_err());
+        invalid.representation_seed = 0;
+        invalid.encoded_dimension = 64;
+        assert!(invalid.validate().is_err());
     }
 
     #[test]
@@ -786,14 +910,36 @@ mod tests {
     }
 
     #[test]
-    fn random_and_hdc_conditions_share_exact_readout_contract() {
-        let random = SimpleBaselineAgent::new(spec(
-            SimpleBaselineKind::FixedRandomTanhRls,
-            128,
-            31,
-        ))
-        .unwrap();
-        let hdc = SimpleBaselineAgent::new(spec(SimpleBaselineKind::VanillaHdcRls, 128, 31)).unwrap();
+    fn matched_family_freezes_one_readout_contract() {
+        let family = family(128, 31);
+        let specs = family.specs().unwrap();
+        assert_eq!(specs.len(), 3);
+        assert_eq!(specs[0].kind, SimpleBaselineKind::OneHotRls);
+        assert_eq!(specs[1].kind, SimpleBaselineKind::FixedRandomTanhRls);
+        assert_eq!(specs[2].kind, SimpleBaselineKind::VanillaHdcRls);
+        assert_eq!(specs[0].rls, specs[1].rls);
+        assert_eq!(specs[1].rls, specs[2].rls);
+        assert_eq!(specs[0].feature_schema, specs[1].feature_schema);
+        assert_eq!(specs[1].feature_schema, specs[2].feature_schema);
+        assert_eq!(specs[0].encoded_dimension, 0);
+        assert_eq!(specs[0].representation_seed, 0);
+        assert_eq!(specs[1].encoded_dimension, 128);
+        assert_eq!(specs[2].encoded_dimension, 128);
+        assert_eq!(specs[1].representation_seed, 31);
+        assert_eq!(specs[2].representation_seed, 31);
+    }
+
+    #[test]
+    fn random_and_hdc_conditions_share_exact_readout_state_shape() {
+        let agents = family(128, 31).agents().unwrap();
+        let random = agents
+            .iter()
+            .find(|agent| agent.kind() == SimpleBaselineKind::FixedRandomTanhRls)
+            .unwrap();
+        let hdc = agents
+            .iter()
+            .find(|agent| agent.kind() == SimpleBaselineKind::VanillaHdcRls)
+            .unwrap();
         let random_resources = random.resources().unwrap();
         let hdc_resources = hdc.resources().unwrap();
         assert_eq!(random_resources.feature_dimension, 128);
