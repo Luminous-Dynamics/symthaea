@@ -123,7 +123,9 @@ impl MultiplicityPlan {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RawHypothesisPValue {
     pub hypothesis_id: String,
-    /// Raw p-value produced by the separately frozen test and tail.
+    /// Tail used by the separately frozen raw inferential test.
+    pub tail: HypothesisTail,
+    /// Raw p-value produced by that separately frozen test.
     pub raw_p: f64,
 }
 
@@ -147,9 +149,9 @@ pub struct HolmFamilyResult {
 
 /// Apply Holm's step-down family-wise correction.
 ///
-/// Raw p-values must correspond exactly to the hypothesis ids/tails frozen in the
-/// plan. This function cannot verify how a p-value was generated; that test remains
-/// part of the preregistered analysis contract.
+/// Raw p-values must correspond exactly to the hypothesis ids and tails frozen in
+/// the plan. This function cannot verify how a p-value was generated; that test
+/// remains part of the preregistered analysis contract.
 pub fn apply_holm(
     plan: &MultiplicityPlan,
     raw: &[RawHypothesisPValue],
@@ -181,19 +183,20 @@ pub fn apply_holm(
         return Err("raw p-value hypothesis ids do not match frozen family".into());
     }
 
-    let mut work: Vec<(HypothesisSpec, f64)> = plan
-        .hypotheses
-        .iter()
-        .cloned()
-        .map(|spec| {
-            let raw_p = raw
-                .iter()
-                .find(|value| value.hypothesis_id == spec.hypothesis_id)
-                .expect("id-set equality established")
-                .raw_p;
-            (spec, raw_p)
-        })
-        .collect();
+    let mut work: Vec<(HypothesisSpec, f64)> = Vec::with_capacity(plan.hypothesis_count());
+    for spec in &plan.hypotheses {
+        let observed = raw
+            .iter()
+            .find(|value| value.hypothesis_id == spec.hypothesis_id)
+            .expect("id-set equality established");
+        if observed.tail != spec.tail {
+            return Err(format!(
+                "raw p-value tail for {} does not match frozen hypothesis tail",
+                spec.hypothesis_id
+            ));
+        }
+        work.push((spec.clone(), observed.raw_p));
+    }
 
     // Deterministic tie-break by frozen hypothesis id.
     work.sort_by(|left, right| {
@@ -282,14 +285,17 @@ mod tests {
             &[
                 RawHypothesisPValue {
                     hypothesis_id: "h1".into(),
+                    tail: HypothesisTail::Greater,
                     raw_p: 0.01,
                 },
                 RawHypothesisPValue {
                     hypothesis_id: "h2".into(),
+                    tail: HypothesisTail::Greater,
                     raw_p: 0.04,
                 },
                 RawHypothesisPValue {
                     hypothesis_id: "h3".into(),
+                    tail: HypothesisTail::Greater,
                     raw_p: 0.03,
                 },
             ],
@@ -375,6 +381,7 @@ mod tests {
         let plan = plan(&["a", "b"]);
         let missing = [RawHypothesisPValue {
             hypothesis_id: "a".into(),
+            tail: HypothesisTail::Greater,
             raw_p: 0.01,
         }];
         assert!(apply_holm(&plan, &missing).is_err());
@@ -382,14 +389,27 @@ mod tests {
         let wrong = [
             RawHypothesisPValue {
                 hypothesis_id: "a".into(),
+                tail: HypothesisTail::Greater,
                 raw_p: 0.01,
             },
             RawHypothesisPValue {
                 hypothesis_id: "c".into(),
+                tail: HypothesisTail::TwoSided,
                 raw_p: 0.02,
             },
         ];
         assert!(apply_holm(&plan, &wrong).is_err());
+    }
+
+    #[test]
+    fn raw_tail_must_match_frozen_tail() {
+        let plan = plan(&["a"]);
+        let raw = [RawHypothesisPValue {
+            hypothesis_id: "a".into(),
+            tail: HypothesisTail::Less,
+            raw_p: 0.01,
+        }];
+        assert!(apply_holm(&plan, &raw).is_err());
     }
 
     #[test]
@@ -398,6 +418,7 @@ mod tests {
         for raw_p in [f64::NAN, -0.01, 1.01] {
             let raw = [RawHypothesisPValue {
                 hypothesis_id: "a".into(),
+                tail: HypothesisTail::Greater,
                 raw_p,
             }];
             assert!(apply_holm(&plan, &raw).is_err());
