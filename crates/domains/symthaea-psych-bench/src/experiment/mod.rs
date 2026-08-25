@@ -542,7 +542,9 @@ impl ClaimLedgerEntry {
     }
 
     pub fn wording_ceiling(&self) -> ClaimWordingCeiling {
-        if self.provenance != ProvenanceStatus::Valid || self.outcome != EvidenceOutcome::Supported
+        if self.provenance != ProvenanceStatus::Valid
+            || self.outcome != EvidenceOutcome::Supported
+            || self.replication == ReplicationState::FailedReplication
         {
             return ClaimWordingCeiling::Exploratory;
         }
@@ -692,7 +694,7 @@ mod tests {
     }
 
     #[test]
-    fn claim_ledger_never_upgrades_invalid_or_unreplicated_evidence() {
+    fn claim_ledger_preserves_replication_and_provenance_ceiling() {
         let mut claim = ClaimLedgerEntry {
             schema: CLAIM_LEDGER_SCHEMA_V1.into(),
             claim_id: "semantic-timescale-retention".into(),
@@ -714,6 +716,10 @@ mod tests {
             ClaimWordingCeiling::ReplicatedCausal
         );
 
+        claim.replication = ReplicationState::FailedReplication;
+        assert_eq!(claim.wording_ceiling(), ClaimWordingCeiling::Exploratory);
+
+        claim.replication = ReplicationState::Unreplicated;
         claim.provenance = ProvenanceStatus::Invalid;
         assert_eq!(claim.wording_ceiling(), ClaimWordingCeiling::Exploratory);
     }
