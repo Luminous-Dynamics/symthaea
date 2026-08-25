@@ -1,3 +1,9 @@
+# SYM-ARCH-001 concluded on 2026-08-25 with a frozen NEGATIVE verdict.
+#
+# Ordinary pull requests now perform only implementation regression checks on the
+# exact historical experiment surface. The full campaign is intentionally manual:
+# a later reproduction must not be mistaken for a second confirmatory sample or
+# overwrite the durable result in docs/research/SYM_ARCH_001_RESULT_2026-08-25.md.
 name: SYM-ARCH-001 Architecture Discrimination
 
 on:
@@ -5,13 +11,19 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/sym-arch-001.yml'
-      - 'crates/domains/symthaea-psych-bench/**'
-      - 'crates/domains/symthaea-ssm/**'
-      - 'crates/core/symthaea-core/src/hdc/**'
+      - 'crates/domains/symthaea-psych-bench/src/benchmarks/architecture.rs'
+      - 'crates/domains/symthaea-psych-bench/src/benchmarks/mod.rs'
+      - 'crates/domains/symthaea-psych-bench/src/bin/sym_arch_001.rs'
+      - 'crates/domains/symthaea-psych-bench/Cargo.toml'
       - 'docs/research/SYM_ARCH_001_PREREGISTRATION_2026-08-24.md'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
   workflow_dispatch:
+
+concurrency:
+  # Automatic branch runs supersede stale queued/running checks. Manual historical
+  # reproductions are deliberate evidence requests and therefore never cancel one
+  # another or get cancelled by a subsequent push.
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -22,7 +34,7 @@ env:
 
 jobs:
   sym-arch-001:
-    name: Preregistered continual/compositional campaign
+    name: Historical experiment regression / reproduction
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -43,33 +55,34 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sym-arch-001-
 
-      # Formatting remains the responsibility of normal repository CI. Keep
-      # the research workflow focused on whether the preregistered experiment
-      # compiles, executes, and emits valid evidence.
       - name: Compile and run experiment unit tests
         run: |
           cargo test -p symthaea-psych-bench --lib benchmarks::architecture -- --nocapture
+          cargo check -p symthaea-psych-bench --bin sym_arch_001
 
-      - name: Run preregistered SYM-ARCH-001 campaign
+      - name: Run historical SYM-ARCH-001 reproduction
+        if: github.event_name == 'workflow_dispatch'
         run: |
           cargo run -p symthaea-psych-bench --bin sym_arch_001 --release -- \
-            --output artifacts/sym-arch-001/report.json
+            --output artifacts/sym-arch-001-reproduction/report.json
 
-      - name: Validate and summarize evidence
+      - name: Validate and summarize reproduction evidence
+        if: github.event_name == 'workflow_dispatch'
         run: |
           python3 - <<'PY'
           import json
           from pathlib import Path
 
-          path = Path('artifacts/sym-arch-001/report.json')
+          path = Path('artifacts/sym-arch-001-reproduction/report.json')
           report = json.loads(path.read_text())
           assert report['schema'] == 'symthaea.sym-arch-001.v1'
           assert report['decision']['verdict'] in {'PASS', 'MIXED', 'NULL', 'NEGATIVE'}
           assert len(report['agents']) == 5
           assert all(len(a['per_seed']) == 16 for a in report['agents'])
 
-          print('=== SYM-ARCH-001 ===')
-          print('verdict:', report['decision']['verdict'])
+          print('=== SYM-ARCH-001 historical reproduction ===')
+          print('reproduction verdict:', report['decision']['verdict'])
+          print('frozen scientific verdict remains: NEGATIVE (2026-08-25)')
           for a in report['agents']:
               print(
                   f"{a['agent']:20s} "
@@ -82,8 +95,10 @@ jobs:
 
           summary = Path(__import__('os').environ['GITHUB_STEP_SUMMARY'])
           with summary.open('a') as f:
-              f.write('## SYM-ARCH-001 result\n\n')
-              f.write(f"**Verdict:** `{report['decision']['verdict']}`\n\n")
+              f.write('## SYM-ARCH-001 historical reproduction\n\n')
+              f.write('This run is a **reproducibility/regression check**, not a new confirmatory sample.\n\n')
+              f.write('The frozen scientific verdict remains **`NEGATIVE` (2026-08-25)** and is recorded in `docs/research/SYM_ARCH_001_RESULT_2026-08-25.md`.\n\n')
+              f.write(f"**Reproduction verdict:** `{report['decision']['verdict']}`\n\n")
               f.write('| agent | retention | composition | forgetting ↓ | reversal | latency ↓ |\n')
               f.write('|---|---:|---:|---:|---:|---:|\n')
               for a in report['agents']:
@@ -92,20 +107,14 @@ jobs:
                       f"{a['compositional']['mean']:.3f} | {a['forgetting']['mean']:.3f} | "
                       f"{a['reversal_final']['mean']:.3f} | {a['reversal_latency']['mean']:.1f} |\n"
                   )
-              d = report['decision']
-              f.write('\nCandidate deltas vs strongest control: ')
-              f.write(
-                  f"retention `{d['retention_delta_vs_best_control']:+.3f}`, "
-                  f"composition `{d['compositional_delta_vs_best_control']:+.3f}`, "
-                  f"reversal `{d['reversal_delta_vs_best_control']:+.3f}`, "
-                  f"forgetting `{d['forgetting_delta_vs_best_control']:+.3f}`.\n"
-              )
           PY
-          sha256sum artifacts/sym-arch-001/report.json | tee artifacts/sym-arch-001/SHA256SUMS
+          sha256sum artifacts/sym-arch-001-reproduction/report.json \
+            | tee artifacts/sym-arch-001-reproduction/SHA256SUMS
 
-      - name: Upload evidence artifact
+      - name: Upload historical reproduction artifact
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: sym-arch-001-${{ github.sha }}
-          path: artifacts/sym-arch-001/
+          name: sym-arch-001-reproduction-${{ github.sha }}
+          path: artifacts/sym-arch-001-reproduction/
           retention-days: 90
