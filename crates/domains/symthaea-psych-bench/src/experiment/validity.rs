@@ -157,7 +157,8 @@ pub struct BenchmarkValidityPolicy {
     pub forbidden_feature_keys: BTreeSet<String>,
     /// Reject feature-identical examples across train and evaluation splits.
     pub require_feature_disjoint_splits: bool,
-    /// Require every support tag to be declared by the split's TaskProgram support.
+    /// Require each example to carry at least one support tag and require every
+    /// support tag to be declared by the split's TaskProgram support.
     pub require_declared_support_tags: bool,
     /// Require positive and negative examples in both train and evaluation splits.
     pub require_both_classes_per_split: bool,
@@ -354,12 +355,22 @@ pub fn validate_generated_task(
                     push_violation(
                         &mut violations,
                         ValidityViolationKind::ForbiddenFeatureLeak,
-                        format!("{}:{} contains forbidden feature {key}", split_name, example.example_id),
+                        format!(
+                            "{}:{} contains forbidden feature {key}",
+                            split_name, example.example_id
+                        ),
                     );
                 }
             }
 
             if policy.require_declared_support_tags {
+                if example.support_tags.is_empty() {
+                    push_violation(
+                        &mut violations,
+                        ValidityViolationKind::UndeclaredSupport,
+                        format!("{}:{} has no support provenance tag", split_name, example.example_id),
+                    );
+                }
                 for tag in &example.support_tags {
                     let normalized = tag.trim().to_string();
                     if !declared_support.contains(&normalized) {
@@ -379,7 +390,10 @@ pub fn validate_generated_task(
                 Ok(label) if label != example.expected_label => push_violation(
                     &mut violations,
                     ValidityViolationKind::OracleMismatch,
-                    format!("{}:{} label disagrees with symbolic oracle", split_name, example.example_id),
+                    format!(
+                        "{}:{} label disagrees with symbolic oracle",
+                        split_name, example.example_id
+                    ),
                 ),
                 Err(error) => push_violation(
                     &mut violations,
@@ -420,7 +434,10 @@ pub fn validate_generated_task(
                     push_violation(
                         &mut violations,
                         ValidityViolationKind::TrainEvalFeatureLeak,
-                        format!("evaluation example {} duplicates training features", example.example_id),
+                        format!(
+                            "evaluation example {} duplicates training features",
+                            example.example_id
+                        ),
                     );
                 }
             }
@@ -472,6 +489,7 @@ pub enum BenchmarkMutation {
     CorruptProgramDigest,
     InjectForbiddenTaskId,
     InjectUndeclaredEvalSupport,
+    RemoveFirstEvalSupport,
 }
 
 /// Apply an intentionally invalid mutation used to test the validator itself.
@@ -517,6 +535,13 @@ pub fn apply_mutation(
                 .ok_or_else(|| "mutation requires a non-empty evaluation split".to_string())?;
             example.support_tags.push("undeclared-support".into());
         }
+        BenchmarkMutation::RemoveFirstEvalSupport => {
+            let example = mutated
+                .eval
+                .first_mut()
+                .ok_or_else(|| "mutation requires a non-empty evaluation split".to_string())?;
+            example.support_tags.clear();
+        }
     }
     Ok(mutated)
 }
@@ -545,6 +570,7 @@ pub fn mutation_detection_suite(
         BenchmarkMutation::CorruptProgramDigest,
         BenchmarkMutation::InjectForbiddenTaskId,
         BenchmarkMutation::InjectUndeclaredEvalSupport,
+        BenchmarkMutation::RemoveFirstEvalSupport,
     ];
 
     let mut detections = Vec::with_capacity(mutations.len());
@@ -676,7 +702,7 @@ mod tests {
     fn mutation_suite_detects_every_standard_benchmark_corruption() {
         let (program, dataset, policy) = fixture();
         let detections = mutation_detection_suite(&program, &dataset, &policy).unwrap();
-        assert_eq!(detections.len(), 5);
+        assert_eq!(detections.len(), 6);
         assert!(detections.iter().all(|detection| detection.detected));
     }
 
@@ -687,6 +713,16 @@ mod tests {
         let report = validate_generated_task(&program, &dataset, &policy);
         assert!(report.violations.iter().any(|violation| {
             violation.kind == ValidityViolationKind::ForbiddenFeatureLeak
+        }));
+    }
+
+    #[test]
+    fn missing_support_provenance_fails_closed() {
+        let (program, mut dataset, policy) = fixture();
+        dataset.eval[0].support_tags.clear();
+        let report = validate_generated_task(&program, &dataset, &policy);
+        assert!(report.violations.iter().any(|violation| {
+            violation.kind == ValidityViolationKind::UndeclaredSupport
         }));
     }
 
