@@ -542,20 +542,31 @@ where
             .iter()
             .map(|assignment| projected_digest(assignment, policy))
             .collect::<Result<_, _>>()?;
-        let actual_train = projected_digest_set(&dataset.train, policy)?;
-        let actual_eval = projected_digest_set(&dataset.eval, policy)?;
-        if actual_train != expected_train || actual_eval != expected_eval {
-            push_violation(
+
+        match (
+            projected_digest_set(&dataset.train, policy),
+            projected_digest_set(&dataset.eval, policy),
+        ) {
+            (Ok(actual_train), Ok(actual_eval)) => {
+                if actual_train != expected_train || actual_eval != expected_eval {
+                    push_violation(
+                        &mut violations,
+                        DifferentialViolationKind::ReferencePartitionMismatch,
+                        format!(
+                            "generated split differs from frozen reference partition: train actual/expected={}/{}, eval actual/expected={}/{}",
+                            actual_train.len(),
+                            expected_train.len(),
+                            actual_eval.len(),
+                            expected_eval.len()
+                        ),
+                    );
+                }
+            }
+            (Err(error), _) | (_, Err(error)) => push_violation(
                 &mut violations,
                 DifferentialViolationKind::ReferencePartitionMismatch,
-                format!(
-                    "generated split differs from frozen reference partition: train actual/expected={}/{}, eval actual/expected={}/{}",
-                    actual_train.len(),
-                    expected_train.len(),
-                    actual_eval.len(),
-                    expected_eval.len()
-                ),
-            );
+                format!("generated split cannot be compared to reference partition: {error}"),
+            ),
         }
     }
 
