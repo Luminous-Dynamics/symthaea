@@ -185,17 +185,32 @@ pub enum TimingRegime {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum RuleExpr {
-    Eq { left: String, right: String },
-    Ne { left: String, right: String },
+    Eq {
+        left: String,
+        right: String,
+    },
+    Ne {
+        left: String,
+        right: String,
+    },
     Parity {
         factor: String,
         modulus: u32,
         remainder: u32,
     },
-    Not { inner: Box<RuleExpr> },
-    And { terms: Vec<RuleExpr> },
-    Or { terms: Vec<RuleExpr> },
-    Xor { left: Box<RuleExpr>, right: Box<RuleExpr> },
+    Not {
+        inner: Box<RuleExpr>,
+    },
+    And {
+        terms: Vec<RuleExpr>,
+    },
+    Or {
+        terms: Vec<RuleExpr>,
+    },
+    Xor {
+        left: Box<RuleExpr>,
+        right: Box<RuleExpr>,
+    },
 }
 
 impl RuleExpr {
@@ -527,7 +542,8 @@ impl ClaimLedgerEntry {
     }
 
     pub fn wording_ceiling(&self) -> ClaimWordingCeiling {
-        if self.provenance != ProvenanceStatus::Valid || self.outcome != EvidenceOutcome::Supported {
+        if self.provenance != ProvenanceStatus::Valid || self.outcome != EvidenceOutcome::Supported
+        {
             return ClaimWordingCeiling::Exploratory;
         }
 

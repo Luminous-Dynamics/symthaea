@@ -40,8 +40,7 @@ pub fn paired_environment_delta_bca(
 ) -> Result<PairedEstimate, String> {
     if pairs.len() < 3 {
         return Err(
-            "confirmatory paired inference requires at least three independent environments"
-                .into(),
+            "confirmatory paired inference requires at least three independent environments".into(),
         );
     }
 
@@ -91,8 +90,7 @@ pub fn classify_practical_effect(
 ) -> Result<PracticalEffect, String> {
     if !sesoi.is_finite() || sesoi <= 0.0 {
         return Err(
-            "SESOI must be finite and strictly positive for practical-effect classification"
-                .into(),
+            "SESOI must be finite and strictly positive for practical-effect classification".into(),
         );
     }
     if !estimate.mean_delta.is_finite()
@@ -152,9 +150,7 @@ pub fn validate_task_support(
     let eval = normalized_set(&program.eval_support, "evaluation")?;
 
     if policy == SupportOverlapPolicy::Disjoint && train.iter().any(|item| eval.contains(item)) {
-        return Err(
-            "training/evaluation support overlaps under a disjoint-support policy".into(),
-        );
+        return Err("training/evaluation support overlaps under a disjoint-support policy".into());
     }
 
     Ok(())
