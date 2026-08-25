@@ -8,6 +8,7 @@ on:
     paths:
       - '.github/workflows/sym-arch-002b1-simple-baselines.yml'
       - 'crates/domains/symthaea-psych-bench/src/experiment/baselines.rs'
+      - 'crates/domains/symthaea-psych-bench/src/experiment/baseline_fairness.rs'
       - 'crates/domains/symthaea-psych-bench/src/lib.rs'
       - 'crates/domains/symthaea-psych-bench/Cargo.toml'
       - 'docs/research/SYM_ARCH_002B1_STRONG_SIMPLE_BASELINES_V1.md'
@@ -33,6 +34,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -45,9 +48,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sym-arch-002b1-
 
+      - name: Check B1 Rust formatting
+        run: |
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-psych-bench/src/experiment/baselines.rs \
+            crates/domains/symthaea-psych-bench/src/experiment/baseline_fairness.rs \
+            crates/domains/symthaea-psych-bench/src/lib.rs
+
       - name: Run strong-simple baseline tests
         run: |
           cargo test -p symthaea-psych-bench --lib experiment_baselines:: -- --nocapture
+          cargo test -p symthaea-psych-bench --lib experiment_baseline_fairness:: -- --nocapture
 
       - name: Check psych-bench library
         run: |
