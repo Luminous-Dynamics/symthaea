@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  # Showroom integrity is repo-wide, but only the latest commit for a branch/PR
+  # needs to consume runner capacity. Supersede stale automatic validations.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate-ring0:
     name: Ring 0 Buildability Audit
@@ -13,10 +19,10 @@ jobs:
     if: github.repository == 'Luminous-Dynamics/symthaea'
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        
+
       - name: Verify Metadata
         run: cargo metadata --no-deps --format-version 1
 
@@ -27,6 +33,6 @@ jobs:
         run: |
           # Ensure no forbidden dependencies
           ! rg -i 'mycelix|prism|holochain|swarm|robotics|symtropy-robotics|zero.?knowledge|zkp|pqc|private monorepo|internal only' .
-          
+
           # Check license
           head -n 5 LICENSE | grep "GNU AFFERO GENERAL PUBLIC LICENSE"
