@@ -1,0 +1,82 @@
+name: SCIP Strict LLM Adapter
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/bridges/symthaea-scip-llm-adapter/**'
+      - 'crates/bridges/symthaea-interlingua/**'
+      - 'src/language/llm_backend.rs'
+      - 'src/language/llm_organ.rs'
+      - '.github/workflows/scip-strict-llm-adapter.yml'
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-scip-llm-adapter/**'
+      - 'crates/bridges/symthaea-interlingua/**'
+      - 'src/language/llm_backend.rs'
+      - 'src/language/llm_organ.rs'
+      - '.github/workflows/scip-strict-llm-adapter.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    name: Format, test and lint strict SCIP LLM adapter
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The formatting ratchet compares the whole PR with its stacked base,
+          # not merely the final commit. Full history guarantees the base SHA is
+          # locally available even for multi-commit stacked pull requests.
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-scip-llm-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-scip-llm-
+            ${{ runner.os }}-cargo-scip-
+
+      - name: Format all adapter Rust files changed by this tranche
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="$(git rev-parse HEAD^1)"
+          fi
+          echo "Formatting diff base: $base"
+          mapfile -t files < <(
+            git diff --diff-filter=ACMR --name-only "$base" HEAD -- crates/bridges/symthaea-scip-llm-adapter \
+              | grep -E '\.rs$' || true
+          )
+          if ((${#files[@]})); then
+            printf 'rustfmt checking %s\n' "${files[@]}"
+            rustfmt --edition 2024 --config skip_children=true --check "${files[@]}"
+          else
+            echo 'No changed strict SCIP LLM adapter Rust files to format-check.'
+          fi
+
+      - name: Test strict SCIP LLM adapter
+        run: cargo test -p symthaea-scip-llm-adapter --all-targets
+
+      - name: Clippy strict SCIP LLM adapter
+        run: cargo clippy -p symthaea-scip-llm-adapter --all-targets --no-deps -- -D warnings
