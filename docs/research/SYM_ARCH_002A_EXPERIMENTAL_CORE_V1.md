@@ -42,6 +42,8 @@ Validation fails closed when, for example, a `confirmatory_first_use` run claims
 
 The runtime/generator remains separate. The program is the auditable identity and ground-truth contract that a generator/runtime must implement.
 
+`validate_task_support` adds an explicit support-overlap policy. Empty or duplicate support descriptors are rejected, and confirmatory OOD/compositional tasks can fail closed on exact train/evaluation support overlap. Experiments that intentionally evaluate IID support must declare that overlap rather than receiving it silently.
+
 ### Continual-learning matrix
 
 `PerformanceMatrix` uses the explicit convention:
@@ -61,11 +63,24 @@ It exposes:
 
 The matrix rejects non-finite, out-of-range, ragged, or dimensionally ambiguous inputs.
 
-### Paired uncertainty
+### Paired uncertainty and the independent unit
 
-`paired_delta_bca` computes candidate-minus-control deltas **before** resampling and reuses the existing `psych-bench` BCa bootstrap implementation. For confirmatory work, callers should pass one aggregate value per independent generated environment rather than flattening nested RNG runs into pseudoreplicates.
+`paired_delta_bca` computes candidate-minus-control deltas **before** resampling and reuses the existing `psych-bench` BCa bootstrap implementation.
 
-Hierarchical resampling is a follow-up once the environment/run result schema is concrete.
+For confirmatory work, `paired_environment_delta_bca` is the stricter entry point. It requires one already-aggregated candidate/control observation per independently generated environment, binds each pair to a unique environment digest, rejects duplicate environment identities, and therefore prevents representation/learner/stream reruns from being flattened into pseudoreplicates.
+
+Hierarchical resampling remains a follow-up once the nested environment/run result schema is concrete. Until then, confirmatory inference treats the environment aggregate as the independent observation.
+
+### SESOI / practical-effect classification
+
+`classify_practical_effect` interprets the complete paired confidence interval against a preregistered, strictly positive SESOI:
+
+- `meaningful_gain` only when the entire interval exceeds `+SESOI`;
+- `meaningful_regression` only when the entire interval is below `-SESOI`;
+- `equivalent` only when the entire interval lies inside `[-SESOI, +SESOI]`;
+- otherwise `inconclusive`.
+
+A favorable point estimate alone therefore cannot establish a meaningful gain, and a low-powered null result cannot be mislabeled as evidence of equivalence.
 
 ### Claim ledger
 
@@ -91,13 +106,16 @@ This follows the same core lesson as the Butlin evidence-tier redesign: architec
 
 This tranche is acceptable when the exact PR head passes:
 
-1. focused `experiment` module unit tests;
+1. focused `experiment` and confirmatory-helper unit tests;
 2. `cargo check -p symthaea-psych-bench --lib`;
 3. changed-file rustfmt;
 4. deterministic manifest/task hashes;
 5. fail-closed confirmation-status tests;
 6. reference-value continual-metric tests;
-7. ClaimLedger wording-ceiling tests.
+7. unique-environment paired-inference tests;
+8. SESOI interval-classification tests;
+9. train/evaluation support-policy tests;
+10. ClaimLedger wording-ceiling tests.
 
 No architecture-performance result is required for merge because this PR is measurement infrastructure, not confirmatory evidence.
 
@@ -107,9 +125,8 @@ This v1 does not yet provide:
 
 - procedural task execution;
 - oracle execution or benchmark mutation tests;
-- hierarchical environment-first bootstrap;
+- hierarchical environment-first bootstrap over nested runs;
 - prospective power simulation;
-- equivalence-test statistics beyond the ClaimLedger outcome vocabulary;
 - resource Pareto-front computation;
 - diagnostic state traces or causal state patching;
 - strong neural/SSM/Mamba baselines;
