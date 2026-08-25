@@ -1,0 +1,65 @@
+name: SYM-ARCH-002A2 Hierarchical Power
+
+on:
+  pull_request:
+    branches:
+      - main
+      - research/sym-arch-002a-core-v1
+    paths:
+      - '.github/workflows/sym-arch-002a2-hierarchical-power.yml'
+      - 'crates/domains/symthaea-psych-bench/src/experiment/statistics.rs'
+      - 'crates/domains/symthaea-psych-bench/src/experiment/confirmatory.rs'
+      - 'crates/domains/symthaea-psych-bench/src/experiment/mod.rs'
+      - 'crates/domains/symthaea-psych-bench/src/lib.rs'
+      - 'crates/domains/symthaea-psych-bench/src/harness/analysis.rs'
+      - 'crates/domains/symthaea-psych-bench/Cargo.toml'
+      - 'docs/research/SYM_ARCH_002A2_HIERARCHICAL_POWER_V1.md'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  hierarchical-power:
+    name: Validate hierarchical statistics and power planning
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-sym-arch-002a2-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-sym-arch-002a2-
+
+      - name: Check A2 Rust formatting
+        run: |
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-psych-bench/src/experiment/statistics.rs \
+            crates/domains/symthaea-psych-bench/src/lib.rs
+
+      - name: Run hierarchical statistics and power tests
+        run: |
+          cargo test -p symthaea-psych-bench --lib experiment_statistics:: -- --nocapture
+
+      - name: Check psych-bench library
+        run: |
+          cargo check -p symthaea-psych-bench --lib
