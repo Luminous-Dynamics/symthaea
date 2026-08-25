@@ -49,16 +49,8 @@ pub fn reference_evaluate_rule(
     }
 
     match rule {
-        RuleExpr::Eq { left, right } => {
-            let left = read(features, left)?;
-            let right = read(features, right)?;
-            Ok(left == right)
-        }
-        RuleExpr::Ne { left, right } => {
-            let left = read(features, left)?;
-            let right = read(features, right)?;
-            Ok(left != right)
-        }
+        RuleExpr::Eq { left, right } => Ok(read(features, left)? == read(features, right)?),
+        RuleExpr::Ne { left, right } => Ok(read(features, left)? != read(features, right)?),
         RuleExpr::Parity {
             factor,
             modulus,
@@ -67,45 +59,37 @@ pub fn reference_evaluate_rule(
             if *modulus == 0 || *remainder >= *modulus {
                 return Err("reference evaluator received invalid parity rule".into());
             }
-            let value = read(features, factor)?;
-            Ok(value.rem_euclid(i64::from(*modulus)) == i64::from(*remainder))
+            Ok(read(features, factor)?.rem_euclid(i64::from(*modulus))
+                == i64::from(*remainder))
         }
-        RuleExpr::Not { inner } => Ok(reference_evaluate_rule(inner, features)?.not()),
+        RuleExpr::Not { inner } => Ok(!reference_evaluate_rule(inner, features)?),
         RuleExpr::And { terms } => {
             if terms.len() < 2 {
                 return Err("reference evaluator requires >=2 AND terms".into());
             }
-            let mut result = true;
             for term in terms {
-                result &= reference_evaluate_rule(term, features)?;
+                if !reference_evaluate_rule(term, features)? {
+                    return Ok(false);
+                }
             }
-            Ok(result)
+            Ok(true)
         }
         RuleExpr::Or { terms } => {
             if terms.len() < 2 {
                 return Err("reference evaluator requires >=2 OR terms".into());
             }
-            let mut result = false;
             for term in terms {
-                result |= reference_evaluate_rule(term, features)?;
+                if reference_evaluate_rule(term, features)? {
+                    return Ok(true);
+                }
             }
-            Ok(result)
+            Ok(false)
         }
         RuleExpr::Xor { left, right } => {
             let left = reference_evaluate_rule(left, features)?;
             let right = reference_evaluate_rule(right, features)?;
             Ok((left || right) && !(left && right))
         }
-    }
-}
-
-trait BoolNot {
-    fn not(self) -> bool;
-}
-
-impl BoolNot for bool {
-    fn not(self) -> bool {
-        !self
     }
 }
 
@@ -140,15 +124,16 @@ pub struct ReferencePartition {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DifferentialValidityPolicy {
     pub structural_policy: BenchmarkValidityPolicy,
-    /// Complete finite domain for every learner-visible factor this reference
-    /// check is responsible for.
+    /// Complete finite domain for every factor governed by the reference check.
     pub factor_domains: BTreeMap<String, Vec<i64>>,
     /// Fail before enumeration if the Cartesian product exceeds this cap.
     pub max_reference_assignments: usize,
-    /// Require generated examples to expose exactly the declared factor keys.
+    /// If true, learner-visible generated features must be exactly the declared
+    /// reference factors. If false, extra nuisance features are allowed but are
+    /// projected out of reference truth/coverage/partition identity.
     pub require_exact_feature_schema: bool,
     /// Minimum fraction of the finite reference universe represented by unique
-    /// generated examples across train + eval.
+    /// projected assignments across train + eval.
     pub minimum_coverage_fraction: f64,
     /// Optional independent source of truth for exact train/eval membership.
     pub reference_partition: Option<ReferencePartition>,
@@ -206,33 +191,39 @@ impl DifferentialValidityPolicy {
     }
 }
 
-fn validate_assignment_against_policy(
+/// Project an assignment onto the declared reference factors while validating
+/// that every reference factor is present and in-domain.
+fn project_assignment(
     assignment: &BTreeMap<String, i64>,
     policy: &DifferentialValidityPolicy,
-) -> Result<(), String> {
+) -> Result<BTreeMap<String, i64>, String> {
     let declared: BTreeSet<&String> = policy.factor_domains.keys().collect();
     let observed: BTreeSet<&String> = assignment.keys().collect();
-
     if policy.require_exact_feature_schema && observed != declared {
         return Err("assignment feature schema differs from reference domain".into());
     }
-    for (key, value) in assignment {
-        let Some(domain) = policy.factor_domains.get(key) else {
-            if policy.require_exact_feature_schema {
-                return Err(format!("undeclared feature in assignment: {key}"));
-            }
-            continue;
-        };
-        if !domain.contains(value) {
-            return Err(format!("feature {key} value {value} is outside reference domain"));
+
+    let mut projected = BTreeMap::new();
+    for (factor, domain) in &policy.factor_domains {
+        let value = assignment
+            .get(factor)
+            .copied()
+            .ok_or_else(|| format!("assignment missing declared reference factor: {factor}"))?;
+        if !domain.contains(&value) {
+            return Err(format!(
+                "feature {factor} value {value} is outside reference domain"
+            ));
         }
+        projected.insert(factor.clone(), value);
     }
-    for key in policy.factor_domains.keys() {
-        if !assignment.contains_key(key) {
-            return Err(format!("assignment missing declared reference factor: {key}"));
-        }
-    }
-    Ok(())
+    Ok(projected)
+}
+
+fn projected_digest(
+    assignment: &BTreeMap<String, i64>,
+    policy: &DifferentialValidityPolicy,
+) -> Result<String, String> {
+    assignment_digest(&project_assignment(assignment, policy)?)
 }
 
 fn validate_reference_partition(
@@ -245,16 +236,15 @@ fn validate_reference_partition(
     let mut train = BTreeSet::new();
     let mut eval = BTreeSet::new();
     for assignment in &partition.train_assignments {
-        validate_assignment_against_policy(assignment, policy)?;
-        if !train.insert(assignment_digest(assignment)?) {
-            return Err("duplicate assignment in reference train partition".into());
+        let digest = projected_digest(assignment, policy)?;
+        if !train.insert(digest) {
+            return Err("duplicate projected assignment in reference train partition".into());
         }
     }
     for assignment in &partition.eval_assignments {
-        validate_assignment_against_policy(assignment, policy)?;
-        let digest = assignment_digest(assignment)?;
+        let digest = projected_digest(assignment, policy)?;
         if !eval.insert(digest.clone()) {
-            return Err("duplicate assignment in reference eval partition".into());
+            return Err("duplicate projected assignment in reference eval partition".into());
         }
         if train.contains(&digest) {
             return Err("reference train/eval partition overlap".into());
@@ -263,9 +253,7 @@ fn validate_reference_partition(
     Ok(())
 }
 
-fn enumerate_assignments(
-    domains: &BTreeMap<String, Vec<i64>>,
-) -> Vec<BTreeMap<String, i64>> {
+fn enumerate_assignments(domains: &BTreeMap<String, Vec<i64>>) -> Vec<BTreeMap<String, i64>> {
     fn recurse(
         factors: &[(&String, &Vec<i64>)],
         index: usize,
@@ -354,10 +342,13 @@ fn push_violation(
     });
 }
 
-fn digest_set(examples: &[ExampleRecord]) -> Result<BTreeSet<String>, String> {
+fn projected_digest_set(
+    examples: &[ExampleRecord],
+    policy: &DifferentialValidityPolicy,
+) -> Result<BTreeSet<String>, String> {
     examples
         .iter()
-        .map(|example| assignment_digest(&example.features))
+        .map(|example| projected_digest(&example.features, policy))
         .collect()
 }
 
@@ -372,7 +363,6 @@ where
 {
     let structural_report = validate_generated_task(program, dataset, &policy.structural_policy);
     let mut violations = Vec::new();
-
     if !structural_report.is_valid() {
         push_violation(
             &mut violations,
@@ -392,7 +382,6 @@ where
             0
         }
     };
-
     if reference_universe_size == 0 {
         return Ok(DifferentialValidityReport {
             schema: DIFFERENTIAL_VALIDITY_SCHEMA_V1.to_string(),
@@ -412,8 +401,8 @@ where
     debug_assert_eq!(universe.len(), reference_universe_size);
     let mut truth_table = Vec::with_capacity(universe.len());
     let mut oracle_disagreements = 0usize;
-
     for assignment in &universe {
+        let digest = assignment_digest(assignment)?;
         let production = evaluate_rule(&program.rule, assignment);
         let independent = reference(&program.rule, assignment);
         match (production, independent) {
@@ -423,26 +412,26 @@ where
                     push_violation(
                         &mut violations,
                         DifferentialViolationKind::OracleImplementationDisagreement,
-                        format!(
-                            "production/reference oracle disagree on assignment {}",
-                            assignment_digest(assignment)?
-                        ),
+                        format!("production/reference oracle disagree on assignment {digest}"),
                     );
                 }
                 truth_table.push(ReferenceTruthEntry {
-                    assignment_digest: assignment_digest(assignment)?,
+                    assignment_digest: digest,
                     label: right,
                 });
             }
-            (Err(left), Err(right)) => push_violation(
-                &mut violations,
-                DifferentialViolationKind::OracleImplementationDisagreement,
-                format!("both evaluators errored on valid finite assignment: production={left}; reference={right}"),
-            ),
+            (Err(left), Err(right)) => {
+                oracle_disagreements += 1;
+                push_violation(
+                    &mut violations,
+                    DifferentialViolationKind::OracleImplementationDisagreement,
+                    format!("both evaluators errored on finite assignment: production={left}; reference={right}"),
+                );
+            }
             (Err(error), Ok(label)) => {
                 oracle_disagreements += 1;
                 truth_table.push(ReferenceTruthEntry {
-                    assignment_digest: assignment_digest(assignment)?,
+                    assignment_digest: digest,
                     label,
                 });
                 push_violation(
@@ -469,13 +458,13 @@ where
         .map(|entry| (entry.assignment_digest.clone(), entry.label))
         .collect();
 
+    let declared_keys: BTreeSet<&String> = policy.factor_domains.keys().collect();
     let mut generated = BTreeSet::new();
     let mut reference_label_disagreements = 0usize;
     for (split, examples) in [("train", &dataset.train), ("eval", &dataset.eval)] {
         for example in examples {
-            let observed: BTreeSet<&String> = example.features.keys().collect();
-            let declared: BTreeSet<&String> = policy.factor_domains.keys().collect();
-            if policy.require_exact_feature_schema && observed != declared {
+            let observed_keys: BTreeSet<&String> = example.features.keys().collect();
+            if policy.require_exact_feature_schema && observed_keys != declared_keys {
                 push_violation(
                     &mut violations,
                     DifferentialViolationKind::FeatureSchemaMismatch,
@@ -483,61 +472,49 @@ where
                 );
             }
 
-            let mut domain_error = false;
-            for (key, value) in &example.features {
-                match policy.factor_domains.get(key) {
-                    Some(domain) if domain.contains(value) => {}
-                    Some(_) => {
-                        domain_error = true;
-                        push_violation(
-                            &mut violations,
-                            DifferentialViolationKind::OutOfDomainValue,
-                            format!("{split}:{} has out-of-domain {key}={value}", example.example_id),
-                        );
-                    }
-                    None if policy.require_exact_feature_schema => {
-                        domain_error = true;
-                    }
-                    None => {}
-                }
-            }
-            for factor in policy.factor_domains.keys() {
-                if !example.features.contains_key(factor) {
-                    domain_error = true;
+            let projected = match project_assignment(&example.features, policy) {
+                Ok(projected) => projected,
+                Err(error) => {
+                    let kind = if error.contains("outside reference domain") {
+                        DifferentialViolationKind::OutOfDomainValue
+                    } else {
+                        DifferentialViolationKind::FeatureSchemaMismatch
+                    };
                     push_violation(
                         &mut violations,
-                        DifferentialViolationKind::FeatureSchemaMismatch,
-                        format!("{split}:{} missing reference factor {factor}", example.example_id),
+                        kind,
+                        format!("{split}:{}: {error}", example.example_id),
                     );
+                    continue;
                 }
-            }
-
-            let digest = assignment_digest(&example.features)?;
+            };
+            let digest = assignment_digest(&projected)?;
             if !generated.insert(digest.clone()) {
                 push_violation(
                     &mut violations,
                     DifferentialViolationKind::DuplicateFeatureAssignment,
-                    format!("generated assignment appears more than once: {digest}"),
+                    format!("projected reference assignment appears more than once: {digest}"),
                 );
             }
 
-            if !domain_error {
-                match truth_labels.get(&digest) {
-                    Some(reference_label) if *reference_label != example.expected_label => {
-                        reference_label_disagreements += 1;
-                        push_violation(
-                            &mut violations,
-                            DifferentialViolationKind::ReferenceLabelMismatch,
-                            format!("{split}:{} disagrees with independent reference label", example.example_id),
-                        );
-                    }
-                    None => push_violation(
+            match truth_labels.get(&digest) {
+                Some(reference_label) if *reference_label != example.expected_label => {
+                    reference_label_disagreements += 1;
+                    push_violation(
                         &mut violations,
-                        DifferentialViolationKind::OutOfDomainValue,
-                        format!("{split}:{} assignment not present in finite reference universe", example.example_id),
-                    ),
-                    _ => {}
+                        DifferentialViolationKind::ReferenceLabelMismatch,
+                        format!("{split}:{} disagrees with independent reference label", example.example_id),
+                    );
                 }
+                None => {
+                    reference_label_disagreements += 1;
+                    push_violation(
+                        &mut violations,
+                        DifferentialViolationKind::ReferenceLabelMismatch,
+                        format!("{split}:{} has no independent reference label", example.example_id),
+                    );
+                }
+                _ => {}
             }
         }
     }
@@ -548,7 +525,7 @@ where
             &mut violations,
             DifferentialViolationKind::CoverageTooLow,
             format!(
-                "generated unique coverage {coverage_fraction:.4} is below frozen minimum {:.4}",
+                "generated projected coverage {coverage_fraction:.4} is below frozen minimum {:.4}",
                 policy.minimum_coverage_fraction
             ),
         );
@@ -558,15 +535,15 @@ where
         let expected_train: BTreeSet<String> = reference_partition
             .train_assignments
             .iter()
-            .map(assignment_digest)
+            .map(|assignment| projected_digest(assignment, policy))
             .collect::<Result<_, _>>()?;
         let expected_eval: BTreeSet<String> = reference_partition
             .eval_assignments
             .iter()
-            .map(assignment_digest)
+            .map(|assignment| projected_digest(assignment, policy))
             .collect::<Result<_, _>>()?;
-        let actual_train = digest_set(&dataset.train)?;
-        let actual_eval = digest_set(&dataset.eval)?;
+        let actual_train = projected_digest_set(&dataset.train, policy)?;
+        let actual_eval = projected_digest_set(&dataset.eval, policy)?;
         if actual_train != expected_train || actual_eval != expected_eval {
             push_violation(
                 &mut violations,
@@ -640,7 +617,12 @@ mod tests {
         ])
     }
 
-    fn example(id: &str, features: BTreeMap<String, i64>, split: &str, rule: &RuleExpr) -> ExampleRecord {
+    fn example(
+        id: &str,
+        features: BTreeMap<String, i64>,
+        split: &str,
+        rule: &RuleExpr,
+    ) -> ExampleRecord {
         let expected_label = evaluate_rule(rule, &features).unwrap();
         ExampleRecord {
             example_id: id.into(),
@@ -667,14 +649,22 @@ mod tests {
         let train: Vec<_> = train_assignments
             .iter()
             .enumerate()
-            .map(|(index, features)| example(&format!("train-{index}"), features.clone(), "train", &rule))
+            .map(|(index, features)| {
+                example(&format!("train-{index}"), features.clone(), "train", &rule)
+            })
             .collect();
         let eval: Vec<_> = eval_assignments
             .iter()
             .enumerate()
-            .map(|(index, features)| example(&format!("eval-{index}"), features.clone(), "eval", &rule))
+            .map(|(index, features)| {
+                example(&format!("eval-{index}"), features.clone(), "eval", &rule)
+            })
             .collect();
-        let positive_examples = train.iter().chain(&eval).filter(|example| example.expected_label).count();
+        let positive_examples = train
+            .iter()
+            .chain(&eval)
+            .filter(|example| example.expected_label)
+            .count();
         let negative_examples = train.len() + eval.len() - positive_examples;
         let mut program = TaskProgram {
             schema: TASK_PROGRAM_SCHEMA_V1.into(),
@@ -774,10 +764,30 @@ mod tests {
     }
 
     #[test]
+    fn relaxed_schema_projects_nuisance_out_of_reference_identity() {
+        let (program, mut dataset, mut policy) = fixture();
+        policy.require_exact_feature_schema = false;
+        policy.reference_partition = None;
+        for (index, example) in dataset
+            .train
+            .iter_mut()
+            .chain(&mut dataset.eval)
+            .enumerate()
+        {
+            example.features.insert("nuisance".into(), index as i64);
+        }
+        let report = run_differential_validation(&program, &dataset, &policy).unwrap();
+        assert!(report.passed(), "violations: {:?}", report.violations);
+        assert_eq!(report.generated_unique_assignments, 8);
+        assert_eq!(report.coverage_fraction, 1.0);
+    }
+
+    #[test]
     fn out_of_domain_value_is_rejected() {
         let (mut program, mut dataset, policy) = fixture();
         dataset.eval[0].features.insert("a".into(), 9);
-        dataset.eval[0].expected_label = evaluate_rule(&program.rule, &dataset.eval[0].features).unwrap();
+        dataset.eval[0].expected_label =
+            evaluate_rule(&program.rule, &dataset.eval[0].features).unwrap();
         program.positive_examples = dataset
             .train
             .iter()
@@ -785,7 +795,6 @@ mod tests {
             .filter(|example| example.expected_label)
             .count();
         program.negative_examples = dataset.train.len() + dataset.eval.len() - program.positive_examples;
-        program.oracle_digest = symbolic_oracle_digest(&program.rule).unwrap();
         dataset.program_digest = program.digest().unwrap();
 
         let report = run_differential_validation(&program, &dataset, &policy).unwrap();
