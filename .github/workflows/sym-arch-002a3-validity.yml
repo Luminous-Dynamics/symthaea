@@ -16,6 +16,12 @@ on:
       - 'Cargo.lock'
   workflow_dispatch:
 
+concurrency:
+  # Automatic branch runs supersede stale checks. Deliberate manual validation
+  # runs are unique and therefore never cancel one another.
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
