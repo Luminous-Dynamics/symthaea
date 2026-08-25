@@ -67,6 +67,32 @@ Requiring consecutive qualifying windows prevents one lucky local burst from bei
 
 The criterion must not be chosen after inspecting CONFIRM/REPL learning curves.
 
+### Criterion admissibility against simple references
+
+A threshold can be implemented perfectly and still be scientifically weak if a known chance, majority, marginal, or other preregistered shortcut reference can already satisfy it.
+
+`experiment_measurement_validity::audit_acquisition_criterion` therefore freezes:
+
+- the learning criterion;
+- a preregistered reference-accuracy ceiling;
+- the minimum practical excess required above that ceiling.
+
+The audit also exposes the criterion's **finite-window resolution**. For a window of `n`, a nominal threshold is converted into the integer number correct actually required and the corresponding effective accuracy threshold.
+
+It returns:
+
+- `admissible` when the effective threshold clears the frozen reference ceiling by at least the required practical margin;
+- `reference_confounded` otherwise, with explicit qualifiers.
+
+This is a construct-validity guard, not a significance test. Passing it does not replace:
+
+- A4's shortcut-control campaign;
+- A2's paired/hierarchical uncertainty;
+- prospective power;
+- multiple-comparison control.
+
+A claim-bearing examples-to-criterion result must not use a `reference_confounded` criterion.
+
 ### Overall prequential accuracy
 
 Accuracy across every pre-update prediction in the phase.
@@ -142,6 +168,8 @@ For every claim-bearing acquisition comparison freeze at least:
 - phase boundaries;
 - prequential ordering rule;
 - learning criterion;
+- reference-accuracy ceiling used to audit the criterion;
+- minimum practical excess above that reference;
 - observation budget;
 - evaluation cadence;
 - latency timing protocol;
@@ -186,13 +214,15 @@ The exact PR head must demonstrate:
 9. impossible replay/persistent-state accounting fails closed;
 10. trace digest changes with order, manifest, task, runtime context, or phase;
 11. summary binds acquisition, latency, resource, and trace identity;
-12. the full psych-bench library compiles.
+12. criterion audit distinguishes admissible from reference-confounded thresholds;
+13. finite-window criterion resolution is explicit;
+14. the full psych-bench library compiles.
 
 ## Claim ceiling
 
 Merging A6 supports only:
 
-> Symthaea psych-bench contains provenance-bound prequential acquisition, latency/throughput, and resource measurement primitives suitable for later preregistered continual-learning experiments.
+> Symthaea psych-bench contains provenance-bound prequential acquisition, criterion-validity, latency/throughput, and resource measurement primitives suitable for later preregistered continual-learning experiments.
 
 It does **not** support:
 
@@ -200,7 +230,8 @@ It does **not** support:
 - a claim that any mechanism learns faster;
 - a hardware-independent latency claim;
 - a resource-efficiency claim across unmatched budgets;
-- a claim that low forgetting implies successful learning.
+- a claim that low forgetting implies successful learning;
+- a claim-bearing acquisition threshold when the criterion audit is `reference_confounded`.
 
 ## Next use
 
