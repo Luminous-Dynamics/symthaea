@@ -401,7 +401,10 @@ impl LLMOrgan {
         }
     }
 
-    fn generation_params_for_query(&self, query: &LLMQuery) -> super::llm_backend::GenerationParams {
+    fn generation_params_for_query(
+        &self,
+        query: &LLMQuery,
+    ) -> super::llm_backend::GenerationParams {
         super::llm_backend::GenerationParams {
             temperature: query
                 .params
@@ -1310,10 +1313,7 @@ mod tests {
         let query = strict_query();
 
         let error = organ.execute_backend_strict(&query).await.unwrap_err();
-        assert!(matches!(
-            error,
-            LLMBackendExecutionError::Generation { .. }
-        ));
+        assert!(matches!(error, LLMBackendExecutionError::Generation { .. }));
         assert_eq!(organ.stats().queries_processed, 0);
         assert_eq!(organ.stats().errors, 1);
         assert!(organ.conversation_history().is_empty());
