@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-scip-llm-transactional"
+version = "0.1.0"
+edition = "2024"
+description = "Transactional accounted execution for strict SCIP LLM realization"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea = { path = "../../..", default-features = false }
+symthaea-interlingua = { path = "../symthaea-interlingua" }
+symthaea-scip-llm-adapter = { path = "../symthaea-scip-llm-adapter" }
+
+[dev-dependencies]
+symthaea-communication = { workspace = true }
+anyhow = { workspace = true }
+async-trait = "0.1"
+tokio = { workspace = true }

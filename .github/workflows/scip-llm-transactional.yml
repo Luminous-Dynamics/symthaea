@@ -1,0 +1,77 @@
+name: SCIP Transactional LLM Accounting
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/bridges/symthaea-scip-llm-transactional/**'
+      - 'crates/bridges/symthaea-scip-llm-adapter/**'
+      - 'src/language/llm_organ.rs'
+      - '.github/workflows/scip-llm-transactional.yml'
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-scip-llm-transactional/**'
+      - 'crates/bridges/symthaea-scip-llm-adapter/**'
+      - 'src/language/llm_organ.rs'
+      - '.github/workflows/scip-llm-transactional.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  transactional-accounting:
+    name: Format, test and lint transactional SCIP accounting
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-scip-llm-transactional-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-scip-llm-transactional-
+            ${{ runner.os }}-cargo-llm-strict-
+            ${{ runner.os }}-cargo-scip-llm-
+            ${{ runner.os }}-cargo-scip-
+
+      - name: Format changed transactional bridge Rust files
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base="${BASE_SHA:-HEAD^1}"
+          mapfile -t files < <(
+            git diff --diff-filter=ACMR --name-only "$base" HEAD -- \
+              crates/bridges/symthaea-scip-llm-transactional \
+              | grep -E '\.rs$' || true
+          )
+          if ((${#files[@]})); then
+            printf 'rustfmt checking %s\n' "${files[@]}"
+            rustfmt --edition 2024 --config skip_children=true --check "${files[@]}"
+          else
+            echo 'No changed transactional bridge Rust files to format-check.'
+          fi
+
+      - name: Test transactional SCIP accounting
+        run: cargo test -p symthaea-scip-llm-transactional --all-targets
+
+      - name: Strict Clippy transactional SCIP accounting
+        run: cargo clippy -p symthaea-scip-llm-transactional --all-targets --no-deps -- -D warnings
