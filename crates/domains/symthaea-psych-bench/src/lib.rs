@@ -56,6 +56,8 @@ pub mod benchmarks;
 pub mod experiment;
 #[path = "experiment/confirmatory.rs"]
 pub mod experiment_confirmatory;
+#[path = "experiment/construct_validity.rs"]
+pub mod experiment_construct_validity;
 #[path = "experiment/validity.rs"]
 pub mod experiment_validity;
 pub mod harness;
