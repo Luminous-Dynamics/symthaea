@@ -4,6 +4,7 @@
 //! Psychological benchmark implementations.
 
 pub mod affect;
+pub mod architecture;
 pub mod attention;
 pub mod binding;
 pub mod butlin;
