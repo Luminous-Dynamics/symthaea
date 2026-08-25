@@ -103,6 +103,13 @@ pub struct OnlineMeasurementTrace {
     pub schema: String,
     /// Digest of the experiment manifest controlling this trace.
     pub manifest_digest: String,
+    /// Digest of the exact task program represented by this contiguous phase.
+    pub task_program_digest: String,
+    /// Digest of separately recorded runtime/hardware/compiler context. Latency
+    /// comparisons across different runtime contexts require an explicit policy.
+    pub runtime_context_digest: String,
+    /// Human-readable contiguous phase identity, e.g. `world-b-acquisition`.
+    pub phase_id: String,
     /// Optional digest of the exact learner/spec state before the first step.
     pub initial_state_digest: Option<String>,
     pub steps: Vec<OnlineStepMeasurement>,
@@ -113,8 +120,19 @@ impl OnlineMeasurementTrace {
         if self.schema != ONLINE_MEASUREMENT_TRACE_SCHEMA_V1 {
             return Err(format!("unsupported online-measurement schema: {}", self.schema));
         }
-        if !looks_like_digest(&self.manifest_digest) {
-            return Err("measurement trace manifest_digest must be a 32-byte hex digest".into());
+        for (name, digest) in [
+            ("manifest", &self.manifest_digest),
+            ("task_program", &self.task_program_digest),
+            ("runtime_context", &self.runtime_context_digest),
+        ] {
+            if !looks_like_digest(digest) {
+                return Err(format!(
+                    "measurement trace {name}_digest must be a 32-byte hex digest"
+                ));
+            }
+        }
+        if self.phase_id.trim().is_empty() {
+            return Err("measurement trace phase_id must be non-empty".into());
         }
         if let Some(digest) = &self.initial_state_digest {
             if !looks_like_digest(digest) {
@@ -157,8 +175,7 @@ impl OnlineMeasurementTrace {
         let mut prefix = Vec::with_capacity(self.steps.len() + 1);
         prefix.push(0usize);
         for step in &self.steps {
-            let next = prefix.last().copied().unwrap_or(0)
-                + usize::from(step.correct_before_update);
+            let next = prefix.last().copied().unwrap_or(0) + step.correct_before_update as usize;
             prefix.push(next);
         }
 
@@ -182,20 +199,20 @@ impl OnlineMeasurementTrace {
     /// Mean cumulative prequential accuracy across learning steps.
     ///
     /// This is a normalized right-rectangle area under the cumulative-accuracy
-    /// learning curve. Two runs with the same final accuracy can differ here when
-    /// one acquires useful behavior earlier.
+    /// learning curve. Two runs with the same overall accuracy can differ here
+    /// when one acquires useful behavior earlier.
     pub fn cumulative_accuracy_auc(&self) -> Result<f64, String> {
         self.validate()?;
         let mut correct = 0usize;
         let mut area = 0.0;
         for (index, step) in self.steps.iter().enumerate() {
-            correct += usize::from(step.correct_before_update);
+            correct += step.correct_before_update as usize;
             area += correct as f64 / (index + 1) as f64;
         }
         Ok(area / self.steps.len() as f64)
     }
 
-    pub fn final_prequential_accuracy(&self) -> Result<f64, String> {
+    pub fn overall_prequential_accuracy(&self) -> Result<f64, String> {
         self.validate()?;
         let correct = self
             .steps
@@ -203,6 +220,22 @@ impl OnlineMeasurementTrace {
             .filter(|step| step.correct_before_update)
             .count();
         Ok(correct as f64 / self.steps.len() as f64)
+    }
+
+    /// Accuracy over the final `window_size` pre-update predictions.
+    pub fn terminal_window_accuracy(&self, window_size: usize) -> Result<Option<f64>, String> {
+        self.validate()?;
+        if window_size == 0 {
+            return Err("terminal accuracy window_size must be positive".into());
+        }
+        if self.steps.len() < window_size {
+            return Ok(None);
+        }
+        let correct = self.steps[self.steps.len() - window_size..]
+            .iter()
+            .filter(|step| step.correct_before_update)
+            .count();
+        Ok(Some(correct as f64 / window_size as f64))
     }
 
     pub fn summarize(
@@ -221,7 +254,8 @@ impl OnlineMeasurementTrace {
         Ok(OnlineMeasurementSummary {
             observations: self.steps.len(),
             examples_to_criterion: self.examples_to_criterion(criterion)?,
-            final_prequential_accuracy: self.final_prequential_accuracy()?,
+            overall_prequential_accuracy: self.overall_prequential_accuracy()?,
+            terminal_window_accuracy: self.terminal_window_accuracy(criterion.window_size)?,
             cumulative_accuracy_auc: self.cumulative_accuracy_auc()?,
             inference_latency: LatencySummary::from_samples(&inference)?,
             update_latency: LatencySummary::from_samples(&update)?,
@@ -337,7 +371,8 @@ impl ResourceTraceSummary {
 pub struct OnlineMeasurementSummary {
     pub observations: usize,
     pub examples_to_criterion: Option<usize>,
-    pub final_prequential_accuracy: f64,
+    pub overall_prequential_accuracy: f64,
+    pub terminal_window_accuracy: Option<f64>,
     pub cumulative_accuracy_auc: f64,
     pub inference_latency: LatencySummary,
     pub update_latency: LatencySummary,
@@ -367,7 +402,10 @@ mod tests {
         OnlineMeasurementTrace {
             schema: ONLINE_MEASUREMENT_TRACE_SCHEMA_V1.into(),
             manifest_digest: digest("a"),
-            initial_state_digest: Some(digest("b")),
+            task_program_digest: digest("b"),
+            runtime_context_digest: digest("c"),
+            phase_id: "phase-a".into(),
+            initial_state_digest: Some(digest("d")),
             steps: correctness
                 .iter()
                 .enumerate()
@@ -409,12 +447,19 @@ mod tests {
     }
 
     #[test]
-    fn cumulative_auc_rewards_earlier_acquisition_at_same_final_accuracy() {
+    fn cumulative_auc_rewards_earlier_acquisition_at_same_overall_accuracy() {
         let early = trace(&[true, true, false, false]);
         let late = trace(&[false, false, true, true]);
-        assert_eq!(early.final_prequential_accuracy().unwrap(), 0.5);
-        assert_eq!(late.final_prequential_accuracy().unwrap(), 0.5);
+        assert_eq!(early.overall_prequential_accuracy().unwrap(), 0.5);
+        assert_eq!(late.overall_prequential_accuracy().unwrap(), 0.5);
         assert!(early.cumulative_accuracy_auc().unwrap() > late.cumulative_accuracy_auc().unwrap());
+    }
+
+    #[test]
+    fn terminal_window_accuracy_is_not_overall_accuracy() {
+        let trace = trace(&[false, false, true, true]);
+        assert_eq!(trace.overall_prequential_accuracy().unwrap(), 0.5);
+        assert_eq!(trace.terminal_window_accuracy(2).unwrap(), Some(1.0));
     }
 
     #[test]
@@ -450,13 +495,23 @@ mod tests {
     }
 
     #[test]
-    fn trace_digest_is_order_sensitive_and_manifest_bound() {
+    fn trace_digest_is_order_task_runtime_and_manifest_bound() {
         let first = trace(&[true, false, true]);
-        let mut reordered = trace(&[false, true, true]);
+        let reordered = trace(&[false, true, true]);
         assert_ne!(first.digest().unwrap(), reordered.digest().unwrap());
-        reordered = first.clone();
-        reordered.manifest_digest = digest("c");
-        assert_ne!(first.digest().unwrap(), reordered.digest().unwrap());
+
+        let mut changed = first.clone();
+        changed.manifest_digest = digest("e");
+        assert_ne!(first.digest().unwrap(), changed.digest().unwrap());
+        changed = first.clone();
+        changed.task_program_digest = digest("e");
+        assert_ne!(first.digest().unwrap(), changed.digest().unwrap());
+        changed = first.clone();
+        changed.runtime_context_digest = digest("e");
+        assert_ne!(first.digest().unwrap(), changed.digest().unwrap());
+        changed = first.clone();
+        changed.phase_id = "phase-b".into();
+        assert_ne!(first.digest().unwrap(), changed.digest().unwrap());
     }
 
     #[test]
@@ -477,6 +532,7 @@ mod tests {
         let summary = trace.summarize(&criterion).unwrap();
         assert_eq!(summary.observations, 4);
         assert_eq!(summary.examples_to_criterion, Some(4));
+        assert_eq!(summary.terminal_window_accuracy, Some(1.0));
         assert!(looks_like_digest(&summary.trace_digest));
         assert_eq!(summary.inference_latency.samples, 4);
         assert_eq!(summary.update_latency.samples, 4);
