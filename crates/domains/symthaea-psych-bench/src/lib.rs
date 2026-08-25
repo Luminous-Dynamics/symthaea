@@ -58,6 +58,8 @@ pub mod experiment;
 pub mod experiment_confirmatory;
 #[path = "experiment/measurement.rs"]
 pub mod experiment_measurement;
+#[path = "experiment/measurement_validity.rs"]
+pub mod experiment_measurement_validity;
 pub mod harness;
 pub mod substrate_transfer;
 pub mod wm;
