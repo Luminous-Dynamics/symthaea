@@ -82,6 +82,32 @@ This audit intentionally does **not** require equal fixed-encoder storage. Encod
 
 `audit_matched_family` audits all three pairwise contrasts emitted by one `MatchedBaselineFamilySpec`. In the usual B1 regime where the encoded random/HDC dimension is much larger than the categorical one-hot dimension, random↔HDC should be representation-level while one-hot↔random and one-hot↔HDC remain reference-only.
 
+## Matched data and update opportunities
+
+Static configuration equality is not enough for a continual-learning comparison. A runner could still accidentally feed models different examples, different labels, a different order, or a different number of updates.
+
+`experiment_baseline_panel::MatchedBaselinePanel` is therefore the preferred claim-bearing B1 execution path.
+
+It owns all three baseline agents and provides:
+
+- `observe_all` — applies one labeled training item to every baseline;
+- clone-before-commit semantics — if any model rejects the item, **no** baseline state, update counter, or training-stream digest changes;
+- `evaluate_all` — scores every baseline on the same labeled evaluation item without changing model state;
+- a domain-separated, order-sensitive training-stream digest;
+- a separate domain-separated, order-sensitive evaluation-stream digest including the expected label;
+- per-member spec digests, update counts, and resource footprints;
+- a canonical panel-snapshot digest independent of member serialization order.
+
+The snapshot fails validation unless:
+
+- exactly one one-hot, one random, and one HDC baseline are present;
+- every member has a well-formed spec digest;
+- every member's update count exactly equals the panel training-observation count.
+
+For a claim-bearing B1 result, bind the panel snapshot digest alongside the experiment manifest, task-program/dataset identity, analysis revision, and relevant contrast audit. A hand-written loop over independent agents may be useful during development, but it is not sufficient evidence for the statement that exposure/update opportunities were matched.
+
+The panel digest does not replace raw result artifacts. It is a compact provenance commitment to the exact baseline specs/resources and the exact ordered training/evaluation exposure streams used by the matched panel.
+
 ## This is RanDumb/F-OAL-inspired, not a reproduction
 
 The fixed-random and analytic-readout controls are motivated by recent online continual-learning results showing that frozen random representations and forward-only analytic classifiers can be unexpectedly strong.
@@ -165,7 +191,8 @@ At minimum:
 - primary comparator and metric;
 - SESOI and analysis rule;
 - resource budget/fairness regime;
-- expected contrast-fairness claim ceiling for every primary comparison.
+- expected contrast-fairness claim ceiling for every primary comparison;
+- matched-panel schema/version and required panel-snapshot binding.
 
 DEV may be used to choose these values. CONFIRM may not be used to tune them.
 
@@ -208,20 +235,25 @@ The implementation tranche is acceptable when the exact PR head demonstrates:
 13. dimension-mismatched one-hot↔random is downgraded to reference-only;
 14. randomized representation contrasts with unpaired seed indices are downgraded;
 15. RLS protocol mismatch is downgraded;
-16. B1 Rust files pass rustfmt;
-17. the psych-bench library compiles.
+16. matched-panel training/evaluation streams are deterministic and order-sensitive;
+17. failed training/evaluation items leave panel exposure state unchanged;
+18. every matched-panel member update count equals the panel training count;
+19. the canonical panel snapshot digest is stable under member serialization reordering;
+20. B1 Rust files pass rustfmt;
+21. the psych-bench library compiles.
 
 ## Wording ceiling
 
 Merging B1 supports only:
 
-> Symthaea psych-bench contains deterministic, resource-audited strong-simple one-hot, fixed-random, and vanilla-HDC online-RLS baselines plus an executable contrast-fairness audit suitable for later preregistered architecture comparisons.
+> Symthaea psych-bench contains deterministic, resource-audited strong-simple one-hot, fixed-random, and vanilla-HDC online-RLS baselines plus executable contrast-fairness and matched-exposure provenance suitable for later preregistered architecture comparisons.
 
 It does not support:
 
 - an architecture-performance claim;
 - a claim that HDC beats random features;
 - a representation-only interpretation for a contrast that the fairness audit marks `reference_only`;
+- a matched-stream claim from a run that does not bind a valid matched-panel snapshot;
 - a claim that RLS is a faithful reproduction of a named published method;
 - a claim that HDC algebra has been isolated;
 - a claim about liquid dynamics, Hebbian plasticity, or full Symthaea intelligence.
