@@ -28,11 +28,8 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  experimental-core-hosted:
-    name: Validate experiment infrastructure (hosted)
-    # Fork PRs must never execute untrusted code on the repository's self-hosted
-    # NixOS runner. Manual dispatch also keeps the standard hosted path.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+  experimental-core:
+    name: Validate experiment infrastructure
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -69,36 +66,3 @@ jobs:
       - name: Check psych-bench library
         run: |
           cargo check -p symthaea-psych-bench --lib
-
-  experimental-core-nixos:
-    name: Validate experiment infrastructure
-    # Security boundary: only branches inside this repository may execute on the
-    # trusted self-hosted runner. Fork PRs are routed to the hosted job above.
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, gpu, nixos]
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Verify pinned Rust toolchain
-        run: |
-          set -euo pipefail
-          nix develop --command rustc --version | grep -F 'rustc 1.96.0 '
-          nix develop --command cargo --version
-          nix develop --command rustfmt --version
-
-      - name: Check changed Rust formatting
-        run: |
-          nix develop --command rustfmt --edition 2024 --check \
-            crates/domains/symthaea-psych-bench/src/experiment/mod.rs \
-            crates/domains/symthaea-psych-bench/src/experiment/confirmatory.rs \
-            crates/domains/symthaea-psych-bench/src/lib.rs
-
-      - name: Run experimental-core tests
-        run: |
-          nix develop --command cargo test -p symthaea-psych-bench --lib experiment -- --nocapture
-
-      - name: Check psych-bench library
-        run: |
-          nix develop --command cargo check -p symthaea-psych-bench --lib
