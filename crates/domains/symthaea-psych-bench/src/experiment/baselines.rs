@@ -219,6 +219,38 @@ impl RlsConfig {
     }
 }
 
+fn rls_layout(
+    input_dimension: usize,
+    config: &RlsConfig,
+) -> Result<(usize, usize, usize), String> {
+    config.validate()?;
+    if input_dimension == 0 {
+        return Err("RLS input dimension must be positive".into());
+    }
+    let state_dimension = input_dimension
+        .checked_add(usize::from(config.include_bias))
+        .ok_or_else(|| "RLS state dimension overflow".to_string())?;
+    let covariance_len = state_dimension
+        .checked_mul(state_dimension)
+        .ok_or_else(|| "RLS covariance allocation overflow".to_string())?;
+    let covariance_bytes = covariance_len
+        .checked_mul(std::mem::size_of::<f64>())
+        .ok_or_else(|| "RLS covariance byte count overflow".to_string())?;
+    if covariance_bytes > MAX_RLS_COVARIANCE_BYTES {
+        return Err(format!(
+            "full RLS covariance would require {covariance_bytes} bytes, above hard ceiling {MAX_RLS_COVARIANCE_BYTES}; use a smaller encoded dimension or a bounded-state analytic readout"
+        ));
+    }
+    Ok((state_dimension, covariance_len, covariance_bytes))
+}
+
+pub fn required_rls_covariance_bytes(
+    input_dimension: usize,
+    config: &RlsConfig,
+) -> Result<usize, String> {
+    Ok(rls_layout(input_dimension, config)?.2)
+}
+
 #[derive(Debug, Clone)]
 pub struct OnlineRlsBinary {
     input_dimension: usize,
@@ -231,24 +263,7 @@ pub struct OnlineRlsBinary {
 
 impl OnlineRlsBinary {
     pub fn new(input_dimension: usize, config: RlsConfig) -> Result<Self, String> {
-        config.validate()?;
-        if input_dimension == 0 {
-            return Err("RLS input dimension must be positive".into());
-        }
-        let state_dimension = input_dimension
-            .checked_add(usize::from(config.include_bias))
-            .ok_or_else(|| "RLS state dimension overflow".to_string())?;
-        let covariance_len = state_dimension
-            .checked_mul(state_dimension)
-            .ok_or_else(|| "RLS covariance allocation overflow".to_string())?;
-        let covariance_bytes = covariance_len
-            .checked_mul(std::mem::size_of::<f64>())
-            .ok_or_else(|| "RLS covariance byte count overflow".to_string())?;
-        if covariance_bytes > MAX_RLS_COVARIANCE_BYTES {
-            return Err(format!(
-                "full RLS covariance would require {covariance_bytes} bytes, above hard ceiling {MAX_RLS_COVARIANCE_BYTES}; use a smaller encoded dimension or a bounded-state analytic readout"
-            ));
-        }
+        let (state_dimension, covariance_len, _) = rls_layout(input_dimension, &config)?;
         let mut inverse_covariance = vec![0.0; covariance_len];
         let diagonal = 1.0 / config.ridge;
         for index in 0..state_dimension {
@@ -396,11 +411,14 @@ impl SimpleBaselineSpec {
                             .into(),
                     );
                 }
+                let dimension = self.feature_schema.one_hot_dimension()?;
+                let _ = rls_layout(dimension, &self.rls)?;
             }
             SimpleBaselineKind::FixedRandomTanhRls | SimpleBaselineKind::VanillaHdcRls => {
                 if self.encoded_dimension == 0 {
                     return Err("encoded dimension must be positive".into());
                 }
+                let _ = rls_layout(self.encoded_dimension, &self.rls)?;
             }
         }
         Ok(())
@@ -431,10 +449,9 @@ impl MatchedBaselineFamilySpec {
         if self.encoded_dimension == 0 {
             return Err("matched random/HDC dimension must be positive".into());
         }
-        // Validate allocation feasibility before any baseline is constructed.
-        let _ = OnlineRlsBinary::new(self.encoded_dimension, self.rls.clone())?;
+        let _ = rls_layout(self.encoded_dimension, &self.rls)?;
         let one_hot_dimension = self.feature_schema.one_hot_dimension()?;
-        let _ = OnlineRlsBinary::new(one_hot_dimension, self.rls.clone())?;
+        let _ = rls_layout(one_hot_dimension, &self.rls)?;
         Ok(())
     }
 
@@ -848,7 +865,7 @@ mod tests {
 
     #[test]
     fn full_rls_rejects_multi_gigabyte_covariance_before_allocation() {
-        let error = OnlineRlsBinary::new(16_384, RlsConfig::default()).unwrap_err();
+        let error = required_rls_covariance_bytes(16_384, &RlsConfig::default()).unwrap_err();
         assert!(error.contains("hard ceiling"));
     }
 
@@ -910,8 +927,9 @@ mod tests {
     }
 
     #[test]
-    fn matched_family_freezes_one_readout_contract() {
+    fn matched_family_freezes_one_readout_contract_without_allocating_on_validate() {
         let family = family(128, 31);
+        family.validate().unwrap();
         let specs = family.specs().unwrap();
         assert_eq!(specs.len(), 3);
         assert_eq!(specs[0].kind, SimpleBaselineKind::OneHotRls);
