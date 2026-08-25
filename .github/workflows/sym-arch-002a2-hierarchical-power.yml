@@ -8,12 +8,14 @@ on:
     paths:
       - '.github/workflows/sym-arch-002a2-hierarchical-power.yml'
       - 'crates/domains/symthaea-psych-bench/src/experiment/statistics.rs'
+      - 'crates/domains/symthaea-psych-bench/src/experiment/statistics_design.rs'
       - 'crates/domains/symthaea-psych-bench/src/experiment/confirmatory.rs'
       - 'crates/domains/symthaea-psych-bench/src/experiment/mod.rs'
       - 'crates/domains/symthaea-psych-bench/src/lib.rs'
       - 'crates/domains/symthaea-psych-bench/src/harness/analysis.rs'
       - 'crates/domains/symthaea-psych-bench/Cargo.toml'
       - 'docs/research/SYM_ARCH_002A2_HIERARCHICAL_POWER_V1.md'
+      - 'docs/research/SYM_ARCH_002A2_NUISANCE_TOPOLOGY_V1.md'
       - 'Cargo.toml'
       - 'Cargo.lock'
   workflow_dispatch:
@@ -54,11 +56,13 @@ jobs:
         run: |
           rustfmt --edition 2024 --check \
             crates/domains/symthaea-psych-bench/src/experiment/statistics.rs \
+            crates/domains/symthaea-psych-bench/src/experiment/statistics_design.rs \
             crates/domains/symthaea-psych-bench/src/lib.rs
 
       - name: Run hierarchical statistics and power tests
         run: |
           cargo test -p symthaea-psych-bench --lib experiment_statistics:: -- --nocapture
+          cargo test -p symthaea-psych-bench --lib experiment_statistics_design:: -- --nocapture
 
       - name: Check psych-bench library
         run: |
