@@ -52,9 +52,7 @@ fn wilson_interval(successes: usize, trials: usize) -> (f64, f64) {
     let z2 = z * z;
     let denominator = 1.0 + z2 / n;
     let center = (p + z2 / (2.0 * n)) / denominator;
-    let radius = z
-        * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt())
-        / denominator;
+    let radius = z * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt() / denominator;
     ((center - radius).max(0.0), (center + radius).min(1.0))
 }
 
@@ -221,6 +219,12 @@ pub struct ProspectivePowerConfig {
     pub target_power: f64,
     /// Frozen smallest effect size of interest in the primary metric's natural units.
     pub sesoi: f64,
+    /// Frozen alternative effect used for planning. This is deliberately separate
+    /// from the observed DEV mean to avoid winner's-curse sample-size selection.
+    pub planning_effect: f64,
+    /// Multiplier applied to DEV residuals around their equal-environment mean.
+    /// Values >= 1.0 allow conservative variance-inflation sensitivity analysis.
+    pub residual_scale: f64,
     pub direction: PowerDirection,
     pub seed: u64,
 }
@@ -251,6 +255,21 @@ impl ProspectivePowerConfig {
         if !self.sesoi.is_finite() || self.sesoi <= 0.0 {
             return Err("SESOI must be finite and strictly positive".into());
         }
+        if !self.planning_effect.is_finite() {
+            return Err("planning effect must be finite".into());
+        }
+        match self.direction {
+            PowerDirection::MeaningfulGain if self.planning_effect <= self.sesoi => {
+                return Err("gain planning effect must be strictly greater than +SESOI".into());
+            }
+            PowerDirection::MeaningfulRegression if self.planning_effect >= -self.sesoi => {
+                return Err("regression planning effect must be strictly below -SESOI".into());
+            }
+            _ => {}
+        }
+        if !self.residual_scale.is_finite() || self.residual_scale < 1.0 {
+            return Err("residual_scale must be finite and at least 1.0".into());
+        }
         Ok(())
     }
 }
@@ -273,6 +292,8 @@ pub struct ProspectivePowerPlan {
     pub planning_input_digest: String,
     pub target_power: f64,
     pub sesoi: f64,
+    pub planning_effect: f64,
+    pub residual_scale: f64,
     pub direction: PowerDirection,
     pub runs_per_environment: usize,
     /// First tested count whose lower power bound clears target and remains clear
@@ -281,13 +302,19 @@ pub struct ProspectivePowerPlan {
     pub points: Vec<PowerPoint>,
 }
 
-/// Estimate a future CONFIRM sample size using DEV outcomes only.
+/// Estimate a future CONFIRM sample size using DEV variability only.
 ///
 /// This is an empirical Monte Carlo planning tool, not an analytic guarantee.
+/// DEV supplies the empirical environment/nuisance residual distribution, but
+/// simulated effects are re-centered on the separately frozen `planning_effect`
+/// rather than on the observed DEV mean. This avoids using a potentially tuned
+/// or winner's-curse DEV point estimate as the alternative hypothesis.
+///
 /// Each future environment is sampled from the DEV environment distribution,
-/// then paired nuisance runs are resampled within that environment. The simulated
-/// study is counted as successful only when its environment-level BCa interval
-/// satisfies the same SESOI gate used for practical-effect interpretation.
+/// paired nuisance runs are resampled within that environment, and residuals are
+/// optionally inflated by `residual_scale`. A simulated study is successful only
+/// when its environment-level BCa interval satisfies the same SESOI gate used for
+/// practical-effect interpretation.
 ///
 /// The selected count is conservative in two ways: the lower Wilson 95% bound on
 /// Monte Carlo power must clear `target_power`, and the crossing must remain clear
@@ -306,13 +333,18 @@ pub fn prospective_power_from_dev(
     }
     validate_environment_results(dev_results)?;
     config.validate()?;
+    if dev_results.len() != dev_manifest.seed_manifest.environment_seeds.len() {
+        return Err("DEV result count must match the frozen environment-seed manifest".into());
+    }
 
     let dev_manifest_digest = dev_manifest.digest().map_err(|error| error.to_string())?;
-    let planning_input_digest = digest_serialized(&(
-        dev_manifest_digest.as_str(),
-        dev_results,
-        config,
-    ))?;
+    let planning_input_digest =
+        digest_serialized(&(dev_manifest_digest.as_str(), dev_results, config))?;
+    let dev_mean = dev_results
+        .iter()
+        .map(NestedEnvironmentResult::mean_delta)
+        .sum::<f64>()
+        / dev_results.len() as f64;
 
     let mut rng = StdRng::seed_from_u64(config.seed);
     let mut points = Vec::with_capacity(config.environment_counts.len());
@@ -327,7 +359,8 @@ pub fn prospective_power_from_dev(
                 let mut delta_sum = 0.0;
                 for _ in 0..config.runs_per_environment {
                     let run = &template.paired_runs[rng.gen_range(0..template.run_count())];
-                    delta_sum += run.delta();
+                    let residual = run.delta() - dev_mean;
+                    delta_sum += config.planning_effect + config.residual_scale * residual;
                 }
                 future_environment_means.push(delta_sum / config.runs_per_environment as f64);
             }
@@ -386,6 +419,8 @@ pub fn prospective_power_from_dev(
         planning_input_digest,
         target_power: config.target_power,
         sesoi: config.sesoi,
+        planning_effect: config.planning_effect,
+        residual_scale: config.residual_scale,
         direction: config.direction,
         runs_per_environment: config.runs_per_environment,
         minimum_environments,
@@ -396,9 +431,7 @@ pub fn prospective_power_from_dev(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::experiment::{
-        EXPERIMENT_MANIFEST_SCHEMA_V1, SeedManifest,
-    };
+    use crate::experiment::{EXPERIMENT_MANIFEST_SCHEMA_V1, SeedManifest};
 
     fn digest(value: u64) -> String {
         format!("{value:064x}")
@@ -423,7 +456,7 @@ mod tests {
         }
     }
 
-    fn dev_manifest() -> ExperimentManifest {
+    fn dev_manifest(environment_count: usize) -> ExperimentManifest {
         ExperimentManifest {
             schema: EXPERIMENT_MANIFEST_SCHEMA_V1.into(),
             experiment_id: "SYM-ARCH-002A2-DEV".into(),
@@ -435,12 +468,12 @@ mod tests {
             tuning_status: TuningStatus::Exploratory,
             prior_results_observed: true,
             seed_manifest: SeedManifest {
-                environment_seeds: vec![1, 2, 3],
+                environment_seeds: (1..=environment_count as u64).collect(),
                 representation_seeds: vec![11, 12],
                 learner_seeds: vec![21, 22],
                 stream_seeds: vec![31, 32],
             },
-            primary_hypothesis: "DEV effect distribution informs prospective power".into(),
+            primary_hypothesis: "DEV variability informs prospective power".into(),
             primary_comparator: "matched control".into(),
             sesoi: 0.05,
         }
@@ -494,12 +527,12 @@ mod tests {
     #[test]
     fn prospective_power_plan_is_deterministic_bound_and_finds_strong_effect() {
         let dev = vec![
-            environment(1, &[0.11, 0.12, 0.13]),
-            environment(2, &[0.10, 0.12, 0.14]),
-            environment(3, &[0.12, 0.13, 0.15]),
-            environment(4, &[0.09, 0.11, 0.13]),
-            environment(5, &[0.11, 0.13, 0.14]),
-            environment(6, &[0.10, 0.12, 0.13]),
+            environment(1, &[0.01, 0.02, 0.03]),
+            environment(2, &[-0.01, 0.02, 0.04]),
+            environment(3, &[0.02, 0.03, 0.05]),
+            environment(4, &[-0.02, 0.01, 0.03]),
+            environment(5, &[0.01, 0.03, 0.04]),
+            environment(6, &[0.00, 0.02, 0.03]),
         ];
         let config = ProspectivePowerConfig {
             environment_counts: vec![3, 5, 8],
@@ -508,10 +541,12 @@ mod tests {
             bootstrap_resamples: 100,
             target_power: 0.80,
             sesoi: 0.05,
+            planning_effect: 0.12,
+            residual_scale: 1.0,
             direction: PowerDirection::MeaningfulGain,
             seed: 99,
         };
-        let manifest = dev_manifest();
+        let manifest = dev_manifest(dev.len());
         let first = prospective_power_from_dev(&manifest, &dev, &config).unwrap();
         let second = prospective_power_from_dev(&manifest, &dev, &config).unwrap();
         assert_eq!(first, second);
@@ -527,8 +562,12 @@ mod tests {
     }
 
     #[test]
-    fn prospective_power_rejects_non_dev_manifest() {
-        let dev = vec![environment(1, &[0.1]), environment(2, &[0.1]), environment(3, &[0.1])];
+    fn prospective_power_does_not_use_observed_dev_mean_as_planning_effect() {
+        let dev = vec![
+            environment(1, &[0.30]),
+            environment(2, &[0.30]),
+            environment(3, &[0.30]),
+        ];
         let config = ProspectivePowerConfig {
             environment_counts: vec![3],
             runs_per_environment: 1,
@@ -536,14 +575,79 @@ mod tests {
             bootstrap_resamples: 100,
             target_power: 0.80,
             sesoi: 0.05,
+            planning_effect: 0.08,
+            residual_scale: 1.0,
+            direction: PowerDirection::MeaningfulGain,
+            seed: 5,
+        };
+        let plan = prospective_power_from_dev(&dev_manifest(3), &dev, &config).unwrap();
+        assert_eq!(plan.planning_effect, 0.08);
+        assert_eq!(plan.points[0].estimated_power, 1.0);
+    }
+
+    #[test]
+    fn prospective_power_rejects_non_dev_manifest() {
+        let dev = vec![
+            environment(1, &[0.1]),
+            environment(2, &[0.1]),
+            environment(3, &[0.1]),
+        ];
+        let config = ProspectivePowerConfig {
+            environment_counts: vec![3],
+            runs_per_environment: 1,
+            simulation_trials: 100,
+            bootstrap_resamples: 100,
+            target_power: 0.80,
+            sesoi: 0.05,
+            planning_effect: 0.10,
+            residual_scale: 1.0,
             direction: PowerDirection::MeaningfulGain,
             seed: 1,
         };
-        let mut manifest = dev_manifest();
+        let mut manifest = dev_manifest(3);
         manifest.stream_namespace = StreamNamespace::Confirm;
         manifest.tuning_status = TuningStatus::ConfirmatoryFirstUse;
         manifest.prior_results_observed = false;
         assert!(prospective_power_from_dev(&manifest, &dev, &config).is_err());
+    }
+
+    #[test]
+    fn prospective_power_rejects_manifest_result_count_mismatch() {
+        let dev = vec![
+            environment(1, &[0.1]),
+            environment(2, &[0.1]),
+            environment(3, &[0.1]),
+        ];
+        let config = ProspectivePowerConfig {
+            environment_counts: vec![3],
+            runs_per_environment: 1,
+            simulation_trials: 100,
+            bootstrap_resamples: 100,
+            target_power: 0.80,
+            sesoi: 0.05,
+            planning_effect: 0.10,
+            residual_scale: 1.0,
+            direction: PowerDirection::MeaningfulGain,
+            seed: 1,
+        };
+        assert!(prospective_power_from_dev(&dev_manifest(4), &dev, &config).is_err());
+    }
+
+    #[test]
+    fn prospective_power_rejects_effect_inside_practical_margin() {
+        let config = ProspectivePowerConfig {
+            environment_counts: vec![5, 8],
+            runs_per_environment: 1,
+            simulation_trials: 100,
+            bootstrap_resamples: 100,
+            target_power: 0.80,
+            sesoi: 0.05,
+            planning_effect: 0.04,
+            residual_scale: 1.0,
+            direction: PowerDirection::MeaningfulGain,
+            seed: 1,
+        };
+        assert!(config.validate().is_err());
     }
 
     #[test]
@@ -555,6 +659,8 @@ mod tests {
             bootstrap_resamples: 100,
             target_power: 0.80,
             sesoi: 0.05,
+            planning_effect: 0.10,
+            residual_scale: 1.0,
             direction: PowerDirection::MeaningfulGain,
             seed: 1,
         };
