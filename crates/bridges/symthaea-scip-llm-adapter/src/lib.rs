@@ -112,11 +112,8 @@ impl ScipLlmRequest {
             _ => None,
         };
 
-        let packet = LlmTextFallback::compile(
-            &canonical_envelope,
-            canonical_resolved.as_ref(),
-            mode,
-        )?;
+        let packet =
+            LlmTextFallback::compile(&canonical_envelope, canonical_resolved.as_ref(), mode)?;
         let request_digest = request_digest_v1(mode, &packet.content, &packet.system_prompt);
         Ok(Self {
             mode,
@@ -499,7 +496,10 @@ mod tests {
         assert_eq!(calls.len(), 1);
         let (prompt, params) = &calls[0];
         assert_eq!(prompt, request.content());
-        assert_eq!(params.system_prompt.as_deref(), Some(request.system_prompt()));
+        assert_eq!(
+            params.system_prompt.as_deref(),
+            Some(request.system_prompt())
+        );
         assert_eq!(params.temperature, FAITHFUL_TRANSLATION_TEMPERATURE);
         assert_eq!(params.max_tokens, FAITHFUL_TRANSLATION_MAX_TOKENS);
         assert!(params.consciousness_context.is_none());
@@ -567,8 +567,7 @@ mod tests {
         second_provenance.feature_flags.reverse();
         second_provenance.transformations.reverse();
 
-        let mut first =
-            CognitiveEnvelope::from_graph(first_graph, 0.9, first_provenance).unwrap();
+        let mut first = CognitiveEnvelope::from_graph(first_graph, 0.9, first_provenance).unwrap();
         first.evidence_ids = vec!["z".into(), "a".into()];
         first.refresh_id().unwrap();
 
@@ -584,7 +583,10 @@ mod tests {
             ScipLlmRequest::compile(&second, None, LlmFallbackMode::FaithfulTranslation).unwrap();
 
         assert_eq!(first_request.content(), second_request.content());
-        assert_eq!(first_request.request_digest(), second_request.request_digest());
+        assert_eq!(
+            first_request.request_digest(),
+            second_request.request_digest()
+        );
         assert_eq!(
             first_request.source_evidence_ids(),
             &[String::from("a"), String::from("z")]
@@ -739,10 +741,8 @@ mod tests {
             ScipLlmRequest::compile(&envelope, None, LlmFallbackMode::GroundedReasoning).unwrap();
 
         let empty_calls = Arc::new(Mutex::new(Vec::new()));
-        let empty_organ = organ_with_backend(Arc::new(RecordingBackend::success(
-            "   ",
-            empty_calls,
-        )));
+        let empty_organ =
+            organ_with_backend(Arc::new(RecordingBackend::success("   ", empty_calls)));
         assert!(matches!(
             request.execute(&empty_organ).await,
             Err(ScipLlmError::EmptyOutput { .. })
