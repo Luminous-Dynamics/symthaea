@@ -17,6 +17,12 @@ on:
       - 'Cargo.lock'
   workflow_dispatch:
 
+concurrency:
+  # Automatic branch/PR validation keeps only the newest run. Manual validation
+  # is deliberate and receives a unique group through github.run_id.
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
