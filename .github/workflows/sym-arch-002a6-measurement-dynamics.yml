@@ -8,6 +8,7 @@ on:
     paths:
       - '.github/workflows/sym-arch-002a6-measurement-dynamics.yml'
       - 'crates/domains/symthaea-psych-bench/src/experiment/measurement.rs'
+      - 'crates/domains/symthaea-psych-bench/src/experiment/measurement_validity.rs'
       - 'crates/domains/symthaea-psych-bench/src/lib.rs'
       - 'crates/domains/symthaea-psych-bench/Cargo.toml'
       - 'docs/research/SYM_ARCH_002A6_MEASUREMENT_DYNAMICS_V1.md'
@@ -52,6 +53,10 @@ jobs:
       - name: Run A6 measurement tests
         run: |
           cargo test -p symthaea-psych-bench --lib experiment_measurement:: -- --nocapture
+
+      - name: Run A6 criterion-validity tests
+        run: |
+          cargo test -p symthaea-psych-bench --lib experiment_measurement_validity:: -- --nocapture
 
       - name: Check psych-bench library
         run: |
