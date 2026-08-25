@@ -13,11 +13,12 @@ use crate::experiment_baselines::{
     BaselineResourceFootprint, MatchedBaselineFamilySpec, SimpleBaselineAgent, SimpleBaselineKind,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 pub const MATCHED_BASELINE_PANEL_SCHEMA_V1: &str = "symthaea.matched-baseline-panel/v1";
 const TRAIN_STREAM_DOMAIN: &[u8] = b"symthaea.matched-baseline-panel.train/v1";
 const EVAL_STREAM_DOMAIN: &[u8] = b"symthaea.matched-baseline-panel.eval/v1";
+const PANEL_SNAPSHOT_DOMAIN: &[u8] = b"symthaea.matched-baseline-panel.snapshot/v1";
 
 fn initialized_hasher(domain: &[u8]) -> blake3::Hasher {
     let mut hasher = blake3::Hasher::new();
@@ -46,6 +47,14 @@ fn digest_hex(hasher: &blake3::Hasher) -> String {
 
 fn looks_like_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn kind_rank(kind: SimpleBaselineKind) -> u8 {
+    match kind {
+        SimpleBaselineKind::OneHotRls => 0,
+        SimpleBaselineKind::FixedRandomTanhRls => 1,
+        SimpleBaselineKind::VanillaHdcRls => 2,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -94,11 +103,12 @@ impl MatchedBaselinePanelSnapshot {
         if self.members.len() != 3 {
             return Err("B1 matched panel must contain exactly three baseline members".into());
         }
-        let mut kinds = BTreeSet::new();
+        let mut kinds = Vec::with_capacity(self.members.len());
         for member in &self.members {
-            if !kinds.insert(member.kind) {
+            if kinds.contains(&member.kind) {
                 return Err("B1 matched panel contains a duplicate baseline kind".into());
             }
+            kinds.push(member.kind);
             if !looks_like_digest(&member.spec_digest) {
                 return Err("baseline member spec digest must be a 32-byte hex digest".into());
             }
@@ -119,6 +129,27 @@ impl MatchedBaselinePanelSnapshot {
             }
         }
         Ok(())
+    }
+
+    /// Canonical digest over the exact baseline specs/resources, matched exposure
+    /// streams, and update counts. Member order is normalized by baseline kind so
+    /// serialization order cannot create a fake scientific variant.
+    pub fn digest(&self) -> Result<String, String> {
+        self.validate()?;
+        let mut canonical_members = self.members.clone();
+        canonical_members.sort_by_key(|member| kind_rank(member.kind));
+        let bytes = serde_json::to_vec(&(
+            self.schema.as_str(),
+            self.training_observations,
+            self.evaluation_observations,
+            self.training_stream_digest.as_str(),
+            self.evaluation_stream_digest.as_str(),
+            canonical_members,
+        ))
+        .map_err(|error| error.to_string())?;
+        let mut hasher = initialized_hasher(PANEL_SNAPSHOT_DOMAIN);
+        hasher.update(&bytes);
+        Ok(hasher.finalize().to_hex().to_string())
     }
 }
 
@@ -163,6 +194,10 @@ impl MatchedBaselinePanel {
         assignment: &BTreeMap<String, i64>,
         label: bool,
     ) -> Result<Vec<BaselineUpdateReceipt>, String> {
+        let next_count = self
+            .training_observations
+            .checked_add(1)
+            .ok_or_else(|| "training observation counter overflow".to_string())?;
         let mut next_agents = self.agents.clone();
         let mut receipts = Vec::with_capacity(next_agents.len());
         for agent in &mut next_agents {
@@ -185,10 +220,7 @@ impl MatchedBaselinePanel {
 
         self.agents = next_agents;
         self.training_hasher = next_hasher;
-        self.training_observations = self
-            .training_observations
-            .checked_add(1)
-            .ok_or_else(|| "training observation counter overflow".to_string())?;
+        self.training_observations = next_count;
         Ok(receipts)
     }
 
@@ -199,6 +231,10 @@ impl MatchedBaselinePanel {
         assignment: &BTreeMap<String, i64>,
         expected_label: bool,
     ) -> Result<Vec<BaselineEvaluationReceipt>, String> {
+        let next_count = self
+            .evaluation_observations
+            .checked_add(1)
+            .ok_or_else(|| "evaluation observation counter overflow".to_string())?;
         let mut receipts = Vec::with_capacity(self.agents.len());
         for agent in &self.agents {
             let score = agent.score(assignment).map_err(|error| {
@@ -220,10 +256,7 @@ impl MatchedBaselinePanel {
             expected_label,
         )?;
         self.evaluation_hasher = next_hasher;
-        self.evaluation_observations = self
-            .evaluation_observations
-            .checked_add(1)
-            .ok_or_else(|| "evaluation observation counter overflow".to_string())?;
+        self.evaluation_observations = next_count;
         Ok(receipts)
     }
 
@@ -301,6 +334,7 @@ mod tests {
         assert!(snapshot.members.iter().all(|member| member.updates == 3));
         assert!(looks_like_digest(&snapshot.training_stream_digest));
         assert!(looks_like_digest(&snapshot.evaluation_stream_digest));
+        assert!(looks_like_digest(&snapshot.digest().unwrap()));
     }
 
     #[test]
@@ -316,6 +350,7 @@ mod tests {
         let b = second.snapshot().unwrap();
         assert_eq!(a.training_stream_digest, b.training_stream_digest);
         assert_eq!(a.evaluation_stream_digest, b.evaluation_stream_digest);
+        assert_eq!(a.digest().unwrap(), b.digest().unwrap());
 
         let mut reversed = MatchedBaselinePanel::new(&family()).unwrap();
         reversed.observe_all(&assignment(1, 0), true).unwrap();
@@ -323,7 +358,20 @@ mod tests {
         reversed.evaluate_all(&assignment(0, 1), true).unwrap();
         let c = reversed.snapshot().unwrap();
         assert_ne!(a.training_stream_digest, c.training_stream_digest);
+        assert_ne!(a.digest().unwrap(), c.digest().unwrap());
         assert_eq!(a.evaluation_stream_digest, c.evaluation_stream_digest);
+    }
+
+    #[test]
+    fn snapshot_digest_is_independent_of_member_serialization_order() {
+        let mut panel = MatchedBaselinePanel::new(&family()).unwrap();
+        panel.observe_all(&assignment(0, 0), false).unwrap();
+        let snapshot = panel.snapshot().unwrap();
+        let expected = snapshot.digest().unwrap();
+        let mut reordered = snapshot.clone();
+        reordered.members.reverse();
+        reordered.validate().unwrap();
+        assert_eq!(expected, reordered.digest().unwrap());
     }
 
     #[test]
