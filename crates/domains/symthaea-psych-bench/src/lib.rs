@@ -54,6 +54,8 @@
 pub mod adapter;
 pub mod benchmarks;
 pub mod experiment;
+#[path = "experiment/baselines.rs"]
+pub mod experiment_baselines;
 #[path = "experiment/confirmatory.rs"]
 pub mod experiment_confirmatory;
 #[path = "experiment/validity.rs"]
