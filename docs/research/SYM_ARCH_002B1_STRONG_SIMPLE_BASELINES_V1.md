@@ -14,7 +14,7 @@ Before adding GRU, trainable SSM, Mamba, liquid dynamics, or Hebbian plasticity,
 
 B1 deliberately contains no replay and no temporal state.
 
-## Readout-matched ladder
+## Baseline ladder
 
 All three conditions use the same `OnlineRlsBinary` update rule and frozen `RlsConfig`:
 
@@ -41,19 +41,46 @@ All three conditions use the same `OnlineRlsBinary` update rule and frozen `RlsC
 
 `MatchedBaselineFamilySpec` is the preferred construction path. It emits all three conditions from one feature-schema/RLS contract so the random and HDC controls cannot quietly receive different ridge, forgetting, bias, schema, or encoded dimensions.
 
+The phrase **readout-matched** is reserved for a pair whose *effective* RLS input/state shape is actually equal. Sharing the same RLS algorithm/configuration is not by itself sufficient when the encoder output dimensions differ.
+
 ## Why include one-hot RLS?
 
 The raw categorical condition tells us whether a strong analytic readout already solves the task without any high-dimensional representation.
 
-Interpretation of the representation ladder is deliberately conservative:
+Interpretation must respect the executable contrast audit:
 
-- `random ≈ one_hot`: high-dimensional nonlinear expansion did not earn its complexity;
-- `random > one_hot`: generic fixed nonlinear expansion is useful;
-- `hdc ≈ random`: HDC does not receive evidence beyond generic fixed random features;
-- `hdc > random`: evidence for the factorized HDC representation *as implemented*;
-- `random > hdc`: the HDC representation is actively less useful under this readout/task regime.
+- `hdc ≈ random` under a representation-level audit: HDC receives no evidence beyond generic fixed random features;
+- `hdc > random` under a representation-level audit: representation-level evidence for the factorized HDC implementation;
+- `random > hdc` under a representation-level audit: HDC is less useful in that regime;
+- `one_hot` versus a higher-dimensional random/HDC condition is a **reference/capacity comparison** when effective readout dimensions differ;
+- therefore `random > one_hot` does **not** by itself isolate a benefit from nonlinear expansion when the RLS trainable/covariance shape also increased;
+- if one-hot and encoded dimensions happen to match and every other fairness invariant passes, the audit may elevate that pair to a representation-level contrast.
 
 A B1 HDC advantage does **not** isolate HDC binding algebra from every other representation difference. The random encoder is pair-feature based, whereas HDC explicitly shares value identities across roles and composes them through binding. Exact algebraic attribution requires a later matched factorization/binding ablation, including the planned continuous-vs-exact bipolar/BinaryHV tranche.
+
+## Executable contrast-fairness audit
+
+`experiment_baseline_fairness::audit_baseline_contrast` validates both specs and records:
+
+- exact spec digests;
+- learner-visible feature-schema equality;
+- exact RLS contract equality;
+- effective feature dimensions;
+- trainable readout state dimensions;
+- inverse-covariance shapes;
+- paired representation-seed index when both encoders are randomized;
+- replay count (`0` for B1);
+- temporal-state bytes (`0` for B1);
+- explicit qualifiers for every mismatch.
+
+It returns one of two non-scalar claim ceilings:
+
+- `representation_level` — schema, RLS protocol, effective readout shape, and applicable random-seed pairing are matched;
+- `reference_only` — capacity/protocol differs enough that a representation-only attribution is not admissible.
+
+This audit intentionally does **not** require equal fixed-encoder storage. Encoder storage is part of the representation's resource cost and must be reported separately. A representation-level predictive contrast is therefore not automatically a resource-normalized comparison.
+
+`audit_matched_family` audits all three pairwise contrasts emitted by one `MatchedBaselineFamilySpec`. In the usual B1 regime where the encoded random/HDC dimension is much larger than the categorical one-hot dimension, random↔HDC should be representation-level while one-hot↔random and one-hot↔HDC remain reference-only.
 
 ## This is RanDumb/F-OAL-inspired, not a reproduction
 
@@ -107,25 +134,25 @@ For claim-bearing experiments the schema comes from the preregistered generator/
 
 Task/world/boundary metadata remains subject to the A3/A4 validity policies; B1 does not authorize hidden task identity merely because a field can be represented categorically.
 
-## Determinism and irrelevant knobs
+## Determinism and provenance
 
-Random and HDC encoder state is a deterministic function of:
+Random and HDC encoder state is deterministic from the versioned implementation plus the frozen:
 
 - baseline kind;
 - categorical schema;
 - encoded dimension;
-- representation seed;
-- code revision.
+- representation seed.
 
 The one-hot condition has no random representation. Its `encoded_dimension` and `representation_seed` fields are required to be exactly zero so irrelevant parameters cannot create fake experimental variants or degrees of freedom.
 
-Each emitted baseline spec has a domain-separated BLAKE3 digest for provenance binding.
+Each emitted baseline spec has a domain-separated BLAKE3 digest over its versioned schema/configuration. The spec digest does **not** pretend to be a git-revision digest. Exact source identity belongs in the experiment manifest's `code_revision` and later claim/evidence binding. A claim-bearing artifact must bind both the frozen baseline-spec digest(s) and the exact code revision used to execute them.
 
 ## What must be frozen before CONFIRM
 
 At minimum:
 
 - all emitted baseline spec digests;
+- exact code revision and baseline schema version;
 - exact categorical schema;
 - encoded dimension for random/HDC;
 - representation-seed manifest;
@@ -137,7 +164,8 @@ At minimum:
 - evaluation points;
 - primary comparator and metric;
 - SESOI and analysis rule;
-- resource budget/fairness regime.
+- resource budget/fairness regime;
+- expected contrast-fairness claim ceiling for every primary comparison.
 
 DEV may be used to choose these values. CONFIRM may not be used to tune them.
 
@@ -145,19 +173,19 @@ DEV may be used to choose these values. CONFIRM may not be used to tune them.
 
 ## Fairness regimes
 
-B1 supports at least two distinct comparisons and they must not be conflated:
+B1 supports distinct comparisons and they must not be conflated.
 
 ### Readout-matched representation comparison
 
-`fixed_random_tanh_rls` vs `vanilla_hdc_rls` at the same encoded dimension and exact same RLS configuration.
+`fixed_random_tanh_rls` vs `vanilla_hdc_rls` at the same encoded dimension, paired representation-seed index, exact same learner-visible schema, and exact same RLS configuration.
 
-This is the primary representation comparison.
+This is the primary representation comparison and should pass the executable fairness audit as `representation_level`.
 
-### Simpler-model comparison
+### Simpler-model / capacity reference
 
-`one_hot_rls` has a smaller feature/readout dimension when the one-hot schema is smaller than the high-dimensional conditions.
+`one_hot_rls` usually has a smaller feature/readout dimension than the high-dimensional conditions.
 
-It is intentionally a lower-complexity baseline. If it is practically equivalent, the simpler model wins under the program's complexity policy.
+It is intentionally a lower-complexity baseline. If it is practically equivalent, the simpler model may still be preferable under a separately frozen complexity/resource policy. But a performance difference against a larger random/HDC readout is not, by itself, a clean representation-only effect.
 
 Later resource-normalized tranches may additionally compare at matched persistent bytes or update compute. B1 does not invent a single weighted score across capability and resource dimensions.
 
@@ -176,18 +204,24 @@ The implementation tranche is acceptable when the exact PR head demonstrates:
 9. encoder state remains fixed while labels/readout updates change;
 10. spec digests change when meaningful baseline configuration changes;
 11. resource accounting exposes the full covariance cost;
-12. the psych-bench library compiles.
+12. random↔HDC receives a representation-level audit under the matched family;
+13. dimension-mismatched one-hot↔random is downgraded to reference-only;
+14. randomized representation contrasts with unpaired seed indices are downgraded;
+15. RLS protocol mismatch is downgraded;
+16. B1 Rust files pass rustfmt;
+17. the psych-bench library compiles.
 
 ## Wording ceiling
 
 Merging B1 supports only:
 
-> Symthaea psych-bench contains deterministic, resource-audited strong-simple one-hot, fixed-random, and vanilla-HDC online-RLS baseline implementations suitable for later preregistered architecture comparisons.
+> Symthaea psych-bench contains deterministic, resource-audited strong-simple one-hot, fixed-random, and vanilla-HDC online-RLS baselines plus an executable contrast-fairness audit suitable for later preregistered architecture comparisons.
 
 It does not support:
 
 - an architecture-performance claim;
 - a claim that HDC beats random features;
+- a representation-only interpretation for a contrast that the fairness audit marks `reference_only`;
 - a claim that RLS is a faithful reproduction of a named published method;
 - a claim that HDC algebra has been isolated;
 - a claim about liquid dynamics, Hebbian plasticity, or full Symthaea intelligence.
