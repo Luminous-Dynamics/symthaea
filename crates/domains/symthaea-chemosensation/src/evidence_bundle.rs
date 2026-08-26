@@ -130,6 +130,11 @@ pub enum EvidenceBundleError {
     InvalidTraceRef(TraceEvidenceRefError),
     DuplicateTraceDigest(TraceArchiveDigest),
     DuplicateRunRef { protocol_id: String, run_id: String },
+    DecisionProtocolMismatch {
+        expected: String,
+        actual: String,
+        run_id: String,
+    },
     DecisionEvidenceMismatch {
         expected: ChemicalEvidenceLevel,
         actual: ChemicalEvidenceLevel,
@@ -141,6 +146,7 @@ pub enum EvidenceBundleError {
     ConfirmedDecisionHasProtocolWideSeparation,
     MissingArchive(TraceArchiveDigest),
     UnexpectedArchive(TraceArchiveDigest),
+    DuplicateArchiveDigest(TraceArchiveDigest),
 }
 
 impl From<TraceEvidenceRefError> for EvidenceBundleError {
@@ -197,6 +203,13 @@ impl ChemicalEvidenceBundle {
                     run_id: run_key.1,
                 });
             }
+            if trace.acquisition_protocol_id != self.decision.protocol_id {
+                return Err(EvidenceBundleError::DecisionProtocolMismatch {
+                    expected: self.decision.protocol_id.clone(),
+                    actual: trace.acquisition_protocol_id.clone(),
+                    run_id: trace.run_id.clone(),
+                });
+            }
             if trace.used_as != self.decision.evidence {
                 return Err(EvidenceBundleError::DecisionEvidenceMismatch {
                     expected: self.decision.evidence,
@@ -249,13 +262,22 @@ impl ChemicalEvidenceBundle {
     /// End-to-end verification when the referenced archives are available.
     ///
     /// This first checks the bundle's decision/deviation semantics, then requires
-    /// an exact one-to-one archive set and re-runs each archive's own integrity and
+    /// an exact archive set and re-runs each archive's own integrity and
     /// trace-invariant verification.
     pub fn verify_with_archives(
         &self,
         archives: &[ChemicalTraceArchive],
     ) -> Result<(), EvidenceBundleError> {
         self.verify()?;
+
+        let mut supplied_digests = BTreeSet::new();
+        for archive in archives {
+            if !supplied_digests.insert(archive.manifest.digest.0) {
+                return Err(EvidenceBundleError::DuplicateArchiveDigest(
+                    archive.manifest.digest,
+                ));
+            }
+        }
 
         for trace_ref in &self.traces {
             let archive = archives
@@ -379,6 +401,26 @@ mod tests {
                 used_as: ChemicalEvidenceLevel::HeldOutPhysicalObservation,
             })
         );
+    }
+
+    #[test]
+    fn decision_protocol_must_match_trace_protocol() {
+        let archive = archive(ChemicalEvidenceLevel::HeldOutPhysicalObservation, "run-a");
+        let mut trace_ref = TraceEvidenceRef::from_archive(
+            &archive,
+            ChemicalEvidenceLevel::HeldOutPhysicalObservation,
+        )
+        .unwrap();
+        trace_ref.acquisition_protocol_id = "other-v1".into();
+
+        assert!(matches!(
+            ChemicalEvidenceBundle::new(
+                decision(ChemicalEvidenceLevel::HeldOutPhysicalObservation, 0.9),
+                vec![trace_ref],
+                vec![],
+            ),
+            Err(EvidenceBundleError::DecisionProtocolMismatch { .. })
+        ));
     }
 
     #[test]
@@ -509,6 +551,29 @@ mod tests {
             bundle.verify_with_archives(&[archive_a, archive_b.clone()]),
             Err(EvidenceBundleError::UnexpectedArchive(
                 archive_b.manifest.digest
+            ))
+        );
+    }
+
+    #[test]
+    fn duplicate_supplied_archive_is_rejected() {
+        let archive = archive(ChemicalEvidenceLevel::HeldOutPhysicalObservation, "run-a");
+        let trace_ref = TraceEvidenceRef::from_archive(
+            &archive,
+            ChemicalEvidenceLevel::HeldOutPhysicalObservation,
+        )
+        .unwrap();
+        let bundle = ChemicalEvidenceBundle::new(
+            decision(ChemicalEvidenceLevel::HeldOutPhysicalObservation, 0.9),
+            vec![trace_ref],
+            vec![],
+        )
+        .unwrap();
+
+        assert_eq!(
+            bundle.verify_with_archives(&[archive.clone(), archive.clone()]),
+            Err(EvidenceBundleError::DuplicateArchiveDigest(
+                archive.manifest.digest
             ))
         );
     }
