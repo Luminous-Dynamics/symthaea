@@ -2,6 +2,7 @@ name: SYM-ARCH-002A7 Multiplicity
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
       - research/sym-arch-002a2-hierarchical-power-v1
@@ -31,6 +32,9 @@ env:
 jobs:
   multiplicity:
     name: Validate multiplicity-safe analysis plan
+    # Draft stacked PRs cannot merge and should not consume scarce runner capacity.
+    # Promoting to ready-for-review explicitly triggers this exact gate.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
