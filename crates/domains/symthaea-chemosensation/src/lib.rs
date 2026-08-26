@@ -29,6 +29,7 @@ pub mod olfaction;
 pub mod percept;
 pub mod sampling;
 pub mod temporal;
+pub mod trace;
 
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
 pub use cognition::{
@@ -61,3 +62,4 @@ pub use sampling::{SamplingContext, SamplingContextError, SamplingPhase};
 pub use temporal::{
     ChemicalTemporalContext, ChemicalTemporalTracker, TemporalConfigError, TemporalError,
 };
+pub use trace::{ChemicalTrace, ChemicalTraceError};
