@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use blake3::Hasher;
+use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::{HDC_DIMENSION, unified_hv::ContinuousHV};
 
 use crate::{ChemicalModality, ChemicalObservation, MeasurementUnit, ScalarHdcEncoder};
@@ -16,7 +17,11 @@ use crate::{ChemicalModality, ChemicalObservation, MeasurementUnit, ScalarHdcEnc
 /// The digest covers channel names/units/ranges, every scalar anchor vector,
 /// every channel-role vector, and both modality-role vectors. Two fingerprints
 /// may therefore be compared geometrically only when their space IDs match.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+///
+/// This is representation identity, not an authenticity signature. It tells
+/// downstream code whether two vectors were produced in the same coordinate
+/// system; provenance/authenticity belongs to the observation/evidence layer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ChemicalEncodingSpaceId(pub [u8; 32]);
 
 impl ChemicalEncodingSpaceId {
