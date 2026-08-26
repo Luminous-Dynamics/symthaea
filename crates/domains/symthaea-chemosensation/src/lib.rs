@@ -7,9 +7,9 @@
 //!
 //! This crate deliberately separates **physical observations** from learned
 //! percepts. Hardware produces [`ChemicalObservation`] values with calibration,
-//! environment, health, and provenance metadata. Higher layers may then derive
-//! odor, taste, flavor, novelty, and semantic hypotheses without overwriting the
-//! underlying measurement.
+//! environment, health, provenance, and optional sampling-protocol metadata.
+//! Higher layers may then derive odor, taste, flavor, novelty, and semantic
+//! hypotheses without overwriting the underlying measurement.
 //!
 //! The crate starts hardware-independent so cognition and experiments can be
 //! validated against deterministic simulated noses/tongues before real sensor
@@ -27,6 +27,7 @@ pub mod novelty;
 pub mod observation;
 pub mod olfaction;
 pub mod percept;
+pub mod sampling;
 pub mod temporal;
 
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
@@ -56,6 +57,7 @@ pub use olfaction::{
     MoxArraySimulator, MoxChannelModel, OlfactorySimulationError, OlfactoryStimulus,
 };
 pub use percept::{ChemicalPercept, ChemicalPerceptEncoder};
+pub use sampling::{SamplingContext, SamplingContextError, SamplingPhase};
 pub use temporal::{
     ChemicalTemporalContext, ChemicalTemporalTracker, TemporalConfigError, TemporalError,
 };
