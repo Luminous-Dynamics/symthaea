@@ -15,12 +15,13 @@
 //! [`CapabilityDecisionReceipt`] proves what this evaluator decided for an
 //! exact request and policy revision. A [`CapabilityEnforcementReceipt`] only
 //! proves an enforced deny when an external adapter records that it actually
-//! applied the deny and supplies evidence for that application.
+//! applied that exact deny and supplies claim-bound evidence for the application.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-pub const CAPABILITY_DECISION_RECEIPT_SCHEMA_VERSION: u16 = 1;
+pub const CAPABILITY_DECISION_RECEIPT_SCHEMA_VERSION: u16 = 2;
+pub const CAPABILITY_ENFORCEMENT_RECEIPT_SCHEMA_VERSION: u16 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct PrincipalRef(pub String);
@@ -120,14 +121,41 @@ impl CapabilityGrant {
     }
 }
 
+/// Evidence from the authoritative identity/session boundary that a principal
+/// was authenticated and that the authentication remained valid at request time.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PrincipalAuthenticationEvidence {
+    pub principal: PrincipalRef,
+    pub exercise_id: String,
+    pub locator: String,
+    pub digest: String,
+    pub producer_revision: String,
+    pub authenticated_at_unix_ms: u64,
+    pub valid_until_unix_ms: u64,
+}
+
+impl PrincipalAuthenticationEvidence {
+    fn proves(&self, request: &CapabilityRequest) -> bool {
+        !self.exercise_id.trim().is_empty()
+            && !self.locator.trim().is_empty()
+            && !self.digest.trim().is_empty()
+            && !self.producer_revision.trim().is_empty()
+            && self.principal == request.principal
+            && self.exercise_id == request.exercise_id
+            && self.authenticated_at_unix_ms <= self.valid_until_unix_ms
+            && self.authenticated_at_unix_ms <= request.observed_at_unix_ms
+            && request.observed_at_unix_ms <= self.valid_until_unix_ms
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CapabilityRequest {
+    pub exercise_id: String,
     pub executable: ExecutableIdentity,
     pub principal: PrincipalRef,
-    /// Opaque locator/digest/reference proving the principal was authenticated
-    /// by the authoritative identity/session boundary. A non-empty principal
-    /// string by itself is never treated as authentication.
-    pub principal_authentication_evidence: Option<String>,
+    /// Evidence emitted by the authoritative identity/session boundary. A
+    /// non-empty principal label or opaque token string is never authentication proof.
+    pub principal_authentication_evidence: Option<PrincipalAuthenticationEvidence>,
     pub capability: NetworkCapabilityId,
     pub purpose: String,
     pub observed_at_unix_ms: u64,
@@ -136,8 +164,8 @@ pub struct CapabilityRequest {
 impl CapabilityRequest {
     fn has_principal_authentication_evidence(&self) -> bool {
         self.principal_authentication_evidence
-            .as_deref()
-            .is_some_and(|value| !value.trim().is_empty())
+            .as_ref()
+            .is_some_and(|evidence| evidence.proves(self))
     }
 }
 
@@ -153,6 +181,7 @@ pub enum PolicyMode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum DenyReason {
+    EmptyExerciseId,
     UnknownExecutableIdentity,
     InvalidExecutableIdentity,
     EmptyPrincipal,
@@ -195,6 +224,15 @@ pub struct CapabilityPolicy {
 
 impl CapabilityPolicy {
     pub fn evaluate(&self, request: &CapabilityRequest) -> PolicyEvaluation {
+        if request.exercise_id.trim().is_empty() {
+            return PolicyEvaluation {
+                mode: self.mode,
+                decision: CapabilityDecision::Deny {
+                    reason: DenyReason::EmptyExerciseId,
+                },
+            };
+        }
+
         if request.principal.0.trim().is_empty() {
             return PolicyEvaluation {
                 mode: self.mode,
@@ -313,6 +351,7 @@ impl CapabilityDecisionReceipt {
         self.schema_version == CAPABILITY_DECISION_RECEIPT_SCHEMA_VERSION
             && !self.request_id.trim().is_empty()
             && !self.policy_revision.trim().is_empty()
+            && !self.request.exercise_id.trim().is_empty()
     }
 }
 
@@ -328,35 +367,68 @@ pub enum EnforcementResult {
     Failed,
 }
 
+/// Exact enforcement fact asserted by an adapter-owned evidence artifact.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CapabilityEnforcementClaim {
+    AppliedDecision { request_id: String },
+}
+
+impl CapabilityEnforcementClaim {
+    fn is_complete(&self) -> bool {
+        match self {
+            Self::AppliedDecision { request_id } => !request_id.trim().is_empty(),
+        }
+    }
+}
+
+/// Claim-bound evidence that an enforcement adapter acted on one exact decision.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CapabilityEnforcementEvidence {
+    pub claim: CapabilityEnforcementClaim,
+    pub exercise_id: String,
+    pub locator: String,
+    pub digest: String,
+    pub adapter_revision: String,
+    pub captured_at_unix_ms: u64,
+}
+
+impl CapabilityEnforcementEvidence {
+    fn proves_applied_decision(&self, decision_receipt: &CapabilityDecisionReceipt) -> bool {
+        self.claim.is_complete()
+            && !self.exercise_id.trim().is_empty()
+            && !self.locator.trim().is_empty()
+            && !self.digest.trim().is_empty()
+            && !self.adapter_revision.trim().is_empty()
+            && self.claim
+                == (CapabilityEnforcementClaim::AppliedDecision {
+                    request_id: decision_receipt.request_id.clone(),
+                })
+            && self.exercise_id == decision_receipt.request.exercise_id
+            && self.captured_at_unix_ms >= decision_receipt.request.observed_at_unix_ms
+    }
+}
+
 /// Adapter-owned evidence layered on top of a Nixward decision receipt.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CapabilityEnforcementReceipt {
+    pub schema_version: u16,
     pub decision_receipt: CapabilityDecisionReceipt,
-    /// Immutable build/revision identity of the enforcing adapter.
-    pub adapter_revision: String,
     pub result: EnforcementResult,
-    /// Locator and digest for independently inspectable enforcement evidence.
-    pub evidence_locator: Option<String>,
-    pub evidence_digest: Option<String>,
+    pub evidence: Option<CapabilityEnforcementEvidence>,
 }
 
 impl CapabilityEnforcementReceipt {
     /// True only when a complete enforce-mode deny decision was actually
-    /// applied by an identified adapter and carries inspectable evidence.
+    /// applied by an identified adapter and its evidence explicitly claims that
+    /// exact request was applied. Result/evidence substitution therefore fails closed.
     pub fn proves_enforced_deny(&self) -> bool {
-        let evidence_complete = self
-            .evidence_locator
-            .as_deref()
-            .is_some_and(|value| !value.trim().is_empty())
-            && self
-                .evidence_digest
-                .as_deref()
-                .is_some_and(|value| !value.trim().is_empty());
-
-        self.decision_receipt.is_complete()
-            && !self.adapter_revision.trim().is_empty()
+        self.schema_version == CAPABILITY_ENFORCEMENT_RECEIPT_SCHEMA_VERSION
+            && self.decision_receipt.is_complete()
             && self.result == EnforcementResult::Applied
-            && evidence_complete
+            && self.evidence.as_ref().is_some_and(|evidence| {
+                evidence.proves_applied_decision(&self.decision_receipt)
+            })
             && self.decision_receipt.evaluation.mode == PolicyMode::Enforce
             && matches!(
                 &self.decision_receipt.evaluation.decision,
@@ -369,15 +441,27 @@ impl CapabilityEnforcementReceipt {
 mod tests {
     use super::*;
 
+    const EXERCISE_ID: &str = "exercise-001";
+
     fn capability(value: &str) -> NetworkCapabilityId {
         NetworkCapabilityId(value.to_string())
     }
 
     fn request(path: ExecutableIdentity) -> CapabilityRequest {
+        let principal = PrincipalRef("did:example:alice".to_string());
         CapabilityRequest {
+            exercise_id: EXERCISE_ID.to_string(),
             executable: path,
-            principal: PrincipalRef("did:example:alice".to_string()),
-            principal_authentication_evidence: Some("xenia-session:receipt-001".to_string()),
+            principal: principal.clone(),
+            principal_authentication_evidence: Some(PrincipalAuthenticationEvidence {
+                principal,
+                exercise_id: EXERCISE_ID.to_string(),
+                locator: "xenia-session:receipt-001".to_string(),
+                digest: "sha256:auth-receipt".to_string(),
+                producer_revision: "git:xenia-abc123".to_string(),
+                authenticated_at_unix_ms: 1_000,
+                valid_until_unix_ms: 2_000,
+            }),
             capability: capability("svc:case-management"),
             purpose: "case-work".to_string(),
             observed_at_unix_ms: 1_500,
@@ -399,6 +483,19 @@ mod tests {
                 valid_from_unix_ms: Some(1_000),
                 valid_until_unix_ms: Some(2_000),
             }],
+        }
+    }
+
+    fn enforcement_evidence(request_id: &str, exercise_id: &str) -> CapabilityEnforcementEvidence {
+        CapabilityEnforcementEvidence {
+            claim: CapabilityEnforcementClaim::AppliedDecision {
+                request_id: request_id.to_string(),
+            },
+            exercise_id: exercise_id.to_string(),
+            locator: "receipt:nftables-001".to_string(),
+            digest: "sha256:deadbeef".to_string(),
+            adapter_revision: "git:adapter-def456".to_string(),
+            captured_at_unix_ms: 1_600,
         }
     }
 
@@ -428,6 +525,39 @@ mod tests {
 
         assert_eq!(
             policy(PolicyMode::Observe).evaluate(&req).decision,
+            CapabilityDecision::Deny {
+                reason: DenyReason::MissingPrincipalAuthenticationEvidence
+            }
+        );
+    }
+
+    #[test]
+    fn foreign_or_expired_authentication_evidence_is_denied() {
+        let mut foreign = request(ExecutableIdentity::NixStorePath(
+            "/nix/store/abc123-case-client/bin/case-client".to_string(),
+        ));
+        foreign
+            .principal_authentication_evidence
+            .as_mut()
+            .unwrap()
+            .exercise_id = "exercise-other".to_string();
+        assert_eq!(
+            policy(PolicyMode::Observe).evaluate(&foreign).decision,
+            CapabilityDecision::Deny {
+                reason: DenyReason::MissingPrincipalAuthenticationEvidence
+            }
+        );
+
+        let mut expired = request(ExecutableIdentity::NixStorePath(
+            "/nix/store/abc123-case-client/bin/case-client".to_string(),
+        ));
+        expired
+            .principal_authentication_evidence
+            .as_mut()
+            .unwrap()
+            .valid_until_unix_ms = 1_499;
+        assert_eq!(
+            policy(PolicyMode::Observe).evaluate(&expired).decision,
             CapabilityDecision::Deny {
                 reason: DenyReason::MissingPrincipalAuthenticationEvidence
             }
@@ -504,6 +634,10 @@ mod tests {
             "/nix/store/abc123-case-client/bin/case-client".to_string(),
         ));
         req.observed_at_unix_ms = 2_001;
+        req.principal_authentication_evidence
+            .as_mut()
+            .unwrap()
+            .valid_until_unix_ms = 3_000;
 
         assert!(matches!(
             policy(PolicyMode::Observe).evaluate(&req).decision,
@@ -589,7 +723,10 @@ mod tests {
         assert!(receipt.is_complete());
         assert_eq!(receipt.request, req);
         assert_eq!(receipt.policy_revision, "git:policy-abc123");
-        assert!(matches!(receipt.evaluation.decision, CapabilityDecision::Allow { .. }));
+        assert!(matches!(
+            receipt.evaluation.decision,
+            CapabilityDecision::Allow { .. }
+        ));
     }
 
     #[test]
@@ -605,18 +742,17 @@ mod tests {
         assert!(decision.evaluation.should_enforce_deny());
 
         let enforcement = CapabilityEnforcementReceipt {
+            schema_version: CAPABILITY_ENFORCEMENT_RECEIPT_SCHEMA_VERSION,
             decision_receipt: decision,
-            adapter_revision: "git:adapter-def456".to_string(),
             result: EnforcementResult::NotAttempted,
-            evidence_locator: None,
-            evidence_digest: None,
+            evidence: None,
         };
 
         assert!(!enforcement.proves_enforced_deny());
     }
 
     #[test]
-    fn applied_enforce_mode_deny_with_evidence_proves_enforcement() {
+    fn applied_enforce_mode_deny_with_bound_evidence_proves_enforcement() {
         let req = request(ExecutableIdentity::Unknown {
             observed_path: Some("/tmp/unknown".to_string()),
         });
@@ -626,13 +762,72 @@ mod tests {
             &req,
         );
         let enforcement = CapabilityEnforcementReceipt {
+            schema_version: CAPABILITY_ENFORCEMENT_RECEIPT_SCHEMA_VERSION,
             decision_receipt: decision,
-            adapter_revision: "git:adapter-def456".to_string(),
             result: EnforcementResult::Applied,
-            evidence_locator: Some("receipt:nftables-001".to_string()),
-            evidence_digest: Some("sha256:deadbeef".to_string()),
+            evidence: Some(enforcement_evidence("request-003", EXERCISE_ID)),
         };
 
         assert!(enforcement.proves_enforced_deny());
+    }
+
+    #[test]
+    fn enforcement_evidence_for_other_request_cannot_prove_deny() {
+        let req = request(ExecutableIdentity::Unknown {
+            observed_path: Some("/tmp/unknown".to_string()),
+        });
+        let decision = policy(PolicyMode::Enforce).evaluate_with_receipt(
+            "request-004",
+            "git:policy-abc123",
+            &req,
+        );
+        let enforcement = CapabilityEnforcementReceipt {
+            schema_version: CAPABILITY_ENFORCEMENT_RECEIPT_SCHEMA_VERSION,
+            decision_receipt: decision,
+            result: EnforcementResult::Applied,
+            evidence: Some(enforcement_evidence("request-other", EXERCISE_ID)),
+        };
+
+        assert!(!enforcement.proves_enforced_deny());
+    }
+
+    #[test]
+    fn enforcement_evidence_for_other_exercise_cannot_prove_deny() {
+        let req = request(ExecutableIdentity::Unknown {
+            observed_path: Some("/tmp/unknown".to_string()),
+        });
+        let decision = policy(PolicyMode::Enforce).evaluate_with_receipt(
+            "request-005",
+            "git:policy-abc123",
+            &req,
+        );
+        let enforcement = CapabilityEnforcementReceipt {
+            schema_version: CAPABILITY_ENFORCEMENT_RECEIPT_SCHEMA_VERSION,
+            decision_receipt: decision,
+            result: EnforcementResult::Applied,
+            evidence: Some(enforcement_evidence("request-005", "exercise-other")),
+        };
+
+        assert!(!enforcement.proves_enforced_deny());
+    }
+
+    #[test]
+    fn unsupported_enforcement_schema_cannot_prove_deny() {
+        let req = request(ExecutableIdentity::Unknown {
+            observed_path: Some("/tmp/unknown".to_string()),
+        });
+        let decision = policy(PolicyMode::Enforce).evaluate_with_receipt(
+            "request-006",
+            "git:policy-abc123",
+            &req,
+        );
+        let enforcement = CapabilityEnforcementReceipt {
+            schema_version: CAPABILITY_ENFORCEMENT_RECEIPT_SCHEMA_VERSION + 1,
+            decision_receipt: decision,
+            result: EnforcementResult::Applied,
+            evidence: Some(enforcement_evidence("request-006", EXERCISE_ID)),
+        };
+
+        assert!(!enforcement.proves_enforced_deny());
     }
 }
