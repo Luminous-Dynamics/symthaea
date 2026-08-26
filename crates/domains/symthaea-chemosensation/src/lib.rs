@@ -11,6 +11,12 @@
 //! odor, taste, flavor, novelty, and semantic hypotheses without overwriting the
 //! underlying measurement.
 //!
+//! Three identities remain deliberately distinct:
+//!
+//! - [`ChemicalObservationId`] / [`ChemicalEvidenceBundleId`] identify raw evidence,
+//! - [`ChemicalEncodingSpaceId`] identifies the HDC coordinate system,
+//! - semantic labels remain later hypotheses rather than identity.
+//!
 //! The crate starts hardware-independent so cognition and experiments can be
 //! validated against deterministic simulated noses/tongues before real sensor
 //! drivers are introduced.
