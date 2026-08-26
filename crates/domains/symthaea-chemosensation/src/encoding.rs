@@ -22,6 +22,11 @@ impl ScalarHdcEncoder {
     /// `anchor_count >= 2` and `max > min` are required. The seed defines the
     /// representation family, so distinct semantic channels should use distinct
     /// seeds or role-binding at a higher layer.
+    ///
+    /// Anchors are L2-normalized at construction. This is a representational
+    /// invariant: exact-anchor values and interpolated values must have comparable
+    /// magnitude, otherwise an exact anchor can dominate a later multi-channel
+    /// bundle purely because of where the scalar landed on the configured grid.
     pub fn new(min: f32, max: f32, anchor_count: usize, seed: u64) -> Self {
         assert!(min.is_finite() && max.is_finite(), "range must be finite");
         assert!(max > min, "max must be greater than min");
@@ -29,10 +34,12 @@ impl ScalarHdcEncoder {
 
         let anchors = (0..anchor_count)
             .map(|i| {
-                ContinuousHV::random(
+                let mut anchor = ContinuousHV::random(
                     HDC_DIMENSION,
                     seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)),
-                )
+                );
+                anchor.l2_normalize();
+                anchor
             })
             .collect();
 
@@ -51,11 +58,20 @@ impl ScalarHdcEncoder {
         self.anchors.len()
     }
 
+    /// Exact anchor vectors defining this scalar coordinate system.
+    ///
+    /// Kept crate-private so higher layers can content-address the encoding
+    /// space without exposing mutable representation internals as public API.
+    pub(crate) fn anchors(&self) -> &[ContinuousHV] {
+        &self.anchors
+    }
+
     /// Encode a finite scalar, saturating values outside the configured range.
     ///
-    /// Non-finite measurements return `None`; they must not be collapsed onto a
-    /// valid endpoint because that would turn missing/corrupt evidence into a
-    /// plausible chemical measurement.
+    /// All successful outputs are L2-normalized, including values that land
+    /// exactly on an anchor. Non-finite measurements return `None`; they must not
+    /// be collapsed onto a valid endpoint because that would turn missing/corrupt
+    /// evidence into a plausible chemical measurement.
     pub fn encode(&self, value: f32) -> Option<ContinuousHV> {
         if !value.is_finite() {
             return None;
@@ -90,6 +106,10 @@ impl ScalarHdcEncoder {
 mod tests {
     use super::*;
 
+    fn l2_norm(hv: &ContinuousHV) -> f32 {
+        hv.values.iter().map(|value| value * value).sum::<f32>().sqrt()
+    }
+
     #[test]
     fn encoding_is_deterministic() {
         let a = ScalarHdcEncoder::new(0.0, 10.0, 8, 42);
@@ -117,6 +137,33 @@ mod tests {
         let right = encoder.encode(50.1).unwrap();
         let far = encoder.encode(80.0).unwrap();
         assert!(left.similarity(&right) > left.similarity(&far));
+    }
+
+    #[test]
+    fn exact_anchors_and_interpolated_values_share_unit_norm() {
+        let encoder = ScalarHdcEncoder::new(0.0, 1.0, 5, 17);
+        for value in [0.0, 0.125, 0.25, 0.5, 0.875, 1.0] {
+            let hv = encoder.encode(value).unwrap();
+            let norm = l2_norm(&hv);
+            assert!(
+                (norm - 1.0).abs() < 1e-4,
+                "encoded value {value} had L2 norm {norm}, expected unit norm"
+            );
+        }
+    }
+
+    #[test]
+    fn anchor_boundary_has_no_magnitude_discontinuity() {
+        let encoder = ScalarHdcEncoder::new(0.0, 100.0, 11, 19);
+        let just_before = encoder.encode(49.999).unwrap();
+        let exact = encoder.encode(50.0).unwrap();
+        let just_after = encoder.encode(50.001).unwrap();
+
+        for hv in [&just_before, &exact, &just_after] {
+            assert!((l2_norm(hv) - 1.0).abs() < 1e-4);
+        }
+        assert!(exact.similarity(&just_before) > 0.99);
+        assert!(exact.similarity(&just_after) > 0.99);
     }
 
     #[test]

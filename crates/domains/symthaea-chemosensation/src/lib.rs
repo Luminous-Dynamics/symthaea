@@ -11,6 +11,12 @@
 //! odor, taste, flavor, novelty, and semantic hypotheses without overwriting the
 //! underlying measurement.
 //!
+//! Three identities remain deliberately distinct:
+//!
+//! - [`ChemicalObservationId`] / [`ChemicalEvidenceBundleId`] identify raw evidence,
+//! - [`ChemicalEncodingSpaceId`] identifies the HDC coordinate system,
+//! - semantic labels remain later hypotheses rather than identity.
+//!
 //! The crate starts hardware-independent so cognition and experiments can be
 //! validated against deterministic simulated noses/tongues before real sensor
 //! drivers are introduced.
@@ -20,9 +26,11 @@
 pub mod calibration;
 pub mod cognition;
 pub mod encoding;
+pub mod evidence;
 pub mod fingerprint;
 pub mod flavor;
 pub mod gustation;
+pub mod multimodal_bridge;
 pub mod novelty;
 pub mod observation;
 pub mod olfaction;
@@ -34,9 +42,10 @@ pub use cognition::{
     ChemicalCognitionError, ChemicalCognitionPipeline, CognitiveChemicalPercept,
 };
 pub use encoding::ScalarHdcEncoder;
+pub use evidence::{ChemicalEvidenceBundleId, ChemicalObservationId};
 pub use fingerprint::{
-    ChannelEncodingSpec, ChemicalFingerprint, ChemicalFingerprintEncoder, FingerprintConfigError,
-    FingerprintError,
+    ChannelEncodingSpec, ChemicalEncodingSpaceId, ChemicalFingerprint, ChemicalFingerprintEncoder,
+    FingerprintConfigError, FingerprintError,
 };
 pub use flavor::{
     FlavorBinder, FlavorBindingConfig, FlavorBindingError, FlavorConfigError, FlavorPercept,
@@ -44,6 +53,10 @@ pub use flavor::{
 pub use gustation::{
     ElectronicTongueSimulator, GustatorySimulationError, GustatoryStimulus,
     PotentiometricChannelModel,
+};
+pub use multimodal_bridge::{
+    ChemicalBridgeTarget, ChemicalModalBridge, ChemicalModalBridgeConfig,
+    ChemicalModalBridgeError, ChemicalModalBridgeInput,
 };
 pub use novelty::{
     ChemicalMemoryReference, ChemicalNoveltyConfig, ChemicalNoveltyMemory, NoveltyAssessment,

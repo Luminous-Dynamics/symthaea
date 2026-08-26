@@ -4,10 +4,44 @@
 //! Role-bound HDC fingerprints for calibrated chemical observations.
 
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 
+use blake3::Hasher;
+use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::{HDC_DIMENSION, unified_hv::ContinuousHV};
 
 use crate::{ChemicalModality, ChemicalObservation, MeasurementUnit, ScalarHdcEncoder};
+
+/// Content identity of the complete chemical HDC coordinate system.
+///
+/// The digest covers channel names/units/ranges, every scalar anchor vector,
+/// every channel-role vector, and both modality-role vectors. Two fingerprints
+/// may therefore be compared geometrically only when their space IDs match.
+///
+/// This is representation identity, not an authenticity signature. It tells
+/// downstream code whether two vectors were produced in the same coordinate
+/// system; provenance/authenticity belongs to the observation/evidence layer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ChemicalEncodingSpaceId(pub [u8; 32]);
+
+impl ChemicalEncodingSpaceId {
+    pub const fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    pub const fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
+impl fmt::Display for ChemicalEncodingSpaceId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for byte in self.0 {
+            write!(f, "{byte:02x}")?;
+        }
+        Ok(())
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct ChannelEncodingSpec {
@@ -59,6 +93,9 @@ pub struct ChemicalFingerprint {
     pub confidence: f32,
     pub used_channels: usize,
     pub ignored_channels: usize,
+    /// Content-addressed identity of the coordinate system that produced
+    /// `vector`. Downstream similarity/fusion must require matching IDs.
+    pub encoding_space_id: ChemicalEncodingSpaceId,
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +103,7 @@ pub struct ChemicalFingerprintEncoder {
     specs: HashMap<String, ChannelEncodingSpec>,
     olfactory_role: ContinuousHV,
     gustatory_role: ContinuousHV,
+    encoding_space_id: ChemicalEncodingSpaceId,
 }
 
 impl ChemicalFingerprintEncoder {
@@ -78,15 +116,25 @@ impl ChemicalFingerprintEncoder {
             }
         }
 
+        let olfactory_role = ContinuousHV::random(HDC_DIMENSION, 0x0F1A_C700_0000_0001);
+        let gustatory_role = ContinuousHV::random(HDC_DIMENSION, 0x0F1A_C700_0000_0002);
+        let encoding_space_id =
+            compute_encoding_space_id(&by_name, &olfactory_role, &gustatory_role);
+
         Ok(Self {
             specs: by_name,
-            olfactory_role: ContinuousHV::random(HDC_DIMENSION, 0x0F1A_C700_0000_0001),
-            gustatory_role: ContinuousHV::random(HDC_DIMENSION, 0x0F1A_C700_0000_0002),
+            olfactory_role,
+            gustatory_role,
+            encoding_space_id,
         })
     }
 
     pub fn configured_channels(&self) -> usize {
         self.specs.len()
+    }
+
+    pub fn encoding_space_id(&self) -> ChemicalEncodingSpaceId {
+        self.encoding_space_id
     }
 
     /// Encode calibrated channel values into a modality-bound chemical
@@ -164,8 +212,74 @@ impl ChemicalFingerprintEncoder {
             confidence,
             used_channels: confidences.len(),
             ignored_channels,
+            encoding_space_id: self.encoding_space_id,
         }))
     }
+}
+
+fn compute_encoding_space_id(
+    specs: &HashMap<String, ChannelEncodingSpec>,
+    olfactory_role: &ContinuousHV,
+    gustatory_role: &ContinuousHV,
+) -> ChemicalEncodingSpaceId {
+    let mut hasher = Hasher::new();
+    put_bytes(&mut hasher, b"symthaea-chemosensation-encoding-space-v1");
+
+    let mut ordered: Vec<&ChannelEncodingSpec> = specs.values().collect();
+    ordered.sort_by(|left, right| left.name.cmp(&right.name));
+    put_u64(&mut hasher, ordered.len() as u64);
+
+    for spec in ordered {
+        put_bytes(&mut hasher, spec.name.as_bytes());
+        put_u8(&mut hasher, unit_tag(spec.unit));
+        put_u32(&mut hasher, spec.scalar.min().to_bits());
+        put_u32(&mut hasher, spec.scalar.max().to_bits());
+        put_u64(&mut hasher, spec.scalar.anchor_count() as u64);
+        for anchor in spec.scalar.anchors() {
+            hash_hv(&mut hasher, anchor);
+        }
+        hash_hv(&mut hasher, &spec.role);
+    }
+
+    hash_hv(&mut hasher, olfactory_role);
+    hash_hv(&mut hasher, gustatory_role);
+    ChemicalEncodingSpaceId(*hasher.finalize().as_bytes())
+}
+
+fn hash_hv(hasher: &mut Hasher, hv: &ContinuousHV) {
+    put_u64(hasher, hv.values.len() as u64);
+    for value in &hv.values {
+        put_u32(hasher, value.to_bits());
+    }
+}
+
+fn unit_tag(unit: MeasurementUnit) -> u8 {
+    match unit {
+        MeasurementUnit::Arbitrary => 1,
+        MeasurementUnit::PartsPerMillion => 2,
+        MeasurementUnit::PartsPerBillion => 3,
+        MeasurementUnit::Ohms => 4,
+        MeasurementUnit::SiemensPerMeter => 5,
+        MeasurementUnit::Millivolts => 6,
+        MeasurementUnit::Ph => 7,
+    }
+}
+
+fn put_bytes(hasher: &mut Hasher, bytes: &[u8]) {
+    put_u64(hasher, bytes.len() as u64);
+    hasher.update(bytes);
+}
+
+fn put_u8(hasher: &mut Hasher, value: u8) {
+    hasher.update(&[value]);
+}
+
+fn put_u32(hasher: &mut Hasher, value: u32) {
+    hasher.update(&value.to_le_bytes());
+}
+
+fn put_u64(hasher: &mut Hasher, value: u64) {
+    hasher.update(&value.to_le_bytes());
 }
 
 #[cfg(test)]
@@ -198,6 +312,37 @@ mod tests {
     fn encoder() -> ChemicalFingerprintEncoder {
         ChemicalFingerprintEncoder::new(vec![spec("a", 11, 101), spec("b", 12, 102)])
             .unwrap()
+    }
+
+    #[test]
+    fn encoding_space_identity_is_deterministic_and_spec_order_invariant() {
+        let a = ChemicalFingerprintEncoder::new(vec![spec("a", 11, 101), spec("b", 12, 102)])
+            .unwrap();
+        let b = ChemicalFingerprintEncoder::new(vec![spec("b", 12, 102), spec("a", 11, 101)])
+            .unwrap();
+        assert_eq!(a.encoding_space_id(), b.encoding_space_id());
+    }
+
+    #[test]
+    fn changing_actual_coordinate_system_changes_space_identity() {
+        let a = ChemicalFingerprintEncoder::new(vec![spec("a", 11, 101)]).unwrap();
+        let scalar_changed = ChemicalFingerprintEncoder::new(vec![spec("a", 12, 101)]).unwrap();
+        let role_changed = ChemicalFingerprintEncoder::new(vec![spec("a", 11, 102)]).unwrap();
+        assert_ne!(a.encoding_space_id(), scalar_changed.encoding_space_id());
+        assert_ne!(a.encoding_space_id(), role_changed.encoding_space_id());
+    }
+
+    #[test]
+    fn fingerprint_carries_the_encoder_space_identity() {
+        let encoder = encoder();
+        let observation = ChemicalObservation::new(
+            0,
+            ChemicalModality::Olfactory,
+            "sensor",
+            vec![channel("a", 20.0)],
+        );
+        let fingerprint = encoder.encode(&observation).unwrap().unwrap();
+        assert_eq!(fingerprint.encoding_space_id, encoder.encoding_space_id());
     }
 
     #[test]
@@ -256,6 +401,7 @@ mod tests {
         let odor_hv = encoder.encode(&odor).unwrap().unwrap();
         let taste_hv = encoder.encode(&taste).unwrap().unwrap();
         assert!(odor_hv.vector.similarity(&taste_hv.vector) < 0.5);
+        assert_eq!(odor_hv.encoding_space_id, taste_hv.encoding_space_id);
     }
 
     #[test]
@@ -346,6 +492,7 @@ mod tests {
         let baseline = encoder.encode(&only_a).unwrap().unwrap();
         let hardened = encoder.encode(&with_dead_b).unwrap().unwrap();
         assert_eq!(baseline.vector, hardened.vector);
+        assert_eq!(baseline.encoding_space_id, hardened.encoding_space_id);
         assert_eq!(hardened.used_channels, 1);
         assert_eq!(hardened.ignored_channels, 1);
     }
