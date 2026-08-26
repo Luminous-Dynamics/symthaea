@@ -50,7 +50,7 @@ impl fmt::Display for ContentAddressError {
             ),
             Self::InvalidNamespaceCharacter => write!(
                 f,
-                "content-address namespace contains a character outside [A-Za-z0-9_-]"
+                "content-address namespace contains a character outside [a-z0-9_-]"
             ),
         }
     }
@@ -65,6 +65,11 @@ impl std::error::Error for ContentAddressError {}
 /// example `symthaea-chemosensation-evidence-bundle-v1`). The same digest bytes
 /// under a different algorithm or namespace are intentionally different
 /// addresses.
+///
+/// Algorithm and namespace identifiers are canonical lowercase ASCII. This
+/// intentionally rejects case aliases such as `BLAKE3-256` or `Symthaea-X`,
+/// which could otherwise create multiple textual identities for the same
+/// intended contract.
 ///
 /// This type is **content identity, not authenticity**. A caller that requires
 /// cryptographic provenance must separately verify a signature, trusted timestamp,
@@ -101,12 +106,12 @@ impl ContentAddress32 {
         &self.namespace
     }
 
+    /// Raw digest bytes without their algorithm/namespace context.
+    ///
+    /// The bytes alone are not the full identity. Prefer comparing or carrying
+    /// the complete `ContentAddress32` whenever possible.
     pub const fn digest(&self) -> &[u8; 32] {
         &self.digest
-    }
-
-    pub fn into_digest(self) -> [u8; 32] {
-        self.digest
     }
 
     /// A stable textual rendering suitable for logs and receipts.
@@ -120,6 +125,7 @@ impl ContentAddress32 {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ContentAddress32Wire {
     algorithm: String,
     namespace: String,
@@ -157,8 +163,6 @@ fn validate_algorithm(value: &str) -> Result<(), ContentAddressError> {
         });
     }
     // Keep algorithm identifiers compact and unambiguous in logs/receipts.
-    // Lowercase ASCII, digits, '-' and '_' cover the algorithms currently used
-    // across the workspace without imposing a cryptographic registry here.
     if !value.bytes().all(|byte| {
         byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_')
     }) {
@@ -177,12 +181,12 @@ fn validate_namespace(value: &str) -> Result<(), ContentAddressError> {
             max: MAX_NAMESPACE_LEN,
         });
     }
-    // Namespace is intentionally ASCII and delimiter-safe so Display remains
-    // unambiguous. Dots/slashes/colons are excluded; use '-' or '_' for hierarchy.
-    if !value
-        .bytes()
-        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
-    {
+    // Namespace is lowercase ASCII and delimiter-safe so textual identity is
+    // canonical. Dots/slashes/colons and case aliases are excluded; use '-' or
+    // '_' for hierarchy.
+    if !value.bytes().all(|byte| {
+        byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_')
+    }) {
         return Err(ContentAddressError::InvalidNamespaceCharacter);
     }
     Ok(())
@@ -239,6 +243,10 @@ mod tests {
             ContentAddress32::new("blake3-256", "symthaea:test", [0; 32]),
             Err(ContentAddressError::InvalidNamespaceCharacter)
         );
+        assert_eq!(
+            ContentAddress32::new("blake3-256", "Symthaea-test-v1", [0; 32]),
+            Err(ContentAddressError::InvalidNamespaceCharacter)
+        );
     }
 
     #[test]
@@ -257,6 +265,13 @@ mod tests {
 
         let mut encoded = serde_json::to_value(address("symthaea-test-v1", 1)).unwrap();
         encoded["namespace"] = serde_json::Value::String("symthaea:test".into());
+        assert!(serde_json::from_value::<ContentAddress32>(encoded).is_err());
+    }
+
+    #[test]
+    fn serde_rejects_unknown_identity_fields() {
+        let mut encoded = serde_json::to_value(address("symthaea-test-v1", 1)).unwrap();
+        encoded["canonicalization"] = serde_json::Value::String("v2".into());
         assert!(serde_json::from_value::<ContentAddress32>(encoded).is_err());
     }
 }
