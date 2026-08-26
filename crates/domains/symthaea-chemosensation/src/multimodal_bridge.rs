@@ -15,15 +15,15 @@
 //! it is never averaged away into false certainty.
 //!
 //! Hypervector comparison is only meaningful when components were encoded in
-//! the same HDC coordinate system. Each [`ChemicalBridgeComponent`] therefore
-//! carries an explicit `encoding_space` identifier and mixed spaces are rejected.
+//! the same HDC coordinate system. Comparability is proven from each fingerprint's
+//! content-addressed [`ChemicalEncodingSpaceId`], not from a caller-supplied label.
 //!
 //! The numeric target IDs mirror the canonical root identity contract introduced
 //! by PR #84 (`consciousness::integration::modality_identity`). This domain crate
 //! intentionally does not depend on the root `symthaea` package, avoiding a
 //! dependency cycle. The final root bridge must assert the mapping on its side too.
 
-use crate::{ChemicalModality, ChemicalPercept};
+use crate::{ChemicalEncodingSpaceId, ChemicalModality, ChemicalPercept};
 use symthaea_core::hdc::{HDC_DIMENSION, unified_hv::ContinuousHV};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -57,36 +57,11 @@ impl From<ChemicalModality> for ChemicalBridgeTarget {
     }
 }
 
-/// A chemical percept plus the HDC coordinate-system identity in which its
-/// fingerprint was encoded.
-///
-/// The identifier is evidence about representation compatibility, not a semantic
-/// odor/taste label. Callers should derive it from a versioned encoder/config
-/// contract rather than from the observed sample identity.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ChemicalBridgeComponent {
-    pub percept: ChemicalPercept,
-    pub encoding_space: String,
-}
-
-impl ChemicalBridgeComponent {
-    pub fn new(
-        percept: ChemicalPercept,
-        encoding_space: impl Into<String>,
-    ) -> Result<Self, ChemicalModalBridgeError> {
-        let encoding_space = encoding_space.into();
-        if encoding_space.trim().is_empty() {
-            return Err(ChemicalModalBridgeError::BlankEncodingSpace);
-        }
-        Ok(Self {
-            percept,
-            encoding_space,
-        })
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChemicalModalBridgeConfig {
+    /// Maximum timestamp spread among components treated as one current-cycle
+    /// observation. This is a protocol choice, not a universal psychophysical
+    /// constant.
     pub max_component_skew_us: u64,
 }
 
@@ -101,10 +76,9 @@ impl Default for ChemicalModalBridgeConfig {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChemicalModalBridgeError {
     EmptyInput,
-    BlankEncodingSpace,
     MixedEncodingSpaces {
-        expected: String,
-        actual: String,
+        expected: ChemicalEncodingSpaceId,
+        actual: ChemicalEncodingSpaceId,
     },
     MixedModalities {
         expected: ChemicalModality,
@@ -123,16 +97,27 @@ pub enum ChemicalModalBridgeError {
     },
 }
 
+/// One root-ready chemical modality representation plus all source percepts.
+///
+/// `components` remain attached so downstream code can inspect disagreement,
+/// sensor identity, raw observations, calibration provenance, timestamps, and
+/// their common encoding-space identity. The aggregate vector is a convenience
+/// representation, not replacement evidence.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChemicalModalBridgeInput {
     pub target: ChemicalBridgeTarget,
-    pub encoding_space: String,
+    pub encoding_space_id: ChemicalEncodingSpaceId,
     pub vector: ContinuousHV,
+    /// Conservative effective confidence after same-modality agreement is
+    /// considered. For a single component this equals that percept's confidence.
     pub confidence: f32,
+    /// Confidence-weighted pairwise cosine agreement in [0, 1]. A single source
+    /// has agreement 1 by definition. Negative similarity is treated as maximal
+    /// disagreement (0), not as evidence that cancels into confidence.
     pub agreement: f32,
     pub earliest_timestamp_us: u64,
     pub latest_timestamp_us: u64,
-    pub components: Vec<ChemicalBridgeComponent>,
+    pub components: Vec<ChemicalPercept>,
 }
 
 impl ChemicalModalBridgeInput {
@@ -167,30 +152,29 @@ impl ChemicalModalBridge {
         &self.config
     }
 
+    /// Aggregate comparable same-modality percepts into exactly one root-ready
+    /// current-cycle input.
+    ///
+    /// Components are sorted deterministically before floating-point accumulation
+    /// so caller iteration order cannot change the resulting vector. Validation
+    /// completes before any derived representation is constructed.
     pub fn aggregate(
         &self,
-        components: &[ChemicalBridgeComponent],
+        percepts: &[ChemicalPercept],
     ) -> Result<ChemicalModalBridgeInput, ChemicalModalBridgeError> {
-        let first = components
+        let first = percepts
             .first()
             .ok_or(ChemicalModalBridgeError::EmptyInput)?;
-        if first.encoding_space.trim().is_empty() {
-            return Err(ChemicalModalBridgeError::BlankEncodingSpace);
-        }
-        let encoding_space = first.encoding_space.clone();
-        let modality = first.percept.evidence.modality;
+        let encoding_space_id = first.fingerprint.encoding_space_id;
+        let modality = first.evidence.modality;
 
-        for component in components {
-            if component.encoding_space.trim().is_empty() {
-                return Err(ChemicalModalBridgeError::BlankEncodingSpace);
-            }
-            if component.encoding_space != encoding_space {
+        for percept in percepts {
+            if percept.fingerprint.encoding_space_id != encoding_space_id {
                 return Err(ChemicalModalBridgeError::MixedEncodingSpaces {
-                    expected: encoding_space.clone(),
-                    actual: component.encoding_space.clone(),
+                    expected: encoding_space_id,
+                    actual: percept.fingerprint.encoding_space_id,
                 });
             }
-            let percept = &component.percept;
             if percept.evidence.modality != modality {
                 return Err(ChemicalModalBridgeError::MixedModalities {
                     expected: modality,
@@ -222,14 +206,14 @@ impl ChemicalModalBridge {
             }
         }
 
-        let earliest_timestamp_us = components
+        let earliest_timestamp_us = percepts
             .iter()
-            .map(|component| component.percept.timestamp_us())
+            .map(ChemicalPercept::timestamp_us)
             .min()
             .expect("non-empty input validated above");
-        let latest_timestamp_us = components
+        let latest_timestamp_us = percepts
             .iter()
-            .map(|component| component.percept.timestamp_us())
+            .map(ChemicalPercept::timestamp_us)
             .max()
             .expect("non-empty input validated above");
         let skew_us = latest_timestamp_us.saturating_sub(earliest_timestamp_us);
@@ -240,22 +224,19 @@ impl ChemicalModalBridge {
             });
         }
 
-        let mut components = components.to_vec();
+        let mut components = percepts.to_vec();
         components.sort_by(|left, right| {
-            left.percept
-                .timestamp_us()
-                .cmp(&right.percept.timestamp_us())
-                .then_with(|| left.percept.evidence.source.cmp(&right.percept.evidence.source))
+            left.timestamp_us()
+                .cmp(&right.timestamp_us())
+                .then_with(|| left.evidence.source.cmp(&right.evidence.source))
                 .then_with(|| {
-                    left.percept
-                        .fingerprint
+                    left.fingerprint
                         .vector
                         .values
                         .iter()
                         .map(|value| value.to_bits())
                         .cmp(
                             right
-                                .percept
                                 .fingerprint
                                 .vector
                                 .values
@@ -264,19 +245,18 @@ impl ChemicalModalBridge {
                         )
                 })
                 .then_with(|| {
-                    left.percept
-                        .confidence()
+                    left.confidence()
                         .to_bits()
-                        .cmp(&right.percept.confidence().to_bits())
+                        .cmp(&right.confidence().to_bits())
                 })
         });
 
         if components.len() == 1 {
             return Ok(ChemicalModalBridgeInput {
                 target: modality.into(),
-                encoding_space,
-                vector: components[0].percept.fingerprint.vector.clone(),
-                confidence: components[0].percept.confidence(),
+                encoding_space_id,
+                vector: components[0].fingerprint.vector.clone(),
+                confidence: components[0].confidence(),
                 agreement: 1.0,
                 earliest_timestamp_us,
                 latest_timestamp_us,
@@ -287,24 +267,24 @@ impl ChemicalModalBridge {
         let agreement = pairwise_agreement(&components);
         let weakest_confidence = components
             .iter()
-            .map(|component| component.percept.confidence())
+            .map(ChemicalPercept::confidence)
             .fold(1.0f32, f32::min);
         let confidence = (weakest_confidence * agreement).clamp(0.0, 1.0);
 
         let hvs: Vec<&ContinuousHV> = components
             .iter()
-            .map(|component| &component.percept.fingerprint.vector)
+            .map(|percept| &percept.fingerprint.vector)
             .collect();
         let weights: Vec<f32> = components
             .iter()
-            .map(|component| component.percept.confidence())
+            .map(ChemicalPercept::confidence)
             .collect();
         let mut vector = ContinuousHV::weighted_bundle(&hvs, &weights);
         vector.l2_normalize();
 
         Ok(ChemicalModalBridgeInput {
             target: modality.into(),
-            encoding_space,
+            encoding_space_id,
             vector,
             confidence,
             agreement,
@@ -321,7 +301,7 @@ impl Default for ChemicalModalBridge {
     }
 }
 
-fn pairwise_agreement(components: &[ChemicalBridgeComponent]) -> f32 {
+fn pairwise_agreement(components: &[ChemicalPercept]) -> f32 {
     if components.len() < 2 {
         return 1.0;
     }
@@ -330,13 +310,11 @@ fn pairwise_agreement(components: &[ChemicalBridgeComponent]) -> f32 {
     let mut pair_weight_sum = 0.0f32;
     for left in 0..components.len() {
         for right in (left + 1)..components.len() {
-            let left_percept = &components[left].percept;
-            let right_percept = &components[right].percept;
-            let pair_weight = left_percept.confidence() * right_percept.confidence();
-            let similarity = left_percept
+            let pair_weight = components[left].confidence() * components[right].confidence();
+            let similarity = components[left]
                 .fingerprint
                 .vector
-                .similarity(&right_percept.fingerprint.vector)
+                .similarity(&components[right].fingerprint.vector)
                 .clamp(0.0, 1.0);
             weighted_similarity += similarity * pair_weight;
             pair_weight_sum += pair_weight;
@@ -375,22 +353,19 @@ mod tests {
                 confidence,
                 used_channels: 1,
                 ignored_channels: 0,
+                encoding_space_id: ChemicalEncodingSpaceId::from_bytes([7; 32]),
             },
         }
     }
 
-    fn component(percept: ChemicalPercept) -> ChemicalBridgeComponent {
-        ChemicalBridgeComponent::new(percept, "chemical-fingerprint-v1").unwrap()
-    }
-
-    fn odor(timestamp_us: u64, source: &str, seed: u64, confidence: f32) -> ChemicalBridgeComponent {
-        component(percept(
+    fn odor(timestamp_us: u64, source: &str, seed: u64, confidence: f32) -> ChemicalPercept {
+        percept(
             ChemicalModality::Olfactory,
             timestamp_us,
             source,
             ContinuousHV::random(HDC_DIMENSION, seed),
             confidence,
-        ))
+        )
     }
 
     #[test]
@@ -399,10 +374,13 @@ mod tests {
         let input = odor(10, "nose-a", 1, 0.8);
         let output = bridge.aggregate(std::slice::from_ref(&input)).unwrap();
 
-        assert_eq!(output.vector, input.percept.fingerprint.vector);
+        assert_eq!(output.vector, input.fingerprint.vector);
         assert_eq!(output.confidence, 0.8);
         assert_eq!(output.agreement, 1.0);
-        assert_eq!(output.encoding_space, "chemical-fingerprint-v1");
+        assert_eq!(
+            output.encoding_space_id,
+            ChemicalEncodingSpaceId::from_bytes([7; 32])
+        );
         assert_eq!(output.component_count(), 1);
         assert_eq!(output.components[0], input);
         assert_eq!(output.stable_target_id(), 13);
@@ -412,13 +390,13 @@ mod tests {
     fn same_modality_sources_collapse_to_one_input_and_preserve_components() {
         let bridge = ChemicalModalBridge::default();
         let a = odor(10, "nose-a", 1, 0.9);
-        let b = component(percept(
+        let b = percept(
             ChemicalModality::Olfactory,
             20,
             "nose-b",
-            a.percept.fingerprint.vector.clone(),
+            a.fingerprint.vector.clone(),
             0.8,
-        ));
+        );
 
         let output = bridge.aggregate(&[b.clone(), a.clone()]).unwrap();
         assert_eq!(output.modality(), ChemicalModality::Olfactory);
@@ -447,13 +425,13 @@ mod tests {
     fn weakest_source_caps_joint_confidence_even_under_perfect_agreement() {
         let bridge = ChemicalModalBridge::default();
         let a = odor(10, "nose-a", 1, 0.95);
-        let b = component(percept(
+        let b = percept(
             ChemicalModality::Olfactory,
             20,
             "nose-b",
-            a.percept.fingerprint.vector.clone(),
+            a.fingerprint.vector.clone(),
             0.4,
-        ));
+        );
         let output = bridge.aggregate(&[a, b]).unwrap();
         assert!((output.agreement - 1.0).abs() < 1e-5);
         assert!((output.confidence - 0.4).abs() < 1e-5);
@@ -463,13 +441,13 @@ mod tests {
     fn mixed_smell_and_taste_are_not_collapsed_into_one_root_modality() {
         let bridge = ChemicalModalBridge::default();
         let odor = odor(10, "nose", 1, 0.9);
-        let taste = component(percept(
+        let taste = percept(
             ChemicalModality::Gustatory,
             10,
             "tongue",
             ContinuousHV::random(HDC_DIMENSION, 2),
             0.9,
-        ));
+        );
         assert!(matches!(
             bridge.aggregate(&[odor, taste]),
             Err(ChemicalModalBridgeError::MixedModalities {
@@ -483,17 +461,8 @@ mod tests {
     fn different_hdc_spaces_are_not_compared_as_sensor_disagreement() {
         let bridge = ChemicalModalBridge::default();
         let a = odor(10, "nose-a", 1, 0.9);
-        let b = ChemicalBridgeComponent::new(
-            percept(
-                ChemicalModality::Olfactory,
-                20,
-                "nose-b",
-                ContinuousHV::random(HDC_DIMENSION, 1),
-                0.9,
-            ),
-            "different-role-seeds-v2",
-        )
-        .unwrap();
+        let mut b = odor(20, "nose-b", 1, 0.9);
+        b.fingerprint.encoding_space_id = ChemicalEncodingSpaceId::from_bytes([8; 32]);
 
         assert!(matches!(
             bridge.aggregate(&[a, b]),
