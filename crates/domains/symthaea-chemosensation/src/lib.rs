@@ -22,6 +22,7 @@ pub mod calibration;
 pub mod cognition;
 pub mod deviation;
 pub mod encoding;
+pub mod evidence_bundle;
 pub mod experiment;
 pub mod fingerprint;
 pub mod flavor;
@@ -46,6 +47,10 @@ pub use deviation::{
     DeviationDisposition, ExpectedBiasDirection, ProtocolDeviation, ProtocolDeviationError,
 };
 pub use encoding::ScalarHdcEncoder;
+pub use evidence_bundle::{
+    ChemicalEvidenceBundle, EvidenceBundleError, TraceEvidenceRef, TraceEvidenceRefError,
+    EVIDENCE_BUNDLE_SCHEMA_VERSION,
+};
 pub use experiment::{
     ChemicalDecisionProtocol, ChemicalDecisionReceipt, ChemicalEvidenceLevel, DecisionError,
     DecisionProtocolError, EvaluationPartition, ExperimentDecision, GateDirection, GateOutcome,
