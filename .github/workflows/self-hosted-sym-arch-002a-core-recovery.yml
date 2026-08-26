@@ -1,0 +1,213 @@
+name: Trusted Recovery - SYM-ARCH-002A Core
+
+on:
+  workflow_dispatch:
+
+# One-purpose recovery harness for the frozen #57 exact tree. It intentionally
+# accepts no ref/SHA inputs and grants no GITHUB_TOKEN permissions.
+permissions: {}
+
+env:
+  NIX_CONFIG: experimental-features = nix-command flakes
+  GIT_TERMINAL_PROMPT: "0"
+  TARGET_COMMIT: f61f5ca04700db90a4f33baca5e58cd1daf068c9
+  TARGET_TREE: ca6cfd632f614144f3be1362d51b2222d60a664f
+  TARGET_BASE: e143c61110a70a361111bda91a986caa2924489a
+  TARGET_HOSTED_WORKFLOW_BLOB: c48b655bfb1a233e29d4a1bf478985d9acb37c11
+
+concurrency:
+  # Each manual recovery attempt is deliberate evidence. Do not cancel it just
+  # because another operator dispatches a later run.
+  group: ${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  exact-tree-core:
+    name: Validate frozen #57 exact tree
+    if: >-
+      github.repository == 'Luminous-Dynamics/symthaea' &&
+      github.ref == 'refs/heads/main'
+    runs-on: [symthaea-trusted-cpu-v1]
+    timeout-minutes: 30
+
+    steps:
+      - name: Fetch trusted harness and authenticate frozen source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/main'
+
+          HARNESS_DIR="$RUNNER_TEMP/trusted-harness"
+          SOURCE_DIR="$RUNNER_TEMP/frozen-source"
+          rm -rf -- "$HARNESS_DIR" "$SOURCE_DIR"
+          mkdir -p "$HARNESS_DIR" "$SOURCE_DIR"
+
+          # The helper Nix/test code must come from the trusted main commit that
+          # defined this workflow, never from the unmerged target tree.
+          git -C "$HARNESS_DIR" init
+          git -C "$HARNESS_DIR" remote add origin https://github.com/Luminous-Dynamics/symthaea.git
+          git -C "$HARNESS_DIR" -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git -C "$HARNESS_DIR" checkout --detach FETCH_HEAD
+          test "$(git -C "$HARNESS_DIR" rev-parse HEAD)" = "$GITHUB_SHA"
+
+          # Fetch only the frozen research target and its known base.
+          git -C "$SOURCE_DIR" init
+          git -C "$SOURCE_DIR" remote add origin https://github.com/Luminous-Dynamics/symthaea.git
+          git -C "$SOURCE_DIR" -c protocol.version=2 fetch --no-tags origin "$TARGET_BASE" "$TARGET_COMMIT"
+
+          test "$(git -C "$SOURCE_DIR" rev-parse "$TARGET_COMMIT^{commit}")" = "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse "$TARGET_COMMIT^{tree}")" = "$TARGET_TREE"
+          git -C "$SOURCE_DIR" merge-base --is-ancestor "$TARGET_BASE" "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse "$TARGET_COMMIT:.github/workflows/sym-arch-002a-core.yml")" = "$TARGET_HOSTED_WORKFLOW_BLOB"
+
+          actual_paths="$(git -C "$SOURCE_DIR" diff --name-only "$TARGET_BASE" "$TARGET_COMMIT" | LC_ALL=C sort)"
+          expected_paths="$(cat <<'EOF'
+          .github/workflows/sym-arch-002a-core.yml
+          crates/domains/symthaea-psych-bench/src/experiment/confirmatory.rs
+          crates/domains/symthaea-psych-bench/src/experiment/mod.rs
+          crates/domains/symthaea-psych-bench/src/lib.rs
+          docs/research/SYM_ARCH_002A_EXPERIMENTAL_CORE_V1.md
+          EOF
+          )"
+          test "$actual_paths" = "$expected_paths"
+
+          git -C "$SOURCE_DIR" checkout --detach "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD)" = "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD^{tree})" = "$TARGET_TREE"
+
+          printf 'HARNESS_DIR=%s\nSOURCE_DIR=%s\n' "$HARNESS_DIR" "$SOURCE_DIR" >> "$GITHUB_ENV"
+
+      - name: Report frozen-source provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$HARNESS_DIR" rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD)" = "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD^{tree})" = "$TARGET_TREE"
+
+          uname -a
+          cat /etc/os-release
+          nix --version
+          git --version
+          printf 'recovery_harness=%s\n' "$GITHUB_SHA"
+          printf 'source_commit=%s\n' "$TARGET_COMMIT"
+          printf 'source_tree=%s\n' "$TARGET_TREE"
+          printf 'source_base=%s\n' "$TARGET_BASE"
+          printf 'hosted_workflow_blob=%s\n' "$TARGET_HOSTED_WORKFLOW_BLOB"
+
+          cd "$SOURCE_DIR"
+          printf 'nixpkgs_rev=%s\n' "$(nix eval --raw --expr 'let l = builtins.fromJSON (builtins.readFile ./flake.lock); n = l.nodes.root.inputs.nixpkgs; in (builtins.getAttr n l.nodes).locked.rev')"
+          printf 'rust_channel=%s\n' "$(nix eval --raw --expr '(builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain.channel')"
+          sha256sum flake.lock rust-toolchain.toml
+
+      - name: Evaluate trusted-runner policy from trusted harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$HARNESS_DIR"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          nix build --no-link --no-write-lock-file \
+            --impure \
+            --expr 'let f = builtins.getFlake (toString ./.); pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in import ./nix/tests/eval-github-actions-runner.nix { inherit pkgs; }'
+
+      - name: Reproduce SYM-ARCH-002A correctness gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+          test "$(git rev-parse HEAD)" = "$TARGET_COMMIT"
+          test "$(git rev-parse HEAD^{tree})" = "$TARGET_TREE"
+
+          export CARGO_HOME="$RUNNER_TEMP/cargo-home"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/cargo-target"
+          mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
+
+          nix develop --no-write-lock-file \
+            --impure \
+            --expr 'let
+              f = builtins.getFlake (toString ./.);
+              harness = builtins.getEnv "HARNESS_DIR";
+              shellFile = builtins.toPath (harness + "/nix/ci-rust-shell.nix");
+            in import shellFile {
+              nixpkgs = f.inputs.nixpkgs;
+              rust-overlay = f.inputs.rust-overlay;
+              toolchainFile = ./rust-toolchain.toml;
+              system = builtins.currentSystem;
+            }' \
+            --command bash -c '
+              set -euo pipefail
+              rustc --version
+              cargo --version
+              rustfmt --version
+
+              rustfmt --edition 2024 --check \
+                crates/domains/symthaea-psych-bench/src/experiment/mod.rs \
+                crates/domains/symthaea-psych-bench/src/experiment/confirmatory.rs \
+                crates/domains/symthaea-psych-bench/src/lib.rs
+
+              cargo test --locked -p symthaea-psych-bench --lib experiment -- --nocapture
+              cargo check --locked -p symthaea-psych-bench --lib
+            '
+
+      - name: Verify immutability and emit recovery attestation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$HARNESS_DIR" rev-parse HEAD)" = "$GITHUB_SHA"
+          git -C "$HARNESS_DIR" diff --exit-code
+          git -C "$HARNESS_DIR" diff --cached --exit-code
+          test -z "$(git -C "$HARNESS_DIR" status --porcelain=v1 --untracked-files=all --ignored=matching)"
+
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD)" = "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD^{tree})" = "$TARGET_TREE"
+          git -C "$SOURCE_DIR" diff --exit-code
+          git -C "$SOURCE_DIR" diff --cached --exit-code
+          test -z "$(git -C "$SOURCE_DIR" status --porcelain=v1 --untracked-files=all --ignored=matching)"
+
+          cd "$SOURCE_DIR"
+          nixpkgs_rev="$(nix eval --raw --expr 'let l = builtins.fromJSON (builtins.readFile ./flake.lock); n = l.nodes.root.inputs.nixpkgs; in (builtins.getAttr n l.nodes).locked.rev')"
+          rust_channel="$(nix eval --raw --expr '(builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain.channel')"
+          flake_lock_sha="$(sha256sum flake.lock | awk '{print $1}')"
+          rust_toolchain_sha="$(sha256sum rust-toolchain.toml | awk '{print $1}')"
+
+          manifest="$RUNNER_TEMP/sym-arch-002a-trusted-recovery-v1.txt"
+          cat > "$manifest" <<EOF
+          schema=symthaea.sym-arch-002a.trusted-recovery.v1
+          result=PASS
+          github_run_id=$GITHUB_RUN_ID
+          github_run_attempt=$GITHUB_RUN_ATTEMPT
+          runner_name=${RUNNER_NAME:-unknown}
+          runner_os=${RUNNER_OS:-unknown}
+          runner_arch=${RUNNER_ARCH:-unknown}
+          harness_commit=$GITHUB_SHA
+          target_commit=$TARGET_COMMIT
+          target_tree=$TARGET_TREE
+          target_base=$TARGET_BASE
+          hosted_workflow_blob=$TARGET_HOSTED_WORKFLOW_BLOB
+          nixpkgs_rev=$nixpkgs_rev
+          rust_channel=$rust_channel
+          flake_lock_sha256=$flake_lock_sha
+          rust_toolchain_sha256=$rust_toolchain_sha
+          gate=rustfmt+experiment-tests+psych-bench-lib-check
+          cargo_dependency_mode=locked
+          EOF
+
+          attestation_sha="$(sha256sum "$manifest" | awk '{print $1}')"
+          cat "$manifest"
+          printf 'attestation_sha256=%s\n' "$attestation_sha"
+
+          {
+            echo '## SYM-ARCH-002A trusted recovery: PASS'
+            echo
+            echo "- Harness commit: \`$GITHUB_SHA\`"
+            echo "- Frozen source commit: \`$TARGET_COMMIT\`"
+            echo "- Frozen source tree: \`$TARGET_TREE\`"
+            echo "- Known base: \`$TARGET_BASE\`"
+            echo "- Hosted workflow blob: \`$TARGET_HOSTED_WORKFLOW_BLOB\`"
+            echo "- Runner: \`${RUNNER_NAME:-unknown}\` / \`${RUNNER_OS:-unknown}\` / \`${RUNNER_ARCH:-unknown}\`"
+            echo "- Rust: \`$rust_channel\`"
+            echo "- nixpkgs: \`$nixpkgs_rev\`"
+            echo "- Attestation SHA-256: \`$attestation_sha\`"
+            echo
+            echo 'Correctness-only evidence; not architecture-performance evidence.'
+          } >> "$GITHUB_STEP_SUMMARY"
