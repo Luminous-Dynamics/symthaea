@@ -8,6 +8,10 @@
 //! only for crossing generic subsystem boundaries such as multimodal cognition.
 //! No digest is recomputed: each generic address carries the exact 32-byte
 //! BLAKE3-derived domain identity under an explicit semantic namespace.
+//!
+//! Observation and evidence-bundle addresses use v2 namespaces because their
+//! underlying strong IDs now include declared chemical clock-domain provenance.
+//! A v1 digest must never be silently reinterpreted as a v2 evidence contract.
 
 use std::fmt;
 
@@ -19,9 +23,9 @@ use crate::{
     ChemicalRootProjectionPolicyId,
 };
 
-pub const CHEMICAL_OBSERVATION_NAMESPACE: &str = "symthaea-chemosensation-observation-v1";
+pub const CHEMICAL_OBSERVATION_NAMESPACE: &str = "symthaea-chemosensation-observation-v2";
 pub const CHEMICAL_EVIDENCE_BUNDLE_NAMESPACE: &str =
-    "symthaea-chemosensation-evidence-bundle-v1";
+    "symthaea-chemosensation-evidence-bundle-v2";
 pub const CHEMICAL_ENCODING_SPACE_NAMESPACE: &str =
     "symthaea-chemosensation-encoding-space-v1";
 pub const CHEMICAL_ROOT_PROJECTION_POLICY_NAMESPACE: &str =
@@ -149,6 +153,8 @@ mod tests {
         assert_eq!(evidence.algorithm(), BLAKE3_256);
         assert_eq!(evidence.namespace(), CHEMICAL_EVIDENCE_BUNDLE_NAMESPACE);
         assert_eq!(space.namespace(), CHEMICAL_ENCODING_SPACE_NAMESPACE);
+        assert!(CHEMICAL_OBSERVATION_NAMESPACE.ends_with("-v2"));
+        assert!(CHEMICAL_EVIDENCE_BUNDLE_NAMESPACE.ends_with("-v2"));
     }
 
     #[test]
@@ -157,6 +163,7 @@ mod tests {
             target: ChemicalBridgeTarget::Olfactory,
             evidence_bundle_id: ChemicalEvidenceBundleId::from_bytes([1; 32]),
             encoding_space_id: ChemicalEncodingSpaceId::from_bytes([2; 32]),
+            clock_domain: None,
             binary_vector: BinaryHV::zero(),
             confidence: 0.8,
             agreement: 0.9,
@@ -191,6 +198,7 @@ mod tests {
             target: ChemicalBridgeTarget::Olfactory,
             evidence_bundle_id: ChemicalEvidenceBundleId::from_bytes([1; 32]),
             encoding_space_id: ChemicalEncodingSpaceId::from_bytes([2; 32]),
+            clock_domain: None,
             binary_vector: BinaryHV::zero(),
             confidence: 0.8,
             agreement: 0.9,
