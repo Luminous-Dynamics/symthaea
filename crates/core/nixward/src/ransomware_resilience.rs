@@ -102,6 +102,43 @@ pub enum RecoveryActionKind {
     Reinstall,
 }
 
+/// Whether the recovery action actually mutated a target.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum RecoveryExecutionMode {
+    /// The action was executed against the intended lab/host target.
+    Live,
+    /// The action was simulated or rendered without changing the target.
+    DryRun,
+    /// The producer did not establish whether mutation occurred.
+    Unknown,
+}
+
+/// Stable action-layer receipt for one recovery attempt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecoveryActionReceipt {
+    /// Caller-supplied stable locator for logs/receipts produced by the action layer.
+    pub locator: String,
+    pub execution_mode: RecoveryExecutionMode,
+    /// Runner-supplied timestamps. They are useful for measured RTO but are not
+    /// trusted wall-clock attestations by themselves.
+    pub started_at_unix_ms: Option<u64>,
+    pub finished_at_unix_ms: Option<u64>,
+}
+
+impl RecoveryActionReceipt {
+    pub fn is_addressable(&self) -> bool {
+        !self.locator.trim().is_empty()
+    }
+
+    pub fn has_valid_time_order(&self) -> bool {
+        match (self.started_at_unix_ms, self.finished_at_unix_ms) {
+            (Some(start), Some(finish)) => start <= finish,
+            _ => true,
+        }
+    }
+}
+
 /// One explicit post-recovery assertion.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PostRecoveryCheck {
@@ -130,23 +167,35 @@ pub struct HostReconstructionEvidence {
     /// Explicit checks such as service health, filesystem mount state, or application probes.
     #[serde(default)]
     pub post_checks: Vec<PostRecoveryCheck>,
-    /// Caller-supplied stable locator for logs/receipts produced by the action layer.
-    pub action_receipt: Option<String>,
+    pub action_receipt: Option<RecoveryActionReceipt>,
 }
 
 impl HostReconstructionEvidence {
     /// Evaluate reconstruction conservatively.
     ///
     /// VERIFIED requires:
+    /// - an addressable receipt proving a LIVE (not dry-run) action;
     /// - an observed post-recovery state;
     /// - exact in-sync identity under [`assess_drift`];
     /// - at least one explicit post-recovery check;
-    /// - every post-recovery check passing;
-    /// - an action receipt locator.
+    /// - every post-recovery check passing.
     ///
-    /// Any explicitly failed check or demonstrated post-state drift yields FAILED.
-    /// Missing evidence remains UNPROVEN.
+    /// A dry-run or unknown execution mode is never promoted to either VERIFIED
+    /// or FAILED because it did not establish a real host transition. Demonstrated
+    /// live post-state drift or a failed live post-check yields FAILED. Missing
+    /// evidence remains UNPROVEN.
     pub fn outcome(&self) -> ReconstructionOutcome {
+        let Some(receipt) = &self.action_receipt else {
+            return ReconstructionOutcome::Unproven;
+        };
+
+        if !receipt.is_addressable()
+            || !receipt.has_valid_time_order()
+            || receipt.execution_mode != RecoveryExecutionMode::Live
+        {
+            return ReconstructionOutcome::Unproven;
+        }
+
         if self.post_checks.iter().any(|check| !check.passed) {
             return ReconstructionOutcome::Failed;
         }
@@ -161,12 +210,36 @@ impl HostReconstructionEvidence {
             DriftAssessment::InSync => {}
         }
 
-        if self.post_checks.is_empty() || self.action_receipt.is_none() {
+        if self.post_checks.is_empty() {
             return ReconstructionOutcome::Unproven;
         }
 
         ReconstructionOutcome::Verified
     }
+}
+
+#[cfg(feature = "native")]
+/// Observe the currently activated NixOS system profile without fabricating
+/// configuration-revision or closure-digest evidence.
+///
+/// The `/run/current-system` link is the concrete activated system identity.
+/// Generation discovery is best-effort because the store path is the stronger
+/// reconstruction anchor; if generation enumeration fails, the generation field
+/// remains `None` rather than making up a value.
+pub fn observe_current_host_state() -> std::io::Result<HostStateIdentity> {
+    use crate::observe::generations::GenerationObserver;
+
+    let system_profile = std::fs::read_link("/run/current-system")?
+        .to_string_lossy()
+        .into_owned();
+    let generation = GenerationObserver::current_generation().ok();
+
+    Ok(HostStateIdentity {
+        generation,
+        system_profile,
+        configuration_revision: None,
+        closure_digest: None,
+    })
 }
 
 #[cfg(test)]
@@ -179,6 +252,15 @@ mod tests {
             system_profile: profile.to_string(),
             configuration_revision: Some("git:abc123".to_string()),
             closure_digest: Some("sha256:deadbeef".to_string()),
+        }
+    }
+
+    fn live_receipt(locator: &str) -> RecoveryActionReceipt {
+        RecoveryActionReceipt {
+            locator: locator.to_string(),
+            execution_mode: RecoveryExecutionMode::Live,
+            started_at_unix_ms: Some(1_000),
+            finished_at_unix_ms: Some(2_000),
         }
     }
 
@@ -215,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn successful_rebuild_requires_post_checks_and_receipt() {
+    fn successful_live_rebuild_requires_post_checks_and_receipt() {
         let target = state("/nix/store/system-a");
         let evidence = HostReconstructionEvidence {
             action: RecoveryActionKind::RebuildSwitch,
@@ -227,14 +309,35 @@ mod tests {
                 passed: true,
                 detail: "HTTP probe returned expected response".to_string(),
             }],
-            action_receipt: Some("nixward-action:run-001".to_string()),
+            action_receipt: Some(live_receipt("nixward-action:run-001")),
         };
 
         assert_eq!(evidence.outcome(), ReconstructionOutcome::Verified);
     }
 
     #[test]
-    fn failed_post_check_fails_reconstruction() {
+    fn dry_run_cannot_verify_reconstruction() {
+        let target = state("/nix/store/system-a");
+        let mut receipt = live_receipt("nixward-action:dry-run-001");
+        receipt.execution_mode = RecoveryExecutionMode::DryRun;
+        let evidence = HostReconstructionEvidence {
+            action: RecoveryActionKind::RebuildSwitch,
+            before: state("/nix/store/system-b"),
+            target: target.clone(),
+            after: Some(target),
+            post_checks: vec![PostRecoveryCheck {
+                name: "synthetic-health".to_string(),
+                passed: true,
+                detail: String::new(),
+            }],
+            action_receipt: Some(receipt),
+        };
+
+        assert_eq!(evidence.outcome(), ReconstructionOutcome::Unproven);
+    }
+
+    #[test]
+    fn failed_live_post_check_fails_reconstruction() {
         let target = state("/nix/store/system-a");
         let evidence = HostReconstructionEvidence {
             action: RecoveryActionKind::Rollback,
@@ -246,7 +349,7 @@ mod tests {
                 passed: false,
                 detail: "integrity probe failed".to_string(),
             }],
-            action_receipt: Some("nixward-action:run-002".to_string()),
+            action_receipt: Some(live_receipt("nixward-action:run-002")),
         };
 
         assert_eq!(evidence.outcome(), ReconstructionOutcome::Failed);
@@ -261,7 +364,29 @@ mod tests {
             target: target.clone(),
             after: Some(target),
             post_checks: Vec::new(),
-            action_receipt: Some("spore:install-001".to_string()),
+            action_receipt: Some(live_receipt("spore:install-001")),
+        };
+
+        assert_eq!(evidence.outcome(), ReconstructionOutcome::Unproven);
+    }
+
+    #[test]
+    fn reversed_receipt_timestamps_are_unproven() {
+        let target = state("/nix/store/system-a");
+        let mut receipt = live_receipt("nixward-action:run-003");
+        receipt.started_at_unix_ms = Some(2_000);
+        receipt.finished_at_unix_ms = Some(1_000);
+        let evidence = HostReconstructionEvidence {
+            action: RecoveryActionKind::Rollback,
+            before: state("/nix/store/system-b"),
+            target: target.clone(),
+            after: Some(target),
+            post_checks: vec![PostRecoveryCheck {
+                name: "critical-service-health".to_string(),
+                passed: true,
+                detail: String::new(),
+            }],
+            action_receipt: Some(receipt),
         };
 
         assert_eq!(evidence.outcome(), ReconstructionOutcome::Unproven);
