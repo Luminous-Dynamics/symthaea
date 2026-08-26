@@ -18,25 +18,44 @@
 #![deny(unsafe_code)]
 
 pub mod calibration;
+pub mod cognition;
 pub mod encoding;
 pub mod fingerprint;
+pub mod flavor;
 pub mod gustation;
+pub mod novelty;
 pub mod observation;
 pub mod olfaction;
+pub mod percept;
+pub mod temporal;
 
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
+pub use cognition::{
+    ChemicalCognitionError, ChemicalCognitionPipeline, CognitiveChemicalPercept,
+};
 pub use encoding::ScalarHdcEncoder;
 pub use fingerprint::{
     ChannelEncodingSpec, ChemicalFingerprint, ChemicalFingerprintEncoder, FingerprintConfigError,
     FingerprintError,
 };
+pub use flavor::{
+    FlavorBinder, FlavorBindingConfig, FlavorBindingError, FlavorConfigError, FlavorPercept,
+};
 pub use gustation::{
     ElectronicTongueSimulator, GustatorySimulationError, GustatoryStimulus,
     PotentiometricChannelModel,
+};
+pub use novelty::{
+    ChemicalMemoryReference, ChemicalNoveltyConfig, ChemicalNoveltyMemory, NoveltyAssessment,
+    NoveltyConfigError,
 };
 pub use observation::{
     ChemicalChannel, ChemicalModality, ChemicalObservation, EnvironmentReading, MeasurementUnit,
 };
 pub use olfaction::{
     MoxArraySimulator, MoxChannelModel, OlfactorySimulationError, OlfactoryStimulus,
+};
+pub use percept::{ChemicalPercept, ChemicalPerceptEncoder};
+pub use temporal::{
+    ChemicalTemporalContext, ChemicalTemporalTracker, TemporalConfigError, TemporalError,
 };
