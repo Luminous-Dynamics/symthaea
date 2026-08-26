@@ -6,6 +6,7 @@
 //! Provides mechanisms for binding information across different modalities
 //! (vision, audio, text, etc.) into unified conscious representations.
 
+use super::modality_identity::modality_seed;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -118,7 +119,7 @@ impl ModalityChannel {
         }
         // Add noise inversely proportional to attention
         let noise_level = (1.0 - self.attention) as f32 * 0.3;
-        self.features.add_noise(noise_level, self.modality as u64)
+        self.features.add_noise(noise_level, modality_seed(self.modality))
     }
 
     /// Compute temporal coherence (similarity between recent representations)

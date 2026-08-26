@@ -13,6 +13,7 @@
 //! 3. **Primitive Routing**: Routes the current unified representation.
 //! 4. **Consciousness Streaming**: Emits multi-modal awareness events.
 
+use super::modality_identity::modality_seed;
 use crate::consciousness::cross_modal_binding::{
     ConvergenceLevel, ConvergenceZone, EpisodicBuffer, Modality, ModalityChannel,
 };
@@ -328,7 +329,7 @@ impl MultiModalIntegrator {
                     channel.features
                 } else {
                     let noise_level = (1.0 - effective_attention) as f32 * 0.3;
-                    channel.features.add_noise(noise_level, *modality as u64)
+                    channel.features.add_noise(noise_level, modality_seed(*modality))
                 };
                 Some((*modality, attended))
             })
