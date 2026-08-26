@@ -47,7 +47,7 @@ pub use gustation::{
     PotentiometricChannelModel,
 };
 pub use multimodal_bridge::{
-    ChemicalBridgeTarget, ChemicalModalBridge, ChemicalModalBridgeConfig,
+    ChemicalBridgeComponent, ChemicalBridgeTarget, ChemicalModalBridge, ChemicalModalBridgeConfig,
     ChemicalModalBridgeError, ChemicalModalBridgeInput,
 };
 pub use novelty::{
