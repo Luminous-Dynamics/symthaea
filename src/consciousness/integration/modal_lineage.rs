@@ -27,7 +27,9 @@ pub enum ModalLineageError {
 impl fmt::Display for ModalLineageError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::EmptyEvidence => write!(f, "modal lineage requires at least one evidence reference"),
+            Self::EmptyEvidence => {
+                write!(f, "modal lineage requires at least one evidence reference")
+            }
         }
     }
 }
@@ -226,17 +228,9 @@ mod tests {
         });
         assert!(serde_json::from_value::<ModalLineageReceipt>(empty).is_err());
 
-        let unknown = serde_json::json!({
-            "evidence": [{
-                "algorithm": "blake3-256",
-                "namespace": "symthaea-evidence-v1",
-                "digest": [1; 32]
-            }],
-            "input_space": null,
-            "transforms": [],
-            "output_space": null,
-            "trust": 1.0
-        });
+        let valid = ModalLineageReceipt::from_single_evidence(address("symthaea-evidence-v1", 1));
+        let mut unknown = serde_json::to_value(valid).unwrap();
+        unknown["trust"] = serde_json::Value::from(1.0);
         assert!(serde_json::from_value::<ModalLineageReceipt>(unknown).is_err());
     }
 }
