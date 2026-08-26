@@ -21,11 +21,11 @@
 
 use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
 
-use crate::{
-    ChemicalBridgeTarget, ChemicalEncodingSpaceId, ChemicalEvidenceBundleId,
-    ChemicalModalBridgeInput, ChemicalModality,
-};
 use crate::projection_geometry::{exact_cosine, validate_non_degenerate};
+use crate::{
+    ChemicalBridgeTarget, ChemicalClockDomainId, ChemicalEncodingSpaceId,
+    ChemicalEvidenceBundleId, ChemicalModalBridgeInput, ChemicalModality,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ChemicalRootProjectionConfig {
@@ -65,6 +65,15 @@ pub enum ChemicalRootProjectionError {
         expected: ChemicalModality,
         actual: ChemicalModality,
     },
+    MissingSharedClockDomain,
+    MixedClockDomains {
+        expected: ChemicalClockDomainId,
+        actual: ChemicalClockDomainId,
+    },
+    ClockDomainMismatch {
+        expected: Option<ChemicalClockDomainId>,
+        actual: Option<ChemicalClockDomainId>,
+    },
     TimestampEnvelopeMismatch {
         expected_earliest_us: u64,
         actual_earliest_us: u64,
@@ -98,12 +107,15 @@ pub struct ChemicalProjectionQuality {
 ///
 /// `binary_vector` is a derived transport/integration representation. The raw
 /// evidence identity and continuous encoding-space identity remain authoritative
-/// provenance for the source percept.
+/// provenance for the source percept. `clock_domain` names the timebase of the
+/// timestamp envelope when one is declared; it is not a synchronization-quality
+/// or authenticity claim.
 #[derive(Clone, PartialEq)]
 pub struct ChemicalRootProjection {
     pub target: ChemicalBridgeTarget,
     pub evidence_bundle_id: ChemicalEvidenceBundleId,
     pub encoding_space_id: ChemicalEncodingSpaceId,
+    pub clock_domain: Option<ChemicalClockDomainId>,
     pub binary_vector: BinaryHV,
     pub confidence: f32,
     pub agreement: f32,
@@ -146,9 +158,9 @@ impl ChemicalRootProjector {
     ///
     /// Because `ChemicalModalBridgeInput` is a public struct, this method does
     /// not blindly trust its receipt fields. It revalidates the evidence bundle,
-    /// encoding-space consistency, modality consistency, timestamp envelope,
-    /// confidence bounds, vector dimensionality, finite numeric content, and
-    /// non-degenerate geometry before quantization.
+    /// encoding-space consistency, modality consistency, clock-domain consistency,
+    /// timestamp envelope, confidence bounds, vector dimensionality, finite
+    /// numeric content, and non-degenerate geometry before quantization.
     pub fn project(
         &self,
         input: &ChemicalModalBridgeInput,
@@ -166,6 +178,7 @@ impl ChemicalRootProjector {
             target: input.target,
             evidence_bundle_id: input.evidence_bundle_id,
             encoding_space_id: input.encoding_space_id,
+            clock_domain: input.clock_domain.clone(),
             binary_vector,
             confidence: input.confidence,
             agreement: input.agreement,
@@ -184,7 +197,8 @@ impl ChemicalRootProjector {
     ///
     /// Pair comparison is only meaningful for the same modality target and same
     /// continuous encoding coordinate system. Both similarities are fixed,
-    /// full-resolution cosine measurements on the same [-1, 1] scale.
+    /// full-resolution cosine measurements on the same [-1, 1] scale. This
+    /// geometric comparison does not infer temporal simultaneity between the pair.
     pub fn assess_pair(
         &self,
         left: &ChemicalModalBridgeInput,
@@ -279,6 +293,14 @@ fn validate_bridge_input(
         }
     }
 
+    let expected_clock_domain = expected_clock_domain(&input.components)?;
+    if expected_clock_domain != input.clock_domain {
+        return Err(ChemicalRootProjectionError::ClockDomainMismatch {
+            expected: expected_clock_domain,
+            actual: input.clock_domain.clone(),
+        });
+    }
+
     let expected_earliest_us = input
         .components
         .iter()
@@ -305,12 +327,44 @@ fn validate_bridge_input(
     Ok(())
 }
 
+fn expected_clock_domain(
+    components: &[crate::ChemicalPercept],
+) -> Result<Option<ChemicalClockDomainId>, ChemicalRootProjectionError> {
+    let first = components
+        .first()
+        .ok_or(ChemicalRootProjectionError::EmptyComponents)?;
+    if components.len() == 1 {
+        return Ok(first.evidence.clock_domain.clone());
+    }
+
+    let expected = first
+        .evidence
+        .clock_domain
+        .clone()
+        .ok_or(ChemicalRootProjectionError::MissingSharedClockDomain)?;
+    for component in components.iter().skip(1) {
+        let actual = component
+            .evidence
+            .clock_domain
+            .clone()
+            .ok_or(ChemicalRootProjectionError::MissingSharedClockDomain)?;
+        if actual != expected {
+            return Err(ChemicalRootProjectionError::MixedClockDomains {
+                expected,
+                actual,
+            });
+        }
+    }
+    Ok(Some(expected))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
-        CalibrationState, ChannelEncodingSpec, ChemicalChannel, ChemicalFingerprintEncoder,
-        ChemicalModalBridge, ChemicalObservation, ChemicalPercept, MeasurementUnit, SensorHealth,
+        CalibrationState, ChannelEncodingSpec, ChemicalChannel, ChemicalClockDomainId,
+        ChemicalFingerprintEncoder, ChemicalModalBridge, ChemicalObservation, ChemicalPercept,
+        MeasurementUnit, SensorHealth,
     };
     use symthaea_core::hdc::unified_hv::ContinuousHV;
 
@@ -367,6 +421,7 @@ mod tests {
         assert_eq!(projected.target, ChemicalBridgeTarget::Olfactory);
         assert_eq!(projected.evidence_bundle_id, input.evidence_bundle_id);
         assert_eq!(projected.encoding_space_id, input.encoding_space_id);
+        assert_eq!(projected.clock_domain, input.clock_domain);
         assert_eq!(projected.component_count, 1);
         assert_eq!(projected.quality.threshold, 0.0);
         assert!(projected.quality.source_to_bipolar_similarity > 0.0);
@@ -420,6 +475,16 @@ mod tests {
         assert!(matches!(
             ChemicalRootProjector::default().project(&input),
             Err(ChemicalRootProjectionError::EncodingSpaceMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn forged_clock_domain_is_rejected_before_projection() {
+        let mut input = bridge_input(50.0, 10);
+        input.clock_domain = Some(ChemicalClockDomainId::unix_epoch());
+        assert!(matches!(
+            ChemicalRootProjector::default().project(&input),
+            Err(ChemicalRootProjectionError::ClockDomainMismatch { .. })
         ));
     }
 
