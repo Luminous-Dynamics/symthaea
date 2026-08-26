@@ -5,14 +5,14 @@
 //!
 //! A flavor percept is created only when one trustworthy olfactory percept and
 //! one trustworthy gustatory percept are close enough in time to plausibly
-//! belong to the same sampling episode and share one HDC coordinate system. The
-//! original evidence from both senses remains attached to the derived flavor
-//! representation.
+//! belong to the same sampling episode, share one declared clock domain, and
+//! share one HDC coordinate system. The original evidence from both senses
+//! remains attached to the derived flavor representation.
 
 use blake3::Hasher;
 use symthaea_core::hdc::{HDC_DIMENSION, unified_hv::ContinuousHV};
 
-use crate::{ChemicalEncodingSpaceId, ChemicalModality, ChemicalPercept};
+use crate::{ChemicalClockDomainId, ChemicalEncodingSpaceId, ChemicalModality, ChemicalPercept};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlavorBindingConfig {
@@ -36,12 +36,17 @@ pub enum FlavorConfigError {
     InvalidMinimumConfidence(f32),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlavorBindingError {
     DuplicateModality(ChemicalModality),
     EncodingSpaceMismatch {
         olfactory: ChemicalEncodingSpaceId,
         gustatory: ChemicalEncodingSpaceId,
+    },
+    MissingClockDomain(ChemicalModality),
+    ClockDomainMismatch {
+        olfactory: ChemicalClockDomainId,
+        gustatory: ChemicalClockDomainId,
     },
     TemporalSkew {
         skew_us: u64,
@@ -49,8 +54,8 @@ pub enum FlavorBindingError {
     },
     LowConfidence {
         modality: ChemicalModality,
-        confidence: f32,
-        minimum: f32,
+        confidence_bits: u32,
+        minimum_bits: u32,
     },
 }
 
@@ -65,6 +70,9 @@ pub struct FlavorPercept {
     /// source space plus the flavor binder's role vectors, so a flavor vector is
     /// never advertised as interchangeable with a raw chemical fingerprint.
     pub encoding_space_id: ChemicalEncodingSpaceId,
+    /// Declared common timebase under which `temporal_skew_us` is meaningful.
+    /// This is not an accuracy or synchronization-quality claim.
+    pub clock_domain: ChemicalClockDomainId,
     /// Conservative joint confidence: the weaker modality limits the pair.
     pub confidence: f32,
     pub temporal_skew_us: u64,
@@ -98,7 +106,9 @@ impl FlavorBinder {
     /// Bind one olfactory and one gustatory percept into a flavor percept.
     ///
     /// Argument order is intentionally irrelevant. Validation completes before
-    /// constructing the derived representation.
+    /// constructing the derived representation. Timestamp skew is never
+    /// interpreted until both inputs prove membership in one declared clock
+    /// domain.
     pub fn bind(
         &self,
         first: &ChemicalPercept,
@@ -132,10 +142,31 @@ impl FlavorBinder {
             if percept.confidence() < self.config.min_confidence {
                 return Err(FlavorBindingError::LowConfidence {
                     modality: percept.evidence.modality,
-                    confidence: percept.confidence(),
-                    minimum: self.config.min_confidence,
+                    confidence_bits: percept.confidence().to_bits(),
+                    minimum_bits: self.config.min_confidence.to_bits(),
                 });
             }
+        }
+
+        let olfactory_clock = olfactory
+            .evidence
+            .clock_domain
+            .clone()
+            .ok_or(FlavorBindingError::MissingClockDomain(
+                ChemicalModality::Olfactory,
+            ))?;
+        let gustatory_clock = gustatory
+            .evidence
+            .clock_domain
+            .clone()
+            .ok_or(FlavorBindingError::MissingClockDomain(
+                ChemicalModality::Gustatory,
+            ))?;
+        if olfactory_clock != gustatory_clock {
+            return Err(FlavorBindingError::ClockDomainMismatch {
+                olfactory: olfactory_clock,
+                gustatory: gustatory_clock,
+            });
         }
 
         let temporal_skew_us = olfactory.timestamp_us().abs_diff(gustatory.timestamp_us());
@@ -162,6 +193,7 @@ impl FlavorBinder {
             vector,
             source_encoding_space_id: olfactory_space,
             encoding_space_id,
+            clock_domain: olfactory_clock,
             confidence: olfactory.confidence().min(gustatory.confidence()),
             temporal_skew_us,
         })
@@ -191,7 +223,11 @@ fn hash_hv(hasher: &mut Hasher, hv: &ContinuousHV) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ChemicalFingerprint, ChemicalObservation, EnvironmentReading};
+    use crate::{ChemicalFingerprint, ChemicalObservation};
+
+    fn test_clock() -> ChemicalClockDomainId {
+        ChemicalClockDomainId::new("test-rig/monotonic").unwrap()
+    }
 
     fn percept(
         modality: ChemicalModality,
@@ -200,13 +236,13 @@ mod tests {
         confidence: f32,
     ) -> ChemicalPercept {
         ChemicalPercept {
-            evidence: ChemicalObservation {
+            evidence: ChemicalObservation::new(
                 timestamp_us,
                 modality,
-                source: format!("source-{seed}"),
-                channels: vec![],
-                environment: EnvironmentReading::default(),
-            },
+                format!("source-{seed}"),
+                vec![],
+            )
+            .with_clock_domain(test_clock()),
             fingerprint: ChemicalFingerprint {
                 vector: ContinuousHV::random(HDC_DIMENSION, seed),
                 confidence,
@@ -226,6 +262,7 @@ mod tests {
         let reverse = binder.bind(&taste, &odor).unwrap();
         assert_eq!(forward.vector, reverse.vector);
         assert_eq!(forward.encoding_space_id, reverse.encoding_space_id);
+        assert_eq!(forward.clock_domain, test_clock());
         assert_eq!(forward.olfactory.evidence, odor.evidence);
         assert_eq!(forward.gustatory.evidence, taste.evidence);
         assert_eq!(
@@ -258,6 +295,33 @@ mod tests {
         assert!(matches!(
             binder.bind(&odor, &taste),
             Err(FlavorBindingError::EncodingSpaceMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn missing_clock_domain_blocks_temporal_binding() {
+        let binder = FlavorBinder::new(FlavorBindingConfig::default()).unwrap();
+        let odor = percept(ChemicalModality::Olfactory, 1, 1, 0.9);
+        let mut taste = percept(ChemicalModality::Gustatory, 2, 2, 0.9);
+        taste.evidence.clock_domain = None;
+        assert!(matches!(
+            binder.bind(&odor, &taste),
+            Err(FlavorBindingError::MissingClockDomain(
+                ChemicalModality::Gustatory
+            ))
+        ));
+    }
+
+    #[test]
+    fn mixed_clock_domains_are_not_interpreted_as_temporal_skew() {
+        let binder = FlavorBinder::new(FlavorBindingConfig::default()).unwrap();
+        let odor = percept(ChemicalModality::Olfactory, 1, 1, 0.9);
+        let mut taste = percept(ChemicalModality::Gustatory, 2, 2, 0.9);
+        taste.evidence.clock_domain =
+            Some(ChemicalClockDomainId::new("other-rig/monotonic").unwrap());
+        assert!(matches!(
+            binder.bind(&odor, &taste),
+            Err(FlavorBindingError::ClockDomainMismatch { .. })
         ));
     }
 
