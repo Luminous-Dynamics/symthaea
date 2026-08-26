@@ -35,10 +35,12 @@ pub struct ChemicalChannel {
 }
 
 impl ChemicalChannel {
-    pub fn calibrated_value(&self) -> f32 {
+    /// Calibrated value when both measurement and calibration are valid.
+    pub fn calibrated_value(&self) -> Option<f32> {
         self.calibration.apply(self.raw_value)
     }
 
+    /// Confidence contribution in [0, 1]. Invalid numeric state is pessimistic.
     pub fn effective_confidence(&self) -> f32 {
         self.health.confidence_factor() * (1.0 - self.calibration.normalized_drift())
     }
@@ -119,7 +121,12 @@ mod tests {
     fn raw_measurement_is_preserved_while_calibrated_view_is_derived() {
         let c = channel(3.0);
         assert!((c.raw_value - 3.0).abs() < 1e-6);
-        assert!((c.calibrated_value() - 4.0).abs() < 1e-6);
+        assert!((c.calibrated_value().unwrap() - 4.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn corrupt_raw_measurement_does_not_gain_a_calibrated_value() {
+        assert!(channel(f32::NAN).calibrated_value().is_none());
     }
 
     #[test]

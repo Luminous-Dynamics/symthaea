@@ -26,7 +26,10 @@ pub mod olfaction;
 
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
 pub use encoding::ScalarHdcEncoder;
-pub use fingerprint::{ChannelEncodingSpec, ChemicalFingerprintEncoder};
+pub use fingerprint::{
+    ChannelEncodingSpec, ChemicalFingerprint, ChemicalFingerprintEncoder, FingerprintConfigError,
+    FingerprintError,
+};
 pub use gustation::{
     ElectronicTongueSimulator, GustatoryStimulus, PotentiometricChannelModel,
 };

@@ -3,15 +3,16 @@
 
 //! Role-bound HDC fingerprints for calibrated chemical observations.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
+use symthaea_core::hdc::{HDC_DIMENSION, unified_hv::ContinuousHV};
 
-use crate::{ChemicalModality, ChemicalObservation, ScalarHdcEncoder};
+use crate::{ChemicalModality, ChemicalObservation, MeasurementUnit, ScalarHdcEncoder};
 
 #[derive(Debug, Clone)]
 pub struct ChannelEncodingSpec {
     pub name: String,
+    pub unit: MeasurementUnit,
     pub scalar: ScalarHdcEncoder,
     role: ContinuousHV,
 }
@@ -19,6 +20,7 @@ pub struct ChannelEncodingSpec {
 impl ChannelEncodingSpec {
     pub fn new(
         name: impl Into<String>,
+        unit: MeasurementUnit,
         min: f32,
         max: f32,
         anchor_count: usize,
@@ -27,10 +29,36 @@ impl ChannelEncodingSpec {
     ) -> Self {
         Self {
             name: name.into(),
+            unit,
             scalar: ScalarHdcEncoder::new(min, max, anchor_count, scalar_seed),
             role: ContinuousHV::random(HDC_DIMENSION, role_seed),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FingerprintConfigError {
+    DuplicateChannelSpec(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FingerprintError {
+    DuplicateChannel(String),
+    UnitMismatch {
+        channel: String,
+        expected: MeasurementUnit,
+        actual: MeasurementUnit,
+    },
+    InvalidMeasurement(String),
+}
+
+/// Derived chemical representation plus evidence-quality metadata.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChemicalFingerprint {
+    pub vector: ContinuousHV,
+    pub confidence: f32,
+    pub used_channels: usize,
+    pub ignored_channels: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -41,15 +69,20 @@ pub struct ChemicalFingerprintEncoder {
 }
 
 impl ChemicalFingerprintEncoder {
-    pub fn new(specs: Vec<ChannelEncodingSpec>) -> Self {
-        Self {
-            specs: specs
-                .into_iter()
-                .map(|spec| (spec.name.clone(), spec))
-                .collect(),
+    pub fn new(specs: Vec<ChannelEncodingSpec>) -> Result<Self, FingerprintConfigError> {
+        let mut by_name = HashMap::with_capacity(specs.len());
+        for spec in specs {
+            let name = spec.name.clone();
+            if by_name.insert(name.clone(), spec).is_some() {
+                return Err(FingerprintConfigError::DuplicateChannelSpec(name));
+            }
+        }
+
+        Ok(Self {
+            specs: by_name,
             olfactory_role: ContinuousHV::random(HDC_DIMENSION, 0x0F1A_C700_0000_0001),
             gustatory_role: ContinuousHV::random(HDC_DIMENSION, 0x0F1A_C700_0000_0002),
-        }
+        })
     }
 
     pub fn configured_channels(&self) -> usize {
@@ -60,28 +93,59 @@ impl ChemicalFingerprintEncoder {
     /// fingerprint. Raw observations remain unchanged and should be retained as
     /// evidence/provenance alongside this derived representation.
     ///
-    /// Channels without an encoding spec are ignored. Returns `None` if no
-    /// configured channel is present in the observation.
-    pub fn encode(&self, observation: &ChemicalObservation) -> Option<ContinuousHV> {
-        let mut channels: Vec<_> = observation
-            .channels
-            .iter()
-            .filter_map(|channel| self.specs.get(&channel.name).map(|spec| (channel, spec)))
-            .collect();
+    /// Unknown channels are ignored for forward-compatible sensor arrays. A
+    /// configured channel with a wrong unit, duplicate name, or invalid numeric
+    /// measurement is an integrity error and is never silently coerced.
+    pub fn encode(
+        &self,
+        observation: &ChemicalObservation,
+    ) -> Result<Option<ChemicalFingerprint>, FingerprintError> {
+        let mut channels: Vec<_> = observation.channels.iter().collect();
+        channels.sort_by(|a, b| a.name.cmp(&b.name));
 
-        // Make the fingerprint independent of hardware/driver channel ordering.
-        channels.sort_by(|(a, _), (b, _)| a.name.cmp(&b.name));
+        let mut seen = HashSet::with_capacity(channels.len());
+        let mut bound = Vec::new();
+        let mut confidences = Vec::new();
+        let mut ignored_channels = 0usize;
 
-        let bound: Vec<ContinuousHV> = channels
-            .into_iter()
-            .map(|(channel, spec)| {
-                let value_hv = spec.scalar.encode(channel.calibrated_value());
-                spec.role.bind(&value_hv)
-            })
-            .collect();
+        for channel in channels {
+            if !seen.insert(channel.name.as_str()) {
+                return Err(FingerprintError::DuplicateChannel(channel.name.clone()));
+            }
+
+            let Some(spec) = self.specs.get(&channel.name) else {
+                ignored_channels += 1;
+                continue;
+            };
+
+            if channel.unit != spec.unit {
+                return Err(FingerprintError::UnitMismatch {
+                    channel: channel.name.clone(),
+                    expected: spec.unit,
+                    actual: channel.unit,
+                });
+            }
+
+            let value = channel
+                .calibrated_value()
+                .ok_or_else(|| FingerprintError::InvalidMeasurement(channel.name.clone()))?;
+            let value_hv = spec
+                .scalar
+                .encode(value)
+                .ok_or_else(|| FingerprintError::InvalidMeasurement(channel.name.clone()))?;
+            let confidence = channel.effective_confidence();
+
+            if confidence <= 0.0 {
+                ignored_channels += 1;
+                continue;
+            }
+
+            bound.push(spec.role.bind(&value_hv).scale(confidence));
+            confidences.push(confidence);
+        }
 
         if bound.is_empty() {
-            return None;
+            return Ok(None);
         }
 
         let refs: Vec<&ContinuousHV> = bound.iter().collect();
@@ -91,18 +155,23 @@ impl ChemicalFingerprintEncoder {
             ChemicalModality::Gustatory => &self.gustatory_role,
         };
 
-        let mut fingerprint = modality_role.bind(&bundled);
-        fingerprint.l2_normalize();
-        Some(fingerprint)
+        let mut vector = modality_role.bind(&bundled);
+        vector.l2_normalize();
+        let confidence = confidences.iter().sum::<f32>() / confidences.len() as f32;
+
+        Ok(Some(ChemicalFingerprint {
+            vector,
+            confidence,
+            used_channels: confidences.len(),
+            ignored_channels,
+        }))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        CalibrationState, ChemicalChannel, ChemicalObservation, MeasurementUnit, SensorHealth,
-    };
+    use crate::{CalibrationState, ChemicalChannel, ChemicalObservation, SensorHealth};
 
     fn channel(name: &str, raw: f32) -> ChemicalChannel {
         ChemicalChannel {
@@ -114,11 +183,21 @@ mod tests {
         }
     }
 
+    fn spec(name: &str, scalar_seed: u64, role_seed: u64) -> ChannelEncodingSpec {
+        ChannelEncodingSpec::new(
+            name,
+            MeasurementUnit::Arbitrary,
+            0.0,
+            100.0,
+            16,
+            scalar_seed,
+            role_seed,
+        )
+    }
+
     fn encoder() -> ChemicalFingerprintEncoder {
-        ChemicalFingerprintEncoder::new(vec![
-            ChannelEncodingSpec::new("a", 0.0, 100.0, 16, 11, 101),
-            ChannelEncodingSpec::new("b", 0.0, 100.0, 16, 12, 102),
-        ])
+        ChemicalFingerprintEncoder::new(vec![spec("a", 11, 101), spec("b", 12, 102)])
+            .unwrap()
     }
 
     #[test]
@@ -142,9 +221,7 @@ mod tests {
 
     #[test]
     fn nearby_chemistry_is_more_similar_than_distant_chemistry() {
-        let encoder = ChemicalFingerprintEncoder::new(vec![ChannelEncodingSpec::new(
-            "a", 0.0, 100.0, 16, 11, 101,
-        )]);
+        let encoder = ChemicalFingerprintEncoder::new(vec![spec("a", 11, 101)]).unwrap();
         let observation = |value| {
             ChemicalObservation::new(
                 0,
@@ -154,10 +231,10 @@ mod tests {
             )
         };
 
-        let center = encoder.encode(&observation(50.0)).unwrap();
-        let near = encoder.encode(&observation(51.0)).unwrap();
-        let far = encoder.encode(&observation(90.0)).unwrap();
-        assert!(center.similarity(&near) > center.similarity(&far));
+        let center = encoder.encode(&observation(50.0)).unwrap().unwrap();
+        let near = encoder.encode(&observation(51.0)).unwrap().unwrap();
+        let far = encoder.encode(&observation(90.0)).unwrap().unwrap();
+        assert!(center.vector.similarity(&near.vector) > center.vector.similarity(&far.vector));
     }
 
     #[test]
@@ -176,9 +253,9 @@ mod tests {
             vec![channel("a", 20.0)],
         );
 
-        let odor_hv = encoder.encode(&odor).unwrap();
-        let taste_hv = encoder.encode(&taste).unwrap();
-        assert!(odor_hv.similarity(&taste_hv) < 0.5);
+        let odor_hv = encoder.encode(&odor).unwrap().unwrap();
+        let taste_hv = encoder.encode(&taste).unwrap().unwrap();
+        assert!(odor_hv.vector.similarity(&taste_hv.vector) < 0.5);
     }
 
     #[test]
@@ -190,6 +267,86 @@ mod tests {
             "sensor",
             vec![channel("unknown", 20.0)],
         );
-        assert!(encoder.encode(&observation).is_none());
+        assert!(encoder.encode(&observation).unwrap().is_none());
+    }
+
+    #[test]
+    fn unit_mismatch_is_an_integrity_error() {
+        let encoder = encoder();
+        let mut wrong = channel("a", 20.0);
+        wrong.unit = MeasurementUnit::Ohms;
+        let observation = ChemicalObservation::new(
+            0,
+            ChemicalModality::Olfactory,
+            "sensor",
+            vec![wrong],
+        );
+        assert!(matches!(
+            encoder.encode(&observation),
+            Err(FingerprintError::UnitMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn duplicate_channel_specs_are_rejected() {
+        assert!(matches!(
+            ChemicalFingerprintEncoder::new(vec![spec("a", 11, 101), spec("a", 12, 102)]),
+            Err(FingerprintConfigError::DuplicateChannelSpec(name)) if name == "a"
+        ));
+    }
+
+    #[test]
+    fn duplicate_observation_channels_are_rejected() {
+        let encoder = encoder();
+        let observation = ChemicalObservation::new(
+            0,
+            ChemicalModality::Olfactory,
+            "sensor",
+            vec![channel("a", 20.0), channel("a", 21.0)],
+        );
+        assert!(matches!(
+            encoder.encode(&observation),
+            Err(FingerprintError::DuplicateChannel(name)) if name == "a"
+        ));
+    }
+
+    #[test]
+    fn invalid_measurement_is_not_collapsed_to_range_endpoint() {
+        let encoder = encoder();
+        let observation = ChemicalObservation::new(
+            0,
+            ChemicalModality::Olfactory,
+            "sensor",
+            vec![channel("a", f32::NAN)],
+        );
+        assert!(matches!(
+            encoder.encode(&observation),
+            Err(FingerprintError::InvalidMeasurement(name)) if name == "a"
+        ));
+    }
+
+    #[test]
+    fn zero_confidence_channels_do_not_influence_fingerprint() {
+        let encoder = encoder();
+        let only_a = ChemicalObservation::new(
+            0,
+            ChemicalModality::Olfactory,
+            "sensor",
+            vec![channel("a", 20.0)],
+        );
+        let mut dead_b = channel("b", 90.0);
+        dead_b.health.score = 0.0;
+        let with_dead_b = ChemicalObservation::new(
+            0,
+            ChemicalModality::Olfactory,
+            "sensor",
+            vec![channel("a", 20.0), dead_b],
+        );
+
+        let baseline = encoder.encode(&only_a).unwrap().unwrap();
+        let hardened = encoder.encode(&with_dead_b).unwrap().unwrap();
+        assert_eq!(baseline.vector, hardened.vector);
+        assert_eq!(hardened.used_channels, 1);
+        assert_eq!(hardened.ignored_channels, 1);
     }
 }

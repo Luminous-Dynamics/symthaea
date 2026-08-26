@@ -38,13 +38,31 @@ impl CalibrationState {
         }
     }
 
-    /// Apply baseline/gain calibration without mutating the raw observation.
-    pub fn apply(&self, raw: f32) -> f32 {
-        (raw - self.baseline) * self.gain
+    /// Whether the numeric calibration parameters are finite.
+    pub fn is_valid(&self) -> bool {
+        self.baseline.is_finite() && self.gain.is_finite() && self.drift.is_finite()
     }
 
+    /// Apply baseline/gain calibration without mutating the raw observation.
+    ///
+    /// Invalid calibration or measurement values yield `None` rather than
+    /// fabricating a plausible numeric result.
+    pub fn apply(&self, raw: f32) -> Option<f32> {
+        if !raw.is_finite() || !self.is_valid() {
+            return None;
+        }
+        let calibrated = (raw - self.baseline) * self.gain;
+        calibrated.is_finite().then_some(calibrated)
+    }
+
+    /// Drift normalized to [0, 1]. Invalid drift is treated as maximally
+    /// uncertain rather than optimistically trusted.
     pub fn normalized_drift(&self) -> f32 {
-        self.drift.clamp(0.0, 1.0)
+        if self.drift.is_finite() {
+            self.drift.clamp(0.0, 1.0)
+        } else {
+            1.0
+        }
     }
 }
 
@@ -71,12 +89,17 @@ impl Default for SensorHealth {
 
 impl SensorHealth {
     pub fn confidence_factor(&self) -> f32 {
+        let score = if self.score.is_finite() {
+            self.score.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         let penalty = if self.saturated || self.contaminated {
             0.5
         } else {
             1.0
         };
-        self.score.clamp(0.0, 1.0) * penalty
+        score * penalty
     }
 }
 
@@ -87,7 +110,7 @@ mod tests {
     #[test]
     fn identity_calibration_is_noop() {
         let c = CalibrationState::identity("factory-v1");
-        assert!((c.apply(2.5) - 2.5).abs() < 1e-6);
+        assert!((c.apply(2.5).unwrap() - 2.5).abs() < 1e-6);
     }
 
     #[test]
@@ -98,8 +121,27 @@ mod tests {
             gain: 2.0,
             drift: 0.2,
         };
-        assert!((c.apply(2.5) - 3.0).abs() < 1e-6);
+        assert!((c.apply(2.5).unwrap() - 3.0).abs() < 1e-6);
         assert!((c.normalized_drift() - 0.2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn non_finite_calibration_never_produces_fake_value() {
+        let c = CalibrationState {
+            id: CalibrationId::new("bad"),
+            baseline: f32::NAN,
+            gain: 1.0,
+            drift: 0.0,
+        };
+        assert!(c.apply(2.5).is_none());
+        assert!(CalibrationState::identity("ok").apply(f32::INFINITY).is_none());
+    }
+
+    #[test]
+    fn invalid_drift_is_maximally_uncertain() {
+        let mut c = CalibrationState::identity("bad-drift");
+        c.drift = f32::NAN;
+        assert_eq!(c.normalized_drift(), 1.0);
     }
 
     #[test]
@@ -110,5 +152,15 @@ mod tests {
             contaminated: false,
         };
         assert!((h.confidence_factor() - 0.4).abs() < 1e-6);
+    }
+
+    #[test]
+    fn non_finite_health_score_is_not_trusted() {
+        let h = SensorHealth {
+            score: f32::NAN,
+            saturated: false,
+            contaminated: false,
+        };
+        assert_eq!(h.confidence_factor(), 0.0);
     }
 }

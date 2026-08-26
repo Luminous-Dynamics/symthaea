@@ -7,7 +7,7 @@
 //! neighboring representations. This encoder creates deterministic anchor HVs
 //! across a numeric range and linearly interpolates between adjacent anchors.
 
-use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
+use symthaea_core::hdc::{HDC_DIMENSION, unified_hv::ContinuousHV};
 
 #[derive(Debug, Clone)]
 pub struct ScalarHdcEncoder {
@@ -51,13 +51,16 @@ impl ScalarHdcEncoder {
         self.anchors.len()
     }
 
-    /// Encode a scalar, saturating values outside the configured range.
-    pub fn encode(&self, value: f32) -> ContinuousHV {
-        let value = if value.is_finite() {
-            value.clamp(self.min, self.max)
-        } else {
-            self.min
-        };
+    /// Encode a finite scalar, saturating values outside the configured range.
+    ///
+    /// Non-finite measurements return `None`; they must not be collapsed onto a
+    /// valid endpoint because that would turn missing/corrupt evidence into a
+    /// plausible chemical measurement.
+    pub fn encode(&self, value: f32) -> Option<ContinuousHV> {
+        if !value.is_finite() {
+            return None;
+        }
+        let value = value.clamp(self.min, self.max);
 
         let normalized = (value - self.min) / (self.max - self.min);
         let position = normalized * (self.anchors.len() - 1) as f32;
@@ -66,7 +69,7 @@ impl ScalarHdcEncoder {
         let t = position - lower as f32;
 
         if lower == upper || t <= f32::EPSILON {
-            return self.anchors[lower].clone();
+            return Some(self.anchors[lower].clone());
         }
 
         let a = &self.anchors[lower].values;
@@ -79,7 +82,7 @@ impl ScalarHdcEncoder {
 
         let mut hv = ContinuousHV::from_vec(values);
         hv.l2_normalize();
-        hv
+        Some(hv)
     }
 }
 
@@ -97,14 +100,23 @@ mod tests {
     #[test]
     fn neighboring_values_are_more_similar_than_distant_values() {
         let encoder = ScalarHdcEncoder::new(0.0, 100.0, 16, 7);
-        let center = encoder.encode(50.0);
-        let near = encoder.encode(51.0);
-        let far = encoder.encode(90.0);
+        let center = encoder.encode(50.0).unwrap();
+        let near = encoder.encode(51.0).unwrap();
+        let far = encoder.encode(90.0).unwrap();
 
         assert!(
             center.similarity(&near) > center.similarity(&far),
             "continuous chemistry values must preserve neighborhood structure"
         );
+    }
+
+    #[test]
+    fn locality_holds_across_an_anchor_boundary() {
+        let encoder = ScalarHdcEncoder::new(0.0, 100.0, 11, 17);
+        let left = encoder.encode(49.9).unwrap();
+        let right = encoder.encode(50.1).unwrap();
+        let far = encoder.encode(80.0).unwrap();
+        assert!(left.similarity(&right) > left.similarity(&far));
     }
 
     #[test]
@@ -115,10 +127,10 @@ mod tests {
     }
 
     #[test]
-    fn non_finite_input_does_not_create_non_finite_hv() {
+    fn non_finite_input_is_rejected() {
         let encoder = ScalarHdcEncoder::new(0.0, 1.0, 4, 99);
-        let hv = encoder.encode(f32::NAN);
-        assert_eq!(hv.values.len(), HDC_DIMENSION);
-        assert!(hv.values.iter().all(|v| v.is_finite()));
+        assert!(encoder.encode(f32::NAN).is_none());
+        assert!(encoder.encode(f32::INFINITY).is_none());
+        assert!(encoder.encode(f32::NEG_INFINITY).is_none());
     }
 }
