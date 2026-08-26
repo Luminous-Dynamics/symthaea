@@ -1,0 +1,73 @@
+name: SYM-ARCH-002A6 Measurement Dynamics
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - main
+      - research/sym-arch-002a-core-v1
+    paths:
+      - '.github/workflows/sym-arch-002a6-measurement-dynamics.yml'
+      - 'crates/domains/symthaea-psych-bench/src/experiment/measurement.rs'
+      - 'crates/domains/symthaea-psych-bench/src/experiment/measurement_validity.rs'
+      - 'crates/domains/symthaea-psych-bench/src/lib.rs'
+      - 'crates/domains/symthaea-psych-bench/Cargo.toml'
+      - 'docs/research/SYM_ARCH_002A6_MEASUREMENT_DYNAMICS_V1.md'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  # Automatic branch runs supersede stale checks. Deliberate manual validation
+  # runs are unique and therefore never cancel one another.
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  measurement-dynamics:
+    name: Validate acquisition and resource measurement core
+    # Draft stacked PRs cannot merge and should not consume scarce runner capacity.
+    # Promoting to ready-for-review explicitly triggers this exact gate.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-sym-arch-002a6-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-sym-arch-002a6-
+
+      - name: Check formatting
+        run: |
+          cargo fmt --all -- --check
+
+      - name: Run A6 measurement tests
+        run: |
+          cargo test -p symthaea-psych-bench --lib experiment_measurement:: -- --nocapture
+
+      - name: Run A6 criterion-validity tests
+        run: |
+          cargo test -p symthaea-psych-bench --lib experiment_measurement_validity:: -- --nocapture
+
+      - name: Check psych-bench library
+        run: |
+          cargo check -p symthaea-psych-bench --lib
