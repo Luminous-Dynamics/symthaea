@@ -35,6 +35,7 @@ pub mod novelty;
 pub mod observation;
 pub mod olfaction;
 pub mod percept;
+pub mod root_projection;
 pub mod temporal;
 
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
@@ -69,6 +70,10 @@ pub use olfaction::{
     MoxArraySimulator, MoxChannelModel, OlfactorySimulationError, OlfactoryStimulus,
 };
 pub use percept::{ChemicalPercept, ChemicalPerceptEncoder};
+pub use root_projection::{
+    ChemicalProjectionPairAssessment, ChemicalProjectionQuality, ChemicalRootProjection,
+    ChemicalRootProjectionConfig, ChemicalRootProjectionError, ChemicalRootProjector,
+};
 pub use temporal::{
     ChemicalTemporalContext, ChemicalTemporalTracker, TemporalConfigError, TemporalError,
 };
