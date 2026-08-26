@@ -36,7 +36,7 @@ pub enum FlavorConfigError {
     InvalidMinimumConfidence(f32),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FlavorBindingError {
     DuplicateModality(ChemicalModality),
     EncodingSpaceMismatch {
@@ -54,8 +54,8 @@ pub enum FlavorBindingError {
     },
     LowConfidence {
         modality: ChemicalModality,
-        confidence_bits: u32,
-        minimum_bits: u32,
+        confidence: f32,
+        minimum: f32,
     },
 }
 
@@ -142,8 +142,8 @@ impl FlavorBinder {
             if percept.confidence() < self.config.min_confidence {
                 return Err(FlavorBindingError::LowConfidence {
                     modality: percept.evidence.modality,
-                    confidence_bits: percept.confidence().to_bits(),
-                    minimum_bits: self.config.min_confidence.to_bits(),
+                    confidence: percept.confidence(),
+                    minimum: self.config.min_confidence,
                 });
             }
         }
