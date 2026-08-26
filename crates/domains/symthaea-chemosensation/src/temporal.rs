@@ -5,13 +5,14 @@
 //!
 //! Smell and taste are temporal signals: onset, persistence, adaptation, and
 //! recovery carry information that a single static fingerprint cannot. This
-//! tracker keeps modality-specific anchors and refuses out-of-order evidence.
+//! tracker keeps modality-specific anchors and refuses out-of-order evidence or
+//! cross-coordinate-space comparisons.
 
 use std::collections::HashMap;
 
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
-use crate::{ChemicalModality, ChemicalPercept};
+use crate::{ChemicalEncodingSpaceId, ChemicalModality, ChemicalPercept};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChemicalTemporalContext {
@@ -38,12 +39,18 @@ pub enum TemporalError {
         previous_timestamp_us: u64,
         current_timestamp_us: u64,
     },
+    EncodingSpaceMismatch {
+        modality: ChemicalModality,
+        previous: ChemicalEncodingSpaceId,
+        current: ChemicalEncodingSpaceId,
+    },
 }
 
 #[derive(Debug, Clone)]
 struct TemporalAnchor {
     timestamp_us: u64,
     vector: ContinuousHV,
+    encoding_space_id: ChemicalEncodingSpaceId,
 }
 
 #[derive(Debug, Clone)]
@@ -76,13 +83,16 @@ impl ChemicalTemporalTracker {
     /// Compare a percept with the previous anchor for the same modality.
     ///
     /// Low-confidence percepts may be assessed but do not replace a stronger
-    /// anchor. Validation completes before state mutation.
+    /// anchor. Validation completes before state mutation. A changed encoding
+    /// space is an integrity boundary: callers must explicitly clear/migrate
+    /// temporal state rather than interpreting coordinate changes as chemistry.
     pub fn observe(
         &mut self,
         percept: &ChemicalPercept,
     ) -> Result<ChemicalTemporalContext, TemporalError> {
         let modality = percept.evidence.modality;
         let timestamp_us = percept.timestamp_us();
+        let current_space = percept.fingerprint.encoding_space_id;
         let previous = self.anchors.get(&modality);
 
         if let Some(anchor) = previous {
@@ -93,6 +103,13 @@ impl ChemicalTemporalTracker {
                     current_timestamp_us: timestamp_us,
                 });
             }
+            if current_space != anchor.encoding_space_id {
+                return Err(TemporalError::EncodingSpaceMismatch {
+                    modality,
+                    previous: anchor.encoding_space_id,
+                    current: current_space,
+                });
+            }
         }
 
         let (previous_timestamp_us, elapsed_s, similarity_to_previous, change, change_rate_per_s) =
@@ -101,8 +118,6 @@ impl ChemicalTemporalTracker {
                     .vector
                     .similarity(&percept.fingerprint.vector)
                     .clamp(-1.0, 1.0);
-                // Anti-correlated vectors are maximally changed rather than
-                // producing change > 1.0.
                 let change = (1.0 - similarity.max(0.0)).clamp(0.0, 1.0);
                 let elapsed_s = (timestamp_us - anchor.timestamp_us) as f32 / 1_000_000.0;
                 (
@@ -123,6 +138,7 @@ impl ChemicalTemporalTracker {
                 TemporalAnchor {
                     timestamp_us,
                     vector: percept.fingerprint.vector.clone(),
+                    encoding_space_id: current_space,
                 },
             );
         }
@@ -141,9 +157,7 @@ impl ChemicalTemporalTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        ChemicalFingerprint, ChemicalObservation, ChemicalPercept, EnvironmentReading,
-    };
+    use crate::{ChemicalFingerprint, ChemicalObservation, ChemicalPercept, EnvironmentReading};
     use symthaea_core::hdc::HDC_DIMENSION;
 
     fn percept(modality: ChemicalModality, timestamp_us: u64, seed: u64, confidence: f32) -> ChemicalPercept {
@@ -160,6 +174,7 @@ mod tests {
                 confidence,
                 used_channels: 1,
                 ignored_channels: 0,
+                encoding_space_id: ChemicalEncodingSpaceId::from_bytes([7; 32]),
             },
         }
     }
@@ -231,5 +246,24 @@ mod tests {
             .unwrap();
         assert_eq!(next.previous_timestamp_us, Some(2_000_000));
         assert!(next.change < 1e-6);
+    }
+
+    #[test]
+    fn changed_encoding_space_is_not_misread_as_temporal_change() {
+        let mut tracker = ChemicalTemporalTracker::new(0.5).unwrap();
+        let first = percept(ChemicalModality::Olfactory, 1_000_000, 1, 0.9);
+        tracker.observe(&first).unwrap();
+
+        let mut changed = percept(ChemicalModality::Olfactory, 2_000_000, 1, 0.9);
+        changed.fingerprint.encoding_space_id = ChemicalEncodingSpaceId::from_bytes([8; 32]);
+        assert!(matches!(
+            tracker.observe(&changed),
+            Err(TemporalError::EncodingSpaceMismatch { .. })
+        ));
+
+        let continuation = percept(ChemicalModality::Olfactory, 3_000_000, 1, 0.9);
+        let context = tracker.observe(&continuation).unwrap();
+        assert_eq!(context.previous_timestamp_us, Some(1_000_000));
+        assert!(context.change < 1e-6);
     }
 }
