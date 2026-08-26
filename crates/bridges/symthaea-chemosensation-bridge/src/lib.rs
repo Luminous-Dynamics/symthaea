@@ -11,6 +11,12 @@
 //! The bridge does **not** enable olfaction or gustation in the default root
 //! topology. It only converts a validated chemical aggregate into a typed,
 //! lineaged root input. Root activation remains a separate explicit decision.
+//!
+//! Chemical acquisition time and root ingestion time are deliberately distinct.
+//! A source timestamp is copied into root `ModalInput::timestamp` only when its
+//! clock domain explicitly declares Unix epoch. Device-local or unspecified
+//! source time remains attached to `ChemicalRootProjection`, while the root input
+//! keeps the ingestion timestamp assigned by `ModalInput::new`.
 
 use std::fmt;
 use std::time::Duration;
@@ -23,9 +29,9 @@ use symthaea::consciousness::integration::modal_lineage_integration::LineagedMod
 use symthaea::consciousness::integration::modality_identity::stable_modality_id;
 use symthaea::consciousness::integration::multi_modal_integration::ModalInput;
 use symthaea_chemosensation::{
-    ChemicalBridgeTarget, ChemicalContentAddressError, ChemicalModalBridgeInput,
-    ChemicalRootContentLineage, ChemicalRootProjection, ChemicalRootProjectionError,
-    ChemicalRootProjector,
+    ChemicalBridgeTarget, ChemicalClockDomainId, ChemicalContentAddressError,
+    ChemicalModalBridgeInput, ChemicalRootContentLineage, ChemicalRootProjection,
+    ChemicalRootProjectionError, ChemicalRootProjector,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -78,7 +84,8 @@ impl From<ModalLineageError> for ChemicalRootBridgeError {
 
 /// Validated chemical projection paired with the exact root input produced from
 /// it. Keeping the projection available preserves agreement/quantization quality
-/// diagnostics that do not fit inside the generic root `ModalInput` contract.
+/// diagnostics and source-clock provenance that do not fit inside the generic
+/// root `ModalInput` contract.
 pub struct ChemicalRootHandoff {
     projection: ChemicalRootProjection,
     lineaged_input: LineagedModalInput,
@@ -128,9 +135,19 @@ pub fn root_modality_for_target(
 ///
 /// Validation is deliberately owned by [`ChemicalRootProjector::project`]. The
 /// bridge accepts the pre-projection aggregate rather than trusting a publicly
-/// constructible `ChemicalRootProjection`, so forged evidence/space/timestamp
+/// constructible `ChemicalRootProjection`, so forged evidence/space/clock/time
 /// fields are rejected by the existing chemical validation path before any root
 /// input is created.
+///
+/// Root timestamp semantics are intentionally conservative:
+///
+/// - explicit `unix-epoch` source time is copied exactly into `ModalInput`;
+/// - every other source clock, including `None`, remains source provenance only;
+/// - in the latter case `ModalInput::new` keeps its normal root ingestion time.
+///
+/// This prevents a device-monotonic counter from masquerading as wall-clock time
+/// while preserving the original `(clock_domain, timestamp_us)` on the returned
+/// [`ChemicalRootProjection`].
 pub fn project_to_lineaged_root_input(
     projector: &ChemicalRootProjector,
     chemical_input: &ChemicalModalBridgeInput,
@@ -154,10 +171,13 @@ pub fn project_to_lineaged_root_input(
     )
     .with_source(source_label(projection.target));
 
-    // Chemical timestamps are microseconds since the acquisition epoch used by
-    // the chemical evidence path. Root `ModalInput` stores a Duration, so retain
-    // the newest component timestamp exactly at microsecond resolution.
-    modal_input.timestamp = Duration::from_micros(projection.latest_timestamp_us);
+    // `ModalInput::new` timestamps ingestion relative to Unix epoch. Only replace
+    // that value when the chemical evidence explicitly declares the same epoch.
+    // Device-local or unspecified acquisition time remains available on
+    // `projection` and is never relabeled as root wall time.
+    if projection.clock_domain.as_ref() == Some(&ChemicalClockDomainId::unix_epoch()) {
+        modal_input.timestamp = Duration::from_micros(projection.latest_timestamp_us);
+    }
 
     Ok(ChemicalRootHandoff {
         projection,
@@ -180,7 +200,7 @@ mod tests {
         GUSTATORY_STABLE_ID, LEGACY_ROOT_MODALITIES, OLFACTORY_STABLE_ID,
     };
     use symthaea::consciousness::integration::multi_modal_integration::{
-        IntegrationConfig, IntegrationResult, MultiModalIntegrator, ModalInput,
+        IntegrationConfig, IntegrationResult, ModalInput, MultiModalIntegrator,
     };
     use symthaea_chemosensation::{
         CalibrationState, ChannelEncodingSpec, ChemicalChannel, ChemicalFingerprintEncoder,
@@ -206,9 +226,10 @@ mod tests {
         timestamp_us: u64,
         value: f32,
         source: &str,
+        clock_domain: Option<ChemicalClockDomainId>,
     ) -> ChemicalPercept {
         let encoder = encoder();
-        let observation = ChemicalObservation::new(
+        let mut observation = ChemicalObservation::new(
             timestamp_us,
             modality,
             source,
@@ -220,6 +241,7 @@ mod tests {
                 health: SensorHealth::default(),
             }],
         );
+        observation.clock_domain = clock_domain;
         let fingerprint = encoder.encode(&observation).unwrap().unwrap();
         ChemicalPercept {
             evidence: observation,
@@ -227,9 +249,28 @@ mod tests {
         }
     }
 
-    fn chemical_input(modality: ChemicalModality, timestamp_us: u64, value: f32) -> ChemicalModalBridgeInput {
+    fn chemical_input(
+        modality: ChemicalModality,
+        timestamp_us: u64,
+        value: f32,
+    ) -> ChemicalModalBridgeInput {
+        chemical_input_with_clock(modality, timestamp_us, value, None)
+    }
+
+    fn chemical_input_with_clock(
+        modality: ChemicalModality,
+        timestamp_us: u64,
+        value: f32,
+        clock_domain: Option<ChemicalClockDomainId>,
+    ) -> ChemicalModalBridgeInput {
         ChemicalModalBridge::default()
-            .aggregate(&[percept(modality, timestamp_us, value, "fixture")])
+            .aggregate(&[percept(
+                modality,
+                timestamp_us,
+                value,
+                "fixture",
+                clock_domain,
+            )])
             .unwrap()
     }
 
@@ -264,17 +305,23 @@ mod tests {
     }
 
     #[test]
-    fn validated_projection_preserves_lineage_timestamp_and_confidence() {
-        let chemical = chemical_input(ChemicalModality::Olfactory, 123_456, 50.0);
+    fn unclocked_projection_preserves_lineage_confidence_and_source_time() {
+        let source_timestamp = 123_456;
+        let chemical = chemical_input(ChemicalModality::Olfactory, source_timestamp, 50.0);
         let handoff = project_to_lineaged_root_input(&ChemicalRootProjector::default(), &chemical)
             .unwrap();
 
         assert_eq!(handoff.projection().target, ChemicalBridgeTarget::Olfactory);
+        assert_eq!(handoff.projection().clock_domain, None);
+        assert_eq!(handoff.projection().latest_timestamp_us, source_timestamp);
         assert_eq!(handoff.lineaged_input().input().modality, Modality::Olfactory);
-        assert_eq!(
+        assert_ne!(
             handoff.lineaged_input().input().timestamp,
-            Duration::from_micros(123_456)
+            Duration::from_micros(source_timestamp)
         );
+        // The root timestamp is ingestion time, not a relabeled tiny device-local
+        // value. This intentionally assumes a sane contemporary system clock.
+        assert!(handoff.lineaged_input().input().timestamp > Duration::from_secs(1_000_000_000));
         assert_eq!(
             handoff.lineaged_input().input().confidence,
             f64::from(handoff.projection().confidence)
@@ -293,6 +340,52 @@ mod tests {
             std::slice::from_ref(&expected.projection_policy)
         );
         assert_eq!(lineage.output_space(), Some(&expected.output_space));
+    }
+
+    #[test]
+    fn explicit_unix_acquisition_time_is_preserved_as_root_timestamp() {
+        let source_timestamp = 123_456;
+        let unix = ChemicalClockDomainId::unix_epoch();
+        let chemical = chemical_input_with_clock(
+            ChemicalModality::Olfactory,
+            source_timestamp,
+            50.0,
+            Some(unix.clone()),
+        );
+        let handoff = project_to_lineaged_root_input(&ChemicalRootProjector::default(), &chemical)
+            .unwrap();
+
+        assert_eq!(handoff.projection().clock_domain.as_ref(), Some(&unix));
+        assert_eq!(handoff.projection().latest_timestamp_us, source_timestamp);
+        assert_eq!(
+            handoff.lineaged_input().input().timestamp,
+            Duration::from_micros(source_timestamp)
+        );
+    }
+
+    #[test]
+    fn device_local_acquisition_time_remains_projection_provenance() {
+        let source_timestamp = 123_456;
+        let device_clock = ChemicalClockDomainId::new("rig-a/monotonic").unwrap();
+        let chemical = chemical_input_with_clock(
+            ChemicalModality::Olfactory,
+            source_timestamp,
+            50.0,
+            Some(device_clock.clone()),
+        );
+        let handoff = project_to_lineaged_root_input(&ChemicalRootProjector::default(), &chemical)
+            .unwrap();
+
+        assert_eq!(
+            handoff.projection().clock_domain.as_ref(),
+            Some(&device_clock)
+        );
+        assert_eq!(handoff.projection().latest_timestamp_us, source_timestamp);
+        assert_ne!(
+            handoff.lineaged_input().input().timestamp,
+            Duration::from_micros(source_timestamp)
+        );
+        assert!(handoff.lineaged_input().input().timestamp > Duration::from_secs(1_000_000_000));
     }
 
     #[test]
