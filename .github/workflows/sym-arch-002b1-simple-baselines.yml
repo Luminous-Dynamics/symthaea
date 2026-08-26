@@ -2,6 +2,7 @@ name: SYM-ARCH-002B1 Strong Simple Baselines
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
       - research/sym-arch-002a3-validity-v1
@@ -33,6 +34,9 @@ env:
 jobs:
   strong-simple-baselines:
     name: Validate readout-matched analytic baselines
+    # Draft stacked PRs cannot merge and should not consume scarce runner capacity.
+    # Promoting to ready-for-review explicitly triggers this exact gate.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
