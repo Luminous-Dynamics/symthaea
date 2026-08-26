@@ -4,19 +4,19 @@
 //! Traceable novelty memory for chemical percepts.
 //!
 //! Novelty is assessed against previously admitted fingerprints from the same
-//! chemical modality. Assessment and memory admission are separate operations
-//! so a single anomalous or low-confidence exposure does not automatically
-//! become the new normal.
+//! chemical modality and the same HDC encoding space. Assessment and memory
+//! admission are separate operations so a single anomalous or low-confidence
+//! exposure does not automatically become the new normal.
 
 use std::collections::{HashMap, VecDeque};
 
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
-use crate::{ChemicalModality, ChemicalPercept};
+use crate::{ChemicalEncodingSpaceId, ChemicalModality, ChemicalPercept};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChemicalNoveltyConfig {
-    /// Maximum retained references per modality.
+    /// Maximum retained references per modality and encoding space.
     pub capacity_per_modality: usize,
     /// Minimum percept confidence required for memory admission.
     pub min_admission_confidence: f32,
@@ -51,7 +51,8 @@ pub struct ChemicalMemoryReference {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct NoveltyAssessment {
-    /// Bounded novelty in [0, 1]. One means no similar admitted reference.
+    /// Bounded novelty in [0, 1]. One means no similar admitted reference in
+    /// the current modality+encoding-space namespace.
     pub novelty: f32,
     pub nearest: Option<ChemicalMemoryReference>,
     pub memory_size: usize,
@@ -65,10 +66,12 @@ struct MemoryEntry {
     confidence: f32,
 }
 
+type MemoryKey = (ChemicalModality, ChemicalEncodingSpaceId);
+
 #[derive(Debug, Clone)]
 pub struct ChemicalNoveltyMemory {
     config: ChemicalNoveltyConfig,
-    entries: HashMap<ChemicalModality, VecDeque<MemoryEntry>>,
+    entries: HashMap<MemoryKey, VecDeque<MemoryEntry>>,
 }
 
 impl ChemicalNoveltyMemory {
@@ -105,14 +108,33 @@ impl ChemicalNoveltyMemory {
         self.entries.clear();
     }
 
+    /// Total retained references for one modality across all representation
+    /// versions. Geometric comparisons still remain space-local.
     pub fn len(&self, modality: ChemicalModality) -> usize {
-        self.entries.get(&modality).map_or(0, VecDeque::len)
+        self.entries
+            .iter()
+            .filter(|((stored_modality, _), _)| *stored_modality == modality)
+            .map(|(_, entries)| entries.len())
+            .sum()
+    }
+
+    pub fn len_in_space(
+        &self,
+        modality: ChemicalModality,
+        encoding_space_id: ChemicalEncodingSpaceId,
+    ) -> usize {
+        self.entries
+            .get(&(modality, encoding_space_id))
+            .map_or(0, VecDeque::len)
     }
 
     /// Assess novelty without changing memory.
     pub fn assess(&self, percept: &ChemicalPercept) -> NoveltyAssessment {
-        let modality = percept.evidence.modality;
-        let Some(entries) = self.entries.get(&modality) else {
+        let key = (
+            percept.evidence.modality,
+            percept.fingerprint.encoding_space_id,
+        );
+        let Some(entries) = self.entries.get(&key) else {
             return NoveltyAssessment {
                 novelty: 1.0,
                 nearest: None,
@@ -151,7 +173,8 @@ impl ChemicalNoveltyMemory {
     }
 
     /// Admit a percept to novelty memory when it is trustworthy and not already
-    /// represented. Returns true only when a new reference was stored.
+    /// represented in the same encoding space. Returns true only when a new
+    /// reference was stored.
     pub fn admit(&mut self, percept: &ChemicalPercept) -> bool {
         if percept.confidence() < self.config.min_admission_confidence {
             return false;
@@ -166,8 +189,11 @@ impl ChemicalNoveltyMemory {
             return false;
         }
 
-        let modality = percept.evidence.modality;
-        let entries = self.entries.entry(modality).or_default();
+        let key = (
+            percept.evidence.modality,
+            percept.fingerprint.encoding_space_id,
+        );
+        let entries = self.entries.entry(key).or_default();
         if entries.len() >= self.config.capacity_per_modality {
             entries.pop_front();
         }
@@ -206,6 +232,7 @@ mod tests {
                 confidence,
                 used_channels: 1,
                 ignored_channels: 0,
+                encoding_space_id: ChemicalEncodingSpaceId::from_bytes([7; 32]),
             },
         }
     }
@@ -262,7 +289,31 @@ mod tests {
     }
 
     #[test]
-    fn memory_is_bounded_per_modality() {
+    fn changed_encoding_space_is_a_separate_novelty_namespace() {
+        let mut memory = ChemicalNoveltyMemory::new(ChemicalNoveltyConfig::default()).unwrap();
+        let reference = percept(ChemicalModality::Olfactory, 1, 1, 0.9);
+        assert!(memory.admit(&reference));
+
+        let mut migrated = reference.clone();
+        migrated.evidence.timestamp_us = 2;
+        migrated.fingerprint.encoding_space_id = ChemicalEncodingSpaceId::from_bytes([8; 32]);
+        let assessment = memory.assess(&migrated);
+        assert_eq!(assessment.novelty, 1.0);
+        assert!(assessment.nearest.is_none());
+        assert_eq!(assessment.memory_size, 0);
+        assert!(memory.admit(&migrated));
+        assert_eq!(memory.len(ChemicalModality::Olfactory), 2);
+        assert_eq!(
+            memory.len_in_space(
+                ChemicalModality::Olfactory,
+                ChemicalEncodingSpaceId::from_bytes([8; 32])
+            ),
+            1
+        );
+    }
+
+    #[test]
+    fn memory_is_bounded_per_modality_and_space() {
         let config = ChemicalNoveltyConfig {
             capacity_per_modality: 2,
             min_admission_confidence: 0.5,
