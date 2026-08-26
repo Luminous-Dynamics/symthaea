@@ -36,8 +36,8 @@ pub use cognition::{
 };
 pub use encoding::ScalarHdcEncoder;
 pub use fingerprint::{
-    ChannelEncodingSpec, ChemicalFingerprint, ChemicalFingerprintEncoder, FingerprintConfigError,
-    FingerprintError,
+    ChannelEncodingSpec, ChemicalEncodingSpaceId, ChemicalFingerprint, ChemicalFingerprintEncoder,
+    FingerprintConfigError, FingerprintError,
 };
 pub use flavor::{
     FlavorBinder, FlavorBindingConfig, FlavorBindingError, FlavorConfigError, FlavorPercept,
@@ -47,7 +47,7 @@ pub use gustation::{
     PotentiometricChannelModel,
 };
 pub use multimodal_bridge::{
-    ChemicalBridgeComponent, ChemicalBridgeTarget, ChemicalModalBridge, ChemicalModalBridgeConfig,
+    ChemicalBridgeTarget, ChemicalModalBridge, ChemicalModalBridgeConfig,
     ChemicalModalBridgeError, ChemicalModalBridgeInput,
 };
 pub use novelty::{
