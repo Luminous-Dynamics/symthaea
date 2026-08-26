@@ -10,7 +10,7 @@
 
 use crate::{
     ChemicalDecisionReceipt, ChemicalEvidenceLevel, ChemicalTraceArchive, DeviationDisposition,
-    ExperimentDecision, ProtocolDeviation, TraceArchiveDigest,
+    ExperimentDecision, ProtocolDeviation, TraceArchiveDigest, TraceArchiveError,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -39,10 +39,17 @@ pub enum TraceEvidenceRefError {
         original: ChemicalEvidenceLevel,
         used_as: ChemicalEvidenceLevel,
     },
+    ArchiveInvalid(TraceArchiveError),
     ArchiveDigestMismatch,
     ArchiveProtocolMismatch,
     ArchiveRunMismatch,
     ArchiveOriginEvidenceMismatch,
+}
+
+impl From<TraceArchiveError> for TraceEvidenceRefError {
+    fn from(value: TraceArchiveError) -> Self {
+        Self::ArchiveInvalid(value)
+    }
 }
 
 impl TraceEvidenceRef {
@@ -50,6 +57,7 @@ impl TraceEvidenceRef {
         archive: &ChemicalTraceArchive,
         used_as: ChemicalEvidenceLevel,
     ) -> Result<Self, TraceEvidenceRefError> {
+        archive.verify()?;
         let reference = Self {
             digest: archive.manifest.digest,
             acquisition_protocol_id: archive.manifest.protocol_id.clone(),
@@ -88,6 +96,7 @@ impl TraceEvidenceRef {
         archive: &ChemicalTraceArchive,
     ) -> Result<(), TraceEvidenceRefError> {
         self.verify_self()?;
+        archive.verify()?;
         if self.digest != archive.manifest.digest {
             return Err(TraceEvidenceRefError::ArchiveDigestMismatch);
         }
@@ -130,6 +139,8 @@ pub enum EvidenceBundleError {
     DiscardedRunReferenced(String),
     ConfirmedDecisionUsesSeparatedEvidence(String),
     ConfirmedDecisionHasProtocolWideSeparation,
+    MissingArchive(TraceArchiveDigest),
+    UnexpectedArchive(TraceArchiveDigest),
 }
 
 impl From<TraceEvidenceRefError> for EvidenceBundleError {
@@ -154,7 +165,7 @@ impl ChemicalEvidenceBundle {
         Ok(bundle)
     }
 
-    /// Verify structural linkage between the decision, archived trace references,
+    /// Verify structural linkage between the decision, trace references,
     /// evidence classes, and any declared protocol deviations.
     pub fn verify(&self) -> Result<(), EvidenceBundleError> {
         if self.schema_version != EVIDENCE_BUNDLE_SCHEMA_VERSION {
@@ -234,6 +245,40 @@ impl ChemicalEvidenceBundle {
 
         Ok(())
     }
+
+    /// End-to-end verification when the referenced archives are available.
+    ///
+    /// This first checks the bundle's decision/deviation semantics, then requires
+    /// an exact one-to-one archive set and re-runs each archive's own integrity and
+    /// trace-invariant verification.
+    pub fn verify_with_archives(
+        &self,
+        archives: &[ChemicalTraceArchive],
+    ) -> Result<(), EvidenceBundleError> {
+        self.verify()?;
+
+        for trace_ref in &self.traces {
+            let archive = archives
+                .iter()
+                .find(|archive| archive.manifest.digest == trace_ref.digest)
+                .ok_or(EvidenceBundleError::MissingArchive(trace_ref.digest))?;
+            trace_ref.verify_against_archive(archive)?;
+        }
+
+        for archive in archives {
+            if !self
+                .traces
+                .iter()
+                .any(|trace_ref| trace_ref.digest == archive.manifest.digest)
+            {
+                return Err(EvidenceBundleError::UnexpectedArchive(
+                    archive.manifest.digest,
+                ));
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -266,10 +311,7 @@ mod tests {
         ChemicalTraceArchive::from_trace(&trace, evidence).unwrap()
     }
 
-    fn decision(
-        evidence: ChemicalEvidenceLevel,
-        value: f64,
-    ) -> ChemicalDecisionReceipt {
+    fn decision(evidence: ChemicalEvidenceLevel, value: f64) -> ChemicalDecisionReceipt {
         ChemicalDecisionProtocol::new(
             "od001-v1",
             "1.0.0",
@@ -294,7 +336,6 @@ mod tests {
             ChemicalEvidenceLevel::HeldOutPhysicalObservation,
         )
         .unwrap();
-        trace_ref.verify_against_archive(&archive).unwrap();
 
         let bundle = ChemicalEvidenceBundle::new(
             decision(ChemicalEvidenceLevel::HeldOutPhysicalObservation, 0.9),
@@ -302,7 +343,7 @@ mod tests {
             vec![],
         )
         .unwrap();
-        assert!(bundle.verify().is_ok());
+        assert!(bundle.verify_with_archives(&[archive]).is_ok());
     }
 
     #[test]
@@ -316,12 +357,13 @@ mod tests {
             ChemicalEvidenceLevel::HeldOutPhysicalObservation
         );
 
-        assert!(ChemicalEvidenceBundle::new(
+        let bundle = ChemicalEvidenceBundle::new(
             decision(ChemicalEvidenceLevel::RecordedReplay, 0.9),
             vec![trace_ref],
             vec![],
         )
-        .is_ok());
+        .unwrap();
+        assert!(bundle.verify_with_archives(&[archive]).is_ok());
     }
 
     #[test]
@@ -415,6 +457,58 @@ mod tests {
             ),
             Err(EvidenceBundleError::ConfirmedDecisionUsesSeparatedEvidence(
                 "run-a".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn end_to_end_verification_detects_archive_tampering() {
+        let mut archive = archive(ChemicalEvidenceLevel::HeldOutPhysicalObservation, "run-a");
+        let trace_ref = TraceEvidenceRef::from_archive(
+            &archive,
+            ChemicalEvidenceLevel::HeldOutPhysicalObservation,
+        )
+        .unwrap();
+        let bundle = ChemicalEvidenceBundle::new(
+            decision(ChemicalEvidenceLevel::HeldOutPhysicalObservation, 0.9),
+            vec![trace_ref],
+            vec![],
+        )
+        .unwrap();
+
+        archive.observations[0].channels[0].raw_value += 1.0;
+        assert!(matches!(
+            bundle.verify_with_archives(&[archive]),
+            Err(EvidenceBundleError::InvalidTraceRef(
+                TraceEvidenceRefError::ArchiveInvalid(TraceArchiveError::DigestMismatch)
+            ))
+        ));
+    }
+
+    #[test]
+    fn end_to_end_verification_requires_exact_archive_set() {
+        let archive_a = archive(ChemicalEvidenceLevel::HeldOutPhysicalObservation, "run-a");
+        let archive_b = archive(ChemicalEvidenceLevel::HeldOutPhysicalObservation, "run-b");
+        let trace_ref = TraceEvidenceRef::from_archive(
+            &archive_a,
+            ChemicalEvidenceLevel::HeldOutPhysicalObservation,
+        )
+        .unwrap();
+        let bundle = ChemicalEvidenceBundle::new(
+            decision(ChemicalEvidenceLevel::HeldOutPhysicalObservation, 0.9),
+            vec![trace_ref],
+            vec![],
+        )
+        .unwrap();
+
+        assert_eq!(
+            bundle.verify_with_archives(&[]),
+            Err(EvidenceBundleError::MissingArchive(archive_a.manifest.digest))
+        );
+        assert_eq!(
+            bundle.verify_with_archives(&[archive_a, archive_b.clone()]),
+            Err(EvidenceBundleError::UnexpectedArchive(
+                archive_b.manifest.digest
             ))
         );
     }
