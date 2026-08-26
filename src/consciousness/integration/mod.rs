@@ -4,12 +4,14 @@
 //! # Integration Layer
 //!
 //! Cross-modal binding, multi-modal integration, Global Workspace Theory,
-//! neuro-autopoietic bridge, hierarchical LTC, and evolution bridge.
+//! neuro-autopoietic bridge, hierarchical LTC, evolution bridge, and typed
+//! modal evidence lineage.
 
 pub mod cross_modal_binding;
 pub mod evolution_bridge;
 pub mod gwt_integration;
 pub mod hierarchical_ltc;
+pub mod modal_lineage;
 pub mod modality_identity;
 pub mod multi_modal_integration;
 pub mod narrative_gwt_integration;
