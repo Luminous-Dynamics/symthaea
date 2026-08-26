@@ -18,6 +18,7 @@
 #![deny(unsafe_code)]
 
 pub mod calibration;
+pub mod cognition;
 pub mod encoding;
 pub mod fingerprint;
 pub mod gustation;
@@ -28,6 +29,9 @@ pub mod percept;
 pub mod temporal;
 
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
+pub use cognition::{
+    ChemicalCognitionError, ChemicalCognitionPipeline, CognitiveChemicalPercept,
+};
 pub use encoding::ScalarHdcEncoder;
 pub use fingerprint::{
     ChannelEncodingSpec, ChemicalFingerprint, ChemicalFingerprintEncoder, FingerprintConfigError,
