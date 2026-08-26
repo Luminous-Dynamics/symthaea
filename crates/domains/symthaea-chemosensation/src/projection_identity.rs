@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     ChemicalEncodingSpaceId, ChemicalProjectionQuality, ChemicalRootProjection,
-    ChemicalRootProjectionConfig,
+    ChemicalRootProjectionConfig, ChemicalRootProjectionError,
 };
 
 /// Identity of the algorithm/parameters used to project a continuous chemical
@@ -24,12 +24,17 @@ use crate::{
 pub struct ChemicalRootProjectionPolicyId([u8; 32]);
 
 impl ChemicalRootProjectionPolicyId {
-    pub fn sign_threshold(threshold: f32) -> Self {
+    pub fn sign_threshold(
+        threshold: f32,
+    ) -> Result<Self, ChemicalRootProjectionError> {
+        if !threshold.is_finite() {
+            return Err(ChemicalRootProjectionError::NonFiniteThreshold);
+        }
         let mut hasher = Hasher::new();
         hasher.update(b"symthaea-chemosensation-root-projection-policy-v1");
         hasher.update(b"continuous-to-binary-sign-threshold");
         hasher.update(&threshold.to_bits().to_le_bytes());
-        Self(*hasher.finalize().as_bytes())
+        Ok(Self(*hasher.finalize().as_bytes()))
     }
 
     pub const fn from_bytes(bytes: [u8; 32]) -> Self {
@@ -83,27 +88,35 @@ impl fmt::Display for ChemicalRootBinarySpaceId {
 }
 
 impl ChemicalRootProjectionConfig {
-    pub fn policy_id(&self) -> ChemicalRootProjectionPolicyId {
+    pub fn policy_id(
+        &self,
+    ) -> Result<ChemicalRootProjectionPolicyId, ChemicalRootProjectionError> {
         ChemicalRootProjectionPolicyId::sign_threshold(self.threshold)
     }
 }
 
 impl ChemicalProjectionQuality {
-    pub fn policy_id(&self) -> ChemicalRootProjectionPolicyId {
+    pub fn policy_id(
+        &self,
+    ) -> Result<ChemicalRootProjectionPolicyId, ChemicalRootProjectionError> {
         ChemicalRootProjectionPolicyId::sign_threshold(self.threshold)
     }
 }
 
 impl ChemicalRootProjection {
-    pub fn projection_policy_id(&self) -> ChemicalRootProjectionPolicyId {
+    pub fn projection_policy_id(
+        &self,
+    ) -> Result<ChemicalRootProjectionPolicyId, ChemicalRootProjectionError> {
         self.quality.policy_id()
     }
 
-    pub fn binary_space_id(&self) -> ChemicalRootBinarySpaceId {
-        ChemicalRootBinarySpaceId::from_parts(
+    pub fn binary_space_id(
+        &self,
+    ) -> Result<ChemicalRootBinarySpaceId, ChemicalRootProjectionError> {
+        Ok(ChemicalRootBinarySpaceId::from_parts(
             self.encoding_space_id,
-            self.projection_policy_id(),
-        )
+            self.projection_policy_id()?,
+        ))
     }
 }
 
@@ -124,13 +137,32 @@ mod tests {
     fn projection_policy_identity_is_deterministic() {
         let a = ChemicalRootProjectionConfig { threshold: 0.0 };
         let b = ChemicalRootProjectionConfig { threshold: 0.0 };
-        assert_eq!(a.policy_id(), b.policy_id());
+        assert_eq!(a.policy_id().unwrap(), b.policy_id().unwrap());
+    }
+
+    #[test]
+    fn invalid_threshold_cannot_obtain_projection_policy_identity() {
+        assert!(matches!(
+            ChemicalRootProjectionPolicyId::sign_threshold(f32::NAN),
+            Err(ChemicalRootProjectionError::NonFiniteThreshold)
+        ));
+        assert!(matches!(
+            ChemicalRootProjectionConfig {
+                threshold: f32::INFINITY,
+            }
+            .policy_id(),
+            Err(ChemicalRootProjectionError::NonFiniteThreshold)
+        ));
     }
 
     #[test]
     fn changing_threshold_changes_projection_policy_identity() {
-        let zero = ChemicalRootProjectionConfig { threshold: 0.0 }.policy_id();
-        let shifted = ChemicalRootProjectionConfig { threshold: 0.01 }.policy_id();
+        let zero = ChemicalRootProjectionConfig { threshold: 0.0 }
+            .policy_id()
+            .unwrap();
+        let shifted = ChemicalRootProjectionConfig { threshold: 0.01 }
+            .policy_id()
+            .unwrap();
         assert_ne!(zero, shifted);
     }
 
@@ -138,8 +170,8 @@ mod tests {
     fn binary_space_identity_depends_on_source_space_and_policy() {
         let source_a = ChemicalEncodingSpaceId::from_bytes([1; 32]);
         let source_b = ChemicalEncodingSpaceId::from_bytes([2; 32]);
-        let policy_a = ChemicalRootProjectionPolicyId::sign_threshold(0.0);
-        let policy_b = ChemicalRootProjectionPolicyId::sign_threshold(0.01);
+        let policy_a = ChemicalRootProjectionPolicyId::sign_threshold(0.0).unwrap();
+        let policy_b = ChemicalRootProjectionPolicyId::sign_threshold(0.01).unwrap();
 
         let baseline = ChemicalRootBinarySpaceId::from_parts(source_a, policy_a);
         assert_ne!(
@@ -172,16 +204,11 @@ mod tests {
             },
         };
 
+        let policy = ChemicalRootProjectionPolicyId::sign_threshold(0.0).unwrap();
+        assert_eq!(projection.projection_policy_id().unwrap(), policy);
         assert_eq!(
-            projection.projection_policy_id(),
-            ChemicalRootProjectionPolicyId::sign_threshold(0.0)
-        );
-        assert_eq!(
-            projection.binary_space_id(),
-            ChemicalRootBinarySpaceId::from_parts(
-                source_space,
-                ChemicalRootProjectionPolicyId::sign_threshold(0.0)
-            )
+            projection.binary_space_id().unwrap(),
+            ChemicalRootBinarySpaceId::from_parts(source_space, policy)
         );
     }
 }
