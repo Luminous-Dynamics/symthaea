@@ -19,6 +19,7 @@
 
 pub mod calibration;
 pub mod cognition;
+pub mod deviation;
 pub mod encoding;
 pub mod experiment;
 pub mod fingerprint;
@@ -35,6 +36,9 @@ pub mod trace;
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
 pub use cognition::{
     ChemicalCognitionError, ChemicalCognitionPipeline, CognitiveChemicalPercept,
+};
+pub use deviation::{
+    DeviationDisposition, ExpectedBiasDirection, ProtocolDeviation, ProtocolDeviationError,
 };
 pub use encoding::ScalarHdcEncoder;
 pub use experiment::{
