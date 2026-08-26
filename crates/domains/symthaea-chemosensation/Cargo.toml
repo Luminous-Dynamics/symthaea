@@ -8,5 +8,6 @@ description = "Shared chemical-sensing primitives for Symthaea olfaction and gus
 
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-evidence-plane = { path = "../../core/symthaea-evidence-plane" }
 serde = { workspace = true }
 blake3 = { workspace = true }
