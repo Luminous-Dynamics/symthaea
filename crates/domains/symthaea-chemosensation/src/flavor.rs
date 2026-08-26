@@ -5,12 +5,13 @@
 //!
 //! A flavor percept is created only when one trustworthy olfactory percept and
 //! one trustworthy gustatory percept are close enough in time to plausibly
-//! belong to the same sampling episode. The original evidence from both senses
-//! remains attached to the derived flavor representation.
+//! belong to the same sampling episode and share one HDC coordinate system. The
+//! original evidence from both senses remains attached to the derived flavor
+//! representation.
 
 use symthaea_core::hdc::{HDC_DIMENSION, unified_hv::ContinuousHV};
 
-use crate::{ChemicalModality, ChemicalPercept};
+use crate::{ChemicalEncodingSpaceId, ChemicalModality, ChemicalPercept};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlavorBindingConfig {
@@ -37,6 +38,10 @@ pub enum FlavorConfigError {
 #[derive(Debug, Clone, PartialEq)]
 pub enum FlavorBindingError {
     DuplicateModality(ChemicalModality),
+    EncodingSpaceMismatch {
+        olfactory: ChemicalEncodingSpaceId,
+        gustatory: ChemicalEncodingSpaceId,
+    },
     TemporalSkew {
         skew_us: u64,
         max_skew_us: u64,
@@ -53,6 +58,7 @@ pub struct FlavorPercept {
     pub olfactory: ChemicalPercept,
     pub gustatory: ChemicalPercept,
     pub vector: ContinuousHV,
+    pub encoding_space_id: ChemicalEncodingSpaceId,
     /// Conservative joint confidence: the weaker modality limits the pair.
     pub confidence: f32,
     pub temporal_skew_us: u64,
@@ -107,6 +113,15 @@ impl FlavorBinder {
             }
         };
 
+        let olfactory_space = olfactory.fingerprint.encoding_space_id;
+        let gustatory_space = gustatory.fingerprint.encoding_space_id;
+        if olfactory_space != gustatory_space {
+            return Err(FlavorBindingError::EncodingSpaceMismatch {
+                olfactory: olfactory_space,
+                gustatory: gustatory_space,
+            });
+        }
+
         for percept in [olfactory, gustatory] {
             if percept.confidence() < self.config.min_confidence {
                 return Err(FlavorBindingError::LowConfidence {
@@ -134,6 +149,7 @@ impl FlavorBinder {
             olfactory: olfactory.clone(),
             gustatory: gustatory.clone(),
             vector,
+            encoding_space_id: olfactory_space,
             confidence: olfactory.confidence().min(gustatory.confidence()),
             temporal_skew_us,
         })
@@ -164,6 +180,7 @@ mod tests {
                 confidence,
                 used_channels: 1,
                 ignored_channels: 0,
+                encoding_space_id: ChemicalEncodingSpaceId::from_bytes([7; 32]),
             },
         }
     }
@@ -178,6 +195,7 @@ mod tests {
         assert_eq!(forward.vector, reverse.vector);
         assert_eq!(forward.olfactory.evidence, odor.evidence);
         assert_eq!(forward.gustatory.evidence, taste.evidence);
+        assert_eq!(forward.encoding_space_id, ChemicalEncodingSpaceId::from_bytes([7; 32]));
         assert!((forward.confidence - 0.8).abs() < 1e-6);
     }
 
@@ -191,6 +209,18 @@ mod tests {
             Err(FlavorBindingError::DuplicateModality(
                 ChemicalModality::Olfactory
             ))
+        ));
+    }
+
+    #[test]
+    fn different_encoding_spaces_are_not_bound_as_flavor() {
+        let binder = FlavorBinder::new(FlavorBindingConfig::default()).unwrap();
+        let odor = percept(ChemicalModality::Olfactory, 1, 1, 0.9);
+        let mut taste = percept(ChemicalModality::Gustatory, 2, 2, 0.9);
+        taste.fingerprint.encoding_space_id = ChemicalEncodingSpaceId::from_bytes([8; 32]);
+        assert!(matches!(
+            binder.bind(&odor, &taste),
+            Err(FlavorBindingError::EncodingSpaceMismatch { .. })
         ));
     }
 
