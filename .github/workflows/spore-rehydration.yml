@@ -1,0 +1,33 @@
+name: Spore Rehydration
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-spore/src/host_rehydration.rs"
+      - "crates/domains/symthaea-spore/src/lib.rs"
+      - ".github/workflows/spore-rehydration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spore-rehydration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Rehydration contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --check -p symthaea-spore
+      - name: Contract tests
+        run: cargo test -p symthaea-spore --lib host_rehydration::tests
+      - name: Clippy
+        run: cargo clippy -p symthaea-spore --lib -- -D warnings
