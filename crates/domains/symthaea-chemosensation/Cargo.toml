@@ -9,3 +9,7 @@ description = "Shared chemical-sensing primitives for Symthaea olfaction and gus
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
 serde = { workspace = true }
+blake3 = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
