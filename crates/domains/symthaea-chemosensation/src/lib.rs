@@ -17,6 +17,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod archive;
 pub mod calibration;
 pub mod cognition;
 pub mod deviation;
@@ -33,6 +34,10 @@ pub mod sampling;
 pub mod temporal;
 pub mod trace;
 
+pub use archive::{
+    ChemicalTraceArchive, TraceArchiveDigest, TraceArchiveError, TraceArchiveManifest,
+    VerifiedChemicalReplay, TRACE_ARCHIVE_SCHEMA_VERSION,
+};
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
 pub use cognition::{
     ChemicalCognitionError, ChemicalCognitionPipeline, CognitiveChemicalPercept,
