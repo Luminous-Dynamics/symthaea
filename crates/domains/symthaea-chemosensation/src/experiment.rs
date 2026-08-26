@@ -247,23 +247,14 @@ impl ChemicalDecisionProtocol {
             results.push(MetricGateResult {
                 id: gate.id.clone(),
                 value,
+                direction: gate.direction,
+                confirmation_threshold: gate.confirmation_threshold,
+                practical_failure_threshold: gate.practical_failure_threshold,
                 outcome: gate.assess(value),
             });
         }
 
-        let decision = if results
-            .iter()
-            .any(|result| result.outcome == GateOutcome::PracticalFailure)
-        {
-            ExperimentDecision::NotConfirmed
-        } else if results
-            .iter()
-            .all(|result| result.outcome == GateOutcome::ConfirmationPass)
-        {
-            ExperimentDecision::Confirmed
-        } else {
-            ExperimentDecision::Inconclusive
-        };
+        let decision = aggregate_decision(&results);
 
         Ok(ChemicalDecisionReceipt {
             protocol_id: self.protocol_id.clone(),
@@ -292,12 +283,55 @@ impl MetricObservation {
     }
 }
 
-/// Evaluated form of one metric.
+/// Evaluated form of one metric, including the exact gate snapshot that produced
+/// the outcome. This keeps historical receipts auditable even if a later protocol
+/// version changes its thresholds.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MetricGateResult {
     pub id: String,
     pub value: f64,
+    pub direction: GateDirection,
+    pub confirmation_threshold: f64,
+    pub practical_failure_threshold: Option<f64>,
     pub outcome: GateOutcome,
+}
+
+impl MetricGateResult {
+    fn reconstructed_gate(&self) -> Result<MetricGate, DecisionProtocolError> {
+        MetricGate::new(
+            self.id.clone(),
+            self.direction,
+            self.confirmation_threshold,
+            self.practical_failure_threshold,
+        )
+    }
+
+    /// Verify that this metric result is internally consistent with its stored
+    /// thresholds and observed value.
+    pub fn verify(&self) -> bool {
+        if !self.value.is_finite() {
+            return false;
+        }
+        self.reconstructed_gate()
+            .is_ok_and(|gate| gate.assess(self.value) == self.outcome)
+    }
+}
+
+fn aggregate_decision(results: &[MetricGateResult]) -> ExperimentDecision {
+    if results
+        .iter()
+        .any(|result| result.outcome == GateOutcome::PracticalFailure)
+    {
+        ExperimentDecision::NotConfirmed
+    } else if !results.is_empty()
+        && results
+            .iter()
+            .all(|result| result.outcome == GateOutcome::ConfirmationPass)
+    {
+        ExperimentDecision::Confirmed
+    } else {
+        ExperimentDecision::Inconclusive
+    }
 }
 
 /// Machine-readable decision receipt for one admissible evaluation.
@@ -309,6 +343,38 @@ pub struct ChemicalDecisionReceipt {
     pub partition: EvaluationPartition,
     pub metrics: Vec<MetricGateResult>,
     pub decision: ExperimentDecision,
+}
+
+impl ChemicalDecisionReceipt {
+    /// Check that the stored metric outcomes and aggregate decision are internally
+    /// reproducible from the receipt's own values and threshold snapshots.
+    pub fn verify_self(&self) -> bool {
+        !self.protocol_id.trim().is_empty()
+            && !self.version.trim().is_empty()
+            && !self.metrics.is_empty()
+            && self.metrics.iter().all(MetricGateResult::verify)
+            && aggregate_decision(&self.metrics) == self.decision
+    }
+
+    /// Check a receipt against the exact frozen protocol that was meant to produce it.
+    pub fn verify_against(&self, protocol: &ChemicalDecisionProtocol) -> bool {
+        if !self.verify_self()
+            || self.protocol_id != protocol.protocol_id
+            || self.version != protocol.version
+            || self.evidence != protocol.required_evidence
+            || self.partition != protocol.required_partition
+            || self.metrics.len() != protocol.gates.len()
+        {
+            return false;
+        }
+
+        self.metrics.iter().zip(&protocol.gates).all(|(result, gate)| {
+            result.id == gate.id
+                && result.direction == gate.direction
+                && result.confirmation_threshold == gate.confirmation_threshold
+                && result.practical_failure_threshold == gate.practical_failure_threshold
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -367,6 +433,8 @@ mod tests {
             .metrics
             .iter()
             .all(|metric| metric.outcome == GateOutcome::ConfirmationPass));
+        assert!(receipt.verify_self());
+        assert!(receipt.verify_against(&protocol()));
     }
 
     #[test]
@@ -387,6 +455,45 @@ mod tests {
             .metrics
             .iter()
             .any(|metric| metric.outcome == GateOutcome::PracticalFailure));
+    }
+
+    #[test]
+    fn receipt_snapshots_the_gate_that_produced_each_outcome() {
+        let receipt = evaluate([0.90, 0.10]).unwrap();
+        let identity = &receipt.metrics[0];
+        assert_eq!(identity.direction, GateDirection::AtLeast);
+        assert_eq!(identity.confirmation_threshold, 0.85);
+        assert_eq!(identity.practical_failure_threshold, Some(0.60));
+    }
+
+    #[test]
+    fn tampered_receipt_fails_self_verification() {
+        let mut receipt = evaluate([0.90, 0.10]).unwrap();
+        receipt.metrics[0].outcome = GateOutcome::PracticalFailure;
+        assert!(!receipt.verify_self());
+
+        let mut receipt = evaluate([0.90, 0.10]).unwrap();
+        receipt.decision = ExperimentDecision::NotConfirmed;
+        assert!(!receipt.verify_self());
+    }
+
+    #[test]
+    fn later_protocol_thresholds_do_not_validate_old_receipt() {
+        let receipt = evaluate([0.90, 0.10]).unwrap();
+        let changed = ChemicalDecisionProtocol::new(
+            "od001-v1",
+            "1.0.0",
+            ChemicalEvidenceLevel::HeldOutPhysicalObservation,
+            EvaluationPartition::Holdout,
+            vec![
+                MetricGate::new("identity_accuracy", GateDirection::AtLeast, 0.90, Some(0.60))
+                    .unwrap(),
+                MetricGate::new("concentration_leakage", GateDirection::AtMost, 0.15, Some(0.35))
+                    .unwrap(),
+            ],
+        )
+        .unwrap();
+        assert!(!receipt.verify_against(&changed));
     }
 
     #[test]
