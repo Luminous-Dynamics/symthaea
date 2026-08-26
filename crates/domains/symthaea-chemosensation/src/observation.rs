@@ -3,7 +3,7 @@
 
 //! Typed raw observations shared by olfaction and gustation.
 
-use crate::{CalibrationState, SensorHealth};
+use crate::{CalibrationState, ChemicalClockDomainId, SensorHealth};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -59,7 +59,17 @@ pub struct EnvironmentReading {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChemicalObservation {
+    /// Timestamp expressed in microseconds in `clock_domain`, when one is known.
+    /// Without a clock domain this value is still preserved evidence, but it must
+    /// not be compared across independent sources as though synchronization were
+    /// established.
     pub timestamp_us: u64,
+    /// Identity of the timebase against which `timestamp_us` is expressed.
+    ///
+    /// `None` means unspecified, not Unix time. The ID names a comparison domain
+    /// only; it does not prove synchronization quality or authenticity.
+    #[serde(default)]
+    pub clock_domain: Option<ChemicalClockDomainId>,
     pub modality: ChemicalModality,
     pub source: String,
     pub channels: Vec<ChemicalChannel>,
@@ -75,11 +85,17 @@ impl ChemicalObservation {
     ) -> Self {
         Self {
             timestamp_us,
+            clock_domain: None,
             modality,
             source: source.into(),
             channels,
             environment: EnvironmentReading::default(),
         }
+    }
+
+    pub fn with_clock_domain(mut self, clock_domain: ChemicalClockDomainId) -> Self {
+        self.clock_domain = Some(clock_domain);
+        self
     }
 
     pub fn with_environment(mut self, environment: EnvironmentReading) -> Self {
@@ -147,6 +163,21 @@ mod tests {
             vec![channel(3.0)],
         );
         assert!((observation.mean_confidence() - 0.9).abs() < 1e-6);
+    }
+
+    #[test]
+    fn new_observations_do_not_imply_a_clock_domain() {
+        let observation = ChemicalObservation::new(
+            42,
+            ChemicalModality::Olfactory,
+            "simulated-nose",
+            vec![channel(3.0)],
+        );
+        assert!(observation.clock_domain.is_none());
+
+        let clock = ChemicalClockDomainId::new("fixture/monotonic").unwrap();
+        let clocked = observation.with_clock_domain(clock.clone());
+        assert_eq!(clocked.clock_domain.as_ref(), Some(&clock));
     }
 
     #[test]
