@@ -19,6 +19,7 @@ use super::modal_lineage::ModalLineageReceipt;
 use super::modal_lineage_integration::{
     LineagedIntegrationResult, LineagedModalInput, integrate_with_lineage,
 };
+use super::modality_identity::LEGACY_ROOT_MODALITIES;
 use super::multi_modal_integration::{IntegrationConfig, MultiModalIntegrator};
 
 /// Capacity of the current root `ModalityChannel` temporal buffer.
@@ -84,20 +85,14 @@ impl LineagedMultiModalIntegrator {
     ) -> HistoricalLineagedIntegrationResult {
         let current = integrate_with_lineage(&mut self.inner, inputs);
 
-        // `attention_weights` contains every current-cycle modality that maps to
-        // a configured root channel, including configured zero-confidence input.
-        // Those configured inputs are exactly the inputs for which the root loop
-        // called `ModalityChannel::update` and therefore altered temporal state.
+        // The stable identity module pins the exact set instantiated by the root
+        // multimodal integrator. Use that typed topology contract rather than
+        // deriving channel configuration from debug-formatted telemetry keys.
         let configured_modalities: HashSet<Modality> = current
             .processed_lineage
             .keys()
             .copied()
-            .filter(|modality| {
-                current
-                    .integration
-                    .attention_weights
-                    .contains_key(&format!("{modality:?}"))
-            })
+            .filter(|modality| LEGACY_ROOT_MODALITIES.contains(modality))
             .collect();
 
         for processed in &current.processed_sequence {
@@ -156,9 +151,9 @@ impl LineagedMultiModalIntegrator {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::cross_modal_binding::ModalityChannel;
-    use super::super::multi_modal_integration::{visual_input, IntegrationConfig};
+    use super::super::multi_modal_integration::{IntegrationConfig, visual_input};
+    use super::*;
     use symthaea_core::hdc::binary_hv::BinaryHV;
     use symthaea_evidence_plane::ContentAddress32;
 
