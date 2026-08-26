@@ -19,12 +19,14 @@
 
 pub mod calibration;
 pub mod encoding;
+pub mod fingerprint;
 pub mod gustation;
 pub mod observation;
 pub mod olfaction;
 
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
 pub use encoding::ScalarHdcEncoder;
+pub use fingerprint::{ChannelEncodingSpec, ChemicalFingerprintEncoder};
 pub use gustation::{
     ElectronicTongueSimulator, GustatoryStimulus, PotentiometricChannelModel,
 };
