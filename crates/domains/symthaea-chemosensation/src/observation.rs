@@ -40,8 +40,12 @@ impl ChemicalChannel {
         self.calibration.apply(self.raw_value)
     }
 
-    /// Confidence contribution in [0, 1]. Invalid numeric state is pessimistic.
+    /// Confidence contribution in [0, 1]. A channel without a valid calibrated
+    /// measurement contributes no confidence, regardless of health metadata.
     pub fn effective_confidence(&self) -> f32 {
+        if self.calibrated_value().is_none() {
+            return 0.0;
+        }
         self.health.confidence_factor() * (1.0 - self.calibration.normalized_drift())
     }
 }
@@ -127,6 +131,11 @@ mod tests {
     #[test]
     fn corrupt_raw_measurement_does_not_gain_a_calibrated_value() {
         assert!(channel(f32::NAN).calibrated_value().is_none());
+    }
+
+    #[test]
+    fn corrupt_raw_measurement_has_zero_confidence() {
+        assert_eq!(channel(f32::NAN).effective_confidence(), 0.0);
     }
 
     #[test]

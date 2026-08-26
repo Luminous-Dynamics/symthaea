@@ -258,7 +258,8 @@ mod tests {
             .unwrap();
 
         // E = RT/F ln(0.1/1) at 298.15 K = -59.159 mV for z=+1.
-        assert!((observation.channels[2].raw_value - (-59.159)).abs() < 0.1);
+        let expected_mv = -59.159_f32;
+        assert!((observation.channels[2].raw_value - expected_mv).abs() < 0.1);
     }
 
     #[test]
