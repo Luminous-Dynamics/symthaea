@@ -3,7 +3,7 @@
 
 //! Typed raw observations shared by olfaction and gustation.
 
-use crate::{CalibrationState, SensorHealth};
+use crate::{CalibrationState, SamplingContext, SensorHealth};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -64,6 +64,10 @@ pub struct ChemicalObservation {
     pub source: String,
     pub channels: Vec<ChemicalChannel>,
     pub environment: EnvironmentReading,
+    /// Optional acquisition context. `serde(default)` keeps recordings created
+    /// before sampling metadata was introduced readable as `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sampling: Option<SamplingContext>,
 }
 
 impl ChemicalObservation {
@@ -79,11 +83,18 @@ impl ChemicalObservation {
             source: source.into(),
             channels,
             environment: EnvironmentReading::default(),
+            sampling: None,
         }
     }
 
     pub fn with_environment(mut self, environment: EnvironmentReading) -> Self {
         self.environment = environment;
+        self
+    }
+
+    /// Attach acquisition context without changing the sensor measurement.
+    pub fn with_sampling(mut self, sampling: SamplingContext) -> Self {
+        self.sampling = Some(sampling);
         self
     }
 
@@ -104,7 +115,9 @@ impl ChemicalObservation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CalibrationId, CalibrationState, SensorHealth};
+    use crate::{
+        CalibrationId, CalibrationState, SamplingContext, SamplingPhase, SensorHealth,
+    };
 
     fn channel(raw: f32) -> ChemicalChannel {
         ChemicalChannel {
@@ -158,5 +171,31 @@ mod tests {
             vec![],
         );
         assert_eq!(observation.mean_confidence(), 0.0);
+    }
+
+    #[test]
+    fn sampling_context_is_optional_and_evidence_preserving() {
+        let plain = ChemicalObservation::new(
+            42,
+            ChemicalModality::Olfactory,
+            "nose-a",
+            vec![channel(3.0)],
+        );
+        assert!(plain.sampling.is_none());
+
+        let context = SamplingContext::new(
+            "od001-v1",
+            "run-7",
+            SamplingPhase::Exposure,
+            2,
+        )
+        .unwrap()
+        .with_sample_id("sample-a")
+        .unwrap();
+        let tagged = plain.clone().with_sampling(context.clone());
+
+        assert_eq!(tagged.sampling.as_ref(), Some(&context));
+        assert_eq!(tagged.channels, plain.channels);
+        assert_eq!(tagged.timestamp_us, plain.timestamp_us);
     }
 }
