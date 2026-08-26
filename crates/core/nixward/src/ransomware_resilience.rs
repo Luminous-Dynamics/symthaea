@@ -9,14 +9,14 @@
 //! declared, what was observed, what recovery action was attempted, and whether the
 //! resulting state actually matched the intended target.
 //!
-//! Schema v2 makes every decision-relevant observation claim-bound, exercise-bound,
-//! time-bound, revision-bound, and digest-bearing. A bare `passed = true` value or a
-//! successful command exit is never reconstruction proof.
+//! Schema v3 makes every decision-relevant observation claim-bound, exercise-bound,
+//! subject-bound, time-bound, revision-bound, and digest-bearing. A bare
+//! `passed = true` value or successful command exit is never reconstruction proof.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-pub const HOST_RECONSTRUCTION_EVIDENCE_SCHEMA_VERSION: u16 = 2;
+pub const HOST_RECONSTRUCTION_EVIDENCE_SCHEMA_VERSION: u16 = 3;
 
 /// Identity of a NixOS host state relevant to reconstruction.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -113,7 +113,7 @@ pub enum RecoveryActionKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ReconstructionEvidenceClaim {
-    RecoveryAction,
+    RecoveryAction { action: RecoveryActionKind },
     ObservedPostState,
     PostRecoveryCheck { name: String },
 }
@@ -135,6 +135,9 @@ pub struct ReconstructionEvidenceRef {
     pub digest: String,
     pub producer_revision: String,
     pub exercise_id: String,
+    /// Stable exercise-local host/target identifier. It should not be a raw
+    /// hardware serial or other unnecessary persistent identifier.
+    pub subject_id: String,
     pub captured_at_unix_ms: u64,
 }
 
@@ -145,17 +148,20 @@ impl ReconstructionEvidenceRef {
             && !self.digest.trim().is_empty()
             && !self.producer_revision.trim().is_empty()
             && !self.exercise_id.trim().is_empty()
+            && !self.subject_id.trim().is_empty()
     }
 
     fn proves(
         &self,
         exercise_id: &str,
+        subject_id: &str,
         expected_claim: &ReconstructionEvidenceClaim,
         started_at_unix_ms: u64,
         finished_at_unix_ms: u64,
     ) -> bool {
         self.is_complete()
             && self.exercise_id == exercise_id
+            && self.subject_id == subject_id
             && &self.claim == expected_claim
             && started_at_unix_ms <= self.captured_at_unix_ms
             && self.captured_at_unix_ms <= finished_at_unix_ms
@@ -187,7 +193,12 @@ pub struct RecoveryActionReceipt {
 }
 
 impl RecoveryActionReceipt {
-    fn proven_live_window(&self, exercise_id: &str) -> Option<(u64, u64)> {
+    fn proven_live_window(
+        &self,
+        exercise_id: &str,
+        subject_id: &str,
+        action: RecoveryActionKind,
+    ) -> Option<(u64, u64)> {
         if self.execution_mode != RecoveryExecutionMode::Live {
             return None;
         }
@@ -200,7 +211,8 @@ impl RecoveryActionReceipt {
         let evidence = self.evidence.as_ref()?;
         if !evidence.proves(
             exercise_id,
-            &ReconstructionEvidenceClaim::RecoveryAction,
+            subject_id,
+            &ReconstructionEvidenceClaim::RecoveryAction { action },
             start,
             finish,
         ) {
@@ -225,6 +237,7 @@ impl PostRecoveryCheck {
     fn evidence_is_applicable(
         &self,
         exercise_id: &str,
+        subject_id: &str,
         started_at_unix_ms: u64,
         finished_at_unix_ms: u64,
     ) -> bool {
@@ -234,6 +247,7 @@ impl PostRecoveryCheck {
         self.evidence.as_ref().is_some_and(|evidence| {
             evidence.proves(
                 exercise_id,
+                subject_id,
                 &ReconstructionEvidenceClaim::PostRecoveryCheck {
                     name: self.name.clone(),
                 },
@@ -258,6 +272,7 @@ pub enum ReconstructionOutcome {
 pub struct HostReconstructionEvidence {
     pub schema_version: u16,
     pub exercise_id: String,
+    pub subject_id: String,
     pub action: RecoveryActionKind,
     pub before: HostStateIdentity,
     pub target: HostStateIdentity,
@@ -274,19 +289,21 @@ impl HostReconstructionEvidence {
     /// Evaluate reconstruction conservatively.
     ///
     /// VERIFIED requires:
-    /// - schema v2 and a non-empty exercise id;
-    /// - claim-bound evidence proving a LIVE recovery action and complete run window;
-    /// - an observed post-recovery state with claim-bound evidence from that same run;
+    /// - schema v3 plus non-empty exercise and subject ids;
+    /// - claim-bound evidence proving the exact LIVE recovery action and run window;
+    /// - an observed post-recovery state with claim-bound evidence for the same subject/run;
     /// - exact in-sync identity under [`assess_drift`];
     /// - at least one uniquely named post-recovery check;
     /// - every post-recovery check carrying matching claim evidence and passing.
     ///
-    /// A dry-run, wrong-run artifact, wrong-claim artifact, missing digest/revision,
-    /// duplicate check, or unevidenced result is UNPROVEN. A demonstrated live
-    /// post-state drift or an evidenced failed post-check yields FAILED.
+    /// A dry-run, wrong-run artifact, wrong-subject artifact, wrong-action/claim
+    /// artifact, missing digest/revision, duplicate check, or unevidenced result
+    /// is UNPROVEN. Demonstrated live post-state drift or an evidenced failed
+    /// post-check yields FAILED.
     pub fn outcome(&self) -> ReconstructionOutcome {
         if self.schema_version != HOST_RECONSTRUCTION_EVIDENCE_SCHEMA_VERSION
             || self.exercise_id.trim().is_empty()
+            || self.subject_id.trim().is_empty()
             || !self.before.is_addressable()
             || !self.target.is_addressable()
         {
@@ -296,9 +313,11 @@ impl HostReconstructionEvidence {
         let Some(receipt) = &self.action_receipt else {
             return ReconstructionOutcome::Unproven;
         };
-        let Some((started_at_unix_ms, finished_at_unix_ms)) =
-            receipt.proven_live_window(&self.exercise_id)
-        else {
+        let Some((started_at_unix_ms, finished_at_unix_ms)) = receipt.proven_live_window(
+            &self.exercise_id,
+            &self.subject_id,
+            self.action,
+        ) else {
             return ReconstructionOutcome::Unproven;
         };
 
@@ -308,6 +327,7 @@ impl HostReconstructionEvidence {
         let post_state_is_proven = self.post_state_evidence.as_ref().is_some_and(|evidence| {
             evidence.proves(
                 &self.exercise_id,
+                &self.subject_id,
                 &ReconstructionEvidenceClaim::ObservedPostState,
                 started_at_unix_ms,
                 finished_at_unix_ms,
@@ -332,6 +352,7 @@ impl HostReconstructionEvidence {
             if !names.insert(check.name.as_str())
                 || !check.evidence_is_applicable(
                     &self.exercise_id,
+                    &self.subject_id,
                     started_at_unix_ms,
                     finished_at_unix_ms,
                 )
@@ -377,6 +398,7 @@ mod tests {
     use super::*;
 
     const EXERCISE_ID: &str = "exercise-001";
+    const SUBJECT_ID: &str = "host:web-01";
 
     fn state(profile: &str) -> HostStateIdentity {
         HostStateIdentity {
@@ -387,13 +409,18 @@ mod tests {
         }
     }
 
-    fn evidence(claim: ReconstructionEvidenceClaim, label: &str, captured: u64) -> ReconstructionEvidenceRef {
+    fn evidence(
+        claim: ReconstructionEvidenceClaim,
+        label: &str,
+        captured: u64,
+    ) -> ReconstructionEvidenceRef {
         ReconstructionEvidenceRef {
             claim,
             locator: format!("receipt:{label}"),
             digest: format!("sha256:{label}"),
             producer_revision: "git:producer-abc123".to_string(),
             exercise_id: EXERCISE_ID.to_string(),
+            subject_id: SUBJECT_ID.to_string(),
             captured_at_unix_ms: captured,
         }
     }
@@ -404,7 +431,9 @@ mod tests {
             started_at_unix_ms: Some(1_000),
             finished_at_unix_ms: Some(2_000),
             evidence: Some(evidence(
-                ReconstructionEvidenceClaim::RecoveryAction,
+                ReconstructionEvidenceClaim::RecoveryAction {
+                    action: RecoveryActionKind::RebuildSwitch,
+                },
                 "recovery-action",
                 1_100,
             )),
@@ -431,6 +460,7 @@ mod tests {
         HostReconstructionEvidence {
             schema_version: HOST_RECONSTRUCTION_EVIDENCE_SCHEMA_VERSION,
             exercise_id: EXERCISE_ID.to_string(),
+            subject_id: SUBJECT_ID.to_string(),
             action: RecoveryActionKind::RebuildSwitch,
             before: state("/nix/store/system-compromised"),
             target: target.clone(),
@@ -485,7 +515,8 @@ mod tests {
     #[test]
     fn dry_run_cannot_verify_reconstruction() {
         let mut reconstruction = reconstruction();
-        reconstruction.action_receipt.as_mut().unwrap().execution_mode = RecoveryExecutionMode::DryRun;
+        reconstruction.action_receipt.as_mut().unwrap().execution_mode =
+            RecoveryExecutionMode::DryRun;
         assert_eq!(reconstruction.outcome(), ReconstructionOutcome::Unproven);
     }
 
@@ -513,6 +544,22 @@ mod tests {
     }
 
     #[test]
+    fn wrong_action_claim_cannot_prove_recovery_action() {
+        let mut reconstruction = reconstruction();
+        reconstruction
+            .action_receipt
+            .as_mut()
+            .unwrap()
+            .evidence
+            .as_mut()
+            .unwrap()
+            .claim = ReconstructionEvidenceClaim::RecoveryAction {
+            action: RecoveryActionKind::Rollback,
+        };
+        assert_eq!(reconstruction.outcome(), ReconstructionOutcome::Unproven);
+    }
+
+    #[test]
     fn foreign_exercise_action_receipt_is_unproven() {
         let mut reconstruction = reconstruction();
         reconstruction
@@ -523,6 +570,20 @@ mod tests {
             .as_mut()
             .unwrap()
             .exercise_id = "exercise-other".to_string();
+        assert_eq!(reconstruction.outcome(), ReconstructionOutcome::Unproven);
+    }
+
+    #[test]
+    fn foreign_subject_action_receipt_is_unproven() {
+        let mut reconstruction = reconstruction();
+        reconstruction
+            .action_receipt
+            .as_mut()
+            .unwrap()
+            .evidence
+            .as_mut()
+            .unwrap()
+            .subject_id = "host:db-01".to_string();
         assert_eq!(reconstruction.outcome(), ReconstructionOutcome::Unproven);
     }
 
@@ -545,7 +606,9 @@ mod tests {
     #[test]
     fn duplicated_post_check_name_is_unproven() {
         let mut reconstruction = reconstruction();
-        reconstruction.post_checks.push(check("critical-service-health", true));
+        reconstruction
+            .post_checks
+            .push(check("critical-service-health", true));
         assert_eq!(reconstruction.outcome(), ReconstructionOutcome::Unproven);
     }
 
