@@ -16,7 +16,7 @@
 
 use std::fmt;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 
 const MAX_ALGORITHM_LEN: usize = 32;
 const MAX_NAMESPACE_LEN: usize = 160;
@@ -31,6 +31,33 @@ pub enum ContentAddressError {
     InvalidNamespaceCharacter,
 }
 
+impl fmt::Display for ContentAddressError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyAlgorithm => write!(f, "content-address algorithm must not be empty"),
+            Self::AlgorithmTooLong { actual, max } => write!(
+                f,
+                "content-address algorithm length {actual} exceeds maximum {max}"
+            ),
+            Self::InvalidAlgorithmCharacter => write!(
+                f,
+                "content-address algorithm contains a character outside [a-z0-9_-]"
+            ),
+            Self::EmptyNamespace => write!(f, "content-address namespace must not be empty"),
+            Self::NamespaceTooLong { actual, max } => write!(
+                f,
+                "content-address namespace length {actual} exceeds maximum {max}"
+            ),
+            Self::InvalidNamespaceCharacter => write!(
+                f,
+                "content-address namespace contains a character outside [A-Za-z0-9_-]"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for ContentAddressError {}
+
 /// A namespaced 32-byte content address whose digest was computed externally.
 ///
 /// `algorithm` identifies the digest algorithm (for example `blake3-256` or
@@ -42,7 +69,7 @@ pub enum ContentAddressError {
 /// This type is **content identity, not authenticity**. A caller that requires
 /// cryptographic provenance must separately verify a signature, trusted timestamp,
 /// attestation, or other authentication evidence over the addressed content.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct ContentAddress32 {
     algorithm: String,
     namespace: String,
@@ -92,6 +119,23 @@ impl ContentAddress32 {
     }
 }
 
+#[derive(Deserialize)]
+struct ContentAddress32Wire {
+    algorithm: String,
+    namespace: String,
+    digest: [u8; 32],
+}
+
+impl<'de> Deserialize<'de> for ContentAddress32 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = ContentAddress32Wire::deserialize(deserializer)?;
+        Self::new(wire.algorithm, wire.namespace, wire.digest).map_err(de::Error::custom)
+    }
+}
+
 impl fmt::Display for ContentAddress32 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}:", self.algorithm, self.namespace)?;
@@ -115,10 +159,9 @@ fn validate_algorithm(value: &str) -> Result<(), ContentAddressError> {
     // Keep algorithm identifiers compact and unambiguous in logs/receipts.
     // Lowercase ASCII, digits, '-' and '_' cover the algorithms currently used
     // across the workspace without imposing a cryptographic registry here.
-    if !value
-        .bytes()
-        .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_'))
-    {
+    if !value.bytes().all(|byte| {
+        byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_')
+    }) {
         return Err(ContentAddressError::InvalidAlgorithmCharacter);
     }
     Ok(())
@@ -136,9 +179,10 @@ fn validate_namespace(value: &str) -> Result<(), ContentAddressError> {
     }
     // Namespace is intentionally ASCII and delimiter-safe so Display remains
     // unambiguous. Dots/slashes/colons are excluded; use '-' or '_' for hierarchy.
-    if !value.bytes().all(|byte| {
-        byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_')
-    }) {
+    if !value
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+    {
         return Err(ContentAddressError::InvalidNamespaceCharacter);
     }
     Ok(())
@@ -206,12 +250,13 @@ mod tests {
     }
 
     #[test]
-    fn serde_does_not_bypass_constructor_invariants_for_valid_values() {
-        let original = address("symthaea-test-v1", 1);
-        let encoded = serde_json::to_string(&original).unwrap();
-        let decoded: ContentAddress32 = serde_json::from_str(&encoded).unwrap();
-        assert_eq!(decoded.algorithm(), "blake3-256");
-        assert_eq!(decoded.namespace(), "symthaea-test-v1");
-        assert_eq!(decoded.digest(), &[1; 32]);
+    fn serde_cannot_bypass_constructor_validation() {
+        let mut encoded = serde_json::to_value(address("symthaea-test-v1", 1)).unwrap();
+        encoded["algorithm"] = serde_json::Value::String("BLAKE3".into());
+        assert!(serde_json::from_value::<ContentAddress32>(encoded).is_err());
+
+        let mut encoded = serde_json::to_value(address("symthaea-test-v1", 1)).unwrap();
+        encoded["namespace"] = serde_json::Value::String("symthaea:test".into());
+        assert!(serde_json::from_value::<ContentAddress32>(encoded).is_err());
     }
 }
