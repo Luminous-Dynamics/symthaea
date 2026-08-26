@@ -34,6 +34,15 @@ pub enum Modality {
     Emotional,
     Interoceptive,
     Abstract,
+    /// Volatile/environmental chemical sensing. Defined here without enabling a
+    /// default root channel; activation remains an explicit topology decision.
+    Olfactory,
+    /// Contact/liquid chemical sensing. Defined here without enabling a default
+    /// root channel; activation remains an explicit topology decision.
+    Gustatory,
+    /// Trigeminal chemical irritation/cooling/burning/carbonation-like sensing,
+    /// kept distinct from gustation and not enabled in the default root topology.
+    Chemesthetic,
 }
 
 impl Modality {
@@ -749,6 +758,24 @@ impl ModalityPrimitiveGrounding {
                 false,
                 false,
             ),
+            // Provisional generic grounding using existing primitive vocabulary.
+            // Chemical semantics remain in the chemosensation subsystem rather
+            // than being fabricated here as new NSM primes.
+            Modality::Olfactory => (
+                vec!["FEEL".into(), "SOMETHING".into(), "NEAR".into(), "BECAUSE".into()],
+                true,
+                false,
+            ),
+            Modality::Gustatory => (
+                vec!["FEEL".into(), "SOMETHING".into(), "BODY".into(), "BECAUSE".into()],
+                true,
+                true,
+            ),
+            Modality::Chemesthetic => (
+                vec!["FEEL".into(), "BODY".into(), "SOMETHING".into(), "MORE".into()],
+                true,
+                true,
+            ),
         }
     }
 }
@@ -820,6 +847,9 @@ impl CrossModalNSMGrounding {
             Modality::Emotional,
             Modality::Interoceptive,
             Modality::Abstract,
+            Modality::Olfactory,
+            Modality::Gustatory,
+            Modality::Chemesthetic,
         ] {
             modalities.insert(modality, ModalityPrimitiveGrounding::new(modality, system));
         }
@@ -1075,6 +1105,9 @@ mod tests {
         assert!(all.contains(&Modality::Visual));
         assert!(all.contains(&Modality::Auditory));
         assert!(all.contains(&Modality::Linguistic));
+        assert!(!all.contains(&Modality::Olfactory));
+        assert!(!all.contains(&Modality::Gustatory));
+        assert!(!all.contains(&Modality::Chemesthetic));
     }
 
     #[test]
@@ -1083,6 +1116,9 @@ mod tests {
         assert!(sensory.contains(&Modality::Visual));
         assert!(sensory.contains(&Modality::Auditory));
         assert!(!sensory.contains(&Modality::Motor));
+        assert!(!sensory.contains(&Modality::Olfactory));
+        assert!(!sensory.contains(&Modality::Gustatory));
+        assert!(!sensory.contains(&Modality::Chemesthetic));
     }
 
     #[test]
