@@ -50,11 +50,18 @@ impl ImmutableArtifactRef {
 }
 
 /// Evidence locator emitted by an existing subsystem.
+///
+/// Completeness alone is deliberately insufficient. Every evidence item is
+/// also bound to the manifest/exercise and capture window that produced it so a
+/// valid old receipt cannot silently satisfy a new recovery exercise.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RehydrationEvidenceRef {
     pub locator: String,
     pub digest: String,
     pub producer_revision: String,
+    pub manifest_id: String,
+    pub exercise_id: String,
+    pub captured_at_unix_ms: u64,
 }
 
 impl RehydrationEvidenceRef {
@@ -62,6 +69,22 @@ impl RehydrationEvidenceRef {
         !self.locator.trim().is_empty()
             && !self.digest.trim().is_empty()
             && !self.producer_revision.trim().is_empty()
+            && !self.manifest_id.trim().is_empty()
+            && !self.exercise_id.trim().is_empty()
+    }
+
+    fn is_bound_to(
+        &self,
+        manifest: &HostRehydrationManifest,
+        started_at_unix_ms: u64,
+        finished_at_unix_ms: u64,
+    ) -> bool {
+        self.is_complete()
+            && started_at_unix_ms <= finished_at_unix_ms
+            && self.manifest_id == manifest.manifest_id
+            && self.exercise_id == manifest.exercise_id
+            && started_at_unix_ms <= self.captured_at_unix_ms
+            && self.captured_at_unix_ms <= finished_at_unix_ms
     }
 }
 
@@ -166,12 +189,14 @@ pub enum PostInstallCheckKind {
     SystemGenerationMatchesDeclaration,
     /// One required service is healthy after reconstruction.
     RequiredServiceHealthy { service: String },
-    /// Secure Boot posture matches the exercise expectation.
+    /// Secure Boot posture matches the exercise expectation. The corresponding
+    /// check spec must carry an expectation digest describing the expected state.
     SecureBootPosture,
     /// Restored protected data matches the provider's manifest/commitment.
     ProtectedDataIntegrity,
     /// Network isolation/egress assertion proven by the Network Twin or an
-    /// authorized enforcement/probe adapter.
+    /// authorized enforcement/probe adapter. The check spec must carry the
+    /// exact network-intent commitment being tested.
     NetworkIsolation,
     /// Extension point; the id remains part of the evidence contract.
     Custom { kind: String },
@@ -191,8 +216,8 @@ impl PostInstallCheckKind {
 pub struct PostInstallCheckSpec {
     pub check_id: String,
     pub kind: PostInstallCheckKind,
-    /// Optional digest/commitment for a check-specific expectation. For
-    /// example, a service-set manifest or network-intent revision.
+    /// Optional digest/commitment for a check-specific expectation. Required for
+    /// check kinds whose expected state is not otherwise present in the type.
     pub expectation_digest: Option<String>,
 }
 
@@ -242,6 +267,9 @@ pub enum HostRehydrationManifestError {
     DuplicatePostInstallCheck { check_id: String },
     MissingGenerationVerification,
     MissingProtectedDataIntegrityCheck,
+    ProtectedDataIntegrityExpectationMismatch { check_id: String },
+    MissingSecureBootExpectation { check_id: String },
+    MissingNetworkIsolationExpectation { check_id: String },
 }
 
 impl HostRehydrationManifest {
@@ -294,11 +322,44 @@ impl HostRehydrationManifest {
                 });
             }
             has_generation_check |= matches!(
-                check.kind,
+                &check.kind,
                 PostInstallCheckKind::SystemGenerationMatchesDeclaration
             );
             has_protected_data_integrity |=
-                matches!(check.kind, PostInstallCheckKind::ProtectedDataIntegrity);
+                matches!(&check.kind, PostInstallCheckKind::ProtectedDataIntegrity);
+
+            match &check.kind {
+                PostInstallCheckKind::ProtectedDataIntegrity => {
+                    if let Some(restore) = &self.protected_restore {
+                        if check.expectation_digest.as_deref()
+                            != Some(restore.manifest_digest.as_str())
+                        {
+                            errors.push(
+                                HostRehydrationManifestError::ProtectedDataIntegrityExpectationMismatch {
+                                    check_id: check.check_id.clone(),
+                                },
+                            );
+                        }
+                    }
+                }
+                PostInstallCheckKind::SecureBootPosture
+                    if check.expectation_digest.as_deref().is_none_or(str::is_empty) =>
+                {
+                    errors.push(HostRehydrationManifestError::MissingSecureBootExpectation {
+                        check_id: check.check_id.clone(),
+                    });
+                }
+                PostInstallCheckKind::NetworkIsolation
+                    if check.expectation_digest.as_deref().is_none_or(str::is_empty) =>
+                {
+                    errors.push(
+                        HostRehydrationManifestError::MissingNetworkIsolationExpectation {
+                            check_id: check.check_id.clone(),
+                        },
+                    );
+                }
+                _ => {}
+            }
         }
 
         if !has_generation_check {
@@ -344,8 +405,8 @@ impl RehydrationExecutionMode {
 pub enum RecoveryBootOrigin {
     /// Booted from the immutable installer artifact named in the manifest.
     ExternalInstaller,
-    /// Booted from another dedicated recovery environment whose identity is
-    /// independently evidenced.
+    /// Booted from the pinned recovery artifact on another dedicated recovery
+    /// environment. The boot fact still requires bound evidence in the receipt.
     DedicatedRecoveryEnvironment,
     /// The previous runtime filesystem remained the trust root.
     PriorRuntime,
@@ -376,14 +437,6 @@ pub struct TargetPreparationReceipt {
     pub evidence: Option<RehydrationEvidenceRef>,
 }
 
-impl TargetPreparationReceipt {
-    fn has_complete_evidence(&self) -> bool {
-        self.evidence
-            .as_ref()
-            .is_some_and(RehydrationEvidenceRef::is_complete)
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RestoreResult {
@@ -401,28 +454,32 @@ pub struct ProtectedRestoreReceipt {
     pub evidence: Option<RehydrationEvidenceRef>,
 }
 
-impl ProtectedRestoreReceipt {
-    fn has_complete_evidence(&self) -> bool {
-        self.evidence
-            .as_ref()
-            .is_some_and(RehydrationEvidenceRef::is_complete)
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PostInstallCheckResult {
     pub check_id: String,
+    /// Echo of the exact semantic check that was executed. The evaluator
+    /// compares this to the manifest instead of trusting `check_id` alone.
+    pub kind: PostInstallCheckKind,
+    /// Echo of the exact expectation commitment used by the checker.
+    pub expectation_digest: Option<String>,
     pub passed: bool,
     pub evidence: Option<RehydrationEvidenceRef>,
 }
 
 impl PostInstallCheckResult {
-    fn has_complete_evidence(&self) -> bool {
+    fn is_complete(&self) -> bool {
         !self.check_id.trim().is_empty()
-            && self
-                .evidence
-                .as_ref()
-                .is_some_and(RehydrationEvidenceRef::is_complete)
+            && self.kind.is_complete()
+            && !self
+                .expectation_digest
+                .as_deref()
+                .is_some_and(|digest| digest.trim().is_empty())
+    }
+
+    fn matches_spec(&self, spec: &PostInstallCheckSpec) -> bool {
+        self.check_id == spec.check_id
+            && self.kind == spec.kind
+            && self.expectation_digest == spec.expectation_digest
     }
 }
 
@@ -434,6 +491,9 @@ pub struct HostRehydrationReceipt {
     pub exercise_id: String,
     pub execution_mode: RehydrationExecutionMode,
     pub boot_origin: RecoveryBootOrigin,
+    /// Evidence that the claimed recovery trust root actually booted for this
+    /// exact exercise; the enum alone never proves the fact.
+    pub boot_origin_evidence: Option<RehydrationEvidenceRef>,
     /// Installer artifact actually observed by the runner.
     pub installer: ImmutableArtifactRef,
     /// Declaration actually supplied to the install/rebuild path.
@@ -465,6 +525,20 @@ pub enum RehydrationOutcome {
 }
 
 impl HostRehydrationReceipt {
+    fn evidence_is_bound(
+        &self,
+        evidence: Option<&RehydrationEvidenceRef>,
+        manifest: &HostRehydrationManifest,
+    ) -> bool {
+        evidence.is_some_and(|evidence| {
+            evidence.is_bound_to(
+                manifest,
+                self.started_at_unix_ms,
+                self.finished_at_unix_ms,
+            )
+        })
+    }
+
     /// Evaluate one receipt against the manifest it claims to satisfy.
     ///
     /// The evaluator is intentionally asymmetric. A complete live failure is
@@ -492,6 +566,9 @@ impl HostRehydrationReceipt {
         if !self.boot_origin.proves_external_trust_root() {
             unproven.push("recovery did not prove an external recovery trust root".to_string());
         }
+        if !self.evidence_is_bound(self.boot_origin_evidence.as_ref(), manifest) {
+            unproven.push("recovery boot origin lacks bound exercise evidence".to_string());
+        }
         if self.installer != manifest.installer || !self.installer.is_complete() {
             unproven.push("observed installer does not match the pinned installer".to_string());
         }
@@ -510,24 +587,23 @@ impl HostRehydrationReceipt {
         }
 
         match self.preparation.result {
-            PreparationResult::Prepared if self.preparation.has_complete_evidence() => {}
-            PreparationResult::Failed if self.preparation.has_complete_evidence() => {
+            PreparationResult::Prepared
+                if self.evidence_is_bound(self.preparation.evidence.as_ref(), manifest) => {}
+            PreparationResult::Failed
+                if self.evidence_is_bound(self.preparation.evidence.as_ref(), manifest) =>
+            {
                 failed.push("target preparation failed".to_string());
             }
             PreparationResult::Prepared | PreparationResult::Failed => {
-                unproven.push("target preparation result lacks complete evidence".to_string());
+                unproven.push("target preparation result lacks bound exercise evidence".to_string());
             }
             PreparationResult::NotAttempted | PreparationResult::Unknown => {
                 unproven.push("target was not proven cleanly prepared".to_string());
             }
         }
 
-        if !self
-            .nixward_reconstruction_evidence
-            .as_ref()
-            .is_some_and(RehydrationEvidenceRef::is_complete)
-        {
-            unproven.push("missing complete Nixward reconstruction evidence".to_string());
+        if !self.evidence_is_bound(self.nixward_reconstruction_evidence.as_ref(), manifest) {
+            unproven.push("missing bound Nixward reconstruction evidence".to_string());
         }
 
         match (&manifest.protected_restore, &self.protected_restore.result) {
@@ -538,18 +614,21 @@ impl HostRehydrationReceipt {
             (Some(expected), RestoreResult::Restored) => {
                 if self.protected_restore.generation_ref.as_deref()
                     != Some(expected.generation_ref.as_str())
-                    || !self.protected_restore.has_complete_evidence()
+                    || !self.evidence_is_bound(self.protected_restore.evidence.as_ref(), manifest)
                 {
                     unproven.push(
-                        "protected restore is missing generation binding or evidence".to_string(),
+                        "protected restore is missing generation binding or bound evidence"
+                            .to_string(),
                     );
                 }
             }
-            (Some(_), RestoreResult::Failed) if self.protected_restore.has_complete_evidence() => {
+            (Some(_), RestoreResult::Failed)
+                if self.evidence_is_bound(self.protected_restore.evidence.as_ref(), manifest) =>
+            {
                 failed.push("protected data restore failed".to_string());
             }
             (Some(_), RestoreResult::Failed) => unproven.push(
-                "protected restore failure lacks complete evidence".to_string(),
+                "protected restore failure lacks bound exercise evidence".to_string(),
             ),
             (Some(_), RestoreResult::NotRequested | RestoreResult::Unknown) => {
                 unproven.push("required protected data restore was not proven".to_string());
@@ -566,19 +645,24 @@ impl HostRehydrationReceipt {
         }
 
         for result in &self.post_install_checks {
-            if !expected.contains_key(result.check_id.as_str()) {
+            let Some(spec) = expected.get(result.check_id.as_str()) else {
                 unproven.push(format!(
                     "unexpected post-install check result: {}",
                     result.check_id
                 ));
                 continue;
-            }
+            };
             if counts.get(result.check_id.as_str()).copied().unwrap_or_default() != 1 {
                 continue;
             }
-            if !result.has_complete_evidence() {
+            if !result.is_complete() || !result.matches_spec(spec) {
                 unproven.push(format!(
-                    "post-install check lacks complete evidence: {}",
+                    "post-install check result is not bound to the manifest spec: {}",
+                    result.check_id
+                ));
+            } else if !self.evidence_is_bound(result.evidence.as_ref(), manifest) {
+                unproven.push(format!(
+                    "post-install check lacks bound exercise evidence: {}",
                     result.check_id
                 ));
             } else if !result.passed {
@@ -619,11 +703,14 @@ mod tests {
         }
     }
 
-    fn evidence(name: &str) -> RehydrationEvidenceRef {
+    fn evidence(name: &str, manifest: &HostRehydrationManifest) -> RehydrationEvidenceRef {
         RehydrationEvidenceRef {
             locator: format!("receipt:{name}"),
             digest: format!("sha256:{name}-digest"),
             producer_revision: format!("git:{name}-producer"),
+            manifest_id: manifest.manifest_id.clone(),
+            exercise_id: manifest.exercise_id.clone(),
+            captured_at_unix_ms: 1_500,
         }
     }
 
@@ -646,7 +733,7 @@ mod tests {
             post_install_checks.push(PostInstallCheckSpec {
                 check_id: "restore-integrity".to_string(),
                 kind: PostInstallCheckKind::ProtectedDataIntegrity,
-                expectation_digest: Some("sha256:expected-data".to_string()),
+                expectation_digest: Some("sha256:protected-manifest".to_string()),
             });
         }
 
@@ -679,6 +766,7 @@ mod tests {
             exercise_id: manifest.exercise_id.clone(),
             execution_mode: RehydrationExecutionMode::LiveDisposableLab,
             boot_origin: RecoveryBootOrigin::ExternalInstaller,
+            boot_origin_evidence: Some(evidence("recovery-boot", manifest)),
             installer: manifest.installer.clone(),
             system_declaration: manifest.system_declaration.clone(),
             started_at_unix_ms: 1_000,
@@ -691,14 +779,14 @@ mod tests {
             },
             preparation: TargetPreparationReceipt {
                 result: PreparationResult::Prepared,
-                evidence: Some(evidence("disk-preparation")),
+                evidence: Some(evidence("disk-preparation", manifest)),
             },
-            nixward_reconstruction_evidence: Some(evidence("nixward-reconstruction")),
+            nixward_reconstruction_evidence: Some(evidence("nixward-reconstruction", manifest)),
             protected_restore: match &manifest.protected_restore {
                 Some(restore) => ProtectedRestoreReceipt {
                     result: RestoreResult::Restored,
                     generation_ref: Some(restore.generation_ref.clone()),
-                    evidence: Some(evidence("protected-restore")),
+                    evidence: Some(evidence("protected-restore", manifest)),
                 },
                 None => ProtectedRestoreReceipt {
                     result: RestoreResult::NotRequested,
@@ -711,8 +799,10 @@ mod tests {
                 .iter()
                 .map(|check| PostInstallCheckResult {
                     check_id: check.check_id.clone(),
+                    kind: check.kind.clone(),
+                    expectation_digest: check.expectation_digest.clone(),
                     passed: true,
-                    evidence: Some(evidence(&check.check_id)),
+                    evidence: Some(evidence(&check.check_id, manifest)),
                 })
                 .collect(),
         }
@@ -723,7 +813,7 @@ mod tests {
         let mut manifest = manifest(false);
         manifest.post_install_checks.retain(|check| {
             !matches!(
-                check.kind,
+                &check.kind,
                 PostInstallCheckKind::SystemGenerationMatchesDeclaration
             )
         });
@@ -736,7 +826,7 @@ mod tests {
     fn restore_manifest_requires_data_integrity_check() {
         let mut manifest = manifest(true);
         manifest.post_install_checks.retain(|check| {
-            !matches!(check.kind, PostInstallCheckKind::ProtectedDataIntegrity)
+            !matches!(&check.kind, PostInstallCheckKind::ProtectedDataIntegrity)
         });
         assert!(manifest.validation_errors().contains(
             &HostRehydrationManifestError::MissingProtectedDataIntegrityCheck
@@ -744,10 +834,56 @@ mod tests {
     }
 
     #[test]
+    fn restore_integrity_check_must_target_exact_protected_manifest() {
+        let mut manifest = manifest(true);
+        let check = manifest
+            .post_install_checks
+            .iter_mut()
+            .find(|check| matches!(&check.kind, PostInstallCheckKind::ProtectedDataIntegrity))
+            .expect("integrity check");
+        check.expectation_digest = Some("sha256:wrong-manifest".to_string());
+        assert!(manifest.validation_errors().iter().any(|error| matches!(
+            error,
+            HostRehydrationManifestError::ProtectedDataIntegrityExpectationMismatch { .. }
+        )));
+    }
+
+    #[test]
+    fn network_isolation_check_requires_an_intent_commitment() {
+        let mut manifest = manifest(false);
+        manifest.post_install_checks.push(PostInstallCheckSpec {
+            check_id: "network".to_string(),
+            kind: PostInstallCheckKind::NetworkIsolation,
+            expectation_digest: None,
+        });
+        assert!(manifest.validation_errors().iter().any(|error| matches!(
+            error,
+            HostRehydrationManifestError::MissingNetworkIsolationExpectation { .. }
+        )));
+    }
+
+    #[test]
+    fn secure_boot_check_requires_an_expected_posture_commitment() {
+        let mut manifest = manifest(false);
+        manifest.post_install_checks.push(PostInstallCheckSpec {
+            check_id: "secure-boot".to_string(),
+            kind: PostInstallCheckKind::SecureBootPosture,
+            expectation_digest: None,
+        });
+        assert!(manifest.validation_errors().iter().any(|error| matches!(
+            error,
+            HostRehydrationManifestError::MissingSecureBootExpectation { .. }
+        )));
+    }
+
+    #[test]
     fn complete_live_clean_rehydration_is_verified() {
         let manifest = manifest(true);
         assert!(manifest.is_valid());
-        assert_eq!(receipt(&manifest).evaluate(&manifest), RehydrationOutcome::Verified);
+        assert_eq!(
+            receipt(&manifest).evaluate(&manifest),
+            RehydrationOutcome::Verified
+        );
     }
 
     #[test]
@@ -766,6 +902,17 @@ mod tests {
         let manifest = manifest(false);
         let mut receipt = receipt(&manifest);
         receipt.boot_origin = RecoveryBootOrigin::PriorRuntime;
+        assert!(matches!(
+            receipt.evaluate(&manifest),
+            RehydrationOutcome::Unproven { .. }
+        ));
+    }
+
+    #[test]
+    fn boot_origin_without_bound_evidence_is_unproven() {
+        let manifest = manifest(false);
+        let mut receipt = receipt(&manifest);
+        receipt.boot_origin_evidence = None;
         assert!(matches!(
             receipt.evaluate(&manifest),
             RehydrationOutcome::Unproven { .. }
@@ -795,7 +942,39 @@ mod tests {
     }
 
     #[test]
-    fn failed_restore_with_complete_evidence_is_failed() {
+    fn foreign_preparation_evidence_cannot_establish_failure() {
+        let manifest = manifest(false);
+        let mut receipt = receipt(&manifest);
+        receipt.preparation.result = PreparationResult::Failed;
+        receipt
+            .preparation
+            .evidence
+            .as_mut()
+            .expect("preparation evidence")
+            .exercise_id = "exercise-other".to_string();
+        assert!(matches!(
+            receipt.evaluate(&manifest),
+            RehydrationOutcome::Unproven { .. }
+        ));
+    }
+
+    #[test]
+    fn stale_nixward_evidence_is_unproven() {
+        let manifest = manifest(false);
+        let mut receipt = receipt(&manifest);
+        receipt
+            .nixward_reconstruction_evidence
+            .as_mut()
+            .expect("Nixward evidence")
+            .captured_at_unix_ms = 999;
+        assert!(matches!(
+            receipt.evaluate(&manifest),
+            RehydrationOutcome::Unproven { .. }
+        ));
+    }
+
+    #[test]
+    fn failed_restore_with_complete_bound_evidence_is_failed() {
         let manifest = manifest(true);
         let mut receipt = receipt(&manifest);
         receipt.protected_restore.result = RestoreResult::Failed;
@@ -818,13 +997,26 @@ mod tests {
     }
 
     #[test]
-    fn failed_post_install_check_with_evidence_is_failed() {
+    fn failed_post_install_check_with_bound_evidence_is_failed() {
         let manifest = manifest(false);
         let mut receipt = receipt(&manifest);
         receipt.post_install_checks[0].passed = false;
         assert!(matches!(
             receipt.evaluate(&manifest),
             RehydrationOutcome::Failed { .. }
+        ));
+    }
+
+    #[test]
+    fn post_install_result_for_wrong_semantic_check_is_unproven() {
+        let manifest = manifest(false);
+        let mut receipt = receipt(&manifest);
+        receipt.post_install_checks[0].kind = PostInstallCheckKind::NetworkIsolation;
+        receipt.post_install_checks[0].expectation_digest =
+            Some("sha256:unrelated-intent".to_string());
+        assert!(matches!(
+            receipt.evaluate(&manifest),
+            RehydrationOutcome::Unproven { .. }
         ));
     }
 
@@ -857,7 +1049,7 @@ mod tests {
         receipt.protected_restore = ProtectedRestoreReceipt {
             result: RestoreResult::Restored,
             generation_ref: Some("unexpected".to_string()),
-            evidence: Some(evidence("unexpected-restore")),
+            evidence: Some(evidence("unexpected-restore", &manifest)),
         };
         assert!(matches!(
             receipt.evaluate(&manifest),
@@ -869,7 +1061,9 @@ mod tests {
     fn duplicate_check_result_is_unproven() {
         let manifest = manifest(false);
         let mut receipt = receipt(&manifest);
-        receipt.post_install_checks.push(receipt.post_install_checks[0].clone());
+        receipt
+            .post_install_checks
+            .push(receipt.post_install_checks[0].clone());
         assert!(matches!(
             receipt.evaluate(&manifest),
             RehydrationOutcome::Unproven { .. }
