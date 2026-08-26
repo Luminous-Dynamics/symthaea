@@ -2,6 +2,7 @@ name: SYM-ARCH-002A6 Measurement Dynamics
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
       - research/sym-arch-002a-core-v1
@@ -32,6 +33,9 @@ env:
 jobs:
   measurement-dynamics:
     name: Validate acquisition and resource measurement core
+    # Draft stacked PRs cannot merge and should not consume scarce runner capacity.
+    # Promoting to ready-for-review explicitly triggers this exact gate.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
