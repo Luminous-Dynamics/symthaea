@@ -157,7 +157,7 @@ pub struct PolicyEvaluation {
 impl PolicyEvaluation {
     pub fn should_enforce_deny(&self) -> bool {
         self.mode == PolicyMode::Enforce
-            && matches!(self.decision, CapabilityDecision::Deny { .. })
+            && matches!(&self.decision, CapabilityDecision::Deny { .. })
     }
 }
 
