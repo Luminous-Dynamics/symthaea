@@ -20,6 +20,7 @@
 pub mod calibration;
 pub mod cognition;
 pub mod encoding;
+pub mod experiment;
 pub mod fingerprint;
 pub mod flavor;
 pub mod gustation;
@@ -36,6 +37,11 @@ pub use cognition::{
     ChemicalCognitionError, ChemicalCognitionPipeline, CognitiveChemicalPercept,
 };
 pub use encoding::ScalarHdcEncoder;
+pub use experiment::{
+    ChemicalDecisionProtocol, ChemicalDecisionReceipt, ChemicalEvidenceLevel, DecisionError,
+    DecisionProtocolError, EvaluationPartition, ExperimentDecision, GateDirection, GateOutcome,
+    MetricGate, MetricGateResult, MetricObservation,
+};
 pub use fingerprint::{
     ChannelEncodingSpec, ChemicalFingerprint, ChemicalFingerprintEncoder, FingerprintConfigError,
     FingerprintError,
