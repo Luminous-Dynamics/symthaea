@@ -384,6 +384,7 @@ mod tests {
         CalibrationDecisionPolicy, CalibrationPolicyId,
     };
     use symthaea_time_integrity::{ClockDomainId, ClockEpochId, TimeIntegrityReceipt};
+    use symthaea_time_normalization::ClockTransformModel;
 
     fn source_domain() -> ClockDomainId {
         ClockDomainId::new("sensor-a/monotonic").unwrap()
@@ -469,9 +470,15 @@ mod tests {
     #[test]
     fn exact_calibration_anchor_maps_using_accepted_nominal_offset() {
         let value = BoundedHoldoverTransform::new(accepted_bundle(), continuous_claim()).unwrap();
-        let json = serde_json::to_value(value.transform()).unwrap();
-        assert_eq!(json["model"]["Offset"]["source_anchor_us"], 1_015);
-        assert_eq!(json["model"]["Offset"]["target_anchor_us"], 1_515);
+        match value.transform().model() {
+            ClockTransformModel::Offset {
+                source_anchor_us,
+                target_anchor_us,
+            } => {
+                assert_eq!(*source_anchor_us, 1_015);
+                assert_eq!(*target_anchor_us, 1_515);
+            }
+        }
     }
 
     #[test]
