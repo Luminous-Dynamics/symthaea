@@ -517,7 +517,7 @@ pub enum RehydrationOutcome {
     /// Complete evidence proves the clean-host exercise succeeded.
     Verified,
     /// Complete evidence positively establishes a required operation/check
-    /// failed during a live exercise.
+    /// failed during a live exercise whose foundational applicability is proven.
     Failed { reasons: Vec<String> },
     /// Evidence is missing, ambiguous, mismatched, dry-run, or otherwise
     /// insufficient to establish success/failure.
@@ -541,49 +541,59 @@ impl HostRehydrationReceipt {
 
     /// Evaluate one receipt against the manifest it claims to satisfy.
     ///
-    /// The evaluator is intentionally asymmetric. A complete live failure is
-    /// `FAILED`; absence or ambiguity is `UNPROVEN`; `VERIFIED` requires every
-    /// positive proof gate to pass.
+    /// The evaluator is intentionally asymmetric. Foundational applicability
+    /// comes first: a failed operation on the wrong host, wrong exercise, wrong
+    /// declaration, or untrusted runtime cannot establish `FAILED` for this
+    /// manifest. Once applicability is proven, a complete bound failure may
+    /// dominate ancillary missing evidence. Otherwise absence or ambiguity is
+    /// `UNPROVEN`; `VERIFIED` requires every positive proof gate to pass.
     pub fn evaluate(&self, manifest: &HostRehydrationManifest) -> RehydrationOutcome {
+        let mut foundational_unproven = Vec::new();
         let mut unproven = Vec::new();
         let mut failed = Vec::new();
 
         if !manifest.is_valid() {
-            unproven.push("manifest is invalid".to_string());
+            foundational_unproven.push("manifest is invalid".to_string());
         }
         if self.schema_version != HOST_REHYDRATION_SCHEMA_VERSION {
-            unproven.push("receipt schema version is unsupported".to_string());
+            foundational_unproven.push("receipt schema version is unsupported".to_string());
         }
         if self.manifest_id != manifest.manifest_id || self.manifest_id.trim().is_empty() {
-            unproven.push("receipt is not bound to the expected manifest".to_string());
+            foundational_unproven.push("receipt is not bound to the expected manifest".to_string());
         }
         if self.exercise_id != manifest.exercise_id || self.exercise_id.trim().is_empty() {
-            unproven.push("receipt is not bound to the expected exercise".to_string());
+            foundational_unproven.push("receipt is not bound to the expected exercise".to_string());
         }
         if !self.execution_mode.matches_scope(manifest.scope) {
-            unproven.push("receipt does not prove a live execution in the manifest scope".to_string());
+            foundational_unproven
+                .push("receipt does not prove a live execution in the manifest scope".to_string());
         }
         if !self.boot_origin.proves_external_trust_root() {
-            unproven.push("recovery did not prove an external recovery trust root".to_string());
+            foundational_unproven
+                .push("recovery did not prove an external recovery trust root".to_string());
         }
         if !self.evidence_is_bound(self.boot_origin_evidence.as_ref(), manifest) {
-            unproven.push("recovery boot origin lacks bound exercise evidence".to_string());
+            foundational_unproven
+                .push("recovery boot origin lacks bound exercise evidence".to_string());
         }
         if self.installer != manifest.installer || !self.installer.is_complete() {
-            unproven.push("observed installer does not match the pinned installer".to_string());
+            foundational_unproven
+                .push("observed installer does not match the pinned installer".to_string());
         }
         if self.system_declaration != manifest.system_declaration
             || !self.system_declaration.is_complete()
         {
-            unproven.push("applied system declaration does not match the pinned declaration".to_string());
+            foundational_unproven
+                .push("applied system declaration does not match the pinned declaration".to_string());
         }
         if self.started_at_unix_ms > self.finished_at_unix_ms {
-            unproven.push("receipt time window is invalid".to_string());
+            foundational_unproven.push("receipt time window is invalid".to_string());
         }
         if !self.observed_target.is_complete()
             || !manifest.target.matches_observation(&self.observed_target)
         {
-            unproven.push("observed recovery target does not match manifest target identity".to_string());
+            foundational_unproven
+                .push("observed recovery target does not match manifest target identity".to_string());
         }
 
         match self.preparation.result {
@@ -678,9 +688,25 @@ impl HostRehydrationReceipt {
             }
         }
 
-        // Do not turn a positively observed failure into UNPROVEN merely because
-        // a separate field is incomplete. A complete required-operation/check
-        // failure is itself enough to establish failure of this exercise.
+        // A positive failure finding is only meaningful after foundational
+        // applicability is established. Preserve observed failures as diagnostic
+        // context, but do not promote them to the expected exercise when subject,
+        // target, trust root, declaration, or run identity is unproven.
+        if !foundational_unproven.is_empty() {
+            foundational_unproven.extend(unproven);
+            foundational_unproven.extend(
+                failed
+                    .into_iter()
+                    .map(|reason| format!("non-applicable observed failure: {reason}")),
+            );
+            return RehydrationOutcome::Unproven {
+                reasons: foundational_unproven,
+            };
+        }
+
+        // Once applicability is proven, a complete required-operation/check
+        // failure is itself enough to establish failure of this exercise. Do not
+        // let a separate ancillary missing field erase that positive evidence.
         if !failed.is_empty() {
             return RehydrationOutcome::Failed { reasons: failed };
         }
@@ -931,10 +957,46 @@ mod tests {
     }
 
     #[test]
+    fn wrong_target_cannot_promote_evidenced_check_failure() {
+        let manifest = manifest(false);
+        let mut receipt = receipt(&manifest);
+        receipt.observed_target.disk_identity_digest = "sha256:other-disk".to_string();
+        receipt.post_install_checks[0].passed = false;
+        assert!(matches!(
+            receipt.evaluate(&manifest),
+            RehydrationOutcome::Unproven { .. }
+        ));
+    }
+
+    #[test]
+    fn wrong_exercise_cannot_promote_evidenced_preparation_failure() {
+        let manifest = manifest(false);
+        let mut receipt = receipt(&manifest);
+        receipt.exercise_id = "exercise-other".to_string();
+        receipt.preparation.result = PreparationResult::Failed;
+        assert!(matches!(
+            receipt.evaluate(&manifest),
+            RehydrationOutcome::Unproven { .. }
+        ));
+    }
+
+    #[test]
     fn evidenced_destructive_preparation_failure_is_failed() {
         let manifest = manifest(false);
         let mut receipt = receipt(&manifest);
         receipt.preparation.result = PreparationResult::Failed;
+        assert!(matches!(
+            receipt.evaluate(&manifest),
+            RehydrationOutcome::Failed { .. }
+        ));
+    }
+
+    #[test]
+    fn applicable_failure_dominates_ancillary_missing_evidence() {
+        let manifest = manifest(false);
+        let mut receipt = receipt(&manifest);
+        receipt.preparation.result = PreparationResult::Failed;
+        receipt.nixward_reconstruction_evidence = None;
         assert!(matches!(
             receipt.evaluate(&manifest),
             RehydrationOutcome::Failed { .. }
