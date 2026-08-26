@@ -9,9 +9,9 @@ description = "Bounded drift/holdover evidence for Symthaea clock transforms"
 serde = { workspace = true }
 symthaea-time-integrity = { path = "../symthaea-time-integrity" }
 symthaea-time-normalization = { path = "../symthaea-time-normalization" }
+symthaea-time-calibration = { path = "../symthaea-time-calibration" }
 symthaea-time-calibration-bundle = { path = "../symthaea-time-calibration-bundle" }
 
 [dev-dependencies]
 serde_json = { workspace = true }
-symthaea-time-calibration = { path = "../symthaea-time-calibration" }
 symthaea-time-calibration-policy = { path = "../symthaea-time-calibration-policy" }
