@@ -37,6 +37,7 @@ pub mod novelty;
 pub mod observation;
 pub mod olfaction;
 pub mod percept;
+mod projection_geometry;
 pub mod projection_identity;
 pub mod projection_study;
 pub mod root_projection;
