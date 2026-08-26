@@ -12,3 +12,4 @@ symthaea-time-calibration-policy = { path = "../symthaea-time-calibration-policy
 
 [dev-dependencies]
 serde_json = { workspace = true }
+symthaea-time-integrity = { path = "../symthaea-time-integrity" }
