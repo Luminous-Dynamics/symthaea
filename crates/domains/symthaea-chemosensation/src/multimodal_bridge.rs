@@ -108,12 +108,13 @@ pub struct ChemicalModalBridgeInput {
     pub target: ChemicalBridgeTarget,
     pub encoding_space_id: ChemicalEncodingSpaceId,
     pub vector: ContinuousHV,
-    /// Conservative effective confidence after same-modality agreement is
-    /// considered. For a single component this equals that percept's confidence.
+    /// Effective confidence after component trust and cross-source conflict are
+    /// combined. Multiple agreeing sensors do not automatically inflate this
+    /// above the confidence scale of their components.
     pub confidence: f32,
-    /// Confidence-weighted pairwise cosine agreement in [0, 1]. A single source
-    /// has agreement 1 by definition. Negative similarity is treated as maximal
-    /// disagreement (0), not as evidence that cancels into confidence.
+    /// Conflict-aware same-modality agreement in [0, 1]. Strong contradictory
+    /// components can drive this to zero; a very weak contradictory component
+    /// contributes only in proportion to its ability to support that conflict.
     pub agreement: f32,
     pub earliest_timestamp_us: u64,
     pub latest_timestamp_us: u64,
@@ -264,12 +265,9 @@ impl ChemicalModalBridge {
             });
         }
 
-        let agreement = pairwise_agreement(&components);
-        let weakest_confidence = components
-            .iter()
-            .map(ChemicalPercept::confidence)
-            .fold(1.0f32, f32::min);
-        let confidence = (weakest_confidence * agreement).clamp(0.0, 1.0);
+        let agreement = conflict_aware_agreement(&components);
+        let base_confidence = evidence_weighted_confidence(&components);
+        let confidence = (base_confidence * agreement).clamp(0.0, 1.0);
 
         let hvs: Vec<&ContinuousHV> = components
             .iter()
@@ -301,30 +299,64 @@ impl Default for ChemicalModalBridge {
     }
 }
 
-fn pairwise_agreement(components: &[ChemicalPercept]) -> f32 {
+/// Confidence scale of the evidence set without multiplying certainty simply
+/// because more sensors exist. Weighting confidence by itself gives strong
+/// evidence more influence while preserving the invariant that N identical
+/// components at confidence C still have base confidence C.
+fn evidence_weighted_confidence(components: &[ChemicalPercept]) -> f32 {
+    let total_confidence: f32 = components.iter().map(ChemicalPercept::confidence).sum();
+    if total_confidence <= f32::EPSILON {
+        return 0.0;
+    }
+
+    components
+        .iter()
+        .map(|component| {
+            let confidence = component.confidence();
+            confidence * confidence
+        })
+        .sum::<f32>()
+        / total_confidence
+}
+
+/// Convert pairwise geometric disagreement into a trust-aware conflict penalty.
+///
+/// For each pair, only the weaker component's confidence can support a conflict
+/// claim. The normalization is chosen so mutually orthogonal, equally trusted
+/// components can drive agreement to zero, while a very weak outlier cannot veto
+/// a much stronger consensus. Negative cosine similarity is treated as maximal
+/// conflict rather than as signed cancellation.
+fn conflict_aware_agreement(components: &[ChemicalPercept]) -> f32 {
     if components.len() < 2 {
         return 1.0;
     }
 
-    let mut weighted_similarity = 0.0f32;
-    let mut pair_weight_sum = 0.0f32;
+    let total_confidence: f32 = components.iter().map(ChemicalPercept::confidence).sum();
+    if total_confidence <= f32::EPSILON {
+        return 0.0;
+    }
+
+    let mut conflict_mass = 0.0f32;
     for left in 0..components.len() {
         for right in (left + 1)..components.len() {
-            let pair_weight = components[left].confidence() * components[right].confidence();
             let similarity = components[left]
                 .fingerprint
                 .vector
                 .similarity(&components[right].fingerprint.vector)
                 .clamp(0.0, 1.0);
-            weighted_similarity += similarity * pair_weight;
-            pair_weight_sum += pair_weight;
+            let conflict_support = components[left]
+                .confidence()
+                .min(components[right].confidence());
+            conflict_mass += conflict_support * (1.0 - similarity);
         }
     }
 
-    if pair_weight_sum <= f32::EPSILON {
+    let max_conflict_mass =
+        0.5 * (components.len().saturating_sub(1) as f32) * total_confidence;
+    if max_conflict_mass <= f32::EPSILON {
         0.0
     } else {
-        (weighted_similarity / pair_weight_sum).clamp(0.0, 1.0)
+        (1.0 - conflict_mass / max_conflict_mass).clamp(0.0, 1.0)
     }
 }
 
@@ -404,13 +436,28 @@ mod tests {
         assert_eq!(output.earliest_timestamp_us, 10);
         assert_eq!(output.latest_timestamp_us, 20);
         assert!((output.agreement - 1.0).abs() < 1e-5);
-        assert!((output.confidence - 0.8).abs() < 1e-5);
+        assert!(output.confidence > 0.8 && output.confidence < 0.9);
         assert_eq!(output.components[0], a);
         assert_eq!(output.components[1], b);
     }
 
     #[test]
-    fn disagreement_reduces_influence_without_erasing_sources() {
+    fn equal_confidence_redundancy_does_not_inflate_confidence() {
+        let bridge = ChemicalModalBridge::default();
+        let a = odor(10, "nose-a", 1, 0.8);
+        let b = percept(
+            ChemicalModality::Olfactory,
+            20,
+            "nose-b",
+            a.fingerprint.vector.clone(),
+            0.8,
+        );
+        let output = bridge.aggregate(&[a, b]).unwrap();
+        assert!((output.confidence - 0.8).abs() < 1e-5);
+    }
+
+    #[test]
+    fn strong_disagreement_can_collapse_influence_without_erasing_sources() {
         let bridge = ChemicalModalBridge::default();
         let a = odor(10, "nose-a", 1, 0.9);
         let b = odor(20, "nose-b", 2, 0.9);
@@ -422,19 +469,15 @@ mod tests {
     }
 
     #[test]
-    fn weakest_source_caps_joint_confidence_even_under_perfect_agreement() {
+    fn weak_conflicting_source_cannot_veto_strong_evidence() {
         let bridge = ChemicalModalBridge::default();
-        let a = odor(10, "nose-a", 1, 0.95);
-        let b = percept(
-            ChemicalModality::Olfactory,
-            20,
-            "nose-b",
-            a.fingerprint.vector.clone(),
-            0.4,
-        );
-        let output = bridge.aggregate(&[a, b]).unwrap();
-        assert!((output.agreement - 1.0).abs() < 1e-5);
-        assert!((output.confidence - 0.4).abs() < 1e-5);
+        let strong = odor(10, "nose-a", 1, 0.95);
+        let weak = odor(20, "nose-b", 2, 0.05);
+        let output = bridge.aggregate(&[strong, weak]).unwrap();
+
+        assert!(output.agreement > 0.85);
+        assert!(output.confidence > 0.75);
+        assert!(output.confidence < 0.95);
     }
 
     #[test]
