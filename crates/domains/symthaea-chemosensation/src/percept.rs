@@ -8,7 +8,8 @@
 //! semantic hypotheses must not replace this evidence object.
 
 use crate::{
-    ChemicalFingerprint, ChemicalFingerprintEncoder, ChemicalObservation, FingerprintError,
+    ChemicalEncodingSpaceId, ChemicalFingerprint, ChemicalFingerprintEncoder, ChemicalObservation,
+    ChemicalObservationId, FingerprintError,
 };
 
 /// A cognitive-ready chemical representation with its source evidence intact.
@@ -24,6 +25,16 @@ impl ChemicalPercept {
     /// Evidence timestamp, preserved from the transducer observation.
     pub fn timestamp_us(&self) -> u64 {
         self.evidence.timestamp_us
+    }
+
+    /// Content identity of the exact raw observation attached to this percept.
+    pub fn observation_id(&self) -> ChemicalObservationId {
+        ChemicalObservationId::from_observation(&self.evidence)
+    }
+
+    /// Coordinate-system identity of the derived HDC representation.
+    pub fn encoding_space_id(&self) -> ChemicalEncodingSpaceId {
+        self.fingerprint.encoding_space_id
     }
 
     /// Effective percept confidence inherited from the usable sensor channels.
@@ -108,12 +119,18 @@ mod tests {
     #[test]
     fn percept_preserves_exact_source_evidence() {
         let observation = observation(12.5);
+        let expected_observation_id = ChemicalObservationId::from_observation(&observation);
         let percept = encoder().encode(&observation).unwrap().unwrap();
 
         assert_eq!(percept.evidence, observation);
         assert_eq!(percept.timestamp_us(), 123);
         assert_eq!(percept.evidence.source, "nose-a");
         assert_eq!(percept.fingerprint.used_channels, 1);
+        assert_eq!(percept.observation_id(), expected_observation_id);
+        assert_eq!(
+            percept.encoding_space_id(),
+            percept.fingerprint.encoding_space_id
+        );
     }
 
     #[test]
