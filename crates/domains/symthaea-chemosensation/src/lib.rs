@@ -11,10 +11,12 @@
 //! odor, taste, flavor, novelty, and semantic hypotheses without overwriting the
 //! underlying measurement.
 //!
-//! Three identities remain deliberately distinct:
+//! Representation and evidence identities remain deliberately distinct:
 //!
 //! - [`ChemicalObservationId`] / [`ChemicalEvidenceBundleId`] identify raw evidence,
-//! - [`ChemicalEncodingSpaceId`] identifies the HDC coordinate system,
+//! - [`ChemicalEncodingSpaceId`] identifies the continuous HDC coordinate system,
+//! - [`ChemicalRootProjectionPolicyId`] identifies ContinuousHV -> BinaryHV quantization,
+//! - [`ChemicalRootBinarySpaceId`] identifies the resulting root BinaryHV space,
 //! - semantic labels remain later hypotheses rather than identity.
 //!
 //! The crate starts hardware-independent so cognition and experiments can be
@@ -35,6 +37,7 @@ pub mod novelty;
 pub mod observation;
 pub mod olfaction;
 pub mod percept;
+pub mod projection_identity;
 pub mod root_projection;
 pub mod temporal;
 
@@ -70,6 +73,7 @@ pub use olfaction::{
     MoxArraySimulator, MoxChannelModel, OlfactorySimulationError, OlfactoryStimulus,
 };
 pub use percept::{ChemicalPercept, ChemicalPerceptEncoder};
+pub use projection_identity::{ChemicalRootBinarySpaceId, ChemicalRootProjectionPolicyId};
 pub use root_projection::{
     ChemicalProjectionPairAssessment, ChemicalProjectionQuality, ChemicalRootProjection,
     ChemicalRootProjectionConfig, ChemicalRootProjectionError, ChemicalRootProjector,
