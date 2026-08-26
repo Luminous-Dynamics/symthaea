@@ -23,6 +23,7 @@ pub mod fingerprint;
 pub mod gustation;
 pub mod observation;
 pub mod olfaction;
+pub mod percept;
 
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
 pub use encoding::ScalarHdcEncoder;
@@ -40,3 +41,4 @@ pub use observation::{
 pub use olfaction::{
     MoxArraySimulator, MoxChannelModel, OlfactorySimulationError, OlfactoryStimulus,
 };
+pub use percept::{ChemicalPercept, ChemicalPerceptEncoder};
