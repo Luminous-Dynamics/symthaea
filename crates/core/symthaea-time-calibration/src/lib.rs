@@ -51,12 +51,16 @@ pub enum ExchangeStamp {
 /// Fail-closed validation or calibration error.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CalibrationError {
-    MissingEpoch { stamp: ExchangeStamp },
+    MissingEpoch {
+        stamp: ExchangeStamp,
+    },
     ContinuityNotEstablished {
         stamp: ExchangeStamp,
         status: ContinuityStatus,
     },
-    UnboundedUncertainty { stamp: ExchangeStamp },
+    UnboundedUncertainty {
+        stamp: ExchangeStamp,
+    },
     SourceClockDomainMismatch {
         send: ClockDomainId,
         receive: ClockDomainId,
@@ -75,8 +79,18 @@ pub enum CalibrationError {
     },
     SourceLocalOrderImpossible,
     TargetLocalOrderImpossible,
-    InconsistentOffsetInterval { lower_us: i128, upper_us: i128 },
-    DeclaredSameTimebaseContradiction { lower_us: i128, upper_us: i128 },
+    InconsistentOffsetInterval {
+        lower_us: i128,
+        upper_us: i128,
+    },
+    DeclaredSameTimebaseContradiction {
+        lower_us: i128,
+        upper_us: i128,
+    },
+    DerivedIntervalMismatch {
+        expected: ClockOffsetIntervalUs,
+        actual: ClockOffsetIntervalUs,
+    },
     EmptyCalibrationSet,
     CalibrationIdentityMismatch,
     DisjointCalibrationIntervals,
@@ -126,6 +140,10 @@ impl fmt::Display for CalibrationError {
             Self::DeclaredSameTimebaseContradiction { lower_us, upper_us } => write!(
                 f,
                 "receipts declare one clock domain/epoch but calibration interval [{lower_us}, {upper_us}] excludes zero offset"
+            ),
+            Self::DerivedIntervalMismatch { expected, actual } => write!(
+                f,
+                "stored calibration interval {actual} does not match exchange-derived interval {expected}"
             ),
             Self::EmptyCalibrationSet => write!(f, "calibration set must not be empty"),
             Self::CalibrationIdentityMismatch => write!(
@@ -220,8 +238,16 @@ impl FourTimestampExchange {
                 receive: source_receive.receipt.clock_domain.clone(),
             });
         }
-        let source_send_epoch = source_send.receipt.clock_epoch.clone().unwrap();
-        let source_receive_epoch = source_receive.receipt.clock_epoch.clone().unwrap();
+        let source_send_epoch = source_send
+            .receipt
+            .clock_epoch
+            .clone()
+            .expect("bounded_error established source-send epoch");
+        let source_receive_epoch = source_receive
+            .receipt
+            .clock_epoch
+            .clone()
+            .expect("bounded_error established source-receive epoch");
         if source_send_epoch != source_receive_epoch {
             return Err(CalibrationError::SourceClockEpochMismatch {
                 send: source_send_epoch,
@@ -235,8 +261,16 @@ impl FourTimestampExchange {
                 send: target_send.receipt.clock_domain.clone(),
             });
         }
-        let target_receive_epoch = target_receive.receipt.clock_epoch.clone().unwrap();
-        let target_send_epoch = target_send.receipt.clock_epoch.clone().unwrap();
+        let target_receive_epoch = target_receive
+            .receipt
+            .clock_epoch
+            .clone()
+            .expect("bounded_error established target-receive epoch");
+        let target_send_epoch = target_send
+            .receipt
+            .clock_epoch
+            .clone()
+            .expect("bounded_error established target-send epoch");
         if target_receive_epoch != target_send_epoch {
             return Err(CalibrationError::TargetClockEpochMismatch {
                 receive: target_receive_epoch,
@@ -245,8 +279,8 @@ impl FourTimestampExchange {
         }
 
         // Physical order is source-send <= source-receive and target-receive <=
-        // target-send. We reject only when the bounded timestamp intervals make
-        // that order impossible; overlapping uncertainty remains admissible.
+        // target-send. Reject only when bounded intervals make that order
+        // impossible; overlapping uncertainty remains admissible.
         let source_send_earliest = i128::from(source_send.timestamp_us) - i128::from(e1);
         let source_receive_latest = i128::from(source_receive.timestamp_us) + i128::from(e4);
         if source_receive_latest < source_send_earliest {
@@ -267,16 +301,15 @@ impl FourTimestampExchange {
             source_receive,
         };
 
-        // Validate that at least one source->target offset satisfies the
-        // exchange assumptions before allowing the evidence object to exist.
+        // At least one source->target offset must satisfy the assumptions.
         let interval = exchange.offset_interval()?;
         if exchange.source_domain() == exchange.target_domain()
             && exchange.source_epoch() == exchange.target_epoch()
             && !interval.contains(0)
         {
             return Err(CalibrationError::DeclaredSameTimebaseContradiction {
-                lower_us: interval.lower_us,
-                upper_us: interval.upper_us,
+                lower_us: interval.lower_us(),
+                upper_us: interval.upper_us(),
             });
         }
 
@@ -308,11 +341,19 @@ impl FourTimestampExchange {
     }
 
     pub fn source_epoch(&self) -> &ClockEpochId {
-        self.source_send.receipt.clock_epoch.as_ref().unwrap()
+        self.source_send
+            .receipt
+            .clock_epoch
+            .as_ref()
+            .expect("validated exchange always has a source epoch")
     }
 
     pub fn target_epoch(&self) -> &ClockEpochId {
-        self.target_receive.receipt.clock_epoch.as_ref().unwrap()
+        self.target_receive
+            .receipt
+            .clock_epoch
+            .as_ref()
+            .expect("validated exchange always has a target epoch")
     }
 
     /// Derive the admissible source->target offset interval.
@@ -329,10 +370,10 @@ impl FourTimestampExchange {
     ///
     /// `upper = t2 - t1 + e2 + e1`.
     pub fn offset_interval(&self) -> Result<ClockOffsetIntervalUs, CalibrationError> {
-        let e1 = self.source_send.receipt.uncertainty.max_error_us().unwrap();
-        let e2 = self.target_receive.receipt.uncertainty.max_error_us().unwrap();
-        let e3 = self.target_send.receipt.uncertainty.max_error_us().unwrap();
-        let e4 = self.source_receive.receipt.uncertainty.max_error_us().unwrap();
+        let e1 = bounded_error(ExchangeStamp::SourceSend, &self.source_send)?;
+        let e2 = bounded_error(ExchangeStamp::TargetReceive, &self.target_receive)?;
+        let e3 = bounded_error(ExchangeStamp::TargetSend, &self.target_send)?;
+        let e4 = bounded_error(ExchangeStamp::SourceReceive, &self.source_receive)?;
 
         let lower_us = i128::from(self.target_send.timestamp_us)
             - i128::from(self.source_receive.timestamp_us)
@@ -369,6 +410,12 @@ impl<'de> Deserialize<'de> for ClockOffsetIntervalUs {
     {
         let wire = ClockOffsetIntervalWire::deserialize(deserializer)?;
         Self::new(wire.lower_us, wire.upper_us).map_err(de::Error::custom)
+    }
+}
+
+impl fmt::Display for ClockOffsetIntervalUs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}, {}] us", self.lower_us, self.upper_us)
     }
 }
 
@@ -422,10 +469,37 @@ impl ClockOffsetIntervalUs {
 }
 
 /// Validated evidence from one four-timestamp calibration exchange.
+///
+/// The derived interval is constructor-owned and revalidated on deserialization,
+/// preventing a valid exchange from being paired with a forged tighter bound.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ClockCalibrationEvidence {
-    pub exchange: FourTimestampExchange,
-    pub offset_interval: ClockOffsetIntervalUs,
+    exchange: FourTimestampExchange,
+    offset_interval: ClockOffsetIntervalUs,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ClockCalibrationEvidenceWire {
+    exchange: FourTimestampExchange,
+    offset_interval: ClockOffsetIntervalUs,
+}
+
+impl<'de> Deserialize<'de> for ClockCalibrationEvidence {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = ClockCalibrationEvidenceWire::deserialize(deserializer)?;
+        let evidence = Self::derive(wire.exchange).map_err(de::Error::custom)?;
+        if evidence.offset_interval != wire.offset_interval {
+            return Err(de::Error::custom(CalibrationError::DerivedIntervalMismatch {
+                expected: evidence.offset_interval,
+                actual: wire.offset_interval,
+            }));
+        }
+        Ok(evidence)
+    }
 }
 
 impl ClockCalibrationEvidence {
@@ -436,40 +510,67 @@ impl ClockCalibrationEvidence {
             offset_interval,
         })
     }
+
+    pub fn exchange(&self) -> &FourTimestampExchange {
+        &self.exchange
+    }
+
+    pub fn offset_interval(&self) -> ClockOffsetIntervalUs {
+        self.offset_interval
+    }
+
+    pub fn verify_self(&self) -> Result<(), CalibrationError> {
+        let expected = self.exchange.offset_interval()?;
+        if expected != self.offset_interval {
+            return Err(CalibrationError::DerivedIntervalMismatch {
+                expected,
+                actual: self.offset_interval,
+            });
+        }
+        Ok(())
+    }
 }
 
 /// Non-statistical consensus from intersecting several compatible calibration
 /// intervals. No averaging or distributional assumption is performed.
+///
+/// This is a derived summary, not independent evidence. Keep the source
+/// [`ClockCalibrationEvidence`] objects when the consensus must be audited.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CalibrationConsensus {
-    pub source_domain: ClockDomainId,
-    pub source_epoch: ClockEpochId,
-    pub target_domain: ClockDomainId,
-    pub target_epoch: ClockEpochId,
-    pub offset_interval: ClockOffsetIntervalUs,
-    pub exchange_count: usize,
+    source_domain: ClockDomainId,
+    source_epoch: ClockEpochId,
+    target_domain: ClockDomainId,
+    target_epoch: ClockEpochId,
+    offset_interval: ClockOffsetIntervalUs,
+    exchange_count: usize,
 }
 
 impl CalibrationConsensus {
     pub fn from_evidence(
         evidence: &[ClockCalibrationEvidence],
     ) -> Result<Self, CalibrationError> {
-        let first = evidence.first().ok_or(CalibrationError::EmptyCalibrationSet)?;
-        let source_domain = first.exchange.source_domain().clone();
-        let source_epoch = first.exchange.source_epoch().clone();
-        let target_domain = first.exchange.target_domain().clone();
-        let target_epoch = first.exchange.target_epoch().clone();
-        let mut interval = first.offset_interval;
+        let first = evidence
+            .first()
+            .ok_or(CalibrationError::EmptyCalibrationSet)?;
+        first.verify_self()?;
+
+        let source_domain = first.exchange().source_domain().clone();
+        let source_epoch = first.exchange().source_epoch().clone();
+        let target_domain = first.exchange().target_domain().clone();
+        let target_epoch = first.exchange().target_epoch().clone();
+        let mut interval = first.offset_interval();
 
         for item in &evidence[1..] {
-            if item.exchange.source_domain() != &source_domain
-                || item.exchange.source_epoch() != &source_epoch
-                || item.exchange.target_domain() != &target_domain
-                || item.exchange.target_epoch() != &target_epoch
+            item.verify_self()?;
+            if item.exchange().source_domain() != &source_domain
+                || item.exchange().source_epoch() != &source_epoch
+                || item.exchange().target_domain() != &target_domain
+                || item.exchange().target_epoch() != &target_epoch
             {
                 return Err(CalibrationError::CalibrationIdentityMismatch);
             }
-            interval = interval.intersect(item.offset_interval)?;
+            interval = interval.intersect(item.offset_interval())?;
         }
 
         Ok(Self {
@@ -480,6 +581,32 @@ impl CalibrationConsensus {
             offset_interval: interval,
             exchange_count: evidence.len(),
         })
+    }
+
+    pub fn source_domain(&self) -> &ClockDomainId {
+        &self.source_domain
+    }
+
+    pub fn source_epoch(&self) -> &ClockEpochId {
+        &self.source_epoch
+    }
+
+    pub fn target_domain(&self) -> &ClockDomainId {
+        &self.target_domain
+    }
+
+    pub fn target_epoch(&self) -> &ClockEpochId {
+        &self.target_epoch
+    }
+
+    pub fn offset_interval(&self) -> ClockOffsetIntervalUs {
+        self.offset_interval
+    }
+
+    /// Raw number of exchange records intersected. This is not a statistical
+    /// confidence score and does not imply independence.
+    pub fn exchange_count(&self) -> usize {
+        self.exchange_count
     }
 }
 
@@ -503,18 +630,33 @@ mod tests {
         ClockEpochId::new("capture-host-boot-3").unwrap()
     }
 
-    fn receipt(domain: ClockDomainId, epoch: ClockEpochId, error_us: u64) -> TimeIntegrityReceipt {
+    fn receipt(
+        domain: ClockDomainId,
+        epoch: ClockEpochId,
+        error_us: u64,
+    ) -> TimeIntegrityReceipt {
         TimeIntegrityReceipt::declared(domain)
             .with_epoch(epoch)
             .with_continuity(ContinuityStatus::Continuous)
             .with_uncertainty(TimeUncertainty::bounded(error_us))
     }
 
-    fn stamp(timestamp_us: u64, domain: ClockDomainId, epoch: ClockEpochId, error_us: u64) -> TimestampEvidence {
+    fn stamp(
+        timestamp_us: u64,
+        domain: ClockDomainId,
+        epoch: ClockEpochId,
+        error_us: u64,
+    ) -> TimestampEvidence {
         TimestampEvidence::new(timestamp_us, receipt(domain, epoch, error_us))
     }
 
-    fn exchange(t1: u64, t2: u64, t3: u64, t4: u64, error_us: u64) -> FourTimestampExchange {
+    fn exchange(
+        t1: u64,
+        t2: u64,
+        t3: u64,
+        t4: u64,
+        error_us: u64,
+    ) -> FourTimestampExchange {
         FourTimestampExchange::new(
             stamp(t1, source_domain(), source_epoch(), error_us),
             stamp(t2, target_domain(), target_epoch(), error_us),
@@ -528,43 +670,85 @@ mod tests {
     fn asymmetric_delay_produces_interval_not_fake_point_estimate() {
         // True source->target offset is +500 us.
         // Forward delay 30 us, target processing 20 us, reverse delay 70 us.
-        let evidence = ClockCalibrationEvidence::derive(exchange(1_000, 1_530, 1_550, 1_120, 0)).unwrap();
-        assert_eq!(evidence.offset_interval.lower_us(), 430);
-        assert_eq!(evidence.offset_interval.upper_us(), 530);
-        assert!(evidence.offset_interval.contains(500));
-        assert_eq!(evidence.offset_interval.midpoint_us(), 480);
+        let evidence = ClockCalibrationEvidence::derive(exchange(
+            1_000, 1_530, 1_550, 1_120, 0,
+        ))
+        .unwrap();
+        assert_eq!(evidence.offset_interval().lower_us(), 430);
+        assert_eq!(evidence.offset_interval().upper_us(), 530);
+        assert!(evidence.offset_interval().contains(500));
+        assert_eq!(evidence.offset_interval().midpoint_us(), 480);
     }
 
     #[test]
     fn endpoint_uncertainty_widens_offset_interval() {
-        let evidence = ClockCalibrationEvidence::derive(exchange(1_000, 1_530, 1_550, 1_120, 5)).unwrap();
-        assert_eq!(evidence.offset_interval.lower_us(), 420);
-        assert_eq!(evidence.offset_interval.upper_us(), 540);
-        assert_eq!(evidence.offset_interval.symmetric_radius_us(), 60);
+        let evidence = ClockCalibrationEvidence::derive(exchange(
+            1_000, 1_530, 1_550, 1_120, 5,
+        ))
+        .unwrap();
+        assert_eq!(evidence.offset_interval().lower_us(), 420);
+        assert_eq!(evidence.offset_interval().upper_us(), 540);
+        assert_eq!(evidence.offset_interval().symmetric_radius_us(), 60);
     }
 
     #[test]
     fn symmetric_delay_places_true_offset_at_midpoint() {
-        let evidence = ClockCalibrationEvidence::derive(exchange(1_000, 1_550, 1_570, 1_120, 0)).unwrap();
-        assert_eq!(evidence.offset_interval, ClockOffsetIntervalUs::new(450, 550).unwrap());
-        assert_eq!(evidence.offset_interval.midpoint_us(), 500);
+        let evidence = ClockCalibrationEvidence::derive(exchange(
+            1_000, 1_550, 1_570, 1_120, 0,
+        ))
+        .unwrap();
+        assert_eq!(
+            evidence.offset_interval(),
+            ClockOffsetIntervalUs::new(450, 550).unwrap()
+        );
+        assert_eq!(evidence.offset_interval().midpoint_us(), 500);
     }
 
     #[test]
     fn interval_intersection_tightens_without_averaging() {
-        let first = ClockCalibrationEvidence::derive(exchange(1_000, 1_530, 1_550, 1_120, 0)).unwrap(); // [430, 530]
-        let second = ClockCalibrationEvidence::derive(exchange(2_000, 2_560, 2_580, 2_100, 0)).unwrap(); // [480, 560]
+        let first = ClockCalibrationEvidence::derive(exchange(
+            1_000, 1_530, 1_550, 1_120, 0,
+        ))
+        .unwrap(); // [430, 530]
+        let second = ClockCalibrationEvidence::derive(exchange(
+            2_000, 2_560, 2_580, 2_100, 0,
+        ))
+        .unwrap(); // [480, 560]
         let consensus = CalibrationConsensus::from_evidence(&[first, second]).unwrap();
-        assert_eq!(consensus.offset_interval, ClockOffsetIntervalUs::new(480, 530).unwrap());
-        assert_eq!(consensus.exchange_count, 2);
+        assert_eq!(
+            consensus.offset_interval(),
+            ClockOffsetIntervalUs::new(480, 530).unwrap()
+        );
+        assert_eq!(consensus.exchange_count(), 2);
     }
 
     #[test]
     fn disjoint_intervals_fail_instead_of_being_averaged() {
-        let first = ClockCalibrationEvidence::derive(exchange(1_000, 1_530, 1_550, 1_120, 0)).unwrap();
-        let second = ClockCalibrationEvidence::derive(exchange(2_000, 2_800, 2_820, 2_100, 0)).unwrap();
+        let first = ClockCalibrationEvidence::derive(exchange(
+            1_000, 1_530, 1_550, 1_120, 0,
+        ))
+        .unwrap();
+        let second = ClockCalibrationEvidence::derive(exchange(
+            2_000, 2_800, 2_820, 2_100, 0,
+        ))
+        .unwrap();
         let error = CalibrationConsensus::from_evidence(&[first, second]).unwrap_err();
         assert_eq!(error, CalibrationError::DisjointCalibrationIntervals);
+    }
+
+    #[test]
+    fn exchange_that_admits_no_offset_fails_closed() {
+        let error = FourTimestampExchange::new(
+            stamp(1_000, source_domain(), source_epoch(), 0),
+            stamp(1_100, target_domain(), target_epoch(), 0),
+            stamp(1_500, target_domain(), target_epoch(), 0),
+            stamp(1_200, source_domain(), source_epoch(), 0),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            CalibrationError::InconsistentOffsetInterval { .. }
+        ));
     }
 
     #[test]
@@ -638,18 +822,35 @@ mod tests {
     }
 
     #[test]
-    fn wire_roundtrip_revalidates_exchange() {
-        let value = exchange(1_000, 1_530, 1_550, 1_120, 5);
-        let json = serde_json::to_string(&value).unwrap();
-        let decoded: FourTimestampExchange = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded, value);
+    fn evidence_wire_roundtrip_revalidates_derived_interval() {
+        let evidence = ClockCalibrationEvidence::derive(exchange(
+            1_000, 1_530, 1_550, 1_120, 5,
+        ))
+        .unwrap();
+        let json = serde_json::to_string(&evidence).unwrap();
+        let decoded: ClockCalibrationEvidence = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, evidence);
     }
 
     #[test]
-    fn unknown_wire_fields_fail_closed() {
+    fn forged_tighter_interval_is_rejected_on_wire() {
+        let evidence = ClockCalibrationEvidence::derive(exchange(
+            1_000, 1_530, 1_550, 1_120, 5,
+        ))
+        .unwrap();
+        let mut json = serde_json::to_value(&evidence).unwrap();
+        json["offset_interval"]["lower_us"] = serde_json::json!(490);
+        json["offset_interval"]["upper_us"] = serde_json::json!(510);
+        assert!(serde_json::from_value::<ClockCalibrationEvidence>(json).is_err());
+    }
+
+    #[test]
+    fn unknown_exchange_wire_fields_fail_closed() {
         let value = exchange(1_000, 1_530, 1_550, 1_120, 5);
         let mut json = serde_json::to_value(&value).unwrap();
-        json.as_object_mut().unwrap().insert("unsupported".into(), serde_json::json!(true));
+        json.as_object_mut()
+            .unwrap()
+            .insert("unsupported".into(), serde_json::json!(true));
         assert!(serde_json::from_value::<FourTimestampExchange>(json).is_err());
     }
 }
