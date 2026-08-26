@@ -20,6 +20,7 @@
 pub mod calibration;
 pub mod cognition;
 pub mod encoding;
+pub mod evidence;
 pub mod fingerprint;
 pub mod flavor;
 pub mod gustation;
@@ -35,6 +36,7 @@ pub use cognition::{
     ChemicalCognitionError, ChemicalCognitionPipeline, CognitiveChemicalPercept,
 };
 pub use encoding::ScalarHdcEncoder;
+pub use evidence::{ChemicalEvidenceBundleId, ChemicalObservationId};
 pub use fingerprint::{
     ChannelEncodingSpec, ChemicalEncodingSpaceId, ChemicalFingerprint, ChemicalFingerprintEncoder,
     FingerprintConfigError, FingerprintError,
