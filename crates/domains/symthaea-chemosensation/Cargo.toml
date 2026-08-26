@@ -3,6 +3,7 @@ name = "symthaea-chemosensation"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
+readme = "README.md"
 description = "Shared chemical-sensing primitives for Symthaea olfaction and gustation: observations, calibration provenance, and locality-preserving HDC encoding."
 
 [dependencies]
