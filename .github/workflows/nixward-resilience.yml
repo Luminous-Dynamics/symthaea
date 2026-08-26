@@ -1,0 +1,36 @@
+name: Nixward Resilience
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/nixward/src/ransomware_resilience.rs"
+      - "crates/core/nixward/src/capability_policy.rs"
+      - "crates/core/nixward/src/lib.rs"
+      - ".github/workflows/nixward-resilience.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nixward-resilience-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Nixward resilience contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --check -p nixward
+      - name: Default-feature contract tests
+        run: cargo test -p nixward --lib ransomware_resilience::tests capability_policy::tests
+      - name: No-default-feature contract tests
+        run: cargo test -p nixward --no-default-features --lib ransomware_resilience::tests capability_policy::tests
+      - name: Clippy
+        run: cargo clippy -p nixward --all-targets -- -D warnings
