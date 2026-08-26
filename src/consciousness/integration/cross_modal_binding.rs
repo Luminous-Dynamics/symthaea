@@ -11,6 +11,7 @@
 //! mutation that can change the bundle invalidates the cached `current_binding`
 //! so queries never silently operate on stale evidence.
 
+use super::modality_identity::{modality_seed, modality_sort_key};
 use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -104,7 +105,7 @@ impl ModalityChannel {
             return self.features;
         }
         let noise_level = (1.0 - attention) as f32 * 0.3;
-        self.features.add_noise(noise_level, self.modality as u64)
+        self.features.add_noise(noise_level, modality_seed(self.modality))
     }
 
     pub fn temporal_coherence(&self) -> f64 {
@@ -429,7 +430,7 @@ impl CrossModalBinder {
             })
             .collect();
 
-        entries.sort_by_key(|(modality, _, _)| *modality as u8);
+        entries.sort_by_key(|(modality, _, _)| modality_sort_key(*modality));
         if entries.is_empty() {
             self.current_binding = None;
             return None;
