@@ -17,13 +17,18 @@
 //! Hypervector comparison is only meaningful when components were encoded in
 //! the same HDC coordinate system. Comparability is proven from each fingerprint's
 //! content-addressed [`ChemicalEncodingSpaceId`], not from a caller-supplied label.
+//! The aggregate also carries a [`ChemicalEvidenceBundleId`] over the exact raw
+//! observations so downstream cognition can distinguish evidence identity from
+//! representation identity.
 //!
 //! The numeric target IDs mirror the canonical root identity contract introduced
 //! by PR #84 (`consciousness::integration::modality_identity`). This domain crate
 //! intentionally does not depend on the root `symthaea` package, avoiding a
 //! dependency cycle. The final root bridge must assert the mapping on its side too.
 
-use crate::{ChemicalEncodingSpaceId, ChemicalModality, ChemicalPercept};
+use crate::{
+    ChemicalEncodingSpaceId, ChemicalEvidenceBundleId, ChemicalModality, ChemicalPercept,
+};
 use symthaea_core::hdc::{HDC_DIMENSION, unified_hv::ContinuousHV};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -101,11 +106,16 @@ pub enum ChemicalModalBridgeError {
 ///
 /// `components` remain attached so downstream code can inspect disagreement,
 /// sensor identity, raw observations, calibration provenance, timestamps, and
-/// their common encoding-space identity. The aggregate vector is a convenience
-/// representation, not replacement evidence.
+/// their common encoding-space identity. `evidence_bundle_id` gives the exact raw
+/// evidence bundle a compact stable identity independent of the derived HDC
+/// representation. The aggregate vector is a convenience representation, not
+/// replacement evidence.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChemicalModalBridgeInput {
     pub target: ChemicalBridgeTarget,
+    /// Identity of the raw observations summarized by this aggregate.
+    pub evidence_bundle_id: ChemicalEvidenceBundleId,
+    /// Identity of the HDC coordinate system used to represent those observations.
     pub encoding_space_id: ChemicalEncodingSpaceId,
     pub vector: ContinuousHV,
     /// Effective confidence after component trust and cross-source conflict are
@@ -251,10 +261,12 @@ impl ChemicalModalBridge {
                         .cmp(&right.confidence().to_bits())
                 })
         });
+        let evidence_bundle_id = ChemicalEvidenceBundleId::from_percepts(&components);
 
         if components.len() == 1 {
             return Ok(ChemicalModalBridgeInput {
                 target: modality.into(),
+                evidence_bundle_id,
                 encoding_space_id,
                 vector: components[0].fingerprint.vector.clone(),
                 confidence: components[0].confidence(),
@@ -282,6 +294,7 @@ impl ChemicalModalBridge {
 
         Ok(ChemicalModalBridgeInput {
             target: modality.into(),
+            evidence_bundle_id,
             encoding_space_id,
             vector,
             confidence,
@@ -413,6 +426,10 @@ mod tests {
             output.encoding_space_id,
             ChemicalEncodingSpaceId::from_bytes([7; 32])
         );
+        assert_eq!(
+            output.evidence_bundle_id,
+            ChemicalEvidenceBundleId::from_percepts(std::slice::from_ref(&input))
+        );
         assert_eq!(output.component_count(), 1);
         assert_eq!(output.components[0], input);
         assert_eq!(output.stable_target_id(), 13);
@@ -541,6 +558,7 @@ mod tests {
         assert_eq!(forward.vector, reverse.vector);
         assert_eq!(forward.confidence, reverse.confidence);
         assert_eq!(forward.agreement, reverse.agreement);
+        assert_eq!(forward.evidence_bundle_id, reverse.evidence_bundle_id);
         assert_eq!(forward.components, reverse.components);
     }
 
