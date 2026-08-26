@@ -1,0 +1,73 @@
+name: SYM-ARCH-002A3 Benchmark Validity
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - main
+      - research/sym-arch-002a-core-v1
+    paths:
+      - '.github/workflows/sym-arch-002a3-validity.yml'
+      - 'crates/domains/symthaea-psych-bench/src/experiment/validity.rs'
+      - 'crates/domains/symthaea-psych-bench/src/experiment/mod.rs'
+      - 'crates/domains/symthaea-psych-bench/src/lib.rs'
+      - 'crates/domains/symthaea-psych-bench/Cargo.toml'
+      - 'docs/research/SYM_ARCH_002A3_BENCHMARK_VALIDITY_V1.md'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  # Automatic branch runs supersede stale checks. Deliberate manual validation
+  # runs are unique and therefore never cancel one another.
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  benchmark-validity:
+    name: Validate benchmark oracle and mutation checks
+    # Draft stacked PRs cannot merge and should not consume scarce runner capacity.
+    # Promoting to ready-for-review explicitly triggers this exact gate.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-sym-arch-002a3-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-sym-arch-002a3-
+
+      - name: Check A3 Rust formatting
+        run: |
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-psych-bench/src/experiment/validity.rs \
+            crates/domains/symthaea-psych-bench/src/lib.rs
+
+      - name: Run benchmark validity and mutation tests
+        run: |
+          cargo test -p symthaea-psych-bench --lib experiment_validity:: -- --nocapture
+
+      - name: Check psych-bench library
+        run: |
+          cargo check -p symthaea-psych-bench --lib
