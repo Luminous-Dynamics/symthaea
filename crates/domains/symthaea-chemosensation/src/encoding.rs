@@ -51,6 +51,14 @@ impl ScalarHdcEncoder {
         self.anchors.len()
     }
 
+    /// Exact anchor vectors defining this scalar coordinate system.
+    ///
+    /// Kept crate-private so higher layers can content-address the encoding
+    /// space without exposing mutable representation internals as public API.
+    pub(crate) fn anchors(&self) -> &[ContinuousHV] {
+        &self.anchors
+    }
+
     /// Encode a finite scalar, saturating values outside the configured range.
     ///
     /// Non-finite measurements return `None`; they must not be collapsed onto a
