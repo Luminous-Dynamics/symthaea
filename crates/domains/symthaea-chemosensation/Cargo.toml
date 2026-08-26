@@ -11,3 +11,6 @@ symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-evidence-plane = { path = "../../core/symthaea-evidence-plane" }
 serde = { workspace = true }
 blake3 = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
