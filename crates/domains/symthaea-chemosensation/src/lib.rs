@@ -38,6 +38,7 @@ pub mod observation;
 pub mod olfaction;
 pub mod percept;
 pub mod projection_identity;
+pub mod projection_study;
 pub mod root_projection;
 pub mod temporal;
 
@@ -74,6 +75,9 @@ pub use olfaction::{
 };
 pub use percept::{ChemicalPercept, ChemicalPerceptEncoder};
 pub use projection_identity::{ChemicalRootBinarySpaceId, ChemicalRootProjectionPolicyId};
+pub use projection_study::{
+    ChemicalProjectionDatasetAssessment, ChemicalProjectionStudyError,
+};
 pub use root_projection::{
     ChemicalProjectionPairAssessment, ChemicalProjectionQuality, ChemicalRootProjection,
     ChemicalRootProjectionConfig, ChemicalRootProjectionError, ChemicalRootProjector,
