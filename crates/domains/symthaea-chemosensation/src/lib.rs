@@ -11,19 +11,24 @@
 //! odor, taste, flavor, novelty, and semantic hypotheses without overwriting the
 //! underlying measurement.
 //!
-//! The first tranche is hardware-independent and provides:
-//! - typed gas/liquid observations;
-//! - calibration provenance and sensor-health metadata;
-//! - locality-preserving scalar HDC encoding for continuous chemistry values.
+//! The crate starts hardware-independent so cognition and experiments can be
+//! validated against deterministic simulated noses/tongues before real sensor
+//! drivers are introduced.
 
 #![deny(unsafe_code)]
 
 pub mod calibration;
 pub mod encoding;
+pub mod gustation;
 pub mod observation;
+pub mod olfaction;
 
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
 pub use encoding::ScalarHdcEncoder;
+pub use gustation::{
+    ElectronicTongueSimulator, GustatoryStimulus, PotentiometricChannelModel,
+};
 pub use observation::{
     ChemicalChannel, ChemicalModality, ChemicalObservation, EnvironmentReading, MeasurementUnit,
 };
+pub use olfaction::{MoxArraySimulator, MoxChannelModel, OlfactoryStimulus};
