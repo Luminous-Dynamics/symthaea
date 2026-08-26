@@ -68,6 +68,9 @@ pub struct ChemicalObservation {
     ///
     /// `None` means unspecified, not Unix time. The ID names a comparison domain
     /// only; it does not prove synchronization quality or authenticity.
+    ///
+    /// The serde default intentionally maps legacy wire observations that predate
+    /// this field to `None`; it never upgrades them into an assumed epoch.
     #[serde(default)]
     pub clock_domain: Option<ChemicalClockDomainId>,
     pub modality: ChemicalModality,
@@ -178,6 +181,25 @@ mod tests {
         let clock = ChemicalClockDomainId::new("fixture/monotonic").unwrap();
         let clocked = observation.with_clock_domain(clock.clone());
         assert_eq!(clocked.clock_domain.as_ref(), Some(&clock));
+    }
+
+    #[test]
+    fn legacy_wire_observation_defaults_clock_to_unspecified() {
+        let legacy = serde_json::json!({
+            "timestamp_us": 42,
+            "modality": "Olfactory",
+            "source": "legacy-nose",
+            "channels": [],
+            "environment": {
+                "temperature_c": null,
+                "humidity_rh": null,
+                "pressure_pa": null
+            }
+        });
+        let decoded: ChemicalObservation = serde_json::from_value(legacy).unwrap();
+        assert_eq!(decoded.timestamp_us, 42);
+        assert_eq!(decoded.source, "legacy-nose");
+        assert!(decoded.clock_domain.is_none());
     }
 
     #[test]
