@@ -28,9 +28,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Format
         run: cargo fmt --check -p nixward
-      - name: Default-feature contract tests
-        run: cargo test -p nixward --lib ransomware_resilience::tests capability_policy::tests
-      - name: No-default-feature contract tests
-        run: cargo test -p nixward --no-default-features --lib ransomware_resilience::tests capability_policy::tests
+      - name: Default-feature library tests
+        run: cargo test -p nixward --lib
+      - name: No-default-feature library tests
+        run: cargo test -p nixward --no-default-features --lib
       - name: Clippy
         run: cargo clippy -p nixward --all-targets -- -D warnings
