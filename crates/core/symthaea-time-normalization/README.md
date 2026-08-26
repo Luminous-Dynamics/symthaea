@@ -1,8 +1,6 @@
 # Symthaea Time Normalization
 
-`symaea-time-normalization` converts timestamp evidence between declared clock domains without erasing where the source time came from or how uncertain the conversion is.
-
-> Note: the crate package name is `symthaea-time-normalization`.
+`symthaea-time-normalization` converts timestamp evidence between declared clock domains without erasing where the source time came from or how uncertain the conversion is.
 
 ## Why this exists
 
