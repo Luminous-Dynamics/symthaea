@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-time-calibration-policy"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Asymmetric acceptance policy for clock calibration evidence in Symthaea"
+
+[dependencies]
+serde = { workspace = true }
+symthaea-time-calibration = { path = "../symthaea-time-calibration" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
