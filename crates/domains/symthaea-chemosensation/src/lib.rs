@@ -19,7 +19,9 @@
 
 pub mod calibration;
 pub mod cognition;
+pub mod deviation;
 pub mod encoding;
+pub mod experiment;
 pub mod fingerprint;
 pub mod flavor;
 pub mod gustation;
@@ -35,7 +37,15 @@ pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
 pub use cognition::{
     ChemicalCognitionError, ChemicalCognitionPipeline, CognitiveChemicalPercept,
 };
+pub use deviation::{
+    DeviationDisposition, ExpectedBiasDirection, ProtocolDeviation, ProtocolDeviationError,
+};
 pub use encoding::ScalarHdcEncoder;
+pub use experiment::{
+    ChemicalDecisionProtocol, ChemicalDecisionReceipt, ChemicalEvidenceLevel, DecisionError,
+    DecisionProtocolError, EvaluationPartition, ExperimentDecision, GateDirection, GateOutcome,
+    MetricGate, MetricGateResult, MetricObservation,
+};
 pub use fingerprint::{
     ChannelEncodingSpec, ChemicalFingerprint, ChemicalFingerprintEncoder, FingerprintConfigError,
     FingerprintError,
