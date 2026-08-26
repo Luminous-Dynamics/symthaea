@@ -46,6 +46,9 @@ pub mod sovereign_config;
 /// Conversational NixOS installer — dialogue-driven config generation
 pub mod sovereign_conversation;
 
+/// Ransomware-resilience evidence contract for declared/observed host state and recovery.
+pub mod ransomware_resilience;
+
 // ── Native-only modules (require filesystem, process, async) ──
 
 /// Layer 1: Perception — Nix source parsing via tree-sitter
