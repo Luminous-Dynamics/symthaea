@@ -31,9 +31,12 @@ pub use fingerprint::{
     FingerprintError,
 };
 pub use gustation::{
-    ElectronicTongueSimulator, GustatoryStimulus, PotentiometricChannelModel,
+    ElectronicTongueSimulator, GustatorySimulationError, GustatoryStimulus,
+    PotentiometricChannelModel,
 };
 pub use observation::{
     ChemicalChannel, ChemicalModality, ChemicalObservation, EnvironmentReading, MeasurementUnit,
 };
-pub use olfaction::{MoxArraySimulator, MoxChannelModel, OlfactoryStimulus};
+pub use olfaction::{
+    MoxArraySimulator, MoxChannelModel, OlfactorySimulationError, OlfactoryStimulus,
+};

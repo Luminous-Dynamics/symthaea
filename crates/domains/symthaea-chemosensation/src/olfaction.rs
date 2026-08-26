@@ -13,6 +13,17 @@ use crate::{
     EnvironmentReading, MeasurementUnit, SensorHealth,
 };
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum OlfactorySimulationError {
+    InvalidStepDuration(f32),
+    InvalidConcentration(f32),
+    InvalidTemperature(f32),
+    InvalidHumidity(f32),
+    AffinityCountMismatch { expected: usize, actual: usize },
+    InvalidAffinity { index: usize, value: f32 },
+    InvalidChannelModel(String),
+}
+
 #[derive(Debug, Clone)]
 pub struct MoxChannelModel {
     pub name: String,
@@ -25,14 +36,34 @@ pub struct MoxChannelModel {
 
 impl MoxChannelModel {
     pub fn new(name: impl Into<String>, baseline_ohms: f32, sensitivity: f32) -> Self {
+        assert!(
+            baseline_ohms.is_finite() && baseline_ohms > 0.0,
+            "MOX baseline resistance must be finite and positive"
+        );
+        assert!(
+            sensitivity.is_finite() && sensitivity >= 0.0,
+            "MOX sensitivity must be finite and non-negative"
+        );
         Self {
             name: name.into(),
-            baseline_ohms: baseline_ohms.max(1.0),
-            sensitivity: sensitivity.max(0.0),
+            baseline_ohms,
+            sensitivity,
             humidity_coefficient: 0.1,
             rise_tau_s: 1.0,
             recovery_tau_s: 3.0,
         }
+    }
+
+    fn is_valid(&self) -> bool {
+        self.baseline_ohms.is_finite()
+            && self.baseline_ohms > 0.0
+            && self.sensitivity.is_finite()
+            && self.sensitivity >= 0.0
+            && self.humidity_coefficient.is_finite()
+            && self.rise_tau_s.is_finite()
+            && self.rise_tau_s > 0.0
+            && self.recovery_tau_s.is_finite()
+            && self.recovery_tau_s > 0.0
     }
 }
 
@@ -82,26 +113,71 @@ impl MoxArraySimulator {
         self.calibration_id = id.into();
     }
 
+    fn validate_step(
+        &self,
+        stimulus: &OlfactoryStimulus,
+        dt_s: f32,
+    ) -> Result<(), OlfactorySimulationError> {
+        if !dt_s.is_finite() || dt_s < 0.0 {
+            return Err(OlfactorySimulationError::InvalidStepDuration(dt_s));
+        }
+        if !stimulus.concentration_ppm.is_finite() || stimulus.concentration_ppm < 0.0 {
+            return Err(OlfactorySimulationError::InvalidConcentration(
+                stimulus.concentration_ppm,
+            ));
+        }
+        if !stimulus.temperature_c.is_finite() {
+            return Err(OlfactorySimulationError::InvalidTemperature(
+                stimulus.temperature_c,
+            ));
+        }
+        if !stimulus.humidity_rh.is_finite()
+            || !(0.0..=100.0).contains(&stimulus.humidity_rh)
+        {
+            return Err(OlfactorySimulationError::InvalidHumidity(
+                stimulus.humidity_rh,
+            ));
+        }
+        if stimulus.affinities.len() != self.channels.len() {
+            return Err(OlfactorySimulationError::AffinityCountMismatch {
+                expected: self.channels.len(),
+                actual: stimulus.affinities.len(),
+            });
+        }
+        for (index, &affinity) in stimulus.affinities.iter().enumerate() {
+            if !affinity.is_finite() || affinity < 0.0 {
+                return Err(OlfactorySimulationError::InvalidAffinity {
+                    index,
+                    value: affinity,
+                });
+            }
+        }
+        if let Some(channel) = self.channels.iter().find(|channel| !channel.is_valid()) {
+            return Err(OlfactorySimulationError::InvalidChannelModel(
+                channel.name.clone(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Advance the simulated sensor array and emit one raw observation.
+    ///
+    /// Validation completes before any temporal state is mutated, so malformed
+    /// stimuli cannot partially advance the simulated nose.
     pub fn step(
         &mut self,
         stimulus: &OlfactoryStimulus,
         dt_s: f32,
         timestamp_us: u64,
-    ) -> ChemicalObservation {
-        let concentration = stimulus.concentration_ppm.max(0.0);
-        let humidity_delta = (stimulus.humidity_rh.clamp(0.0, 100.0) - 50.0) / 50.0;
-        let dt_s = dt_s.max(0.0);
+    ) -> Result<ChemicalObservation, OlfactorySimulationError> {
+        self.validate_step(stimulus, dt_s)?;
 
+        let concentration = stimulus.concentration_ppm;
+        let humidity_delta = (stimulus.humidity_rh - 50.0) / 50.0;
         let mut observed = Vec::with_capacity(self.channels.len());
 
         for (index, channel) in self.channels.iter().enumerate() {
-            let affinity = stimulus
-                .affinities
-                .get(index)
-                .copied()
-                .unwrap_or(0.0)
-                .max(0.0);
+            let affinity = stimulus.affinities[index];
 
             // Log concentration captures broad MOX dynamic range without
             // pretending to be a vendor-specific transfer function.
@@ -114,8 +190,7 @@ impl MoxArraySimulator {
                 channel.rise_tau_s
             } else {
                 channel.recovery_tau_s
-            }
-            .max(1e-3);
+            };
             let alpha = 1.0 - (-dt_s / tau).exp();
             let next = current + alpha * (target - current);
             self.response_state[index] = next.max(0.0);
@@ -133,7 +208,7 @@ impl MoxArraySimulator {
             });
         }
 
-        ChemicalObservation::new(
+        Ok(ChemicalObservation::new(
             timestamp_us,
             ChemicalModality::Olfactory,
             "mox-array-simulator",
@@ -143,7 +218,7 @@ impl MoxArraySimulator {
             temperature_c: Some(stimulus.temperature_c),
             humidity_rh: Some(stimulus.humidity_rh),
             pressure_pa: None,
-        })
+        }))
     }
 }
 
@@ -161,17 +236,21 @@ mod tests {
     #[test]
     fn odor_changes_cross_sensitive_array() {
         let mut sim = simulator();
-        let clean = sim.step(&OlfactoryStimulus::clean_air(2, 25.0, 50.0), 1.0, 0);
-        let odor = sim.step(
-            &OlfactoryStimulus {
-                concentration_ppm: 10.0,
-                affinities: vec![1.0, 0.25],
-                temperature_c: 25.0,
-                humidity_rh: 50.0,
-            },
-            1.0,
-            1_000_000,
-        );
+        let clean = sim
+            .step(&OlfactoryStimulus::clean_air(2, 25.0, 50.0), 1.0, 0)
+            .unwrap();
+        let odor = sim
+            .step(
+                &OlfactoryStimulus {
+                    concentration_ppm: 10.0,
+                    affinities: vec![1.0, 0.25],
+                    temperature_c: 25.0,
+                    humidity_rh: 50.0,
+                },
+                1.0,
+                1_000_000,
+            )
+            .unwrap();
 
         assert!(odor.channels[0].raw_value < clean.channels[0].raw_value);
         assert!(odor.channels[1].raw_value < clean.channels[1].raw_value);
@@ -187,10 +266,10 @@ mod tests {
             temperature_c: 25.0,
             humidity_rh: 50.0,
         };
-        let exposed = sim.step(&odor, 2.0, 0);
+        let exposed = sim.step(&odor, 2.0, 0).unwrap();
         let purge = OlfactoryStimulus::clean_air(2, 25.0, 50.0);
-        let early = sim.step(&purge, 0.1, 100_000);
-        let later = sim.step(&purge, 10.0, 10_100_000);
+        let early = sim.step(&purge, 0.1, 100_000).unwrap();
+        let later = sim.step(&purge, 10.0, 10_100_000).unwrap();
 
         assert!(early.channels[0].raw_value < later.channels[0].raw_value);
         assert!(exposed.channels[0].raw_value < later.channels[0].raw_value);
@@ -206,8 +285,56 @@ mod tests {
         };
         let mut dry_sim = simulator();
         let mut humid_sim = simulator();
-        let dry = dry_sim.step(&odor(20.0), 2.0, 0);
-        let humid = humid_sim.step(&odor(80.0), 2.0, 0);
+        let dry = dry_sim.step(&odor(20.0), 2.0, 0).unwrap();
+        let humid = humid_sim.step(&odor(80.0), 2.0, 0).unwrap();
         assert_ne!(dry.channels[0].raw_value, humid.channels[0].raw_value);
+    }
+
+    #[test]
+    fn affinity_count_mismatch_is_rejected() {
+        let mut sim = simulator();
+        let stimulus = OlfactoryStimulus {
+            concentration_ppm: 5.0,
+            affinities: vec![1.0],
+            temperature_c: 25.0,
+            humidity_rh: 50.0,
+        };
+        assert!(matches!(
+            sim.step(&stimulus, 1.0, 0),
+            Err(OlfactorySimulationError::AffinityCountMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn invalid_stimulus_does_not_mutate_temporal_state() {
+        let mut tested = simulator();
+        let mut control = simulator();
+        let bad = OlfactoryStimulus {
+            concentration_ppm: f32::NAN,
+            affinities: vec![1.0, 1.0],
+            temperature_c: 25.0,
+            humidity_rh: 50.0,
+        };
+        assert!(tested.step(&bad, 1.0, 0).is_err());
+
+        let good = OlfactoryStimulus {
+            concentration_ppm: 10.0,
+            affinities: vec![1.0, 0.5],
+            temperature_c: 25.0,
+            humidity_rh: 50.0,
+        };
+        let after_error = tested.step(&good, 1.0, 1).unwrap();
+        let untouched = control.step(&good, 1.0, 1).unwrap();
+        assert_eq!(after_error, untouched);
+    }
+
+    #[test]
+    fn invalid_step_duration_is_rejected() {
+        let mut sim = simulator();
+        let stimulus = OlfactoryStimulus::clean_air(2, 25.0, 50.0);
+        assert!(matches!(
+            sim.step(&stimulus, f32::NAN, 0),
+            Err(OlfactorySimulationError::InvalidStepDuration(_))
+        ));
     }
 }

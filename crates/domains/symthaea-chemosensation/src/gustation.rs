@@ -14,6 +14,20 @@ use crate::{
 };
 use symthaea_core::physics::BiophysicsEncoder;
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum GustatorySimulationError {
+    InvalidPh(f32),
+    InvalidConductivity(f32),
+    InvalidTemperature(f32),
+    InvalidIonActivity { index: usize, value: f32 },
+    SpeciesCountMismatch {
+        electrode: String,
+        expected: usize,
+        actual: usize,
+    },
+    InvalidElectrodeModel(String),
+}
+
 #[derive(Debug, Clone)]
 pub struct PotentiometricChannelModel {
     pub name: String,
@@ -27,12 +41,29 @@ pub struct PotentiometricChannelModel {
 impl PotentiometricChannelModel {
     pub fn new(name: impl Into<String>, valence: i32, selectivity: Vec<f32>) -> Self {
         assert_ne!(valence, 0, "potentiometric channel valence must be non-zero");
+        assert!(
+            !selectivity.is_empty()
+                && selectivity
+                    .iter()
+                    .all(|weight| weight.is_finite() && *weight >= 0.0),
+            "potentiometric selectivity must be non-empty, finite, and non-negative"
+        );
         Self {
             name: name.into(),
             valence,
             selectivity,
             reference_mv: 0.0,
         }
+    }
+
+    fn is_valid(&self) -> bool {
+        self.valence != 0
+            && self.reference_mv.is_finite()
+            && !self.selectivity.is_empty()
+            && self
+                .selectivity
+                .iter()
+                .all(|weight| weight.is_finite() && *weight >= 0.0)
     }
 }
 
@@ -67,7 +98,55 @@ impl ElectronicTongueSimulator {
         self.calibration_id = id.into();
     }
 
-    pub fn sample(&self, stimulus: &GustatoryStimulus, timestamp_us: u64) -> ChemicalObservation {
+    fn validate_stimulus(
+        &self,
+        stimulus: &GustatoryStimulus,
+    ) -> Result<(), GustatorySimulationError> {
+        if !stimulus.ph.is_finite() {
+            return Err(GustatorySimulationError::InvalidPh(stimulus.ph));
+        }
+        if !stimulus.conductivity_s_m.is_finite() || stimulus.conductivity_s_m < 0.0 {
+            return Err(GustatorySimulationError::InvalidConductivity(
+                stimulus.conductivity_s_m,
+            ));
+        }
+        if !stimulus.temperature_c.is_finite() || stimulus.temperature_c + 273.15 <= 0.0 {
+            return Err(GustatorySimulationError::InvalidTemperature(
+                stimulus.temperature_c,
+            ));
+        }
+        for (index, &activity) in stimulus.ion_activities.iter().enumerate() {
+            if !activity.is_finite() || activity < 0.0 {
+                return Err(GustatorySimulationError::InvalidIonActivity {
+                    index,
+                    value: activity,
+                });
+            }
+        }
+        for electrode in &self.electrodes {
+            if !electrode.is_valid() {
+                return Err(GustatorySimulationError::InvalidElectrodeModel(
+                    electrode.name.clone(),
+                ));
+            }
+            if electrode.selectivity.len() != stimulus.ion_activities.len() {
+                return Err(GustatorySimulationError::SpeciesCountMismatch {
+                    electrode: electrode.name.clone(),
+                    expected: electrode.selectivity.len(),
+                    actual: stimulus.ion_activities.len(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    pub fn sample(
+        &self,
+        stimulus: &GustatoryStimulus,
+        timestamp_us: u64,
+    ) -> Result<ChemicalObservation, GustatorySimulationError> {
+        self.validate_stimulus(stimulus)?;
+
         let calibration = || CalibrationState::identity(self.calibration_id.clone());
         let mut channels = Vec::with_capacity(self.electrodes.len() + 2);
 
@@ -80,7 +159,7 @@ impl ElectronicTongueSimulator {
         });
         channels.push(ChemicalChannel {
             name: "conductivity".into(),
-            raw_value: stimulus.conductivity_s_m.max(0.0),
+            raw_value: stimulus.conductivity_s_m,
             unit: MeasurementUnit::SiemensPerMeter,
             calibration: calibration(),
             health: SensorHealth::default(),
@@ -91,22 +170,14 @@ impl ElectronicTongueSimulator {
             let activity = electrode
                 .selectivity
                 .iter()
-                .enumerate()
-                .map(|(i, weight)| {
-                    weight.max(0.0)
-                        * stimulus
-                            .ion_activities
-                            .get(i)
-                            .copied()
-                            .unwrap_or(0.0)
-                            .max(0.0)
-                })
+                .zip(&stimulus.ion_activities)
+                .map(|(weight, ion_activity)| weight * ion_activity)
                 .sum::<f32>()
                 .max(1e-9);
 
-            // Treat the reference side as unit activity. This yields a
-            // deterministic cross-sensitive electrode response suitable for
-            // testing concentration, temperature, and mixture effects.
+            // Treat the reference side as unit activity. The 1e-9 floor is a
+            // simulator detection floor that prevents log(0), not an inferred
+            // chemical identity.
             let nernst_mv = BiophysicsEncoder::nernst_potential_mv(
                 electrode.valence,
                 activity as f64,
@@ -123,7 +194,7 @@ impl ElectronicTongueSimulator {
             });
         }
 
-        ChemicalObservation::new(
+        Ok(ChemicalObservation::new(
             timestamp_us,
             ChemicalModality::Gustatory,
             "electronic-tongue-simulator",
@@ -133,7 +204,7 @@ impl ElectronicTongueSimulator {
             temperature_c: Some(stimulus.temperature_c),
             humidity_rh: None,
             pressure_pa: None,
-        })
+        }))
     }
 }
 
@@ -150,15 +221,17 @@ mod tests {
 
     #[test]
     fn sample_preserves_direct_ph_and_conductivity_channels() {
-        let observation = simulator().sample(
-            &GustatoryStimulus {
-                ph: 4.2,
-                conductivity_s_m: 1.7,
-                ion_activities: vec![0.1, 0.2],
-                temperature_c: 25.0,
-            },
-            7,
-        );
+        let observation = simulator()
+            .sample(
+                &GustatoryStimulus {
+                    ph: 4.2,
+                    conductivity_s_m: 1.7,
+                    ion_activities: vec![0.1, 0.2],
+                    temperature_c: 25.0,
+                },
+                7,
+            )
+            .unwrap();
 
         assert_eq!(observation.modality, ChemicalModality::Gustatory);
         assert!((observation.channels[0].raw_value - 4.2).abs() < 1e-6);
@@ -168,24 +241,28 @@ mod tests {
     #[test]
     fn changing_ion_activity_changes_cross_sensitive_voltage() {
         let sim = simulator();
-        let low = sim.sample(
-            &GustatoryStimulus {
-                ph: 7.0,
-                conductivity_s_m: 1.0,
-                ion_activities: vec![0.01, 0.01],
-                temperature_c: 25.0,
-            },
-            0,
-        );
-        let high = sim.sample(
-            &GustatoryStimulus {
-                ph: 7.0,
-                conductivity_s_m: 1.0,
-                ion_activities: vec![0.5, 0.01],
-                temperature_c: 25.0,
-            },
-            1,
-        );
+        let low = sim
+            .sample(
+                &GustatoryStimulus {
+                    ph: 7.0,
+                    conductivity_s_m: 1.0,
+                    ion_activities: vec![0.01, 0.01],
+                    temperature_c: 25.0,
+                },
+                0,
+            )
+            .unwrap();
+        let high = sim
+            .sample(
+                &GustatoryStimulus {
+                    ph: 7.0,
+                    conductivity_s_m: 1.0,
+                    ion_activities: vec![0.5, 0.01],
+                    temperature_c: 25.0,
+                },
+                1,
+            )
+            .unwrap();
 
         assert_ne!(low.channels[2].raw_value, high.channels[2].raw_value);
     }
@@ -199,8 +276,53 @@ mod tests {
             ion_activities: vec![0.1, 0.1],
             temperature_c,
         };
-        let cold = sim.sample(&stimulus(5.0), 0);
-        let warm = sim.sample(&stimulus(40.0), 1);
+        let cold = sim.sample(&stimulus(5.0), 0).unwrap();
+        let warm = sim.sample(&stimulus(40.0), 1).unwrap();
         assert_ne!(cold.channels[2].raw_value, warm.channels[2].raw_value);
+    }
+
+    #[test]
+    fn invalid_temperature_is_rejected() {
+        let sim = simulator();
+        let stimulus = GustatoryStimulus {
+            ph: 7.0,
+            conductivity_s_m: 1.0,
+            ion_activities: vec![0.1, 0.1],
+            temperature_c: -273.15,
+        };
+        assert!(matches!(
+            sim.sample(&stimulus, 0),
+            Err(GustatorySimulationError::InvalidTemperature(_))
+        ));
+    }
+
+    #[test]
+    fn species_count_mismatch_is_rejected() {
+        let sim = simulator();
+        let stimulus = GustatoryStimulus {
+            ph: 7.0,
+            conductivity_s_m: 1.0,
+            ion_activities: vec![0.1],
+            temperature_c: 25.0,
+        };
+        assert!(matches!(
+            sim.sample(&stimulus, 0),
+            Err(GustatorySimulationError::SpeciesCountMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn non_finite_ion_activity_is_rejected() {
+        let sim = simulator();
+        let stimulus = GustatoryStimulus {
+            ph: 7.0,
+            conductivity_s_m: 1.0,
+            ion_activities: vec![0.1, f32::NAN],
+            temperature_c: 25.0,
+        };
+        assert!(matches!(
+            sim.sample(&stimulus, 0),
+            Err(GustatorySimulationError::InvalidIonActivity { index: 1, .. })
+        ));
     }
 }
