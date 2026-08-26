@@ -5,8 +5,8 @@
 //!
 //! This crate does not synchronize clocks and does not authenticate timing
 //! claims. It represents a validated, finite-window mapping from one declared
-//! clock domain/continuity epoch into another and propagates the source and
-//! transform uncertainty into a target-domain [`TimeIntegrityReceipt`].
+//! clock domain/continuity epoch into another and propagates source + transform
+//! uncertainty into a target-domain [`TimeIntegrityReceipt`].
 
 use std::fmt;
 
@@ -19,9 +19,9 @@ use symthaea_time_integrity::{
 /// Transform model supported by the v1 normalization contract.
 ///
 /// `Offset` assumes equal clock rate within the receipt's validity interval.
-/// Drift, calibration residual, and synchronization error must therefore be
-/// covered by the transform's finite uncertainty bound. A future model may add
-/// explicit rate/skew terms without changing the meaning of this variant.
+/// Drift, fit residual, and synchronization error must therefore be covered by
+/// the transform's finite uncertainty bound. A future model may add explicit
+/// rate/skew terms without changing this variant's meaning.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClockTransformModel {
@@ -75,7 +75,8 @@ pub struct ClockTransformReceipt {
     model: ClockTransformModel,
     valid_source_start_us: u64,
     valid_source_end_us: u64,
-    continuity: ContinuityStatus,
+    mapping_continuity: ContinuityStatus,
+    target_continuity: ContinuityStatus,
     uncertainty: TimeUncertainty,
     sequence: Option<u64>,
 }
@@ -103,7 +104,8 @@ impl ClockTransformReceipt {
             },
             valid_source_start_us,
             valid_source_end_us,
-            continuity: ContinuityStatus::Unverified,
+            mapping_continuity: ContinuityStatus::Unverified,
+            target_continuity: ContinuityStatus::Unverified,
             uncertainty: TimeUncertainty::Unbounded,
             sequence: None,
         };
@@ -111,8 +113,15 @@ impl ClockTransformReceipt {
         Ok(receipt)
     }
 
-    pub fn with_continuity(mut self, continuity: ContinuityStatus) -> Self {
-        self.continuity = continuity;
+    /// Declare continuity of the transform mapping over its validity interval.
+    pub fn with_mapping_continuity(mut self, continuity: ContinuityStatus) -> Self {
+        self.mapping_continuity = continuity;
+        self
+    }
+
+    /// Declare continuity of the target timebase/epoch over the mapping.
+    pub fn with_target_continuity(mut self, continuity: ContinuityStatus) -> Self {
+        self.target_continuity = continuity;
         self
     }
 
@@ -150,8 +159,12 @@ impl ClockTransformReceipt {
         (self.valid_source_start_us, self.valid_source_end_us)
     }
 
-    pub fn continuity(&self) -> ContinuityStatus {
-        self.continuity
+    pub fn mapping_continuity(&self) -> ContinuityStatus {
+        self.mapping_continuity
+    }
+
+    pub fn target_continuity(&self) -> ContinuityStatus {
+        self.target_continuity
     }
 
     pub fn uncertainty(&self) -> TimeUncertainty {
@@ -169,6 +182,7 @@ impl ClockTransformReceipt {
                 end_us: self.valid_source_end_us,
             });
         }
+
         let anchor = self.model.source_anchor_us();
         if anchor < self.valid_source_start_us || anchor > self.valid_source_end_us {
             return Err(ClockTransformError::AnchorOutsideValidity {
@@ -177,6 +191,12 @@ impl ClockTransformReceipt {
                 end_us: self.valid_source_end_us,
             });
         }
+
+        // A receipt must not claim a validity interval whose endpoints cannot
+        // both be represented in the target u64 timestamp space.
+        self.model.map_timestamp_us(self.valid_source_start_us)?;
+        self.model.map_timestamp_us(self.valid_source_end_us)?;
+
         Ok(())
     }
 
@@ -195,7 +215,8 @@ struct RawClockTransformReceipt {
     model: ClockTransformModel,
     valid_source_start_us: u64,
     valid_source_end_us: u64,
-    continuity: ContinuityStatus,
+    mapping_continuity: ContinuityStatus,
+    target_continuity: ContinuityStatus,
     uncertainty: TimeUncertainty,
     #[serde(default)]
     sequence: Option<u64>,
@@ -215,7 +236,8 @@ impl<'de> Deserialize<'de> for ClockTransformReceipt {
             model: raw.model,
             valid_source_start_us: raw.valid_source_start_us,
             valid_source_end_us: raw.valid_source_end_us,
-            continuity: raw.continuity,
+            mapping_continuity: raw.mapping_continuity,
+            target_continuity: raw.target_continuity,
             uncertainty: raw.uncertainty,
             sequence: raw.sequence,
         };
@@ -227,7 +249,8 @@ impl<'de> Deserialize<'de> for ClockTransformReceipt {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransformEvidenceSide {
     Source,
-    Transform,
+    Mapping,
+    Target,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -362,11 +385,11 @@ impl NormalizedTimePoint {
 ///
 /// - source domain and explicit source epoch match the transform;
 /// - the timestamp lies within the transform's finite validity interval;
-/// - source and transform continuity are both established;
+/// - source, mapping, and target continuity are all established;
 /// - source and transform both provide finite uncertainty bounds;
-/// - applying the transform cannot underflow or overflow `u64`.
+/// - the transform's entire validity interval is representable in target time.
 ///
-/// The target uncertainty is the saturating sum of the two supplied error
+/// The target uncertainty is the saturating sum of source and transform error
 /// bounds. The target sequence is left unset because a source-domain sequence
 /// is not automatically meaningful in the target domain.
 pub fn normalize_timestamp_us(
@@ -409,10 +432,16 @@ pub fn normalize_timestamp_us(
             status: source.continuity,
         });
     }
-    if transform.continuity() != ContinuityStatus::Continuous {
+    if transform.mapping_continuity() != ContinuityStatus::Continuous {
         return Err(ClockTransformError::ContinuityNotEstablished {
-            side: TransformEvidenceSide::Transform,
-            status: transform.continuity(),
+            side: TransformEvidenceSide::Mapping,
+            status: transform.mapping_continuity(),
+        });
+    }
+    if transform.target_continuity() != ContinuityStatus::Continuous {
+        return Err(ClockTransformError::ContinuityNotEstablished {
+            side: TransformEvidenceSide::Target,
+            status: transform.target_continuity(),
         });
     }
 
@@ -426,7 +455,7 @@ pub fn normalize_timestamp_us(
         .uncertainty()
         .max_error_us()
         .ok_or(ClockTransformError::UnboundedUncertainty {
-            side: TransformEvidenceSide::Transform,
+            side: TransformEvidenceSide::Mapping,
         })?;
 
     let target_timestamp_us = transform.model().map_timestamp_us(source_timestamp_us)?;
@@ -518,7 +547,8 @@ mod tests {
             1_100,
         )
         .unwrap()
-        .with_continuity(ContinuityStatus::Continuous)
+        .with_mapping_continuity(ContinuityStatus::Continuous)
+        .with_target_continuity(ContinuityStatus::Continuous)
         .with_uncertainty(TimeUncertainty::bounded(error_us))
         .with_sequence(7)
     }
@@ -536,7 +566,8 @@ mod tests {
         let value = serde_json::to_value(transform(12)).unwrap();
         let mut object = value.as_object().unwrap().clone();
         object.insert("pretend_quality".into(), serde_json::json!(1.0));
-        assert!(serde_json::from_value::<ClockTransformReceipt>(object.into()).is_err());
+        let forged = serde_json::Value::Object(object);
+        assert!(serde_json::from_value::<ClockTransformReceipt>(forged).is_err());
     }
 
     #[test]
@@ -569,6 +600,22 @@ mod tests {
         )
         .unwrap_err();
         assert!(matches!(error, ClockTransformError::AnchorOutsideValidity { .. }));
+    }
+
+    #[test]
+    fn entire_validity_interval_must_be_target_representable() {
+        let error = ClockTransformReceipt::offset(
+            source_domain(),
+            source_epoch(),
+            target_domain(),
+            target_epoch(),
+            1_000,
+            10,
+            900,
+            1_100,
+        )
+        .unwrap_err();
+        assert_eq!(error, ClockTransformError::TargetTimestampUnderflow);
     }
 
     #[test]
@@ -633,7 +680,7 @@ mod tests {
     }
 
     #[test]
-    fn source_and_transform_continuity_are_both_required() {
+    fn source_mapping_and_target_continuity_are_all_required() {
         let source = TimeIntegrityReceipt::declared(source_domain())
             .with_epoch(source_epoch())
             .with_uncertainty(TimeUncertainty::bounded(1));
@@ -646,7 +693,7 @@ mod tests {
             }
         );
 
-        let unverified_transform = ClockTransformReceipt::offset(
+        let mapping_unverified = ClockTransformReceipt::offset(
             source_domain(),
             source_epoch(),
             target_domain(),
@@ -657,13 +704,37 @@ mod tests {
             1_100,
         )
         .unwrap()
+        .with_target_continuity(ContinuityStatus::Continuous)
         .with_uncertainty(TimeUncertainty::bounded(1));
-        let error = normalize_timestamp_us(1_000, &source_receipt(1), &unverified_transform)
+        let error = normalize_timestamp_us(1_000, &source_receipt(1), &mapping_unverified)
             .unwrap_err();
         assert_eq!(
             error,
             ClockTransformError::ContinuityNotEstablished {
-                side: TransformEvidenceSide::Transform,
+                side: TransformEvidenceSide::Mapping,
+                status: ContinuityStatus::Unverified,
+            }
+        );
+
+        let target_unverified = ClockTransformReceipt::offset(
+            source_domain(),
+            source_epoch(),
+            target_domain(),
+            target_epoch(),
+            1_000,
+            10_000,
+            900,
+            1_100,
+        )
+        .unwrap()
+        .with_mapping_continuity(ContinuityStatus::Continuous)
+        .with_uncertainty(TimeUncertainty::bounded(1));
+        let error = normalize_timestamp_us(1_000, &source_receipt(1), &target_unverified)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            ClockTransformError::ContinuityNotEstablished {
+                side: TransformEvidenceSide::Target,
                 status: ContinuityStatus::Unverified,
             }
         );
@@ -693,50 +764,16 @@ mod tests {
             1_100,
         )
         .unwrap()
-        .with_continuity(ContinuityStatus::Continuous);
+        .with_mapping_continuity(ContinuityStatus::Continuous)
+        .with_target_continuity(ContinuityStatus::Continuous);
         let error = normalize_timestamp_us(1_000, &source_receipt(1), &unbounded_transform)
             .unwrap_err();
         assert_eq!(
             error,
             ClockTransformError::UnboundedUncertainty {
-                side: TransformEvidenceSide::Transform,
+                side: TransformEvidenceSide::Mapping,
             }
         );
-    }
-
-    #[test]
-    fn target_mapping_underflow_and_overflow_fail_closed() {
-        let underflow = ClockTransformReceipt::offset(
-            source_domain(),
-            source_epoch(),
-            target_domain(),
-            target_epoch(),
-            1_000,
-            10,
-            900,
-            1_100,
-        )
-        .unwrap()
-        .with_continuity(ContinuityStatus::Continuous)
-        .with_uncertainty(TimeUncertainty::bounded(1));
-        let error = normalize_timestamp_us(900, &source_receipt(1), &underflow).unwrap_err();
-        assert_eq!(error, ClockTransformError::TargetTimestampUnderflow);
-
-        let overflow = ClockTransformReceipt::offset(
-            source_domain(),
-            source_epoch(),
-            target_domain(),
-            target_epoch(),
-            1_000,
-            u64::MAX - 10,
-            900,
-            1_100,
-        )
-        .unwrap()
-        .with_continuity(ContinuityStatus::Continuous)
-        .with_uncertainty(TimeUncertainty::bounded(1));
-        let error = normalize_timestamp_us(1_100, &source_receipt(1), &overflow).unwrap_err();
-        assert_eq!(error, ClockTransformError::TargetTimestampOverflow);
     }
 
     #[test]
