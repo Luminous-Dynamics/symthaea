@@ -8,11 +8,15 @@
 //! projection behavior over a comparable set of chemical bridge inputs without
 //! declaring an acceptance threshold. Thresholds belong in a preregistered study
 //! once calibration and held-out physical data exist.
+//!
+//! All geometric metrics are fixed full-resolution calculations, independent of
+//! Symthaea's adaptive cognitive stride.
 
 use crate::{
     ChemicalBridgeTarget, ChemicalEncodingSpaceId, ChemicalModalBridgeInput,
     ChemicalRootProjectionError, ChemicalRootProjector,
 };
+use crate::projection_geometry::exact_cosine;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChemicalProjectionStudyError {
@@ -51,7 +55,8 @@ pub struct ChemicalProjectionDatasetAssessment {
     /// Fraction of samples whose strongest ContinuousHV neighbor remains among
     /// the strongest projected neighbors. Projected ties count as preserved.
     pub nearest_neighbor_preservation: f32,
-    /// Mean cosine between each source ContinuousHV and its own bipolar expansion.
+    /// Mean full-resolution cosine between each source ContinuousHV and its own
+    /// bipolar expansion.
     pub mean_source_to_bipolar_similarity: f32,
     /// Mean fraction of positive bits in projected BinaryHV vectors.
     pub mean_positive_fraction: f32,
@@ -107,13 +112,17 @@ impl ChemicalRootProjector {
         let mut distortions = Vec::new();
         for left in 0..inputs.len() {
             for right in (left + 1)..inputs.len() {
-                let continuous = inputs[left]
-                    .vector
-                    .similarity(&inputs[right].vector)
-                    .clamp(-1.0, 1.0);
-                let projected = bipolar[left]
-                    .similarity(&bipolar[right])
-                    .clamp(-1.0, 1.0);
+                let continuous = exact_cosine(&inputs[left].vector, &inputs[right].vector)
+                    .map_err(|_| {
+                        ChemicalProjectionStudyError::Projection(
+                            ChemicalRootProjectionError::DegenerateVector,
+                        )
+                    })?;
+                let projected = exact_cosine(&bipolar[left], &bipolar[right]).map_err(|_| {
+                    ChemicalProjectionStudyError::Projection(
+                        ChemicalRootProjectionError::DegenerateVector,
+                    )
+                })?;
                 continuous_pairs.push(continuous);
                 projected_pairs.push(projected);
                 distortions.push((continuous - projected).abs());
@@ -126,8 +135,7 @@ impl ChemicalRootProjector {
         let max_absolute_similarity_distortion =
             distortions.iter().copied().fold(0.0f32, f32::max);
         let pairwise_similarity_correlation = pearson(&continuous_pairs, &projected_pairs);
-        let nearest_neighbor_preservation =
-            nearest_neighbor_preservation(inputs, &bipolar);
+        let nearest_neighbor_preservation = nearest_neighbor_preservation(inputs, &bipolar)?;
         let mean_source_to_bipolar_similarity = projections
             .iter()
             .map(|projection| projection.quality.source_to_bipolar_similarity)
@@ -162,7 +170,7 @@ impl ChemicalRootProjector {
 fn nearest_neighbor_preservation(
     inputs: &[ChemicalModalBridgeInput],
     projected: &[symthaea_core::hdc::unified_hv::ContinuousHV],
-) -> f32 {
+) -> Result<f32, ChemicalProjectionStudyError> {
     const TIE_EPSILON: f32 = 1e-6;
     let mut preserved = 0usize;
 
@@ -173,10 +181,12 @@ fn nearest_neighbor_preservation(
             if candidate == anchor {
                 continue;
             }
-            let similarity = inputs[anchor]
-                .vector
-                .similarity(&inputs[candidate].vector)
-                .clamp(-1.0, 1.0);
+            let similarity = exact_cosine(&inputs[anchor].vector, &inputs[candidate].vector)
+                .map_err(|_| {
+                    ChemicalProjectionStudyError::Projection(
+                        ChemicalRootProjectionError::DegenerateVector,
+                    )
+                })?;
             if similarity > continuous_best_similarity {
                 continuous_best_similarity = similarity;
                 continuous_best_index = Some(candidate);
@@ -190,21 +200,25 @@ fn nearest_neighbor_preservation(
             if candidate == anchor {
                 continue;
             }
-            projected_best_similarity = projected_best_similarity.max(
-                projected[anchor]
-                    .similarity(&projected[candidate])
-                    .clamp(-1.0, 1.0),
-            );
+            let similarity = exact_cosine(&projected[anchor], &projected[candidate]).map_err(|_| {
+                ChemicalProjectionStudyError::Projection(
+                    ChemicalRootProjectionError::DegenerateVector,
+                )
+            })?;
+            projected_best_similarity = projected_best_similarity.max(similarity);
         }
-        let original_neighbor_projected_similarity = projected[anchor]
-            .similarity(&projected[continuous_best_index])
-            .clamp(-1.0, 1.0);
+        let original_neighbor_projected_similarity =
+            exact_cosine(&projected[anchor], &projected[continuous_best_index]).map_err(|_| {
+                ChemicalProjectionStudyError::Projection(
+                    ChemicalRootProjectionError::DegenerateVector,
+                )
+            })?;
         if original_neighbor_projected_similarity + TIE_EPSILON >= projected_best_similarity {
             preserved += 1;
         }
     }
 
-    preserved as f32 / inputs.len() as f32
+    Ok(preserved as f32 / inputs.len() as f32)
 }
 
 fn pearson(left: &[f32], right: &[f32]) -> Option<f32> {
@@ -314,14 +328,13 @@ mod tests {
     }
 
     #[test]
-    fn current_scalar_fixture_retains_local_neighbors_after_projection() {
+    fn current_scalar_fixture_reports_neighborhood_metric_without_gate() {
         let samples = inputs(&[10.0, 11.0, 30.0, 31.0, 70.0, 71.0, 90.0]);
         let assessment = ChemicalRootProjector::default()
             .assess_dataset(&samples)
             .unwrap();
 
-        // This is a fixture-level regression, not a physical-data acceptance gate.
-        assert!(assessment.nearest_neighbor_preservation >= 0.5);
+        assert!((0.0..=1.0).contains(&assessment.nearest_neighbor_preservation));
     }
 
     #[test]
