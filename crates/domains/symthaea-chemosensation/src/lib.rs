@@ -23,6 +23,7 @@ pub mod encoding;
 pub mod fingerprint;
 pub mod flavor;
 pub mod gustation;
+pub mod multimodal_bridge;
 pub mod novelty;
 pub mod observation;
 pub mod olfaction;
@@ -44,6 +45,10 @@ pub use flavor::{
 pub use gustation::{
     ElectronicTongueSimulator, GustatorySimulationError, GustatoryStimulus,
     PotentiometricChannelModel,
+};
+pub use multimodal_bridge::{
+    ChemicalBridgeTarget, ChemicalModalBridge, ChemicalModalBridgeConfig,
+    ChemicalModalBridgeError, ChemicalModalBridgeInput,
 };
 pub use novelty::{
     ChemicalMemoryReference, ChemicalNoveltyConfig, ChemicalNoveltyMemory, NoveltyAssessment,
