@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! Stable identity contract for cross-modal modality variants.
+//! Stable identity and enumeration contracts for cross-modal modality variants.
 //!
 //! Some existing deterministic paths use the numeric discriminant of
 //! [`Modality`] as a noise seed or ordering key. That is safe only while the
@@ -11,11 +11,65 @@
 //! new code so future modalities can be added without depending on declaration
 //! order.
 //!
+//! Enumeration is a separate contract from identity. The historical
+//! `Modality::all()` helper does **not** enumerate every defined enum variant; it
+//! selects the legacy root channel set. Likewise `Modality::sensory()` is a
+//! legacy runtime subset rather than an exhaustive scientific classification.
+//! Those behaviors are captured explicitly below so adding olfaction,
+//! gustation, or chemesthesis cannot silently alter root topology merely by
+//! changing an enum helper.
+//!
 //! Existing variants intentionally retain their historical IDs `0..=12`.
 //! Chemical modalities have reserved IDs so the upcoming olfactory/gustatory
 //! integration cannot accidentally renumber an existing sense.
 
 use super::cross_modal_binding::Modality;
+
+/// Exhaustive list of every modality variant currently defined by the enum.
+///
+/// Use this for identity/invariant checks that genuinely mean "every defined
+/// variant". Do not substitute `Modality::all()`: that helper is a legacy root
+/// runtime selection and intentionally has a different contract.
+pub const DEFINED_MODALITIES: [Modality; 13] = [
+    Modality::Visual,
+    Modality::Auditory,
+    Modality::Textual,
+    Modality::Linguistic,
+    Modality::Proprioceptive,
+    Modality::Somatosensory,
+    Modality::Motor,
+    Modality::Temporal,
+    Modality::Spatial,
+    Modality::Affective,
+    Modality::Emotional,
+    Modality::Interoceptive,
+    Modality::Abstract,
+];
+
+/// Historical set instantiated by `MultiModalIntegrator` through
+/// `Modality::all()`.
+///
+/// This is named explicitly because it is not exhaustive. Chemical integration
+/// must decide deliberately whether a new modality joins this default topology;
+/// appending an enum variant alone must not make that decision.
+pub const LEGACY_ROOT_MODALITIES: [Modality; 7] = [
+    Modality::Visual,
+    Modality::Auditory,
+    Modality::Linguistic,
+    Modality::Somatosensory,
+    Modality::Motor,
+    Modality::Emotional,
+    Modality::Interoceptive,
+];
+
+/// Historical set returned by `Modality::sensory()` and used by the legacy
+/// amodal convergence zone.
+pub const LEGACY_SENSORY_MODALITIES: [Modality; 4] = [
+    Modality::Visual,
+    Modality::Auditory,
+    Modality::Linguistic,
+    Modality::Somatosensory,
+];
 
 /// First IDs reserved for the chemical-sensing tranche.
 pub const OLFACTORY_STABLE_ID: u16 = 13;
@@ -60,25 +114,19 @@ mod tests {
     use super::*;
     use std::collections::BTreeSet;
 
-    const EXISTING_MODALITIES: [Modality; 13] = [
-        Modality::Visual,
-        Modality::Auditory,
-        Modality::Textual,
-        Modality::Linguistic,
-        Modality::Proprioceptive,
-        Modality::Somatosensory,
-        Modality::Motor,
-        Modality::Temporal,
-        Modality::Spatial,
-        Modality::Affective,
-        Modality::Emotional,
-        Modality::Interoceptive,
-        Modality::Abstract,
-    ];
+    #[test]
+    fn exhaustive_defined_set_has_every_historical_variant_once() {
+        let ids: BTreeSet<u16> = DEFINED_MODALITIES
+            .into_iter()
+            .map(stable_modality_id)
+            .collect();
+        assert_eq!(DEFINED_MODALITIES.len(), 13);
+        assert_eq!(ids.len(), DEFINED_MODALITIES.len());
+    }
 
     #[test]
     fn historical_discriminants_match_explicit_stable_ids() {
-        for modality in EXISTING_MODALITIES {
+        for modality in DEFINED_MODALITIES {
             assert_eq!(
                 modality as u16,
                 stable_modality_id(modality),
@@ -88,17 +136,34 @@ mod tests {
     }
 
     #[test]
+    fn legacy_root_enumeration_is_explicit_not_exhaustive() {
+        assert_eq!(Modality::all(), LEGACY_ROOT_MODALITIES.to_vec());
+        assert!(LEGACY_ROOT_MODALITIES.len() < DEFINED_MODALITIES.len());
+        assert!(!LEGACY_ROOT_MODALITIES.contains(&Modality::Proprioceptive));
+        assert!(!LEGACY_ROOT_MODALITIES.contains(&Modality::Temporal));
+        assert!(!LEGACY_ROOT_MODALITIES.contains(&Modality::Spatial));
+        assert!(!LEGACY_ROOT_MODALITIES.contains(&Modality::Abstract));
+    }
+
+    #[test]
+    fn legacy_sensory_enumeration_is_pinned_separately() {
+        assert_eq!(Modality::sensory(), LEGACY_SENSORY_MODALITIES.to_vec());
+        assert!(!LEGACY_SENSORY_MODALITIES.contains(&Modality::Proprioceptive));
+        assert!(!LEGACY_SENSORY_MODALITIES.contains(&Modality::Interoceptive));
+    }
+
+    #[test]
     fn stable_ids_are_unique() {
-        let ids: BTreeSet<u16> = EXISTING_MODALITIES
+        let ids: BTreeSet<u16> = DEFINED_MODALITIES
             .into_iter()
             .map(stable_modality_id)
             .collect();
-        assert_eq!(ids.len(), EXISTING_MODALITIES.len());
+        assert_eq!(ids.len(), DEFINED_MODALITIES.len());
     }
 
     #[test]
     fn chemical_ids_are_reserved_after_existing_modalities() {
-        let existing: BTreeSet<u16> = EXISTING_MODALITIES
+        let existing: BTreeSet<u16> = DEFINED_MODALITIES
             .into_iter()
             .map(stable_modality_id)
             .collect();
