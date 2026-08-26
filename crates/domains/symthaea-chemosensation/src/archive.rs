@@ -3,9 +3,14 @@
 
 //! Versioned, self-verifying archives for recorded chemical acquisition traces.
 //!
-//! Archive identity is computed from the semantic evidence fields rather than a
+//! Archive identity is computed from semantic evidence fields rather than a
 //! transport-specific serialization. JSON/CBOR/postcard formatting may therefore
 //! evolve without changing the identity of the underlying acquisition evidence.
+//!
+//! [`ChemicalTraceArchive::verify`] establishes internal consistency, not author
+//! authenticity. Call [`ChemicalTraceArchive::verify_pinned`] when the expected
+//! digest was captured independently (for example in a signed receipt, evidence
+//! ledger, release manifest, or lab record).
 
 use crate::{
     ChemicalEvidenceLevel, ChemicalModality, ChemicalObservation, ChemicalTrace,
@@ -88,6 +93,10 @@ pub enum TraceArchiveError {
     ManifestCountMismatch,
     ManifestTimestampMismatch,
     DigestMismatch,
+    PinnedDigestMismatch {
+        expected: TraceArchiveDigest,
+        actual: TraceArchiveDigest,
+    },
 }
 
 impl From<ChemicalTraceError> for TraceArchiveError {
@@ -145,9 +154,18 @@ impl ChemicalTraceArchive {
         })
     }
 
-    /// Validate structural invariants, manifest consistency, and semantic digest,
-    /// then return a replay object whose evidence class is explicitly downgraded
-    /// to `RecordedReplay`.
+    /// Digest that should be pinned independently when later authenticity or
+    /// tamper-evidence across trust boundaries is required.
+    pub fn digest(&self) -> TraceArchiveDigest {
+        self.manifest.digest
+    }
+
+    /// Validate structural invariants, manifest consistency, and semantic digest.
+    ///
+    /// This proves only that the archive is internally self-consistent. A party
+    /// able to modify both payload and manifest can recompute the digest. Use
+    /// [`verify_pinned`](Self::verify_pinned) when an independently captured digest
+    /// is available.
     pub fn verify(&self) -> Result<VerifiedChemicalReplay, TraceArchiveError> {
         if self.manifest.schema_version != TRACE_ARCHIVE_SCHEMA_VERSION {
             return Err(TraceArchiveError::UnsupportedSchemaVersion {
@@ -208,6 +226,23 @@ impl ChemicalTraceArchive {
             original_acquisition_evidence: self.manifest.acquisition_evidence,
             archive_digest: self.manifest.digest,
         })
+    }
+
+    /// Verify against a digest captured outside the archive itself.
+    ///
+    /// This is the appropriate entry point when an experiment receipt, signed
+    /// manifest, content-addressed store, or evidence ledger pins the archive ID.
+    pub fn verify_pinned(
+        &self,
+        expected_digest: TraceArchiveDigest,
+    ) -> Result<VerifiedChemicalReplay, TraceArchiveError> {
+        if self.manifest.digest != expected_digest {
+            return Err(TraceArchiveError::PinnedDigestMismatch {
+                expected: expected_digest,
+                actual: self.manifest.digest,
+            });
+        }
+        self.verify()
     }
 }
 
@@ -489,5 +524,35 @@ mod tests {
         )
         .unwrap();
         assert_ne!(bench.manifest.digest, holdout.manifest.digest);
+    }
+
+    #[test]
+    fn independently_pinned_digest_detects_rehashed_tampering() {
+        let mut archive = ChemicalTraceArchive::from_trace(
+            &trace(),
+            ChemicalEvidenceLevel::BenchPhysicalObservation,
+        )
+        .unwrap();
+        let pinned = archive.digest();
+
+        archive.observations[1].channels[0].raw_value += 10.0;
+        archive.manifest.digest = digest_trace(
+            archive.manifest.schema_version,
+            archive.manifest.acquisition_evidence,
+            &archive.manifest.protocol_id,
+            &archive.manifest.run_id,
+            archive.manifest.modality,
+            archive.manifest.replicate,
+            &archive.observations,
+        );
+
+        assert!(archive.verify().is_ok());
+        assert_eq!(
+            archive.verify_pinned(pinned),
+            Err(TraceArchiveError::PinnedDigestMismatch {
+                expected: pinned,
+                actual: archive.manifest.digest,
+            })
+        );
     }
 }
