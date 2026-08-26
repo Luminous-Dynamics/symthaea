@@ -27,6 +27,7 @@
 
 pub mod calibration;
 pub mod cognition;
+pub mod content_address_adapter;
 pub mod encoding;
 pub mod evidence;
 pub mod fingerprint;
@@ -47,6 +48,12 @@ pub mod temporal;
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
 pub use cognition::{
     ChemicalCognitionError, ChemicalCognitionPipeline, CognitiveChemicalPercept,
+};
+pub use content_address_adapter::{
+    CHEMICAL_ENCODING_SPACE_NAMESPACE, CHEMICAL_EVIDENCE_BUNDLE_NAMESPACE,
+    CHEMICAL_OBSERVATION_NAMESPACE, CHEMICAL_ROOT_BINARY_SPACE_NAMESPACE,
+    CHEMICAL_ROOT_PROJECTION_POLICY_NAMESPACE, ChemicalContentAddressError,
+    ChemicalRootContentLineage,
 };
 pub use encoding::ScalarHdcEncoder;
 pub use evidence::{ChemicalEvidenceBundleId, ChemicalObservationId};
