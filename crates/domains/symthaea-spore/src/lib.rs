@@ -55,6 +55,7 @@ pub mod dream_journal;
 pub mod engine;
 pub mod fep;
 pub mod fractal;
+pub mod host_rehydration;
 pub mod memory;
 pub mod persistence;
 pub mod secure_boot;
