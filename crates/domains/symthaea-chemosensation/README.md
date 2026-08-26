@@ -4,11 +4,11 @@ Hardware-independent foundations for artificial olfaction and gustation in Symth
 
 ## Status
 
-**Active research / draft foundation.** The initial simulators are simplified research fixtures. They exist to make the perception pipeline testable before vendor-specific hardware drivers and real calibration datasets are introduced.
+**Active research / draft foundation.** The current sensor models are simplified research fixtures. They exist to make evidence handling, representation, cognition, and experiment design testable before vendor-specific hardware drivers and real calibration datasets are introduced.
 
 They are not calibrated analytical instruments, and this crate does not make claims about subjective smell or taste experience.
 
-No crate evidence level is claimed here ahead of CI. The workspace truth registry may leave this crate unclassified until its evidence has actually been assessed.
+No physical performance evidence level is claimed ahead of held-out sensor characterization.
 
 ## Evidence boundary
 
@@ -16,6 +16,9 @@ The central invariant is that interpretation never overwrites measurement:
 
 ```text
 physical or simulated transducer
+            |
+            v
+    SamplingContext (optional)
             |
             v
     ChemicalObservation
@@ -35,14 +38,25 @@ physical or simulated transducer
       used/ignored channels
             |
             v
- future odor/taste/flavor hypotheses
+      ChemicalPercept
+       + exact evidence
+            |
+      +-----+------+----------------+
+      |            |                |
+   temporal      novelty          flavor
+    context      assessment       binding
+      |            |                |
+      +------------+----------------+
+                   |
+                   v
+        later multimodal cognition
 ```
 
 Raw observations remain available as evidence even after derived representations are produced.
 
 ## Current capabilities
 
-### Shared observation layer
+### Shared observation and acquisition layer
 
 - typed olfactory/gustatory modality
 - physical measurement units
@@ -51,6 +65,9 @@ Raw observations remain available as evidence even after derived representations
 - saturation/contamination health metadata
 - temperature, humidity, and pressure context
 - pessimistic handling of NaN/infinite/corrupt values
+- optional typed `SamplingContext` with protocol/run/sample/phase/step/replicate metadata
+- validated `ChemicalTrace` sequences with monotonic timestamp and protocol-step invariants
+- transactional trace append so rejected evidence never partially mutates a run
 
 ### Continuous HDC encoding
 
@@ -58,7 +75,7 @@ Raw observations remain available as evidence even after derived representations
 
 `ChemicalFingerprintEncoder` role-binds channel identity and modality, validates units, rejects duplicate configured/observed channels, ignores unknown channels for forward compatibility, and attenuates unhealthy/drifting channels by confidence.
 
-This is a starting representation, not a claim that anchor interpolation is the optimal continuous HDC code. Alternative level/thermometer encodings should be compared empirically before replacing it.
+This is a starting representation, not a claim that anchor interpolation is the optimal continuous HDC code. Level/thermometer and conventional dense baselines are preregistered comparison targets before any representation-superiority claim.
 
 ### Olfaction fixture
 
@@ -83,7 +100,37 @@ It is not a vendor-specific transfer-function model and does not identify arbitr
 - temperature-dependent Nernst response using Symthaea's existing biophysics implementation
 - explicit latent-species dimensionality
 
-It does not directly encode human labels such as sweet, bitter, salty, sour, or umami. Those should remain learned interpretations over chemical evidence rather than primary sensor coordinates.
+It does not directly encode human labels such as sweet, bitter, salty, sour, or umami. Those remain learned interpretations over chemical evidence rather than primary sensor coordinates.
+
+### Cognitive chemical context
+
+The crate now provides:
+
+- `ChemicalPercept`, which preserves the exact source observation beside its derived fingerprint
+- modality-specific temporal change tracking
+- confidence-gated temporal anchors
+- traceable novelty assessment and bounded novelty memory
+- explicit memory admission rather than implicit learning on exposure
+- a transactional `ChemicalCognitionPipeline`
+- conservative smell+taste `FlavorBinder` with time/confidence gates and both source observations retained
+
+Absence of trustworthy evidence remains `None`; it is never manufactured into a zero-valued percept.
+
+### Preregistered experiment decisions
+
+`ChemicalDecisionProtocol` encodes confirmatory metric gates before outcome-bearing evaluation. Each gate has a confirmation threshold and may have a separate practical-failure threshold.
+
+Aggregate decisions are intentionally asymmetric:
+
+- `Confirmed`: every required confirmation gate passes
+- `NotConfirmed`: at least one preregistered practical-failure boundary is crossed
+- `Inconclusive`: neither condition is established
+
+Failing to confirm is therefore not automatically a negative result.
+
+Evidence source and dataset/session partition must match the frozen protocol exactly; development or simulated results cannot silently satisfy a held-out physical claim.
+
+The program-level rules live in `docs/CHEMOSENSATION_PILOT_PREREGISTRATION.md`.
 
 ## Validation
 
@@ -103,19 +150,44 @@ Current tests cover, among other invariants:
 - confidence weighting and dead-channel exclusion
 - MOX temporal response, recovery, humidity confounding, transactional failure, and an analytical one-time-constant reference value
 - potentiometric mixture/temperature behavior and the monovalent Nernst known answer at 25 C
+- evidence-preserving percept construction
+- temporal timestamp and confidence gates
+- novelty admission and non-implicit learning
+- conservative flavor binding
+- sampling-context and trace consistency
+- asymmetric experiment decisions, threshold ordering, evidence/partition admission, and rejection of non-finite metrics
 
 Passing these tests establishes internal/model correctness only. Real olfactory/gustatory performance requires independent sensor characterization and held-out physical data.
 
+## Preregistered research path
+
+The current pilot families include:
+
+- `OD-001`: odor identity under concentration shift
+- `OD-002`: humidity nuisance robustness
+- `OD-003`: temporal response utility
+- `OD-004`: open-set novelty
+- `GT-001`: gustatory concentration shift
+- `GT-002`: mixture discrimination
+- `GT-003`: temperature robustness
+- `GT-004`: rinse/carryover
+- `FL-001`: smell+taste complementarity
+- `FL-002`: cross-modal contradiction preservation
+
+Physical pass/failure thresholds are not invented from software fixtures. They are selected using calibration-only data, frozen in a versioned decision protocol, and only then evaluated on sealed holdout evidence.
+
 ## Deliberate next boundaries
 
-This foundation should become green before later PRs add:
+Before live chemosensation enters the root cognitive loop, the generic multimodal presence and weighted-binding integrity repairs should be validated independently.
 
-1. canonical `Olfactory`, `Gustatory`, and `Chemesthetic` cognitive modalities
-2. temporal chemical percepts, novelty, memory, and flavor binding
+After that, follow-on work can add:
+
+1. canonical `Olfactory`, `Gustatory`, and `Chemesthetic` modalities
+2. an evidence-preserving bridge into root multimodal cognition
 3. active sniff/sampling policy
 4. gas-sensor hardware adapters
 5. ADC/electrode and microfluidic tongue hardware
 6. drift/recalibration studies across sessions, days, sensors, and environments
-7. HDC-vs-dense/level-encoding ablations on held-out real data
+7. preregistered HDC-vs-conventional representation comparisons on held-out real data
 
-The intended path is **measurement -> calibrated evidence -> uncertain percept -> multimodal cognition**, not sensor reading -> hard-coded semantic label.
+The intended path is **measurement -> calibrated evidence -> uncertain percept -> preregistered evaluation -> multimodal cognition**, not sensor reading -> hard-coded semantic label.
