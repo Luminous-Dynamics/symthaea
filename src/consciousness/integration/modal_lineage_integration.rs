@@ -34,6 +34,7 @@ use std::collections::HashMap;
 
 use super::cross_modal_binding::Modality;
 use super::modal_lineage::ModalLineageReceipt;
+use super::modality_identity::LEGACY_ROOT_MODALITIES;
 use super::multi_modal_integration::{IntegrationResult, ModalInput, MultiModalIntegrator};
 
 /// A legacy [`ModalInput`] paired with exact content lineage.
@@ -85,9 +86,9 @@ pub struct ProcessedModalLineage {
 /// those were still observed and entered current-cycle bookkeeping.
 ///
 /// `fused_lineage` is narrower still: it includes only final processed modalities
-/// whose sanitized current-cycle confidence is positive and for which the root
-/// result reports a configured channel. It therefore describes lineage behind
-/// the current-cycle feature vectors that reached the fusion input set.
+/// whose sanitized current-cycle confidence is positive and which belong to the
+/// explicitly pinned root channel topology. It therefore describes lineage
+/// behind the current-cycle feature vectors that reached the fusion input set.
 ///
 /// None of these fields claim complete historical lineage for temporal metrics
 /// that also depend on observations retained from earlier cycles.
@@ -158,19 +159,17 @@ pub fn integrate_with_lineage(
         processed_lineage.insert(entry.input.modality, entry.lineage.clone());
     }
 
-    // `attention_weights` contains an entry only when the modality corresponds
-    // to a configured root channel. Positive sanitized confidence is the other
-    // condition for inclusion in `channel_inputs` inside the root integrator.
+    // The stable identity module explicitly pins the set instantiated by the
+    // root integrator. Use that typed topology contract instead of inferring
+    // channel configuration from debug-formatted telemetry keys.
     let mut fused_lineage = HashMap::new();
     for (modality, lineage) in &processed_lineage {
         let positive_confidence = integrator
             .current_confidence(*modality)
             .is_some_and(|confidence| confidence > 0.0);
-        let configured_channel_reported = integration
-            .attention_weights
-            .contains_key(&format!("{modality:?}"));
+        let configured_channel = LEGACY_ROOT_MODALITIES.contains(modality);
 
-        if positive_confidence && configured_channel_reported {
+        if positive_confidence && configured_channel {
             fused_lineage.insert(*modality, lineage.clone());
         }
     }
