@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-time-holdover"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Bounded drift/holdover evidence for Symthaea clock transforms"
+
+[dependencies]
+serde = { workspace = true }
+symthaea-time-integrity = { path = "../symthaea-time-integrity" }
+symthaea-time-normalization = { path = "../symthaea-time-normalization" }
+symthaea-time-calibration = { path = "../symthaea-time-calibration" }
+symthaea-time-calibration-bundle = { path = "../symthaea-time-calibration-bundle" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+symthaea-time-calibration-policy = { path = "../symthaea-time-calibration-policy" }
