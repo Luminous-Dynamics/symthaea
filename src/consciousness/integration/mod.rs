@@ -12,6 +12,7 @@ pub mod evolution_bridge;
 pub mod gwt_integration;
 pub mod hierarchical_ltc;
 pub mod modal_lineage;
+pub mod modal_lineage_integration;
 pub mod modality_identity;
 pub mod multi_modal_integration;
 pub mod narrative_gwt_integration;
