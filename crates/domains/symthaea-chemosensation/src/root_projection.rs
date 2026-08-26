@@ -13,6 +13,11 @@
 //! Projection quality is descriptive evidence, not a pass/fail claim. Thresholds
 //! for acceptable neighborhood distortion should be preregistered from held-out
 //! experiments before canonical root integration depends on them.
+//!
+//! Assessment geometry is deliberately full-resolution and independent of
+//! Symthaea's adaptive global cognitive stride. An experiment receipt must not
+//! change because an unrelated runtime throttle changed how many HDC dimensions
+//! cognition samples.
 
 use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
 
@@ -20,6 +25,7 @@ use crate::{
     ChemicalBridgeTarget, ChemicalEncodingSpaceId, ChemicalEvidenceBundleId,
     ChemicalModalBridgeInput, ChemicalModality,
 };
+use crate::projection_geometry::{exact_cosine, validate_non_degenerate};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ChemicalRootProjectionConfig {
@@ -46,6 +52,7 @@ pub enum ChemicalRootProjectionError {
         actual: usize,
     },
     NonFiniteVector,
+    DegenerateVector,
     EvidenceBundleMismatch {
         expected: ChemicalEvidenceBundleId,
         actual: ChemicalEvidenceBundleId,
@@ -79,8 +86,8 @@ pub enum ChemicalRootProjectionError {
 pub struct ChemicalProjectionQuality {
     /// Threshold actually used for sign quantization.
     pub threshold: f32,
-    /// Cosine similarity between the source ContinuousHV and the bipolar
-    /// ContinuousHV obtained by expanding the projected BinaryHV.
+    /// Full-resolution cosine similarity between the source ContinuousHV and
+    /// the bipolar ContinuousHV obtained by expanding the projected BinaryHV.
     pub source_to_bipolar_similarity: f32,
     /// Fraction of BinaryHV dimensions set to 1 after projection.
     pub positive_fraction: f32,
@@ -140,8 +147,8 @@ impl ChemicalRootProjector {
     /// Because `ChemicalModalBridgeInput` is a public struct, this method does
     /// not blindly trust its receipt fields. It revalidates the evidence bundle,
     /// encoding-space consistency, modality consistency, timestamp envelope,
-    /// confidence bounds, vector dimensionality, and finite numeric content
-    /// before quantization.
+    /// confidence bounds, vector dimensionality, finite numeric content, and
+    /// non-degenerate geometry before quantization.
     pub fn project(
         &self,
         input: &ChemicalModalBridgeInput,
@@ -150,7 +157,8 @@ impl ChemicalRootProjector {
 
         let binary_vector = input.vector.to_binary(self.config.threshold);
         let bipolar = binary_vector.to_continuous();
-        let source_to_bipolar_similarity = input.vector.similarity(&bipolar).clamp(-1.0, 1.0);
+        let source_to_bipolar_similarity = exact_cosine(&input.vector, &bipolar)
+            .map_err(|_| ChemicalRootProjectionError::DegenerateVector)?;
         let positive_bits: u32 = binary_vector.0.iter().map(|byte| byte.count_ones()).sum();
         let positive_fraction = positive_bits as f32 / BinaryHV::DIM as f32;
 
@@ -175,9 +183,8 @@ impl ChemicalRootProjector {
     /// Measure pairwise semantic distortion caused by BinaryHV projection.
     ///
     /// Pair comparison is only meaningful for the same modality target and same
-    /// continuous encoding coordinate system. Binary similarity is computed in
-    /// bipolar ContinuousHV form so both reported similarities use cosine on the
-    /// same [-1, 1] scale.
+    /// continuous encoding coordinate system. Both similarities are fixed,
+    /// full-resolution cosine measurements on the same [-1, 1] scale.
     pub fn assess_pair(
         &self,
         left: &ChemicalModalBridgeInput,
@@ -199,10 +206,12 @@ impl ChemicalRootProjector {
             });
         }
 
-        let continuous_similarity = left.vector.similarity(&right.vector).clamp(-1.0, 1.0);
+        let continuous_similarity = exact_cosine(&left.vector, &right.vector)
+            .map_err(|_| ChemicalRootProjectionError::DegenerateVector)?;
         let left_binary = left.vector.to_binary(self.config.threshold).to_continuous();
         let right_binary = right.vector.to_binary(self.config.threshold).to_continuous();
-        let projected_bipolar_similarity = left_binary.similarity(&right_binary).clamp(-1.0, 1.0);
+        let projected_bipolar_similarity = exact_cosine(&left_binary, &right_binary)
+            .map_err(|_| ChemicalRootProjectionError::DegenerateVector)?;
 
         Ok(ChemicalProjectionPairAssessment {
             continuous_similarity,
@@ -241,6 +250,9 @@ fn validate_bridge_input(
     }
     if input.vector.values.iter().any(|value| !value.is_finite()) {
         return Err(ChemicalRootProjectionError::NonFiniteVector);
+    }
+    if validate_non_degenerate(&input.vector).is_err() {
+        return Err(ChemicalRootProjectionError::DegenerateVector);
     }
 
     let expected_bundle = ChemicalEvidenceBundleId::from_percepts(&input.components);
@@ -300,6 +312,7 @@ mod tests {
         CalibrationState, ChannelEncodingSpec, ChemicalChannel, ChemicalFingerprintEncoder,
         ChemicalModalBridge, ChemicalObservation, ChemicalPercept, MeasurementUnit, SensorHealth,
     };
+    use symthaea_core::hdc::unified_hv::ContinuousHV;
 
     fn encoder() -> ChemicalFingerprintEncoder {
         ChemicalFingerprintEncoder::new(vec![ChannelEncodingSpec::new(
@@ -377,6 +390,16 @@ mod tests {
                 threshold: f32::NAN,
             }),
             Err(ChemicalRootProjectionError::NonFiniteThreshold)
+        ));
+    }
+
+    #[test]
+    fn degenerate_vector_is_rejected_before_quality_is_computed() {
+        let mut input = bridge_input(50.0, 10);
+        input.vector = ContinuousHV::zero(HDC_DIMENSION);
+        assert!(matches!(
+            ChemicalRootProjector::default().project(&input),
+            Err(ChemicalRootProjectionError::DegenerateVector)
         ));
     }
 
