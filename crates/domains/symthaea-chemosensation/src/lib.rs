@@ -7,13 +7,14 @@
 //!
 //! This crate deliberately separates **physical observations** from learned
 //! percepts. Hardware produces [`ChemicalObservation`] values with calibration,
-//! environment, health, and provenance metadata. Higher layers may then derive
-//! odor, taste, flavor, novelty, and semantic hypotheses without overwriting the
-//! underlying measurement.
+//! environment, health, clock-domain, and provenance metadata. Higher layers may
+//! then derive odor, taste, flavor, novelty, and semantic hypotheses without
+//! overwriting the underlying measurement.
 //!
 //! Representation and evidence identities remain deliberately distinct:
 //!
 //! - [`ChemicalObservationId`] / [`ChemicalEvidenceBundleId`] identify raw evidence,
+//! - [`ChemicalClockDomainId`] identifies the declared timestamp-comparison domain,
 //! - [`ChemicalEncodingSpaceId`] identifies the continuous HDC coordinate system,
 //! - [`ChemicalRootProjectionPolicyId`] identifies ContinuousHV -> BinaryHV quantization,
 //! - [`ChemicalRootBinarySpaceId`] identifies the resulting root BinaryHV space,
@@ -26,6 +27,7 @@
 #![deny(unsafe_code)]
 
 pub mod calibration;
+pub mod clock;
 pub mod cognition;
 pub mod content_address_adapter;
 pub mod encoding;
@@ -46,6 +48,9 @@ pub mod root_projection;
 pub mod temporal;
 
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
+pub use clock::{
+    ChemicalClockDomainError, ChemicalClockDomainId, MAX_CHEMICAL_CLOCK_DOMAIN_LEN,
+};
 pub use cognition::{
     ChemicalCognitionError, ChemicalCognitionPipeline, CognitiveChemicalPercept,
 };

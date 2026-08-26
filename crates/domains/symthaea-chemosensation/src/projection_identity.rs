@@ -191,6 +191,7 @@ mod tests {
             target: ChemicalBridgeTarget::Olfactory,
             evidence_bundle_id: ChemicalEvidenceBundleId::from_bytes([4; 32]),
             encoding_space_id: source_space,
+            clock_domain: None,
             binary_vector: BinaryHV::zero(),
             confidence: 0.8,
             agreement: 0.9,

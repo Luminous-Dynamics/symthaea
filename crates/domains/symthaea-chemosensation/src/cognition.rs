@@ -81,6 +81,8 @@ impl ChemicalCognitionPipeline {
     ///
     /// `Ok(None)` is genuine absence of trustworthy configured evidence. The
     /// operation never manufactures a zero percept to fill a missing modality.
+    /// Missing clock provenance does not erase valid chemistry; the temporal
+    /// context simply withholds elapsed-time claims and does not create an anchor.
     pub fn perceive(
         &mut self,
         observation: &ChemicalObservation,
@@ -89,9 +91,9 @@ impl ChemicalCognitionPipeline {
             return Ok(None);
         };
 
-        // The temporal tracker validates timestamps before mutating its anchor.
-        // Novelty assessment is read-only, so a temporal error leaves cognitive
-        // state unchanged.
+        // The temporal tracker validates declared clock/time ordering before
+        // mutating its anchor. Novelty assessment is read-only, so a temporal
+        // integrity error leaves cognitive state unchanged.
         let temporal = self.temporal.observe(&percept)?;
         let novelty = self.novelty.assess(&percept);
 
@@ -119,8 +121,9 @@ impl ChemicalCognitionPipeline {
 mod tests {
     use super::*;
     use crate::{
-        CalibrationState, ChannelEncodingSpec, ChemicalChannel, ChemicalFingerprintEncoder,
-        ChemicalModality, ChemicalNoveltyConfig, MeasurementUnit, SensorHealth,
+        CalibrationState, ChannelEncodingSpec, ChemicalChannel, ChemicalClockDomainId,
+        ChemicalFingerprintEncoder, ChemicalModality, ChemicalNoveltyConfig, MeasurementUnit,
+        SensorHealth,
     };
 
     fn pipeline() -> ChemicalCognitionPipeline {
@@ -140,6 +143,10 @@ mod tests {
         ChemicalCognitionPipeline::new(encoder, temporal, novelty)
     }
 
+    fn test_clock() -> ChemicalClockDomainId {
+        ChemicalClockDomainId::new("test-rig/monotonic").unwrap()
+    }
+
     fn observation(timestamp_us: u64, value: f32, confidence: f32) -> ChemicalObservation {
         ChemicalObservation::new(
             timestamp_us,
@@ -157,6 +164,7 @@ mod tests {
                 },
             }],
         )
+        .with_clock_domain(test_clock())
     }
 
     #[test]
@@ -174,6 +182,19 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(second.novelty.novelty, 1.0);
+    }
+
+    #[test]
+    fn unclocked_chemistry_remains_perceivable_without_temporal_claims() {
+        let mut pipeline = pipeline();
+        let mut raw = observation(1_000_000, 20.0, 0.9);
+        raw.clock_domain = None;
+        let perceived = pipeline.perceive(&raw).unwrap().unwrap();
+        assert_eq!(perceived.temporal.clock_domain, None);
+        assert_eq!(perceived.temporal.elapsed_s, None);
+        assert_eq!(perceived.temporal.change_rate_per_s, None);
+        assert!(!perceived.temporal.anchor_updated);
+        assert_eq!(perceived.novelty.novelty, 1.0);
     }
 
     #[test]
@@ -238,6 +259,24 @@ mod tests {
             pipeline.perceive(&observation(1_000_000, 30.0, 0.9)),
             Err(ChemicalCognitionError::Temporal(
                 TemporalError::NonMonotonicTimestamp { .. }
+            ))
+        ));
+    }
+
+    #[test]
+    fn clock_migration_is_a_cognitive_integrity_boundary() {
+        let mut pipeline = pipeline();
+        pipeline
+            .perceive(&observation(2_000_000, 20.0, 0.9))
+            .unwrap()
+            .unwrap();
+        let mut migrated = observation(3_000_000, 30.0, 0.9);
+        migrated.clock_domain =
+            Some(ChemicalClockDomainId::new("other-rig/monotonic").unwrap());
+        assert!(matches!(
+            pipeline.perceive(&migrated),
+            Err(ChemicalCognitionError::Temporal(
+                TemporalError::ClockDomainMismatch { .. }
             ))
         ));
     }

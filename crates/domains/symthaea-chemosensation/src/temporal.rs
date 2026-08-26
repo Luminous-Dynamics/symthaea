@@ -5,23 +5,32 @@
 //!
 //! Smell and taste are temporal signals: onset, persistence, adaptation, and
 //! recovery carry information that a single static fingerprint cannot. This
-//! tracker keeps modality-specific anchors and refuses out-of-order evidence or
-//! cross-coordinate-space comparisons.
+//! tracker keeps modality-specific anchors and refuses out-of-order evidence,
+//! cross-clock comparisons, or cross-coordinate-space comparisons.
+//!
+//! Missing clock provenance is treated as absence of temporal evidence, not
+//! absence of chemical evidence. Such a percept can still be represented and
+//! assessed elsewhere, but it cannot establish or advance temporal state.
 
 use std::collections::HashMap;
 
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
-use crate::{ChemicalEncodingSpaceId, ChemicalModality, ChemicalPercept};
+use crate::{ChemicalClockDomainId, ChemicalEncodingSpaceId, ChemicalModality, ChemicalPercept};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChemicalTemporalContext {
+    /// Declared timebase under which previous/current timestamps and elapsed time
+    /// are comparable. `None` means temporal claims were intentionally withheld.
+    pub clock_domain: Option<ChemicalClockDomainId>,
     pub previous_timestamp_us: Option<u64>,
     pub elapsed_s: Option<f32>,
     pub similarity_to_previous: Option<f32>,
-    /// Bounded change score in [0, 1]. Zero means no representational change.
+    /// Bounded representational change in [0, 1] when temporal comparison is
+    /// admissible. Zero with no clock domain means "not temporally assessed",
+    /// not proof that the chemistry was unchanged.
     pub change: f32,
-    /// Change per second when a previous anchor exists.
+    /// Change per second when a comparable previous anchor exists.
     pub change_rate_per_s: Option<f32>,
     /// Whether this percept became the new temporal anchor.
     pub anchor_updated: bool,
@@ -34,6 +43,11 @@ pub enum TemporalConfigError {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TemporalError {
+    ClockDomainMismatch {
+        modality: ChemicalModality,
+        previous: ChemicalClockDomainId,
+        current: ChemicalClockDomainId,
+    },
     NonMonotonicTimestamp {
         modality: ChemicalModality,
         previous_timestamp_us: u64,
@@ -49,6 +63,7 @@ pub enum TemporalError {
 #[derive(Debug, Clone)]
 struct TemporalAnchor {
     timestamp_us: u64,
+    clock_domain: ChemicalClockDomainId,
     vector: ContinuousHV,
     encoding_space_id: ChemicalEncodingSpaceId,
 }
@@ -84,8 +99,13 @@ impl ChemicalTemporalTracker {
     ///
     /// Low-confidence percepts may be assessed but do not replace a stronger
     /// anchor. Validation completes before state mutation. A changed encoding
-    /// space is an integrity boundary: callers must explicitly clear/migrate
-    /// temporal state rather than interpreting coordinate changes as chemistry.
+    /// space or positively different clock domain is an integrity boundary:
+    /// callers must explicitly clear/migrate temporal state rather than
+    /// interpreting coordinate or timebase changes as chemistry.
+    ///
+    /// A percept without a declared clock domain is still valid chemical
+    /// evidence. It simply receives an empty temporal context and does not
+    /// create or mutate a temporal anchor.
     pub fn observe(
         &mut self,
         percept: &ChemicalPercept,
@@ -93,9 +113,30 @@ impl ChemicalTemporalTracker {
         let modality = percept.evidence.modality;
         let timestamp_us = percept.timestamp_us();
         let current_space = percept.fingerprint.encoding_space_id;
-        let previous = self.anchors.get(&modality);
 
+        let Some(current_clock) = percept.evidence.clock_domain.clone() else {
+            return Ok(ChemicalTemporalContext {
+                clock_domain: None,
+                previous_timestamp_us: None,
+                elapsed_s: None,
+                similarity_to_previous: None,
+                change: 0.0,
+                change_rate_per_s: None,
+                anchor_updated: false,
+            });
+        };
+
+        let previous = self.anchors.get(&modality);
         if let Some(anchor) = previous {
+            // Clock comparability must be established before timestamp ordering
+            // or elapsed-time arithmetic is interpreted.
+            if current_clock != anchor.clock_domain {
+                return Err(TemporalError::ClockDomainMismatch {
+                    modality,
+                    previous: anchor.clock_domain.clone(),
+                    current: current_clock,
+                });
+            }
             if timestamp_us <= anchor.timestamp_us {
                 return Err(TemporalError::NonMonotonicTimestamp {
                     modality,
@@ -137,6 +178,7 @@ impl ChemicalTemporalTracker {
                 modality,
                 TemporalAnchor {
                     timestamp_us,
+                    clock_domain: current_clock.clone(),
                     vector: percept.fingerprint.vector.clone(),
                     encoding_space_id: current_space,
                 },
@@ -144,6 +186,7 @@ impl ChemicalTemporalTracker {
         }
 
         Ok(ChemicalTemporalContext {
+            clock_domain: Some(current_clock),
             previous_timestamp_us,
             elapsed_s,
             similarity_to_previous,
@@ -157,18 +200,22 @@ impl ChemicalTemporalTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ChemicalFingerprint, ChemicalObservation, ChemicalPercept, EnvironmentReading};
+    use crate::{ChemicalFingerprint, ChemicalObservation, ChemicalPercept};
     use symthaea_core::hdc::HDC_DIMENSION;
 
-    fn percept(modality: ChemicalModality, timestamp_us: u64, seed: u64, confidence: f32) -> ChemicalPercept {
+    fn test_clock() -> ChemicalClockDomainId {
+        ChemicalClockDomainId::new("test-rig/monotonic").unwrap()
+    }
+
+    fn percept(
+        modality: ChemicalModality,
+        timestamp_us: u64,
+        seed: u64,
+        confidence: f32,
+    ) -> ChemicalPercept {
         ChemicalPercept {
-            evidence: ChemicalObservation {
-                timestamp_us,
-                modality,
-                source: "fixture".into(),
-                channels: vec![],
-                environment: EnvironmentReading::default(),
-            },
+            evidence: ChemicalObservation::new(timestamp_us, modality, "fixture", vec![])
+                .with_clock_domain(test_clock()),
             fingerprint: ChemicalFingerprint {
                 vector: ContinuousHV::random(HDC_DIMENSION, seed),
                 confidence,
@@ -185,9 +232,47 @@ mod tests {
         let context = tracker
             .observe(&percept(ChemicalModality::Olfactory, 1_000_000, 1, 0.9))
             .unwrap();
+        assert_eq!(context.clock_domain, Some(test_clock()));
         assert_eq!(context.previous_timestamp_us, None);
         assert_eq!(context.change, 0.0);
         assert!(context.anchor_updated);
+    }
+
+    #[test]
+    fn unspecified_clock_withholds_temporal_claims_without_rejecting_percept() {
+        let mut tracker = ChemicalTemporalTracker::new(0.5).unwrap();
+        let mut sample = percept(ChemicalModality::Olfactory, 1_000_000, 1, 0.9);
+        sample.evidence.clock_domain = None;
+        let context = tracker.observe(&sample).unwrap();
+        assert_eq!(context.clock_domain, None);
+        assert_eq!(context.previous_timestamp_us, None);
+        assert_eq!(context.elapsed_s, None);
+        assert_eq!(context.similarity_to_previous, None);
+        assert_eq!(context.change_rate_per_s, None);
+        assert!(!context.anchor_updated);
+
+        // No hidden anchor was created; a later valid first sample has no
+        // synthetic previous context.
+        let valid = tracker
+            .observe(&percept(ChemicalModality::Olfactory, 2_000_000, 1, 0.9))
+            .unwrap();
+        assert_eq!(valid.previous_timestamp_us, None);
+    }
+
+    #[test]
+    fn unclocked_sample_does_not_erase_existing_temporal_anchor() {
+        let mut tracker = ChemicalTemporalTracker::new(0.5).unwrap();
+        tracker
+            .observe(&percept(ChemicalModality::Olfactory, 1_000_000, 1, 0.9))
+            .unwrap();
+        let mut unclocked = percept(ChemicalModality::Olfactory, 99, 2, 0.9);
+        unclocked.evidence.clock_domain = None;
+        assert!(!tracker.observe(&unclocked).unwrap().anchor_updated);
+
+        let continuation = tracker
+            .observe(&percept(ChemicalModality::Olfactory, 2_000_000, 1, 0.9))
+            .unwrap();
+        assert_eq!(continuation.previous_timestamp_us, Some(1_000_000));
     }
 
     #[test]
@@ -229,6 +314,28 @@ mod tests {
             .unwrap();
         assert_eq!(later.previous_timestamp_us, Some(1_000_000));
         assert!(later.change < 1e-6);
+    }
+
+    #[test]
+    fn clock_change_is_rejected_before_timestamp_interpretation_without_mutation() {
+        let mut tracker = ChemicalTemporalTracker::new(0.5).unwrap();
+        tracker
+            .observe(&percept(ChemicalModality::Olfactory, 2_000_000, 1, 0.9))
+            .unwrap();
+
+        let mut changed_clock = percept(ChemicalModality::Olfactory, 1, 2, 0.9);
+        changed_clock.evidence.clock_domain =
+            Some(ChemicalClockDomainId::new("other-rig/monotonic").unwrap());
+        assert!(matches!(
+            tracker.observe(&changed_clock),
+            Err(TemporalError::ClockDomainMismatch { .. })
+        ));
+
+        let next = tracker
+            .observe(&percept(ChemicalModality::Olfactory, 3_000_000, 1, 0.9))
+            .unwrap();
+        assert_eq!(next.previous_timestamp_us, Some(2_000_000));
+        assert!(next.change < 1e-6);
     }
 
     #[test]
