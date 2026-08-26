@@ -1,0 +1,60 @@
+name: Time Calibration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "crates/core/symthaea-time-calibration/**"
+      - "crates/core/symthaea-time-integrity/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/time-calibration.yml"
+  pull_request:
+    paths:
+      - "crates/core/symthaea-time-calibration/**"
+      - "crates/core/symthaea-time-integrity/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/time-calibration.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: time-calibration-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    name: Time calibration unit and lint gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-time-calibration-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-time-calibration-
+
+      - name: Run time calibration unit tests
+        run: cargo test -p symthaea-time-calibration
+
+      - name: Run time calibration clippy
+        run: cargo clippy -p symthaea-time-calibration --all-targets -- -D warnings
+
+      - name: Run time calibration documentation tests
+        run: cargo test -p symthaea-time-calibration --doc

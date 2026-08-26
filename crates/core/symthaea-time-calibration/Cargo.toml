@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-time-calibration"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Evidence-first four-timestamp clock calibration intervals for Symthaea"
+
+[dependencies]
+serde = { workspace = true }
+symthaea-time-integrity = { path = "../symthaea-time-integrity" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
