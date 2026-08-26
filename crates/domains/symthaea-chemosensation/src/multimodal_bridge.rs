@@ -17,6 +17,9 @@
 //! Hypervector comparison is only meaningful when components were encoded in
 //! the same HDC coordinate system. Comparability is proven from each fingerprint's
 //! content-addressed [`ChemicalEncodingSpaceId`], not from a caller-supplied label.
+//! Timestamp comparison likewise requires a shared explicit [`ChemicalClockDomainId`]
+//! whenever multiple sources are aggregated. An unspecified timestamp is preserved
+//! for single-source evidence but is never treated as comparable across devices.
 //! The aggregate also carries a [`ChemicalEvidenceBundleId`] over the exact raw
 //! observations so downstream cognition can distinguish evidence identity from
 //! representation identity.
@@ -27,7 +30,8 @@
 //! dependency cycle. The final root bridge must assert the mapping on its side too.
 
 use crate::{
-    ChemicalEncodingSpaceId, ChemicalEvidenceBundleId, ChemicalModality, ChemicalPercept,
+    ChemicalClockDomainId, ChemicalEncodingSpaceId, ChemicalEvidenceBundleId, ChemicalModality,
+    ChemicalPercept,
 };
 use symthaea_core::hdc::{HDC_DIMENSION, unified_hv::ContinuousHV};
 
@@ -66,7 +70,7 @@ impl From<ChemicalModality> for ChemicalBridgeTarget {
 pub struct ChemicalModalBridgeConfig {
     /// Maximum timestamp spread among components treated as one current-cycle
     /// observation. This is a protocol choice, not a universal psychophysical
-    /// constant.
+    /// constant. It is evaluated only after a shared clock domain is proven.
     pub max_component_skew_us: u64,
 }
 
@@ -89,6 +93,13 @@ pub enum ChemicalModalBridgeError {
         expected: ChemicalModality,
         actual: ChemicalModality,
     },
+    /// More than one source was supplied but at least one timestamp had no
+    /// declared comparison domain.
+    MissingSharedClockDomain,
+    MixedClockDomains {
+        expected: ChemicalClockDomainId,
+        actual: ChemicalClockDomainId,
+    },
     InvalidConfidence,
     UntrustedComponent,
     NonFiniteVector,
@@ -108,8 +119,9 @@ pub enum ChemicalModalBridgeError {
 /// sensor identity, raw observations, calibration provenance, timestamps, and
 /// their common encoding-space identity. `evidence_bundle_id` gives the exact raw
 /// evidence bundle a compact stable identity independent of the derived HDC
-/// representation. The aggregate vector is a convenience representation, not
-/// replacement evidence.
+/// representation. `clock_domain` is preserved explicitly; it is required for
+/// multi-source aggregates and optional for a single-source aggregate. The
+/// aggregate vector is a convenience representation, not replacement evidence.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChemicalModalBridgeInput {
     pub target: ChemicalBridgeTarget,
@@ -117,6 +129,9 @@ pub struct ChemicalModalBridgeInput {
     pub evidence_bundle_id: ChemicalEvidenceBundleId,
     /// Identity of the HDC coordinate system used to represent those observations.
     pub encoding_space_id: ChemicalEncodingSpaceId,
+    /// Declared timebase for the timestamp envelope. `None` is allowed only for
+    /// single-source evidence.
+    pub clock_domain: Option<ChemicalClockDomainId>,
     pub vector: ContinuousHV,
     /// Effective confidence after component trust and cross-source conflict are
     /// combined. Multiple agreeing sensors do not automatically inflate this
@@ -168,7 +183,9 @@ impl ChemicalModalBridge {
     ///
     /// Components are sorted deterministically before floating-point accumulation
     /// so caller iteration order cannot change the resulting vector. Validation
-    /// completes before any derived representation is constructed.
+    /// completes before any derived representation is constructed. For multiple
+    /// components, timestamp skew is evaluated only after every component proves
+    /// membership in the same explicit clock domain.
     pub fn aggregate(
         &self,
         percepts: &[ChemicalPercept],
@@ -217,6 +234,7 @@ impl ChemicalModalBridge {
             }
         }
 
+        let clock_domain = shared_clock_domain(percepts)?;
         let earliest_timestamp_us = percepts
             .iter()
             .map(ChemicalPercept::timestamp_us)
@@ -268,6 +286,7 @@ impl ChemicalModalBridge {
                 target: modality.into(),
                 evidence_bundle_id,
                 encoding_space_id,
+                clock_domain,
                 vector: components[0].fingerprint.vector.clone(),
                 confidence: components[0].confidence(),
                 agreement: 1.0,
@@ -296,6 +315,7 @@ impl ChemicalModalBridge {
             target: modality.into(),
             evidence_bundle_id,
             encoding_space_id,
+            clock_domain,
             vector,
             confidence,
             agreement,
@@ -310,6 +330,41 @@ impl Default for ChemicalModalBridge {
     fn default() -> Self {
         Self::new(ChemicalModalBridgeConfig::default())
     }
+}
+
+/// Determine whether timestamp comparison is admissible for this aggregate.
+/// A single observation does not require a clock domain because no cross-source
+/// timestamp comparison is performed. Two or more observations must all declare
+/// the exact same clock-domain identity.
+fn shared_clock_domain(
+    components: &[ChemicalPercept],
+) -> Result<Option<ChemicalClockDomainId>, ChemicalModalBridgeError> {
+    let first = components
+        .first()
+        .ok_or(ChemicalModalBridgeError::EmptyInput)?;
+    if components.len() == 1 {
+        return Ok(first.evidence.clock_domain.clone());
+    }
+
+    let expected = first
+        .evidence
+        .clock_domain
+        .clone()
+        .ok_or(ChemicalModalBridgeError::MissingSharedClockDomain)?;
+    for component in components.iter().skip(1) {
+        let actual = component
+            .evidence
+            .clock_domain
+            .clone()
+            .ok_or(ChemicalModalBridgeError::MissingSharedClockDomain)?;
+        if actual != expected {
+            return Err(ChemicalModalBridgeError::MixedClockDomains {
+                expected,
+                actual,
+            });
+        }
+    }
+    Ok(Some(expected))
 }
 
 /// Confidence scale of the evidence set without multiplying certainty simply
@@ -378,6 +433,10 @@ mod tests {
     use super::*;
     use crate::{ChemicalFingerprint, ChemicalObservation, EnvironmentReading};
 
+    fn test_clock() -> ChemicalClockDomainId {
+        ChemicalClockDomainId::new("test-rig/monotonic").unwrap()
+    }
+
     fn percept(
         modality: ChemicalModality,
         timestamp_us: u64,
@@ -388,6 +447,7 @@ mod tests {
         ChemicalPercept {
             evidence: ChemicalObservation {
                 timestamp_us,
+                clock_domain: Some(test_clock()),
                 modality,
                 source: source.into(),
                 channels: vec![],
@@ -422,6 +482,7 @@ mod tests {
         assert_eq!(output.vector, input.fingerprint.vector);
         assert_eq!(output.confidence, 0.8);
         assert_eq!(output.agreement, 1.0);
+        assert_eq!(output.clock_domain.as_ref(), input.evidence.clock_domain.as_ref());
         assert_eq!(
             output.encoding_space_id,
             ChemicalEncodingSpaceId::from_bytes([7; 32])
@@ -433,6 +494,41 @@ mod tests {
         assert_eq!(output.component_count(), 1);
         assert_eq!(output.components[0], input);
         assert_eq!(output.stable_target_id(), 13);
+    }
+
+    #[test]
+    fn single_unspecified_clock_is_preserved_without_cross_source_comparison() {
+        let bridge = ChemicalModalBridge::default();
+        let mut input = odor(10, "nose-a", 1, 0.8);
+        input.evidence.clock_domain = None;
+        let output = bridge.aggregate(std::slice::from_ref(&input)).unwrap();
+        assert!(output.clock_domain.is_none());
+    }
+
+    #[test]
+    fn multiple_sources_require_an_explicit_shared_clock_domain() {
+        let bridge = ChemicalModalBridge::default();
+        let mut a = odor(10, "nose-a", 1, 0.9);
+        let b = odor(20, "nose-b", 1, 0.9);
+        a.evidence.clock_domain = None;
+
+        assert!(matches!(
+            bridge.aggregate(&[a, b]),
+            Err(ChemicalModalBridgeError::MissingSharedClockDomain)
+        ));
+    }
+
+    #[test]
+    fn mixed_clock_domains_are_rejected_before_skew_is_interpreted() {
+        let bridge = ChemicalModalBridge::default();
+        let a = odor(10, "nose-a", 1, 0.9);
+        let mut b = odor(20, "nose-b", 1, 0.9);
+        b.evidence.clock_domain = Some(ChemicalClockDomainId::new("other-rig/monotonic").unwrap());
+
+        assert!(matches!(
+            bridge.aggregate(&[a, b]),
+            Err(ChemicalModalBridgeError::MixedClockDomains { .. })
+        ));
     }
 
     #[test]
@@ -450,6 +546,7 @@ mod tests {
         let output = bridge.aggregate(&[b.clone(), a.clone()]).unwrap();
         assert_eq!(output.modality(), ChemicalModality::Olfactory);
         assert_eq!(output.component_count(), 2);
+        assert_eq!(output.clock_domain.as_ref(), Some(&test_clock()));
         assert_eq!(output.earliest_timestamp_us, 10);
         assert_eq!(output.latest_timestamp_us, 20);
         assert!((output.agreement - 1.0).abs() < 1e-5);
@@ -531,7 +628,7 @@ mod tests {
     }
 
     #[test]
-    fn excessive_same_cycle_skew_is_rejected() {
+    fn excessive_same_cycle_skew_is_rejected_only_with_shared_clock() {
         let bridge = ChemicalModalBridge::new(ChemicalModalBridgeConfig {
             max_component_skew_us: 10,
         });
@@ -558,6 +655,7 @@ mod tests {
         assert_eq!(forward.vector, reverse.vector);
         assert_eq!(forward.confidence, reverse.confidence);
         assert_eq!(forward.agreement, reverse.agreement);
+        assert_eq!(forward.clock_domain, reverse.clock_domain);
         assert_eq!(forward.evidence_bundle_id, reverse.evidence_bundle_id);
         assert_eq!(forward.components, reverse.components);
     }

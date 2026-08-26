@@ -4,10 +4,14 @@
 //! Content-addressed receipts for raw chemical evidence.
 //!
 //! These IDs identify observations, not derived interpretations. The raw-value,
-//! calibration, health, environment, source, modality, and timestamp content is
-//! covered while channel ordering is canonicalized. HDC encoding-space identity
-//! is intentionally excluded: the same physical evidence re-encoded under a new
-//! representation should keep the same evidence identity.
+//! calibration, health, environment, source, modality, timestamp, and declared
+//! clock-domain content is covered while channel ordering is canonicalized. HDC
+//! encoding-space identity is intentionally excluded: the same physical evidence
+//! re-encoded under a new representation should keep the same evidence identity.
+//!
+//! The observation and bundle domain separators are v2 because adding clock-domain
+//! semantics changes what the digest means. Old v1 digests must never be silently
+//! interpreted under the stronger v2 contract.
 
 use std::fmt;
 
@@ -17,6 +21,9 @@ use serde::{Deserialize, Serialize};
 use crate::{
     ChemicalChannel, ChemicalModality, ChemicalObservation, ChemicalPercept, MeasurementUnit,
 };
+
+const OBSERVATION_HASH_DOMAIN_V2: &[u8] = b"symthaea-chemosensation-observation-v2";
+const EVIDENCE_BUNDLE_HASH_DOMAIN_V2: &[u8] = b"symthaea-chemosensation-evidence-bundle-v2";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ChemicalObservationId([u8; 32]);
@@ -56,7 +63,7 @@ impl ChemicalEvidenceBundleId {
         ids.sort_by(|left, right| left.as_bytes().cmp(right.as_bytes()));
 
         let mut hasher = Hasher::new();
-        put_bytes(&mut hasher, b"symthaea-chemosensation-evidence-bundle-v1");
+        put_bytes(&mut hasher, EVIDENCE_BUNDLE_HASH_DOMAIN_V2);
         put_u64(&mut hasher, ids.len() as u64);
         for id in ids {
             hasher.update(id.as_bytes());
@@ -87,8 +94,15 @@ impl fmt::Display for ChemicalEvidenceBundleId {
 
 fn hash_observation(observation: &ChemicalObservation) -> [u8; 32] {
     let mut hasher = Hasher::new();
-    put_bytes(&mut hasher, b"symthaea-chemosensation-observation-v1");
+    put_bytes(&mut hasher, OBSERVATION_HASH_DOMAIN_V2);
     put_u8(&mut hasher, modality_tag(observation.modality));
+    match &observation.clock_domain {
+        Some(clock_domain) => {
+            put_u8(&mut hasher, 1);
+            put_bytes(&mut hasher, clock_domain.as_str().as_bytes());
+        }
+        None => put_u8(&mut hasher, 0),
+    }
     put_u64(&mut hasher, observation.timestamp_us);
     put_bytes(&mut hasher, observation.source.as_bytes());
     put_optional_f32(&mut hasher, observation.environment.temperature_c);
@@ -203,7 +217,8 @@ fn write_hex(f: &mut fmt::Formatter<'_>, bytes: &[u8; 32]) -> fmt::Result {
 mod tests {
     use super::*;
     use crate::{
-        CalibrationState, ChemicalFingerprint, EnvironmentReading, SensorHealth,
+        CalibrationState, ChemicalClockDomainId, ChemicalFingerprint, EnvironmentReading,
+        SensorHealth,
     };
     use symthaea_core::hdc::{HDC_DIMENSION, unified_hv::ContinuousHV};
 
@@ -263,6 +278,28 @@ mod tests {
             base_id,
             ChemicalObservationId::from_observation(&calibration_changed)
         );
+    }
+
+    #[test]
+    fn clock_domain_is_part_of_raw_evidence_identity() {
+        let base = observation(vec![channel("voc", 1.0)]);
+        let clock_a = base
+            .clone()
+            .with_clock_domain(ChemicalClockDomainId::new("rig-a/monotonic").unwrap());
+        let clock_b = base
+            .clone()
+            .with_clock_domain(ChemicalClockDomainId::new("rig-b/monotonic").unwrap());
+        let unix = base
+            .clone()
+            .with_clock_domain(ChemicalClockDomainId::unix_epoch());
+
+        let base_id = ChemicalObservationId::from_observation(&base);
+        assert_ne!(base_id, ChemicalObservationId::from_observation(&clock_a));
+        assert_ne!(
+            ChemicalObservationId::from_observation(&clock_a),
+            ChemicalObservationId::from_observation(&clock_b)
+        );
+        assert_ne!(base_id, ChemicalObservationId::from_observation(&unix));
     }
 
     #[test]

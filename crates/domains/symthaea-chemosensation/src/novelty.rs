@@ -17,7 +17,7 @@ use std::collections::{HashMap, VecDeque};
 
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
-use crate::{ChemicalEncodingSpaceId, ChemicalModality, ChemicalPercept};
+use crate::{ChemicalClockDomainId, ChemicalEncodingSpaceId, ChemicalModality, ChemicalPercept};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChemicalNoveltyConfig {
@@ -56,6 +56,10 @@ pub enum NoveltyConfigError {
 pub struct ChemicalMemoryReference {
     pub similarity: f32,
     pub timestamp_us: u64,
+    /// Clock domain attached to `timestamp_us`, when one was declared by the
+    /// admitted evidence. Novelty does not compare timestamps; this is retained
+    /// strictly so the reference remains traceable without inventing an epoch.
+    pub clock_domain: Option<ChemicalClockDomainId>,
     pub source: String,
     pub confidence: f32,
 }
@@ -73,6 +77,7 @@ pub struct NoveltyAssessment {
 struct MemoryEntry {
     vector: ContinuousHV,
     timestamp_us: u64,
+    clock_domain: Option<ChemicalClockDomainId>,
     source: String,
     confidence: f32,
 }
@@ -177,6 +182,7 @@ impl ChemicalNoveltyMemory {
                 nearest = Some(ChemicalMemoryReference {
                     similarity,
                     timestamp_us: entry.timestamp_us,
+                    clock_domain: entry.clock_domain.clone(),
                     source: entry.source.clone(),
                     confidence: entry.confidence,
                 });
@@ -236,6 +242,7 @@ impl ChemicalNoveltyMemory {
         entries.push_back(MemoryEntry {
             vector: percept.fingerprint.vector.clone(),
             timestamp_us: percept.timestamp_us(),
+            clock_domain: percept.evidence.clock_domain.clone(),
             source: percept.evidence.source.clone(),
             confidence: percept.confidence(),
         });
@@ -246,8 +253,12 @@ impl ChemicalNoveltyMemory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ChemicalFingerprint, ChemicalObservation, EnvironmentReading};
+    use crate::{ChemicalFingerprint, ChemicalObservation};
     use symthaea_core::hdc::{HDC_DIMENSION, unified_hv::ContinuousHV};
+
+    fn test_clock() -> ChemicalClockDomainId {
+        ChemicalClockDomainId::new("test-rig/monotonic").unwrap()
+    }
 
     fn percept(
         modality: ChemicalModality,
@@ -256,13 +267,13 @@ mod tests {
         confidence: f32,
     ) -> ChemicalPercept {
         ChemicalPercept {
-            evidence: ChemicalObservation {
+            evidence: ChemicalObservation::new(
                 timestamp_us,
                 modality,
-                source: format!("source-{seed}"),
-                channels: vec![],
-                environment: EnvironmentReading::default(),
-            },
+                format!("source-{seed}"),
+                vec![],
+            )
+            .with_clock_domain(test_clock()),
             fingerprint: ChemicalFingerprint {
                 vector: ContinuousHV::random(HDC_DIMENSION, seed),
                 confidence,
@@ -297,8 +308,20 @@ mod tests {
         let nearest = assessment.nearest.unwrap();
         assert!(assessment.novelty < 1e-6);
         assert_eq!(nearest.timestamp_us, 123);
+        assert_eq!(nearest.clock_domain, Some(test_clock()));
         assert_eq!(nearest.source, "source-1");
         assert!((nearest.confidence - 0.9).abs() < 1e-6);
+    }
+
+    #[test]
+    fn unclocked_reference_remains_traceable_without_inventing_epoch() {
+        let mut memory = ChemicalNoveltyMemory::new(ChemicalNoveltyConfig::default()).unwrap();
+        let mut reference = percept(ChemicalModality::Olfactory, 123, 1, 0.9);
+        reference.evidence.clock_domain = None;
+        assert!(memory.admit(&reference));
+        let nearest = memory.assess(&reference).nearest.unwrap();
+        assert_eq!(nearest.timestamp_us, 123);
+        assert_eq!(nearest.clock_domain, None);
     }
 
     #[test]
