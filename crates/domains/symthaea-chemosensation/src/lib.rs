@@ -21,6 +21,7 @@ pub mod calibration;
 pub mod cognition;
 pub mod encoding;
 pub mod fingerprint;
+pub mod flavor;
 pub mod gustation;
 pub mod novelty;
 pub mod observation;
@@ -36,6 +37,9 @@ pub use encoding::ScalarHdcEncoder;
 pub use fingerprint::{
     ChannelEncodingSpec, ChemicalFingerprint, ChemicalFingerprintEncoder, FingerprintConfigError,
     FingerprintError,
+};
+pub use flavor::{
+    FlavorBinder, FlavorBindingConfig, FlavorBindingError, FlavorConfigError, FlavorPercept,
 };
 pub use gustation::{
     ElectronicTongueSimulator, GustatorySimulationError, GustatoryStimulus,
