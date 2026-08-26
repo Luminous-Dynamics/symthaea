@@ -2,6 +2,7 @@ name: SYM-ARCH-002A5 Differential Validity
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
       - research/sym-arch-002a3-validity-v1
@@ -33,6 +34,9 @@ env:
 jobs:
   differential-validity:
     name: Validate differential benchmark semantics
+    # Draft stacked PRs cannot merge and should not consume scarce runner capacity.
+    # Promoting to ready-for-review explicitly triggers this exact gate.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
