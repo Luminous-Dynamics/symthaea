@@ -34,7 +34,8 @@ pub struct TraceArchiveManifest {
     pub run_id: String,
     pub modality: ChemicalModality,
     pub replicate: u32,
-    pub observation_count: usize,
+    /// Fixed-width count for transport stability across 32/64-bit platforms.
+    pub observation_count: u64,
     pub first_timestamp_us: u64,
     pub last_timestamp_us: u64,
     pub digest: TraceArchiveDigest,
@@ -126,6 +127,7 @@ impl ChemicalTraceArchive {
             .last()
             .map(|observation| observation.timestamp_us)
             .ok_or(TraceArchiveError::EmptyArchive)?;
+        let observation_count = len_u64(observations.len());
 
         let digest = digest_trace(
             TRACE_ARCHIVE_SCHEMA_VERSION,
@@ -145,7 +147,7 @@ impl ChemicalTraceArchive {
                 run_id: trace.run_id().to_string(),
                 modality: trace.modality(),
                 replicate: trace.replicate(),
-                observation_count: observations.len(),
+                observation_count,
                 first_timestamp_us,
                 last_timestamp_us,
                 digest,
@@ -196,7 +198,7 @@ impl ChemicalTraceArchive {
         if trace.replicate() != self.manifest.replicate {
             return Err(TraceArchiveError::ManifestReplicateMismatch);
         }
-        if trace.len() != self.manifest.observation_count {
+        if len_u64(trace.len()) != self.manifest.observation_count {
             return Err(TraceArchiveError::ManifestCountMismatch);
         }
 
@@ -274,7 +276,7 @@ fn digest_trace(
     put_str(&mut hasher, run_id);
     put_u8(&mut hasher, modality_tag(modality));
     put_u32(&mut hasher, replicate);
-    put_u64(&mut hasher, observations.len() as u64);
+    put_u64(&mut hasher, len_u64(observations.len()));
 
     for observation in observations {
         hash_observation(&mut hasher, observation);
@@ -311,7 +313,7 @@ fn hash_observation(hasher: &mut Hasher, observation: &ChemicalObservation) {
         None => put_u8(hasher, 0),
     }
 
-    put_u64(hasher, observation.channels.len() as u64);
+    put_u64(hasher, len_u64(observation.channels.len()));
     for channel in &observation.channels {
         put_str(hasher, &channel.name);
         put_u8(hasher, unit_tag(channel.unit));
@@ -384,7 +386,7 @@ fn put_str(hasher: &mut Hasher, value: &str) {
 }
 
 fn put_bytes(hasher: &mut Hasher, value: &[u8]) {
-    put_u64(hasher, value.len() as u64);
+    put_u64(hasher, len_u64(value.len()));
     hasher.update(value);
 }
 
@@ -402,6 +404,10 @@ fn put_u32(hasher: &mut Hasher, value: u32) {
 
 fn put_u64(hasher: &mut Hasher, value: u64) {
     hasher.update(&value.to_le_bytes());
+}
+
+fn len_u64(value: usize) -> u64 {
+    u64::try_from(value).expect("in-memory archive length must fit in u64")
 }
 
 #[cfg(test)]
@@ -552,6 +558,37 @@ mod tests {
             Err(TraceArchiveError::PinnedDigestMismatch {
                 expected: pinned,
                 actual: archive.manifest.digest,
+            })
+        );
+    }
+
+    #[test]
+    fn json_transport_roundtrip_preserves_identity_and_verification() {
+        let archive = ChemicalTraceArchive::from_trace(
+            &trace(),
+            ChemicalEvidenceLevel::BenchPhysicalObservation,
+        )
+        .unwrap();
+        let pinned = archive.digest();
+        let bytes = serde_json::to_vec(&archive).unwrap();
+        let decoded: ChemicalTraceArchive = serde_json::from_slice(&bytes).unwrap();
+
+        assert_eq!(decoded, archive);
+        assert_eq!(decoded.verify_pinned(pinned).unwrap().archive_digest(), pinned);
+    }
+
+    #[test]
+    fn unsupported_archive_schema_is_rejected() {
+        let mut archive = ChemicalTraceArchive::from_trace(
+            &trace(),
+            ChemicalEvidenceLevel::BenchPhysicalObservation,
+        )
+        .unwrap();
+        archive.manifest.schema_version = TRACE_ARCHIVE_SCHEMA_VERSION + 1;
+        assert_eq!(
+            archive.verify(),
+            Err(TraceArchiveError::UnsupportedSchemaVersion {
+                actual: TRACE_ARCHIVE_SCHEMA_VERSION + 1,
             })
         );
     }
