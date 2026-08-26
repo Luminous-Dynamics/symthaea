@@ -9,9 +9,9 @@
 //! pattern is normal.
 
 use crate::{
-    ChemicalNoveltyMemory, ChemicalObservation, ChemicalPercept, ChemicalPerceptEncoder,
-    ChemicalTemporalContext, ChemicalTemporalTracker, FingerprintError, NoveltyAssessment,
-    TemporalError,
+    ChemicalEncodingSpaceId, ChemicalNoveltyMemory, ChemicalObservation, ChemicalObservationId,
+    ChemicalPercept, ChemicalPerceptEncoder, ChemicalTemporalContext, ChemicalTemporalTracker,
+    FingerprintError, NoveltyAssessment, TemporalError,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -19,6 +19,16 @@ pub struct CognitiveChemicalPercept {
     pub percept: ChemicalPercept,
     pub temporal: ChemicalTemporalContext,
     pub novelty: NoveltyAssessment,
+}
+
+impl CognitiveChemicalPercept {
+    pub fn observation_id(&self) -> ChemicalObservationId {
+        self.percept.observation_id()
+    }
+
+    pub fn encoding_space_id(&self) -> ChemicalEncodingSpaceId {
+        self.percept.encoding_space_id()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -164,6 +174,20 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(second.novelty.novelty, 1.0);
+    }
+
+    #[test]
+    fn cognitive_output_exposes_evidence_and_representation_identity() {
+        let mut pipeline = pipeline();
+        let raw = observation(1_000_000, 20.0, 0.9);
+        let expected_observation_id = ChemicalObservationId::from_observation(&raw);
+        let perceived = pipeline.perceive(&raw).unwrap().unwrap();
+
+        assert_eq!(perceived.observation_id(), expected_observation_id);
+        assert_eq!(
+            perceived.encoding_space_id(),
+            perceived.percept.fingerprint.encoding_space_id
+        );
     }
 
     #[test]
