@@ -258,6 +258,32 @@ mod tests {
     }
 
     #[test]
+    fn one_time_constant_matches_analytical_fixture_value() {
+        let mut sim = MoxArraySimulator::new(vec![MoxChannelModel::new(
+            "mox-reference",
+            100_000.0,
+            1.0,
+        )]);
+        let observation = sim
+            .step(
+                &OlfactoryStimulus {
+                    // ln(1 + concentration) = 1, so target response = 1 at RH 50%.
+                    concentration_ppm: std::f32::consts::E - 1.0,
+                    affinities: vec![1.0],
+                    temperature_c: 25.0,
+                    humidity_rh: 50.0,
+                },
+                1.0,
+                0,
+            )
+            .unwrap();
+
+        // Starting from zero with tau=1 s and dt=1 s gives response
+        // 1 - exp(-1), hence R = 100000 / (2 - exp(-1)) = 61269.98 ohm.
+        assert!((observation.channels[0].raw_value - 61_269.98).abs() < 1.0);
+    }
+
+    #[test]
     fn response_has_memory_and_recovers_over_time() {
         let mut sim = simulator();
         let odor = OlfactoryStimulus {

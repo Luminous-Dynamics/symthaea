@@ -239,6 +239,29 @@ mod tests {
     }
 
     #[test]
+    fn monovalent_electrode_matches_nernst_known_answer_at_25c() {
+        let sim = ElectronicTongueSimulator::new(vec![PotentiometricChannelModel::new(
+            "monovalent-reference",
+            1,
+            vec![1.0],
+        )]);
+        let observation = sim
+            .sample(
+                &GustatoryStimulus {
+                    ph: 7.0,
+                    conductivity_s_m: 1.0,
+                    ion_activities: vec![0.1],
+                    temperature_c: 25.0,
+                },
+                0,
+            )
+            .unwrap();
+
+        // E = RT/F ln(0.1/1) at 298.15 K = -59.159 mV for z=+1.
+        assert!((observation.channels[2].raw_value - (-59.159)).abs() < 0.1);
+    }
+
+    #[test]
     fn changing_ion_activity_changes_cross_sensitive_voltage() {
         let sim = simulator();
         let low = sim
