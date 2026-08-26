@@ -5,14 +5,20 @@ on:
     branches: [main]
     paths:
       - "crates/domains/symthaea-chemosensation/**"
+      - "crates/bridges/symthaea-chemosensation-bridge/**"
       - "crates/core/symthaea-core/**"
+      - "crates/core/symthaea-evidence-plane/**"
+      - "src/consciousness/integration/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/chemosensation.yml"
   pull_request:
     paths:
       - "crates/domains/symthaea-chemosensation/**"
+      - "crates/bridges/symthaea-chemosensation-bridge/**"
       - "crates/core/symthaea-core/**"
+      - "crates/core/symthaea-evidence-plane/**"
+      - "src/consciousness/integration/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/chemosensation.yml"
@@ -58,3 +64,12 @@ jobs:
 
       - name: Run chemosensation documentation tests
         run: cargo test -p symthaea-chemosensation --doc
+
+      - name: Run root handoff bridge unit tests
+        run: cargo test -p symthaea-chemosensation-bridge
+
+      - name: Run root handoff bridge clippy
+        run: cargo clippy -p symthaea-chemosensation-bridge --all-targets -- -D warnings
+
+      - name: Run root handoff bridge documentation tests
+        run: cargo test -p symthaea-chemosensation-bridge --doc
