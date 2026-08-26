@@ -7,7 +7,7 @@
 //! that observations belong to one protocol execution and are ordered, while
 //! leaving protocol-specific phase requirements to experiment definitions.
 
-use crate::{ChemicalModality, ChemicalObservation, SamplingContext, SamplingPhase};
+use crate::{ChemicalModality, ChemicalObservation, SamplingPhase};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChemicalTraceError {
