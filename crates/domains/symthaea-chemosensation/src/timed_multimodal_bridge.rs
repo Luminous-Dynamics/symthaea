@@ -1,13 +1,20 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Temporal-admission wrapper around the existing chemical multimodal bridge.
+//! Temporal-admission wrapper around the chemical multimodal bridge.
 //!
 //! This module deliberately does not reimplement HDC aggregation, confidence,
 //! conflict, ordering, or evidence-bundle logic. It first classifies generic
-//! timing evidence, then calls [`crate::ChemicalModalBridge::aggregate`] only
-//! when same-cycle admission is justified. Ambiguous or definitely-outside
-//! evidence is preserved without synthesizing an aggregate vector.
+//! timing evidence. Only `NoComparisonNeeded` or `DefinitelyWithin` may enter the
+//! crate-private admitted aggregation path on [`crate::ChemicalModalBridge`].
+//! Ambiguous or definitely-outside evidence is preserved without synthesizing an
+//! aggregate vector.
+//!
+//! The admitted path is what allows independently clocked physical devices to be
+//! fused after evidence-backed normalization. Raw chemical timestamps and legacy
+//! [`crate::ChemicalClockDomainId`] values remain unchanged acquisition evidence;
+//! the generic timed components remain attached beside the HDC aggregate and are
+//! required again by downstream admitted projection.
 
 use std::fmt;
 
@@ -17,12 +24,14 @@ use crate::{
     TimedChemicalPercept, classify_chemical_temporal_admission,
 };
 
-/// Result of combining temporal admission with the unchanged chemical HDC bridge.
+/// Result of combining generic temporal admission with the existing chemical HDC
+/// aggregation math.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TimedChemicalAggregation {
     /// Timing evidence permits one same-cycle aggregate. `timed_components`
-    /// preserve the generic receipts while `input` contains the existing
-    /// evidence-preserving HDC aggregate.
+    /// preserve the exact generic receipts/normalization provenance while `input`
+    /// contains the evidence-preserving HDC aggregate over the unchanged raw
+    /// chemical percepts.
     Aggregated {
         admission: ChemicalTemporalAdmission,
         input: ChemicalModalBridgeInput,
@@ -98,11 +107,14 @@ impl From<ChemicalModalBridgeError> for TimedChemicalAggregationError {
 /// Apply generic bounded temporal admission before the existing chemical HDC
 /// aggregation path.
 ///
-/// During migration, multi-source raw observations still need their legacy
-/// `ChemicalClockDomainId` populated consistently because the legacy bridge
-/// independently rechecks nominal skew/domain metadata. The generic sidecar is
-/// the stronger temporal evidence path; the duplicate legacy metadata can be
-/// removed in a later compatibility-breaking release once all callers migrate.
+/// The generic admission decision is authoritative for temporal comparability in
+/// this wrapper. Once admitted, the exact raw percept set is passed to
+/// `ChemicalModalBridge::aggregate_after_temporal_admission`, which shares all
+/// non-temporal validation and HDC/evidence math with the legacy public bridge.
+///
+/// This means two sensors may retain different raw chemical clock domains while
+/// being aggregated after their independent source clocks were normalized into
+/// one bounded target timebase. No raw observation is relabeled to make that work.
 pub fn aggregate_timed_chemical_percepts(
     bridge: &ChemicalModalBridge,
     timed_components: Vec<TimedChemicalPercept>,
@@ -123,7 +135,7 @@ pub fn aggregate_timed_chemical_percepts(
         .iter()
         .map(|component| component.percept().clone())
         .collect();
-    let input = bridge.aggregate(&percepts)?;
+    let input = bridge.aggregate_after_temporal_admission(&percepts)?;
 
     Ok(TimedChemicalAggregation::Aggregated {
         admission,
@@ -143,6 +155,7 @@ mod tests {
     use symthaea_time_integrity::{
         ClockDomainId, ClockEpochId, ContinuityStatus, TimeIntegrityReceipt, TimeUncertainty,
     };
+    use symthaea_time_normalization::{ClockTransformReceipt, normalize_timestamp_us};
 
     fn generic_domain() -> ClockDomainId {
         ClockDomainId::new("rig-01/monotonic").unwrap()
@@ -150,6 +163,14 @@ mod tests {
 
     fn epoch() -> ClockEpochId {
         ClockEpochId::new("rig-01-boot-7").unwrap()
+    }
+
+    fn target_domain() -> ClockDomainId {
+        ClockDomainId::new("capture-host/monotonic").unwrap()
+    }
+
+    fn target_epoch() -> ClockEpochId {
+        ClockEpochId::new("capture-host-boot-3").unwrap()
     }
 
     fn receipt(error_us: u64) -> TimeIntegrityReceipt {
@@ -160,13 +181,22 @@ mod tests {
     }
 
     fn percept(timestamp_us: u64, source: &str, seed: u64) -> crate::ChemicalPercept {
+        percept_in_domain(timestamp_us, source, seed, "rig-01/monotonic")
+    }
+
+    fn percept_in_domain(
+        timestamp_us: u64,
+        source: &str,
+        seed: u64,
+        clock_domain: &str,
+    ) -> crate::ChemicalPercept {
         let mut evidence = ChemicalObservation::new(
             timestamp_us,
             ChemicalModality::Olfactory,
             source,
             vec![],
         );
-        evidence.clock_domain = Some(ChemicalClockDomainId::new("rig-01/monotonic").unwrap());
+        evidence.clock_domain = Some(ChemicalClockDomainId::new(clock_domain).unwrap());
         crate::ChemicalPercept {
             evidence,
             fingerprint: ChemicalFingerprint {
@@ -183,8 +213,45 @@ mod tests {
         TimedChemicalPercept::new(percept(timestamp_us, source, seed), receipt(error_us)).unwrap()
     }
 
+    fn normalized_timed(
+        raw_timestamp_us: u64,
+        target_timestamp_us: u64,
+        source: &str,
+        seed: u64,
+        raw_domain: &str,
+        raw_epoch: &str,
+    ) -> TimedChemicalPercept {
+        let source_domain = ClockDomainId::new(raw_domain).unwrap();
+        let source_epoch = ClockEpochId::new(raw_epoch).unwrap();
+        let source_receipt = TimeIntegrityReceipt::declared(source_domain.clone())
+            .with_epoch(source_epoch.clone())
+            .with_continuity(ContinuityStatus::Continuous)
+            .with_uncertainty(TimeUncertainty::bounded(5));
+        let transform = ClockTransformReceipt::offset(
+            source_domain,
+            source_epoch,
+            target_domain(),
+            target_epoch(),
+            raw_timestamp_us,
+            target_timestamp_us,
+            raw_timestamp_us.saturating_sub(100),
+            raw_timestamp_us.saturating_add(100),
+        )
+        .unwrap()
+        .with_mapping_continuity(ContinuityStatus::Continuous)
+        .with_target_continuity(ContinuityStatus::Continuous)
+        .with_uncertainty(TimeUncertainty::bounded(5));
+        let normalized = normalize_timestamp_us(raw_timestamp_us, &source_receipt, &transform)
+            .unwrap();
+        TimedChemicalPercept::from_normalized(
+            percept_in_domain(raw_timestamp_us, source, seed, raw_domain),
+            normalized,
+        )
+        .unwrap()
+    }
+
     #[test]
-    fn definitely_within_uses_existing_bridge_math_and_preserves_evidence_identity() {
+    fn definitely_within_reuses_existing_bridge_math_and_preserves_evidence_identity() {
         let bridge = ChemicalModalBridge::new(crate::ChemicalModalBridgeConfig {
             max_component_skew_us: 150,
         });
@@ -204,10 +271,53 @@ mod tests {
             ChemicalTemporalAdmissionStatus::DefinitelyWithin
         );
         let input = result.input().expect("definitely-within timing should aggregate");
-        assert_eq!(input.evidence_bundle_id, expected.evidence_bundle_id);
-        assert_eq!(input.vector, expected.vector);
-        assert_eq!(input.confidence, expected.confidence);
-        assert_eq!(input.agreement, expected.agreement);
+        assert_eq!(input, &expected);
+    }
+
+    #[test]
+    fn normalized_different_source_clocks_can_now_aggregate_without_raw_relabeling() {
+        let bridge = ChemicalModalBridge::new(crate::ChemicalModalBridgeConfig {
+            max_component_skew_us: 100,
+        });
+        let a = normalized_timed(
+            1_000,
+            10_000,
+            "nose-a",
+            1,
+            "nose-a/monotonic",
+            "nose-a-boot-1",
+        );
+        let b = normalized_timed(
+            5_000,
+            10_050,
+            "nose-b",
+            2,
+            "nose-b/monotonic",
+            "nose-b-boot-9",
+        );
+        let a_id = a.observation_id();
+        let b_id = b.observation_id();
+
+        let result = aggregate_timed_chemical_percepts(&bridge, vec![a, b]).unwrap();
+        assert_eq!(
+            result.admission().status(),
+            ChemicalTemporalAdmissionStatus::DefinitelyWithin
+        );
+        assert_eq!(result.admission().clock_domain(), &target_domain());
+        assert_eq!(result.admission().pairwise_windows()[0].separation.nominal_us, 50);
+
+        let input = result.input().expect("normalized bounded timing should aggregate");
+        // Mixed raw source clocks stay mixed; no fake shared chemical domain is minted.
+        assert!(input.clock_domain.is_none());
+        assert_eq!(input.earliest_timestamp_us, 1_000);
+        assert_eq!(input.latest_timestamp_us, 5_000);
+        let ids: Vec<_> = input
+            .components
+            .iter()
+            .map(crate::ChemicalPercept::observation_id)
+            .collect();
+        assert!(ids.contains(&a_id));
+        assert!(ids.contains(&b_id));
     }
 
     #[test]
