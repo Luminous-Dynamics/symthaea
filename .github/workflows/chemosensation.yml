@@ -6,6 +6,7 @@ on:
     paths:
       - "crates/domains/symthaea-chemosensation/**"
       - "crates/bridges/symthaea-chemosensation-bridge/**"
+      - "crates/bridges/symthaea-chemosensation-timed-bridge/**"
       - "crates/core/symthaea-core/**"
       - "crates/core/symthaea-evidence-plane/**"
       - "src/consciousness/integration/**"
@@ -16,6 +17,7 @@ on:
     paths:
       - "crates/domains/symthaea-chemosensation/**"
       - "crates/bridges/symthaea-chemosensation-bridge/**"
+      - "crates/bridges/symthaea-chemosensation-timed-bridge/**"
       - "crates/core/symthaea-core/**"
       - "crates/core/symthaea-evidence-plane/**"
       - "src/consciousness/integration/**"
@@ -73,3 +75,12 @@ jobs:
 
       - name: Run root handoff bridge documentation tests
         run: cargo test -p symthaea-chemosensation-bridge --doc
+
+      - name: Run timed root handoff bridge unit tests
+        run: cargo test -p symthaea-chemosensation-timed-bridge
+
+      - name: Run timed root handoff bridge clippy
+        run: cargo clippy -p symthaea-chemosensation-timed-bridge --all-targets -- -D warnings
+
+      - name: Run timed root handoff bridge documentation tests
+        run: cargo test -p symthaea-chemosensation-timed-bridge --doc

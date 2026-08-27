@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-chemosensation-timed-bridge"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Evidence-preserving timed chemosensation handoff into Symthaea root multimodal cognition."
+
+[dependencies]
+symthaea = { path = "../../.." }
+symthaea-chemosensation = { path = "../../domains/symthaea-chemosensation" }
+symthaea-chemosensation-bridge = { path = "../symthaea-chemosensation-bridge" }
+
+[dev-dependencies]
+symthaea-time-integrity = { path = "../../core/symthaea-time-integrity" }
+symthaea-time-normalization = { path = "../../core/symthaea-time-normalization" }
