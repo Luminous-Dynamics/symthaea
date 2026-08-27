@@ -1,0 +1,45 @@
+name: One-shot Spore formatter
+
+on:
+  pull_request:
+    branches:
+      - feat/nixward-ransomware-reconstructibility-v1
+    paths:
+      - 'crates/domains/symthaea-spore/src/host_rehydration.rs'
+      - '.github/workflows/spore-format-once.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: spore-format-once-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  format-once:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Apply exact rustfmt output
+        run: cargo fmt -p symthaea-spore
+      - name: Commit formatter-only repair and remove helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/spore-format-once.yml
+          git add crates/domains/symthaea-spore/src/host_rehydration.rs .github/workflows/spore-format-once.yml
+          if git diff --cached --quiet; then
+            echo 'No formatting changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'style(spore): apply pinned rustfmt to rehydration contract'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
