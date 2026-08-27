@@ -49,6 +49,7 @@ pub mod projection_study;
 pub mod root_projection;
 pub mod temporal;
 pub mod time_alignment;
+pub mod timed_multimodal_bridge;
 
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
 pub use clock::{
@@ -108,4 +109,7 @@ pub use temporal::{
 pub use time_alignment::{
     ChemicalPairwiseTimeWindow, ChemicalTemporalAdmission, ChemicalTemporalAdmissionStatus,
     ChemicalTimeAlignmentError, TimedChemicalPercept, classify_chemical_temporal_admission,
+};
+pub use timed_multimodal_bridge::{
+    TimedChemicalAggregation, TimedChemicalAggregationError, aggregate_timed_chemical_percepts,
 };
