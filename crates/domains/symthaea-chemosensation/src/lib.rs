@@ -14,7 +14,9 @@
 //! Representation and evidence identities remain deliberately distinct:
 //!
 //! - [`ChemicalObservationId`] / [`ChemicalEvidenceBundleId`] identify raw evidence,
-//! - [`ChemicalClockDomainId`] identifies the declared timestamp-comparison domain,
+//! - [`ChemicalClockDomainId`] identifies the legacy declared timestamp-comparison domain,
+//! - [`TimedChemicalPercept`] attaches generic [`symthaea_time_integrity::TimeIntegrityReceipt`]
+//!   evidence without mutating raw observations,
 //! - [`ChemicalEncodingSpaceId`] identifies the continuous HDC coordinate system,
 //! - [`ChemicalRootProjectionPolicyId`] identifies ContinuousHV -> BinaryHV quantization,
 //! - [`ChemicalRootBinarySpaceId`] identifies the resulting root BinaryHV space,
@@ -46,6 +48,7 @@ pub mod projection_stability;
 pub mod projection_study;
 pub mod root_projection;
 pub mod temporal;
+pub mod time_alignment;
 
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
 pub use clock::{
@@ -101,4 +104,8 @@ pub use root_projection::{
 };
 pub use temporal::{
     ChemicalTemporalContext, ChemicalTemporalTracker, TemporalConfigError, TemporalError,
+};
+pub use time_alignment::{
+    ChemicalPairwiseTimeWindow, ChemicalTemporalAdmission, ChemicalTemporalAdmissionStatus,
+    ChemicalTimeAlignmentError, TimedChemicalPercept, classify_chemical_temporal_admission,
 };
