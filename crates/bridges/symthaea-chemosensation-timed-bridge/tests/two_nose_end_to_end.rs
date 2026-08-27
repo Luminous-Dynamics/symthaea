@@ -377,3 +377,34 @@ fn tampering_with_hdc_aggregate_does_not_change_timing_identity_but_fails_projec
         Err(TimedChemicalRootBridgeError::TimedProjection(_))
     ));
 }
+
+#[test]
+fn substituting_an_admission_from_different_timing_evidence_is_rejected() {
+    let original = normalized_pair(ClockDomainId::unix_epoch(), 10_050, 100);
+    let foreign = normalized_pair(ClockDomainId::unix_epoch(), 10_080, 100);
+
+    let tampered = match (original, foreign) {
+        (
+            TimedChemicalAggregation::Aggregated {
+                input,
+                timed_components,
+                ..
+            },
+            TimedChemicalAggregation::Aggregated { admission, .. },
+        ) => TimedChemicalAggregation::Aggregated {
+            admission,
+            input,
+            timed_components,
+        },
+        _ => panic!("both timing fixtures must aggregate"),
+    };
+
+    assert_eq!(
+        ChemicalTemporalAuthorizationId::from_aggregation(&tampered),
+        Err(ChemicalTemporalAuthorizationError::AdmissionMismatch)
+    );
+    assert!(matches!(
+        project_timed_to_lineaged_root_input(&ChemicalRootProjector::default(), &tampered),
+        Err(TimedChemicalRootBridgeError::TimedProjection(_))
+    ));
+}
