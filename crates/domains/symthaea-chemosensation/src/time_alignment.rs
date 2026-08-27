@@ -13,6 +13,9 @@
 //! default constructor compares in the raw clock domain. Evidence-bound clock
 //! normalization may instead attach a [`NormalizedTimePoint`], preserving the
 //! source timestamp and transform while comparing in the target clock domain.
+//! When that normalization was authorized by a self-verifying calibration +
+//! holdover chain, the percept may additionally retain a generic content address
+//! for that exact acquisition-time authority without changing raw evidence.
 //!
 //! Multi-source admission uses [`bounded_separation_window_us`] pairwise. A set
 //! is admitted as definitely simultaneous only when every pair's *maximum*
@@ -22,6 +25,7 @@
 
 use std::fmt;
 
+use symthaea_evidence_plane::ContentAddress32;
 use symthaea_time_integrity::{
     ClockDomainId, ClockEpochId, SeparationWindowUs, TimeComparisonError,
     TimeIntegrityReceipt, bounded_separation_window_us,
@@ -38,14 +42,20 @@ use crate::{ChemicalClockDomainId, ChemicalObservationId, ChemicalPercept};
 /// complete [`NormalizedTimePoint`] is retained so the target timestamp cannot
 /// become detached from its source receipt and transform.
 ///
-/// Attaching timing evidence does not mutate the underlying chemical observation
-/// and therefore does not change its [`ChemicalObservationId`].
+/// `acquisition_authorization` is intentionally separate from normalization. A
+/// valid transform can be constructed for replay/test purposes without proving
+/// which calibration evidence + holdover claim earned it. Only the evidence-bound
+/// acquisition adapter in this crate may attach that authority reference.
+///
+/// Attaching timing evidence or authority does not mutate the underlying chemical
+/// observation and therefore does not change its [`ChemicalObservationId`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct TimedChemicalPercept {
     percept: ChemicalPercept,
     comparison_timestamp_us: u64,
     time: TimeIntegrityReceipt,
     normalization: Option<NormalizedTimePoint>,
+    acquisition_authorization: Option<ContentAddress32>,
 }
 
 impl TimedChemicalPercept {
@@ -61,6 +71,7 @@ impl TimedChemicalPercept {
             comparison_timestamp_us,
             time,
             normalization: None,
+            acquisition_authorization: None,
         })
     }
 
@@ -70,6 +81,10 @@ impl TimedChemicalPercept {
     /// acquisition timestamp exactly. Legacy chemical clock metadata, when
     /// present, is checked against the *source* receipt rather than the target
     /// receipt. The target timestamp/receipt then become the comparison pair.
+    ///
+    /// This general constructor deliberately does not claim which calibration +
+    /// holdover evidence authorized the transform. Evidence-bound acquisition uses
+    /// the crate-private constructor below to attach that stronger provenance.
     pub fn from_normalized(
         percept: ChemicalPercept,
         normalization: NormalizedTimePoint,
@@ -92,7 +107,24 @@ impl TimedChemicalPercept {
             comparison_timestamp_us,
             time,
             normalization: Some(normalization),
+            acquisition_authorization: None,
         })
+    }
+
+    /// Attach normalized time together with the content identity of the exact
+    /// calibration + holdover authority that produced it.
+    ///
+    /// Crate-private by design: public callers may construct normalized/replay
+    /// percepts, but they cannot attach an arbitrary authority reference and make
+    /// it look like evidence-bound physical acquisition.
+    pub(crate) fn from_evidence_bound_normalized(
+        percept: ChemicalPercept,
+        normalization: NormalizedTimePoint,
+        acquisition_authorization: ContentAddress32,
+    ) -> Result<Self, ChemicalTimeAlignmentError> {
+        let mut value = Self::from_normalized(percept, normalization)?;
+        value.acquisition_authorization = Some(acquisition_authorization);
+        Ok(value)
     }
 
     pub fn percept(&self) -> &ChemicalPercept {
@@ -117,6 +149,16 @@ impl TimedChemicalPercept {
     /// normalized target timebase rather than the raw acquisition timebase.
     pub fn normalization(&self) -> Option<&NormalizedTimePoint> {
         self.normalization.as_ref()
+    }
+
+    /// Exact calibration-decision + holdover authority that permitted this
+    /// normalized acquisition time, when the evidence-bound acquisition adapter
+    /// produced the percept.
+    ///
+    /// `None` means only that no such authority was attached here. It does not
+    /// invalidate raw-time or replay/test timing evidence on its own.
+    pub fn acquisition_authorization(&self) -> Option<&ContentAddress32> {
+        self.acquisition_authorization.as_ref()
     }
 
     pub fn observation_id(&self) -> ChemicalObservationId {
@@ -424,6 +466,7 @@ mod tests {
         assert_eq!(timed.observation_id(), before);
         assert_eq!(timed.comparison_timestamp_us(), 1_000);
         assert!(timed.normalization().is_none());
+        assert!(timed.acquisition_authorization().is_none());
     }
 
     #[test]
@@ -440,7 +483,7 @@ mod tests {
     }
 
     #[test]
-    fn normalized_sidecar_preserves_raw_time_and_identity() {
+    fn normalized_sidecar_preserves_raw_time_and_identity_without_claiming_authority() {
         let percept = percept(1_000, "nose-a");
         let before = percept.observation_id();
         let normalized = normalize_timestamp_us(
@@ -455,10 +498,37 @@ mod tests {
         assert_eq!(timed.comparison_timestamp_us(), 5_000);
         assert_eq!(timed.time().clock_domain, target_domain());
         assert_eq!(timed.observation_id(), before);
+        assert!(timed.acquisition_authorization().is_none());
         assert_eq!(
             timed.normalization().unwrap().source_timestamp_us(),
             timed.percept().timestamp_us()
         );
+    }
+
+    #[test]
+    fn evidence_bound_constructor_can_attach_authority_without_changing_observation() {
+        let percept = percept(1_000, "nose-a");
+        let before = percept.observation_id();
+        let normalized = normalize_timestamp_us(
+            1_000,
+            &receipt(10),
+            &transform(generic_domain(), epoch(), 1_000, 5_000),
+        )
+        .unwrap();
+        let authority = ContentAddress32::new(
+            "blake3-256",
+            "symthaea-chemosensation-acquisition-time-authorization-v1",
+            [9; 32],
+        )
+        .unwrap();
+        let timed = TimedChemicalPercept::from_evidence_bound_normalized(
+            percept,
+            normalized,
+            authority.clone(),
+        )
+        .unwrap();
+        assert_eq!(timed.observation_id(), before);
+        assert_eq!(timed.acquisition_authorization(), Some(&authority));
     }
 
     #[test]
