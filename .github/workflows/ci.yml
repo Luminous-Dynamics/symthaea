@@ -808,7 +808,7 @@ jobs:
             cmake
 
       - name: Run tests (${{ matrix.group }})
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         with:
           timeout_minutes: 60
           max_attempts: 2
@@ -980,7 +980,7 @@ jobs:
         # silently swallow real future regressions across the whole matrix
         # instead of just accommodating overall test-suite growth.
         continue-on-error: ${{ matrix.features == 'school_learning' || matrix.features == 'ssm_language' }}
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         with:
           timeout_minutes: 45
           max_attempts: 2
