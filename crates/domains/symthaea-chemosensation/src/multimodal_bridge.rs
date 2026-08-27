@@ -17,12 +17,20 @@
 //! Hypervector comparison is only meaningful when components were encoded in
 //! the same HDC coordinate system. Comparability is proven from each fingerprint's
 //! content-addressed [`ChemicalEncodingSpaceId`], not from a caller-supplied label.
-//! Timestamp comparison likewise requires a shared explicit [`ChemicalClockDomainId`]
-//! whenever multiple sources are aggregated. An unspecified timestamp is preserved
-//! for single-source evidence but is never treated as comparable across devices.
-//! The aggregate also carries a [`ChemicalEvidenceBundleId`] over the exact raw
-//! observations so downstream cognition can distinguish evidence identity from
-//! representation identity.
+//!
+//! The public [`ChemicalModalBridge::aggregate`] path retains the legacy raw-time
+//! contract: multiple sources must share one explicit [`ChemicalClockDomainId`]
+//! and fit inside the configured raw timestamp skew. New evidence-bearing timing
+//! code may instead call the crate-private `aggregate_after_temporal_admission`
+//! only after generic bounded temporal admission has succeeded. That path skips
+//! the duplicate legacy temporal decision while reusing this exact validation,
+//! ordering, evidence-bundle, conflict, confidence, and HDC bundling code.
+//!
+//! Raw chemical clock metadata is never rewritten by either path. On an
+//! externally admitted aggregate, `clock_domain` remains raw-source provenance:
+//! it is `Some` only when all raw components already share one declared chemical
+//! clock. A mixed-clock admitted aggregate therefore has `clock_domain = None`
+//! even though its separate generic timing evidence may prove comparability.
 //!
 //! The numeric target IDs mirror the canonical root identity contract introduced
 //! by PR #84 (`consciousness::integration::modality_identity`). This domain crate
@@ -68,9 +76,11 @@ impl From<ChemicalModality> for ChemicalBridgeTarget {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChemicalModalBridgeConfig {
-    /// Maximum timestamp spread among components treated as one current-cycle
-    /// observation. This is a protocol choice, not a universal psychophysical
-    /// constant. It is evaluated only after a shared clock domain is proven.
+    /// Maximum raw timestamp spread among components treated as one current-cycle
+    /// observation by the legacy bridge path. This is a protocol choice, not a
+    /// universal psychophysical constant. The generic timed wrapper uses the same
+    /// threshold against evidence-bearing comparison timestamps before invoking
+    /// the admitted aggregation path.
     pub max_component_skew_us: u64,
 }
 
@@ -94,7 +104,7 @@ pub enum ChemicalModalBridgeError {
         actual: ChemicalModality,
     },
     /// More than one source was supplied but at least one timestamp had no
-    /// declared comparison domain.
+    /// declared comparison domain on the legacy raw-time path.
     MissingSharedClockDomain,
     MixedClockDomains {
         expected: ChemicalClockDomainId,
@@ -117,11 +127,16 @@ pub enum ChemicalModalBridgeError {
 ///
 /// `components` remain attached so downstream code can inspect disagreement,
 /// sensor identity, raw observations, calibration provenance, timestamps, and
-/// their common encoding-space identity. `evidence_bundle_id` gives the exact raw
-/// evidence bundle a compact stable identity independent of the derived HDC
-/// representation. `clock_domain` is preserved explicitly; it is required for
-/// multi-source aggregates and optional for a single-source aggregate. The
-/// aggregate vector is a convenience representation, not replacement evidence.
+/// encoding-space identity. `evidence_bundle_id` gives the exact raw evidence
+/// bundle a compact stable identity independent of the derived HDC representation.
+///
+/// `clock_domain`, `earliest_timestamp_us`, and `latest_timestamp_us` are raw
+/// acquisition provenance. The public legacy aggregate requires them to form one
+/// comparable raw-time envelope. An aggregate created inside a validated generic
+/// temporal wrapper may instead contain mixed raw clocks; in that case
+/// `clock_domain` is `None` and the generic wrapper is the authority for temporal
+/// comparability. Such an input must not be detached from that wrapper and passed
+/// to a legacy temporal validator as though `None` meant comparable raw time.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChemicalModalBridgeInput {
     pub target: ChemicalBridgeTarget,
@@ -129,8 +144,8 @@ pub struct ChemicalModalBridgeInput {
     pub evidence_bundle_id: ChemicalEvidenceBundleId,
     /// Identity of the HDC coordinate system used to represent those observations.
     pub encoding_space_id: ChemicalEncodingSpaceId,
-    /// Declared timebase for the timestamp envelope. `None` is allowed only for
-    /// single-source evidence.
+    /// Shared raw chemical timebase when all components already declare one.
+    /// `None` means either a single unclocked source or no single raw timebase.
     pub clock_domain: Option<ChemicalClockDomainId>,
     pub vector: ContinuousHV,
     /// Effective confidence after component trust and cross-source conflict are
@@ -141,6 +156,8 @@ pub struct ChemicalModalBridgeInput {
     /// components can drive this to zero; a very weak contradictory component
     /// contributes only in proportion to its ability to support that conflict.
     pub agreement: f32,
+    /// Raw acquisition timestamp envelope. Generic normalized comparison time is
+    /// retained separately by the timed wrapper and is never written here.
     pub earliest_timestamp_us: u64,
     pub latest_timestamp_us: u64,
     pub components: Vec<ChemicalPercept>,
@@ -179,72 +196,20 @@ impl ChemicalModalBridge {
     }
 
     /// Aggregate comparable same-modality percepts into exactly one root-ready
-    /// current-cycle input.
+    /// current-cycle input using the legacy raw-time contract.
     ///
     /// Components are sorted deterministically before floating-point accumulation
     /// so caller iteration order cannot change the resulting vector. Validation
     /// completes before any derived representation is constructed. For multiple
-    /// components, timestamp skew is evaluated only after every component proves
-    /// membership in the same explicit clock domain.
+    /// components, raw timestamp skew is evaluated only after every component
+    /// proves membership in the same explicit chemical clock domain.
     pub fn aggregate(
         &self,
         percepts: &[ChemicalPercept],
     ) -> Result<ChemicalModalBridgeInput, ChemicalModalBridgeError> {
-        let first = percepts
-            .first()
-            .ok_or(ChemicalModalBridgeError::EmptyInput)?;
-        let encoding_space_id = first.fingerprint.encoding_space_id;
-        let modality = first.evidence.modality;
-
-        for percept in percepts {
-            if percept.fingerprint.encoding_space_id != encoding_space_id {
-                return Err(ChemicalModalBridgeError::MixedEncodingSpaces {
-                    expected: encoding_space_id,
-                    actual: percept.fingerprint.encoding_space_id,
-                });
-            }
-            if percept.evidence.modality != modality {
-                return Err(ChemicalModalBridgeError::MixedModalities {
-                    expected: modality,
-                    actual: percept.evidence.modality,
-                });
-            }
-            let confidence = percept.confidence();
-            if !confidence.is_finite() || !(0.0..=1.0).contains(&confidence) {
-                return Err(ChemicalModalBridgeError::InvalidConfidence);
-            }
-            if confidence <= 0.0 {
-                return Err(ChemicalModalBridgeError::UntrustedComponent);
-            }
-            let actual = percept.fingerprint.vector.dim();
-            if actual != HDC_DIMENSION {
-                return Err(ChemicalModalBridgeError::UnexpectedDimension {
-                    expected: HDC_DIMENSION,
-                    actual,
-                });
-            }
-            if percept
-                .fingerprint
-                .vector
-                .values
-                .iter()
-                .any(|value| !value.is_finite())
-            {
-                return Err(ChemicalModalBridgeError::NonFiniteVector);
-            }
-        }
-
+        let (encoding_space_id, modality) = validate_component_geometry(percepts)?;
         let clock_domain = shared_clock_domain(percepts)?;
-        let earliest_timestamp_us = percepts
-            .iter()
-            .map(ChemicalPercept::timestamp_us)
-            .min()
-            .expect("non-empty input validated above");
-        let latest_timestamp_us = percepts
-            .iter()
-            .map(ChemicalPercept::timestamp_us)
-            .max()
-            .expect("non-empty input validated above");
+        let (earliest_timestamp_us, latest_timestamp_us) = raw_timestamp_envelope(percepts)?;
         let skew_us = latest_timestamp_us.saturating_sub(earliest_timestamp_us);
         if skew_us > self.config.max_component_skew_us {
             return Err(ChemicalModalBridgeError::ComponentSkew {
@@ -253,76 +218,42 @@ impl ChemicalModalBridge {
             });
         }
 
-        let mut components = percepts.to_vec();
-        components.sort_by(|left, right| {
-            left.timestamp_us()
-                .cmp(&right.timestamp_us())
-                .then_with(|| left.evidence.source.cmp(&right.evidence.source))
-                .then_with(|| {
-                    left.fingerprint
-                        .vector
-                        .values
-                        .iter()
-                        .map(|value| value.to_bits())
-                        .cmp(
-                            right
-                                .fingerprint
-                                .vector
-                                .values
-                                .iter()
-                                .map(|value| value.to_bits()),
-                        )
-                })
-                .then_with(|| {
-                    left.confidence()
-                        .to_bits()
-                        .cmp(&right.confidence().to_bits())
-                })
-        });
-        let evidence_bundle_id = ChemicalEvidenceBundleId::from_percepts(&components);
-
-        if components.len() == 1 {
-            return Ok(ChemicalModalBridgeInput {
-                target: modality.into(),
-                evidence_bundle_id,
-                encoding_space_id,
-                clock_domain,
-                vector: components[0].fingerprint.vector.clone(),
-                confidence: components[0].confidence(),
-                agreement: 1.0,
-                earliest_timestamp_us,
-                latest_timestamp_us,
-                components,
-            });
-        }
-
-        let agreement = conflict_aware_agreement(&components);
-        let base_confidence = evidence_weighted_confidence(&components);
-        let confidence = (base_confidence * agreement).clamp(0.0, 1.0);
-
-        let hvs: Vec<&ContinuousHV> = components
-            .iter()
-            .map(|percept| &percept.fingerprint.vector)
-            .collect();
-        let weights: Vec<f32> = components
-            .iter()
-            .map(ChemicalPercept::confidence)
-            .collect();
-        let mut vector = ContinuousHV::weighted_bundle(&hvs, &weights);
-        vector.l2_normalize();
-
-        Ok(ChemicalModalBridgeInput {
-            target: modality.into(),
-            evidence_bundle_id,
+        Ok(build_aggregate(
+            percepts,
             encoding_space_id,
+            modality,
             clock_domain,
-            vector,
-            confidence,
-            agreement,
             earliest_timestamp_us,
             latest_timestamp_us,
-            components,
-        })
+        ))
+    }
+
+    /// Aggregate HDC/evidence geometry after a stronger temporal layer has
+    /// already admitted the exact component set.
+    ///
+    /// This method is crate-private by design. It performs *no* timestamp
+    /// comparability decision. Callers must retain and later revalidate the
+    /// generic temporal admission evidence that authorized this operation.
+    ///
+    /// All non-temporal bridge invariants and the exact legacy aggregation math
+    /// are shared with [`Self::aggregate`]. Raw timestamps/domains remain attached
+    /// solely as acquisition provenance and are never normalized in place.
+    pub(crate) fn aggregate_after_temporal_admission(
+        &self,
+        percepts: &[ChemicalPercept],
+    ) -> Result<ChemicalModalBridgeInput, ChemicalModalBridgeError> {
+        let (encoding_space_id, modality) = validate_component_geometry(percepts)?;
+        let clock_domain = uniform_raw_clock_domain(percepts);
+        let (earliest_timestamp_us, latest_timestamp_us) = raw_timestamp_envelope(percepts)?;
+
+        Ok(build_aggregate(
+            percepts,
+            encoding_space_id,
+            modality,
+            clock_domain,
+            earliest_timestamp_us,
+            latest_timestamp_us,
+        ))
     }
 }
 
@@ -332,10 +263,156 @@ impl Default for ChemicalModalBridge {
     }
 }
 
-/// Determine whether timestamp comparison is admissible for this aggregate.
-/// A single observation does not require a clock domain because no cross-source
-/// timestamp comparison is performed. Two or more observations must all declare
-/// the exact same clock-domain identity.
+fn validate_component_geometry(
+    percepts: &[ChemicalPercept],
+) -> Result<(ChemicalEncodingSpaceId, ChemicalModality), ChemicalModalBridgeError> {
+    let first = percepts
+        .first()
+        .ok_or(ChemicalModalBridgeError::EmptyInput)?;
+    let encoding_space_id = first.fingerprint.encoding_space_id;
+    let modality = first.evidence.modality;
+
+    for percept in percepts {
+        if percept.fingerprint.encoding_space_id != encoding_space_id {
+            return Err(ChemicalModalBridgeError::MixedEncodingSpaces {
+                expected: encoding_space_id,
+                actual: percept.fingerprint.encoding_space_id,
+            });
+        }
+        if percept.evidence.modality != modality {
+            return Err(ChemicalModalBridgeError::MixedModalities {
+                expected: modality,
+                actual: percept.evidence.modality,
+            });
+        }
+        let confidence = percept.confidence();
+        if !confidence.is_finite() || !(0.0..=1.0).contains(&confidence) {
+            return Err(ChemicalModalBridgeError::InvalidConfidence);
+        }
+        if confidence <= 0.0 {
+            return Err(ChemicalModalBridgeError::UntrustedComponent);
+        }
+        let actual = percept.fingerprint.vector.dim();
+        if actual != HDC_DIMENSION {
+            return Err(ChemicalModalBridgeError::UnexpectedDimension {
+                expected: HDC_DIMENSION,
+                actual,
+            });
+        }
+        if percept
+            .fingerprint
+            .vector
+            .values
+            .iter()
+            .any(|value| !value.is_finite())
+        {
+            return Err(ChemicalModalBridgeError::NonFiniteVector);
+        }
+    }
+
+    Ok((encoding_space_id, modality))
+}
+
+fn raw_timestamp_envelope(
+    percepts: &[ChemicalPercept],
+) -> Result<(u64, u64), ChemicalModalBridgeError> {
+    let earliest = percepts
+        .iter()
+        .map(ChemicalPercept::timestamp_us)
+        .min()
+        .ok_or(ChemicalModalBridgeError::EmptyInput)?;
+    let latest = percepts
+        .iter()
+        .map(ChemicalPercept::timestamp_us)
+        .max()
+        .ok_or(ChemicalModalBridgeError::EmptyInput)?;
+    Ok((earliest, latest))
+}
+
+fn build_aggregate(
+    percepts: &[ChemicalPercept],
+    encoding_space_id: ChemicalEncodingSpaceId,
+    modality: ChemicalModality,
+    clock_domain: Option<ChemicalClockDomainId>,
+    earliest_timestamp_us: u64,
+    latest_timestamp_us: u64,
+) -> ChemicalModalBridgeInput {
+    let mut components = percepts.to_vec();
+    components.sort_by(|left, right| {
+        left.timestamp_us()
+            .cmp(&right.timestamp_us())
+            .then_with(|| left.evidence.source.cmp(&right.evidence.source))
+            .then_with(|| {
+                left.fingerprint
+                    .vector
+                    .values
+                    .iter()
+                    .map(|value| value.to_bits())
+                    .cmp(
+                        right
+                            .fingerprint
+                            .vector
+                            .values
+                            .iter()
+                            .map(|value| value.to_bits()),
+                    )
+            })
+            .then_with(|| {
+                left.confidence()
+                    .to_bits()
+                    .cmp(&right.confidence().to_bits())
+            })
+    });
+    let evidence_bundle_id = ChemicalEvidenceBundleId::from_percepts(&components);
+
+    if components.len() == 1 {
+        return ChemicalModalBridgeInput {
+            target: modality.into(),
+            evidence_bundle_id,
+            encoding_space_id,
+            clock_domain,
+            vector: components[0].fingerprint.vector.clone(),
+            confidence: components[0].confidence(),
+            agreement: 1.0,
+            earliest_timestamp_us,
+            latest_timestamp_us,
+            components,
+        };
+    }
+
+    let agreement = conflict_aware_agreement(&components);
+    let base_confidence = evidence_weighted_confidence(&components);
+    let confidence = (base_confidence * agreement).clamp(0.0, 1.0);
+
+    let hvs: Vec<&ContinuousHV> = components
+        .iter()
+        .map(|percept| &percept.fingerprint.vector)
+        .collect();
+    let weights: Vec<f32> = components
+        .iter()
+        .map(ChemicalPercept::confidence)
+        .collect();
+    let mut vector = ContinuousHV::weighted_bundle(&hvs, &weights);
+    vector.l2_normalize();
+
+    ChemicalModalBridgeInput {
+        target: modality.into(),
+        evidence_bundle_id,
+        encoding_space_id,
+        clock_domain,
+        vector,
+        confidence,
+        agreement,
+        earliest_timestamp_us,
+        latest_timestamp_us,
+        components,
+    }
+}
+
+/// Determine whether timestamp comparison is admissible for the legacy raw-time
+/// aggregate. A single observation does not require a clock domain because no
+/// cross-source timestamp comparison is performed. Two or more observations must
+/// all declare the exact same clock-domain identity.
 fn shared_clock_domain(
     components: &[ChemicalPercept],
 ) -> Result<Option<ChemicalClockDomainId>, ChemicalModalBridgeError> {
@@ -365,6 +442,21 @@ fn shared_clock_domain(
         }
     }
     Ok(Some(expected))
+}
+
+/// Preserve one raw clock domain only when every component actually declares the
+/// same one. This function never decides temporal comparability.
+fn uniform_raw_clock_domain(components: &[ChemicalPercept]) -> Option<ChemicalClockDomainId> {
+    let first = components.first()?.evidence.clock_domain.clone()?;
+    if components
+        .iter()
+        .skip(1)
+        .all(|component| component.evidence.clock_domain.as_ref() == Some(&first))
+    {
+        Some(first)
+    } else {
+        None
+    }
 }
 
 /// Confidence scale of the evidence set without multiplying certainty simply
@@ -553,6 +645,34 @@ mod tests {
         assert!(output.confidence > 0.8 && output.confidence < 0.9);
         assert_eq!(output.components[0], a);
         assert_eq!(output.components[1], b);
+    }
+
+    #[test]
+    fn admitted_geometry_matches_legacy_geometry_when_raw_time_is_already_valid() {
+        let bridge = ChemicalModalBridge::default();
+        let a = odor(10, "nose-a", 1, 0.9);
+        let b = odor(20, "nose-b", 2, 0.8);
+        let legacy = bridge.aggregate(&[a.clone(), b.clone()]).unwrap();
+        let admitted = bridge
+            .aggregate_after_temporal_admission(&[a, b])
+            .unwrap();
+        assert_eq!(admitted, legacy);
+    }
+
+    #[test]
+    fn admitted_geometry_preserves_mixed_raw_clocks_without_relabeling() {
+        let bridge = ChemicalModalBridge::default();
+        let a = odor(10, "nose-a", 1, 0.9);
+        let mut b = odor(20, "nose-b", 2, 0.8);
+        b.evidence.clock_domain = Some(ChemicalClockDomainId::new("other-rig/monotonic").unwrap());
+
+        let output = bridge
+            .aggregate_after_temporal_admission(&[a.clone(), b.clone()])
+            .unwrap();
+        assert!(output.clock_domain.is_none());
+        assert_eq!(output.component_count(), 2);
+        assert!(output.components.contains(&a));
+        assert!(output.components.contains(&b));
     }
 
     #[test]
