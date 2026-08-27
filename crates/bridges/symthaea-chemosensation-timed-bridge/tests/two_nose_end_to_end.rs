@@ -18,9 +18,9 @@ use symthaea::consciousness::integration::modal_lineage_history::LineagedMultiMo
 use symthaea::consciousness::integration::multi_modal_integration::IntegrationConfig;
 use symthaea_chemosensation::{
     CalibrationState, ChannelEncodingSpec, ChemicalChannel, ChemicalClockDomainId,
-    ChemicalContentAddressError, ChemicalFingerprintEncoder, ChemicalModalBridge,
-    ChemicalModalBridgeConfig, ChemicalModality, ChemicalObservation, ChemicalPercept,
-    ChemicalRootContentLineage, ChemicalRootProjector, ChemicalTemporalAdmissionStatus,
+    ChemicalFingerprintEncoder, ChemicalModalBridge, ChemicalModalBridgeConfig,
+    ChemicalModality, ChemicalObservation, ChemicalPercept, ChemicalRootContentLineage,
+    ChemicalRootProjector, ChemicalTemporalAdmissionStatus,
     ChemicalTemporalAuthorizationError, ChemicalTemporalAuthorizationId, MeasurementUnit,
     SensorHealth, TimedChemicalAggregation, TimedChemicalPercept,
     aggregate_timed_chemical_percepts,
