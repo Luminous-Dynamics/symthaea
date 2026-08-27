@@ -44,9 +44,11 @@ impl ChemicalTemporalAuthorizationId {
     /// aggregation result.
     ///
     /// The caller-order admission is recomputed first so a forged/stale admission
-    /// summary cannot be hashed as authoritative. The component set is then
-    /// canonicalized by raw observation identity before hashing, making the final
-    /// ID insensitive to input ordering while rejecting duplicate observations.
+    /// summary cannot be hashed as authoritative. Only an actually aggregated,
+    /// temporally permitted result may receive an *authorization* ID. The
+    /// component set is then canonicalized by raw observation identity before
+    /// hashing, making the final ID insensitive to input ordering while rejecting
+    /// duplicate observations.
     pub fn from_aggregation(
         aggregation: &TimedChemicalAggregation,
     ) -> Result<Self, ChemicalTemporalAuthorizationError> {
@@ -57,6 +59,14 @@ impl ChemicalTemporalAuthorizationId {
         )?;
         if &recomputed != stored {
             return Err(ChemicalTemporalAuthorizationError::AdmissionMismatch);
+        }
+        if !stored.permits_same_cycle_aggregation() {
+            return Err(ChemicalTemporalAuthorizationError::NotAuthorized {
+                status: stored.status(),
+            });
+        }
+        if !aggregation.was_aggregated() {
+            return Err(ChemicalTemporalAuthorizationError::AggregationVariantMismatch);
         }
 
         let mut canonical: Vec<TimedChemicalPercept> = aggregation.timed_components().to_vec();
@@ -96,6 +106,10 @@ impl ChemicalTemporalAuthorizationId {
 pub enum ChemicalTemporalAuthorizationError {
     Time(ChemicalTimeAlignmentError),
     AdmissionMismatch,
+    NotAuthorized {
+        status: ChemicalTemporalAdmissionStatus,
+    },
+    AggregationVariantMismatch,
     DuplicateObservationId,
 }
 
@@ -106,6 +120,14 @@ impl fmt::Display for ChemicalTemporalAuthorizationError {
             Self::AdmissionMismatch => write!(
                 f,
                 "stored chemical temporal admission does not reproduce from retained timed components"
+            ),
+            Self::NotAuthorized { status } => write!(
+                f,
+                "chemical temporal admission status {status:?} does not authorize same-cycle aggregation"
+            ),
+            Self::AggregationVariantMismatch => write!(
+                f,
+                "chemical temporal admission permits aggregation but the retained result is an abstention"
             ),
             Self::DuplicateObservationId => write!(
                 f,
@@ -333,6 +355,20 @@ mod tests {
         assert_eq!(
             ChemicalTemporalAuthorizationId::from_aggregation(&duplicated),
             Err(ChemicalTemporalAuthorizationError::DuplicateObservationId)
+        );
+    }
+
+    #[test]
+    fn abstention_cannot_be_minted_as_temporal_authorization() {
+        let outside = aggregate(
+            vec![timed(1_000, "nose-a", 1), timed(1_050, "nose-b", 2)],
+            10,
+        );
+        assert_eq!(
+            ChemicalTemporalAuthorizationId::from_aggregation(&outside),
+            Err(ChemicalTemporalAuthorizationError::NotAuthorized {
+                status: ChemicalTemporalAdmissionStatus::DefinitelyOutside,
+            })
         );
     }
 
