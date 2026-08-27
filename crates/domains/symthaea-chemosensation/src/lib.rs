@@ -21,6 +21,8 @@
 //!   through a self-verifying bounded calibration/holdover transform,
 //! - [`TimedChemicalAggregation`] retains generic temporal admission beside the
 //!   exact raw evidence-preserving HDC aggregate,
+//! - [`ChemicalTemporalAuthorizationId`] content-addresses the exact timing
+//!   evidence + skew policy + admission result that justified that aggregation,
 //! - [`TimedChemicalRootProjection`] revalidates timing and HDC aggregation before
 //!   BinaryHV root projection,
 //! - [`ChemicalEncodingSpaceId`] identifies the continuous HDC coordinate system,
@@ -55,6 +57,7 @@ pub mod projection_stability;
 pub mod projection_study;
 pub mod root_projection;
 pub mod temporal;
+pub mod temporal_authorization;
 pub mod time_alignment;
 pub mod timed_multimodal_bridge;
 pub mod timed_root_projection;
@@ -116,6 +119,10 @@ pub use root_projection::{
 };
 pub use temporal::{
     ChemicalTemporalContext, ChemicalTemporalTracker, TemporalConfigError, TemporalError,
+};
+pub use temporal_authorization::{
+    CHEMICAL_TEMPORAL_AUTHORIZATION_NAMESPACE, ChemicalTemporalAuthorizationError,
+    ChemicalTemporalAuthorizationId,
 };
 pub use time_alignment::{
     ChemicalPairwiseTimeWindow, ChemicalTemporalAdmission, ChemicalTemporalAdmissionStatus,
