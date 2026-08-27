@@ -14,9 +14,11 @@
 //! Representation and evidence identities remain deliberately distinct:
 //!
 //! - [`ChemicalObservationId`] / [`ChemicalEvidenceBundleId`] identify raw evidence,
-//! - [`ChemicalClockDomainId`] identifies the legacy declared timestamp-comparison domain,
-//! - [`TimedChemicalPercept`] attaches generic [`symthaea_time_integrity::TimeIntegrityReceipt`]
-//!   evidence without mutating raw observations,
+//! - [`ChemicalClockDomainId`] identifies the legacy raw acquisition time domain,
+//! - [`TimedChemicalPercept`] carries a separate comparison timestamp + generic
+//!   [`symthaea_time_integrity::TimeIntegrityReceipt`] without mutating raw evidence,
+//! - [`bind_evidence_bound_acquisition_time`] derives that comparison time only
+//!   through a self-verifying bounded calibration/holdover transform,
 //! - [`ChemicalEncodingSpaceId`] identifies the continuous HDC coordinate system,
 //! - [`ChemicalRootProjectionPolicyId`] identifies ContinuousHV -> BinaryHV quantization,
 //! - [`ChemicalRootBinarySpaceId`] identifies the resulting root BinaryHV space,
@@ -28,6 +30,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod acquisition_time;
 pub mod calibration;
 pub mod clock;
 pub mod cognition;
@@ -51,6 +54,9 @@ pub mod temporal;
 pub mod time_alignment;
 pub mod timed_multimodal_bridge;
 
+pub use acquisition_time::{
+    ChemicalAcquisitionTimeError, bind_evidence_bound_acquisition_time,
+};
 pub use calibration::{CalibrationId, CalibrationState, SensorHealth};
 pub use clock::{
     ChemicalClockDomainError, ChemicalClockDomainId, MAX_CHEMICAL_CLOCK_DOMAIN_LEN,

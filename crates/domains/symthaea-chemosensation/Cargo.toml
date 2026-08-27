@@ -10,8 +10,13 @@ description = "Shared chemical-sensing primitives for Symthaea olfaction and gus
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-evidence-plane = { path = "../../core/symthaea-evidence-plane" }
 symthaea-time-integrity = { path = "../../core/symthaea-time-integrity" }
+symthaea-time-normalization = { path = "../../core/symthaea-time-normalization" }
+symthaea-time-holdover = { path = "../../core/symthaea-time-holdover" }
 serde = { workspace = true }
 blake3 = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+symthaea-time-calibration = { path = "../../core/symthaea-time-calibration" }
+symthaea-time-calibration-policy = { path = "../../core/symthaea-time-calibration-policy" }
+symthaea-time-calibration-bundle = { path = "../../core/symthaea-time-calibration-bundle" }
