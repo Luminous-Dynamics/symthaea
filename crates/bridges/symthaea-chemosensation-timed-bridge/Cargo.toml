@@ -13,3 +13,7 @@ symthaea-chemosensation-bridge = { path = "../symthaea-chemosensation-bridge" }
 [dev-dependencies]
 symthaea-time-integrity = { path = "../../core/symthaea-time-integrity" }
 symthaea-time-normalization = { path = "../../core/symthaea-time-normalization" }
+symthaea-time-calibration = { path = "../../core/symthaea-time-calibration" }
+symthaea-time-calibration-policy = { path = "../../core/symthaea-time-calibration-policy" }
+symthaea-time-calibration-bundle = { path = "../../core/symthaea-time-calibration-bundle" }
+symthaea-time-holdover = { path = "../../core/symthaea-time-holdover" }
