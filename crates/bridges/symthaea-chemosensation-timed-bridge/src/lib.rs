@@ -18,17 +18,21 @@
 //! - device-local or other normalized comparison domains remain projection
 //!   provenance, while `ModalInput::new` keeps root ingestion time;
 //! - raw acquisition timestamps/domains are never rewritten or relabeled.
+//!
+//! Root modal lineage carries two independent evidence identities: the chemical
+//! evidence bundle and a content-addressed temporal-authorization receipt. Root
+//! cognition does not need to import timing types to preserve the exact evidence
+//! that justified treating multiple chemical samples as one event.
 
 use std::fmt;
 use std::time::Duration;
 
-use symthaea::consciousness::integration::modal_lineage::{
-    ModalLineageReceipt,
-};
+use symthaea::consciousness::integration::modal_lineage::ModalLineageReceipt;
 use symthaea::consciousness::integration::modal_lineage_integration::LineagedModalInput;
 use symthaea::consciousness::integration::multi_modal_integration::ModalInput;
 use symthaea_chemosensation::{
-    ChemicalBridgeTarget, ChemicalRootContentLineage, ChemicalRootProjector,
+    ChemicalBridgeTarget, ChemicalContentAddressError, ChemicalRootContentLineage,
+    ChemicalRootProjector, ChemicalTemporalAuthorizationError, ChemicalTemporalAuthorizationId,
     TimedChemicalAggregation, TimedChemicalRootProjection, TimedChemicalRootProjectionError,
 };
 use symthaea_chemosensation_bridge::{ChemicalRootBridgeError, root_modality_for_target};
@@ -36,6 +40,7 @@ use symthaea_chemosensation_bridge::{ChemicalRootBridgeError, root_modality_for_
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TimedChemicalRootBridgeError {
     TimedProjection(TimedChemicalRootProjectionError),
+    TemporalAuthorization(ChemicalTemporalAuthorizationError),
     RootBridge(ChemicalRootBridgeError),
 }
 
@@ -44,6 +49,9 @@ impl fmt::Display for TimedChemicalRootBridgeError {
         match self {
             Self::TimedProjection(error) => {
                 write!(f, "timed chemical root projection failed: {error}")
+            }
+            Self::TemporalAuthorization(error) => {
+                write!(f, "chemical temporal authorization failed: {error}")
             }
             Self::RootBridge(error) => write!(f, "chemical root handoff failed: {error}"),
         }
@@ -58,6 +66,12 @@ impl From<TimedChemicalRootProjectionError> for TimedChemicalRootBridgeError {
     }
 }
 
+impl From<ChemicalTemporalAuthorizationError> for TimedChemicalRootBridgeError {
+    fn from(value: ChemicalTemporalAuthorizationError) -> Self {
+        Self::TemporalAuthorization(value)
+    }
+}
+
 impl From<ChemicalRootBridgeError> for TimedChemicalRootBridgeError {
     fn from(value: ChemicalRootBridgeError) -> Self {
         Self::RootBridge(value)
@@ -67,9 +81,10 @@ impl From<ChemicalRootBridgeError> for TimedChemicalRootBridgeError {
 /// Self-revalidating timed chemical projection paired with the exact root input
 /// produced from it.
 ///
-/// Keeping the full timed projection attached prevents normalized comparison
-/// time from being detached from its raw sensor evidence, temporal admission,
-/// and projection diagnostics when crossing into root cognition.
+/// Keeping the full timed projection attached preserves rich timing diagnostics,
+/// while the generic modal lineage carries a content address for the exact
+/// temporal authorization so root-side evidence tracking does not lose that
+/// provenance when the timing structs are not otherwise retained.
 pub struct TimedChemicalRootHandoff {
     timed_projection: TimedChemicalRootProjection,
     lineaged_input: LineagedModalInput,
@@ -101,9 +116,10 @@ impl TimedChemicalRootHandoff {
 /// admission and HDC aggregation from the retained component evidence before
 /// BinaryHV projection.
 ///
-/// The generic modal lineage still describes the chemical evidence bundle and
-/// representation transforms. The complete timing proof remains attached on the
-/// returned [`TimedChemicalRootProjection`] rather than being reduced to a label.
+/// The generic modal lineage contains independent content addresses for the raw
+/// chemical evidence bundle and the exact temporal authorization, plus the
+/// representation-space and projection-policy identities. The complete timed
+/// projection is still retained for direct diagnostics and revalidation.
 pub fn project_timed_to_lineaged_root_input(
     projector: &ChemicalRootProjector,
     aggregation: &TimedChemicalAggregation,
@@ -113,12 +129,21 @@ pub fn project_timed_to_lineaged_root_input(
     let modality = root_modality_for_target(projection.target)?;
     let content_lineage = ChemicalRootContentLineage::from_projection(projection)
         .map_err(ChemicalRootBridgeError::from)?;
+    let temporal_authorization = ChemicalTemporalAuthorizationId::from_aggregation(aggregation)?;
+    let temporal_evidence = temporal_authorization
+        .content_address()
+        .map_err(ChemicalContentAddressError::from)
+        .map_err(ChemicalRootBridgeError::from)?;
 
-    let modal_lineage = ModalLineageReceipt::from_single_evidence(content_lineage.evidence_bundle)
-        .with_input_space(content_lineage.input_space)
-        .with_transform(content_lineage.projection_policy)
-        .map_err(ChemicalRootBridgeError::from)?
-        .with_output_space(content_lineage.output_space);
+    let modal_lineage = ModalLineageReceipt::new(vec![
+        content_lineage.evidence_bundle,
+        temporal_evidence,
+    ])
+    .map_err(ChemicalRootBridgeError::from)?
+    .with_input_space(content_lineage.input_space)
+    .with_transform(content_lineage.projection_policy)
+    .map_err(ChemicalRootBridgeError::from)?
+    .with_output_space(content_lineage.output_space);
 
     let mut modal_input = ModalInput::new(
         modality,
@@ -159,8 +184,7 @@ mod tests {
         CalibrationState, ChannelEncodingSpec, ChemicalChannel, ChemicalClockDomainId,
         ChemicalFingerprintEncoder, ChemicalModalBridge, ChemicalModalBridgeConfig,
         ChemicalModality, ChemicalObservation, ChemicalPercept, ChemicalTemporalAdmissionStatus,
-        MeasurementUnit, SensorHealth, TimedChemicalPercept,
-        aggregate_timed_chemical_percepts,
+        MeasurementUnit, SensorHealth, TimedChemicalPercept, aggregate_timed_chemical_percepts,
     };
     use symthaea_time_integrity::{
         ClockDomainId, ClockEpochId, ContinuityStatus, TimeIntegrityReceipt, TimeUncertainty,
@@ -320,8 +344,12 @@ mod tests {
     }
 
     #[test]
-    fn timed_handoff_preserves_content_lineage_and_does_not_activate_olfaction() {
+    fn timed_handoff_preserves_chemical_and_temporal_lineage_without_activation() {
         let aggregation = normalized_pair(ClockDomainId::unix_epoch());
+        let temporal_evidence = ChemicalTemporalAuthorizationId::from_aggregation(&aggregation)
+            .unwrap()
+            .content_address()
+            .unwrap();
         let handoff = project_timed_to_lineaged_root_input(
             &ChemicalRootProjector::default(),
             &aggregation,
@@ -333,7 +361,9 @@ mod tests {
         )
         .unwrap();
         let lineage = handoff.lineaged_input().lineage();
-        assert_eq!(lineage.evidence(), std::slice::from_ref(&expected.evidence_bundle));
+        assert_eq!(lineage.evidence().len(), 2);
+        assert!(lineage.evidence().contains(&expected.evidence_bundle));
+        assert!(lineage.evidence().contains(&temporal_evidence));
         assert_eq!(lineage.input_space(), Some(&expected.input_space));
         assert_eq!(lineage.transforms(), std::slice::from_ref(&expected.projection_policy));
         assert_eq!(lineage.output_space(), Some(&expected.output_space));
