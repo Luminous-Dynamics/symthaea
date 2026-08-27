@@ -92,13 +92,15 @@ fn calibration_evidence(
     evidence
 }
 
-fn evidence_bound_holdover(
+#[allow(clippy::too_many_arguments)]
+fn evidence_bound_holdover_with_policy(
     source_domain: ClockDomainId,
     source_epoch: ClockEpochId,
     calibration_source_send_us: u64,
     source_to_target_offset_us: u64,
     valid_source_start_us: u64,
     valid_source_end_us: u64,
+    policy_id: &str,
 ) -> BoundedHoldoverTransform {
     let evidence = vec![calibration_evidence(
         source_domain,
@@ -108,7 +110,7 @@ fn evidence_bound_holdover(
     )];
     let consensus = CalibrationConsensus::from_evidence(&evidence).unwrap();
     let policy = CalibrationDecisionPolicy::new(
-        CalibrationPolicyId::new("two-nose-software-calibration-v1").unwrap(),
+        CalibrationPolicyId::new(policy_id).unwrap(),
         1,
         20,
         Some(100),
@@ -136,6 +138,25 @@ fn evidence_bound_holdover(
         TimeUncertainty::Bounded { max_error_us: 10 }
     );
     value
+}
+
+fn evidence_bound_holdover(
+    source_domain: ClockDomainId,
+    source_epoch: ClockEpochId,
+    calibration_source_send_us: u64,
+    source_to_target_offset_us: u64,
+    valid_source_start_us: u64,
+    valid_source_end_us: u64,
+) -> BoundedHoldoverTransform {
+    evidence_bound_holdover_with_policy(
+        source_domain,
+        source_epoch,
+        calibration_source_send_us,
+        source_to_target_offset_us,
+        valid_source_start_us,
+        valid_source_end_us,
+        "two-nose-software-calibration-v1",
+    )
 }
 
 fn mox_encoder() -> ChemicalFingerprintEncoder {
@@ -195,7 +216,6 @@ fn calibration_policy_bundle_and_holdover_authorize_two_nose_root_handoff() {
     let source_b_domain = ClockDomainId::new("nose-b/monotonic").unwrap();
     let source_b_epoch = ClockEpochId::new("nose-b-boot-9").unwrap();
 
-    // Nose A maps raw 1_000 -> Unix 10_000 through an evidence-derived +9_000 us offset.
     let holdover_a = evidence_bound_holdover(
         source_a_domain.clone(),
         source_a_epoch.clone(),
@@ -204,7 +224,6 @@ fn calibration_policy_bundle_and_holdover_authorize_two_nose_root_handoff() {
         800,
         1_100,
     );
-    // Nose B maps raw 5_000 -> Unix 10_050 through an evidence-derived +5_050 us offset.
     let holdover_b = evidence_bound_holdover(
         source_b_domain.clone(),
         source_b_epoch.clone(),
@@ -288,8 +307,6 @@ fn calibration_policy_bundle_and_holdover_authorize_two_nose_root_handoff() {
             .contains(&temporal_address)
     );
 
-    // The root still only records that this evidence was processed. Olfaction is
-    // not configured into the fusion topology by this experiment.
     let mut root = LineagedMultiModalIntegrator::new(IntegrationConfig::default());
     let result = root.integrate(&[handoff.into_lineaged_input()]);
     assert!(
@@ -305,4 +322,77 @@ fn calibration_policy_bundle_and_holdover_authorize_two_nose_root_handoff() {
             .is_none()
     );
     assert_eq!(result.current.integration.integrated_phi, 0.0);
+}
+
+#[test]
+fn equal_transform_but_different_calibration_policy_remains_distinct_in_root_lineage() {
+    let source_domain = ClockDomainId::new("nose-a/monotonic").unwrap();
+    let source_epoch = ClockEpochId::new("nose-a-boot-1").unwrap();
+    let holdover_a = evidence_bound_holdover_with_policy(
+        source_domain.clone(),
+        source_epoch.clone(),
+        900,
+        9_000,
+        800,
+        1_100,
+        "software-policy-a-v1",
+    );
+    let holdover_b = evidence_bound_holdover_with_policy(
+        source_domain.clone(),
+        source_epoch.clone(),
+        900,
+        9_000,
+        800,
+        1_100,
+        "software-policy-b-v1",
+    );
+    assert_eq!(holdover_a.transform(), holdover_b.transform());
+
+    let timed_a = bind_calibrated_time(
+        simulated_percept(1_000, "nose-a/monotonic"),
+        source_domain.clone(),
+        source_epoch.clone(),
+        &holdover_a,
+    );
+    let timed_b = bind_calibrated_time(
+        simulated_percept(1_000, "nose-a/monotonic"),
+        source_domain,
+        source_epoch,
+        &holdover_b,
+    );
+    assert_eq!(timed_a.observation_id(), timed_b.observation_id());
+    assert_eq!(timed_a.comparison_timestamp_us(), timed_b.comparison_timestamp_us());
+    assert_eq!(timed_a.time(), timed_b.time());
+    assert_ne!(
+        timed_a.acquisition_authorization(),
+        timed_b.acquisition_authorization()
+    );
+
+    let bridge = ChemicalModalBridge::new(ChemicalModalBridgeConfig {
+        max_component_skew_us: 100,
+    });
+    let aggregation_a = aggregate_timed_chemical_percepts(&bridge, vec![timed_a]).unwrap();
+    let aggregation_b = aggregate_timed_chemical_percepts(&bridge, vec![timed_b]).unwrap();
+    let temporal_a = ChemicalTemporalAuthorizationId::from_aggregation(&aggregation_a).unwrap();
+    let temporal_b = ChemicalTemporalAuthorizationId::from_aggregation(&aggregation_b).unwrap();
+    assert_ne!(temporal_a, temporal_b);
+
+    let handoff_a = project_timed_to_lineaged_root_input(
+        &ChemicalRootProjector::default(),
+        &aggregation_a,
+    )
+    .unwrap();
+    let handoff_b = project_timed_to_lineaged_root_input(
+        &ChemicalRootProjector::default(),
+        &aggregation_b,
+    )
+    .unwrap();
+    assert_eq!(
+        handoff_a.timed_projection().projection().binary_vector,
+        handoff_b.timed_projection().projection().binary_vector
+    );
+    assert_ne!(
+        handoff_a.lineaged_input().lineage(),
+        handoff_b.lineaged_input().lineage()
+    );
 }
