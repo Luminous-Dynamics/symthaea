@@ -9,10 +9,17 @@
 //! of its temporal admission evidence and exposes only a generic
 //! [`ContentAddress32`] across subsystem boundaries.
 //!
+//! V2 additionally commits each timed component's optional acquisition-time
+//! authorization reference. This means evidence-bound physical acquisition can
+//! remain distinguishable even when two different calibration/holdover histories
+//! derive an identical normalized clock transform. General replay/test normalized
+//! percepts remain valid with no acquisition-authority reference.
+//!
 //! The identity is **not** a signature, timestamp authority, synchronization
 //! proof, or trust score. It says only which exact timing claims, normalization
-//! provenance, skew policy, pairwise separation windows, and admission result were
-//! used. Authenticity and authorization of the producers remain separate layers.
+//! provenance, acquisition authority references, skew policy, pairwise separation
+//! windows, and admission result were used. Authenticity and authorization of the
+//! producers remain separate layers.
 
 use std::fmt;
 
@@ -31,9 +38,9 @@ use crate::{
 };
 
 pub const CHEMICAL_TEMPORAL_AUTHORIZATION_NAMESPACE: &str =
-    "symthaea-chemosensation-temporal-authorization-v1";
+    "symthaea-chemosensation-temporal-authorization-v2";
 const BLAKE3_256: &str = "blake3-256";
-const HASH_DOMAIN: &[u8] = b"symthaea-chemosensation-temporal-authorization-v1";
+const HASH_DOMAIN: &[u8] = b"symthaea-chemosensation-temporal-authorization-v2";
 
 /// Strong domain identity for one exact chemical temporal-admission evidence set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -156,6 +163,19 @@ fn hash_timed_component(hasher: &mut Hasher, component: &TimedChemicalPercept) {
             hash_normalized_time_point(hasher, normalized);
         }
     }
+    match component.acquisition_authorization() {
+        None => hash_tag(hasher, 0),
+        Some(address) => {
+            hash_tag(hasher, 1);
+            hash_content_address(hasher, address);
+        }
+    }
+}
+
+fn hash_content_address(hasher: &mut Hasher, address: &ContentAddress32) {
+    hash_str(hasher, address.algorithm());
+    hash_str(hasher, address.namespace());
+    hasher.update(address.digest());
 }
 
 fn hash_normalized_time_point(hasher: &mut Hasher, normalized: &NormalizedTimePoint) {
@@ -285,10 +305,17 @@ mod tests {
     };
     use symthaea_core::hdc::{HDC_DIMENSION, unified_hv::ContinuousHV};
     use symthaea_time_integrity::{ClockDomainId, ClockEpochId};
+    use symthaea_time_normalization::normalize_timestamp_us;
 
-    fn timed(timestamp_us: u64, source: &str, seed: u64) -> TimedChemicalPercept {
-        let domain = ClockDomainId::new("capture/monotonic").unwrap();
-        let epoch = ClockEpochId::new("capture-boot-1").unwrap();
+    fn domain() -> ClockDomainId {
+        ClockDomainId::new("capture/monotonic").unwrap()
+    }
+
+    fn epoch() -> ClockEpochId {
+        ClockEpochId::new("capture-boot-1").unwrap()
+    }
+
+    fn percept(timestamp_us: u64, source: &str, seed: u64) -> ChemicalPercept {
         let mut evidence = ChemicalObservation::new(
             timestamp_us,
             ChemicalModality::Olfactory,
@@ -296,7 +323,7 @@ mod tests {
             vec![],
         );
         evidence.clock_domain = Some(ChemicalClockDomainId::new("capture/monotonic").unwrap());
-        let percept = ChemicalPercept {
+        ChemicalPercept {
             evidence,
             fingerprint: ChemicalFingerprint {
                 vector: ContinuousHV::random(HDC_DIMENSION, seed),
@@ -305,12 +332,53 @@ mod tests {
                 ignored_channels: 0,
                 encoding_space_id: ChemicalEncodingSpaceId::from_bytes([7; 32]),
             },
-        };
-        let receipt = TimeIntegrityReceipt::declared(domain)
-            .with_epoch(epoch)
+        }
+    }
+
+    fn receipt() -> TimeIntegrityReceipt {
+        TimeIntegrityReceipt::declared(domain())
+            .with_epoch(epoch())
             .with_continuity(ContinuityStatus::Continuous)
-            .with_uncertainty(TimeUncertainty::bounded(10));
-        TimedChemicalPercept::new(percept, receipt).unwrap()
+            .with_uncertainty(TimeUncertainty::bounded(10))
+    }
+
+    fn timed(timestamp_us: u64, source: &str, seed: u64) -> TimedChemicalPercept {
+        TimedChemicalPercept::new(percept(timestamp_us, source, seed), receipt()).unwrap()
+    }
+
+    fn timed_with_authority(
+        timestamp_us: u64,
+        source: &str,
+        seed: u64,
+        authority_byte: u8,
+    ) -> TimedChemicalPercept {
+        let transform = ClockTransformReceipt::offset(
+            domain(),
+            epoch(),
+            domain(),
+            epoch(),
+            timestamp_us,
+            timestamp_us,
+            timestamp_us.saturating_sub(100),
+            timestamp_us.saturating_add(100),
+        )
+        .unwrap()
+        .with_mapping_continuity(ContinuityStatus::Continuous)
+        .with_target_continuity(ContinuityStatus::Continuous)
+        .with_uncertainty(TimeUncertainty::bounded(0));
+        let normalized = normalize_timestamp_us(timestamp_us, &receipt(), &transform).unwrap();
+        let authority = ContentAddress32::new(
+            "blake3-256",
+            "symthaea-chemosensation-acquisition-time-authorization-v1",
+            [authority_byte; 32],
+        )
+        .unwrap();
+        TimedChemicalPercept::from_evidence_bound_normalized(
+            percept(timestamp_us, source, seed),
+            normalized,
+            authority,
+        )
+        .unwrap()
     }
 
     fn aggregate(components: Vec<TimedChemicalPercept>, skew_us: u64) -> TimedChemicalAggregation {
@@ -333,6 +401,29 @@ mod tests {
         let left_id = ChemicalTemporalAuthorizationId::from_aggregation(&left).unwrap();
         let right_id = ChemicalTemporalAuthorizationId::from_aggregation(&right).unwrap();
         assert_eq!(left_id, right_id);
+    }
+
+    #[test]
+    fn acquisition_authority_reference_is_part_of_v2_temporal_identity() {
+        let left = aggregate(
+            vec![
+                timed_with_authority(1_000, "nose-a", 1, 1),
+                timed_with_authority(1_050, "nose-b", 2, 2),
+            ],
+            100,
+        );
+        let right = aggregate(
+            vec![
+                timed_with_authority(1_000, "nose-a", 1, 9),
+                timed_with_authority(1_050, "nose-b", 2, 2),
+            ],
+            100,
+        );
+        assert_eq!(left.admission(), right.admission());
+        assert_ne!(
+            ChemicalTemporalAuthorizationId::from_aggregation(&left).unwrap(),
+            ChemicalTemporalAuthorizationId::from_aggregation(&right).unwrap()
+        );
     }
 
     #[test]
