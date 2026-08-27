@@ -108,7 +108,7 @@ fn evidence_bound_holdover(
     )];
     let consensus = CalibrationConsensus::from_evidence(&evidence).unwrap();
     let policy = CalibrationDecisionPolicy::new(
-        CalibrationPolicyId::new("two-nose-physical-fusion-v1").unwrap(),
+        CalibrationPolicyId::new("two-nose-software-calibration-v1").unwrap(),
         1,
         20,
         Some(100),
@@ -244,6 +244,13 @@ fn calibration_policy_bundle_and_holdover_authorize_two_nose_root_handoff() {
         timed_b.time().uncertainty,
         TimeUncertainty::Bounded { max_error_us: 12 }
     );
+    let authority_a = timed_a
+        .acquisition_authorization()
+        .expect("evidence-bound nose A must retain acquisition authority");
+    let authority_b = timed_b
+        .acquisition_authorization()
+        .expect("evidence-bound nose B must retain acquisition authority");
+    assert_ne!(authority_a, authority_b);
 
     let aggregation = aggregate_timed_chemical_percepts(
         &ChemicalModalBridge::new(ChemicalModalBridgeConfig {
