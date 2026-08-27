@@ -19,6 +19,10 @@
 //!   [`symthaea_time_integrity::TimeIntegrityReceipt`] without mutating raw evidence,
 //! - [`bind_evidence_bound_acquisition_time`] derives that comparison time only
 //!   through a self-verifying bounded calibration/holdover transform,
+//! - [`TimedChemicalAggregation`] retains generic temporal admission beside the
+//!   exact raw evidence-preserving HDC aggregate,
+//! - [`TimedChemicalRootProjection`] revalidates timing and HDC aggregation before
+//!   BinaryHV root projection,
 //! - [`ChemicalEncodingSpaceId`] identifies the continuous HDC coordinate system,
 //! - [`ChemicalRootProjectionPolicyId`] identifies ContinuousHV -> BinaryHV quantization,
 //! - [`ChemicalRootBinarySpaceId`] identifies the resulting root BinaryHV space,
@@ -53,6 +57,7 @@ pub mod root_projection;
 pub mod temporal;
 pub mod time_alignment;
 pub mod timed_multimodal_bridge;
+pub mod timed_root_projection;
 
 pub use acquisition_time::{
     ChemicalAcquisitionTimeError, bind_evidence_bound_acquisition_time,
@@ -118,4 +123,7 @@ pub use time_alignment::{
 };
 pub use timed_multimodal_bridge::{
     TimedChemicalAggregation, TimedChemicalAggregationError, aggregate_timed_chemical_percepts,
+};
+pub use timed_root_projection::{
+    TimedChemicalRootProjection, TimedChemicalRootProjectionError,
 };
