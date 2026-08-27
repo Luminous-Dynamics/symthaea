@@ -404,7 +404,7 @@ mod tests {
         // Detaching the aggregate correctly fails the legacy raw-clock validator.
         assert!(matches!(
             ChemicalRootProjector::default().project(raw_input),
-            Err(ChemicalRootProjectionError::MissingSharedClockDomain)
+            Err(ChemicalRootProjectionError::MixedClockDomains { .. })
         ));
 
         let timed = ChemicalRootProjector::default()
@@ -454,6 +454,21 @@ mod tests {
             .project_timed_aggregation(&aggregation)
             .unwrap();
         assert_eq!(timed.projection(), &legacy);
+    }
+
+    #[test]
+    fn tampered_stored_aggregate_is_rejected_before_projection() {
+        let mut aggregation = normalized_pair(ClockDomainId::new("capture-host/monotonic").unwrap());
+        match &mut aggregation {
+            TimedChemicalAggregation::Aggregated { input, .. } => {
+                input.confidence *= 0.5;
+            }
+            TimedChemicalAggregation::Abstained { .. } => panic!("fixture must aggregate"),
+        }
+        assert!(matches!(
+            ChemicalRootProjector::default().project_timed_aggregation(&aggregation),
+            Err(TimedChemicalRootProjectionError::AggregateMismatch)
+        ));
     }
 
     #[test]
