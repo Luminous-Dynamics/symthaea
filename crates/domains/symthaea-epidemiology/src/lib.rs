@@ -12,7 +12,11 @@
 //!   series using a robust historical baseline and explicit uncertainty-aware
 //!   abstention.
 //!
-//! The surveillance module reports statistical change candidates only. It does
+//! [`surveillance_receipt`] adds an evidence-bearing wrapper that binds a result
+//! to the exact screening algorithm identifier, caller-supplied configuration,
+//! baseline time scope, and latest timestamp.
+//!
+//! The surveillance modules report statistical change candidates only. They do
 //! **not** diagnose disease, declare an outbreak, identify a pathogen, estimate
 //! operational/public-health authority, or recommend a response. Source trust,
 //! lineage/corroboration, persistence, competing hypotheses, and action authority
@@ -33,7 +37,7 @@
 //! ```
 //! use symthaea_epidemiology::{
 //!     ScreeningDisposition, SurveillancePoint, SurveillanceScreenConfig,
-//!     assess_latest_change,
+//!     assess_latest_change_with_receipt,
 //! };
 //!
 //! let history = [
@@ -45,20 +49,25 @@
 //! ];
 //! let latest = SurveillancePoint::observed(6, 20.0, 19.0, 21.0).unwrap();
 //! let config = SurveillanceScreenConfig::new(5, 3.0).unwrap();
-//! let assessment = assess_latest_change(&history, latest, config).unwrap();
+//! let receipt = assess_latest_change_with_receipt(&history, latest, config).unwrap();
 //!
 //! assert!(matches!(
-//!     assessment.disposition,
+//!     receipt.assessment.disposition,
 //!     ScreeningDisposition::ChangeCandidate(_)
 //! ));
 //! ```
 
 pub mod sir;
 pub mod surveillance;
+pub mod surveillance_receipt;
 
 pub use sir::{Sir, State};
 pub use surveillance::{
     AbstentionReason, ChangeDirection, IntervalEstimate, RobustBaseline, ScreeningDisposition,
     SurveillanceAssessment, SurveillancePoint, SurveillanceScreenConfig, SurveillanceScreenError,
     assess_latest_change,
+};
+pub use surveillance_receipt::{
+    BaselineTimeWindow, SURVEILLANCE_SCREEN_ALGORITHM_V1, SurveillanceScreenReceipt,
+    assess_latest_change_with_receipt,
 };
