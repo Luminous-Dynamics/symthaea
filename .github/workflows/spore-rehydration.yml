@@ -21,6 +21,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # A formatter-only bot commit can leave pull-request workflows in
+      # action_required. Keeping this qualification definition user-authored
+      # retriggers the exact formatted source without altering R4 semantics.
       - uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
