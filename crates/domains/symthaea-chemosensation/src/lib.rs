@@ -15,6 +15,8 @@
 //!
 //! - [`ChemicalObservationId`] / [`ChemicalEvidenceBundleId`] identify raw evidence,
 //! - [`ChemicalClockDomainId`] identifies the legacy raw acquisition time domain,
+//! - [`ChemicalAcquisitionTimeAuthorizationId`] identifies the exact calibration
+//!   decision + holdover authority that permitted acquisition-time normalization,
 //! - [`TimedChemicalPercept`] carries a separate comparison timestamp + generic
 //!   [`symthaea_time_integrity::TimeIntegrityReceipt`] without mutating raw evidence,
 //! - [`bind_evidence_bound_acquisition_time`] derives that comparison time only
@@ -36,6 +38,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod acquisition_authorization;
 pub mod acquisition_time;
 pub mod calibration;
 pub mod clock;
@@ -62,6 +65,10 @@ pub mod time_alignment;
 pub mod timed_multimodal_bridge;
 pub mod timed_root_projection;
 
+pub use acquisition_authorization::{
+    CHEMICAL_ACQUISITION_TIME_AUTHORIZATION_NAMESPACE,
+    ChemicalAcquisitionTimeAuthorizationError, ChemicalAcquisitionTimeAuthorizationId,
+};
 pub use acquisition_time::{
     ChemicalAcquisitionTimeError, bind_evidence_bound_acquisition_time,
 };

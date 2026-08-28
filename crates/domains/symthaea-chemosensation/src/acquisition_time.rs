@@ -10,23 +10,34 @@
 //! stack. The generic normalization contract then produces the only comparison
 //! timestamp/receipt accepted here.
 //!
-//! The chemical observation itself is never rewritten. Its raw acquisition
-//! timestamp, legacy clock metadata, calibration provenance, and content address
-//! remain the evidence of what the sensor actually emitted.
+//! The exact calibration decision + holdover authority is content-addressed and
+//! attached beside the normalized comparison time. This preserves the distinction
+//! between "this transform is valid" and "this exact evidence chain authorized
+//! its use for acquisition" without rewriting the chemical observation itself.
+//!
+//! The raw acquisition timestamp, legacy clock metadata, calibration provenance,
+//! and observation content address remain the evidence of what the sensor emitted.
 
 use std::fmt;
 
+use symthaea_evidence_plane::ContentAddressError;
 use symthaea_time_holdover::{BoundedHoldoverTransform, HoldoverError};
 use symthaea_time_integrity::TimeIntegrityReceipt;
 use symthaea_time_normalization::{ClockTransformError, normalize_timestamp_us};
 
-use crate::{ChemicalPercept, ChemicalTimeAlignmentError, TimedChemicalPercept};
+use crate::{
+    ChemicalAcquisitionTimeAuthorizationError, ChemicalAcquisitionTimeAuthorizationId,
+    ChemicalPercept, ChemicalTimeAlignmentError, TimedChemicalPercept,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChemicalAcquisitionTimeError {
     /// The calibration + holdover capability no longer verifies against its own
     /// stored evidence and derivation.
     Holdover(HoldoverError),
+    /// The verified authority digest could not be wrapped in the generic content
+    /// address contract.
+    ContentAddress(ContentAddressError),
     /// The raw timestamp/receipt cannot be normalized under the verified finite
     /// transform window.
     Normalization(ClockTransformError),
@@ -39,6 +50,10 @@ impl fmt::Display for ChemicalAcquisitionTimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Holdover(error) => write!(f, "chemical acquisition holdover evidence invalid: {error}"),
+            Self::ContentAddress(error) => write!(
+                f,
+                "chemical acquisition authority could not be content-addressed: {error}"
+            ),
             Self::Normalization(error) => {
                 write!(f, "chemical acquisition timestamp cannot be normalized: {error}")
             }
@@ -54,6 +69,12 @@ impl std::error::Error for ChemicalAcquisitionTimeError {}
 impl From<HoldoverError> for ChemicalAcquisitionTimeError {
     fn from(value: HoldoverError) -> Self {
         Self::Holdover(value)
+    }
+}
+
+impl From<ContentAddressError> for ChemicalAcquisitionTimeError {
+    fn from(value: ContentAddressError) -> Self {
+        Self::ContentAddress(value)
     }
 }
 
@@ -73,10 +94,11 @@ impl From<ChemicalTimeAlignmentError> for ChemicalAcquisitionTimeError {
 /// evidence-bound finite holdover transform.
 ///
 /// This function intentionally re-runs [`BoundedHoldoverTransform::verify_self`]
-/// at the consumer boundary. It then delegates all domain, epoch, continuity,
-/// validity-window, and uncertainty propagation checks to
-/// [`normalize_timestamp_us`]. Only that normalized result is attached to the
-/// chemical percept.
+/// at the consumer boundary. It then content-addresses the exact calibration
+/// decision bundle + holdover claim + derived transform, delegates all domain,
+/// epoch, continuity, validity-window, and uncertainty propagation checks to
+/// [`normalize_timestamp_us`], and attaches both normalized provenance and the
+/// authority address to the resulting timed percept.
 ///
 /// No timing metadata is copied into the raw [`crate::ChemicalObservation`].
 pub fn bind_evidence_bound_acquisition_time(
@@ -84,13 +106,26 @@ pub fn bind_evidence_bound_acquisition_time(
     source_time: TimeIntegrityReceipt,
     holdover: &BoundedHoldoverTransform,
 ) -> Result<TimedChemicalPercept, ChemicalAcquisitionTimeError> {
+    // Preserve the existing consumer-facing Holdover error boundary explicitly.
     holdover.verify_self()?;
+    let authorization = ChemicalAcquisitionTimeAuthorizationId::from_holdover(holdover)
+        .map_err(|error| match error {
+            ChemicalAcquisitionTimeAuthorizationError::Holdover(inner) => {
+                ChemicalAcquisitionTimeError::Holdover(inner)
+            }
+        })?;
+    let authorization = authorization.content_address()?;
+
     let normalized = normalize_timestamp_us(
         percept.timestamp_us(),
         &source_time,
         holdover.transform(),
     )?;
-    Ok(TimedChemicalPercept::from_normalized(percept, normalized)?)
+    Ok(TimedChemicalPercept::from_evidence_bound_normalized(
+        percept,
+        normalized,
+        authorization,
+    )?)
 }
 
 #[cfg(test)]
@@ -201,13 +236,18 @@ mod tests {
     }
 
     #[test]
-    fn verified_holdover_produces_normalized_comparison_time_without_rewriting_raw_evidence() {
+    fn verified_holdover_produces_normalized_time_and_exact_authority_without_rewriting_raw_evidence() {
         let percept = percept(1_000, "sensor-a/monotonic");
         let observation_id = percept.observation_id();
+        let holdover = holdover();
+        let expected_authority = ChemicalAcquisitionTimeAuthorizationId::from_holdover(&holdover)
+            .unwrap()
+            .content_address()
+            .unwrap();
         let timed = bind_evidence_bound_acquisition_time(
             percept,
             acquisition_receipt(),
-            &holdover(),
+            &holdover,
         )
         .unwrap();
 
@@ -217,10 +257,11 @@ mod tests {
         assert_eq!(timed.time().clock_domain, target_domain());
         assert_eq!(timed.time().clock_epoch.as_ref(), Some(&target_epoch()));
         assert!(timed.time().supports_bounded_comparison());
+        assert_eq!(timed.acquisition_authorization(), Some(&expected_authority));
         let normalization = timed.normalization().expect("normalized provenance retained");
         assert_eq!(normalization.source_timestamp_us(), 1_000);
         assert_eq!(normalization.target_timestamp_us(), 1_500);
-        assert_eq!(normalization.transform(), holdover().transform());
+        assert_eq!(normalization.transform(), holdover.transform());
     }
 
     #[test]
