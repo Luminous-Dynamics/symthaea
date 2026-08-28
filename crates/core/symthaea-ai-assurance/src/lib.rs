@@ -19,7 +19,7 @@ pub use action::{
     RiskAssessed,
 };
 pub use capability::{
-    AuthorityRoot, Capability, CapabilityKind, Deploy, Execute, GrantError, GrantId,
-    GrantMetadata, Network, Observe, OneShotCapability, PrincipalId, Read, Scope, ScopeError,
-    UpdateModel, Write,
+    AuthorityRoot, BoundOneShotCapability, Capability, CapabilityKind, Deploy, Execute, GrantError,
+    GrantId, GrantMetadata, Network, Observe, OneShotCapability, PrincipalId, Read, Scope,
+    ScopeError, UpdateModel, Write,
 };

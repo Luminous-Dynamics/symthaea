@@ -3,12 +3,13 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Typed action lifecycle for autonomous systems.
 //!
-//! Invalid lifecycle shortcuts are absent from the public API. In particular,
-//! a proposed action cannot be marked executed, an authorized action requires a
-//! matching one-shot capability, and an executed action requires a separately
-//! authorized observation before it can be resolved.
+//! Invalid lifecycle shortcuts are absent from the public API. Exact action
+//! authorization is bound to the action id, risk classification, and immutable
+//! descriptor fingerprint. External observation authority is separately bound
+//! to the exact execution output.
 //!
 //! ```compile_fail
+//! use std::time::SystemTime;
 //! use symthaea_ai_assurance::{Action, PrincipalId, Proposed, Scope, Write};
 //! let action = Action::<Write, Proposed>::propose(
 //!     PrincipalId::new(),
@@ -16,28 +17,33 @@
 //!     Scope::new("workspace", ["symthaea", "src"]).unwrap(),
 //!     b"candidate patch",
 //! );
-//! // No such transition exists.
-//! let _ = action.record_execution([0_u8; 32]);
+//! // No such transition exists from Proposed.
+//! let _ = action.record_execution([0_u8; 32], SystemTime::now());
 //! ```
 //!
 //! ```compile_fail
 //! use std::time::SystemTime;
 //! use symthaea_ai_assurance::{
-//!     Action, AuthorityRoot, PrincipalId, Proposed, Read, Scope, Write,
+//!     Action, ActionRisk, AuthorityRoot, PrincipalId, Proposed, Read, Scope, Write,
 //! };
 //! let actor = PrincipalId::new();
 //! let scope = Scope::new("workspace", ["symthaea"]).unwrap();
 //! let root = AuthorityRoot::new(PrincipalId::new());
-//! let read_grant = root.issue_one_shot::<Read>(actor, scope.clone(), None);
-//! let action = Action::<Write, Proposed>::propose(actor, "edit", scope, b"patch")
-//!     .assess(symthaea_ai_assurance::ActionRisk::Reversible);
+//! let action = Action::<Write, Proposed>::propose(actor, "edit", scope.clone(), b"patch")
+//!     .assess(ActionRisk::Reversible);
+//! let read_grant = root.issue_bound_one_shot::<Read>(
+//!     actor,
+//!     scope,
+//!     None,
+//!     action.authorization_binding(),
+//! );
 //! // A read capability cannot authorize a write action.
 //! let _ = action.authorize(read_grant, SystemTime::now());
 //! ```
 
 use crate::capability::{
-    CapabilityKind, GrantError, GrantId, GrantMetadata, Observe, OneShotCapability, PrincipalId,
-    Scope,
+    BoundOneShotCapability, CapabilityKind, GrantError, GrantId, GrantMetadata, Observe,
+    PrincipalId, Scope,
 };
 use std::fmt;
 use std::marker::PhantomData;
@@ -72,6 +78,18 @@ pub enum ActionRisk {
     Destructive,
     /// Irreversible or safety-critical behavior.
     Critical,
+}
+
+impl ActionRisk {
+    fn code(self) -> u8 {
+        match self {
+            Self::Observation => 0,
+            Self::Reversible => 1,
+            Self::StateModifying => 2,
+            Self::Destructive => 3,
+            Self::Critical => 4,
+        }
+    }
 }
 
 /// Immutable description bound to the action fingerprint.
@@ -130,6 +148,22 @@ fn hash_field(hasher: &mut blake3::Hasher, bytes: &[u8]) {
     hasher.update(bytes);
 }
 
+fn transition_binding(
+    domain: &[u8],
+    action_id: ActionId,
+    action_fingerprint: [u8; 32],
+    fields: &[&[u8]],
+) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(domain);
+    hash_field(&mut hasher, action_id.as_uuid().as_bytes());
+    hash_field(&mut hasher, &action_fingerprint);
+    for field in fields {
+        hash_field(&mut hasher, field);
+    }
+    *hasher.finalize().as_bytes()
+}
+
 /// Initial state: proposed by a model or planner but not yet risk assessed.
 #[derive(Debug)]
 pub struct Proposed;
@@ -140,11 +174,12 @@ pub struct RiskAssessed {
     risk: ActionRisk,
 }
 
-/// A matching one-shot capability was validated and consumed.
+/// A matching exact-action one-shot capability was validated and consumed.
 #[derive(Debug)]
 pub struct Authorized {
     risk: ActionRisk,
     grant: GrantMetadata,
+    authorization_binding: [u8; 32],
 }
 
 /// Trusted host execution has been recorded.
@@ -152,6 +187,7 @@ pub struct Authorized {
 pub struct Executed {
     risk: ActionRisk,
     grant: GrantMetadata,
+    authorization_binding: [u8; 32],
     output_digest: [u8; 32],
 }
 
@@ -160,8 +196,10 @@ pub struct Executed {
 pub struct Observed {
     risk: ActionRisk,
     grant: GrantMetadata,
+    authorization_binding: [u8; 32],
     output_digest: [u8; 32],
     observer_grant: GrantMetadata,
+    observation_binding: [u8; 32],
     observation: Observation,
 }
 
@@ -234,11 +272,23 @@ impl<K: CapabilityKind> Action<K, RiskAssessed> {
         self.state.risk
     }
 
-    /// Consume a matching one-shot capability to authorize this exact action
-    /// class and scope.
+    /// Domain-separated digest that a policy gate must bind into the exact
+    /// one-shot capability for this action.
+    pub fn authorization_binding(&self) -> [u8; 32] {
+        let risk = [self.state.risk.code()];
+        transition_binding(
+            b"symthaea-ai-assurance/authorize-v1\0",
+            self.id,
+            self.descriptor.fingerprint(),
+            &[&risk],
+        )
+    }
+
+    /// Consume a matching exact-action one-shot capability to authorize this
+    /// action class, instance, risk classification, and scope.
     pub fn authorize(
         self,
-        grant: OneShotCapability<K>,
+        grant: BoundOneShotCapability<K>,
         now: SystemTime,
     ) -> Result<Action<K, Authorized>, ActionError> {
         grant.validate_at(now).map_err(ActionError::Grant)?;
@@ -257,7 +307,15 @@ impl<K: CapabilityKind> Action<K, RiskAssessed> {
             });
         }
 
-        let grant = grant.into_metadata();
+        let expected_binding = self.authorization_binding();
+        if grant.binding() != expected_binding {
+            return Err(ActionError::BindingMismatch {
+                expected: expected_binding,
+                actual: grant.binding(),
+            });
+        }
+
+        let (grant, authorization_binding) = grant.into_parts();
         Ok(Action {
             id: self.id,
             actor: self.actor,
@@ -265,6 +323,7 @@ impl<K: CapabilityKind> Action<K, RiskAssessed> {
             state: Authorized {
                 risk: self.state.risk,
                 grant,
+                authorization_binding,
             },
             _kind: PhantomData,
         })
@@ -277,22 +336,40 @@ impl<K: CapabilityKind> Action<K, Authorized> {
         self.state.grant.grant_id()
     }
 
+    /// Exact authorization binding consumed by this action.
+    pub fn authorization_binding(&self) -> [u8; 32] {
+        self.state.authorization_binding
+    }
+
     /// Record the digest produced by a trusted executor adapter.
     ///
+    /// Expiry is checked again at the execution transition so an action that
+    /// was authorized before expiry cannot be executed indefinitely later.
     /// This method deliberately performs no ambient process/filesystem/network
     /// operation. PR 2 will bind concrete executors to this transition.
-    pub fn record_execution(self, output_digest: [u8; 32]) -> Action<K, Executed> {
-        Action {
+    pub fn record_execution(
+        self,
+        output_digest: [u8; 32],
+        now: SystemTime,
+    ) -> Result<Action<K, Executed>, ActionError> {
+        if !self.state.grant.is_valid_at(now) {
+            return Err(ActionError::Grant(GrantError::Expired {
+                grant_id: self.state.grant.grant_id(),
+            }));
+        }
+
+        Ok(Action {
             id: self.id,
             actor: self.actor,
             descriptor: self.descriptor,
             state: Executed {
                 risk: self.state.risk,
                 grant: self.state.grant,
+                authorization_binding: self.state.authorization_binding,
                 output_digest,
             },
             _kind: PhantomData,
-        }
+        })
     }
 }
 
@@ -320,7 +397,8 @@ pub struct Observation {
 
 impl Observation {
     /// Construct a digest-bound observation. The observation does not become
-    /// part of an action lineage until a matching `Observe` grant is consumed.
+    /// part of an action lineage until matching exact observation authority is
+    /// consumed.
     pub fn new(outcome: ObservedOutcome, evidence_digest: [u8; 32]) -> Self {
         Self {
             outcome,
@@ -340,11 +418,22 @@ impl Observation {
 }
 
 impl<K: CapabilityKind> Action<K, Executed> {
-    /// Record external observation using a separately issued one-shot observer
-    /// grant whose scope covers the action.
+    /// Domain-separated digest an observer grant must bind. It includes the
+    /// exact action authorization and the trusted executor's output digest.
+    pub fn observation_binding(&self) -> [u8; 32] {
+        transition_binding(
+            b"symthaea-ai-assurance/observe-v1\0",
+            self.id,
+            self.descriptor.fingerprint(),
+            &[&self.state.authorization_binding, &self.state.output_digest],
+        )
+    }
+
+    /// Record external observation using a separately issued, exact-execution
+    /// observer grant whose scope covers the action.
     pub fn observe(
         self,
-        observer: OneShotCapability<Observe>,
+        observer: BoundOneShotCapability<Observe>,
         observation: Observation,
         now: SystemTime,
     ) -> Result<Action<K, Observed>, ActionError> {
@@ -357,7 +446,15 @@ impl<K: CapabilityKind> Action<K, Executed> {
             });
         }
 
-        let observer_grant = observer.into_metadata();
+        let expected_binding = self.observation_binding();
+        if observer.binding() != expected_binding {
+            return Err(ActionError::ObservationBindingMismatch {
+                expected: expected_binding,
+                actual: observer.binding(),
+            });
+        }
+
+        let (observer_grant, observation_binding) = observer.into_parts();
         Ok(Action {
             id: self.id,
             actor: self.actor,
@@ -365,8 +462,10 @@ impl<K: CapabilityKind> Action<K, Executed> {
             state: Observed {
                 risk: self.state.risk,
                 grant: self.state.grant,
+                authorization_binding: self.state.authorization_binding,
                 output_digest: self.state.output_digest,
                 observer_grant,
+                observation_binding,
                 observation,
             },
             _kind: PhantomData,
@@ -395,8 +494,10 @@ pub struct EvidenceReceipt {
     capability_kind: &'static str,
     risk: ActionRisk,
     authorization_grant_id: GrantId,
+    authorization_binding: [u8; 32],
     observer_grant_id: GrantId,
     observer: PrincipalId,
+    observation_binding: [u8; 32],
     output_digest: [u8; 32],
     observation: Observation,
     resolution: ResolutionDecision,
@@ -438,6 +539,11 @@ impl EvidenceReceipt {
         self.authorization_grant_id
     }
 
+    /// Exact action transition digest authorized by the grant.
+    pub fn authorization_binding(&self) -> [u8; 32] {
+        self.authorization_binding
+    }
+
     /// One-shot grant consumed to authorize observation.
     pub fn observer_grant_id(&self) -> GrantId {
         self.observer_grant_id
@@ -446,6 +552,11 @@ impl EvidenceReceipt {
     /// Principal that held observation authority.
     pub fn observer(&self) -> PrincipalId {
         self.observer
+    }
+
+    /// Exact execution transition digest authorized for observation.
+    pub fn observation_binding(&self) -> [u8; 32] {
+        self.observation_binding
     }
 
     /// Digest reported by the trusted executor adapter.
@@ -478,8 +589,10 @@ impl<K: CapabilityKind> Action<K, Observed> {
             capability_kind: K::NAME,
             risk: self.state.risk,
             authorization_grant_id: self.state.grant.grant_id(),
+            authorization_binding: self.state.authorization_binding,
             observer_grant_id: self.state.observer_grant.grant_id(),
             observer: self.state.observer_grant.subject(),
+            observation_binding: self.state.observation_binding,
             output_digest: self.state.output_digest,
             observation: self.state.observation,
             resolution,
@@ -527,12 +640,26 @@ pub enum ActionError {
         /// Scope required by the action.
         required: Scope,
     },
+    /// Exact action transition digest does not match the grant binding.
+    BindingMismatch {
+        /// Digest required by this action instance and risk state.
+        expected: [u8; 32],
+        /// Digest bound into the supplied grant.
+        actual: [u8; 32],
+    },
     /// Observer authority does not cover the action scope.
     ObservationScopeMismatch {
         /// Scope supplied by observer authority.
         granted: Scope,
         /// Scope required by the action.
         required: Scope,
+    },
+    /// Exact execution digest does not match the observer grant binding.
+    ObservationBindingMismatch {
+        /// Digest required by this exact execution result.
+        expected: [u8; 32],
+        /// Digest bound into the supplied observer grant.
+        actual: [u8; 32],
     },
 }
 
@@ -542,8 +669,12 @@ impl fmt::Display for ActionError {
             Self::Grant(error) => write!(f, "grant validation failed: {error}"),
             Self::WrongSubject { .. } => write!(f, "grant subject does not match action actor"),
             Self::ScopeMismatch { .. } => write!(f, "execution grant does not cover action scope"),
+            Self::BindingMismatch { .. } => write!(f, "execution grant is bound to another action"),
             Self::ObservationScopeMismatch { .. } => {
                 write!(f, "observer grant does not cover action scope")
+            }
+            Self::ObservationBindingMismatch { .. } => {
+                write!(f, "observer grant is bound to another execution")
             }
         }
     }
@@ -562,41 +693,50 @@ mod tests {
     }
 
     #[test]
-    fn authorization_binds_subject_scope_and_grant_lineage() {
+    fn authorization_binds_subject_scope_action_and_grant_lineage() {
         let issuer = AuthorityRoot::new(PrincipalId::new());
         let actor = PrincipalId::new();
         let requested = scope(&["symthaea", "src"]);
-        let grant = issuer.issue_one_shot::<Write>(actor, scope(&["symthaea"]), None);
-        let grant_id = grant.metadata().grant_id();
-
-        let authorized = Action::<Write, Proposed>::propose(
+        let action = Action::<Write, Proposed>::propose(
             actor,
             "edit-source",
             requested,
             b"canonical-patch-v1",
         )
-        .assess(ActionRisk::Reversible)
-        .authorize(grant, SystemTime::now())
-        .unwrap();
+        .assess(ActionRisk::Reversible);
+        let binding = action.authorization_binding();
+        let grant = issuer.issue_bound_one_shot::<Write>(
+            actor,
+            scope(&["symthaea"]),
+            None,
+            binding,
+        );
+        let grant_id = grant.metadata().grant_id();
 
+        let authorized = action.authorize(grant, SystemTime::now()).unwrap();
         assert_eq!(authorized.grant_id(), grant_id);
+        assert_eq!(authorized.authorization_binding(), binding);
     }
 
     #[test]
     fn wrong_subject_fails_closed() {
         let issuer = AuthorityRoot::new(PrincipalId::new());
         let actor = PrincipalId::new();
-        let grant = issuer.issue_one_shot::<Write>(PrincipalId::new(), scope(&["symthaea"]), None);
-
-        let result = Action::<Write, Proposed>::propose(
+        let action = Action::<Write, Proposed>::propose(
             actor,
             "edit-source",
             scope(&["symthaea", "src"]),
             b"patch",
         )
-        .assess(ActionRisk::Reversible)
-        .authorize(grant, SystemTime::now());
+        .assess(ActionRisk::Reversible);
+        let grant = issuer.issue_bound_one_shot::<Write>(
+            PrincipalId::new(),
+            scope(&["symthaea"]),
+            None,
+            action.authorization_binding(),
+        );
 
+        let result = action.authorize(grant, SystemTime::now());
         assert!(matches!(result, Err(ActionError::WrongSubject { .. })));
     }
 
@@ -604,18 +744,51 @@ mod tests {
     fn action_scope_cannot_exceed_grant_scope() {
         let issuer = AuthorityRoot::new(PrincipalId::new());
         let actor = PrincipalId::new();
-        let grant = issuer.issue_one_shot::<Write>(actor, scope(&["symthaea", "scratch"]), None);
-
-        let result = Action::<Write, Proposed>::propose(
+        let action = Action::<Write, Proposed>::propose(
             actor,
             "edit-source",
             scope(&["symthaea", "src"]),
             b"patch",
         )
-        .assess(ActionRisk::Reversible)
-        .authorize(grant, SystemTime::now());
+        .assess(ActionRisk::Reversible);
+        let grant = issuer.issue_bound_one_shot::<Write>(
+            actor,
+            scope(&["symthaea", "scratch"]),
+            None,
+            action.authorization_binding(),
+        );
 
+        let result = action.authorize(grant, SystemTime::now());
         assert!(matches!(result, Err(ActionError::ScopeMismatch { .. })));
+    }
+
+    #[test]
+    fn bound_grant_cannot_authorize_a_different_action() {
+        let issuer = AuthorityRoot::new(PrincipalId::new());
+        let actor = PrincipalId::new();
+        let first = Action::<Write, Proposed>::propose(
+            actor,
+            "edit-source",
+            scope(&["symthaea", "src"]),
+            b"patch-a",
+        )
+        .assess(ActionRisk::Reversible);
+        let second = Action::<Write, Proposed>::propose(
+            actor,
+            "edit-source",
+            scope(&["symthaea", "src"]),
+            b"patch-b",
+        )
+        .assess(ActionRisk::Reversible);
+        let grant = issuer.issue_bound_one_shot::<Write>(
+            actor,
+            scope(&["symthaea"]),
+            None,
+            first.authorization_binding(),
+        );
+
+        let result = second.authorize(grant, SystemTime::now());
+        assert!(matches!(result, Err(ActionError::BindingMismatch { .. })));
     }
 
     #[test]
@@ -623,22 +796,53 @@ mod tests {
         let now = SystemTime::now();
         let issuer = AuthorityRoot::new(PrincipalId::new());
         let actor = PrincipalId::new();
-        let grant = issuer.issue_one_shot::<Read>(
-            actor,
-            scope(&["symthaea"]),
-            Some(now - Duration::from_secs(1)),
-        );
-
-        let result = Action::<Read, Proposed>::propose(
+        let action = Action::<Read, Proposed>::propose(
             actor,
             "read-source",
             scope(&["symthaea", "src"]),
             b"src/lib.rs",
         )
-        .assess(ActionRisk::Observation)
-        .authorize(grant, now);
+        .assess(ActionRisk::Observation);
+        let grant = issuer.issue_bound_one_shot::<Read>(
+            actor,
+            scope(&["symthaea"]),
+            Some(now - Duration::from_secs(1)),
+            action.authorization_binding(),
+        );
 
-        assert!(matches!(result, Err(ActionError::Grant(GrantError::Expired { .. }))));
+        let result = action.authorize(grant, now);
+        assert!(matches!(
+            result,
+            Err(ActionError::Grant(GrantError::Expired { .. }))
+        ));
+    }
+
+    #[test]
+    fn authorization_expiry_is_rechecked_at_execution() {
+        let now = SystemTime::now();
+        let issuer = AuthorityRoot::new(PrincipalId::new());
+        let actor = PrincipalId::new();
+        let action = Action::<Write, Proposed>::propose(
+            actor,
+            "edit-source",
+            scope(&["symthaea", "src"]),
+            b"patch",
+        )
+        .assess(ActionRisk::Reversible);
+        let expires_at = now + Duration::from_secs(1);
+        let grant = issuer.issue_bound_one_shot::<Write>(
+            actor,
+            scope(&["symthaea"]),
+            Some(expires_at),
+            action.authorization_binding(),
+        );
+        let authorized = action.authorize(grant, now).unwrap();
+
+        let result = authorized.record_execution([7_u8; 32], now + Duration::from_secs(2));
+        assert!(matches!(
+            result,
+            Err(ActionError::Grant(GrantError::Expired { .. }))
+        ));
     }
 
     #[test]
@@ -647,22 +851,35 @@ mod tests {
         let actor = PrincipalId::new();
         let observer = PrincipalId::new();
         let action_scope = scope(&["symthaea", "src"]);
-        let execution_grant = root.issue_one_shot::<Write>(actor, scope(&["symthaea"]), None);
-        let observation_grant = root.issue_one_shot::<Observe>(observer, scope(&["symthaea"]), None);
-        let execution_grant_id = execution_grant.metadata().grant_id();
-        let observation_grant_id = observation_grant.metadata().grant_id();
-
-        let executed = Action::<Write, Proposed>::propose(
+        let action = Action::<Write, Proposed>::propose(
             actor,
             "edit-source",
             action_scope.clone(),
             b"patch-v1",
         )
-        .assess(ActionRisk::Reversible)
-        .authorize(execution_grant, SystemTime::now())
-        .unwrap()
-        .record_execution([7_u8; 32]);
+        .assess(ActionRisk::Reversible);
+        let authorization_binding = action.authorization_binding();
+        let execution_grant = root.issue_bound_one_shot::<Write>(
+            actor,
+            scope(&["symthaea"]),
+            None,
+            authorization_binding,
+        );
+        let execution_grant_id = execution_grant.metadata().grant_id();
+        let executed = action
+            .authorize(execution_grant, SystemTime::now())
+            .unwrap()
+            .record_execution([7_u8; 32], SystemTime::now())
+            .unwrap();
 
+        let observation_binding = executed.observation_binding();
+        let observation_grant = root.issue_bound_one_shot::<Observe>(
+            observer,
+            scope(&["symthaea"]),
+            None,
+            observation_binding,
+        );
+        let observation_grant_id = observation_grant.metadata().grant_id();
         let observed = executed
             .observe(
                 observation_grant,
@@ -673,7 +890,9 @@ mod tests {
         let (resolved, receipt) = observed.resolve(ResolutionDecision::Confirmed);
 
         assert_eq!(receipt.authorization_grant_id(), execution_grant_id);
+        assert_eq!(receipt.authorization_binding(), authorization_binding);
         assert_eq!(receipt.observer_grant_id(), observation_grant_id);
+        assert_eq!(receipt.observation_binding(), observation_binding);
         assert_eq!(receipt.observer(), observer);
         assert_eq!(receipt.actor(), actor);
         assert_eq!(receipt.action_scope(), &action_scope);
@@ -683,11 +902,86 @@ mod tests {
     }
 
     #[test]
+    fn observer_grant_cannot_be_replayed_on_another_execution() {
+        let root = AuthorityRoot::new(PrincipalId::new());
+        let actor = PrincipalId::new();
+        let observer = PrincipalId::new();
+
+        let first = Action::<Write, Proposed>::propose(
+            actor,
+            "edit-source",
+            scope(&["symthaea", "src"]),
+            b"patch-a",
+        )
+        .assess(ActionRisk::Reversible);
+        let first_grant = root.issue_bound_one_shot::<Write>(
+            actor,
+            scope(&["symthaea"]),
+            None,
+            first.authorization_binding(),
+        );
+        let first_executed = first
+            .authorize(first_grant, SystemTime::now())
+            .unwrap()
+            .record_execution([1_u8; 32], SystemTime::now())
+            .unwrap();
+        let observer_grant = root.issue_bound_one_shot::<Observe>(
+            observer,
+            scope(&["symthaea"]),
+            None,
+            first_executed.observation_binding(),
+        );
+
+        let second = Action::<Write, Proposed>::propose(
+            actor,
+            "edit-source",
+            scope(&["symthaea", "src"]),
+            b"patch-b",
+        )
+        .assess(ActionRisk::Reversible);
+        let second_grant = root.issue_bound_one_shot::<Write>(
+            actor,
+            scope(&["symthaea"]),
+            None,
+            second.authorization_binding(),
+        );
+        let second_executed = second
+            .authorize(second_grant, SystemTime::now())
+            .unwrap()
+            .record_execution([2_u8; 32], SystemTime::now())
+            .unwrap();
+
+        let result = second_executed.observe(
+            observer_grant,
+            Observation::new(ObservedOutcome::Success, [3_u8; 32]),
+            SystemTime::now(),
+        );
+        assert!(matches!(
+            result,
+            Err(ActionError::ObservationBindingMismatch { .. })
+        ));
+    }
+
+    #[test]
     fn action_fingerprint_changes_when_payload_changes() {
         let actor = PrincipalId::new();
         let scope = scope(&["symthaea", "src"]);
         let first = Action::<Write, Proposed>::propose(actor, "edit", scope.clone(), b"patch-a");
         let second = Action::<Write, Proposed>::propose(actor, "edit", scope, b"patch-b");
-        assert_ne!(first.descriptor().fingerprint(), second.descriptor().fingerprint());
+        assert_ne!(
+            first.descriptor().fingerprint(),
+            second.descriptor().fingerprint()
+        );
+    }
+
+    #[test]
+    fn authorization_binding_changes_with_risk_and_action_instance() {
+        let actor = PrincipalId::new();
+        let scope = scope(&["symthaea", "src"]);
+        let low = Action::<Write, Proposed>::propose(actor, "edit", scope.clone(), b"same")
+            .assess(ActionRisk::Reversible);
+        let high = Action::<Write, Proposed>::propose(actor, "edit", scope, b"same")
+            .assess(ActionRisk::Destructive);
+        assert_ne!(low.authorization_binding(), high.authorization_binding());
     }
 }

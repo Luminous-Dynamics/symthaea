@@ -16,9 +16,11 @@ Assume the proposing model can be mistaken, adversarially prompted, overconfiden
 
 - execute before authorization;
 - reuse one-shot authority;
-- use expired authority;
+- use authority after expiry;
 - widen a delegated scope;
 - substitute a different action after approval;
+- substitute a different risk classification after approval;
+- reuse observation authority on another execution;
 - resolve an outcome without external observation;
 - self-grade success;
 - turn read authority into write authority;
@@ -35,13 +37,15 @@ The initial research contract is:
 1. **A1 — Explicit authority:** execution requires an explicit authority object.
 2. **A2 — No widening:** delegated authority may be equal to or narrower than the authority from which it was derived, never broader.
 3. **A3 — One-shot use:** one-shot authority cannot be reused through the safe API.
-4. **A4 — Expiry:** expired authority cannot authorize an action.
+4. **A4 — Expiry:** expired authority cannot authorize or later execute an action.
 5. **A5 — Scope binding:** authority is bound to an explicit scope.
-6. **A6 — Resolution is observational:** resolution authority does not silently imply execution authority.
-7. **A7 — No self-grading:** externally resolved outcomes require an observation/evidence transition.
-8. **A8 — Typed lifecycle:** invalid action-state transitions are unrepresentable through the public API.
-9. **A9 — Lineage:** evidence identifies the action and grant lineage that produced it.
-10. **A10 — Fail closed:** failed validation does not produce an executable/authorized state.
+6. **A6 — Exact-action binding:** execution authority is bound to the exact action instance, risk state, capability class, and descriptor fingerprint.
+7. **A7 — Resolution is observational:** resolution authority does not silently imply execution authority.
+8. **A8 — Exact-observation binding:** observer authority is bound to the exact executed action and output digest.
+9. **A9 — No self-grading:** externally resolved outcomes require an independently authorized observation transition.
+10. **A10 — Typed lifecycle:** invalid action-state transitions are unrepresentable through the public API.
+11. **A11 — Lineage:** evidence identifies the action, execution grant, observer grant, and transition bindings that produced it.
+12. **A12 — Fail closed:** failed validation does not produce an executable/authorized state.
 
 ## Action lifecycle
 
@@ -66,7 +70,7 @@ Action<Observed>
 Action<Resolved>
 ```
 
-The public API intentionally omits shortcuts such as `Action<Proposed>::execute` or `Action<Executed>::resolve`.
+The public API intentionally omits shortcuts such as `Action<Proposed>::record_execution` or `Action<Executed>::resolve`.
 
 ## Authority model
 
@@ -79,7 +83,9 @@ Capabilities are affine Rust values: they are not `Copy`, and one-shot grants ar
 - a capability kind marker;
 - a delegation depth.
 
-The v0.1 kernel begins with data/resource scopes and does not grant ambient process authority. In particular, a generic shell string is not an assurance primitive.
+Exact transitions use `BoundOneShotCapability<K>`, which additionally carries a 32-byte domain-separated transition binding. An action authorization binding covers the action id, immutable action fingerprint, and risk state. An observation binding additionally covers the authorization binding and executor output digest. A grant for one transition therefore cannot be replayed onto another transition through the safe API.
+
+The v0.1 kernel begins with logical data/resource scopes and does not grant ambient process authority. In particular, a generic shell string is not an assurance primitive.
 
 ## Relationship to existing Symthaea layers
 
@@ -100,6 +106,6 @@ The v0.1 kernel begins with data/resource scopes and does not grant ambient proc
 
 ## Qualification strategy
 
-PR 1 is foundation-only: threat model, capability primitives, typestate actions, and adversarial/compile-fail tests. MAGI runtime behavior changes belong in a separate PR so architectural review and behavioral hardening remain independently reversible.
+PR 1 is foundation-only: threat model, capability primitives, typestate actions, exact-transition binding, and adversarial/compile-fail tests. MAGI runtime behavior changes belong in a separate PR so architectural review and behavioral hardening remain independently reversible.
 
 Later qualification should measure where attacks are stopped: compile time, assurance validation, sandbox admission, runtime-safe failure, or escape. Any escape is a critical failure for the tested invariant.
