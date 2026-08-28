@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-ai-assurance"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Project-neutral capability, authority, and typed action-lifecycle primitives for trustworthy autonomous systems"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["ai", "capability-security", "agents", "safety", "typestate"]
+categories = ["development-tools", "authentication"]
+
+[dependencies]
+uuid = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
