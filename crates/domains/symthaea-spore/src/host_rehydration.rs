@@ -371,14 +371,20 @@ impl HostRehydrationManifest {
                     }
                 }
                 PostInstallCheckKind::SecureBootPosture
-                    if check.expectation_digest.as_deref().is_none_or(str::is_empty) =>
+                    if check
+                        .expectation_digest
+                        .as_deref()
+                        .is_none_or(str::is_empty) =>
                 {
                     errors.push(HostRehydrationManifestError::MissingSecureBootExpectation {
                         check_id: check.check_id.clone(),
                     });
                 }
                 PostInstallCheckKind::NetworkIsolation
-                    if check.expectation_digest.as_deref().is_none_or(str::is_empty) =>
+                    if check
+                        .expectation_digest
+                        .as_deref()
+                        .is_none_or(str::is_empty) =>
                 {
                     errors.push(
                         HostRehydrationManifestError::MissingNetworkIsolationExpectation {
@@ -561,11 +567,7 @@ impl HostRehydrationReceipt {
     ) -> bool {
         evidence.is_some_and(|evidence| {
             &evidence.claim == expected_claim
-                && evidence.is_bound_to(
-                    manifest,
-                    self.started_at_unix_ms,
-                    self.finished_at_unix_ms,
-                )
+                && evidence.is_bound_to(manifest, self.started_at_unix_ms, self.finished_at_unix_ms)
         })
     }
 
@@ -617,8 +619,9 @@ impl HostRehydrationReceipt {
         if self.system_declaration != manifest.system_declaration
             || !self.system_declaration.is_complete()
         {
-            foundational_unproven
-                .push("applied system declaration does not match the pinned declaration".to_string());
+            foundational_unproven.push(
+                "applied system declaration does not match the pinned declaration".to_string(),
+            );
         }
         if self.started_at_unix_ms > self.finished_at_unix_ms {
             foundational_unproven.push("receipt time window is invalid".to_string());
@@ -626,8 +629,9 @@ impl HostRehydrationReceipt {
         if !self.observed_target.is_complete()
             || !manifest.target.matches_observation(&self.observed_target)
         {
-            foundational_unproven
-                .push("observed recovery target does not match manifest target identity".to_string());
+            foundational_unproven.push(
+                "observed recovery target does not match manifest target identity".to_string(),
+            );
         }
 
         match self.preparation.result {
@@ -647,8 +651,9 @@ impl HostRehydrationReceipt {
                 failed.push("target preparation failed".to_string());
             }
             PreparationResult::Prepared | PreparationResult::Failed => {
-                unproven
-                    .push("target preparation result lacks claim-bound exercise evidence".to_string());
+                unproven.push(
+                    "target preparation result lacks claim-bound exercise evidence".to_string(),
+                );
             }
             PreparationResult::NotAttempted | PreparationResult::Unknown => {
                 unproven.push("target was not proven cleanly prepared".to_string());
@@ -692,9 +697,8 @@ impl HostRehydrationReceipt {
             {
                 failed.push("protected data restore failed".to_string());
             }
-            (Some(_), RestoreResult::Failed) => unproven.push(
-                "protected restore failure lacks claim-bound exercise evidence".to_string(),
-            ),
+            (Some(_), RestoreResult::Failed) => unproven
+                .push("protected restore failure lacks claim-bound exercise evidence".to_string()),
             (Some(_), RestoreResult::NotRequested | RestoreResult::Unknown) => {
                 unproven.push("required protected data restore was not proven".to_string());
             }
@@ -717,7 +721,12 @@ impl HostRehydrationReceipt {
                 ));
                 continue;
             };
-            if counts.get(result.check_id.as_str()).copied().unwrap_or_default() != 1 {
+            if counts
+                .get(result.check_id.as_str())
+                .copied()
+                .unwrap_or_default()
+                != 1
+            {
                 continue;
             }
             if !result.is_complete() || !result.matches_spec(spec) {
@@ -931,20 +940,24 @@ mod tests {
                 PostInstallCheckKind::SystemGenerationMatchesDeclaration
             )
         });
-        assert!(manifest
-            .validation_errors()
-            .contains(&HostRehydrationManifestError::MissingGenerationVerification));
+        assert!(
+            manifest
+                .validation_errors()
+                .contains(&HostRehydrationManifestError::MissingGenerationVerification)
+        );
     }
 
     #[test]
     fn restore_manifest_requires_data_integrity_check() {
         let mut manifest = manifest(true);
-        manifest.post_install_checks.retain(|check| {
-            !matches!(&check.kind, PostInstallCheckKind::ProtectedDataIntegrity)
-        });
-        assert!(manifest.validation_errors().contains(
-            &HostRehydrationManifestError::MissingProtectedDataIntegrityCheck
-        ));
+        manifest
+            .post_install_checks
+            .retain(|check| !matches!(&check.kind, PostInstallCheckKind::ProtectedDataIntegrity));
+        assert!(
+            manifest
+                .validation_errors()
+                .contains(&HostRehydrationManifestError::MissingProtectedDataIntegrityCheck)
+        );
     }
 
     #[test]
