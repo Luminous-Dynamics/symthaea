@@ -33,7 +33,21 @@ The v1 algorithm is deliberately auditable:
 7. require the latest source-supplied uncertainty interval to be clearly separated from the baseline threshold envelope before returning `ChangeCandidate`;
 8. otherwise return `WithinBaseline`, `InsufficientBaseline`, or an explicit abstention reason.
 
-The default screen configuration is only a convenience profile. Its thresholds are **not universal epidemiological or clinical cutoffs**. A real source/deployment should preregister and validate screening parameters against its own historical process and false-alert tolerance.
+Screening thresholds are **not universal epidemiological or clinical cutoffs**. A real source/deployment should explicitly construct and preregister its `SurveillanceScreenConfig` against its own historical process and false-alert tolerance. Evidence-bearing code should not rely on an implicit/default profile.
+
+### Evidence-bearing receipt
+
+`assess_latest_change_with_receipt` is the preferred entry point when a result will enter an evidence ledger or later reasoning stage.
+
+Its `SurveillanceScreenReceipt` binds the assessment to:
+
+- `robust-median-mad-interval-guard-v1`, the stable semantic algorithm identifier;
+- the exact caller-supplied `SurveillanceScreenConfig`;
+- the baseline series' start/end timestamps;
+- the latest observation timestamp;
+- the complete `SurveillanceAssessment`.
+
+The receipt does not add epistemic strength or authority. It makes the screening method and configuration auditable/reproducible instead of preserving only a conclusion label.
 
 ### Explicit abstention
 
@@ -81,7 +95,7 @@ The crate remains lightweight and has no `symthaea-core` dependency. Aggregate s
 ```rust
 use symthaea_epidemiology::{
     ScreeningDisposition, SurveillancePoint, SurveillanceScreenConfig,
-    assess_latest_change,
+    assess_latest_change_with_receipt,
 };
 
 let history = [
@@ -93,9 +107,9 @@ let history = [
 ];
 let latest = SurveillancePoint::observed(6, 20.0, 19.0, 21.0).unwrap();
 let config = SurveillanceScreenConfig::new(5, 3.0).unwrap();
-let assessment = assess_latest_change(&history, latest, config).unwrap();
+let receipt = assess_latest_change_with_receipt(&history, latest, config).unwrap();
 assert!(matches!(
-    assessment.disposition,
+    receipt.assessment.disposition,
     ScreeningDisposition::ChangeCandidate(_)
 ));
 ```
