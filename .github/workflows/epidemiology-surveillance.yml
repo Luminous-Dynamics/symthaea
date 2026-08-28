@@ -1,0 +1,47 @@
+name: Epidemiology Surveillance Screen
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-epidemiology/**"
+      - "crates/domains/symthaea-statistics/**"
+      - ".github/workflows/epidemiology-surveillance.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-epidemiology/**"
+      - "crates/domains/symthaea-statistics/**"
+      - ".github/workflows/epidemiology-surveillance.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  surveillance-screen:
+    name: Conservative aggregate surveillance screening
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-epidemiology -- --check
+
+      - name: Run epidemiology tests
+        run: cargo test -p symthaea-epidemiology
+
+      - name: Run documentation tests
+        run: cargo test -p symthaea-epidemiology --doc
+
+      - name: Run Clippy
+        run: cargo clippy -p symthaea-epidemiology --all-targets -- -D warnings
+
+      - name: Check pure-domain WASM portability
+        run: cargo check -p symthaea-epidemiology --target wasm32-unknown-unknown
