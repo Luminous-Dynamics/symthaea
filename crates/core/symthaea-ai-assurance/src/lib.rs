@@ -8,16 +8,18 @@
 //! they receive.
 //!
 //! [`capability`] and [`action`] expose the low-level affine capability and
-//! typestate mechanics. Security-sensitive integrations should normally use the
-//! [`trusted`] layer as their admission path: it binds actions and grants to a
-//! host-selected authority domain and revocation epoch, rejects unrelated roots,
-//! and preserves execution/observer trust lineage in evidence receipts.
+//! typestate mechanics. [`trusted`] binds actions and grants to host-selected
+//! authority domains and revocation epochs. Security-sensitive concrete tool
+//! integrations should normally use [`host`], which additionally retains the
+//! host-selected verifiers internally and removes caller-selected validation
+//! time from guarded transitions.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 
 pub mod action;
 pub mod capability;
+pub mod host;
 pub mod trusted;
 
 pub use action::{
@@ -30,6 +32,7 @@ pub use capability::{
     GrantId, GrantMetadata, Network, Observe, OneShotCapability, PrincipalId, Read, Scope,
     ScopeError, UpdateModel, Write,
 };
+pub use host::{RuntimeAction, TrustedRuntime};
 pub use trusted::{
     AuthorityDomain, AuthorityDomainId, AuthorityEpoch, AuthorityVerifier, TrustError,
     TrustedAction, TrustedBoundOneShotCapability, TrustedEvidenceReceipt,
