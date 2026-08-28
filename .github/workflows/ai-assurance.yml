@@ -1,0 +1,51 @@
+name: AI Assurance
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-ai-assurance/**'
+      - 'docs/architecture/AI_ASSURANCE_*.md'
+      - '.github/workflows/ai-assurance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'crates/core/symthaea-ai-assurance/**'
+      - 'docs/architecture/AI_ASSURANCE_*.md'
+      - '.github/workflows/ai-assurance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-assurance-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  qualify:
+    name: Qualify authority kernel
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Verify locked workspace resolution
+        run: cargo metadata --locked --no-deps --format-version 1 > /dev/null
+
+      - name: Test assurance kernel, integration attacks, and compile-fail docs
+        run: cargo test --locked -p symthaea-ai-assurance
+
+      - name: Clippy assurance kernel
+        run: cargo clippy --locked -p symthaea-ai-assurance --all-targets -- -D warnings
