@@ -11,10 +11,12 @@
 //! typestate mechanics. [`trusted`] binds actions and grants to host-selected
 //! authority domains and revocation epochs. [`resolution`] provides distinct
 //! final-interpretation authority. [`resource`] binds logical scopes to concrete
-//! adapter-resolved identities and retained handles. Security-sensitive concrete
-//! tool integrations should normally use [`host`] together with [`resource`],
-//! so trust anchors, validation time, and concrete resource resolution remain
-//! host-owned rather than model-selected.
+//! adapter-resolved identities and retained handles. [`policy`] records why
+//! trusted policy admitted an action and carries that provenance into exact
+//! resource-bound execution authority. Security-sensitive concrete tool
+//! integrations should normally compose [`host`], [`resource`], and [`policy`]
+//! so trust anchors, validation time, concrete resources, and policy admission
+//! remain host-owned rather than model-selected.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
@@ -22,6 +24,7 @@
 pub mod action;
 pub mod capability;
 pub mod host;
+pub mod policy;
 pub mod resolution;
 pub mod resource;
 pub mod trusted;
@@ -38,6 +41,12 @@ pub use capability::{
 };
 pub use host::{
     ResolutionEvidenceReceipt, ResolutionError, RuntimeAction, TrustedRuntime,
+};
+pub use policy::{
+    ApprovalEvidence, PolicyAdmission, PolicyAdmissionReceipt, PolicyAuthorizationEvidence,
+    PolicyDescriptor, PolicyError, PolicyEvaluatorDomain, PolicyExecutionDomain, PolicyGrant,
+    PolicyMode, PolicyResourceAction, PolicyResourceEvidenceReceipt, PolicyResourceRuntime,
+    PolicyVerifier,
 };
 pub use resolution::{ResolutionAuthorityDomain, ResolutionGrant, ResolutionVerifier};
 pub use resource::{
