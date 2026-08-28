@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-blender-bridge"
+version = "0.1.0"
+edition = "2024"
+description = "Proposal-first Blender protocol bridge for Symthaea artistic embodiment"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-art-world = { path = "../../domains/symthaea-art-world" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
