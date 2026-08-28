@@ -13,6 +13,26 @@
 //! A future lower-level capability marker can replace the private transport once
 //! the resolution semantics are stable; that migration should not change this
 //! public host-facing distinction.
+//!
+//! ```compile_fail
+//! use symthaea_ai_assurance::{
+//!     AuthorityDomain, Observe, PrincipalId, ResolutionGrant, Scope,
+//! };
+//!
+//! fn requires_resolution_authority(_: ResolutionGrant) {}
+//!
+//! let observation = AuthorityDomain::new(PrincipalId::new());
+//! let grant = observation.issue_bound_one_shot::<Observe>(
+//!     PrincipalId::new(),
+//!     Scope::new("workspace", ["symthaea"]).unwrap(),
+//!     None,
+//!     [0; 32],
+//! );
+//!
+//! // Observation authority is a different public type and cannot authorize
+//! // final interpretation.
+//! requires_resolution_authority(grant);
+//! ```
 
 use crate::capability::{GrantMetadata, Observe, PrincipalId, Scope};
 use crate::trusted::{
