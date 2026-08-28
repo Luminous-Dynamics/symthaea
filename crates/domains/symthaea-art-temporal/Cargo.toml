@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-art-temporal"
+version = "0.1.0"
+edition = "2024"
+description = "Temporal render and cinematic planning contracts for Symthaea studios"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-art-world = { path = "../symthaea-art-world" }
+serde = { workspace = true }
+thiserror = { workspace = true }
