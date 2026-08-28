@@ -4,5 +4,8 @@
 
 pub use symthaea_art_world::{IntentId, ProposalId, RevisionId};
 
+mod engagement;
 mod practice;
+
+pub use engagement::*;
 pub use practice::*;
