@@ -4,87 +4,71 @@
 //! Host-owned trusted runtime for security-sensitive agent execution.
 //!
 //! [`crate::trusted`] binds actions to authority domains and revocation epochs,
-//! but its low-level transition methods intentionally accept an
-//! [`crate::AuthorityVerifier`] and [`std::time::SystemTime`] from the caller.
-//! That is useful for deterministic assurance mechanics, but it is too flexible
-//! for a concrete autonomous-agent execution boundary: model-controlled call
-//! data must not choose either the trust anchor or the time used for expiry.
+//! but its lower-level transition methods intentionally accept verifier and time
+//! values from the caller. That is useful for deterministic assurance mechanics,
+//! but too flexible for a concrete autonomous-agent execution boundary.
 //!
-//! This module adds the stricter integration surface. [`TrustedRuntime`] stores
-//! the host-selected execution and observation verifiers internally. Actions
-//! admitted through it carry those verifiers across typestate transitions, and
-//! all expiry checks use a host-owned wall-clock floor. Callers supply proposal
-//! data, grants, executor output digests, and observation evidence -- never a
-//! verifier or a validation timestamp.
+//! This module provides the stricter integration surface. [`TrustedRuntime`]
+//! stores host-selected execution, observation, and final-resolution trust
+//! anchors internally. Actions admitted through it carry those choices across
+//! typestate transitions, and all expiry checks use a host-owned wall-clock
+//! floor. Model/planner call data never chooses a verifier or validation time.
+//!
+//! Final resolution is separately authorized. An independently observed action
+//! exposes a deterministic resolution binding over the exact action lineage,
+//! observation commitment, and proposed [`ResolutionDecision`]. The transition
+//! to `Resolved` consumes an opaque one-shot [`crate::ResolutionGrant`] from the
+//! runtime-pinned resolver domain. A grant for one decision or observed lineage
+//! cannot be substituted onto another.
 //!
 //! The clock floor is non-decreasing for the lifetime of the runtime. A local
 //! wall-clock rollback therefore cannot resurrect authority that has already
 //! aged past a later observed time. Durable anti-rollback across process restart
 //! remains a deployment responsibility for a later HAL/Xenia-backed trusted
 //! clock or persisted monotonic epoch.
-//!
-//! ```compile_fail
-//! use std::time::SystemTime;
-//! use symthaea_ai_assurance::{
-//!     ActionRisk, AuthorityDomain, PrincipalId, Scope, TrustedRuntime, Write,
-//! };
-//!
-//! let execution = AuthorityDomain::new(PrincipalId::new());
-//! let observation = AuthorityDomain::new(PrincipalId::new());
-//! let runtime = TrustedRuntime::new(execution.verifier(), observation.verifier());
-//! let actor = PrincipalId::new();
-//! let scope = Scope::new("workspace", ["symthaea"]).unwrap();
-//! let action = runtime
-//!     .admit::<Write>(actor, "edit", scope.clone(), b"patch")
-//!     .assess(ActionRisk::Reversible);
-//! let grant = execution.issue_bound_one_shot::<Write>(
-//!     actor,
-//!     scope,
-//!     None,
-//!     action.authorization_binding(),
-//! );
-//!
-//! // The strict host API deliberately accepts neither a verifier nor a time.
-//! let _ = action.authorize(grant, SystemTime::UNIX_EPOCH);
-//! ```
 
 use crate::action::{
-    ActionDescriptor, ActionId, ActionRisk, Authorized, Executed, Observation, Observed, Proposed,
-    ResolutionDecision, Resolved, RiskAssessed,
+    ActionDescriptor, ActionId, ActionRisk, Authorized, Executed, Observation, Observed,
+    ObservedOutcome, Proposed, ResolutionDecision, Resolved, RiskAssessed,
 };
-use crate::capability::{CapabilityKind, Observe, PrincipalId, Scope};
+use crate::capability::{CapabilityKind, GrantId, Observe, PrincipalId, Scope};
+use crate::resolution::{ResolutionGrant, ResolutionVerifier};
 use crate::trusted::{
-    AuthorityDomainId, AuthorityVerifier, TrustError, TrustedAction, TrustedBoundOneShotCapability,
-    TrustedEvidenceReceipt,
+    AuthorityDomainId, AuthorityEpoch, AuthorityVerifier, TrustError, TrustedAction,
+    TrustedBoundOneShotCapability, TrustedEvidenceReceipt,
 };
+use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
-/// Host-owned runtime boundary for one configured execution trust domain and
-/// one configured observation trust domain.
+/// Host-owned runtime boundary for configured execution, observation, and final
+/// resolution trust domains.
 ///
 /// The runtime can verify and admit authority, but cannot mint it. Capability
-/// minting remains in [`crate::AuthorityDomain`] policy code, preserving a
-/// separation between grant issuance and concrete tool execution.
+/// minting remains in trusted policy code, preserving separation between grant
+/// issuance and concrete tool execution.
 #[derive(Debug, Clone)]
 pub struct TrustedRuntime {
     execution_verifier: AuthorityVerifier,
     observer_verifier: AuthorityVerifier,
+    resolver_verifier: ResolutionVerifier,
     clock: Arc<MonotonicWallClock>,
 }
 
 impl TrustedRuntime {
-    /// Construct a host runtime from verifiers selected by trusted host policy.
+    /// Construct a host runtime from trust anchors selected by trusted policy.
     ///
-    /// The resulting runtime should be retained by the concrete executor. Model
-    /// or planner output should never be permitted to replace these verifiers.
+    /// The resulting runtime should be retained by concrete host/tool adapters.
+    /// Model or planner output should never replace any of these verifiers.
     pub fn new(
         execution_verifier: AuthorityVerifier,
         observer_verifier: AuthorityVerifier,
+        resolver_verifier: ResolutionVerifier,
     ) -> Self {
         Self {
             execution_verifier,
             observer_verifier,
+            resolver_verifier,
             clock: Arc::new(MonotonicWallClock::new()),
         }
     }
@@ -97,6 +81,11 @@ impl TrustedRuntime {
     /// Configured external-observation authority domain.
     pub fn observer_domain(&self) -> AuthorityDomainId {
         self.observer_verifier.domain_id()
+    }
+
+    /// Configured final-resolution authority domain.
+    pub fn resolver_domain(&self) -> AuthorityDomainId {
+        self.resolver_verifier.domain_id()
     }
 
     /// Admit proposal data into the host-selected execution trust domain.
@@ -117,7 +106,10 @@ impl TrustedRuntime {
             ),
             execution_verifier: self.execution_verifier.clone(),
             observer_verifier: self.observer_verifier.clone(),
+            resolver_verifier: self.resolver_verifier.clone(),
             clock: Arc::clone(&self.clock),
+            resolution_context: None,
+            resolution_receipt: None,
         }
     }
 }
@@ -129,7 +121,10 @@ pub struct RuntimeAction<K: CapabilityKind, S> {
     inner: TrustedAction<K, S>,
     execution_verifier: AuthorityVerifier,
     observer_verifier: AuthorityVerifier,
+    resolver_verifier: ResolutionVerifier,
     clock: Arc<MonotonicWallClock>,
+    resolution_context: Option<ResolutionContext>,
+    resolution_receipt: Option<ResolutionEvidenceReceipt>,
 }
 
 impl<K: CapabilityKind, S> RuntimeAction<K, S> {
@@ -157,6 +152,11 @@ impl<K: CapabilityKind, S> RuntimeAction<K, S> {
     pub fn observer_domain(&self) -> AuthorityDomainId {
         self.observer_verifier.domain_id()
     }
+
+    /// Final-resolution trust domain retained by the concrete host path.
+    pub fn resolver_domain(&self) -> AuthorityDomainId {
+        self.resolver_verifier.domain_id()
+    }
 }
 
 impl<K: CapabilityKind> RuntimeAction<K, Proposed> {
@@ -166,7 +166,10 @@ impl<K: CapabilityKind> RuntimeAction<K, Proposed> {
             inner: self.inner.assess(risk),
             execution_verifier: self.execution_verifier,
             observer_verifier: self.observer_verifier,
+            resolver_verifier: self.resolver_verifier,
             clock: self.clock,
+            resolution_context: None,
+            resolution_receipt: None,
         }
     }
 }
@@ -196,7 +199,10 @@ impl<K: CapabilityKind> RuntimeAction<K, RiskAssessed> {
             inner,
             execution_verifier: self.execution_verifier,
             observer_verifier: self.observer_verifier,
+            resolver_verifier: self.resolver_verifier,
             clock: self.clock,
+            resolution_context: None,
+            resolution_receipt: None,
         })
     }
 }
@@ -221,7 +227,10 @@ impl<K: CapabilityKind> RuntimeAction<K, Authorized> {
             inner,
             execution_verifier: self.execution_verifier,
             observer_verifier: self.observer_verifier,
+            resolver_verifier: self.resolver_verifier,
             clock: self.clock,
+            resolution_context: None,
+            resolution_receipt: None,
         })
     }
 }
@@ -240,6 +249,11 @@ impl<K: CapabilityKind> RuntimeAction<K, Executed> {
         observation: Observation,
     ) -> Result<RuntimeAction<K, Observed>, TrustError> {
         let now = self.clock.now();
+        let observation_binding = self.inner.observation_binding();
+        let resolution_context = ResolutionContext {
+            observation_binding,
+            observation: observation.clone(),
+        };
         let inner = self
             .inner
             .observe(observer, &self.observer_verifier, observation, now)?;
@@ -247,35 +261,250 @@ impl<K: CapabilityKind> RuntimeAction<K, Executed> {
             inner,
             execution_verifier: self.execution_verifier,
             observer_verifier: self.observer_verifier,
+            resolver_verifier: self.resolver_verifier,
             clock: self.clock,
+            resolution_context: Some(resolution_context),
+            resolution_receipt: None,
         })
     }
 }
 
 impl<K: CapabilityKind> RuntimeAction<K, Observed> {
-    /// Resolve an independently observed action and emit trusted-domain evidence.
+    /// Exact digest resolver policy must bind for this observed lineage and
+    /// proposed final decision.
+    pub fn resolution_binding(&self, decision: ResolutionDecision) -> [u8; 32] {
+        let context = self
+            .resolution_context
+            .as_ref()
+            .expect("Observed runtime action always carries resolution context");
+        compute_resolution_binding(
+            self.inner.id(),
+            self.inner.descriptor().fingerprint(),
+            self.execution_verifier.domain_id(),
+            self.observer_verifier.domain_id(),
+            self.resolver_verifier.domain_id(),
+            context,
+            decision,
+        )
+    }
+
+    /// Resolve an independently observed action using exact one-shot authority
+    /// from the runtime-pinned resolver domain.
     pub fn resolve(
         self,
-        resolution: ResolutionDecision,
-    ) -> (RuntimeAction<K, Resolved>, TrustedEvidenceReceipt) {
-        let (inner, receipt) = self.inner.resolve(resolution);
-        (
+        grant: ResolutionGrant,
+        decision: ResolutionDecision,
+    ) -> Result<(RuntimeAction<K, Resolved>, ResolutionEvidenceReceipt), ResolutionError> {
+        let now = self.clock.now();
+        grant
+            .validate_with(&self.resolver_verifier, now)
+            .map_err(ResolutionError::Trust)?;
+
+        if !grant.metadata().scope().contains(self.inner.descriptor().scope()) {
+            return Err(ResolutionError::ScopeMismatch {
+                granted: grant.metadata().scope().clone(),
+                required: self.inner.descriptor().scope().clone(),
+            });
+        }
+
+        let expected_binding = self.resolution_binding(decision);
+        if grant.binding() != expected_binding {
+            return Err(ResolutionError::BindingMismatch {
+                expected: expected_binding,
+                actual: grant.binding(),
+            });
+        }
+
+        let resolver_grant_id = grant.metadata().grant_id();
+        let resolver = grant.metadata().subject();
+        let resolver_domain = grant.domain_id();
+        let resolver_epoch = grant.epoch();
+        let resolution_binding = grant.binding();
+
+        let (inner, trusted_receipt) = self.inner.resolve(decision);
+        let resolution_receipt = ResolutionEvidenceReceipt {
+            trusted_receipt,
+            resolver_grant_id,
+            resolver,
+            resolver_domain,
+            resolver_epoch,
+            resolution_binding,
+            decision,
+        };
+
+        let retained_receipt = resolution_receipt.clone();
+        Ok((
             RuntimeAction {
                 inner,
                 execution_verifier: self.execution_verifier,
                 observer_verifier: self.observer_verifier,
+                resolver_verifier: self.resolver_verifier,
                 clock: self.clock,
+                resolution_context: self.resolution_context,
+                resolution_receipt: Some(retained_receipt),
             },
-            receipt,
-        )
+            resolution_receipt,
+        ))
     }
 }
 
 impl<K: CapabilityKind> RuntimeAction<K, Resolved> {
-    /// Final trusted-domain receipt retained by the resolved state.
+    /// Lower-level trusted execution/observation receipt retained by the action.
     pub fn trusted_receipt(&self) -> &TrustedEvidenceReceipt {
         self.inner.trusted_receipt()
     }
+
+    /// Final receipt including independently attributable resolver lineage.
+    pub fn resolution_receipt(&self) -> &ResolutionEvidenceReceipt {
+        self.resolution_receipt
+            .as_ref()
+            .expect("Resolved runtime action always carries resolution evidence")
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ResolutionContext {
+    observation_binding: [u8; 32],
+    observation: Observation,
+}
+
+/// Immutable final evidence augmented with resolver authority lineage.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolutionEvidenceReceipt {
+    trusted_receipt: TrustedEvidenceReceipt,
+    resolver_grant_id: GrantId,
+    resolver: PrincipalId,
+    resolver_domain: AuthorityDomainId,
+    resolver_epoch: AuthorityEpoch,
+    resolution_binding: [u8; 32],
+    decision: ResolutionDecision,
+}
+
+impl ResolutionEvidenceReceipt {
+    /// Execution/observation evidence produced by the trusted lower layer.
+    pub fn trusted_receipt(&self) -> &TrustedEvidenceReceipt {
+        &self.trusted_receipt
+    }
+
+    /// One-shot resolver grant consumed by the final transition.
+    pub fn resolver_grant_id(&self) -> GrantId {
+        self.resolver_grant_id
+    }
+
+    /// Principal that held final-resolution authority.
+    pub fn resolver(&self) -> PrincipalId {
+        self.resolver
+    }
+
+    /// Resolver trust domain selected by the host runtime.
+    pub fn resolver_domain(&self) -> AuthorityDomainId {
+        self.resolver_domain
+    }
+
+    /// Resolver revocation epoch consumed by this decision.
+    pub fn resolver_epoch(&self) -> AuthorityEpoch {
+        self.resolver_epoch
+    }
+
+    /// Exact observed-lineage + decision digest authorized by resolver policy.
+    pub fn resolution_binding(&self) -> [u8; 32] {
+        self.resolution_binding
+    }
+
+    /// Final authorized interpretation.
+    pub fn decision(&self) -> ResolutionDecision {
+        self.decision
+    }
+}
+
+/// Failure to cross the strict final-resolution boundary.
+#[derive(Debug)]
+pub enum ResolutionError {
+    /// Resolver domain, epoch, or expiry validation failed.
+    Trust(TrustError),
+    /// Resolver authority did not cover the action scope.
+    ScopeMismatch {
+        /// Scope carried by resolver authority.
+        granted: Scope,
+        /// Scope required by the observed action.
+        required: Scope,
+    },
+    /// Resolver grant was minted for another observed lineage or decision.
+    BindingMismatch {
+        /// Exact digest required for this observed lineage and decision.
+        expected: [u8; 32],
+        /// Digest carried by the supplied resolver grant.
+        actual: [u8; 32],
+    },
+}
+
+impl fmt::Display for ResolutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Trust(error) => write!(f, "resolution authority validation failed: {error}"),
+            Self::ScopeMismatch { .. } => {
+                write!(f, "resolution authority does not cover action scope")
+            }
+            Self::BindingMismatch { .. } => {
+                write!(f, "resolution grant is bound to another lineage or decision")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ResolutionError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Trust(error) => Some(error),
+            Self::ScopeMismatch { .. } | Self::BindingMismatch { .. } => None,
+        }
+    }
+}
+
+fn compute_resolution_binding(
+    action_id: ActionId,
+    action_fingerprint: [u8; 32],
+    execution_domain: AuthorityDomainId,
+    observer_domain: AuthorityDomainId,
+    resolver_domain: AuthorityDomainId,
+    context: &ResolutionContext,
+    decision: ResolutionDecision,
+) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-ai-assurance/resolve-v1\0");
+    hash_field(&mut hasher, action_id.as_uuid().as_bytes());
+    hash_field(&mut hasher, &action_fingerprint);
+    hash_field(&mut hasher, execution_domain.as_uuid().as_bytes());
+    hash_field(&mut hasher, observer_domain.as_uuid().as_bytes());
+    hash_field(&mut hasher, resolver_domain.as_uuid().as_bytes());
+    hash_field(&mut hasher, &context.observation_binding);
+    hash_field(&mut hasher, &[observed_outcome_code(context.observation.outcome())]);
+    hash_field(&mut hasher, &context.observation.evidence_digest());
+    hash_field(&mut hasher, &[resolution_decision_code(decision)]);
+    *hasher.finalize().as_bytes()
+}
+
+fn observed_outcome_code(outcome: ObservedOutcome) -> u8 {
+    match outcome {
+        ObservedOutcome::Success => 0,
+        ObservedOutcome::Partial => 1,
+        ObservedOutcome::NoEffect => 2,
+        ObservedOutcome::SafeFailure => 3,
+        ObservedOutcome::UnsafeFailure => 4,
+    }
+}
+
+fn resolution_decision_code(decision: ResolutionDecision) -> u8 {
+    match decision {
+        ResolutionDecision::Confirmed => 0,
+        ResolutionDecision::Contradicted => 1,
+        ResolutionDecision::Inconclusive => 2,
+    }
+}
+
+fn hash_field(hasher: &mut blake3::Hasher, bytes: &[u8]) {
+    hasher.update(&(bytes.len() as u64).to_le_bytes());
+    hasher.update(bytes);
 }
 
 #[derive(Debug)]
@@ -318,7 +547,7 @@ impl MonotonicWallClock {
 mod tests {
     use super::*;
     use crate::{
-        ActionRisk, AuthorityDomain, ObservedOutcome, ResolutionDecision, Write,
+        ActionRisk, AuthorityDomain, ObservedOutcome, ResolutionAuthorityDomain, Write,
     };
     use std::time::Duration;
 
@@ -326,52 +555,177 @@ mod tests {
         Scope::new("workspace", ["symthaea", "src"]).unwrap()
     }
 
-    #[test]
-    fn strict_runtime_executes_and_observes_without_caller_time_or_verifier() {
+    fn runtime(
+    ) -> (
+        AuthorityDomain,
+        AuthorityDomain,
+        ResolutionAuthorityDomain,
+        TrustedRuntime,
+    ) {
         let execution = AuthorityDomain::new(PrincipalId::new());
-        let observation_domain = AuthorityDomain::new(PrincipalId::new());
-        let runtime = TrustedRuntime::new(execution.verifier(), observation_domain.verifier());
-        let actor = PrincipalId::new();
-        let observer = PrincipalId::new();
-        let action_scope = scope();
-        let expires = SystemTime::now() + Duration::from_secs(60);
+        let observation = AuthorityDomain::new(PrincipalId::new());
+        let resolution = ResolutionAuthorityDomain::new(PrincipalId::new());
+        let runtime = TrustedRuntime::new(
+            execution.verifier(),
+            observation.verifier(),
+            resolution.verifier(),
+        );
+        (execution, observation, resolution, runtime)
+    }
 
+    fn observed_action(
+        execution: &AuthorityDomain,
+        observation_domain: &AuthorityDomain,
+        runtime: &TrustedRuntime,
+        actor: PrincipalId,
+        observer: PrincipalId,
+        action_scope: Scope,
+        outcome: ObservedOutcome,
+        evidence_digest: [u8; 32],
+    ) -> RuntimeAction<Write, Observed> {
         let action = runtime
             .admit::<Write>(actor, "edit-source", action_scope.clone(), b"patch-v1")
             .assess(ActionRisk::Reversible);
         let execution_grant = execution.issue_bound_one_shot::<Write>(
             actor,
             action_scope.clone(),
-            Some(expires),
+            None,
             action.authorization_binding(),
         );
-        let action = action.authorize(execution_grant).unwrap();
-        let action = action.record_execution([7; 32]).unwrap();
-
+        let action = action
+            .authorize(execution_grant)
+            .unwrap()
+            .record_execution([7; 32])
+            .unwrap();
         let observer_grant = observation_domain.issue_bound_one_shot::<Observe>(
             observer,
             action_scope,
-            Some(expires),
+            None,
             action.observation_binding(),
         );
-        let observed = action
-            .observe(
-                observer_grant,
-                Observation::new(ObservedOutcome::Success, [8; 32]),
-            )
-            .unwrap();
-        let (resolved, receipt) = observed.resolve(ResolutionDecision::Confirmed);
-
-        assert_eq!(resolved.execution_domain(), execution.domain_id());
-        assert_eq!(resolved.observer_domain(), observation_domain.domain_id());
-        assert_eq!(resolved.trusted_receipt(), &receipt);
+        action
+            .observe(observer_grant, Observation::new(outcome, evidence_digest))
+            .unwrap()
     }
 
     #[test]
-    fn caller_cannot_resurrect_expired_grant_by_selecting_old_time() {
-        let execution = AuthorityDomain::new(PrincipalId::new());
-        let observation_domain = AuthorityDomain::new(PrincipalId::new());
-        let runtime = TrustedRuntime::new(execution.verifier(), observation_domain.verifier());
+    fn strict_runtime_requires_exact_resolution_authority() {
+        let (execution, observation, resolution, runtime) = runtime();
+        let actor = PrincipalId::new();
+        let observer = PrincipalId::new();
+        let resolver = PrincipalId::new();
+        let action_scope = scope();
+        let observed = observed_action(
+            &execution,
+            &observation,
+            &runtime,
+            actor,
+            observer,
+            action_scope.clone(),
+            ObservedOutcome::Success,
+            [8; 32],
+        );
+        let binding = observed.resolution_binding(ResolutionDecision::Confirmed);
+        let resolution_grant =
+            resolution.issue_bound_one_shot(resolver, action_scope, None, binding);
+
+        let (resolved, receipt) = observed
+            .resolve(resolution_grant, ResolutionDecision::Confirmed)
+            .unwrap();
+
+        assert_eq!(resolved.execution_domain(), execution.domain_id());
+        assert_eq!(resolved.observer_domain(), observation.domain_id());
+        assert_eq!(resolved.resolver_domain(), resolution.domain_id());
+        assert_eq!(receipt.resolver(), resolver);
+        assert_eq!(receipt.decision(), ResolutionDecision::Confirmed);
+        assert_eq!(resolved.resolution_receipt(), &receipt);
+    }
+
+    #[test]
+    fn grant_for_confirmed_cannot_authorize_contradicted() {
+        let (execution, observation, resolution, runtime) = runtime();
+        let action_scope = scope();
+        let observed = observed_action(
+            &execution,
+            &observation,
+            &runtime,
+            PrincipalId::new(),
+            PrincipalId::new(),
+            action_scope.clone(),
+            ObservedOutcome::UnsafeFailure,
+            [9; 32],
+        );
+        let grant = resolution.issue_bound_one_shot(
+            PrincipalId::new(),
+            action_scope,
+            None,
+            observed.resolution_binding(ResolutionDecision::Confirmed),
+        );
+
+        let result = observed.resolve(grant, ResolutionDecision::Contradicted);
+        assert!(matches!(result, Err(ResolutionError::BindingMismatch { .. })));
+    }
+
+    #[test]
+    fn runtime_pins_resolver_domain() {
+        let (execution, observation, expected_resolution, runtime) = runtime();
+        let wrong_resolution = ResolutionAuthorityDomain::new(PrincipalId::new());
+        let action_scope = scope();
+        let observed = observed_action(
+            &execution,
+            &observation,
+            &runtime,
+            PrincipalId::new(),
+            PrincipalId::new(),
+            action_scope.clone(),
+            ObservedOutcome::Success,
+            [2; 32],
+        );
+        let grant = wrong_resolution.issue_bound_one_shot(
+            PrincipalId::new(),
+            action_scope,
+            None,
+            observed.resolution_binding(ResolutionDecision::Confirmed),
+        );
+
+        assert!(matches!(
+            observed.resolve(grant, ResolutionDecision::Confirmed),
+            Err(ResolutionError::Trust(_))
+        ));
+        assert_ne!(wrong_resolution.domain_id(), expected_resolution.domain_id());
+    }
+
+    #[test]
+    fn resolver_epoch_revocation_blocks_final_decision() {
+        let (execution, observation, resolution, runtime) = runtime();
+        let action_scope = scope();
+        let observed = observed_action(
+            &execution,
+            &observation,
+            &runtime,
+            PrincipalId::new(),
+            PrincipalId::new(),
+            action_scope.clone(),
+            ObservedOutcome::Success,
+            [3; 32],
+        );
+        let grant = resolution.issue_bound_one_shot(
+            PrincipalId::new(),
+            action_scope,
+            None,
+            observed.resolution_binding(ResolutionDecision::Confirmed),
+        );
+        resolution.revoke_all().unwrap();
+
+        assert!(matches!(
+            observed.resolve(grant, ResolutionDecision::Confirmed),
+            Err(ResolutionError::Trust(_))
+        ));
+    }
+
+    #[test]
+    fn caller_cannot_resurrect_expired_execution_grant_by_selecting_old_time() {
+        let (execution, _observation, _resolution, runtime) = runtime();
         let actor = PrincipalId::new();
         let action_scope = scope();
         let action = runtime
@@ -389,10 +743,13 @@ mod tests {
 
     #[test]
     fn runtime_pins_observer_verifier() {
-        let execution = AuthorityDomain::new(PrincipalId::new());
-        let expected_observer = AuthorityDomain::new(PrincipalId::new());
+        let (execution, expected_observer, resolution, _runtime) = runtime();
         let wrong_observer = AuthorityDomain::new(PrincipalId::new());
-        let runtime = TrustedRuntime::new(execution.verifier(), expected_observer.verifier());
+        let runtime = TrustedRuntime::new(
+            execution.verifier(),
+            expected_observer.verifier(),
+            resolution.verifier(),
+        );
         let actor = PrincipalId::new();
         let observer = PrincipalId::new();
         let action_scope = scope();
