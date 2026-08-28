@@ -10,10 +10,11 @@
 //! [`capability`] and [`action`] expose the low-level affine capability and
 //! typestate mechanics. [`trusted`] binds actions and grants to host-selected
 //! authority domains and revocation epochs. [`resolution`] provides distinct
-//! final-interpretation authority. Security-sensitive concrete tool integrations
-//! should normally use [`host`], which additionally retains host-selected
-//! execution, observation, and resolution trust anchors internally and removes
-//! caller-selected validation time from guarded transitions.
+//! final-interpretation authority. [`resource`] binds logical scopes to concrete
+//! adapter-resolved identities and retained handles. Security-sensitive concrete
+//! tool integrations should normally use [`host`] together with [`resource`],
+//! so trust anchors, validation time, and concrete resource resolution remain
+//! host-owned rather than model-selected.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
@@ -22,6 +23,7 @@ pub mod action;
 pub mod capability;
 pub mod host;
 pub mod resolution;
+pub mod resource;
 pub mod trusted;
 
 pub use action::{
@@ -38,6 +40,11 @@ pub use host::{
     ResolutionEvidenceReceipt, ResolutionError, RuntimeAction, TrustedRuntime,
 };
 pub use resolution::{ResolutionAuthorityDomain, ResolutionGrant, ResolutionVerifier};
+pub use resource::{
+    AdapterSchema, ResolvedResource, ResourceAction, ResourceError, ResourceEvidenceReceipt,
+    ResourceExecutionError, ResourceIdentity, ResourceIdentityError, ResourceResolverDomain,
+    ResourceRuntime, ResourceVerifier,
+};
 pub use trusted::{
     AuthorityDomain, AuthorityDomainId, AuthorityEpoch, AuthorityVerifier, TrustError,
     TrustedAction, TrustedBoundOneShotCapability, TrustedEvidenceReceipt,
