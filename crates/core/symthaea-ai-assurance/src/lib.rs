@@ -6,12 +6,19 @@
 //! The crate is intentionally independent of Symthaea cognition. Models and
 //! planners propose actions; trusted host code decides which authority values
 //! they receive.
+//!
+//! [`capability`] and [`action`] expose the low-level affine capability and
+//! typestate mechanics. Security-sensitive integrations should normally use the
+//! [`trusted`] layer as their admission path: it binds actions and grants to a
+//! host-selected authority domain and revocation epoch, rejects unrelated roots,
+//! and preserves execution/observer trust lineage in evidence receipts.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 
 pub mod action;
 pub mod capability;
+pub mod trusted;
 
 pub use action::{
     Action, ActionDescriptor, ActionError, ActionId, ActionRisk, Authorized, EvidenceReceipt,
@@ -22,4 +29,8 @@ pub use capability::{
     AuthorityRoot, BoundOneShotCapability, Capability, CapabilityKind, Deploy, Execute, GrantError,
     GrantId, GrantMetadata, Network, Observe, OneShotCapability, PrincipalId, Read, Scope,
     ScopeError, UpdateModel, Write,
+};
+pub use trusted::{
+    AuthorityDomain, AuthorityDomainId, AuthorityEpoch, AuthorityVerifier, TrustError,
+    TrustedAction, TrustedBoundOneShotCapability, TrustedEvidenceReceipt,
 };
