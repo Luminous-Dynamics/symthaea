@@ -4,7 +4,9 @@
 
 pub use symthaea_art_world::{ArtifactRef, EntityId, IntentId, ProposalId, RevisionId};
 
+mod choice;
 mod fidelity;
 mod temporal;
+pub use choice::*;
 pub use fidelity::*;
 pub use temporal::*;
