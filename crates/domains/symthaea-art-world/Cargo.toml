@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-art-world"
+version = "0.1.0"
+edition = "2024"
+description = "Host-neutral creative-world protocol for Symthaea artistic embodiment"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
