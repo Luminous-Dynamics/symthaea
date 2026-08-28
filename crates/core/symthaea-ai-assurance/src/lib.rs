@@ -10,10 +10,16 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod action;
 pub mod capability;
 
+pub use action::{
+    Action, ActionDescriptor, ActionError, ActionId, ActionRisk, Authorized, EvidenceReceipt,
+    Executed, Observation, Observed, ObservedOutcome, Proposed, ResolutionDecision, Resolved,
+    RiskAssessed,
+};
 pub use capability::{
     AuthorityRoot, Capability, CapabilityKind, Deploy, Execute, GrantError, GrantId,
-    GrantMetadata, Network, OneShotCapability, PrincipalId, Read, Scope, ScopeError,
+    GrantMetadata, Network, Observe, OneShotCapability, PrincipalId, Read, Scope, ScopeError,
     UpdateModel, Write,
 };

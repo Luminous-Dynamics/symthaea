@@ -166,6 +166,7 @@ capability_kinds! {
     Network => "network",
     Deploy => "deploy",
     UpdateModel => "update-model",
+    Observe => "observe",
 }
 
 mod private {

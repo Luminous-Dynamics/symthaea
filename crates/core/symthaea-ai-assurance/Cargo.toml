@@ -12,6 +12,7 @@ keywords = ["ai", "capability-security", "agents", "safety", "typestate"]
 categories = ["development-tools", "authentication"]
 
 [dependencies]
+blake3 = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]
