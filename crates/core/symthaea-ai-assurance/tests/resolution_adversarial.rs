@@ -94,7 +94,7 @@ fn resolution_grant_cannot_replay_across_actions() {
 }
 
 #[test]
-fn observation_evidence_changes_resolution_binding() {
+fn distinct_observed_lineages_do_not_share_resolution_bindings() {
     let execution = AuthorityDomain::new(PrincipalId::new());
     let observation = AuthorityDomain::new(PrincipalId::new());
     let resolution = ResolutionAuthorityDomain::new(PrincipalId::new());
@@ -106,6 +106,10 @@ fn observation_evidence_changes_resolution_binding() {
     let actor = PrincipalId::new();
     let observer = PrincipalId::new();
 
+    // Keep the visible action shape and executor output the same while creating
+    // two independent observed lineages with different evidence. The action ids
+    // are also necessarily distinct, so this test establishes whole-lineage
+    // separation rather than attributing the difference to evidence alone.
     let first = observed_action(
         &execution,
         &observation,
