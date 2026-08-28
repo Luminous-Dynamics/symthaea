@@ -13,10 +13,12 @@
 //! final-interpretation authority. [`resource`] binds logical scopes to concrete
 //! adapter-resolved identities and retained handles. [`policy`] records why
 //! trusted policy admitted an action and carries that provenance into exact
-//! resource-bound execution authority. Security-sensitive concrete tool
-//! integrations should normally compose [`host`], [`resource`], and [`policy`]
-//! so trust anchors, validation time, concrete resources, and policy admission
-//! remain host-owned rather than model-selected.
+//! resource-bound execution authority. [`policy_guard`] additionally rechecks
+//! policy-domain revocation immediately before the concrete side-effect boundary.
+//! Security-sensitive state-changing integrations should compose [`host`],
+//! [`resource`], [`policy`], and [`policy_guard`] so trust anchors, validation
+//! time, concrete resources, policy admission, and policy revocation remain
+//! host-owned rather than model-selected.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
@@ -25,6 +27,7 @@ pub mod action;
 pub mod capability;
 pub mod host;
 pub mod policy;
+pub mod policy_guard;
 pub mod resolution;
 pub mod resource;
 pub mod trusted;
@@ -47,6 +50,10 @@ pub use policy::{
     PolicyDescriptor, PolicyError, PolicyEvaluatorDomain, PolicyExecutionDomain, PolicyGrant,
     PolicyMode, PolicyResourceAction, PolicyResourceEvidenceReceipt, PolicyResourceRuntime,
     PolicyVerifier,
+};
+pub use policy_guard::{
+    PolicyGuardError, PolicyGuardedAction, PolicyGuardedAuthorizeError, PolicyGuardedExecutionError,
+    PolicyGuardedRuntime,
 };
 pub use resolution::{ResolutionAuthorityDomain, ResolutionGrant, ResolutionVerifier};
 pub use resource::{
