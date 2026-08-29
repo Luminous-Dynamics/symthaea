@@ -12,25 +12,56 @@ permissions:
   contents: read
 
 concurrency:
-  group: spore-rehydration-${{ github.ref }}
+  group: spore-rehydration-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   qualify:
-    name: Rehydration contract
-    runs-on: ubuntu-latest
+    name: Exact-head rehydration contract
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      # A formatter-only bot commit can leave pull-request workflows in
-      # action_required. Keeping this qualification definition user-authored
-      # retriggers the exact formatted source without altering R4 semantics.
-      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Assert exact clean source head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          echo "source_head=$(git rev-parse HEAD)"
+          echo "source_tree=$(git rev-parse 'HEAD^{tree}')"
+          echo "runner_image=${ImageOS:-unknown}/${ImageVersion:-unknown}"
+
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e
+        with:
+          toolchain: 1.96.0
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
+
+      - name: Toolchain and lock provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc -vV
+          cargo -Vv
+          test -f Cargo.lock
+          sha256sum Cargo.lock
+
       - name: Format
         run: cargo fmt --check -p symthaea-spore
+
       - name: Contract tests
-        run: cargo test -p symthaea-spore --lib host_rehydration::tests
+        run: cargo test --locked -p symthaea-spore --lib host_rehydration::tests
+
       - name: Clippy
-        run: cargo clippy -p symthaea-spore --lib -- -D warnings
+        run: cargo clippy --locked -p symthaea-spore --lib -- -D warnings
+
+      - name: Verify qualification left source and lock unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=all)"
