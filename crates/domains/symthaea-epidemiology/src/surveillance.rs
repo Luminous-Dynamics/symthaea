@@ -283,13 +283,14 @@ pub fn assess_latest_change(
         });
     }
 
-    let center = median(&observed_values).ok_or(SurveillanceScreenError::NonFiniteDerivedStatistic)?;
+    let center =
+        median(&observed_values).ok_or(SurveillanceScreenError::NonFiniteDerivedStatistic)?;
     let absolute_deviations: Vec<f64> = observed_values
         .iter()
         .map(|value| (value - center).abs())
         .collect();
-    let mad = median(&absolute_deviations)
-        .ok_or(SurveillanceScreenError::NonFiniteDerivedStatistic)?;
+    let mad =
+        median(&absolute_deviations).ok_or(SurveillanceScreenError::NonFiniteDerivedStatistic)?;
     let robust_scale = mad * MAD_NORMAL_SCALE;
 
     if !center.is_finite() || !mad.is_finite() || !robust_scale.is_finite() {
@@ -489,9 +490,7 @@ mod tests {
         assert!(assessment.robust_z.unwrap() > 3.0);
         assert_eq!(
             assessment.disposition,
-            ScreeningDisposition::Abstain(
-                AbstentionReason::UncertaintyOverlapsThresholdEnvelope
-            )
+            ScreeningDisposition::Abstain(AbstentionReason::UncertaintyOverlapsThresholdEnvelope)
         );
     }
 
