@@ -66,8 +66,10 @@ impl RealityRecord {
                 hasher.update(&[1]);
                 hasher.update(&frame.to_le_bytes());
             }
-            None => hasher.update(&[0]),
-        };
+            None => {
+                hasher.update(&[0]);
+            }
+        }
         feed(&mut hasher, self.content_digest.as_bytes());
         feed_optional(&mut hasher, self.previous_record_digest.as_deref());
         Ok(hasher.finalize().to_hex().to_string())
@@ -200,20 +202,30 @@ fn feed_world(hasher: &mut blake3::Hasher, world: &WorldDescriptor) {
         }
     }
     match &world.origin {
-        crate::types::WorldOrigin::PhysicalSensorium => hasher.update(&[0]),
+        crate::types::WorldOrigin::PhysicalSensorium => {
+            hasher.update(&[0]);
+        }
         crate::types::WorldOrigin::DigitalHost { host_kind } => {
             hasher.update(&[1]);
             feed(hasher, host_kind.as_bytes());
         }
-        crate::types::WorldOrigin::CounterfactualBranch => hasher.update(&[2]),
-        crate::types::WorldOrigin::ReplayArtifact => hasher.update(&[3]),
-        crate::types::WorldOrigin::DreamEngine => hasher.update(&[4]),
+        crate::types::WorldOrigin::CounterfactualBranch => {
+            hasher.update(&[2]);
+        }
+        crate::types::WorldOrigin::ReplayArtifact => {
+            hasher.update(&[3]);
+        }
+        crate::types::WorldOrigin::DreamEngine => {
+            hasher.update(&[4]);
+        }
         crate::types::WorldOrigin::ImportedExternal { source } => {
             hasher.update(&[5]);
             feed(hasher, source.as_bytes());
         }
-        crate::types::WorldOrigin::Unknown => hasher.update(&[6]),
-    };
+        crate::types::WorldOrigin::Unknown => {
+            hasher.update(&[6]);
+        }
+    }
 }
 
 fn feed_source(hasher: &mut blake3::Hasher, source: &EvidenceSource) {
