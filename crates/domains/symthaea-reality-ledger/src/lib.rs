@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Symthaea Reality Ledger v1.
+//! Symthaea Reality Ledger.
 //!
 //! The ledger keeps a hard distinction between:
 //! - physical-grounded observations;
@@ -11,22 +11,48 @@
 //! - imported worlds; and
 //! - unresolved provenance.
 //!
-//! The crate is deliberately host-neutral. Bevy/Symtropy, robotics, dream
+//! v1.2 additionally keeps world provenance distinct from claim grounding,
+//! gives state/evidence digests explicit semantic domains, supports external
+//! authenticated checkpoints, transactional multi-plane observations, world
+//! genesis, persistent world graphs, and explicit presence/capability sessions.
+//!
+//! The crate remains deliberately host-neutral. Bevy/Symtropy, robotics, dream
 //! engines, futures simulations and other hosts may supply records, but this
 //! crate does not grant mutation authority and does not decide metaphysical or
 //! phenomenological questions.
 
+pub mod checkpoint;
+pub mod claim;
 pub mod commit;
 pub mod context;
+pub mod digest;
+pub mod genesis;
+pub mod graph;
 pub mod ledger;
+pub mod materialization;
 pub mod memory;
+pub mod presence;
+pub mod transaction;
 pub mod types;
 
+pub use checkpoint::{CheckpointAttestation, CheckpointError, LedgerCheckpoint};
+pub use claim::{ClaimGrounding, RealityClaimEnvelope, RealityClaimError, validate_grounding};
 pub use commit::{CounterfactualCommitReceipt, RealityCommitError};
 pub use context::{RealityContextError, RealityContextStack};
+pub use digest::{DigestAlgorithm, TypedDigest, TypedDigestError};
+pub use genesis::{DeterminismClass, WorldGenesisError, WorldGenesisManifest};
+pub use graph::{WorldGraph, WorldGraphError, WorldKey};
 pub use ledger::{RealityLedger, RealityLedgerError, RealityRecord, RealityRecordKind};
+pub use materialization::{
+    TypedCounterfactualCommitReceipt, TypedMaterializationError,
+};
 pub use memory::{
     MemoryAdmissionClass, MemoryAdmissionError, MemoryAdmissionReceipt, assess_memory_admission,
+};
+pub use presence::{PresenceCapability, PresenceError, WorldPresenceSession};
+pub use transaction::{
+    ObservationArtifactReceipt, ObservationPlane, ObservationTransactionError,
+    WorldObservationBundle,
 };
 pub use types::{
     EvidenceSource, RealityLayer, RealityRecordId, RealityTypeError, WorldDescriptor, WorldId,
