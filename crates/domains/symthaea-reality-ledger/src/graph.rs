@@ -70,9 +70,6 @@ impl WorldGraph {
             if world.generation_depth != parent_world.generation_depth + 1 {
                 return Err(WorldGraphError::GenerationDepthMismatch);
             }
-        } else if !self.worlds.is_empty() {
-            // Multiple independent roots are allowed, but every root must be an
-            // actual root. WorldDescriptor::validate already enforces depth 0.
         }
 
         self.worlds.insert(key, world);
