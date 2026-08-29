@@ -76,8 +76,10 @@ impl WorldGenesisManifest {
                 hasher.update(&[1]);
                 hasher.update(&seed.to_le_bytes());
             }
-            None => hasher.update(&[0]),
-        };
+            None => {
+                hasher.update(&[0]);
+            }
+        }
         feed(&mut hasher, self.timebase_id.as_bytes());
         TypedDigest::new(
             "symthaea.world-genesis.v1",
