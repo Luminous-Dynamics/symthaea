@@ -1,24 +1,15 @@
 //! Provider-neutral Earth-observation evidence contracts for Symthaea.
 //!
-//! This crate deliberately separates what a sensor measured from what a model
-//! infers. Provider adapters (Copernicus, Sentinel Hub, local archives, etc.)
-//! belong in bridge crates. Domain cognition (Morphos, ecology, hydrology,
-//! planetary perception) consumes these contracts rather than owning provider
-//! I/O.
-//!
-//! A load-bearing invariant is that an indirect surface signature must never be
-//! promoted to a direct subsurface observation. Direct subsurface claims require
-//! an observation whose calibrated sensitivity explicitly supports direct
-//! penetration to the claimed depth.
+//! The central rule is epistemic: what a sensor measured, what processing
+//! derived, what a model inferred, and what later evidence verified are
+//! different things. In particular, indirect surface evidence must not be
+//! promoted to a direct subsurface observation.
 
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-/// Result type for contract construction and validation.
 pub type Result<T> = std::result::Result<T, EvidenceError>;
 
-/// Validation failures are explicit because these types sit on an evidence
-/// boundary rather than a convenience API.
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvidenceError {
     EmptyId(&'static str),
@@ -55,7 +46,7 @@ impl Display for EvidenceError {
                 write!(f, "a footprint polygon requires at least 3 vertices, got {count}")
             }
             Self::InvalidDigest => write!(f, "content digest must be non-empty hexadecimal text"),
-            Self::MissingSupport => write!(f, "evidence-bearing claims require at least one support reference"),
+            Self::MissingSupport => write!(f, "evidence-bearing claims require support"),
             Self::MissingReferencedObservation(id) => {
                 write!(f, "support references unknown observation {id}")
             }
@@ -84,7 +75,6 @@ fn require_id(value: impl Into<String>, kind: &'static str) -> Result<String> {
     Ok(value)
 }
 
-/// Closed-interval confidence with no hidden percentage convention.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Confidence(f64);
 
@@ -101,7 +91,6 @@ impl Confidence {
     }
 }
 
-/// Geographic coordinate in decimal degrees.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GeoPoint {
     pub latitude_deg: f64,
@@ -129,8 +118,6 @@ impl GeoPoint {
     }
 }
 
-/// Provider-neutral polygon footprint. Antimeridian normalization is left to
-/// geodesy/provider adapters; this contract only guarantees valid vertices.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GeoFootprint {
     pub vertices: Vec<GeoPoint>,
@@ -145,41 +132,23 @@ impl GeoFootprint {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MissionId(pub String);
+macro_rules! id_type {
+    ($name:ident, $label:literal) => {
+        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        pub struct $name(pub String);
 
-impl MissionId {
-    pub fn new(value: impl Into<String>) -> Result<Self> {
-        Ok(Self(require_id(value, "mission id")?))
-    }
+        impl $name {
+            pub fn new(value: impl Into<String>) -> Result<Self> {
+                Ok(Self(require_id(value, $label)?))
+            }
+        }
+    };
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InstrumentId(pub String);
-
-impl InstrumentId {
-    pub fn new(value: impl Into<String>) -> Result<Self> {
-        Ok(Self(require_id(value, "instrument id")?))
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProductId(pub String);
-
-impl ProductId {
-    pub fn new(value: impl Into<String>) -> Result<Self> {
-        Ok(Self(require_id(value, "product id")?))
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ObservationId(pub String);
-
-impl ObservationId {
-    pub fn new(value: impl Into<String>) -> Result<Self> {
-        Ok(Self(require_id(value, "observation id")?))
-    }
-}
+id_type!(MissionId, "mission id");
+id_type!(InstrumentId, "instrument id");
+id_type!(ProductId, "product id");
+id_type!(ObservationId, "observation id");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DigestAlgorithm {
@@ -188,8 +157,6 @@ pub enum DigestAlgorithm {
     Other,
 }
 
-/// Content address or source-product digest. This crate does not compute hashes;
-/// it preserves the identity supplied by a trusted ingestion boundary.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContentDigest {
     pub algorithm: DigestAlgorithm,
@@ -228,7 +195,6 @@ pub enum Polarization {
     Other,
 }
 
-/// Sensor modality describes physics, not mission branding.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SensorModality {
     Optical,
@@ -250,12 +216,9 @@ pub enum SensorModality {
     Other(String),
 }
 
-/// Calibrated statement about what depths a particular observation can support.
-///
-/// This intentionally avoids universal claims such as "L-band penetrates N
-/// metres". Penetration depends on medium, moisture, geometry, processing and
-/// validation. A provider/experiment may only emit `DirectPenetrating` when it
-/// has a defensible depth bound for that acquisition and method.
+/// Acquisition-specific calibrated sensitivity. This intentionally contains no
+/// universal wavelength-to-depth lookup: medium, moisture, geometry,
+/// processing, and validation determine defensible penetration bounds.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ObservationSensitivity {
     SurfaceOnly,
@@ -289,12 +252,12 @@ impl ObservationSensitivity {
         if depth_m < 0.0 {
             return Err(EvidenceError::Negative("estimated_depth_m", depth_m));
         }
-        Ok(match self {
+        Ok(matches!(
+            self,
             Self::DirectPenetrating {
-                max_validated_depth_m,
-            } => depth_m <= max_validated_depth_m,
-            Self::SurfaceOnly | Self::IndirectSubsurface => false,
-        })
+                max_validated_depth_m
+            } if depth_m <= max_validated_depth_m
+        ))
     }
 }
 
@@ -322,7 +285,6 @@ impl BandDescriptor {
         center_wavelength_nm: Option<f64>,
         unit: RadiometricUnit,
     ) -> Result<Self> {
-        let name = require_id(name, "band name")?;
         if let Some(value) = center_wavelength_nm {
             if !value.is_finite() {
                 return Err(EvidenceError::NonFinite("center_wavelength_nm"));
@@ -332,7 +294,7 @@ impl BandDescriptor {
             }
         }
         Ok(Self {
-            name,
+            name: require_id(name, "band name")?,
             center_wavelength_nm,
             unit,
         })
@@ -376,22 +338,6 @@ pub struct ProcessingStep {
     pub parameters_digest: Option<ContentDigest>,
 }
 
-impl ProcessingStep {
-    pub fn new(
-        name: impl Into<String>,
-        software: impl Into<String>,
-        version: impl Into<String>,
-        parameters_digest: Option<ContentDigest>,
-    ) -> Result<Self> {
-        Ok(Self {
-            name: require_id(name, "processing step name")?,
-            software: require_id(software, "processing software")?,
-            version: require_id(version, "processing version")?,
-            parameters_digest,
-        })
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ProcessingLineage {
     pub steps: Vec<ProcessingStep>,
@@ -403,8 +349,6 @@ pub struct ObservationEvidence {
     pub mission: MissionId,
     pub instrument: InstrumentId,
     pub product: ProductId,
-    /// Unix milliseconds. Time-system conversion belongs at ingestion; preserving
-    /// a primitive integer here avoids silently assuming network time availability.
     pub acquired_at_unix_ms: i64,
     pub footprint: GeoFootprint,
     pub modality: SensorModality,
@@ -417,6 +361,7 @@ pub struct ObservationEvidence {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EvidenceStage {
+    Observation,
     Measurement,
     DerivedFeature,
     Hypothesis,
@@ -450,30 +395,6 @@ pub struct Measurement {
     pub support: Vec<EvidenceRef>,
 }
 
-impl Measurement {
-    pub fn new(
-        id: impl Into<String>,
-        quantity: impl Into<String>,
-        value: f64,
-        unit: impl Into<String>,
-        uncertainty: Option<ObservationUncertainty>,
-        support: Vec<EvidenceRef>,
-    ) -> Result<Self> {
-        if !value.is_finite() {
-            return Err(EvidenceError::NonFinite("measurement value"));
-        }
-        Ok(Self {
-            id: require_id(id, "measurement id")?,
-            quantity: require_id(quantity, "measurement quantity")?,
-            value,
-            unit: require_id(unit, "measurement unit")?,
-            uncertainty,
-            support,
-        })
-    }
-}
-
-/// Indices are named by exact formulation rather than ambiguous aliases.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpectralIndex {
     Ndvi,
@@ -530,10 +451,7 @@ pub enum HypothesisDomain {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ClaimMode {
-    /// The supporting observation directly senses the claimed domain.
     DirectObservation,
-    /// The claim is inferred from effects, correlations, models, or multiple
-    /// modalities and must remain labelled as inference.
     IndirectInference,
 }
 
@@ -544,9 +462,6 @@ pub struct Hypothesis {
     pub domain: HypothesisDomain,
     pub mode: ClaimMode,
     pub confidence: Confidence,
-    /// Observation ids supporting this hypothesis. Higher-stage evidence can be
-    /// represented separately through `EvidenceRef`; this direct list exists to
-    /// enforce sensor-physics claim boundaries.
     pub supporting_observations: Vec<ObservationId>,
 }
 
@@ -559,36 +474,37 @@ impl Hypothesis {
         confidence: Confidence,
         supporting_observations: Vec<ObservationId>,
     ) -> Result<Self> {
-        let hypothesis = Self {
+        if supporting_observations.is_empty() {
+            return Err(EvidenceError::MissingSupport);
+        }
+        Ok(Self {
             id: require_id(id, "hypothesis id")?,
             statement: require_id(statement, "hypothesis statement")?,
             domain,
             mode,
             confidence,
             supporting_observations,
-        };
-        if hypothesis.supporting_observations.is_empty() {
-            return Err(EvidenceError::MissingSupport);
-        }
-        Ok(hypothesis)
+        })
     }
 
-    /// Enforce the strongest epistemic boundary in the crate: a direct
-    /// subsurface claim cannot be supported only by surface or indirect
-    /// evidence, and a claimed depth cannot exceed a sensor's validated bound.
+    /// A direct subsurface claim must be backed by a calibrated direct-
+    /// penetration observation, and a depth claim may not exceed that
+    /// observation's validated bound. Indirect hypotheses remain legal but
+    /// remain explicitly labelled `IndirectInference`.
     pub fn validate_observation_support(&self, observations: &[ObservationEvidence]) -> Result<()> {
         let mut matched = Vec::with_capacity(self.supporting_observations.len());
         for requested in &self.supporting_observations {
-            let Some(observation) = observations.iter().find(|candidate| candidate.id == *requested)
+            let Some(observation) = observations.iter().find(|candidate| &candidate.id == requested)
             else {
                 return Err(EvidenceError::MissingReferencedObservation(requested.0.clone()));
             };
             matched.push(observation);
         }
 
-        let HypothesisDomain::Subsurface { estimated_depth_m } = self.domain else {
+        let HypothesisDomain::Subsurface { estimated_depth_m } = &self.domain else {
             return Ok(());
         };
+        let estimated_depth_m = *estimated_depth_m;
 
         if self.mode == ClaimMode::IndirectInference {
             return Ok(());
@@ -632,27 +548,6 @@ pub struct Inference {
     pub support: Vec<EvidenceRef>,
 }
 
-impl Inference {
-    pub fn new(
-        id: impl Into<String>,
-        conclusion: impl Into<String>,
-        confidence: Confidence,
-        alternatives: Vec<String>,
-        support: Vec<EvidenceRef>,
-    ) -> Result<Self> {
-        if support.is_empty() {
-            return Err(EvidenceError::MissingSupport);
-        }
-        Ok(Self {
-            id: require_id(id, "inference id")?,
-            conclusion: require_id(conclusion, "inference conclusion")?,
-            confidence,
-            alternatives,
-            support,
-        })
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Prediction {
     pub id: String,
@@ -679,8 +574,7 @@ pub struct Verification {
     pub support: Vec<EvidenceRef>,
 }
 
-/// Contradiction is preserved as first-class evidence rather than averaged
-/// away. Resolution belongs to a higher-level inference engine.
+/// Contradiction is retained as evidence rather than averaged away.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EvidenceConflict {
     pub id: String,
@@ -751,7 +645,7 @@ mod tests {
     }
 
     #[test]
-    fn direct_subsurface_claim_rejects_indirect_surface_evidence() {
+    fn direct_subsurface_claim_rejects_indirect_evidence() {
         let observations = vec![observation(
             "obs-1",
             ObservationSensitivity::IndirectSubsurface,
@@ -801,6 +695,7 @@ mod tests {
             "obs-1",
             ObservationSensitivity::direct_penetrating(2.0).unwrap(),
         )];
+
         let supported = Hypothesis::new(
             "hyp-near",
             "directly observed shallow reflector",
