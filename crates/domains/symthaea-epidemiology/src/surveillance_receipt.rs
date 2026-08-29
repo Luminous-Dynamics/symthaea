@@ -45,12 +45,13 @@ pub fn assess_latest_change_with_receipt(
     latest: SurveillancePoint,
     config: SurveillanceScreenConfig,
 ) -> Result<SurveillanceScreenReceipt, SurveillanceScreenError> {
-    let baseline_window = baseline_points.first().zip(baseline_points.last()).map(
-        |(first, last)| BaselineTimeWindow {
+    let baseline_window = baseline_points
+        .first()
+        .zip(baseline_points.last())
+        .map(|(first, last)| BaselineTimeWindow {
             start_unix_s: first.observed_at_unix_s(),
             end_unix_s: last.observed_at_unix_s(),
-        },
-    );
+        });
     let latest_observed_at_unix_s = latest.observed_at_unix_s();
     let assessment = assess_latest_change(baseline_points, latest, config)?;
 
