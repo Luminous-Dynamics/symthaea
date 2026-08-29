@@ -13,24 +13,60 @@ permissions:
   contents: read
 
 concurrency:
-  group: nixward-resilience-${{ github.ref }}
+  group: nixward-resilience-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   qualify:
-    name: Nixward resilience contracts
-    runs-on: ubuntu-latest
+    name: Exact-head Nixward resilience contracts
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Assert exact clean source head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          echo "source_head=$(git rev-parse HEAD)"
+          echo "source_tree=$(git rev-parse 'HEAD^{tree}')"
+          echo "runner_image=${ImageOS:-unknown}/${ImageVersion:-unknown}"
+
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e
         with:
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
+
+      - name: Toolchain and lock provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc -vV
+          cargo -Vv
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+          test "$(cargo --version | awk '{print $2}')" = "1.96.0"
+          test -f Cargo.lock
+          sha256sum Cargo.lock
+
       - name: Format
         run: cargo fmt --check -p nixward
+
       - name: Default-feature library tests
-        run: cargo test -p nixward --lib
+        run: cargo test --locked -p nixward --lib
+
       - name: No-default-feature library tests
-        run: cargo test -p nixward --no-default-features --lib
+        run: cargo test --locked -p nixward --no-default-features --lib
+
       - name: Clippy
-        run: cargo clippy -p nixward --all-targets -- -D warnings
+        run: cargo clippy --locked -p nixward --all-targets -- -D warnings
+
+      - name: Verify qualification left source and lock unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=all)"
