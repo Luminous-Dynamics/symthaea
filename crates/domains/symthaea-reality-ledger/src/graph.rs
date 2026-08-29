@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Persistent graph of worlds that have existed, independent of current context.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -110,9 +110,9 @@ impl WorldGraph {
     fn verify_acyclic(&self) -> Result<(), WorldGraphError> {
         for start in self.worlds.keys() {
             let mut cursor = Some(start.clone());
-            let mut seen = BTreeMap::<WorldKey, ()>::new();
+            let mut seen = BTreeSet::<WorldKey>::new();
             while let Some(key) = cursor {
-                if seen.insert(key.clone(), ()).is_some() {
+                if !seen.insert(key.clone()) {
                     return Err(WorldGraphError::CycleDetected);
                 }
                 let Some(world) = self.worlds.get(&key) else {
