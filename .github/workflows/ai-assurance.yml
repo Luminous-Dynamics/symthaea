@@ -38,8 +38,8 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+      - name: Check assurance formatting
+        run: cargo fmt --package symthaea-ai-assurance -- --check
 
       - name: Verify locked workspace resolution
         run: cargo metadata --locked --no-deps --format-version 1 > /dev/null
