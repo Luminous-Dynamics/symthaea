@@ -358,16 +358,15 @@ impl HostRehydrationManifest {
 
             match &check.kind {
                 PostInstallCheckKind::ProtectedDataIntegrity => {
-                    if let Some(restore) = &self.protected_restore {
-                        if check.expectation_digest.as_deref()
+                    if let Some(restore) = &self.protected_restore
+                        && check.expectation_digest.as_deref()
                             != Some(restore.manifest_digest.as_str())
-                        {
-                            errors.push(
-                                HostRehydrationManifestError::ProtectedDataIntegrityExpectationMismatch {
-                                    check_id: check.check_id.clone(),
-                                },
-                            );
-                        }
+                    {
+                        errors.push(
+                            HostRehydrationManifestError::ProtectedDataIntegrityExpectationMismatch {
+                                check_id: check.check_id.clone(),
+                            },
+                        );
                     }
                 }
                 PostInstallCheckKind::SecureBootPosture
