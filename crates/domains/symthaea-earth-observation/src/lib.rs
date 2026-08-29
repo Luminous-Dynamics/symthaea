@@ -6,6 +6,7 @@
 //! owns Earth/sensor-physics semantics and deterministic feature math.
 
 pub mod features;
+pub mod sar;
 mod model;
 
 pub use model::*;
