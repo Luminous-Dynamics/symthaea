@@ -4,7 +4,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{digest::{DigestAlgorithm, TypedDigest}, types::WorldDescriptor};
+use crate::{
+    digest::{DigestAlgorithm, TypedDigest},
+    types::{RealityLayer, WorldDescriptor, WorldOrigin, WorldRelation},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DeterminismClass {
@@ -59,16 +62,14 @@ impl WorldGenesisManifest {
         let mut hasher = blake3::Hasher::new();
         feed(&mut hasher, b"symthaea.world-genesis.v1");
         hasher.update(&self.schema_version.to_le_bytes());
-        feed(&mut hasher, self.world.world_id.0.as_bytes());
-        feed(&mut hasher, self.world.lineage_id.0.as_bytes());
+        feed_world(&mut hasher, &self.world);
         for digest in [
             &self.simulation_kernel_digest,
             &self.physics_profile_digest,
             &self.asset_manifest_digest,
             &self.initial_state_digest,
         ] {
-            feed(&mut hasher, digest.domain.as_bytes());
-            feed(&mut hasher, digest.value.as_bytes());
+            feed_typed_digest(&mut hasher, digest);
         }
         hasher.update(&[determinism_tag(self.determinism)]);
         match self.seed {
@@ -87,6 +88,89 @@ impl WorldGenesisManifest {
             hasher.finalize().to_hex().to_string(),
         )
         .map_err(|error| WorldGenesisError::InvalidDigest(error.to_string()))
+    }
+}
+
+fn feed_world(hasher: &mut blake3::Hasher, world: &WorldDescriptor) {
+    feed(hasher, world.world_id.0.as_bytes());
+    feed(hasher, world.lineage_id.0.as_bytes());
+    hasher.update(&[layer_tag(world.layer)]);
+    feed(hasher, world.creator_id.as_bytes());
+    hasher.update(&world.generation_depth.to_le_bytes());
+    match &world.parent {
+        Some(parent) => {
+            hasher.update(&[1]);
+            feed(hasher, parent.world_id.0.as_bytes());
+            feed(hasher, parent.lineage_id.0.as_bytes());
+            hasher.update(&[relation_tag(&parent.relation)]);
+        }
+        None => {
+            hasher.update(&[0]);
+        }
+    }
+    match &world.origin {
+        WorldOrigin::PhysicalSensorium => {
+            hasher.update(&[0]);
+        }
+        WorldOrigin::DigitalHost { host_kind } => {
+            hasher.update(&[1]);
+            feed(hasher, host_kind.as_bytes());
+        }
+        WorldOrigin::CounterfactualBranch => {
+            hasher.update(&[2]);
+        }
+        WorldOrigin::ReplayArtifact => {
+            hasher.update(&[3]);
+        }
+        WorldOrigin::DreamEngine => {
+            hasher.update(&[4]);
+        }
+        WorldOrigin::ImportedExternal { source } => {
+            hasher.update(&[5]);
+            feed(hasher, source.as_bytes());
+        }
+        WorldOrigin::Unknown => {
+            hasher.update(&[6]);
+        }
+    }
+}
+
+fn feed_typed_digest(hasher: &mut blake3::Hasher, digest: &TypedDigest) {
+    feed(hasher, digest.domain.as_bytes());
+    match &digest.algorithm {
+        DigestAlgorithm::Blake3 => {
+            hasher.update(&[0]);
+        }
+        DigestAlgorithm::Sha256 => {
+            hasher.update(&[1]);
+        }
+        DigestAlgorithm::Other(name) => {
+            hasher.update(&[2]);
+            feed(hasher, name.as_bytes());
+        }
+    }
+    feed(hasher, digest.value.as_bytes());
+}
+
+fn layer_tag(layer: RealityLayer) -> u8 {
+    match layer {
+        RealityLayer::PhysicalGrounded => 0,
+        RealityLayer::DigitalCommitted => 1,
+        RealityLayer::Counterfactual => 2,
+        RealityLayer::Replay => 3,
+        RealityLayer::Dream => 4,
+        RealityLayer::Imported => 5,
+        RealityLayer::Unknown => 6,
+    }
+}
+
+fn relation_tag(relation: &WorldRelation) -> u8 {
+    match relation {
+        WorldRelation::CounterfactualOf => 0,
+        WorldRelation::ReplayOf => 1,
+        WorldRelation::DreamedFrom => 2,
+        WorldRelation::ImportedFrom => 3,
+        WorldRelation::SpawnedFrom => 4,
     }
 }
 
@@ -121,7 +205,7 @@ pub enum WorldGenesisError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{digest::TypedDigest, types::{RealityLayer, WorldId, WorldLineageId, WorldOrigin}};
+    use crate::{digest::TypedDigest, types::{WorldId, WorldLineageId}};
 
     fn d(domain: &str) -> TypedDigest {
         TypedDigest::blake3(domain, domain.as_bytes()).unwrap()
@@ -153,5 +237,24 @@ mod tests {
             timebase_id: "studio-frame".into(),
         };
         assert_eq!(manifest.validate(), Err(WorldGenesisError::SeedRequired));
+    }
+
+    #[test]
+    fn changing_world_provenance_changes_genesis_digest() {
+        let mut a = WorldGenesisManifest {
+            schema_version: 1,
+            world: world(),
+            simulation_kernel_digest: d("kernel.v1"),
+            physics_profile_digest: d("physics.v1"),
+            asset_manifest_digest: d("assets.v1"),
+            initial_state_digest: d("state.v1"),
+            determinism: DeterminismClass::Deterministic,
+            seed: None,
+            timebase_id: "studio-frame".into(),
+        };
+        let before = a.digest().unwrap();
+        a.world.creator_id = "different-creator".into();
+        let after = a.digest().unwrap();
+        assert_ne!(before, after);
     }
 }
