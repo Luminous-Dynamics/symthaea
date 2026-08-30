@@ -27,12 +27,15 @@
 //! generic `Err` as proof that nothing happened. [`independence`] makes
 //! observer/resolver separation an explicit host policy and records the exact
 //! principal/domain guarantee actually enforced rather than overloading the word
-//! “independent.”
+//! “independent.” [`budget_purpose`] adds a separate quantitative-policy
+//! admission proving which trusted purpose policy approved the exact conserved
+//! resource envelope for the exact action.
 //!
 //! Security-sensitive state-changing integrations should compose these layers so
 //! trust anchors, validation time, concrete resources, policy admission,
-//! revocation, temporal bounds, quantitative capacity, effect-attempt evidence,
-//! and separation-of-duties claims remain host-owned rather than model-selected.
+//! revocation, temporal bounds, quantitative capacity, approved purpose,
+//! effect-attempt evidence, and separation-of-duties claims remain host-owned
+//! rather than model-selected.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
@@ -40,6 +43,7 @@
 pub mod action;
 pub mod budget;
 pub mod budget_guard;
+pub mod budget_purpose;
 pub mod capability;
 pub mod effect_guard;
 pub mod host;
@@ -63,6 +67,12 @@ pub use budget::{
 pub use budget_guard::{
     BudgetAdapterError, BudgetGuardedAction, BudgetGuardedAuthorizeError, BudgetGuardedRuntime,
     BudgetLeaseEvidence, BudgetedEvidenceReceipt,
+};
+pub use budget_purpose::{
+    BudgetPurposeAdmissionReceipt, BudgetPurposeAuthorityDomain, BudgetPurposeAuthorizeError,
+    BudgetPurposeDescriptor, BudgetPurposeError, BudgetPurposeEvidence, BudgetPurposeRules,
+    BudgetPurposeVerifier, PurposeBoundBudgetLease, PurposeBoundEvidenceReceipt,
+    PurposeEffectAttemptFailure, PurposeGuardedAction, PurposeGuardedRuntime,
 };
 pub use capability::{
     AuthorityRoot, BoundOneShotCapability, Capability, CapabilityKind, Deploy, Execute, GrantError,
