@@ -13,11 +13,11 @@
 //!   abstention.
 //!
 //! [`surveillance_receipt`] adds an evidence-bearing wrapper that binds a result
-//! to the exact screening algorithm identifier, caller-supplied configuration,
-//! baseline time scope, latest timestamp, and a SHA-256 content commitment over
-//! the complete ordered input series including explicit missingness. The complete
-//! receipt also has its own canonical content identity, committing to every
-//! configuration and returned-assessment field.
+//! to a typed, versioned screening-algorithm identity, caller-supplied
+//! configuration, baseline time scope, latest timestamp, and a SHA-256 content
+//! commitment over the complete ordered input series including explicit
+//! missingness. The complete receipt also has its own canonical content identity,
+//! committing to every configuration and returned-assessment field.
 //!
 //! The surveillance modules report statistical change candidates only. They do
 //! **not** diagnose disease, declare an outbreak, identify a pathogen, estimate
@@ -39,8 +39,8 @@
 //!
 //! ```
 //! use symthaea_epidemiology::{
-//!     ScreeningDisposition, SurveillancePoint, SurveillanceScreenConfig,
-//!     assess_latest_change_with_receipt,
+//!     ScreeningDisposition, SurveillancePoint, SurveillanceScreenAlgorithm,
+//!     SurveillanceScreenConfig, assess_latest_change_with_receipt,
 //! };
 //!
 //! let history = [
@@ -54,6 +54,10 @@
 //! let config = SurveillanceScreenConfig::new(5, 3.0).unwrap();
 //! let receipt = assess_latest_change_with_receipt(&history, latest, config).unwrap();
 //!
+//! assert_eq!(
+//!     receipt.algorithm(),
+//!     SurveillanceScreenAlgorithm::RobustMedianMadIntervalGuardV1
+//! );
 //! assert_eq!(receipt.input_id().to_hex().len(), 64);
 //! assert_eq!(receipt.id().to_hex().len(), 64);
 //! assert!(matches!(
@@ -74,6 +78,7 @@ pub use surveillance::{
 };
 pub use surveillance_receipt::{
     BaselineTimeWindow, SURVEILLANCE_SCREEN_ALGORITHM_V1, SURVEILLANCE_SCREEN_INPUT_ID_DOMAIN_V1,
-    SURVEILLANCE_SCREEN_RECEIPT_ID_DOMAIN_V1, SurveillanceScreenInputId, SurveillanceScreenReceipt,
-    SurveillanceScreenReceiptId, assess_latest_change_with_receipt,
+    SURVEILLANCE_SCREEN_RECEIPT_ID_DOMAIN_V1, SurveillanceScreenAlgorithm,
+    SurveillanceScreenInputId, SurveillanceScreenReceipt, SurveillanceScreenReceiptId,
+    assess_latest_change_with_receipt,
 };
