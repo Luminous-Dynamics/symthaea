@@ -12,3 +12,4 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 blake3 = { workspace = true }
 symthaea-research-result = { path = "../symthaea-research-result" }
+symthaea-research-protocol = { path = "../symthaea-research-protocol" }
