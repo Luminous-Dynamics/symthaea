@@ -6,8 +6,10 @@
 //! contains no semantic category layer and no dependency on the cognitive loop,
 //! allowing deterministic regulation experiments to remain mechanically isolated.
 
+mod homeostasis;
 mod state;
 
+pub use homeostasis::{assess_homeostasis, HomeostaticReport};
 pub use state::{
     NativeInteroceptiveState, ViabilityChannel, ViabilityVariable, CHANNEL_COUNT,
 };
