@@ -4,15 +4,16 @@
 //!
 //! These tests intentionally model a non-zero protected sink. The important
 //! property is not merely that denial leaves a default state empty; denial,
-//! stale authorization, and foreign-monitor authority must preserve already
-//! meaningful state exactly.
+//! stale authorization, forged request annotations, and foreign-monitor
+//! authority must preserve already meaningful state exactly.
 
 use std::collections::BTreeSet;
 use symthaea_cogsec::{
     ArtifactIntegrity, AuthorityError, CapabilityFact, CognitiveSecurityLabel, CommitPermit,
     Confidentiality, Consequence, ControlIntegrity, Digest32, MutationKind, MutationRequest,
     OriginState, PolicyRule, PolicySnapshot, PrincipalId, ReferenceMonitor, ResourceId,
-    ResourceScope, TaintLevel, TrustedFactAuthority, TrustedFacts,
+    ResourceScope, TaintLevel, TransitionField, TrustedFactAuthority, TrustedFacts,
+    VerifiedTransition,
 };
 
 fn d(byte: u8) -> Digest32 {
@@ -88,14 +89,29 @@ impl Fixture {
         }
     }
 
-    fn facts(
+    fn transition_for(&self, request: &MutationRequest) -> VerifiedTransition {
+        self.authority.issue_transition(
+            request.subject.clone(),
+            request.kind,
+            request.resource.clone(),
+            request.mutation_digest,
+            request.consequence,
+            request.input_label.clone(),
+            request.sequence,
+        )
+    }
+
+    fn facts_for(
         &self,
+        request: &MutationRequest,
         state_root: Digest32,
         authorization_epoch: u64,
         revocation_epoch: u64,
     ) -> TrustedFacts {
+        let transition = self.transition_for(request);
         self.authority
             .snapshot(
+                &transition,
                 state_root,
                 self.policy.root,
                 self.policy.epoch,
@@ -125,8 +141,9 @@ impl ProtectedGoalState {
 
     /// Reference P0 sink contract for future runtime integration.
     ///
-    /// The sink both consumes post-revalidation typestate and checks that the
-    /// permit belongs to the monitor domain owned by this protected state.
+    /// The sink consumes post-revalidation typestate and independently checks
+    /// the monitor domain plus the exact principal/kind/resource/effect/
+    /// consequence/state binding expected by this owner.
     fn commit(
         &mut self,
         monitor: &ReferenceMonitor,
@@ -135,11 +152,20 @@ impl ProtectedGoalState {
         if !monitor.accepts_commit_permit(&permit) {
             return Err("foreign monitor domain");
         }
+        if permit.subject() != &PrincipalId("local-user".into()) {
+            return Err("wrong subject");
+        }
         if permit.kind() != MutationKind::GoalActivation {
             return Err("wrong mutation kind");
         }
         if permit.resource() != &ResourceId("mind/goals".into()) {
             return Err("wrong resource");
+        }
+        if permit.mutation_digest() != d(2) {
+            return Err("wrong mutation digest");
+        }
+        if permit.consequence() != Consequence::High {
+            return Err("wrong consequence");
         }
         if permit.resource_state_root() != self.state_root {
             return Err("stale resource state");
@@ -153,10 +179,10 @@ impl ProtectedGoalState {
 }
 
 #[test]
-fn denied_request_preserves_nonzero_state_exactly() {
+fn policy_denial_preserves_nonzero_state_exactly() {
     let mut fixture = Fixture::new();
     fixture.request.input_label.taint = TaintLevel::Tainted;
-    let facts = fixture.facts(d(8), 11, 13);
+    let facts = fixture.facts_for(&fixture.request, d(8), 11, 13);
 
     let state = ProtectedGoalState::nonzero();
     let before = state.clone();
@@ -171,7 +197,7 @@ fn denied_request_preserves_nonzero_state_exactly() {
 #[test]
 fn stale_authorization_cannot_reach_commit_typestate_or_mutate_state() {
     let fixture = Fixture::new();
-    let initial_facts = fixture.facts(d(8), 11, 13);
+    let initial_facts = fixture.facts_for(&fixture.request, d(8), 11, 13);
     let permit = fixture
         .monitor
         .authorize(&fixture.request, &initial_facts, &fixture.policy)
@@ -183,7 +209,7 @@ fn stale_authorization_cannot_reach_commit_typestate_or_mutate_state() {
     state.accepted_mutations.push(d(76));
     let before = state.clone();
 
-    let fresh_facts = fixture.facts(state.state_root, 11, 13);
+    let fresh_facts = fixture.facts_for(&fixture.request, state.state_root, 11, 13);
     let precommit = fixture
         .monitor
         .precommit(permit, &fresh_facts, &fixture.policy);
@@ -192,9 +218,9 @@ fn stale_authorization_cannot_reach_commit_typestate_or_mutate_state() {
 }
 
 #[test]
-fn fresh_commit_permit_commits_once_against_exact_state_and_domain() {
+fn fresh_commit_permit_commits_once_against_exact_state_domain_and_effect() {
     let fixture = Fixture::new();
-    let facts = fixture.facts(d(8), 11, 13);
+    let facts = fixture.facts_for(&fixture.request, d(8), 11, 13);
     let permit = fixture
         .monitor
         .authorize(&fixture.request, &facts, &fixture.policy)
@@ -217,7 +243,7 @@ fn fresh_commit_permit_commits_once_against_exact_state_and_domain() {
 #[test]
 fn revocation_between_authorize_and_precommit_preserves_nonzero_state() {
     let fixture = Fixture::new();
-    let facts = fixture.facts(d(8), 11, 13);
+    let facts = fixture.facts_for(&fixture.request, d(8), 11, 13);
     let permit = fixture
         .monitor
         .authorize(&fixture.request, &facts, &fixture.policy)
@@ -225,7 +251,7 @@ fn revocation_between_authorize_and_precommit_preserves_nonzero_state() {
 
     let state = ProtectedGoalState::nonzero();
     let before = state.clone();
-    let revoked_context = fixture.facts(d(8), 11, 14);
+    let revoked_context = fixture.facts_for(&fixture.request, d(8), 11, 14);
 
     assert!(
         fixture
@@ -239,7 +265,7 @@ fn revocation_between_authorize_and_precommit_preserves_nonzero_state() {
 #[test]
 fn authorization_epoch_change_invalidates_reauthorization() {
     let fixture = Fixture::new();
-    let changed = fixture.facts(d(8), 12, 13);
+    let changed = fixture.facts_for(&fixture.request, d(8), 12, 13);
 
     let state = ProtectedGoalState::nonzero();
     let before = state.clone();
@@ -253,10 +279,77 @@ fn authorization_epoch_change_invalidates_reauthorization() {
 }
 
 #[test]
+fn consequence_underclaim_after_verification_preserves_nonzero_state() {
+    let mut fixture = Fixture::new();
+    let facts = fixture.facts_for(&fixture.request, d(8), 11, 13);
+    fixture.request.consequence = Consequence::Low;
+
+    let state = ProtectedGoalState::nonzero();
+    let before = state.clone();
+    let result = fixture
+        .monitor
+        .authorize(&fixture.request, &facts, &fixture.policy);
+
+    assert!(matches!(
+        result,
+        Err(AuthorityError::TransitionBindingMismatch(
+            TransitionField::Consequence
+        ))
+    ));
+    assert_eq!(state, before);
+}
+
+#[test]
+fn integrity_upgrade_after_verification_preserves_nonzero_state() {
+    let mut fixture = Fixture::new();
+    fixture.request.input_label.control_integrity = ControlIntegrity::Untrusted;
+    fixture.request.input_label.taint = TaintLevel::Tainted;
+    let facts = fixture.facts_for(&fixture.request, d(8), 11, 13);
+
+    fixture.request.input_label.control_integrity = ControlIntegrity::PolicyEndorsed;
+    fixture.request.input_label.taint = TaintLevel::Clean;
+
+    let state = ProtectedGoalState::nonzero();
+    let before = state.clone();
+    let result = fixture
+        .monitor
+        .authorize(&fixture.request, &facts, &fixture.policy);
+
+    assert!(matches!(
+        result,
+        Err(AuthorityError::TransitionBindingMismatch(
+            TransitionField::InputSecurityLabel
+        ))
+    ));
+    assert_eq!(state, before);
+}
+
+#[test]
+fn subject_spoof_after_verification_preserves_nonzero_state() {
+    let mut fixture = Fixture::new();
+    let facts = fixture.facts_for(&fixture.request, d(8), 11, 13);
+    fixture.request.subject = PrincipalId("other-user".into());
+
+    let state = ProtectedGoalState::nonzero();
+    let before = state.clone();
+    let result = fixture
+        .monitor
+        .authorize(&fixture.request, &facts, &fixture.policy);
+
+    assert!(matches!(
+        result,
+        Err(AuthorityError::TransitionBindingMismatch(
+            TransitionField::Subject
+        ))
+    ));
+    assert_eq!(state, before);
+}
+
+#[test]
 fn foreign_monitor_commit_permit_is_rejected_without_state_change() {
     let fixture_a = Fixture::new();
     let fixture_b = Fixture::new();
-    let facts_b = fixture_b.facts(d(8), 11, 13);
+    let facts_b = fixture_b.facts_for(&fixture_b.request, d(8), 11, 13);
     let permit_b = fixture_b
         .monitor
         .authorize(&fixture_b.request, &facts_b, &fixture_b.policy)
@@ -277,7 +370,7 @@ fn foreign_monitor_commit_permit_is_rejected_without_state_change() {
 fn facts_from_foreign_domain_never_reach_inner_monitor() {
     let fixture_a = Fixture::new();
     let fixture_b = Fixture::new();
-    let facts_b = fixture_b.facts(d(8), 11, 13);
+    let facts_b = fixture_b.facts_for(&fixture_b.request, d(8), 11, 13);
 
     let result = fixture_a
         .monitor
