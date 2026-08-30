@@ -1,7 +1,7 @@
 use symthaea_interoception::{
-    assess_allostasis, assess_allostasis_with_drive, assess_homeostasis, AllostaticConfig,
-    InteroceptiveDrive, InteroceptiveSnapshot, NativeInteroceptiveModel,
-    NativeInteroceptiveState, ViabilityChannel,
+    apply_intervention, assess_allostasis, assess_allostasis_with_drive, assess_homeostasis,
+    AllostaticConfig, InteroceptiveDrive, InteroceptiveIntervention, InteroceptiveSnapshot,
+    NativeInteroceptiveModel, NativeInteroceptiveState, ViabilityChannel,
 };
 
 #[test]
@@ -66,11 +66,9 @@ fn dynamics_aware_allostasis_uses_declared_future_drive() {
         discount: 1.0,
     };
 
-    // A resting state has no measured velocity, so the kinematic baseline is flat.
     let kinematic = assess_allostasis(model.state(), config);
     assert_eq!(kinematic.discounted_debt, 0.0);
 
-    // The dynamics-aware arm can nevertheless anticipate a declared ongoing load.
     let drive = InteroceptiveDrive::ZERO.with_rate(ViabilityChannel::ComputeReserve, -0.08);
     let rollout = assess_allostasis_with_drive(&model, drive, config);
     assert!(rollout.discounted_debt > 0.0);
@@ -85,7 +83,12 @@ fn zero_drive_recovers_a_perturbed_channel_toward_its_preferred_band() {
     let before = assess_homeostasis(&state).weighted_deviation;
 
     let mut model = NativeInteroceptiveModel::new(state, Default::default());
-    for _ in 0..20 {
+    let first = model.step(InteroceptiveDrive::ZERO);
+    assert_eq!(first.restorative_channels, 1);
+    assert_eq!(first.driven_channels, 0);
+    assert_eq!(first.changed_channels, 1);
+
+    for _ in 1..20 {
         model.step(InteroceptiveDrive::ZERO);
     }
 
@@ -116,7 +119,12 @@ fn zero_drive_preserves_states_already_inside_preferred_band() {
     let before = state.clone();
 
     let mut model = NativeInteroceptiveModel::new(state, Default::default());
-    model.step(InteroceptiveDrive::ZERO);
+    let report = model.step(InteroceptiveDrive::ZERO);
+
+    assert_eq!(report.driven_channels, 0);
+    assert_eq!(report.restorative_channels, 0);
+    assert_eq!(report.clamped_channels, 0);
+    assert_eq!(report.changed_channels, 0);
 
     for channel in ViabilityChannel::ALL {
         assert_eq!(
@@ -126,6 +134,26 @@ fn zero_drive_preserves_states_already_inside_preferred_band() {
         );
         assert_eq!(model.state().get(channel).velocity, 0.0);
     }
+}
+
+#[test]
+fn interventions_are_explicit_clamped_and_do_not_create_false_velocity() {
+    let mut model = NativeInteroceptiveModel::default();
+    model.step(InteroceptiveDrive::ZERO.with_rate(ViabilityChannel::Integrity, -0.1));
+    assert!(model.state().get(ViabilityChannel::Integrity).velocity < 0.0);
+
+    let record = apply_intervention(
+        &mut model,
+        InteroceptiveIntervention::set(ViabilityChannel::Integrity, -1.0),
+    );
+
+    assert_eq!(record.cycle, 1);
+    assert_eq!(record.before, 0.8);
+    assert_eq!(record.requested, -1.0);
+    assert_eq!(record.after, 0.0);
+    assert!(record.clamped);
+    assert_eq!(model.state().get(ViabilityChannel::Integrity).velocity, 0.0);
+    assert!(!assess_homeostasis(model.state()).is_within_viability());
 }
 
 #[test]
@@ -155,6 +183,7 @@ fn core_source_contains_no_named_state_categories() {
         include_str!("../src/homeostasis.rs"),
         include_str!("../src/allostasis.rs"),
         include_str!("../src/dynamics.rs"),
+        include_str!("../src/intervention.rs"),
         include_str!("../src/snapshot.rs"),
     ]
     .join("\n")

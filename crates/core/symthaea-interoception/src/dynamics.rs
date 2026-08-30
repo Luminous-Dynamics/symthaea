@@ -63,6 +63,17 @@ impl Default for InteroceptiveDrive {
     }
 }
 
+/// Mechanically measured receipt for one native regulatory transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InteroceptiveStepReport {
+    pub cycle_before: u64,
+    pub cycle_after: u64,
+    pub driven_channels: u8,
+    pub restorative_channels: u8,
+    pub clamped_channels: u8,
+    pub changed_channels: u8,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NativeInteroceptiveModel {
     state: NativeInteroceptiveState,
@@ -86,6 +97,11 @@ impl NativeInteroceptiveModel {
     }
 
     #[inline]
+    pub(crate) fn state_mut(&mut self) -> &mut NativeInteroceptiveState {
+        &mut self.state
+    }
+
+    #[inline]
     pub fn config(&self) -> InteroceptiveDynamicsConfig {
         self.config
     }
@@ -95,22 +111,50 @@ impl NativeInteroceptiveModel {
         self.cycle
     }
 
-    pub fn step(&mut self, drive: InteroceptiveDrive) {
+    pub fn step(&mut self, drive: InteroceptiveDrive) -> InteroceptiveStepReport {
         let dt = self.config.step_dt;
+        let cycle_before = self.cycle;
+        let mut driven_channels = 0_u8;
+        let mut restorative_channels = 0_u8;
+        let mut clamped_channels = 0_u8;
+        let mut changed_channels = 0_u8;
 
         for channel in ViabilityChannel::ALL {
             let variable = self.state.get_mut(channel);
             let previous = variable.value;
             let restorative_rate = restorative_rate(variable, self.config.recovery_rate);
-            let total_rate = restorative_rate + drive.rate(channel);
-            let next = (previous + total_rate * dt)
-                .clamp(self.config.min_value, self.config.max_value);
+            let external_rate = drive.rate(channel);
+
+            if restorative_rate != 0.0 {
+                restorative_channels = restorative_channels.saturating_add(1);
+            }
+            if external_rate != 0.0 {
+                driven_channels = driven_channels.saturating_add(1);
+            }
+
+            let proposed = previous + (restorative_rate + external_rate) * dt;
+            let next = proposed.clamp(self.config.min_value, self.config.max_value);
+            if next != proposed {
+                clamped_channels = clamped_channels.saturating_add(1);
+            }
+            if next != previous {
+                changed_channels = changed_channels.saturating_add(1);
+            }
 
             variable.value = next;
             variable.velocity = (next - previous) / dt;
         }
 
         self.cycle = self.cycle.saturating_add(1);
+
+        InteroceptiveStepReport {
+            cycle_before,
+            cycle_after: self.cycle,
+            driven_channels,
+            restorative_channels,
+            clamped_channels,
+            changed_channels,
+        }
     }
 }
 

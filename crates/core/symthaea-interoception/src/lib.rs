@@ -9,6 +9,7 @@
 mod allostasis;
 mod dynamics;
 mod homeostasis;
+mod intervention;
 mod snapshot;
 mod state;
 
@@ -16,9 +17,13 @@ pub use allostasis::{
     assess_allostasis, assess_allostasis_with_drive, AllostaticConfig, AllostaticReport,
 };
 pub use dynamics::{
-    InteroceptiveDrive, InteroceptiveDynamicsConfig, NativeInteroceptiveModel,
+    InteroceptiveDrive, InteroceptiveDynamicsConfig, InteroceptiveStepReport,
+    NativeInteroceptiveModel,
 };
 pub use homeostasis::{assess_homeostasis, HomeostaticReport};
+pub use intervention::{
+    apply_intervention, InterventionKind, InterventionRecord, InteroceptiveIntervention,
+};
 pub use snapshot::InteroceptiveSnapshot;
 pub use state::{
     NativeInteroceptiveState, ViabilityChannel, ViabilityVariable, CHANNEL_COUNT,
