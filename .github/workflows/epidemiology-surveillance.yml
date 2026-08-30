@@ -5,12 +5,14 @@ on:
     paths:
       - "crates/domains/symthaea-epidemiology/**"
       - "crates/domains/symthaea-statistics/**"
+      - "Cargo.lock"
       - ".github/workflows/epidemiology-surveillance.yml"
   push:
     branches: [main]
     paths:
       - "crates/domains/symthaea-epidemiology/**"
       - "crates/domains/symthaea-statistics/**"
+      - "Cargo.lock"
       - ".github/workflows/epidemiology-surveillance.yml"
   workflow_dispatch:
 
@@ -35,13 +37,13 @@ jobs:
         run: cargo fmt -p symthaea-epidemiology -- --check
 
       - name: Run epidemiology tests
-        run: cargo test -p symthaea-epidemiology
+        run: cargo test --locked -p symthaea-epidemiology
 
       - name: Run documentation tests
-        run: cargo test -p symthaea-epidemiology --doc
+        run: cargo test --locked -p symthaea-epidemiology --doc
 
       - name: Run Clippy
-        run: cargo clippy -p symthaea-epidemiology --all-targets -- -D warnings
+        run: cargo clippy --locked -p symthaea-epidemiology --all-targets -- -D warnings
 
       - name: Check pure-domain WASM portability
-        run: cargo check -p symthaea-epidemiology --target wasm32-unknown-unknown
+        run: cargo check --locked -p symthaea-epidemiology --target wasm32-unknown-unknown
