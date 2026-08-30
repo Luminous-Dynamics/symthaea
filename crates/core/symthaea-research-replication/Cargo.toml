@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-research-replication"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Replication and lineage-comparison evidence for Symthaea research results."
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+blake3 = { workspace = true }
+symthaea-research-result = { path = "../symthaea-research-result" }
+
+[dev-dependencies]
+symthaea-research-protocol = { path = "../symthaea-research-protocol" }
