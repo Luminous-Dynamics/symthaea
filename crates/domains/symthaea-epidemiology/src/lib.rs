@@ -54,10 +54,10 @@
 //! let config = SurveillanceScreenConfig::new(5, 3.0).unwrap();
 //! let receipt = assess_latest_change_with_receipt(&history, latest, config).unwrap();
 //!
-//! assert_eq!(receipt.input_id.to_hex().len(), 64);
+//! assert_eq!(receipt.input_id().to_hex().len(), 64);
 //! assert_eq!(receipt.id().to_hex().len(), 64);
 //! assert!(matches!(
-//!     receipt.assessment.disposition,
+//!     receipt.assessment().disposition,
 //!     ScreeningDisposition::ChangeCandidate(_)
 //! ));
 //! ```
