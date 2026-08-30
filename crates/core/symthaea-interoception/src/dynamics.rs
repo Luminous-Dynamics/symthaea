@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{NativeInteroceptiveState, ViabilityChannel, CHANNEL_COUNT};
+use crate::{NativeInteroceptiveState, ViabilityChannel, ViabilityVariable, CHANNEL_COUNT};
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct InteroceptiveDynamicsConfig {
@@ -25,6 +25,10 @@ impl InteroceptiveDynamicsConfig {
     pub fn validate(&self) {
         assert!(self.step_dt.is_finite() && self.step_dt > 0.0);
         assert!(self.recovery_rate.is_finite() && self.recovery_rate >= 0.0);
+        assert!(
+            self.recovery_rate * self.step_dt <= 1.0,
+            "recovery gain per step must not exceed 1.0"
+        );
         assert!(self.min_value.is_finite());
         assert!(self.max_value.is_finite());
         assert!(self.min_value < self.max_value);
@@ -82,6 +86,11 @@ impl NativeInteroceptiveModel {
     }
 
     #[inline]
+    pub fn config(&self) -> InteroceptiveDynamicsConfig {
+        self.config
+    }
+
+    #[inline]
     pub fn cycle(&self) -> u64 {
         self.cycle
     }
@@ -92,8 +101,7 @@ impl NativeInteroceptiveModel {
         for channel in ViabilityChannel::ALL {
             let variable = self.state.get_mut(channel);
             let previous = variable.value;
-            let restorative_rate =
-                (variable.preferred_midpoint() - previous) * self.config.recovery_rate;
+            let restorative_rate = restorative_rate(variable, self.config.recovery_rate);
             let total_rate = restorative_rate + drive.rate(channel);
             let next = (previous + total_rate * dt)
                 .clamp(self.config.min_value, self.config.max_value);
@@ -103,6 +111,16 @@ impl NativeInteroceptiveModel {
         }
 
         self.cycle = self.cycle.saturating_add(1);
+    }
+}
+
+fn restorative_rate(variable: &ViabilityVariable, recovery_rate: f32) -> f32 {
+    if variable.value < variable.preferred_low {
+        (variable.preferred_low - variable.value) * recovery_rate
+    } else if variable.value > variable.preferred_high {
+        (variable.preferred_high - variable.value) * recovery_rate
+    } else {
+        0.0
     }
 }
 

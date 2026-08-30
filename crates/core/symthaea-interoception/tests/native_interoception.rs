@@ -69,6 +69,26 @@ fn zero_drive_recovers_a_perturbed_channel_toward_its_preferred_band() {
 }
 
 #[test]
+fn zero_drive_preserves_states_already_inside_preferred_band() {
+    let mut state = NativeInteroceptiveState::default();
+    state.get_mut(ViabilityChannel::ComputeReserve).value = 0.68;
+    state.get_mut(ViabilityChannel::NoveltyBalance).value = 0.57;
+    let before = state.clone();
+
+    let mut model = NativeInteroceptiveModel::new(state, Default::default());
+    model.step(InteroceptiveDrive::ZERO);
+
+    for channel in ViabilityChannel::ALL {
+        assert_eq!(
+            model.state().get(channel).value,
+            before.get(channel).value,
+            "zero drive must not create an implicit midpoint setpoint for {channel:?}"
+        );
+        assert_eq!(model.state().get(channel).velocity, 0.0);
+    }
+}
+
+#[test]
 fn identical_initial_state_and_drives_produce_identical_snapshots() {
     let mut left = NativeInteroceptiveModel::default();
     let mut right = NativeInteroceptiveModel::default();
