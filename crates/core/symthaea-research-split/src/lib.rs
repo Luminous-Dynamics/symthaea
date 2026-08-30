@@ -1,13 +1,10 @@
 //! Content-addressed research split contracts for leakage-resistant evaluation.
 //!
-//! This crate records and enforces **declared** sample separation. It can prove facts such as
-//! "no evaluation sample shares the declared `spatial-block` or `acquisition` group with
-//! development data" and "evaluation begins only after the declared forward-time embargo".
-//!
-//! It deliberately does **not** prove that the chosen group definitions are scientifically
-//! adequate, that two blocks are statistically independent, or that a buffer distance exceeds
-//! the process autocorrelation scale. Those stronger claims require domain-specific evidence and
-//! remain visible through [`SeparationEvidence`] rather than being collapsed into a trust score.
+//! This crate enforces **declared** separation facts such as “evaluation does not share the
+//! declared `spatial-block` or `acquisition` group with development data” and “evaluation starts
+//! after a frozen forward-time embargo”. It deliberately does not infer statistical independence,
+//! adequate buffer distance, or an autocorrelation scale from group ids alone. Stronger claims
+//! remain attributable through [`SeparationEvidence`] rather than a universal trust score.
 
 use std::collections::{HashMap, HashSet};
 
@@ -37,7 +34,7 @@ pub enum SplitError {
     #[error("sample {sample_id} is missing required group dimension {dimension}")]
     MissingRequiredGroupDimension { sample_id: String, dimension: String },
     #[error(
-        "declared group leakage on {dimension}={value}: {first_role:?} and {second_role:?} are not allowed to share that group"
+        "declared group leakage on {dimension}={value}: {first_role:?} and {second_role:?} may not share that group"
     )]
     GroupLeakage {
         dimension: String,
@@ -82,32 +79,31 @@ impl PartitionRole {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GroupRef {
-    /// Group namespace, e.g. `spatial-block`, `acquisition`, `watershed`, or `subject`.
+    /// Namespace such as `spatial-block`, `acquisition`, `watershed`, or `subject`.
     pub dimension: String,
-    /// Caller-defined value within the dimension.
     pub value: String,
 }
 
 impl GroupRef {
     pub fn new(dimension: impl Into<String>, value: impl Into<String>) -> Result<Self> {
-        let dimension = dimension.into();
-        let value = value.into();
-        non_empty(&dimension, "group dimension")?;
-        non_empty(&value, "group value")?;
-        Ok(Self { dimension, value })
+        let result = Self {
+            dimension: dimension.into(),
+            value: value.into(),
+        };
+        non_empty(&result.dimension, "group dimension")?;
+        non_empty(&result.value, "group value")?;
+        Ok(result)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SplitUnit {
     pub sample_id: String,
-    /// Timestamp used only when a temporal policy is selected. The contract does not prescribe
-    /// whether this is acquisition, event, publication, or another domain clock; that meaning
-    /// belongs in the dataset/split documentation and must remain consistent within a manifest.
+    /// Domain-defined sample clock. A selected temporal policy assumes this meaning is consistent
+    /// across the manifest.
     pub observed_at_unix_ms: i64,
-    /// Content/provenance digest of the immutable sample record or source artifact.
     pub content_digest: String,
-    /// At most one value per dimension for this unit.
+    /// At most one value per dimension.
     pub groups: Vec<GroupRef>,
 }
 
@@ -118,14 +114,14 @@ impl SplitUnit {
         content_digest: impl Into<String>,
         groups: Vec<GroupRef>,
     ) -> Result<Self> {
-        let unit = Self {
+        let result = Self {
             sample_id: sample_id.into(),
             observed_at_unix_ms,
             content_digest: content_digest.into(),
             groups,
         };
-        unit.validate()?;
-        Ok(unit)
+        result.validate()?;
+        Ok(result)
     }
 
     fn validate(&self) -> Result<()> {
@@ -167,12 +163,11 @@ impl AssignedUnit {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GroupSeparationPolicy {
-    /// No group-exclusivity assertion. Group metadata may still be retained for audit.
     None,
-    /// Evaluation may not share any configured group value with Training or Calibration.
-    /// Training and Calibration may share groups with each other.
+    /// Evaluation may not share configured group values with Training or Calibration. Development
+    /// roles may share values with each other.
     EvaluationDisjoint { dimensions: Vec<String> },
-    /// A configured group value may occur in only one partition role across the manifest.
+    /// A configured group value may occur in only one partition role.
     AllRolesDisjoint { dimensions: Vec<String> },
 }
 
@@ -202,11 +197,10 @@ impl GroupSeparationPolicy {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TemporalSeparationPolicy {
     None,
-    /// Every evaluation sample must be at least `embargo_ms` later than the latest Training or
-    /// Calibration sample. This is intentionally stricter than merely checking mean dates.
+    /// Earliest evaluation must be at least `embargo_ms` after the latest development sample.
     ForwardEvaluation { embargo_ms: u64 },
 }
 
@@ -220,11 +214,9 @@ pub enum SeparationEvidenceKind {
     Other,
 }
 
-/// Evidence about separation adequacy that cannot be proven from equality/timestamps alone.
-///
-/// Example: an artifact may show that 20 km exceeds an empirically estimated spatial
-/// autocorrelation range. Recording that artifact makes the claim attributable; this type does
-/// not independently establish that the artifact or conclusion is correct.
+/// Attributable evidence for separation adequacy that cannot be inferred from group equality or
+/// timestamps alone. The record preserves a claim and artifact lineage; it does not make the
+/// claim true by construction.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SeparationEvidence {
     pub kind: SeparationEvidenceKind,
@@ -238,13 +230,13 @@ impl SeparationEvidence {
         statement: impl Into<String>,
         artifact_digest: impl Into<String>,
     ) -> Result<Self> {
-        let value = Self {
+        let result = Self {
             kind,
             statement: statement.into(),
             artifact_digest: artifact_digest.into(),
         };
-        value.validate()?;
-        Ok(value)
+        result.validate()?;
+        Ok(result)
     }
 
     fn validate(&self) -> Result<()> {
@@ -269,7 +261,7 @@ struct ManifestDigestView<'a> {
     manifest_id: &'a str,
     assignments: &'a [AssignedUnit],
     group_policy: &'a GroupSeparationPolicy,
-    temporal_policy: &'a TemporalSeparationPolicy,
+    temporal_policy: TemporalSeparationPolicy,
     separation_evidence: &'a [SeparationEvidence],
 }
 
@@ -280,8 +272,7 @@ pub struct SplitSummary {
     pub evaluation_count: usize,
     pub latest_development_unix_ms: Option<i64>,
     pub earliest_evaluation_unix_ms: Option<i64>,
-    /// Signed observed gap `earliest evaluation - latest development` before comparing it to an
-    /// embargo. Kept as i128 so extreme i64 endpoints cannot overflow the diagnostic.
+    /// Signed `earliest evaluation - latest development`, using i128 to avoid diagnostic overflow.
     pub observed_temporal_gap_ms: Option<i128>,
 }
 
@@ -293,7 +284,7 @@ impl ResearchSplitManifest {
         temporal_policy: TemporalSeparationPolicy,
         separation_evidence: Vec<SeparationEvidence>,
     ) -> Result<Self> {
-        let mut manifest = Self {
+        let mut result = Self {
             manifest_id: manifest_id.into(),
             assignments,
             group_policy,
@@ -301,9 +292,9 @@ impl ResearchSplitManifest {
             separation_evidence,
             manifest_digest: String::new(),
         };
-        manifest.validate()?;
-        manifest.manifest_digest = manifest.compute_digest()?;
-        Ok(manifest)
+        result.validate()?;
+        result.manifest_digest = result.compute_digest()?;
+        Ok(result)
     }
 
     fn digest_view(&self) -> ManifestDigestView<'_> {
@@ -312,7 +303,7 @@ impl ResearchSplitManifest {
             manifest_id: &self.manifest_id,
             assignments: &self.assignments,
             group_policy: &self.group_policy,
-            temporal_policy: &self.temporal_policy,
+            temporal_policy: self.temporal_policy,
             separation_evidence: &self.separation_evidence,
         }
     }
@@ -348,11 +339,8 @@ impl ResearchSplitManifest {
                     assignment.unit.sample_id.clone(),
                 ));
             }
-            if assignment.role.is_development() {
-                has_development = true;
-            } else if assignment.role == PartitionRole::Evaluation {
-                has_evaluation = true;
-            }
+            has_development |= assignment.role.is_development();
+            has_evaluation |= assignment.role == PartitionRole::Evaluation;
         }
         if !has_development {
             return Err(SplitError::MissingDevelopment);
@@ -363,8 +351,7 @@ impl ResearchSplitManifest {
 
         self.validate_required_groups()?;
         self.validate_group_separation()?;
-        self.validate_temporal_separation()?;
-        Ok(())
+        self.validate_temporal_separation()
     }
 
     fn validate_required_groups(&self) -> Result<()> {
@@ -388,9 +375,10 @@ impl ResearchSplitManifest {
                 for dimension in dimensions {
                     let mut seen: HashMap<&str, PartitionRole> = HashMap::new();
                     for assignment in &self.assignments {
-                        let value = assignment.unit.group_value(dimension).expect(
-                            "required group dimensions are checked before group separation",
-                        );
+                        let value = assignment
+                            .unit
+                            .group_value(dimension)
+                            .expect("required group checked before separation");
                         if let Some(first_role) = seen.get(value).copied() {
                             let crosses_evaluation = (first_role == PartitionRole::Evaluation)
                                 != (assignment.role == PartitionRole::Evaluation);
@@ -413,9 +401,10 @@ impl ResearchSplitManifest {
                 for dimension in dimensions {
                     let mut seen: HashMap<&str, PartitionRole> = HashMap::new();
                     for assignment in &self.assignments {
-                        let value = assignment.unit.group_value(dimension).expect(
-                            "required group dimensions are checked before group separation",
-                        );
+                        let value = assignment
+                            .unit
+                            .group_value(dimension)
+                            .expect("required group checked before separation");
                         if let Some(first_role) = seen.get(value).copied() {
                             if first_role != assignment.role {
                                 return Err(SplitError::GroupLeakage {
@@ -440,18 +429,17 @@ impl ResearchSplitManifest {
             return Ok(());
         };
         let summary = self.summary();
-        let latest_development_unix_ms = summary
+        let latest = summary
             .latest_development_unix_ms
-            .expect("development presence validated before temporal policy");
-        let earliest_evaluation_unix_ms = summary
+            .expect("development presence validated first");
+        let earliest = summary
             .earliest_evaluation_unix_ms
-            .expect("evaluation presence validated before temporal policy");
-        let required_evaluation =
-            i128::from(latest_development_unix_ms) + i128::from(embargo_ms);
-        if i128::from(earliest_evaluation_unix_ms) < required_evaluation {
+            .expect("evaluation presence validated first");
+        let required = i128::from(latest) + i128::from(embargo_ms);
+        if i128::from(earliest) < required {
             return Err(SplitError::TemporalEmbargoViolation {
-                latest_development_unix_ms,
-                earliest_evaluation_unix_ms,
+                latest_development_unix_ms: latest,
+                earliest_evaluation_unix_ms: earliest,
                 embargo_ms,
             });
         }
@@ -473,17 +461,17 @@ impl ResearchSplitManifest {
             }
             if assignment.role.is_development() {
                 latest_development_unix_ms = Some(
-                    latest_development_unix_ms
-                        .map_or(assignment.unit.observed_at_unix_ms, |current| {
-                            current.max(assignment.unit.observed_at_unix_ms)
-                        }),
+                    latest_development_unix_ms.map_or(
+                        assignment.unit.observed_at_unix_ms,
+                        |current| current.max(assignment.unit.observed_at_unix_ms),
+                    ),
                 );
             } else {
                 earliest_evaluation_unix_ms = Some(
-                    earliest_evaluation_unix_ms
-                        .map_or(assignment.unit.observed_at_unix_ms, |current| {
-                            current.min(assignment.unit.observed_at_unix_ms)
-                        }),
+                    earliest_evaluation_unix_ms.map_or(
+                        assignment.unit.observed_at_unix_ms,
+                        |current| current.min(assignment.unit.observed_at_unix_ms),
+                    ),
                 );
             }
         }
