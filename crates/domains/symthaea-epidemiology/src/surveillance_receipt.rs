@@ -350,8 +350,14 @@ mod tests {
             receipt.input_id,
             SurveillanceScreenInputId::from_series(&history, latest)
         );
-        assert_eq!(receipt.input_id.to_hex().len(), 64);
-        assert_eq!(receipt.id().to_hex().len(), 64);
+        assert_eq!(
+            receipt.input_id.to_hex(),
+            "31281d529d4fb72626e0f2af0b3874a380f055f7baa57be9c2858c3a3e90d7c6"
+        );
+        assert_eq!(
+            receipt.id().to_hex(),
+            "9ab80879d2903714349612bd8faf7f154bf521f7d059290f4a455cb50ee69aaf"
+        );
         assert_eq!(receipt.config, config);
         assert_eq!(
             receipt.baseline_window,
