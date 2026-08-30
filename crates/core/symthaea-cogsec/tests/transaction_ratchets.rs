@@ -8,8 +8,8 @@
 
 use std::collections::BTreeSet;
 use symthaea_cogsec::{
-    ArtifactIntegrity, CapabilityFact, CognitiveSecurityLabel, Confidentiality, Consequence,
-    ControlIntegrity, Digest32, MutationKind, MutationPermit, MutationRequest, OriginState,
+    ArtifactIntegrity, CapabilityFact, CognitiveSecurityLabel, CommitPermit, Confidentiality,
+    Consequence, ControlIntegrity, Digest32, MutationKind, MutationRequest, OriginState,
     PolicyRule, PolicySnapshot, PrincipalId, ReferenceMonitor, ResourceId, ResourceScope,
     TaintLevel, TrustedFacts,
 };
@@ -100,12 +100,11 @@ impl ProtectedGoalState {
         }
     }
 
-    /// Reference sink contract for the future runtime integration.
+    /// Reference P0 sink contract for the future runtime integration.
     ///
-    /// The sink independently checks the state binding immediately before
-    /// consuming the non-cloneable permit. This is intentionally redundant with
-    /// authorization-time checking: the resource can change after authorization.
-    fn commit(&mut self, permit: MutationPermit) -> Result<(), &'static str> {
+    /// This method accepts only the post-revalidation typestate. An
+    /// authorization-time `MutationPermit` cannot be passed here in safe Rust.
+    fn commit(&mut self, permit: CommitPermit) -> Result<(), &'static str> {
         if permit.kind() != MutationKind::GoalActivation {
             return Err("wrong mutation kind");
         }
@@ -128,7 +127,7 @@ fn denied_request_preserves_nonzero_state_exactly() {
     let (mut request, facts, policy) = fixture();
     request.input_label.taint = TaintLevel::Tainted;
 
-    let mut state = ProtectedGoalState::nonzero();
+    let state = ProtectedGoalState::nonzero();
     let before = state.clone();
 
     let authorization = ReferenceMonitor.authorize(&request, &facts, &policy);
@@ -137,8 +136,8 @@ fn denied_request_preserves_nonzero_state_exactly() {
 }
 
 #[test]
-fn stale_permit_cannot_mutate_nonzero_state() {
-    let (request, facts, policy) = fixture();
+fn stale_authorization_cannot_reach_commit_typestate_or_mutate_state() {
+    let (request, mut facts, policy) = fixture();
     let permit = ReferenceMonitor
         .authorize(&request, &facts, &policy)
         .expect("fixture must authorize");
@@ -150,25 +149,49 @@ fn stale_permit_cannot_mutate_nonzero_state() {
     state.accepted_mutations.push(d(76));
     let before = state.clone();
 
-    assert_eq!(state.commit(permit), Err("stale resource state"));
+    // The protected owner samples the fresh state root under its own
+    // serialization boundary before asking CogSec for commit typestate.
+    facts.resource_state_root = state.state_root;
+    let precommit = ReferenceMonitor.precommit(permit, &facts, &policy);
+    assert!(precommit.is_err());
     assert_eq!(state, before);
 }
 
 #[test]
-fn fresh_permit_commits_once_against_exact_state() {
+fn fresh_commit_permit_commits_once_against_exact_state() {
     let (request, facts, policy) = fixture();
     let permit = ReferenceMonitor
         .authorize(&request, &facts, &policy)
         .expect("fixture must authorize");
+    let commit_permit = ReferenceMonitor
+        .precommit(permit, &facts, &policy)
+        .expect("unchanged security context must precommit");
 
     let mut state = ProtectedGoalState::nonzero();
-    state.commit(permit).expect("fresh permit must commit");
+    state
+        .commit(commit_permit)
+        .expect("fresh commit permit must commit");
 
     assert_eq!(state.active_goal_count, 8);
     assert_eq!(state.accepted_mutations.last(), Some(&d(2)));
     assert_eq!(state.state_root, d(10));
-    // MutationPermit is consumed by commit(), so the same permit cannot be
-    // replayed in safe Rust without manufacturing a new authorization object.
+    // CommitPermit is consumed by commit(), so the same token cannot be replayed
+    // in safe Rust without manufacturing a new monitor authorization.
+}
+
+#[test]
+fn revocation_between_authorize_and_precommit_preserves_nonzero_state() {
+    let (request, mut facts, policy) = fixture();
+    let permit = ReferenceMonitor
+        .authorize(&request, &facts, &policy)
+        .expect("fixture must authorize");
+
+    let state = ProtectedGoalState::nonzero();
+    let before = state.clone();
+    facts.revocation_epoch += 1;
+
+    assert!(ReferenceMonitor.precommit(permit, &facts, &policy).is_err());
+    assert_eq!(state, before);
 }
 
 #[test]
@@ -176,7 +199,7 @@ fn authorization_epoch_change_invalidates_reauthorization() {
     let (request, mut facts, policy) = fixture();
     facts.authorization_epoch += 1;
 
-    let mut state = ProtectedGoalState::nonzero();
+    let state = ProtectedGoalState::nonzero();
     let before = state.clone();
     assert!(ReferenceMonitor.authorize(&request, &facts, &policy).is_err());
     assert_eq!(state, before);
