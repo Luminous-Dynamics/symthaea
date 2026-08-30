@@ -40,7 +40,7 @@ impl SurveillanceScreenInputId {
     pub fn from_series(baseline_points: &[SurveillancePoint], latest: SurveillancePoint) -> Self {
         let mut h = Sha256::new();
         h.update(SURVEILLANCE_SCREEN_INPUT_ID_DOMAIN_V1);
-        h.update((baseline_points.len() as u64).to_be_bytes());
+        put_usize(&mut h, baseline_points.len());
         for point in baseline_points {
             put_point(&mut h, *point);
         }
@@ -106,6 +106,11 @@ fn put_hex(f: &mut fmt::Formatter<'_>, bytes: [u8; 32]) -> fmt::Result {
     Ok(())
 }
 
+fn put_usize(h: &mut Sha256, value: usize) {
+    let value = u64::try_from(value).expect("supported Rust targets fit usize into u64");
+    h.update(value.to_be_bytes());
+}
+
 fn put_point(h: &mut Sha256, point: SurveillancePoint) {
     h.update(point.observed_at_unix_s().to_be_bytes());
     match point.measurement() {
@@ -135,12 +140,12 @@ fn put_f64(h: &mut Sha256, value: f64) {
 }
 
 fn put_string(h: &mut Sha256, value: &str) {
-    h.update((value.len() as u64).to_be_bytes());
+    put_usize(h, value.len());
     h.update(value.as_bytes());
 }
 
 fn put_config(h: &mut Sha256, config: SurveillanceScreenConfig) {
-    h.update((config.min_baseline_observations() as u64).to_be_bytes());
+    put_usize(h, config.min_baseline_observations());
     put_f64(h, config.robust_z_threshold());
     put_f64(h, config.scale_epsilon());
 }
@@ -215,8 +220,8 @@ fn put_optional_interval(h: &mut Sha256, value: Option<IntervalEstimate>) {
 fn put_assessment(h: &mut Sha256, assessment: SurveillanceAssessment) {
     put_disposition(h, assessment.disposition);
     put_robust_baseline(h, assessment.baseline);
-    h.update((assessment.baseline_observed as u64).to_be_bytes());
-    h.update((assessment.baseline_missing as u64).to_be_bytes());
+    put_usize(h, assessment.baseline_observed);
+    put_usize(h, assessment.baseline_missing);
     put_optional_f64(h, assessment.robust_z);
     put_optional_interval(h, assessment.latest);
 }
@@ -227,25 +232,48 @@ pub struct BaselineTimeWindow {
     pub end_unix_s: i64,
 }
 
+/// Evidence-bearing result of one validated invocation of the v1 screen.
+///
+/// Fields are private so external callers cannot manufacture a receipt with an
+/// arbitrary assessment/configuration pair. Receipts are created by
+/// [`assess_latest_change_with_receipt`] and exposed through read-only accessors.
+/// This is an implementation-integrity boundary only; it does not authenticate
+/// the upstream measurements or their institutional provenance.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SurveillanceScreenReceipt {
-    /// Stable semantic identifier for the screening algorithm, not a software
-    /// build/version claim.
-    pub algorithm_id: &'static str,
-    /// Content commitment over the complete ordered baseline + latest point.
-    /// This prevents two different series with the same time extent/result from
-    /// becoming indistinguishable in downstream audit records.
-    pub input_id: SurveillanceScreenInputId,
-    /// Exact caller-supplied screening configuration used for this result.
-    pub config: SurveillanceScreenConfig,
-    /// Time extent of the supplied historical series, including explicit
-    /// missing observations. `None` only when the baseline slice is empty.
-    pub baseline_window: Option<BaselineTimeWindow>,
-    pub latest_observed_at_unix_s: i64,
-    pub assessment: SurveillanceAssessment,
+    algorithm_id: &'static str,
+    input_id: SurveillanceScreenInputId,
+    config: SurveillanceScreenConfig,
+    baseline_window: Option<BaselineTimeWindow>,
+    latest_observed_at_unix_s: i64,
+    assessment: SurveillanceAssessment,
 }
 
 impl SurveillanceScreenReceipt {
+    pub const fn algorithm_id(self) -> &'static str {
+        self.algorithm_id
+    }
+
+    pub const fn input_id(self) -> SurveillanceScreenInputId {
+        self.input_id
+    }
+
+    pub const fn config(self) -> SurveillanceScreenConfig {
+        self.config
+    }
+
+    pub const fn baseline_window(self) -> Option<BaselineTimeWindow> {
+        self.baseline_window
+    }
+
+    pub const fn latest_observed_at_unix_s(self) -> i64 {
+        self.latest_observed_at_unix_s
+    }
+
+    pub const fn assessment(self) -> SurveillanceAssessment {
+        self.assessment
+    }
+
     /// Return the semantic content identity of this complete receipt.
     ///
     /// The ID is intentionally independent of Rust Debug output, serde formats,
