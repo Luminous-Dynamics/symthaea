@@ -19,11 +19,11 @@ No claim should be described as production-proven merely because its design exis
 
 **Claim.** Ordinary information transformation cannot manufacture a capability, live permit, delegation, or authorization fact.
 
-**Required architecture.** Authority is represented separately from `CognitiveSecurityLabel`; live `MutationPermit` values have private fields, no public constructor, no serde representation, and are minted only by the reference monitor.
+**Required architecture.** Authority is represented separately from `CognitiveSecurityLabel`; live `MutationPermit` and `CommitPermit` values have private fields, no public constructor, no serde representation, and are minted only through the reference-monitor transition path.
 
-**Current evidence.** A1: kernel API and tests. The current permit is non-`Clone` and non-serde, but Rust module/sink integration is not yet complete.
+**Current evidence.** A2: kernel API, negative documentation compile tests for clone/default/deserialization, and property tests for non-escalating label composition. Runtime sink integration is not yet complete.
 
-**Target evidence before enforcement.** A2 compile-fail/API tests; A3 Kani proof over permit issuance; A4 runtime sink census showing no alternate authority path.
+**Target evidence before enforcement.** A3 Kani proof over permit issuance/typestate transitions; A4 runtime sink census showing no alternate authority path.
 
 ### CS-IFC-001 — Ordinary transformation is non-escalating
 
@@ -41,6 +41,14 @@ No claim should be described as production-proven merely because its design exis
 
 **Merge/enforcement gate.** P0 sink coverage = 100%; unknown P0 sinks = 0; unpermitted P0 commits observed in qualification = 0.
 
+### CS-TOPO-001 — Mutation authority does not escape through ambient API topology
+
+**Claim.** Ordinary cognition cannot obtain a handle, mailbox, trait object, mutable reference, or other API surface that can directly perform a P0 mutation outside the CogSec transition path.
+
+**Current evidence.** A0: authority-escape analysis identifies current ambient authority bundles, including `AsyncMindHandle` and the combined inference/mutation `LLMBackend` surface. The live architecture does **not** yet satisfy this claim.
+
+**Target.** A2 static/API ratchets proving observer/inference/proposal handles exclude privileged mutation methods; A4 runtime census with unknown P0 mutable handles = 0.
+
 ### CS-OBS-001 — Observation does not imply influence
 
 **Claim.** Information may be received/inspected without thereby gaining permission to alter active cognition, affect, persistent memory, learning or authority-bearing state.
@@ -51,35 +59,37 @@ No claim should be described as production-proven merely because its design exis
 
 ### CS-TXN-001 — Authorization is state-bound and revalidated before commit
 
-**Claim.** A permit issued for state root R, policy root P and epochs E cannot commit after any bound value changes.
+**Claim.** An authorization issued for state root R, policy root P and epochs E cannot become commit authority after any bound value changes.
 
-**Current evidence.** A1/A2 reference tests, including non-zero protected state and a stale-resource race. The runtime core does not yet expose one canonical precommit revalidation API, so this claim is not complete.
+**Required architecture.** `authorize()` yields only `MutationPermit`. Protected sinks accept only the distinct `CommitPermit` typestate, which is produced by `precommit()` after fresh resource/policy/authorization/revocation checks. The owner must perform precommit and commit under the same serialization/transaction boundary.
 
-**Target.** A2 kernel-level precommit tests for resource, policy, authorization and revocation changes; A3 state-machine/model-check evidence for authorize/change/commit interleavings.
+**Current evidence.** A2: canonical kernel precommit API, distinct authorization/commit typestates, unit tests for resource/policy/authorization/revocation context, and non-zero-state race ratchets.
+
+**Target.** A3 state-machine/model-check evidence for authorize/change/precommit/commit interleavings; A4 real protected-sink integration.
 
 ### CS-TXN-002 — Rejection preserves pre-existing accepted state
 
 **Claim.** A rejected candidate cannot partially alter an already non-zero protected state.
 
-**Current evidence.** A1 reference-sink tests in `transaction_ratchets.rs`. Existing SCIP transactional work is also an invariant source demonstrating exact preservation of non-zero LLMOrgan state for rejected surfaces.
+**Current evidence.** A2: reference-sink tests in `transaction_ratchets.rs` cover denied requests, stale authorization, revocation between authorize/precommit, and one-use commit typestate against non-zero state. Existing SCIP transactional work remains an invariant source demonstrating exact preservation of non-zero LLMOrgan state for rejected surfaces.
 
-**Target.** A2 for each protected sink; durable-state crash tests for persistence layers.
+**Target.** A2/A4 for each protected runtime sink; durable-state crash tests for persistence layers.
 
 ### CS-REV-001 — Revocation dominates prior authority
 
 **Claim.** Once trusted revocation state advances, old capability/permit contexts cannot authorize a later privileged commit.
 
-**Current evidence.** A1 authorization-epoch/revocation-epoch tests at evaluation time.
+**Current evidence.** A2: evaluation-time revocation tests plus commit-time revocation-epoch revalidation; failed precommit consumes the authorization token and preserves non-zero state.
 
-**Target.** A2 commit-time revalidation tests; A3 concurrent revocation/commit model; A4 Xenia adapter evidence.
+**Target.** A3 concurrent revocation/precommit/commit model; A4 Xenia adapter evidence. The trusted adapter contract must advance `revocation_epoch` for every security-relevant revocation capable of invalidating an outstanding permit.
 
 ### CS-DELEG-001 — Delegation can only attenuate
 
-**Claim.** A delegated child authority may narrow mutation class/resource scope, consequence ceiling and validity interval, but may never widen its parent.
+**Claim.** A delegated child authority may narrow resource scope, consequence ceiling and validity interval, while retaining the parent's mutation class and security epochs; it may never widen its parent.
 
-**Current evidence.** A0 only.
+**Current evidence.** A2: executable `CapabilityFact::attenuate()` logic, explicit negative tests for resource/consequence/validity widening, and generated consequence-order ratchets. This is structural attenuation only; signed delegation-chain authority is not yet implemented.
 
-**Target.** A2 property tests over parent/child grants; A3 pure attenuation proof; later Xenia delegation adapter vectors.
+**Target.** A3 pure attenuation proof; later Xenia delegation-chain vectors proving parent authorization and ancestry binding.
 
 ### CS-LEARN-001 — Remote learning is promotion, not direct application
 
@@ -139,28 +149,31 @@ Growth in the logical TCB should require an explicit rationale tied to one or mo
 
 ## Coverage accounting
 
-Two independent coverage measures are required before an enforcement claim:
+Three independent measures are required before an enforcement claim:
 
 `P0 mediation coverage = mediated privileged mutation sinks / all discovered P0 mutation sinks`
 
+`P0 authority-topology coverage = privilege-separated or CogSec-owned P0 mutable handles / all discovered P0 mutable handles`
+
 `P1 influence coverage = labeled + locally bounded remote/adversarial influence paths / all discovered P1 influence paths`
 
-A release must never report 100% by silently shrinking the denominator. Every census entry needs an owner, status (`unmediated`, `audit`, `enforced`, `retired`) and evidence reference.
+A release must never report 100% by silently shrinking a denominator. Every census entry needs an owner, status (`unmediated`, `audit`, `enforced`, `retired`) and evidence reference.
 
 ## Evidence-plane integration
 
 Future runtime qualification should record mechanism counters, not only attack outcomes. Candidate counters include:
 
 - `cogsec_monitor_invocations`;
-- `cogsec_permits_minted`;
+- `cogsec_authorization_permits_minted`;
 - `cogsec_precommit_revalidations`;
+- `cogsec_commit_permits_minted`;
 - `cogsec_precommit_rejections`;
 - `cogsec_goal_denials`;
 - `cogsec_memory_quarantines`;
 - `cogsec_learning_quarantines`;
 - `cogsec_revocations_enforced`;
 - `cogsec_influence_budget_rejections`;
-- `privileged_mutations_without_permit` (must be zero);
+- `privileged_mutations_without_commit_permit` (must be zero);
 - `authority_created_by_dataflow` (must be zero);
 - `unlabelled_persistent_writes` (must be zero).
 
@@ -168,4 +181,4 @@ An attack test is insufficient if it cannot demonstrate that the intended securi
 
 ## Explicit non-claims
 
-CogSec does not claim that Symthaea cannot be deceived, that a signed source is truthful, that consensus establishes fact, that formal verification of the kernel proves the entire application correct, or that an in-process monitor survives arbitrary compromise of the hosting process. Higher assurance deployment may move the same request/decision/permit protocol into a separate process or hardware-backed enforcement domain.
+CogSec does not claim that Symthaea cannot be deceived, that a signed source is truthful, that consensus establishes fact, that structural attenuation proves a delegation was authorized, that formal verification of the kernel proves the entire application correct, or that an in-process monitor survives arbitrary compromise of the hosting process. Higher assurance deployment may move the same request/decision/permit protocol into a separate process or hardware-backed enforcement domain.
