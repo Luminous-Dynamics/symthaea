@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-scenario-evidence"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Evidence-bearing counterfactual scenario envelopes for Symthaea decision support."
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+symthaea-earth-causal-query = { path = "../symthaea-earth-causal-query" }
+symthaea-causal-reasoning = { path = "../../core/symthaea-causal-reasoning" }
+symthaea-digital-twin = { path = "../../domains/symthaea-digital-twin" }
