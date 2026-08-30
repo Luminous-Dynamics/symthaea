@@ -228,9 +228,10 @@ impl WatershedHistory {
 
 /// Dataset fixture with a deliberately private held-out outcome.
 ///
-/// `TrajectoryGenerator<Observation = WatershedHistory>` implementations cannot receive this
-/// type through the witness runner, so the held-out state is not part of their input surface.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// The type intentionally does **not** implement `Debug`, `Serialize`, or `Deserialize`, so the
+/// held-out state cannot leak through routine formatting or serde calls. Predictor code should
+/// receive only [`WatershedHistory`] through [`evaluate_forecaster`]. This is still a code-level
+/// boundary, not a claim of process/organizational blinding against malicious ambient access.
 pub struct SealedWatershedFixture {
     spec: SyntheticWatershedSpec,
     history: WatershedHistory,
@@ -316,7 +317,7 @@ impl SealedWatershedFixture {
         &self.spec.fixture_id
     }
 
-    /// The only predictor-facing view exposed by the witness runner.
+    /// Predictor-visible view. The held-out state is not reachable through this type.
     pub fn forecast_history(&self) -> &WatershedHistory {
         &self.history
     }
@@ -494,6 +495,25 @@ impl ForecasterReport {
     }
 }
 
+/// Run any compatible forecaster behind the held-out observation firewall.
+///
+/// The generator receives only `WatershedHistory`. Scoring against the private held-out state
+/// happens after `generate` returns. This is the extension point for future Sentinel/HDC/model
+/// candidates without widening their input type to the sealed fixture.
+pub fn evaluate_forecaster<G>(
+    forecaster_id: &str,
+    generator: &G,
+    fixture: &SealedWatershedFixture,
+    horizon: Horizon,
+) -> Result<ForecasterReport>
+where
+    G: TrajectoryGenerator<Observation = WatershedHistory>,
+{
+    non_empty(forecaster_id, "forecaster id")?;
+    let output = generator.generate(fixture.forecast_history(), horizon);
+    ForecasterReport::from_output(forecaster_id, output, fixture)
+}
+
 #[derive(Debug, Clone)]
 pub struct WitnessRunLineage {
     pub run_id: String,
@@ -650,15 +670,18 @@ pub fn run_witness(
     )
     .map_err(|error| WitnessError::Protocol(error.to_string()))?;
 
-    // Observation firewall: only this history reference reaches either TrajectoryGenerator.
-    let history = fixture.forecast_history();
-    let persistence_output = PersistenceForecaster::default().generate(history, Horizon(1));
-    let climatology_output = ClimatologyForecaster::default().generate(history, Horizon(1));
-
-    // The held-out outcome enters only after both outputs exist, inside from_output -> score_brier.
-    let persistence = ForecasterReport::from_output("persistence-v0", persistence_output, fixture)?;
-    let climatology =
-        ForecasterReport::from_output("empirical-climatology-v0", climatology_output, fixture)?;
+    let persistence = evaluate_forecaster(
+        "persistence-v0",
+        &PersistenceForecaster::default(),
+        fixture,
+        Horizon(1),
+    )?;
+    let climatology = evaluate_forecaster(
+        "empirical-climatology-v0",
+        &ClimatologyForecaster::default(),
+        fixture,
+        Horizon(1),
+    )?;
 
     let forecast_ledger_digest = digest_serializable(&(
         FORECAST_LEDGER_SCHEMA,
