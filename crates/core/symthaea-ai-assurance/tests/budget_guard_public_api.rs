@@ -267,9 +267,10 @@ fn recoverable_wrong_action_budget_returns_exact_original_lease() {
     let lease_epoch = lease.epoch();
     let remaining_before = fixture.budgets.remaining();
 
-    let failure = action
-        .authorize_recoverable(policy_grant, lease)
-        .unwrap_err();
+    let failure = match action.authorize_recoverable(policy_grant, lease) {
+        Ok(_) => panic!("wrong-action budget unexpectedly authorized"),
+        Err(failure) => failure,
+    };
     assert!(matches!(
         failure.error(),
         BudgetGuardedAuthorizeError::Budget(_)
@@ -333,9 +334,10 @@ fn recoverable_policy_rejection_returns_exact_original_lease() {
     let lease_epoch = lease.epoch();
     let remaining_before = fixture.budgets.remaining();
 
-    let failure = action
-        .authorize_recoverable(rogue_grant, lease)
-        .unwrap_err();
+    let failure = match action.authorize_recoverable(rogue_grant, lease) {
+        Ok(_) => panic!("unrelated policy lineage unexpectedly authorized"),
+        Err(failure) => failure,
+    };
     assert!(matches!(
         failure.error(),
         BudgetGuardedAuthorizeError::Policy(_)
