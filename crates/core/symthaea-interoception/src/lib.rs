@@ -24,7 +24,9 @@ pub use homeostasis::{assess_homeostasis, HomeostaticReport};
 pub use intervention::{
     apply_intervention, InterventionKind, InterventionRecord, InteroceptiveIntervention,
 };
-pub use snapshot::InteroceptiveSnapshot;
+pub use snapshot::{
+    AllostaticForecastSnapshot, InteroceptiveSnapshot, INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION,
+};
 pub use state::{
     NativeInteroceptiveState, ViabilityChannel, ViabilityVariable, CHANNEL_COUNT,
 };

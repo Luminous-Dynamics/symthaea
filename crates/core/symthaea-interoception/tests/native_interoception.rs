@@ -1,7 +1,8 @@
 use symthaea_interoception::{
     apply_intervention, assess_allostasis, assess_allostasis_with_drive, assess_homeostasis,
-    AllostaticConfig, InteroceptiveDrive, InteroceptiveIntervention, InteroceptiveSnapshot,
-    NativeInteroceptiveModel, NativeInteroceptiveState, ViabilityChannel,
+    AllostaticConfig, AllostaticForecastSnapshot, InteroceptiveDrive, InteroceptiveIntervention,
+    InteroceptiveSnapshot, NativeInteroceptiveModel, NativeInteroceptiveState, ViabilityChannel,
+    INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION,
 };
 
 #[test]
@@ -148,12 +149,46 @@ fn interventions_are_explicit_clamped_and_do_not_create_false_velocity() {
     );
 
     assert_eq!(record.cycle, 1);
-    assert_eq!(record.before, 0.8);
+    assert!((record.before - 0.8).abs() < 1e-6);
     assert_eq!(record.requested, -1.0);
     assert_eq!(record.after, 0.0);
     assert!(record.clamped);
     assert_eq!(model.state().get(ViabilityChannel::Integrity).velocity, 0.0);
     assert!(!assess_homeostasis(model.state()).is_within_viability());
+}
+
+#[test]
+fn snapshots_record_forecast_basis_and_configuration() {
+    let model = NativeInteroceptiveModel::default();
+    let config = AllostaticConfig {
+        horizon_steps: 4,
+        dt: 1.0,
+        discount: 0.9,
+    };
+
+    let kinematic = InteroceptiveSnapshot::capture_kinematic(&model, config);
+    assert_eq!(kinematic.schema_version, INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION);
+    assert_eq!(kinematic.dynamics_config, model.config());
+    match &kinematic.forecast {
+        AllostaticForecastSnapshot::Kinematic {
+            config: recorded, ..
+        } => assert_eq!(*recorded, config),
+        other => panic!("unexpected forecast basis: {other:?}"),
+    }
+
+    let drive = InteroceptiveDrive::ZERO.with_rate(ViabilityChannel::ComputeReserve, -0.02);
+    let rollout = InteroceptiveSnapshot::capture_with_drive(&model, drive, config);
+    match &rollout.forecast {
+        AllostaticForecastSnapshot::DynamicsAwareConstantDrive {
+            config: recorded,
+            drive: recorded_drive,
+            ..
+        } => {
+            assert_eq!(*recorded, config);
+            assert_eq!(*recorded_drive, drive);
+        }
+        other => panic!("unexpected forecast basis: {other:?}"),
+    }
 }
 
 #[test]
@@ -189,7 +224,15 @@ fn core_source_contains_no_named_state_categories() {
     .join("\n")
     .to_ascii_lowercase();
 
-    for forbidden in ["emotion", "fear", "joy", "anger", "sadness", "grief"] {
+    for forbidden in [
+        "emotion",
+        "fear",
+        "joy",
+        "anger",
+        "sadness",
+        "grief",
+        "attachment",
+    ] {
         assert!(
             !source.contains(forbidden),
             "core interoception source must remain category-free: found {forbidden}"
