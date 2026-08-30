@@ -66,8 +66,9 @@ pub use budget::{
     EnforcementClass,
 };
 pub use budget_guard::{
-    BudgetAdapterError, BudgetGuardedAction, BudgetGuardedAuthorizeError, BudgetGuardedRuntime,
-    BudgetLeaseEvidence, BudgetedEvidenceReceipt,
+    BudgetAdapterError, BudgetGuardedAction, BudgetGuardedAuthorizeError,
+    BudgetGuardedAuthorizeFailure, BudgetGuardedRuntime, BudgetLeaseEvidence,
+    BudgetedEvidenceReceipt,
 };
 pub use budget_purpose::{
     BudgetPurposeAdmissionReceipt, BudgetPurposeAuthorityDomain, BudgetPurposeAuthorizeError,
