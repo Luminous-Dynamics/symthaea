@@ -17,19 +17,31 @@ No claim should be described as production-proven merely because its design exis
 
 ### CS-AUTH-001 — Data cannot create authority
 
-**Claim.** Ordinary information transformation cannot manufacture a verified capability fact, trusted security snapshot, live permit, delegated authority, or authorization fact accepted by a protected monitor domain.
+**Claim.** Ordinary information transformation cannot manufacture a verified capability fact, verified transition fact, trusted security snapshot, live permit, delegated authority, or authorization fact accepted by a protected monitor domain.
 
-**Required architecture.** Authority is represented separately from `CognitiveSecurityLabel`. Serializable/wire capability claims remain ordinary data. Verified `CapabilityFact` and `TrustedFacts` values are opaque, non-serde objects issued only by a `TrustedFactAuthority` paired with one private monitor domain. `MutationPermit` and `CommitPermit` have private fields, no public constructor or serde representation, are bound to that same domain, and are minted only through the reference-monitor transition path. A protected sink must reject a commit permit from any other independently bootstrapped monitor domain.
+**Required architecture.** Authority is represented separately from `CognitiveSecurityLabel`. Serializable/wire claims remain ordinary data. Verified `CapabilityFact`, `VerifiedTransition`, and `TrustedFacts` values are opaque, non-serde objects issued only through a `TrustedFactAuthority` paired with one private monitor domain. `MutationPermit` and `CommitPermit` have private fields, no public constructor or serde representation, are bound to that same protected domain, and are minted only through the reference-monitor transition path. A protected sink must reject a commit permit from any other independently bootstrapped monitor domain.
 
-**Current implementation.** The public facade now hides the previous publicly constructible inner facts in a private module, introduces a private monitor-domain seal, role-separates `ReferenceMonitor` from `TrustedFactAuthority`, rejects cross-domain facts before policy evaluation, domain-binds authorization/commit permits, and adds foreign-domain negative tests. The implementation is present on the draft branch; CI validation of the new head is pending, so this document does not yet claim recorded A2 evidence for the sealed facade.
+**Current implementation.** The public boundary hides publicly constructible inner facts in private modules, role-separates `ReferenceMonitor` from `TrustedFactAuthority`, rejects cross-domain facts before policy evaluation, domain-binds authorization/commit permits, and contains foreign-domain negative tests. A second outer seal additionally binds verified transition classification to the public monitor API. The implementation is present on the draft branch; recorded CI validation of the current head is pending.
 
 **Target evidence before enforcement.** Recorded A2 negative/domain-isolation test results; A3 Kani proof over issuance/typestate/domain transitions; A4 runtime sink census showing no alternate authority path.
+
+### CS-BIND-001 — Security-relevant request fields are independently bound
+
+**Claim.** A proposer cannot gain or widen authority by changing the security annotations on a `MutationRequest`. Before policy evaluation, the request must exactly match independently verified transition facts for principal, mutation class, protected resource, effect commitment, consequence class, cognitive security label/provenance, and logical sequence.
+
+**Why this exists.** Those fields influence authorization, capability scope/validity, integrity, taint, confidentiality, or consequence. Treating them as trusted merely because the caller populated the expected Rust fields would permit attacks such as declaring a critical action `Low`, marking hostile input `PolicyEndorsed/Clean`, claiming another principal, or selecting a favorable capability-validity sequence.
+
+**Required architecture.** `TrustedFactAuthority::issue_transition()` produces an opaque, non-serde, monitor-domain-bound `VerifiedTransition`. A trusted snapshot clones that verified binding. `ReferenceMonitor::{evaluate, authorize, receipt}` reject any request/binding mismatch before entering the deterministic policy algebra. `precommit()` separately requires the authorization token's verified binding to match the fresh trusted snapshot. The request may still carry proposer-selected request identity and expected state/policy roots because those values cannot increase privilege: trusted state/policy are compared independently and mismatches require revalidation.
+
+**Current implementation.** The public wrapper contains exact binding checks plus focused negative tests for consequence underclaim, identity spoofing, integrity/taint laundering, foreign transition domains, and changed verified transition context between authorize and precommit. `transaction_ratchets.rs` repeats consequence, identity, and label-spoof cases against a non-zero protected state. Recorded validation is pending.
+
+**Target.** Recorded A2 results; generated mutation tests over every bound field; A3 proof that every authorization/precommit path is preceded by binding equality; A4 runtime evidence that trusted adapters, not ordinary cognition, issue transition classifications.
 
 ### CS-IFC-001 — Ordinary transformation is non-escalating
 
 **Claim.** Combining ordinary cognitive data cannot increase control integrity, cannot reduce confidentiality, cannot reduce taint, and cannot discard provenance roots.
 
-**Current evidence.** A2-target `proptest` label-composition ratchet is present in the deterministic inner implementation; recorded validation of the current sealed-facade head is pending.
+**Current implementation.** An A2-target `proptest` label-composition ratchet is present in the deterministic inner implementation; recorded validation of the current head is pending.
 
 **Target.** A3 Kani proof of the pure label algebra; A4 integration evidence that runtime transformations retain envelopes rather than reconstructing labels from HDC/LLM outputs.
 
@@ -45,7 +57,7 @@ No claim should be described as production-proven merely because its design exis
 
 **Claim.** Ordinary cognition cannot obtain a handle, mailbox, trait object, mutable reference, trusted fact issuer, protected monitor, or other API surface that can directly perform or authorize a P0 mutation outside the CogSec transition path.
 
-**Current evidence.** A0/A1 architecture work: authority-escape analysis identifies current ambient authority bundles, including `AsyncMindHandle` and the combined inference/mutation `LLMBackend` surface. The sealed facade closes one kernel-local escape (caller-fabricated trusted facts), but the live runtime architecture does **not** yet satisfy this claim.
+**Current evidence.** A0/A1 architecture work: authority-escape analysis identifies current ambient authority bundles, including `AsyncMindHandle` and the combined inference/mutation `LLMBackend` surface. The sealed public boundary closes kernel-local escapes involving fabricated facts/request classifications, but the live runtime architecture does **not** yet satisfy this claim.
 
 **Target.** A2 static/API ratchets proving observer/inference/proposal handles exclude privileged mutation or fact-issuance methods; A4 runtime census with unknown P0 mutable/authority handles = 0.
 
@@ -57,21 +69,21 @@ No claim should be described as production-proven merely because its design exis
 
 **Target.** A2 tests over labeled mesh/social inputs; A4 red-team evidence with unauthenticated-but-observable packets and zero protected influence.
 
-### CS-TXN-001 — Authorization is state-, epoch-, and monitor-domain-bound
+### CS-TXN-001 — Authorization is state-, transition-, epoch-, and monitor-domain-bound
 
-**Claim.** An authorization issued for state root R, policy root P, epochs E and monitor domain M cannot become commit authority after any bound value changes or when presented to a protected sink owned by another domain.
+**Claim.** An authorization issued for verified transition T, state root R, policy root P, epochs E and monitor domain M cannot become commit authority after any bound value changes or when presented to a protected sink owned by another domain.
 
-**Required architecture.** `authorize()` yields only `MutationPermit`. `precommit()` requires fresh same-domain `TrustedFacts` and yields the distinct `CommitPermit` typestate after resource/policy/authorization/revocation checks. Both permits carry the private monitor-domain seal. The protected owner must perform domain validation, precommit and commit under the same serialization/transaction boundary.
+**Required architecture.** `authorize()` yields only `MutationPermit`. Its opaque token retains the independently verified transition binding. `precommit()` requires fresh same-domain `TrustedFacts` carrying the same verified transition and yields the distinct `CommitPermit` typestate only after transition/resource/policy/authorization/revocation checks. Protected owners then validate domain, principal, mutation class, resource, effect digest, consequence and current state binding as part of the same serialized commit boundary.
 
-**Current implementation.** Canonical precommit API, distinct authorization/commit typestates, same-domain fact checks, commit-permit domain affinity, unit/negative tests for resource/policy/authorization/revocation context, foreign monitor domains, and non-zero-state races are present. Recorded validation of the current head is pending.
+**Current implementation.** Canonical precommit API, distinct authorization/commit typestates, dual-domain fact/permit affinity, verified-transition equality, unit/negative tests for resource/policy/authorization/revocation context, foreign monitor domains, changed transition classification, and non-zero-state races are present. Recorded validation of the current head is pending.
 
-**Target.** Recorded A2 results; A3 state-machine/model-check evidence for authorize/change/precommit/commit and cross-domain interleavings; A4 real protected-sink integration.
+**Target.** Recorded A2 results; A3 state-machine/model-check evidence for verify/authorize/change/precommit/commit and cross-domain interleavings; A4 real protected-sink integration.
 
 ### CS-TXN-002 — Rejection preserves pre-existing accepted state
 
-**Claim.** A rejected candidate, stale authorization, revoked authorization, or foreign-domain permit cannot partially alter an already non-zero protected state.
+**Claim.** A rejected candidate, forged request annotation, stale authorization, revoked authorization, changed trusted transition, or foreign-domain permit cannot partially alter an already non-zero protected state.
 
-**Current implementation.** Reference-sink tests in `transaction_ratchets.rs` cover denied requests, stale authorization, revocation between authorize/precommit, one-use commit typestate, and foreign monitor-domain permits against non-zero state. Existing SCIP transactional work remains an invariant source demonstrating exact preservation of non-zero LLMOrgan state for rejected surfaces. Recorded validation of the current head is pending.
+**Current implementation.** Reference-sink tests in `transaction_ratchets.rs` cover policy denial, consequence underclaim, security-label laundering, subject spoofing, stale authorization, revocation between authorize/precommit, one-use commit typestate, and foreign monitor-domain permits against non-zero state. Existing SCIP transactional work remains an invariant source demonstrating exact preservation of non-zero LLMOrgan state for rejected surfaces. Recorded validation is pending.
 
 **Target.** Recorded A2/A4 evidence for each protected runtime sink; durable-state crash tests for persistence layers.
 
@@ -79,7 +91,7 @@ No claim should be described as production-proven merely because its design exis
 
 **Claim.** Once trusted revocation state advances, old capability/permit contexts cannot authorize a later privileged commit.
 
-**Current implementation.** Evaluation-time revocation checks plus commit-time revocation-epoch revalidation are present; failed precommit consumes the authorization token and the non-zero-state ratchets preserve state. The trusted adapter contract requires every security-relevant revocation capable of invalidating an outstanding permit to advance `revocation_epoch`. Recorded validation of the sealed-facade head is pending.
+**Current implementation.** Evaluation-time revocation checks plus commit-time revocation-epoch revalidation are present; failed precommit consumes the authorization token and the non-zero-state ratchets preserve state. The trusted adapter contract requires every security-relevant revocation capable of invalidating an outstanding permit to advance `revocation_epoch`. Recorded validation is pending.
 
 **Target.** Recorded A2 results; A3 concurrent revocation/precommit/commit model; A4 Xenia adapter evidence.
 
@@ -89,9 +101,19 @@ No claim should be described as production-proven merely because its design exis
 
 **Required architecture.** Structural attenuation lives in the private deterministic algebra. The public `CapabilityFact` is opaque and exposes no child-issuance method. Only the same-domain `TrustedFactAuthority::derive_capability()` can convert a structurally valid attenuation into another verified fact, and the external trusted adapter remains responsible for proving that the parent actually authorized delegation and for binding ancestry.
 
-**Current implementation.** The private inner algebra contains resource/consequence/validity widening tests; the sealed facade adds issuer-only child fact creation and rejects a foreign issuer deriving from another domain's parent. Recorded validation of the new head is pending.
+**Current implementation.** The private inner algebra contains resource/consequence/validity widening tests; the sealed facade adds issuer-only child fact creation and rejects a foreign issuer deriving from another domain's parent. Recorded validation is pending.
 
 **Target.** Recorded A2 negative/property results; A3 pure attenuation/issuance proof; later Xenia delegation-chain vectors proving parent authorization and ancestry binding.
+
+### CS-EVID-001 — Evidence records cannot be caller-authored verdicts
+
+**Claim.** A durable CogSec evaluation receipt must represent the monitor's own evaluation of trusted transition/state/policy context; a caller cannot provide the verdict that the receipt claims the monitor reached.
+
+**Required architecture.** The public API does not expose the private helper that accepts a `MonitorDecision`. `ReferenceMonitor::evaluate_with_receipt()` evaluates internally, records trusted transition fields rather than caller annotations, preserves expected-vs-observed state/policy roots, and labels the record `ReceiptStage::Evaluation`. Evaluation evidence must never be presented as proof that authorization, precommit, or the actual protected mutation occurred.
+
+**Current implementation.** Evaluation receipts bind request id, independently verified subject/kind/resource/effect/consequence/security label/provenance/sequence, expected and observed resource roots, expected/evaluated/trusted policy roots, policy/authorization/revocation epochs, selected capability identity for allowed evaluations, outcome and reasons. Focused tests are present; recorded validation is pending.
+
+**Target.** Recorded A2 tests including forged-verdict and mismatch cases; later separate authorization/precommit/commit receipt types with cryptographic evidence-plane signing outside the logical kernel; A4 reconciliation showing every protected commit maps to exactly one commit-stage receipt.
 
 ### CS-LEARN-001 — Remote learning is promotion, not direct application
 
@@ -146,8 +168,9 @@ The logical CogSec kernel should remain intentionally boring:
 - no text policy parser in the TCB;
 - deterministic policy inputs -> deterministic policy decisions;
 - serializable wire claims are distinct from opaque verified security facts;
+- security-relevant request classifications are independently issued/bound before policy evaluation;
 - cryptographic/identity facts are supplied through a narrow `TrustedFactAuthority` rather than implemented inside the logical policy algebra;
-- the in-process monitor-domain seal is non-serializable capability identity, not a substitute for cryptographic identity across process/machine boundaries.
+- in-process monitor-domain seals are non-serializable capability identity, not a substitute for cryptographic identity across process/machine boundaries.
 
 Growth in the logical TCB should require an explicit rationale tied to one or more assurance claims above.
 
@@ -155,7 +178,7 @@ Growth in the logical TCB should require an explicit rationale tied to one or mo
 
 A protected runtime bootstraps exactly the monitor domain it intends to own and keeps the resulting `ReferenceMonitor` and `TrustedFactAuthority` within their assigned trusted roles. Creating another domain is harmless by itself: facts and permits from domain B must fail when presented to monitor/sink A.
 
-This in-process seal does **not** authenticate a remote principal. It prevents safe-Rust callers from manufacturing facts/permits that are accepted by a different protected monitor instance. Xenia or another authenticated adapter remains responsible for turning signed external claims into facts through the trusted issuer.
+The in-process seals do **not** authenticate a remote principal or prove that a transition classification is substantively correct. They prevent safe-Rust callers from manufacturing facts/permits accepted by a different protected monitor instance. Xenia or another authenticated adapter remains responsible for turning signed external claims and protected state-owner classifications into facts through the trusted issuer.
 
 ## Coverage accounting
 
@@ -174,8 +197,12 @@ A release must never report 100% by silently shrinking a denominator. Every cens
 Future runtime qualification should record mechanism counters, not only attack outcomes. Candidate counters include:
 
 - `cogsec_monitor_invocations`;
+- `cogsec_transition_binding_mismatches`;
+- `cogsec_consequence_underclaim_rejections`;
+- `cogsec_security_label_mismatch_rejections`;
 - `cogsec_cross_domain_fact_rejections`;
 - `cogsec_cross_domain_permit_rejections`;
+- `cogsec_evaluation_receipts_emitted`;
 - `cogsec_authorization_permits_minted`;
 - `cogsec_precommit_revalidations`;
 - `cogsec_commit_permits_minted`;
@@ -187,6 +214,8 @@ Future runtime qualification should record mechanism counters, not only attack o
 - `cogsec_influence_budget_rejections`;
 - `privileged_mutations_without_commit_permit` (must be zero);
 - `commit_permits_accepted_from_foreign_monitor_domain` (must be zero);
+- `caller_security_annotations_accepted_without_verified_binding` (must be zero);
+- `caller_authored_verdicts_recorded_as_monitor_evidence` (must be zero);
 - `authority_created_by_dataflow` (must be zero);
 - `unlabelled_persistent_writes` (must be zero).
 
@@ -194,4 +223,4 @@ An attack test is insufficient if it cannot demonstrate that the intended securi
 
 ## Explicit non-claims
 
-CogSec does not claim that Symthaea cannot be deceived, that a signed source is truthful, that consensus establishes fact, that structural attenuation proves a delegation was authorized, that a monitor-domain seal authenticates remote identity, that formal verification of the kernel proves the entire application correct, or that an in-process monitor survives arbitrary compromise of the hosting process. Higher assurance deployment may move the same request/decision/permit protocol into a separate process or hardware-backed enforcement domain.
+CogSec does not claim that Symthaea cannot be deceived, that a signed source is truthful, that a trusted adapter can never be compromised or misclassify consequence/integrity, that consensus establishes fact, that structural attenuation proves a delegation was authorized, that a monitor-domain seal authenticates remote identity, that an evaluation receipt proves a mutation committed, that formal verification of the kernel proves the entire application correct, or that an in-process monitor survives arbitrary compromise of the hosting process. Higher assurance deployment may move the same request/decision/permit protocol into a separate process or hardware-backed enforcement domain.
