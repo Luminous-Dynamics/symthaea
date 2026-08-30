@@ -25,6 +25,31 @@ pub const SURVEILLANCE_SCREEN_INPUT_ID_DOMAIN_V1: &[u8] =
 pub const SURVEILLANCE_SCREEN_RECEIPT_ID_DOMAIN_V1: &[u8] =
     b"symthaea-epidemiology-surveillance-screen-receipt-v1\0";
 
+/// Typed semantic identity of a surveillance-screen algorithm.
+///
+/// The enum is intentionally small and versioned rather than storing an
+/// arbitrary `&'static str` in evidence receipts. Its semantic string remains
+/// the canonical v1 hash input so introducing this type does not redefine the
+/// already-frozen receipt identity vector.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum SurveillanceScreenAlgorithm {
+    RobustMedianMadIntervalGuardV1,
+}
+
+impl SurveillanceScreenAlgorithm {
+    pub const fn semantic_id(self) -> &'static str {
+        match self {
+            Self::RobustMedianMadIntervalGuardV1 => SURVEILLANCE_SCREEN_ALGORITHM_V1,
+        }
+    }
+}
+
+impl fmt::Display for SurveillanceScreenAlgorithm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.semantic_id())
+    }
+}
+
 /// Content identity for the exact ordered aggregate series supplied to one
 /// surveillance screen.
 ///
@@ -241,7 +266,7 @@ pub struct BaselineTimeWindow {
 /// the upstream measurements or their institutional provenance.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SurveillanceScreenReceipt {
-    algorithm_id: &'static str,
+    algorithm: SurveillanceScreenAlgorithm,
     input_id: SurveillanceScreenInputId,
     config: SurveillanceScreenConfig,
     baseline_window: Option<BaselineTimeWindow>,
@@ -250,8 +275,12 @@ pub struct SurveillanceScreenReceipt {
 }
 
 impl SurveillanceScreenReceipt {
+    pub const fn algorithm(self) -> SurveillanceScreenAlgorithm {
+        self.algorithm
+    }
+
     pub const fn algorithm_id(self) -> &'static str {
-        self.algorithm_id
+        self.algorithm.semantic_id()
     }
 
     pub const fn input_id(self) -> SurveillanceScreenInputId {
@@ -282,7 +311,7 @@ impl SurveillanceScreenReceipt {
     pub fn id(&self) -> SurveillanceScreenReceiptId {
         let mut h = Sha256::new();
         h.update(SURVEILLANCE_SCREEN_RECEIPT_ID_DOMAIN_V1);
-        put_string(&mut h, self.algorithm_id);
+        put_string(&mut h, self.algorithm.semantic_id());
         h.update(self.input_id.as_bytes());
         put_config(&mut h, self.config);
         put_baseline_window(&mut h, self.baseline_window);
@@ -315,7 +344,7 @@ pub fn assess_latest_change_with_receipt(
     let assessment = assess_latest_change(baseline_points, latest, config)?;
 
     Ok(SurveillanceScreenReceipt {
-        algorithm_id: SURVEILLANCE_SCREEN_ALGORITHM_V1,
+        algorithm: SurveillanceScreenAlgorithm::RobustMedianMadIntervalGuardV1,
         input_id,
         config,
         baseline_window,
@@ -345,7 +374,11 @@ mod tests {
         let config = SurveillanceScreenConfig::new(5, 3.0).unwrap();
 
         let receipt = assess_latest_change_with_receipt(&history, latest, config).unwrap();
-        assert_eq!(receipt.algorithm_id, SURVEILLANCE_SCREEN_ALGORITHM_V1);
+        assert_eq!(
+            receipt.algorithm,
+            SurveillanceScreenAlgorithm::RobustMedianMadIntervalGuardV1
+        );
+        assert_eq!(receipt.algorithm_id(), SURVEILLANCE_SCREEN_ALGORITHM_V1);
         assert_eq!(
             receipt.input_id,
             SurveillanceScreenInputId::from_series(&history, latest)
@@ -414,15 +447,11 @@ mod tests {
     }
 
     #[test]
-    fn algorithm_identifier_is_receipt_identity_significant() {
-        let history = history();
-        let latest = SurveillancePoint::observed(60, 20.0, 19.0, 21.0).unwrap();
-        let config = SurveillanceScreenConfig::new(5, 3.0).unwrap();
-        let receipt = assess_latest_change_with_receipt(&history, latest, config).unwrap();
-        let mut altered = receipt;
-        altered.algorithm_id = "different-screen-v1";
-
-        assert_ne!(receipt.id(), altered.id());
+    fn typed_algorithm_identity_is_hash_stable() {
+        assert_eq!(
+            SurveillanceScreenAlgorithm::RobustMedianMadIntervalGuardV1.semantic_id(),
+            SURVEILLANCE_SCREEN_ALGORITHM_V1
+        );
     }
 
     #[test]
