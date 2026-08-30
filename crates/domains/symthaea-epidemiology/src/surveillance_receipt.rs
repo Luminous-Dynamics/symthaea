@@ -14,6 +14,7 @@ use std::fmt;
 use sha2::{Digest, Sha256};
 
 use crate::surveillance::{
+    AbstentionReason, ChangeDirection, IntervalEstimate, RobustBaseline, ScreeningDisposition,
     SurveillanceAssessment, SurveillancePoint, SurveillanceScreenConfig, SurveillanceScreenError,
     assess_latest_change,
 };
@@ -21,6 +22,8 @@ use crate::surveillance::{
 pub const SURVEILLANCE_SCREEN_ALGORITHM_V1: &str = "robust-median-mad-interval-guard-v1";
 pub const SURVEILLANCE_SCREEN_INPUT_ID_DOMAIN_V1: &[u8] =
     b"symthaea-epidemiology-surveillance-screen-input-v1\0";
+pub const SURVEILLANCE_SCREEN_RECEIPT_ID_DOMAIN_V1: &[u8] =
+    b"symthaea-epidemiology-surveillance-screen-receipt-v1\0";
 
 /// Content identity for the exact ordered aggregate series supplied to one
 /// surveillance screen.
@@ -52,22 +55,55 @@ impl SurveillanceScreenInputId {
     }
 
     pub fn to_hex(self) -> String {
-        let mut out = String::with_capacity(64);
-        for byte in self.0 {
-            use fmt::Write as _;
-            write!(&mut out, "{byte:02x}").expect("writing to String cannot fail");
-        }
-        out
+        hex(self.0)
     }
 }
 
 impl fmt::Display for SurveillanceScreenInputId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for byte in self.0 {
-            write!(f, "{byte:02x}")?;
-        }
-        Ok(())
+        put_hex(f, self.0)
     }
+}
+
+/// Content identity for one complete evidence-bearing screen receipt.
+///
+/// The identity commits to the exact input identity, semantic algorithm ID,
+/// every screen-configuration field, explicit time scope, and every field in the
+/// returned assessment. It is a content commitment only: it does not authenticate
+/// a source, prove that the measurements are true, or grant operational authority.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct SurveillanceScreenReceiptId([u8; 32]);
+
+impl SurveillanceScreenReceiptId {
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    pub fn to_hex(self) -> String {
+        hex(self.0)
+    }
+}
+
+impl fmt::Display for SurveillanceScreenReceiptId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        put_hex(f, self.0)
+    }
+}
+
+fn hex(bytes: [u8; 32]) -> String {
+    let mut out = String::with_capacity(64);
+    for byte in bytes {
+        use fmt::Write as _;
+        write!(&mut out, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    out
+}
+
+fn put_hex(f: &mut fmt::Formatter<'_>, bytes: [u8; 32]) -> fmt::Result {
+    for byte in bytes {
+        write!(f, "{byte:02x}")?;
+    }
+    Ok(())
 }
 
 fn put_point(h: &mut Sha256, point: SurveillancePoint) {
@@ -75,21 +111,114 @@ fn put_point(h: &mut Sha256, point: SurveillancePoint) {
     match point.measurement() {
         Some(measurement) => {
             h.update([1]);
-            put_f64(h, measurement.estimate());
-            put_f64(h, measurement.lower());
-            put_f64(h, measurement.upper());
+            put_interval(h, measurement);
         }
         None => h.update([0]),
     }
 }
 
+fn put_interval(h: &mut Sha256, measurement: IntervalEstimate) {
+    put_f64(h, measurement.estimate());
+    put_f64(h, measurement.lower());
+    put_f64(h, measurement.upper());
+}
+
 fn put_f64(h: &mut Sha256, value: f64) {
     let bits = if value == 0.0 {
         0.0f64.to_bits()
+    } else if value.is_nan() {
+        0x7ff8_0000_0000_0000u64
     } else {
         value.to_bits()
     };
     h.update(bits.to_be_bytes());
+}
+
+fn put_string(h: &mut Sha256, value: &str) {
+    h.update((value.len() as u64).to_be_bytes());
+    h.update(value.as_bytes());
+}
+
+fn put_config(h: &mut Sha256, config: SurveillanceScreenConfig) {
+    h.update((config.min_baseline_observations() as u64).to_be_bytes());
+    put_f64(h, config.robust_z_threshold());
+    put_f64(h, config.scale_epsilon());
+}
+
+fn put_baseline_window(h: &mut Sha256, window: Option<BaselineTimeWindow>) {
+    match window {
+        Some(window) => {
+            h.update([1]);
+            h.update(window.start_unix_s.to_be_bytes());
+            h.update(window.end_unix_s.to_be_bytes());
+        }
+        None => h.update([0]),
+    }
+}
+
+fn put_disposition(h: &mut Sha256, disposition: ScreeningDisposition) {
+    match disposition {
+        ScreeningDisposition::InsufficientBaseline => h.update([0]),
+        ScreeningDisposition::WithinBaseline => h.update([1]),
+        ScreeningDisposition::ChangeCandidate(direction) => {
+            h.update([2]);
+            h.update([match direction {
+                ChangeDirection::Upward => 0,
+                ChangeDirection::Downward => 1,
+            }]);
+        }
+        ScreeningDisposition::Abstain(reason) => {
+            h.update([3]);
+            h.update([match reason {
+                AbstentionReason::LatestMeasurementMissing => 0,
+                AbstentionReason::DegenerateBaselineSpread => 1,
+                AbstentionReason::UncertaintyOverlapsThresholdEnvelope => 2,
+            }]);
+        }
+    }
+}
+
+fn put_robust_baseline(h: &mut Sha256, baseline: Option<RobustBaseline>) {
+    match baseline {
+        Some(baseline) => {
+            h.update([1]);
+            put_f64(h, baseline.center);
+            put_f64(h, baseline.mad);
+            put_f64(h, baseline.robust_scale);
+            put_f64(h, baseline.lower_threshold_envelope);
+            put_f64(h, baseline.upper_threshold_envelope);
+        }
+        None => h.update([0]),
+    }
+}
+
+fn put_optional_f64(h: &mut Sha256, value: Option<f64>) {
+    match value {
+        Some(value) => {
+            h.update([1]);
+            put_f64(h, value);
+        }
+        None => h.update([0]),
+    }
+}
+
+fn put_optional_interval(h: &mut Sha256, value: Option<IntervalEstimate>) {
+    match value {
+        Some(value) => {
+            h.update([1]);
+            put_interval(h, value);
+        }
+        None => h.update([0]),
+    }
+}
+
+fn put_assessment(h: &mut Sha256, assessment: SurveillanceAssessment) {
+    put_disposition(h, assessment.disposition);
+    put_robust_baseline(h, assessment.baseline);
+    h.update((assessment.baseline_observed as u64).to_be_bytes());
+    h.update((assessment.baseline_missing as u64).to_be_bytes());
+    put_optional_f64(h, assessment.robust_z);
+    put_optional_interval(h, assessment.latest);
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -114,6 +243,25 @@ pub struct SurveillanceScreenReceipt {
     pub baseline_window: Option<BaselineTimeWindow>,
     pub latest_observed_at_unix_s: i64,
     pub assessment: SurveillanceAssessment,
+}
+
+impl SurveillanceScreenReceipt {
+    /// Return the semantic content identity of this complete receipt.
+    ///
+    /// The ID is intentionally independent of Rust Debug output, serde formats,
+    /// pointer layout, and machine endianness. Fixed tags, big-endian integers,
+    /// and canonical IEEE-754 bit encodings define the v1 identity contract.
+    pub fn id(&self) -> SurveillanceScreenReceiptId {
+        let mut h = Sha256::new();
+        h.update(SURVEILLANCE_SCREEN_RECEIPT_ID_DOMAIN_V1);
+        put_string(&mut h, self.algorithm_id);
+        h.update(self.input_id.as_bytes());
+        put_config(&mut h, self.config);
+        put_baseline_window(&mut h, self.baseline_window);
+        h.update(self.latest_observed_at_unix_s.to_be_bytes());
+        put_assessment(&mut h, self.assessment);
+        SurveillanceScreenReceiptId(h.finalize().into())
+    }
 }
 
 /// Preferred evidence-bearing entry point for the v1 screen.
@@ -151,17 +299,20 @@ pub fn assess_latest_change_with_receipt(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::surveillance::{ChangeDirection, ScreeningDisposition};
 
-    #[test]
-    fn receipt_binds_algorithm_config_time_scope_and_exact_input() {
-        let history = [
+    fn history() -> [SurveillancePoint; 5] {
+        [
             SurveillancePoint::observed(10, 8.0, 7.9, 8.1).unwrap(),
             SurveillancePoint::observed(20, 9.0, 8.9, 9.1).unwrap(),
             SurveillancePoint::observed(30, 10.0, 9.9, 10.1).unwrap(),
             SurveillancePoint::observed(40, 11.0, 10.9, 11.1).unwrap(),
             SurveillancePoint::observed(50, 12.0, 11.9, 12.1).unwrap(),
-        ];
+        ]
+    }
+
+    #[test]
+    fn receipt_binds_algorithm_config_time_scope_and_exact_input() {
+        let history = history();
         let latest = SurveillancePoint::observed(60, 20.0, 19.0, 21.0).unwrap();
         let config = SurveillanceScreenConfig::new(5, 3.0).unwrap();
 
@@ -172,6 +323,7 @@ mod tests {
             SurveillanceScreenInputId::from_series(&history, latest)
         );
         assert_eq!(receipt.input_id.to_hex().len(), 64);
+        assert_eq!(receipt.id().to_hex().len(), 64);
         assert_eq!(receipt.config, config);
         assert_eq!(
             receipt.baseline_window,
@@ -185,6 +337,58 @@ mod tests {
             receipt.assessment.disposition,
             ScreeningDisposition::ChangeCandidate(ChangeDirection::Upward)
         );
+    }
+
+    #[test]
+    fn identical_receipts_have_identical_receipt_identity() {
+        let history = history();
+        let latest = SurveillancePoint::observed(60, 20.0, 19.0, 21.0).unwrap();
+        let config = SurveillanceScreenConfig::new(5, 3.0).unwrap();
+        let a = assess_latest_change_with_receipt(&history, latest, config).unwrap();
+        let b = assess_latest_change_with_receipt(&history, latest, config).unwrap();
+
+        assert_eq!(a, b);
+        assert_eq!(a.id(), b.id());
+    }
+
+    #[test]
+    fn scale_epsilon_is_receipt_identity_significant() {
+        let history = history();
+        let latest = SurveillancePoint::observed(60, 11.0, 10.9, 11.1).unwrap();
+        let a_config = SurveillanceScreenConfig::with_scale_epsilon(5, 3.0, 1e-12).unwrap();
+        let b_config = SurveillanceScreenConfig::with_scale_epsilon(5, 3.0, 1e-6).unwrap();
+        let a = assess_latest_change_with_receipt(&history, latest, a_config).unwrap();
+        let b = assess_latest_change_with_receipt(&history, latest, b_config).unwrap();
+
+        assert_eq!(a.input_id, b.input_id);
+        assert_eq!(a.assessment, b.assessment);
+        assert_ne!(a.id(), b.id());
+    }
+
+    #[test]
+    fn returned_assessment_is_receipt_identity_significant() {
+        let history = history();
+        let latest = SurveillancePoint::observed(60, 20.0, 19.0, 21.0).unwrap();
+        let config = SurveillanceScreenConfig::new(5, 3.0).unwrap();
+        let receipt = assess_latest_change_with_receipt(&history, latest, config).unwrap();
+        let mut altered = receipt;
+        altered.assessment.disposition = ScreeningDisposition::WithinBaseline;
+
+        assert_eq!(receipt.input_id, altered.input_id);
+        assert_eq!(receipt.config, altered.config);
+        assert_ne!(receipt.id(), altered.id());
+    }
+
+    #[test]
+    fn algorithm_identifier_is_receipt_identity_significant() {
+        let history = history();
+        let latest = SurveillancePoint::observed(60, 20.0, 19.0, 21.0).unwrap();
+        let config = SurveillanceScreenConfig::new(5, 3.0).unwrap();
+        let receipt = assess_latest_change_with_receipt(&history, latest, config).unwrap();
+        let mut altered = receipt;
+        altered.algorithm_id = "different-screen-v1";
+
+        assert_ne!(receipt.id(), altered.id());
     }
 
     #[test]
