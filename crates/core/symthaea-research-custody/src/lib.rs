@@ -34,6 +34,13 @@ pub enum CustodyError {
         principal: CustodyPrincipal,
         action: CustodyAction,
     },
+    #[error("unsafe early rule for sealed outcome asset {asset_id}: {principal:?}/{action:?} from {earliest_phase:?}")]
+    UnsafeOutcomeRule {
+        asset_id: String,
+        principal: CustodyPrincipal,
+        action: CustodyAction,
+        earliest_phase: CustodyPhase,
+    },
     #[error("custody asset references sample outside split: {0}")]
     UnknownSample(String),
     #[error("custody asset sample role changed for {sample_id}: recorded={recorded:?}, actual={actual:?}")]
@@ -85,7 +92,7 @@ pub enum CustodyPhase {
     SelectionFrozen,
     /// Final predictor inputs may be opened where the study design permits it.
     EvaluationInputsOpen,
-    /// Predictions/outputs are committed and verification outcomes may be revealed.
+    /// Predictions/outputs are committed and verification outcomes may be revealed/scored.
     OutcomeRevealed,
     /// Final result/evidence package may be disclosed according to study policy.
     Published,
@@ -181,7 +188,7 @@ impl CustodyAsset {
         if kind.requires_evaluation_role() && assignment.role != PartitionRole::Evaluation {
             return Err(CustodyError::OutcomeNotEvaluation(sample_id.to_string()));
         }
-        validate_rules(&asset_id, &access_rules)?;
+        validate_rules(&asset_id, kind, &access_rules)?;
         Ok(Self {
             asset_id,
             sample_id: assignment.unit.sample_id.clone(),
@@ -289,7 +296,7 @@ impl CustodyAsset {
     }
 }
 
-fn validate_rules(asset_id: &str, rules: &[AccessRule]) -> Result<()> {
+fn validate_rules(asset_id: &str, kind: CustodyAssetKind, rules: &[AccessRule]) -> Result<()> {
     let mut seen = HashSet::new();
     for rule in rules {
         if !seen.insert((rule.principal, rule.action)) {
@@ -298,6 +305,26 @@ fn validate_rules(asset_id: &str, rules: &[AccessRule]) -> Result<()> {
                 principal: rule.principal,
                 action: rule.action,
             });
+        }
+        if kind.requires_evaluation_role() {
+            let early_model_or_operator_access = matches!(
+                rule.principal,
+                CustodyPrincipal::ModelProcess | CustodyPrincipal::ResearchOperator
+            ) && matches!(rule.action, CustodyAction::Read | CustodyAction::Transform)
+                && rule.earliest_phase < CustodyPhase::OutcomeRevealed;
+            let early_scoring = rule.action == CustodyAction::Score
+                && rule.earliest_phase < CustodyPhase::OutcomeRevealed;
+            let early_public_reveal = rule.principal == CustodyPrincipal::Public
+                && rule.action == CustodyAction::Reveal
+                && rule.earliest_phase < CustodyPhase::Published;
+            if early_model_or_operator_access || early_scoring || early_public_reveal {
+                return Err(CustodyError::UnsafeOutcomeRule {
+                    asset_id: asset_id.to_string(),
+                    principal: rule.principal,
+                    action: rule.action,
+                    earliest_phase: rule.earliest_phase,
+                });
+            }
         }
     }
     Ok(())
@@ -457,7 +484,7 @@ fn validate_internal(manifest: &ResearchCustodyManifest) -> Result<()> {
         if asset.kind.requires_evaluation_role() && asset.sample_role != PartitionRole::Evaluation {
             return Err(CustodyError::OutcomeNotEvaluation(asset.sample_id.clone()));
         }
-        validate_rules(&asset.asset_id, &asset.access_rules)?;
+        validate_rules(&asset.asset_id, asset.kind, &asset.access_rules)?;
         if !ids.insert(asset.asset_id.clone()) {
             return Err(CustodyError::DuplicateAsset(asset.asset_id.clone()));
         }
@@ -484,7 +511,7 @@ fn validate_asset_against_split(asset: &CustodyAsset, split: &ResearchSplitManif
     if asset.kind.requires_evaluation_role() && assignment.role != PartitionRole::Evaluation {
         return Err(CustodyError::OutcomeNotEvaluation(asset.sample_id.clone()));
     }
-    validate_rules(&asset.asset_id, &asset.access_rules)
+    validate_rules(&asset.asset_id, asset.kind, &asset.access_rules)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
