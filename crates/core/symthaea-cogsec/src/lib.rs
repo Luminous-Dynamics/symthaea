@@ -155,7 +155,7 @@ impl ReferenceMonitor {
     ) -> Result<(MonitorDecision, MutationReceipt), AuthorityError> {
         let decision = self.inner.evaluate(request, facts, policy)?;
         let capability_id = if decision.outcome == DecisionOutcome::Allow {
-            Some(self.inner.authorize(request, facts, policy)?.capability_id()).flatten()
+            self.inner.authorize(request, facts, policy)?.capability_id()
         } else {
             None
         };
