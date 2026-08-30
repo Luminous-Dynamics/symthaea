@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-living-watershed-witness"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Deterministic Living Watershed research witness for Symthaea forecasting and research-lineage infrastructure."
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+blake3 = { workspace = true }
+thiserror = { workspace = true }
+symthaea-earth-system = { workspace = true }
+symthaea-ecology = { path = "../../domains/symthaea-ecology" }
+symthaea-futures-core = { workspace = true }
+symthaea-futures-calibration = { workspace = true }
+symthaea-research-protocol = { path = "../../core/symthaea-research-protocol" }
+symthaea-research-result = { path = "../../core/symthaea-research-result" }
+symthaea-research-replication = { path = "../../core/symthaea-research-replication" }
