@@ -16,6 +16,12 @@
 //! authenticated checkpoints, transactional multi-plane observations, world
 //! genesis, persistent world graphs, and explicit presence/capability sessions.
 //!
+//! v1.3 adds host-neutral persistent-world lifecycle evidence: immutable
+//! snapshots, authority-gated suspend/resume/archive transitions, chained
+//! snapshots, ordered lifecycle timelines, snapshot-bound forks, and revisit
+//! receipts that prove exit -> snapshot -> re-entry state continuity without
+//! pretending persistence implies consciousness.
+//!
 //! The crate remains deliberately host-neutral. Bevy/Symtropy, robotics, dream
 //! engines, futures simulations and other hosts may supply records, but this
 //! crate does not grant mutation authority and does not decide metaphysical or
@@ -29,6 +35,9 @@ pub mod digest;
 pub mod genesis;
 pub mod graph;
 pub mod ledger;
+pub mod lifecycle;
+pub mod lifecycle_fork;
+pub mod lifecycle_history;
 pub mod materialization;
 pub mod memory;
 pub mod presence;
@@ -43,6 +52,16 @@ pub use digest::{DigestAlgorithm, TypedDigest, TypedDigestError};
 pub use genesis::{DeterminismClass, WorldGenesisError, WorldGenesisManifest};
 pub use graph::{WorldGraph, WorldGraphError, WorldKey};
 pub use ledger::{RealityLedger, RealityLedgerError, RealityRecord, RealityRecordKind};
+pub use lifecycle::{
+    WORLD_REVISIT_DIGEST_DOMAIN, WORLD_SNAPSHOT_DIGEST_DOMAIN, WorldLifecycleError,
+    WorldLifecycleReceipt, WorldLifecycleState, WorldLifecycleTransition, WorldRevisitReceipt,
+    WorldSnapshotManifest,
+};
+pub use lifecycle_fork::{WorldSnapshotForkError, WorldSnapshotForkReceipt};
+pub use lifecycle_history::{
+    WORLD_LIFECYCLE_TIMELINE_DIGEST_DOMAIN, WorldLifecycleTimeline,
+    WorldLifecycleTimelineError,
+};
 pub use materialization::{
     TypedCounterfactualCommitReceipt, TypedMaterializationError,
 };
