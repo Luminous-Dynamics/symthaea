@@ -22,8 +22,7 @@ fn default_state_has_zero_regulatory_deviation() {
 
 #[test]
 fn deviation_is_zero_inside_preferred_band_and_normalized_outside_it() {
-    let mut state = NativeInteroceptiveState::default();
-    state.get_mut(ViabilityChannel::ComputeReserve).value = 0.45;
+    let state = NativeInteroceptiveState::default().with_value(ViabilityChannel::ComputeReserve, 0.45);
 
     let report = assess_homeostasis(&state);
     let deviation = report.channel_deviations[ViabilityChannel::ComputeReserve.index()];
@@ -35,10 +34,11 @@ fn deviation_is_zero_inside_preferred_band_and_normalized_outside_it() {
 
 #[test]
 fn kinematic_allostasis_detects_future_deterioration_before_current_deviation() {
-    let mut state = NativeInteroceptiveState::default();
-    let reserve = state.get_mut(ViabilityChannel::ComputeReserve);
-    reserve.value = 0.70;
-    reserve.velocity = -0.08;
+    let state = NativeInteroceptiveState::default().with_observation(
+        ViabilityChannel::ComputeReserve,
+        0.70,
+        -0.08,
+    );
 
     let current = assess_homeostasis(&state);
     let future = assess_allostasis(
@@ -79,8 +79,7 @@ fn dynamics_aware_allostasis_uses_declared_future_drive() {
 
 #[test]
 fn zero_drive_recovers_a_perturbed_channel_toward_its_preferred_band() {
-    let mut state = NativeInteroceptiveState::default();
-    state.get_mut(ViabilityChannel::ComputeReserve).value = 0.30;
+    let state = NativeInteroceptiveState::default().with_value(ViabilityChannel::ComputeReserve, 0.30);
     let before = assess_homeostasis(&state).weighted_deviation;
 
     let mut model = NativeInteroceptiveModel::new(state, Default::default());
@@ -99,8 +98,7 @@ fn zero_drive_recovers_a_perturbed_channel_toward_its_preferred_band() {
 
 #[test]
 fn rollout_forecast_represents_native_recovery() {
-    let mut state = NativeInteroceptiveState::default();
-    state.get_mut(ViabilityChannel::ComputeReserve).value = 0.30;
+    let state = NativeInteroceptiveState::default().with_value(ViabilityChannel::ComputeReserve, 0.30);
     let model = NativeInteroceptiveModel::new(state, Default::default());
     let current = assess_homeostasis(model.state()).weighted_deviation;
     let future = assess_allostasis_with_drive(
@@ -114,9 +112,9 @@ fn rollout_forecast_represents_native_recovery() {
 
 #[test]
 fn zero_drive_preserves_states_already_inside_preferred_band() {
-    let mut state = NativeInteroceptiveState::default();
-    state.get_mut(ViabilityChannel::ComputeReserve).value = 0.68;
-    state.get_mut(ViabilityChannel::NoveltyBalance).value = 0.57;
+    let state = NativeInteroceptiveState::default()
+        .with_value(ViabilityChannel::ComputeReserve, 0.68)
+        .with_value(ViabilityChannel::NoveltyBalance, 0.57);
     let before = state.clone();
 
     let mut model = NativeInteroceptiveModel::new(state, Default::default());
@@ -129,11 +127,11 @@ fn zero_drive_preserves_states_already_inside_preferred_band() {
 
     for channel in ViabilityChannel::ALL {
         assert_eq!(
-            model.state().get(channel).value,
-            before.get(channel).value,
+            model.state().get(channel).value(),
+            before.get(channel).value(),
             "zero drive must not create an implicit midpoint setpoint for {channel:?}"
         );
-        assert_eq!(model.state().get(channel).velocity, 0.0);
+        assert_eq!(model.state().get(channel).velocity(), 0.0);
     }
 }
 
@@ -141,7 +139,7 @@ fn zero_drive_preserves_states_already_inside_preferred_band() {
 fn interventions_are_explicit_clamped_and_do_not_create_false_velocity() {
     let mut model = NativeInteroceptiveModel::default();
     model.step(InteroceptiveDrive::ZERO.with_rate(ViabilityChannel::Integrity, -0.1));
-    assert!(model.state().get(ViabilityChannel::Integrity).velocity < 0.0);
+    assert!(model.state().get(ViabilityChannel::Integrity).velocity() < 0.0);
 
     let record = apply_intervention(
         &mut model,
@@ -153,7 +151,7 @@ fn interventions_are_explicit_clamped_and_do_not_create_false_velocity() {
     assert_eq!(record.requested, -1.0);
     assert_eq!(record.after, 0.0);
     assert!(record.clamped);
-    assert_eq!(model.state().get(ViabilityChannel::Integrity).velocity, 0.0);
+    assert_eq!(model.state().get(ViabilityChannel::Integrity).velocity(), 0.0);
     assert!(!assess_homeostasis(model.state()).is_within_viability());
 }
 

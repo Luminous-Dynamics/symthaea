@@ -17,12 +17,12 @@ fn stable_channel_ids_are_unique_and_complete() {
 #[test]
 fn lower_viability_boundary_normalizes_to_one_for_every_channel() {
     for channel in ViabilityChannel::ALL {
-        let mut state = NativeInteroceptiveState::default();
-        let variable = state.get_mut(channel);
-        assert!(variable.viable_low < variable.preferred_low);
-        variable.value = variable.viable_low;
+        let baseline = NativeInteroceptiveState::default();
+        let variable = baseline.get(channel);
+        assert!(variable.viable_low() < variable.preferred_low());
+        let state = baseline.with_value(channel, variable.viable_low());
+        let deviation = state.get(channel).normalized_deviation();
 
-        let deviation = variable.normalized_deviation();
         assert!(
             (deviation - 1.0).abs() < 1e-6,
             "unexpected lower-bound normalization for {channel:?}: {deviation}"
@@ -33,9 +33,10 @@ fn lower_viability_boundary_normalizes_to_one_for_every_channel() {
 #[test]
 fn undriven_recovery_never_increases_deviation_from_below_the_preferred_band() {
     for channel in ViabilityChannel::ALL {
-        let mut state = NativeInteroceptiveState::default();
-        let variable = state.get_mut(channel);
-        variable.value = 0.5 * (variable.viable_low + variable.preferred_low);
+        let baseline = NativeInteroceptiveState::default();
+        let variable = baseline.get(channel);
+        let initial = 0.5 * (variable.viable_low() + variable.preferred_low());
+        let state = baseline.with_value(channel, initial);
 
         let mut model = NativeInteroceptiveModel::new(state, Default::default());
         let mut previous = model.state().get(channel).normalized_deviation();
@@ -58,7 +59,7 @@ fn extreme_drives_are_bounded_and_finite() {
         for rate in [-100.0_f32, 100.0_f32] {
             let mut model = NativeInteroceptiveModel::default();
             let report = model.step(InteroceptiveDrive::ZERO.with_rate(channel, rate));
-            let value = model.state().get(channel).value;
+            let value = model.state().get(channel).value();
 
             assert!(value.is_finite());
             assert!((0.0..=1.0).contains(&value));
@@ -70,8 +71,11 @@ fn extreme_drives_are_bounded_and_finite() {
 
 #[test]
 fn allostatic_reports_are_finite_at_discount_extremes() {
-    let mut state = NativeInteroceptiveState::default();
-    state.get_mut(ViabilityChannel::ComputeReserve).velocity = -0.04;
+    let state = NativeInteroceptiveState::default().with_observation(
+        ViabilityChannel::ComputeReserve,
+        0.75,
+        -0.04,
+    );
 
     for discount in [0.0_f32, 1.0_f32] {
         let config = AllostaticConfig {

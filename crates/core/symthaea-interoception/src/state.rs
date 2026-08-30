@@ -49,16 +49,20 @@ impl ViabilityChannel {
     }
 }
 
+/// One native viability channel.
+///
+/// Fields are private so construction-time invariants cannot later be bypassed
+/// by mutating bounds, precision, importance, or the measured state directly.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ViabilityVariable {
-    pub value: f32,
-    pub preferred_low: f32,
-    pub preferred_high: f32,
-    pub viable_low: f32,
-    pub viable_high: f32,
-    pub precision: f32,
-    pub velocity: f32,
-    pub importance: f32,
+    value: f32,
+    preferred_low: f32,
+    preferred_high: f32,
+    viable_low: f32,
+    viable_high: f32,
+    precision: f32,
+    velocity: f32,
+    importance: f32,
 }
 
 impl ViabilityVariable {
@@ -71,7 +75,7 @@ impl ViabilityVariable {
         precision: f32,
         importance: f32,
     ) -> Self {
-        assert!(value.is_finite());
+        validate_observation(value, 0.0);
         assert!(preferred_low.is_finite());
         assert!(preferred_high.is_finite());
         assert!(viable_low.is_finite());
@@ -92,6 +96,46 @@ impl ViabilityVariable {
             velocity: 0.0,
             importance,
         }
+    }
+
+    #[inline]
+    pub const fn value(&self) -> f32 {
+        self.value
+    }
+
+    #[inline]
+    pub const fn velocity(&self) -> f32 {
+        self.velocity
+    }
+
+    #[inline]
+    pub const fn preferred_low(&self) -> f32 {
+        self.preferred_low
+    }
+
+    #[inline]
+    pub const fn preferred_high(&self) -> f32 {
+        self.preferred_high
+    }
+
+    #[inline]
+    pub const fn viable_low(&self) -> f32 {
+        self.viable_low
+    }
+
+    #[inline]
+    pub const fn viable_high(&self) -> f32 {
+        self.viable_high
+    }
+
+    #[inline]
+    pub const fn precision(&self) -> f32 {
+        self.precision
+    }
+
+    #[inline]
+    pub const fn importance(&self) -> f32 {
+        self.importance
     }
 
     #[inline]
@@ -129,9 +173,20 @@ impl ViabilityVariable {
     pub fn predicted(&self, dt: f32) -> Self {
         assert!(dt.is_finite() && dt >= 0.0);
         let mut next = *self;
-        next.value = self.value + self.velocity * dt;
+        next.set_observation(self.value + self.velocity * dt, self.velocity);
         next
     }
+
+    pub(crate) fn set_observation(&mut self, value: f32, velocity: f32) {
+        validate_observation(value, velocity);
+        self.value = value;
+        self.velocity = velocity;
+    }
+}
+
+fn validate_observation(value: f32, velocity: f32) {
+    assert!(value.is_finite(), "viability values must be finite");
+    assert!(velocity.is_finite(), "viability velocities must be finite");
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -150,13 +205,30 @@ impl NativeInteroceptiveState {
     }
 
     #[inline]
-    pub fn get_mut(&mut self, channel: ViabilityChannel) -> &mut ViabilityVariable {
+    pub(crate) fn get_mut(&mut self, channel: ViabilityChannel) -> &mut ViabilityVariable {
         &mut self.channels[channel.index()]
     }
 
     #[inline]
     pub fn channels(&self) -> &[ViabilityVariable; CHANNEL_COUNT] {
         &self.channels
+    }
+
+    /// Build an experimental initial condition with an explicit observed value
+    /// and measured velocity. Live state changes should use the model transition
+    /// law or the intervention API instead.
+    pub fn with_observation(
+        mut self,
+        channel: ViabilityChannel,
+        value: f32,
+        velocity: f32,
+    ) -> Self {
+        self.channels[channel.index()].set_observation(value, velocity);
+        self
+    }
+
+    pub fn with_value(self, channel: ViabilityChannel, value: f32) -> Self {
+        self.with_observation(channel, value, 0.0)
     }
 
     pub fn predicted(&self, dt: f32) -> Self {

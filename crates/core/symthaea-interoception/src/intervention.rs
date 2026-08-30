@@ -69,13 +69,12 @@ pub fn apply_intervention(
     let config = model.config();
     let cycle = model.cycle();
     let variable = model.state_mut().get_mut(intervention.channel);
-    let before = variable.value;
+    let before = variable.value();
     let requested = intervention.kind.requested_value(before);
     assert!(requested.is_finite(), "intervention target must be finite");
     let after = requested.clamp(config.min_value, config.max_value);
 
-    variable.value = after;
-    variable.velocity = 0.0;
+    variable.set_observation(after, 0.0);
 
     InterventionRecord {
         cycle,

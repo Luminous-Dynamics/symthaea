@@ -29,7 +29,7 @@ pub fn assess_homeostasis(state: &NativeInteroceptiveState) -> HomeostaticReport
         let deviation = variable.normalized_deviation().max(0.0);
         channel_deviations[channel.index()] = deviation;
 
-        let weight = variable.precision * variable.importance;
+        let weight = variable.precision() * variable.importance();
         weighted_sum += deviation * weight;
         weight_sum += weight;
         peak_deviation = peak_deviation.max(deviation);

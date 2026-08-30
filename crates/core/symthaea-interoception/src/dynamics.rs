@@ -121,7 +121,7 @@ impl NativeInteroceptiveModel {
 
         for channel in ViabilityChannel::ALL {
             let variable = self.state.get_mut(channel);
-            let previous = variable.value;
+            let previous = variable.value();
             let restorative_rate = restorative_rate(variable, self.config.recovery_rate);
             let external_rate = drive.rate(channel);
 
@@ -133,6 +133,7 @@ impl NativeInteroceptiveModel {
             }
 
             let proposed = previous + (restorative_rate + external_rate) * dt;
+            assert!(proposed.is_finite(), "native transition produced a non-finite value");
             let next = proposed.clamp(self.config.min_value, self.config.max_value);
             if next != proposed {
                 clamped_channels = clamped_channels.saturating_add(1);
@@ -141,8 +142,7 @@ impl NativeInteroceptiveModel {
                 changed_channels = changed_channels.saturating_add(1);
             }
 
-            variable.value = next;
-            variable.velocity = (next - previous) / dt;
+            variable.set_observation(next, (next - previous) / dt);
         }
 
         self.cycle = self.cycle.saturating_add(1);
@@ -159,10 +159,10 @@ impl NativeInteroceptiveModel {
 }
 
 fn restorative_rate(variable: &ViabilityVariable, recovery_rate: f32) -> f32 {
-    if variable.value < variable.preferred_low {
-        (variable.preferred_low - variable.value) * recovery_rate
-    } else if variable.value > variable.preferred_high {
-        (variable.preferred_high - variable.value) * recovery_rate
+    if variable.value() < variable.preferred_low() {
+        (variable.preferred_low() - variable.value()) * recovery_rate
+    } else if variable.value() > variable.preferred_high() {
+        (variable.preferred_high() - variable.value()) * recovery_rate
     } else {
         0.0
     }

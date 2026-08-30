@@ -39,8 +39,8 @@ fn evidence_plane_distinguishes_passive_restorative_driven_and_clamped_arms() {
     );
     passive_evidence.enforce();
 
-    let mut perturbed = NativeInteroceptiveState::default();
-    perturbed.get_mut(ViabilityChannel::ComputeReserve).value = 0.30;
+    let perturbed = NativeInteroceptiveState::default()
+        .with_value(ViabilityChannel::ComputeReserve, 0.30);
     let mut restorative = NativeInteroceptiveModel::new(perturbed, Default::default());
     let restorative_report = restorative.step(InteroceptiveDrive::ZERO);
     let restorative_evidence = RunEvidence::new(
