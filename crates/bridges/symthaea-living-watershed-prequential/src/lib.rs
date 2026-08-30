@@ -79,6 +79,8 @@ pub enum PrequentialError {
     FixtureCommitmentMismatch { origin: usize },
     #[error("verification commitment mismatch at origin {origin}")]
     VerificationCommitmentMismatch { origin: usize },
+    #[error("frozen protocol does not match the prepared prequential design")]
+    ProtocolDesignMismatch,
     #[error("forecast scoring failed: {0}")]
     Scoring(String),
     #[error("serialization failed: {0}")]
@@ -146,6 +148,21 @@ impl PrequentialEpisodeSpec {
                 "evaluation_steps must be > 0".into(),
             ));
         }
+        // Reconstruct through the v0 validated constructor because its fields are public and a
+        // caller may have mutated a previously valid value.
+        let template = SyntheticWatershedSpec::new(
+            template.fixture_id,
+            template.capacity_mm,
+            template.potential_evapotranspiration_mm_per_day,
+            template.initial_storage_mm,
+            template.precipitation_mm_per_day,
+            template.history_steps,
+            template.wilting_fraction,
+            template.optimum_fraction,
+            template.minimum_moisture_multiplier,
+            template.stress_multiplier_threshold,
+        )
+        .map_err(|error| PrequentialError::Fixture(error.to_string()))?;
         template
             .history_steps
             .checked_add(evaluation_steps)
@@ -199,7 +216,35 @@ impl PrequentialEpisodePlan {
         digest_serializable(&self.digest_view())
     }
 
+    fn verify_structure(&self) -> Result<()> {
+        if self.commitments.len() != self.spec.evaluation_steps {
+            return Err(PrequentialError::InvalidSpec(format!(
+                "plan has {} commitments but evaluation_steps is {}",
+                self.commitments.len(), self.spec.evaluation_steps
+            )));
+        }
+        for (offset, commitment) in self.commitments.iter().enumerate() {
+            let expected = self.spec.first_origin() + offset;
+            if commitment.origin != expected {
+                return Err(PrequentialError::InvalidSpec(format!(
+                    "commitment origin mismatch at offset {offset}: expected {expected}, got {}",
+                    commitment.origin
+                )));
+            }
+            non_empty(
+                &commitment.dataset_manifest_digest,
+                "dataset manifest digest",
+            )?;
+            non_empty(
+                &commitment.verification_commitment_digest,
+                "verification commitment digest",
+            )?;
+        }
+        Ok(())
+    }
+
     pub fn verify_digest(&self) -> Result<()> {
+        self.verify_structure()?;
         if self.compute_digest()? != self.plan_digest {
             return Err(PrequentialError::PlanDigestMismatch);
         }
@@ -212,6 +257,7 @@ impl PrequentialEpisodePlan {
 /// The returned digests commit to each sealed fixture and held-out next state, but are not a
 /// secrecy guarantee. They are never passed through the candidate `TrajectoryGenerator` input.
 pub fn prepare_episode(spec: PrequentialEpisodeSpec) -> Result<PrequentialEpisodePlan> {
+    let spec = PrequentialEpisodeSpec::new(spec.template, spec.evaluation_steps)?;
     let mut commitments = Vec::with_capacity(spec.evaluation_steps);
     for origin in spec.first_origin()..spec.end_origin_exclusive() {
         let fixture = fixture_at_origin(&spec.template, origin)?;
@@ -229,6 +275,7 @@ pub fn prepare_episode(spec: PrequentialEpisodeSpec) -> Result<PrequentialEpisod
         plan_digest: String::new(),
     };
     plan.plan_digest = plan.compute_digest()?;
+    plan.verify_digest()?;
     Ok(plan)
 }
 
@@ -280,7 +327,7 @@ pub struct ResolvedForecast {
 
 impl ResolvedForecast {
     pub fn abstained(&self) -> bool {
-        matches!(self.issued.output, ForecastOutput::Abstain(_))
+        matches!(&self.issued.output, ForecastOutput::Abstain(_))
     }
 }
 
@@ -331,7 +378,7 @@ fn validate_distribution_binding(
             got: distribution.horizon(),
         });
     }
-    if distribution.outcome_space().0 != WETLAND_STRESS_OUTCOME_SPACE {
+    if distribution.outcome_space().0.as_str() != WETLAND_STRESS_OUTCOME_SPACE {
         return Err(BindingViolation::WrongOutcomeSpace {
             expected: WETLAND_STRESS_OUTCOME_SPACE.into(),
             got: distribution.outcome_space().0.clone(),
@@ -348,7 +395,7 @@ fn validate_distribution_binding(
         return Err(BindingViolation::NonBinarySupport);
     }
     for branch in distribution.branches() {
-        match branch.outcome {
+        match &branch.outcome {
             OutcomeRegion::Boolean(true) if !seen_true => seen_true = true,
             OutcomeRegion::Boolean(false) if !seen_false => seen_false = true,
             _ => return Err(BindingViolation::NonBinarySupport),
@@ -396,7 +443,11 @@ fn reveal_committed_outcome(
     template: &SyntheticWatershedSpec,
     commitment: &StepCommitment,
 ) -> Result<WetlandObservation> {
-    let reveal_fixture = fixture_at_origin(template, commitment.origin + 1)?;
+    let next_origin = commitment
+        .origin
+        .checked_add(1)
+        .ok_or_else(|| PrequentialError::InvalidSpec("reveal origin overflow".into()))?;
+    let reveal_fixture = fixture_at_origin(template, next_origin)?;
     let actual = reveal_fixture
         .forecast_history()
         .last()
@@ -554,6 +605,9 @@ pub fn frozen_prequential_protocol(
             "first_origin and evaluation_steps must both be > 0".into(),
         ));
     }
+    first_origin
+        .checked_add(evaluation_steps)
+        .ok_or_else(|| PrequentialError::InvalidSpec("origin range overflow".into()))?;
     let evaluation_steps_u64 = u64::try_from(evaluation_steps)
         .map_err(|_| PrequentialError::InvalidSpec("evaluation_steps exceeds u64".into()))?;
     let analysis = AnalysisPlanRef::new(
@@ -650,6 +704,24 @@ pub fn frozen_prequential_protocol(
         .map_err(|error| PrequentialError::Protocol(error.to_string()))
 }
 
+fn verify_protocol_matches_plan(
+    frozen: &FrozenProtocol,
+    plan: &PrequentialEpisodePlan,
+) -> Result<()> {
+    frozen
+        .verify_digest()
+        .map_err(|error| PrequentialError::Protocol(error.to_string()))?;
+    let expected = frozen_prequential_protocol(
+        frozen.frozen_at_unix_ms(),
+        plan.spec.first_origin(),
+        plan.spec.evaluation_steps,
+    )?;
+    if frozen.digest() != expected.digest() {
+        return Err(PrequentialError::ProtocolDesignMismatch);
+    }
+    Ok(())
+}
+
 fn aggregate<'a>(evaluation: &'a PrequentialEvaluation, id: &str) -> Result<&'a ForecasterAggregate> {
     evaluation
         .aggregates
@@ -696,6 +768,7 @@ pub fn run_prequential_baselines(
     lineage: WitnessRunLineage,
 ) -> Result<PrequentialExecution> {
     plan.verify_digest()?;
+    verify_protocol_matches_plan(frozen, plan)?;
     let run = ResearchRunRegistration::new(
         frozen,
         lineage.run_id,
@@ -717,13 +790,19 @@ pub fn run_prequential_baselines(
     let persistence_aggregate = aggregate(&evaluation, "persistence-v0")?;
     let climatology_aggregate = aggregate(&evaluation, "empirical-climatology-v0")?;
 
-    let verification_ledger_digest = digest_serializable(&evaluation.steps.iter().map(|step| {
-        (
-            step.origin,
-            step.verification_commitment_digest.as_str(),
-            &step.actual,
-        )
-    }).collect::<Vec<_>>())?;
+    let verification_ledger_digest = digest_serializable(
+        &evaluation
+            .steps
+            .iter()
+            .map(|step| {
+                (
+                    step.origin,
+                    step.verification_commitment_digest.as_str(),
+                    &step.actual,
+                )
+            })
+            .collect::<Vec<_>>(),
+    )?;
 
     let artifacts = vec![
         ResultArtifactRef::new(
