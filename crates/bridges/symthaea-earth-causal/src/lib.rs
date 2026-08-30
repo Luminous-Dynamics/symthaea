@@ -17,14 +17,14 @@ use symthaea_earth_observation::{
 
 pub type Result<T> = std::result::Result<T, BridgeError>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BridgeError {
     EmptyField(&'static str),
+    NonFiniteAssociationScore(f64),
     DuplicateEvidenceId(String),
     MissingEvidenceId(String),
     SelfEdge(String),
     MissingStructuralSupport,
-    MissingDomainAssumption,
     StructuralCycle { parent: String, child: String },
 }
 
@@ -32,6 +32,9 @@ impl Display for BridgeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EmptyField(field) => write!(f, "{field} must not be empty"),
+            Self::NonFiniteAssociationScore(score) => {
+                write!(f, "association score must be finite, got {score}")
+            }
             Self::DuplicateEvidenceId(id) => write!(f, "evidence id {id} is already registered"),
             Self::MissingEvidenceId(id) => write!(f, "evidence id {id} is not registered"),
             Self::SelfEdge(id) => write!(f, "causal self-edge is not allowed for {id}"),
@@ -39,9 +42,6 @@ impl Display for BridgeError {
                 f,
                 "this structural-edge basis requires explicit supporting evidence"
             ),
-            Self::MissingDomainAssumption => {
-                write!(f, "domain-assumption edges require an explicit assumption")
-            }
             Self::StructuralCycle { parent, child } => write!(
                 f,
                 "adding structural edge {parent} -> {child} would create a causal cycle"
@@ -97,7 +97,7 @@ impl EvidenceAssociation {
         non_empty(&relation, "association relation")?;
         if let Some(score) = score {
             if !score.is_finite() {
-                return Err(BridgeError::EmptyField("finite association score"));
+                return Err(BridgeError::NonFiniteAssociationScore(score));
             }
         }
         Ok(Self {
@@ -118,7 +118,7 @@ impl EvidenceAssociation {
 /// basis.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StructuralEdgeBasis {
-    /// A structural assumption supplied by a named domain model or expert model.
+    /// A structural assumption supplied by a named domain or expert model.
     DomainAssumption { assumption: String },
     /// A controlled intervention provides evidence for the proposed direct link.
     ControlledIntervention { intervention_id: String },
@@ -133,6 +133,8 @@ pub struct StructuralEdgeClaim {
     pub child_evidence_id: String,
     pub basis: StructuralEdgeBasis,
     pub supporting_evidence: Vec<EvidenceRef>,
+    /// Additional assumptions beyond the basis itself. These remain explicit
+    /// but are not required merely to duplicate a `DomainAssumption` string.
     pub assumptions: Vec<String>,
 }
 
@@ -147,9 +149,6 @@ impl StructuralEdgeClaim {
         match &self.basis {
             StructuralEdgeBasis::DomainAssumption { assumption } => {
                 non_empty(assumption, "domain assumption")?;
-                if self.assumptions.is_empty() {
-                    return Err(BridgeError::MissingDomainAssumption);
-                }
             }
             StructuralEdgeBasis::ControlledIntervention { intervention_id } => {
                 non_empty(intervention_id, "intervention id")?;
@@ -165,6 +164,9 @@ impl StructuralEdgeClaim {
                 }
             }
         }
+        for assumption in &self.assumptions {
+            non_empty(assumption, "structural assumption")?;
+        }
         Ok(())
     }
 }
@@ -173,13 +175,25 @@ impl StructuralEdgeClaim {
 ///
 /// Registering evidence never creates an edge. Recording an association never
 /// creates an edge. Only `assert_structural_edge` mutates graph structure.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct EarthCausalWorkspace {
     dag: CausalDAG,
     bindings: Vec<EvidenceNodeBinding>,
     node_by_evidence_id: HashMap<String, usize>,
     associations: Vec<EvidenceAssociation>,
     structural_claims: Vec<StructuralEdgeClaim>,
+}
+
+impl Default for EarthCausalWorkspace {
+    fn default() -> Self {
+        Self {
+            dag: CausalDAG::new(),
+            bindings: Vec::new(),
+            node_by_evidence_id: HashMap::new(),
+            associations: Vec::new(),
+            structural_claims: Vec::new(),
+        }
+    }
 }
 
 impl EarthCausalWorkspace {
@@ -298,9 +312,7 @@ impl EarthCausalWorkspace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_earth_observation::{
-        ClaimMode, Confidence, HypothesisDomain,
-    };
+    use symthaea_earth_observation::{ClaimMode, Confidence, HypothesisDomain};
 
     fn evidence(id: &str, stage: EvidenceStage) -> EvidenceRef {
         EvidenceRef::new(id, stage).unwrap()
@@ -391,7 +403,7 @@ mod tests {
                 assumption: format!("fixture structural assumption {parent}->{child}"),
             },
             supporting_evidence: vec![],
-            assumptions: vec!["fixture assumption".into()],
+            assumptions: vec![],
         };
 
         workspace.assert_structural_edge(claim("a", "b")).unwrap();
@@ -454,5 +466,13 @@ mod tests {
             external.validate(),
             Err(BridgeError::MissingStructuralSupport)
         );
+    }
+
+    #[test]
+    fn non_finite_association_score_is_rejected() {
+        assert!(matches!(
+            EvidenceAssociation::new("a", "b", "association", Some(f64::NAN), vec![]),
+            Err(BridgeError::NonFiniteAssociationScore(value)) if value.is_nan()
+        ));
     }
 }
