@@ -2,1141 +2,673 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! # Symthaea Cognitive Security Core
 //!
-//! A deliberately small, deterministic reference-monitor foundation for
-//! privileged cognitive state transitions.
+//! Public, monitor-domain-sealed facade for the deterministic CogSec algebra.
 //!
-//! This crate is intentionally free of LLM, HDC, networking, filesystem,
-//! wall-clock, random-number, and cryptographic implementation dependencies.
-//! Callers provide already-established security facts; this crate evaluates
-//! those facts against canonical policy and can mint a one-use mutation permit.
+//! The underlying label/policy/state-transition implementation lives in a
+//! private module. Security-relevant facts are deliberately *not* ordinary
+//! serializable structs at this boundary: a trusted adapter must possess the
+//! [`TrustedFactAuthority`] paired with one [`ReferenceMonitor`] domain before
+//! it can create facts that the monitor will accept.
 //!
-//! The crate does **not** decide whether a proposition is true. Authentication,
-//! epistemic support, confidence, consensus, and authorization are distinct.
+//! A second independently bootstrapped monitor may evaluate its own facts, but
+//! its permits are cryptographically-neutral **in-process capabilities** for a
+//! different domain and must not authorize a protected sink owned by the first
+//! monitor. Protected sinks therefore validate commit-permit domain affinity in
+//! addition to consuming the one-use typestate.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+mod legacy;
 
-/// Fixed-size commitment used for policy, state, provenance, capability, and
-/// mutation identities.
+use std::sync::Arc;
+
+pub use legacy::{
+    ArtifactIntegrity, CognitiveSecurityLabel, Confidentiality, Consequence, ControlIntegrity,
+    DecisionOutcome, DelegationError, Digest32, MonitorDecision, MutationKind, MutationReceipt,
+    MutationRequest, OriginState, PolicyRule, PolicySnapshot, PrincipalId, ReasonCode, ResourceId,
+    ResourceScope, TaintLevel,
+};
+
+/// Private identity shared only by one monitor and its trusted fact authority.
 ///
-/// CogSec does not hash data itself in this core crate. Trusted adapters are
-/// responsible for supplying cryptographically appropriate commitments.
-#[derive(
-    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
-pub struct Digest32(pub [u8; 32]);
+/// Pointer identity is sufficient for the in-process safe-Rust boundary: the
+/// protected monitor keeps the allocation alive for its lifetime, so another
+/// independently bootstrapped monitor cannot obtain the same identity by
+/// constructing ordinary application data.
+#[derive(Debug)]
+struct MonitorDomainSeal;
 
-/// Stable principal identity supplied by a trusted identity adapter.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct PrincipalId(pub String);
+/// Error returned when a security object is used outside the monitor domain
+/// that issued it, or when the deterministic inner monitor rejects a request.
+#[derive(Debug, PartialEq, Eq)]
+pub enum AuthorityError {
+    /// Facts, capabilities, or permits belong to another monitor domain.
+    MonitorDomainMismatch,
+    /// The deterministic reference monitor rejected or deferred the request.
+    Monitor(MonitorDecision),
+    /// A requested delegated capability would widen its parent.
+    Delegation(DelegationError),
+}
 
-/// Stable resource identity for the state being mutated.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct ResourceId(pub String);
+impl From<MonitorDecision> for AuthorityError {
+    fn from(value: MonitorDecision) -> Self {
+        Self::Monitor(value)
+    }
+}
 
-/// Control-integrity level attached to information.
+impl From<DelegationError> for AuthorityError {
+    fn from(value: DelegationError) -> Self {
+        Self::Delegation(value)
+    }
+}
+
+/// Opaque verified capability fact belonging to exactly one monitor domain.
 ///
-/// This is **not** factual truth. It describes how much privileged influence
-/// may safely derive from the information under local policy.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
-#[repr(u8)]
-pub enum ControlIntegrity {
-    /// Unknown, unauthenticated, or otherwise untrusted influence.
-    Untrusted = 0,
-    /// Origin is authenticated, but no local endorsement has been granted.
-    Authenticated = 1,
-    /// A trusted local policy/authority explicitly endorsed the information for
-    /// a bounded class of cognitive influence.
-    PolicyEndorsed = 2,
-}
-
-impl Default for ControlIntegrity {
-    fn default() -> Self {
-        Self::Untrusted
-    }
-}
-
-/// Confidentiality classification. Larger values are more restrictive.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
-#[repr(u8)]
-pub enum Confidentiality {
-    /// May be released publicly.
-    Public = 0,
-    /// Intended to remain local to the user/device unless explicitly released.
-    Local = 1,
-    /// Sensitive information requiring an authorized sink.
-    Sensitive = 2,
-    /// Most restrictive application-defined information class.
-    Restricted = 3,
-}
-
-impl Default for Confidentiality {
-    fn default() -> Self {
-        Self::Public
-    }
-}
-
-/// Strength of the known origin statement for an object.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
-#[repr(u8)]
-pub enum OriginState {
-    /// No authoritative origin information is available.
-    Unknown = 0,
-    /// An origin was claimed but not independently authenticated.
-    Claimed = 1,
-    /// Origin was authenticated by a trusted adapter.
-    Authenticated = 2,
-}
-
-impl Default for OriginState {
-    fn default() -> Self {
-        Self::Unknown
-    }
-}
-
-/// Integrity state of the artifact/bytes carrying the information.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
-#[repr(u8)]
-pub enum ArtifactIntegrity {
-    /// Artifact integrity has not been checked.
-    Unchecked = 0,
-    /// Bytes matched an expected digest supplied by a trusted context.
-    DigestMatched = 1,
-    /// A trusted adapter verified an authenticated integrity statement.
-    Authenticated = 2,
-}
-
-impl Default for ArtifactIntegrity {
-    fn default() -> Self {
-        Self::Unchecked
-    }
-}
-
-/// Monotonic contamination level for security-relevant dependencies.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
-#[repr(u8)]
-pub enum TaintLevel {
-    /// No known security contamination.
-    Clean = 0,
-    /// Dependency requires additional review or revalidation.
-    Suspect = 1,
-    /// Dependency is known to be contaminated for the requested use.
-    Tainted = 2,
-    /// Dependency was explicitly revoked.
-    Revoked = 3,
-}
-
-impl Default for TaintLevel {
-    fn default() -> Self {
-        Self::Clean
-    }
-}
-
-/// Security metadata that remains attached to cognitively meaningful data.
+/// This type intentionally has no serde implementation and no public struct
+/// fields or constructor. Network/signed capability envelopes are ordinary
+/// data outside this type; a trusted adapter converts them only after
+/// authentication, signature, revocation, and local-policy verification.
 ///
-/// Authority is intentionally absent. Authority is represented separately by
-/// capability facts and never propagates through ordinary data transformations.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CognitiveSecurityLabel {
-    /// Minimum control integrity of the information lineage.
-    pub control_integrity: ControlIntegrity,
-    /// Maximum confidentiality restriction of the information lineage.
-    pub confidentiality: Confidentiality,
-    /// Strength of origin authentication.
-    pub origin: OriginState,
-    /// Strength of artifact integrity verification.
-    pub artifact_integrity: ArtifactIntegrity,
-    /// Highest known taint level across dependencies.
-    pub taint: TaintLevel,
-    /// Security-relevant provenance commitments.
-    pub provenance_roots: BTreeSet<Digest32>,
-}
-
-impl Default for CognitiveSecurityLabel {
-    fn default() -> Self {
-        Self {
-            control_integrity: ControlIntegrity::Untrusted,
-            confidentiality: Confidentiality::Public,
-            origin: OriginState::Unknown,
-            artifact_integrity: ArtifactIntegrity::Unchecked,
-            taint: TaintLevel::Clean,
-            provenance_roots: BTreeSet::new(),
-        }
-    }
-}
-
-impl CognitiveSecurityLabel {
-    /// Conservative combination for ordinary data transformation.
-    ///
-    /// - control integrity can only stay equal or decrease;
-    /// - confidentiality can only stay equal or become more restrictive;
-    /// - origin/artifact-integrity strength can only stay equal or decrease;
-    /// - taint can only stay equal or increase;
-    /// - provenance commitments are unioned.
-    ///
-    /// Deliberate endorsement/declassification are separate privileged
-    /// operations and therefore are not expressible through this method.
-    pub fn combine(&self, other: &Self) -> Self {
-        let mut provenance_roots = self.provenance_roots.clone();
-        provenance_roots.extend(other.provenance_roots.iter().copied());
-
-        Self {
-            control_integrity: self.control_integrity.min(other.control_integrity),
-            confidentiality: self.confidentiality.max(other.confidentiality),
-            origin: self.origin.min(other.origin),
-            artifact_integrity: self.artifact_integrity.min(other.artifact_integrity),
-            taint: self.taint.max(other.taint),
-            provenance_roots,
-        }
-    }
-}
-
-/// Security-relevant cognitive or external state-transition class.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub enum MutationKind {
-    /// Receive/inspect information without granting it persistent or active influence.
-    Observe,
-    /// Change attention, priority, or salience.
-    Attention,
-    /// Change affective or neuromodulatory state.
-    Affect,
-    /// Admit an item into working memory.
-    WorkingMemoryAdmission,
-    /// Commit information to persistent episodic/conversation memory.
-    PersistentMemoryCommit,
-    /// Promote information into semantic/operational knowledge.
-    SemanticPromotion,
-    /// Promote a model, gradient, LoRA delta, or learned adaptation.
-    LearningPromotion,
-    /// Activate or materially modify an active goal.
-    GoalActivation,
-    /// Modify source/identity trust policy.
-    TrustPolicyChange,
-    /// Modify CogSec or another security policy.
-    SecurityPolicyChange,
-    /// Invoke a tool or capability-bearing internal service.
-    ToolInvocation,
-    /// Cause a consequential effect outside the cognitive process.
-    ExternalAction,
-    /// Release information to a less restrictive confidentiality domain.
-    Declassify,
-}
-
-/// Coarse consequence class used by deterministic policy.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
-#[repr(u8)]
-pub enum Consequence {
-    /// Negligible lasting consequence.
-    Low = 0,
-    /// Bounded/reversible consequence.
-    Moderate = 1,
-    /// Significant persistent, financial, privacy, or operational consequence.
-    High = 2,
-    /// Safety-, sovereignty-, or infrastructure-critical consequence.
-    Critical = 3,
-}
-
-/// Exact or global resource scope for a capability.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ResourceScope {
-    /// Capability is bound to exactly one resource.
-    Exact(ResourceId),
-    /// Capability applies to any resource accepted by the surrounding policy.
-    /// High-assurance profiles should prefer exact scopes.
-    Any,
-}
-
-impl ResourceScope {
-    fn contains(&self, resource: &ResourceId) -> bool {
-        match self {
-            Self::Exact(expected) => expected == resource,
-            Self::Any => true,
-        }
-    }
-
-    fn is_subset_of(&self, parent: &Self) -> bool {
-        match (self, parent) {
-            (Self::Exact(child), Self::Exact(parent)) => child == parent,
-            (Self::Exact(_), Self::Any) | (Self::Any, Self::Any) => true,
-            (Self::Any, Self::Exact(_)) => false,
-        }
-    }
-}
-
-/// Reason a requested capability delegation would widen its parent.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DelegationError {
-    /// A revoked capability cannot delegate further authority.
-    ParentRevoked,
-    /// The requested resource scope is broader than the parent scope.
-    ResourceScopeWidened,
-    /// The requested consequence ceiling is higher than the parent ceiling.
-    ConsequenceWidened,
-    /// The requested sequence-validity window extends outside the parent window.
-    ValidityWidened,
-}
-
-/// Capability statement after identity/signature verification by a trusted
-/// adapter.
-///
-/// This type is a security *fact*, not a live permit. The reference monitor
-/// revalidates scope, epochs, sequence bounds, consequence, and revocation
-/// before minting a one-use permit.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// ```compile_fail
+/// use symthaea_cogsec::CapabilityFact;
+/// let _ = CapabilityFact {};
+/// ```
 pub struct CapabilityFact {
-    /// Stable identity of the capability/delegation.
-    pub capability_id: Digest32,
-    /// Principal allowed to exercise the capability.
-    pub subject: PrincipalId,
-    /// Mutation class authorized by the capability.
-    pub mutation: MutationKind,
-    /// Resource scope authorized by the capability.
-    pub resource_scope: ResourceScope,
-    /// Highest consequence class authorized by the capability.
-    pub max_consequence: Consequence,
-    /// Authorization epoch at issuance/verification.
-    pub authorization_epoch: u64,
-    /// Revocation epoch at issuance/verification.
-    pub revocation_epoch: u64,
-    /// First logical sequence at which this fact is valid.
-    pub valid_from_sequence: u64,
-    /// Optional last logical sequence at which this fact is valid.
-    pub valid_until_sequence: Option<u64>,
-    /// Trusted adapter's current revocation result.
-    pub revoked: bool,
+    inner: legacy::CapabilityFact,
+    seal: Arc<MonitorDomainSeal>,
+}
+
+impl std::fmt::Debug for CapabilityFact {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CapabilityFact")
+            .field("capability_id", &self.inner.capability_id)
+            .field("subject", &self.inner.subject)
+            .field("mutation", &self.inner.mutation)
+            .field("resource_scope", &self.inner.resource_scope)
+            .field("max_consequence", &self.inner.max_consequence)
+            .field("authorization_epoch", &self.inner.authorization_epoch)
+            .field("revocation_epoch", &self.inner.revocation_epoch)
+            .field("valid_from_sequence", &self.inner.valid_from_sequence)
+            .field("valid_until_sequence", &self.inner.valid_until_sequence)
+            .field("revoked", &self.inner.revoked)
+            .finish_non_exhaustive()
+    }
 }
 
 impl CapabilityFact {
-    fn valid_for(&self, request: &MutationRequest, facts: &TrustedFacts) -> bool {
-        if self.revoked
-            || self.subject != request.subject
-            || self.mutation != request.kind
-            || !self.resource_scope.contains(&request.resource)
-            || self.max_consequence < request.consequence
-            || self.authorization_epoch != facts.authorization_epoch
-            || self.revocation_epoch != facts.revocation_epoch
-            || request.sequence < self.valid_from_sequence
-        {
-            return false;
-        }
-
-        if let Some(until) = self.valid_until_sequence {
-            if request.sequence > until {
-                return false;
-            }
-        }
-
-        true
+    /// Stable capability identity.
+    pub fn capability_id(&self) -> Digest32 {
+        self.inner.capability_id
     }
 
-    /// Derive a structurally narrower child capability.
+    /// Principal to whom the verified fact applies.
+    pub fn subject(&self) -> &PrincipalId {
+        &self.inner.subject
+    }
+
+    /// Authorized mutation class.
+    pub fn mutation(&self) -> MutationKind {
+        self.inner.mutation
+    }
+
+    /// Authorized resource scope.
+    pub fn resource_scope(&self) -> &ResourceScope {
+        &self.inner.resource_scope
+    }
+
+    /// Maximum consequence authorized by this fact.
+    pub fn max_consequence(&self) -> Consequence {
+        self.inner.max_consequence
+    }
+
+    /// Authorization epoch bound to this fact.
+    pub fn authorization_epoch(&self) -> u64 {
+        self.inner.authorization_epoch
+    }
+
+    /// Revocation epoch bound to this fact.
+    pub fn revocation_epoch(&self) -> u64 {
+        self.inner.revocation_epoch
+    }
+
+    /// First sequence at which this fact is valid.
+    pub fn valid_from_sequence(&self) -> u64 {
+        self.inner.valid_from_sequence
+    }
+
+    /// Optional last sequence at which this fact is valid.
+    pub fn valid_until_sequence(&self) -> Option<u64> {
+        self.inner.valid_until_sequence
+    }
+
+    /// Whether the trusted adapter marked this fact revoked.
+    pub fn revoked(&self) -> bool {
+        self.inner.revoked
+    }
+}
+
+/// Opaque snapshot of trusted state, policy, authorization, revocation, and
+/// verified capabilities for one monitor domain.
+///
+/// Unlike [`MutationRequest`] and policy IR, this is not a wire type. Its
+/// fields are private and it is not deserializable.
+///
+/// ```compile_fail
+/// use symthaea_cogsec::TrustedFacts;
+/// let _ = TrustedFacts {};
+/// ```
+pub struct TrustedFacts {
+    inner: legacy::TrustedFacts,
+    seal: Arc<MonitorDomainSeal>,
+}
+
+impl std::fmt::Debug for TrustedFacts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TrustedFacts")
+            .field("resource_state_root", &self.inner.resource_state_root)
+            .field("policy_root", &self.inner.policy_root)
+            .field("policy_epoch", &self.inner.policy_epoch)
+            .field("authorization_epoch", &self.inner.authorization_epoch)
+            .field("revocation_epoch", &self.inner.revocation_epoch)
+            .field("capability_count", &self.inner.capabilities.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl TrustedFacts {
+    /// Current protected-resource state root.
+    pub fn resource_state_root(&self) -> Digest32 {
+        self.inner.resource_state_root
+    }
+
+    /// Current trusted policy root.
+    pub fn policy_root(&self) -> Digest32 {
+        self.inner.policy_root
+    }
+
+    /// Current policy epoch.
+    pub fn policy_epoch(&self) -> u64 {
+        self.inner.policy_epoch
+    }
+
+    /// Current authorization epoch.
+    pub fn authorization_epoch(&self) -> u64 {
+        self.inner.authorization_epoch
+    }
+
+    /// Current revocation epoch.
+    pub fn revocation_epoch(&self) -> u64 {
+        self.inner.revocation_epoch
+    }
+
+    /// Number of verified capability facts in this snapshot.
+    pub fn capability_count(&self) -> usize {
+        self.inner.capabilities.len()
+    }
+}
+
+/// Trusted adapter capability for issuing security facts in one monitor domain.
+///
+/// Possession of this object is itself privileged. It is deliberately neither
+/// cloneable nor serializable and should be held only by the authenticated
+/// identity/policy/state adapter owned by the protected runtime boundary.
+pub struct TrustedFactAuthority {
+    seal: Arc<MonitorDomainSeal>,
+}
+
+impl std::fmt::Debug for TrustedFactAuthority {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TrustedFactAuthority")
+            .finish_non_exhaustive()
+    }
+}
+
+impl TrustedFactAuthority {
+    /// Convert already-verified adapter results into an opaque capability fact.
     ///
-    /// This validates attenuation only. The surrounding authorization adapter
-    /// remains responsible for proving that the parent principal actually
-    /// authorized the delegation and for binding the child to its parent in
-    /// the signed/auditable capability chain.
-    pub fn attenuate(
+    /// This function does not perform cryptography. Calling it asserts that the
+    /// holder has independently verified the identity/signature/delegation and
+    /// current revocation status represented by these fields.
+    #[allow(clippy::too_many_arguments)]
+    pub fn issue_capability(
         &self,
+        capability_id: Digest32,
+        subject: PrincipalId,
+        mutation: MutationKind,
+        resource_scope: ResourceScope,
+        max_consequence: Consequence,
+        authorization_epoch: u64,
+        revocation_epoch: u64,
+        valid_from_sequence: u64,
+        valid_until_sequence: Option<u64>,
+        revoked: bool,
+    ) -> CapabilityFact {
+        CapabilityFact {
+            inner: legacy::CapabilityFact {
+                capability_id,
+                subject,
+                mutation,
+                resource_scope,
+                max_consequence,
+                authorization_epoch,
+                revocation_epoch,
+                valid_from_sequence,
+                valid_until_sequence,
+                revoked,
+            },
+            seal: Arc::clone(&self.seal),
+        }
+    }
+
+    /// Build an opaque trusted-facts snapshot from fresh authoritative state.
+    ///
+    /// Every capability must have been issued inside this same monitor domain.
+    /// Passing a fact from another independently bootstrapped domain fails
+    /// closed before the deterministic policy engine sees its contents.
+    pub fn snapshot(
+        &self,
+        resource_state_root: Digest32,
+        policy_root: Digest32,
+        policy_epoch: u64,
+        authorization_epoch: u64,
+        revocation_epoch: u64,
+        capabilities: &[&CapabilityFact],
+    ) -> Result<TrustedFacts, AuthorityError> {
+        let mut inner_capabilities = Vec::with_capacity(capabilities.len());
+        for capability in capabilities {
+            if !Arc::ptr_eq(&self.seal, &capability.seal) {
+                return Err(AuthorityError::MonitorDomainMismatch);
+            }
+            inner_capabilities.push(capability.inner.clone());
+        }
+
+        Ok(TrustedFacts {
+            inner: legacy::TrustedFacts {
+                resource_state_root,
+                policy_root,
+                policy_epoch,
+                authorization_epoch,
+                revocation_epoch,
+                capabilities: inner_capabilities,
+            },
+            seal: Arc::clone(&self.seal),
+        })
+    }
+
+    /// Issue a verified structurally-attenuated child capability.
+    ///
+    /// The inner algebra checks that scope, consequence, and validity only
+    /// narrow. This method is intentionally on the trusted issuer rather than
+    /// on [`CapabilityFact`] itself: possession of a verified parent fact does
+    /// not by itself confer authority to manufacture another verified subject.
+    /// The adapter remains responsible for verifying that the parent actually
+    /// authorized the delegation and for recording delegation ancestry.
+    #[allow(clippy::too_many_arguments)]
+    pub fn derive_capability(
+        &self,
+        parent: &CapabilityFact,
         capability_id: Digest32,
         subject: PrincipalId,
         resource_scope: ResourceScope,
         max_consequence: Consequence,
         valid_from_sequence: u64,
         valid_until_sequence: Option<u64>,
-    ) -> Result<Self, DelegationError> {
-        if self.revoked {
-            return Err(DelegationError::ParentRevoked);
-        }
-        if !resource_scope.is_subset_of(&self.resource_scope) {
-            return Err(DelegationError::ResourceScopeWidened);
-        }
-        if max_consequence > self.max_consequence {
-            return Err(DelegationError::ConsequenceWidened);
-        }
-        if valid_from_sequence < self.valid_from_sequence {
-            return Err(DelegationError::ValidityWidened);
+    ) -> Result<CapabilityFact, AuthorityError> {
+        if !Arc::ptr_eq(&self.seal, &parent.seal) {
+            return Err(AuthorityError::MonitorDomainMismatch);
         }
 
-        match (self.valid_until_sequence, valid_until_sequence) {
-            (Some(parent_until), Some(child_until))
-                if child_until <= parent_until && child_until >= valid_from_sequence => {}
-            (Some(_), _) => return Err(DelegationError::ValidityWidened),
-            (None, Some(child_until)) if child_until >= valid_from_sequence => {}
-            (None, Some(_)) => return Err(DelegationError::ValidityWidened),
-            (None, None) => {}
-        }
-
-        Ok(Self {
+        let inner = parent.inner.attenuate(
             capability_id,
             subject,
-            mutation: self.mutation,
             resource_scope,
             max_consequence,
-            authorization_epoch: self.authorization_epoch,
-            revocation_epoch: self.revocation_epoch,
             valid_from_sequence,
             valid_until_sequence,
-            revoked: false,
+        )?;
+
+        Ok(CapabilityFact {
+            inner,
+            seal: Arc::clone(&self.seal),
         })
     }
 }
 
-/// Canonical request describing one proposed cognitive mutation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MutationRequest {
-    /// Caller-chosen stable request identity/commitment.
-    pub request_id: Digest32,
-    /// Mutation class.
-    pub kind: MutationKind,
-    /// Principal on whose authority the mutation is requested.
-    pub subject: PrincipalId,
-    /// Protected resource to mutate.
-    pub resource: ResourceId,
-    /// Commitment to the exact intended effect.
-    pub mutation_digest: Digest32,
-    /// Resource-state root the caller observed when preparing the request.
-    pub expected_resource_state_root: Digest32,
-    /// Policy root the caller observed when preparing the request.
-    pub expected_policy_root: Digest32,
-    /// Security label of the information driving the proposed mutation.
-    pub input_label: CognitiveSecurityLabel,
-    /// Consequence class of the requested effect.
-    pub consequence: Consequence,
-    /// Monotonic logical sequence supplied by the state owner.
-    pub sequence: u64,
-}
-
-/// Trusted security facts supplied independently of the untrusted request
-/// payload.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TrustedFacts {
-    /// Current protected-resource state root.
-    pub resource_state_root: Digest32,
-    /// Current canonical policy root.
-    pub policy_root: Digest32,
-    /// Current policy epoch.
-    pub policy_epoch: u64,
-    /// Current authorization epoch.
-    pub authorization_epoch: u64,
-    /// Current security-relevant revocation epoch. Any revocation capable of
-    /// invalidating an outstanding permit must advance this epoch.
-    pub revocation_epoch: u64,
-    /// Verified capability facts available to the requesting subject.
-    pub capabilities: Vec<CapabilityFact>,
-}
-
-/// One canonical policy rule for a mutation class.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PolicyRule {
-    /// Mutation class governed by this rule.
-    pub kind: MutationKind,
-    /// Minimum control integrity needed for direct influence on this mutation.
-    pub minimum_control_integrity: ControlIntegrity,
-    /// Highest taint level accepted without quarantine/revalidation.
-    pub maximum_taint: TaintLevel,
-    /// Whether a valid capability is required.
-    pub capability_required: bool,
-}
-
-/// Canonical deterministic policy snapshot consumed by the reference monitor.
+/// Authorization-time token bound to one monitor domain.
 ///
-/// Parsing human-readable policy belongs outside the TCB. The surrounding
-/// system should validate/compile policy into this IR and provide its root.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PolicySnapshot {
-    /// Commitment to the exact policy IR.
-    pub root: Digest32,
-    /// Monotonic policy epoch.
-    pub epoch: u64,
-    /// Rules. Duplicate entries are invalid and fail closed at evaluation time.
-    pub rules: Vec<PolicyRule>,
-}
-
-impl PolicySnapshot {
-    fn rule_for(&self, kind: MutationKind) -> Option<PolicyRule> {
-        let mut matches = self.rules.iter().copied().filter(|r| r.kind == kind);
-        let first = matches.next()?;
-        if matches.next().is_some() {
-            return None;
-        }
-        Some(first)
-    }
-}
-
-/// Deterministic monitor outcome.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DecisionOutcome {
-    /// Request is permitted and may be converted into a one-use permit.
-    Allow,
-    /// Request is forbidden by policy or malformed security context.
-    Deny,
-    /// Content may be retained for analysis but must not influence the protected sink.
-    Quarantine,
-    /// A valid capability/authorization is missing.
-    RequireAuthorization,
-    /// State, policy, or authorization context changed and must be re-evaluated.
-    RequireRevalidation,
-    /// Trusted facts are temporarily insufficient to make a safe decision.
-    Defer,
-}
-
-/// Stable machine-readable reason code for a monitor decision.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub enum ReasonCode {
-    /// Request's policy commitment differs from the current policy.
-    PolicyRootMismatch,
-    /// Trusted policy facts disagree with the supplied policy snapshot.
-    PolicyFactsMismatch,
-    /// Policy epoch changed.
-    PolicyEpochMismatch,
-    /// Authorization context changed after evaluation/permit issuance.
-    AuthorizationEpochMismatch,
-    /// Revocation context changed after evaluation/permit issuance.
-    RevocationEpochMismatch,
-    /// Resource changed after request preparation or permit issuance.
-    ResourceStateMismatch,
-    /// No unique rule exists for the mutation class.
-    MissingOrDuplicatePolicyRule,
-    /// Input control integrity is below the policy requirement.
-    InsufficientControlIntegrity,
-    /// Input carries too much taint for the requested mutation.
-    TaintedDependency,
-    /// Policy requires a capability and no valid matching capability exists.
-    MissingCapability,
-    /// At least one apparently relevant capability is revoked.
-    RevokedCapability,
-    /// At least one apparently relevant capability is stale for current epochs/sequence.
-    StaleCapability,
-    /// Capability does not cover the requested resource/effect class.
-    ScopeMismatch,
-}
-
-/// Complete deterministic decision returned by the reference monitor.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MonitorDecision {
-    /// High-level outcome.
-    pub outcome: DecisionOutcome,
-    /// Stable, sorted reason codes supporting the outcome.
-    pub reasons: Vec<ReasonCode>,
-}
-
-impl MonitorDecision {
-    fn single(outcome: DecisionOutcome, reason: ReasonCode) -> Self {
-        Self {
-            outcome,
-            reasons: vec![reason],
-        }
-    }
-}
-
-/// Authorization-time token for exactly one already-evaluated mutation.
-///
-/// This is deliberately **not** commit-ready. A protected sink should accept
-/// only [`CommitPermit`], which can be minted only by
-/// [`ReferenceMonitor::precommit`] from a still-valid `MutationPermit`.
-///
-/// The fields are private, the type is not `Clone`, and it is deliberately not
-/// serializable or default-constructible.
-///
-/// ```compile_fail
-/// use symthaea_cogsec::MutationPermit;
-/// fn requires_clone<T: Clone>() {}
-/// requires_clone::<MutationPermit>();
-/// ```
-///
-/// ```compile_fail
-/// use symthaea_cogsec::MutationPermit;
-/// fn requires_default<T: Default>() {}
-/// requires_default::<MutationPermit>();
-/// ```
-///
-/// ```compile_fail
-/// use serde::de::DeserializeOwned;
-/// use symthaea_cogsec::MutationPermit;
-/// fn requires_deserialize<T: DeserializeOwned>() {}
-/// requires_deserialize::<MutationPermit>();
-/// ```
-#[derive(Debug, PartialEq, Eq)]
+/// This is not commit-ready. It is non-cloneable and non-serializable and must
+/// be consumed by [`ReferenceMonitor::precommit`].
 pub struct MutationPermit {
-    request_id: Digest32,
-    kind: MutationKind,
-    subject: PrincipalId,
-    resource: ResourceId,
-    mutation_digest: Digest32,
-    consequence: Consequence,
-    capability_id: Option<Digest32>,
-    resource_state_root: Digest32,
-    policy_root: Digest32,
-    policy_epoch: u64,
-    authorization_epoch: u64,
-    revocation_epoch: u64,
-    sequence: u64,
+    inner: legacy::MutationPermit,
+    seal: Arc<MonitorDomainSeal>,
+}
+
+impl std::fmt::Debug for MutationPermit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MutationPermit")
+            .field("request_id", &self.inner.request_id())
+            .field("kind", &self.inner.kind())
+            .field("resource", &self.inner.resource())
+            .field("mutation_digest", &self.inner.mutation_digest())
+            .finish_non_exhaustive()
+    }
 }
 
 impl MutationPermit {
     /// Request identity bound into this permit.
     pub fn request_id(&self) -> Digest32 {
-        self.request_id
+        self.inner.request_id()
     }
 
     /// Mutation class bound into this permit.
     pub fn kind(&self) -> MutationKind {
-        self.kind
+        self.inner.kind()
     }
 
     /// Principal bound into this permit.
     pub fn subject(&self) -> &PrincipalId {
-        &self.subject
-    }
-
-    /// Resource bound into this permit.
-    pub fn resource(&self) -> &ResourceId {
-        &self.resource
-    }
-
-    /// Exact mutation commitment bound into this permit.
-    pub fn mutation_digest(&self) -> Digest32 {
-        self.mutation_digest
-    }
-
-    /// Consequence class bound into this permit.
-    pub fn consequence(&self) -> Consequence {
-        self.consequence
-    }
-
-    /// Capability identity used to authorize the mutation, if policy required one.
-    pub fn capability_id(&self) -> Option<Digest32> {
-        self.capability_id
-    }
-
-    /// Resource state that must still be current at commit time.
-    pub fn resource_state_root(&self) -> Digest32 {
-        self.resource_state_root
-    }
-
-    /// Policy root used to issue this permit.
-    pub fn policy_root(&self) -> Digest32 {
-        self.policy_root
-    }
-
-    /// Policy epoch used to issue this permit.
-    pub fn policy_epoch(&self) -> u64 {
-        self.policy_epoch
-    }
-
-    /// Authorization epoch used to issue this permit.
-    pub fn authorization_epoch(&self) -> u64 {
-        self.authorization_epoch
-    }
-
-    /// Revocation epoch used to issue this permit.
-    pub fn revocation_epoch(&self) -> u64 {
-        self.revocation_epoch
-    }
-
-    /// Logical sequence bound into this permit.
-    pub fn sequence(&self) -> u64 {
-        self.sequence
-    }
-}
-
-/// Commit-ready one-use token produced only after fresh-state revalidation.
-///
-/// Protected P0 mutation sinks should require this type rather than
-/// [`MutationPermit`]. That makes the precommit boundary part of the Rust API
-/// topology instead of a convention that callers can accidentally skip.
-///
-/// ```compile_fail
-/// use symthaea_cogsec::CommitPermit;
-/// fn requires_clone<T: Clone>() {}
-/// requires_clone::<CommitPermit>();
-/// ```
-///
-/// ```compile_fail
-/// use symthaea_cogsec::CommitPermit;
-/// fn requires_default<T: Default>() {}
-/// requires_default::<CommitPermit>();
-/// ```
-#[derive(Debug, PartialEq, Eq)]
-pub struct CommitPermit {
-    inner: MutationPermit,
-}
-
-impl CommitPermit {
-    /// Request identity bound into this commit permit.
-    pub fn request_id(&self) -> Digest32 {
-        self.inner.request_id()
-    }
-
-    /// Mutation class bound into this commit permit.
-    pub fn kind(&self) -> MutationKind {
-        self.inner.kind()
-    }
-
-    /// Principal bound into this commit permit.
-    pub fn subject(&self) -> &PrincipalId {
         self.inner.subject()
     }
 
-    /// Resource bound into this commit permit.
+    /// Protected resource bound into this permit.
     pub fn resource(&self) -> &ResourceId {
         self.inner.resource()
     }
 
-    /// Exact mutation commitment bound into this commit permit.
+    /// Exact effect commitment bound into this permit.
     pub fn mutation_digest(&self) -> Digest32 {
         self.inner.mutation_digest()
     }
 
-    /// Consequence class bound into this commit permit.
+    /// Consequence class bound into this permit.
     pub fn consequence(&self) -> Consequence {
         self.inner.consequence()
     }
 
-    /// Capability identity used to authorize the mutation, if required.
+    /// Verified capability identity used to authorize this permit, if required.
     pub fn capability_id(&self) -> Option<Digest32> {
         self.inner.capability_id()
     }
 
-    /// Resource-state root freshly revalidated immediately before commit.
+    /// Resource state root observed at authorization.
     pub fn resource_state_root(&self) -> Digest32 {
         self.inner.resource_state_root()
     }
 
-    /// Policy root freshly revalidated immediately before commit.
+    /// Policy root observed at authorization.
     pub fn policy_root(&self) -> Digest32 {
         self.inner.policy_root()
     }
 
-    /// Policy epoch freshly revalidated immediately before commit.
+    /// Policy epoch observed at authorization.
     pub fn policy_epoch(&self) -> u64 {
         self.inner.policy_epoch()
     }
 
-    /// Authorization epoch freshly revalidated immediately before commit.
+    /// Authorization epoch observed at authorization.
     pub fn authorization_epoch(&self) -> u64 {
         self.inner.authorization_epoch()
     }
 
-    /// Revocation epoch freshly revalidated immediately before commit.
+    /// Revocation epoch observed at authorization.
     pub fn revocation_epoch(&self) -> u64 {
         self.inner.revocation_epoch()
     }
 
-    /// Logical sequence bound into this commit permit.
+    /// Logical sequence bound into this permit.
     pub fn sequence(&self) -> u64 {
         self.inner.sequence()
     }
 }
 
-/// Audit receipt for a monitor evaluation or later state commit.
+/// Commit-ready one-use token bound to exactly one monitor domain.
 ///
-/// This initial core receipt contains only commitments and reason codes. Runtime
-/// integrations can wrap it with signatures/timestamps without moving those
-/// dependencies into the logical kernel.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MutationReceipt {
-    /// Request identity.
-    pub request_id: Digest32,
-    /// Mutation class.
-    pub kind: MutationKind,
-    /// Protected resource.
-    pub resource: ResourceId,
-    /// Exact proposed/committed effect commitment.
-    pub mutation_digest: Digest32,
-    /// Resource-state root observed by the monitor.
-    pub resource_state_root: Digest32,
-    /// Policy root used by the monitor.
-    pub policy_root: Digest32,
-    /// Policy epoch used by the monitor.
-    pub policy_epoch: u64,
-    /// Authorization epoch used by the monitor.
-    pub authorization_epoch: u64,
-    /// Revocation epoch used by the monitor.
-    pub revocation_epoch: u64,
-    /// Logical sequence.
-    pub sequence: u64,
-    /// Monitor outcome.
-    pub outcome: DecisionOutcome,
-    /// Stable reason codes.
-    pub reasons: Vec<ReasonCode>,
+/// Future P0 sinks must both consume this type and verify that it belongs to
+/// the protected owner's monitor via [`ReferenceMonitor::accepts_commit_permit`]
+/// (or encapsulate that check in the protected owner itself).
+pub struct CommitPermit {
+    inner: legacy::CommitPermit,
+    seal: Arc<MonitorDomainSeal>,
 }
 
-/// Deterministic cognitive-security reference monitor.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct ReferenceMonitor;
+impl std::fmt::Debug for CommitPermit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CommitPermit")
+            .field("request_id", &self.inner.request_id())
+            .field("kind", &self.inner.kind())
+            .field("resource", &self.inner.resource())
+            .field("mutation_digest", &self.inner.mutation_digest())
+            .finish_non_exhaustive()
+    }
+}
+
+impl CommitPermit {
+    /// Request identity bound into this permit.
+    pub fn request_id(&self) -> Digest32 {
+        self.inner.request_id()
+    }
+
+    /// Mutation class bound into this permit.
+    pub fn kind(&self) -> MutationKind {
+        self.inner.kind()
+    }
+
+    /// Principal bound into this permit.
+    pub fn subject(&self) -> &PrincipalId {
+        self.inner.subject()
+    }
+
+    /// Protected resource bound into this permit.
+    pub fn resource(&self) -> &ResourceId {
+        self.inner.resource()
+    }
+
+    /// Exact effect commitment bound into this permit.
+    pub fn mutation_digest(&self) -> Digest32 {
+        self.inner.mutation_digest()
+    }
+
+    /// Consequence class bound into this permit.
+    pub fn consequence(&self) -> Consequence {
+        self.inner.consequence()
+    }
+
+    /// Verified capability identity used to authorize this permit, if required.
+    pub fn capability_id(&self) -> Option<Digest32> {
+        self.inner.capability_id()
+    }
+
+    /// Freshly revalidated resource state root.
+    pub fn resource_state_root(&self) -> Digest32 {
+        self.inner.resource_state_root()
+    }
+
+    /// Freshly revalidated policy root.
+    pub fn policy_root(&self) -> Digest32 {
+        self.inner.policy_root()
+    }
+
+    /// Freshly revalidated policy epoch.
+    pub fn policy_epoch(&self) -> u64 {
+        self.inner.policy_epoch()
+    }
+
+    /// Freshly revalidated authorization epoch.
+    pub fn authorization_epoch(&self) -> u64 {
+        self.inner.authorization_epoch()
+    }
+
+    /// Freshly revalidated revocation epoch.
+    pub fn revocation_epoch(&self) -> u64 {
+        self.inner.revocation_epoch()
+    }
+
+    /// Logical sequence bound into this permit.
+    pub fn sequence(&self) -> u64 {
+        self.inner.sequence()
+    }
+}
+
+/// Deterministic reference monitor bound to one private in-process authority
+/// domain.
+///
+/// `bootstrap()` creates a fresh domain and returns the two role-separated
+/// capabilities required by the protected runtime: the monitor and its trusted
+/// fact issuer. The monitor is intentionally not `Copy`, `Clone`, `Default`, or
+/// serializable.
+pub struct ReferenceMonitor {
+    inner: legacy::ReferenceMonitor,
+    seal: Arc<MonitorDomainSeal>,
+}
+
+impl std::fmt::Debug for ReferenceMonitor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ReferenceMonitor").finish_non_exhaustive()
+    }
+}
 
 impl ReferenceMonitor {
-    /// Evaluate a proposed mutation without minting a permit.
+    /// Bootstrap one isolated monitor domain and its trusted fact authority.
+    pub fn bootstrap() -> (Self, TrustedFactAuthority) {
+        let seal = Arc::new(MonitorDomainSeal);
+        (
+            Self {
+                inner: legacy::ReferenceMonitor,
+                seal: Arc::clone(&seal),
+            },
+            TrustedFactAuthority { seal },
+        )
+    }
+
+    fn facts_match_domain(&self, facts: &TrustedFacts) -> bool {
+        Arc::ptr_eq(&self.seal, &facts.seal)
+    }
+
+    /// Evaluate one mutation using only facts issued for this monitor domain.
     pub fn evaluate(
         &self,
         request: &MutationRequest,
         facts: &TrustedFacts,
         policy: &PolicySnapshot,
-    ) -> MonitorDecision {
-        if request.expected_policy_root != policy.root {
-            return MonitorDecision::single(
-                DecisionOutcome::RequireRevalidation,
-                ReasonCode::PolicyRootMismatch,
-            );
+    ) -> Result<MonitorDecision, AuthorityError> {
+        if !self.facts_match_domain(facts) {
+            return Err(AuthorityError::MonitorDomainMismatch);
         }
-
-        if facts.policy_root != policy.root {
-            return MonitorDecision::single(
-                DecisionOutcome::Defer,
-                ReasonCode::PolicyFactsMismatch,
-            );
-        }
-
-        if facts.policy_epoch != policy.epoch {
-            return MonitorDecision::single(
-                DecisionOutcome::RequireRevalidation,
-                ReasonCode::PolicyEpochMismatch,
-            );
-        }
-
-        if request.expected_resource_state_root != facts.resource_state_root {
-            return MonitorDecision::single(
-                DecisionOutcome::RequireRevalidation,
-                ReasonCode::ResourceStateMismatch,
-            );
-        }
-
-        let Some(rule) = policy.rule_for(request.kind) else {
-            return MonitorDecision::single(
-                DecisionOutcome::Deny,
-                ReasonCode::MissingOrDuplicatePolicyRule,
-            );
-        };
-
-        if request.input_label.taint > rule.maximum_taint {
-            return MonitorDecision::single(
-                DecisionOutcome::Quarantine,
-                ReasonCode::TaintedDependency,
-            );
-        }
-
-        if request.input_label.control_integrity < rule.minimum_control_integrity {
-            return MonitorDecision::single(
-                DecisionOutcome::Quarantine,
-                ReasonCode::InsufficientControlIntegrity,
-            );
-        }
-
-        if !rule.capability_required {
-            return MonitorDecision {
-                outcome: DecisionOutcome::Allow,
-                reasons: Vec::new(),
-            };
-        }
-
-        if facts
-            .capabilities
-            .iter()
-            .any(|cap| cap.valid_for(request, facts))
-        {
-            return MonitorDecision {
-                outcome: DecisionOutcome::Allow,
-                reasons: Vec::new(),
-            };
-        }
-
-        let mut reasons = BTreeSet::new();
-        let mut saw_relevant = false;
-        for cap in &facts.capabilities {
-            if cap.subject != request.subject || cap.mutation != request.kind {
-                continue;
-            }
-            saw_relevant = true;
-            if cap.revoked {
-                reasons.insert(ReasonCode::RevokedCapability);
-            }
-            if cap.authorization_epoch != facts.authorization_epoch
-                || cap.revocation_epoch != facts.revocation_epoch
-                || request.sequence < cap.valid_from_sequence
-                || cap
-                    .valid_until_sequence
-                    .is_some_and(|until| request.sequence > until)
-            {
-                reasons.insert(ReasonCode::StaleCapability);
-            }
-            if !cap.resource_scope.contains(&request.resource)
-                || cap.max_consequence < request.consequence
-            {
-                reasons.insert(ReasonCode::ScopeMismatch);
-            }
-        }
-
-        if !saw_relevant || reasons.is_empty() {
-            reasons.insert(ReasonCode::MissingCapability);
-        }
-
-        MonitorDecision {
-            outcome: DecisionOutcome::RequireAuthorization,
-            reasons: reasons.into_iter().collect(),
-        }
+        Ok(self.inner.evaluate(request, &facts.inner, policy))
     }
 
-    /// Evaluate and, only on `Allow`, mint an authorization-time mutation permit.
+    /// Evaluate and mint a one-use authorization-time permit in this monitor
+    /// domain.
     pub fn authorize(
         &self,
         request: &MutationRequest,
         facts: &TrustedFacts,
         policy: &PolicySnapshot,
-    ) -> Result<MutationPermit, MonitorDecision> {
-        let decision = self.evaluate(request, facts, policy);
-        if decision.outcome != DecisionOutcome::Allow {
-            return Err(decision);
+    ) -> Result<MutationPermit, AuthorityError> {
+        if !self.facts_match_domain(facts) {
+            return Err(AuthorityError::MonitorDomainMismatch);
         }
 
-        let Some(rule) = policy.rule_for(request.kind) else {
-            return Err(MonitorDecision::single(
-                DecisionOutcome::Deny,
-                ReasonCode::MissingOrDuplicatePolicyRule,
-            ));
-        };
-
-        let capability_id = if rule.capability_required {
-            match facts
-                .capabilities
-                .iter()
-                .find(|cap| cap.valid_for(request, facts))
-            {
-                Some(cap) => Some(cap.capability_id),
-                None => {
-                    return Err(MonitorDecision::single(
-                        DecisionOutcome::RequireAuthorization,
-                        ReasonCode::MissingCapability,
-                    ));
-                }
-            }
-        } else {
-            None
-        };
-
+        let inner = self
+            .inner
+            .authorize(request, &facts.inner, policy)
+            .map_err(AuthorityError::Monitor)?;
         Ok(MutationPermit {
-            request_id: request.request_id,
-            kind: request.kind,
-            subject: request.subject.clone(),
-            resource: request.resource.clone(),
-            mutation_digest: request.mutation_digest,
-            consequence: request.consequence,
-            capability_id,
-            resource_state_root: facts.resource_state_root,
-            policy_root: policy.root,
-            policy_epoch: policy.epoch,
-            authorization_epoch: facts.authorization_epoch,
-            revocation_epoch: facts.revocation_epoch,
-            sequence: request.sequence,
+            inner,
+            seal: Arc::clone(&self.seal),
         })
     }
 
-    /// Revalidate an authorization-time permit immediately before the protected
-    /// state owner consumes it, returning a distinct commit-ready typestate.
-    ///
-    /// The authorization permit is taken by value. Any failed precommit destroys
-    /// that token; callers must prepare and authorize a new request against the
-    /// fresh state rather than retrying stale authority. The protected state
-    /// owner should perform this check and the subsequent commit under the same
-    /// serialization/transaction boundary.
+    /// Revalidate an authorization-time permit against fresh facts and produce
+    /// commit typestate only when both objects belong to this same monitor
+    /// domain.
     pub fn precommit(
         &self,
         permit: MutationPermit,
         facts: &TrustedFacts,
         policy: &PolicySnapshot,
-    ) -> Result<CommitPermit, MonitorDecision> {
-        if facts.policy_root != policy.root {
-            return Err(MonitorDecision::single(
-                DecisionOutcome::Defer,
-                ReasonCode::PolicyFactsMismatch,
-            ));
-        }
-        if permit.policy_root != policy.root {
-            return Err(MonitorDecision::single(
-                DecisionOutcome::RequireRevalidation,
-                ReasonCode::PolicyRootMismatch,
-            ));
-        }
-        if permit.policy_epoch != policy.epoch || facts.policy_epoch != policy.epoch {
-            return Err(MonitorDecision::single(
-                DecisionOutcome::RequireRevalidation,
-                ReasonCode::PolicyEpochMismatch,
-            ));
-        }
-        if permit.resource_state_root != facts.resource_state_root {
-            return Err(MonitorDecision::single(
-                DecisionOutcome::RequireRevalidation,
-                ReasonCode::ResourceStateMismatch,
-            ));
-        }
-        if permit.authorization_epoch != facts.authorization_epoch {
-            return Err(MonitorDecision::single(
-                DecisionOutcome::RequireRevalidation,
-                ReasonCode::AuthorizationEpochMismatch,
-            ));
-        }
-        if permit.revocation_epoch != facts.revocation_epoch {
-            return Err(MonitorDecision::single(
-                DecisionOutcome::RequireRevalidation,
-                ReasonCode::RevocationEpochMismatch,
-            ));
+    ) -> Result<CommitPermit, AuthorityError> {
+        if !Arc::ptr_eq(&self.seal, &permit.seal) || !self.facts_match_domain(facts) {
+            return Err(AuthorityError::MonitorDomainMismatch);
         }
 
-        if let Some(capability_id) = permit.capability_id {
-            let Some(capability) = facts
-                .capabilities
-                .iter()
-                .find(|cap| cap.capability_id == capability_id)
-            else {
-                return Err(MonitorDecision::single(
-                    DecisionOutcome::RequireAuthorization,
-                    ReasonCode::MissingCapability,
-                ));
-            };
-
-            if capability.revoked {
-                return Err(MonitorDecision::single(
-                    DecisionOutcome::RequireAuthorization,
-                    ReasonCode::RevokedCapability,
-                ));
-            }
-            if capability.subject != permit.subject
-                || capability.mutation != permit.kind
-                || !capability.resource_scope.contains(&permit.resource)
-                || capability.max_consequence < permit.consequence
-            {
-                return Err(MonitorDecision::single(
-                    DecisionOutcome::RequireAuthorization,
-                    ReasonCode::ScopeMismatch,
-                ));
-            }
-            if capability.authorization_epoch != facts.authorization_epoch
-                || capability.revocation_epoch != facts.revocation_epoch
-                || permit.sequence < capability.valid_from_sequence
-                || capability
-                    .valid_until_sequence
-                    .is_some_and(|until| permit.sequence > until)
-            {
-                return Err(MonitorDecision::single(
-                    DecisionOutcome::RequireAuthorization,
-                    ReasonCode::StaleCapability,
-                ));
-            }
-        }
-
-        Ok(CommitPermit { inner: permit })
+        let inner = self
+            .inner
+            .precommit(permit.inner, &facts.inner, policy)
+            .map_err(AuthorityError::Monitor)?;
+        Ok(CommitPermit {
+            inner,
+            seal: Arc::clone(&self.seal),
+        })
     }
 
-    /// Produce an audit receipt for a monitor decision.
+    /// Whether a commit-ready permit belongs to this exact monitor domain.
+    ///
+    /// Protected P0 owners should perform this check inside the same serialized
+    /// state-owner boundary as the mutation itself. A permit from another
+    /// monitor instance is rejected regardless of otherwise identical fields.
+    pub fn accepts_commit_permit(&self, permit: &CommitPermit) -> bool {
+        Arc::ptr_eq(&self.seal, &permit.seal)
+    }
+
+    /// Produce a deterministic audit receipt for one monitor decision.
     pub fn receipt(
         &self,
         request: &MutationRequest,
         facts: &TrustedFacts,
         policy: &PolicySnapshot,
         decision: &MonitorDecision,
-    ) -> MutationReceipt {
-        MutationReceipt {
-            request_id: request.request_id,
-            kind: request.kind,
-            resource: request.resource.clone(),
-            mutation_digest: request.mutation_digest,
-            resource_state_root: facts.resource_state_root,
-            policy_root: policy.root,
-            policy_epoch: policy.epoch,
-            authorization_epoch: facts.authorization_epoch,
-            revocation_epoch: facts.revocation_epoch,
-            sequence: request.sequence,
-            outcome: decision.outcome,
-            reasons: decision.reasons.clone(),
+    ) -> Result<MutationReceipt, AuthorityError> {
+        if !self.facts_match_domain(facts) {
+            return Err(AuthorityError::MonitorDomainMismatch);
         }
+        Ok(self
+            .inner
+            .receipt(request, &facts.inner, policy, decision))
     }
 }
 
 #[cfg(test)]
-mod tests {
+mod facade_tests {
     use super::*;
-    use proptest::prelude::*;
+    use std::collections::BTreeSet;
 
     fn d(byte: u8) -> Digest32 {
         Digest32([byte; 32])
     }
 
-    fn label(
-        integrity: ControlIntegrity,
-        confidentiality: Confidentiality,
-        taint: TaintLevel,
-        provenance: u8,
-    ) -> CognitiveSecurityLabel {
-        let mut roots = BTreeSet::new();
-        roots.insert(d(provenance));
+    fn label() -> CognitiveSecurityLabel {
+        let mut provenance_roots = BTreeSet::new();
+        provenance_roots.insert(d(3));
         CognitiveSecurityLabel {
-            control_integrity: integrity,
-            confidentiality,
+            control_integrity: ControlIntegrity::Authenticated,
+            confidentiality: Confidentiality::Local,
             origin: OriginState::Authenticated,
             artifact_integrity: ArtifactIntegrity::Authenticated,
-            taint,
-            provenance_roots: roots,
+            taint: TaintLevel::Clean,
+            provenance_roots,
         }
     }
 
-    fn goal_fixture() -> (MutationRequest, TrustedFacts, PolicySnapshot) {
-        let subject = PrincipalId("local-user".into());
-        let resource = ResourceId("mind/goals".into());
-        let policy_root = d(9);
-        let state_root = d(8);
-        let request = MutationRequest {
+    fn request(policy_root: Digest32, state_root: Digest32) -> MutationRequest {
+        MutationRequest {
             request_id: d(1),
             kind: MutationKind::GoalActivation,
-            subject: subject.clone(),
-            resource: resource.clone(),
+            subject: PrincipalId("local-user".into()),
+            resource: ResourceId("mind/goals".into()),
             mutation_digest: d(2),
             expected_resource_state_root: state_root,
             expected_policy_root: policy_root,
-            input_label: label(
-                ControlIntegrity::Authenticated,
-                Confidentiality::Local,
-                TaintLevel::Clean,
-                3,
-            ),
+            input_label: label(),
             consequence: Consequence::High,
             sequence: 42,
-        };
-        let facts = TrustedFacts {
-            resource_state_root: state_root,
-            policy_root,
-            policy_epoch: 7,
-            authorization_epoch: 11,
-            revocation_epoch: 13,
-            capabilities: vec![CapabilityFact {
-                capability_id: d(4),
-                subject,
-                mutation: MutationKind::GoalActivation,
-                resource_scope: ResourceScope::Exact(resource),
-                max_consequence: Consequence::High,
-                authorization_epoch: 11,
-                revocation_epoch: 13,
-                valid_from_sequence: 40,
-                valid_until_sequence: Some(50),
-                revoked: false,
-            }],
-        };
-        let policy = PolicySnapshot {
-            root: policy_root,
+        }
+    }
+
+    fn policy(root: Digest32) -> PolicySnapshot {
+        PolicySnapshot {
+            root,
             epoch: 7,
             rules: vec![PolicyRule {
                 kind: MutationKind::GoalActivation,
@@ -1144,157 +676,91 @@ mod tests {
                 maximum_taint: TaintLevel::Clean,
                 capability_required: true,
             }],
-        };
-        (request, facts, policy)
+        }
+    }
+
+    fn capability(authority: &TrustedFactAuthority) -> CapabilityFact {
+        authority.issue_capability(
+            d(4),
+            PrincipalId("local-user".into()),
+            MutationKind::GoalActivation,
+            ResourceScope::Exact(ResourceId("mind/goals".into())),
+            Consequence::High,
+            11,
+            13,
+            40,
+            Some(50),
+            false,
+        )
     }
 
     #[test]
-    fn default_label_is_low_privilege() {
-        let label = CognitiveSecurityLabel::default();
-        assert_eq!(label.control_integrity, ControlIntegrity::Untrusted);
-        assert_eq!(label.origin, OriginState::Unknown);
-        assert_eq!(label.artifact_integrity, ArtifactIntegrity::Unchecked);
-    }
+    fn same_domain_facts_authorize_and_precommit() {
+        let (monitor, authority) = ReferenceMonitor::bootstrap();
+        let cap = capability(&authority);
+        let facts = authority
+            .snapshot(d(8), d(9), 7, 11, 13, &[&cap])
+            .unwrap();
+        let request = request(d(9), d(8));
+        let policy = policy(d(9));
 
-    #[test]
-    fn provenance_union_is_preserved() {
-        let a = label(
-            ControlIntegrity::PolicyEndorsed,
-            Confidentiality::Public,
-            TaintLevel::Clean,
-            1,
-        );
-        let b = label(
-            ControlIntegrity::Authenticated,
-            Confidentiality::Sensitive,
-            TaintLevel::Suspect,
-            2,
-        );
-        let combined = a.combine(&b);
-        assert!(combined.provenance_roots.contains(&d(1)));
-        assert!(combined.provenance_roots.contains(&d(2)));
-        assert_eq!(combined.control_integrity, ControlIntegrity::Authenticated);
-        assert_eq!(combined.confidentiality, Confidentiality::Sensitive);
-        assert_eq!(combined.taint, TaintLevel::Suspect);
-    }
-
-    #[test]
-    fn valid_capability_allows_exact_goal_mutation() {
-        let (request, facts, policy) = goal_fixture();
-        let monitor = ReferenceMonitor;
         let permit = monitor.authorize(&request, &facts, &policy).unwrap();
-        assert_eq!(permit.kind(), MutationKind::GoalActivation);
-        assert_eq!(permit.resource(), &ResourceId("mind/goals".into()));
-        assert_eq!(permit.mutation_digest(), d(2));
-        assert_eq!(permit.resource_state_root(), d(8));
-        assert_eq!(permit.capability_id(), Some(d(4)));
-    }
-
-    #[test]
-    fn revocation_epoch_change_fails_closed() {
-        let (request, mut facts, policy) = goal_fixture();
-        facts.revocation_epoch += 1;
-        let decision = ReferenceMonitor.evaluate(&request, &facts, &policy);
-        assert_eq!(decision.outcome, DecisionOutcome::RequireAuthorization);
-        assert!(decision.reasons.contains(&ReasonCode::StaleCapability));
-    }
-
-    #[test]
-    fn revoked_capability_fails_closed() {
-        let (request, mut facts, policy) = goal_fixture();
-        facts.capabilities[0].revoked = true;
-        let decision = ReferenceMonitor.evaluate(&request, &facts, &policy);
-        assert_eq!(decision.outcome, DecisionOutcome::RequireAuthorization);
-        assert!(decision.reasons.contains(&ReasonCode::RevokedCapability));
-    }
-
-    #[test]
-    fn resource_state_change_requires_revalidation() {
-        let (request, mut facts, policy) = goal_fixture();
-        facts.resource_state_root = d(99);
-        let decision = ReferenceMonitor.evaluate(&request, &facts, &policy);
-        assert_eq!(decision.outcome, DecisionOutcome::RequireRevalidation);
-        assert_eq!(decision.reasons, vec![ReasonCode::ResourceStateMismatch]);
-    }
-
-    #[test]
-    fn tainted_dependency_is_quarantined_before_capability_check() {
-        let (mut request, facts, policy) = goal_fixture();
-        request.input_label.taint = TaintLevel::Tainted;
-        let decision = ReferenceMonitor.evaluate(&request, &facts, &policy);
-        assert_eq!(decision.outcome, DecisionOutcome::Quarantine);
-        assert_eq!(decision.reasons, vec![ReasonCode::TaintedDependency]);
-    }
-
-    #[test]
-    fn insufficient_integrity_is_quarantined() {
-        let (mut request, facts, policy) = goal_fixture();
-        request.input_label.control_integrity = ControlIntegrity::Untrusted;
-        let decision = ReferenceMonitor.evaluate(&request, &facts, &policy);
-        assert_eq!(decision.outcome, DecisionOutcome::Quarantine);
-        assert_eq!(
-            decision.reasons,
-            vec![ReasonCode::InsufficientControlIntegrity]
-        );
-    }
-
-    #[test]
-    fn permit_is_bound_to_policy_and_epochs() {
-        let (request, facts, policy) = goal_fixture();
-        let permit = ReferenceMonitor.authorize(&request, &facts, &policy).unwrap();
-        assert_eq!(permit.policy_root(), policy.root);
-        assert_eq!(permit.policy_epoch(), policy.epoch);
-        assert_eq!(permit.authorization_epoch(), facts.authorization_epoch);
-        assert_eq!(permit.revocation_epoch(), facts.revocation_epoch);
-        assert_eq!(permit.sequence(), request.sequence);
-    }
-
-    #[test]
-    fn precommit_accepts_unchanged_context_and_changes_typestate() {
-        let (request, facts, policy) = goal_fixture();
-        let permit = ReferenceMonitor.authorize(&request, &facts, &policy).unwrap();
-        let commit = ReferenceMonitor.precommit(permit, &facts, &policy).unwrap();
-        assert_eq!(commit.request_id(), request.request_id);
-        assert_eq!(commit.resource_state_root(), facts.resource_state_root);
+        let commit = monitor.precommit(permit, &facts, &policy).unwrap();
+        assert!(monitor.accepts_commit_permit(&commit));
         assert_eq!(commit.capability_id(), Some(d(4)));
     }
 
     #[test]
-    fn precommit_destroys_stale_resource_authorization() {
-        let (request, mut facts, policy) = goal_fixture();
-        let permit = ReferenceMonitor.authorize(&request, &facts, &policy).unwrap();
-        facts.resource_state_root = d(99);
-        let decision = ReferenceMonitor.precommit(permit, &facts, &policy).unwrap_err();
-        assert_eq!(decision.outcome, DecisionOutcome::RequireRevalidation);
-        assert_eq!(decision.reasons, vec![ReasonCode::ResourceStateMismatch]);
+    fn cross_domain_trusted_facts_are_rejected_before_policy_evaluation() {
+        let (monitor_a, _authority_a) = ReferenceMonitor::bootstrap();
+        let (_monitor_b, authority_b) = ReferenceMonitor::bootstrap();
+        let cap_b = capability(&authority_b);
+        let facts_b = authority_b
+            .snapshot(d(8), d(9), 7, 11, 13, &[&cap_b])
+            .unwrap();
+
+        let error = monitor_a
+            .authorize(&request(d(9), d(8)), &facts_b, &policy(d(9)))
+            .unwrap_err();
+        assert_eq!(error, AuthorityError::MonitorDomainMismatch);
     }
 
     #[test]
-    fn precommit_rechecks_revocation_context() {
-        let (request, mut facts, policy) = goal_fixture();
-        let permit = ReferenceMonitor.authorize(&request, &facts, &policy).unwrap();
-        facts.revocation_epoch += 1;
-        let decision = ReferenceMonitor.precommit(permit, &facts, &policy).unwrap_err();
-        assert_eq!(decision.outcome, DecisionOutcome::RequireRevalidation);
-        assert_eq!(decision.reasons, vec![ReasonCode::RevocationEpochMismatch]);
+    fn commit_permit_from_monitor_b_is_not_valid_for_monitor_a() {
+        let (monitor_a, _authority_a) = ReferenceMonitor::bootstrap();
+        let (monitor_b, authority_b) = ReferenceMonitor::bootstrap();
+        let cap_b = capability(&authority_b);
+        let facts_b = authority_b
+            .snapshot(d(8), d(9), 7, 11, 13, &[&cap_b])
+            .unwrap();
+        let request = request(d(9), d(8));
+        let policy = policy(d(9));
+        let permit_b = monitor_b.authorize(&request, &facts_b, &policy).unwrap();
+        let commit_b = monitor_b.precommit(permit_b, &facts_b, &policy).unwrap();
+
+        assert!(!monitor_a.accepts_commit_permit(&commit_b));
+        assert!(monitor_b.accepts_commit_permit(&commit_b));
     }
 
     #[test]
-    fn precommit_rechecks_exact_capability_identity() {
-        let (request, mut facts, policy) = goal_fixture();
-        let permit = ReferenceMonitor.authorize(&request, &facts, &policy).unwrap();
-        facts.capabilities.clear();
-        let decision = ReferenceMonitor.precommit(permit, &facts, &policy).unwrap_err();
-        assert_eq!(decision.outcome, DecisionOutcome::RequireAuthorization);
-        assert_eq!(decision.reasons, vec![ReasonCode::MissingCapability]);
+    fn trusted_fact_authority_rejects_foreign_capability_in_snapshot() {
+        let (_monitor_a, authority_a) = ReferenceMonitor::bootstrap();
+        let (_monitor_b, authority_b) = ReferenceMonitor::bootstrap();
+        let cap_b = capability(&authority_b);
+
+        let error = authority_a
+            .snapshot(d(8), d(9), 7, 11, 13, &[&cap_b])
+            .unwrap_err();
+        assert_eq!(error, AuthorityError::MonitorDomainMismatch);
     }
 
     #[test]
-    fn attenuation_can_only_narrow_parent_authority() {
-        let (_, facts, _) = goal_fixture();
-        let parent = &facts.capabilities[0];
-        let child = parent
-            .attenuate(
+    fn only_trusted_issuer_can_turn_attenuation_into_verified_child_fact() {
+        let (_monitor, authority) = ReferenceMonitor::bootstrap();
+        let parent = capability(&authority);
+        let child = authority
+            .derive_capability(
+                &parent,
                 d(21),
                 PrincipalId("delegate".into()),
                 ResourceScope::Exact(ResourceId("mind/goals".into())),
@@ -1303,147 +769,30 @@ mod tests {
                 Some(48),
             )
             .unwrap();
-        assert_eq!(child.mutation, parent.mutation);
-        assert!(child.max_consequence <= parent.max_consequence);
-        assert!(child.valid_from_sequence >= parent.valid_from_sequence);
-        assert!(child.valid_until_sequence <= parent.valid_until_sequence);
-        assert_eq!(child.authorization_epoch, parent.authorization_epoch);
-        assert_eq!(child.revocation_epoch, parent.revocation_epoch);
+
+        assert_eq!(child.mutation(), parent.mutation());
+        assert!(child.max_consequence() <= parent.max_consequence());
+        assert!(child.valid_from_sequence() >= parent.valid_from_sequence());
+        assert!(child.valid_until_sequence() <= parent.valid_until_sequence());
     }
 
     #[test]
-    fn attenuation_rejects_resource_scope_widening() {
-        let (_, facts, _) = goal_fixture();
-        let parent = &facts.capabilities[0];
-        let result = parent.attenuate(
-            d(21),
-            PrincipalId("delegate".into()),
-            ResourceScope::Any,
-            Consequence::Moderate,
-            43,
-            Some(48),
-        );
-        assert_eq!(result, Err(DelegationError::ResourceScopeWidened));
-    }
+    fn foreign_issuer_cannot_derive_child_from_verified_parent() {
+        let (_monitor_a, authority_a) = ReferenceMonitor::bootstrap();
+        let (_monitor_b, authority_b) = ReferenceMonitor::bootstrap();
+        let parent_a = capability(&authority_a);
 
-    #[test]
-    fn attenuation_rejects_consequence_widening() {
-        let (_, facts, _) = goal_fixture();
-        let parent = &facts.capabilities[0];
-        let result = parent.attenuate(
-            d(21),
-            PrincipalId("delegate".into()),
-            ResourceScope::Exact(ResourceId("mind/goals".into())),
-            Consequence::Critical,
-            43,
-            Some(48),
-        );
-        assert_eq!(result, Err(DelegationError::ConsequenceWidened));
-    }
-
-    #[test]
-    fn attenuation_rejects_validity_widening() {
-        let (_, facts, _) = goal_fixture();
-        let parent = &facts.capabilities[0];
-        let result = parent.attenuate(
-            d(21),
-            PrincipalId("delegate".into()),
-            ResourceScope::Exact(ResourceId("mind/goals".into())),
-            Consequence::Moderate,
-            39,
-            Some(48),
-        );
-        assert_eq!(result, Err(DelegationError::ValidityWidened));
-    }
-
-    #[test]
-    fn decisions_round_trip_but_live_permits_are_not_serde_types() {
-        let (request, facts, policy) = goal_fixture();
-        let decision = ReferenceMonitor.evaluate(&request, &facts, &policy);
-        let encoded = serde_json::to_string(&decision).unwrap();
-        let decoded: MonitorDecision = serde_json::from_str(&encoded).unwrap();
-        assert_eq!(decoded, decision);
-        // MutationPermit and CommitPermit intentionally have no serde implementations.
-    }
-
-    proptest! {
-        #[test]
-        fn combine_never_increases_control_integrity(
-            ia in 0u8..3,
-            ib in 0u8..3,
-            ca in 0u8..4,
-            cb in 0u8..4,
-            ta in 0u8..4,
-            tb in 0u8..4,
-        ) {
-            let integrity = [
-                ControlIntegrity::Untrusted,
-                ControlIntegrity::Authenticated,
-                ControlIntegrity::PolicyEndorsed,
-            ];
-            let confidentiality = [
-                Confidentiality::Public,
-                Confidentiality::Local,
-                Confidentiality::Sensitive,
-                Confidentiality::Restricted,
-            ];
-            let taint = [
-                TaintLevel::Clean,
-                TaintLevel::Suspect,
-                TaintLevel::Tainted,
-                TaintLevel::Revoked,
-            ];
-
-            let a = label(
-                integrity[ia as usize],
-                confidentiality[ca as usize],
-                taint[ta as usize],
-                1,
-            );
-            let b = label(
-                integrity[ib as usize],
-                confidentiality[cb as usize],
-                taint[tb as usize],
-                2,
-            );
-            let merged = a.combine(&b);
-
-            prop_assert!(merged.control_integrity <= a.control_integrity);
-            prop_assert!(merged.control_integrity <= b.control_integrity);
-            prop_assert!(merged.confidentiality >= a.confidentiality);
-            prop_assert!(merged.confidentiality >= b.confidentiality);
-            prop_assert!(merged.taint >= a.taint);
-            prop_assert!(merged.taint >= b.taint);
-            prop_assert!(merged.provenance_roots.is_superset(&a.provenance_roots));
-            prop_assert!(merged.provenance_roots.is_superset(&b.provenance_roots));
-        }
-
-        #[test]
-        fn attenuation_never_raises_consequence(parent_idx in 0usize..4, child_idx in 0usize..4) {
-            let levels = [
-                Consequence::Low,
-                Consequence::Moderate,
-                Consequence::High,
-                Consequence::Critical,
-            ];
-            let (_, mut facts, _) = goal_fixture();
-            let parent = &mut facts.capabilities[0];
-            parent.max_consequence = levels[parent_idx];
-            let result = parent.attenuate(
-                d(22),
+        let error = authority_b
+            .derive_capability(
+                &parent_a,
+                d(21),
                 PrincipalId("delegate".into()),
                 ResourceScope::Exact(ResourceId("mind/goals".into())),
-                levels[child_idx],
+                Consequence::Moderate,
                 43,
                 Some(48),
-            );
-            match result {
-                Ok(child) => prop_assert!(child.max_consequence <= parent.max_consequence),
-                Err(error) if child_idx > parent_idx => {
-                    prop_assert_eq!(error, DelegationError::ConsequenceWidened)
-                }
-                Err(_) => {}
-            }
-        }
+            )
+            .unwrap_err();
+        assert_eq!(error, AuthorityError::MonitorDomainMismatch);
     }
 }
