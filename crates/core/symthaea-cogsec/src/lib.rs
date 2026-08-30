@@ -1,213 +1,79 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Public CogSec API boundary.
+//! Public CogSec authority boundary.
 //!
-//! The detailed deterministic implementation is private. This wrapper adds the
-//! authority topology needed for safe runtime use: verified transition facts,
-//! trusted state snapshots, authorization permits, and commit permits are
-//! opaque, non-serializable, and bound to one monitor domain. Caller-controlled
-//! request annotations cannot become security facts merely because they have
-//! the expected Rust shape.
+//! The lower transition/fact/permit implementation is private. This final
+//! public layer also seals the canonical policy IR so callers cannot pair a
+//! trusted policy root with substituted rules.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-mod facade;
+mod transition_facade;
 
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-pub use facade::{
-    ArtifactIntegrity, CapabilityFact, CognitiveSecurityLabel, Confidentiality, Consequence,
-    ControlIntegrity, DecisionOutcome, DelegationError, Digest32, MonitorDecision, MutationKind,
-    MutationRequest, OriginState, PolicyRule, PolicySnapshot, PrincipalId, ReasonCode, ResourceId,
-    ResourceScope, TaintLevel,
+pub use transition_facade::{
+    ArtifactIntegrity, AuthorityError, CapabilityFact, CognitiveSecurityLabel, Confidentiality,
+    Consequence, ControlIntegrity, DecisionOutcome, DelegationError, Digest32, MonitorDecision,
+    MutationKind, MutationReceipt, MutationRequest, OriginState, PolicyRule, PolicySnapshot,
+    PrincipalId, ReasonCode, ReceiptStage, ResourceId, ResourceScope, TaintLevel, TransitionField,
+    VerifiedTransition,
 };
 
-/// Private identity for the outer public monitor boundary.
+/// Private identity for the policy-sealing public boundary.
 #[derive(Debug)]
-struct PublicMonitorSeal;
+struct PolicyDomainSeal;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct TransitionBinding {
-    subject: PrincipalId,
-    kind: MutationKind,
-    resource: ResourceId,
-    mutation_digest: Digest32,
-    consequence: Consequence,
-    input_label: CognitiveSecurityLabel,
-    sequence: u64,
-}
-
-impl TransitionBinding {
-    fn mismatch_with_request(&self, request: &MutationRequest) -> Option<TransitionField> {
-        if self.subject != request.subject {
-            return Some(TransitionField::Subject);
-        }
-        if self.kind != request.kind {
-            return Some(TransitionField::MutationKind);
-        }
-        if self.resource != request.resource {
-            return Some(TransitionField::Resource);
-        }
-        if self.mutation_digest != request.mutation_digest {
-            return Some(TransitionField::MutationDigest);
-        }
-        if self.consequence != request.consequence {
-            return Some(TransitionField::Consequence);
-        }
-        if self.input_label != request.input_label {
-            return Some(TransitionField::InputSecurityLabel);
-        }
-        if self.sequence != request.sequence {
-            return Some(TransitionField::Sequence);
-        }
-        None
-    }
-
-    fn mismatch_with_binding(&self, other: &Self) -> Option<TransitionField> {
-        if self.subject != other.subject {
-            return Some(TransitionField::Subject);
-        }
-        if self.kind != other.kind {
-            return Some(TransitionField::MutationKind);
-        }
-        if self.resource != other.resource {
-            return Some(TransitionField::Resource);
-        }
-        if self.mutation_digest != other.mutation_digest {
-            return Some(TransitionField::MutationDigest);
-        }
-        if self.consequence != other.consequence {
-            return Some(TransitionField::Consequence);
-        }
-        if self.input_label != other.input_label {
-            return Some(TransitionField::InputSecurityLabel);
-        }
-        if self.sequence != other.sequence {
-            return Some(TransitionField::Sequence);
-        }
-        None
-    }
-}
-
-/// Security-relevant transition field that disagreed with independently
-/// verified facts.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TransitionField {
-    /// Authenticated/authorized principal identity.
-    Subject,
-    /// Canonical mutation class.
-    MutationKind,
-    /// Protected resource identity.
-    Resource,
-    /// Exact proposed-effect commitment.
-    MutationDigest,
-    /// Trusted consequence classification.
-    Consequence,
-    /// Trusted cognitive security label/provenance.
-    InputSecurityLabel,
-    /// State-owner logical sequence.
-    Sequence,
-}
-
-/// Public authority-boundary error.
-#[derive(Debug, PartialEq, Eq)]
-pub enum AuthorityError {
-    /// Facts, transitions, or permits belong to another monitor domain.
-    MonitorDomainMismatch,
-    /// A caller-controlled request field disagrees with trusted transition facts.
-    TransitionBindingMismatch(TransitionField),
-    /// The deterministic policy engine rejected/deferred the request.
-    Monitor(MonitorDecision),
-    /// A requested delegated capability would widen its verified parent.
-    Delegation(DelegationError),
-}
-
-impl From<facade::AuthorityError> for AuthorityError {
-    fn from(value: facade::AuthorityError) -> Self {
-        match value {
-            facade::AuthorityError::MonitorDomainMismatch => Self::MonitorDomainMismatch,
-            facade::AuthorityError::Monitor(decision) => Self::Monitor(decision),
-            facade::AuthorityError::Delegation(error) => Self::Delegation(error),
-        }
-    }
-}
-
-/// Opaque trusted classification of one proposed state transition.
+/// Opaque canonical policy accepted by one monitor domain.
 ///
-/// The fields cannot be constructed or deserialized by ordinary application
-/// data. A trusted adapter possessing [`TrustedFactAuthority`] creates this only
-/// after independently establishing the principal, resource/effect identity,
-/// consequence, security label/provenance, and logical sequence.
+/// A raw [`PolicySnapshot`] is ordinary data. It cannot be used for public
+/// authorization until a trusted policy compiler/owner possessing
+/// [`TrustedFactAuthority`] admits it as `VerifiedPolicy`.
 ///
 /// ```compile_fail
-/// use symthaea_cogsec::VerifiedTransition;
-/// let _ = VerifiedTransition {};
+/// use symthaea_cogsec::VerifiedPolicy;
+/// let _ = VerifiedPolicy {};
 /// ```
-pub struct VerifiedTransition {
-    binding: TransitionBinding,
-    seal: Arc<PublicMonitorSeal>,
+pub struct VerifiedPolicy {
+    inner: PolicySnapshot,
+    seal: Arc<PolicyDomainSeal>,
 }
 
-impl std::fmt::Debug for VerifiedTransition {
+impl std::fmt::Debug for VerifiedPolicy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("VerifiedTransition")
-            .field("subject", &self.binding.subject)
-            .field("kind", &self.binding.kind)
-            .field("resource", &self.binding.resource)
-            .field("mutation_digest", &self.binding.mutation_digest)
-            .field("consequence", &self.binding.consequence)
-            .field("sequence", &self.binding.sequence)
+        f.debug_struct("VerifiedPolicy")
+            .field("root", &self.inner.root)
+            .field("epoch", &self.inner.epoch)
+            .field("rule_count", &self.inner.rules.len())
             .finish_non_exhaustive()
     }
 }
 
-impl VerifiedTransition {
-    /// Verified principal.
-    pub fn subject(&self) -> &PrincipalId {
-        &self.binding.subject
+impl VerifiedPolicy {
+    /// Commitment to the canonical policy IR.
+    pub fn root(&self) -> Digest32 {
+        self.inner.root
     }
 
-    /// Verified mutation class.
-    pub fn kind(&self) -> MutationKind {
-        self.binding.kind
+    /// Monotonic policy epoch.
+    pub fn epoch(&self) -> u64 {
+        self.inner.epoch
     }
 
-    /// Verified protected resource.
-    pub fn resource(&self) -> &ResourceId {
-        &self.binding.resource
-    }
-
-    /// Verified effect commitment.
-    pub fn mutation_digest(&self) -> Digest32 {
-        self.binding.mutation_digest
-    }
-
-    /// Verified consequence classification.
-    pub fn consequence(&self) -> Consequence {
-        self.binding.consequence
-    }
-
-    /// Verified input security label/provenance.
-    pub fn input_label(&self) -> &CognitiveSecurityLabel {
-        &self.binding.input_label
-    }
-
-    /// Verified logical sequence.
-    pub fn sequence(&self) -> u64 {
-        self.binding.sequence
+    /// Number of canonical policy rules.
+    pub fn rule_count(&self) -> usize {
+        self.inner.rules.len()
     }
 }
 
-/// Trusted adapter capability for one public monitor domain.
+/// Trusted fact/policy authority for one protected monitor domain.
 ///
-/// Possession of this object is privileged. It is neither cloneable nor
-/// serializable and should remain inside the authenticated state/identity/policy
-/// adapter owned by the protected runtime.
+/// This object is intentionally non-cloneable and non-serializable. Runtime
+/// topology must keep it inside the trusted identity/state/policy adapter.
 pub struct TrustedFactAuthority {
-    inner: facade::TrustedFactAuthority,
-    seal: Arc<PublicMonitorSeal>,
+    inner: transition_facade::TrustedFactAuthority,
+    seal: Arc<PolicyDomainSeal>,
 }
 
 impl std::fmt::Debug for TrustedFactAuthority {
@@ -218,6 +84,19 @@ impl std::fmt::Debug for TrustedFactAuthority {
 }
 
 impl TrustedFactAuthority {
+    /// Admit an already-validated canonical policy IR into this monitor domain.
+    ///
+    /// The caller holding this privileged authority asserts that the policy
+    /// compiler has validated the IR and that `policy.root` actually commits to
+    /// the supplied canonical contents. CogSec intentionally does not implement
+    /// hashing or text-policy compilation inside the logical TCB.
+    pub fn issue_policy(&self, policy: PolicySnapshot) -> VerifiedPolicy {
+        VerifiedPolicy {
+            inner: policy,
+            seal: Arc::clone(&self.seal),
+        }
+    }
+
     /// Convert already-verified capability information into an opaque fact.
     #[allow(clippy::too_many_arguments)]
     pub fn issue_capability(
@@ -247,7 +126,7 @@ impl TrustedFactAuthority {
         )
     }
 
-    /// Issue the independently verified transition facts for one proposal.
+    /// Issue independently verified facts for one proposed transition.
     #[allow(clippy::too_many_arguments)]
     pub fn issue_transition(
         &self,
@@ -259,18 +138,15 @@ impl TrustedFactAuthority {
         input_label: CognitiveSecurityLabel,
         sequence: u64,
     ) -> VerifiedTransition {
-        VerifiedTransition {
-            binding: TransitionBinding {
-                subject,
-                kind,
-                resource,
-                mutation_digest,
-                consequence,
-                input_label,
-                sequence,
-            },
-            seal: Arc::clone(&self.seal),
-        }
+        self.inner.issue_transition(
+            subject,
+            kind,
+            resource,
+            mutation_digest,
+            consequence,
+            input_label,
+            sequence,
+        )
     }
 
     /// Issue a verified structurally attenuated child capability.
@@ -285,69 +161,64 @@ impl TrustedFactAuthority {
         valid_from_sequence: u64,
         valid_until_sequence: Option<u64>,
     ) -> Result<CapabilityFact, AuthorityError> {
-        self.inner
-            .derive_capability(
-                parent,
-                capability_id,
-                subject,
-                resource_scope,
-                max_consequence,
-                valid_from_sequence,
-                valid_until_sequence,
-            )
-            .map_err(AuthorityError::from)
+        self.inner.derive_capability(
+            parent,
+            capability_id,
+            subject,
+            resource_scope,
+            max_consequence,
+            valid_from_sequence,
+            valid_until_sequence,
+        )
     }
 
-    /// Build an opaque trusted snapshot for exactly one verified transition.
+    /// Build a trusted snapshot for exactly one transition and one sealed policy.
+    ///
+    /// Policy root/epoch are derived from `VerifiedPolicy`; callers cannot pass
+    /// those security facts independently of the policy contents.
     #[allow(clippy::too_many_arguments)]
     pub fn snapshot(
         &self,
         transition: &VerifiedTransition,
         resource_state_root: Digest32,
-        policy_root: Digest32,
-        policy_epoch: u64,
+        policy: &VerifiedPolicy,
         authorization_epoch: u64,
         revocation_epoch: u64,
         capabilities: &[&CapabilityFact],
     ) -> Result<TrustedFacts, AuthorityError> {
-        if !Arc::ptr_eq(&self.seal, &transition.seal) {
+        if !Arc::ptr_eq(&self.seal, &policy.seal) {
             return Err(AuthorityError::MonitorDomainMismatch);
         }
 
-        let inner = self
-            .inner
-            .snapshot(
-                resource_state_root,
-                policy_root,
-                policy_epoch,
-                authorization_epoch,
-                revocation_epoch,
-                capabilities,
-            )
-            .map_err(AuthorityError::from)?;
+        let inner = self.inner.snapshot(
+            transition,
+            resource_state_root,
+            policy.inner.root,
+            policy.inner.epoch,
+            authorization_epoch,
+            revocation_epoch,
+            capabilities,
+        )?;
 
         Ok(TrustedFacts {
             inner,
-            binding: transition.binding.clone(),
             seal: Arc::clone(&self.seal),
         })
     }
 }
 
-/// Opaque trusted state/policy snapshot bound to one verified transition.
+/// Opaque trusted state/transition snapshot bound to the sealed policy domain.
 pub struct TrustedFacts {
-    inner: facade::TrustedFacts,
-    binding: TransitionBinding,
-    seal: Arc<PublicMonitorSeal>,
+    inner: transition_facade::TrustedFacts,
+    seal: Arc<PolicyDomainSeal>,
 }
 
 impl std::fmt::Debug for TrustedFacts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TrustedFacts")
-            .field("subject", &self.binding.subject)
-            .field("kind", &self.binding.kind)
-            .field("resource", &self.binding.resource)
-            .field("consequence", &self.binding.consequence)
+            .field("subject", &self.inner.subject())
+            .field("kind", &self.inner.kind())
+            .field("resource", &self.inner.resource())
             .field("resource_state_root", &self.inner.resource_state_root())
             .field("policy_root", &self.inner.policy_root())
             .field("policy_epoch", &self.inner.policy_epoch())
@@ -359,76 +230,37 @@ impl std::fmt::Debug for TrustedFacts {
 
 impl TrustedFacts {
     /// Verified principal.
-    pub fn subject(&self) -> &PrincipalId {
-        &self.binding.subject
-    }
-
+    pub fn subject(&self) -> &PrincipalId { self.inner.subject() }
     /// Verified mutation class.
-    pub fn kind(&self) -> MutationKind {
-        self.binding.kind
-    }
-
+    pub fn kind(&self) -> MutationKind { self.inner.kind() }
     /// Verified protected resource.
-    pub fn resource(&self) -> &ResourceId {
-        &self.binding.resource
-    }
-
-    /// Verified mutation commitment.
-    pub fn mutation_digest(&self) -> Digest32 {
-        self.binding.mutation_digest
-    }
-
+    pub fn resource(&self) -> &ResourceId { self.inner.resource() }
+    /// Verified exact effect commitment.
+    pub fn mutation_digest(&self) -> Digest32 { self.inner.mutation_digest() }
     /// Verified consequence classification.
-    pub fn consequence(&self) -> Consequence {
-        self.binding.consequence
-    }
-
+    pub fn consequence(&self) -> Consequence { self.inner.consequence() }
     /// Verified security label/provenance.
-    pub fn input_label(&self) -> &CognitiveSecurityLabel {
-        &self.binding.input_label
-    }
-
+    pub fn input_label(&self) -> &CognitiveSecurityLabel { self.inner.input_label() }
     /// Verified logical sequence.
-    pub fn sequence(&self) -> u64 {
-        self.binding.sequence
-    }
-
+    pub fn sequence(&self) -> u64 { self.inner.sequence() }
     /// Current protected-resource state root.
-    pub fn resource_state_root(&self) -> Digest32 {
-        self.inner.resource_state_root()
-    }
-
+    pub fn resource_state_root(&self) -> Digest32 { self.inner.resource_state_root() }
     /// Current trusted policy root.
-    pub fn policy_root(&self) -> Digest32 {
-        self.inner.policy_root()
-    }
-
-    /// Current policy epoch.
-    pub fn policy_epoch(&self) -> u64 {
-        self.inner.policy_epoch()
-    }
-
+    pub fn policy_root(&self) -> Digest32 { self.inner.policy_root() }
+    /// Current trusted policy epoch.
+    pub fn policy_epoch(&self) -> u64 { self.inner.policy_epoch() }
     /// Current authorization epoch.
-    pub fn authorization_epoch(&self) -> u64 {
-        self.inner.authorization_epoch()
-    }
-
+    pub fn authorization_epoch(&self) -> u64 { self.inner.authorization_epoch() }
     /// Current revocation epoch.
-    pub fn revocation_epoch(&self) -> u64 {
-        self.inner.revocation_epoch()
-    }
-
-    /// Number of verified capability facts in the snapshot.
-    pub fn capability_count(&self) -> usize {
-        self.inner.capability_count()
-    }
+    pub fn revocation_epoch(&self) -> u64 { self.inner.revocation_epoch() }
+    /// Number of verified capabilities in the snapshot.
+    pub fn capability_count(&self) -> usize { self.inner.capability_count() }
 }
 
-/// Authorization-time token for exactly one trusted transition.
+/// Authorization-time one-use token bound to the sealed policy domain.
 pub struct MutationPermit {
-    inner: facade::MutationPermit,
-    binding: TransitionBinding,
-    seal: Arc<PublicMonitorSeal>,
+    inner: transition_facade::MutationPermit,
+    seal: Arc<PolicyDomainSeal>,
 }
 
 impl std::fmt::Debug for MutationPermit {
@@ -438,372 +270,176 @@ impl std::fmt::Debug for MutationPermit {
             .field("kind", &self.inner.kind())
             .field("resource", &self.inner.resource())
             .field("mutation_digest", &self.inner.mutation_digest())
+            .field("policy_root", &self.inner.policy_root())
             .finish_non_exhaustive()
     }
 }
 
 impl MutationPermit {
     /// Request identity.
-    pub fn request_id(&self) -> Digest32 {
-        self.inner.request_id()
-    }
-    /// Trusted mutation class.
-    pub fn kind(&self) -> MutationKind {
-        self.binding.kind
-    }
-    /// Trusted principal.
-    pub fn subject(&self) -> &PrincipalId {
-        &self.binding.subject
-    }
-    /// Trusted resource.
-    pub fn resource(&self) -> &ResourceId {
-        &self.binding.resource
-    }
-    /// Trusted effect commitment.
-    pub fn mutation_digest(&self) -> Digest32 {
-        self.binding.mutation_digest
-    }
-    /// Trusted consequence classification.
-    pub fn consequence(&self) -> Consequence {
-        self.binding.consequence
-    }
+    pub fn request_id(&self) -> Digest32 { self.inner.request_id() }
+    /// Verified mutation class.
+    pub fn kind(&self) -> MutationKind { self.inner.kind() }
+    /// Verified principal.
+    pub fn subject(&self) -> &PrincipalId { self.inner.subject() }
+    /// Verified resource.
+    pub fn resource(&self) -> &ResourceId { self.inner.resource() }
+    /// Verified effect commitment.
+    pub fn mutation_digest(&self) -> Digest32 { self.inner.mutation_digest() }
+    /// Verified consequence.
+    pub fn consequence(&self) -> Consequence { self.inner.consequence() }
     /// Capability selected at authorization, if required.
-    pub fn capability_id(&self) -> Option<Digest32> {
-        self.inner.capability_id()
-    }
-    /// Resource state root at authorization.
-    pub fn resource_state_root(&self) -> Digest32 {
-        self.inner.resource_state_root()
-    }
-    /// Policy root at authorization.
-    pub fn policy_root(&self) -> Digest32 {
-        self.inner.policy_root()
-    }
-    /// Policy epoch at authorization.
-    pub fn policy_epoch(&self) -> u64 {
-        self.inner.policy_epoch()
-    }
+    pub fn capability_id(&self) -> Option<Digest32> { self.inner.capability_id() }
+    /// Resource root at authorization.
+    pub fn resource_state_root(&self) -> Digest32 { self.inner.resource_state_root() }
+    /// Sealed policy root at authorization.
+    pub fn policy_root(&self) -> Digest32 { self.inner.policy_root() }
+    /// Sealed policy epoch at authorization.
+    pub fn policy_epoch(&self) -> u64 { self.inner.policy_epoch() }
     /// Authorization epoch at authorization.
-    pub fn authorization_epoch(&self) -> u64 {
-        self.inner.authorization_epoch()
-    }
+    pub fn authorization_epoch(&self) -> u64 { self.inner.authorization_epoch() }
     /// Revocation epoch at authorization.
-    pub fn revocation_epoch(&self) -> u64 {
-        self.inner.revocation_epoch()
-    }
-    /// Trusted logical sequence.
-    pub fn sequence(&self) -> u64 {
-        self.binding.sequence
-    }
+    pub fn revocation_epoch(&self) -> u64 { self.inner.revocation_epoch() }
+    /// Verified logical sequence.
+    pub fn sequence(&self) -> u64 { self.inner.sequence() }
 }
 
-/// Commit-ready one-use token for exactly one trusted transition.
+/// Commit-ready one-use token bound to the sealed policy domain.
 pub struct CommitPermit {
-    inner: facade::CommitPermit,
-    binding: TransitionBinding,
-    seal: Arc<PublicMonitorSeal>,
+    inner: transition_facade::CommitPermit,
+    seal: Arc<PolicyDomainSeal>,
 }
 
 impl std::fmt::Debug for CommitPermit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CommitPermit")
             .field("request_id", &self.inner.request_id())
-            .field("kind", &self.binding.kind)
-            .field("resource", &self.binding.resource)
-            .field("mutation_digest", &self.binding.mutation_digest)
+            .field("kind", &self.inner.kind())
+            .field("resource", &self.inner.resource())
+            .field("mutation_digest", &self.inner.mutation_digest())
+            .field("policy_root", &self.inner.policy_root())
             .finish_non_exhaustive()
     }
 }
 
 impl CommitPermit {
     /// Request identity.
-    pub fn request_id(&self) -> Digest32 {
-        self.inner.request_id()
-    }
-    /// Trusted mutation class.
-    pub fn kind(&self) -> MutationKind {
-        self.binding.kind
-    }
-    /// Trusted principal.
-    pub fn subject(&self) -> &PrincipalId {
-        &self.binding.subject
-    }
-    /// Trusted resource.
-    pub fn resource(&self) -> &ResourceId {
-        &self.binding.resource
-    }
-    /// Trusted effect commitment.
-    pub fn mutation_digest(&self) -> Digest32 {
-        self.binding.mutation_digest
-    }
-    /// Trusted consequence classification.
-    pub fn consequence(&self) -> Consequence {
-        self.binding.consequence
-    }
+    pub fn request_id(&self) -> Digest32 { self.inner.request_id() }
+    /// Verified mutation class.
+    pub fn kind(&self) -> MutationKind { self.inner.kind() }
+    /// Verified principal.
+    pub fn subject(&self) -> &PrincipalId { self.inner.subject() }
+    /// Verified resource.
+    pub fn resource(&self) -> &ResourceId { self.inner.resource() }
+    /// Verified effect commitment.
+    pub fn mutation_digest(&self) -> Digest32 { self.inner.mutation_digest() }
+    /// Verified consequence.
+    pub fn consequence(&self) -> Consequence { self.inner.consequence() }
     /// Capability selected at authorization, if required.
-    pub fn capability_id(&self) -> Option<Digest32> {
-        self.inner.capability_id()
-    }
-    /// Freshly revalidated resource state root.
-    pub fn resource_state_root(&self) -> Digest32 {
-        self.inner.resource_state_root()
-    }
+    pub fn capability_id(&self) -> Option<Digest32> { self.inner.capability_id() }
+    /// Freshly revalidated resource root.
+    pub fn resource_state_root(&self) -> Digest32 { self.inner.resource_state_root() }
     /// Freshly revalidated policy root.
-    pub fn policy_root(&self) -> Digest32 {
-        self.inner.policy_root()
-    }
+    pub fn policy_root(&self) -> Digest32 { self.inner.policy_root() }
     /// Freshly revalidated policy epoch.
-    pub fn policy_epoch(&self) -> u64 {
-        self.inner.policy_epoch()
-    }
+    pub fn policy_epoch(&self) -> u64 { self.inner.policy_epoch() }
     /// Freshly revalidated authorization epoch.
-    pub fn authorization_epoch(&self) -> u64 {
-        self.inner.authorization_epoch()
-    }
+    pub fn authorization_epoch(&self) -> u64 { self.inner.authorization_epoch() }
     /// Freshly revalidated revocation epoch.
-    pub fn revocation_epoch(&self) -> u64 {
-        self.inner.revocation_epoch()
-    }
-    /// Trusted logical sequence.
-    pub fn sequence(&self) -> u64 {
-        self.binding.sequence
-    }
+    pub fn revocation_epoch(&self) -> u64 { self.inner.revocation_epoch() }
+    /// Verified logical sequence.
+    pub fn sequence(&self) -> u64 { self.inner.sequence() }
 }
 
-/// Stage represented by a durable CogSec evidence record.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ReceiptStage {
-    /// Deterministic policy evaluation against one trusted-facts snapshot.
-    Evaluation,
-}
-
-/// Serializable evidence for one monitor evaluation.
-///
-/// This is evidence, not authority. It deliberately carries no private domain
-/// seal; exported receipts require an authenticated evidence-plane signature or
-/// equivalent provenance envelope when used across trust boundaries.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MutationReceipt {
-    /// Evidence stage.
-    pub stage: ReceiptStage,
-    /// Request identity chosen by the proposer.
-    pub request_id: Digest32,
-    /// Independently verified principal.
-    pub subject: PrincipalId,
-    /// Independently verified mutation class.
-    pub kind: MutationKind,
-    /// Independently verified protected resource.
-    pub resource: ResourceId,
-    /// Independently verified exact effect commitment.
-    pub mutation_digest: Digest32,
-    /// Independently verified consequence classification.
-    pub consequence: Consequence,
-    /// Independently verified security label/provenance.
-    pub input_label: CognitiveSecurityLabel,
-    /// Resource root expected by the proposer.
-    pub expected_resource_state_root: Digest32,
-    /// Resource root supplied by the trusted state owner.
-    pub observed_resource_state_root: Digest32,
-    /// Policy root expected by the proposer.
-    pub expected_policy_root: Digest32,
-    /// Canonical policy root evaluated by the monitor.
-    pub evaluated_policy_root: Digest32,
-    /// Trusted policy root supplied independently in the snapshot.
-    pub trusted_policy_root: Digest32,
-    /// Trusted policy epoch.
-    pub policy_epoch: u64,
-    /// Trusted authorization epoch.
-    pub authorization_epoch: u64,
-    /// Trusted revocation epoch.
-    pub revocation_epoch: u64,
-    /// Independently verified logical sequence.
-    pub sequence: u64,
-    /// Capability selected for an allowed request, if policy required one.
-    pub capability_id: Option<Digest32>,
-    /// Monitor outcome.
-    pub outcome: DecisionOutcome,
-    /// Stable reason codes.
-    pub reasons: Vec<ReasonCode>,
-}
-
-/// Public deterministic reference monitor for one private authority domain.
-///
-/// This type is neither cloneable, default-constructible, nor serializable.
+/// Public deterministic reference monitor for one sealed policy/authority domain.
 #[derive(Debug)]
 pub struct ReferenceMonitor {
-    inner: facade::ReferenceMonitor,
-    seal: Arc<PublicMonitorSeal>,
+    inner: transition_facade::ReferenceMonitor,
+    seal: Arc<PolicyDomainSeal>,
 }
 
 impl ReferenceMonitor {
-    /// Bootstrap one isolated monitor domain and its trusted fact issuer.
+    /// Bootstrap one protected monitor domain and its trusted authority.
     pub fn bootstrap() -> (Self, TrustedFactAuthority) {
-        let (inner, inner_authority) = facade::ReferenceMonitor::bootstrap();
-        let seal = Arc::new(PublicMonitorSeal);
+        let (inner, inner_authority) = transition_facade::ReferenceMonitor::bootstrap();
+        let seal = Arc::new(PolicyDomainSeal);
         (
-            Self {
-                inner,
-                seal: Arc::clone(&seal),
-            },
-            TrustedFactAuthority {
-                inner: inner_authority,
-                seal,
-            },
+            Self { inner, seal: Arc::clone(&seal) },
+            TrustedFactAuthority { inner: inner_authority, seal },
         )
     }
 
-    fn facts_match_domain(&self, facts: &TrustedFacts) -> bool {
-        Arc::ptr_eq(&self.seal, &facts.seal)
-    }
-
-    fn validate_request_binding(
+    fn validate_context(
         &self,
-        request: &MutationRequest,
         facts: &TrustedFacts,
+        policy: &VerifiedPolicy,
     ) -> Result<(), AuthorityError> {
-        if !self.facts_match_domain(facts) {
+        if !Arc::ptr_eq(&self.seal, &facts.seal) || !Arc::ptr_eq(&self.seal, &policy.seal) {
             return Err(AuthorityError::MonitorDomainMismatch);
-        }
-        if let Some(field) = facts.binding.mismatch_with_request(request) {
-            return Err(AuthorityError::TransitionBindingMismatch(field));
         }
         Ok(())
     }
 
-    fn validate_permit_binding(
-        &self,
-        permit: &MutationPermit,
-        facts: &TrustedFacts,
-    ) -> Result<(), AuthorityError> {
-        if !Arc::ptr_eq(&self.seal, &permit.seal) || !self.facts_match_domain(facts) {
-            return Err(AuthorityError::MonitorDomainMismatch);
-        }
-        if let Some(field) = permit.binding.mismatch_with_binding(&facts.binding) {
-            return Err(AuthorityError::TransitionBindingMismatch(field));
-        }
-        Ok(())
-    }
-
-    /// Evaluate one proposed mutation only after its security-relevant request
-    /// fields match independently verified transition facts exactly.
+    /// Evaluate one proposed mutation against the sealed canonical policy.
     pub fn evaluate(
         &self,
         request: &MutationRequest,
         facts: &TrustedFacts,
-        policy: &PolicySnapshot,
+        policy: &VerifiedPolicy,
     ) -> Result<MonitorDecision, AuthorityError> {
-        self.validate_request_binding(request, facts)?;
-        self.inner
-            .evaluate(request, &facts.inner, policy)
-            .map_err(AuthorityError::from)
+        self.validate_context(facts, policy)?;
+        self.inner.evaluate(request, &facts.inner, &policy.inner)
     }
 
-    /// Evaluate and mint a one-use authorization token for the verified transition.
+    /// Authorize one verified transition under the sealed canonical policy.
     pub fn authorize(
         &self,
         request: &MutationRequest,
         facts: &TrustedFacts,
-        policy: &PolicySnapshot,
+        policy: &VerifiedPolicy,
     ) -> Result<MutationPermit, AuthorityError> {
-        self.validate_request_binding(request, facts)?;
-        let inner = self
-            .inner
-            .authorize(request, &facts.inner, policy)
-            .map_err(AuthorityError::from)?;
-        Ok(MutationPermit {
-            inner,
-            binding: facts.binding.clone(),
-            seal: Arc::clone(&self.seal),
-        })
+        self.validate_context(facts, policy)?;
+        let inner = self.inner.authorize(request, &facts.inner, &policy.inner)?;
+        Ok(MutationPermit { inner, seal: Arc::clone(&self.seal) })
     }
 
-    /// Revalidate a one-use authorization token against fresh same-transition facts.
+    /// Revalidate authorization against fresh trusted facts and sealed policy.
     pub fn precommit(
         &self,
         permit: MutationPermit,
         facts: &TrustedFacts,
-        policy: &PolicySnapshot,
+        policy: &VerifiedPolicy,
     ) -> Result<CommitPermit, AuthorityError> {
-        self.validate_permit_binding(&permit, facts)?;
-        let MutationPermit {
-            inner,
-            binding,
-            seal: _,
-        } = permit;
-        let inner = self
-            .inner
-            .precommit(inner, &facts.inner, policy)
-            .map_err(AuthorityError::from)?;
-        Ok(CommitPermit {
-            inner,
-            binding,
-            seal: Arc::clone(&self.seal),
-        })
+        self.validate_context(facts, policy)?;
+        if !Arc::ptr_eq(&self.seal, &permit.seal) {
+            return Err(AuthorityError::MonitorDomainMismatch);
+        }
+        let inner = self.inner.precommit(permit.inner, &facts.inner, &policy.inner)?;
+        Ok(CommitPermit { inner, seal: Arc::clone(&self.seal) })
     }
 
-    /// Whether a commit-ready permit belongs to this exact public and private
-    /// monitor domain.
-    ///
-    /// Protected owners must still check the permit's resource, kind, effect
-    /// digest, consequence, and current state binding as part of the sink's
-    /// serialized commit contract.
+    /// Whether a commit permit belongs to this complete public monitor domain.
     pub fn accepts_commit_permit(&self, permit: &CommitPermit) -> bool {
         Arc::ptr_eq(&self.seal, &permit.seal) && self.inner.accepts_commit_permit(&permit.inner)
     }
 
-    /// Evaluate and produce a receipt whose security fields come from trusted
-    /// transition facts rather than caller annotations.
+    /// Evaluate and emit evidence for the exact sealed policy actually used.
     pub fn evaluate_with_receipt(
         &self,
         request: &MutationRequest,
         facts: &TrustedFacts,
-        policy: &PolicySnapshot,
+        policy: &VerifiedPolicy,
     ) -> Result<(MonitorDecision, MutationReceipt), AuthorityError> {
-        self.validate_request_binding(request, facts)?;
-        let decision = self
-            .inner
-            .evaluate(request, &facts.inner, policy)
-            .map_err(AuthorityError::from)?;
-        let capability_id = if decision.outcome == DecisionOutcome::Allow {
-            self.inner
-                .authorize(request, &facts.inner, policy)
-                .map_err(AuthorityError::from)?
-                .capability_id()
-        } else {
-            None
-        };
-
-        let receipt = MutationReceipt {
-            stage: ReceiptStage::Evaluation,
-            request_id: request.request_id,
-            subject: facts.binding.subject.clone(),
-            kind: facts.binding.kind,
-            resource: facts.binding.resource.clone(),
-            mutation_digest: facts.binding.mutation_digest,
-            consequence: facts.binding.consequence,
-            input_label: facts.binding.input_label.clone(),
-            expected_resource_state_root: request.expected_resource_state_root,
-            observed_resource_state_root: facts.resource_state_root(),
-            expected_policy_root: request.expected_policy_root,
-            evaluated_policy_root: policy.root,
-            trusted_policy_root: facts.policy_root(),
-            policy_epoch: facts.policy_epoch(),
-            authorization_epoch: facts.authorization_epoch(),
-            revocation_epoch: facts.revocation_epoch(),
-            sequence: facts.binding.sequence,
-            capability_id,
-            outcome: decision.outcome,
-            reasons: decision.reasons.clone(),
-        };
-        Ok((decision, receipt))
+        self.validate_context(facts, policy)?;
+        self.inner.evaluate_with_receipt(request, &facts.inner, &policy.inner)
     }
 
-    /// Produce evidence for the monitor's own freshly evaluated decision.
+    /// Emit evaluation evidence for the exact sealed policy actually used.
     pub fn receipt(
         &self,
         request: &MutationRequest,
         facts: &TrustedFacts,
-        policy: &PolicySnapshot,
+        policy: &VerifiedPolicy,
     ) -> Result<MutationReceipt, AuthorityError> {
         self.evaluate_with_receipt(request, facts, policy)
             .map(|(_, receipt)| receipt)
@@ -811,13 +447,11 @@ impl ReferenceMonitor {
 }
 
 #[cfg(test)]
-mod public_api_tests {
+mod public_policy_tests {
     use super::*;
     use std::collections::BTreeSet;
 
-    fn d(byte: u8) -> Digest32 {
-        Digest32([byte; 32])
-    }
+    fn d(byte: u8) -> Digest32 { Digest32([byte; 32]) }
 
     fn label() -> CognitiveSecurityLabel {
         let mut roots = BTreeSet::new();
@@ -836,8 +470,9 @@ mod public_api_tests {
         monitor: ReferenceMonitor,
         authority: TrustedFactAuthority,
         capability: CapabilityFact,
+        transition: VerifiedTransition,
         request: MutationRequest,
-        policy: PolicySnapshot,
+        policy: VerifiedPolicy,
     }
 
     impl Fixture {
@@ -845,23 +480,11 @@ mod public_api_tests {
             let (monitor, authority) = ReferenceMonitor::bootstrap();
             let subject = PrincipalId("local-user".into());
             let resource = ResourceId("mind/goals".into());
-            let capability = authority.issue_capability(
-                d(4),
-                subject.clone(),
-                MutationKind::GoalActivation,
-                ResourceScope::Exact(resource.clone()),
-                Consequence::High,
-                11,
-                13,
-                40,
-                Some(50),
-                false,
-            );
             let request = MutationRequest {
                 request_id: d(1),
                 kind: MutationKind::GoalActivation,
-                subject,
-                resource,
+                subject: subject.clone(),
+                resource: resource.clone(),
                 mutation_digest: d(2),
                 expected_resource_state_root: d(8),
                 expected_policy_root: d(9),
@@ -869,7 +492,28 @@ mod public_api_tests {
                 consequence: Consequence::High,
                 sequence: 42,
             };
-            let policy = PolicySnapshot {
+            let transition = authority.issue_transition(
+                subject.clone(),
+                request.kind,
+                resource.clone(),
+                request.mutation_digest,
+                request.consequence,
+                request.input_label.clone(),
+                request.sequence,
+            );
+            let capability = authority.issue_capability(
+                d(4),
+                subject,
+                MutationKind::GoalActivation,
+                ResourceScope::Exact(resource),
+                Consequence::High,
+                11,
+                13,
+                40,
+                Some(50),
+                false,
+            );
+            let policy = authority.issue_policy(PolicySnapshot {
                 root: d(9),
                 epoch: 7,
                 rules: vec![PolicyRule {
@@ -878,170 +522,92 @@ mod public_api_tests {
                     maximum_taint: TaintLevel::Clean,
                     capability_required: true,
                 }],
-            };
-            Self {
-                monitor,
-                authority,
-                capability,
-                request,
-                policy,
-            }
+            });
+            Self { monitor, authority, capability, transition, request, policy }
         }
 
-        fn transition(&self) -> VerifiedTransition {
-            self.authority.issue_transition(
-                self.request.subject.clone(),
-                self.request.kind,
-                self.request.resource.clone(),
-                self.request.mutation_digest,
-                self.request.consequence,
-                self.request.input_label.clone(),
-                self.request.sequence,
-            )
-        }
-
-        fn facts(&self, transition: &VerifiedTransition) -> TrustedFacts {
-            self.authority
-                .snapshot(transition, d(8), d(9), 7, 11, 13, &[&self.capability])
-                .unwrap()
+        fn facts(&self, state_root: Digest32) -> TrustedFacts {
+            self.authority.snapshot(
+                &self.transition,
+                state_root,
+                &self.policy,
+                11,
+                13,
+                &[&self.capability],
+            ).unwrap()
         }
     }
 
     #[test]
-    fn verified_transition_allows_matching_request() {
+    fn verified_policy_allows_matching_request() {
         let fixture = Fixture::new();
-        let transition = fixture.transition();
-        let facts = fixture.facts(&transition);
-        let permit = fixture
-            .monitor
-            .authorize(&fixture.request, &facts, &fixture.policy)
-            .unwrap();
-        assert_eq!(permit.subject(), &fixture.request.subject);
-        assert_eq!(permit.consequence(), Consequence::High);
+        let facts = fixture.facts(d(8));
+        assert!(fixture.monitor.authorize(&fixture.request, &facts, &fixture.policy).is_ok());
     }
 
     #[test]
-    fn caller_cannot_understate_consequence_after_verification() {
-        let mut fixture = Fixture::new();
-        let transition = fixture.transition();
-        let facts = fixture.facts(&transition);
-        fixture.request.consequence = Consequence::Low;
-        assert_eq!(
-            fixture
-                .monitor
-                .authorize(&fixture.request, &facts, &fixture.policy)
-                .unwrap_err(),
-            AuthorityError::TransitionBindingMismatch(TransitionField::Consequence)
-        );
-    }
-
-    #[test]
-    fn caller_cannot_upgrade_integrity_or_clear_taint_after_verification() {
-        let mut fixture = Fixture::new();
-        let mut verified_label = fixture.request.input_label.clone();
-        verified_label.taint = TaintLevel::Tainted;
-        let transition = fixture.authority.issue_transition(
-            fixture.request.subject.clone(),
-            fixture.request.kind,
-            fixture.request.resource.clone(),
-            fixture.request.mutation_digest,
-            fixture.request.consequence,
-            verified_label,
-            fixture.request.sequence,
-        );
-        let facts = fixture.facts(&transition);
-        fixture.request.input_label.taint = TaintLevel::Clean;
-        fixture.request.input_label.control_integrity = ControlIntegrity::PolicyEndorsed;
-        assert_eq!(
-            fixture
-                .monitor
-                .evaluate(&fixture.request, &facts, &fixture.policy)
-                .unwrap_err(),
-            AuthorityError::TransitionBindingMismatch(TransitionField::InputSecurityLabel)
-        );
-    }
-
-    #[test]
-    fn caller_cannot_claim_another_subject_after_verification() {
-        let mut fixture = Fixture::new();
-        let transition = fixture.transition();
-        let facts = fixture.facts(&transition);
-        fixture.request.subject = PrincipalId("other-user".into());
-        assert_eq!(
-            fixture
-                .monitor
-                .evaluate(&fixture.request, &facts, &fixture.policy)
-                .unwrap_err(),
-            AuthorityError::TransitionBindingMismatch(TransitionField::Subject)
-        );
-    }
-
-    #[test]
-    fn foreign_transition_cannot_build_local_trusted_snapshot() {
+    fn foreign_verified_policy_is_rejected_before_policy_evaluation() {
         let fixture_a = Fixture::new();
         let fixture_b = Fixture::new();
-        let transition_b = fixture_b.transition();
-        assert_eq!(
-            fixture_a
-                .authority
-                .snapshot(
-                    &transition_b,
-                    d(8),
-                    d(9),
-                    7,
-                    11,
-                    13,
-                    &[&fixture_a.capability],
-                )
-                .unwrap_err(),
-            AuthorityError::MonitorDomainMismatch
-        );
+        let facts_a = fixture_a.facts(d(8));
+        let result = fixture_a.monitor.evaluate(&fixture_a.request, &facts_a, &fixture_b.policy);
+        assert!(matches!(result, Err(AuthorityError::MonitorDomainMismatch)));
     }
 
     #[test]
-    fn precommit_rejects_changed_verified_transition_context() {
-        let fixture = Fixture::new();
-        let transition = fixture.transition();
-        let facts = fixture.facts(&transition);
-        let permit = fixture
-            .monitor
-            .authorize(&fixture.request, &facts, &fixture.policy)
-            .unwrap();
+    fn mutating_raw_policy_copy_after_admission_cannot_change_verified_policy() {
+        let (monitor, authority) = ReferenceMonitor::bootstrap();
+        let subject = PrincipalId("local-user".into());
+        let resource = ResourceId("mind/goals".into());
+        let request = MutationRequest {
+            request_id: d(1),
+            kind: MutationKind::GoalActivation,
+            subject: subject.clone(),
+            resource: resource.clone(),
+            mutation_digest: d(2),
+            expected_resource_state_root: d(8),
+            expected_policy_root: d(9),
+            input_label: label(),
+            consequence: Consequence::High,
+            sequence: 42,
+        };
+        let transition = authority.issue_transition(
+            subject.clone(), request.kind, resource.clone(), request.mutation_digest,
+            request.consequence, request.input_label.clone(), request.sequence,
+        );
+        let capability = authority.issue_capability(
+            d(4), subject, request.kind, ResourceScope::Exact(resource), Consequence::High,
+            11, 13, 40, Some(50), false,
+        );
+        let mut raw = PolicySnapshot {
+            root: d(9),
+            epoch: 7,
+            rules: vec![PolicyRule {
+                kind: MutationKind::GoalActivation,
+                minimum_control_integrity: ControlIntegrity::Authenticated,
+                maximum_taint: TaintLevel::Clean,
+                capability_required: true,
+            }],
+        };
+        let verified = authority.issue_policy(raw.clone());
+        raw.rules[0].minimum_control_integrity = ControlIntegrity::Untrusted;
+        raw.rules[0].capability_required = false;
 
-        let changed_transition = fixture.authority.issue_transition(
-            fixture.request.subject.clone(),
-            fixture.request.kind,
-            fixture.request.resource.clone(),
-            fixture.request.mutation_digest,
-            Consequence::Moderate,
-            fixture.request.input_label.clone(),
-            fixture.request.sequence,
-        );
-        let changed_facts = fixture.facts(&changed_transition);
-        assert_eq!(
-            fixture
-                .monitor
-                .precommit(permit, &changed_facts, &fixture.policy)
-                .unwrap_err(),
-            AuthorityError::TransitionBindingMismatch(TransitionField::Consequence)
-        );
+        let facts = authority.snapshot(&transition, d(8), &verified, 11, 13, &[&capability]).unwrap();
+        let permit = monitor.authorize(&request, &facts, &verified).unwrap();
+        assert_eq!(permit.capability_id(), Some(d(4)));
+        assert_eq!(verified.rule_count(), 1);
     }
 
     #[test]
-    fn receipt_uses_verified_transition_security_fields() {
+    fn trusted_snapshot_policy_identity_is_derived_from_verified_policy() {
         let fixture = Fixture::new();
-        let transition = fixture.transition();
-        let facts = fixture.facts(&transition);
-        let receipt = fixture
-            .monitor
-            .receipt(&fixture.request, &facts, &fixture.policy)
-            .unwrap();
-
-        assert_eq!(receipt.stage, ReceiptStage::Evaluation);
-        assert_eq!(receipt.subject, fixture.request.subject);
-        assert_eq!(receipt.consequence, Consequence::High);
-        assert_eq!(receipt.input_label, fixture.request.input_label);
-        assert_eq!(receipt.capability_id, Some(d(4)));
-        assert_eq!(receipt.outcome, DecisionOutcome::Allow);
+        let facts = fixture.facts(d(8));
+        assert_eq!(facts.policy_root(), fixture.policy.root());
+        assert_eq!(facts.policy_epoch(), fixture.policy.epoch());
+        let receipt = fixture.monitor.receipt(&fixture.request, &facts, &fixture.policy).unwrap();
+        assert_eq!(receipt.evaluated_policy_root, fixture.policy.root());
+        assert_eq!(receipt.trusted_policy_root, fixture.policy.root());
+        assert_eq!(receipt.policy_epoch, fixture.policy.epoch());
     }
 }
