@@ -70,7 +70,12 @@ fn public_lease_is_exact_action_subject_scope_and_domain_bound() {
         .unwrap();
 
     assert!(lease
-        .validate_for(&domain.verifier(), actor, &scope(&["root", "child"]), [3; 32])
+        .validate_for(
+            &domain.verifier(),
+            actor,
+            &scope(&["root", "child"]),
+            [3; 32]
+        )
         .is_ok());
     assert!(matches!(
         lease.validate_for(&domain.verifier(), actor, &scope(&["root"]), [4; 32]),
@@ -130,6 +135,127 @@ fn public_affine_split_and_release_conserve_root_capacity() {
     child.release().unwrap();
     assert_eq!(domain.remaining().get(BudgetDimension::ComputeUnits), 10);
     assert_eq!(domain.remaining().get(BudgetDimension::Subprocesses), 2);
+}
+
+#[test]
+fn public_recoverable_split_preserves_exact_parent_on_scope_rejection() {
+    let domain = BudgetAuthorityDomain::new(PrincipalId::new(), profile(10, 2));
+    let actor = PrincipalId::new();
+    let allocation = BudgetQuantities::zero()
+        .with(BudgetDimension::ComputeUnits, 7)
+        .with(BudgetDimension::Subprocesses, 1);
+    let parent = domain
+        .reserve(
+            actor,
+            scope(&["root"]),
+            [20; 32],
+            allocation,
+            Some(SystemTime::now() + Duration::from_secs(60)),
+        )
+        .unwrap();
+    let id = parent.lease_id();
+    let budget_domain = parent.domain_id();
+    let epoch = parent.epoch();
+    let action_binding = parent.action_binding();
+    let profile_digest = parent.profile().digest();
+    let remaining_before = domain.remaining();
+
+    let failure = domain
+        .split_recoverable(
+            parent,
+            PrincipalId::new(),
+            scope(&["other"]),
+            [21; 32],
+            BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 2),
+            Some(SystemTime::now() + Duration::from_secs(30)),
+        )
+        .unwrap_err();
+
+    assert!(matches!(failure.error(), BudgetError::ScopeWidening { .. }));
+    assert_eq!(failure.parent().lease_id(), id);
+    assert_eq!(failure.parent().allocation(), allocation);
+    assert_eq!(failure.parent().domain_id(), budget_domain);
+    assert_eq!(failure.parent().epoch(), epoch);
+    assert_eq!(failure.parent().action_binding(), action_binding);
+    assert_eq!(failure.parent().profile().digest(), profile_digest);
+    assert_eq!(domain.remaining(), remaining_before);
+
+    failure.into_parent().release().unwrap();
+    assert_eq!(domain.remaining(), domain.profile().limits());
+}
+
+#[test]
+fn public_recoverable_split_rejects_stale_child_without_capacity_loss() {
+    let domain = BudgetAuthorityDomain::new(PrincipalId::new(), profile(10, 2));
+    let actor = PrincipalId::new();
+    let parent = domain
+        .reserve(
+            actor,
+            scope(&["root"]),
+            [22; 32],
+            BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 6),
+            Some(SystemTime::now() + Duration::from_secs(60)),
+        )
+        .unwrap();
+    let id = parent.lease_id();
+    let remaining_before = domain.remaining();
+
+    let failure = domain
+        .split_recoverable(
+            parent,
+            PrincipalId::new(),
+            scope(&["root", "child"]),
+            [23; 32],
+            BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 2),
+            Some(SystemTime::UNIX_EPOCH),
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        failure.error(),
+        BudgetError::ExpiredDelegationRequest { .. }
+    ));
+    assert_eq!(failure.parent().lease_id(), id);
+    assert_eq!(domain.remaining(), remaining_before);
+    failure.into_parent().release().unwrap();
+    assert_eq!(domain.remaining(), domain.profile().limits());
+}
+
+#[test]
+fn public_recoverable_split_rejects_overallocation_without_capacity_loss() {
+    let domain = BudgetAuthorityDomain::new(PrincipalId::new(), profile(10, 2));
+    let actor = PrincipalId::new();
+    let parent = domain
+        .reserve(
+            actor,
+            scope(&["root"]),
+            [24; 32],
+            BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 4),
+            Some(SystemTime::now() + Duration::from_secs(60)),
+        )
+        .unwrap();
+    let id = parent.lease_id();
+    let remaining_before = domain.remaining();
+
+    let failure = domain
+        .split_recoverable(
+            parent,
+            PrincipalId::new(),
+            scope(&["root", "child"]),
+            [25; 32],
+            BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 5),
+            Some(SystemTime::now() + Duration::from_secs(30)),
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        failure.error(),
+        BudgetError::InsufficientBudget { .. }
+    ));
+    assert_eq!(failure.parent().lease_id(), id);
+    assert_eq!(domain.remaining(), remaining_before);
+    failure.into_parent().release().unwrap();
+    assert_eq!(domain.remaining(), domain.profile().limits());
 }
 
 #[test]
