@@ -268,6 +268,27 @@ impl ResourceScope {
             Self::Any => true,
         }
     }
+
+    fn is_subset_of(&self, parent: &Self) -> bool {
+        match (self, parent) {
+            (Self::Exact(child), Self::Exact(parent)) => child == parent,
+            (Self::Exact(_), Self::Any) | (Self::Any, Self::Any) => true,
+            (Self::Any, Self::Exact(_)) => false,
+        }
+    }
+}
+
+/// Reason a requested capability delegation would widen its parent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DelegationError {
+    /// A revoked capability cannot delegate further authority.
+    ParentRevoked,
+    /// The requested resource scope is broader than the parent scope.
+    ResourceScopeWidened,
+    /// The requested consequence ceiling is higher than the parent ceiling.
+    ConsequenceWidened,
+    /// The requested sequence-validity window extends outside the parent window.
+    ValidityWidened,
 }
 
 /// Capability statement after identity/signature verification by a trusted
@@ -321,6 +342,57 @@ impl CapabilityFact {
         }
 
         true
+    }
+
+    /// Derive a structurally narrower child capability.
+    ///
+    /// This validates attenuation only. The surrounding authorization adapter
+    /// remains responsible for proving that the parent principal actually
+    /// authorized the delegation and for binding the child to its parent in
+    /// the signed/auditable capability chain.
+    pub fn attenuate(
+        &self,
+        capability_id: Digest32,
+        subject: PrincipalId,
+        resource_scope: ResourceScope,
+        max_consequence: Consequence,
+        valid_from_sequence: u64,
+        valid_until_sequence: Option<u64>,
+    ) -> Result<Self, DelegationError> {
+        if self.revoked {
+            return Err(DelegationError::ParentRevoked);
+        }
+        if !resource_scope.is_subset_of(&self.resource_scope) {
+            return Err(DelegationError::ResourceScopeWidened);
+        }
+        if max_consequence > self.max_consequence {
+            return Err(DelegationError::ConsequenceWidened);
+        }
+        if valid_from_sequence < self.valid_from_sequence {
+            return Err(DelegationError::ValidityWidened);
+        }
+
+        match (self.valid_until_sequence, valid_until_sequence) {
+            (Some(parent_until), Some(child_until))
+                if child_until <= parent_until && child_until >= valid_from_sequence => {}
+            (Some(_), _) => return Err(DelegationError::ValidityWidened),
+            (None, Some(child_until)) if child_until >= valid_from_sequence => {}
+            (None, Some(_)) => return Err(DelegationError::ValidityWidened),
+            (None, None) => {}
+        }
+
+        Ok(Self {
+            capability_id,
+            subject,
+            mutation: self.mutation,
+            resource_scope,
+            max_consequence,
+            authorization_epoch: self.authorization_epoch,
+            revocation_epoch: self.revocation_epoch,
+            valid_from_sequence,
+            valid_until_sequence,
+            revoked: false,
+        })
     }
 }
 
@@ -431,7 +503,11 @@ pub enum ReasonCode {
     PolicyFactsMismatch,
     /// Policy epoch changed.
     PolicyEpochMismatch,
-    /// Resource changed after request preparation.
+    /// Authorization context changed after evaluation/permit issuance.
+    AuthorizationEpochMismatch,
+    /// Revocation context changed after evaluation/permit issuance.
+    RevocationEpochMismatch,
+    /// Resource changed after request preparation or permit issuance.
     ResourceStateMismatch,
     /// No unique rule exists for the mutation class.
     MissingOrDuplicatePolicyRule,
@@ -472,12 +548,38 @@ impl MonitorDecision {
 /// The fields are private, the type is not `Clone`, and it is deliberately not
 /// serializable. A serialized capability envelope or prior receipt is never a
 /// live mutation permit. The permit must be minted by [`ReferenceMonitor`].
+///
+/// The following documentation tests intentionally fail to compile. They are
+/// API ratchets: making a permit cloneable, default-constructible, or
+/// deserializable would turn them green-to-red in CI.
+///
+/// ```compile_fail
+/// use symthaea_cogsec::MutationPermit;
+/// fn requires_clone<T: Clone>() {}
+/// requires_clone::<MutationPermit>();
+/// ```
+///
+/// ```compile_fail
+/// use symthaea_cogsec::MutationPermit;
+/// fn requires_default<T: Default>() {}
+/// requires_default::<MutationPermit>();
+/// ```
+///
+/// ```compile_fail
+/// use serde::de::DeserializeOwned;
+/// use symthaea_cogsec::MutationPermit;
+/// fn requires_deserialize<T: DeserializeOwned>() {}
+/// requires_deserialize::<MutationPermit>();
+/// ```
 #[derive(Debug, PartialEq, Eq)]
 pub struct MutationPermit {
     request_id: Digest32,
     kind: MutationKind,
+    subject: PrincipalId,
     resource: ResourceId,
     mutation_digest: Digest32,
+    consequence: Consequence,
+    capability_id: Option<Digest32>,
     resource_state_root: Digest32,
     policy_root: Digest32,
     policy_epoch: u64,
@@ -497,6 +599,11 @@ impl MutationPermit {
         self.kind
     }
 
+    /// Principal bound into this permit.
+    pub fn subject(&self) -> &PrincipalId {
+        &self.subject
+    }
+
     /// Resource bound into this permit.
     pub fn resource(&self) -> &ResourceId {
         &self.resource
@@ -505,6 +612,16 @@ impl MutationPermit {
     /// Exact mutation commitment bound into this permit.
     pub fn mutation_digest(&self) -> Digest32 {
         self.mutation_digest
+    }
+
+    /// Consequence class bound into this permit.
+    pub fn consequence(&self) -> Consequence {
+        self.consequence
+    }
+
+    /// Capability identity used to authorize the mutation, if policy required one.
+    pub fn capability_id(&self) -> Option<Digest32> {
+        self.capability_id
     }
 
     /// Resource state that must still be current at commit time.
@@ -698,11 +815,39 @@ impl ReferenceMonitor {
             return Err(decision);
         }
 
+        let Some(rule) = policy.rule_for(request.kind) else {
+            return Err(MonitorDecision::single(
+                DecisionOutcome::Deny,
+                ReasonCode::MissingOrDuplicatePolicyRule,
+            ));
+        };
+
+        let capability_id = if rule.capability_required {
+            match facts
+                .capabilities
+                .iter()
+                .find(|cap| cap.valid_for(request, facts))
+            {
+                Some(cap) => Some(cap.capability_id),
+                None => {
+                    return Err(MonitorDecision::single(
+                        DecisionOutcome::RequireAuthorization,
+                        ReasonCode::MissingCapability,
+                    ));
+                }
+            }
+        } else {
+            None
+        };
+
         Ok(MutationPermit {
             request_id: request.request_id,
             kind: request.kind,
+            subject: request.subject.clone(),
             resource: request.resource.clone(),
             mutation_digest: request.mutation_digest,
+            consequence: request.consequence,
+            capability_id,
             resource_state_root: facts.resource_state_root,
             policy_root: policy.root,
             policy_epoch: policy.epoch,
@@ -710,6 +855,100 @@ impl ReferenceMonitor {
             revocation_epoch: facts.revocation_epoch,
             sequence: request.sequence,
         })
+    }
+
+    /// Revalidate a live permit immediately before the protected state owner
+    /// consumes it.
+    ///
+    /// The permit is taken by value. Any failed precommit therefore destroys
+    /// that authorization token; callers must prepare and authorize a new
+    /// request against the fresh state rather than retrying a stale permit.
+    pub fn precommit(
+        &self,
+        permit: MutationPermit,
+        facts: &TrustedFacts,
+        policy: &PolicySnapshot,
+    ) -> Result<MutationPermit, MonitorDecision> {
+        if facts.policy_root != policy.root {
+            return Err(MonitorDecision::single(
+                DecisionOutcome::Defer,
+                ReasonCode::PolicyFactsMismatch,
+            ));
+        }
+        if permit.policy_root != policy.root {
+            return Err(MonitorDecision::single(
+                DecisionOutcome::RequireRevalidation,
+                ReasonCode::PolicyRootMismatch,
+            ));
+        }
+        if permit.policy_epoch != policy.epoch || facts.policy_epoch != policy.epoch {
+            return Err(MonitorDecision::single(
+                DecisionOutcome::RequireRevalidation,
+                ReasonCode::PolicyEpochMismatch,
+            ));
+        }
+        if permit.resource_state_root != facts.resource_state_root {
+            return Err(MonitorDecision::single(
+                DecisionOutcome::RequireRevalidation,
+                ReasonCode::ResourceStateMismatch,
+            ));
+        }
+        if permit.authorization_epoch != facts.authorization_epoch {
+            return Err(MonitorDecision::single(
+                DecisionOutcome::RequireRevalidation,
+                ReasonCode::AuthorizationEpochMismatch,
+            ));
+        }
+        if permit.revocation_epoch != facts.revocation_epoch {
+            return Err(MonitorDecision::single(
+                DecisionOutcome::RequireRevalidation,
+                ReasonCode::RevocationEpochMismatch,
+            ));
+        }
+
+        if let Some(capability_id) = permit.capability_id {
+            let Some(capability) = facts
+                .capabilities
+                .iter()
+                .find(|cap| cap.capability_id == capability_id)
+            else {
+                return Err(MonitorDecision::single(
+                    DecisionOutcome::RequireAuthorization,
+                    ReasonCode::MissingCapability,
+                ));
+            };
+
+            if capability.revoked {
+                return Err(MonitorDecision::single(
+                    DecisionOutcome::RequireAuthorization,
+                    ReasonCode::RevokedCapability,
+                ));
+            }
+            if capability.subject != permit.subject
+                || capability.mutation != permit.kind
+                || !capability.resource_scope.contains(&permit.resource)
+                || capability.max_consequence < permit.consequence
+            {
+                return Err(MonitorDecision::single(
+                    DecisionOutcome::RequireAuthorization,
+                    ReasonCode::ScopeMismatch,
+                ));
+            }
+            if capability.authorization_epoch != facts.authorization_epoch
+                || capability.revocation_epoch != facts.revocation_epoch
+                || permit.sequence < capability.valid_from_sequence
+                || capability
+                    .valid_until_sequence
+                    .is_some_and(|until| permit.sequence > until)
+            {
+                return Err(MonitorDecision::single(
+                    DecisionOutcome::RequireAuthorization,
+                    ReasonCode::StaleCapability,
+                ));
+            }
+        }
+
+        Ok(permit)
     }
 
     /// Produce an audit receipt for a monitor decision.
@@ -857,6 +1096,7 @@ mod tests {
         assert_eq!(permit.resource(), &ResourceId("mind/goals".into()));
         assert_eq!(permit.mutation_digest(), d(2));
         assert_eq!(permit.resource_state_root(), d(8));
+        assert_eq!(permit.capability_id(), Some(d(4)));
     }
 
     #[test]
@@ -919,6 +1159,112 @@ mod tests {
     }
 
     #[test]
+    fn precommit_accepts_unchanged_context() {
+        let (request, facts, policy) = goal_fixture();
+        let permit = ReferenceMonitor.authorize(&request, &facts, &policy).unwrap();
+        let permit = ReferenceMonitor.precommit(permit, &facts, &policy).unwrap();
+        assert_eq!(permit.request_id(), request.request_id);
+        assert_eq!(permit.resource_state_root(), facts.resource_state_root);
+    }
+
+    #[test]
+    fn precommit_destroys_stale_resource_authorization() {
+        let (request, mut facts, policy) = goal_fixture();
+        let permit = ReferenceMonitor.authorize(&request, &facts, &policy).unwrap();
+        facts.resource_state_root = d(99);
+        let decision = ReferenceMonitor.precommit(permit, &facts, &policy).unwrap_err();
+        assert_eq!(decision.outcome, DecisionOutcome::RequireRevalidation);
+        assert_eq!(decision.reasons, vec![ReasonCode::ResourceStateMismatch]);
+    }
+
+    #[test]
+    fn precommit_rechecks_revocation_context() {
+        let (request, mut facts, policy) = goal_fixture();
+        let permit = ReferenceMonitor.authorize(&request, &facts, &policy).unwrap();
+        facts.revocation_epoch += 1;
+        let decision = ReferenceMonitor.precommit(permit, &facts, &policy).unwrap_err();
+        assert_eq!(decision.outcome, DecisionOutcome::RequireRevalidation);
+        assert_eq!(decision.reasons, vec![ReasonCode::RevocationEpochMismatch]);
+    }
+
+    #[test]
+    fn precommit_rechecks_exact_capability_identity() {
+        let (request, mut facts, policy) = goal_fixture();
+        let permit = ReferenceMonitor.authorize(&request, &facts, &policy).unwrap();
+        facts.capabilities.clear();
+        let decision = ReferenceMonitor.precommit(permit, &facts, &policy).unwrap_err();
+        assert_eq!(decision.outcome, DecisionOutcome::RequireAuthorization);
+        assert_eq!(decision.reasons, vec![ReasonCode::MissingCapability]);
+    }
+
+    #[test]
+    fn attenuation_can_only_narrow_parent_authority() {
+        let (_, facts, _) = goal_fixture();
+        let parent = &facts.capabilities[0];
+        let child = parent
+            .attenuate(
+                d(21),
+                PrincipalId("delegate".into()),
+                ResourceScope::Exact(ResourceId("mind/goals".into())),
+                Consequence::Moderate,
+                43,
+                Some(48),
+            )
+            .unwrap();
+        assert_eq!(child.mutation, parent.mutation);
+        assert!(child.max_consequence <= parent.max_consequence);
+        assert!(child.valid_from_sequence >= parent.valid_from_sequence);
+        assert!(child.valid_until_sequence <= parent.valid_until_sequence);
+        assert_eq!(child.authorization_epoch, parent.authorization_epoch);
+        assert_eq!(child.revocation_epoch, parent.revocation_epoch);
+    }
+
+    #[test]
+    fn attenuation_rejects_resource_scope_widening() {
+        let (_, facts, _) = goal_fixture();
+        let parent = &facts.capabilities[0];
+        let result = parent.attenuate(
+            d(21),
+            PrincipalId("delegate".into()),
+            ResourceScope::Any,
+            Consequence::Moderate,
+            43,
+            Some(48),
+        );
+        assert_eq!(result, Err(DelegationError::ResourceScopeWidened));
+    }
+
+    #[test]
+    fn attenuation_rejects_consequence_widening() {
+        let (_, facts, _) = goal_fixture();
+        let parent = &facts.capabilities[0];
+        let result = parent.attenuate(
+            d(21),
+            PrincipalId("delegate".into()),
+            ResourceScope::Exact(ResourceId("mind/goals".into())),
+            Consequence::Critical,
+            43,
+            Some(48),
+        );
+        assert_eq!(result, Err(DelegationError::ConsequenceWidened));
+    }
+
+    #[test]
+    fn attenuation_rejects_validity_widening() {
+        let (_, facts, _) = goal_fixture();
+        let parent = &facts.capabilities[0];
+        let result = parent.attenuate(
+            d(21),
+            PrincipalId("delegate".into()),
+            ResourceScope::Exact(ResourceId("mind/goals".into())),
+            Consequence::Moderate,
+            39,
+            Some(48),
+        );
+        assert_eq!(result, Err(DelegationError::ValidityWidened));
+    }
+
+    #[test]
     fn decisions_round_trip_but_live_permits_are_not_serde_types() {
         let (request, facts, policy) = goal_fixture();
         let decision = ReferenceMonitor.evaluate(&request, &facts, &policy);
@@ -978,6 +1324,32 @@ mod tests {
             prop_assert!(merged.taint >= b.taint);
             prop_assert!(merged.provenance_roots.is_superset(&a.provenance_roots));
             prop_assert!(merged.provenance_roots.is_superset(&b.provenance_roots));
+        }
+
+        #[test]
+        fn attenuation_never_raises_consequence(parent_idx in 0usize..4, child_idx in 0usize..4) {
+            let levels = [
+                Consequence::Low,
+                Consequence::Moderate,
+                Consequence::High,
+                Consequence::Critical,
+            ];
+            let (_, mut facts, _) = goal_fixture();
+            let parent = &mut facts.capabilities[0];
+            parent.max_consequence = levels[parent_idx];
+            let result = parent.attenuate(
+                d(22),
+                PrincipalId("delegate".into()),
+                ResourceScope::Exact(ResourceId("mind/goals".into())),
+                levels[child_idx],
+                43,
+                Some(48),
+            );
+            if let Ok(child) = result {
+                prop_assert!(child.max_consequence <= parent.max_consequence);
+            } else if child_idx > parent_idx {
+                prop_assert!(matches!(result, Err(DelegationError::ConsequenceWidened)));
+            }
         }
     }
 }
