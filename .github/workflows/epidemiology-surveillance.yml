@@ -9,6 +9,7 @@ on:
       - "Cargo.lock"
       - "rust-toolchain.toml"
       - ".github/workflows/epidemiology-surveillance.yml"
+      - ".github/workflows/epidemiology-lock-refresh.yml"
   push:
     branches: [main]
     paths:
@@ -18,6 +19,7 @@ on:
       - "Cargo.lock"
       - "rust-toolchain.toml"
       - ".github/workflows/epidemiology-surveillance.yml"
+      - ".github/workflows/epidemiology-lock-refresh.yml"
   workflow_dispatch:
 
 concurrency:
@@ -30,14 +32,26 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      # Pin action source revisions so qualification does not depend on moving
-      # marketplace tags. This rust-toolchain revision itself selects Rust 1.96.0.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # Evidence qualification is against the immutable feature head, not the
+      # synthetic pull-request merge ref. Integration CI remains separate.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5 / node24
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          EXPECTED="${{ github.event.pull_request.head.sha || github.sha }}"
+          ACTUAL="$(git rev-parse HEAD)"
+          test "$ACTUAL" = "$EXPECTED"
+          echo "QUALIFICATION_HEAD=$ACTUAL"
+
+      # This pinned rust-toolchain revision itself selects Rust 1.96.0.
       - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e
         with:
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
       - name: Record qualification environment
         shell: bash
@@ -49,8 +63,10 @@ jobs:
             crates/domains/symthaea-epidemiology/Cargo.toml \
             crates/domains/symthaea-statistics/Cargo.toml
 
-      - name: Verify committed lock graph
-        run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
+      # Full metadata resolution is required. `--no-deps` can report success
+      # even when a later locked build needs to rewrite package dependency data.
+      - name: Verify complete committed lock graph
+        run: cargo metadata --locked --format-version 1 > /dev/null
 
       - name: Check formatting
         run: cargo fmt -p symthaea-epidemiology -- --check
