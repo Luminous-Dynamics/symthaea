@@ -12,7 +12,9 @@ mod homeostasis;
 mod snapshot;
 mod state;
 
-pub use allostasis::{assess_allostasis, AllostaticConfig, AllostaticReport};
+pub use allostasis::{
+    assess_allostasis, assess_allostasis_with_drive, AllostaticConfig, AllostaticReport,
+};
 pub use dynamics::{
     InteroceptiveDrive, InteroceptiveDynamicsConfig, NativeInteroceptiveModel,
 };

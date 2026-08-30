@@ -1,7 +1,7 @@
 use symthaea_interoception::{
-    assess_allostasis, assess_homeostasis, AllostaticConfig, InteroceptiveDrive,
-    InteroceptiveSnapshot, NativeInteroceptiveModel, NativeInteroceptiveState,
-    ViabilityChannel,
+    assess_allostasis, assess_allostasis_with_drive, assess_homeostasis, AllostaticConfig,
+    InteroceptiveDrive, InteroceptiveSnapshot, NativeInteroceptiveModel,
+    NativeInteroceptiveState, ViabilityChannel,
 };
 
 #[test]
@@ -14,7 +14,9 @@ fn default_state_has_zero_regulatory_deviation() {
     assert_eq!(home.peak_deviation, 0.0);
     assert!(home.is_within_viability());
     assert_eq!(allo.discounted_debt, 0.0);
-    assert_eq!(allo.projected_viability_breaches, 0);
+    assert_eq!(allo.breach_exposures, 0);
+    assert_eq!(allo.unique_breached_channels, 0);
+    assert_eq!(allo.first_breach_step, None);
 }
 
 #[test]
@@ -31,7 +33,7 @@ fn deviation_is_zero_inside_preferred_band_and_normalized_outside_it() {
 }
 
 #[test]
-fn allostasis_detects_future_deterioration_before_current_deviation() {
+fn kinematic_allostasis_detects_future_deterioration_before_current_deviation() {
     let mut state = NativeInteroceptiveState::default();
     let reserve = state.get_mut(ViabilityChannel::ComputeReserve);
     reserve.value = 0.70;
@@ -50,7 +52,30 @@ fn allostasis_detects_future_deterioration_before_current_deviation() {
     assert_eq!(current.weighted_deviation, 0.0);
     assert!(future.discounted_debt > 0.0);
     assert!(future.terminal_deviation > 0.0);
-    assert!(future.projected_viability_breaches > 0);
+    assert!(future.breach_exposures > 0);
+    assert_eq!(future.unique_breached_channels, 1);
+    assert!(future.first_breach_step.is_some());
+}
+
+#[test]
+fn dynamics_aware_allostasis_uses_declared_future_drive() {
+    let model = NativeInteroceptiveModel::default();
+    let config = AllostaticConfig {
+        horizon_steps: 8,
+        dt: 1.0,
+        discount: 1.0,
+    };
+
+    // A resting state has no measured velocity, so the kinematic baseline is flat.
+    let kinematic = assess_allostasis(model.state(), config);
+    assert_eq!(kinematic.discounted_debt, 0.0);
+
+    // The dynamics-aware arm can nevertheless anticipate a declared ongoing load.
+    let drive = InteroceptiveDrive::ZERO.with_rate(ViabilityChannel::ComputeReserve, -0.08);
+    let rollout = assess_allostasis_with_drive(&model, drive, config);
+    assert!(rollout.discounted_debt > 0.0);
+    assert!(rollout.terminal_deviation > 0.0);
+    assert!(rollout.breach_exposures > 0);
 }
 
 #[test]
@@ -66,6 +91,21 @@ fn zero_drive_recovers_a_perturbed_channel_toward_its_preferred_band() {
 
     let after = assess_homeostasis(model.state()).weighted_deviation;
     assert!(after < before);
+}
+
+#[test]
+fn rollout_forecast_represents_native_recovery() {
+    let mut state = NativeInteroceptiveState::default();
+    state.get_mut(ViabilityChannel::ComputeReserve).value = 0.30;
+    let model = NativeInteroceptiveModel::new(state, Default::default());
+    let current = assess_homeostasis(model.state()).weighted_deviation;
+    let future = assess_allostasis_with_drive(
+        &model,
+        InteroceptiveDrive::ZERO,
+        AllostaticConfig::default(),
+    );
+
+    assert!(future.terminal_deviation < current);
 }
 
 #[test]
