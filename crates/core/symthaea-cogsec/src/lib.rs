@@ -3,21 +3,86 @@
 //! Public CogSec API boundary.
 //!
 //! The detailed sealed-domain implementation is private. This wrapper keeps the
-//! public reference-monitor surface deliberately small and prevents application
-//! data from supplying a monitor verdict when an audit receipt is produced.
+//! public reference-monitor surface deliberately small, prevents application
+//! data from supplying a monitor verdict when evidence is produced, and emits
+//! evaluation receipts that bind the security context that actually determined
+//! the monitor outcome.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 mod facade;
 
+use serde::{Deserialize, Serialize};
+
 pub use facade::{
     ArtifactIntegrity, AuthorityError, CapabilityFact, CognitiveSecurityLabel, CommitPermit,
     Confidentiality, Consequence, ControlIntegrity, DecisionOutcome, DelegationError, Digest32,
-    MonitorDecision, MutationKind, MutationPermit, MutationReceipt, MutationRequest, OriginState,
-    PolicyRule, PolicySnapshot, PrincipalId, ReasonCode, ResourceId, ResourceScope, TaintLevel,
+    MonitorDecision, MutationKind, MutationPermit, MutationRequest, OriginState, PolicyRule,
+    PolicySnapshot, PrincipalId, ReasonCode, ResourceId, ResourceScope, TaintLevel,
     TrustedFactAuthority, TrustedFacts,
 };
+
+/// Stage represented by a durable CogSec evidence record.
+///
+/// An evaluation receipt proves only what the monitor evaluated. It is not
+/// evidence that authorization, precommit, or the protected state mutation
+/// itself subsequently occurred.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ReceiptStage {
+    /// Deterministic policy evaluation against one trusted-facts snapshot.
+    Evaluation,
+}
+
+/// Serializable evidence for one monitor evaluation.
+///
+/// This is evidence, not authority: it is intentionally serializable and does
+/// not carry the private monitor-domain seal. Runtime integrations should bind
+/// exported receipts to an authenticated evidence-plane identity/signature when
+/// cross-process or cross-machine provenance is required.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MutationReceipt {
+    /// Evidence stage represented by this record.
+    pub stage: ReceiptStage,
+    /// Request identity.
+    pub request_id: Digest32,
+    /// Principal whose authority was requested.
+    pub subject: PrincipalId,
+    /// Mutation class.
+    pub kind: MutationKind,
+    /// Protected resource.
+    pub resource: ResourceId,
+    /// Exact proposed effect commitment.
+    pub mutation_digest: Digest32,
+    /// Consequence class of the requested effect.
+    pub consequence: Consequence,
+    /// Security label/provenance used by policy evaluation.
+    pub input_label: CognitiveSecurityLabel,
+    /// Resource-state root prepared by the requester.
+    pub expected_resource_state_root: Digest32,
+    /// Resource-state root supplied by the trusted state owner at evaluation.
+    pub observed_resource_state_root: Digest32,
+    /// Policy root prepared by the requester.
+    pub expected_policy_root: Digest32,
+    /// Canonical policy root evaluated by the monitor.
+    pub evaluated_policy_root: Digest32,
+    /// Trusted policy root supplied independently through the fact authority.
+    pub trusted_policy_root: Digest32,
+    /// Policy epoch evaluated by the monitor.
+    pub policy_epoch: u64,
+    /// Authorization epoch observed by the monitor.
+    pub authorization_epoch: u64,
+    /// Revocation epoch observed by the monitor.
+    pub revocation_epoch: u64,
+    /// Logical sequence of the proposed transition.
+    pub sequence: u64,
+    /// Capability selected by the monitor for an allowed request, if one was required.
+    pub capability_id: Option<Digest32>,
+    /// Monitor outcome.
+    pub outcome: DecisionOutcome,
+    /// Stable reason codes supporting the outcome.
+    pub reasons: Vec<ReasonCode>,
+}
 
 /// Public deterministic reference monitor for one private in-process authority domain.
 ///
@@ -75,11 +140,13 @@ impl ReferenceMonitor {
         self.inner.accepts_commit_permit(permit)
     }
 
-    /// Evaluate and produce the matching receipt as one operation.
+    /// Evaluate and produce the matching evidence receipt as one operation.
     ///
-    /// The caller cannot supply the verdict recorded in the receipt: the monitor
-    /// recomputes it from the request, trusted facts, and policy and passes that
-    /// exact decision to the private receipt implementation.
+    /// The caller cannot supply the verdict recorded in the receipt. For an
+    /// allowed request, the monitor deterministically re-runs authorization on
+    /// the same immutable inputs solely to record the capability identity that
+    /// would back the authorization token; that temporary token is immediately
+    /// dropped and conveys no commit authority.
     pub fn evaluate_with_receipt(
         &self,
         request: &MutationRequest,
@@ -87,11 +154,38 @@ impl ReferenceMonitor {
         policy: &PolicySnapshot,
     ) -> Result<(MonitorDecision, MutationReceipt), AuthorityError> {
         let decision = self.inner.evaluate(request, facts, policy)?;
-        let receipt = self.inner.receipt(request, facts, policy, &decision)?;
+        let capability_id = if decision.outcome == DecisionOutcome::Allow {
+            Some(self.inner.authorize(request, facts, policy)?.capability_id()).flatten()
+        } else {
+            None
+        };
+
+        let receipt = MutationReceipt {
+            stage: ReceiptStage::Evaluation,
+            request_id: request.request_id,
+            subject: request.subject.clone(),
+            kind: request.kind,
+            resource: request.resource.clone(),
+            mutation_digest: request.mutation_digest,
+            consequence: request.consequence,
+            input_label: request.input_label.clone(),
+            expected_resource_state_root: request.expected_resource_state_root,
+            observed_resource_state_root: facts.resource_state_root(),
+            expected_policy_root: request.expected_policy_root,
+            evaluated_policy_root: policy.root,
+            trusted_policy_root: facts.policy_root(),
+            policy_epoch: policy.epoch,
+            authorization_epoch: facts.authorization_epoch(),
+            revocation_epoch: facts.revocation_epoch(),
+            sequence: request.sequence,
+            capability_id,
+            outcome: decision.outcome,
+            reasons: decision.reasons.clone(),
+        };
         Ok((decision, receipt))
     }
 
-    /// Produce a receipt for the monitor's own freshly evaluated decision.
+    /// Produce evidence for the monitor's own freshly evaluated decision.
     pub fn receipt(
         &self,
         request: &MutationRequest,
@@ -169,7 +263,7 @@ mod public_api_tests {
     }
 
     #[test]
-    fn receipt_records_the_monitors_decision_not_caller_data() {
+    fn receipt_records_the_monitors_decision_and_full_security_context() {
         let (monitor, authority, capability, request, policy) = fixture();
         let facts = authority
             .snapshot(d(8), d(9), 7, 11, 13, &[&capability])
@@ -177,20 +271,48 @@ mod public_api_tests {
         let (decision, receipt) = monitor
             .evaluate_with_receipt(&request, &facts, &policy)
             .unwrap();
+
         assert_eq!(decision.outcome, DecisionOutcome::Allow);
+        assert_eq!(receipt.stage, ReceiptStage::Evaluation);
+        assert_eq!(receipt.subject, request.subject);
+        assert_eq!(receipt.consequence, Consequence::High);
+        assert_eq!(receipt.input_label, request.input_label);
+        assert_eq!(receipt.expected_resource_state_root, d(8));
+        assert_eq!(receipt.observed_resource_state_root, d(8));
+        assert_eq!(receipt.expected_policy_root, d(9));
+        assert_eq!(receipt.evaluated_policy_root, d(9));
+        assert_eq!(receipt.trusted_policy_root, d(9));
+        assert_eq!(receipt.capability_id, Some(d(4)));
         assert_eq!(receipt.outcome, decision.outcome);
         assert_eq!(receipt.reasons, decision.reasons);
     }
 
     #[test]
-    fn receipt_recomputes_non_allow_outcome() {
+    fn receipt_recomputes_non_allow_outcome_and_preserves_taint_context() {
         let (monitor, authority, capability, mut request, policy) = fixture();
         request.input_label.taint = TaintLevel::Tainted;
         let facts = authority
             .snapshot(d(8), d(9), 7, 11, 13, &[&capability])
             .unwrap();
         let receipt = monitor.receipt(&request, &facts, &policy).unwrap();
+
         assert_eq!(receipt.outcome, DecisionOutcome::Quarantine);
         assert_eq!(receipt.reasons, vec![ReasonCode::TaintedDependency]);
+        assert_eq!(receipt.input_label.taint, TaintLevel::Tainted);
+        assert_eq!(receipt.capability_id, None);
+    }
+
+    #[test]
+    fn mismatch_receipt_keeps_expected_and_observed_roots_distinct() {
+        let (monitor, authority, capability, mut request, policy) = fixture();
+        request.expected_resource_state_root = d(77);
+        let facts = authority
+            .snapshot(d(8), d(9), 7, 11, 13, &[&capability])
+            .unwrap();
+        let receipt = monitor.receipt(&request, &facts, &policy).unwrap();
+
+        assert_eq!(receipt.outcome, DecisionOutcome::RequireRevalidation);
+        assert_eq!(receipt.expected_resource_state_root, d(77));
+        assert_eq!(receipt.observed_resource_state_root, d(8));
     }
 }
