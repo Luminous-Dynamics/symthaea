@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-model-ensemble"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Evidence-preserving model comparison and disagreement contracts for Symthaea Planetary Perception."
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+symthaea-scenario-outcomes = { path = "../symthaea-scenario-outcomes" }
