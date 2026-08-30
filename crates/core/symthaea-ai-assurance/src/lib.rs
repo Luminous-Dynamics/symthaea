@@ -96,3 +96,24 @@ pub use trusted::{
     AuthorityDomain, AuthorityDomainId, AuthorityEpoch, AuthorityVerifier, TrustError,
     TrustedAction, TrustedBoundOneShotCapability, TrustedEvidenceReceipt,
 };
+
+impl<K: CapabilityKind, H> std::fmt::Debug for EffectAttemptFailure<K, H> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Preflight { error, .. } => f
+                .debug_struct("EffectAttemptFailure::Preflight")
+                .field("error", error)
+                .field("action", &"<authority-bearing action retained>")
+                .finish(),
+            Self::RejectedBeforeAttempt { error } => f
+                .debug_struct("EffectAttemptFailure::RejectedBeforeAttempt")
+                .field("error", error)
+                .finish(),
+            Self::LineageFailedAfterAttempt { evidence, error } => f
+                .debug_struct("EffectAttemptFailure::LineageFailedAfterAttempt")
+                .field("evidence", evidence)
+                .field("error", error)
+                .finish(),
+        }
+    }
+}
