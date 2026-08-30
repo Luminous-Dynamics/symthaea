@@ -1,45 +1,56 @@
 # symthaea-forecast-calibration
 
-Append-only forecast verification and calibration contracts for Planetary Perception.
+Physical-world forecast provenance adapter for Planetary Perception and the existing Symthaea Futures Laboratory.
 
 ## Core rule
 
-Predictions earn credibility by surviving contact with later evidence.
+Planetary Perception does **not** define a second forecast representation or a second scoring implementation.
 
-A forecast records its model/version, target, issue time, validity window, prediction, assumptions, and optional artifact digest **before** the target window is evaluated. Later verification refers to that immutable forecast id and requires explicit `EvidenceStage::Verification` support.
+Canonical forecast distributions, typed abstention, and proper scoring are reused from:
 
-There is no delete/replace operation for bad forecasts in this crate.
+- `symthaea-futures-core`;
+- `symthaea-futures-calibration`.
 
-## Metrics
+This bridge adds the pieces the simulation-focused Futures Laboratory does not own:
 
-Numeric forecasts retain:
+- explicit wall-clock ↔ forecast-tick binding;
+- physical verification windows;
+- Earth evidence references;
+- model/scenario provenance for physical forecasts;
+- append-only registration and resolution of physical forecasts.
 
-- signed error;
-- absolute error;
-- squared error;
-- interval hit/miss when an interval was supplied.
+## Hindsight resistance
 
-Binary probability forecasts use Brier score.
+A forecast is registered before later evidence resolves it. Bad forecasts, good forecasts, abstentions, and still-pending forecasts all remain visible.
 
-Model/target reports expose:
+Verification requires explicit `EvidenceStage::Verification` evidence.
 
-- total forecasts;
-- verified forecasts;
-- pending forecasts;
-- MAE / RMSE for numeric forecasts;
-- empirical interval coverage;
-- mean Brier score for binary forecasts.
+## Explicit clocks
 
-There is intentionally no composite `trust_score`.
+The Futures Laboratory is tick-indexed. Physical Earth observations are wall-clock-indexed. `PhysicalTimeBinding` makes the mapping explicit; no implicit convention such as “one tick = one day” is permitted.
+
+A distribution's canonical `issued_at_tick` and `Horizon` must agree with the physical forecast record.
+
+## Scoring
+
+`ScoringRuleKind::{Brier, Crps, LogScore}` is delegated directly to `symthaea-futures-calibration`.
+
+This crate intentionally does not reimplement Brier, CRPS, log score, reliability math, or probability validation.
+
+Reports aggregate only within the same model, target, and scoring rule. Scores from incompatible rules are never averaged together.
+
+## Abstention
+
+`ForecastOutput::Abstain` remains first-class. An abstention can later be resolved against what happened so coverage/abstention rates remain auditable, but it is not converted into a numeric failure sentinel.
 
 ## Boundaries
 
-- A pending forecast is not silently excluded from history.
-- A missed interval is retained alongside a hit.
-- Verification evidence must be explicitly marked as verification rather than an ordinary supporting observation.
-- Calibration describes historical predictive performance; it does not grant authority to act.
-- Different targets are calibrated separately so incompatible units/phenomena are not averaged together.
+- Historical calibration is evidence, not authority.
+- A proper score does not prove a causal model.
+- An abstention is not silently discarded.
+- Verification does not rewrite the original forecast.
+- Physical-world provenance remains separate from the simulation-specific `symthaea-futures-ledger::EvidenceRecord` until a generic cross-context ledger contract is deliberately designed.
 
-## Future work
+## Next integration
 
-A later tranche can bind these reports into `symthaea-model-ensemble` applicability/calibration views and compare calibration across regimes, regions, horizons, and out-of-distribution transitions.
+Use this bridge in the Living Watershed witness so Sentinel-derived evidence can initialize a forecast, later Sentinel/local verification can resolve it, and the exact same proper-scoring machinery used by the Futures Laboratory judges the result.
