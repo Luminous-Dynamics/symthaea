@@ -147,6 +147,13 @@ impl SurveillanceScreenConfig {
     pub const fn robust_z_threshold(self) -> f64 {
         self.robust_z_threshold
     }
+
+    /// Small positive threshold below which the robust scale is treated as
+    /// degenerate. This is algorithm configuration, not an epidemiological
+    /// threshold, and is identity-significant for evidence-bearing receipts.
+    pub const fn scale_epsilon(self) -> f64 {
+        self.scale_epsilon
+    }
 }
 
 impl Default for SurveillanceScreenConfig {
