@@ -5,8 +5,9 @@ use symthaea_futures_core::{
     TrajectoryGenerator,
 };
 use symthaea_living_watershed_prequential::{
-    BindingViolation, Candidate, PrequentialEpisodeSpec, PrequentialError, WETLAND_STRESS_OUTCOME_SPACE,
-    evaluate_candidates, frozen_prequential_protocol, prepare_episode, run_prequential_baselines,
+    BindingViolation, Candidate, PrequentialEpisodeSpec, PrequentialError,
+    WETLAND_STRESS_OUTCOME_SPACE, evaluate_candidates, frozen_prequential_protocol,
+    prepare_episode, run_prequential_baselines,
 };
 use symthaea_living_watershed_witness::{
     ClimatologyForecaster, PersistenceForecaster, SyntheticWatershedSpec, WatershedHistory,
@@ -30,7 +31,10 @@ fn lineage(run: &str, manifest: &str, registered: i64, completed: i64) -> Witnes
     .unwrap()
 }
 
-fn plan(first_origin: usize, evaluation_steps: usize) -> symthaea_living_watershed_prequential::PrequentialEpisodePlan {
+fn plan(
+    first_origin: usize,
+    evaluation_steps: usize,
+) -> symthaea_living_watershed_prequential::PrequentialEpisodePlan {
     prepare_episode(
         PrequentialEpisodeSpec::new(
             SyntheticWatershedSpec::drydown("episode-a", first_origin).unwrap(),
@@ -205,8 +209,8 @@ fn rolling_origins_expose_only_the_available_prefix() {
     let evaluation = evaluate_candidates(&prepared, &candidates).unwrap();
 
     let expected = vec![(1, 0), (2, 1), (3, 2), (4, 3)];
-    assert_eq!(*first.calls.borrow(), expected);
-    assert_eq!(*second.calls.borrow(), expected);
+    assert_eq!(first.calls.borrow().as_slice(), expected.as_slice());
+    assert_eq!(second.calls.borrow().as_slice(), expected.as_slice());
     assert_eq!(
         evaluation
             .steps
@@ -313,9 +317,9 @@ fn result_manifest_retains_mean_scores_coverage_and_registered_plan() {
         .find(|metric| metric.metric_id == "climatology-coverage")
         .unwrap();
     assert!(matches!(
-        coverage.outcome,
-        MetricOutcome::Numeric { value, ref unit }
-            if value == 0.5 && unit == "fraction"
+        &coverage.outcome,
+        MetricOutcome::Numeric { value, unit }
+            if *value == 0.5 && unit == "fraction"
     ));
 }
 
@@ -324,10 +328,8 @@ fn distinct_episode_plan_can_be_direct_replication_under_same_protocol() {
     let original_plan = plan(1, 4);
     let mut followup_template = SyntheticWatershedSpec::drydown("episode-b", 1).unwrap();
     followup_template.initial_storage_mm = 70.0;
-    let followup_plan = prepare_episode(
-        PrequentialEpisodeSpec::new(followup_template, 4).unwrap(),
-    )
-    .unwrap();
+    let followup_plan =
+        prepare_episode(PrequentialEpisodeSpec::new(followup_template, 4).unwrap()).unwrap();
     assert_ne!(original_plan.plan_digest, followup_plan.plan_digest);
 
     let frozen = frozen_prequential_protocol(1, 1, 4).unwrap();
