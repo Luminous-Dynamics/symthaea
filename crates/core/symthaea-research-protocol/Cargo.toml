@@ -9,4 +9,5 @@ repository = "https://github.com/Luminous-Dynamics/symthaea"
 
 [dependencies]
 serde = { workspace = true }
+serde_json = { workspace = true }
 blake3 = { workspace = true }
