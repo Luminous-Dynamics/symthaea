@@ -2,10 +2,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use symthaea_ai_assurance::{
     ActionRisk, AdapterSchema, ApprovalEvidence, AuthorityDomain, BudgetAuthorityDomain,
-    BudgetDimension, BudgetEnforcement, BudgetGuardedRuntime, BudgetProfile, BudgetQuantities,
-    EnforcementClass, Observation, Observe, ObservedOutcome, PolicyDescriptor,
-    PolicyEvaluatorDomain, PolicyExecutionDomain, PolicyGuardedRuntime, PolicyMode,
-    PolicyResourceRuntime, PrincipalId, ResolutionAuthorityDomain, ResolutionDecision,
+    BudgetDimension, BudgetEnforcement, BudgetGuardedAuthorizeError, BudgetGuardedRuntime,
+    BudgetProfile, BudgetQuantities, EnforcementClass, Observation, Observe, ObservedOutcome,
+    PolicyDescriptor, PolicyEvaluatorDomain, PolicyExecutionDomain, PolicyGuardedRuntime,
+    PolicyMode, PolicyResourceRuntime, PrincipalId, ResolutionAuthorityDomain, ResolutionDecision,
     ResourceIdentity, ResourceResolverDomain, ResourceRuntime, Scope, TrustedRuntime, Write,
 };
 
@@ -237,4 +237,115 @@ fn budget_lease_for_another_action_is_rejected_before_authorization() {
         .unwrap();
 
     assert!(action.authorize(policy_grant, wrong_budget).is_err());
+}
+
+#[test]
+fn recoverable_wrong_action_budget_returns_exact_original_lease() {
+    let fixture = fixture();
+    let actor = PrincipalId::new();
+    let action = fixture
+        .runtime
+        .admit_resolved::<Write, _>(
+            actor,
+            "edit-source",
+            fixture
+                .resources
+                .resolve(0_u64, resource_identity(), None),
+            b"patch-recover",
+        )
+        .unwrap()
+        .assess(ActionRisk::Reversible);
+    let binding = action.authorization_binding();
+    let policy_grant = policy_grant(&fixture, actor, binding, action.risk());
+    let allocation = budget_allocation();
+    let lease = fixture
+        .budgets
+        .reserve(actor, scope(), [98; 32], allocation, None)
+        .unwrap();
+    let lease_id = lease.lease_id();
+    let lease_domain = lease.domain_id();
+    let lease_epoch = lease.epoch();
+    let remaining_before = fixture.budgets.remaining();
+
+    let failure = action
+        .authorize_recoverable(policy_grant, lease)
+        .unwrap_err();
+    assert!(matches!(
+        failure.error(),
+        BudgetGuardedAuthorizeError::Budget(_)
+    ));
+    assert_eq!(failure.budget_lease().lease_id(), lease_id);
+    assert_eq!(failure.budget_lease().allocation(), allocation);
+    assert_eq!(failure.budget_lease().domain_id(), lease_domain);
+    assert_eq!(failure.budget_lease().epoch(), lease_epoch);
+    assert_eq!(fixture.budgets.remaining(), remaining_before);
+
+    failure.into_budget_lease().release().unwrap();
+    assert_eq!(fixture.budgets.remaining(), fixture.budgets.profile().limits());
+}
+
+#[test]
+fn recoverable_policy_rejection_returns_exact_original_lease() {
+    let fixture = fixture();
+    let actor = PrincipalId::new();
+    let action = fixture
+        .runtime
+        .admit_resolved::<Write, _>(
+            actor,
+            "edit-source",
+            fixture
+                .resources
+                .resolve(0_u64, resource_identity(), None),
+            b"patch-policy-recover",
+        )
+        .unwrap()
+        .assess(ActionRisk::Reversible);
+    let binding = action.authorization_binding();
+
+    let rogue_evaluator = PolicyEvaluatorDomain::new(
+        PrincipalId::new(),
+        PolicyDescriptor::new("rogue-policy", 1, [44; 32], 1).unwrap(),
+    );
+    let rogue_execution =
+        PolicyExecutionDomain::new(PrincipalId::new(), rogue_evaluator.verifier());
+    let rogue_admission = rogue_evaluator.admit(
+        binding,
+        scope(),
+        action.risk(),
+        PolicyMode::Autonomous,
+        ApprovalEvidence::new([45; 32], [46; 32], true),
+        [47; 32],
+        [48; 32],
+        [49; 32],
+        None,
+    );
+    let rogue_grant = rogue_execution
+        .issue::<Write>(actor, scope(), None, binding, rogue_admission)
+        .unwrap();
+
+    let allocation = budget_allocation();
+    let lease = fixture
+        .budgets
+        .reserve(actor, scope(), binding, allocation, None)
+        .unwrap();
+    let lease_id = lease.lease_id();
+    let lease_domain = lease.domain_id();
+    let lease_epoch = lease.epoch();
+    let remaining_before = fixture.budgets.remaining();
+
+    let failure = action
+        .authorize_recoverable(rogue_grant, lease)
+        .unwrap_err();
+    assert!(matches!(
+        failure.error(),
+        BudgetGuardedAuthorizeError::Policy(_)
+    ));
+    assert_eq!(failure.budget_lease().lease_id(), lease_id);
+    assert_eq!(failure.budget_lease().allocation(), allocation);
+    assert_eq!(failure.budget_lease().domain_id(), lease_domain);
+    assert_eq!(failure.budget_lease().epoch(), lease_epoch);
+    assert_eq!(fixture.budgets.remaining(), remaining_before);
+
+    failure.into_budget_lease().release().unwrap();
+    assert_eq!(fixture.budgets.remaining(), fixture.budgets.profile().limits());
 }
