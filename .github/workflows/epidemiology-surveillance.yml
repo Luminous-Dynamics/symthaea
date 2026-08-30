@@ -5,14 +5,18 @@ on:
     paths:
       - "crates/domains/symthaea-epidemiology/**"
       - "crates/domains/symthaea-statistics/**"
+      - "Cargo.toml"
       - "Cargo.lock"
+      - "rust-toolchain.toml"
       - ".github/workflows/epidemiology-surveillance.yml"
   push:
     branches: [main]
     paths:
       - "crates/domains/symthaea-epidemiology/**"
       - "crates/domains/symthaea-statistics/**"
+      - "Cargo.toml"
       - "Cargo.lock"
+      - "rust-toolchain.toml"
       - ".github/workflows/epidemiology-surveillance.yml"
   workflow_dispatch:
 
@@ -23,15 +27,31 @@ concurrency:
 jobs:
   surveillance-screen:
     name: Conservative aggregate surveillance screening
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.96.0
+      # Pin action source revisions so qualification does not depend on moving
+      # marketplace tags.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e
         with:
+          toolchain: 1.96.0
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Record qualification environment
+        shell: bash
+        run: |
+          echo "HEAD=$(git rev-parse HEAD)"
+          rustc -vV
+          cargo -Vv
+          sha256sum Cargo.toml Cargo.lock rust-toolchain.toml \
+            crates/domains/symthaea-epidemiology/Cargo.toml \
+            crates/domains/symthaea-statistics/Cargo.toml
+
+      - name: Verify committed lock graph
+        run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
 
       - name: Check formatting
         run: cargo fmt -p symthaea-epidemiology -- --check
