@@ -246,6 +246,7 @@ impl SeparationEvidence {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "ResearchSplitManifestRepr")]
 pub struct ResearchSplitManifest {
     pub manifest_id: String,
     pub assignments: Vec<AssignedUnit>,
@@ -253,6 +254,33 @@ pub struct ResearchSplitManifest {
     pub temporal_policy: TemporalSeparationPolicy,
     pub separation_evidence: Vec<SeparationEvidence>,
     pub manifest_digest: String,
+}
+
+#[derive(Deserialize)]
+struct ResearchSplitManifestRepr {
+    manifest_id: String,
+    assignments: Vec<AssignedUnit>,
+    group_policy: GroupSeparationPolicy,
+    temporal_policy: TemporalSeparationPolicy,
+    separation_evidence: Vec<SeparationEvidence>,
+    manifest_digest: String,
+}
+
+impl TryFrom<ResearchSplitManifestRepr> for ResearchSplitManifest {
+    type Error = SplitError;
+
+    fn try_from(value: ResearchSplitManifestRepr) -> Result<Self> {
+        let manifest = Self {
+            manifest_id: value.manifest_id,
+            assignments: value.assignments,
+            group_policy: value.group_policy,
+            temporal_policy: value.temporal_policy,
+            separation_evidence: value.separation_evidence,
+            manifest_digest: value.manifest_digest,
+        };
+        manifest.verify_digest()?;
+        Ok(manifest)
+    }
 }
 
 #[derive(Serialize)]
