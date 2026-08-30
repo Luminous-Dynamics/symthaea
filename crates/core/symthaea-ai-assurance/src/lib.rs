@@ -13,16 +13,18 @@
 //! final-interpretation authority. [`resource`] binds logical scopes to concrete
 //! adapter-resolved identities and retained handles. [`policy`] records why
 //! trusted policy admitted an action and carries that provenance into exact
-//! resource-bound execution authority. [`policy_guard`] additionally rechecks
-//! policy-domain revocation immediately before the concrete side-effect boundary.
-//! [`budget`] separates permission from quantitative resource authority using
-//! conserved exact-action leases and explicit enforcement truth labels.
+//! resource-bound execution authority. [`temporal_policy`] adds a strict
+//! production-facing derivation rule so execution authority cannot silently
+//! outlive the policy admission that justified it. [`policy_guard`] additionally
+//! rechecks policy-domain revocation immediately before the concrete side-effect
+//! boundary. [`budget`] separates permission from quantitative resource authority
+//! using conserved exact-action leases and explicit enforcement truth labels.
 //! [`budget_guard`] composes those leases with the strongest policy/resource
 //! boundary so budget authority is revalidated immediately before adapter entry.
 //! Security-sensitive state-changing integrations should compose these layers so
 //! trust anchors, validation time, concrete resources, policy admission,
-//! revocation, and quantitative capacity remain host-owned rather than
-//! model-selected.
+//! revocation, temporal bounds, and quantitative capacity remain host-owned
+//! rather than model-selected.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
@@ -36,6 +38,7 @@ pub mod policy;
 pub mod policy_guard;
 pub mod resolution;
 pub mod resource;
+pub mod temporal_policy;
 pub mod trusted;
 
 pub use action::{
@@ -72,6 +75,11 @@ pub use resource::{
     AdapterSchema, ResolvedResource, ResourceAction, ResourceError, ResourceEvidenceReceipt,
     ResourceExecutionError, ResourceIdentity, ResourceIdentityError, ResourceResolverDomain,
     ResourceRuntime, ResourceVerifier,
+};
+pub use temporal_policy::{
+    TemporalDerivationEvidence, TemporalPolicyAdmission, TemporalPolicyError,
+    TemporalPolicyEvaluatorDomain, TemporalPolicyExecutionDomain, TemporalPolicyGrant,
+    TemporalPolicyRules,
 };
 pub use trusted::{
     AuthorityDomain, AuthorityDomainId, AuthorityEpoch, AuthorityVerifier, TrustError,
