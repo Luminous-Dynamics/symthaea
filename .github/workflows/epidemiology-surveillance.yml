@@ -31,11 +31,10 @@ jobs:
     timeout-minutes: 20
     steps:
       # Pin action source revisions so qualification does not depend on moving
-      # marketplace tags.
+      # marketplace tags. This rust-toolchain revision itself selects Rust 1.96.0.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e
         with:
-          toolchain: 1.96.0
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
