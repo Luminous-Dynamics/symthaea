@@ -7,3 +7,6 @@ description = "Native artificial interoceptive regulation primitives for Symthae
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
+
+[dev-dependencies]
+symthaea-evidence-plane = { path = "../symthaea-evidence-plane" }
