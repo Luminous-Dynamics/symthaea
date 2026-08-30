@@ -433,7 +433,8 @@ pub struct TrustedFacts {
     pub policy_epoch: u64,
     /// Current authorization epoch.
     pub authorization_epoch: u64,
-    /// Current revocation epoch.
+    /// Current security-relevant revocation epoch. Any revocation capable of
+    /// invalidating an outstanding permit must advance this epoch.
     pub revocation_epoch: u64,
     /// Verified capability facts available to the requesting subject.
     pub capabilities: Vec<CapabilityFact>,
@@ -543,15 +544,14 @@ impl MonitorDecision {
     }
 }
 
-/// One-use authorization to commit exactly one already-evaluated mutation.
+/// Authorization-time token for exactly one already-evaluated mutation.
+///
+/// This is deliberately **not** commit-ready. A protected sink should accept
+/// only [`CommitPermit`], which can be minted only by
+/// [`ReferenceMonitor::precommit`] from a still-valid `MutationPermit`.
 ///
 /// The fields are private, the type is not `Clone`, and it is deliberately not
-/// serializable. A serialized capability envelope or prior receipt is never a
-/// live mutation permit. The permit must be minted by [`ReferenceMonitor`].
-///
-/// The following documentation tests intentionally fail to compile. They are
-/// API ratchets: making a permit cloneable, default-constructible, or
-/// deserializable would turn them green-to-red in CI.
+/// serializable or default-constructible.
 ///
 /// ```compile_fail
 /// use symthaea_cogsec::MutationPermit;
@@ -652,6 +652,95 @@ impl MutationPermit {
     /// Logical sequence bound into this permit.
     pub fn sequence(&self) -> u64 {
         self.sequence
+    }
+}
+
+/// Commit-ready one-use token produced only after fresh-state revalidation.
+///
+/// Protected P0 mutation sinks should require this type rather than
+/// [`MutationPermit`]. That makes the precommit boundary part of the Rust API
+/// topology instead of a convention that callers can accidentally skip.
+///
+/// ```compile_fail
+/// use symthaea_cogsec::CommitPermit;
+/// fn requires_clone<T: Clone>() {}
+/// requires_clone::<CommitPermit>();
+/// ```
+///
+/// ```compile_fail
+/// use symthaea_cogsec::CommitPermit;
+/// fn requires_default<T: Default>() {}
+/// requires_default::<CommitPermit>();
+/// ```
+#[derive(Debug, PartialEq, Eq)]
+pub struct CommitPermit {
+    inner: MutationPermit,
+}
+
+impl CommitPermit {
+    /// Request identity bound into this commit permit.
+    pub fn request_id(&self) -> Digest32 {
+        self.inner.request_id()
+    }
+
+    /// Mutation class bound into this commit permit.
+    pub fn kind(&self) -> MutationKind {
+        self.inner.kind()
+    }
+
+    /// Principal bound into this commit permit.
+    pub fn subject(&self) -> &PrincipalId {
+        self.inner.subject()
+    }
+
+    /// Resource bound into this commit permit.
+    pub fn resource(&self) -> &ResourceId {
+        self.inner.resource()
+    }
+
+    /// Exact mutation commitment bound into this commit permit.
+    pub fn mutation_digest(&self) -> Digest32 {
+        self.inner.mutation_digest()
+    }
+
+    /// Consequence class bound into this commit permit.
+    pub fn consequence(&self) -> Consequence {
+        self.inner.consequence()
+    }
+
+    /// Capability identity used to authorize the mutation, if required.
+    pub fn capability_id(&self) -> Option<Digest32> {
+        self.inner.capability_id()
+    }
+
+    /// Resource-state root freshly revalidated immediately before commit.
+    pub fn resource_state_root(&self) -> Digest32 {
+        self.inner.resource_state_root()
+    }
+
+    /// Policy root freshly revalidated immediately before commit.
+    pub fn policy_root(&self) -> Digest32 {
+        self.inner.policy_root()
+    }
+
+    /// Policy epoch freshly revalidated immediately before commit.
+    pub fn policy_epoch(&self) -> u64 {
+        self.inner.policy_epoch()
+    }
+
+    /// Authorization epoch freshly revalidated immediately before commit.
+    pub fn authorization_epoch(&self) -> u64 {
+        self.inner.authorization_epoch()
+    }
+
+    /// Revocation epoch freshly revalidated immediately before commit.
+    pub fn revocation_epoch(&self) -> u64 {
+        self.inner.revocation_epoch()
+    }
+
+    /// Logical sequence bound into this commit permit.
+    pub fn sequence(&self) -> u64 {
+        self.inner.sequence()
     }
 }
 
@@ -803,7 +892,7 @@ impl ReferenceMonitor {
         }
     }
 
-    /// Evaluate and, only on `Allow`, mint a one-use state-bound mutation permit.
+    /// Evaluate and, only on `Allow`, mint an authorization-time mutation permit.
     pub fn authorize(
         &self,
         request: &MutationRequest,
@@ -857,18 +946,20 @@ impl ReferenceMonitor {
         })
     }
 
-    /// Revalidate a live permit immediately before the protected state owner
-    /// consumes it.
+    /// Revalidate an authorization-time permit immediately before the protected
+    /// state owner consumes it, returning a distinct commit-ready typestate.
     ///
-    /// The permit is taken by value. Any failed precommit therefore destroys
-    /// that authorization token; callers must prepare and authorize a new
-    /// request against the fresh state rather than retrying a stale permit.
+    /// The authorization permit is taken by value. Any failed precommit destroys
+    /// that token; callers must prepare and authorize a new request against the
+    /// fresh state rather than retrying stale authority. The protected state
+    /// owner should perform this check and the subsequent commit under the same
+    /// serialization/transaction boundary.
     pub fn precommit(
         &self,
         permit: MutationPermit,
         facts: &TrustedFacts,
         policy: &PolicySnapshot,
-    ) -> Result<MutationPermit, MonitorDecision> {
+    ) -> Result<CommitPermit, MonitorDecision> {
         if facts.policy_root != policy.root {
             return Err(MonitorDecision::single(
                 DecisionOutcome::Defer,
@@ -948,7 +1039,7 @@ impl ReferenceMonitor {
             }
         }
 
-        Ok(permit)
+        Ok(CommitPermit { inner: permit })
     }
 
     /// Produce an audit receipt for a monitor decision.
@@ -1159,12 +1250,13 @@ mod tests {
     }
 
     #[test]
-    fn precommit_accepts_unchanged_context() {
+    fn precommit_accepts_unchanged_context_and_changes_typestate() {
         let (request, facts, policy) = goal_fixture();
         let permit = ReferenceMonitor.authorize(&request, &facts, &policy).unwrap();
-        let permit = ReferenceMonitor.precommit(permit, &facts, &policy).unwrap();
-        assert_eq!(permit.request_id(), request.request_id);
-        assert_eq!(permit.resource_state_root(), facts.resource_state_root);
+        let commit = ReferenceMonitor.precommit(permit, &facts, &policy).unwrap();
+        assert_eq!(commit.request_id(), request.request_id);
+        assert_eq!(commit.resource_state_root(), facts.resource_state_root);
+        assert_eq!(commit.capability_id(), Some(d(4)));
     }
 
     #[test]
@@ -1271,7 +1363,7 @@ mod tests {
         let encoded = serde_json::to_string(&decision).unwrap();
         let decoded: MonitorDecision = serde_json::from_str(&encoded).unwrap();
         assert_eq!(decoded, decision);
-        // MutationPermit intentionally has no Serialize/Deserialize implementation.
+        // MutationPermit and CommitPermit intentionally have no serde implementations.
     }
 
     proptest! {
@@ -1345,10 +1437,12 @@ mod tests {
                 43,
                 Some(48),
             );
-            if let Ok(child) = result {
-                prop_assert!(child.max_consequence <= parent.max_consequence);
-            } else if child_idx > parent_idx {
-                prop_assert!(matches!(result, Err(DelegationError::ConsequenceWidened)));
+            match result {
+                Ok(child) => prop_assert!(child.max_consequence <= parent.max_consequence),
+                Err(error) if child_idx > parent_idx => {
+                    prop_assert_eq!(error, DelegationError::ConsequenceWidened)
+                }
+                Err(_) => {}
             }
         }
     }
