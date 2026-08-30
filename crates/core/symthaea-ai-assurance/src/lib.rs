@@ -15,15 +15,21 @@
 //! trusted policy admitted an action and carries that provenance into exact
 //! resource-bound execution authority. [`policy_guard`] additionally rechecks
 //! policy-domain revocation immediately before the concrete side-effect boundary.
-//! Security-sensitive state-changing integrations should compose [`host`],
-//! [`resource`], [`policy`], and [`policy_guard`] so trust anchors, validation
-//! time, concrete resources, policy admission, and policy revocation remain
-//! host-owned rather than model-selected.
+//! [`budget`] separates permission from quantitative resource authority using
+//! conserved exact-action leases and explicit enforcement truth labels.
+//! [`budget_guard`] composes those leases with the strongest policy/resource
+//! boundary so budget authority is revalidated immediately before adapter entry.
+//! Security-sensitive state-changing integrations should compose these layers so
+//! trust anchors, validation time, concrete resources, policy admission,
+//! revocation, and quantitative capacity remain host-owned rather than
+//! model-selected.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 
 pub mod action;
+pub mod budget;
+pub mod budget_guard;
 pub mod capability;
 pub mod host;
 pub mod policy;
@@ -37,14 +43,20 @@ pub use action::{
     Executed, Observation, Observed, ObservedOutcome, Proposed, ResolutionDecision, Resolved,
     RiskAssessed,
 };
+pub use budget::{
+    BudgetAuthorityDomain, BudgetDimension, BudgetEnforcement, BudgetError, BudgetLease,
+    BudgetProfile, BudgetQuantities, BudgetReleaseReceipt, BudgetVerifier, EnforcementClass,
+};
+pub use budget_guard::{
+    BudgetAdapterError, BudgetGuardedAction, BudgetGuardedAuthorizeError, BudgetGuardedRuntime,
+    BudgetLeaseEvidence, BudgetedEvidenceReceipt,
+};
 pub use capability::{
     AuthorityRoot, BoundOneShotCapability, Capability, CapabilityKind, Deploy, Execute, GrantError,
     GrantId, GrantMetadata, Network, Observe, OneShotCapability, PrincipalId, Read, Scope,
     ScopeError, UpdateModel, Write,
 };
-pub use host::{
-    ResolutionEvidenceReceipt, ResolutionError, RuntimeAction, TrustedRuntime,
-};
+pub use host::{ResolutionError, ResolutionEvidenceReceipt, RuntimeAction, TrustedRuntime};
 pub use policy::{
     ApprovalEvidence, PolicyAdmission, PolicyAdmissionReceipt, PolicyAuthorizationEvidence,
     PolicyDescriptor, PolicyError, PolicyEvaluatorDomain, PolicyExecutionDomain, PolicyGrant,
@@ -52,8 +64,8 @@ pub use policy::{
     PolicyVerifier,
 };
 pub use policy_guard::{
-    PolicyGuardError, PolicyGuardedAction, PolicyGuardedAuthorizeError, PolicyGuardedExecutionError,
-    PolicyGuardedRuntime,
+    PolicyGuardError, PolicyGuardedAction, PolicyGuardedAuthorizeError,
+    PolicyGuardedExecutionError, PolicyGuardedRuntime,
 };
 pub use resolution::{ResolutionAuthorityDomain, ResolutionGrant, ResolutionVerifier};
 pub use resource::{
