@@ -14,7 +14,8 @@
 //!
 //! [`surveillance_receipt`] adds an evidence-bearing wrapper that binds a result
 //! to the exact screening algorithm identifier, caller-supplied configuration,
-//! baseline time scope, and latest timestamp.
+//! baseline time scope, latest timestamp, and a SHA-256 content commitment over
+//! the complete ordered input series including explicit missingness.
 //!
 //! The surveillance modules report statistical change candidates only. They do
 //! **not** diagnose disease, declare an outbreak, identify a pathogen, estimate
@@ -51,6 +52,7 @@
 //! let config = SurveillanceScreenConfig::new(5, 3.0).unwrap();
 //! let receipt = assess_latest_change_with_receipt(&history, latest, config).unwrap();
 //!
+//! assert_eq!(receipt.input_id.to_hex().len(), 64);
 //! assert!(matches!(
 //!     receipt.assessment.disposition,
 //!     ScreeningDisposition::ChangeCandidate(_)
@@ -68,6 +70,6 @@ pub use surveillance::{
     assess_latest_change,
 };
 pub use surveillance_receipt::{
-    BaselineTimeWindow, SURVEILLANCE_SCREEN_ALGORITHM_V1, SurveillanceScreenReceipt,
-    assess_latest_change_with_receipt,
+    BaselineTimeWindow, SURVEILLANCE_SCREEN_ALGORITHM_V1, SURVEILLANCE_SCREEN_INPUT_ID_DOMAIN_V1,
+    SurveillanceScreenInputId, SurveillanceScreenReceipt, assess_latest_change_with_receipt,
 };
