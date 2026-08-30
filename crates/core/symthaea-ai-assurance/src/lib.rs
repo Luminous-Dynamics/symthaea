@@ -21,10 +21,15 @@
 //! using conserved exact-action leases and explicit enforcement truth labels.
 //! [`budget_guard`] composes those leases with the strongest policy/resource
 //! boundary so budget authority is revalidated immediately before adapter entry.
+//! [`effect_guard`] adds exact execution-domain/expiry preflight and forces
+//! effectful adapters to report success, failure, uncertainty, or proven
+//! transactional no-effect as evidence-bearing outcome data rather than using a
+//! generic `Err` as proof that nothing happened.
+//!
 //! Security-sensitive state-changing integrations should compose these layers so
 //! trust anchors, validation time, concrete resources, policy admission,
-//! revocation, temporal bounds, and quantitative capacity remain host-owned
-//! rather than model-selected.
+//! revocation, temporal bounds, quantitative capacity, and effect-attempt
+//! evidence remain host-owned rather than model-selected.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
@@ -33,6 +38,7 @@ pub mod action;
 pub mod budget;
 pub mod budget_guard;
 pub mod capability;
+pub mod effect_guard;
 pub mod host;
 pub mod policy;
 pub mod policy_guard;
@@ -58,6 +64,11 @@ pub use capability::{
     AuthorityRoot, BoundOneShotCapability, Capability, CapabilityKind, Deploy, Execute, GrantError,
     GrantId, GrantMetadata, Network, Observe, OneShotCapability, PrincipalId, Read, Scope,
     ScopeError, UpdateModel, Write,
+};
+pub use effect_guard::{
+    EffectAssuredEvidenceReceipt, EffectAttemptEvidence, EffectAttemptFailure,
+    EffectAttemptOutcome, EffectGuardedAction, EffectGuardedAuthorizeError, EffectGuardedRuntime,
+    EffectInnerExecutionError, ExecutionPreflightError,
 };
 pub use host::{ResolutionError, ResolutionEvidenceReceipt, RuntimeAction, TrustedRuntime};
 pub use policy::{
@@ -85,3 +96,24 @@ pub use trusted::{
     AuthorityDomain, AuthorityDomainId, AuthorityEpoch, AuthorityVerifier, TrustError,
     TrustedAction, TrustedBoundOneShotCapability, TrustedEvidenceReceipt,
 };
+
+impl<K: CapabilityKind, H> std::fmt::Debug for EffectAttemptFailure<K, H> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Preflight { error, .. } => f
+                .debug_struct("EffectAttemptFailure::Preflight")
+                .field("error", error)
+                .field("action", &"<authority-bearing action retained>")
+                .finish(),
+            Self::RejectedBeforeAttempt { error } => f
+                .debug_struct("EffectAttemptFailure::RejectedBeforeAttempt")
+                .field("error", error)
+                .finish(),
+            Self::LineageFailedAfterAttempt { evidence, error } => f
+                .debug_struct("EffectAttemptFailure::LineageFailedAfterAttempt")
+                .field("evidence", evidence)
+                .field("error", error)
+                .finish(),
+        }
+    }
+}
