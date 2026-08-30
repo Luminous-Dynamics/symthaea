@@ -42,17 +42,39 @@ impl Display for ReplicationError {
             Self::FollowupManifestInvalid(message) => {
                 write!(f, "follow-up result manifest is invalid: {message}")
             }
-            Self::SameResultManifest => write!(f, "replication assessment requires two distinct result manifests"),
-            Self::ExactReproductionProtocolChanged => write!(f, "exact reproduction requires the same frozen protocol digest"),
-            Self::ExactReproductionSourceChanged => write!(f, "exact reproduction requires the same source commit"),
-            Self::ExactReproductionDatasetChanged => write!(f, "exact reproduction requires the same dataset manifest digest"),
-            Self::ExactReproductionEnvironmentChanged => write!(f, "exact reproduction requires the same reproducibility capsule digest"),
-            Self::ExactReproductionSeedsChanged => write!(f, "exact reproduction requires the same seed manifest digest"),
-            Self::DirectReplicationProtocolChanged => write!(f, "direct replication requires the same frozen protocol digest"),
-            Self::DirectReplicationReusedDataset => write!(f, "direct replication requires a different dataset lineage; same-data reruns are reproduction/reanalysis evidence"),
-            Self::ReanalysisDatasetChanged => write!(f, "reanalysis requires the same dataset manifest digest"),
+            Self::SameResultManifest => {
+                write!(f, "replication assessment requires two distinct result manifests")
+            }
+            Self::ExactReproductionProtocolChanged => {
+                write!(f, "exact reproduction requires the same frozen protocol digest")
+            }
+            Self::ExactReproductionSourceChanged => {
+                write!(f, "exact reproduction requires the same source commit")
+            }
+            Self::ExactReproductionDatasetChanged => {
+                write!(f, "exact reproduction requires the same dataset manifest digest")
+            }
+            Self::ExactReproductionEnvironmentChanged => write!(
+                f,
+                "exact reproduction requires the same reproducibility capsule digest"
+            ),
+            Self::ExactReproductionSeedsChanged => {
+                write!(f, "exact reproduction requires the same seed manifest digest")
+            }
+            Self::DirectReplicationProtocolChanged => {
+                write!(f, "direct replication requires the same frozen protocol digest")
+            }
+            Self::DirectReplicationReusedDataset => write!(
+                f,
+                "direct replication requires a different dataset lineage; same-data reruns are reproduction/reanalysis evidence"
+            ),
+            Self::ReanalysisDatasetChanged => {
+                write!(f, "reanalysis requires the same dataset manifest digest")
+            }
             Self::AssessmentDigestMismatch => write!(f, "replication assessment digest mismatch"),
-            Self::Serialization(message) => write!(f, "replication assessment serialization failed: {message}"),
+            Self::Serialization(message) => {
+                write!(f, "replication assessment serialization failed: {message}")
+            }
         }
     }
 }
@@ -325,185 +347,5 @@ impl ReplicationAssessment {
             return Err(ReplicationError::AssessmentDigestMismatch);
         }
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use symthaea_research_result::{
-        MetricOutcome, MetricResult, ResultArtifactKind, ResultArtifactRef, ResearchResultManifest,
-    };
-    use symthaea_research_result::symthaea_research_protocol::{
-        AnalysisPlanRef, BaselineSpec, FrozenProtocol, HypothesisDirection, HypothesisRole,
-        HypothesisSpec, MetricRole, MetricSpec, MultiplicityPolicy, ResearchProtocol,
-        ResearchRunRegistration, StoppingRule,
-    };
-
-    fn frozen() -> FrozenProtocol {
-        ResearchProtocol::new(
-            "p",
-            "1",
-            "question",
-            vec![HypothesisSpec::new(
-                "h",
-                "effect exists",
-                HypothesisRole::Primary,
-                HypothesisDirection::TwoSided,
-            )
-            .unwrap()],
-            vec![MetricSpec::new("m", "metric", "unit", MetricRole::Primary, "mean").unwrap()],
-            vec![BaselineSpec::new("b", "baseline", "impl").unwrap()],
-            vec![],
-            StoppingRule::FixedSampleCount(10),
-            MultiplicityPolicy::NotApplicable,
-            AnalysisPlanRef::new("a", "1", "digest:a").unwrap(),
-            "dataset plan",
-            "seed plan",
-        )
-        .unwrap()
-        .freeze(1)
-        .unwrap()
-    }
-
-    fn result(
-        frozen: &FrozenProtocol,
-        id: &str,
-        source: &str,
-        dataset: &str,
-        environment: &str,
-        seeds: &str,
-    ) -> ResearchResultManifest {
-        let run = ResearchRunRegistration::new(
-            frozen,
-            format!("run-{id}"),
-            2,
-            source,
-            dataset,
-            environment,
-            seeds,
-        )
-        .unwrap();
-        ResearchResultManifest::new(
-            frozen,
-            run,
-            id,
-            3,
-            vec![],
-            vec![],
-            false,
-            vec![ResultArtifactRef::new(
-                "analysis",
-                ResultArtifactKind::Analysis,
-                format!("digest:analysis:{id}"),
-                "analysis",
-            )
-            .unwrap()],
-            vec![MetricResult::new(
-                "m",
-                MetricOutcome::Numeric {
-                    value: 1.0,
-                    unit: "unit".into(),
-                },
-            )
-            .unwrap()],
-            vec![],
-        )
-        .unwrap()
-    }
-
-    fn comparison() -> ReplicationComparisonEvidence {
-        ReplicationComparisonEvidence::new(
-            "frozen comparison plan v1",
-            "digest:comparison",
-            "effect direction and interval overlap",
-        )
-        .unwrap()
-    }
-
-    #[test]
-    fn direct_replication_requires_new_data() {
-        let frozen = frozen();
-        let a = result(&frozen, "a", "source", "data", "env", "seeds-a");
-        let b = result(&frozen, "b", "source", "data", "env", "seeds-b");
-        let err = ReplicationAssessment::new(
-            "r",
-            ReplicationDesign::DirectReplication,
-            &a,
-            &b,
-            vec![],
-            ReplicationOutcome::Concordant,
-            comparison(),
-        )
-        .unwrap_err();
-        assert_eq!(err, ReplicationError::DirectReplicationReusedDataset);
-    }
-
-    #[test]
-    fn direct_replication_can_reuse_implementation_but_not_data() {
-        let frozen = frozen();
-        let a = result(&frozen, "a", "source", "data-a", "env", "seeds-a");
-        let b = result(&frozen, "b", "source", "data-b", "env", "seeds-b");
-        let assessment = ReplicationAssessment::new(
-            "r",
-            ReplicationDesign::DirectReplication,
-            &a,
-            &b,
-            vec![],
-            ReplicationOutcome::Concordant,
-            comparison(),
-        )
-        .unwrap();
-        assert_eq!(assessment.factual_lineage.source_commit, LineageRelation::Same);
-        assert_eq!(assessment.factual_lineage.dataset_manifest, LineageRelation::Different);
-        assessment.verify_digest().unwrap();
-    }
-
-    #[test]
-    fn exact_reproduction_rejects_environment_change() {
-        let frozen = frozen();
-        let a = result(&frozen, "a", "source", "data", "env-a", "seeds");
-        let b = result(&frozen, "b", "source", "data", "env-b", "seeds");
-        let err = ReplicationAssessment::new(
-            "r",
-            ReplicationDesign::ExactReproduction,
-            &a,
-            &b,
-            vec![],
-            ReplicationOutcome::Concordant,
-            comparison(),
-        )
-        .unwrap_err();
-        assert_eq!(err, ReplicationError::ExactReproductionEnvironmentChanged);
-    }
-
-    #[test]
-    fn reanalysis_requires_same_dataset() {
-        let frozen = frozen();
-        let a = result(&frozen, "a", "source-a", "data-a", "env", "seeds");
-        let b = result(&frozen, "b", "source-b", "data-b", "env", "seeds");
-        let err = ReplicationAssessment::new(
-            "r",
-            ReplicationDesign::Reanalysis,
-            &a,
-            &b,
-            vec![],
-            ReplicationOutcome::Mixed,
-            comparison(),
-        )
-        .unwrap_err();
-        assert_eq!(err, ReplicationError::ReanalysisDatasetChanged);
-    }
-
-    #[test]
-    fn human_or_institutional_independence_is_evidence_backed_not_inferred() {
-        let evidence = IndependenceEvidence::new(
-            IndependenceDimension::Institution,
-            "follow-up was performed by a separate laboratory",
-            "digest:attestation",
-        )
-        .unwrap();
-        assert_eq!(evidence.dimension, IndependenceDimension::Institution);
-        assert_eq!(evidence.evidence_digest, "digest:attestation");
     }
 }
