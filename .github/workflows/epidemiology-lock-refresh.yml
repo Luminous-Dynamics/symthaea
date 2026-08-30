@@ -1,0 +1,122 @@
+name: Epidemiology Cargo.lock Refresh Evidence
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-epidemiology/**"
+      - "crates/domains/symthaea-statistics/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/epidemiology-lock-refresh.yml"
+      - ".github/workflows/epidemiology-surveillance.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lock-refresh-evidence:
+    name: Generate reviewed Cargo.lock candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5 / node24
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          EXPECTED="${{ github.event.pull_request.head.sha || github.sha }}"
+          ACTUAL="$(git rev-parse HEAD)"
+          test "$ACTUAL" = "$EXPECTED"
+          echo "LOCK_SOURCE_HEAD=$ACTUAL"
+
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e
+
+      - name: Capture pre-refresh evidence
+        shell: bash
+        run: |
+          mkdir -p lock-refresh-evidence
+          cp Cargo.lock /tmp/Cargo.lock.committed
+          {
+            echo "HEAD=$(git rev-parse HEAD)"
+            rustc -vV
+            cargo -Vv
+            echo "--- committed hashes ---"
+            sha256sum Cargo.toml Cargo.lock rust-toolchain.toml \
+              crates/domains/symthaea-epidemiology/Cargo.toml \
+              crates/domains/symthaea-statistics/Cargo.toml
+          } > lock-refresh-evidence/environment.txt
+
+      - name: Generate Cargo-produced minimal lock candidate
+        shell: bash
+        run: |
+          set +e
+          cargo metadata --format-version 1 > /dev/null \
+            2> lock-refresh-evidence/cargo-metadata.stderr.txt
+          METADATA_STATUS=$?
+          set -e
+          echo "metadata_exit_code=$METADATA_STATUS" \
+            > lock-refresh-evidence/generation-status.txt
+
+          cp Cargo.lock lock-refresh-evidence/Cargo.lock.generated
+          sha256sum Cargo.lock > lock-refresh-evidence/Cargo.lock.generated.sha256
+          git diff --no-ext-diff -- Cargo.lock > lock-refresh-evidence/Cargo.lock.diff || true
+
+          if [[ "$METADATA_STATUS" -ne 0 ]]; then
+            echo "LOCK_RESULT=generation_error" >> "$GITHUB_ENV"
+            echo "Cargo could not resolve the workspace; inspect stderr evidence." \
+              > lock-refresh-evidence/result.txt
+          elif cmp -s /tmp/Cargo.lock.committed Cargo.lock; then
+            if cargo metadata --locked --format-version 1 > /dev/null; then
+              echo "LOCK_RESULT=clean" >> "$GITHUB_ENV"
+              echo "Committed Cargo.lock already matches the fully resolved pinned graph." \
+                > lock-refresh-evidence/result.txt
+            else
+              echo "LOCK_RESULT=locked_recheck_error" >> "$GITHUB_ENV"
+              echo "Generated graph did not pass the locked recheck." \
+                > lock-refresh-evidence/result.txt
+            fi
+          else
+            if cargo metadata --locked --format-version 1 > /dev/null; then
+              echo "LOCK_RESULT=changed" >> "$GITHUB_ENV"
+              {
+                echo "Committed Cargo.lock is stale under the pinned environment."
+                echo "Review Cargo.lock.generated and Cargo.lock.diff before committing."
+              } > lock-refresh-evidence/result.txt
+            else
+              echo "LOCK_RESULT=locked_recheck_error" >> "$GITHUB_ENV"
+              echo "Cargo changed the lock, but the generated graph failed locked recheck." \
+                > lock-refresh-evidence/result.txt
+            fi
+          fi
+
+      - name: Upload lock-refresh evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6 / node24
+        with:
+          name: epidemiology-lock-refresh-${{ github.event.pull_request.head.sha || github.sha }}
+          path: lock-refresh-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Require committed lock to match Cargo
+        shell: bash
+        run: |
+          case "${LOCK_RESULT:-missing}" in
+            clean)
+              echo "Cargo.lock matches the complete pinned dependency graph."
+              ;;
+            changed)
+              echo "Cargo.lock requires a reviewed Cargo-produced refresh; see artifact."
+              exit 1
+              ;;
+            *)
+              echo "Lock refresh evidence generation failed: ${LOCK_RESULT:-missing}."
+              exit 1
+              ;;
+          esac
