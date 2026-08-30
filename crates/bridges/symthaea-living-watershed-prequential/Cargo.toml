@@ -1,0 +1,22 @@
+[package]
+name = "symthaea-living-watershed-prequential"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Rolling-origin commit-reveal validation for the Symthaea Living Watershed research witness."
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+blake3 = { workspace = true }
+thiserror = { workspace = true }
+symthaea-futures-core = { workspace = true }
+symthaea-futures-calibration = { workspace = true }
+symthaea-living-watershed-witness = { path = "../symthaea-living-watershed-witness" }
+symthaea-research-protocol = { path = "../../core/symthaea-research-protocol" }
+symthaea-research-result = { path = "../../core/symthaea-research-result" }
+
+[dev-dependencies]
+symthaea-research-replication = { path = "../../core/symthaea-research-replication" }
