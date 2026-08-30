@@ -12,7 +12,9 @@ pub enum ViabilityChannel {
     Integrity = 4,
     ActionEfficacy = 5,
     NoveltyBalance = 6,
-    SocialSecurity = 7,
+    /// Reliability of action/environment coupling, without assuming that the
+    /// relevant counterpart is another agent.
+    InteractionReliability = 7,
 }
 
 impl ViabilityChannel {
@@ -24,12 +26,26 @@ impl ViabilityChannel {
         Self::Integrity,
         Self::ActionEfficacy,
         Self::NoveltyBalance,
-        Self::SocialSecurity,
+        Self::InteractionReliability,
     ];
 
     #[inline]
     pub const fn index(self) -> usize {
         self as usize
+    }
+
+    /// Stable machine-readable identifier for evidence exports.
+    pub const fn stable_id(self) -> &'static str {
+        match self {
+            Self::ComputeReserve => "compute_reserve",
+            Self::MemoryHeadroom => "memory_headroom",
+            Self::ModelStability => "model_stability",
+            Self::EpistemicResolution => "epistemic_resolution",
+            Self::Integrity => "integrity",
+            Self::ActionEfficacy => "action_efficacy",
+            Self::NoveltyBalance => "novelty_balance",
+            Self::InteractionReliability => "interaction_reliability",
+        }
     }
 }
 
