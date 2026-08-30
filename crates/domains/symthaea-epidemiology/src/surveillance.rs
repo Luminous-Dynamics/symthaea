@@ -103,8 +103,9 @@ impl SurveillancePoint {
 /// Configuration for a statistical screen.
 ///
 /// Thresholds are screening parameters, not clinical/public-health policy. A
-/// deployment should preregister and validate them for its data source instead
-/// of interpreting the defaults as universal epidemiological cutoffs.
+/// deployment should preregister and validate them for its data source. No
+/// `Default` implementation is provided: the baseline-count and robust-z
+/// threshold must be chosen explicitly by every caller.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SurveillanceScreenConfig {
     min_baseline_observations: usize,
@@ -153,17 +154,6 @@ impl SurveillanceScreenConfig {
     /// threshold, and is identity-significant for evidence-bearing receipts.
     pub const fn scale_epsilon(self) -> f64 {
         self.scale_epsilon
-    }
-}
-
-impl Default for SurveillanceScreenConfig {
-    fn default() -> Self {
-        // A convenience screening profile only; not a public-health threshold.
-        Self {
-            min_baseline_observations: 5,
-            robust_z_threshold: 3.5,
-            scale_epsilon: 1e-12,
-        }
     }
 }
 
