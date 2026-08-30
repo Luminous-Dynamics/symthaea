@@ -11,9 +11,13 @@
 //! typestate mechanics. [`trusted`] binds actions and grants to host-selected
 //! authority domains and revocation epochs. [`resolution`] provides distinct
 //! final-interpretation authority. [`resource`] binds logical scopes to concrete
-//! adapter-resolved identities and retained handles. Security-sensitive concrete
-//! tool integrations should normally use [`host`] together with [`resource`],
-//! so trust anchors, validation time, and concrete resource resolution remain
+//! adapter-resolved identities and retained handles. [`policy`] records why
+//! trusted policy admitted an action and carries that provenance into exact
+//! resource-bound execution authority. [`policy_guard`] additionally rechecks
+//! policy-domain revocation immediately before the concrete side-effect boundary.
+//! Security-sensitive state-changing integrations should compose [`host`],
+//! [`resource`], [`policy`], and [`policy_guard`] so trust anchors, validation
+//! time, concrete resources, policy admission, and policy revocation remain
 //! host-owned rather than model-selected.
 
 #![deny(unsafe_code)]
@@ -22,6 +26,8 @@
 pub mod action;
 pub mod capability;
 pub mod host;
+pub mod policy;
+pub mod policy_guard;
 pub mod resolution;
 pub mod resource;
 pub mod trusted;
@@ -38,6 +44,16 @@ pub use capability::{
 };
 pub use host::{
     ResolutionEvidenceReceipt, ResolutionError, RuntimeAction, TrustedRuntime,
+};
+pub use policy::{
+    ApprovalEvidence, PolicyAdmission, PolicyAdmissionReceipt, PolicyAuthorizationEvidence,
+    PolicyDescriptor, PolicyError, PolicyEvaluatorDomain, PolicyExecutionDomain, PolicyGrant,
+    PolicyMode, PolicyResourceAction, PolicyResourceEvidenceReceipt, PolicyResourceRuntime,
+    PolicyVerifier,
+};
+pub use policy_guard::{
+    PolicyGuardError, PolicyGuardedAction, PolicyGuardedAuthorizeError, PolicyGuardedExecutionError,
+    PolicyGuardedRuntime,
 };
 pub use resolution::{ResolutionAuthorityDomain, ResolutionGrant, ResolutionVerifier};
 pub use resource::{
