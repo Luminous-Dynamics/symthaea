@@ -26,6 +26,45 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  normalize-foundation:
+    name: Normalize foundation artifacts once
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.head_ref == 'research/ai-assurance-kernel-v0.1' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Generate deterministic assurance formatting and lock resolution
+        run: |
+          cargo fmt --package symthaea-ai-assurance
+          cargo metadata --format-version 1 > /dev/null
+
+      - name: Commit only generated assurance artifacts when needed
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if git diff --quiet -- Cargo.lock crates/core/symthaea-ai-assurance; then
+            echo 'Generated assurance artifacts are already committed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.lock crates/core/symthaea-ai-assurance
+          git commit -m 'chore(ai-assurance): commit generated formatting and lock resolution'
+          git push origin "HEAD:${HEAD_REF}"
+
   qualify:
     name: Qualify authority kernel
     runs-on: ubuntu-latest
