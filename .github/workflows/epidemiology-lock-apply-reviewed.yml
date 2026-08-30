@@ -1,0 +1,58 @@
+name: Apply Reviewed Epidemiology Cargo.lock
+
+on:
+  push:
+    branches: [feat/public-health-surveillance-reasoning-v1]
+    paths:
+      - ".github/workflows/epidemiology-lock-apply-reviewed.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: epidemiology-lock-apply-reviewed
+  cancel-in-progress: false
+
+env:
+  EXPECTED_COMMITTED_LOCK_SHA256: d7dcc25f8dc3807a86cea758f5380059ec8460d304618bcc5cfd6d5c9a6ce44f
+  EXPECTED_GENERATED_LOCK_SHA256: 364c40f969e5f98b5ba61c3c83c5fd624094d9410fb1e42256204553d83dc191
+
+jobs:
+  apply-reviewed-lock:
+    name: Apply exact reviewed epidemiology lock candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5 / node24
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: true
+
+      - name: Verify source and committed lock precondition
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+          ACTUAL_LOCK_SHA="$(sha256sum Cargo.lock | awk '{print $1}')"
+          test "$ACTUAL_LOCK_SHA" = "$EXPECTED_COMMITTED_LOCK_SHA256"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e
+
+      - name: Reproduce reviewed Cargo candidate
+        shell: bash
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          cargo metadata --locked --format-version 1 > /dev/null
+          GENERATED_SHA="$(sha256sum Cargo.lock | awk '{print $1}')"
+          test "$GENERATED_SHA" = "$EXPECTED_GENERATED_LOCK_SHA256"
+          test -n "$(git diff -- Cargo.lock)"
+          test -z "$(git diff --name-only | grep -v '^Cargo.lock$' || true)"
+
+      - name: Commit exact reviewed lock
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git commit -m "chore(epidemiology): refresh Cargo lock from reviewed evidence"
+          git push origin HEAD:feat/public-health-surveillance-reasoning-v1
