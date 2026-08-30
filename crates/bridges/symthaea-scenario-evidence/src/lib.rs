@@ -22,6 +22,7 @@ pub enum ScenarioError {
     MissingBaselineEvidence,
     MissingModel,
     MissingSpeculativeAssumption,
+    InvalidUrgency(f64),
     NonFiniteScore { field: &'static str, value: f64 },
 }
 
@@ -35,6 +36,9 @@ impl Display for ScenarioError {
             Self::MissingModel => write!(f, "a simulated scenario requires at least one model"),
             Self::MissingSpeculativeAssumption => {
                 write!(f, "a speculative scenario must state at least one assumption")
+            }
+            Self::InvalidUrgency(value) => {
+                write!(f, "scenario urgency must be finite and in [0, 1], got {value}")
             }
             Self::NonFiniteScore { field, value } => {
                 write!(f, "{field} must be finite, got {value}")
@@ -57,6 +61,7 @@ pub struct ScenarioModelRef {
     pub model_id: String,
     pub version: String,
     pub role: ScenarioModelRole,
+    pub artifact_digest: Option<String>,
 }
 
 impl ScenarioModelRef {
@@ -73,7 +78,15 @@ impl ScenarioModelRef {
             model_id,
             version,
             role,
+            artifact_digest: None,
         })
+    }
+
+    pub fn with_artifact_digest(mut self, digest: impl Into<String>) -> Result<Self> {
+        let digest = digest.into();
+        non_empty(&digest, "scenario model artifact digest")?;
+        self.artifact_digest = Some(digest);
+        Ok(self)
     }
 }
 
@@ -93,6 +106,8 @@ pub struct ScenarioIntervention {
     pub target: String,
     pub action: String,
     pub rationale: String,
+    /// Context for prioritization only. This is not execution authority.
+    pub urgency: Option<f64>,
 }
 
 impl ScenarioIntervention {
@@ -111,7 +126,16 @@ impl ScenarioIntervention {
             target,
             action,
             rationale,
+            urgency: None,
         })
+    }
+
+    pub fn with_urgency(mut self, urgency: f64) -> Result<Self> {
+        if !urgency.is_finite() || !(0.0..=1.0).contains(&urgency) {
+            return Err(ScenarioError::InvalidUrgency(urgency));
+        }
+        self.urgency = Some(urgency);
+        Ok(self)
     }
 }
 
@@ -119,7 +143,7 @@ impl TryFrom<&Intervention> for ScenarioIntervention {
     type Error = ScenarioError;
 
     fn try_from(value: &Intervention) -> Result<Self> {
-        Self::new(&value.twin_id, &value.action, &value.rationale)
+        Self::new(&value.twin_id, &value.action, &value.rationale)?.with_urgency(value.urgency)
     }
 }
 
@@ -235,7 +259,7 @@ impl CounterfactualScenarioEnvelope {
         assumptions: Vec<String>,
     ) -> Result<Self> {
         let causal_support = CausalSupport::from_query_outcome(outcome)?;
-        let epistemic_class = match causal_support {
+        let epistemic_class = match &causal_support {
             CausalSupport::Identified { .. } => ScenarioEpistemicClass::CausallyIdentified,
             CausalSupport::Unidentified { .. } => ScenarioEpistemicClass::CausallyUnidentified,
             CausalSupport::AssumptionRequired { .. } => {
@@ -316,6 +340,13 @@ impl CounterfactualScenarioEnvelope {
         for assumption in &assumptions {
             non_empty(assumption, "scenario assumption")?;
         }
+        for model in &models {
+            non_empty(&model.model_id, "scenario model id")?;
+            non_empty(&model.version, "scenario model version")?;
+            if let Some(digest) = &model.artifact_digest {
+                non_empty(digest, "scenario model artifact digest")?;
+            }
+        }
 
         Ok(Self {
             id,
@@ -360,9 +391,7 @@ impl CounterfactualScenarioEnvelope {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_causal_reasoning::counterfactual::{
-        CausalEstimand, CausalQueryOutcome,
-    };
+    use symthaea_causal_reasoning::counterfactual::{CausalEstimand, CausalQueryOutcome};
     use symthaea_earth_causal_query::EarthCausalQueryOutcome;
 
     fn intervention() -> ScenarioIntervention {
@@ -370,7 +399,10 @@ mod tests {
     }
 
     fn model() -> ScenarioModelRef {
-        ScenarioModelRef::new("watershed-twin", "0.1.0", ScenarioModelRole::DigitalTwin).unwrap()
+        ScenarioModelRef::new("watershed-twin", "0.1.0", ScenarioModelRole::DigitalTwin)
+            .unwrap()
+            .with_artifact_digest("sha256:fixture-model")
+            .unwrap()
     }
 
     #[test]
@@ -463,6 +495,15 @@ mod tests {
         let mapped = ScenarioIntervention::try_from(&twin).unwrap();
         assert_eq!(mapped.target, "pump-7");
         assert_eq!(mapped.action, "inspect");
+        assert_eq!(mapped.urgency, Some(0.8));
+    }
+
+    #[test]
+    fn invalid_urgency_is_rejected() {
+        assert_eq!(
+            intervention().with_urgency(1.5).unwrap_err(),
+            ScenarioError::InvalidUrgency(1.5)
+        );
     }
 
     #[test]
