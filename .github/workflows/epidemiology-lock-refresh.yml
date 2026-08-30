@@ -1,0 +1,42 @@
+name: Epidemiology One-Shot Lock Refresh
+
+on:
+  push:
+    branches:
+      - feat/public-health-surveillance-reasoning-v1
+    paths:
+      - ".github/workflows/epidemiology-lock-refresh.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-lock:
+    name: Regenerate epidemiology lock metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/public-health-surveillance-reasoning-v1
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Regenerate Cargo.lock from the exact manifest graph
+        run: cargo metadata --format-version 1 --no-deps > /dev/null
+
+      - name: Commit lock metadata if required
+        shell: bash
+        run: |
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches the manifest graph"
+            exit 0
+          fi
+
+          git diff --check -- Cargo.lock
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git commit -m "chore(epidemiology): refresh workspace lock metadata"
+          git push origin HEAD:feat/public-health-surveillance-reasoning-v1
