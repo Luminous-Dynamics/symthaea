@@ -18,9 +18,11 @@ fn stable_channel_ids_are_unique_and_complete() {
 fn lower_viability_boundary_normalizes_to_one_for_every_channel() {
     for channel in ViabilityChannel::ALL {
         let baseline = NativeInteroceptiveState::default();
-        let variable = baseline.get(channel);
-        assert!(variable.viable_low() < variable.preferred_low());
-        let state = baseline.with_value(channel, variable.viable_low());
+        let viable_low = baseline.get(channel).viable_low();
+        let preferred_low = baseline.get(channel).preferred_low();
+        assert!(viable_low < preferred_low);
+
+        let state = baseline.with_value(channel, viable_low);
         let deviation = state.get(channel).normalized_deviation();
 
         assert!(
@@ -34,8 +36,9 @@ fn lower_viability_boundary_normalizes_to_one_for_every_channel() {
 fn undriven_recovery_never_increases_deviation_from_below_the_preferred_band() {
     for channel in ViabilityChannel::ALL {
         let baseline = NativeInteroceptiveState::default();
-        let variable = baseline.get(channel);
-        let initial = 0.5 * (variable.viable_low() + variable.preferred_low());
+        let viable_low = baseline.get(channel).viable_low();
+        let preferred_low = baseline.get(channel).preferred_low();
+        let initial = 0.5 * (viable_low + preferred_low);
         let state = baseline.with_value(channel, initial);
 
         let mut model = NativeInteroceptiveModel::new(state, Default::default());
