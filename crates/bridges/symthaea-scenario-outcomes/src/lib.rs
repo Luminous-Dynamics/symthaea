@@ -10,6 +10,8 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+use symthaea_scenario_evidence::CounterfactualScenarioEnvelope;
+
 pub type Result<T> = std::result::Result<T, OutcomeError>;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -287,6 +289,15 @@ impl ScenarioOutcomeVector {
         })
     }
 
+    /// Bind outcomes directly to an existing scenario envelope rather than
+    /// duplicating its identifier manually at call sites.
+    pub fn for_scenario(
+        scenario: &CounterfactualScenarioEnvelope,
+        dimensions: Vec<OutcomeDimension>,
+    ) -> Result<Self> {
+        Self::new(scenario.id(), dimensions)
+    }
+
     pub fn dimension(&self, id: &str) -> Option<&OutcomeDimension> {
         self.dimensions.iter().find(|dimension| dimension.id == id)
     }
@@ -295,12 +306,25 @@ impl ScenarioOutcomeVector {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_scenario_evidence::{
+        CounterfactualScenarioEnvelope, ScenarioIntervention, ScenarioModelRef, ScenarioModelRole,
+    };
 
     fn source() -> OutcomeSourceRef {
         OutcomeSourceRef::ScenarioModelOutput {
             model_id: "watershed-twin".into(),
             run_id: "run-001".into(),
         }
+    }
+
+    fn dimension(id: &str) -> OutcomeDimension {
+        OutcomeDimension::new(
+            id,
+            id,
+            OutcomeEstimate::point(1.0, "unit").unwrap(),
+            vec![source()],
+        )
+        .unwrap()
     }
 
     #[test]
@@ -323,11 +347,8 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            ScenarioOutcomeVector::new(
-                "scenario-1",
-                vec![dimension.clone(), dimension],
-            )
-            .unwrap_err(),
+            ScenarioOutcomeVector::new("scenario-1", vec![dimension.clone(), dimension])
+                .unwrap_err(),
             OutcomeError::DuplicateDimension("water-reliability".into())
         );
     }
@@ -406,5 +427,26 @@ mod tests {
         let vector = ScenarioOutcomeVector::new("scenario-2", vec![water, habitat, cost]).unwrap();
         assert_eq!(vector.dimensions.len(), 3);
         assert_eq!(vector.dimension("wetland-area").unwrap().estimate.unit, "ha");
+    }
+
+    #[test]
+    fn outcome_vector_can_bind_to_scenario_without_retyping_id() {
+        let scenario = CounterfactualScenarioEnvelope::simulation_only(
+            "scenario-bound",
+            vec!["baseline-1".into()],
+            ScenarioIntervention::new("wetland-1", "restore", "test restoration").unwrap(),
+            vec![ScenarioModelRef::new(
+                "watershed-twin",
+                "0.1.0",
+                ScenarioModelRole::DigitalTwin,
+            )
+            .unwrap()],
+            vec![],
+        )
+        .unwrap();
+
+        let vector = ScenarioOutcomeVector::for_scenario(&scenario, vec![dimension("water")])
+            .unwrap();
+        assert_eq!(vector.scenario_id, scenario.id());
     }
 }
