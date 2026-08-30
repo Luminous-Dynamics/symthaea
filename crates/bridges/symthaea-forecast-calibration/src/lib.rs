@@ -1,134 +1,144 @@
-//! Append-only forecast verification and calibration contracts.
+//! Physical-world forecast provenance adapter for the Symthaea Futures Laboratory.
 //!
-//! Forecasts must exist before their validity window, verification refers back
-//! to the immutable forecast id, and calibration reports preserve misses as well
-//! as hits. This crate does not produce a universal model trust score.
+//! Planetary Perception does not define a second forecast language or scoring
+//! system. Forecast distributions, abstentions, and proper scoring rules come
+//! from `symthaea-futures-core` / `symthaea-futures-calibration`. This bridge
+//! adds Earth-facing wall-clock binding and verification evidence.
 
-use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
 use symthaea_earth_observation::{EvidenceRef, EvidenceStage};
-use symthaea_scenario_outcomes::OutcomeEstimate;
+use symthaea_futures_calibration::{
+    BrierScore, Crps, FiniteScore, LogScore, ScoringRule, ScoringRuleKind,
+};
+use symthaea_futures_core::{
+    AbstentionReason, ForecastDistribution, ForecastOutput, Horizon, OutcomeRegion,
+};
 
-pub type Result<T> = std::result::Result<T, CalibrationError>;
+pub type Result<T> = std::result::Result<T, CalibrationBridgeError>;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum CalibrationError {
+pub enum CalibrationBridgeError {
     EmptyField(&'static str),
-    NonFinite { field: &'static str, value: f64 },
-    InvalidProbability(f64),
-    InvalidForecastWindow { issued_at: i64, valid_from: i64, valid_until: i64 },
+    ZeroTickDuration,
+    ClockOverflow,
+    InvalidVerificationWindow { valid_from: i64, valid_until: i64 },
+    TargetOutsideVerificationWindow { target: i64, valid_from: i64, valid_until: i64 },
+    DistributionTickMismatch { record_tick: u64, distribution_tick: u64 },
+    DistributionHorizonMismatch { record_horizon: u64, distribution_horizon: u64 },
     DuplicateForecast(String),
     UnknownForecast(String),
-    DuplicateVerification(String),
+    DuplicateResolution(String),
     VerificationOutsideWindow { observed_for: i64, valid_from: i64, valid_until: i64 },
     MissingVerificationEvidence,
     VerificationEvidenceNotVerificationStage(String),
-    VerificationKindMismatch,
-    UnitMismatch { expected: String, got: String },
+    Scoring(String),
     NoForecastsForModelTarget,
 }
 
-impl Display for CalibrationError {
+impl Display for CalibrationBridgeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EmptyField(field) => write!(f, "{field} must not be empty"),
-            Self::NonFinite { field, value } => write!(f, "{field} must be finite, got {value}"),
-            Self::InvalidProbability(value) => write!(f, "probability must be in [0,1], got {value}"),
-            Self::InvalidForecastWindow { issued_at, valid_from, valid_until } => write!(
+            Self::ZeroTickDuration => write!(f, "physical forecast tick duration must be > 0 ms"),
+            Self::ClockOverflow => write!(f, "physical forecast clock mapping overflowed i64 milliseconds"),
+            Self::InvalidVerificationWindow { valid_from, valid_until } => write!(
                 f,
-                "forecast must be issued before a non-empty validity window: issued={issued_at}, valid_from={valid_from}, valid_until={valid_until}"
+                "verification window requires valid_from <= valid_until, got {valid_from}..={valid_until}"
+            ),
+            Self::TargetOutsideVerificationWindow { target, valid_from, valid_until } => write!(
+                f,
+                "forecast target time {target} lies outside verification window {valid_from}..={valid_until}"
+            ),
+            Self::DistributionTickMismatch { record_tick, distribution_tick } => write!(
+                f,
+                "record issued tick {record_tick} differs from canonical forecast tick {distribution_tick}"
+            ),
+            Self::DistributionHorizonMismatch { record_horizon, distribution_horizon } => write!(
+                f,
+                "record horizon {record_horizon} differs from canonical forecast horizon {distribution_horizon}"
             ),
             Self::DuplicateForecast(id) => write!(f, "forecast {id} already exists"),
             Self::UnknownForecast(id) => write!(f, "forecast {id} does not exist"),
-            Self::DuplicateVerification(id) => write!(f, "forecast {id} is already verified"),
+            Self::DuplicateResolution(id) => write!(f, "forecast {id} is already resolved"),
             Self::VerificationOutsideWindow { observed_for, valid_from, valid_until } => write!(
                 f,
-                "verification target time {observed_for} is outside [{valid_from}, {valid_until}]"
+                "verification target time {observed_for} is outside {valid_from}..={valid_until}"
             ),
-            Self::MissingVerificationEvidence => write!(f, "forecast verification requires evidence"),
+            Self::MissingVerificationEvidence => write!(f, "forecast verification requires explicit verification evidence"),
             Self::VerificationEvidenceNotVerificationStage(id) => write!(
                 f,
-                "verification evidence {id} must be explicitly marked EvidenceStage::Verification"
+                "verification evidence {id} must be EvidenceStage::Verification"
             ),
-            Self::VerificationKindMismatch => write!(f, "forecast and verification kinds do not match"),
-            Self::UnitMismatch { expected, got } => write!(f, "unit mismatch: expected {expected}, got {got}"),
-            Self::NoForecastsForModelTarget => write!(f, "no forecasts exist for requested model/target"),
+            Self::Scoring(message) => write!(f, "Futures Laboratory scoring failed: {message}"),
+            Self::NoForecastsForModelTarget => write!(f, "no forecasts exist for requested model/target/rule"),
         }
     }
 }
 
-impl Error for CalibrationError {}
+impl Error for CalibrationBridgeError {}
 
 fn non_empty(value: &str, field: &'static str) -> Result<()> {
     if value.trim().is_empty() {
-        return Err(CalibrationError::EmptyField(field));
+        return Err(CalibrationBridgeError::EmptyField(field));
     }
     Ok(())
 }
 
-fn finite(value: f64, field: &'static str) -> Result<()> {
-    if !value.is_finite() {
-        return Err(CalibrationError::NonFinite { field, value });
-    }
-    Ok(())
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PhysicalTimeBinding {
+    pub tick_zero_unix_ms: i64,
+    pub tick_duration_ms: u64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum ForecastValue {
-    Numeric(OutcomeEstimate),
-    BinaryProbability(f64),
-}
-
-impl ForecastValue {
-    fn validate(&self) -> Result<()> {
-        match self {
-            Self::Numeric(estimate) => {
-                finite(estimate.point, "numeric forecast point")?;
-                if let Some(lower) = estimate.lower {
-                    finite(lower, "numeric forecast lower")?;
-                }
-                if let Some(upper) = estimate.upper {
-                    finite(upper, "numeric forecast upper")?;
-                }
-                non_empty(&estimate.unit, "numeric forecast unit")
-            }
-            Self::BinaryProbability(probability) => {
-                if !probability.is_finite() || !(0.0..=1.0).contains(probability) {
-                    return Err(CalibrationError::InvalidProbability(*probability));
-                }
-                Ok(())
-            }
+impl PhysicalTimeBinding {
+    pub fn new(tick_zero_unix_ms: i64, tick_duration_ms: u64) -> Result<Self> {
+        if tick_duration_ms == 0 {
+            return Err(CalibrationBridgeError::ZeroTickDuration);
         }
+        Ok(Self { tick_zero_unix_ms, tick_duration_ms })
+    }
+
+    pub fn unix_ms_for_tick(&self, tick: u64) -> Result<i64> {
+        let value = i128::from(self.tick_zero_unix_ms)
+            + i128::from(tick) * i128::from(self.tick_duration_ms);
+        i64::try_from(value).map_err(|_| CalibrationBridgeError::ClockOverflow)
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ForecastRecord {
+#[derive(Debug, Clone)]
+pub struct PhysicalForecastRecord {
     pub id: String,
     pub model_id: String,
     pub model_version: String,
     pub target_id: String,
     pub scenario_id: Option<String>,
-    pub issued_at_unix_ms: i64,
+    pub issued_tick: u64,
+    pub horizon: Horizon,
+    pub clock: PhysicalTimeBinding,
     pub valid_from_unix_ms: i64,
     pub valid_until_unix_ms: i64,
-    pub value: ForecastValue,
+    pub output: ForecastOutput,
+    pub scoring_rule: ScoringRuleKind,
     pub model_artifact_digest: Option<String>,
     pub assumptions: Vec<String>,
 }
 
-impl ForecastRecord {
+impl PhysicalForecastRecord {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: impl Into<String>,
         model_id: impl Into<String>,
         model_version: impl Into<String>,
         target_id: impl Into<String>,
-        issued_at_unix_ms: i64,
+        issued_tick: u64,
+        horizon: Horizon,
+        clock: PhysicalTimeBinding,
         valid_from_unix_ms: i64,
         valid_until_unix_ms: i64,
-        value: ForecastValue,
+        output: ForecastOutput,
+        scoring_rule: ScoringRuleKind,
     ) -> Result<Self> {
         let id = id.into();
         let model_id = model_id.into();
@@ -138,27 +148,63 @@ impl ForecastRecord {
         non_empty(&model_id, "forecast model id")?;
         non_empty(&model_version, "forecast model version")?;
         non_empty(&target_id, "forecast target id")?;
-        if valid_until_unix_ms < valid_from_unix_ms || issued_at_unix_ms > valid_from_unix_ms {
-            return Err(CalibrationError::InvalidForecastWindow {
-                issued_at: issued_at_unix_ms,
+        if valid_until_unix_ms < valid_from_unix_ms {
+            return Err(CalibrationBridgeError::InvalidVerificationWindow {
                 valid_from: valid_from_unix_ms,
                 valid_until: valid_until_unix_ms,
             });
         }
-        value.validate()?;
+
+        let target_tick = issued_tick.checked_add(horizon.0).ok_or(CalibrationBridgeError::ClockOverflow)?;
+        let target_unix_ms = clock.unix_ms_for_tick(target_tick)?;
+        if target_unix_ms < valid_from_unix_ms || target_unix_ms > valid_until_unix_ms {
+            return Err(CalibrationBridgeError::TargetOutsideVerificationWindow {
+                target: target_unix_ms,
+                valid_from: valid_from_unix_ms,
+                valid_until: valid_until_unix_ms,
+            });
+        }
+
+        if let ForecastOutput::Distribution(distribution) = &output {
+            if distribution.issued_at_tick() != issued_tick {
+                return Err(CalibrationBridgeError::DistributionTickMismatch {
+                    record_tick: issued_tick,
+                    distribution_tick: distribution.issued_at_tick(),
+                });
+            }
+            if distribution.horizon() != horizon {
+                return Err(CalibrationBridgeError::DistributionHorizonMismatch {
+                    record_horizon: horizon.0,
+                    distribution_horizon: distribution.horizon().0,
+                });
+            }
+        }
+
         Ok(Self {
             id,
             model_id,
             model_version,
             target_id,
             scenario_id: None,
-            issued_at_unix_ms,
+            issued_tick,
+            horizon,
+            clock,
             valid_from_unix_ms,
             valid_until_unix_ms,
-            value,
+            output,
+            scoring_rule,
             model_artifact_digest: None,
             assumptions: Vec::new(),
         })
+    }
+
+    pub fn issued_at_unix_ms(&self) -> Result<i64> {
+        self.clock.unix_ms_for_tick(self.issued_tick)
+    }
+
+    pub fn target_unix_ms(&self) -> Result<i64> {
+        let target_tick = self.issued_tick.checked_add(self.horizon.0).ok_or(CalibrationBridgeError::ClockOverflow)?;
+        self.clock.unix_ms_for_tick(target_tick)
     }
 
     pub fn with_scenario_id(mut self, scenario_id: impl Into<String>) -> Result<Self> {
@@ -183,435 +229,243 @@ impl ForecastRecord {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum VerifiedOutcome {
-    Numeric { value: f64, unit: String },
-    Binary(bool),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ForecastVerification {
+#[derive(Debug, Clone)]
+pub struct PhysicalForecastVerification {
     pub forecast_id: String,
-    /// Time in the physical world to which the observed outcome applies.
     pub observed_for_unix_ms: i64,
-    /// Time verification was recorded; this may be later than the target time.
     pub recorded_at_unix_ms: i64,
-    pub outcome: VerifiedOutcome,
+    pub actual: OutcomeRegion,
     pub evidence: Vec<EvidenceRef>,
 }
 
-impl ForecastVerification {
+impl PhysicalForecastVerification {
     pub fn new(
         forecast_id: impl Into<String>,
         observed_for_unix_ms: i64,
         recorded_at_unix_ms: i64,
-        outcome: VerifiedOutcome,
+        actual: OutcomeRegion,
         evidence: Vec<EvidenceRef>,
     ) -> Result<Self> {
         let forecast_id = forecast_id.into();
         non_empty(&forecast_id, "forecast verification id")?;
         if evidence.is_empty() {
-            return Err(CalibrationError::MissingVerificationEvidence);
+            return Err(CalibrationBridgeError::MissingVerificationEvidence);
         }
         for reference in &evidence {
             if reference.stage != EvidenceStage::Verification {
-                return Err(CalibrationError::VerificationEvidenceNotVerificationStage(
-                    reference.id.clone(),
-                ));
+                return Err(CalibrationBridgeError::VerificationEvidenceNotVerificationStage(reference.id.clone()));
             }
         }
-        match &outcome {
-            VerifiedOutcome::Numeric { value, unit } => {
-                finite(*value, "verified numeric outcome")?;
-                non_empty(unit, "verified numeric outcome unit")?;
-            }
-            VerifiedOutcome::Binary(_) => {}
-        }
-        Ok(Self {
-            forecast_id,
-            observed_for_unix_ms,
-            recorded_at_unix_ms,
-            outcome,
-            evidence,
-        })
+        Ok(Self { forecast_id, observed_for_unix_ms, recorded_at_unix_ms, actual, evidence })
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct NumericForecastScore {
-    pub error: f64,
-    pub absolute_error: f64,
-    pub squared_error: f64,
-    pub interval_hit: Option<bool>,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ForecastResolutionScore {
+    ProperScore(FiniteScore),
+    Abstained(AbstentionReason),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct BinaryForecastScore {
-    pub brier_score: f64,
+#[derive(Debug, Clone)]
+pub struct ResolvedPhysicalForecast {
+    pub forecast: PhysicalForecastRecord,
+    pub verification: PhysicalForecastVerification,
+    pub resolution: ForecastResolutionScore,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum ForecastScore {
-    Numeric(NumericForecastScore),
-    Binary(BinaryForecastScore),
+fn proper_score(rule: ScoringRuleKind, forecast: &ForecastDistribution, actual: &OutcomeRegion) -> Result<FiniteScore> {
+    let score = match rule {
+        ScoringRuleKind::Brier => BrierScore.score(forecast, actual),
+        ScoringRuleKind::Crps => Crps.score(forecast, actual),
+        ScoringRuleKind::LogScore => LogScore::default().score(forecast, actual),
+    };
+    score.map_err(|error| CalibrationBridgeError::Scoring(error.to_string()))
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct VerifiedForecast {
-    pub forecast: ForecastRecord,
-    pub verification: ForecastVerification,
-    pub score: ForecastScore,
+#[derive(Debug, Clone, Default)]
+pub struct PhysicalForecastLedger {
+    forecasts: Vec<PhysicalForecastRecord>,
+    resolved: Vec<ResolvedPhysicalForecast>,
 }
 
-fn score(forecast: &ForecastRecord, verification: &ForecastVerification) -> Result<ForecastScore> {
-    match (&forecast.value, &verification.outcome) {
-        (ForecastValue::Numeric(estimate), VerifiedOutcome::Numeric { value, unit }) => {
-            if &estimate.unit != unit {
-                return Err(CalibrationError::UnitMismatch {
-                    expected: estimate.unit.clone(),
-                    got: unit.clone(),
-                });
-            }
-            let error = estimate.point - *value;
-            let interval_hit = match (estimate.lower, estimate.upper) {
-                (Some(lower), Some(upper)) => Some(*value >= lower && *value <= upper),
-                _ => None,
-            };
-            Ok(ForecastScore::Numeric(NumericForecastScore {
-                error,
-                absolute_error: error.abs(),
-                squared_error: error * error,
-                interval_hit,
-            }))
-        }
-        (ForecastValue::BinaryProbability(probability), VerifiedOutcome::Binary(observed)) => {
-            let y = if *observed { 1.0 } else { 0.0 };
-            let error = probability - y;
-            Ok(ForecastScore::Binary(BinaryForecastScore {
-                brier_score: error * error,
-            }))
-        }
-        _ => Err(CalibrationError::VerificationKindMismatch),
-    }
-}
+impl PhysicalForecastLedger {
+    pub fn new() -> Self { Self::default() }
+    pub fn forecasts(&self) -> &[PhysicalForecastRecord] { &self.forecasts }
+    pub fn resolved(&self) -> &[ResolvedPhysicalForecast] { &self.resolved }
 
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct ForecastCalibrationLedger {
-    forecasts: Vec<ForecastRecord>,
-    verified: Vec<VerifiedForecast>,
-}
-
-impl ForecastCalibrationLedger {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn forecasts(&self) -> &[ForecastRecord] {
-        &self.forecasts
-    }
-
-    pub fn verified(&self) -> &[VerifiedForecast] {
-        &self.verified
-    }
-
-    pub fn register_forecast(&mut self, forecast: ForecastRecord) -> Result<()> {
+    pub fn register(&mut self, forecast: PhysicalForecastRecord) -> Result<()> {
         if self.forecasts.iter().any(|existing| existing.id == forecast.id) {
-            return Err(CalibrationError::DuplicateForecast(forecast.id));
+            return Err(CalibrationBridgeError::DuplicateForecast(forecast.id));
         }
         self.forecasts.push(forecast);
         Ok(())
     }
 
-    pub fn verify(&mut self, verification: ForecastVerification) -> Result<&VerifiedForecast> {
-        if self
-            .verified
-            .iter()
-            .any(|existing| existing.forecast.id == verification.forecast_id)
-        {
-            return Err(CalibrationError::DuplicateVerification(
-                verification.forecast_id,
-            ));
+    pub fn resolve(&mut self, verification: PhysicalForecastVerification) -> Result<&ResolvedPhysicalForecast> {
+        if self.resolved.iter().any(|existing| existing.forecast.id == verification.forecast_id) {
+            return Err(CalibrationBridgeError::DuplicateResolution(verification.forecast_id));
         }
-
-        let Some(forecast) = self
-            .forecasts
-            .iter()
-            .find(|forecast| forecast.id == verification.forecast_id)
-            .cloned()
-        else {
-            return Err(CalibrationError::UnknownForecast(
-                verification.forecast_id,
-            ));
+        let Some(forecast) = self.forecasts.iter().find(|forecast| forecast.id == verification.forecast_id).cloned() else {
+            return Err(CalibrationBridgeError::UnknownForecast(verification.forecast_id));
         };
-
-        if verification.observed_for_unix_ms < forecast.valid_from_unix_ms
-            || verification.observed_for_unix_ms > forecast.valid_until_unix_ms
-        {
-            return Err(CalibrationError::VerificationOutsideWindow {
+        if verification.observed_for_unix_ms < forecast.valid_from_unix_ms || verification.observed_for_unix_ms > forecast.valid_until_unix_ms {
+            return Err(CalibrationBridgeError::VerificationOutsideWindow {
                 observed_for: verification.observed_for_unix_ms,
                 valid_from: forecast.valid_from_unix_ms,
                 valid_until: forecast.valid_until_unix_ms,
             });
         }
-
-        let score = score(&forecast, &verification)?;
-        self.verified.push(VerifiedForecast {
-            forecast,
-            verification,
-            score,
-        });
-        Ok(self.verified.last().expect("just pushed verified forecast"))
+        let resolution = match &forecast.output {
+            ForecastOutput::Distribution(distribution) => ForecastResolutionScore::ProperScore(
+                proper_score(forecast.scoring_rule, distribution, &verification.actual)?,
+            ),
+            ForecastOutput::Abstain(reason) => ForecastResolutionScore::Abstained(*reason),
+        };
+        self.resolved.push(ResolvedPhysicalForecast { forecast, verification, resolution });
+        Ok(self.resolved.last().expect("resolved forecast was just pushed"))
     }
 
     pub fn pending_forecast_ids(&self) -> Vec<&str> {
-        let verified: HashSet<&str> = self
-            .verified
-            .iter()
-            .map(|entry| entry.forecast.id.as_str())
-            .collect();
-        self.forecasts
-            .iter()
-            .filter(|forecast| !verified.contains(forecast.id.as_str()))
+        self.forecasts.iter()
+            .filter(|forecast| !self.resolved.iter().any(|resolved| resolved.forecast.id == forecast.id))
             .map(|forecast| forecast.id.as_str())
             .collect()
     }
 
-    pub fn report(&self, model_id: &str, target_id: &str) -> Result<ModelTargetCalibrationReport> {
-        let all: Vec<&ForecastRecord> = self
-            .forecasts
-            .iter()
-            .filter(|forecast| forecast.model_id == model_id && forecast.target_id == target_id)
+    pub fn report(&self, model_id: &str, target_id: &str, scoring_rule: ScoringRuleKind) -> Result<PhysicalForecastReport> {
+        let all: Vec<&PhysicalForecastRecord> = self.forecasts.iter()
+            .filter(|forecast| forecast.model_id == model_id && forecast.target_id == target_id && forecast.scoring_rule == scoring_rule)
             .collect();
         if all.is_empty() {
-            return Err(CalibrationError::NoForecastsForModelTarget);
+            return Err(CalibrationBridgeError::NoForecastsForModelTarget);
         }
-
-        let verified: Vec<&VerifiedForecast> = self
-            .verified
-            .iter()
-            .filter(|entry| entry.forecast.model_id == model_id && entry.forecast.target_id == target_id)
+        let resolved: Vec<&ResolvedPhysicalForecast> = self.resolved.iter()
+            .filter(|entry| entry.forecast.model_id == model_id && entry.forecast.target_id == target_id && entry.forecast.scoring_rule == scoring_rule)
             .collect();
-
-        let mut numeric_count = 0usize;
-        let mut abs_error_sum = 0.0;
-        let mut squared_error_sum = 0.0;
-        let mut interval_scored = 0usize;
-        let mut interval_hits = 0usize;
-        let mut binary_count = 0usize;
-        let mut brier_sum = 0.0;
-
-        for entry in &verified {
-            match &entry.score {
-                ForecastScore::Numeric(score) => {
-                    numeric_count += 1;
-                    abs_error_sum += score.absolute_error;
-                    squared_error_sum += score.squared_error;
-                    if let Some(hit) = score.interval_hit {
-                        interval_scored += 1;
-                        if hit {
-                            interval_hits += 1;
-                        }
-                    }
-                }
-                ForecastScore::Binary(score) => {
-                    binary_count += 1;
-                    brier_sum += score.brier_score;
-                }
-            }
-        }
-
-        Ok(ModelTargetCalibrationReport {
+        let scores: Vec<f64> = resolved.iter().filter_map(|entry| match entry.resolution {
+            ForecastResolutionScore::ProperScore(score) => Some(score.get()),
+            ForecastResolutionScore::Abstained(_) => None,
+        }).collect();
+        let abstained = resolved.len() - scores.len();
+        let mean_proper_score = (!scores.is_empty()).then(|| scores.iter().sum::<f64>() / scores.len() as f64);
+        Ok(PhysicalForecastReport {
             model_id: model_id.to_string(),
             target_id: target_id.to_string(),
+            scoring_rule,
             total_forecasts: all.len(),
-            verified_forecasts: verified.len(),
-            pending_forecasts: all.len() - verified.len(),
-            numeric_count,
-            mean_absolute_error: (numeric_count > 0).then(|| abs_error_sum / numeric_count as f64),
-            root_mean_squared_error: (numeric_count > 0)
-                .then(|| (squared_error_sum / numeric_count as f64).sqrt()),
-            interval_scored,
-            interval_coverage: (interval_scored > 0)
-                .then(|| interval_hits as f64 / interval_scored as f64),
-            binary_count,
-            mean_brier_score: (binary_count > 0).then(|| brier_sum / binary_count as f64),
+            resolved_forecasts: resolved.len(),
+            pending_forecasts: all.len() - resolved.len(),
+            scored_forecasts: scores.len(),
+            abstained_forecasts: abstained,
+            mean_proper_score,
         })
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModelTargetCalibrationReport {
+pub struct PhysicalForecastReport {
     pub model_id: String,
     pub target_id: String,
+    pub scoring_rule: ScoringRuleKind,
     pub total_forecasts: usize,
-    pub verified_forecasts: usize,
+    pub resolved_forecasts: usize,
     pub pending_forecasts: usize,
-    pub numeric_count: usize,
-    pub mean_absolute_error: Option<f64>,
-    pub root_mean_squared_error: Option<f64>,
-    pub interval_scored: usize,
-    pub interval_coverage: Option<f64>,
-    pub binary_count: usize,
-    pub mean_brier_score: Option<f64>,
+    pub scored_forecasts: usize,
+    pub abstained_forecasts: usize,
+    pub mean_proper_score: Option<f64>,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_futures_core::{ForecastDistribution, OutcomeSpaceId};
 
-    fn verification_ref(id: &str) -> EvidenceRef {
-        EvidenceRef::new(id, EvidenceStage::Verification).unwrap()
+    fn clock() -> PhysicalTimeBinding { PhysicalTimeBinding::new(1_000, 100).unwrap() }
+    fn evidence(stage: EvidenceStage) -> EvidenceRef { EvidenceRef::new("verify-1", stage).unwrap() }
+
+    fn boolean_distribution() -> ForecastDistribution {
+        ForecastDistribution::try_from_raw(
+            2,
+            Horizon(3),
+            OutcomeSpaceId("flood-within-horizon".into()),
+            vec![
+                (0.8, OutcomeRegion::Boolean(true), vec![]),
+                (0.2, OutcomeRegion::Boolean(false), vec![]),
+            ],
+            0.0,
+        ).unwrap()
     }
 
-    fn numeric_forecast(id: &str, point: f64, lower: f64, upper: f64) -> ForecastRecord {
-        ForecastRecord::new(
-            id,
-            "watershed-model",
-            "1.0",
-            "wetland-area",
-            0,
-            100,
-            200,
-            ForecastValue::Numeric(OutcomeEstimate::interval(point, lower, upper, "ha").unwrap()),
-        )
-        .unwrap()
+    fn record(output: ForecastOutput) -> PhysicalForecastRecord {
+        PhysicalForecastRecord::new(
+            "forecast-1", "wetland-model", "0.1.0", "flood-within-horizon",
+            2, Horizon(3), clock(), 1_490, 1_510, output, ScoringRuleKind::Brier,
+        ).unwrap()
     }
 
     #[test]
-    fn forecast_cannot_be_registered_after_its_window_starts() {
+    fn physical_clock_binding_is_explicit_and_checked() {
+        assert_eq!(clock().unix_ms_for_tick(5).unwrap(), 1_500);
+        assert_eq!(PhysicalTimeBinding::new(0, 0).unwrap_err(), CalibrationBridgeError::ZeroTickDuration);
+    }
+
+    #[test]
+    fn canonical_distribution_tick_must_match_physical_record() {
+        let distribution = ForecastDistribution::try_from_raw(
+            3, Horizon(3), OutcomeSpaceId("flood-within-horizon".into()),
+            vec![(0.5, OutcomeRegion::Boolean(true), vec![]), (0.5, OutcomeRegion::Boolean(false), vec![])], 0.0,
+        ).unwrap();
         assert!(matches!(
-            ForecastRecord::new(
-                "late",
-                "m",
-                "1",
-                "target",
-                101,
-                100,
-                200,
-                ForecastValue::BinaryProbability(0.7),
+            PhysicalForecastRecord::new(
+                "forecast-x", "model", "1", "target", 2, Horizon(3), clock(), 1_490, 1_510,
+                ForecastOutput::Distribution(distribution), ScoringRuleKind::Brier,
             ),
-            Err(CalibrationError::InvalidForecastWindow { .. })
+            Err(CalibrationBridgeError::DistributionTickMismatch { .. })
         ));
     }
 
     #[test]
-    fn verification_requires_explicit_verification_stage_evidence() {
-        let ordinary = EvidenceRef::new("obs", EvidenceStage::Observation).unwrap();
-        assert_eq!(
-            ForecastVerification::new(
-                "f",
-                150,
-                210,
-                VerifiedOutcome::Binary(true),
-                vec![ordinary],
-            )
-            .unwrap_err(),
-            CalibrationError::VerificationEvidenceNotVerificationStage("obs".into())
-        );
+    fn uses_futures_lab_multi_class_brier_convention() {
+        let mut ledger = PhysicalForecastLedger::new();
+        ledger.register(record(ForecastOutput::Distribution(boolean_distribution()))).unwrap();
+        let verification = PhysicalForecastVerification::new(
+            "forecast-1", 1_500, 1_600, OutcomeRegion::Boolean(true),
+            vec![evidence(EvidenceStage::Verification)],
+        ).unwrap();
+        let resolved = ledger.resolve(verification).unwrap();
+        let ForecastResolutionScore::ProperScore(score) = resolved.resolution else { panic!("expected proper score") };
+        assert!((score.get() - 0.08).abs() < 1e-12);
     }
 
     #[test]
-    fn numeric_hit_and_error_are_recorded_without_a_trust_score() {
-        let mut ledger = ForecastCalibrationLedger::new();
-        ledger.register_forecast(numeric_forecast("f1", 100.0, 90.0, 110.0)).unwrap();
-        ledger
-            .verify(
-                ForecastVerification::new(
-                    "f1",
-                    150,
-                    220,
-                    VerifiedOutcome::Numeric {
-                        value: 105.0,
-                        unit: "ha".into(),
-                    },
-                    vec![verification_ref("v1")],
-                )
-                .unwrap(),
-            )
-            .unwrap();
-
-        let ForecastScore::Numeric(score) = &ledger.verified()[0].score else {
-            panic!("expected numeric score");
-        };
-        assert_eq!(score.absolute_error, 5.0);
-        assert_eq!(score.interval_hit, Some(true));
+    fn verification_requires_verification_stage_evidence() {
+        assert!(matches!(
+            PhysicalForecastVerification::new(
+                "forecast-1", 1_500, 1_600, OutcomeRegion::Boolean(true),
+                vec![evidence(EvidenceStage::Observation)],
+            ),
+            Err(CalibrationBridgeError::VerificationEvidenceNotVerificationStage(_))
+        ));
     }
 
     #[test]
-    fn binary_forecasts_use_brier_score() {
-        let mut ledger = ForecastCalibrationLedger::new();
-        ledger
-            .register_forecast(
-                ForecastRecord::new(
-                    "f1",
-                    "flood-model",
-                    "1.0",
-                    "flood-next-pass",
-                    0,
-                    100,
-                    200,
-                    ForecastValue::BinaryProbability(0.8),
-                )
-                .unwrap(),
-            )
-            .unwrap();
-        ledger
-            .verify(
-                ForecastVerification::new(
-                    "f1",
-                    150,
-                    220,
-                    VerifiedOutcome::Binary(true),
-                    vec![verification_ref("v1")],
-                )
-                .unwrap(),
-            )
-            .unwrap();
-
-        let ForecastScore::Binary(score) = &ledger.verified()[0].score else {
-            panic!("expected binary score");
-        };
-        assert!((score.brier_score - 0.04).abs() < 1e-12);
+    fn abstention_is_retained_and_not_scored_as_failure_sentinel() {
+        let mut ledger = PhysicalForecastLedger::new();
+        ledger.register(record(ForecastOutput::Abstain(AbstentionReason::OutOfDistributionScenario))).unwrap();
+        ledger.resolve(PhysicalForecastVerification::new(
+            "forecast-1", 1_500, 1_600, OutcomeRegion::Boolean(true),
+            vec![evidence(EvidenceStage::Verification)],
+        ).unwrap()).unwrap();
+        let report = ledger.report("wetland-model", "flood-within-horizon", ScoringRuleKind::Brier).unwrap();
+        assert_eq!(report.scored_forecasts, 0);
+        assert_eq!(report.abstained_forecasts, 1);
+        assert_eq!(report.mean_proper_score, None);
     }
 
     #[test]
-    fn bad_forecasts_remain_in_calibration_history() {
-        let mut ledger = ForecastCalibrationLedger::new();
-        ledger.register_forecast(numeric_forecast("good", 100.0, 90.0, 110.0)).unwrap();
-        ledger.register_forecast(numeric_forecast("bad", 200.0, 190.0, 210.0)).unwrap();
-
-        for (id, observed, evidence) in [("good", 100.0, "vg"), ("bad", 100.0, "vb")] {
-            ledger
-                .verify(
-                    ForecastVerification::new(
-                        id,
-                        150,
-                        220,
-                        VerifiedOutcome::Numeric {
-                            value: observed,
-                            unit: "ha".into(),
-                        },
-                        vec![verification_ref(evidence)],
-                    )
-                    .unwrap(),
-                )
-                .unwrap();
-        }
-
-        let report = ledger.report("watershed-model", "wetland-area").unwrap();
-        assert_eq!(report.total_forecasts, 2);
-        assert_eq!(report.verified_forecasts, 2);
-        assert!((report.mean_absolute_error.unwrap() - 50.0).abs() < 1e-12);
-        assert!((report.interval_coverage.unwrap() - 0.5).abs() < 1e-12);
-    }
-
-    #[test]
-    fn pending_forecasts_are_visible_not_dropped() {
-        let mut ledger = ForecastCalibrationLedger::new();
-        ledger.register_forecast(numeric_forecast("pending", 100.0, 90.0, 110.0)).unwrap();
-        assert_eq!(ledger.pending_forecast_ids(), vec!["pending"]);
-        let report = ledger.report("watershed-model", "wetland-area").unwrap();
-        assert_eq!(report.pending_forecasts, 1);
-        assert_eq!(report.verified_forecasts, 0);
+    fn pending_forecasts_remain_visible() {
+        let mut ledger = PhysicalForecastLedger::new();
+        ledger.register(record(ForecastOutput::Distribution(boolean_distribution()))).unwrap();
+        assert_eq!(ledger.pending_forecast_ids(), vec!["forecast-1"]);
     }
 }
