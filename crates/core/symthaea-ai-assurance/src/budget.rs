@@ -19,11 +19,13 @@
 //! - race-safe root reservations;
 //! - affine split semantics that consume one parent lease and produce conserved
 //!   parent-remainder + child leases;
+//! - recoverable affine split rejection that returns the exact parent lease;
 //! - explicit release of unused reservations back to the pool.
 //!
 //! Dropping a lease without releasing it intentionally leaks *capacity*, not
 //! authority. That is fail-safe: abandoned reservations can reduce availability
-//! but cannot mint additional resource authority.
+//! but cannot mint additional resource authority. Trusted pre-effect transitions
+//! should prefer recoverable APIs where the runtime can prove no effect occurred.
 //!
 //! Concrete execution integration must still distinguish accounting from real
 //! enforcement. `CoreMetered` means the future adapter routes usage through a
@@ -124,9 +126,7 @@ impl BudgetQuantities {
     fn checked_sub(self, rhs: Self) -> Option<Self> {
         let mut values = [0; DIMENSION_COUNT];
         for dimension in BudgetDimension::ALL {
-            values[dimension.index()] = self
-                .get(dimension)
-                .checked_sub(rhs.get(dimension))?;
+            values[dimension.index()] = self.get(dimension).checked_sub(rhs.get(dimension))?;
         }
         Some(Self { values })
     }
@@ -134,9 +134,7 @@ impl BudgetQuantities {
     fn checked_add(self, rhs: Self) -> Option<Self> {
         let mut values = [0; DIMENSION_COUNT];
         for dimension in BudgetDimension::ALL {
-            values[dimension.index()] = self
-                .get(dimension)
-                .checked_add(rhs.get(dimension))?;
+            values[dimension.index()] = self.get(dimension).checked_add(rhs.get(dimension))?;
         }
         Some(Self { values })
     }
@@ -229,11 +227,7 @@ impl BudgetProfile {
         {
             return Err(BudgetError::MissingExternalEnforcementEvidence);
         }
-        let digest = compute_profile_digest(
-            limits,
-            enforcement,
-            external_enforcement_evidence_digest,
-        );
+        let digest = compute_profile_digest(limits, enforcement, external_enforcement_evidence_digest);
         Ok(Self {
             limits,
             enforcement,
@@ -344,9 +338,7 @@ impl BudgetAuthorityDomain {
                 .ledger
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if let Some((dimension, requested, remaining)) =
-                allocation.first_excess(ledger.remaining)
-            {
+            if let Some((dimension, requested, remaining)) = allocation.first_excess(ledger.remaining) {
                 return Err(BudgetError::InsufficientBudget {
                     dimension,
                     requested,
@@ -359,23 +351,14 @@ impl BudgetAuthorityDomain {
                 .ok_or(BudgetError::ArithmeticInvariant)?;
         }
 
-        Ok(self.issue_lease(
-            subject,
-            scope,
-            action_binding,
-            allocation,
-            expires_at,
-            None,
-        ))
+        Ok(self.issue_lease(subject, scope, action_binding, allocation, expires_at, None))
     }
 
-    /// Affinely split one existing lease into a parent remainder and a child
-    /// lease. The source lease is consumed, so the output allocations cannot be
-    /// duplicated through the safe API.
+    /// Compatibility affine split API.
     ///
-    /// The root pool ledger is unchanged by a split: the source allocation was
-    /// already reserved. Releasing the two output leases returns exactly their
-    /// conserved portions to the root pool.
+    /// This preserves the original lossy error shape. Trusted callers that need
+    /// to avoid capacity-burning pre-effect failures should use
+    /// [`Self::split_recoverable`] instead.
     pub fn split(
         &self,
         parent: BudgetLease,
@@ -385,44 +368,95 @@ impl BudgetAuthorityDomain {
         child_allocation: BudgetQuantities,
         child_expires_at: Option<SystemTime>,
     ) -> Result<(BudgetLease, BudgetLease), BudgetError> {
+        self.split_recoverable(
+            parent,
+            child_subject,
+            child_scope,
+            child_action_binding,
+            child_allocation,
+            child_expires_at,
+        )
+        .map_err(BudgetSplitFailure::into_error)
+    }
+
+    /// Affinely split one lease while returning the exact original parent on
+    /// any rejection before child/remainder issuance.
+    ///
+    /// Validation and issuance are serialized under the budget domain's private
+    /// control lock. One host-owned time snapshot is used for parent validation
+    /// and child-expiry checks. On failure no output lease is minted, the root
+    /// ledger is unchanged, and [`BudgetSplitFailure`] owns the same parent lease
+    /// object supplied by the caller.
+    pub fn split_recoverable(
+        &self,
+        parent: BudgetLease,
+        child_subject: PrincipalId,
+        child_scope: Scope,
+        child_action_binding: [u8; 32],
+        child_allocation: BudgetQuantities,
+        child_expires_at: Option<SystemTime>,
+    ) -> Result<(BudgetLease, BudgetLease), BudgetSplitFailure> {
         let _control = self
             .control
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let now = self.clock.now();
         let verifier = self.verifier();
-        parent.validate_with(&verifier)?;
 
+        if let Err(error) = parent.validate_with_at(&verifier, now) {
+            return Err(BudgetSplitFailure::new(parent, error));
+        }
         if !parent.scope().contains(&child_scope) {
-            return Err(BudgetError::ScopeWidening {
+            let error = BudgetError::ScopeWidening {
                 parent: parent.scope().clone(),
-                requested: child_scope,
-            });
+                requested: child_scope.clone(),
+            };
+            return Err(BudgetSplitFailure::new(parent, error));
+        }
+        if let Some(child_expiry) = child_expires_at {
+            if child_expiry < now {
+                return Err(BudgetSplitFailure::new(
+                    parent,
+                    BudgetError::ExpiredDelegationRequest {
+                        requested: child_expiry,
+                        now,
+                    },
+                ));
+            }
         }
         if let Some(parent_expiry) = parent.expires_at() {
             match child_expires_at {
                 Some(child_expiry) if child_expiry <= parent_expiry => {}
                 _ => {
-                    return Err(BudgetError::ExpiryWidening {
-                        parent: Some(parent_expiry),
-                        requested: child_expires_at,
-                    });
+                    return Err(BudgetSplitFailure::new(
+                        parent,
+                        BudgetError::ExpiryWidening {
+                            parent: Some(parent_expiry),
+                            requested: child_expires_at,
+                        },
+                    ));
                 }
             }
         }
         if let Some((dimension, requested, remaining)) =
             child_allocation.first_excess(parent.allocation)
         {
-            return Err(BudgetError::InsufficientBudget {
-                dimension,
-                requested,
-                remaining,
-            });
+            return Err(BudgetSplitFailure::new(
+                parent,
+                BudgetError::InsufficientBudget {
+                    dimension,
+                    requested,
+                    remaining,
+                },
+            ));
         }
 
-        let remainder = parent
-            .allocation
-            .checked_sub(child_allocation)
-            .ok_or(BudgetError::ArithmeticInvariant)?;
+        let Some(remainder) = parent.allocation.checked_sub(child_allocation) else {
+            return Err(BudgetSplitFailure::new(
+                parent,
+                BudgetError::ArithmeticInvariant,
+            ));
+        };
         let parent_id = parent.lease_id();
         let parent_subject = parent.subject();
         let parent_scope = parent.scope().clone();
@@ -474,12 +508,9 @@ impl BudgetAuthorityDomain {
             self.profile.digest(),
             parent_lease_id,
         );
-        let attestation = self.inner.issue_bound_one_shot::<Read>(
-            subject,
-            scope,
-            expires_at,
-            binding,
-        );
+        let attestation = self
+            .inner
+            .issue_bound_one_shot::<Read>(subject, scope, expires_at, binding);
         BudgetLease {
             attestation,
             profile: self.profile.clone(),
@@ -631,8 +662,16 @@ impl BudgetLease {
     }
 
     fn validate_with(&self, verifier: &BudgetVerifier) -> Result<(), BudgetError> {
+        self.validate_with_at(verifier, verifier.clock.now())
+    }
+
+    fn validate_with_at(
+        &self,
+        verifier: &BudgetVerifier,
+        now: SystemTime,
+    ) -> Result<(), BudgetError> {
         self.attestation
-            .validate_with(&verifier.inner, verifier.clock.now())
+            .validate_with(&verifier.inner, now)
             .map_err(BudgetError::Trust)?;
         if self.profile.digest() != verifier.profile_digest {
             return Err(BudgetError::ProfileMismatch);
@@ -649,6 +688,60 @@ impl BudgetLease {
             return Err(BudgetError::LeaseBindingMismatch);
         }
         Ok(())
+    }
+}
+
+/// Recoverable affine split rejection.
+///
+/// The original parent lease is returned by value so callers can correct the
+/// request, retain the reservation, or explicitly release it. This type is not
+/// `Clone` because it owns affine quantitative authority.
+#[derive(Debug)]
+pub struct BudgetSplitFailure {
+    parent: BudgetLease,
+    error: BudgetError,
+}
+
+impl BudgetSplitFailure {
+    fn new(parent: BudgetLease, error: BudgetError) -> Self {
+        Self { parent, error }
+    }
+
+    /// Reason the split was rejected before any output lease was minted.
+    pub fn error(&self) -> &BudgetError {
+        &self.error
+    }
+
+    /// Exact original parent lease recovered from the failed transition.
+    pub fn parent(&self) -> &BudgetLease {
+        &self.parent
+    }
+
+    /// Consume the failure and recover the exact original parent lease.
+    pub fn into_parent(self) -> BudgetLease {
+        self.parent
+    }
+
+    /// Consume the failure and return both the original parent and rejection.
+    pub fn into_parts(self) -> (BudgetLease, BudgetError) {
+        (self.parent, self.error)
+    }
+
+    /// Consume the failure and retain only the compatibility error.
+    pub fn into_error(self) -> BudgetError {
+        self.error
+    }
+}
+
+impl fmt::Display for BudgetSplitFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "recoverable budget split rejected: {}", self.error)
+    }
+}
+
+impl std::error::Error for BudgetSplitFailure {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.error)
     }
 }
 
@@ -678,6 +771,13 @@ pub enum BudgetError {
     MissingExternalEnforcementEvidence,
     /// Requested reservation already expired according to the host-owned clock.
     ExpiredReservationRequest,
+    /// Requested child delegation expiry was already stale at split validation.
+    ExpiredDelegationRequest {
+        /// Requested stale child expiry.
+        requested: SystemTime,
+        /// Single host-owned validation-time snapshot.
+        now: SystemTime,
+    },
     /// Not enough conserved capacity remained for one dimension.
     InsufficientBudget {
         /// Dimension that failed.
@@ -736,6 +836,9 @@ impl fmt::Display for BudgetError {
                 write!(f, "external hard budget claim requires enforcement evidence")
             }
             Self::ExpiredReservationRequest => write!(f, "requested budget lease is already expired"),
+            Self::ExpiredDelegationRequest { .. } => {
+                write!(f, "requested child budget lease is already expired")
+            }
             Self::InsufficientBudget { dimension, .. } => {
                 write!(f, "insufficient remaining budget for {dimension:?}")
             }
@@ -927,10 +1030,7 @@ mod tests {
             .filter(|thread| thread.join().unwrap().is_ok())
             .count();
         assert_eq!(successes, 1);
-        assert_eq!(
-            domain.remaining().get(BudgetDimension::ComputeUnits),
-            0
-        );
+        assert_eq!(domain.remaining().get(BudgetDimension::ComputeUnits), 0);
     }
 
     #[test]
@@ -1006,7 +1106,7 @@ mod tests {
             .unwrap();
         let source_id = parent.lease_id();
         let (remainder, child) = domain
-            .split(
+            .split_recoverable(
                 parent,
                 child_actor,
                 scope(&["root", "child"]),
@@ -1019,16 +1119,120 @@ mod tests {
             .unwrap();
         assert_eq!(remainder.parent_lease_id(), Some(source_id));
         assert_eq!(child.parent_lease_id(), Some(source_id));
-        assert_eq!(
-            remainder.allocation().get(BudgetDimension::ComputeUnits),
-            5
-        );
+        assert_eq!(remainder.allocation().get(BudgetDimension::ComputeUnits), 5);
         assert_eq!(child.allocation().get(BudgetDimension::ComputeUnits), 3);
-        assert_eq!(
-            remainder.allocation().get(BudgetDimension::Subprocesses),
-            1
-        );
+        assert_eq!(remainder.allocation().get(BudgetDimension::Subprocesses), 1);
         assert_eq!(child.allocation().get(BudgetDimension::Subprocesses), 1);
+    }
+
+    #[test]
+    fn recoverable_split_returns_exact_parent_on_scope_rejection() {
+        let domain = BudgetAuthorityDomain::new(PrincipalId::new(), profile(10, 2));
+        let actor = PrincipalId::new();
+        let allocation = BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 6);
+        let parent = domain
+            .reserve(
+                actor,
+                scope(&["root"]),
+                [10; 32],
+                allocation,
+                Some(SystemTime::now() + Duration::from_secs(60)),
+            )
+            .unwrap();
+        let id = parent.lease_id();
+        let epoch = parent.epoch();
+        let budget_domain = parent.domain_id();
+        let remaining_before = domain.remaining();
+
+        let failure = domain
+            .split_recoverable(
+                parent,
+                PrincipalId::new(),
+                scope(&["other"]),
+                [11; 32],
+                BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 2),
+                Some(SystemTime::now() + Duration::from_secs(30)),
+            )
+            .unwrap_err();
+        assert!(matches!(failure.error(), BudgetError::ScopeWidening { .. }));
+        assert_eq!(failure.parent().lease_id(), id);
+        assert_eq!(failure.parent().allocation(), allocation);
+        assert_eq!(failure.parent().epoch(), epoch);
+        assert_eq!(failure.parent().domain_id(), budget_domain);
+        assert_eq!(domain.remaining(), remaining_before);
+
+        failure.into_parent().release().unwrap();
+        assert_eq!(domain.remaining(), domain.profile().limits());
+    }
+
+    #[test]
+    fn recoverable_split_rejects_stale_child_without_consuming_parent() {
+        let domain = BudgetAuthorityDomain::new(PrincipalId::new(), profile(10, 2));
+        let actor = PrincipalId::new();
+        let parent = domain
+            .reserve(
+                actor,
+                scope(&["root"]),
+                [12; 32],
+                BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 6),
+                Some(SystemTime::now() + Duration::from_secs(60)),
+            )
+            .unwrap();
+        let id = parent.lease_id();
+        let remaining_before = domain.remaining();
+
+        let failure = domain
+            .split_recoverable(
+                parent,
+                PrincipalId::new(),
+                scope(&["root", "child"]),
+                [13; 32],
+                BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 2),
+                Some(SystemTime::UNIX_EPOCH),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            failure.error(),
+            BudgetError::ExpiredDelegationRequest { .. }
+        ));
+        assert_eq!(failure.parent().lease_id(), id);
+        assert_eq!(domain.remaining(), remaining_before);
+        failure.into_parent().release().unwrap();
+    }
+
+    #[test]
+    fn recoverable_split_returns_parent_when_child_allocation_exceeds_source() {
+        let domain = BudgetAuthorityDomain::new(PrincipalId::new(), profile(10, 2));
+        let actor = PrincipalId::new();
+        let parent = domain
+            .reserve(
+                actor,
+                scope(&["root"]),
+                [14; 32],
+                BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 4),
+                Some(SystemTime::now() + Duration::from_secs(60)),
+            )
+            .unwrap();
+        let id = parent.lease_id();
+        let remaining_before = domain.remaining();
+
+        let failure = domain
+            .split_recoverable(
+                parent,
+                PrincipalId::new(),
+                scope(&["root", "child"]),
+                [15; 32],
+                BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 5),
+                Some(SystemTime::now() + Duration::from_secs(30)),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            failure.error(),
+            BudgetError::InsufficientBudget { .. }
+        ));
+        assert_eq!(failure.parent().lease_id(), id);
+        assert_eq!(domain.remaining(), remaining_before);
+        failure.into_parent().release().unwrap();
     }
 
     #[test]
