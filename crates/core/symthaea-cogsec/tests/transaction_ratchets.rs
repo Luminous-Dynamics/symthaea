@@ -1,11 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Transactional ratchets for the monitor-domain-sealed CogSec facade.
+//! Transactional ratchets for the fully sealed CogSec public boundary.
 //!
 //! These tests intentionally model a non-zero protected sink. The important
-//! property is not merely that denial leaves a default state empty; denial,
-//! stale authorization, forged request annotations, and foreign-monitor
-//! authority must preserve already meaningful state exactly.
+//! property is not merely that denial leaves a default state empty; policy
+//! denial, stale authorization, forged request annotations, policy-domain
+//! substitution, and foreign-monitor authority must preserve already meaningful
+//! state exactly.
 
 use std::collections::BTreeSet;
 use symthaea_cogsec::{
@@ -13,7 +14,7 @@ use symthaea_cogsec::{
     Confidentiality, Consequence, ControlIntegrity, Digest32, MutationKind, MutationRequest,
     OriginState, PolicyRule, PolicySnapshot, PrincipalId, ReferenceMonitor, ResourceId,
     ResourceScope, TaintLevel, TransitionField, TrustedFactAuthority, TrustedFacts,
-    VerifiedTransition,
+    VerifiedPolicy, VerifiedTransition,
 };
 
 fn d(byte: u8) -> Digest32 {
@@ -38,7 +39,7 @@ struct Fixture {
     authority: TrustedFactAuthority,
     capability: CapabilityFact,
     request: MutationRequest,
-    policy: PolicySnapshot,
+    policy: VerifiedPolicy,
 }
 
 impl Fixture {
@@ -70,7 +71,7 @@ impl Fixture {
             consequence: Consequence::High,
             sequence: 42,
         };
-        let policy = PolicySnapshot {
+        let policy = authority.issue_policy(PolicySnapshot {
             root: d(9),
             epoch: 7,
             rules: vec![PolicyRule {
@@ -79,7 +80,7 @@ impl Fixture {
                 maximum_taint: TaintLevel::Clean,
                 capability_required: true,
             }],
-        };
+        });
         Self {
             monitor,
             authority,
@@ -113,13 +114,12 @@ impl Fixture {
             .snapshot(
                 &transition,
                 state_root,
-                self.policy.root,
-                self.policy.epoch,
+                &self.policy,
                 authorization_epoch,
                 revocation_epoch,
                 &[&self.capability],
             )
-            .expect("fixture facts must belong to monitor domain")
+            .expect("fixture facts must belong to monitor/policy domain")
     }
 }
 
@@ -142,8 +142,8 @@ impl ProtectedGoalState {
     /// Reference P0 sink contract for future runtime integration.
     ///
     /// The sink consumes post-revalidation typestate and independently checks
-    /// the monitor domain plus the exact principal/kind/resource/effect/
-    /// consequence/state binding expected by this owner.
+    /// the exact monitor/principal/kind/resource/effect/consequence/state
+    /// binding expected by this owner.
     fn commit(
         &mut self,
         monitor: &ReferenceMonitor,
@@ -342,6 +342,22 @@ fn subject_spoof_after_verification_preserves_nonzero_state() {
             TransitionField::Subject
         ))
     ));
+    assert_eq!(state, before);
+}
+
+#[test]
+fn foreign_policy_domain_is_rejected_without_state_change() {
+    let fixture_a = Fixture::new();
+    let fixture_b = Fixture::new();
+    let facts_a = fixture_a.facts_for(&fixture_a.request, d(8), 11, 13);
+
+    let state = ProtectedGoalState::nonzero();
+    let before = state.clone();
+    let result = fixture_a
+        .monitor
+        .authorize(&fixture_a.request, &facts_a, &fixture_b.policy);
+
+    assert!(matches!(result, Err(AuthorityError::MonitorDomainMismatch)));
     assert_eq!(state, before);
 }
 
