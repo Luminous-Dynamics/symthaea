@@ -5,6 +5,9 @@
 //! Copernicus service. A future network adapter can populate the same metadata
 //! types without changing downstream Earth-observation semantics.
 
+mod fixture_manifest;
+pub use fixture_manifest::*;
+
 use symthaea_earth_observation::{
     BandDescriptor, ContentDigest, GeoFootprint, InstrumentId, MissionId,
     ObservationEvidence, ObservationId, ObservationSensitivity, ObservationUncertainty,
@@ -176,7 +179,7 @@ impl SentinelCatalog for FrozenSentinelCatalog {
 mod tests {
     use super::*;
     use symthaea_earth_observation::{
-        Confidence, DigestAlgorithm, GeoPoint, RadarBand, Polarization,
+        Confidence, DigestAlgorithm, GeoPoint, Polarization, RadarBand,
     };
 
     fn footprint() -> GeoFootprint {
