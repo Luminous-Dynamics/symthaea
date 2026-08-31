@@ -6,9 +6,7 @@
 //! resampling.
 
 use serde::{Deserialize, Serialize};
-use symthaea_earth_observation::{
-    AffineGridTransform, GridAnchor, RasterWindowPlan,
-};
+use symthaea_earth_observation::{AffineGridTransform, GridAnchor, RasterWindowPlan};
 use thiserror::Error;
 
 use crate::{
@@ -26,6 +24,12 @@ pub enum ExactWindowError {
     EmptyField(&'static str),
     #[error("{0} must be canonical lowercase hexadecimal")]
     NonCanonicalDigest(&'static str),
+    #[error("{0} must use canonical lowercase spelling")]
+    NonCanonicalToken(&'static str),
+    #[error("arithmetic overflow while validating {0}")]
+    ArithmeticOverflow(&'static str),
+    #[error("invalid exact-window geometry: {0}")]
+    Geometry(String),
     #[error("exact-window evidence digest does not match recomputation")]
     EvidenceDigestMismatch,
     #[error("exact-window serialization failed: {0}")]
@@ -53,8 +57,17 @@ fn canonical_hex(value: &str, field: &'static str) -> ExactWindowResult<()> {
     }
 }
 
+fn canonical_token(value: &str, field: &'static str) -> ExactWindowResult<()> {
+    non_empty(value, field)?;
+    if value.bytes().any(|byte| byte.is_ascii_uppercase()) {
+        Err(ExactWindowError::NonCanonicalToken(field))
+    } else {
+        Ok(())
+    }
+}
+
 fn validate_digest(value: &FrozenDigest, field: &'static str) -> ExactWindowResult<()> {
-    non_empty(&value.algorithm, "digest algorithm")?;
+    canonical_token(&value.algorithm, "digest algorithm")?;
     canonical_hex(&value.hex, field)
 }
 
@@ -80,6 +93,15 @@ impl From<GridAnchor> for FrozenGridAnchor {
     }
 }
 
+impl From<FrozenGridAnchor> for GridAnchor {
+    fn from(value: FrozenGridAnchor) -> Self {
+        match value {
+            FrozenGridAnchor::PixelCorner => Self::PixelCorner,
+            FrozenGridAnchor::PixelCenter => Self::PixelCenter,
+        }
+    }
+}
+
 /// Exact IEEE-754 representation of an affine raster transform.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FrozenAffineGrid {
@@ -90,6 +112,22 @@ pub struct FrozenAffineGrid {
     pub row_step_x_bits: u64,
     pub row_step_y_bits: u64,
     pub anchor: FrozenGridAnchor,
+}
+
+impl FrozenAffineGrid {
+    fn validate(&self) -> ExactWindowResult<()> {
+        AffineGridTransform::new(
+            f64::from_bits(self.origin_x_bits),
+            f64::from_bits(self.origin_y_bits),
+            f64::from_bits(self.col_step_x_bits),
+            f64::from_bits(self.col_step_y_bits),
+            f64::from_bits(self.row_step_x_bits),
+            f64::from_bits(self.row_step_y_bits),
+            self.anchor.into(),
+        )
+        .map(|_| ())
+        .map_err(|error| ExactWindowError::Geometry(error.to_string()))
+    }
 }
 
 impl From<AffineGridTransform> for FrozenAffineGrid {
@@ -111,7 +149,7 @@ impl From<AffineGridTransform> for FrozenAffineGrid {
 /// Both the immutable root transform and the exact integer support are frozen.
 /// The local effective transform is intentionally not a second source of truth:
 /// it is deterministically derivable from these fields.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct FrozenExactWindowGeometry {
     pub crs_id: String,
     pub root_affine: FrozenAffineGrid,
@@ -128,6 +166,25 @@ pub struct FrozenExactWindowGeometry {
     pub output_rows: u32,
     pub output_cols: u32,
     pub geometry_digest: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+struct FrozenExactWindowGeometryRepr {
+    crs_id: String,
+    root_affine: FrozenAffineGrid,
+    source_rows: u32,
+    source_cols: u32,
+    source_root_row_offset: u32,
+    source_root_col_offset: u32,
+    window_row_offset: u32,
+    window_col_offset: u32,
+    window_rows: u32,
+    window_cols: u32,
+    output_root_row_offset: u32,
+    output_root_col_offset: u32,
+    output_rows: u32,
+    output_cols: u32,
+    geometry_digest: String,
 }
 
 #[derive(Serialize)]
@@ -208,27 +265,95 @@ impl FrozenExactWindowGeometry {
 
     fn validate_payload(&self) -> ExactWindowResult<()> {
         non_empty(&self.crs_id, "CRS id")?;
+        self.root_affine.validate()?;
+
         if self.source_rows == 0 || self.source_cols == 0 {
-            return Err(ExactWindowError::EmptyField("source raster shape"));
-        }
-        if self.window_rows == 0 || self.window_cols == 0 {
-            return Err(ExactWindowError::EmptyField("window shape"));
-        }
-        if self.output_rows != self.window_rows || self.output_cols != self.window_cols {
-            return Err(ExactWindowError::EmptyField(
-                "exact-window output shape must equal requested window shape",
+            return Err(ExactWindowError::Geometry(
+                "source raster shape must be nonzero".to_string(),
             ));
         }
-        if self.output_root_row_offset
-            != self.source_root_row_offset.saturating_add(self.window_row_offset)
-            || self.output_root_col_offset
-                != self.source_root_col_offset.saturating_add(self.window_col_offset)
+        if self.window_rows == 0 || self.window_cols == 0 {
+            return Err(ExactWindowError::Geometry(
+                "window shape must be nonzero".to_string(),
+            ));
+        }
+
+        let row_end = self
+            .window_row_offset
+            .checked_add(self.window_rows)
+            .ok_or(ExactWindowError::ArithmeticOverflow("window row end"))?;
+        let col_end = self
+            .window_col_offset
+            .checked_add(self.window_cols)
+            .ok_or(ExactWindowError::ArithmeticOverflow("window column end"))?;
+        if row_end > self.source_rows || col_end > self.source_cols {
+            return Err(ExactWindowError::Geometry(
+                "window exceeds declared source support".to_string(),
+            ));
+        }
+
+        if self.output_rows != self.window_rows || self.output_cols != self.window_cols {
+            return Err(ExactWindowError::Geometry(
+                "exact-window output shape must equal requested window shape".to_string(),
+            ));
+        }
+
+        let expected_output_row = self
+            .source_root_row_offset
+            .checked_add(self.window_row_offset)
+            .ok_or(ExactWindowError::ArithmeticOverflow(
+                "output root row offset",
+            ))?;
+        let expected_output_col = self
+            .source_root_col_offset
+            .checked_add(self.window_col_offset)
+            .ok_or(ExactWindowError::ArithmeticOverflow(
+                "output root column offset",
+            ))?;
+        if self.output_root_row_offset != expected_output_row
+            || self.output_root_col_offset != expected_output_col
         {
-            return Err(ExactWindowError::EmptyField(
-                "exact-window root-relative offsets must compose",
+            return Err(ExactWindowError::Geometry(
+                "exact-window root-relative offsets must compose".to_string(),
             ));
         }
         Ok(())
+    }
+}
+
+impl TryFrom<FrozenExactWindowGeometryRepr> for FrozenExactWindowGeometry {
+    type Error = ExactWindowError;
+
+    fn try_from(value: FrozenExactWindowGeometryRepr) -> ExactWindowResult<Self> {
+        let geometry = Self {
+            crs_id: value.crs_id,
+            root_affine: value.root_affine,
+            source_rows: value.source_rows,
+            source_cols: value.source_cols,
+            source_root_row_offset: value.source_root_row_offset,
+            source_root_col_offset: value.source_root_col_offset,
+            window_row_offset: value.window_row_offset,
+            window_col_offset: value.window_col_offset,
+            window_rows: value.window_rows,
+            window_cols: value.window_cols,
+            output_root_row_offset: value.output_root_row_offset,
+            output_root_col_offset: value.output_root_col_offset,
+            output_rows: value.output_rows,
+            output_cols: value.output_cols,
+            geometry_digest: value.geometry_digest,
+        };
+        geometry.verify_digest()?;
+        Ok(geometry)
+    }
+}
+
+impl<'de> Deserialize<'de> for FrozenExactWindowGeometry {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let repr = FrozenExactWindowGeometryRepr::deserialize(deserializer)?;
+        Self::try_from(repr).map_err(serde::de::Error::custom)
     }
 }
 
@@ -317,8 +442,12 @@ impl ExactPixelWindowEvidence {
 
     fn validate_payload(&self) -> ExactWindowResult<()> {
         match &self.source {
-            FixtureSourceRef::Product { product_id } => non_empty(product_id, "source product id")?,
-            FixtureSourceRef::Artifact { artifact_id } => non_empty(artifact_id, "source artifact id")?,
+            FixtureSourceRef::Product { product_id } => {
+                non_empty(product_id, "source product id")?
+            }
+            FixtureSourceRef::Artifact { artifact_id } => {
+                non_empty(artifact_id, "source artifact id")?
+            }
         }
         self.geometry.verify_digest()?;
         validate_digest(&self.output_content_digest, "output content digest")?;
@@ -387,8 +516,8 @@ impl<'de> Deserialize<'de> for ExactPixelWindowEvidence {
 mod tests {
     use super::*;
     use symthaea_earth_observation::{
-        AffineGridTransform, CrsId, GridAnchor, PixelWindow, RasterGrid,
-        RasterReference, RasterShape,
+        AffineGridTransform, CrsId, GridAnchor, PixelWindow, RasterGrid, RasterReference,
+        RasterShape,
     };
 
     fn plan(anchor: GridAnchor) -> RasterWindowPlan {
@@ -514,6 +643,23 @@ mod tests {
             ),
             Err(ExactWindowError::NonCanonicalDigest("output content digest"))
         ));
+    }
+
+    #[test]
+    fn direct_geometry_deserialization_revalidates_affine_bits() {
+        let geometry = FrozenExactWindowGeometry::from_plan(&plan(GridAnchor::PixelCorner)).unwrap();
+        let mut value = serde_json::to_value(&geometry).unwrap();
+        value["root_affine"]["origin_x_bits"] = serde_json::json!(f64::NAN.to_bits());
+        assert!(serde_json::from_value::<FrozenExactWindowGeometry>(value).is_err());
+    }
+
+    #[test]
+    fn overflowed_root_offset_is_rejected_on_persistence() {
+        let geometry = FrozenExactWindowGeometry::from_plan(&plan(GridAnchor::PixelCorner)).unwrap();
+        let mut value = serde_json::to_value(&geometry).unwrap();
+        value["source_root_row_offset"] = serde_json::json!(u32::MAX);
+        value["window_row_offset"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<FrozenExactWindowGeometry>(value).is_err());
     }
 
     #[test]
