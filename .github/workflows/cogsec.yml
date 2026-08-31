@@ -6,6 +6,7 @@ on:
       - 'crates/core/symthaea-cogsec/**'
       - 'crates/bridges/symthaea-cogsec-evidence/**'
       - 'crates/bridges/symthaea-cogsec-qualification/**'
+      - 'crates/bridges/symthaea-cogsec-shadow-runtime/**'
       - 'docs/security/cogsec/**'
       - 'scripts/cogsec-focused-qualification.sh'
       - '.github/workflows/cogsec.yml'
