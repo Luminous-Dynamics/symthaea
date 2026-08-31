@@ -17,6 +17,7 @@
 #![forbid(unsafe_code)]
 
 pub mod conformance;
+pub mod independence;
 pub mod manifest;
 pub mod observation;
 pub mod registry;
@@ -25,6 +26,10 @@ pub mod traits;
 
 pub use conformance::{
     ReadOnlyConformanceCounters, evaluate_read_only_conformance,
+};
+pub use independence::{
+    IndependenceAssessment, IndependenceAssessmentError, IndependenceMetadataConflict,
+    assess_independence,
 };
 pub use manifest::{
     AccessMode, CapabilityClass, CapabilityDeclaration, CredentialKind,
