@@ -11,6 +11,7 @@ mod dynamics;
 mod evidence;
 mod homeostasis;
 mod intervention;
+mod qualification;
 mod snapshot;
 mod state;
 
@@ -27,6 +28,10 @@ pub use evidence::{
 pub use homeostasis::{assess_homeostasis, HomeostaticReport};
 pub use intervention::{
     apply_intervention, InterventionKind, InterventionRecord, InteroceptiveIntervention,
+};
+pub use qualification::{
+    GateStatus, QualificationGateReceipt, QualificationReceipt, QUALIFICATION_RECEIPT_SCHEMA_VERSION,
+    REQUIRED_QUALIFICATION_GATES,
 };
 pub use snapshot::{
     AllostaticForecastSnapshot, InteroceptiveSnapshot, INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION,
