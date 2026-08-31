@@ -24,20 +24,20 @@
 //! [`effect_guard`] adds exact execution-domain/expiry preflight and forces
 //! effectful adapters to report success, failure, uncertainty, or proven
 //! transactional no-effect as evidence-bearing outcome data rather than using a
-//! generic `Err` as proof that nothing happened. [`effect_permit`] adds a short
-//! host-owned linearization point so concurrent revocation and already-authorized
-//! effect admission have a deterministic order without holding a coarse lock
-//! across the effect. [`independence`] makes observer/resolver separation an
-//! explicit host policy and records the exact principal/domain guarantee actually
-//! enforced rather than overloading the word “independent.” [`budget_purpose`]
-//! adds a separate quantitative-policy admission proving which trusted purpose
-//! policy approved the exact conserved resource envelope for the exact action.
+//! generic `Err` as proof that nothing happened. [`independence`] makes
+//! observer/resolver separation an explicit host policy and records the exact
+//! principal/domain guarantee actually enforced rather than overloading the word
+//! “independent.” [`budget_purpose`] adds a separate quantitative-policy
+//! admission proving which trusted purpose policy approved the exact conserved
+//! resource envelope for the exact action. [`effect_permit`] adds a latched
+//! host-owned stop/resume domain that linearizes effect admission against
+//! concurrent revocation without holding a coarse lock across the effect itself.
 //!
 //! Security-sensitive state-changing integrations should compose these layers so
 //! trust anchors, validation time, concrete resources, policy admission,
 //! revocation, temporal bounds, quantitative capacity, approved purpose,
-//! effect-entry admission, effect-attempt evidence, and separation-of-duties
-//! claims remain host-owned rather than model-selected.
+//! effect-attempt evidence, separation-of-duties claims, and effect-entry
+//! admission remain host-owned rather than model-selected.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
@@ -92,7 +92,7 @@ pub use effect_guard::{
 pub use effect_permit::{
     EffectEntryActivity, EffectEntryDomain, EffectEntryDomainId, EffectEntryEpoch, EffectEntryError,
     EffectEntryPermit, EffectEntryPermitId, EffectEntryReceipt, EffectEntrySequence,
-    EffectEntryTicket, EffectEntryTicketId, EffectRevocationReceipt,
+    EffectEntryTicket, EffectEntryTicketId, EffectResumeReceipt, EffectRevocationReceipt,
 };
 pub use host::{ResolutionError, ResolutionEvidenceReceipt, RuntimeAction, TrustedRuntime};
 pub use independence::{
