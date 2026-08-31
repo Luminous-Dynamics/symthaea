@@ -29,7 +29,8 @@ pub mod syslog_source;
 
 pub use event::{LogEvent, Severity, Source};
 pub use integration::{
-    LogIntegrationContext, LogIntegrationError, integration_manifest, log_event_to_observation,
+    LogIntegrationContext, LogIntegrationError, NormalizedLogObserver, ObservedLogRecord,
+    integration_manifest, log_event_to_observation,
 };
 
 #[derive(Debug, thiserror::Error)]

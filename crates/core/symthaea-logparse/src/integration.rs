@@ -3,10 +3,11 @@
 use crate::{LogEvent, Severity, Source};
 use std::collections::BTreeMap;
 use symthaea_integration_core::{
-    AccessMode, CapabilityClass, CapabilityDeclaration, EntityRef, IntegrationId,
-    IntegrationManifest, MaturityLevel, ObservationEnvelope, ObservationId, ObservationKind,
-    ObservationLineage, ObservationQuality, ObservationSource, ObservationState,
-    ObservationValidationError, ObservationValue, RiskClass, TransformStep,
+    AccessMode, CapabilityClass, CapabilityDeclaration, EntityRef, IntegrationError,
+    IntegrationFuture, IntegrationId, IntegrationIdentity, IntegrationManifest, MaturityLevel,
+    ObservationBatch, ObservationEnvelope, ObservationId, ObservationKind, ObservationLineage,
+    ObservationQuality, ObservationRequest, ObservationSource, ObservationState,
+    ObservationValidationError, ObservationValue, Observer, RiskClass, TransformStep,
     INTEGRATION_MANIFEST_SCHEMA_VERSION,
 };
 
@@ -33,6 +34,143 @@ impl Default for LogIntegrationContext {
             independence_group: None,
             source_confidence: 0.8,
         }
+    }
+}
+
+/// One normalized event with boundary-supplied replay identity and ingestion time.
+///
+/// IDs are explicit rather than synthesized inside the core contract so a real
+/// collector can preserve source-native sequence/event identities across replay.
+#[derive(Debug, Clone)]
+pub struct ObservedLogRecord {
+    pub observation_id: ObservationId,
+    pub event: LogEvent,
+    pub ingested_at_unix_ms: u64,
+}
+
+/// Honest E1 observer over an already-normalized corpus/buffer.
+///
+/// This is deliberately not called a live syslog/ETW observer: the underlying
+/// parsers currently consume offline files/lines. A later live source can feed
+/// the same `ObservedLogRecord` boundary without changing the observation model.
+#[derive(Debug, Clone)]
+pub struct NormalizedLogObserver {
+    manifest: IntegrationManifest,
+    context: LogIntegrationContext,
+    records: Vec<ObservedLogRecord>,
+}
+
+impl NormalizedLogObserver {
+    pub fn new(context: LogIntegrationContext, records: Vec<ObservedLogRecord>) -> Self {
+        Self {
+            manifest: integration_manifest(),
+            context,
+            records,
+        }
+    }
+
+    pub fn records(&self) -> &[ObservedLogRecord] {
+        &self.records
+    }
+
+    /// Synchronous implementation used by both the object-safe async trait and
+    /// deterministic unit tests.
+    pub fn observe_sync(
+        &self,
+        request: ObservationRequest,
+    ) -> Result<ObservationBatch, IntegrationError> {
+        request.validate()?;
+
+        if !request.signals.is_empty()
+            && !request.signals.iter().any(|signal| signal == "log.event")
+        {
+            return Ok(ObservationBatch {
+                integration_id: LOGPARSE_INTEGRATION_ID.into(),
+                collected_at_unix_ms: self.collected_at_unix_ms(),
+                observations: vec![],
+            });
+        }
+
+        let mut observations = Vec::new();
+        for record in &self.records {
+            let observed_at = record.event.timestamp.timestamp_millis();
+            let Ok(observed_at_unix_ms) = u64::try_from(observed_at) else {
+                return Err(IntegrationError::InvalidOutput(format!(
+                    "log event timestamp predates unix epoch: {observed_at}"
+                )));
+            };
+
+            if request
+                .since_unix_ms
+                .is_some_and(|since| observed_at_unix_ms < since)
+            {
+                continue;
+            }
+            if request
+                .until_unix_ms
+                .is_some_and(|until| observed_at_unix_ms > until)
+            {
+                continue;
+            }
+
+            let observation = log_event_to_observation(
+                &record.event,
+                &self.context,
+                record.observation_id.clone(),
+                record.ingested_at_unix_ms,
+            )
+            .map_err(|error| IntegrationError::InvalidOutput(error.to_string()))?;
+
+            if !request.entities.is_empty()
+                && !request
+                    .entities
+                    .iter()
+                    .any(|entity| entity == &observation.entity)
+            {
+                continue;
+            }
+
+            if !request.filters.iter().all(|(key, value)| {
+                observation.labels.get(key) == Some(value)
+            }) {
+                continue;
+            }
+
+            observations.push(observation);
+        }
+
+        let batch = ObservationBatch {
+            integration_id: LOGPARSE_INTEGRATION_ID.into(),
+            collected_at_unix_ms: self.collected_at_unix_ms(),
+            observations,
+        };
+        batch
+            .validate()
+            .map_err(|error| IntegrationError::InvalidOutput(error.to_string()))?;
+        Ok(batch)
+    }
+
+    fn collected_at_unix_ms(&self) -> u64 {
+        self.records
+            .iter()
+            .map(|record| record.ingested_at_unix_ms)
+            .max()
+            .unwrap_or(0)
+    }
+}
+
+impl IntegrationIdentity for NormalizedLogObserver {
+    fn manifest(&self) -> &IntegrationManifest {
+        &self.manifest
+    }
+}
+
+impl Observer for NormalizedLogObserver {
+    fn observe<'a>(
+        &'a self,
+        request: ObservationRequest,
+    ) -> IntegrationFuture<'a, Result<ObservationBatch, IntegrationError>> {
+        Box::pin(async move { self.observe_sync(request) })
     }
 }
 
@@ -192,13 +330,13 @@ mod tests {
     use super::*;
     use chrono::{DateTime, Utc};
 
-    fn event(host: Option<&str>) -> LogEvent {
+    fn event(host: Option<&str>, severity: Severity) -> LogEvent {
         LogEvent {
             timestamp: "2026-08-31T00:00:00Z"
                 .parse::<DateTime<Utc>>()
                 .unwrap(),
             source: Source::Syslog,
-            severity: Severity::Warning,
+            severity,
             component: "sshd".into(),
             provider: "auth".into(),
             event_id: 42,
@@ -209,6 +347,28 @@ mod tests {
         }
     }
 
+    fn observer() -> NormalizedLogObserver {
+        NormalizedLogObserver::new(
+            LogIntegrationContext {
+                namespace: "site:lab".into(),
+                independence_group: Some("host-kernel-log".into()),
+                ..Default::default()
+            },
+            vec![
+                ObservedLogRecord {
+                    observation_id: ObservationId::new("one"),
+                    event: event(Some("host-a"), Severity::Warning),
+                    ingested_at_unix_ms: 1_777_593_601_000,
+                },
+                ObservedLogRecord {
+                    observation_id: ObservationId::new("two"),
+                    event: event(Some("host-b"), Severity::Error),
+                    ingested_at_unix_ms: 1_777_593_602_000,
+                },
+            ],
+        )
+    }
+
     #[test]
     fn manifest_is_strictly_read_only() {
         assert!(integration_manifest().validate_read_only_profile().is_ok());
@@ -217,7 +377,7 @@ mod tests {
     #[test]
     fn normalized_log_becomes_valid_observation() {
         let observation = log_event_to_observation(
-            &event(Some("host-a")),
+            &event(Some("host-a"), Severity::Warning),
             &LogIntegrationContext {
                 namespace: "site:lab".into(),
                 independence_group: Some("host-kernel-log".into()),
@@ -237,7 +397,7 @@ mod tests {
     #[test]
     fn missing_host_is_partial_not_falsely_complete() {
         let observation = log_event_to_observation(
-            &event(None),
+            &event(None, Severity::Warning),
             &LogIntegrationContext::default(),
             ObservationId::new("unknown-host-log"),
             1_777_593_601_000,
@@ -245,5 +405,30 @@ mod tests {
         .unwrap();
         assert_eq!(observation.quality.state, ObservationState::Partial);
         assert!(observation.quality.completeness < 1.0);
+    }
+
+    #[test]
+    fn observer_filters_by_entity_and_labels() {
+        let batch = observer()
+            .observe_sync(ObservationRequest {
+                entities: vec![EntityRef::new("site:lab", "host", "host-b")],
+                filters: BTreeMap::from([("log.severity".into(), "error".into())]),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(batch.observations.len(), 1);
+        assert_eq!(batch.observations[0].entity.id, "host-b");
+    }
+
+    #[test]
+    fn unsupported_signal_selector_returns_empty_valid_batch() {
+        let batch = observer()
+            .observe_sync(ObservationRequest {
+                signals: vec!["system.cpu.utilization".into()],
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(batch.observations.is_empty());
+        assert!(batch.validate().is_ok());
     }
 }
