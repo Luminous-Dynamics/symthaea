@@ -6,6 +6,7 @@
 //! types without changing downstream Earth-observation semantics.
 
 mod exact_window;
+mod exact_window_fixture;
 mod fixture_manifest;
 pub use exact_window::*;
 pub use fixture_manifest::*;
