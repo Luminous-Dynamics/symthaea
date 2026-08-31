@@ -19,6 +19,7 @@
 pub mod conformance;
 pub mod manifest;
 pub mod observation;
+pub mod registry;
 pub mod topology;
 pub mod traits;
 
@@ -36,6 +37,7 @@ pub use observation::{
     ObservationQuality, ObservationSource, ObservationState, ObservationValidationError,
     ObservationValue, TransformStep, OBSERVATION_SCHEMA_VERSION,
 };
+pub use registry::{IntegrationRegistry, RegistryError};
 pub use topology::{
     DiscoveredEntity, DiscoverySnapshot, EntityRelation, RelationKind,
 };
