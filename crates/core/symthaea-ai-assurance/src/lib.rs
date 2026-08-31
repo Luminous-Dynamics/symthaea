@@ -32,6 +32,9 @@
 //! resource envelope for the exact action. [`effect_permit`] adds a latched
 //! host-owned stop/resume domain that linearizes effect admission against
 //! concurrent revocation without holding a coarse lock across the effect itself.
+//! Its typed commitment joins the exact action, a digest of the complete host
+//! preflight-authority snapshot, and a digest of adapter version/point-of-no-return
+//! semantics so effect admission cannot be replayed across changed safety context.
 //!
 //! Security-sensitive state-changing integrations should compose these layers so
 //! trust anchors, validation time, concrete resources, policy admission,
