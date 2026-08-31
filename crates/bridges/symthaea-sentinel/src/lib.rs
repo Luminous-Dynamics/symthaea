@@ -5,13 +5,15 @@
 //! Copernicus service. A future network adapter can populate the same metadata
 //! types without changing downstream Earth-observation semantics.
 
+mod exact_window;
 mod fixture_manifest;
+pub use exact_window::*;
 pub use fixture_manifest::*;
 
 use symthaea_earth_observation::{
-    BandDescriptor, ContentDigest, GeoFootprint, InstrumentId, MissionId,
-    ObservationEvidence, ObservationId, ObservationSensitivity, ObservationUncertainty,
-    ProcessingLineage, ProductId, Result as ObservationResult, SensorModality,
+    BandDescriptor, ContentDigest, GeoFootprint, InstrumentId, MissionId, ObservationEvidence,
+    ObservationId, ObservationSensitivity, ObservationUncertainty, ProcessingLineage, ProductId,
+    Result as ObservationResult, SensorModality,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -118,8 +120,14 @@ impl CatalogQuery {
 pub trait SentinelCatalog {
     type Error;
 
-    fn search(&self, query: CatalogQuery) -> std::result::Result<Vec<SentinelProductMetadata>, Self::Error>;
-    fn get(&self, product_id: &str) -> std::result::Result<Option<SentinelProductMetadata>, Self::Error>;
+    fn search(
+        &self,
+        query: CatalogQuery,
+    ) -> std::result::Result<Vec<SentinelProductMetadata>, Self::Error>;
+    fn get(
+        &self,
+        product_id: &str,
+    ) -> std::result::Result<Option<SentinelProductMetadata>, Self::Error>;
 }
 
 /// A deterministic, network-free catalog for tests, replay, and frozen evidence
@@ -178,9 +186,7 @@ impl SentinelCatalog for FrozenSentinelCatalog {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_earth_observation::{
-        Confidence, DigestAlgorithm, GeoPoint, Polarization, RadarBand,
-    };
+    use symthaea_earth_observation::{Confidence, DigestAlgorithm, GeoPoint, Polarization, RadarBand};
 
     fn footprint() -> GeoFootprint {
         GeoFootprint::new(vec![
