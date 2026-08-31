@@ -129,22 +129,27 @@ proptest! {
                 }
                 5 => {
                     let before_sequence = model_sequence;
+                    let before_activity = domain.activity();
                     let result = domain.resume();
                     if model_open {
                         prop_assert!(matches!(result, Err(EffectEntryError::AlreadyRunning)));
                         prop_assert_eq!(domain.current_sequence().get(), before_sequence);
+                        prop_assert_eq!(domain.activity(), before_activity);
                     } else if model_outstanding != 0 {
                         prop_assert!(matches!(
                             result,
                             Err(EffectEntryError::ResumeWhileActive { .. })
                         ));
                         prop_assert_eq!(domain.current_sequence().get(), before_sequence);
+                        prop_assert_eq!(domain.activity(), before_activity);
+                        prop_assert!(domain.is_stopped());
                     } else {
                         let receipt = result.expect("quiescent stopped model must resume");
                         model_sequence += 1;
                         model_open = true;
                         prop_assert_eq!(receipt.epoch().get(), model_epoch);
                         prop_assert_eq!(receipt.resume_sequence().get(), model_sequence);
+                        prop_assert!(domain.activity().is_quiescent());
                     }
                 }
                 _ => unreachable!(),
