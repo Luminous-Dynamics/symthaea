@@ -14,6 +14,7 @@ fn public_revocation_before_acquisition_prevents_entry() {
     assert!(matches!(result, Err(EffectEntryError::Revoked { .. })));
     assert_eq!(revocation.previous_epoch().get(), 0);
     assert_eq!(revocation.current_epoch().get(), 1);
+    assert!(revocation.admitted_activity().is_quiescent());
 }
 
 #[test]
@@ -25,12 +26,15 @@ fn public_acquisition_before_revocation_preserves_one_admitted_effect() {
     let acquisition = permit.acquisition_sequence();
 
     let revocation = domain.revoke_all().unwrap();
-    let (receipt, effect_result) = permit.enter(|| "entered");
+    assert_eq!(revocation.admitted_activity().outstanding_permits(), 1);
+    assert_eq!(revocation.admitted_activity().in_flight_effects(), 0);
 
+    let (receipt, effect_result) = permit.enter(|| "entered").unwrap();
     assert_eq!(effect_result, "entered");
     assert_eq!(receipt.action_binding(), binding);
     assert_eq!(receipt.acquisition_sequence(), acquisition);
     assert!(acquisition < revocation.revocation_sequence());
+    assert!(domain.activity().is_quiescent());
 }
 
 #[test]
@@ -54,11 +58,14 @@ fn public_effect_callback_does_not_hold_revocation_lock() {
     entered_rx.recv().unwrap();
     let revocation = domain.revoke_all().unwrap();
     assert!(acquisition < revocation.revocation_sequence());
+    assert_eq!(revocation.admitted_activity().outstanding_permits(), 0);
+    assert_eq!(revocation.admitted_activity().in_flight_effects(), 1);
 
     continue_tx.send(()).unwrap();
-    let (receipt, value) = worker.join().unwrap();
+    let (receipt, value) = worker.join().unwrap().unwrap();
     assert_eq!(value, 13);
     assert_eq!(receipt.acquisition_sequence(), acquisition);
+    assert!(domain.activity().is_quiescent());
 }
 
 #[test]
@@ -90,8 +97,10 @@ fn public_concurrent_race_has_only_admit_before_revoke_or_revoke_before_admit() 
         match acquisition {
             Ok(permit) => {
                 assert!(permit.acquisition_sequence() < revocation.revocation_sequence());
-                let (_, entered) = permit.enter(|| true);
+                assert_eq!(revocation.admitted_activity().outstanding_permits(), 1);
+                let (_, entered) = permit.enter(|| true).unwrap();
                 assert!(entered);
+                assert!(domain.activity().is_quiescent());
             }
             Err(EffectEntryError::Revoked {
                 ticket_epoch,
@@ -100,6 +109,7 @@ fn public_concurrent_race_has_only_admit_before_revoke_or_revoke_before_admit() 
             }) => {
                 assert!(ticket_epoch < current_epoch);
                 assert_eq!(current_sequence, revocation.revocation_sequence());
+                assert!(revocation.admitted_activity().is_quiescent());
             }
             Err(other) => panic!("unexpected linearization result: {other}"),
         }
