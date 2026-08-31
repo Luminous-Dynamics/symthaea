@@ -432,6 +432,40 @@ fn validate_internal(manifest: &ResearchSelectionManifest) -> Result<()> {
         return Err(SelectionError::WinnerMismatch);
     }
 
+    // Persisted manifests must enforce their own declared selection-role policy before an
+    // authoritative split is supplied. This prevents an attacker from changing a recorded
+    // Calibration observation to Evaluation, recomputing the outer manifest digest, and obtaining
+    // a superficially self-consistent object. Authoritative verify_against(...) remains mandatory
+    // because this local check cannot prove that recorded sample roles/content match the true split.
+    let mut observation_keys = HashSet::new();
+    for observation in &manifest.observations {
+        non_empty(&observation.candidate_id, "observation candidate id")?;
+        non_empty(&observation.sample_id, "observation sample id")?;
+        non_empty(&observation.sample_content_digest, "observation sample digest")?;
+        if !candidate_ids.contains(&observation.candidate_id) {
+            return Err(SelectionError::UnknownCandidate(observation.candidate_id.clone()));
+        }
+        if !observation.metric_value.is_finite() {
+            return Err(SelectionError::NonFiniteMetric {
+                candidate_id: observation.candidate_id.clone(),
+                sample_id: observation.sample_id.clone(),
+            });
+        }
+        if observation.sample_role == PartitionRole::Evaluation {
+            return Err(SelectionError::EvaluationLeakage(observation.sample_id.clone()));
+        }
+        if !manifest.role_policy.allows(observation.sample_role) {
+            return Err(SelectionError::TrainingLeakage(observation.sample_id.clone()));
+        }
+        let key = (observation.candidate_id.clone(), observation.sample_id.clone());
+        if !observation_keys.insert(key) {
+            return Err(SelectionError::DuplicateObservation {
+                candidate_id: observation.candidate_id.clone(),
+                sample_id: observation.sample_id.clone(),
+            });
+        }
+    }
+
     let recomputed = compute_aggregates(&manifest.candidates, &manifest.observations)?;
     let recorded: BTreeMap<_, _> = manifest
         .aggregates
