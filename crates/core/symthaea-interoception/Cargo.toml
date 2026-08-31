@@ -9,5 +9,6 @@ description = "Native artificial interoceptive regulation primitives for Symthae
 serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
+proptest = { workspace = true }
 serde_json = { workspace = true }
 symthaea-evidence-plane = { path = "../symthaea-evidence-plane" }
