@@ -18,6 +18,7 @@ mod qualification;
 mod snapshot;
 mod state;
 mod study;
+mod study_validation;
 
 pub use allostasis::{
     assess_allostasis, assess_allostasis_with_drive, AllostaticConfig, AllostaticReport,
@@ -60,10 +61,13 @@ pub use state::{
     NativeInteroceptiveState, ViabilityChannel, ViabilityVariable, CHANNEL_COUNT,
 };
 pub use study::{
-    evaluate_confirmatory_study, execute_study, extract_study_blinded_metrics,
-    ConfirmatoryHypothesisEvaluation, EvidenceRunClass, ExclusionCriterionDecision,
-    ExclusionDecisionReceipt, ExclusionDecisionStatus, RunDisposition, StudyBlindedMetricReport,
-    StudyExecutionTrace, StudyPreregistration, CONFIRMATORY_EVALUATION_SCHEMA_VERSION,
+    execute_study, extract_study_blinded_metrics, ConfirmatoryHypothesisEvaluation,
+    EvidenceRunClass, ExclusionCriterionDecision, ExclusionDecisionReceipt,
+    ExclusionDecisionStatus, RunDisposition, StudyBlindedMetricReport, StudyExecutionTrace,
+    StudyPreregistration, CONFIRMATORY_EVALUATION_SCHEMA_VERSION,
     EXCLUSION_DECISION_RECEIPT_SCHEMA_VERSION, STUDY_BLINDED_METRIC_SCHEMA_VERSION,
     STUDY_EXECUTION_SCHEMA_VERSION, STUDY_PREREGISTRATION_SCHEMA_VERSION,
+};
+pub use study_validation::{
+    evaluate_confirmatory_study_bound, validate_study_blinded_metrics,
 };
