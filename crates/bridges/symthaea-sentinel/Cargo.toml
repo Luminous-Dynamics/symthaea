@@ -9,3 +9,7 @@ repository = "https://github.com/Luminous-Dynamics/symthaea"
 
 [dependencies]
 symthaea-earth-observation = { path = "../../domains/symthaea-earth-observation" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+blake3 = { workspace = true }
+thiserror = { workspace = true }
