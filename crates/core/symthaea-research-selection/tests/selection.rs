@@ -194,15 +194,44 @@ fn persisted_winner_tampering_is_rejected() {
 }
 
 #[test]
-fn authoritative_verification_rejects_recomputed_evaluation_role_tamper() {
-    let (split, fit_a, fit_b, selection) = valid_selection();
-    let mut value = serde_json::to_value(&selection).unwrap();
-    let observations = value["observations"].as_array_mut().unwrap();
-    observations[0]["sample_role"] = serde_json::Value::String("Evaluation".into());
-    // Digest is now stale, so the persisted representation already fails closed. More generally,
-    // even a self-consistent reconstructed manifest must still pass verify_against(authoritative split).
+fn persisted_manifest_rejects_recomputed_evaluation_role_tamper() {
+    let (_, _, _, mut selection) = valid_selection();
+    selection.observations[0].sample_role = PartitionRole::Evaluation;
+    // Simulate an attacker who can recompute the outer content digest after changing the role.
+    selection.manifest_digest = selection.compute_digest().unwrap();
+    assert!(matches!(
+        selection.verify_digest().unwrap_err(),
+        SelectionError::EvaluationLeakage(id) if id == "cal-1"
+    ));
+
+    let value = serde_json::to_value(&selection).unwrap();
     assert!(serde_json::from_value::<ResearchSelectionManifest>(value).is_err());
-    selection.verify_against(&split, &[fit_a, fit_b]).unwrap();
+}
+
+#[test]
+fn persisted_manifest_rejects_recomputed_training_role_under_calibration_only() {
+    let (_, _, _, mut selection) = valid_selection();
+    selection.observations[0].sample_role = PartitionRole::Training;
+    selection.manifest_digest = selection.compute_digest().unwrap();
+    assert!(matches!(
+        selection.verify_digest().unwrap_err(),
+        SelectionError::TrainingLeakage(id) if id == "cal-1"
+    ));
+}
+
+#[test]
+fn authoritative_verification_rejects_role_or_content_drift() {
+    let (mut split, fit_a, fit_b, selection) = valid_selection();
+    let cal_1 = split
+        .assignments
+        .iter_mut()
+        .find(|assignment| assignment.unit.sample_id == "cal-1")
+        .unwrap();
+    cal_1.unit.content_digest = "digest:changed".into();
+    split.manifest_digest = split.compute_digest().unwrap();
+
+    let err = selection.verify_against(&split, &[fit_a, fit_b]).unwrap_err();
+    assert!(matches!(err, SelectionError::Fit(_) | SelectionError::SampleDigestMismatch(_)));
 }
 
 #[test]
