@@ -1,6 +1,8 @@
-# symthaea-sentinel
+# symthaea-sentinel-eo
 
-Offline-first Sentinel-1/2 bridge into `symthaea-earth-observation`.
+Offline-first Sentinel-1/2 Earth-observation bridge into `symthaea-earth-observation`.
+
+The package name intentionally includes `-eo` because the workspace already contains the unrelated core `symthaea-sentinel` audio-pattern-recognition crate. Cargo package identity is therefore unambiguous.
 
 The bridge intentionally contains **no live network client**. Scientific and CI workflows begin with replayable metadata so product identity, timestamps, footprints, digests, and processing lineage do not depend on live credentials or an external service.
 
@@ -109,7 +111,7 @@ Those remain separately gated claims.
 
 ```bash
 cargo fmt --all -- --check
-cargo check -p symthaea-sentinel --all-targets
-cargo test -p symthaea-sentinel
-cargo clippy -p symthaea-sentinel --all-targets -- -D warnings
+cargo check -p symthaea-sentinel-eo --all-targets
+cargo test -p symthaea-sentinel-eo
+cargo clippy -p symthaea-sentinel-eo --all-targets -- -D warnings
 ```
