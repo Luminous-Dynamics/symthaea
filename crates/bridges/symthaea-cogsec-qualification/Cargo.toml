@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-cogsec-qualification"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Independent scenario contracts and expected-count qualification for Symthaea CogSec shadow evidence"
+
+[dependencies]
+symthaea-cogsec-evidence = { path = "../symthaea-cogsec-evidence" }
+symthaea-evidence-plane = { path = "../../core/symthaea-evidence-plane" }
+serde = { workspace = true }
+
+[dev-dependencies]
+symthaea-cogsec = { path = "../../core/symthaea-cogsec" }
