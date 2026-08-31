@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-prometheus-bridge"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Read-only Prometheus text exposition bridge for the Symthaea infrastructure integration fabric"
+
+[dependencies]
+symthaea-integration-core = { path = "../../core/symthaea-integration-core" }
+prometheus-parse = "0.2.5"
+chrono = { workspace = true }
+blake3 = { workspace = true }
