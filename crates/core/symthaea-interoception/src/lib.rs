@@ -9,6 +9,7 @@
 mod allostasis;
 mod dynamics;
 mod evidence;
+mod execution;
 mod homeostasis;
 mod intervention;
 mod protocol;
@@ -25,6 +26,10 @@ pub use dynamics::{
 };
 pub use evidence::{
     ArtifactDigest, EvidenceCapsuleManifest, ForecastBasisId, EVIDENCE_CAPSULE_SCHEMA_VERSION,
+};
+pub use execution::{
+    execute_preregistration, ArmExecutionTrace, ExecutionLimits, ExecutionStepTrace, ExecutionTrace,
+    EXECUTION_TRACE_SCHEMA_VERSION,
 };
 pub use homeostasis::{assess_homeostasis, HomeostaticReport};
 pub use intervention::{

@@ -29,7 +29,7 @@ The test suite must demonstrate all of the following:
 6. kinematic and dynamics-aware forecasts remain explicitly distinguishable;
 7. dynamics-aware forecasts replay deterministically;
 8. direct interventions are recorded separately from endogenous dynamics and reset measured velocity;
-9. snapshot, intervention, qualification, capsule, and preregistration evidence survives serialization round trips;
+9. snapshot, intervention, qualification, capsule, preregistration, and execution-trace evidence survives serialization round trips where applicable;
 10. stable channel identifiers are unique;
 11. named higher-level state categories remain absent from core source;
 12. passive, restorative, driven, and clamped evidence-plane arms satisfy their declared mechanism expectations;
@@ -39,7 +39,10 @@ The test suite must demonstrate all of the following:
 16. every exported snapshot, qualification receipt, and evidence capsule binds the exact native model-semantics version;
 17. deserialization cannot bypass viability/configuration invariants and loaded snapshots reject forged derived reports;
 18. preregistration rejects ambiguous arm/metric/hypothesis references, invalid schedules, and incompatible forecast timesteps;
-19. the preregistration digest is stable under round trip, changes when the prospective plan changes, and is separately bound into the evidence capsule.
+19. the preregistration digest is stable under round trip, changes when the prospective plan changes, and is separately bound into the evidence capsule;
+20. executing the same preregistration twice produces exactly equal traces and hashes;
+21. execution limits fail closed instead of silently truncating an arm or protocol;
+22. replay validation rejects any trace that diverges from the locked preregistration, and blinded trace exports omit semantic arm identifiers.
 
 ## Workspace gates
 
@@ -101,6 +104,34 @@ separately records the preregistration digest and the resolved runtime-configura
 and input-sequence digests so divergence can be detected instead of silently folded
 into the planned experiment.
 
+## Deterministic protocol execution
+
+`execute_preregistration` consumes the validated prospective protocol directly. It
+does not accept an independently reconstructed arm configuration. Each arm executes
+its declared initial state, dynamics configuration, drive phases, and interventions
+in protocol order.
+
+Execution is bounded by caller-supplied `ExecutionLimits`. Exceeding either the
+per-arm or total-step limit is a hard error; the executor never shortens a run and
+reports it as complete.
+
+`ExecutionTrace` records:
+
+- protocol and analysis identity;
+- protocol SHA-256;
+- resolved native-configuration SHA-256;
+- resolved input-sequence SHA-256;
+- model- and snapshot-semantics versions;
+- opaque arm code and native initial state;
+- each executed drive and intervention receipt;
+- each mechanical transition receipt;
+- state and homeostatic report after every executed step.
+
+Semantic `arm_id` values are deliberately omitted from the trace. A primary analyst
+can therefore receive the trace without receiving the arm-identity mapping. The
+trace can later be replayed against the locked preregistration; exact mismatch is a
+validation failure rather than a warning.
+
 ## Evidence capsule
 
 Any result promoted beyond exploratory status should be accompanied by a valid
@@ -120,7 +151,7 @@ Any result promoted beyond exploratory status should be accompanied by a valid
 - input drive/intervention sequence digest;
 - snapshot schema version;
 - evidence-plane artifact digest;
-- raw result artifact hashes.
+- raw result artifact hashes, including the blinded execution trace for confirmatory runs.
 
 The crate validates caller-supplied provenance but does not discover or synthesize
 Git state, toolchain identity, or artifact hashes itself.
