@@ -13,6 +13,7 @@
 //!   - `evtx_source` — Windows Event Log ingestion
 //!   - `syslog_source` — RFC5424/RFC3164 syslog ingestion
 //!   - `event` — normalized `LogEvent` all sources flatten into
+//!   - `integration` — read-only bridge into `symthaea-integration-core`
 //!   - `encoder` — HDC hypervector encoding (feature-gated on `hdc-encoder`)
 //!   - `cluster` — HDBSCAN wrapper + purity metric
 
@@ -21,11 +22,15 @@ pub mod encoder;
 pub mod event;
 pub mod evtx_source;
 pub mod fixtures;
+pub mod integration;
 pub mod otrf_source;
 pub mod probe;
 pub mod syslog_source;
 
 pub use event::{LogEvent, Severity, Source};
+pub use integration::{
+    LogIntegrationContext, LogIntegrationError, integration_manifest, log_event_to_observation,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LogParseError {
