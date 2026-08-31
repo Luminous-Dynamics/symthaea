@@ -8,6 +8,7 @@
 
 mod allostasis;
 mod dynamics;
+mod evidence;
 mod homeostasis;
 mod intervention;
 mod snapshot;
@@ -19,6 +20,9 @@ pub use allostasis::{
 pub use dynamics::{
     InteroceptiveDrive, InteroceptiveDynamicsConfig, InteroceptiveStepReport,
     NativeInteroceptiveModel,
+};
+pub use evidence::{
+    ArtifactDigest, EvidenceCapsuleManifest, ForecastBasisId, EVIDENCE_CAPSULE_SCHEMA_VERSION,
 };
 pub use homeostasis::{assess_homeostasis, HomeostaticReport};
 pub use intervention::{
