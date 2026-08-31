@@ -4,23 +4,56 @@
 //!
 //! Registration is an admission boundary, not a passive lookup table. Every
 //! adapter must pass the strict read-only manifest profile and must declare the
-//! capability class matching the role under which it is registered.
+//! capability class matching the role under which it is registered. Runtime
+//! observation calls also cross this boundary, where centrally configured
+//! resource/cardinality budgets are enforced independently of adapter code.
 
+use crate::limits::ObservationLimits;
 use crate::manifest::{CapabilityClass, IntegrationId, IntegrationManifest, ManifestValidationError};
-use crate::traits::{Discoverer, Observer};
+use crate::observation::ObservationBatch;
+use crate::traits::{
+    Discoverer, IntegrationError, IntegrationFuture, ObservationRequest, Observer,
+};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-#[derive(Default)]
 pub struct IntegrationRegistry {
     manifests: BTreeMap<IntegrationId, IntegrationManifest>,
     observers: BTreeMap<IntegrationId, Arc<dyn Observer>>,
     discoverers: BTreeMap<IntegrationId, Arc<dyn Discoverer>>,
+    observation_limits: ObservationLimits,
+}
+
+impl Default for IntegrationRegistry {
+    fn default() -> Self {
+        Self {
+            manifests: BTreeMap::new(),
+            observers: BTreeMap::new(),
+            discoverers: BTreeMap::new(),
+            observation_limits: ObservationLimits::default(),
+        }
+    }
 }
 
 impl IntegrationRegistry {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn with_observation_limits(observation_limits: ObservationLimits) -> Self {
+        Self {
+            observation_limits,
+            ..Self::default()
+        }
+    }
+
+    pub fn observation_limits(&self) -> &ObservationLimits {
+        &self.observation_limits
+    }
+
+    /// Replace the central admission budget. Adapters cannot mutate this value.
+    pub fn set_observation_limits(&mut self, observation_limits: ObservationLimits) {
+        self.observation_limits = observation_limits;
     }
 
     pub fn register_observer(
@@ -61,6 +94,37 @@ impl IntegrationRegistry {
         self.manifests.entry(id.clone()).or_insert(manifest);
         self.discoverers.insert(id, discoverer);
         Ok(())
+    }
+
+    /// Invoke a registered observer through the central admission boundary.
+    ///
+    /// The adapter's own structural checks remain useful, but the registry does
+    /// not trust them to enforce resource/cardinality policy. Every returned
+    /// batch is independently validated against the registry's limits before it
+    /// can be handed to a world model.
+    pub fn observe<'a>(
+        &'a self,
+        id: &IntegrationId,
+        request: ObservationRequest,
+    ) -> IntegrationFuture<'a, Result<ObservationBatch, IntegrationError>> {
+        let observer = self.observers.get(id).cloned();
+        let integration_id = id.clone();
+        let limits = self.observation_limits.clone();
+
+        Box::pin(async move {
+            let observer = observer.ok_or_else(|| {
+                IntegrationError::Unsupported(format!(
+                    "no observer registered for integration `{integration_id}`"
+                ))
+            })?;
+            let batch = observer.observe(request).await?;
+            batch.validate_with_limits(&limits).map_err(|error| {
+                IntegrationError::InvalidOutput(format!(
+                    "integration `{integration_id}` output rejected by admission budget: {error}"
+                ))
+            })?;
+            Ok(batch)
+        })
     }
 
     pub fn manifest(&self, id: &IntegrationId) -> Option<&IntegrationManifest> {
@@ -146,12 +210,12 @@ mod tests {
         AccessMode, CapabilityDeclaration, INTEGRATION_MANIFEST_SCHEMA_VERSION, MaturityLevel,
         RiskClass,
     };
-    use crate::observation::ObservationBatch;
-    use crate::topology::DiscoverySnapshot;
-    use crate::traits::{
-        DiscoveryRequest, IntegrationError, IntegrationFuture, IntegrationIdentity,
-        ObservationRequest,
+    use crate::observation::{
+        EntityRef, ObservationEnvelope, ObservationId, ObservationKind, ObservationLineage,
+        ObservationQuality, ObservationSource, ObservationValue,
     };
+    use crate::topology::DiscoverySnapshot;
+    use crate::traits::{DiscoveryRequest, IntegrationIdentity};
 
     #[derive(Clone)]
     struct FixtureIntegration {
@@ -172,9 +236,34 @@ mod tests {
             let id = self.manifest.id.0.clone();
             Box::pin(async move {
                 Ok(ObservationBatch {
-                    integration_id: id,
-                    collected_at_unix_ms: 0,
-                    observations: vec![],
+                    integration_id: id.clone(),
+                    collected_at_unix_ms: 2,
+                    observations: vec![ObservationEnvelope::new(
+                        ObservationId::new("fixture-observation"),
+                        1,
+                        2,
+                        EntityRef::new("test", "host", "node-1"),
+                        ObservationKind::Metric,
+                        "system.cpu.utilization",
+                        ObservationValue::Number {
+                            value: 0.5,
+                            unit: Some("1".into()),
+                        },
+                        ObservationSource {
+                            integration_id: id,
+                            collector_id: None,
+                            upstream_origin: None,
+                            measurement_method: "fixture".into(),
+                            tenant: None,
+                        },
+                        ObservationQuality::observed(1.0),
+                        ObservationLineage {
+                            lineage_id: "fixture-lineage".into(),
+                            parent_ids: vec![],
+                            independence_group: None,
+                            transforms: vec![],
+                        },
+                    )],
                 })
             })
         }
@@ -293,5 +382,22 @@ mod tests {
             registry.register_discoverer(second),
             Err(RegistryError::ManifestCollision { .. })
         ));
+    }
+
+    #[test]
+    fn registry_observe_enforces_central_batch_budget() {
+        let integration = Arc::new(FixtureIntegration {
+            manifest: manifest(&[CapabilityClass::Observe]),
+        });
+        let mut registry = IntegrationRegistry::with_observation_limits(ObservationLimits {
+            max_batch_observations: 0,
+            ..ObservationLimits::default()
+        });
+        registry.register_observer(integration).unwrap();
+
+        let result = futures_lite::future::block_on(
+            registry.observe(&IntegrationId::new("fixture"), ObservationRequest::default()),
+        );
+        assert!(matches!(result, Err(IntegrationError::InvalidOutput(_))));
     }
 }
