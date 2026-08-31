@@ -1,15 +1,19 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Owner-bound runtime bookkeeping for CogSec shadow mode.
+//! Audit-only runtime observation support for CogSec shadow mode.
 //!
 //! This crate deliberately does **not** own cognitive state and does not store
 //! authorization or commit permits. It provides one optional observer object
 //! that future `ContinuousMind` hooks can use to:
 //!
-//! - identify the protected owner being observed;
-//! - track owner-issued `ResourceVersion`s after legacy mutations occur;
+//! - identify the protected resource being observed;
 //! - append typed shadow evidence through one bounded ledger;
 //! - keep qualification-run correlation separate from authority.
+//!
+//! The observer does **not** issue `ResourceVersion`. Early shadow continuity
+//! comes from owner-issued evidence `EventId`s and explicit causal parents.
+//! Authoritative `ResourceVersion` is reserved for the actual protected state
+//! owner once that owner boundary is instrumented.
 //!
 //! Absence of this object is the default disabled state. Presence means
 //! **audit/shadow observation only**; this crate has no enforcement mode.
@@ -19,7 +23,7 @@
 use symthaea_cogsec::ResourceId;
 use symthaea_cogsec_evidence::{
     AppendError, EvidenceCompleteness, EvidenceLedgerSnapshot, EventId, LedgerInitError, LedgerStats,
-    QualificationManifest, ResourceVersion, ShadowEventDraft, ShadowEventLedger,
+    QualificationManifest, ShadowEventDraft, ShadowEventLedger,
 };
 use symthaea_evidence_plane::RunId;
 use thiserror::Error;
@@ -30,7 +34,7 @@ const GOAL_STORE_RESOURCE: &str = "mind/goals";
 const AFFECTIVE_STATE_RESOURCE: &str = "mind/affect";
 const GRADUATION_BOUNDARY_RESOURCE: &str = "mind/memory/graduation";
 
-/// First-tranche protected owner domains observed by CogSec shadow mode.
+/// First-tranche protected domains observed by CogSec shadow mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ShadowResource {
     /// Working-memory ordering/content/metadata owner.
@@ -68,7 +72,7 @@ impl Default for ShadowResourceIds {
 }
 
 impl ShadowResourceIds {
-    /// Resource identity for one protected owner domain.
+    /// Resource identity for one protected domain.
     pub fn get(&self, resource: ShadowResource) -> &ResourceId {
         match resource {
             ShadowResource::WorkingMemory => &self.working_memory,
@@ -80,81 +84,16 @@ impl ShadowResourceIds {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct VersionSlots {
-    working_memory: ResourceVersion,
-    active_cognitive_state: ResourceVersion,
-    goal_store: ResourceVersion,
-    affective_state: ResourceVersion,
-    graduation_boundary: ResourceVersion,
-}
-
-impl VersionSlots {
-    fn new(owner_epoch: u64) -> Self {
-        let initial = ResourceVersion {
-            owner_epoch,
-            counter: 0,
-        };
-        Self {
-            working_memory: initial,
-            active_cognitive_state: initial,
-            goal_store: initial,
-            affective_state: initial,
-            graduation_boundary: initial,
-        }
-    }
-
-    fn get(&self, resource: ShadowResource) -> ResourceVersion {
-        match resource {
-            ShadowResource::WorkingMemory => self.working_memory,
-            ShadowResource::ActiveCognitiveState => self.active_cognitive_state,
-            ShadowResource::GoalStore => self.goal_store,
-            ShadowResource::AffectiveState => self.affective_state,
-            ShadowResource::GraduationBoundary => self.graduation_boundary,
-        }
-    }
-
-    fn get_mut(&mut self, resource: ShadowResource) -> &mut ResourceVersion {
-        match resource {
-            ShadowResource::WorkingMemory => &mut self.working_memory,
-            ShadowResource::ActiveCognitiveState => &mut self.active_cognitive_state,
-            ShadowResource::GoalStore => &mut self.goal_store,
-            ShadowResource::AffectiveState => &mut self.affective_state,
-            ShadowResource::GraduationBoundary => &mut self.graduation_boundary,
-        }
-    }
-}
-
-/// Exact before/after freshness observation for one legacy owner transition.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ResourceVersionTransition {
-    /// Version before the legacy owner mutation.
-    pub before: ResourceVersion,
-    /// Version after the legacy owner mutation.
-    pub after: ResourceVersion,
-}
-
-/// Failure to advance observer freshness state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
-pub enum VersionObservationError {
-    /// The per-owner mutation counter cannot advance further in this owner epoch.
-    #[error("resource version exhausted for {resource:?}")]
-    CounterExhausted {
-        /// Protected resource whose counter overflowed.
-        resource: ShadowResource,
-    },
-}
-
-/// Failure to append through the owner-bound shadow evidence boundary.
+/// Failure to append through the observer-bound shadow evidence boundary.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ShadowAppendError {
-    /// A qualification owner expects one run identity but the draft omitted it.
-    #[error("shadow event is missing the owner-bound qualification run id")]
+    /// A qualification observer expects one run identity but the draft omitted it.
+    #[error("shadow event is missing the observer-bound qualification run id")]
     MissingRunId,
-    /// The draft carries a run identity different from the owner-bound run.
-    #[error("shadow event run id does not match the owner-bound qualification run")]
+    /// The draft carries a run identity different from the observer-bound run.
+    #[error("shadow event run id does not match the observer-bound qualification run")]
     RunIdMismatch,
-    /// The owner has no run grouping but the draft attempted to inject one.
+    /// The observer has no run grouping but the draft attempted to inject one.
     #[error("shadow event supplied an unexpected qualification run id")]
     UnexpectedRunId,
     /// The underlying bounded ledger rejected the event.
@@ -162,28 +101,22 @@ pub enum ShadowAppendError {
     Ledger(#[from] AppendError),
 }
 
-/// Optional audit-only runtime observer for one `ContinuousMind` instance.
+/// Optional audit-only observer for one `ContinuousMind` instance.
 ///
-/// This holder is not a cognitive state owner. Its version counters advance
-/// only **after** future hooks observe that legacy state actually mutated.
-/// It contains no `MutationPermit`, `CommitPermit`, policy authority, or
-/// enforcement switch.
+/// This object owns evidence bookkeeping only. It deliberately has no mutable
+/// cognitive-state reference and no method that issues authoritative state
+/// freshness. `ResourceVersion` must come from the actual protected owner.
 #[derive(Debug)]
-pub struct ShadowRuntimeOwner {
+pub struct ShadowRuntimeObserver {
     run_id: Option<RunId>,
     resource_ids: ShadowResourceIds,
-    versions: VersionSlots,
     ledger: ShadowEventLedger,
 }
 
-impl ShadowRuntimeOwner {
-    /// Construct an audit-only owner with fully preallocated retained-event storage.
-    ///
-    /// `owner_epoch` must be changed when the protected owner is reconstructed or
-    /// restored such that old freshness tokens must no longer compare equal.
+impl ShadowRuntimeObserver {
+    /// Construct an audit-only observer with fully preallocated retained-event storage.
     pub fn try_new_preallocated(
         ledger_epoch: u64,
-        owner_epoch: u64,
         event_capacity: usize,
         manifest: QualificationManifest,
         run_id: Option<RunId>,
@@ -191,7 +124,6 @@ impl ShadowRuntimeOwner {
         Ok(Self {
             run_id,
             resource_ids: ShadowResourceIds::default(),
-            versions: VersionSlots::new(owner_epoch),
             ledger: ShadowEventLedger::try_new_preallocated(
                 ledger_epoch,
                 event_capacity,
@@ -205,55 +137,16 @@ impl ShadowRuntimeOwner {
         self.run_id.as_ref()
     }
 
-    /// Stable protected resource identity for one owner domain.
+    /// Stable protected resource identity for one observed domain.
     pub fn resource_id(&self, resource: ShadowResource) -> &ResourceId {
         self.resource_ids.get(resource)
     }
 
-    /// Current owner-issued freshness version for one protected resource.
-    pub fn resource_version(&self, resource: ShadowResource) -> ResourceVersion {
-        self.versions.get(resource)
-    }
-
-    /// Observe one legacy owner mutation that has already committed.
+    /// Append one event through the observer-bound evidence ledger.
     ///
-    /// This method does not perform the mutation. It advances only the observer's
-    /// freshness counter and returns the exact before/after pair to place on the
-    /// corresponding `...Observed` event.
-    pub fn observe_legacy_mutation(
-        &mut self,
-        resource: ShadowResource,
-    ) -> Result<ResourceVersionTransition, VersionObservationError> {
-        let slot = self.versions.get_mut(resource);
-        let before = *slot;
-        let counter = before
-            .counter
-            .checked_add(1)
-            .ok_or(VersionObservationError::CounterExhausted { resource })?;
-        let after = ResourceVersion {
-            owner_epoch: before.owner_epoch,
-            counter,
-        };
-        *slot = after;
-        Ok(ResourceVersionTransition { before, after })
-    }
-
-    /// Observe that a proposed legacy transition did not mutate its protected owner.
-    ///
-    /// The freshness version deliberately remains unchanged.
-    pub fn observe_legacy_noop(&self, resource: ShadowResource) -> ResourceVersionTransition {
-        let version = self.versions.get(resource);
-        ResourceVersionTransition {
-            before: version,
-            after: version,
-        }
-    }
-
-    /// Append one event through the owner-bound evidence ledger.
-    ///
-    /// Run grouping is checked rather than silently rewritten. This prevents a
-    /// future runtime hook from accidentally mixing two qualification scenarios
-    /// into one owner while keeping `RunId` explicitly non-authoritative.
+    /// Run grouping is checked rather than silently rewritten. The observer does
+    /// not fill or reinterpret `resource_version_*`: those fields are reserved
+    /// for values supplied by the actual protected state owner.
     pub fn try_append(&mut self, draft: ShadowEventDraft) -> Result<EventId, ShadowAppendError> {
         match (self.run_id.as_ref(), draft.run_id.as_ref()) {
             (Some(expected), Some(observed)) if expected != observed => {
@@ -303,8 +196,8 @@ mod tests {
         QualificationManifest::new([ShadowEventKind::IngressObserved], [])
     }
 
-    fn owner(run_id: Option<RunId>) -> ShadowRuntimeOwner {
-        ShadowRuntimeOwner::try_new_preallocated(7, 11, 16, manifest(), run_id).unwrap()
+    fn observer(run_id: Option<RunId>) -> ShadowRuntimeObserver {
+        ShadowRuntimeObserver::try_new_preallocated(7, 16, manifest(), run_id).unwrap()
     }
 
     fn ingress(run_id: Option<RunId>) -> ShadowEventDraft {
@@ -333,89 +226,61 @@ mod tests {
     }
 
     #[test]
-    fn resource_versions_are_independent_and_start_in_one_owner_epoch() {
-        let mut owner = owner(None);
-        let wm_before = owner.resource_version(ShadowResource::WorkingMemory);
-        let goal_before = owner.resource_version(ShadowResource::GoalStore);
-        assert_eq!(wm_before.owner_epoch, 11);
-        assert_eq!(wm_before.counter, 0);
-        assert_eq!(goal_before, wm_before);
-
-        let transition = owner
-            .observe_legacy_mutation(ShadowResource::WorkingMemory)
-            .unwrap();
-        assert_eq!(transition.before.counter, 0);
-        assert_eq!(transition.after.counter, 1);
+    fn resource_identity_is_stable_and_domain_specific() {
+        let observer = observer(None);
         assert_eq!(
-            owner.resource_version(ShadowResource::WorkingMemory).counter,
-            1
-        );
-        assert_eq!(owner.resource_version(ShadowResource::GoalStore).counter, 0);
-    }
-
-    #[test]
-    fn noop_observation_never_advances_resource_version() {
-        let owner = owner(None);
-        let transition = owner.observe_legacy_noop(ShadowResource::AffectiveState);
-        assert_eq!(transition.before, transition.after);
-        assert_eq!(transition.before.counter, 0);
-    }
-
-    #[test]
-    fn resource_identity_is_stable_and_owner_specific() {
-        let owner = owner(None);
-        assert_eq!(
-            owner.resource_id(ShadowResource::WorkingMemory).0.as_str(),
+            observer
+                .resource_id(ShadowResource::WorkingMemory)
+                .0
+                .as_str(),
             WORKING_MEMORY_RESOURCE
         );
         assert_eq!(
-            owner
+            observer
                 .resource_id(ShadowResource::ActiveCognitiveState)
                 .0
                 .as_str(),
             ACTIVE_COGNITIVE_STATE_RESOURCE
         );
         assert_ne!(
-            owner.resource_id(ShadowResource::GoalStore),
-            owner.resource_id(ShadowResource::AffectiveState)
+            observer.resource_id(ShadowResource::GoalStore),
+            observer.resource_id(ShadowResource::AffectiveState)
         );
     }
 
     #[test]
     fn event_storage_is_preallocated_before_runtime_use() {
-        let owner = owner(None);
-        assert!(owner.event_storage_fully_preallocated());
+        let observer = observer(None);
+        assert!(observer.event_storage_fully_preallocated());
     }
 
     #[test]
-    fn owner_bound_run_id_must_match_without_becoming_authority() {
+    fn observer_bound_run_id_must_match_without_becoming_authority() {
         let expected = RunId::new("scenario-s0");
-        let mut owner = owner(Some(expected.clone()));
+        let mut observer = observer(Some(expected.clone()));
 
-        let missing = owner.try_append(ingress(None));
+        let missing = observer.try_append(ingress(None));
         assert_eq!(missing, Err(ShadowAppendError::MissingRunId));
 
-        let mismatch = owner.try_append(ingress(Some(RunId::new("scenario-s1"))));
+        let mismatch = observer.try_append(ingress(Some(RunId::new("scenario-s1"))));
         assert_eq!(mismatch, Err(ShadowAppendError::RunIdMismatch));
 
-        let event_id = owner.try_append(ingress(Some(expected))).unwrap();
+        let event_id = observer.try_append(ingress(Some(expected))).unwrap();
         assert_eq!(event_id.ledger_epoch, 7);
         assert_eq!(event_id.sequence, 1);
     }
 
     #[test]
-    fn counter_exhaustion_fails_without_wrapping_security_time() {
-        let mut owner = owner(None);
-        owner.versions.goal_store.counter = u64::MAX;
-        let before = owner.resource_version(ShadowResource::GoalStore);
-
-        let result = owner.observe_legacy_mutation(ShadowResource::GoalStore);
-        assert_eq!(
-            result,
-            Err(VersionObservationError::CounterExhausted {
-                resource: ShadowResource::GoalStore
-            })
-        );
-        assert_eq!(owner.resource_version(ShadowResource::GoalStore), before);
+    fn observer_does_not_populate_authoritative_resource_versions() {
+        let mut observer = observer(None);
+        let event_id = observer.try_append(ingress(None)).unwrap();
+        let snapshot = observer.snapshot();
+        let event = snapshot
+            .events
+            .iter()
+            .find(|event| event.event_id == event_id)
+            .unwrap();
+        assert!(event.resource_version_before.is_none());
+        assert!(event.resource_version_after.is_none());
     }
 }
