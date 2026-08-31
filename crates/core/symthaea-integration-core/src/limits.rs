@@ -49,7 +49,7 @@ impl Default for ObservationLimits {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum ObservationBudgetError {
     #[error("observation batch is structurally invalid: {0}")]
     InvalidBatch(#[from] BatchValidationError),
