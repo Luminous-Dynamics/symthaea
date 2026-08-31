@@ -96,12 +96,21 @@ impl IntegrationRegistry {
         Ok(())
     }
 
-    /// Invoke a registered observer through the central admission boundary.
+    /// Independently validate adapter output before world-model admission.
     ///
-    /// The adapter's own structural checks remain useful, but the registry does
-    /// not trust them to enforce resource/cardinality policy. Every returned
-    /// batch is independently validated against the registry's limits before it
-    /// can be handed to a world model.
+    /// Besides cardinality/resource limits, the producing integration identity
+    /// must match the registry slot that was invoked. This prevents a buggy or
+    /// malicious adapter from returning a structurally valid batch attributed to
+    /// another registered integration.
+    pub fn admit_observation_batch(
+        &self,
+        id: &IntegrationId,
+        batch: &ObservationBatch,
+    ) -> Result<(), IntegrationError> {
+        validate_batch_for_limits(id, batch, &self.observation_limits)
+    }
+
+    /// Invoke a registered observer through the central admission boundary.
     pub fn observe<'a>(
         &'a self,
         id: &IntegrationId,
@@ -118,11 +127,7 @@ impl IntegrationRegistry {
                 ))
             })?;
             let batch = observer.observe(request).await?;
-            batch.validate_with_limits(&limits).map_err(|error| {
-                IntegrationError::InvalidOutput(format!(
-                    "integration `{integration_id}` output rejected by admission budget: {error}"
-                ))
-            })?;
+            validate_batch_for_limits(&integration_id, &batch, &limits)?;
             Ok(batch)
         })
     }
@@ -185,6 +190,24 @@ impl IntegrationRegistry {
     }
 }
 
+fn validate_batch_for_limits(
+    id: &IntegrationId,
+    batch: &ObservationBatch,
+    limits: &ObservationLimits,
+) -> Result<(), IntegrationError> {
+    if batch.integration_id != id.as_str() {
+        return Err(IntegrationError::InvalidOutput(format!(
+            "observer `{id}` returned batch attributed to `{}`",
+            batch.integration_id
+        )));
+    }
+    batch.validate_with_limits(limits).map_err(|error| {
+        IntegrationError::InvalidOutput(format!(
+            "integration `{id}` output rejected by admission budget: {error}"
+        ))
+    })
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum RegistryError {
     #[error("integration manifest rejected: {0}")]
@@ -234,38 +257,7 @@ mod tests {
             _request: ObservationRequest,
         ) -> IntegrationFuture<'a, Result<ObservationBatch, IntegrationError>> {
             let id = self.manifest.id.0.clone();
-            Box::pin(async move {
-                Ok(ObservationBatch {
-                    integration_id: id.clone(),
-                    collected_at_unix_ms: 2,
-                    observations: vec![ObservationEnvelope::new(
-                        ObservationId::new("fixture-observation"),
-                        1,
-                        2,
-                        EntityRef::new("test", "host", "node-1"),
-                        ObservationKind::Metric,
-                        "system.cpu.utilization",
-                        ObservationValue::Number {
-                            value: 0.5,
-                            unit: Some("1".into()),
-                        },
-                        ObservationSource {
-                            integration_id: id,
-                            collector_id: None,
-                            upstream_origin: None,
-                            measurement_method: "fixture".into(),
-                            tenant: None,
-                        },
-                        ObservationQuality::observed(1.0),
-                        ObservationLineage {
-                            lineage_id: "fixture-lineage".into(),
-                            parent_ids: vec![],
-                            independence_group: None,
-                            transforms: vec![],
-                        },
-                    )],
-                })
-            })
+            Box::pin(async move { Ok(fixture_batch(&id)) })
         }
     }
 
@@ -283,6 +275,39 @@ mod tests {
                     relations: vec![],
                 })
             })
+        }
+    }
+
+    fn fixture_batch(id: &str) -> ObservationBatch {
+        ObservationBatch {
+            integration_id: id.into(),
+            collected_at_unix_ms: 2,
+            observations: vec![ObservationEnvelope::new(
+                ObservationId::new("fixture-observation"),
+                1,
+                2,
+                EntityRef::new("test", "host", "node-1"),
+                ObservationKind::Metric,
+                "system.cpu.utilization",
+                ObservationValue::Number {
+                    value: 0.5,
+                    unit: Some("1".into()),
+                },
+                ObservationSource {
+                    integration_id: id.into(),
+                    collector_id: None,
+                    upstream_origin: None,
+                    measurement_method: "fixture".into(),
+                    tenant: None,
+                },
+                ObservationQuality::observed(1.0),
+                ObservationLineage {
+                    lineage_id: "fixture-lineage".into(),
+                    parent_ids: vec![],
+                    independence_group: None,
+                    transforms: vec![],
+                },
+            )],
         }
     }
 
@@ -385,18 +410,24 @@ mod tests {
     }
 
     #[test]
-    fn registry_observe_enforces_central_batch_budget() {
-        let integration = Arc::new(FixtureIntegration {
-            manifest: manifest(&[CapabilityClass::Observe]),
-        });
-        let mut registry = IntegrationRegistry::with_observation_limits(ObservationLimits {
+    fn registry_admission_enforces_central_batch_budget() {
+        let registry = IntegrationRegistry::with_observation_limits(ObservationLimits {
             max_batch_observations: 0,
             ..ObservationLimits::default()
         });
-        registry.register_observer(integration).unwrap();
+        let result = registry.admit_observation_batch(
+            &IntegrationId::new("fixture"),
+            &fixture_batch("fixture"),
+        );
+        assert!(matches!(result, Err(IntegrationError::InvalidOutput(_))));
+    }
 
-        let result = futures_lite::future::block_on(
-            registry.observe(&IntegrationId::new("fixture"), ObservationRequest::default()),
+    #[test]
+    fn registry_admission_rejects_cross_integration_identity_smuggling() {
+        let registry = IntegrationRegistry::new();
+        let result = registry.admit_observation_batch(
+            &IntegrationId::new("fixture"),
+            &fixture_batch("other-integration"),
         );
         assert!(matches!(result, Err(IntegrationError::InvalidOutput(_))));
     }
