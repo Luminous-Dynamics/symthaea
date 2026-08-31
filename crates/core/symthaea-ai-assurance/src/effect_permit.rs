@@ -30,8 +30,15 @@
 //! the point of no return for admission semantics; post-entry cancellation is a
 //! separate adapter-specific guarantee.
 //!
-//! This primitive does not itself prove that arbitrary code used the permit. A
-//! concrete production adapter must make [`EffectEntryPermit::enter`] (or an
+//! The commitment's authority-snapshot and adapter-semantics digests are
+//! **commitments, not attestations by themselves**. The trusted host must derive
+//! them from canonical evidence/configuration owned outside cognition. This
+//! module prevents substitution after ticket issuance; it does not decide whether
+//! the committed policy was wise or whether an adapter actually implements the
+//! semantics its digest names.
+//!
+//! This primitive also does not itself prove that arbitrary code used the permit.
+//! A concrete production adapter must make [`EffectEntryPermit::enter`] (or an
 //! equivalent permit-consuming boundary) structurally necessary before its first
 //! external side effect.
 
@@ -808,7 +815,11 @@ mod tests {
     use std::thread;
 
     fn commitment(tag: u8) -> EffectAdmissionCommitment {
-        EffectAdmissionCommitment::new([tag; 32], [tag.wrapping_add(1); 32], [tag.wrapping_add(2); 32])
+        EffectAdmissionCommitment::new(
+            [tag; 32],
+            [tag.wrapping_add(1); 32],
+            [tag.wrapping_add(2); 32],
+        )
     }
 
     #[test]
