@@ -21,6 +21,9 @@ fn public_commitment_changes_with_authority_and_adapter_semantics() {
 
     assert_ne!(base.digest(), authority_changed.digest());
     assert_ne!(base.digest(), adapter_changed.digest());
+    assert_eq!(base.action_binding(), [1; 32]);
+    assert_eq!(base.authority_snapshot_digest(), [2; 32]);
+    assert_eq!(base.adapter_semantics_digest(), [3; 32]);
 }
 
 #[test]
@@ -156,10 +159,21 @@ fn public_commitment_substitution_fails_before_admission() {
         [99; 32],
         original.adapter_semantics_digest(),
     );
-    let ticket = domain.issue_ticket(original).unwrap();
+    let changed_adapter = EffectAdmissionCommitment::new(
+        original.action_binding(),
+        original.authority_snapshot_digest(),
+        [98; 32],
+    );
 
+    let ticket = domain.issue_ticket(original).unwrap();
     assert!(matches!(
         domain.acquire(ticket, changed_authority),
+        Err(EffectEntryError::CommitmentMismatch)
+    ));
+
+    let ticket = domain.issue_ticket(original).unwrap();
+    assert!(matches!(
+        domain.acquire(ticket, changed_adapter),
         Err(EffectEntryError::CommitmentMismatch)
     ));
     assert!(domain.activity().is_quiescent());
