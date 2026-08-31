@@ -1,11 +1,13 @@
 use symthaea_interoception::{
     GateStatus, QualificationGateReceipt, QualificationReceipt,
-    QUALIFICATION_RECEIPT_SCHEMA_VERSION, REQUIRED_QUALIFICATION_GATES,
+    INTEROCEPTIVE_MODEL_SEMANTICS_VERSION, QUALIFICATION_RECEIPT_SCHEMA_VERSION,
+    REQUIRED_QUALIFICATION_GATES,
 };
 
 fn receipt_with(status: GateStatus) -> QualificationReceipt {
     QualificationReceipt {
         schema_version: QUALIFICATION_RECEIPT_SCHEMA_VERSION,
+        model_semantics_version: INTEROCEPTIVE_MODEL_SEMANTICS_VERSION,
         source_commit: "0123456789abcdef0123456789abcdef01234567".into(),
         gates: REQUIRED_QUALIFICATION_GATES
             .iter()
@@ -55,6 +57,15 @@ fn missing_or_duplicate_required_gate_invalidates_receipt() {
     duplicate.gates.push(duplicate.gates[0].clone());
     assert!(duplicate.validate().is_err());
     assert!(!duplicate.is_qualified());
+}
+
+#[test]
+fn semantics_mismatch_invalidates_receipt() {
+    let mut receipt = receipt_with(GateStatus::Passed);
+    receipt.model_semantics_version = INTEROCEPTIVE_MODEL_SEMANTICS_VERSION + 1;
+
+    assert!(receipt.validate().is_err());
+    assert!(!receipt.is_qualified());
 }
 
 #[test]

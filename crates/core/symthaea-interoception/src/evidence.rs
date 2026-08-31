@@ -2,7 +2,10 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{AllostaticForecastSnapshot, INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION};
+use crate::snapshot::{
+    AllostaticForecastSnapshot, INTEROCEPTIVE_MODEL_SEMANTICS_VERSION,
+    INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION,
+};
 
 pub const EVIDENCE_CAPSULE_SCHEMA_VERSION: u16 = 1;
 
@@ -47,6 +50,7 @@ impl ArtifactDigest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvidenceCapsuleManifest {
     pub schema_version: u16,
+    pub model_semantics_version: u16,
     pub source_commit: String,
     pub cargo_lock_sha256: String,
     pub flake_lock_sha256: Option<String>,
@@ -73,6 +77,12 @@ impl EvidenceCapsuleManifest {
             errors.push(format!(
                 "unsupported evidence capsule schema version: {}",
                 self.schema_version
+            ));
+        }
+        if self.model_semantics_version != INTEROCEPTIVE_MODEL_SEMANTICS_VERSION {
+            errors.push(format!(
+                "model semantics version mismatch: {}",
+                self.model_semantics_version
             ));
         }
         if self.snapshot_schema_version != INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION {

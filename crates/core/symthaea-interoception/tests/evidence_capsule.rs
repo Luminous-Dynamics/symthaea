@@ -1,6 +1,6 @@
 use symthaea_interoception::{
     ArtifactDigest, EvidenceCapsuleManifest, ForecastBasisId, EVIDENCE_CAPSULE_SCHEMA_VERSION,
-    INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION,
+    INTEROCEPTIVE_MODEL_SEMANTICS_VERSION, INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION,
 };
 
 fn digest(ch: char) -> String {
@@ -10,6 +10,7 @@ fn digest(ch: char) -> String {
 fn valid_manifest() -> EvidenceCapsuleManifest {
     EvidenceCapsuleManifest {
         schema_version: EVIDENCE_CAPSULE_SCHEMA_VERSION,
+        model_semantics_version: INTEROCEPTIVE_MODEL_SEMANTICS_VERSION,
         source_commit: "0123456789abcdef0123456789abcdef01234567".into(),
         cargo_lock_sha256: digest('a'),
         flake_lock_sha256: Some(digest('b')),
@@ -53,12 +54,16 @@ fn evidence_capsule_rejects_ambiguous_or_malformed_identity() {
 }
 
 #[test]
-fn evidence_capsule_requires_exact_snapshot_schema() {
+fn evidence_capsule_requires_exact_snapshot_and_semantics_versions() {
     let mut manifest = valid_manifest();
     manifest.snapshot_schema_version = INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION + 1;
+    manifest.model_semantics_version = INTEROCEPTIVE_MODEL_SEMANTICS_VERSION + 1;
 
-    let errors = manifest.validate().expect_err("schema mismatch must fail");
+    let errors = manifest.validate().expect_err("version mismatch must fail");
     assert!(errors
         .iter()
         .any(|error| error.contains("snapshot schema version mismatch")));
+    assert!(errors
+        .iter()
+        .any(|error| error.contains("model semantics version mismatch")));
 }

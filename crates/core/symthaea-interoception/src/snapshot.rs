@@ -6,7 +6,10 @@ use crate::{
     NativeInteroceptiveModel, NativeInteroceptiveState,
 };
 
-pub const INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION: u16 = 1;
+/// Scientific semantics version for the native interoceptive model contract.
+/// Increment when a change alters the meaning of state, regulation, or forecast behavior.
+pub const INTEROCEPTIVE_MODEL_SEMANTICS_VERSION: u16 = 1;
+pub const INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION: u16 = 2;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AllostaticForecastSnapshot {
@@ -36,6 +39,7 @@ impl AllostaticForecastSnapshot {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InteroceptiveSnapshot {
     pub schema_version: u16,
+    pub model_semantics_version: u16,
     pub cycle: u64,
     pub dynamics_config: InteroceptiveDynamicsConfig,
     pub state: NativeInteroceptiveState,
@@ -57,6 +61,7 @@ impl InteroceptiveSnapshot {
         let report = assess_allostasis(&state, allostatic_config);
         Self {
             schema_version: INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION,
+            model_semantics_version: INTEROCEPTIVE_MODEL_SEMANTICS_VERSION,
             cycle: model.cycle(),
             dynamics_config: model.config(),
             homeostasis: assess_homeostasis(&state),
@@ -77,6 +82,7 @@ impl InteroceptiveSnapshot {
         let report = assess_allostasis_with_drive(model, drive, allostatic_config);
         Self {
             schema_version: INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION,
+            model_semantics_version: INTEROCEPTIVE_MODEL_SEMANTICS_VERSION,
             cycle: model.cycle(),
             dynamics_config: model.config(),
             homeostasis: assess_homeostasis(&state),

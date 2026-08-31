@@ -2,6 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+use crate::snapshot::INTEROCEPTIVE_MODEL_SEMANTICS_VERSION;
+
 pub const QUALIFICATION_RECEIPT_SCHEMA_VERSION: u16 = 1;
 pub const REQUIRED_QUALIFICATION_GATES: [&str; 5] = [
     "local_fmt",
@@ -44,6 +46,7 @@ impl QualificationGateReceipt {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QualificationReceipt {
     pub schema_version: u16,
+    pub model_semantics_version: u16,
     pub source_commit: String,
     pub gates: Vec<QualificationGateReceipt>,
 }
@@ -55,6 +58,12 @@ impl QualificationReceipt {
             errors.push(format!(
                 "unsupported qualification receipt schema version: {}",
                 self.schema_version
+            ));
+        }
+        if self.model_semantics_version != INTEROCEPTIVE_MODEL_SEMANTICS_VERSION {
+            errors.push(format!(
+                "model semantics version mismatch: {}",
+                self.model_semantics_version
             ));
         }
         if !is_lower_hex(&self.source_commit, 40) {

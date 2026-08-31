@@ -35,7 +35,8 @@ The test suite must demonstrate all of the following:
 12. passive, restorative, driven, and clamped evidence-plane arms satisfy their declared mechanism expectations;
 13. property-based tests preserve boundedness, determinism, and passive-recovery monotonicity across a declared generated region;
 14. structural sensitivity monotonicities hold for preferred/viable widths, weights, forecast load, recovery, horizon, discount, and drive persistence;
-15. zero aggregate weight cannot erase raw per-channel breach evidence.
+15. zero aggregate weight cannot erase raw per-channel breach evidence;
+16. every exported snapshot, qualification receipt, and evidence capsule binds the exact native model-semantics version.
 
 ## Workspace gates
 
@@ -43,10 +44,24 @@ The repository's ordinary pull-request CI must remain green for the exact PR hea
 Showroom Integrity must also pass for that head. A skipped benchmark workflow is not
 evidence of benchmark success and must not be reported as such.
 
+## Semantic versioning of the research contract
+
+`INTEROCEPTIVE_MODEL_SEMANTICS_VERSION` identifies the scientific meaning of the
+native state/regulation/forecast contract independently of the Git commit. A source
+refactor that preserves the scientific contract may keep this value stable. Any
+change that alters the meaning of viability state, recovery, intervention, or
+allostatic forecast behavior must increment it and starts a new experimental
+semantics lineage.
+
+`INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION` is separate: it changes when the serialized
+snapshot representation changes, even when the underlying scientific semantics do
+not. Evidence artifacts must bind both versions.
+
 ## Machine-readable qualification receipt
 
-`QualificationReceipt` records the exact source commit and one explicit status for
-each fixed required gate. The v0.1 required gate identifiers are:
+`QualificationReceipt` records the exact source commit, model-semantics version, and
+one explicit status for each fixed required gate. The v0.1 required gate identifiers
+are:
 
 - `local_fmt`
 - `local_test`
@@ -65,6 +80,7 @@ Any result promoted beyond exploratory status should be accompanied by a valid
 `EvidenceCapsuleManifest` recording at minimum:
 
 - exact source commit;
+- exact native model-semantics version;
 - `Cargo.lock` SHA-256;
 - `flake.lock` SHA-256 when present;
 - `rust-toolchain.toml` SHA-256 when present;
@@ -80,8 +96,8 @@ Any result promoted beyond exploratory status should be accompanied by a valid
 The crate validates caller-supplied provenance but does not discover or synthesize
 Git state, toolchain identity, or artifact hashes itself.
 
-A change to source, locked dependencies, toolchain, or experimental semantics starts
-a new evidence lineage rather than being mixed into an existing one.
+A change to source, locked dependencies, toolchain, model semantics, or experimental
+semantics starts a new evidence lineage rather than being mixed into an existing one.
 
 ## Parameter gate
 
@@ -97,4 +113,4 @@ sweep.
 Do not wire this crate into the cognitive loop or derive higher-level regulatory
 state from it until the local crate gates and the required workspace gates pass for
 the exact head intended as the v0.1 baseline, and the corresponding qualification
-receipt and evidence capsule validate.
+receipt and evidence capsule validate against the same model-semantics version.

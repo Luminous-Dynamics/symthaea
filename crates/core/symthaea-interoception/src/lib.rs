@@ -34,7 +34,8 @@ pub use qualification::{
     REQUIRED_QUALIFICATION_GATES,
 };
 pub use snapshot::{
-    AllostaticForecastSnapshot, InteroceptiveSnapshot, INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION,
+    AllostaticForecastSnapshot, InteroceptiveSnapshot, INTEROCEPTIVE_MODEL_SEMANTICS_VERSION,
+    INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION,
 };
 pub use state::{
     NativeInteroceptiveState, ViabilityChannel, ViabilityVariable, CHANNEL_COUNT,
