@@ -8,12 +8,17 @@
 //!
 //! - identify the protected resource being observed;
 //! - append typed shadow evidence through one bounded ledger;
-//! - keep qualification-run correlation separate from authority.
+//! - keep qualification-run correlation separate from authority;
+//! - make the assurance profile explicit at construction time.
 //!
 //! The observer does **not** issue `ResourceVersion`. Early shadow continuity
 //! comes from owner-issued evidence `EventId`s and explicit causal parents.
 //! Authoritative `ResourceVersion` is reserved for the actual protected state
 //! owner once that owner boundary is instrumented.
+//!
+//! `ObserverOnly` and `OwnerAware` are intentionally distinct profiles:
+//! observer-only evidence must not carry authoritative resource versions,
+//! whereas owner-aware evidence must use a manifest that requires them.
 //!
 //! Absence of this object is the default disabled state. Presence means
 //! **audit/shadow observation only**; this crate has no enforcement mode.
@@ -23,7 +28,7 @@
 use symthaea_cogsec::ResourceId;
 use symthaea_cogsec_evidence::{
     AppendError, EvidenceCompleteness, EvidenceLedgerSnapshot, EventId, LedgerInitError, LedgerStats,
-    QualificationManifest, ShadowEventDraft, ShadowEventLedger,
+    QualificationManifest, ShadowEventDraft, ShadowEventKind, ShadowEventLedger,
 };
 use symthaea_evidence_plane::RunId;
 use thiserror::Error;
@@ -47,6 +52,18 @@ pub enum ShadowResource {
     AffectiveState,
     /// Working-memory eviction/graduation transition boundary.
     GraduationBoundary,
+}
+
+/// Explicit assurance profile for one shadow observer instance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ShadowAssuranceProfile {
+    /// Audit-only observation. Authoritative protected-owner freshness is not
+    /// claimed and `resource_version_*` fields are forbidden on appended events.
+    ObserverOnly,
+    /// Owner-aware observation. The manifest must require owner-issued
+    /// `ResourceVersion` on observed resource mutations. The observer records
+    /// supplied versions but never creates them.
+    OwnerAware,
 }
 
 /// Stable resource identities for the first shadow-runtime tranche.
@@ -84,6 +101,20 @@ impl ShadowResourceIds {
     }
 }
 
+/// Failure to construct a shadow observer with a contradictory assurance profile.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum ShadowObserverInitError {
+    /// Observer-only mode cannot claim owner-issued resource-version coverage.
+    #[error("observer-only shadow profile cannot require authoritative resource versions")]
+    ObserverOnlyRequiresResourceVersions,
+    /// Owner-aware mode must require authoritative resource-version coverage.
+    #[error("owner-aware shadow profile must require authoritative resource versions")]
+    OwnerAwareOmitsResourceVersions,
+    /// The bounded ledger could not establish its requested retained-event capacity.
+    #[error(transparent)]
+    Ledger(#[from] LedgerInitError),
+}
+
 /// Failure to append through the observer-bound shadow evidence boundary.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ShadowAppendError {
@@ -96,6 +127,12 @@ pub enum ShadowAppendError {
     /// The observer has no run grouping but the draft attempted to inject one.
     #[error("shadow event supplied an unexpected qualification run id")]
     UnexpectedRunId,
+    /// Observer-only mode may not carry authoritative owner freshness.
+    #[error("observer-only shadow event {kind:?} supplied resource-version fields")]
+    ObserverOnlyResourceVersionForbidden {
+        /// Event kind that attempted to carry owner-version evidence.
+        kind: ShadowEventKind,
+    },
     /// The underlying bounded ledger rejected the event.
     #[error(transparent)]
     Ledger(#[from] AppendError),
@@ -108,6 +145,7 @@ pub enum ShadowAppendError {
 /// freshness. `ResourceVersion` must come from the actual protected owner.
 #[derive(Debug)]
 pub struct ShadowRuntimeObserver {
+    profile: ShadowAssuranceProfile,
     run_id: Option<RunId>,
     resource_ids: ShadowResourceIds,
     ledger: ShadowEventLedger,
@@ -115,13 +153,29 @@ pub struct ShadowRuntimeObserver {
 
 impl ShadowRuntimeObserver {
     /// Construct an audit-only observer with fully preallocated retained-event storage.
+    ///
+    /// The profile and manifest must agree. This prevents an observer-only run
+    /// from claiming owner-issued freshness and prevents an owner-aware run from
+    /// silently omitting that qualification requirement.
     pub fn try_new_preallocated(
+        profile: ShadowAssuranceProfile,
         ledger_epoch: u64,
         event_capacity: usize,
         manifest: QualificationManifest,
         run_id: Option<RunId>,
-    ) -> Result<Self, LedgerInitError> {
+    ) -> Result<Self, ShadowObserverInitError> {
+        match profile {
+            ShadowAssuranceProfile::ObserverOnly if manifest.require_resource_versions => {
+                return Err(ShadowObserverInitError::ObserverOnlyRequiresResourceVersions);
+            }
+            ShadowAssuranceProfile::OwnerAware if !manifest.require_resource_versions => {
+                return Err(ShadowObserverInitError::OwnerAwareOmitsResourceVersions);
+            }
+            _ => {}
+        }
+
         Ok(Self {
+            profile,
             run_id,
             resource_ids: ShadowResourceIds::default(),
             ledger: ShadowEventLedger::try_new_preallocated(
@@ -130,6 +184,11 @@ impl ShadowRuntimeObserver {
                 manifest,
             )?,
         })
+    }
+
+    /// Explicit assurance profile for this observer instance.
+    pub const fn profile(&self) -> ShadowAssuranceProfile {
+        self.profile
     }
 
     /// Qualification grouping identity. This is never authorization authority.
@@ -144,9 +203,14 @@ impl ShadowRuntimeObserver {
 
     /// Append one event through the observer-bound evidence ledger.
     ///
-    /// Run grouping is checked rather than silently rewritten. The observer does
-    /// not fill or reinterpret `resource_version_*`: those fields are reserved
-    /// for values supplied by the actual protected state owner.
+    /// Run grouping is checked rather than silently rewritten. In
+    /// [`ShadowAssuranceProfile::ObserverOnly`] mode the append boundary also
+    /// rejects any supplied `resource_version_*` values, preventing audit data
+    /// from accidentally presenting itself as protected-owner freshness.
+    ///
+    /// In [`ShadowAssuranceProfile::OwnerAware`] mode owner-version fields are
+    /// passed through unchanged; the underlying manifest/ledger validates the
+    /// required version semantics for observed mutations.
     pub fn try_append(&mut self, draft: ShadowEventDraft) -> Result<EventId, ShadowAppendError> {
         match (self.run_id.as_ref(), draft.run_id.as_ref()) {
             (Some(expected), Some(observed)) if expected != observed => {
@@ -156,6 +220,15 @@ impl ShadowRuntimeObserver {
             (None, Some(_)) => return Err(ShadowAppendError::UnexpectedRunId),
             _ => {}
         }
+
+        if self.profile == ShadowAssuranceProfile::ObserverOnly
+            && (draft.resource_version_before.is_some() || draft.resource_version_after.is_some())
+        {
+            return Err(ShadowAppendError::ObserverOnlyResourceVersionForbidden {
+                kind: draft.kind,
+            });
+        }
+
         Ok(self.ledger.try_append(draft)?)
     }
 
@@ -188,16 +261,28 @@ mod tests {
     use super::*;
     use std::collections::BTreeSet;
     use symthaea_cogsec_evidence::{
-        EvidenceConfidentiality, IngressClass, PrincipalContext, ShadowEventKind,
+        EvidenceConfidentiality, IngressClass, PrincipalContext, ResourceVersion,
         ShadowEventPayload,
     };
 
-    fn manifest() -> QualificationManifest {
+    fn observer_manifest() -> QualificationManifest {
         QualificationManifest::new([ShadowEventKind::IngressObserved], [])
     }
 
+    fn owner_aware_manifest() -> QualificationManifest {
+        QualificationManifest::new([ShadowEventKind::IngressObserved], [])
+            .with_required_resource_versions(true)
+    }
+
     fn observer(run_id: Option<RunId>) -> ShadowRuntimeObserver {
-        ShadowRuntimeObserver::try_new_preallocated(7, 16, manifest(), run_id).unwrap()
+        ShadowRuntimeObserver::try_new_preallocated(
+            ShadowAssuranceProfile::ObserverOnly,
+            7,
+            16,
+            observer_manifest(),
+            run_id,
+        )
+        .unwrap()
     }
 
     fn ingress(run_id: Option<RunId>) -> ShadowEventDraft {
@@ -223,6 +308,52 @@ mod tests {
                 ingress_class: IngressClass::LegacyUnclassified,
             },
         }
+    }
+
+    #[test]
+    fn observer_only_profile_rejects_owner_version_requirement_at_init() {
+        let result = ShadowRuntimeObserver::try_new_preallocated(
+            ShadowAssuranceProfile::ObserverOnly,
+            7,
+            16,
+            owner_aware_manifest(),
+            None,
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            ShadowObserverInitError::ObserverOnlyRequiresResourceVersions
+        );
+    }
+
+    #[test]
+    fn owner_aware_profile_requires_owner_version_requirement_at_init() {
+        let result = ShadowRuntimeObserver::try_new_preallocated(
+            ShadowAssuranceProfile::OwnerAware,
+            7,
+            16,
+            observer_manifest(),
+            None,
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            ShadowObserverInitError::OwnerAwareOmitsResourceVersions
+        );
+    }
+
+    #[test]
+    fn assurance_profile_is_explicit_and_stable() {
+        let observer = observer(None);
+        assert_eq!(observer.profile(), ShadowAssuranceProfile::ObserverOnly);
+
+        let owner_aware = ShadowRuntimeObserver::try_new_preallocated(
+            ShadowAssuranceProfile::OwnerAware,
+            8,
+            16,
+            owner_aware_manifest(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(owner_aware.profile(), ShadowAssuranceProfile::OwnerAware);
     }
 
     #[test]
@@ -271,7 +402,26 @@ mod tests {
     }
 
     #[test]
-    fn observer_does_not_populate_authoritative_resource_versions() {
+    fn observer_only_append_rejects_supplied_resource_versions() {
+        let mut observer = observer(None);
+        let mut draft = ingress(None);
+        draft.resource_version_before = Some(ResourceVersion {
+            owner_epoch: 3,
+            counter: 9,
+        });
+
+        assert_eq!(
+            observer.try_append(draft),
+            Err(ShadowAppendError::ObserverOnlyResourceVersionForbidden {
+                kind: ShadowEventKind::IngressObserved,
+            })
+        );
+        assert_eq!(observer.ledger_stats().assigned_sequences, 0);
+        assert!(observer.snapshot().events.is_empty());
+    }
+
+    #[test]
+    fn observer_only_append_does_not_populate_authoritative_resource_versions() {
         let mut observer = observer(None);
         let event_id = observer.try_append(ingress(None)).unwrap();
         let snapshot = observer.snapshot();
