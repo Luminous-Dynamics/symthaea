@@ -2,8 +2,8 @@
 //!
 //! PP-06 defines geometry-only raster/window semantics in the provider-neutral
 //! Earth-observation domain. This module binds one such plan to a concrete
-//! fixture source and exact output bytes without mislabelling the operation as
-//! resampling.
+//! frozen fixture universe, source node, and exact output bytes without
+//! mislabelling the operation as resampling.
 
 use serde::{Deserialize, Serialize};
 use symthaea_earth_observation::{AffineGridTransform, GridAnchor, RasterWindowPlan};
@@ -14,7 +14,9 @@ use crate::{
     SentinelFixtureArtifact,
 };
 
-const EXACT_WINDOW_SCHEMA: &str = "symthaea-sentinel-exact-pixel-window/v1";
+const EXACT_WINDOW_GEOMETRY_SCHEMA: &str = "symthaea-sentinel-exact-window-geometry/v1";
+const EXACT_WINDOW_EVIDENCE_SCHEMA: &str = "symthaea-sentinel-exact-window-evidence/v1";
+const HEX_256_LEN: usize = 64;
 
 pub type ExactWindowResult<T> = std::result::Result<T, ExactWindowError>;
 
@@ -24,8 +26,14 @@ pub enum ExactWindowError {
     EmptyField(&'static str),
     #[error("{0} must be canonical lowercase hexadecimal")]
     NonCanonicalDigest(&'static str),
-    #[error("{0} must use canonical lowercase spelling")]
-    NonCanonicalToken(&'static str),
+    #[error("{field} must contain exactly {expected} hexadecimal characters, got {actual}")]
+    InvalidDigestLength {
+        field: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    #[error("unsupported frozen digest algorithm: {0}")]
+    UnsupportedDigestAlgorithm(String),
     #[error("arithmetic overflow while validating {0}")]
     ArithmeticOverflow(&'static str),
     #[error("invalid exact-window geometry: {0}")]
@@ -57,18 +65,26 @@ fn canonical_hex(value: &str, field: &'static str) -> ExactWindowResult<()> {
     }
 }
 
-fn canonical_token(value: &str, field: &'static str) -> ExactWindowResult<()> {
-    non_empty(value, field)?;
-    if value.bytes().any(|byte| byte.is_ascii_uppercase()) {
-        Err(ExactWindowError::NonCanonicalToken(field))
-    } else {
-        Ok(())
+fn canonical_hex_256(value: &str, field: &'static str) -> ExactWindowResult<()> {
+    canonical_hex(value, field)?;
+    if value.len() != HEX_256_LEN {
+        return Err(ExactWindowError::InvalidDigestLength {
+            field,
+            expected: HEX_256_LEN,
+            actual: value.len(),
+        });
     }
+    Ok(())
 }
 
 fn validate_digest(value: &FrozenDigest, field: &'static str) -> ExactWindowResult<()> {
-    canonical_token(&value.algorithm, "digest algorithm")?;
-    canonical_hex(&value.hex, field)
+    match value.algorithm.as_str() {
+        "sha256" | "blake3" => canonical_hex_256(&value.hex, field),
+        "other" => canonical_hex(&value.hex, field),
+        other => Err(ExactWindowError::UnsupportedDigestAlgorithm(
+            other.to_string(),
+        )),
+    }
 }
 
 fn blake3_json<T: Serialize>(value: &T) -> ExactWindowResult<String> {
@@ -147,8 +163,8 @@ impl From<AffineGridTransform> for FrozenAffineGrid {
 /// Geometry-only identity of one exact pixel-window extraction.
 ///
 /// Both the immutable root transform and the exact integer support are frozen.
-/// The local effective transform is intentionally not a second source of truth:
-/// it is deterministically derivable from these fields.
+/// The local effective transform is intentionally not stored as a second source
+/// of truth: it is deterministically derivable from these fields.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct FrozenExactWindowGeometry {
     pub crs_id: String,
@@ -232,7 +248,7 @@ impl FrozenExactWindowGeometry {
 
     fn digest_view(&self) -> GeometryDigestView<'_> {
         GeometryDigestView {
-            schema: EXACT_WINDOW_SCHEMA,
+            schema: EXACT_WINDOW_GEOMETRY_SCHEMA,
             crs_id: &self.crs_id,
             root_affine: &self.root_affine,
             source_rows: self.source_rows,
@@ -256,7 +272,7 @@ impl FrozenExactWindowGeometry {
 
     pub fn verify_digest(&self) -> ExactWindowResult<()> {
         self.validate_payload()?;
-        canonical_hex(&self.geometry_digest, "geometry digest")?;
+        canonical_hex_256(&self.geometry_digest, "geometry digest")?;
         if self.compute_digest()? != self.geometry_digest {
             return Err(ExactWindowError::EvidenceDigestMismatch);
         }
@@ -277,6 +293,17 @@ impl FrozenExactWindowGeometry {
                 "window shape must be nonzero".to_string(),
             ));
         }
+
+        self.source_root_row_offset
+            .checked_add(self.source_rows)
+            .ok_or(ExactWindowError::ArithmeticOverflow(
+                "source root row support end",
+            ))?;
+        self.source_root_col_offset
+            .checked_add(self.source_cols)
+            .ok_or(ExactWindowError::ArithmeticOverflow(
+                "source root column support end",
+            ))?;
 
         let row_end = self
             .window_row_offset
@@ -357,10 +384,16 @@ impl<'de> Deserialize<'de> for FrozenExactWindowGeometry {
     }
 }
 
-/// Evidence that exact output bytes were materialized from a declared fixture
-/// source under one frozen PP-06 window geometry.
+/// Evidence that exact output bytes were materialized from one declared source
+/// node in one exact frozen fixture universe under one frozen PP-06 geometry.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ExactPixelWindowEvidence {
+    /// BLAKE3 identity of the PP-05 `FrozenSentinelFixtureManifest` used to
+    /// resolve `source`. The source label alone is not sufficient provenance.
+    pub fixture_manifest_digest: String,
+    /// BLAKE3 metadata/identity digest of the referenced frozen product or
+    /// derived artifact node.
+    pub source_identity_digest: String,
     pub source: FixtureSourceRef,
     pub geometry: FrozenExactWindowGeometry,
     pub output_content_digest: FrozenDigest,
@@ -372,6 +405,8 @@ pub struct ExactPixelWindowEvidence {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 struct ExactPixelWindowEvidenceRepr {
+    fixture_manifest_digest: String,
+    source_identity_digest: String,
     source: FixtureSourceRef,
     geometry: FrozenExactWindowGeometry,
     output_content_digest: FrozenDigest,
@@ -384,6 +419,8 @@ struct ExactPixelWindowEvidenceRepr {
 #[derive(Serialize)]
 struct EvidenceDigestView<'a> {
     schema: &'static str,
+    fixture_manifest_digest: &'a str,
+    source_identity_digest: &'a str,
     source: &'a FixtureSourceRef,
     geometry_digest: &'a str,
     output_content_digest: &'a FrozenDigest,
@@ -393,7 +430,10 @@ struct EvidenceDigestView<'a> {
 }
 
 impl ExactPixelWindowEvidence {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
+        fixture_manifest_digest: impl Into<String>,
+        source_identity_digest: impl Into<String>,
         source: FixtureSourceRef,
         plan: &RasterWindowPlan,
         output_content_digest: FrozenDigest,
@@ -402,6 +442,8 @@ impl ExactPixelWindowEvidence {
         extractor_version: impl Into<String>,
     ) -> ExactWindowResult<Self> {
         let mut evidence = Self {
+            fixture_manifest_digest: fixture_manifest_digest.into(),
+            source_identity_digest: source_identity_digest.into(),
             source,
             geometry: FrozenExactWindowGeometry::from_plan(plan)?,
             output_content_digest,
@@ -417,7 +459,9 @@ impl ExactPixelWindowEvidence {
 
     fn digest_view(&self) -> EvidenceDigestView<'_> {
         EvidenceDigestView {
-            schema: EXACT_WINDOW_SCHEMA,
+            schema: EXACT_WINDOW_EVIDENCE_SCHEMA,
+            fixture_manifest_digest: &self.fixture_manifest_digest,
+            source_identity_digest: &self.source_identity_digest,
             source: &self.source,
             geometry_digest: &self.geometry.geometry_digest,
             output_content_digest: &self.output_content_digest,
@@ -433,7 +477,7 @@ impl ExactPixelWindowEvidence {
 
     pub fn verify_digest(&self) -> ExactWindowResult<()> {
         self.validate_payload()?;
-        canonical_hex(&self.evidence_digest, "evidence digest")?;
+        canonical_hex_256(&self.evidence_digest, "evidence digest")?;
         if self.compute_digest()? != self.evidence_digest {
             return Err(ExactWindowError::EvidenceDigestMismatch);
         }
@@ -441,6 +485,8 @@ impl ExactPixelWindowEvidence {
     }
 
     fn validate_payload(&self) -> ExactWindowResult<()> {
+        canonical_hex_256(&self.fixture_manifest_digest, "fixture manifest digest")?;
+        canonical_hex_256(&self.source_identity_digest, "source identity digest")?;
         match &self.source {
             FixtureSourceRef::Product { product_id } => {
                 non_empty(product_id, "source product id")?
@@ -456,9 +502,10 @@ impl ExactPixelWindowEvidence {
         Ok(())
     }
 
-    /// Materialize the generic PP-05 artifact node without ever calling the
-    /// operation a resample. The exact semantics remain bound by this sidecar
-    /// and its geometry digest.
+    /// Materialize the generic PP-05 v1 artifact node without ever calling the
+    /// operation a resample. The processing-parameters digest points to this
+    /// full exact-window sidecar, which binds fixture universe, source identity,
+    /// geometry, and output bytes.
     pub fn to_fixture_artifact(
         &self,
         artifact_id: impl Into<String>,
@@ -476,7 +523,7 @@ impl ExactPixelWindowEvidence {
                 version: self.extractor_version.clone(),
                 parameters_digest: Some(FrozenDigest {
                     algorithm: "blake3".to_string(),
-                    hex: self.geometry.geometry_digest.clone(),
+                    hex: self.evidence_digest.clone(),
                 }),
             }],
         )
@@ -489,6 +536,8 @@ impl TryFrom<ExactPixelWindowEvidenceRepr> for ExactPixelWindowEvidence {
 
     fn try_from(value: ExactPixelWindowEvidenceRepr) -> ExactWindowResult<Self> {
         let evidence = Self {
+            fixture_manifest_digest: value.fixture_manifest_digest,
+            source_identity_digest: value.source_identity_digest,
             source: value.source,
             geometry: value.geometry,
             output_content_digest: value.output_content_digest,
@@ -539,47 +588,49 @@ mod tests {
             .unwrap()
     }
 
-    fn digest(hex: &str) -> FrozenDigest {
+    fn hex256(ch: char) -> String {
+        std::iter::repeat_n(ch, HEX_256_LEN).collect()
+    }
+
+    fn digest(ch: char) -> FrozenDigest {
         FrozenDigest {
             algorithm: "sha256".to_string(),
-            hex: hex.to_string(),
+            hex: hex256(ch),
         }
     }
 
-    #[test]
-    fn exact_window_binds_integer_support_and_affine_bits() {
-        let evidence = ExactPixelWindowEvidence::new(
+    fn evidence(output_digest_char: char) -> ExactPixelWindowEvidence {
+        ExactPixelWindowEvidence::new(
+            hex256('a'),
+            hex256('b'),
             FixtureSourceRef::Product {
                 product_id: "S2-L2A-001".to_string(),
             },
             &plan(GridAnchor::PixelCorner),
-            digest("00aa"),
+            digest(output_digest_char),
             Some(600),
             "symthaea-window",
             "0.1.0",
         )
-        .unwrap();
+        .unwrap()
+    }
+
+    #[test]
+    fn exact_window_binds_integer_support_and_source_universe() {
+        let evidence = evidence('c');
 
         assert_eq!(evidence.geometry.source_rows, 100);
         assert_eq!(evidence.geometry.window_row_offset, 7);
         assert_eq!(evidence.geometry.output_root_row_offset, 7);
         assert_eq!(evidence.geometry.output_rows, 20);
+        assert_eq!(evidence.fixture_manifest_digest, hex256('a'));
+        assert_eq!(evidence.source_identity_digest, hex256('b'));
         evidence.verify_digest().unwrap();
     }
 
     #[test]
     fn exact_window_is_not_encoded_as_resampling() {
-        let evidence = ExactPixelWindowEvidence::new(
-            FixtureSourceRef::Artifact {
-                artifact_id: "masked-s2".to_string(),
-            },
-            &plan(GridAnchor::PixelCorner),
-            digest("00aa"),
-            None,
-            "symthaea-window",
-            "0.1.0",
-        )
-        .unwrap();
+        let evidence = evidence('c');
         let artifact = evidence.to_fixture_artifact("roi-1").unwrap();
 
         assert_eq!(artifact.kind, FixtureArtifactKind::Other);
@@ -590,7 +641,7 @@ mod tests {
                 .as_ref()
                 .unwrap()
                 .hex,
-            evidence.geometry.geometry_digest
+            evidence.evidence_digest
         );
         assert_ne!(artifact.kind, FixtureArtifactKind::ResampledWindow);
     }
@@ -604,23 +655,41 @@ mod tests {
 
     #[test]
     fn output_bytes_are_part_of_evidence_identity() {
-        let source = FixtureSourceRef::Product {
-            product_id: "S2-L2A-001".to_string(),
-        };
-        let first = ExactPixelWindowEvidence::new(
-            source.clone(),
+        let first = evidence('c');
+        let second = evidence('d');
+        assert_ne!(first.evidence_digest, second.evidence_digest);
+    }
+
+    #[test]
+    fn source_identity_is_not_just_a_label() {
+        let first = evidence('c');
+        let mut second = ExactPixelWindowEvidence::new(
+            hex256('a'),
+            hex256('d'),
+            first.source.clone(),
             &plan(GridAnchor::PixelCorner),
-            digest("00aa"),
-            None,
+            first.output_content_digest.clone(),
+            first.byte_len,
             "symthaea-window",
             "0.1.0",
         )
         .unwrap();
+        assert_ne!(first.evidence_digest, second.evidence_digest);
+
+        second.source_identity_digest = first.source_identity_digest.clone();
+        assert!(second.verify_digest().is_err());
+    }
+
+    #[test]
+    fn fixture_universe_is_identity_significant() {
+        let first = evidence('c');
         let second = ExactPixelWindowEvidence::new(
-            source,
+            hex256('d'),
+            first.source_identity_digest.clone(),
+            first.source.clone(),
             &plan(GridAnchor::PixelCorner),
-            digest("00ab"),
-            None,
+            first.output_content_digest.clone(),
+            first.byte_len,
             "symthaea-window",
             "0.1.0",
         )
@@ -630,18 +699,47 @@ mod tests {
 
     #[test]
     fn uppercase_digest_spelling_is_rejected() {
+        let result = ExactPixelWindowEvidence::new(
+            hex256('a'),
+            hex256('b'),
+            FixtureSourceRef::Product {
+                product_id: "S2-L2A-001".to_string(),
+            },
+            &plan(GridAnchor::PixelCorner),
+            FrozenDigest {
+                algorithm: "sha256".to_string(),
+                hex: hex256('A'),
+            },
+            None,
+            "symthaea-window",
+            "0.1.0",
+        );
         assert!(matches!(
-            ExactPixelWindowEvidence::new(
-                FixtureSourceRef::Product {
-                    product_id: "S2-L2A-001".to_string(),
-                },
-                &plan(GridAnchor::PixelCorner),
-                digest("00AA"),
-                None,
-                "symthaea-window",
-                "0.1.0",
-            ),
+            result,
             Err(ExactWindowError::NonCanonicalDigest("output content digest"))
+        ));
+    }
+
+    #[test]
+    fn truncated_blake3_identity_is_rejected() {
+        let result = ExactPixelWindowEvidence::new(
+            "abc",
+            hex256('b'),
+            FixtureSourceRef::Product {
+                product_id: "S2-L2A-001".to_string(),
+            },
+            &plan(GridAnchor::PixelCorner),
+            digest('c'),
+            None,
+            "symthaea-window",
+            "0.1.0",
+        );
+        assert!(matches!(
+            result,
+            Err(ExactWindowError::InvalidDigestLength {
+                field: "fixture manifest digest",
+                ..
+            })
         ));
     }
 
@@ -654,27 +752,16 @@ mod tests {
     }
 
     #[test]
-    fn overflowed_root_offset_is_rejected_on_persistence() {
+    fn overflowed_root_support_is_rejected_on_persistence() {
         let geometry = FrozenExactWindowGeometry::from_plan(&plan(GridAnchor::PixelCorner)).unwrap();
         let mut value = serde_json::to_value(&geometry).unwrap();
         value["source_root_row_offset"] = serde_json::json!(u32::MAX);
-        value["window_row_offset"] = serde_json::json!(1);
         assert!(serde_json::from_value::<FrozenExactWindowGeometry>(value).is_err());
     }
 
     #[test]
     fn persisted_tampering_is_rejected_even_with_valid_json() {
-        let evidence = ExactPixelWindowEvidence::new(
-            FixtureSourceRef::Product {
-                product_id: "S2-L2A-001".to_string(),
-            },
-            &plan(GridAnchor::PixelCorner),
-            digest("00aa"),
-            None,
-            "symthaea-window",
-            "0.1.0",
-        )
-        .unwrap();
+        let evidence = evidence('c');
         let mut value = serde_json::to_value(&evidence).unwrap();
         value["geometry"]["window_rows"] = serde_json::json!(21);
 
