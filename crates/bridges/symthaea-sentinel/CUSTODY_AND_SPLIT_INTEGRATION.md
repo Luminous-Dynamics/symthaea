@@ -1,14 +1,16 @@
 # Sentinel custody and split integration contract
 
-This document defines the intended boundary between the offline-first `symthaea-sentinel` bridge and the separate research-integrity layers used by future Wetland Watch / Planetary Perception experiments.
+This document defines the intended boundary between the offline-first `symthaea-sentinel-eo` Earth-observation bridge and the separate research-integrity layers used by future Wetland Watch / Planetary Perception experiments.
+
+The package suffix `-eo` is deliberate: the workspace already has an unrelated core `symthaea-sentinel` audio-pattern-recognition crate. The Earth-observation bridge therefore has a distinct Cargo identity.
 
 It is deliberately a contract, not a claim that real Sentinel fixture custody has already been implemented.
 
 ## Responsibilities
 
-### `symthaea-sentinel`
+### `symthaea-sentinel-eo`
 
-Owns provider-facing Sentinel semantics:
+Owns provider-facing Sentinel Earth-observation semantics:
 
 - Sentinel mission and product kind;
 - stable product id;
