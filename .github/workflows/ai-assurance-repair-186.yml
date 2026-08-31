@@ -1,0 +1,96 @@
+name: AI Assurance Recovery Repair 186
+
+on:
+  push:
+    branches:
+      - research/ai-assurance-budget-recovery-v1.1
+    paths:
+      - '.github/workflows/ai-assurance-repair-186.yml'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  repair-once:
+    if: github.ref_name == 'research/ai-assurance-budget-recovery-v1.1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/ai-assurance-budget-recovery-v1.1
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Move policy test-only imports out of production module
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('crates/core/symthaea-ai-assurance/src/policy.rs')
+          text = path.read_text()
+
+          replacements = [
+              (
+                  'use crate::host::{ResolutionError, TrustedRuntime};\n',
+                  'use crate::host::ResolutionError;\n',
+              ),
+              (
+                  'use crate::resolution::{ResolutionAuthorityDomain, ResolutionGrant};\n',
+                  'use crate::resolution::ResolutionGrant;\n',
+              ),
+              (
+                  '    ResourceResolverDomain, ResourceRuntime, ResourceVerifier,\n',
+                  '    ResourceRuntime,\n',
+              ),
+              (
+                  'mod tests {\n    use super::*;\n    use crate::{\n        AdapterSchema, ObservedOutcome, ResourceIdentity, Write,\n    };\n',
+                  'mod tests {\n    use super::*;\n    use crate::host::TrustedRuntime;\n    use crate::resolution::ResolutionAuthorityDomain;\n    use crate::resource::ResourceResolverDomain;\n    use crate::{AdapterSchema, ObservedOutcome, ResourceIdentity, Write};\n',
+              ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected exactly one match, found {count}: {old!r}')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+
+      - name: Generate deterministic formatting and workspace lock resolution
+        run: |
+          cargo fmt --package symthaea-ai-assurance
+          cargo metadata --format-version 1 > /dev/null
+
+      - name: Enforce repair scope
+        shell: bash
+        run: |
+          unexpected="$(git diff --name-only -- . ':!Cargo.lock' ':!crates/core/symthaea-ai-assurance/**')"
+          if [ -n "$unexpected" ]; then
+            echo 'Unexpected repair paths:' >&2
+            echo "$unexpected" >&2
+            exit 1
+          fi
+          git diff --check
+
+      - name: Commit deterministic repair
+        shell: bash
+        run: |
+          if git diff --quiet -- Cargo.lock crates/core/symthaea-ai-assurance; then
+            echo 'No repair changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.lock crates/core/symthaea-ai-assurance
+          git commit -m 'chore(ai-assurance): normalize recovery qualification artifacts'
+          git push origin HEAD:research/ai-assurance-budget-recovery-v1.1
