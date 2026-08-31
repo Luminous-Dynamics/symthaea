@@ -7,13 +7,18 @@
 //! the typed event ledger reports what was observed; and the generic evidence
 //! plane independently reports mechanism counters. A missing hook therefore
 //! cannot make itself disappear from both sides of the comparison.
+//!
+//! The scenario driver also owns the expected coverage manifest. A portable
+//! event snapshot cannot shrink the P0 denominator or relax resource-version
+//! requirements merely by serializing a more permissive manifest.
 
 #![forbid(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use symthaea_cogsec_evidence::{
-    EvidenceLedgerSnapshot, ReconciliationReport, ShadowEventKind, reconcile_shadow_evidence,
+    EvidenceLedgerSnapshot, QualificationManifest, ReconciliationReport, ShadowEventKind,
+    reconcile_shadow_evidence,
 };
 use symthaea_evidence_plane::EvidenceCounters;
 
@@ -30,31 +35,40 @@ pub enum EventCountExpectation {
     ExactlySameAs(ShadowEventKind),
 }
 
-/// Scenario-owned expected transition contract.
+/// Scenario-owned expected transition and coverage contract.
 ///
 /// This is qualification input, not runtime instrumentation output. Production
 /// qualification should source it from the deterministic test/scenario driver,
-/// not infer it from the events being validated.
+/// not infer it from the events or snapshot manifest being validated.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScenarioContract {
     /// Stable human-readable scenario identifier. This is not security authority.
     pub scenario_id: String,
     /// Expected count relation for every event kind the scenario constrains.
     pub expectations: BTreeMap<ShadowEventKind, EventCountExpectation>,
+    /// Independently expected coverage/P0/resource-version manifest.
+    pub expected_manifest: QualificationManifest,
 }
 
 impl ScenarioContract {
-    /// Create an empty scenario contract.
+    /// Create an empty scenario contract with an empty expected coverage manifest.
     pub fn new(scenario_id: impl Into<String>) -> Self {
         Self {
             scenario_id: scenario_id.into(),
             expectations: BTreeMap::new(),
+            expected_manifest: QualificationManifest::new([], []),
         }
     }
 
     /// Add or replace one event-count expectation.
     pub fn expect(mut self, kind: ShadowEventKind, expectation: EventCountExpectation) -> Self {
         self.expectations.insert(kind, expectation);
+        self
+    }
+
+    /// Bind the exact qualification manifest expected from the instrumentation run.
+    pub fn with_expected_manifest(mut self, manifest: QualificationManifest) -> Self {
+        self.expected_manifest = manifest;
         self
     }
 }
@@ -72,8 +86,20 @@ pub struct EventCountViolation {
     pub reference_observed: Option<u64>,
 }
 
-/// Full shadow qualification result: structural/event/counter reconciliation
-/// plus the independent scenario expectation check.
+/// Independent contract mismatch outside event-level reconciliation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum QualificationContractViolation {
+    /// Runtime/exported snapshot attempted to use a different coverage manifest.
+    ManifestMismatch {
+        /// Manifest declared by the independent scenario driver.
+        expected: QualificationManifest,
+        /// Manifest carried by the evidence snapshot.
+        observed: QualificationManifest,
+    },
+}
+
+/// Full shadow qualification result: structural/event/counter reconciliation,
+/// independent scenario counts, and independent coverage-manifest validation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScenarioQualificationReport {
     /// Scenario identifier supplied by the independent driver.
@@ -82,16 +108,20 @@ pub struct ScenarioQualificationReport {
     pub evidence: ReconciliationReport,
     /// Scenario expectation violations.
     pub event_count_violations: Vec<EventCountViolation>,
+    /// Coverage/manifest contract violations.
+    pub contract_violations: Vec<QualificationContractViolation>,
 }
 
 impl ScenarioQualificationReport {
     /// Whether this run can claim complete coverage for the scenario's scoped paths.
     pub fn qualifies_for_full_coverage(&self) -> bool {
-        self.evidence.qualifies_for_full_coverage() && self.event_count_violations.is_empty()
+        self.evidence.qualifies_for_full_coverage()
+            && self.event_count_violations.is_empty()
+            && self.contract_violations.is_empty()
     }
 }
 
-/// Validate one event snapshot against an independent scenario contract.
+/// Validate one event snapshot against an independent scenario count contract.
 pub fn validate_expected_event_counts(
     contract: &ScenarioContract,
     snapshot: &EvidenceLedgerSnapshot,
@@ -126,11 +156,28 @@ pub fn validate_expected_event_counts(
         .collect()
 }
 
+/// Validate that runtime/exported evidence did not redefine its own coverage denominator.
+pub fn validate_qualification_manifest(
+    contract: &ScenarioContract,
+    snapshot: &EvidenceLedgerSnapshot,
+) -> Vec<QualificationContractViolation> {
+    if snapshot.manifest == contract.expected_manifest {
+        Vec::new()
+    } else {
+        vec![QualificationContractViolation::ManifestMismatch {
+            expected: contract.expected_manifest.clone(),
+            observed: snapshot.manifest.clone(),
+        }]
+    }
+}
+
 /// Run the complete first-layer shadow qualification.
 ///
 /// The existing evidence adapter checks event structure, causal pairing, P0
 /// coverage, resource-version semantics and optional mechanism counters. This
-/// outer layer independently checks scenario-owned expected event counts.
+/// outer layer independently checks scenario-owned expected event counts and
+/// rejects any attempt by the portable snapshot to redefine its own coverage
+/// manifest.
 pub fn qualify_shadow_scenario(
     contract: &ScenarioContract,
     snapshot: &EvidenceLedgerSnapshot,
@@ -140,13 +187,32 @@ pub fn qualify_shadow_scenario(
         scenario_id: contract.scenario_id.clone(),
         evidence: reconcile_shadow_evidence(snapshot, measured),
         event_count_violations: validate_expected_event_counts(contract, snapshot),
+        contract_violations: validate_qualification_manifest(contract, snapshot),
     }
+}
+
+fn manifest(
+    required: impl IntoIterator<Item = ShadowEventKind>,
+    p0: impl IntoIterator<Item = ShadowEventKind>,
+    require_versions: bool,
+) -> QualificationManifest {
+    QualificationManifest::new(required, p0).with_required_resource_versions(require_versions)
 }
 
 /// Canonical v0 contract: one goal input while working memory has capacity.
 pub fn goal_no_eviction_v0() -> ScenarioContract {
     use EventCountExpectation::{Exactly, MustBeZero};
     use ShadowEventKind::*;
+
+    let required = [
+        IngressObserved,
+        WorkingMemoryAdmissionEvaluated,
+        WorkingMemoryAdmissionObserved,
+        WorkingStateInfluenceEvaluated,
+        WorkingStateInfluenceObserved,
+        GoalActivationEvaluated,
+        GoalActivationObserved,
+    ];
 
     ScenarioContract::new("cogsec-shadow-v0/goal-no-eviction")
         .expect(IngressObserved, Exactly(1))
@@ -161,12 +227,26 @@ pub fn goal_no_eviction_v0() -> ScenarioContract {
         .expect(GoalActivationObserved, Exactly(1))
         .expect(AffectMutationEvaluated, MustBeZero)
         .expect(AffectMutationObserved, MustBeZero)
+        .with_expected_manifest(manifest(required, [GoalActivationObserved], true))
 }
 
 /// Canonical v0 contract: one goal input that forces working-memory eviction.
 pub fn goal_with_eviction_v0() -> ScenarioContract {
     use EventCountExpectation::Exactly;
     use ShadowEventKind::*;
+
+    let required = [
+        IngressObserved,
+        WorkingMemoryAdmissionEvaluated,
+        WorkingMemoryAdmissionObserved,
+        WorkingMemoryEvictionObserved,
+        GraduationEvaluated,
+        GraduationObserved,
+        WorkingStateInfluenceEvaluated,
+        WorkingStateInfluenceObserved,
+        GoalActivationEvaluated,
+        GoalActivationObserved,
+    ];
 
     ScenarioContract::new("cogsec-shadow-v0/goal-with-eviction")
         .expect(IngressObserved, Exactly(1))
@@ -179,12 +259,27 @@ pub fn goal_with_eviction_v0() -> ScenarioContract {
         .expect(WorkingStateInfluenceObserved, Exactly(1))
         .expect(GoalActivationEvaluated, Exactly(1))
         .expect(GoalActivationObserved, Exactly(1))
+        .with_expected_manifest(manifest(
+            required,
+            [GraduationObserved, GoalActivationObserved],
+            true,
+        ))
 }
 
 /// Canonical v0 contract: one feedback input.
 pub fn feedback_input_v0() -> ScenarioContract {
     use EventCountExpectation::{Exactly, MustBeZero};
     use ShadowEventKind::*;
+
+    let required = [
+        IngressObserved,
+        WorkingMemoryAdmissionEvaluated,
+        WorkingMemoryAdmissionObserved,
+        WorkingStateInfluenceEvaluated,
+        WorkingStateInfluenceObserved,
+        AffectMutationEvaluated,
+        AffectMutationObserved,
+    ];
 
     ScenarioContract::new("cogsec-shadow-v0/feedback-input")
         .expect(IngressObserved, Exactly(1))
@@ -196,6 +291,7 @@ pub fn feedback_input_v0() -> ScenarioContract {
         .expect(AffectMutationObserved, Exactly(1))
         .expect(GoalActivationEvaluated, MustBeZero)
         .expect(GoalActivationObserved, MustBeZero)
+        .with_expected_manifest(manifest(required, [], false))
 }
 
 #[cfg(test)]
@@ -205,8 +301,7 @@ mod tests {
     use symthaea_cogsec::Digest32;
     use symthaea_cogsec_evidence::{
         EvidenceCompleteness, EvidenceConfidentiality, IngressClass, LedgerStats,
-        PrincipalContext, QualificationManifest, ShadowEvent, ShadowEventPayload,
-        SHADOW_EVENT_SCHEMA_V1,
+        PrincipalContext, ShadowEvent, ShadowEventPayload, SHADOW_EVENT_SCHEMA_V1,
     };
 
     fn event(sequence: u64, kind: ShadowEventKind, payload: ShadowEventPayload) -> ShadowEvent {
@@ -319,7 +414,29 @@ mod tests {
     }
 
     #[test]
-    fn canonical_contracts_encode_the_documented_scenarios() {
+    fn snapshot_cannot_shrink_the_independent_p0_denominator() {
+        let contract = ScenarioContract::new("p0-goal")
+            .with_expected_manifest(manifest(
+                [ShadowEventKind::GoalActivationObserved],
+                [ShadowEventKind::GoalActivationObserved],
+                true,
+            ));
+        let snapshot = snapshot(Vec::new());
+
+        let violations = validate_qualification_manifest(&contract, &snapshot);
+        assert_eq!(violations.len(), 1);
+        assert!(matches!(
+            &violations[0],
+            QualificationContractViolation::ManifestMismatch { expected, observed }
+                if expected.p0_observed_kinds.contains(&ShadowEventKind::GoalActivationObserved)
+                    && observed.p0_observed_kinds.is_empty()
+                    && expected.require_resource_versions
+                    && !observed.require_resource_versions
+        ));
+    }
+
+    #[test]
+    fn canonical_contracts_encode_documented_counts_and_scope() {
         let no_eviction = goal_no_eviction_v0();
         assert_eq!(
             no_eviction.expectations.get(&ShadowEventKind::GoalActivationObserved),
@@ -329,11 +446,23 @@ mod tests {
             no_eviction.expectations.get(&ShadowEventKind::GraduationObserved),
             Some(&EventCountExpectation::MustBeZero)
         );
+        assert_eq!(
+            no_eviction.expected_manifest.p0_observed_kinds,
+            BTreeSet::from([ShadowEventKind::GoalActivationObserved])
+        );
+        assert!(no_eviction.expected_manifest.require_resource_versions);
 
         let eviction = goal_with_eviction_v0();
         assert_eq!(
             eviction.expectations.get(&ShadowEventKind::GraduationObserved),
             Some(&EventCountExpectation::Exactly(1))
+        );
+        assert_eq!(
+            eviction.expected_manifest.p0_observed_kinds,
+            BTreeSet::from([
+                ShadowEventKind::GraduationObserved,
+                ShadowEventKind::GoalActivationObserved,
+            ])
         );
 
         let feedback = feedback_input_v0();
@@ -345,5 +474,6 @@ mod tests {
             feedback.expectations.get(&ShadowEventKind::GoalActivationObserved),
             Some(&EventCountExpectation::MustBeZero)
         );
+        assert!(feedback.expected_manifest.p0_observed_kinds.is_empty());
     }
 }
