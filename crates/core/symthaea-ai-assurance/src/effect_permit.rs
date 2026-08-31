@@ -17,7 +17,9 @@
 //!    a monotonic linearization sequence;
 //! 4. a completed revocation invalidates every still-unacquired ticket from an
 //!    earlier epoch;
-//! 5. a permit acquired before revocation remains admission for that one effect.
+//! 5. a permit acquired before revocation remains admission for that one effect;
+//! 6. revocation evidence records already-acquired and currently in-flight work
+//!    instead of pretending those effects disappeared.
 //!
 //! The domain lock is **not** held while the effect callback runs. Acquisition is
 //! the point of no return for admission semantics; post-entry cancellation is a
@@ -29,7 +31,7 @@
 //! external side effect.
 
 use std::fmt;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use uuid::Uuid;
 
@@ -93,6 +95,30 @@ impl EffectEntryPermitId {
     }
 }
 
+/// Snapshot of already-admitted work in one effect-entry domain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct EffectEntryActivity {
+    outstanding_permits: u64,
+    in_flight_effects: u64,
+}
+
+impl EffectEntryActivity {
+    /// Acquired permits that have not yet entered their effect callback.
+    pub const fn outstanding_permits(self) -> u64 {
+        self.outstanding_permits
+    }
+
+    /// Effect callbacks that have begun and not yet returned/unwound.
+    pub const fn in_flight_effects(self) -> u64 {
+        self.in_flight_effects
+    }
+
+    /// Whether the domain currently has no already-admitted work.
+    pub const fn is_quiescent(self) -> bool {
+        self.outstanding_permits == 0 && self.in_flight_effects == 0
+    }
+}
+
 /// Host-owned domain that linearizes revocation against effect admission.
 ///
 /// Model/planner code should never receive this minting/acquisition root. A
@@ -101,7 +127,7 @@ impl EffectEntryPermitId {
 #[derive(Debug)]
 pub struct EffectEntryDomain {
     domain_id: EffectEntryDomainId,
-    state: Mutex<EffectEntryState>,
+    state: Arc<Mutex<EffectEntryState>>,
 }
 
 impl EffectEntryDomain {
@@ -109,10 +135,12 @@ impl EffectEntryDomain {
     pub fn new() -> Self {
         Self {
             domain_id: EffectEntryDomainId(Uuid::new_v4()),
-            state: Mutex::new(EffectEntryState {
+            state: Arc::new(Mutex::new(EffectEntryState {
                 epoch: 0,
                 sequence: 0,
-            }),
+                outstanding_permits: 0,
+                in_flight_effects: 0,
+            })),
         }
     }
 
@@ -139,17 +167,27 @@ impl EffectEntryDomain {
         EffectEntrySequence(state.sequence)
     }
 
+    /// Current already-admitted work counters.
+    pub fn activity(&self) -> EffectEntryActivity {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        state.activity()
+    }
+
     /// Issue an affine ticket for one exact action binding in the current epoch.
     ///
     /// Ticket issuance is not the effect-entry linearization point. A ticket from
     /// an epoch revoked before [`Self::acquire`] runs will fail closed.
     pub fn issue_ticket(&self, action_binding: [u8; 32]) -> EffectEntryTicket {
+        let ticket_id = EffectEntryTicketId(Uuid::new_v4());
         let state = self
             .state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         EffectEntryTicket {
-            ticket_id: EffectEntryTicketId(Uuid::new_v4()),
+            ticket_id,
             domain_id: self.domain_id,
             epoch: EffectEntryEpoch(state.epoch),
             action_binding,
@@ -177,6 +215,7 @@ impl EffectEntryDomain {
             return Err(EffectEntryError::ActionBindingMismatch);
         }
 
+        let permit_id = EffectEntryPermitId(Uuid::new_v4());
         let mut state = self
             .state
             .lock()
@@ -193,15 +232,21 @@ impl EffectEntryDomain {
             .sequence
             .checked_add(1)
             .ok_or(EffectEntryError::SequenceExhausted)?;
+        let next_outstanding = state
+            .outstanding_permits
+            .checked_add(1)
+            .ok_or(EffectEntryError::PermitCounterExhausted)?;
         state.sequence = next_sequence;
+        state.outstanding_permits = next_outstanding;
 
         Ok(EffectEntryPermit {
-            permit_id: EffectEntryPermitId(Uuid::new_v4()),
+            permit_id,
             ticket_id: ticket.ticket_id,
             domain_id: self.domain_id,
             epoch: ticket.epoch,
             action_binding: ticket.action_binding,
             acquisition_sequence: EffectEntrySequence(next_sequence),
+            state: Some(Arc::clone(&self.state)),
         })
     }
 
@@ -210,6 +255,7 @@ impl EffectEntryDomain {
     /// The method holds the same short critical section as [`Self::acquire`]. A
     /// returned receipt therefore proves that every ticket from `previous_epoch`
     /// which had not already acquired a permit will fail on later acquisition.
+    /// Already-acquired or in-flight work is counted explicitly in the receipt.
     pub fn revoke_all(&self) -> Result<EffectRevocationReceipt, EffectEntryError> {
         let mut state = self
             .state
@@ -227,12 +273,14 @@ impl EffectEntryDomain {
 
         state.epoch = next_epoch;
         state.sequence = next_sequence;
+        let admitted_activity = state.activity();
 
         Ok(EffectRevocationReceipt {
             domain_id: self.domain_id,
             previous_epoch: EffectEntryEpoch(previous_epoch),
             current_epoch: EffectEntryEpoch(next_epoch),
             revocation_sequence: EffectEntrySequence(next_sequence),
+            admitted_activity,
         })
     }
 }
@@ -289,8 +337,8 @@ impl EffectEntryTicket {
 /// let binding = [7; 32];
 /// let ticket = domain.issue_ticket(binding);
 /// let permit = domain.acquire(ticket, binding).unwrap();
-/// let _ = permit.enter(|| ());
-/// let _ = permit.enter(|| ());
+/// let _ = permit.enter(|| ()).unwrap();
+/// let _ = permit.enter(|| ()).unwrap();
 /// ```
 #[derive(Debug)]
 pub struct EffectEntryPermit {
@@ -300,6 +348,7 @@ pub struct EffectEntryPermit {
     epoch: EffectEntryEpoch,
     action_binding: [u8; 32],
     acquisition_sequence: EffectEntrySequence,
+    state: Option<Arc<Mutex<EffectEntryState>>>,
 }
 
 impl EffectEntryPermit {
@@ -335,13 +384,39 @@ impl EffectEntryPermit {
 
     /// Consume this permit and invoke one already-admitted effect callback.
     ///
-    /// No domain lock is held while `effect` runs. A later revocation may support
-    /// adapter-specific cancellation, but it does not retroactively invalidate
-    /// this admission.
-    pub fn enter<F, R>(self, effect: F) -> (EffectEntryReceipt, R)
+    /// No domain lock is held while `effect` runs. Immediately before invoking
+    /// the callback, this method moves the permit from the outstanding count to
+    /// the in-flight count. A private drop guard removes the in-flight count even
+    /// if the callback unwinds.
+    pub fn enter<F, R>(mut self, effect: F) -> Result<(EffectEntryReceipt, R), EffectEntryError>
     where
         F: FnOnce() -> R,
     {
+        let state = Arc::clone(
+            self.state
+                .as_ref()
+                .expect("live effect-entry permit always retains domain state"),
+        );
+        let activity_at_entry = {
+            let mut locked = state
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if locked.outstanding_permits == 0 {
+                return Err(EffectEntryError::ActivityInvariant);
+            }
+            let next_in_flight = locked
+                .in_flight_effects
+                .checked_add(1)
+                .ok_or(EffectEntryError::InFlightCounterExhausted)?;
+            locked.outstanding_permits -= 1;
+            locked.in_flight_effects = next_in_flight;
+            locked.activity()
+        };
+
+        self.state = None;
+        let in_flight = EffectInFlightGuard {
+            state: Arc::clone(&state),
+        };
         let receipt = EffectEntryReceipt {
             permit_id: self.permit_id,
             ticket_id: self.ticket_id,
@@ -349,9 +424,26 @@ impl EffectEntryPermit {
             epoch: self.epoch,
             action_binding: self.action_binding,
             acquisition_sequence: self.acquisition_sequence,
+            activity_at_entry,
         };
         let result = effect();
-        (receipt, result)
+        drop(in_flight);
+        Ok((receipt, result))
+    }
+}
+
+impl Drop for EffectEntryPermit {
+    fn drop(&mut self) {
+        let Some(state) = self.state.take() else {
+            return;
+        };
+        let mut locked = state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        debug_assert!(locked.outstanding_permits > 0);
+        if locked.outstanding_permits > 0 {
+            locked.outstanding_permits -= 1;
+        }
     }
 }
 
@@ -364,6 +456,7 @@ pub struct EffectEntryReceipt {
     epoch: EffectEntryEpoch,
     action_binding: [u8; 32],
     acquisition_sequence: EffectEntrySequence,
+    activity_at_entry: EffectEntryActivity,
 }
 
 impl EffectEntryReceipt {
@@ -396,6 +489,11 @@ impl EffectEntryReceipt {
     pub const fn acquisition_sequence(self) -> EffectEntrySequence {
         self.acquisition_sequence
     }
+
+    /// Already-admitted work snapshot immediately before the callback began.
+    pub const fn activity_at_entry(self) -> EffectEntryActivity {
+        self.activity_at_entry
+    }
 }
 
 /// Immutable evidence that one revocation epoch rotation linearized.
@@ -405,6 +503,7 @@ pub struct EffectRevocationReceipt {
     previous_epoch: EffectEntryEpoch,
     current_epoch: EffectEntryEpoch,
     revocation_sequence: EffectEntrySequence,
+    admitted_activity: EffectEntryActivity,
 }
 
 impl EffectRevocationReceipt {
@@ -427,9 +526,14 @@ impl EffectRevocationReceipt {
     pub const fn revocation_sequence(self) -> EffectEntrySequence {
         self.revocation_sequence
     }
+
+    /// Already-admitted work that revocation did not retroactively invalidate.
+    pub const fn admitted_activity(self) -> EffectEntryActivity {
+        self.admitted_activity
+    }
 }
 
-/// Failure while acquiring or rotating effect-entry authority.
+/// Failure while acquiring, entering, or rotating effect-entry authority.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EffectEntryError {
     /// Ticket belongs to another admission domain.
@@ -454,6 +558,12 @@ pub enum EffectEntryError {
     EpochExhausted,
     /// Linearization sequence counter cannot advance further.
     SequenceExhausted,
+    /// Outstanding-permit accounting counter cannot advance further.
+    PermitCounterExhausted,
+    /// In-flight effect accounting counter cannot advance further.
+    InFlightCounterExhausted,
+    /// Internal permit/activity accounting invariant was violated.
+    ActivityInvariant,
 }
 
 impl fmt::Display for EffectEntryError {
@@ -466,6 +576,13 @@ impl fmt::Display for EffectEntryError {
             Self::Revoked { .. } => write!(f, "effect-entry ticket was revoked before acquisition"),
             Self::EpochExhausted => write!(f, "effect-entry epoch counter exhausted"),
             Self::SequenceExhausted => write!(f, "effect-entry sequence counter exhausted"),
+            Self::PermitCounterExhausted => {
+                write!(f, "effect-entry outstanding permit counter exhausted")
+            }
+            Self::InFlightCounterExhausted => {
+                write!(f, "effect-entry in-flight counter exhausted")
+            }
+            Self::ActivityInvariant => write!(f, "effect-entry activity invariant failed"),
         }
     }
 }
@@ -476,11 +593,41 @@ impl std::error::Error for EffectEntryError {}
 struct EffectEntryState {
     epoch: u64,
     sequence: u64,
+    outstanding_permits: u64,
+    in_flight_effects: u64,
+}
+
+impl EffectEntryState {
+    fn activity(&self) -> EffectEntryActivity {
+        EffectEntryActivity {
+            outstanding_permits: self.outstanding_permits,
+            in_flight_effects: self.in_flight_effects,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct EffectInFlightGuard {
+    state: Arc<Mutex<EffectEntryState>>,
+}
+
+impl Drop for EffectInFlightGuard {
+    fn drop(&mut self) {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        debug_assert!(state.in_flight_effects > 0);
+        if state.in_flight_effects > 0 {
+            state.in_flight_effects -= 1;
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::panic::{catch_unwind, AssertUnwindSafe};
     use std::sync::{Arc, Barrier};
     use std::thread;
 
@@ -495,6 +642,7 @@ mod tests {
         assert!(matches!(result, Err(EffectEntryError::Revoked { .. })));
         assert_eq!(revocation.previous_epoch().get(), 0);
         assert_eq!(revocation.current_epoch().get(), 1);
+        assert!(revocation.admitted_activity().is_quiescent());
     }
 
     #[test]
@@ -504,13 +652,43 @@ mod tests {
         let ticket = domain.issue_ticket(binding);
         let permit = domain.acquire(ticket, binding).unwrap();
         let acquisition = permit.acquisition_sequence();
-        let revocation = domain.revoke_all().unwrap();
-        let (receipt, value) = permit.enter(|| 42_u64);
+        assert_eq!(domain.activity().outstanding_permits(), 1);
 
+        let revocation = domain.revoke_all().unwrap();
+        assert_eq!(revocation.admitted_activity().outstanding_permits(), 1);
+        assert_eq!(revocation.admitted_activity().in_flight_effects(), 0);
+
+        let (receipt, value) = permit.enter(|| 42_u64).unwrap();
         assert_eq!(value, 42);
         assert_eq!(receipt.action_binding(), binding);
         assert_eq!(receipt.acquisition_sequence(), acquisition);
         assert!(acquisition < revocation.revocation_sequence());
+        assert!(domain.activity().is_quiescent());
+    }
+
+    #[test]
+    fn dropping_unused_permit_repairs_outstanding_count() {
+        let domain = EffectEntryDomain::new();
+        let binding = [8; 32];
+        let ticket = domain.issue_ticket(binding);
+        let permit = domain.acquire(ticket, binding).unwrap();
+        assert_eq!(domain.activity().outstanding_permits(), 1);
+        drop(permit);
+        assert!(domain.activity().is_quiescent());
+    }
+
+    #[test]
+    fn callback_unwind_repairs_in_flight_count() {
+        let domain = EffectEntryDomain::new();
+        let binding = [9; 32];
+        let ticket = domain.issue_ticket(binding);
+        let permit = domain.acquire(ticket, binding).unwrap();
+
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            let _ = permit.enter(|| panic!("synthetic adapter unwind"));
+        }));
+        assert!(result.is_err());
+        assert!(domain.activity().is_quiescent());
     }
 
     #[test]
@@ -526,7 +704,9 @@ mod tests {
 
         let new_ticket = domain.issue_ticket(binding);
         assert_eq!(new_ticket.epoch(), domain.current_epoch());
-        assert!(domain.acquire(new_ticket, binding).is_ok());
+        let permit = domain.acquire(new_ticket, binding).unwrap();
+        drop(permit);
+        assert!(domain.activity().is_quiescent());
     }
 
     #[test]
@@ -545,6 +725,7 @@ mod tests {
             first.acquire(ticket, [5; 32]),
             Err(EffectEntryError::ActionBindingMismatch)
         ));
+        assert!(first.activity().is_quiescent());
     }
 
     #[test]
@@ -576,9 +757,11 @@ mod tests {
             match acquire {
                 Ok(permit) => {
                     assert!(permit.acquisition_sequence() < revocation.revocation_sequence());
-                    let (receipt, entered) = permit.enter(|| true);
+                    assert_eq!(revocation.admitted_activity().outstanding_permits(), 1);
+                    let (receipt, entered) = permit.enter(|| true).unwrap();
                     assert!(entered);
                     assert!(receipt.acquisition_sequence() < revocation.revocation_sequence());
+                    assert!(domain.activity().is_quiescent());
                 }
                 Err(EffectEntryError::Revoked {
                     ticket_epoch,
@@ -587,6 +770,7 @@ mod tests {
                 }) => {
                     assert!(ticket_epoch < current_epoch);
                     assert_eq!(current_sequence, revocation.revocation_sequence());
+                    assert!(revocation.admitted_activity().is_quiescent());
                 }
                 Err(other) => panic!("unexpected race outcome: {other}"),
             }
