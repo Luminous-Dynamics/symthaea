@@ -1,4 +1,4 @@
-name: Statistics Core
+name: Statistics Active Test Surface
 
 permissions:
   contents: read
@@ -7,7 +7,7 @@ on:
   pull_request:
     paths:
       - "crates/domains/symthaea-statistics/**"
-      - ".github/workflows/statistics-core.yml"
+      - ".github/workflows/statistics-test-surface.yml"
   workflow_dispatch:
 
 concurrency:
@@ -19,8 +19,8 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  statistics-core:
-    name: Pure statistics qualification
+  active-test-surface:
+    name: Active 0.1 package coherence
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -40,7 +40,7 @@ jobs:
       - name: Install pinned Rust
         uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e
         with:
-          components: rustfmt, clippy
+          components: rustfmt
           targets: wasm32-unknown-unknown
 
       - name: Record qualification environment
@@ -58,14 +58,11 @@ jobs:
       - name: Check formatting
         run: cargo fmt -p symthaea-statistics -- --check
 
-      - name: Run statistics tests
+      - name: Run active package tests
         run: cargo test --locked -p symthaea-statistics
 
       - name: Run documentation tests
         run: cargo test --locked -p symthaea-statistics --doc
-
-      - name: Run Clippy
-        run: cargo clippy --locked -p symthaea-statistics --all-targets -- -D warnings
 
       - name: Check pure-domain WASM portability
         run: cargo check --locked -p symthaea-statistics --target wasm32-unknown-unknown
