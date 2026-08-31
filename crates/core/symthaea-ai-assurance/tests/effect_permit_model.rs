@@ -1,12 +1,33 @@
 use proptest::prelude::*;
-use symthaea_ai_assurance::{EffectEntryDomain, EffectEntryError, EffectEntryPermit, EffectEntryTicket};
+use symthaea_ai_assurance::{
+    EffectAdmissionCommitment, EffectEntryDomain, EffectEntryError, EffectEntryPermit,
+    EffectEntryTicket,
+};
 
 const SLOTS: usize = 4;
 
 #[derive(Clone, Copy)]
 struct TicketModel {
     epoch: u64,
-    binding: [u8; 32],
+    commitment: EffectAdmissionCommitment,
+}
+
+fn commitment(tag: u8) -> EffectAdmissionCommitment {
+    EffectAdmissionCommitment::new(
+        [tag; 32],
+        [tag.wrapping_add(1); 32],
+        [tag.wrapping_add(2); 32],
+    )
+}
+
+fn guaranteed_different(commitment: EffectAdmissionCommitment) -> EffectAdmissionCommitment {
+    let mut authority = commitment.authority_snapshot_digest();
+    authority[0] ^= 1;
+    EffectAdmissionCommitment::new(
+        commitment.action_binding(),
+        authority,
+        commitment.adapter_semantics_digest(),
+    )
 }
 
 proptest! {
@@ -29,17 +50,17 @@ proptest! {
         let mut model_open = true;
         let mut model_outstanding = 0_u64;
 
-        for (operation, slot, tag, use_correct_binding) in operations {
+        for (operation, slot, tag, use_correct_commitment) in operations {
             match operation {
                 0 => {
-                    let binding = [tag; 32];
-                    let result = domain.issue_ticket(binding);
+                    let commitment = commitment(tag);
+                    let result = domain.issue_ticket(commitment);
                     if model_open {
                         let ticket = result.expect("running model must issue ticket");
                         tickets[slot] = Some(ticket);
                         ticket_models[slot] = Some(TicketModel {
                             epoch: model_epoch,
-                            binding,
+                            commitment,
                         });
                     } else {
                         prop_assert!(matches!(
@@ -70,19 +91,17 @@ proptest! {
                         let model = ticket_models[slot]
                             .take()
                             .expect("ticket model accompanies public ticket");
-                        let expected_binding = if use_correct_binding {
-                            model.binding
+                        let expected_commitment = if use_correct_commitment {
+                            model.commitment
                         } else {
-                            let mut wrong = model.binding;
-                            wrong[0] ^= 1;
-                            wrong
+                            guaranteed_different(model.commitment)
                         };
-                        let result = domain.acquire(ticket, expected_binding);
+                        let result = domain.acquire(ticket, expected_commitment);
 
-                        if expected_binding != model.binding {
+                        if expected_commitment.digest() != model.commitment.digest() {
                             prop_assert!(matches!(
                                 result,
-                                Err(EffectEntryError::ActionBindingMismatch)
+                                Err(EffectEntryError::CommitmentMismatch)
                             ));
                         } else if !model_open {
                             prop_assert!(matches!(
@@ -96,6 +115,7 @@ proptest! {
                             model_sequence += 1;
                             model_outstanding += 1;
                             prop_assert_eq!(permit.acquisition_sequence().get(), model_sequence);
+                            prop_assert_eq!(permit.commitment(), model.commitment);
 
                             if let Some(previous) = permits[slot].take() {
                                 drop(previous);
@@ -118,12 +138,14 @@ proptest! {
                         let permit_sequence = permit_sequences[slot]
                             .take()
                             .expect("permit sequence accompanies public permit");
+                        let permit_commitment = permit.commitment();
                         model_outstanding -= 1;
                         let expected_outstanding = model_outstanding;
                         let (receipt, activity_during_callback) = permit
                             .enter(|| domain.activity())
                             .expect("valid acquired permit must enter");
                         prop_assert_eq!(receipt.acquisition_sequence().get(), permit_sequence);
+                        prop_assert_eq!(receipt.commitment(), permit_commitment);
                         prop_assert_eq!(
                             activity_during_callback.outstanding_permits(),
                             expected_outstanding
