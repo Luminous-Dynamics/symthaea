@@ -443,7 +443,18 @@ pub struct LedgerStats {
     pub invalid_event_attempts: u64,
 }
 
-/// Non-blocking append failure. The ledger records qualification degradation internally.
+/// Failure to establish the requested event-storage capacity before cognition begins.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+pub enum LedgerInitError {
+    /// The allocator could not reserve the declared logical event capacity.
+    #[error("failed to reserve shadow event capacity {capacity}")]
+    CapacityReservationFailed {
+        /// Requested number of retained events.
+        capacity: usize,
+    },
+}
+
+/// Non-waiting append failure. The ledger records qualification degradation internally.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum AppendError {
     /// Event sequence exhausted.
@@ -487,7 +498,7 @@ pub enum AppendError {
         /// Event kind with invalid version semantics.
         kind: ShadowEventKind,
     },
-    /// Bounded ledger cannot retain the event without blocking cognition.
+    /// Bounded ledger cannot retain the event without waiting for external capacity.
     #[error("shadow evidence buffer full at event {event_id}; required={required}")]
     BufferFull {
         /// Reserved event identity that was not retained.
@@ -499,8 +510,15 @@ pub enum AppendError {
 
 /// Bounded owner-issued event ledger for local shadow instrumentation.
 ///
-/// The ledger never blocks waiting for storage. Capacity pressure degrades or
-/// invalidates the evidence claim instead of perturbing legacy cognition.
+/// The ledger never waits for external storage or a downstream consumer.
+/// Capacity pressure degrades or invalidates the evidence claim instead of
+/// perturbing legacy cognition. `new()` is the convenience/L0 constructor and
+/// may grow its backing `Vec` before logical capacity is reached. Use
+/// `try_new_preallocated()` when the retained-event backing storage must be
+/// reserved completely before cognition starts.
+///
+/// Neither constructor claims end-to-end allocation-free event construction:
+/// event payloads and `causal_parents` may already own allocator-backed data.
 #[derive(Debug)]
 pub struct ShadowEventLedger {
     ledger_epoch: u64,
@@ -509,12 +527,14 @@ pub struct ShadowEventLedger {
     manifest: QualificationManifest,
     completeness: EvidenceCompleteness,
     events: Vec<ShadowEvent>,
-    retained_ids: BTreeSet<EventId>,
     stats: LedgerStats,
 }
 
 impl ShadowEventLedger {
     /// Create one bounded local ledger. Sequence numbering begins at one.
+    ///
+    /// This convenience constructor preserves the L0 non-waiting semantics but
+    /// does not promise that the retained-event `Vec` is fully preallocated.
     pub fn new(ledger_epoch: u64, capacity: usize, manifest: QualificationManifest) -> Self {
         Self {
             ledger_epoch,
@@ -523,9 +543,42 @@ impl ShadowEventLedger {
             manifest,
             completeness: EvidenceCompleteness::Complete,
             events: Vec::with_capacity(capacity.min(4096)),
-            retained_ids: BTreeSet::new(),
             stats: LedgerStats::default(),
         }
+    }
+
+    /// Create a ledger whose retained-event backing storage is fully reserved
+    /// before the constructor returns.
+    ///
+    /// If the reservation cannot be established, construction fails rather
+    /// than silently falling back to append-time growth. This is a narrower
+    /// guarantee than hard real-time execution: event draft construction can
+    /// still allocate and no WCET claim is made.
+    pub fn try_new_preallocated(
+        ledger_epoch: u64,
+        capacity: usize,
+        manifest: QualificationManifest,
+    ) -> Result<Self, LedgerInitError> {
+        let mut events = Vec::new();
+        events
+            .try_reserve_exact(capacity)
+            .map_err(|_| LedgerInitError::CapacityReservationFailed { capacity })?;
+
+        Ok(Self {
+            ledger_epoch,
+            next_sequence: 1,
+            capacity,
+            manifest,
+            completeness: EvidenceCompleteness::Complete,
+            events,
+            stats: LedgerStats::default(),
+        })
+    }
+
+    /// Whether the retained-event backing storage can hold the full declared
+    /// logical capacity without growing.
+    pub fn event_storage_fully_preallocated(&self) -> bool {
+        self.events.capacity() >= self.capacity
     }
 
     /// Current evidence completeness state.
@@ -543,7 +596,8 @@ impl ShadowEventLedger {
         &self.events
     }
 
-    /// Append one event without blocking. The ledger owner allocates the identity.
+    /// Append one event without waiting on external storage/backpressure.
+    /// The ledger owner allocates the identity.
     pub fn try_append(&mut self, draft: ShadowEventDraft) -> Result<EventId, AppendError> {
         let sequence = self.next_sequence;
         self.next_sequence = self
@@ -600,7 +654,6 @@ impl ShadowEventLedger {
             payload: draft.payload,
         };
 
-        self.retained_ids.insert(event_id);
         self.events.push(event);
         self.stats.stored_events = self.stats.stored_events.saturating_add(1);
         Ok(event_id)
@@ -632,7 +685,11 @@ impl ShadowEventLedger {
                     event_id,
                 });
             }
-            if !self.retained_ids.contains(parent) {
+            if self
+                .events
+                .binary_search_by_key(&parent.sequence, |event| event.event_id.sequence)
+                .is_err()
+            {
                 return Err(AppendError::MissingParent { parent: *parent });
             }
         }
@@ -1185,7 +1242,13 @@ mod tests {
         });
         let mutation = ledger.try_append(observed).unwrap();
 
-        assert_eq!(ingress, EventId { ledger_epoch: 9, sequence: 1 });
+        assert_eq!(
+            ingress,
+            EventId {
+                ledger_epoch: 9,
+                sequence: 1
+            }
+        );
         assert_eq!(evaluation.sequence, 2);
         assert_eq!(mutation.sequence, 3);
         assert_eq!(ledger.completeness(), EvidenceCompleteness::Complete);
@@ -1199,7 +1262,44 @@ mod tests {
     }
 
     #[test]
-    fn required_buffer_loss_invalidates_qualification_without_blocking() {
+    fn preallocated_constructor_reserves_full_event_capacity() {
+        let mut ledger =
+            ShadowEventLedger::try_new_preallocated(6, 3, goal_manifest(false)).unwrap();
+        assert!(ledger.event_storage_fully_preallocated());
+        let initial_capacity = ledger.events.capacity();
+
+        let ingress = ledger
+            .try_append(draft(
+                ShadowEventKind::IngressObserved,
+                ShadowEventPayload::Ingress {
+                    ingress_class: IngressClass::LegacyUnclassified,
+                },
+                [],
+            ))
+            .unwrap();
+        let evaluation = ledger
+            .try_append(draft(
+                ShadowEventKind::GoalActivationEvaluated,
+                ShadowEventPayload::Evaluation {
+                    receipt: receipt(DecisionOutcome::Allow, MutationKind::GoalActivation),
+                },
+                [ingress],
+            ))
+            .unwrap();
+        ledger
+            .try_append(draft(
+                ShadowEventKind::GoalActivationObserved,
+                ShadowEventPayload::MutationObserved { applied: false },
+                [evaluation],
+            ))
+            .unwrap();
+
+        assert_eq!(ledger.events.capacity(), initial_capacity);
+        assert_eq!(ledger.events.len(), 3);
+    }
+
+    #[test]
+    fn required_buffer_loss_invalidates_qualification_without_waiting() {
         let mut ledger = ShadowEventLedger::new(4, 1, goal_manifest(false));
         let ingress = ledger
             .try_append(draft(
@@ -1230,6 +1330,46 @@ mod tests {
         assert_eq!(ledger.stats().required_events_lost, 1);
         assert_eq!(ledger.stats().assigned_sequences, 2);
         assert_eq!(ledger.stats().stored_events, 1);
+    }
+
+    #[test]
+    fn allocated_but_unretained_sequence_cannot_be_used_as_parent() {
+        let mut ledger = ShadowEventLedger::new(4, 1, goal_manifest(false));
+        let ingress = ledger
+            .try_append(draft(
+                ShadowEventKind::IngressObserved,
+                ShadowEventPayload::Ingress {
+                    ingress_class: IngressClass::LegacyUnclassified,
+                },
+                [],
+            ))
+            .unwrap();
+
+        let lost = ledger.try_append(draft(
+            ShadowEventKind::GoalActivationEvaluated,
+            ShadowEventPayload::Evaluation {
+                receipt: receipt(
+                    DecisionOutcome::RequireAuthorization,
+                    MutationKind::GoalActivation,
+                ),
+            },
+            [ingress],
+        ));
+        let lost_id = match lost {
+            Err(AppendError::BufferFull { event_id, .. }) => event_id,
+            other => panic!("expected buffer loss, got {other:?}"),
+        };
+
+        let observed = ledger.try_append(draft(
+            ShadowEventKind::GoalActivationObserved,
+            ShadowEventPayload::MutationObserved { applied: true },
+            [lost_id],
+        ));
+        assert!(matches!(
+            observed,
+            Err(AppendError::MissingParent { parent }) if parent == lost_id
+        ));
+        assert_eq!(ledger.stats().invalid_event_attempts, 1);
     }
 
     #[test]
