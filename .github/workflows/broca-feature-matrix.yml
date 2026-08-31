@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - "Cargo.toml"
-      - "Cargo.lock"
       - "crates/domains/symthaea-broca/**"
       - ".github/workflows/broca-feature-matrix.yml"
   workflow_dispatch:
