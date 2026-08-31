@@ -1,0 +1,122 @@
+name: AI Assurance v1.3 Implement Once
+
+on:
+  push:
+    branches:
+      - research/ai-assurance-effect-entry-evidence-v1.3
+    paths:
+      - '.github/workflows/ai-assurance-v13-implement-once.yml'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  implement-and-qualify:
+    if: github.ref_name == 'research/ai-assurance-effect-entry-evidence-v1.3'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/ai-assurance-effect-entry-evidence-v1.3
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Implement evidence-before-adapter-entry guard
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          effect = Path('crates/core/symthaea-ai-assurance/src/effect_permit.rs')
+          text = effect.read_text()
+
+          start_marker = '    /// Consume this permit and invoke one already-admitted effect callback.\n'
+          end_marker = '\n}\n\nimpl Drop for EffectEntryPermit'
+          start = text.index(start_marker)
+          end = text.index(end_marker, start)
+          replacement = '''    /// Consume this permit and transition its admitted unit into in-flight state.\n    ///\n    /// The returned [`EffectInFlight`] exposes the immutable admission receipt\n    /// *before* arbitrary adapter code runs. Trusted host code can therefore\n    /// persist the receipt before calling [`EffectInFlight::run`]. No domain\n    /// lock is held after this method returns.\n    pub fn begin(mut self) -> Result<EffectInFlight, EffectEntryError> {\n        let state = Arc::clone(\n            self.state\n                .as_ref()\n                .expect("live effect-entry permit always retains domain state"),\n        );\n        let activity_at_entry = {\n            let mut locked = state\n                .lock()\n                .unwrap_or_else(std::sync::PoisonError::into_inner);\n            if locked.outstanding_permits == 0 {\n                return Err(EffectEntryError::ActivityInvariant);\n            }\n            let next_in_flight = locked\n                .in_flight_effects\n                .checked_add(1)\n                .ok_or(EffectEntryError::InFlightCounterExhausted)?;\n            locked.outstanding_permits -= 1;\n            locked.in_flight_effects = next_in_flight;\n            locked.activity()\n        };\n\n        self.state = None;\n        let receipt = EffectEntryReceipt {\n            permit_id: self.permit_id,\n            ticket_id: self.ticket_id,\n            domain_id: self.domain_id,\n            epoch: self.epoch,\n            commitment: self.commitment,\n            acquisition_sequence: self.acquisition_sequence,\n            activity_at_entry,\n        };\n        Ok(EffectInFlight {\n            receipt,\n            state: Some(state),\n        })\n    }\n\n    /// Convenience wrapper that begins, runs, and settles one effect callback.\n    ///\n    /// Production hosts that need panic-surviving admission evidence should call\n    /// [`Self::begin`], persist [`EffectInFlight::receipt`], and only then invoke\n    /// [`EffectInFlight::run`]. This wrapper preserves the v1.2 API for callers\n    /// that do not need that intermediate persistence point.\n    pub fn enter<F, R>(self, effect: F) -> Result<(EffectEntryReceipt, R), EffectEntryError>\n    where\n        F: FnOnce() -> R,\n    {\n        let in_flight = self.begin()?;\n        let receipt = in_flight.receipt();\n        let result = in_flight.run(effect);\n        Ok((receipt, result))\n    }\n'''
+          text = text[:start] + replacement + text[end:]
+
+          old_guard = '''#[derive(Debug)]\nstruct EffectInFlightGuard {\n    state: Arc<Mutex<EffectEntryState>>,\n}\n\nimpl Drop for EffectInFlightGuard {\n    fn drop(&mut self) {\n        let mut state = self\n            .state\n            .lock()\n            .unwrap_or_else(std::sync::PoisonError::into_inner);\n        debug_assert!(state.in_flight_effects > 0);\n        if state.in_flight_effects > 0 {\n            state.in_flight_effects -= 1;\n        }\n    }\n}\n'''
+          new_guard = '''/// Affine in-flight admission guard with evidence available before adapter execution.\n///\n/// Creating this value means effect admission already won its linearization\n/// race and the domain now counts one in-flight admitted effect. The value is\n/// intentionally neither `Clone` nor `Copy`. Dropping it repairs in-flight\n/// accounting whether adapter execution completed, was skipped, or unwound.\n#[derive(Debug)]\npub struct EffectInFlight {\n    receipt: EffectEntryReceipt,\n    state: Option<Arc<Mutex<EffectEntryState>>>,\n}\n\nimpl EffectInFlight {\n    /// Immutable admission evidence available before arbitrary adapter code runs.\n    pub const fn receipt(&self) -> EffectEntryReceipt {\n        self.receipt\n    }\n\n    /// Run arbitrary adapter code while this admission remains counted in flight.\n    ///\n    /// The guard is released after normal return and during unwinding on panic.\n    /// The returned value is adapter output, not proof that an external effect\n    /// occurred; effect-attempt and observation layers retain that responsibility.\n    pub fn run<F, R>(self, effect: F) -> R\n    where\n        F: FnOnce() -> R,\n    {\n        let result = effect();\n        drop(self);\n        result\n    }\n}\n\nimpl Drop for EffectInFlight {\n    fn drop(&mut self) {\n        let Some(state) = self.state.take() else {\n            return;\n        };\n        let mut state = state\n            .lock()\n            .unwrap_or_else(std::sync::PoisonError::into_inner);\n        debug_assert!(state.in_flight_effects > 0);\n        if state.in_flight_effects > 0 {\n            state.in_flight_effects -= 1;\n        }\n    }\n}\n'''
+          if text.count(old_guard) != 1:
+              raise SystemExit('expected exactly one private in-flight guard block')
+          text = text.replace(old_guard, new_guard, 1)
+
+          text = text.replace(
+              '    /// Already-admitted work snapshot immediately before the callback began.\n',
+              '    /// Already-admitted work snapshot when the permit transitioned in flight.\n',
+              1,
+          )
+          effect.write_text(text)
+
+          lib = Path('crates/core/symthaea-ai-assurance/src/lib.rs')
+          lib_text = lib.read_text()
+          old = '    EffectEntryActivity, EffectEntryDomain, EffectEntryDomainId, EffectEntryEpoch, EffectEntryError,\n    EffectEntryPermit, EffectEntryPermitId, EffectEntryReceipt, EffectEntrySequence,\n'
+          new = '    EffectEntryActivity, EffectEntryDomain, EffectEntryDomainId, EffectEntryEpoch, EffectEntryError,\n    EffectEntryPermit, EffectEntryPermitId, EffectEntryReceipt, EffectEntrySequence, EffectInFlight,\n'
+          if lib_text.count(old) != 1:
+              raise SystemExit('expected exactly one effect-entry export block')
+          lib.write_text(lib_text.replace(old, new, 1))
+
+          tests = Path('crates/core/symthaea-ai-assurance/tests/effect_permit_public_api.rs')
+          test_text = tests.read_text()
+          old_import = 'use std::sync::{mpsc, Arc, Barrier};\nuse std::thread;\n'
+          new_import = 'use std::panic::{catch_unwind, AssertUnwindSafe};\nuse std::sync::{mpsc, Arc, Barrier};\nuse std::thread;\n'
+          if test_text.count(old_import) != 1:
+              raise SystemExit('expected exactly one public-test import block')
+          test_text = test_text.replace(old_import, new_import, 1)
+
+          marker = '#[test]\nfn public_concurrent_race_has_only_admit_before_stop_or_stop_before_admit() {'
+          if test_text.count(marker) != 1:
+              raise SystemExit('expected exactly one public race-test marker')
+          added = '''#[test]\nfn public_begin_exposes_admission_receipt_before_adapter_run() {\n    let domain = EffectEntryDomain::new();\n    let commitment = commitment(16);\n    let ticket = domain.issue_ticket(commitment).unwrap();\n    let permit = domain.acquire(ticket, commitment).unwrap();\n\n    let in_flight = permit.begin().unwrap();\n    let receipt = in_flight.receipt();\n    assert_eq!(receipt.commitment(), commitment);\n    assert_eq!(domain.activity().outstanding_permits(), 0);\n    assert_eq!(domain.activity().in_flight_effects(), 1);\n\n    let value = in_flight.run(|| 16_u64);\n    assert_eq!(value, 16);\n    assert!(domain.activity().is_quiescent());\n}\n\n#[test]\nfn public_begin_receipt_survives_adapter_panic_at_host_boundary() {\n    let domain = EffectEntryDomain::new();\n    let commitment = commitment(17);\n    let ticket = domain.issue_ticket(commitment).unwrap();\n    let permit = domain.acquire(ticket, commitment).unwrap();\n\n    let in_flight = permit.begin().unwrap();\n    let receipt_persisted_before_adapter = in_flight.receipt();\n    assert_eq!(receipt_persisted_before_adapter.commitment(), commitment);\n\n    let result = catch_unwind(AssertUnwindSafe(|| {\n        in_flight.run(|| panic!("synthetic adapter panic"));\n    }));\n    assert!(result.is_err());\n    assert_eq!(receipt_persisted_before_adapter.commitment(), commitment);\n    assert!(domain.activity().is_quiescent());\n}\n\n#[test]\nfn public_dropping_unrun_in_flight_guard_repairs_activity() {\n    let domain = EffectEntryDomain::new();\n    let commitment = commitment(18);\n    let ticket = domain.issue_ticket(commitment).unwrap();\n    let permit = domain.acquire(ticket, commitment).unwrap();\n\n    let in_flight = permit.begin().unwrap();\n    assert_eq!(domain.activity().in_flight_effects(), 1);\n    drop(in_flight);\n    assert!(domain.activity().is_quiescent());\n}\n\n'''
+          tests.write_text(test_text.replace(marker, added + marker, 1))
+          PY
+
+      - name: Format only v1.3 touched Rust files
+        run: |
+          rustfmt --edition 2024 \
+            crates/core/symthaea-ai-assurance/src/effect_permit.rs \
+            crates/core/symthaea-ai-assurance/src/lib.rs \
+            crates/core/symthaea-ai-assurance/tests/effect_permit_public_api.rs
+
+      - name: Compile and run focused v1.3 tests
+        run: |
+          cargo test -p symthaea-ai-assurance --lib effect_permit
+          cargo test -p symthaea-ai-assurance --test effect_permit_public_api
+
+      - name: Keep inherited lockfile outside this isolated source tranche
+        run: git restore Cargo.lock
+
+      - name: Enforce implementation scope
+        shell: bash
+        run: |
+          allowed='^(crates/core/symthaea-ai-assurance/src/effect_permit.rs|crates/core/symthaea-ai-assurance/src/lib.rs|crates/core/symthaea-ai-assurance/tests/effect_permit_public_api.rs)$'
+          bad="$(git diff --name-only | grep -Ev "$allowed" || true)"
+          if [ -n "$bad" ]; then
+            echo 'Unexpected v1.3 implementation paths:' >&2
+            echo "$bad" >&2
+            exit 1
+          fi
+          git diff --check
+
+      - name: Commit qualified v1.3 source
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            crates/core/symthaea-ai-assurance/src/effect_permit.rs \
+            crates/core/symthaea-ai-assurance/src/lib.rs \
+            crates/core/symthaea-ai-assurance/tests/effect_permit_public_api.rs
+          git commit -m 'feat(ai-assurance): expose evidence before adapter entry'
+          git push origin HEAD:research/ai-assurance-effect-entry-evidence-v1.3
