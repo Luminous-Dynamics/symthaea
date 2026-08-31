@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - "Cargo.toml"
-      - "Cargo.lock"
       - "crates/domains/symthaea-geodesic/**"
       - "examples/benchmark_coding_backends.rs"
       - "scripts/coding_backend_regression.sh"
