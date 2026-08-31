@@ -1,9 +1,8 @@
 //! Content-addressed Sentinel fixture manifests for reproducible Earth-observation research.
 //!
-//! This module freezes provider-facing Sentinel metadata and every materially transformed
-//! downstream artifact into a deterministic lineage graph. It deliberately does not own
-//! Training/Calibration/Evaluation assignment or evaluation custody; those belong to the
-//! separate research-integrity layers.
+//! The fixture layer freezes provider metadata and materially transformed artifacts. It does not
+//! own train/calibration/evaluation assignment or access custody; those remain separate research
+//! integrity concerns.
 
 use std::collections::{BTreeMap, HashSet};
 
@@ -28,8 +27,12 @@ pub enum FixtureError {
     EmptyField(&'static str),
     #[error("invalid hexadecimal digest in {0}")]
     InvalidDigest(&'static str),
-    #[error("non-finite or invalid frozen float field: {0}")]
+    #[error("invalid frozen floating-point field: {0}")]
     InvalidFloat(&'static str),
+    #[error("a frozen footprint requires at least three vertices, got {0}")]
+    InvalidFootprint(usize),
+    #[error("Sentinel mission/product-kind mismatch for {0}")]
+    MissionProductMismatch(String),
     #[error("duplicate Sentinel product id: {0}")]
     DuplicateProduct(String),
     #[error("duplicate derived artifact id: {0}")]
@@ -102,9 +105,54 @@ impl FrozenDigest {
         }
     }
 
-    pub fn validate(&self) -> FixtureResult<()> {
+    fn validate(&self) -> FixtureResult<()> {
         non_empty(&self.algorithm, "digest algorithm")?;
         validate_hex(&self.hex, "content digest")
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum FrozenSentinelMission {
+    Sentinel1,
+    Sentinel2,
+}
+
+impl From<SentinelMission> for FrozenSentinelMission {
+    fn from(value: SentinelMission) -> Self {
+        match value {
+            SentinelMission::Sentinel1 => Self::Sentinel1,
+            SentinelMission::Sentinel2 => Self::Sentinel2,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum FrozenSentinelProductKind {
+    Sentinel1Grd,
+    Sentinel1Slc,
+    Sentinel2L1C,
+    Sentinel2L2A,
+}
+
+impl FrozenSentinelProductKind {
+    fn mission(self) -> FrozenSentinelMission {
+        match self {
+            Self::Sentinel1Grd | Self::Sentinel1Slc => FrozenSentinelMission::Sentinel1,
+            Self::Sentinel2L1C | Self::Sentinel2L2A => FrozenSentinelMission::Sentinel2,
+        }
+    }
+}
+
+impl From<SentinelProductKind> for FrozenSentinelProductKind {
+    fn from(value: SentinelProductKind) -> Self {
+        match value {
+            SentinelProductKind::Sentinel1Grd => Self::Sentinel1Grd,
+            SentinelProductKind::Sentinel1Slc => Self::Sentinel1Slc,
+            SentinelProductKind::Sentinel2L1C => Self::Sentinel2L1C,
+            SentinelProductKind::Sentinel2L2A => Self::Sentinel2L2A,
+        }
     }
 }
 
@@ -190,7 +238,10 @@ impl FrozenProcessingStep {
             name: step.name.clone(),
             software: step.software.clone(),
             version: step.version.clone(),
-            parameters_digest: step.parameters_digest.as_ref().map(FrozenDigest::from_content_digest),
+            parameters_digest: step
+                .parameters_digest
+                .as_ref()
+                .map(FrozenDigest::from_content_digest),
         }
     }
 
@@ -248,7 +299,9 @@ impl FrozenSensorModality {
             SensorModality::ElectricalResistivity => Self::ElectricalResistivity,
             SensorModality::Seismic => Self::Seismic,
             SensorModality::InSitu => Self::InSitu,
-            SensorModality::Other(label) => Self::Other { label: label.clone() },
+            SensorModality::Other(label) => Self::Other {
+                label: label.clone(),
+            },
         }
     }
 
@@ -267,22 +320,6 @@ impl FrozenSensorModality {
     }
 }
 
-fn mission_tag(mission: SentinelMission) -> &'static str {
-    match mission {
-        SentinelMission::Sentinel1 => "sentinel-1",
-        SentinelMission::Sentinel2 => "sentinel-2",
-    }
-}
-
-fn product_kind_tag(kind: SentinelProductKind) -> &'static str {
-    match kind {
-        SentinelProductKind::Sentinel1Grd => "sentinel-1-grd",
-        SentinelProductKind::Sentinel1Slc => "sentinel-1-slc",
-        SentinelProductKind::Sentinel2L1C => "sentinel-2-l1c",
-        SentinelProductKind::Sentinel2L2A => "sentinel-2-l2a",
-    }
-}
-
 fn radar_band_tag(band: RadarBand) -> &'static str {
     match band {
         RadarBand::P => "p",
@@ -296,8 +333,8 @@ fn radar_band_tag(band: RadarBand) -> &'static str {
     }
 }
 
-fn polarization_tag(polarization: Polarization) -> &'static str {
-    match polarization {
+fn polarization_tag(value: Polarization) -> &'static str {
+    match value {
         Polarization::Hh => "hh",
         Polarization::Hv => "hv",
         Polarization::Vh => "vh",
@@ -319,14 +356,14 @@ fn radiometric_unit_tag(unit: RadiometricUnit) -> &'static str {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct FrozenSentinelProduct {
     pub observation_id: String,
     pub mission_id: String,
-    pub mission: String,
+    pub mission: FrozenSentinelMission,
     pub instrument_id: String,
     pub product_id: String,
-    pub product_kind: String,
+    pub product_kind: FrozenSentinelProductKind,
     pub acquired_at_unix_ms: i64,
     pub footprint: Vec<FrozenGeoPoint>,
     pub modality: FrozenSensorModality,
@@ -337,15 +374,33 @@ pub struct FrozenSentinelProduct {
     pub metadata_digest: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+struct FrozenSentinelProductRepr {
+    observation_id: String,
+    mission_id: String,
+    mission: FrozenSentinelMission,
+    instrument_id: String,
+    product_id: String,
+    product_kind: FrozenSentinelProductKind,
+    acquired_at_unix_ms: i64,
+    footprint: Vec<FrozenGeoPoint>,
+    modality: FrozenSensorModality,
+    bands: Vec<FrozenBand>,
+    uncertainty: FrozenUncertainty,
+    source_digest: FrozenDigest,
+    processing_lineage: Vec<FrozenProcessingStep>,
+    metadata_digest: String,
+}
+
 #[derive(Serialize)]
 struct ProductDigestView<'a> {
     schema: &'static str,
     observation_id: &'a str,
     mission_id: &'a str,
-    mission: &'a str,
+    mission: FrozenSentinelMission,
     instrument_id: &'a str,
     product_id: &'a str,
-    product_kind: &'a str,
+    product_kind: FrozenSentinelProductKind,
     acquired_at_unix_ms: i64,
     footprint: &'a [FrozenGeoPoint],
     modality: &'a FrozenSensorModality,
@@ -360,10 +415,10 @@ impl FrozenSentinelProduct {
         let mut result = Self {
             observation_id: product.observation_id.clone(),
             mission_id: product.mission_id.clone(),
-            mission: mission_tag(product.product_kind.mission()).to_string(),
+            mission: product.product_kind.mission().into(),
             instrument_id: product.instrument_id.clone(),
             product_id: product.product_id.clone(),
-            product_kind: product_kind_tag(product.product_kind).to_string(),
+            product_kind: product.product_kind.into(),
             acquired_at_unix_ms: product.acquired_at_unix_ms,
             footprint: product
                 .footprint
@@ -385,8 +440,14 @@ impl FrozenSentinelProduct {
                 })
                 .collect(),
             uncertainty: FrozenUncertainty {
-                confidence_bits: product.uncertainty.confidence.map(|value| value.get().to_bits()),
-                standard_uncertainty_bits: product.uncertainty.standard_uncertainty.map(f64::to_bits),
+                confidence_bits: product
+                    .uncertainty
+                    .confidence
+                    .map(|value| value.get().to_bits()),
+                standard_uncertainty_bits: product
+                    .uncertainty
+                    .standard_uncertainty
+                    .map(f64::to_bits),
                 note: product.uncertainty.note.clone(),
             },
             source_digest: FrozenDigest::from_content_digest(&product.source_digest),
@@ -398,7 +459,7 @@ impl FrozenSentinelProduct {
                 .collect(),
             metadata_digest: String::new(),
         };
-        result.validate_semantics()?;
+        result.validate_payload()?;
         result.metadata_digest = result.compute_digest()?;
         Ok(result)
     }
@@ -408,10 +469,10 @@ impl FrozenSentinelProduct {
             schema: PRODUCT_SCHEMA,
             observation_id: &self.observation_id,
             mission_id: &self.mission_id,
-            mission: &self.mission,
+            mission: self.mission,
             instrument_id: &self.instrument_id,
             product_id: &self.product_id,
-            product_kind: &self.product_kind,
+            product_kind: self.product_kind,
             acquired_at_unix_ms: self.acquired_at_unix_ms,
             footprint: &self.footprint,
             modality: &self.modality,
@@ -427,22 +488,24 @@ impl FrozenSentinelProduct {
     }
 
     pub fn verify_digest(&self) -> FixtureResult<()> {
-        self.validate_semantics()?;
+        self.validate_payload()?;
+        validate_hex(&self.metadata_digest, "product metadata digest")?;
         if self.compute_digest()? != self.metadata_digest {
             return Err(FixtureError::ProductDigestMismatch(self.product_id.clone()));
         }
         Ok(())
     }
 
-    fn validate_semantics(&self) -> FixtureResult<()> {
+    fn validate_payload(&self) -> FixtureResult<()> {
         non_empty(&self.observation_id, "observation id")?;
         non_empty(&self.mission_id, "mission id")?;
-        non_empty(&self.mission, "mission tag")?;
         non_empty(&self.instrument_id, "instrument id")?;
         non_empty(&self.product_id, "product id")?;
-        non_empty(&self.product_kind, "product kind")?;
+        if self.product_kind.mission() != self.mission {
+            return Err(FixtureError::MissionProductMismatch(self.product_id.clone()));
+        }
         if self.footprint.len() < 3 {
-            return Err(FixtureError::InvalidFloat("footprint vertex count"));
+            return Err(FixtureError::InvalidFootprint(self.footprint.len()));
         }
         for point in &self.footprint {
             point.validate()?;
@@ -456,13 +519,42 @@ impl FrozenSentinelProduct {
         for step in &self.processing_lineage {
             step.validate()?;
         }
-        validate_hex(&self.metadata_digest, "product metadata digest").or_else(|error| {
-            if self.metadata_digest.is_empty() {
-                Ok(())
-            } else {
-                Err(error)
-            }
-        })
+        Ok(())
+    }
+}
+
+impl TryFrom<FrozenSentinelProductRepr> for FrozenSentinelProduct {
+    type Error = FixtureError;
+
+    fn try_from(value: FrozenSentinelProductRepr) -> FixtureResult<Self> {
+        let product = Self {
+            observation_id: value.observation_id,
+            mission_id: value.mission_id,
+            mission: value.mission,
+            instrument_id: value.instrument_id,
+            product_id: value.product_id,
+            product_kind: value.product_kind,
+            acquired_at_unix_ms: value.acquired_at_unix_ms,
+            footprint: value.footprint,
+            modality: value.modality,
+            bands: value.bands,
+            uncertainty: value.uncertainty,
+            source_digest: value.source_digest,
+            processing_lineage: value.processing_lineage,
+            metadata_digest: value.metadata_digest,
+        };
+        product.verify_digest()?;
+        Ok(product)
+    }
+}
+
+impl<'de> Deserialize<'de> for FrozenSentinelProduct {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let repr = FrozenSentinelProductRepr::deserialize(deserializer)?;
+        Self::try_from(repr).map_err(serde::de::Error::custom)
     }
 }
 
@@ -501,18 +593,29 @@ pub enum FixtureArtifactKind {
     Other,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SentinelFixtureArtifact {
     pub artifact_id: String,
     pub kind: FixtureArtifactKind,
     pub content_digest: FrozenDigest,
     pub byte_len: Option<u64>,
-    /// Ordered semantic inputs. Order is intentionally retained because operations such as band
-    /// stacking can be order-sensitive.
+    /// Ordered semantic inputs. Order remains identity-significant because band stacking and similar
+    /// transforms may be order-sensitive.
     pub sources: Vec<FixtureSourceRef>,
-    /// Ordered processing steps; their order is part of artifact identity.
+    /// Ordered processing steps. Their order is identity-significant.
     pub processing_steps: Vec<FrozenProcessingStep>,
     pub identity_digest: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+struct SentinelFixtureArtifactRepr {
+    artifact_id: String,
+    kind: FixtureArtifactKind,
+    content_digest: FrozenDigest,
+    byte_len: Option<u64>,
+    sources: Vec<FixtureSourceRef>,
+    processing_steps: Vec<FrozenProcessingStep>,
+    identity_digest: String,
 }
 
 #[derive(Serialize)]
@@ -535,7 +638,7 @@ impl SentinelFixtureArtifact {
         sources: Vec<FixtureSourceRef>,
         processing_steps: Vec<FrozenProcessingStep>,
     ) -> FixtureResult<Self> {
-        let mut result = Self {
+        let mut artifact = Self {
             artifact_id: artifact_id.into(),
             kind,
             content_digest,
@@ -544,9 +647,9 @@ impl SentinelFixtureArtifact {
             processing_steps,
             identity_digest: String::new(),
         };
-        result.validate_semantics()?;
-        result.identity_digest = result.compute_digest()?;
-        Ok(result)
+        artifact.validate_payload()?;
+        artifact.identity_digest = artifact.compute_digest()?;
+        Ok(artifact)
     }
 
     fn digest_view(&self) -> ArtifactDigestView<'_> {
@@ -566,14 +669,15 @@ impl SentinelFixtureArtifact {
     }
 
     pub fn verify_digest(&self) -> FixtureResult<()> {
-        self.validate_semantics()?;
+        self.validate_payload()?;
+        validate_hex(&self.identity_digest, "artifact identity digest")?;
         if self.compute_digest()? != self.identity_digest {
             return Err(FixtureError::ArtifactDigestMismatch(self.artifact_id.clone()));
         }
         Ok(())
     }
 
-    fn validate_semantics(&self) -> FixtureResult<()> {
+    fn validate_payload(&self) -> FixtureResult<()> {
         non_empty(&self.artifact_id, "artifact id")?;
         self.content_digest.validate()?;
         if self.sources.is_empty() {
@@ -595,13 +699,35 @@ impl SentinelFixtureArtifact {
         for step in &self.processing_steps {
             step.validate()?;
         }
-        validate_hex(&self.identity_digest, "artifact identity digest").or_else(|error| {
-            if self.identity_digest.is_empty() {
-                Ok(())
-            } else {
-                Err(error)
-            }
-        })
+        Ok(())
+    }
+}
+
+impl TryFrom<SentinelFixtureArtifactRepr> for SentinelFixtureArtifact {
+    type Error = FixtureError;
+
+    fn try_from(value: SentinelFixtureArtifactRepr) -> FixtureResult<Self> {
+        let artifact = Self {
+            artifact_id: value.artifact_id,
+            kind: value.kind,
+            content_digest: value.content_digest,
+            byte_len: value.byte_len,
+            sources: value.sources,
+            processing_steps: value.processing_steps,
+            identity_digest: value.identity_digest,
+        };
+        artifact.verify_digest()?;
+        Ok(artifact)
+    }
+}
+
+impl<'de> Deserialize<'de> for SentinelFixtureArtifact {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let repr = SentinelFixtureArtifactRepr::deserialize(deserializer)?;
+        Self::try_from(repr).map_err(serde::de::Error::custom)
     }
 }
 
@@ -633,26 +759,24 @@ impl FrozenSentinelFixtureManifest {
     pub fn new(
         fixture_id: impl Into<String>,
         products: Vec<SentinelProductMetadata>,
-        artifacts: Vec<SentinelFixtureArtifact>,
+        mut artifacts: Vec<SentinelFixtureArtifact>,
     ) -> FixtureResult<Self> {
-        let mut frozen_products = products
+        let mut products = products
             .iter()
             .map(FrozenSentinelProduct::from_metadata)
             .collect::<FixtureResult<Vec<_>>>()?;
-        frozen_products.sort_by(|a, b| a.product_id.cmp(&b.product_id));
-
-        let mut artifacts = artifacts;
+        products.sort_by(|a, b| a.product_id.cmp(&b.product_id));
         artifacts.sort_by(|a, b| a.artifact_id.cmp(&b.artifact_id));
 
-        let mut result = Self {
+        let mut manifest = Self {
             fixture_id: fixture_id.into(),
-            products: frozen_products,
+            products,
             artifacts,
             manifest_digest: String::new(),
         };
-        result.validate_internal()?;
-        result.manifest_digest = result.compute_digest()?;
-        Ok(result)
+        manifest.validate_payload()?;
+        manifest.manifest_digest = manifest.compute_digest()?;
+        Ok(manifest)
     }
 
     fn digest_view(&self) -> FixtureDigestView<'_> {
@@ -669,14 +793,15 @@ impl FrozenSentinelFixtureManifest {
     }
 
     pub fn verify_digest(&self) -> FixtureResult<()> {
-        self.validate_internal()?;
+        self.validate_payload()?;
+        validate_hex(&self.manifest_digest, "fixture manifest digest")?;
         if self.compute_digest()? != self.manifest_digest {
             return Err(FixtureError::ManifestDigestMismatch);
         }
         Ok(())
     }
 
-    fn validate_internal(&self) -> FixtureResult<()> {
+    fn validate_payload(&self) -> FixtureResult<()> {
         non_empty(&self.fixture_id, "fixture id")?;
 
         let mut product_ids = HashSet::new();
@@ -720,8 +845,7 @@ impl FrozenSentinelFixtureManifest {
             }
         }
 
-        validate_acyclic_artifacts(&self.artifacts)?;
-        Ok(())
+        validate_acyclic_artifacts(&self.artifacts)
     }
 }
 
@@ -729,14 +853,14 @@ impl TryFrom<FrozenSentinelFixtureManifestRepr> for FrozenSentinelFixtureManifes
     type Error = FixtureError;
 
     fn try_from(value: FrozenSentinelFixtureManifestRepr) -> FixtureResult<Self> {
-        let result = Self {
+        let manifest = Self {
             fixture_id: value.fixture_id,
             products: value.products,
             artifacts: value.artifacts,
             manifest_digest: value.manifest_digest,
         };
-        result.verify_digest()?;
-        Ok(result)
+        manifest.verify_digest()?;
+        Ok(manifest)
     }
 }
 
@@ -751,16 +875,16 @@ impl<'de> Deserialize<'de> for FrozenSentinelFixtureManifest {
 }
 
 fn validate_acyclic_artifacts(artifacts: &[SentinelFixtureArtifact]) -> FixtureResult<()> {
-    let by_id: BTreeMap<&str, &SentinelFixtureArtifact> = artifacts
+    let by_id: BTreeMap<String, &SentinelFixtureArtifact> = artifacts
         .iter()
-        .map(|artifact| (artifact.artifact_id.as_str(), artifact))
+        .map(|artifact| (artifact.artifact_id.clone(), artifact))
         .collect();
     let mut visiting = HashSet::<String>::new();
     let mut visited = HashSet::<String>::new();
 
     fn visit(
         id: &str,
-        by_id: &BTreeMap<&str, &SentinelFixtureArtifact>,
+        by_id: &BTreeMap<String, &SentinelFixtureArtifact>,
         visiting: &mut HashSet<String>,
         visited: &mut HashSet<String>,
     ) -> FixtureResult<()> {
@@ -808,6 +932,11 @@ mod tests {
             ),
             SentinelMission::Sentinel2 => ("Sentinel-2", "MSI", SensorModality::Multispectral),
         };
+        let source_hex = if id.ends_with('1') {
+            "11".repeat(32)
+        } else {
+            "22".repeat(32)
+        };
         SentinelProductMetadata {
             observation_id: format!("obs-{id}"),
             mission_id: mission_id.into(),
@@ -834,8 +963,7 @@ mod tests {
                 Some("fixture uncertainty".into()),
             )
             .unwrap(),
-            source_digest: ContentDigest::new(DigestAlgorithm::Sha256, format!("aa{id:0>2}"))
-                .unwrap(),
+            source_digest: ContentDigest::new(DigestAlgorithm::Sha256, source_hex).unwrap(),
             lineage: ProcessingLineage::default(),
         }
     }
@@ -852,16 +980,13 @@ mod tests {
         }
     }
 
-    fn artifact(
-        id: &str,
-        sources: Vec<FixtureSourceRef>,
-    ) -> SentinelFixtureArtifact {
+    fn artifact(id: &str, sources: Vec<FixtureSourceRef>) -> SentinelFixtureArtifact {
         SentinelFixtureArtifact::new(
             id,
             FixtureArtifactKind::FeatureCube,
             FrozenDigest {
                 algorithm: "sha256".into(),
-                hex: format!("bb{}", id.len()),
+                hex: format!("{:064x}", id.len()),
             },
             Some(1024),
             sources,
@@ -950,21 +1075,19 @@ mod tests {
     }
 
     #[test]
-    fn artifact_cycles_fail_even_when_all_digests_are_recomputed() {
-        let mut a = artifact(
+    fn artifact_cycles_fail_even_when_inner_digests_are_recomputed() {
+        let a = artifact(
             "a",
             vec![FixtureSourceRef::Artifact {
                 artifact_id: "b".into(),
             }],
         );
-        let mut b = artifact(
+        let b = artifact(
             "b",
             vec![FixtureSourceRef::Artifact {
                 artifact_id: "a".into(),
             }],
         );
-        a.identity_digest = a.compute_digest().unwrap();
-        b.identity_digest = b.compute_digest().unwrap();
         let err = FrozenSentinelFixtureManifest::new(
             "fixture",
             vec![product("s1", SentinelProductKind::Sentinel1Grd, 1)],
@@ -989,6 +1112,21 @@ mod tests {
         .unwrap();
         let mut value = serde_json::to_value(&manifest).unwrap();
         value["artifacts"][0]["byte_len"] = serde_json::Value::from(999_u64);
+        assert!(serde_json::from_value::<FrozenSentinelFixtureManifest>(value).is_err());
+    }
+
+    #[test]
+    fn persisted_product_rejects_recomputed_outer_manifest_tamper() {
+        let manifest = FrozenSentinelFixtureManifest::new(
+            "fixture",
+            vec![product("s1", SentinelProductKind::Sentinel1Grd, 1)],
+            vec![],
+        )
+        .unwrap();
+        let mut value = serde_json::to_value(&manifest).unwrap();
+        value["products"][0]["acquired_at_unix_ms"] = serde_json::Value::from(999_i64);
+        // Even if an attacker later recomputed the outer manifest digest, the nested product's own
+        // metadata digest must first verify during deserialization.
         assert!(serde_json::from_value::<FrozenSentinelFixtureManifest>(value).is_err());
     }
 
