@@ -44,10 +44,15 @@ fn public_acquisition_before_revocation_preserves_one_admitted_effect() {
     assert!(domain.is_stopped());
     assert_eq!(revocation.admitted_activity().outstanding_permits(), 1);
     assert_eq!(revocation.admitted_activity().in_flight_effects(), 0);
+    let sequence_before_failed_resume = domain.current_sequence();
+    let activity_before_failed_resume = domain.activity();
     assert!(matches!(
         domain.resume(),
         Err(EffectEntryError::ResumeWhileActive { .. })
     ));
+    assert_eq!(domain.current_sequence(), sequence_before_failed_resume);
+    assert_eq!(domain.activity(), activity_before_failed_resume);
+    assert!(domain.is_stopped());
 
     let (receipt, effect_result) = permit.enter(|| "entered").unwrap();
     assert_eq!(effect_result, "entered");
@@ -83,10 +88,13 @@ fn public_effect_callback_does_not_hold_revocation_lock() {
     assert!(acquisition < revocation.revocation_sequence());
     assert_eq!(revocation.admitted_activity().outstanding_permits(), 0);
     assert_eq!(revocation.admitted_activity().in_flight_effects(), 1);
+    let sequence_before_failed_resume = domain.current_sequence();
     assert!(matches!(
         domain.resume(),
         Err(EffectEntryError::ResumeWhileActive { .. })
     ));
+    assert_eq!(domain.current_sequence(), sequence_before_failed_resume);
+    assert!(domain.is_stopped());
 
     continue_tx.send(()).unwrap();
     let (receipt, value) = worker.join().unwrap().unwrap();
