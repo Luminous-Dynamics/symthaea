@@ -365,11 +365,14 @@ mod tests {
     fn resource_identity_is_stable_and_owner_specific() {
         let owner = owner(None);
         assert_eq!(
-            owner.resource_id(ShadowResource::WorkingMemory).0,
+            owner.resource_id(ShadowResource::WorkingMemory).0.as_str(),
             WORKING_MEMORY_RESOURCE
         );
         assert_eq!(
-            owner.resource_id(ShadowResource::ActiveCognitiveState).0,
+            owner
+                .resource_id(ShadowResource::ActiveCognitiveState)
+                .0
+                .as_str(),
             ACTIVE_COGNITIVE_STATE_RESOURCE
         );
         assert_ne!(
