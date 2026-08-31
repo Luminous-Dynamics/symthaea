@@ -1,0 +1,86 @@
+name: CogSec Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-cogsec/**'
+      - 'crates/bridges/symthaea-cogsec-evidence/**'
+      - 'crates/bridges/symthaea-cogsec-qualification/**'
+      - 'docs/security/cogsec/**'
+      - '.github/workflows/cogsec.yml'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  cogsec:
+    name: CogSec focused qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cogsec-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-cogsec-
+
+      - name: Verify workspace metadata does not rewrite Cargo.lock
+        run: |
+          cargo metadata --format-version=1 > /dev/null
+          git diff --exit-code -- Cargo.lock
+
+      - name: Format CogSec packages
+        run: |
+          cargo fmt --check \
+            -p symthaea-cogsec \
+            -p symthaea-cogsec-evidence \
+            -p symthaea-cogsec-qualification
+
+      - name: Check CogSec packages
+        run: |
+          cargo check \
+            -p symthaea-cogsec \
+            -p symthaea-cogsec-evidence \
+            -p symthaea-cogsec-qualification
+
+      - name: Test CogSec packages
+        run: |
+          cargo test \
+            -p symthaea-cogsec \
+            -p symthaea-cogsec-evidence \
+            -p symthaea-cogsec-qualification
+
+      - name: Run CogSec documentation tests
+        run: |
+          cargo test --doc \
+            -p symthaea-cogsec \
+            -p symthaea-cogsec-evidence \
+            -p symthaea-cogsec-qualification
+
+      - name: Clippy CogSec packages
+        run: |
+          cargo clippy --all-targets \
+            -p symthaea-cogsec \
+            -p symthaea-cogsec-evidence \
+            -p symthaea-cogsec-qualification \
+            -- -D warnings
