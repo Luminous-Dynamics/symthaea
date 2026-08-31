@@ -48,7 +48,8 @@ fn public_pool_is_conserved_under_concurrent_reservation() {
     barrier.wait();
     let successes = workers
         .into_iter()
-        .filter(|worker| worker.join().unwrap().is_ok())
+        .map(|worker| worker.join().unwrap())
+        .filter(Result::is_ok)
         .count();
     assert_eq!(successes, 1);
     assert_eq!(domain.remaining().get(BudgetDimension::ComputeUnits), 0);
