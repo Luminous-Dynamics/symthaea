@@ -9,7 +9,8 @@
 //! - identify the protected resource being observed;
 //! - append typed shadow evidence through one bounded ledger;
 //! - keep qualification-run correlation separate from authority;
-//! - make the assurance profile explicit at construction time.
+//! - make the assurance profile explicit at construction time;
+//! - bind each typed runtime stage to its canonical observed resource.
 //!
 //! The observer does **not** issue `ResourceVersion`. Early shadow continuity
 //! comes from owner-issued evidence `EventId`s and explicit causal parents.
@@ -19,6 +20,10 @@
 //! `ObserverOnly` and `OwnerAware` are intentionally distinct profiles:
 //! observer-only evidence must not carry authoritative resource versions,
 //! whereas owner-aware evidence must use a manifest that requires them.
+//!
+//! Resource binding is attribution, not authorization. Knowing that a
+//! `GoalActivationObserved` event belongs to `mind/goals` does not grant any
+//! permission to mutate that resource.
 //!
 //! Absence of this object is the default disabled state. Presence means
 //! **audit/shadow observation only**; this crate has no enforcement mode.
@@ -52,6 +57,33 @@ pub enum ShadowResource {
     AffectiveState,
     /// Working-memory eviction/graduation transition boundary.
     GraduationBoundary,
+}
+
+impl ShadowResource {
+    /// Canonical protected resource for a typed shadow stage.
+    ///
+    /// `IngressObserved` has no protected mutation resource and
+    /// `EvidenceGapObserved` may describe loss from more than one resource, so
+    /// those kinds intentionally return `None`.
+    pub const fn for_event_kind(kind: ShadowEventKind) -> Option<Self> {
+        match kind {
+            ShadowEventKind::WorkingMemoryAdmissionEvaluated
+            | ShadowEventKind::WorkingMemoryAdmissionObserved
+            | ShadowEventKind::WorkingMemoryEvictionObserved
+            | ShadowEventKind::DreamMergeEvaluated
+            | ShadowEventKind::DreamMergeObserved => Some(Self::WorkingMemory),
+            ShadowEventKind::GraduationEvaluated | ShadowEventKind::GraduationObserved => {
+                Some(Self::GraduationBoundary)
+            }
+            ShadowEventKind::WorkingStateInfluenceEvaluated
+            | ShadowEventKind::WorkingStateInfluenceObserved => Some(Self::ActiveCognitiveState),
+            ShadowEventKind::GoalActivationEvaluated
+            | ShadowEventKind::GoalActivationObserved => Some(Self::GoalStore),
+            ShadowEventKind::AffectMutationEvaluated
+            | ShadowEventKind::AffectMutationObserved => Some(Self::AffectiveState),
+            ShadowEventKind::IngressObserved | ShadowEventKind::EvidenceGapObserved => None,
+        }
+    }
 }
 
 /// Explicit assurance profile for one shadow observer instance.
@@ -133,6 +165,26 @@ pub enum ShadowAppendError {
         /// Event kind that attempted to carry owner-version evidence.
         kind: ShadowEventKind,
     },
+    /// A resource-bearing stage omitted its canonical protected resource.
+    #[error("shadow event {kind:?} omitted canonical resource {expected:?}")]
+    RequiredResourceMissing {
+        /// Stage whose resource binding was missing.
+        kind: ShadowEventKind,
+        /// Canonical resource identity expected for the stage.
+        expected: ResourceId,
+    },
+    /// A resource-bearing stage was attributed to the wrong protected resource.
+    #[error(
+        "shadow event {kind:?} targeted {observed:?}, expected canonical resource {expected:?}"
+    )]
+    ResourceBindingMismatch {
+        /// Stage whose resource binding was inconsistent.
+        kind: ShadowEventKind,
+        /// Canonical resource identity expected for the stage.
+        expected: ResourceId,
+        /// Resource identity supplied by the caller.
+        observed: ResourceId,
+    },
     /// The underlying bounded ledger rejected the event.
     #[error(transparent)]
     Ledger(#[from] AppendError),
@@ -201,10 +253,39 @@ impl ShadowRuntimeObserver {
         self.resource_ids.get(resource)
     }
 
+    /// Canonical resource identity expected for one typed shadow stage.
+    pub fn expected_resource_id(&self, kind: ShadowEventKind) -> Option<&ResourceId> {
+        ShadowResource::for_event_kind(kind).map(|resource| self.resource_ids.get(resource))
+    }
+
+    fn validate_resource_binding(&self, draft: &ShadowEventDraft) -> Result<(), ShadowAppendError> {
+        let Some(expected) = self.expected_resource_id(draft.kind) else {
+            return Ok(());
+        };
+
+        match draft.resource.as_ref() {
+            None => Err(ShadowAppendError::RequiredResourceMissing {
+                kind: draft.kind,
+                expected: expected.clone(),
+            }),
+            Some(observed) if observed != expected => {
+                Err(ShadowAppendError::ResourceBindingMismatch {
+                    kind: draft.kind,
+                    expected: expected.clone(),
+                    observed: observed.clone(),
+                })
+            }
+            Some(_) => Ok(()),
+        }
+    }
+
     /// Append one event through the observer-bound evidence ledger.
     ///
-    /// Run grouping is checked rather than silently rewritten. In
-    /// [`ShadowAssuranceProfile::ObserverOnly`] mode the append boundary also
+    /// Run grouping is checked rather than silently rewritten. Resource-bearing
+    /// stages must also target the canonical resource identity owned by this
+    /// observer's local registry. This is an attribution check, not permission.
+    ///
+    /// In [`ShadowAssuranceProfile::ObserverOnly`] mode the append boundary also
     /// rejects any supplied `resource_version_*` values, preventing audit data
     /// from accidentally presenting itself as protected-owner freshness.
     ///
@@ -228,6 +309,8 @@ impl ShadowRuntimeObserver {
                 kind: draft.kind,
             });
         }
+
+        self.validate_resource_binding(&draft)?;
 
         Ok(self.ledger.try_append(draft)?)
     }
@@ -310,6 +393,29 @@ mod tests {
         }
     }
 
+    fn mutation_observation(kind: ShadowEventKind, resource: Option<ResourceId>) -> ShadowEventDraft {
+        ShadowEventDraft {
+            kind,
+            proposal_id: None,
+            transaction_id: None,
+            principals: PrincipalContext::default(),
+            resource,
+            resource_version_before: None,
+            resource_version_after: None,
+            state_root_before: None,
+            state_root_after: None,
+            policy_root: None,
+            policy_epoch: None,
+            authorization_epoch: None,
+            revocation_epoch: None,
+            causal_parents: BTreeSet::new(),
+            cognitive_tick: None,
+            run_id: None,
+            confidentiality: EvidenceConfidentiality::LocalPrivate,
+            payload: ShadowEventPayload::MutationObserved { applied: true },
+        }
+    }
+
     #[test]
     fn observer_only_profile_rejects_owner_version_requirement_at_init() {
         let result = ShadowRuntimeObserver::try_new_preallocated(
@@ -380,6 +486,76 @@ mod tests {
     }
 
     #[test]
+    fn stage_resource_mapping_is_explicit_for_every_protected_stage() {
+        let cases = [
+            (
+                ShadowEventKind::WorkingMemoryAdmissionEvaluated,
+                ShadowResource::WorkingMemory,
+            ),
+            (
+                ShadowEventKind::WorkingMemoryAdmissionObserved,
+                ShadowResource::WorkingMemory,
+            ),
+            (
+                ShadowEventKind::WorkingMemoryEvictionObserved,
+                ShadowResource::WorkingMemory,
+            ),
+            (
+                ShadowEventKind::GraduationEvaluated,
+                ShadowResource::GraduationBoundary,
+            ),
+            (
+                ShadowEventKind::GraduationObserved,
+                ShadowResource::GraduationBoundary,
+            ),
+            (
+                ShadowEventKind::WorkingStateInfluenceEvaluated,
+                ShadowResource::ActiveCognitiveState,
+            ),
+            (
+                ShadowEventKind::WorkingStateInfluenceObserved,
+                ShadowResource::ActiveCognitiveState,
+            ),
+            (
+                ShadowEventKind::GoalActivationEvaluated,
+                ShadowResource::GoalStore,
+            ),
+            (
+                ShadowEventKind::GoalActivationObserved,
+                ShadowResource::GoalStore,
+            ),
+            (
+                ShadowEventKind::AffectMutationEvaluated,
+                ShadowResource::AffectiveState,
+            ),
+            (
+                ShadowEventKind::AffectMutationObserved,
+                ShadowResource::AffectiveState,
+            ),
+            (
+                ShadowEventKind::DreamMergeEvaluated,
+                ShadowResource::WorkingMemory,
+            ),
+            (
+                ShadowEventKind::DreamMergeObserved,
+                ShadowResource::WorkingMemory,
+            ),
+        ];
+
+        for (kind, expected) in cases {
+            assert_eq!(ShadowResource::for_event_kind(kind), Some(expected));
+        }
+        assert_eq!(
+            ShadowResource::for_event_kind(ShadowEventKind::IngressObserved),
+            None
+        );
+        assert_eq!(
+            ShadowResource::for_event_kind(ShadowEventKind::EvidenceGapObserved),
+            None
+        );
+    }
+
+    #[test]
     fn event_storage_is_preallocated_before_runtime_use() {
         let observer = observer(None);
         assert!(observer.event_storage_fully_preallocated());
@@ -418,6 +594,40 @@ mod tests {
         );
         assert_eq!(observer.ledger_stats().assigned_sequences, 0);
         assert!(observer.snapshot().events.is_empty());
+    }
+
+    #[test]
+    fn missing_canonical_resource_is_rejected_before_event_id_allocation() {
+        let mut observer = observer(None);
+        let draft = mutation_observation(ShadowEventKind::GoalActivationObserved, None);
+
+        assert_eq!(
+            observer.try_append(draft),
+            Err(ShadowAppendError::RequiredResourceMissing {
+                kind: ShadowEventKind::GoalActivationObserved,
+                expected: ResourceId(GOAL_STORE_RESOURCE.into()),
+            })
+        );
+        assert_eq!(observer.ledger_stats().assigned_sequences, 0);
+    }
+
+    #[test]
+    fn wrong_canonical_resource_is_rejected_before_event_id_allocation() {
+        let mut observer = observer(None);
+        let draft = mutation_observation(
+            ShadowEventKind::GoalActivationObserved,
+            Some(ResourceId(AFFECTIVE_STATE_RESOURCE.into())),
+        );
+
+        assert_eq!(
+            observer.try_append(draft),
+            Err(ShadowAppendError::ResourceBindingMismatch {
+                kind: ShadowEventKind::GoalActivationObserved,
+                expected: ResourceId(GOAL_STORE_RESOURCE.into()),
+                observed: ResourceId(AFFECTIVE_STATE_RESOURCE.into()),
+            })
+        );
+        assert_eq!(observer.ledger_stats().assigned_sequences, 0);
     }
 
     #[test]
