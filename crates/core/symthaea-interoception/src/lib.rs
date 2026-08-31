@@ -17,6 +17,7 @@ mod protocol;
 mod qualification;
 mod snapshot;
 mod state;
+mod study;
 
 pub use allostasis::{
     assess_allostasis, assess_allostasis_with_drive, AllostaticConfig, AllostaticReport,
@@ -57,4 +58,12 @@ pub use snapshot::{
 };
 pub use state::{
     NativeInteroceptiveState, ViabilityChannel, ViabilityVariable, CHANNEL_COUNT,
+};
+pub use study::{
+    evaluate_confirmatory_study, execute_study, extract_study_blinded_metrics,
+    ConfirmatoryHypothesisEvaluation, EvidenceRunClass, ExclusionCriterionDecision,
+    ExclusionDecisionReceipt, ExclusionDecisionStatus, RunDisposition, StudyBlindedMetricReport,
+    StudyExecutionTrace, StudyPreregistration, CONFIRMATORY_EVALUATION_SCHEMA_VERSION,
+    EXCLUSION_DECISION_RECEIPT_SCHEMA_VERSION, STUDY_BLINDED_METRIC_SCHEMA_VERSION,
+    STUDY_EXECUTION_SCHEMA_VERSION, STUDY_PREREGISTRATION_SCHEMA_VERSION,
 };
