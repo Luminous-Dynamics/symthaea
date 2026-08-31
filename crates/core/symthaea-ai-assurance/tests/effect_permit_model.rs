@@ -49,6 +49,7 @@ proptest! {
                     }
                 }
                 1 => {
+                    let was_open = model_open;
                     let receipt = domain.revoke_all().unwrap();
                     model_epoch += 1;
                     model_sequence += 1;
@@ -60,6 +61,9 @@ proptest! {
                         model_outstanding
                     );
                     prop_assert_eq!(receipt.admitted_activity().in_flight_effects(), 0);
+                    if !was_open {
+                        prop_assert!(domain.is_stopped());
+                    }
                 }
                 2 => {
                     if let Some(ticket) = tickets[slot].take() {
