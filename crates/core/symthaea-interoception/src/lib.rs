@@ -11,6 +11,7 @@ mod dynamics;
 mod evidence;
 mod homeostasis;
 mod intervention;
+mod protocol;
 mod qualification;
 mod snapshot;
 mod state;
@@ -28,6 +29,12 @@ pub use evidence::{
 pub use homeostasis::{assess_homeostasis, HomeostaticReport};
 pub use intervention::{
     apply_intervention, InterventionKind, InterventionRecord, InteroceptiveIntervention,
+};
+pub use protocol::{
+    DrivePhase, ExclusionCriterion, ExpectedRelation, ExperimentArmSpec,
+    ExperimentPreregistration, HypothesisSpec, OutcomeRef, ProtocolForecastSpec,
+    RegisteredMeasure, RegisteredMetricSpec, ScheduledIntervention,
+    PREREGISTRATION_SCHEMA_VERSION,
 };
 pub use qualification::{
     GateStatus, QualificationGateReceipt, QualificationReceipt, QUALIFICATION_RECEIPT_SCHEMA_VERSION,

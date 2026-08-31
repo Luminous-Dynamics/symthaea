@@ -7,7 +7,7 @@ use crate::snapshot::{
     INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION,
 };
 
-pub const EVIDENCE_CAPSULE_SCHEMA_VERSION: u16 = 1;
+pub const EVIDENCE_CAPSULE_SCHEMA_VERSION: u16 = 2;
 
 /// Machine-readable identifier for the prospective mechanism used by a snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,7 +60,10 @@ pub struct EvidenceCapsuleManifest {
     pub target_triple: String,
     pub architecture: String,
     pub experiment_id: String,
+    /// Digest of the locked prospective plan before result generation.
+    pub preregistration_sha256: String,
     pub forecast_basis: ForecastBasisId,
+    /// Digest of the resolved runtime configuration actually executed.
     pub experiment_config_sha256: String,
     pub input_sequence_sha256: String,
     pub snapshot_schema_version: u16,
@@ -101,6 +104,11 @@ impl EvidenceCapsuleManifest {
         if let Some(value) = &self.rust_toolchain_sha256 {
             validate_sha256("rust_toolchain_sha256", value, &mut errors);
         }
+        validate_sha256(
+            "preregistration_sha256",
+            &self.preregistration_sha256,
+            &mut errors,
+        );
         validate_sha256(
             "experiment_config_sha256",
             &self.experiment_config_sha256,

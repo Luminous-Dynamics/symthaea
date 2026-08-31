@@ -20,6 +20,7 @@ fn valid_manifest() -> EvidenceCapsuleManifest {
         target_triple: "x86_64-unknown-linux-gnu".into(),
         architecture: "x86_64".into(),
         experiment_id: "native-interoception-v0.1-smoke".into(),
+        preregistration_sha256: digest('0'),
         forecast_basis: ForecastBasisId::DynamicsAwareConstantDrive,
         experiment_config_sha256: digest('d'),
         input_sequence_sha256: digest('e'),
@@ -45,12 +46,24 @@ fn evidence_capsule_rejects_ambiguous_or_malformed_identity() {
     let mut manifest = valid_manifest();
     manifest.source_commit = "NOT-A-GIT-SHA".into();
     manifest.cargo_lock_sha256 = "ABCDEF".into();
-    manifest.artifacts.push(ArtifactDigest::new("snapshots.jsonl", digest('2')));
+    manifest.preregistration_sha256 = "not-a-digest".into();
+    manifest
+        .artifacts
+        .push(ArtifactDigest::new("snapshots.jsonl", digest('2')));
 
-    let errors = manifest.validate().expect_err("manifest must fail validation");
+    let errors = manifest
+        .validate()
+        .expect_err("manifest must fail validation");
     assert!(errors.iter().any(|error| error.contains("source_commit")));
-    assert!(errors.iter().any(|error| error.contains("cargo_lock_sha256")));
-    assert!(errors.iter().any(|error| error.contains("duplicate artifact name")));
+    assert!(errors
+        .iter()
+        .any(|error| error.contains("cargo_lock_sha256")));
+    assert!(errors
+        .iter()
+        .any(|error| error.contains("preregistration_sha256")));
+    assert!(errors
+        .iter()
+        .any(|error| error.contains("duplicate artifact name")));
 }
 
 #[test]
