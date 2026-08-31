@@ -1,0 +1,84 @@
+name: Epidemiology Surveillance Screen
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-epidemiology/**"
+      - "crates/domains/symthaea-statistics/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/epidemiology-surveillance.yml"
+      - ".github/workflows/epidemiology-lock-refresh.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-epidemiology/**"
+      - "crates/domains/symthaea-statistics/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/epidemiology-surveillance.yml"
+      - ".github/workflows/epidemiology-lock-refresh.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  surveillance-screen:
+    name: Conservative aggregate surveillance screening
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      # Evidence qualification is against the immutable feature head, not the
+      # synthetic pull-request merge ref. Integration CI remains separate.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5 / node24
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          EXPECTED="${{ github.event.pull_request.head.sha || github.sha }}"
+          ACTUAL="$(git rev-parse HEAD)"
+          test "$ACTUAL" = "$EXPECTED"
+          echo "QUALIFICATION_HEAD=$ACTUAL"
+
+      # This pinned rust-toolchain revision itself selects Rust 1.96.0.
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+
+      - name: Record qualification environment
+        shell: bash
+        run: |
+          echo "HEAD=$(git rev-parse HEAD)"
+          rustc -vV
+          cargo -Vv
+          sha256sum Cargo.toml Cargo.lock rust-toolchain.toml \
+            crates/domains/symthaea-epidemiology/Cargo.toml \
+            crates/domains/symthaea-statistics/Cargo.toml
+
+      # Full metadata resolution is required. `--no-deps` can report success
+      # even when a later locked build needs to rewrite package dependency data.
+      - name: Verify complete committed lock graph
+        run: cargo metadata --locked --format-version 1 > /dev/null
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-epidemiology -- --check
+
+      - name: Run epidemiology tests
+        run: cargo test --locked -p symthaea-epidemiology
+
+      - name: Run documentation tests
+        run: cargo test --locked -p symthaea-epidemiology --doc
+
+      - name: Run Clippy
+        run: cargo clippy --locked -p symthaea-epidemiology --all-targets -- -D warnings
+
+      - name: Check pure-domain WASM portability
+        run: cargo check --locked -p symthaea-epidemiology --target wasm32-unknown-unknown
