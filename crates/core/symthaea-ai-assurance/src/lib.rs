@@ -90,9 +90,10 @@ pub use effect_guard::{
     EffectInnerExecutionError, ExecutionPreflightError,
 };
 pub use effect_permit::{
-    EffectEntryActivity, EffectEntryDomain, EffectEntryDomainId, EffectEntryEpoch, EffectEntryError,
-    EffectEntryPermit, EffectEntryPermitId, EffectEntryReceipt, EffectEntrySequence,
-    EffectEntryTicket, EffectEntryTicketId, EffectResumeReceipt, EffectRevocationReceipt,
+    EffectAdmissionCommitment, EffectEntryActivity, EffectEntryDomain, EffectEntryDomainId,
+    EffectEntryEpoch, EffectEntryError, EffectEntryPermit, EffectEntryPermitId, EffectEntryReceipt,
+    EffectEntrySequence, EffectEntryTicket, EffectEntryTicketId, EffectResumeReceipt,
+    EffectRevocationReceipt,
 };
 pub use host::{ResolutionError, ResolutionEvidenceReceipt, RuntimeAction, TrustedRuntime};
 pub use independence::{
