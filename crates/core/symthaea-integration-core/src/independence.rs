@@ -91,7 +91,7 @@ pub fn assess_independence(
         }
         if observation.signal != signal {
             return Err(IndependenceAssessmentError::MixedSignal {
-                expected: signal,
+                expected: signal.clone(),
                 found: observation.signal.clone(),
             });
         }
