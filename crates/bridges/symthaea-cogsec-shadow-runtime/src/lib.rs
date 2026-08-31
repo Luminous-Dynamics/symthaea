@@ -10,7 +10,8 @@
 //! - append typed shadow evidence through one bounded ledger;
 //! - keep qualification-run correlation separate from authority;
 //! - make the assurance profile explicit at construction time;
-//! - bind each typed runtime stage to its canonical observed resource.
+//! - bind each typed runtime stage to its canonical observed resource;
+//! - require opaque same-monitor provenance for live evaluation events.
 //!
 //! The observer does **not** issue `ResourceVersion`. Early shadow continuity
 //! comes from owner-issued evidence `EventId`s and explicit causal parents.
@@ -25,15 +26,23 @@
 //! `GoalActivationObserved` event belongs to `mind/goals` does not grant any
 //! permission to mutate that resource.
 //!
+//! Live evaluation provenance is likewise separate from portable evidence.
+//! A serializable `MutationReceiptRecord` is ordinary data; only an opaque
+//! `MutationReceipt` accepted by the exact `ReferenceMonitor` may enter the
+//! runtime ledger as an `...Evaluated` event through this adapter.
+//!
 //! Absence of this object is the default disabled state. Presence means
 //! **audit/shadow observation only**; this crate has no enforcement mode.
 
 #![forbid(unsafe_code)]
 
-use symthaea_cogsec::ResourceId;
+use std::collections::BTreeSet;
+use symthaea_cogsec::{MutationKind, MutationReceipt, ReferenceMonitor, ResourceId};
 use symthaea_cogsec_evidence::{
-    AppendError, EvidenceCompleteness, EvidenceLedgerSnapshot, EventId, LedgerInitError, LedgerStats,
-    QualificationManifest, ShadowEventDraft, ShadowEventKind, ShadowEventLedger,
+    AppendError, CognitiveTick, EvidenceCompleteness, EvidenceConfidentiality,
+    EvidenceLedgerSnapshot, EventId, LedgerInitError, LedgerStats, PrincipalContext, ProposalId,
+    QualificationManifest, ResourceVersion, ShadowEventDraft, ShadowEventKind, ShadowEventLedger,
+    ShadowEventPayload, TransactionId,
 };
 use symthaea_evidence_plane::RunId;
 use thiserror::Error;
@@ -98,6 +107,39 @@ pub enum ShadowAssuranceProfile {
     OwnerAware,
 }
 
+/// Correlation/context fields allowed when appending a live monitor evaluation.
+///
+/// Security facts already carried by the opaque monitor receipt are
+/// intentionally absent. The runtime adapter derives resource, state root,
+/// policy root/epochs, decision payload and exact evaluated effect commitment
+/// from the receipt itself, avoiding two independently editable copies.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShadowEvaluationDraft {
+    /// Typed evaluation stage to record.
+    pub kind: ShadowEventKind,
+    /// Caller-visible proposal correlation only.
+    pub proposal_id: Option<ProposalId>,
+    /// Protected-owner transaction identity, if one exists.
+    pub transaction_id: Option<TransactionId>,
+    /// Role-explicit principal context. This remains evidence metadata; the
+    /// authoritative evaluated subject comes from the monitor receipt.
+    pub principals: PrincipalContext,
+    /// Optional owner-supplied freshness before the transition. Forbidden in
+    /// observer-only mode; never synthesized by this observer.
+    pub resource_version_before: Option<ResourceVersion>,
+    /// Optional owner-supplied freshness after the transition. Evaluation
+    /// stages normally leave this absent; never synthesized by this observer.
+    pub resource_version_after: Option<ResourceVersion>,
+    /// Explicit causal predecessor set.
+    pub causal_parents: BTreeSet<EventId>,
+    /// Cognitive tick for correlation only.
+    pub cognitive_tick: Option<CognitiveTick>,
+    /// Qualification-run grouping label only.
+    pub run_id: Option<RunId>,
+    /// Confidentiality of the evidence record.
+    pub confidentiality: EvidenceConfidentiality,
+}
+
 /// Stable resource identities for the first shadow-runtime tranche.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShadowResourceIds {
@@ -159,6 +201,34 @@ pub enum ShadowAppendError {
     /// The observer has no run grouping but the draft attempted to inject one.
     #[error("shadow event supplied an unexpected qualification run id")]
     UnexpectedRunId,
+    /// Raw portable data may not claim that a live monitor evaluation occurred.
+    #[error("evaluation event {kind:?} requires an opaque same-monitor receipt")]
+    EvaluationRequiresOpaqueReceipt {
+        /// Evaluation stage rejected from the generic append API.
+        kind: ShadowEventKind,
+    },
+    /// The evaluation-specific API was called with a non-evaluation stage.
+    #[error("shadow event {kind:?} is not an evaluation stage")]
+    ExpectedEvaluationKind {
+        /// Non-evaluation stage supplied to the evaluation API.
+        kind: ShadowEventKind,
+    },
+    /// Opaque receipt belongs to another reference-monitor domain.
+    #[error("opaque evaluation receipt belongs to another reference-monitor domain")]
+    ForeignMonitorReceipt,
+    /// A mapped evaluation stage disagrees with the mutation class in the
+    /// opaque monitor receipt.
+    #[error(
+        "evaluation event {event_kind:?} expects mutation {expected:?}, receipt recorded {observed:?}"
+    )]
+    EvaluationMutationKindMismatch {
+        /// Outer typed evaluation stage.
+        event_kind: ShadowEventKind,
+        /// Mutation class implied by the mapped stage.
+        expected: MutationKind,
+        /// Mutation class carried by the opaque receipt.
+        observed: MutationKind,
+    },
     /// Observer-only mode may not carry authoritative owner freshness.
     #[error("observer-only shadow event {kind:?} supplied resource-version fields")]
     ObserverOnlyResourceVersionForbidden {
@@ -258,6 +328,18 @@ impl ShadowRuntimeObserver {
         ShadowResource::for_event_kind(kind).map(|resource| self.resource_ids.get(resource))
     }
 
+    fn expected_mutation_kind(kind: ShadowEventKind) -> Option<MutationKind> {
+        match kind {
+            ShadowEventKind::WorkingMemoryAdmissionEvaluated => {
+                Some(MutationKind::WorkingMemoryAdmission)
+            }
+            ShadowEventKind::GraduationEvaluated => Some(MutationKind::PersistentMemoryCommit),
+            ShadowEventKind::GoalActivationEvaluated => Some(MutationKind::GoalActivation),
+            ShadowEventKind::AffectMutationEvaluated => Some(MutationKind::Affect),
+            _ => None,
+        }
+    }
+
     fn validate_resource_binding(&self, draft: &ShadowEventDraft) -> Result<(), ShadowAppendError> {
         let Some(expected) = self.expected_resource_id(draft.kind) else {
             return Ok(());
@@ -279,20 +361,7 @@ impl ShadowRuntimeObserver {
         }
     }
 
-    /// Append one event through the observer-bound evidence ledger.
-    ///
-    /// Run grouping is checked rather than silently rewritten. Resource-bearing
-    /// stages must also target the canonical resource identity owned by this
-    /// observer's local registry. This is an attribution check, not permission.
-    ///
-    /// In [`ShadowAssuranceProfile::ObserverOnly`] mode the append boundary also
-    /// rejects any supplied `resource_version_*` values, preventing audit data
-    /// from accidentally presenting itself as protected-owner freshness.
-    ///
-    /// In [`ShadowAssuranceProfile::OwnerAware`] mode owner-version fields are
-    /// passed through unchanged; the underlying manifest/ledger validates the
-    /// required version semantics for observed mutations.
-    pub fn try_append(&mut self, draft: ShadowEventDraft) -> Result<EventId, ShadowAppendError> {
+    fn validate_common_draft(&self, draft: &ShadowEventDraft) -> Result<(), ShadowAppendError> {
         match (self.run_id.as_ref(), draft.run_id.as_ref()) {
             (Some(expected), Some(observed)) if expected != observed => {
                 return Err(ShadowAppendError::RunIdMismatch);
@@ -310,9 +379,96 @@ impl ShadowRuntimeObserver {
             });
         }
 
-        self.validate_resource_binding(&draft)?;
+        self.validate_resource_binding(draft)
+    }
 
+    fn try_append_prepared(
+        &mut self,
+        draft: ShadowEventDraft,
+    ) -> Result<EventId, ShadowAppendError> {
+        self.validate_common_draft(&draft)?;
         Ok(self.ledger.try_append(draft)?)
+    }
+
+    /// Append a non-evaluation event through the observer-bound evidence ledger.
+    ///
+    /// Portable application data is intentionally barred from creating live
+    /// `...Evaluated` events. Call [`Self::try_append_evaluation`] with an opaque
+    /// same-monitor receipt for that case.
+    pub fn try_append(&mut self, draft: ShadowEventDraft) -> Result<EventId, ShadowAppendError> {
+        if draft.kind.is_evaluation() {
+            return Err(ShadowAppendError::EvaluationRequiresOpaqueReceipt {
+                kind: draft.kind,
+            });
+        }
+        self.try_append_prepared(draft)
+    }
+
+    /// Append one live evaluation using an opaque receipt from the exact
+    /// reference-monitor domain that produced it.
+    ///
+    /// Security-relevant envelope fields are derived from the receipt rather
+    /// than supplied independently by the caller:
+    ///
+    /// - resource identity;
+    /// - observed pre-state root;
+    /// - evaluated policy root/epoch;
+    /// - authorization/revocation epochs;
+    /// - portable evaluation payload, including the exact mutation digest and
+    ///   monitor decision.
+    ///
+    /// The caller supplies only correlation/context fields through
+    /// [`ShadowEvaluationDraft`]. In safe Rust, possessing a serialized
+    /// `MutationReceiptRecord` is therefore insufficient to claim that the live
+    /// monitor executed.
+    pub fn try_append_evaluation(
+        &mut self,
+        monitor: &ReferenceMonitor,
+        draft: ShadowEvaluationDraft,
+        receipt: &MutationReceipt,
+    ) -> Result<EventId, ShadowAppendError> {
+        if !draft.kind.is_evaluation() {
+            return Err(ShadowAppendError::ExpectedEvaluationKind { kind: draft.kind });
+        }
+        if !monitor.accepts_receipt(receipt) {
+            return Err(ShadowAppendError::ForeignMonitorReceipt);
+        }
+
+        let record = receipt.record();
+        if let Some(expected) = Self::expected_mutation_kind(draft.kind) {
+            if record.kind != expected {
+                return Err(ShadowAppendError::EvaluationMutationKindMismatch {
+                    event_kind: draft.kind,
+                    expected,
+                    observed: record.kind,
+                });
+            }
+        }
+
+        let prepared = ShadowEventDraft {
+            kind: draft.kind,
+            proposal_id: draft.proposal_id,
+            transaction_id: draft.transaction_id,
+            principals: draft.principals,
+            resource: Some(record.resource.clone()),
+            resource_version_before: draft.resource_version_before,
+            resource_version_after: draft.resource_version_after,
+            state_root_before: Some(record.observed_resource_state_root),
+            state_root_after: None,
+            policy_root: Some(record.evaluated_policy_root),
+            policy_epoch: Some(record.policy_epoch),
+            authorization_epoch: Some(record.authorization_epoch),
+            revocation_epoch: Some(record.revocation_epoch),
+            causal_parents: draft.causal_parents,
+            cognitive_tick: draft.cognitive_tick,
+            run_id: draft.run_id,
+            confidentiality: draft.confidentiality,
+            payload: ShadowEventPayload::Evaluation {
+                receipt: receipt.export_record(),
+            },
+        };
+
+        self.try_append_prepared(prepared)
     }
 
     /// Evidence completeness state observed by the bounded ledger.
@@ -342,11 +498,15 @@ impl ShadowRuntimeObserver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeSet;
-    use symthaea_cogsec_evidence::{
-        EvidenceConfidentiality, IngressClass, PrincipalContext, ResourceVersion,
-        ShadowEventPayload,
+    use symthaea_cogsec::{
+        CognitiveSecurityLabel, Consequence, ControlIntegrity, Digest32, MutationRequest,
+        PolicyRule, PolicySnapshot, PrincipalId, TaintLevel,
     };
+    use symthaea_cogsec_evidence::IngressClass;
+
+    fn d(byte: u8) -> Digest32 {
+        Digest32([byte; 32])
+    }
 
     fn observer_manifest() -> QualificationManifest {
         QualificationManifest::new([ShadowEventKind::IngressObserved], [])
@@ -414,6 +574,64 @@ mod tests {
             confidentiality: EvidenceConfidentiality::LocalPrivate,
             payload: ShadowEventPayload::MutationObserved { applied: true },
         }
+    }
+
+    fn evaluation_draft(kind: ShadowEventKind) -> ShadowEvaluationDraft {
+        ShadowEvaluationDraft {
+            kind,
+            proposal_id: None,
+            transaction_id: None,
+            principals: PrincipalContext::default(),
+            resource_version_before: None,
+            resource_version_after: None,
+            causal_parents: BTreeSet::new(),
+            cognitive_tick: None,
+            run_id: None,
+            confidentiality: EvidenceConfidentiality::LocalPrivate,
+        }
+    }
+
+    fn goal_monitor_receipt() -> (ReferenceMonitor, MutationReceipt) {
+        let (monitor, authority) = ReferenceMonitor::bootstrap();
+        let subject = PrincipalId("local-user".into());
+        let resource = ResourceId(GOAL_STORE_RESOURCE.into());
+        let input_label = CognitiveSecurityLabel::default();
+        let request = MutationRequest {
+            request_id: d(1),
+            kind: MutationKind::GoalActivation,
+            subject: subject.clone(),
+            resource: resource.clone(),
+            mutation_digest: d(2),
+            expected_resource_state_root: d(8),
+            expected_policy_root: d(9),
+            input_label: input_label.clone(),
+            consequence: Consequence::Low,
+            sequence: 42,
+        };
+        let transition = authority.issue_transition(
+            subject,
+            request.kind,
+            resource,
+            request.mutation_digest,
+            request.consequence,
+            input_label,
+            request.sequence,
+        );
+        let policy = authority.issue_policy(PolicySnapshot {
+            root: d(9),
+            epoch: 7,
+            rules: vec![PolicyRule {
+                kind: MutationKind::GoalActivation,
+                minimum_control_integrity: ControlIntegrity::Untrusted,
+                maximum_taint: TaintLevel::Revoked,
+                capability_required: false,
+            }],
+        });
+        let facts = authority
+            .snapshot(&transition, d(8), &policy, 11, 13, &[])
+            .unwrap();
+        let receipt = monitor.receipt(&request, &facts, &policy).unwrap();
+        (monitor, receipt)
     }
 
     #[test]
@@ -625,6 +843,115 @@ mod tests {
                 kind: ShadowEventKind::GoalActivationObserved,
                 expected: ResourceId(GOAL_STORE_RESOURCE.into()),
                 observed: ResourceId(AFFECTIVE_STATE_RESOURCE.into()),
+            })
+        );
+        assert_eq!(observer.ledger_stats().assigned_sequences, 0);
+    }
+
+    #[test]
+    fn raw_portable_evaluation_record_cannot_claim_live_monitor_origin() {
+        let (_monitor, receipt) = goal_monitor_receipt();
+        let mut observer = observer(None);
+        let mut draft = ingress(None);
+        draft.kind = ShadowEventKind::GoalActivationEvaluated;
+        draft.resource = Some(ResourceId(GOAL_STORE_RESOURCE.into()));
+        draft.payload = ShadowEventPayload::Evaluation {
+            receipt: receipt.export_record(),
+        };
+
+        assert_eq!(
+            observer.try_append(draft),
+            Err(ShadowAppendError::EvaluationRequiresOpaqueReceipt {
+                kind: ShadowEventKind::GoalActivationEvaluated,
+            })
+        );
+        assert_eq!(observer.ledger_stats().assigned_sequences, 0);
+    }
+
+    #[test]
+    fn opaque_same_monitor_receipt_is_exported_with_derived_security_context() {
+        let (monitor, receipt) = goal_monitor_receipt();
+        let expected_record = receipt.export_record();
+        let mut observer = observer(None);
+
+        let event_id = observer
+            .try_append_evaluation(
+                &monitor,
+                evaluation_draft(ShadowEventKind::GoalActivationEvaluated),
+                &receipt,
+            )
+            .unwrap();
+
+        let snapshot = observer.snapshot();
+        let event = snapshot
+            .events
+            .iter()
+            .find(|event| event.event_id == event_id)
+            .unwrap();
+        assert_eq!(event.resource, Some(ResourceId(GOAL_STORE_RESOURCE.into())));
+        assert_eq!(event.state_root_before, Some(d(8)));
+        assert_eq!(event.policy_root, Some(d(9)));
+        assert_eq!(event.policy_epoch, Some(7));
+        assert_eq!(event.authorization_epoch, Some(11));
+        assert_eq!(event.revocation_epoch, Some(13));
+        assert_eq!(
+            event.payload,
+            ShadowEventPayload::Evaluation {
+                receipt: expected_record,
+            }
+        );
+    }
+
+    #[test]
+    fn foreign_monitor_receipt_is_rejected_before_event_id_allocation() {
+        let (monitor_a, _receipt_a) = goal_monitor_receipt();
+        let (_monitor_b, receipt_b) = goal_monitor_receipt();
+        let mut observer = observer(None);
+
+        assert_eq!(
+            observer.try_append_evaluation(
+                &monitor_a,
+                evaluation_draft(ShadowEventKind::GoalActivationEvaluated),
+                &receipt_b,
+            ),
+            Err(ShadowAppendError::ForeignMonitorReceipt)
+        );
+        assert_eq!(observer.ledger_stats().assigned_sequences, 0);
+    }
+
+    #[test]
+    fn mapped_evaluation_stage_must_match_receipt_mutation_kind() {
+        let (monitor, receipt) = goal_monitor_receipt();
+        let mut observer = observer(None);
+
+        assert_eq!(
+            observer.try_append_evaluation(
+                &monitor,
+                evaluation_draft(ShadowEventKind::AffectMutationEvaluated),
+                &receipt,
+            ),
+            Err(ShadowAppendError::EvaluationMutationKindMismatch {
+                event_kind: ShadowEventKind::AffectMutationEvaluated,
+                expected: MutationKind::Affect,
+                observed: MutationKind::GoalActivation,
+            })
+        );
+        assert_eq!(observer.ledger_stats().assigned_sequences, 0);
+    }
+
+    #[test]
+    fn non_evaluation_stage_is_rejected_by_opaque_receipt_api() {
+        let (monitor, receipt) = goal_monitor_receipt();
+        let mut observer = observer(None);
+
+        assert_eq!(
+            observer.try_append_evaluation(
+                &monitor,
+                evaluation_draft(ShadowEventKind::GoalActivationObserved),
+                &receipt,
+            ),
+            Err(ShadowAppendError::ExpectedEvaluationKind {
+                kind: ShadowEventKind::GoalActivationObserved,
             })
         );
         assert_eq!(observer.ledger_stats().assigned_sequences, 0);
