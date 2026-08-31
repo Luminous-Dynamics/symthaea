@@ -25,8 +25,10 @@ pub type FixtureResult<T> = std::result::Result<T, FixtureError>;
 pub enum FixtureError {
     #[error("{0} must not be empty")]
     EmptyField(&'static str),
-    #[error("invalid hexadecimal digest in {0}")]
+    #[error("invalid or noncanonical hexadecimal digest in {0}")]
     InvalidDigest(&'static str),
+    #[error("unsupported or noncanonical digest algorithm: {0}")]
+    InvalidDigestAlgorithm(String),
     #[error("invalid frozen floating-point field: {0}")]
     InvalidFloat(&'static str),
     #[error("a frozen footprint requires at least three vertices, got {0}")]
@@ -73,7 +75,10 @@ fn non_empty(value: &str, field: &'static str) -> FixtureResult<()> {
 }
 
 fn validate_hex(value: &str, field: &'static str) -> FixtureResult<()> {
-    if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+    if value.is_empty()
+        || !value.bytes().all(|byte| byte.is_ascii_hexdigit())
+        || value.bytes().any(|byte| byte.is_ascii_uppercase())
+    {
         Err(FixtureError::InvalidDigest(field))
     } else {
         Ok(())
@@ -106,7 +111,10 @@ impl FrozenDigest {
     }
 
     fn validate(&self) -> FixtureResult<()> {
-        non_empty(&self.algorithm, "digest algorithm")?;
+        match self.algorithm.as_str() {
+            "sha256" | "blake3" | "other" => {}
+            _ => return Err(FixtureError::InvalidDigestAlgorithm(self.algorithm.clone())),
+        }
         validate_hex(&self.hex, "content digest")
     }
 }
@@ -1127,6 +1135,49 @@ mod tests {
         value["products"][0]["acquired_at_unix_ms"] = serde_json::Value::from(999_i64);
         // Even if an attacker later recomputed the outer manifest digest, the nested product's own
         // metadata digest must first verify during deserialization.
+        assert!(serde_json::from_value::<FrozenSentinelFixtureManifest>(value).is_err());
+    }
+
+    #[test]
+    fn persisted_manifest_rejects_noncanonical_nested_digest_with_recomputed_identities() {
+        let mut manifest = FrozenSentinelFixtureManifest::new(
+            "fixture",
+            vec![product("s1", SentinelProductKind::Sentinel1Grd, 1)],
+            vec![artifact(
+                "derived",
+                vec![FixtureSourceRef::Product {
+                    product_id: "s1".into(),
+                }],
+            )],
+        )
+        .unwrap();
+
+        // This is the stronger canonicalization attack: mutate only the spelling of a nested
+        // cryptographic value, then recompute every enclosing identity so no stale hash remains.
+        // The scientific object must still fail persistence validation because v1 has exactly one
+        // canonical textual representation for a digest.
+        manifest.products[0].source_digest.hex = "AB".repeat(32);
+        manifest.products[0].metadata_digest = manifest.products[0].compute_digest().unwrap();
+        manifest.manifest_digest = manifest.compute_digest().unwrap();
+
+        let value = serde_json::to_value(&manifest).unwrap();
+        assert!(serde_json::from_value::<FrozenSentinelFixtureManifest>(value).is_err());
+    }
+
+    #[test]
+    fn persisted_manifest_rejects_noncanonical_algorithm_with_recomputed_identities() {
+        let mut manifest = FrozenSentinelFixtureManifest::new(
+            "fixture",
+            vec![product("s1", SentinelProductKind::Sentinel1Grd, 1)],
+            vec![],
+        )
+        .unwrap();
+
+        manifest.products[0].source_digest.algorithm = "SHA256".into();
+        manifest.products[0].metadata_digest = manifest.products[0].compute_digest().unwrap();
+        manifest.manifest_digest = manifest.compute_digest().unwrap();
+
+        let value = serde_json::to_value(&manifest).unwrap();
         assert!(serde_json::from_value::<FrozenSentinelFixtureManifest>(value).is_err());
     }
 
