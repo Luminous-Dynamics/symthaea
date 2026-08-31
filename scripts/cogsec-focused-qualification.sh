@@ -51,33 +51,38 @@ printf 'rustc: %s\n' "$RUSTC_VERSION"
 printf 'cargo: %s\n' "$CARGO_VERSION"
 
 CURRENT_GATE="metadata-lockfile"
-printf '\n[1/6] workspace metadata + lockfile consistency\n'
+printf '\n[1/7] workspace metadata + lockfile consistency\n'
 cargo metadata --locked --format-version=1 > /dev/null
 git diff --exit-code -- Cargo.lock
 LAST_COMPLETED_GATE="$CURRENT_GATE"
 
 CURRENT_GATE="rustfmt"
-printf '\n[2/6] rustfmt\n'
-cargo fmt --check "${PACKAGES[@]}"
+printf '\n[2/7] rustfmt\n'
+cargo fmt --check -p symthaea "${PACKAGES[@]}"
 LAST_COMPLETED_GATE="$CURRENT_GATE"
 
 CURRENT_GATE="cargo-check"
-printf '\n[3/6] cargo check\n'
+printf '\n[3/7] cargo check\n'
 cargo check --locked "${PACKAGES[@]}"
 LAST_COMPLETED_GATE="$CURRENT_GATE"
 
 CURRENT_GATE="package-tests"
-printf '\n[4/6] package tests\n'
+printf '\n[4/7] CogSec package tests\n'
 cargo test --locked "${PACKAGES[@]}"
 LAST_COMPLETED_GATE="$CURRENT_GATE"
 
+CURRENT_GATE="legacy-control-determinism"
+printf '\n[5/7] legacy S0/S1/S2 control determinism\n'
+cargo test --locked -p symthaea --lib 'mind::tests::cogsec_shadow_control::'
+LAST_COMPLETED_GATE="$CURRENT_GATE"
+
 CURRENT_GATE="doc-tests"
-printf '\n[5/6] documentation tests\n'
+printf '\n[6/7] documentation tests\n'
 cargo test --locked --doc "${PACKAGES[@]}"
 LAST_COMPLETED_GATE="$CURRENT_GATE"
 
 CURRENT_GATE="clippy"
-printf '\n[6/6] clippy -D warnings\n'
+printf '\n[7/7] clippy -D warnings\n'
 cargo clippy --locked --all-targets "${PACKAGES[@]}" -- -D warnings
 LAST_COMPLETED_GATE="$CURRENT_GATE"
 
