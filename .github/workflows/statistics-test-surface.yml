@@ -1,0 +1,68 @@
+name: Statistics Active Test Surface
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-statistics/**"
+      - ".github/workflows/statistics-test-surface.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  active-test-surface:
+    name: Active 0.1 package coherence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5 / node24
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          EXPECTED="${{ github.event.pull_request.head.sha || github.sha }}"
+          ACTUAL="$(git rev-parse HEAD)"
+          test "$ACTUAL" = "$EXPECTED"
+          echo "QUALIFICATION_HEAD=$ACTUAL"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e
+        with:
+          components: rustfmt
+          targets: wasm32-unknown-unknown
+
+      - name: Record qualification environment
+        shell: bash
+        run: |
+          echo "HEAD=$(git rev-parse HEAD)"
+          rustc -vV
+          cargo -Vv
+          sha256sum Cargo.toml Cargo.lock rust-toolchain.toml \
+            crates/domains/symthaea-statistics/Cargo.toml
+
+      - name: Verify complete committed lock graph
+        run: cargo metadata --locked --format-version 1 > /dev/null
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-statistics -- --check
+
+      - name: Run active package tests
+        run: cargo test --locked -p symthaea-statistics
+
+      - name: Run documentation tests
+        run: cargo test --locked -p symthaea-statistics --doc
+
+      - name: Check pure-domain WASM portability
+        run: cargo check --locked -p symthaea-statistics --target wasm32-unknown-unknown
