@@ -12,3 +12,4 @@ pub mod sar;
 mod model;
 
 pub use model::*;
+pub use raster::*;
