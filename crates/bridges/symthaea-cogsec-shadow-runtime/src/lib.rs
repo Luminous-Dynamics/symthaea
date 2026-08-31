@@ -11,7 +11,8 @@
 //! - keep qualification-run correlation separate from authority;
 //! - make the assurance profile explicit at construction time;
 //! - bind each typed runtime stage to its canonical observed resource;
-//! - require opaque same-monitor provenance for live evaluation events.
+//! - require opaque same-monitor provenance for live evaluation events;
+//! - consume each opaque monitor receipt exactly once at the live append boundary.
 //!
 //! The observer does **not** issue `ResourceVersion`. Early shadow continuity
 //! comes from owner-issued evidence `EventId`s and explicit causal parents.
@@ -29,7 +30,9 @@
 //! Live evaluation provenance is likewise separate from portable evidence.
 //! A serializable `MutationReceiptRecord` is ordinary data; only an opaque
 //! `MutationReceipt` accepted by the exact `ReferenceMonitor` may enter the
-//! runtime ledger as an `...Evaluated` event through this adapter.
+//! runtime ledger as an `...Evaluated` event through this adapter. That opaque
+//! receipt is consumed by value, so safe Rust cannot replay one monitor
+//! evaluation into multiple live evaluation events.
 //!
 //! Absence of this object is the default disabled state. Presence means
 //! **audit/shadow observation only**; this crate has no enforcement mode.
@@ -387,7 +390,7 @@ impl ShadowRuntimeObserver {
         draft: ShadowEventDraft,
     ) -> Result<EventId, ShadowAppendError> {
         self.validate_common_draft(&draft)?;
-        Ok(self.ledger.try_append(draft)?)
+        self.ledger.try_append(draft).map_err(ShadowAppendError::from)
     }
 
     /// Append a non-evaluation event through the observer-bound evidence ledger.
@@ -407,6 +410,10 @@ impl ShadowRuntimeObserver {
     /// Append one live evaluation using an opaque receipt from the exact
     /// reference-monitor domain that produced it.
     ///
+    /// The receipt is consumed by value. Since `MutationReceipt` is non-cloneable
+    /// and non-serde, one opaque monitor evaluation can therefore create at most
+    /// one live evaluation append attempt in safe Rust.
+    ///
     /// Security-relevant envelope fields are derived from the receipt rather
     /// than supplied independently by the caller:
     ///
@@ -418,31 +425,30 @@ impl ShadowRuntimeObserver {
     ///   monitor decision.
     ///
     /// The caller supplies only correlation/context fields through
-    /// [`ShadowEvaluationDraft`]. In safe Rust, possessing a serialized
-    /// `MutationReceiptRecord` is therefore insufficient to claim that the live
-    /// monitor executed.
+    /// [`ShadowEvaluationDraft`]. Possessing a serialized `MutationReceiptRecord`
+    /// is therefore insufficient to claim that the live monitor executed.
     pub fn try_append_evaluation(
         &mut self,
         monitor: &ReferenceMonitor,
         draft: ShadowEvaluationDraft,
-        receipt: &MutationReceipt,
+        receipt: MutationReceipt,
     ) -> Result<EventId, ShadowAppendError> {
         if !draft.kind.is_evaluation() {
             return Err(ShadowAppendError::ExpectedEvaluationKind { kind: draft.kind });
         }
-        if !monitor.accepts_receipt(receipt) {
+        if !monitor.accepts_receipt(&receipt) {
             return Err(ShadowAppendError::ForeignMonitorReceipt);
         }
 
         let record = receipt.record();
-        if let Some(expected) = Self::expected_mutation_kind(draft.kind) {
-            if record.kind != expected {
-                return Err(ShadowAppendError::EvaluationMutationKindMismatch {
-                    event_kind: draft.kind,
-                    expected,
-                    observed: record.kind,
-                });
-            }
+        if let Some(expected) = Self::expected_mutation_kind(draft.kind)
+            && record.kind != expected
+        {
+            return Err(ShadowAppendError::EvaluationMutationKindMismatch {
+                event_kind: draft.kind,
+                expected,
+                observed: record.kind,
+            });
         }
 
         let prepared = ShadowEventDraft {
@@ -553,7 +559,10 @@ mod tests {
         }
     }
 
-    fn mutation_observation(kind: ShadowEventKind, resource: Option<ResourceId>) -> ShadowEventDraft {
+    fn mutation_observation(
+        kind: ShadowEventKind,
+        resource: Option<ResourceId>,
+    ) -> ShadowEventDraft {
         ShadowEventDraft {
             kind,
             proposal_id: None,
@@ -869,7 +878,7 @@ mod tests {
     }
 
     #[test]
-    fn opaque_same_monitor_receipt_is_exported_with_derived_security_context() {
+    fn opaque_same_monitor_receipt_is_consumed_and_security_context_is_derived() {
         let (monitor, receipt) = goal_monitor_receipt();
         let expected_record = receipt.export_record();
         let mut observer = observer(None);
@@ -878,7 +887,7 @@ mod tests {
             .try_append_evaluation(
                 &monitor,
                 evaluation_draft(ShadowEventKind::GoalActivationEvaluated),
-                &receipt,
+                receipt,
             )
             .unwrap();
 
@@ -888,7 +897,10 @@ mod tests {
             .iter()
             .find(|event| event.event_id == event_id)
             .unwrap();
-        assert_eq!(event.resource, Some(ResourceId(GOAL_STORE_RESOURCE.into())));
+        assert_eq!(
+            event.resource,
+            Some(ResourceId(GOAL_STORE_RESOURCE.into()))
+        );
         assert_eq!(event.state_root_before, Some(d(8)));
         assert_eq!(event.policy_root, Some(d(9)));
         assert_eq!(event.policy_epoch, Some(7));
@@ -912,7 +924,7 @@ mod tests {
             observer.try_append_evaluation(
                 &monitor_a,
                 evaluation_draft(ShadowEventKind::GoalActivationEvaluated),
-                &receipt_b,
+                receipt_b,
             ),
             Err(ShadowAppendError::ForeignMonitorReceipt)
         );
@@ -928,7 +940,7 @@ mod tests {
             observer.try_append_evaluation(
                 &monitor,
                 evaluation_draft(ShadowEventKind::AffectMutationEvaluated),
-                &receipt,
+                receipt,
             ),
             Err(ShadowAppendError::EvaluationMutationKindMismatch {
                 event_kind: ShadowEventKind::AffectMutationEvaluated,
@@ -948,13 +960,77 @@ mod tests {
             observer.try_append_evaluation(
                 &monitor,
                 evaluation_draft(ShadowEventKind::GoalActivationObserved),
-                &receipt,
+                receipt,
             ),
             Err(ShadowAppendError::ExpectedEvaluationKind {
                 kind: ShadowEventKind::GoalActivationObserved,
             })
         );
         assert_eq!(observer.ledger_stats().assigned_sequences, 0);
+    }
+
+    #[test]
+    fn separate_monitor_evaluations_can_each_produce_one_live_event() {
+        let (monitor, authority) = ReferenceMonitor::bootstrap();
+        let subject = PrincipalId("local-user".into());
+        let resource = ResourceId(GOAL_STORE_RESOURCE.into());
+        let input_label = CognitiveSecurityLabel::default();
+        let request = MutationRequest {
+            request_id: d(21),
+            kind: MutationKind::GoalActivation,
+            subject: subject.clone(),
+            resource: resource.clone(),
+            mutation_digest: d(22),
+            expected_resource_state_root: d(28),
+            expected_policy_root: d(29),
+            input_label: input_label.clone(),
+            consequence: Consequence::Low,
+            sequence: 52,
+        };
+        let transition = authority.issue_transition(
+            subject,
+            request.kind,
+            resource,
+            request.mutation_digest,
+            request.consequence,
+            input_label,
+            request.sequence,
+        );
+        let policy = authority.issue_policy(PolicySnapshot {
+            root: d(29),
+            epoch: 17,
+            rules: vec![PolicyRule {
+                kind: MutationKind::GoalActivation,
+                minimum_control_integrity: ControlIntegrity::Untrusted,
+                maximum_taint: TaintLevel::Revoked,
+                capability_required: false,
+            }],
+        });
+        let facts = authority
+            .snapshot(&transition, d(28), &policy, 31, 33, &[])
+            .unwrap();
+        let receipt_a = monitor.receipt(&request, &facts, &policy).unwrap();
+        let receipt_b = monitor.receipt(&request, &facts, &policy).unwrap();
+        let mut observer = observer(None);
+
+        let first = observer
+            .try_append_evaluation(
+                &monitor,
+                evaluation_draft(ShadowEventKind::GoalActivationEvaluated),
+                receipt_a,
+            )
+            .unwrap();
+        let second = observer
+            .try_append_evaluation(
+                &monitor,
+                evaluation_draft(ShadowEventKind::GoalActivationEvaluated),
+                receipt_b,
+            )
+            .unwrap();
+
+        assert_ne!(first, second);
+        assert_eq!(observer.ledger_stats().assigned_sequences, 2);
+        assert_eq!(observer.snapshot().events.len(), 2);
     }
 
     #[test]
