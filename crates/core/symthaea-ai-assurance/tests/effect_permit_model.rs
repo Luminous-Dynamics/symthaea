@@ -57,6 +57,7 @@ proptest! {
                     let result = domain.issue_ticket(commitment);
                     if model_open {
                         let ticket = result.expect("running model must issue ticket");
+                        prop_assert_eq!(ticket.commitment(), commitment);
                         tickets[slot] = Some(ticket);
                         ticket_models[slot] = Some(TicketModel {
                             epoch: model_epoch,
