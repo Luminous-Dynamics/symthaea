@@ -14,7 +14,7 @@ proptest! {
 
     #[test]
     fn public_effect_entry_state_machine_matches_model(
-        operations in prop::collection::vec((0_u8..5, 0_usize..SLOTS, any::<u8>(), any::<bool>()), 1..120)
+        operations in prop::collection::vec((0_u8..6, 0_usize..SLOTS, any::<u8>(), any::<bool>()), 1..140)
     ) {
         let domain = EffectEntryDomain::new();
         let mut tickets: Vec<Option<EffectEntryTicket>> =
@@ -26,22 +26,33 @@ proptest! {
 
         let mut model_epoch = 0_u64;
         let mut model_sequence = 0_u64;
+        let mut model_open = true;
         let mut model_outstanding = 0_u64;
 
         for (operation, slot, tag, use_correct_binding) in operations {
             match operation {
                 0 => {
                     let binding = [tag; 32];
-                    tickets[slot] = Some(domain.issue_ticket(binding));
-                    ticket_models[slot] = Some(TicketModel {
-                        epoch: model_epoch,
-                        binding,
-                    });
+                    let result = domain.issue_ticket(binding);
+                    if model_open {
+                        let ticket = result.expect("running model must issue ticket");
+                        tickets[slot] = Some(ticket);
+                        ticket_models[slot] = Some(TicketModel {
+                            epoch: model_epoch,
+                            binding,
+                        });
+                    } else {
+                        prop_assert!(matches!(
+                            result,
+                            Err(EffectEntryError::AdmissionStopped { .. })
+                        ));
+                    }
                 }
                 1 => {
                     let receipt = domain.revoke_all().unwrap();
                     model_epoch += 1;
                     model_sequence += 1;
+                    model_open = false;
                     prop_assert_eq!(receipt.current_epoch().get(), model_epoch);
                     prop_assert_eq!(receipt.revocation_sequence().get(), model_sequence);
                     prop_assert_eq!(
@@ -68,6 +79,11 @@ proptest! {
                             prop_assert!(matches!(
                                 result,
                                 Err(EffectEntryError::ActionBindingMismatch)
+                            ));
+                        } else if !model_open {
+                            prop_assert!(matches!(
+                                result,
+                                Err(EffectEntryError::AdmissionStopped { .. })
                             ));
                         } else if model.epoch != model_epoch {
                             prop_assert!(matches!(result, Err(EffectEntryError::Revoked { .. })));
@@ -111,11 +127,32 @@ proptest! {
                         prop_assert_eq!(activity_during_callback.in_flight_effects(), 1);
                     }
                 }
+                5 => {
+                    let before_sequence = model_sequence;
+                    let result = domain.resume();
+                    if model_open {
+                        prop_assert!(matches!(result, Err(EffectEntryError::AlreadyRunning)));
+                        prop_assert_eq!(domain.current_sequence().get(), before_sequence);
+                    } else if model_outstanding != 0 {
+                        prop_assert!(matches!(
+                            result,
+                            Err(EffectEntryError::ResumeWhileActive { .. })
+                        ));
+                        prop_assert_eq!(domain.current_sequence().get(), before_sequence);
+                    } else {
+                        let receipt = result.expect("quiescent stopped model must resume");
+                        model_sequence += 1;
+                        model_open = true;
+                        prop_assert_eq!(receipt.epoch().get(), model_epoch);
+                        prop_assert_eq!(receipt.resume_sequence().get(), model_sequence);
+                    }
+                }
                 _ => unreachable!(),
             }
 
             prop_assert_eq!(domain.current_epoch().get(), model_epoch);
             prop_assert_eq!(domain.current_sequence().get(), model_sequence);
+            prop_assert_eq!(domain.is_stopped(), !model_open);
             prop_assert_eq!(domain.activity().outstanding_permits(), model_outstanding);
             prop_assert_eq!(domain.activity().in_flight_effects(), 0);
         }
@@ -126,5 +163,6 @@ proptest! {
         }
         prop_assert_eq!(model_outstanding, 0);
         prop_assert!(domain.activity().is_quiescent());
+        prop_assert_eq!(domain.is_stopped(), !model_open);
     }
 }
