@@ -243,6 +243,14 @@ impl ExecutionTrace {
             Err(errors)
         }
     }
+
+    pub fn canonical_json(&self) -> Result<Vec<u8>, String> {
+        serde_json::to_vec(self).map_err(|error| error.to_string())
+    }
+
+    pub fn sha256(&self) -> Result<String, String> {
+        hash_json(self)
+    }
 }
 
 fn resolved_config_sha256(protocol: &ExperimentPreregistration) -> Result<String, String> {

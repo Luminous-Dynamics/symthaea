@@ -7,6 +7,7 @@
 //! allowing deterministic regulation experiments to remain mechanically isolated.
 
 mod allostasis;
+mod analysis;
 mod dynamics;
 mod evidence;
 mod execution;
@@ -19,6 +20,11 @@ mod state;
 
 pub use allostasis::{
     assess_allostasis, assess_allostasis_with_drive, AllostaticConfig, AllostaticReport,
+};
+pub use analysis::{
+    evaluate_hypotheses, extract_blinded_metrics, BlindedMetricReport, BlindedMetricValue,
+    HypothesisEvaluationReport, HypothesisOutcome, BLINDED_METRIC_REPORT_SCHEMA_VERSION,
+    HYPOTHESIS_EVALUATION_SCHEMA_VERSION,
 };
 pub use dynamics::{
     InteroceptiveDrive, InteroceptiveDynamicsConfig, InteroceptiveStepReport,

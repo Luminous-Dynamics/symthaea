@@ -29,7 +29,7 @@ The test suite must demonstrate all of the following:
 6. kinematic and dynamics-aware forecasts remain explicitly distinguishable;
 7. dynamics-aware forecasts replay deterministically;
 8. direct interventions are recorded separately from endogenous dynamics and reset measured velocity;
-9. snapshot, intervention, qualification, capsule, preregistration, and execution-trace evidence survives serialization round trips where applicable;
+9. snapshot, intervention, qualification, capsule, preregistration, execution-trace, and analysis evidence survives serialization round trips where applicable;
 10. stable channel identifiers are unique;
 11. named higher-level state categories remain absent from core source;
 12. passive, restorative, driven, and clamped evidence-plane arms satisfy their declared mechanism expectations;
@@ -42,7 +42,10 @@ The test suite must demonstrate all of the following:
 19. the preregistration digest is stable under round trip, changes when the prospective plan changes, and is separately bound into the evidence capsule;
 20. executing the same preregistration twice produces exactly equal traces and hashes;
 21. execution limits fail closed instead of silently truncating an arm or protocol;
-22. replay validation rejects any trace that diverges from the locked preregistration, and blinded trace exports omit semantic arm identifiers.
+22. replay validation rejects any trace that diverges from the locked preregistration, and blinded trace exports omit semantic arm identifiers;
+23. primary metric extraction validates the execution trace first and emits only blind codes plus preregistered metric identifiers;
+24. the blinded metric artifact has a stable digest that is bound into the later hypothesis-evaluation report before semantic arm outcomes are emitted;
+25. preregistered minimum-effect relations remain distinct from direction-only relations, preventing arbitrarily tiny differences from satisfying a declared effect-size gate.
 
 ## Workspace gates
 
@@ -91,7 +94,7 @@ experiment. It records:
 - each arm's initial native state and dynamics configuration;
 - ordered drive phases and scheduled interventions;
 - stable registered metric identifiers;
-- explicit directional hypotheses over arm/metric outcome references;
+- explicit directional or minimum-effect hypotheses over arm/metric outcome references;
 - exclusion criteria declared before results are inspected.
 
 The protocol exposes a deterministic SHA-256 over its validated canonical JSON under
@@ -132,6 +135,27 @@ can therefore receive the trace without receiving the arm-identity mapping. The
 trace can later be replayed against the locked preregistration; exact mismatch is a
 validation failure rather than a warning.
 
+## Blinded analysis boundary
+
+`extract_blinded_metrics` validates the complete trace against the locked protocol
+before computing any registered metric. Its output contains blind codes and metric
+identifiers, but no semantic arm IDs. The resulting `BlindedMetricReport` is sorted
+deterministically and can be hashed and frozen as a primary-analysis artifact.
+
+`evaluate_hypotheses` is a separate unblinding operation. It consumes the locked
+protocol and the already-produced blinded metric report, maps blind codes back to
+semantic arms, applies the exact preregistered relation, and emits a
+`HypothesisEvaluationReport` that includes the blinded-metric SHA-256.
+
+For confirmatory work, the blinded metric digest should be captured before the
+unblinding report is generated. If a primary metric definition or metric value is
+changed after unblinding, the digest changes and the original hypothesis report no
+longer binds that altered artifact.
+
+`GreaterByAtLeast` and `LessByAtLeast` relations are provided so primary hypotheses
+can preregister a minimum practically meaningful difference instead of treating any
+nonzero numerical direction as confirmation.
+
 ## Evidence capsule
 
 Any result promoted beyond exploratory status should be accompanied by a valid
@@ -151,14 +175,14 @@ Any result promoted beyond exploratory status should be accompanied by a valid
 - input drive/intervention sequence digest;
 - snapshot schema version;
 - evidence-plane artifact digest;
-- raw result artifact hashes, including the blinded execution trace for confirmatory runs.
+- raw result artifact hashes, including the blinded execution trace and blinded metric report for confirmatory runs.
 
 The crate validates caller-supplied provenance but does not discover or synthesize
 Git state, toolchain identity, or artifact hashes itself.
 
 A change to source, locked dependencies, toolchain, model semantics, prospective
-protocol, or executed experimental semantics starts a new evidence lineage rather
-than being mixed into an existing one.
+protocol, executed experimental semantics, or primary analysis definition starts a
+new evidence lineage rather than being mixed into an existing one.
 
 ## Parameter gate
 
@@ -177,4 +201,5 @@ receipt and evidence capsule validate against the same model-semantics version.
 
 For the first v0.2 observational experiment, lock and hash the preregistration before
 running any primary arm. Exploratory pilot runs must be labeled exploratory and must
-not be retroactively promoted into the preregistered confirmatory set.
+not be retroactively promoted into the preregistered confirmatory set. Freeze the
+blinded metric digest before generating the semantic-arm hypothesis report.

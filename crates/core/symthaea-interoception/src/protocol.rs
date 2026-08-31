@@ -10,7 +10,7 @@ use crate::{
     INTEROCEPTIVE_MODEL_SEMANTICS_VERSION, INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION,
 };
 
-pub const PREREGISTRATION_SCHEMA_VERSION: u16 = 1;
+pub const PREREGISTRATION_SCHEMA_VERSION: u16 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct DrivePhase {
@@ -114,18 +114,48 @@ pub enum ExpectedRelation {
     LessThanOrEqual,
     GreaterThan,
     GreaterThanOrEqual,
+    LessByAtLeast { minimum_difference: f32 },
+    GreaterByAtLeast { minimum_difference: f32 },
     EqualWithin { absolute_tolerance: f32 },
 }
 
 impl ExpectedRelation {
     fn validation_error(self) -> Option<String> {
-        match self {
-            Self::EqualWithin { absolute_tolerance }
-                if !absolute_tolerance.is_finite() || absolute_tolerance < 0.0 =>
-            {
-                Some("equal-within tolerance must be finite and non-negative".into())
+        let threshold = match self {
+            Self::LessByAtLeast { minimum_difference }
+            | Self::GreaterByAtLeast { minimum_difference } => Some((
+                "minimum difference",
+                minimum_difference,
+            )),
+            Self::EqualWithin { absolute_tolerance } => {
+                Some(("equal-within tolerance", absolute_tolerance))
             }
-            _ => None,
+            Self::LessThan
+            | Self::LessThanOrEqual
+            | Self::GreaterThan
+            | Self::GreaterThanOrEqual => None,
+        };
+        threshold.and_then(|(name, value)| {
+            (!value.is_finite() || value < 0.0)
+                .then(|| format!("{name} must be finite and non-negative"))
+        })
+    }
+
+    pub fn is_satisfied_by(self, left: f64, right: f64) -> bool {
+        match self {
+            Self::LessThan => left < right,
+            Self::LessThanOrEqual => left <= right,
+            Self::GreaterThan => left > right,
+            Self::GreaterThanOrEqual => left >= right,
+            Self::LessByAtLeast { minimum_difference } => {
+                right - left >= f64::from(minimum_difference)
+            }
+            Self::GreaterByAtLeast { minimum_difference } => {
+                left - right >= f64::from(minimum_difference)
+            }
+            Self::EqualWithin { absolute_tolerance } => {
+                (left - right).abs() <= f64::from(absolute_tolerance)
+            }
         }
     }
 }
