@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-otlp-bridge"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Read-only OTLP metrics replay bridge for the Symthaea infrastructure integration fabric"
+
+[dependencies]
+symthaea-integration-core = { path = "../../core/symthaea-integration-core" }
+opentelemetry-proto = { version = "0.32.0", default-features = false, features = ["gen-tonic-messages", "metrics"] }
+blake3 = { workspace = true }

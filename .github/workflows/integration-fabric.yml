@@ -7,6 +7,7 @@ on:
       - 'crates/core/symthaea-evidence-plane/**'
       - 'crates/core/symthaea-logparse/**'
       - 'crates/bridges/symthaea-prometheus-bridge/**'
+      - 'crates/bridges/symthaea-otlp-bridge/**'
       - '.github/workflows/integration-fabric.yml'
       - 'Cargo.lock'
   workflow_dispatch:
@@ -53,11 +54,15 @@ jobs:
       - name: Test Prometheus observation bridge
         run: cargo test -p symthaea-prometheus-bridge --lib
 
+      - name: Test OTLP metrics observation bridge
+        run: cargo test -p symthaea-otlp-bridge --lib
+
       - name: Compile all integration targets
         run: |
           cargo check -p symthaea-integration-core --all-targets
           cargo check -p symthaea-logparse --all-targets
           cargo check -p symthaea-prometheus-bridge --all-targets
+          cargo check -p symthaea-otlp-bridge --all-targets
 
       # Cargo may resolve newly introduced adapter dependencies during the
       # preceding commands. A green integration PR must include that exact
