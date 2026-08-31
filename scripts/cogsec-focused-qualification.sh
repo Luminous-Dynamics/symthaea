@@ -8,6 +8,7 @@ PACKAGES=(
   -p symthaea-cogsec
   -p symthaea-cogsec-evidence
   -p symthaea-cogsec-qualification
+  -p symthaea-cogsec-shadow-runtime
 )
 
 RECEIPT_OUT="${COGSEC_RECEIPT_OUT:-}"
