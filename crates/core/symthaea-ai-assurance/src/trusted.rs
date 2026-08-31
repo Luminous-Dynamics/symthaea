@@ -205,12 +205,10 @@ impl AuthorityDomain {
             let next = current.checked_add(1).ok_or(TrustError::EpochExhausted {
                 domain_id: self.domain_id,
             })?;
-            match self.epoch.compare_exchange(
-                current,
-                next,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            match self
+                .epoch
+                .compare_exchange(current, next, Ordering::SeqCst, Ordering::SeqCst)
+            {
                 Ok(_) => return Ok(AuthorityEpoch(next)),
                 Err(_) => continue,
             }
@@ -561,7 +559,9 @@ impl fmt::Display for TrustError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::WrongDomain { .. } => write!(f, "authority belongs to a different trust domain"),
-            Self::RevokedEpoch { .. } => write!(f, "authority lineage was revoked by epoch rotation"),
+            Self::RevokedEpoch { .. } => {
+                write!(f, "authority lineage was revoked by epoch rotation")
+            }
             Self::EpochExhausted { .. } => write!(f, "authority revocation epoch exhausted"),
             Self::ObserverNotIndependent { .. } => {
                 write!(f, "external observer must differ from the acting principal")
@@ -614,14 +614,9 @@ mod tests {
         let domain = AuthorityDomain::new(PrincipalId::new());
         let verifier = domain.verifier();
         let actor = PrincipalId::new();
-        let action = TrustedAction::<Write, Proposed>::propose(
-            &verifier,
-            actor,
-            "edit",
-            scope(),
-            b"patch",
-        )
-        .assess(ActionRisk::Reversible);
+        let action =
+            TrustedAction::<Write, Proposed>::propose(&verifier, actor, "edit", scope(), b"patch")
+                .assess(ActionRisk::Reversible);
         let grant = domain.issue_bound_one_shot::<Write>(
             actor,
             scope(),
@@ -639,14 +634,9 @@ mod tests {
         let domain = AuthorityDomain::new(PrincipalId::new());
         let verifier = domain.verifier();
         let actor = PrincipalId::new();
-        let action = TrustedAction::<Write, Proposed>::propose(
-            &verifier,
-            actor,
-            "edit",
-            scope(),
-            b"patch",
-        )
-        .assess(ActionRisk::Reversible);
+        let action =
+            TrustedAction::<Write, Proposed>::propose(&verifier, actor, "edit", scope(), b"patch")
+                .assess(ActionRisk::Reversible);
         let grant = domain.issue_bound_one_shot::<Write>(
             actor,
             scope(),
@@ -700,7 +690,10 @@ mod tests {
             Observation::new(ObservedOutcome::Success, [2; 32]),
             SystemTime::now(),
         );
-        assert!(matches!(result, Err(TrustError::ObserverNotIndependent { .. })));
+        assert!(matches!(
+            result,
+            Err(TrustError::ObserverNotIndependent { .. })
+        ));
     }
 
     #[test]
@@ -756,20 +749,19 @@ mod tests {
         let domain = AuthorityDomain::new(PrincipalId::new());
         let verifier = domain.verifier();
         let actor = PrincipalId::new();
-        let action = TrustedAction::<Read, Proposed>::propose(
-            &verifier,
-            actor,
-            "inspect",
-            scope(),
-            b"read",
-        )
-        .assess(ActionRisk::Observation);
+        let action =
+            TrustedAction::<Read, Proposed>::propose(&verifier, actor, "inspect", scope(), b"read")
+                .assess(ActionRisk::Observation);
         let grant = domain.issue_bound_one_shot::<Read>(
             actor,
             scope(),
             None,
             action.authorization_binding(),
         );
-        assert!(action.authorize(grant, &verifier, SystemTime::now()).is_ok());
+        assert!(
+            action
+                .authorize(grant, &verifier, SystemTime::now())
+                .is_ok()
+        );
     }
 }
