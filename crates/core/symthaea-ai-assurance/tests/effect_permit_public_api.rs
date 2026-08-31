@@ -1,23 +1,43 @@
 use std::sync::{mpsc, Arc, Barrier};
 use std::thread;
 
-use symthaea_ai_assurance::{EffectEntryDomain, EffectEntryError};
+use symthaea_ai_assurance::{
+    EffectAdmissionCommitment, EffectEntryDomain, EffectEntryError,
+};
+
+fn commitment(tag: u8) -> EffectAdmissionCommitment {
+    EffectAdmissionCommitment::new(
+        [tag; 32],
+        [tag.wrapping_add(1); 32],
+        [tag.wrapping_add(2); 32],
+    )
+}
+
+#[test]
+fn public_commitment_changes_with_authority_and_adapter_semantics() {
+    let base = EffectAdmissionCommitment::new([1; 32], [2; 32], [3; 32]);
+    let authority_changed = EffectAdmissionCommitment::new([1; 32], [4; 32], [3; 32]);
+    let adapter_changed = EffectAdmissionCommitment::new([1; 32], [2; 32], [5; 32]);
+
+    assert_ne!(base.digest(), authority_changed.digest());
+    assert_ne!(base.digest(), adapter_changed.digest());
+}
 
 #[test]
 fn public_revocation_latches_admission_until_explicit_resume() {
     let domain = EffectEntryDomain::new();
-    let binding = [11; 32];
-    let ticket = domain.issue_ticket(binding).unwrap();
-    let stale_after_resume = domain.issue_ticket(binding).unwrap();
+    let commitment = commitment(11);
+    let ticket = domain.issue_ticket(commitment).unwrap();
+    let stale_after_resume = domain.issue_ticket(commitment).unwrap();
     let revocation = domain.revoke_all().unwrap();
 
     assert!(domain.is_stopped());
     assert!(matches!(
-        domain.issue_ticket(binding),
+        domain.issue_ticket(commitment),
         Err(EffectEntryError::AdmissionStopped { .. })
     ));
     assert!(matches!(
-        domain.acquire(ticket, binding),
+        domain.acquire(ticket, commitment),
         Err(EffectEntryError::AdmissionStopped { .. })
     ));
     assert!(revocation.admitted_activity().is_quiescent());
@@ -27,7 +47,7 @@ fn public_revocation_latches_admission_until_explicit_resume() {
     assert_eq!(resume.epoch(), revocation.current_epoch());
     assert!(revocation.revocation_sequence() < resume.resume_sequence());
     assert!(matches!(
-        domain.acquire(stale_after_resume, binding),
+        domain.acquire(stale_after_resume, commitment),
         Err(EffectEntryError::Revoked { .. })
     ));
 }
@@ -35,9 +55,9 @@ fn public_revocation_latches_admission_until_explicit_resume() {
 #[test]
 fn public_acquisition_before_revocation_preserves_one_admitted_effect() {
     let domain = EffectEntryDomain::new();
-    let binding = [12; 32];
-    let ticket = domain.issue_ticket(binding).unwrap();
-    let permit = domain.acquire(ticket, binding).unwrap();
+    let commitment = commitment(12);
+    let ticket = domain.issue_ticket(commitment).unwrap();
+    let permit = domain.acquire(ticket, commitment).unwrap();
     let acquisition = permit.acquisition_sequence();
 
     let revocation = domain.revoke_all().unwrap();
@@ -56,7 +76,7 @@ fn public_acquisition_before_revocation_preserves_one_admitted_effect() {
 
     let (receipt, effect_result) = permit.enter(|| "entered").unwrap();
     assert_eq!(effect_result, "entered");
-    assert_eq!(receipt.action_binding(), binding);
+    assert_eq!(receipt.commitment(), commitment);
     assert_eq!(receipt.acquisition_sequence(), acquisition);
     assert!(acquisition < revocation.revocation_sequence());
     assert!(domain.activity().is_quiescent());
@@ -68,9 +88,9 @@ fn public_acquisition_before_revocation_preserves_one_admitted_effect() {
 #[test]
 fn public_effect_callback_does_not_hold_revocation_lock() {
     let domain = Arc::new(EffectEntryDomain::new());
-    let binding = [13; 32];
-    let ticket = domain.issue_ticket(binding).unwrap();
-    let permit = domain.acquire(ticket, binding).unwrap();
+    let commitment = commitment(13);
+    let ticket = domain.issue_ticket(commitment).unwrap();
+    let permit = domain.acquire(ticket, commitment).unwrap();
     let acquisition = permit.acquisition_sequence();
 
     let (entered_tx, entered_rx) = mpsc::channel();
@@ -99,6 +119,7 @@ fn public_effect_callback_does_not_hold_revocation_lock() {
     continue_tx.send(()).unwrap();
     let (receipt, value) = worker.join().unwrap().unwrap();
     assert_eq!(value, 13);
+    assert_eq!(receipt.commitment(), commitment);
     assert_eq!(receipt.acquisition_sequence(), acquisition);
     assert!(domain.activity().is_quiescent());
 
@@ -109,20 +130,38 @@ fn public_effect_callback_does_not_hold_revocation_lock() {
 #[test]
 fn public_new_work_requires_resume_after_emergency_stop() {
     let domain = EffectEntryDomain::new();
-    let binding = [14; 32];
+    let commitment = commitment(14);
     domain.revoke_all().unwrap();
 
     assert!(matches!(
-        domain.issue_ticket(binding),
+        domain.issue_ticket(commitment),
         Err(EffectEntryError::AdmissionStopped { .. })
     ));
     let stopped_sequence = domain.current_sequence();
     let resume = domain.resume().unwrap();
     assert!(stopped_sequence < resume.resume_sequence());
 
-    let ticket = domain.issue_ticket(binding).unwrap();
-    let permit = domain.acquire(ticket, binding).unwrap();
+    let ticket = domain.issue_ticket(commitment).unwrap();
+    let permit = domain.acquire(ticket, commitment).unwrap();
     drop(permit);
+    assert!(domain.activity().is_quiescent());
+}
+
+#[test]
+fn public_commitment_substitution_fails_before_admission() {
+    let domain = EffectEntryDomain::new();
+    let original = commitment(15);
+    let changed_authority = EffectAdmissionCommitment::new(
+        original.action_binding(),
+        [99; 32],
+        original.adapter_semantics_digest(),
+    );
+    let ticket = domain.issue_ticket(original).unwrap();
+
+    assert!(matches!(
+        domain.acquire(ticket, changed_authority),
+        Err(EffectEntryError::CommitmentMismatch)
+    ));
     assert!(domain.activity().is_quiescent());
 }
 
@@ -130,15 +169,15 @@ fn public_new_work_requires_resume_after_emergency_stop() {
 fn public_concurrent_race_has_only_admit_before_stop_or_stop_before_admit() {
     for tag in 0_u8..32 {
         let domain = Arc::new(EffectEntryDomain::new());
-        let binding = [tag; 32];
-        let ticket = domain.issue_ticket(binding).unwrap();
+        let commitment = commitment(tag);
+        let ticket = domain.issue_ticket(commitment).unwrap();
         let barrier = Arc::new(Barrier::new(3));
 
         let acquire_domain = Arc::clone(&domain);
         let acquire_barrier = Arc::clone(&barrier);
         let acquire_thread = thread::spawn(move || {
             acquire_barrier.wait();
-            acquire_domain.acquire(ticket, binding)
+            acquire_domain.acquire(ticket, commitment)
         });
 
         let revoke_domain = Arc::clone(&domain);
