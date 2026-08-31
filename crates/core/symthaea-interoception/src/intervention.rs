@@ -1,11 +1,31 @@
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::{NativeInteroceptiveModel, ViabilityChannel};
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub enum InterventionKind {
     SetValue(f32),
     AddValue(f32),
+}
+
+#[derive(Deserialize)]
+enum InterventionKindWire {
+    SetValue(f32),
+    AddValue(f32),
+}
+
+impl<'de> Deserialize<'de> for InterventionKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let kind = match InterventionKindWire::deserialize(deserializer)? {
+            InterventionKindWire::SetValue(value) => Self::SetValue(value),
+            InterventionKindWire::AddValue(value) => Self::AddValue(value),
+        };
+        kind.try_validate().map_err(de::Error::custom)?;
+        Ok(kind)
+    }
 }
 
 impl InterventionKind {
@@ -16,11 +36,19 @@ impl InterventionKind {
         }
     }
 
-    fn validate(self) {
+    fn try_validate(self) -> Result<(), String> {
         let value = match self {
             Self::SetValue(value) | Self::AddValue(value) => value,
         };
-        assert!(value.is_finite(), "intervention values must be finite");
+        if !value.is_finite() {
+            return Err("intervention values must be finite".into());
+        }
+        Ok(())
+    }
+
+    fn validate(self) {
+        self.try_validate()
+            .unwrap_or_else(|error| panic!("{error}"));
     }
 }
 
@@ -32,17 +60,15 @@ pub struct InteroceptiveIntervention {
 
 impl InteroceptiveIntervention {
     pub fn set(channel: ViabilityChannel, value: f32) -> Self {
-        Self {
-            channel,
-            kind: InterventionKind::SetValue(value),
-        }
+        let kind = InterventionKind::SetValue(value);
+        kind.validate();
+        Self { channel, kind }
     }
 
     pub fn add(channel: ViabilityChannel, delta: f32) -> Self {
-        Self {
-            channel,
-            kind: InterventionKind::AddValue(delta),
-        }
+        let kind = InterventionKind::AddValue(delta);
+        kind.validate();
+        Self { channel, kind }
     }
 }
 

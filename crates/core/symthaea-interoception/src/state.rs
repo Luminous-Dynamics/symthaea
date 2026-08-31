@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 
 pub const CHANNEL_COUNT: usize = 8;
 
@@ -53,7 +53,7 @@ impl ViabilityChannel {
 ///
 /// Fields are private so construction-time invariants cannot later be bypassed
 /// by mutating bounds, precision, importance, or the measured state directly.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct ViabilityVariable {
     value: f32,
     preferred_low: f32,
@@ -63,6 +63,38 @@ pub struct ViabilityVariable {
     precision: f32,
     velocity: f32,
     importance: f32,
+}
+
+#[derive(Deserialize)]
+struct ViabilityVariableWire {
+    value: f32,
+    preferred_low: f32,
+    preferred_high: f32,
+    viable_low: f32,
+    viable_high: f32,
+    precision: f32,
+    velocity: f32,
+    importance: f32,
+}
+
+impl<'de> Deserialize<'de> for ViabilityVariable {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = ViabilityVariableWire::deserialize(deserializer)?;
+        Self::try_from_parts(
+            wire.value,
+            wire.preferred_low,
+            wire.preferred_high,
+            wire.viable_low,
+            wire.viable_high,
+            wire.precision,
+            wire.velocity,
+            wire.importance,
+        )
+        .map_err(de::Error::custom)
+    }
 }
 
 impl ViabilityVariable {
@@ -75,27 +107,90 @@ impl ViabilityVariable {
         precision: f32,
         importance: f32,
     ) -> Self {
-        validate_observation(value, 0.0);
-        assert!(preferred_low.is_finite());
-        assert!(preferred_high.is_finite());
-        assert!(viable_low.is_finite());
-        assert!(viable_high.is_finite());
-        assert!(precision.is_finite() && precision >= 0.0);
-        assert!(importance.is_finite() && importance >= 0.0);
-        assert!(viable_low <= preferred_low);
-        assert!(preferred_low <= preferred_high);
-        assert!(preferred_high <= viable_high);
-
-        Self {
+        Self::try_new(
             value,
             preferred_low,
             preferred_high,
             viable_low,
             viable_high,
             precision,
-            velocity: 0.0,
             importance,
+        )
+        .unwrap_or_else(|error| panic!("{error}"))
+    }
+
+    pub fn try_new(
+        value: f32,
+        preferred_low: f32,
+        preferred_high: f32,
+        viable_low: f32,
+        viable_high: f32,
+        precision: f32,
+        importance: f32,
+    ) -> Result<Self, String> {
+        Self::try_from_parts(
+            value,
+            preferred_low,
+            preferred_high,
+            viable_low,
+            viable_high,
+            precision,
+            0.0,
+            importance,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn try_from_parts(
+        value: f32,
+        preferred_low: f32,
+        preferred_high: f32,
+        viable_low: f32,
+        viable_high: f32,
+        precision: f32,
+        velocity: f32,
+        importance: f32,
+    ) -> Result<Self, String> {
+        for (name, candidate) in [
+            ("value", value),
+            ("preferred_low", preferred_low),
+            ("preferred_high", preferred_high),
+            ("viable_low", viable_low),
+            ("viable_high", viable_high),
+            ("precision", precision),
+            ("velocity", velocity),
+            ("importance", importance),
+        ] {
+            if !candidate.is_finite() {
+                return Err(format!("{name} must be finite"));
+            }
         }
+        if precision < 0.0 {
+            return Err("precision must be non-negative".into());
+        }
+        if importance < 0.0 {
+            return Err("importance must be non-negative".into());
+        }
+        if viable_low > preferred_low {
+            return Err("viable_low must not exceed preferred_low".into());
+        }
+        if preferred_low > preferred_high {
+            return Err("preferred_low must not exceed preferred_high".into());
+        }
+        if preferred_high > viable_high {
+            return Err("preferred_high must not exceed viable_high".into());
+        }
+
+        Ok(Self {
+            value,
+            preferred_low,
+            preferred_high,
+            viable_low,
+            viable_high,
+            precision,
+            velocity,
+            importance,
+        })
     }
 
     #[inline]
@@ -178,15 +273,11 @@ impl ViabilityVariable {
     }
 
     pub(crate) fn set_observation(&mut self, value: f32, velocity: f32) {
-        validate_observation(value, velocity);
+        assert!(value.is_finite(), "viability values must be finite");
+        assert!(velocity.is_finite(), "viability velocities must be finite");
         self.value = value;
         self.velocity = velocity;
     }
-}
-
-fn validate_observation(value: f32, velocity: f32) {
-    assert!(value.is_finite(), "viability values must be finite");
-    assert!(velocity.is_finite(), "viability velocities must be finite");
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

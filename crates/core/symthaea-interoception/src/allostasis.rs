@@ -1,15 +1,38 @@
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::{
     assess_homeostasis, InteroceptiveDrive, NativeInteroceptiveModel, NativeInteroceptiveState,
     ViabilityChannel, CHANNEL_COUNT,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct AllostaticConfig {
     pub horizon_steps: u16,
     pub dt: f32,
     pub discount: f32,
+}
+
+#[derive(Deserialize)]
+struct AllostaticConfigWire {
+    horizon_steps: u16,
+    dt: f32,
+    discount: f32,
+}
+
+impl<'de> Deserialize<'de> for AllostaticConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = AllostaticConfigWire::deserialize(deserializer)?;
+        let config = Self {
+            horizon_steps: wire.horizon_steps,
+            dt: wire.dt,
+            discount: wire.discount,
+        };
+        config.try_validate().map_err(de::Error::custom)?;
+        Ok(config)
+    }
 }
 
 impl Default for AllostaticConfig {
@@ -23,10 +46,22 @@ impl Default for AllostaticConfig {
 }
 
 impl AllostaticConfig {
+    pub fn try_validate(&self) -> Result<(), String> {
+        if self.horizon_steps == 0 {
+            return Err("horizon_steps must be greater than zero".into());
+        }
+        if !self.dt.is_finite() || self.dt <= 0.0 {
+            return Err("allostatic dt must be finite and positive".into());
+        }
+        if !self.discount.is_finite() || !(0.0..=1.0).contains(&self.discount) {
+            return Err("discount must be finite and in [0, 1]".into());
+        }
+        Ok(())
+    }
+
     pub fn validate(&self) {
-        assert!(self.horizon_steps > 0);
-        assert!(self.dt.is_finite() && self.dt > 0.0);
-        assert!(self.discount.is_finite() && self.discount >= 0.0 && self.discount <= 1.0);
+        self.try_validate()
+            .unwrap_or_else(|error| panic!("{error}"));
     }
 }
 

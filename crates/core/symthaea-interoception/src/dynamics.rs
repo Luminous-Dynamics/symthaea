@@ -1,13 +1,38 @@
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::{NativeInteroceptiveState, ViabilityChannel, ViabilityVariable, CHANNEL_COUNT};
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct InteroceptiveDynamicsConfig {
     pub step_dt: f32,
     pub recovery_rate: f32,
     pub min_value: f32,
     pub max_value: f32,
+}
+
+#[derive(Deserialize)]
+struct InteroceptiveDynamicsConfigWire {
+    step_dt: f32,
+    recovery_rate: f32,
+    min_value: f32,
+    max_value: f32,
+}
+
+impl<'de> Deserialize<'de> for InteroceptiveDynamicsConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = InteroceptiveDynamicsConfigWire::deserialize(deserializer)?;
+        let config = Self {
+            step_dt: wire.step_dt,
+            recovery_rate: wire.recovery_rate,
+            min_value: wire.min_value,
+            max_value: wire.max_value,
+        };
+        config.try_validate().map_err(de::Error::custom)?;
+        Ok(config)
+    }
 }
 
 impl Default for InteroceptiveDynamicsConfig {
@@ -22,22 +47,52 @@ impl Default for InteroceptiveDynamicsConfig {
 }
 
 impl InteroceptiveDynamicsConfig {
+    pub fn try_validate(&self) -> Result<(), String> {
+        if !self.step_dt.is_finite() || self.step_dt <= 0.0 {
+            return Err("step_dt must be finite and positive".into());
+        }
+        if !self.recovery_rate.is_finite() || self.recovery_rate < 0.0 {
+            return Err("recovery_rate must be finite and non-negative".into());
+        }
+        if self.recovery_rate * self.step_dt > 1.0 {
+            return Err("recovery gain per step must not exceed 1.0".into());
+        }
+        if !self.min_value.is_finite() || !self.max_value.is_finite() {
+            return Err("model bounds must be finite".into());
+        }
+        if self.min_value >= self.max_value {
+            return Err("min_value must be less than max_value".into());
+        }
+        Ok(())
+    }
+
     pub fn validate(&self) {
-        assert!(self.step_dt.is_finite() && self.step_dt > 0.0);
-        assert!(self.recovery_rate.is_finite() && self.recovery_rate >= 0.0);
-        assert!(
-            self.recovery_rate * self.step_dt <= 1.0,
-            "recovery gain per step must not exceed 1.0"
-        );
-        assert!(self.min_value.is_finite());
-        assert!(self.max_value.is_finite());
-        assert!(self.min_value < self.max_value);
+        self.try_validate()
+            .unwrap_or_else(|error| panic!("{error}"));
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct InteroceptiveDrive {
     rates: [f32; CHANNEL_COUNT],
+}
+
+#[derive(Deserialize)]
+struct InteroceptiveDriveWire {
+    rates: [f32; CHANNEL_COUNT],
+}
+
+impl<'de> Deserialize<'de> for InteroceptiveDrive {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = InteroceptiveDriveWire::deserialize(deserializer)?;
+        if wire.rates.iter().any(|rate| !rate.is_finite()) {
+            return Err(de::Error::custom("interoceptive drive rates must be finite"));
+        }
+        Ok(Self { rates: wire.rates })
+    }
 }
 
 impl InteroceptiveDrive {
@@ -74,7 +129,7 @@ pub struct InteroceptiveStepReport {
     pub changed_channels: u8,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NativeInteroceptiveModel {
     state: NativeInteroceptiveState,
     config: InteroceptiveDynamicsConfig,
@@ -133,7 +188,10 @@ impl NativeInteroceptiveModel {
             }
 
             let proposed = previous + (restorative_rate + external_rate) * dt;
-            assert!(proposed.is_finite(), "native transition produced a non-finite value");
+            assert!(
+                proposed.is_finite(),
+                "native transition produced a non-finite value"
+            );
             let next = proposed.clamp(self.config.min_value, self.config.max_value);
             if next != proposed {
                 clamped_channels = clamped_channels.saturating_add(1);
