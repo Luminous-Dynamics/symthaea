@@ -51,38 +51,39 @@ proptest! {
                     prop_assert_eq!(receipt.admitted_activity().in_flight_effects(), 0);
                 }
                 2 => {
-                    let Some(ticket) = tickets[slot].take() else {
-                        continue;
-                    };
-                    let model = ticket_models[slot]
-                        .take()
-                        .expect("ticket model accompanies public ticket");
-                    let expected_binding = if use_correct_binding {
-                        model.binding
-                    } else {
-                        [tag.wrapping_add(1); 32]
-                    };
-                    let result = domain.acquire(ticket, expected_binding);
+                    if let Some(ticket) = tickets[slot].take() {
+                        let model = ticket_models[slot]
+                            .take()
+                            .expect("ticket model accompanies public ticket");
+                        let expected_binding = if use_correct_binding {
+                            model.binding
+                        } else {
+                            let mut wrong = model.binding;
+                            wrong[0] ^= 1;
+                            wrong
+                        };
+                        let result = domain.acquire(ticket, expected_binding);
 
-                    if expected_binding != model.binding {
-                        prop_assert!(matches!(
-                            result,
-                            Err(EffectEntryError::ActionBindingMismatch)
-                        ));
-                    } else if model.epoch != model_epoch {
-                        prop_assert!(matches!(result, Err(EffectEntryError::Revoked { .. })));
-                    } else {
-                        let permit = result.expect("current exact ticket must acquire");
-                        model_sequence += 1;
-                        model_outstanding += 1;
-                        prop_assert_eq!(permit.acquisition_sequence().get(), model_sequence);
+                        if expected_binding != model.binding {
+                            prop_assert!(matches!(
+                                result,
+                                Err(EffectEntryError::ActionBindingMismatch)
+                            ));
+                        } else if model.epoch != model_epoch {
+                            prop_assert!(matches!(result, Err(EffectEntryError::Revoked { .. })));
+                        } else {
+                            let permit = result.expect("current exact ticket must acquire");
+                            model_sequence += 1;
+                            model_outstanding += 1;
+                            prop_assert_eq!(permit.acquisition_sequence().get(), model_sequence);
 
-                        if let Some(previous) = permits[slot].take() {
-                            drop(previous);
-                            model_outstanding -= 1;
+                            if let Some(previous) = permits[slot].take() {
+                                drop(previous);
+                                model_outstanding -= 1;
+                            }
+                            permits[slot] = Some(permit);
+                            permit_sequences[slot] = Some(model_sequence);
                         }
-                        permits[slot] = Some(permit);
-                        permit_sequences[slot] = Some(model_sequence);
                     }
                 }
                 3 => {
