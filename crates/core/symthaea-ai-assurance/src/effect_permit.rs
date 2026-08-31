@@ -10,17 +10,20 @@
 //!
 //! This module adds a deliberately small host-owned linearization primitive:
 //!
-//! 1. the host issues an affine [`EffectEntryTicket`] for one exact action;
-//! 2. [`EffectEntryDomain::acquire`] and [`EffectEntryDomain::revoke_all`]
+//! 1. the host forms an [`EffectAdmissionCommitment`] joining the exact action,
+//!    the complete preflight-authority snapshot, and adapter point-of-no-return
+//!    semantics;
+//! 2. the host issues an affine [`EffectEntryTicket`] for that commitment;
+//! 3. [`EffectEntryDomain::acquire`] and [`EffectEntryDomain::revoke_all`]
 //!    serialize on the same short critical section;
-//! 3. successful acquisition returns an affine [`EffectEntryPermit`] and records
+//! 4. successful acquisition returns an affine [`EffectEntryPermit`] and records
 //!    a monotonic linearization sequence;
-//! 4. revocation rotates the epoch **and latches admission closed**;
-//! 5. while stopped, new tickets cannot be issued and old tickets cannot acquire;
-//! 6. [`EffectEntryDomain::resume`] reopens admission only after already-admitted
+//! 5. revocation rotates the epoch **and latches admission closed**;
+//! 6. while stopped, new tickets cannot be issued and old tickets cannot acquire;
+//! 7. [`EffectEntryDomain::resume`] reopens admission only after already-admitted
 //!    work has become quiescent;
-//! 7. a permit acquired before revocation remains admission for that one effect;
-//! 8. revocation evidence records already-acquired and currently in-flight work
+//! 8. a permit acquired before revocation remains admission for that one effect;
+//! 9. revocation evidence records already-acquired and currently in-flight work
 //!    instead of pretending those effects disappeared.
 //!
 //! The domain lock is **not** held while the effect callback runs. Acquisition is
@@ -94,6 +97,64 @@ impl EffectEntryPermitId {
     /// Borrow the underlying UUID for evidence serialization.
     pub fn as_uuid(&self) -> &Uuid {
         &self.0
+    }
+}
+
+/// Exact effect-admission commitment consumed by the linearization domain.
+///
+/// The three components deliberately remain visible in evidence. The final
+/// domain-separated digest is what tickets and permits compare, while auditors
+/// can still determine *which action*, *which preflight authority state*, and
+/// *which adapter point-of-no-return contract* were admitted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EffectAdmissionCommitment {
+    action_binding: [u8; 32],
+    authority_snapshot_digest: [u8; 32],
+    adapter_semantics_digest: [u8; 32],
+    digest: [u8; 32],
+}
+
+impl EffectAdmissionCommitment {
+    /// Construct a commitment from the exact action authorization binding, a
+    /// digest of the complete host preflight authority/evidence snapshot, and a
+    /// digest naming the adapter boundary/version/point-of-no-return semantics.
+    pub fn new(
+        action_binding: [u8; 32],
+        authority_snapshot_digest: [u8; 32],
+        adapter_semantics_digest: [u8; 32],
+    ) -> Self {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-ai-assurance/effect-admission-commitment-v1\0");
+        hash_field(&mut hasher, &action_binding);
+        hash_field(&mut hasher, &authority_snapshot_digest);
+        hash_field(&mut hasher, &adapter_semantics_digest);
+        let digest = *hasher.finalize().as_bytes();
+        Self {
+            action_binding,
+            authority_snapshot_digest,
+            adapter_semantics_digest,
+            digest,
+        }
+    }
+
+    /// Exact action authorization binding.
+    pub const fn action_binding(self) -> [u8; 32] {
+        self.action_binding
+    }
+
+    /// Digest of policy/resource/budget/purpose/time/separation preflight state.
+    pub const fn authority_snapshot_digest(self) -> [u8; 32] {
+        self.authority_snapshot_digest
+    }
+
+    /// Digest identifying adapter version and point-of-no-return semantics.
+    pub const fn adapter_semantics_digest(self) -> [u8; 32] {
+        self.adapter_semantics_digest
+    }
+
+    /// Domain-separated commitment digest compared by tickets/permits.
+    pub const fn digest(self) -> [u8; 32] {
+        self.digest
     }
 }
 
@@ -188,13 +249,13 @@ impl EffectEntryDomain {
         state.activity()
     }
 
-    /// Issue an affine ticket for one exact action binding in the current epoch.
+    /// Issue an affine ticket for one exact effect-admission commitment.
     ///
     /// Ticket issuance is not the effect-entry linearization point. A stopped
     /// domain refuses new tickets until [`Self::resume`] succeeds.
     pub fn issue_ticket(
         &self,
-        action_binding: [u8; 32],
+        commitment: EffectAdmissionCommitment,
     ) -> Result<EffectEntryTicket, EffectEntryError> {
         let ticket_id = EffectEntryTicketId(Uuid::new_v4());
         let state = self
@@ -211,11 +272,11 @@ impl EffectEntryDomain {
             ticket_id,
             domain_id: self.domain_id,
             epoch: EffectEntryEpoch(state.epoch),
-            action_binding,
+            commitment,
         })
     }
 
-    /// Atomically acquire admission for one exact effect.
+    /// Atomically acquire admission for one exact effect commitment.
     ///
     /// Successful acquisition is the linearization point. If revocation already
     /// completed, admission is latched closed and acquisition fails. After an
@@ -227,7 +288,7 @@ impl EffectEntryDomain {
     pub fn acquire(
         &self,
         ticket: EffectEntryTicket,
-        expected_action_binding: [u8; 32],
+        expected_commitment: EffectAdmissionCommitment,
     ) -> Result<EffectEntryPermit, EffectEntryError> {
         if ticket.domain_id != self.domain_id {
             return Err(EffectEntryError::WrongDomain {
@@ -235,8 +296,8 @@ impl EffectEntryDomain {
                 actual: ticket.domain_id,
             });
         }
-        if ticket.action_binding != expected_action_binding {
-            return Err(EffectEntryError::ActionBindingMismatch);
+        if ticket.commitment.digest() != expected_commitment.digest() {
+            return Err(EffectEntryError::CommitmentMismatch);
         }
 
         let permit_id = EffectEntryPermitId(Uuid::new_v4());
@@ -274,7 +335,7 @@ impl EffectEntryDomain {
             ticket_id: ticket.ticket_id,
             domain_id: self.domain_id,
             epoch: ticket.epoch,
-            action_binding: ticket.action_binding,
+            commitment: ticket.commitment,
             acquisition_sequence: EffectEntrySequence(next_sequence),
             state: Some(Arc::clone(&self.state)),
         })
@@ -354,7 +415,7 @@ impl Default for EffectEntryDomain {
     }
 }
 
-/// Affine pre-entry request bound to one domain, epoch, and exact action.
+/// Affine pre-entry request bound to one domain, epoch, and exact effect commitment.
 ///
 /// The type is intentionally neither `Clone` nor `Copy`.
 #[derive(Debug)]
@@ -362,7 +423,7 @@ pub struct EffectEntryTicket {
     ticket_id: EffectEntryTicketId,
     domain_id: EffectEntryDomainId,
     epoch: EffectEntryEpoch,
-    action_binding: [u8; 32],
+    commitment: EffectAdmissionCommitment,
 }
 
 impl EffectEntryTicket {
@@ -371,7 +432,7 @@ impl EffectEntryTicket {
         self.ticket_id
     }
 
-    /// Effect-entry domain that issued the ticket.
+    /// Effect-entry domain that issued this ticket.
     pub const fn domain_id(&self) -> EffectEntryDomainId {
         self.domain_id
     }
@@ -381,9 +442,9 @@ impl EffectEntryTicket {
         self.epoch
     }
 
-    /// Exact action authorization binding.
-    pub const fn action_binding(&self) -> [u8; 32] {
-        self.action_binding
+    /// Exact effect-admission commitment.
+    pub const fn commitment(&self) -> EffectAdmissionCommitment {
+        self.commitment
     }
 }
 
@@ -394,12 +455,12 @@ impl EffectEntryTicket {
 /// admission without holding the domain lock during the callback.
 ///
 /// ```compile_fail
-/// use symthaea_ai_assurance::EffectEntryDomain;
+/// use symthaea_ai_assurance::{EffectAdmissionCommitment, EffectEntryDomain};
 ///
 /// let domain = EffectEntryDomain::new();
-/// let binding = [7; 32];
-/// let ticket = domain.issue_ticket(binding).unwrap();
-/// let permit = domain.acquire(ticket, binding).unwrap();
+/// let commitment = EffectAdmissionCommitment::new([7; 32], [8; 32], [9; 32]);
+/// let ticket = domain.issue_ticket(commitment).unwrap();
+/// let permit = domain.acquire(ticket, commitment).unwrap();
 /// let _ = permit.enter(|| ()).unwrap();
 /// let _ = permit.enter(|| ()).unwrap();
 /// ```
@@ -409,7 +470,7 @@ pub struct EffectEntryPermit {
     ticket_id: EffectEntryTicketId,
     domain_id: EffectEntryDomainId,
     epoch: EffectEntryEpoch,
-    action_binding: [u8; 32],
+    commitment: EffectAdmissionCommitment,
     acquisition_sequence: EffectEntrySequence,
     state: Option<Arc<Mutex<EffectEntryState>>>,
 }
@@ -435,9 +496,9 @@ impl EffectEntryPermit {
         self.epoch
     }
 
-    /// Exact action binding admitted by this permit.
-    pub const fn action_binding(&self) -> [u8; 32] {
-        self.action_binding
+    /// Exact effect-admission commitment.
+    pub const fn commitment(&self) -> EffectAdmissionCommitment {
+        self.commitment
     }
 
     /// Total-order position at which acquisition won or preceded revocation.
@@ -485,7 +546,7 @@ impl EffectEntryPermit {
             ticket_id: self.ticket_id,
             domain_id: self.domain_id,
             epoch: self.epoch,
-            action_binding: self.action_binding,
+            commitment: self.commitment,
             acquisition_sequence: self.acquisition_sequence,
             activity_at_entry,
         };
@@ -517,7 +578,7 @@ pub struct EffectEntryReceipt {
     ticket_id: EffectEntryTicketId,
     domain_id: EffectEntryDomainId,
     epoch: EffectEntryEpoch,
-    action_binding: [u8; 32],
+    commitment: EffectAdmissionCommitment,
     acquisition_sequence: EffectEntrySequence,
     activity_at_entry: EffectEntryActivity,
 }
@@ -543,9 +604,9 @@ impl EffectEntryReceipt {
         self.epoch
     }
 
-    /// Exact admitted action binding.
-    pub const fn action_binding(self) -> [u8; 32] {
-        self.action_binding
+    /// Exact effect-admission commitment.
+    pub const fn commitment(self) -> EffectAdmissionCommitment {
+        self.commitment
     }
 
     /// Acquisition's total-order position within the domain.
@@ -631,8 +692,8 @@ pub enum EffectEntryError {
         /// Domain carried by the supplied ticket.
         actual: EffectEntryDomainId,
     },
-    /// Ticket targets another exact action.
-    ActionBindingMismatch,
+    /// Ticket targets another exact preflight/adapter commitment.
+    CommitmentMismatch,
     /// Effect admission is latched closed after revocation.
     AdmissionStopped {
         /// Current stopped epoch.
@@ -672,8 +733,8 @@ impl fmt::Display for EffectEntryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::WrongDomain { .. } => write!(f, "effect-entry ticket belongs to another domain"),
-            Self::ActionBindingMismatch => {
-                write!(f, "effect-entry ticket targets another exact action")
+            Self::CommitmentMismatch => {
+                write!(f, "effect-entry ticket targets another exact preflight commitment")
             }
             Self::AdmissionStopped { .. } => write!(f, "effect admission is stopped"),
             Self::Revoked { .. } => {
@@ -734,6 +795,11 @@ impl Drop for EffectInFlightGuard {
     }
 }
 
+fn hash_field(hasher: &mut blake3::Hasher, bytes: &[u8]) {
+    hasher.update(&(bytes.len() as u64).to_le_bytes());
+    hasher.update(bytes);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -741,12 +807,25 @@ mod tests {
     use std::sync::{mpsc, Arc, Barrier};
     use std::thread;
 
+    fn commitment(tag: u8) -> EffectAdmissionCommitment {
+        EffectAdmissionCommitment::new([tag; 32], [tag.wrapping_add(1); 32], [tag.wrapping_add(2); 32])
+    }
+
+    #[test]
+    fn commitment_changes_with_authority_or_adapter_semantics() {
+        let base = EffectAdmissionCommitment::new([1; 32], [2; 32], [3; 32]);
+        let authority_changed = EffectAdmissionCommitment::new([1; 32], [4; 32], [3; 32]);
+        let adapter_changed = EffectAdmissionCommitment::new([1; 32], [2; 32], [5; 32]);
+        assert_ne!(base.digest(), authority_changed.digest());
+        assert_ne!(base.digest(), adapter_changed.digest());
+    }
+
     #[test]
     fn revocation_latches_admission_until_explicit_resume() {
         let domain = EffectEntryDomain::new();
-        let binding = [1; 32];
-        let ticket_while_running = domain.issue_ticket(binding).unwrap();
-        let stale_after_resume = domain.issue_ticket(binding).unwrap();
+        let commitment = commitment(1);
+        let ticket_while_running = domain.issue_ticket(commitment).unwrap();
+        let stale_after_resume = domain.issue_ticket(commitment).unwrap();
         let revocation = domain.revoke_all().unwrap();
 
         assert!(domain.is_stopped());
@@ -754,11 +833,11 @@ mod tests {
         assert_eq!(revocation.current_epoch().get(), 1);
         assert!(revocation.admitted_activity().is_quiescent());
         assert!(matches!(
-            domain.issue_ticket(binding),
+            domain.issue_ticket(commitment),
             Err(EffectEntryError::AdmissionStopped { .. })
         ));
         assert!(matches!(
-            domain.acquire(ticket_while_running, binding),
+            domain.acquire(ticket_while_running, commitment),
             Err(EffectEntryError::AdmissionStopped { .. })
         ));
 
@@ -767,7 +846,7 @@ mod tests {
         assert_eq!(resume.epoch(), revocation.current_epoch());
         assert!(revocation.revocation_sequence() < resume.resume_sequence());
         assert!(matches!(
-            domain.acquire(stale_after_resume, binding),
+            domain.acquire(stale_after_resume, commitment),
             Err(EffectEntryError::Revoked { .. })
         ));
     }
@@ -775,9 +854,9 @@ mod tests {
     #[test]
     fn acquired_permit_survives_stop_but_blocks_resume_until_quiescent() {
         let domain = EffectEntryDomain::new();
-        let binding = [2; 32];
-        let ticket = domain.issue_ticket(binding).unwrap();
-        let permit = domain.acquire(ticket, binding).unwrap();
+        let commitment = commitment(2);
+        let ticket = domain.issue_ticket(commitment).unwrap();
+        let permit = domain.acquire(ticket, commitment).unwrap();
         let acquisition = permit.acquisition_sequence();
         assert_eq!(domain.activity().outstanding_permits(), 1);
 
@@ -792,7 +871,7 @@ mod tests {
 
         let (receipt, value) = permit.enter(|| 42_u64).unwrap();
         assert_eq!(value, 42);
-        assert_eq!(receipt.action_binding(), binding);
+        assert_eq!(receipt.commitment(), commitment);
         assert_eq!(receipt.acquisition_sequence(), acquisition);
         assert!(acquisition < revocation.revocation_sequence());
         assert!(domain.activity().is_quiescent());
@@ -804,9 +883,9 @@ mod tests {
     #[test]
     fn revocation_during_callback_reports_in_flight_work_and_does_not_block() {
         let domain = Arc::new(EffectEntryDomain::new());
-        let binding = [3; 32];
-        let ticket = domain.issue_ticket(binding).unwrap();
-        let permit = domain.acquire(ticket, binding).unwrap();
+        let commitment = commitment(3);
+        let ticket = domain.issue_ticket(commitment).unwrap();
+        let permit = domain.acquire(ticket, commitment).unwrap();
 
         let (entered_tx, entered_rx) = mpsc::channel();
         let (continue_tx, continue_rx) = mpsc::channel();
@@ -837,9 +916,9 @@ mod tests {
     #[test]
     fn dropping_unused_permit_repairs_outstanding_count() {
         let domain = EffectEntryDomain::new();
-        let binding = [8; 32];
-        let ticket = domain.issue_ticket(binding).unwrap();
-        let permit = domain.acquire(ticket, binding).unwrap();
+        let commitment = commitment(8);
+        let ticket = domain.issue_ticket(commitment).unwrap();
+        let permit = domain.acquire(ticket, commitment).unwrap();
         assert_eq!(domain.activity().outstanding_permits(), 1);
         drop(permit);
         assert!(domain.activity().is_quiescent());
@@ -848,9 +927,9 @@ mod tests {
     #[test]
     fn callback_unwind_repairs_in_flight_count() {
         let domain = EffectEntryDomain::new();
-        let binding = [9; 32];
-        let ticket = domain.issue_ticket(binding).unwrap();
-        let permit = domain.acquire(ticket, binding).unwrap();
+        let commitment = commitment(9);
+        let ticket = domain.issue_ticket(commitment).unwrap();
+        let permit = domain.acquire(ticket, commitment).unwrap();
 
         let result = catch_unwind(AssertUnwindSafe(|| {
             let _ = permit.enter(|| panic!("synthetic adapter unwind"));
@@ -862,41 +941,41 @@ mod tests {
     #[test]
     fn new_epoch_ticket_can_be_admitted_only_after_resume() {
         let domain = EffectEntryDomain::new();
-        let binding = [4; 32];
-        let old_ticket = domain.issue_ticket(binding).unwrap();
+        let commitment = commitment(4);
+        let old_ticket = domain.issue_ticket(commitment).unwrap();
         domain.revoke_all().unwrap();
         assert!(matches!(
-            domain.issue_ticket(binding),
+            domain.issue_ticket(commitment),
             Err(EffectEntryError::AdmissionStopped { .. })
         ));
         domain.resume().unwrap();
         assert!(matches!(
-            domain.acquire(old_ticket, binding),
+            domain.acquire(old_ticket, commitment),
             Err(EffectEntryError::Revoked { .. })
         ));
 
-        let new_ticket = domain.issue_ticket(binding).unwrap();
+        let new_ticket = domain.issue_ticket(commitment).unwrap();
         assert_eq!(new_ticket.epoch(), domain.current_epoch());
-        let permit = domain.acquire(new_ticket, binding).unwrap();
+        let permit = domain.acquire(new_ticket, commitment).unwrap();
         drop(permit);
         assert!(domain.activity().is_quiescent());
     }
 
     #[test]
-    fn wrong_domain_and_action_binding_fail_closed() {
+    fn wrong_domain_and_commitment_fail_closed() {
         let first = EffectEntryDomain::new();
         let second = EffectEntryDomain::new();
-        let binding = [5; 32];
-        let ticket = first.issue_ticket(binding).unwrap();
+        let commitment = commitment(5);
+        let ticket = first.issue_ticket(commitment).unwrap();
         assert!(matches!(
-            second.acquire(ticket, binding),
+            second.acquire(ticket, commitment),
             Err(EffectEntryError::WrongDomain { .. })
         ));
 
-        let ticket = first.issue_ticket(binding).unwrap();
+        let ticket = first.issue_ticket(commitment).unwrap();
         assert!(matches!(
-            first.acquire(ticket, [6; 32]),
-            Err(EffectEntryError::ActionBindingMismatch)
+            first.acquire(ticket, commitment(6)),
+            Err(EffectEntryError::CommitmentMismatch)
         ));
         assert!(first.activity().is_quiescent());
     }
@@ -913,15 +992,15 @@ mod tests {
     fn repeated_acquire_revoke_race_has_only_linearized_outcomes() {
         for iteration in 0_u8..64 {
             let domain = Arc::new(EffectEntryDomain::new());
-            let binding = [iteration; 32];
-            let ticket = domain.issue_ticket(binding).unwrap();
+            let commitment = commitment(iteration);
+            let ticket = domain.issue_ticket(commitment).unwrap();
             let barrier = Arc::new(Barrier::new(3));
 
             let acquire_domain = Arc::clone(&domain);
             let acquire_barrier = Arc::clone(&barrier);
             let acquire_thread = thread::spawn(move || {
                 acquire_barrier.wait();
-                acquire_domain.acquire(ticket, binding)
+                acquire_domain.acquire(ticket, commitment)
             });
 
             let revoke_domain = Arc::clone(&domain);
