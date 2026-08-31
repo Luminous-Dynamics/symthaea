@@ -46,4 +46,14 @@ jobs:
             ${{ runner.os }}-cargo-cogsec-
 
       - name: Run focused CogSec qualification
+        env:
+          COGSEC_RECEIPT_OUT: target/cogsec-qualification-receipt.tsv
         run: bash scripts/cogsec-focused-qualification.sh
+
+      - name: Upload CogSec qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cogsec-qualification-${{ github.sha }}
+          path: target/cogsec-qualification-receipt.tsv
+          if-no-files-found: error
