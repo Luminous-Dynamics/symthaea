@@ -1,0 +1,76 @@
+name: Integration Fabric Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-integration-core/**'
+      - 'crates/core/symthaea-evidence-plane/**'
+      - 'crates/core/symthaea-logparse/**'
+      - 'crates/bridges/symthaea-prometheus-bridge/**'
+      - '.github/workflows/integration-fabric.yml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  group: integration-fabric-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  qualify-read-only-fabric:
+    name: Read-only integration fabric
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-integration-fabric-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-integration-fabric-
+
+      - name: Resolve workspace metadata
+        run: cargo metadata --format-version 1 --no-deps >/dev/null
+
+      - name: Test canonical integration contracts
+        run: cargo test -p symthaea-integration-core --lib
+
+      - name: Test normalized log observer
+        run: cargo test -p symthaea-logparse --lib
+
+      - name: Test Prometheus observation bridge
+        run: cargo test -p symthaea-prometheus-bridge --lib
+
+      - name: Compile all integration targets
+        run: |
+          cargo check -p symthaea-integration-core --all-targets
+          cargo check -p symthaea-logparse --all-targets
+          cargo check -p symthaea-prometheus-bridge --all-targets
+
+      # Cargo may resolve newly introduced adapter dependencies during the
+      # preceding commands. A green integration PR must include that exact
+      # lockfile delta rather than relying on CI-only resolution.
+      - name: Lockfile is committed
+        run: git diff --exit-code -- Cargo.lock
+
+      # Keep the exact resolver output even on a failed lockfile gate so it can
+      # be reviewed and committed rather than reconstructed by hand.
+      - name: Upload resolved lockfile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-fabric-lockfile-${{ github.sha }}
+          path: Cargo.lock
+          retention-days: 7
