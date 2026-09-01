@@ -87,8 +87,8 @@ pub use semantic_identity::{
 };
 pub use state::{
     StateAssessment, StateAssessmentError, StateAssessmentStatus, StateAssertion,
-    StateAssertionSource, StateComparisonPolicy, StateRole, StateValidationError, StateValue,
-    assess_state_dimension,
+    StateAssertionSource, StateBudgetError, StateComparisonPolicy, StateLimits, StateRole,
+    StateSnapshot, StateValidationError, StateValue, assess_state_dimension,
 };
 pub use topology::{
     DiscoveredEntity, DiscoverySnapshot, EntityRelation, RelationBasis, RelationKind,
