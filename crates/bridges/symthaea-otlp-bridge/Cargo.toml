@@ -12,3 +12,5 @@ blake3 = { workspace = true }
 
 [dev-dependencies]
 symthaea-prometheus-bridge = { path = "../symthaea-prometheus-bridge" }
+symthaea-kubernetes-bridge = { path = "../symthaea-kubernetes-bridge" }
+serde_json = { workspace = true }
