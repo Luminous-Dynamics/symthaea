@@ -7,7 +7,7 @@
 
 use crate::{
     DiscoverySnapshot, IdentitySnapshot, IdentitySnapshotError, IdentityValidationError,
-    kubernetes_object_uid_identifier,
+    K8S_OBJECT_UID_SCHEME, kubernetes_object_uid_identifier, kubernetes_uid_scheme,
 };
 use std::collections::BTreeSet;
 
@@ -62,19 +62,28 @@ pub fn kubernetes_cluster_uid_from_topology(
     }
 }
 
-/// Upgrade legacy Kubernetes object UID claims to the shared semantic scheme
-/// using a *real* Kubernetes cluster UID.
+/// Normalize Kubernetes object UID claims to the shared semantic scheme using
+/// a *real* Kubernetes cluster UID.
 ///
-/// This function intentionally requires the caller to provide that UID. It will
-/// not derive strong scope from a cluster name, tenant, hostname, or adapter
-/// namespace. Claims already using another scheme are preserved unchanged.
+/// Both the transitional `k8s.uid` scheme and already-kind-specific semantic
+/// claims are re-scoped through the same canonical cluster-UID encoding. This
+/// lets old Kubernetes replay evidence and OTLP semantic-convention evidence be
+/// compared without teaching the resolver hidden aliases.
+///
+/// The function intentionally requires the caller to provide the real cluster
+/// UID. It will not derive strong scope from a cluster name, tenant, hostname,
+/// or adapter namespace. Unrelated identity schemes are preserved unchanged.
 pub fn normalize_kubernetes_uid_snapshot(
     snapshot: &IdentitySnapshot,
     cluster_uid: &str,
 ) -> Result<IdentitySnapshot, IdentityNormalizationError> {
     let mut normalized = snapshot.clone();
     for claim in &mut normalized.claims {
-        if claim.identifier.scheme != LEGACY_K8S_UID_SCHEME {
+        let expected_scheme =
+            kubernetes_uid_scheme(&claim.subject.kind).unwrap_or(K8S_OBJECT_UID_SCHEME);
+        if claim.identifier.scheme != LEGACY_K8S_UID_SCHEME
+            && claim.identifier.scheme != expected_scheme
+        {
             continue;
         }
 
@@ -155,6 +164,27 @@ mod tests {
         assert_eq!(claim.identifier.scheme, "k8s.pod.uid");
         assert!(claim.identifier.scope.as_deref().unwrap().contains("cluster-uid"));
         assert!(claim.claim_id.starts_with("normalized-claim-v1"));
+    }
+
+    #[test]
+    fn already_standard_pod_claim_is_rescoped_canonically() {
+        let mut snapshot = legacy_snapshot();
+        snapshot.claims[0].identifier.scheme = "k8s.pod.uid".into();
+        snapshot.claims[0].identifier.scope = Some("old-otel-scope".into());
+        let normalized = normalize_kubernetes_uid_snapshot(&snapshot, "cluster-uid").unwrap();
+        let claim = &normalized.claims[0];
+        assert_eq!(claim.identifier.scheme, "k8s.pod.uid");
+        assert!(claim.identifier.scope.as_deref().unwrap().contains("cluster-uid"));
+        assert_ne!(claim.identifier.scope.as_deref(), Some("old-otel-scope"));
+    }
+
+    #[test]
+    fn unrelated_identity_scheme_is_not_rewritten() {
+        let mut snapshot = legacy_snapshot();
+        snapshot.claims[0].identifier.scheme = "host.id".into();
+        let original = snapshot.claims[0].clone();
+        let normalized = normalize_kubernetes_uid_snapshot(&snapshot, "cluster-uid").unwrap();
+        assert_eq!(normalized.claims[0], original);
     }
 
     #[test]
