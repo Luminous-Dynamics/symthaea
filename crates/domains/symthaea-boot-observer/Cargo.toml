@@ -6,6 +6,7 @@ license = "AGPL-3.0-or-later"
 description = "Non-authoritative systemd boot observer for Symthaea/Spore presentation"
 
 [dependencies]
+blake3 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 symthaea-boot-protocol = { path = "../symthaea-boot-protocol" }
