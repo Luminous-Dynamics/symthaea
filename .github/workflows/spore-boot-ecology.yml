@@ -9,6 +9,7 @@ on:
       - "nix/packages/spore-boot-tools.nix"
       - "scripts/spore_preview_gallery.py"
       - "scripts/spore_inoculation_gallery.py"
+      - "scripts/spore_visual_evidence.py"
       - "docs/design/SPORE_BOOT_ECOLOGY_V03.md"
       - "docs/design/SPORE_VISUAL_LANGUAGE_V031.md"
       - "docs/design/SPORE_VISUAL_FIDELITY_V032.md"
@@ -62,6 +63,34 @@ jobs:
           -p symthaea-boot-ecology
           -p symthaea-boot-state
           -p symthaea-quicken-fb
+
+      - name: Probe complete renderer CPU cost
+        run: >-
+          cargo run --release
+          -p symthaea-quicken-fb
+          --bin spore_render_probe
+          --
+          --width 640
+          --height 360
+          --frames 24
+          --out spore-render-probe.json
+
+      - name: Verify renderer cost evidence
+        run: |
+          test -s spore-render-probe.json
+          python3 - <<'PY'
+          import json, math
+          from pathlib import Path
+          report = json.loads(Path("spore-render-probe.json").read_text())
+          assert report["schema"] == "spore-render-probe-v1"
+          assert report["width"] == 640 and report["height"] == 360
+          assert report["frames"] == 24
+          for key in ("mean_frame_ms", "p50_frame_ms", "p95_frame_ms", "max_frame_ms"):
+              value = float(report[key])
+              assert math.isfinite(value) and value >= 0.0, (key, value)
+          assert len(report["final_frame_blake3"]) == 64
+          assert report["policy"] == "evidence-only-no-performance-threshold"
+          PY
 
       - name: Render exact lifecycle preview matrix
         run: >-
@@ -127,6 +156,46 @@ jobs:
           test -s spore-inoculation-paths-preview/index.html
           test "$(find spore-inoculation-paths-preview -name 'frame-*.ppm' | wc -l)" -eq 18
           test "$(find spore-inoculation-paths-preview -name 'frame-*.png' | wc -l)" -eq 18
+
+      - name: Seal exact visual evidence
+        run: >-
+          python3 scripts/spore_visual_evidence.py
+          spore-boot-preview-matrix
+          spore-inoculation-preview
+          spore-inoculation-paths-preview
+
+      - name: Verify exact visual evidence seals
+        run: |
+          for root in spore-boot-preview-matrix spore-inoculation-preview spore-inoculation-paths-preview; do
+            test -s "$root/evidence-manifest.json"
+            test -s "$root/EVIDENCE.sha256"
+            (cd "$root" && sha256sum -c EVIDENCE.sha256)
+          done
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          roots = (
+              "spore-boot-preview-matrix",
+              "spore-inoculation-preview",
+              "spore-inoculation-paths-preview",
+          )
+          expected = os.environ["GITHUB_SHA"]
+          for root in roots:
+              manifest = json.loads(Path(root, "evidence-manifest.json").read_text())
+              assert manifest["schema"] == "spore-visual-evidence-v1"
+              assert manifest["source_commit"] == expected
+              assert manifest["file_count"] > 0
+              assert manifest["total_bytes"] > 0
+          PY
+
+      - name: Upload renderer cost evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-render-probe
+          path: spore-render-probe.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload exact boot renderer previews
         if: always()
