@@ -17,7 +17,7 @@
 #![forbid(unsafe_code)]
 
 pub mod conformance;
-pub mod identity;
+mod identity;
 pub mod identity_provider;
 pub mod independence;
 pub mod limits;
@@ -33,9 +33,9 @@ pub use conformance::{
 };
 pub use identity::{
     EntityPair, EntityResolutionProposal, ExternalIdentifier, IdentifierMatchEvidence,
-    IdentifierStability, IdentifierUniqueness, IdentityClaim, IdentityClaimIndex,
-    IdentityClaimSource, IdentityStrength, IdentityValidationError, ResolutionStatus,
-    SeparationClaim, assess_entity_pair,
+    IdentifierStability, IdentifierUniqueness, IdentityClaim, IdentityClaimSource,
+    IdentityStrength, IdentityValidationError, ResolutionStatus, SeparationClaim,
+    assess_entity_pair,
 };
 pub use identity_provider::{
     IDENTITY_DISCOVERY_CAPABILITY, IdentityAdmissionError, IdentityLimits, IdentityProvider,
