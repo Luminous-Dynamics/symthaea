@@ -11,6 +11,7 @@ on:
       - "scripts/spore_inoculation_gallery.py"
       - "docs/design/SPORE_BOOT_ECOLOGY_V03.md"
       - "docs/design/SPORE_VISUAL_LANGUAGE_V031.md"
+      - "docs/design/SPORE_VISUAL_FIDELITY_V032.md"
       - ".github/workflows/spore-boot-ecology.yml"
   workflow_dispatch:
 
@@ -22,7 +23,7 @@ jobs:
   boot-ecology:
     name: Rust state + renderer gate
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -85,7 +86,7 @@ jobs:
           test "$(find spore-boot-preview-matrix -name 'frame-*.ppm' | wc -l)" -ge 16
           test "$(find spore-boot-preview-matrix -name 'frame-*.png' | wc -l)" -ge 16
 
-      - name: Render exact inoculation preview matrix
+      - name: Render exact inoculation phase matrix
         run: >-
           cargo run --release
           -p symthaea-quicken-fb
@@ -95,16 +96,37 @@ jobs:
           --width 320
           --height 180
 
-      - name: Publish exact inoculation gallery
+      - name: Publish exact inoculation phase gallery
         run: python3 scripts/spore_inoculation_gallery.py spore-inoculation-preview
 
-      - name: Verify inoculation preview and phase count
+      - name: Verify inoculation phase preview and count
         run: |
           test -s spore-inoculation-preview/inoculation-manifest.json
           test -s spore-inoculation-preview/gallery-manifest.json
           test -s spore-inoculation-preview/index.html
           test "$(find spore-inoculation-preview -name 'frame-*.ppm' | wc -l)" -eq 32
           test "$(find spore-inoculation-preview -name 'frame-*.png' | wc -l)" -eq 32
+
+      - name: Render exact install-path ceremony matrix
+        run: >-
+          cargo run --release
+          -p symthaea-quicken-fb
+          --bin spore_inoculation_paths_preview
+          --
+          --out spore-inoculation-paths-preview
+          --width 320
+          --height 180
+
+      - name: Publish exact install-path ceremony gallery
+        run: python3 scripts/spore_inoculation_gallery.py spore-inoculation-paths-preview
+
+      - name: Verify six path signatures
+        run: |
+          test -s spore-inoculation-paths-preview/inoculation-manifest.json
+          test -s spore-inoculation-paths-preview/gallery-manifest.json
+          test -s spore-inoculation-paths-preview/index.html
+          test "$(find spore-inoculation-paths-preview -name 'frame-*.ppm' | wc -l)" -eq 18
+          test "$(find spore-inoculation-paths-preview -name 'frame-*.png' | wc -l)" -eq 18
 
       - name: Upload exact boot renderer previews
         if: always()
@@ -115,11 +137,20 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Upload exact inoculation previews
+      - name: Upload exact inoculation phase previews
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: spore-inoculation-preview
           path: spore-inoculation-preview
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload exact install-path ceremony previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-inoculation-paths-preview
+          path: spore-inoculation-paths-preview
           if-no-files-found: warn
           retention-days: 14
