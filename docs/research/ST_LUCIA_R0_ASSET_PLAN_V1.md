@@ -105,10 +105,20 @@ The frozen planner is:
 ```text
 scripts/research/st_lucia_r0_asset_plan.py
 schema       symthaea-st-lucia-r0-asset-plan/v1
-tool_version 1.0.0
+tool_version 1.1.0
 ```
 
-It must:
+The first executed v1.0.0 plan attempt passed all then-current offline tests but correctly stopped on the first real S2 asset because CDSE represented its STAC asset `href` relatively rather than as an absolute URL. No asset bytes were downloaded. This v1.1.0 amendment is therefore post-plan-attempt but still strictly pre-download/pre-preview.
+
+STAC permits relative references. For each selected item, the planner must preserve the raw asset `href` exactly as retained in the frozen STAC bytes. If that raw `href` is relative, the planner may resolve it only against exactly one unique item `rel=self` link retained in the same frozen item. The self link and the final resolved retrieval URL must both be absolute HTTPS URLs on the pinned host:
+
+```text
+stac.dataspace.copernicus.eu
+```
+
+The planner must reject non-HTTPS values, off-origin absolute URLs, scheme-relative off-origin escapes, URL userinfo, non-default HTTPS ports, fragments, missing self links for relative assets, and ambiguous multiple self links. This resolution performs no network request.
+
+The planner must:
 
 1. use zero network access;
 2. verify the original discovery receipt file hash;
@@ -117,13 +127,13 @@ It must:
 5. verify the exact S1/S2 selected IDs from the acquisition-set receipt;
 6. locate those exact items inside the retained raw STAC pages;
 7. require every frozen asset key above to exist exactly once per selected item;
-8. require every planned asset href to be HTTPS;
-9. preserve href, MIME type, roles, title and item identity from the frozen STAC bytes;
+8. preserve each raw STAC asset href and deterministically derive a reviewed absolute retrieval href under the rules above;
+9. preserve resolved href, resolution base when used, MIME type, roles, title and item identity from the frozen STAC bytes;
 10. emit all planned entries in deterministic `(collection, item_id, asset_key)` order;
 11. content-address the resulting plan;
 12. perform **no asset download**.
 
-Any missing required asset, duplicate selected item, changed source receipt, changed raw-page hash, non-HTTPS href, or selected-ID mismatch is a hard failure.
+Any missing required asset, duplicate selected item, changed source receipt, changed raw-page hash, unsafe/unresolvable href, or selected-ID mismatch is a hard failure.
 
 ## Review stop
 
@@ -136,7 +146,8 @@ Review must confirm:
 - exactly the frozen asset keys above;
 - no thumbnail/preview/TCI scientific substitution;
 - no bulk `Product` archive substituted for exact assets;
-- exact immutable hrefs as seen in the frozen catalogue pages;
+- exact raw STAC hrefs from the frozen catalogue bytes;
+- exact deterministic absolute hrefs produced by the reviewed resolution rule;
 - deterministic plan hash.
 
 Only after that review may a separate acquisition step fetch bytes. Each downloaded file must be hashed immediately and its byte length, final URL/redirect chain, HTTP metadata where available, and download tool/environment recorded before any raster inspection or feature computation.
