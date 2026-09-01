@@ -123,10 +123,9 @@ impl ExpectedRelation {
     fn validation_error(self) -> Option<String> {
         let threshold = match self {
             Self::LessByAtLeast { minimum_difference }
-            | Self::GreaterByAtLeast { minimum_difference } => Some((
-                "minimum difference",
-                minimum_difference,
-            )),
+            | Self::GreaterByAtLeast { minimum_difference } => {
+                Some(("minimum difference", minimum_difference))
+            }
             Self::EqualWithin { absolute_tolerance } => {
                 Some(("equal-within tolerance", absolute_tolerance))
             }
@@ -243,8 +242,11 @@ impl ExperimentPreregistration {
             } else if !blind_codes.insert(arm.blind_code.as_str()) {
                 errors.push(format!("duplicate blind_code: {}", arm.blind_code));
             }
-            if let Err(error) = arm.dynamics_config.try_validate() {
-                errors.push(format!("arm {} has invalid dynamics config: {error}", arm.arm_id));
+            if let Err(error) = arm.dynamics_config.try_validate_state(&arm.initial_state) {
+                errors.push(format!(
+                    "arm {} has invalid dynamics/state contract: {error}",
+                    arm.arm_id
+                ));
             }
             if arm.phases.is_empty() {
                 errors.push(format!("arm {} must have at least one drive phase", arm.arm_id));
