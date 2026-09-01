@@ -4,10 +4,13 @@
 //!
 //! v0.1 does not yet add another invocation/provider trait. State assertions are
 //! derived from existing registered read-only sources, then rebound to that
-//! registry slot and subjected to centrally chosen `StateLimits` before they can
-//! enter the world model.
+//! registry slot and subjected to centrally chosen limits before they can enter
+//! the world model or temporal reasoning path.
 
-use crate::{IntegrationError, IntegrationId, IntegrationRegistry, StateLimits, StateSnapshot};
+use crate::{
+    IntegrationError, IntegrationId, IntegrationRegistry, StateHistory, StateHistoryLimits,
+    StateLimits, StateSnapshot,
+};
 
 impl IntegrationRegistry {
     pub fn admit_state_snapshot(
@@ -24,11 +27,7 @@ impl IntegrationRegistry {
         snapshot: &StateSnapshot,
         limits: &StateLimits,
     ) -> Result<(), IntegrationError> {
-        if self.manifest(id).is_none() {
-            return Err(IntegrationError::Unsupported(format!(
-                "no registered integration manifest for state source `{id}`"
-            )));
-        }
+        self.require_registered_state_source(id)?;
         if snapshot.integration_id != id.as_str() {
             return Err(IntegrationError::InvalidOutput(format!(
                 "state source `{id}` returned snapshot attributed to `{}`",
@@ -40,5 +39,42 @@ impl IntegrationRegistry {
                 "integration `{id}` state evidence rejected by admission budget: {error}"
             ))
         })
+    }
+
+    pub fn admit_state_history(
+        &self,
+        id: &IntegrationId,
+        history: &StateHistory,
+    ) -> Result<(), IntegrationError> {
+        self.admit_state_history_with_limits(id, history, &StateHistoryLimits::default())
+    }
+
+    pub fn admit_state_history_with_limits(
+        &self,
+        id: &IntegrationId,
+        history: &StateHistory,
+        limits: &StateHistoryLimits,
+    ) -> Result<(), IntegrationError> {
+        self.require_registered_state_source(id)?;
+        if history.integration_id != id.as_str() {
+            return Err(IntegrationError::InvalidOutput(format!(
+                "state source `{id}` returned history attributed to `{}`",
+                history.integration_id
+            )));
+        }
+        history.validate_with_limits(limits).map_err(|error| {
+            IntegrationError::InvalidOutput(format!(
+                "integration `{id}` state history rejected by admission budget: {error}"
+            ))
+        })
+    }
+
+    fn require_registered_state_source(&self, id: &IntegrationId) -> Result<(), IntegrationError> {
+        if self.manifest(id).is_none() {
+            return Err(IntegrationError::Unsupported(format!(
+                "no registered integration manifest for state source `{id}`"
+            )));
+        }
+        Ok(())
     }
 }
