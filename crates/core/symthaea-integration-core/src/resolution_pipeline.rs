@@ -11,7 +11,7 @@
 
 use crate::{
     EntityResolutionBatch, IdentitySnapshot, IntegrationId, IntegrationRegistry, ResolutionError,
-    ResolutionLimits, resolve_identity_claims_with_limits,
+    ResolutionLimits, normalize_kubernetes_uid_snapshot, resolve_identity_claims_with_limits,
 };
 use std::collections::BTreeSet;
 
@@ -99,6 +99,48 @@ pub fn resolve_registry_identity_snapshots_with_limits(
     .map_err(ResolutionPipelineError::Resolution)
 }
 
+/// Explicit Kubernetes semantic-normalization + registry-admitted resolution.
+///
+/// This wrapper keeps Kubernetes/OTLP alias knowledge out of the resolver. Every
+/// supplied snapshot is normalized through the shared semantic vocabulary using
+/// a real Kubernetes cluster UID, then the ordinary registry admission and work
+/// budgets are applied.
+pub fn resolve_registry_kubernetes_uid_snapshots(
+    registry: &IntegrationRegistry,
+    snapshots: &[IdentitySnapshot],
+    cluster_uid: &str,
+    at_unix_ms: u64,
+) -> Result<EntityResolutionBatch, ResolutionPipelineError> {
+    resolve_registry_kubernetes_uid_snapshots_with_limits(
+        registry,
+        snapshots,
+        cluster_uid,
+        at_unix_ms,
+        &ResolutionLimits::default(),
+    )
+}
+
+pub fn resolve_registry_kubernetes_uid_snapshots_with_limits(
+    registry: &IntegrationRegistry,
+    snapshots: &[IdentitySnapshot],
+    cluster_uid: &str,
+    at_unix_ms: u64,
+    limits: &ResolutionLimits,
+) -> Result<EntityResolutionBatch, ResolutionPipelineError> {
+    let mut normalized = Vec::with_capacity(snapshots.len());
+    for snapshot in snapshots {
+        normalized.push(
+            normalize_kubernetes_uid_snapshot(snapshot, cluster_uid).map_err(|error| {
+                ResolutionPipelineError::IdentityNormalizationRejected {
+                    integration: snapshot.integration_id.clone(),
+                    reason: error.to_string(),
+                }
+            })?,
+        );
+    }
+    resolve_registry_identity_snapshots_with_limits(registry, &normalized, at_unix_ms, limits)
+}
+
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum ResolutionPipelineError {
     #[error("identity snapshot belongs to unregistered provider `{integration}`")]
@@ -107,6 +149,8 @@ pub enum ResolutionPipelineError {
     DuplicateProviderSnapshot { integration: String },
     #[error("identity snapshot from `{integration}` failed registry admission: {reason}")]
     AdmissionRejected { integration: String, reason: String },
+    #[error("identity snapshot from `{integration}` failed semantic normalization: {reason}")]
+    IdentityNormalizationRejected { integration: String, reason: String },
     #[error("identity resolution failed: {0}")]
     Resolution(#[from] ResolutionError),
 }
@@ -119,7 +163,8 @@ mod tests {
         IDENTITY_DISCOVERY_CAPABILITY, IdentifierStability, IdentifierUniqueness, IdentityClaim,
         IdentityClaimSource, IdentityProvider, IdentityRequest, IdentityStrength,
         INTEGRATION_MANIFEST_SCHEMA_VERSION, IntegrationError, IntegrationFuture,
-        IntegrationIdentity, IntegrationManifest, MaturityLevel, RiskClass, ResolutionStatus,
+        IntegrationIdentity, IntegrationManifest, LEGACY_K8S_UID_SCHEME, MaturityLevel, RiskClass,
+        ResolutionStatus,
     };
     use std::sync::Arc;
 
@@ -211,6 +256,46 @@ mod tests {
         }
     }
 
+    fn k8s_snapshot(
+        integration: &str,
+        namespace: &str,
+        scheme: &str,
+        scope: Option<&str>,
+    ) -> IdentitySnapshot {
+        IdentitySnapshot {
+            integration_id: integration.into(),
+            collected_at_unix_ms: 100,
+            claims: vec![IdentityClaim {
+                claim_id: "pod-claim".into(),
+                subject: EntityRef::new(namespace, "k8s_pod", format!("{integration}-pod")),
+                identifier: ExternalIdentifier {
+                    scheme: scheme.into(),
+                    value: "pod-uid".into(),
+                    scope: scope.map(str::to_string),
+                    uniqueness: if scope.is_some() {
+                        IdentifierUniqueness::Scoped
+                    } else {
+                        IdentifierUniqueness::Ambiguous
+                    },
+                    stability: IdentifierStability::Persistent,
+                    case_sensitive: true,
+                },
+                strength: IdentityStrength::Strong,
+                source_confidence: 1.0,
+                source: IdentityClaimSource {
+                    integration_id: integration.into(),
+                    collector_id: None,
+                    tenant: None,
+                },
+                observed_at_unix_ms: 100,
+                valid_from_unix_ms: None,
+                valid_until_unix_ms: None,
+                evidence_observation_ids: vec![],
+            }],
+            separation_claims: vec![],
+        }
+    }
+
     #[test]
     fn source_qualified_claim_refs_are_unambiguous() {
         assert_ne!(
@@ -241,6 +326,43 @@ mod tests {
         assert_ne!(matched.left_claim_ids[0], matched.right_claim_ids[0]);
         assert!(matched.left_claim_ids[0].starts_with("claim-ref-v1|"));
         assert!(matched.right_claim_ids[0].starts_with("claim-ref-v1|"));
+    }
+
+    #[test]
+    fn kubernetes_pipeline_normalizes_legacy_and_standard_uid_claims_before_resolution() {
+        let left_snapshot = k8s_snapshot(
+            "kubernetes",
+            "k8s-native",
+            LEGACY_K8S_UID_SCHEME,
+            Some("legacy-name-scope"),
+        );
+        let right_snapshot = k8s_snapshot(
+            "otlp",
+            "otel",
+            "k8s.pod.uid",
+            Some("old-otel-scope"),
+        );
+        let left = FixtureProvider {
+            manifest: manifest("kubernetes"),
+            snapshot: left_snapshot.clone(),
+        };
+        let right = FixtureProvider {
+            manifest: manifest("otlp"),
+            snapshot: right_snapshot.clone(),
+        };
+        let mut registry = IntegrationRegistry::new();
+        registry.register_identity_provider(Arc::new(left)).unwrap();
+        registry.register_identity_provider(Arc::new(right)).unwrap();
+
+        let resolved = resolve_registry_kubernetes_uid_snapshots(
+            &registry,
+            &[left_snapshot, right_snapshot],
+            "cluster-uid",
+            100,
+        )
+        .unwrap();
+        assert_eq!(resolved.proposals.len(), 1);
+        assert_eq!(resolved.proposals[0].status, ResolutionStatus::StrongCandidateSame);
     }
 
     #[test]
