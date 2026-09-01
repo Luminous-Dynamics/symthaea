@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::snapshot::INTEROCEPTIVE_MODEL_SEMANTICS_VERSION;
 
-pub const QUALIFICATION_RECEIPT_SCHEMA_VERSION: u16 = 1;
+pub const QUALIFICATION_RECEIPT_SCHEMA_VERSION: u16 = 2;
 pub const REQUIRED_QUALIFICATION_GATES: [&str; 5] = [
     "local_fmt",
     "local_test",
@@ -21,24 +21,151 @@ pub enum GateStatus {
     Pending,
 }
 
+/// Typed identity for the evidence underlying one qualification-gate status.
+///
+/// This establishes provenance consistency inside the receipt. It does not by
+/// itself authenticate an external service or prove that a reported status is
+/// truthful; the qualification harness must verify the referenced transcript or
+/// workflow run before constructing evidence-bearing `Passed`/`Failed` receipts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum QualificationGateEvidence {
+    LocalCommand {
+        subject_commit: String,
+        command: String,
+        environment_sha256: String,
+        transcript_sha256: String,
+    },
+    GitHubActions {
+        subject_commit: String,
+        workflow: String,
+        run_id: u64,
+        run_attempt: u32,
+    },
+}
+
+impl QualificationGateEvidence {
+    pub fn local_command(
+        subject_commit: impl Into<String>,
+        command: impl Into<String>,
+        environment_sha256: impl Into<String>,
+        transcript_sha256: impl Into<String>,
+    ) -> Self {
+        Self::LocalCommand {
+            subject_commit: subject_commit.into(),
+            command: command.into(),
+            environment_sha256: environment_sha256.into(),
+            transcript_sha256: transcript_sha256.into(),
+        }
+    }
+
+    pub fn github_actions(
+        subject_commit: impl Into<String>,
+        workflow: impl Into<String>,
+        run_id: u64,
+        run_attempt: u32,
+    ) -> Self {
+        Self::GitHubActions {
+            subject_commit: subject_commit.into(),
+            workflow: workflow.into(),
+            run_id,
+            run_attempt,
+        }
+    }
+
+    pub fn subject_commit(&self) -> &str {
+        match self {
+            Self::LocalCommand { subject_commit, .. }
+            | Self::GitHubActions { subject_commit, .. } => subject_commit,
+        }
+    }
+
+    pub fn validation_errors(&self) -> Vec<String> {
+        let mut errors = Vec::new();
+        if !is_lower_hex(self.subject_commit(), 40) {
+            errors.push(
+                "gate evidence subject_commit must be a 40-character lowercase Git SHA-1".into(),
+            );
+        }
+
+        match self {
+            Self::LocalCommand {
+                command,
+                environment_sha256,
+                transcript_sha256,
+                ..
+            } => {
+                if command.trim().is_empty() {
+                    errors.push("local-command evidence must include the executed command".into());
+                }
+                if !is_lower_hex(environment_sha256, 64) {
+                    errors.push(
+                        "local-command environment_sha256 must be a 64-character lowercase SHA-256 digest"
+                            .into(),
+                    );
+                }
+                if !is_lower_hex(transcript_sha256, 64) {
+                    errors.push(
+                        "local-command transcript_sha256 must be a 64-character lowercase SHA-256 digest"
+                            .into(),
+                    );
+                }
+            }
+            Self::GitHubActions {
+                workflow,
+                run_id,
+                run_attempt,
+                ..
+            } => {
+                if workflow.trim().is_empty() {
+                    errors.push("GitHub Actions evidence must include a workflow identity".into());
+                }
+                if *run_id == 0 {
+                    errors.push("GitHub Actions run_id must be positive".into());
+                }
+                if *run_attempt == 0 {
+                    errors.push("GitHub Actions run_attempt must be positive".into());
+                }
+            }
+        }
+
+        errors
+    }
+
+    pub fn validate(&self) -> Result<(), Vec<String>> {
+        let errors = self.validation_errors();
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QualificationGateReceipt {
     pub gate_id: String,
     pub status: GateStatus,
-    /// Human- or machine-readable evidence locator, run id, or command transcript identity.
-    pub evidence: String,
+    pub evidence: Option<QualificationGateEvidence>,
 }
 
 impl QualificationGateReceipt {
-    pub fn new(
+    pub fn with_evidence(
         gate_id: impl Into<String>,
         status: GateStatus,
-        evidence: impl Into<String>,
+        evidence: QualificationGateEvidence,
     ) -> Self {
         Self {
             gate_id: gate_id.into(),
             status,
-            evidence: evidence.into(),
+            evidence: Some(evidence),
+        }
+    }
+
+    pub fn pending(gate_id: impl Into<String>) -> Self {
+        Self {
+            gate_id: gate_id.into(),
+            status: GateStatus::Pending,
+            evidence: None,
         }
     }
 }
@@ -79,11 +206,34 @@ impl QualificationReceipt {
             if !seen.insert(gate.gate_id.as_str()) {
                 errors.push(format!("duplicate qualification gate: {}", gate.gate_id));
             }
-            if gate.evidence.trim().is_empty() && gate.status != GateStatus::Pending {
+
+            if gate.status != GateStatus::Pending && gate.evidence.is_none() {
                 errors.push(format!(
-                    "non-pending gate {} must include evidence identity",
+                    "non-pending gate {} must include typed evidence identity",
                     gate.gate_id
                 ));
+            }
+
+            if let Some(evidence) = &gate.evidence {
+                if let Err(evidence_errors) = evidence.validate() {
+                    errors.extend(
+                        evidence_errors
+                            .into_iter()
+                            .map(|error| format!("gate {} evidence: {error}", gate.gate_id)),
+                    );
+                }
+                if evidence.subject_commit() != self.source_commit {
+                    errors.push(format!(
+                        "gate {} evidence subject commit does not match qualification source_commit",
+                        gate.gate_id
+                    ));
+                }
+                if !evidence_matches_gate_contract(&gate.gate_id, evidence) {
+                    errors.push(format!(
+                        "gate {} uses an incompatible evidence kind or identity",
+                        gate.gate_id
+                    ));
+                }
             }
         }
 
@@ -131,6 +281,39 @@ impl QualificationReceipt {
                     && gate.status != GateStatus::Passed
             })
             .collect()
+    }
+}
+
+fn evidence_matches_gate_contract(gate_id: &str, evidence: &QualificationGateEvidence) -> bool {
+    match (gate_id, evidence) {
+        (
+            "local_fmt",
+            QualificationGateEvidence::LocalCommand { command, .. },
+        ) => command == "cargo fmt --all --check",
+        (
+            "local_test",
+            QualificationGateEvidence::LocalCommand { command, .. },
+        ) => command == "cargo test -p symthaea-interoception",
+        (
+            "local_clippy",
+            QualificationGateEvidence::LocalCommand { command, .. },
+        ) => command
+            == "cargo clippy -p symthaea-interoception --all-targets -- -D warnings",
+        (
+            "workspace_ci",
+            QualificationGateEvidence::GitHubActions { workflow, .. },
+        ) => workflow == "CI",
+        (
+            "showroom_integrity",
+            QualificationGateEvidence::GitHubActions { workflow, .. },
+        ) => workflow == "Showroom Integrity",
+        (
+            "benchmark_suite",
+            QualificationGateEvidence::GitHubActions { workflow, .. },
+        ) => workflow == "Symthaea Benchmark Suite",
+        ("local_fmt" | "local_test" | "local_clippy", _) => false,
+        ("workspace_ci" | "showroom_integrity" | "benchmark_suite", _) => false,
+        _ => true,
     }
 }
 

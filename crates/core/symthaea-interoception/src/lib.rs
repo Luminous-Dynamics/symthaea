@@ -51,8 +51,8 @@ pub use protocol::{
     PREREGISTRATION_SCHEMA_VERSION,
 };
 pub use qualification::{
-    GateStatus, QualificationGateReceipt, QualificationReceipt, QUALIFICATION_RECEIPT_SCHEMA_VERSION,
-    REQUIRED_QUALIFICATION_GATES,
+    GateStatus, QualificationGateEvidence, QualificationGateReceipt, QualificationReceipt,
+    QUALIFICATION_RECEIPT_SCHEMA_VERSION, REQUIRED_QUALIFICATION_GATES,
 };
 pub use qualification_bundle::{
     QualificationEvidenceBundle, QUALIFICATION_EVIDENCE_BUNDLE_SCHEMA_VERSION,
