@@ -28,10 +28,7 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def source_commit() -> str:
-    github_sha = os.environ.get("GITHUB_SHA", "").strip()
-    if github_sha:
-        return github_sha
+def git_head() -> str:
     try:
         return subprocess.check_output(
             ["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL
@@ -40,7 +37,25 @@ def source_commit() -> str:
         return "unknown"
 
 
-def seal(root: Path, commit: str) -> dict:
+def source_commit() -> str:
+    # On pull_request workflows GITHUB_SHA is normally the synthetic merge
+    # commit. Preserve the PR head separately so visual evidence can be tied to
+    # the actual patch lineage as well as the tree that CI evaluated.
+    explicit = os.environ.get("SPORE_SOURCE_COMMIT", "").strip()
+    if explicit:
+        return explicit
+    github_sha = os.environ.get("GITHUB_SHA", "").strip()
+    if github_sha:
+        return github_sha
+    return git_head()
+
+
+def evaluated_commit() -> str:
+    github_sha = os.environ.get("GITHUB_SHA", "").strip()
+    return github_sha or git_head()
+
+
+def seal(root: Path, source: str, evaluated: str) -> dict:
     if not root.is_dir():
         raise SystemExit(f"visual evidence root does not exist: {root}")
 
@@ -61,7 +76,10 @@ def seal(root: Path, commit: str) -> dict:
 
     manifest = {
         "schema": "spore-visual-evidence-v1",
-        "source_commit": commit,
+        "source_commit": source,
+        "evaluated_commit": evaluated,
+        "workflow_run_id": os.environ.get("GITHUB_RUN_ID", "unknown"),
+        "workflow_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", "unknown"),
         "root": root.name,
         "file_count": len(records),
         "total_bytes": total_bytes,
@@ -86,15 +104,19 @@ def main() -> None:
     parser.add_argument("roots", nargs="+", type=Path)
     args = parser.parse_args()
 
-    commit = source_commit()
+    source = source_commit()
+    evaluated = evaluated_commit()
     summaries = []
     for root in args.roots:
-        manifest = seal(root, commit)
+        manifest = seal(root, source, evaluated)
         summaries.append(
             f"{manifest['root']}: {manifest['file_count']} files, "
             f"{manifest['total_bytes']} bytes"
         )
-    print(f"sealed {len(summaries)} visual evidence roots at {commit}")
+    print(
+        f"sealed {len(summaries)} visual evidence roots "
+        f"source={source} evaluated={evaluated}"
+    )
     for summary in summaries:
         print(f"  {summary}")
 
