@@ -7,6 +7,7 @@ on:
       - "crates/core/symthaea-boot-state/**"
       - "crates/domains/symthaea-quicken-fb/**"
       - "nix/packages/spore-boot-tools.nix"
+      - "scripts/spore_preview_gallery.py"
       - "docs/design/SPORE_BOOT_ECOLOGY_V03.md"
       - ".github/workflows/spore-boot-ecology.yml"
   workflow_dispatch:
@@ -70,11 +71,17 @@ jobs:
           --height 180
           --fps 1
 
-      - name: Verify preview manifest and case count
+      - name: Publish exact preview gallery
+        run: python3 scripts/spore_preview_gallery.py spore-boot-preview-matrix
+
+      - name: Verify preview manifest, gallery, and case count
         run: |
           test -s spore-boot-preview-matrix/matrix-manifest.json
+          test -s spore-boot-preview-matrix/gallery-manifest.json
+          test -s spore-boot-preview-matrix/index.html
           test "$(find spore-boot-preview-matrix -name preview-manifest.json | wc -l)" -eq 16
           test "$(find spore-boot-preview-matrix -name 'frame-*.ppm' | wc -l)" -ge 16
+          test "$(find spore-boot-preview-matrix -name 'frame-*.png' | wc -l)" -ge 16
 
       - name: Upload exact renderer previews
         if: always()
