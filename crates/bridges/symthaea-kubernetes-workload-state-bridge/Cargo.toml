@@ -12,3 +12,6 @@ symthaea-kubernetes-state-bridge = { path = "../symthaea-kubernetes-state-bridge
 serde_json = { workspace = true }
 blake3 = { workspace = true }
 chrono = { workspace = true }
+
+[dev-dependencies]
+symthaea-kubernetes-endpointslice-bridge = { path = "../symthaea-kubernetes-endpointslice-bridge" }
