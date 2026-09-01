@@ -28,6 +28,9 @@
     "revision_outcome_sha256",
     "included_in_confirmatory_analysis",
     "trial_state",
+    "integrity_violations",
+    "metric_definition_set_sha256",
+    "analysis_contract_sha256",
     "evidence_bundle_sha256"
   ],
   "properties": {
