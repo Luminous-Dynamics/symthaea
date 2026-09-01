@@ -9,6 +9,7 @@ on:
       - "nix/packages/spore-boot-tools.nix"
       - "scripts/spore_preview_gallery.py"
       - "scripts/spore_inoculation_gallery.py"
+      - "scripts/spore_visual_lint.py"
       - "scripts/spore_visual_evidence.py"
       - "docs/design/SPORE_BOOT_ECOLOGY_V03.md"
       - "docs/design/SPORE_VISUAL_LANGUAGE_V031.md"
@@ -161,6 +162,32 @@ jobs:
           test "$(find spore-inoculation-paths-preview -name 'frame-*.ppm' | wc -l)" -eq 18
           test "$(find spore-inoculation-paths-preview -name 'frame-*.png' | wc -l)" -eq 18
 
+      - name: Lint exact pixels for blank-output and semantic-collapse regressions
+        run: >-
+          python3 scripts/spore_visual_lint.py
+          spore-boot-preview-matrix
+          spore-inoculation-preview
+          spore-inoculation-paths-preview
+
+      - name: Verify visual lint reports
+        run: |
+          for root in spore-boot-preview-matrix spore-inoculation-preview spore-inoculation-paths-preview; do
+            test -s "$root/visual-lint.json"
+          done
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for root in (
+              "spore-boot-preview-matrix",
+              "spore-inoculation-preview",
+              "spore-inoculation-paths-preview",
+          ):
+              report = json.loads(Path(root, "visual-lint.json").read_text())
+              assert report["schema"] == "spore-visual-lint-v1"
+              assert report["scenario_count"] > 0
+              assert report["policy"]["purpose"] == "sanity-and-semantic-diversity-not-aesthetic-scoring"
+          PY
+
       - name: Seal exact visual evidence
         run: >-
           python3 scripts/spore_visual_evidence.py
@@ -173,6 +200,7 @@ jobs:
           for root in spore-boot-preview-matrix spore-inoculation-preview spore-inoculation-paths-preview; do
             test -s "$root/evidence-manifest.json"
             test -s "$root/EVIDENCE.sha256"
+            test -s "$root/visual-lint.json"
             (cd "$root" && sha256sum -c EVIDENCE.sha256)
           done
           python3 - <<'PY'
@@ -192,6 +220,7 @@ jobs:
               assert manifest["evaluated_commit"] == expected_evaluated
               assert manifest["file_count"] > 0
               assert manifest["total_bytes"] > 0
+              assert any(item["path"] == "visual-lint.json" for item in manifest["files"])
           PY
 
       - name: Upload renderer cost evidence
