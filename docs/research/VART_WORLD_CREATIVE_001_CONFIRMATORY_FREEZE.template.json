@@ -25,6 +25,7 @@
   "ablation_policy_digests": {},
   "metric_definition_set_sha256": null,
   "analysis_contract_sha256": null,
+  "trial_inventory_sha256": null,
   "trial_manifest_schema_sha256": null,
   "independent_verifier_sha256": null,
   "qualified_verifier_sha256": null,
@@ -56,8 +57,7 @@
     "confirmatory_root": null,
     "confirmatory_root_must_be_fresh": true,
     "pilot_material_forbidden_from_confirmatory_root": true,
-    "all_preregistered_trial_ids_sha256": null,
-    "trial_inventory_sha256": null
+    "all_preregistered_trial_ids_sha256": null
   },
   "external_anchor": {
     "required": true,
