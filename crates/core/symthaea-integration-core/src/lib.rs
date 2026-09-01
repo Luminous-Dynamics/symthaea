@@ -75,6 +75,6 @@ pub use topology::{
 };
 pub use topology_limits::{TopologyBudgetError, TopologyLimits};
 pub use traits::{
-    Discoverer, DiscoveryRequest, IntegrationError, IntegrationFuture, IntegrationIdentity,
-    ObservationRequest, Observer,
+    COMPLETE_DISCOVERY_CAPABILITY, Discoverer, DiscoveryRequest, IntegrationError,
+    IntegrationFuture, IntegrationIdentity, ObservationRequest, Observer,
 };
