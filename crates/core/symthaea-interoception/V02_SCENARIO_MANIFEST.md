@@ -33,6 +33,7 @@ Each deterministic scenario should bind at minimum:
 - paired/twin/discriminator group ID where applicable;
 - declared nuisance-matching fields;
 - declared candidate-factor axes intentionally manipulated/held fixed;
+- declared history-access/state-sufficiency obligation when applicable;
 - expected mechanical/structural invariants;
 - explicit invalidation/exclusion conditions;
 - source generator ID/version when generated;
@@ -54,6 +55,7 @@ A scenario used to:
 - select a baseline;
 - alter an exclusion criterion;
 - discover a missing candidate discriminator;
+- discover a missing history/state-sufficiency distinction;
 
 is a discovery scenario and cannot later become confirmatory evidence.
 
@@ -87,6 +89,8 @@ Use to test absence of manufactured signal and numerical drift.
 Match current homeostatic burden while giving different already-observed trajectories.
 
 Use to compare current-state baselines against prefix-causal trajectory forecasts.
+
+This family alone does not prove native memory because current native state may still differ in transition-relevant fields.
 
 ### S3 — equal current state, different currently observed drive
 
@@ -197,10 +201,58 @@ A scenario may serve multiple discrimination obligations only when the manifest 
 
 If no scenario can distinguish a primary candidate from a simpler baseline, the design records `InsufficientDiscrimination` rather than inventing a winner.
 
+### S15 — history / native-state sufficiency
+
+Implement the families from `V02_HISTORY_STATE_SUFFICIENCY.md`.
+
+#### S15a — same complete native state, different prior path
+
+Construct two prefixes whose complete current native state/configuration at the cut point is exactly matched but whose historical paths differ.
+
+Where the candidate contract depends on an explicitly current drive/input, match that current input too.
+
+Use to distinguish:
+
+- H0 current-native-state-only candidates;
+- H1 replayed-prefix-history candidates.
+
+If H1 differs while H0 does not, the supported interpretation is that prior history adds information to the **external observatory** beyond the matched native state. It is not evidence that the native regulator stores that history.
+
+#### S15b — deterministic restart equivalence
+
+Take the same validated native state/configuration at the comparison point and start two native continuations with identical future drives/interventions.
+
+Require exact future native execution equality under the v0.1 deterministic contract.
+
+If the future native trajectories differ solely because their pre-restart histories differed, the declared native state is not transition-sufficient and the state contract requires investigation.
+
+#### S15c — same cumulative exposure, different ordering
+
+Match cumulative exposure but permute temporal ordering of prior load while matching current native state where feasible.
+
+Use to identify order-sensitive H1 statistics.
+
+#### S15d — same recent window, different remote history
+
+Match the candidate's declared recent support while changing older prefix history.
+
+A bounded-window candidate should remain invariant; a whole-history candidate may differ according to its locked definition.
+
+#### S15e — reset / warm-up semantics
+
+Apply the prospectively declared history reset or warm-up boundary and verify the candidate obeys it exactly.
+
+History accumulated before the reset must not influence a candidate whose contract says it was cleared.
+
+These scenarios prevent observer-maintained history from being mistaken for native mood, memory, or endogenous persistence.
+
 ## Nuisance matching
 
 Scenario pairs should declare which nuisance variables are intentionally matched, such as:
 
+- complete current native state when testing information beyond current state;
+- native dynamics configuration;
+- current drive/input when required by the comparison;
 - current weighted homeostatic deviation;
 - raw/importance-only burden where relevant;
 - peak deviation;
@@ -212,9 +264,12 @@ Scenario pairs should declare which nuisance variables are intentionally matched
 - initial regulatory margin;
 - precision/confidence summaries;
 - channel-set and denominator policy;
-- temporal horizon/discount when they are not the manipulated factor.
+- temporal horizon/discount when they are not the manipulated factor;
+- history window/reset semantics when history is not the manipulated factor.
 
 A candidate should not receive credit for discriminating paired scenarios when the same discrimination is trivially available from an undeclared nuisance difference.
+
+Per `V02_CAUSAL_CONTRASTS.md`, matching is appropriate only for the causal question being asked. Current-state matching is required when testing whether history adds information beyond current state, but may be inappropriate when estimating the total causal effect of a historical perturbation whose effect is mediated through current state.
 
 ## Scenario cut-point identity
 
@@ -242,6 +297,8 @@ Recommended confirmatory summaries include:
 - equivalence success/failure for neutral controls;
 - paired candidate-minus-baseline margin per scenario;
 - candidate equivalence-class membership under the locked discrimination contract;
+- history-access classification / H0-vs-H1 discrimination where relevant;
+- restart/state-sufficiency status;
 - explicit count/list of failure or insufficient-discrimination scenarios;
 - coverage of the declared parameter/scenario region.
 
@@ -277,6 +334,7 @@ A later `ScenarioCohortManifest` should bind:
 - candidate-definition digest set allowed for the cohort;
 - candidate-discrimination-manifest digest;
 - required pairwise discrimination obligations covered by the cohort;
+- required history/state-sufficiency obligations covered by the cohort;
 - analysis-definition digest;
 - canonical SHA-256.
 
@@ -284,6 +342,6 @@ A confirmatory evidence capsule/root should bind the exact cohort manifest diges
 
 ## Claim boundary
 
-A held-out deterministic cohort can demonstrate robustness across prospectively selected cases and parameter regions. An identifiability-qualified cohort can additionally establish that the planned comparisons have scenarios capable of separating the candidate explanations under test.
+A held-out deterministic cohort can demonstrate robustness across prospectively selected cases and parameter regions. An identifiability-qualified cohort can additionally establish that the planned comparisons have scenarios capable of separating the candidate explanations under test. History/state-sufficiency scenarios can distinguish external history-derived information from current-state sufficiency and test deterministic restart behavior.
 
-It does not by itself establish statistical population generalization, biological emotion, subjective feeling, sentience, or consciousness.
+They do not by themselves establish statistical population generalization, native memory, biological emotion, subjective feeling, sentience, or consciousness.
