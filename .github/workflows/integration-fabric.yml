@@ -57,6 +57,9 @@ jobs:
       - name: Test OTLP metrics observation bridge
         run: cargo test -p symthaea-otlp-bridge --lib
 
+      - name: Test cross-protocol identity resolution
+        run: cargo test -p symthaea-otlp-bridge --test cross_protocol_identity
+
       - name: Compile all integration targets
         run: |
           cargo check -p symthaea-integration-core --all-targets
