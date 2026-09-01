@@ -8,6 +8,7 @@
 /// # Architecture
 ///
 /// - `ecology_renderer` — deterministic state-aware procedural curve renderer
+/// - `preview` — exact offline frame capture using the same renderer
 /// - `framebuffer` — DRM device management, dumb buffer allocation, mmap
 /// - `mycelium` — legacy L-system renderer retained for compatibility
 /// - `progress` — optional named-pipe / disk-I/O progress events
@@ -16,4 +17,5 @@ pub mod color;
 pub mod ecology_renderer;
 pub mod framebuffer;
 pub mod mycelium;
+pub mod preview;
 pub mod progress;
