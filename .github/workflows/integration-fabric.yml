@@ -74,7 +74,7 @@ jobs:
         run: cargo test -p symthaea-otlp-bridge --test cross_protocol_identity
 
       - name: Test Kubernetes topology and identity replay
-        run: cargo test -p symthaea-kubernetes-bridge --lib
+        run: cargo test -p symthaea-kubernetes-bridge
 
       - name: Compile all integration targets
         run: |
