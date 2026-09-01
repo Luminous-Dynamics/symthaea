@@ -18,13 +18,13 @@ The exact live and preview renderer is now deliberately layered:
 2. **Holographic field** — projected membranes, segmented orbitals, sparse anchors, spectral echoes, energy sweeps.
 3. **Fidelity pass** — seeded spore membrane detail, bounded caustic interference, thresholded low-resolution bloom.
 4. **Identity layer** — sparse dependency-free factual microtype (`SPORE`, lifecycle cue, current stage).
-5. **Lifecycle-specific wrapper** — Inoculation chamber and install-route signature when the renderer is used for installation.
+5. **Lifecycle-specific wrapper** — Inoculation chamber and install-route signature when the renderer is used for installation. Inoculation deliberately bypasses boot-only Germination identity and supplies its own factual install identity.
 
 Each layer is optional presentation. None is allowed to become a dependency of system startup.
 
 ## Bloom without a GPU dependency
 
-Concept art gains much of its perceived depth from bloom. The early-boot renderer now implements a small CPU bloom workspace instead of requiring a shader compiler or graphics stack.
+Concept art gains much of its perceived depth from bloom. The early-boot renderer implements a small CPU bloom workspace instead of requiring a shader compiler or graphics stack.
 
 Properties:
 
@@ -41,7 +41,7 @@ This is a fidelity effect, never a progress or health signal.
 
 ## Spore membrane
 
-The central focal organism now receives a deterministic membrane shell derived from the same `BootGenome`.
+The central focal organism receives a deterministic membrane shell derived from the same `BootGenome`.
 
 The membrane is intentionally procedural rather than an image asset:
 
@@ -123,19 +123,41 @@ These route signatures wrap the same factual installation phase state and the sa
 
 ## Inoculation narration policy
 
-The web ceremony has also been brought into the same epistemic language as the framebuffer UI. Narration describes verifiable actions — trust establishment, reproducible transition environment, storage layout, derivations, runtime components, configuration, and first verified boot — rather than asserting that hardware has awakened or become sentient.
+The web ceremony uses the same epistemic language as the framebuffer UI. Narration describes verifiable actions — trust establishment, reproducible transition environment, storage layout, derivations, runtime components, configuration, and first verified boot — rather than asserting that hardware has awakened or become sentient.
 
 Optional Phi telemetry can remain visible as a research metric where enabled, but it is explicitly not an installation/boot success signal.
 
-## Exact evidence
+## Exact-pixel evidence
 
-CI renders three independent exact-pixel review artifacts:
+CI renders three independent exact-pixel review artifacts through the same presentation stack used by live DRM:
 
 - **Boot lifecycle matrix** — sixteen system-history cases.
 - **Inoculation phase matrix** — eight phases × four progress samples.
 - **Inoculation path matrix** — six installation routes × three representative lifecycle phases.
 
 The browser galleries are produced from the renderer's PPM output. Generated concept art is not used as validation evidence.
+
+After gallery publication, `scripts/spore_visual_evidence.py` seals every review root. Each `.ppm`, `.png`, `.json`, and `.html` review file receives a SHA-256 entry in `EVIDENCE.sha256`. `evidence-manifest.json` records the exact source commit, file count, total bytes, and individual hashes, and CI verifies the seal after creation.
+
+The seal proves which renderer bytes were produced and reviewed. It is not a boot authority, health signal, or security key.
+
+## Renderer-cost evidence
+
+The additional bloom, membrane, holographic and microtype layers must earn their visual cost.
+
+`spore_render_probe` exercises the complete organic + holographic + fidelity + factual-identity stack with a fixed deterministic genome and records:
+
+- resolution and frame count;
+- sequence duration;
+- mean frame cost;
+- p50 frame cost;
+- p95 frame cost;
+- maximum frame cost;
+- a BLAKE3 digest of the final rendered frame.
+
+The initial CI probe intentionally runs at 640×360 for 24 frames and is **evidence-only**. It validates that measurements are finite and stores the report as a CI artifact, but imposes no arbitrary performance cutoff. Thresholds should be introduced only after representative 1080p and 1440p measurements exist on known physical hardware.
+
+The boot deadline always has priority over visual completeness: expensive presentation may lose detail or frames; boot may not wait for it.
 
 ## What comes next
 
@@ -144,9 +166,10 @@ Candidate v0.3.3 work should prioritize continuity over ornament:
 - write a bounded visual handoff receipt before compositor takeover;
 - allow the greeter/session shell to continue the same `BootGenome` rather than cutting to an unrelated login screen;
 - persist shutdown contraction anchors so the next healthy boot can germinate from the same abstract spore positions;
+- add Calm / Standard / Rich presentation profiles with identical factual semantics;
 - evaluate DRM page flips/double buffering for cleaner motion;
 - measure 1080p/1440p CPU budgets before increasing bloom radius or effect count;
-- add accessibility profiles for reduced motion and reduced bloom.
+- add reduced-motion and reduced-bloom accessibility behavior.
 
 The design test remains:
 
