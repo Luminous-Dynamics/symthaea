@@ -5,6 +5,9 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Canonical effect commitments shared by CogSec evaluation and shadow observation"
 
+[lib]
+path = "src/root.rs"
+
 [dependencies]
 sha2 = { workspace = true }
 symthaea-cogsec = { path = "../../core/symthaea-cogsec" }
