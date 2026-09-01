@@ -44,15 +44,16 @@ impl LifecycleTransition {
     }
 
     /// Conservative lifecycle graph. Direct Boot -> Session permits autologin;
-    /// recovery is reachable without asserting why recovery was entered.
+    /// Session/Lock -> Greeter permits logout and user switching; recovery is
+    /// reachable without asserting why recovery was entered.
     pub const fn is_allowed(self) -> bool {
         use LifecycleSurface::{Boot, Greeter, Lock, Recovery, Session, Shutdown, Suspended};
         matches!(
             (self.from, self.to),
             (Boot, Greeter | Session | Recovery)
                 | (Greeter, Session | Suspended | Recovery | Shutdown)
-                | (Session, Lock | Suspended | Recovery | Shutdown)
-                | (Lock, Session | Suspended | Recovery | Shutdown)
+                | (Session, Greeter | Lock | Suspended | Recovery | Shutdown)
+                | (Lock, Greeter | Session | Suspended | Recovery | Shutdown)
                 | (Suspended, Greeter | Session | Lock | Recovery)
                 | (Recovery, Greeter | Session | Shutdown)
         )
@@ -316,6 +317,8 @@ mod tests {
         assert!(transition(LifecycleSurface::Boot, LifecycleSurface::Greeter).is_allowed());
         assert!(transition(LifecycleSurface::Boot, LifecycleSurface::Session).is_allowed());
         assert!(transition(LifecycleSurface::Greeter, LifecycleSurface::Suspended).is_allowed());
+        assert!(transition(LifecycleSurface::Session, LifecycleSurface::Greeter).is_allowed());
+        assert!(transition(LifecycleSurface::Lock, LifecycleSurface::Greeter).is_allowed());
         assert!(transition(LifecycleSurface::Lock, LifecycleSurface::Suspended).is_allowed());
         assert!(transition(LifecycleSurface::Suspended, LifecycleSurface::Lock).is_allowed());
         assert!(!transition(LifecycleSurface::Shutdown, LifecycleSurface::Session).is_allowed());
