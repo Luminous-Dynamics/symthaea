@@ -90,6 +90,16 @@ for path in "${CHANGED_PATHS[@]}"; do
   [[ "$path" == "Cargo.lock" ]] || fail "Cargo changed unexpected path: $path"
 done
 
+# CogSec hydration is deliberately narrower than general dependency maintenance.
+# Existing lockfile material may not disappear or be rewritten under cover of this
+# repair. A deletion in the diff means the repository needs a separately reviewed
+# broader lock update, so restore the original lock and fail closed.
+LOCK_DELETIONS="$(git diff --unified=0 -- Cargo.lock | grep -E '^-[^-]' || true)"
+if [[ -n "$LOCK_DELETIONS" ]]; then
+  printf '%s\n' "$LOCK_DELETIONS" >&2
+  fail "hydration is not additive-only; refusing unrelated Cargo.lock churn"
+fi
+
 for package in "${COGSEC_PACKAGES[@]}"; do
   grep -Fqx "name = \"$package\"" Cargo.lock || \
     fail "Cargo.lock still lacks package entry: $package"
@@ -113,7 +123,7 @@ if [[ "$LOCK_BEFORE" != "$LOCK_AFTER" ]]; then
   trap - EXIT INT TERM
   rm -f "$BACKUP" "$METADATA"
 
-  printf '\nHYDRATED: Cargo.lock changed and passes locked metadata validation.\n'
+  printf '\nHYDRATED: Cargo.lock changed additively and passes locked metadata validation.\n'
   printf 'Review the Cargo.lock diff and commit it without editing generated entries.\n'
   printf 'Then rerun this same command from the clean committed head; the second pass\n'
   printf 'will execute the canonical seven-gate CogSec qualification.\n'
