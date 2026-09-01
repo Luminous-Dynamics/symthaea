@@ -27,6 +27,7 @@ pub mod registry;
 pub mod resolution;
 pub mod resolution_pipeline;
 pub mod topology;
+pub mod topology_limits;
 pub mod traits;
 
 pub use conformance::{
@@ -68,8 +69,10 @@ pub use resolution_pipeline::{
     resolve_registry_identity_snapshots_with_limits, source_qualified_claim_id,
 };
 pub use topology::{
-    DiscoveredEntity, DiscoverySnapshot, EntityRelation, RelationKind,
+    DiscoveredEntity, DiscoverySnapshot, EntityRelation, RelationBasis, RelationKind,
+    TopologyValidationError,
 };
+pub use topology_limits::{TopologyBudgetError, TopologyLimits};
 pub use traits::{
     Discoverer, DiscoveryRequest, IntegrationError, IntegrationFuture, IntegrationIdentity,
     ObservationRequest, Observer,
