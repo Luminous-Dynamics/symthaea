@@ -9,9 +9,11 @@
 ///
 /// - `ecology_renderer_base` — deterministic state-aware procedural curve renderer
 /// - `ecology_renderer_holo` — bounded holographic spatial field wrapper
-/// - `ecology_renderer` — final visual-fidelity wrapper used by live + preview paths
+/// - `ecology_renderer_fidelity_v2` — membrane, caustics, and CPU bloom
+/// - `ecology_renderer` — final factual identity wrapper used by live + preview paths
 /// - `inoculation_renderer` — shared installation/incubation phase grammar
 /// - `inoculation_ceremony` — install-path-specific visual signatures
+/// - `microtype` — tiny dependency-free uppercase factual label renderer
 /// - `preview` — exact offline frame capture using the same renderer
 /// - `framebuffer` — DRM device management, dumb buffer allocation, mmap
 /// - `mycelium` — legacy L-system renderer retained for compatibility
@@ -22,11 +24,13 @@ pub mod color;
 pub mod ecology_renderer_base;
 #[path = "ecology_renderer_holo.rs"]
 pub mod ecology_renderer_holo;
-#[path = "ecology_renderer_fidelity_v2.rs"]
+pub mod ecology_renderer_fidelity_v2;
+#[path = "ecology_renderer_identity.rs"]
 pub mod ecology_renderer;
 pub mod framebuffer;
 pub mod inoculation_ceremony;
 pub mod inoculation_renderer;
+pub mod microtype;
 pub mod mycelium;
 pub mod preview;
 pub mod progress;
