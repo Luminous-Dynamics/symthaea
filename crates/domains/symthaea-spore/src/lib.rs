@@ -42,7 +42,7 @@
 
 pub mod app_migration;
 pub mod boot_consciousness;
-pub mod boot_ecology;
+pub use symthaea_boot_ecology as boot_ecology;
 pub mod broca;
 #[cfg(feature = "broca-full")]
 pub mod broca_full;
