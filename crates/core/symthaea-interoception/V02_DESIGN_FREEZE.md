@@ -20,6 +20,7 @@ Create a canonical machine-readable manifest binding at minimum:
 - exact v0.1 parent source commit;
 - v0.1 model-semantics version;
 - current v0.1 qualification dependency state;
+- required v0.1 `QualificationEvidenceBundle` schema/version;
 - exact v0.2 design branch/source commit;
 - top-level observational-affect plan digest;
 - information-firewall contract digest;
@@ -43,11 +44,11 @@ Use explicit states rather than a generic complete/incomplete flag:
 - `Draft` — design still actively changing;
 - `Reviewable` — all required contracts exist, but unresolved blocking questions remain or review has not completed;
 - `FrozenBlockedOnV01` — v0.2 design is frozen, but implementation remains blocked on v0.1 qualification;
-- `FrozenImplementationAuthorized` — v0.1 dependency satisfied and implementation may begin;
+- `FrozenImplementationAuthorized` — v0.1 dependency satisfied by one exact valid qualification/evidence bundle and implementation may begin;
 - `Superseded` — a later design freeze replaces this one;
 - `Invalidated` — a discovered internal contradiction makes this freeze unusable.
 
-`FrozenImplementationAuthorized` must never be reachable while v0.1 qualification is unresolved/failed.
+`FrozenImplementationAuthorized` must never be reachable while v0.1 qualification is unresolved/failed or while the supplied v0.1 qualification/evidence components do not validate as one exact bound lineage.
 
 ## Required design-completeness gates
 
@@ -111,6 +112,20 @@ The design specifies:
 The no-feedback invariant is explicit and requires native execution equality with and without observatory attachment.
 
 No v0.2 measurement type is designed to become a drive/action/neuromodulator/memory/cognitive command.
+
+### Baseline-qualification gate
+
+The v0.2 design recognizes one authoritative v0.1 promotion object: `QualificationEvidenceBundle`.
+
+Implementation authorization requires that the bundle:
+
+- validates structurally;
+- reports qualified;
+- binds the exact v0.1 source commit named by the design/start receipt;
+- binds the expected v0.1 model-semantics version;
+- contains the passing qualification receipt and evidence capsule from that same source lineage.
+
+Two independently valid but cross-paired v0.1 artifacts must never authorize v0.2 implementation.
 
 ### Evidence gate
 
@@ -229,17 +244,23 @@ Invalidates v0.2 observational freeze and requires a new scientific tranche.
 
 When v0.1 qualification eventually passes, create a small receipt binding:
 
-- DesignFreezeManifest SHA-256;
+- `DesignFreezeManifest` SHA-256;
 - exact qualified v0.1 source commit;
-- v0.1 qualification receipt/evidence capsule digests;
+- v0.1 `QualificationEvidenceBundle` SHA-256;
+- embedded v0.1 qualification-receipt SHA-256 and evidence-capsule SHA-256 for audit detail;
+- v0.1 model-semantics version;
 - v0.2 implementation branch starting SHA;
 - implementation tranche version;
 - authorization state `FrozenImplementationAuthorized`;
 - canonical receipt SHA-256.
 
+The start receipt validator must require that the supplied `QualificationEvidenceBundle` validates, reports qualified, and binds exactly the same source commit/model-semantics version named by the receipt. The component digests recorded by the receipt must equal the corresponding embedded bundle components; component validity alone is insufficient.
+
 This receipt marks the exact transition from design to implementation.
 
 No observational primary data should predate the relevant implementation-start/design identities.
+
+If v0.1 source changes after the start receipt is issued but before a later experiment claims the new source lineage, a new qualified v0.1 bundle and a new implementation/evidence lineage are required as appropriate. An older qualified bundle does not silently qualify a newer source head.
 
 ## Confirmatory lock occurs later
 
@@ -270,7 +291,8 @@ A reviewer should be able to answer yes to all of these before implementation be
 7. Can every confirmatory scenario be accounted for?
 8. Can malicious leakage/tampering fixtures be caught?
 9. Is the observatory provably read-only relative to v0.1?
-10. Are stronger affect/consciousness claims explicitly out of scope?
+10. Does implementation authorization bind one exact qualified v0.1 `QualificationEvidenceBundle` rather than independently pairing components?
+11. Are stronger affect/consciousness claims explicitly out of scope?
 
 ## Claim boundary
 
