@@ -145,9 +145,14 @@ impl InteroceptiveSnapshot {
                 self.model_semantics_version
             ));
         }
-        if let Err(error) = self.dynamics_config.try_validate() {
-            errors.push(format!("invalid dynamics config: {error}"));
-        }
+
+        let state_matches_domain = match self.dynamics_config.try_validate_state(&self.state) {
+            Ok(()) => true,
+            Err(error) => {
+                errors.push(format!("invalid dynamics/state contract: {error}"));
+                false
+            }
+        };
 
         let expected_homeostasis = assess_homeostasis(&self.state);
         if self.homeostasis != expected_homeostasis {
@@ -174,17 +179,23 @@ impl InteroceptiveSnapshot {
                     errors.push(format!("invalid dynamics-aware forecast config: {error}"));
                 } else if (config.dt - self.dynamics_config.step_dt).abs() > f32::EPSILON {
                     errors.push("dynamics-aware forecast dt does not match model step_dt".into());
-                } else if self.dynamics_config.try_validate().is_ok() {
-                    let model = NativeInteroceptiveModel::new(
+                } else if state_matches_domain {
+                    match NativeInteroceptiveModel::try_new(
                         self.state.clone(),
                         self.dynamics_config,
-                    );
-                    let expected = assess_allostasis_with_drive(&model, *drive, *config);
-                    if report != &expected {
-                        errors.push(
-                            "dynamics-aware forecast report does not match serialized state and drive"
-                                .into(),
-                        );
+                    ) {
+                        Ok(model) => {
+                            let expected = assess_allostasis_with_drive(&model, *drive, *config);
+                            if report != &expected {
+                                errors.push(
+                                    "dynamics-aware forecast report does not match serialized state and drive"
+                                        .into(),
+                                );
+                            }
+                        }
+                        Err(error) => errors.push(format!(
+                            "failed to reconstruct dynamics-aware snapshot model: {error}"
+                        )),
                     }
                 }
             }
