@@ -16,8 +16,9 @@ use opentelemetry_proto::tonic::{
 use serde_json::json;
 use std::sync::Arc;
 use symthaea_integration_core::{
-    IdentityRequest, IntegrationRegistry, ResolutionStatus, kubernetes_cluster_uid_from_topology,
-    normalize_kubernetes_uid_snapshot, resolve_registry_identity_snapshots,
+    IdentityRequest, IntegrationIdentity, IntegrationRegistry, ResolutionStatus,
+    kubernetes_cluster_uid_from_topology, normalize_kubernetes_uid_snapshot,
+    resolve_registry_identity_snapshots,
 };
 use symthaea_kubernetes_bridge::{KubernetesReplayContext, KubernetesReplayDiscoverer};
 use symthaea_otlp_bridge::{OtlpMetricsContext, OtlpMetricsObserver};
