@@ -1,0 +1,134 @@
+{
+  "schema": "symthaea.vart-world-creative-001.analysis-contract.v1",
+  "experiment_id": "VART-WORLD-CREATIVE-001",
+  "status": "template_not_frozen",
+  "principles": {
+    "no_primary_scalar_aggregate": true,
+    "paired_policy_comparisons": true,
+    "longitudinal_revisions_are_not_independent_replicates": true,
+    "world_is_primary_cluster_for_longitudinal_inference": true,
+    "calibration_and_world_improvement_are_separate_claim_families": true,
+    "integrity_failures_are_not_scientific_failures": true
+  },
+  "primary_comparison": {
+    "contrast": "full_symthaea-minus-random_valid",
+    "rationale": "Isolate experience-conditioned judgment value while holding the physically admissible candidate surface constant.",
+    "required_same_candidate_set_sha256": true,
+    "channels": {
+      "declared_goal_consequence": {
+        "role": "superiority",
+        "direction": null,
+        "minimum_effect": null
+      },
+      "physical_validity": {
+        "role": "noninferiority",
+        "direction": "higher_is_better",
+        "noninferiority_margin": null
+      },
+      "protected_side_effects": {
+        "role": "noninferiority",
+        "direction": "lower_is_better",
+        "noninferiority_margin": null
+      }
+    }
+  },
+  "secondary_comparisons": [
+    {
+      "contrast": "full_symthaea-minus-heuristic",
+      "channels": ["declared_goal_consequence", "physical_validity", "protected_side_effects", "perceptual_consequence"]
+    },
+    {
+      "contrast": "full_symthaea-minus-no_embodied_experience",
+      "channels": ["declared_goal_consequence", "prediction_error"]
+    },
+    {
+      "contrast": "full_symthaea-minus-no_counterfactual_evaluation",
+      "channels": ["declared_goal_consequence", "counterfactual_selection_quality"]
+    },
+    {
+      "contrast": "full_symthaea-minus-no_reality_ledger_context",
+      "channels": ["provenance_integrity", "declared_goal_consequence"]
+    },
+    {
+      "contrast": "full_symthaea-minus-no_depth",
+      "channels": ["physical_validity", "declared_goal_consequence", "perceptual_consequence"]
+    }
+  ],
+  "longitudinal_analysis": {
+    "pairing_unit": "world_fixture_seed_revision_index",
+    "cluster_unit": "persistent_world_identity",
+    "within_cluster_summary": null,
+    "effect_estimator": "paired_policy_difference_after_within_world_summary",
+    "uncertainty": {
+      "method": "cluster_bootstrap_over_worlds",
+      "resample_unit": "persistent_world_identity",
+      "iterations": null,
+      "confidence_level": null
+    },
+    "forbidden": [
+      "treating_each_revision_as_an_independent_world",
+      "pooling_revisions_across_worlds_without_cluster_accounting"
+    ]
+  },
+  "generalization_analysis": {
+    "pairing_unit": "unseen_world_fixture_seed_revision_index",
+    "cluster_unit": "unseen_world_identity",
+    "effect_estimator": "paired_policy_difference",
+    "uncertainty": {
+      "method": "bootstrap_over_unseen_worlds",
+      "iterations": null,
+      "confidence_level": null
+    }
+  },
+  "adversarial_analysis": {
+    "report_each_fixture_separately": true,
+    "fixtures": [
+      "pretty_trap",
+      "local_optimum",
+      "hidden_dependency",
+      "delayed_consequence",
+      "counterfactual_decoy",
+      "memory_trap"
+    ],
+    "cross_fixture_summary_is_secondary_only": true
+  },
+  "calibration_analysis": {
+    "separate_claim_family": true,
+    "prediction_error_metric": null,
+    "confidence_calibration_metric": null,
+    "temporal_unit": "revision_index_within_persistent_world",
+    "world_level_trend_estimator": null,
+    "population_summary": "distribution_of_world_level_trends",
+    "must_report_worlds_that_worsen": true
+  },
+  "human_evaluation": {
+    "optional": true,
+    "blinded_to_policy": true,
+    "blinded_to_before_after_order_when_task_allows": true,
+    "sampling_protocol_sha256": null,
+    "rater_exclusion_policy_sha256": null,
+    "cannot_override_physical_invalidity": true
+  },
+  "multiplicity": {
+    "primary_family_method": null,
+    "secondary_results_labeled_secondary": true,
+    "exploratory_results_labeled_exploratory": true
+  },
+  "missingness_and_aborts": {
+    "policy_sha256": null,
+    "all_counts_reported_by_policy_fixture_and_stage": true,
+    "no_silent_complete_case_filtering": true,
+    "integrity_invalid_trials_reported_separately": true,
+    "scientifically_negative_complete_trials_must_not_be_reclassified_invalid": true
+  },
+  "freeze_requirements": [
+    "all_null_metric_directions_resolved",
+    "all_primary_effect_or_noninferiority_thresholds_resolved",
+    "within_cluster_summary_resolved",
+    "bootstrap_iterations_resolved",
+    "confidence_level_resolved",
+    "calibration_metrics_resolved",
+    "multiplicity_method_resolved",
+    "missingness_policy_digest_resolved"
+  ]
+}
