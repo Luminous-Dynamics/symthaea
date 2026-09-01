@@ -21,6 +21,12 @@ tool_version 1.1.0
 
 The runner uses only the Python standard library and performs **catalogue discovery only**. It must not download raster assets, thumbnails, previews, quicklooks, or labels.
 
+The runner follows current CDSE STAC conventions used by the frozen protocol:
+
+- Sentinel-2 L2A item assets expose band keys such as `B03_10m`, `B04_10m`, `B08_10m`, `B11_20m`, `B12_20m`;
+- Sentinel-1 GRD item properties use `sar:instrument_mode` and `sar:polarizations`;
+- orbit metadata such as `sat:orbit_state` is retained in the raw page even though orbit direction is not a v1 selection criterion.
+
 ## Qualification before live discovery
 
 Before the first live catalogue request, record:
