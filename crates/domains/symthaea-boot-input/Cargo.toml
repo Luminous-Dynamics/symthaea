@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-boot-input"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Ephemeral F1/F2/Esc input adapter for the Symthaea/Spore boot renderer"
+
+[dependencies]
+evdev = "0.13.2"
+symthaea-boot-control = { path = "../symthaea-boot-control" }
