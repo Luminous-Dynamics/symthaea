@@ -15,6 +15,12 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
+/// Canonical manifest capability required for an [`IdentityProvider`].
+///
+/// Requiring the exact operation name prevents a connector that merely exposes
+/// unrelated topology discovery from being admitted as an identity authority.
+pub const IDENTITY_DISCOVERY_CAPABILITY: &str = "discover.entity.identity";
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct IdentityRequest {
     /// Empty means every entity visible inside the provider's configured scope.
@@ -27,6 +33,7 @@ pub struct IdentityRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at_unix_ms: Option<u64>,
     /// Include explicit separation claims when true.
+    #[serde(default)]
     pub include_separations: bool,
 }
 
@@ -420,5 +427,11 @@ mod tests {
             snapshot.validate_with_limits(&limits),
             Err(IdentityAdmissionError::IdentifierValueTooLarge { .. })
         ));
+    }
+
+    #[test]
+    fn identity_request_deserializes_missing_separation_flag_as_false() {
+        let request: IdentityRequest = serde_json::from_str("{}").unwrap();
+        assert!(!request.include_separations);
     }
 }
