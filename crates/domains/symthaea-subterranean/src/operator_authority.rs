@@ -335,7 +335,11 @@ impl OperatorAuthority {
         Ok(decision)
     }
 
-    pub fn reset_runtime(&mut self) {
+    /// Full simulation/episode reset. This deliberately clears restrictive
+    /// operator authority and therefore must not be used as a production
+    /// restart/recovery primitive. Operational recovery should restore a
+    /// validated checkpoint instead.
+    pub(crate) fn reset_runtime(&mut self) {
         self.pending_resume.clear();
         self.constraint = OperatorConstraint::None;
         self.last_applied_proposal = None;
