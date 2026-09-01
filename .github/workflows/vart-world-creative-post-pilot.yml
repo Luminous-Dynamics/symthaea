@@ -1,0 +1,45 @@
+name: VART World Creative Post-Pilot
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/audit_vart_world_creative_001_pilot.py'
+      - 'scripts/test_audit_vart_world_creative_001_pilot.py'
+      - 'scripts/verify_vart_world_creative_001_post_pilot.py'
+      - 'scripts/test_verify_vart_world_creative_001_post_pilot.py'
+      - 'docs/research/VART_WORLD_CREATIVE_001_POST_PILOT_*'
+      - '.github/workflows/vart-world-creative-post-pilot.yml'
+  push:
+    branches:
+      - 'research/vart-world-creative-001-execution'
+    paths:
+      - 'scripts/audit_vart_world_creative_001_pilot.py'
+      - 'scripts/test_audit_vart_world_creative_001_pilot.py'
+      - 'scripts/verify_vart_world_creative_001_post_pilot.py'
+      - 'scripts/test_verify_vart_world_creative_001_post_pilot.py'
+      - 'docs/research/VART_WORLD_CREATIVE_001_POST_PILOT_*'
+      - '.github/workflows/vart-world-creative-post-pilot.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  post-pilot-transition:
+    name: Pilot audit + disposition gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Python syntax gate
+        run: |
+          python3 -m py_compile \
+            scripts/audit_vart_world_creative_001_pilot.py \
+            scripts/test_audit_vart_world_creative_001_pilot.py \
+            scripts/verify_vart_world_creative_001_post_pilot.py \
+            scripts/test_verify_vart_world_creative_001_post_pilot.py
+      - name: Paired-design post-pilot adversarial suite
+        run: python3 scripts/test_audit_vart_world_creative_001_pilot.py
+      - name: Post-pilot disposition adversarial suite
+        run: python3 scripts/test_verify_vart_world_creative_001_post_pilot.py
