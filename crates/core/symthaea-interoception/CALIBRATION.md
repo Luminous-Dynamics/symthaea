@@ -35,6 +35,15 @@ H-class research hypotheses. Normalization and schema choices are S-class.
 The six channels using the standard profile are compute reserve, memory headroom,
 model stability, epistemic resolution, action efficacy, and interaction reliability.
 
+A standalone `ViabilityVariable` can represent arbitrary finite values for mathematical
+or diagnostic tests. A runnable `NativeInteroceptiveModel`, however, enforces the
+`InteroceptiveDynamicsConfig` numerical domain: every channel's current value,
+preferred interval, and viable interval must lie inside `[min_value, max_value]`.
+This prevents an invalid initial state from being silently collapsed to a clamp
+boundary on its first transition. Being outside the *viable* interval remains a
+valid model state as long as the value itself remains inside the declared numerical
+domain.
+
 ## Dynamics defaults
 
 | Parameter | Default | Class | Interpretation |
@@ -46,6 +55,13 @@ model stability, epistemic resolution, action efficacy, and interaction reliabil
 
 Recovery is inactive inside a preferred interval. This prevents the midpoint of a
 preferred band from becoming an undeclared setpoint.
+
+`NativeInteroceptiveModel::try_new` validates both the dynamics configuration and the
+state/domain contract before creating a runnable model. Preregistration performs the
+same compatibility check for every arm, and snapshot validation fails closed on a
+domain mismatch rather than constructing an invalid model during evidence loading.
+These are invariant checks over the declared structural domain, not new behavioral
+parameters.
 
 ## Allostatic defaults
 
