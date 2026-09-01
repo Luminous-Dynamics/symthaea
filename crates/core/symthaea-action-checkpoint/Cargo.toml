@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-action-checkpoint"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Grant-bound anti-rollback checkpoints for Symthaea bounded action runtime state"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+
+[dependencies]
+symthaea-authority = { path = "../symthaea-authority" }
+symthaea-action-runtime = { path = "../symthaea-action-runtime" }
+serde = { workspace = true }
+bincode = { workspace = true }
+blake3 = { workspace = true }
+thiserror = { workspace = true }
