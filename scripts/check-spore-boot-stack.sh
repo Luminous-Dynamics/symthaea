@@ -29,7 +29,7 @@ run_cargo_for_each() {
 for package in "${PACKAGES[@]}"; do
     echo "== cargo fmt -p $package --check =="
     cargo fmt -p "$package" --check
- done
+done
 
 run_cargo_for_each check --all-targets
 run_cargo_for_each test
@@ -37,15 +37,19 @@ run_cargo_for_each test
 for package in "${PACKAGES[@]}"; do
     echo "== cargo clippy -p $package --all-targets -- -D warnings =="
     cargo clippy -p "$package" --all-targets -- -D warnings
- done
+done
 
 echo "== deterministic headless smoke =="
+BENCH_SMOKE="$(mktemp /tmp/spore-boot-bench-smoke.XXXXXX.json)"
+trap 'rm -f "$BENCH_SMOKE"' EXIT
 cargo run -p symthaea-quicken-fb --release --bin spore-boot-bench -- \
     --width 320 \
     --height 180 \
     --warmup-frames 2 \
     --frames 8 \
-    --seed qualification-v1 >/tmp/spore-boot-bench-smoke.json
+    --seed qualification-v1 >"$BENCH_SMOKE"
+grep -q '"schema": "spore-boot-headless-benchmark-v1"' "$BENCH_SMOKE"
+grep -q '"total_cpu_frame"' "$BENCH_SMOKE"
 
 if command -v nix-instantiate >/dev/null 2>&1; then
     echo "== Nix parse: quicken-fb module =="
