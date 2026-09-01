@@ -26,7 +26,7 @@ Run:
 bash scripts/check-spore-boot-stack.sh
 ```
 
-This checks formatting, all targets, tests, Clippy with warnings denied, the deterministic headless benchmark smoke case, and Nix module parsing when Nix is available.
+This checks locked Cargo metadata, formatting, all targets, tests, Clippy with warnings denied, the deterministic headless benchmark smoke case, and Nix module parsing when Nix is available.
 
 Covered packages:
 
@@ -35,6 +35,8 @@ Covered packages:
 - `symthaea-quicken-fb`;
 - `symthaea-boot-control`;
 - `symthaea-boot-input`.
+
+The committed `Cargo.lock` is part of Q1 evidence. An unlocked Cargo success is not qualification because the Nix package path consumes the workspace lock.
 
 ## Q2 — NixOS VM
 
@@ -93,10 +95,23 @@ At minimum inspect:
 - display-manager timing;
 - DRM open;
 - first frame;
-- grow/render/blit p50/p95/p99;
+- CPU render / DRM blit p50/p95/p99;
 - frame-work deadline misses;
 - post-DRM release;
 - time-to-session delta.
+
+### Exact Boot Ecology renderer cost
+
+Boot Ecology v0.3.2 and the newer lifecycle/observability stack have complementary performance instruments, not competing ones.
+
+- `spore_render_probe` from Boot Ecology is the qualification source for the exact organic + holographic + fidelity + identity CPU renderer path.
+- `spore-boot-bench` in the newer stack currently isolates the legacy mycelial simulation/raster primitive. It is useful for algorithmic regression analysis but must not be presented as the final Boot Ecology renderer cost.
+- the live performance receipt measures quantities the pure render probe cannot: DRM open, actual framebuffer blit, first-frame latency, frame-work deadline misses, and post-DRM release.
+- whole-boot evidence measures whether any renderer-level improvement actually changes time-to-session.
+
+After Boot Ecology v0.3.2 qualifies, convergence must keep one exact visual path: `BootSnapshot/BootEvent -> ecology adapter -> BootGenome/RenderPlan -> preview or DRM/KMS`. The newer live instrumentation should wrap that exact path rather than creating a second visual engine.
+
+Do not optimize the legacy benchmark and infer that the ecology renderer improved. Optimize whichever layer the combined evidence identifies.
 
 ## Q5 — enablement
 
@@ -105,6 +120,7 @@ Only after Q0–Q4:
 - enable typed telemetry by default for the Spore specialisation;
 - qualify F1/F2/Esc integration;
 - qualify the display-manager handoff trigger;
+- complete Boot Ecology/protocol convergence with deterministic parity tests;
 - consider making the specialisation the normal default.
 
 Never remove the diagnostics/no-Spore escape path.
@@ -122,6 +138,7 @@ protocol/policy
   -> renderer handoff contract
   -> performance baseline
   -> qualification
+  -> Boot Ecology convergence
   -> measured optimization
   -> compatibility-preserving rename
 ```
