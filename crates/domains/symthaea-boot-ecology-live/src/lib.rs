@@ -95,6 +95,27 @@ impl DomainMask {
     pub const fn contains(self, domain: BootDomain) -> bool {
         (self.0 & (1u16 << domain.index())) != 0
     }
+
+    const fn newly_set_from(self, previous: Self) -> bool {
+        self.0 & !previous.0 != 0
+    }
+
+    const fn removed_from(self, previous: Self) -> bool {
+        previous.0 & !self.0 != 0
+    }
+}
+
+/// One bounded transient visual accent. Renderers should trigger it only when
+/// `accent_token` changes, not once per received telemetry packet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VisualAccent {
+    None,
+    Progress,
+    Delay,
+    Degraded,
+    Failed,
+    Recovery,
+    Ready,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -106,13 +127,16 @@ pub struct LiveEcologyModulation {
     pub health: BootHealth,
     pub reveal_floor: u32,
     pub delayed_domains: DomainMask,
-    pub repair_domains: DomainMask,
+    pub degraded_domains: DomainMask,
+    pub failed_domains: DomainMask,
     /// Minimum presentation visibility. This may defensively surface more detail
     /// than global health alone when domain state is inconsistent, but it never
     /// rewrites the authoritative `health` field.
     pub diagnostic_floor: DiagnosticFloor,
-    /// Idempotent change token: renderers may pulse only when this value changes.
-    pub pulse_token: u64,
+    /// Sequence-derived idempotency token for meaningful transient accents.
+    /// It changes only when presentation-relevant semantics change.
+    pub accent_token: u64,
+    pub accent: VisualAccent,
     /// True only for the protocol's explicit `Ready` phase.
     pub handoff_ready: bool,
 }
@@ -131,6 +155,9 @@ pub enum LiveAdapterError {
         previous: u64,
         observed: u64,
     },
+    SequenceEquivocated {
+        sequence: u64,
+    },
     AnchorRegressed {
         previous: SemanticBootAnchor,
         observed: SemanticBootAnchor,
@@ -145,6 +172,10 @@ impl std::fmt::Display for LiveAdapterError {
                 f,
                 "boot observation sequence regressed: previous={previous}, observed={observed}"
             ),
+            Self::SequenceEquivocated { sequence } => write!(
+                f,
+                "boot observation sequence {sequence} changed presentation semantics"
+            ),
             Self::AnchorRegressed { previous, observed } => write!(
                 f,
                 "semantic boot anchor regressed: previous={previous:?}, observed={observed:?}"
@@ -155,62 +186,28 @@ impl std::fmt::Display for LiveAdapterError {
 
 impl std::error::Error for LiveAdapterError {}
 
-/// One reducer instance belongs to one already-validated boot observation lineage.
-/// Callers must create/reset it when the protocol receiver adopts a new lineage.
-#[derive(Debug, Default)]
-pub struct LiveEcologyReducer {
-    last_sequence: Option<u64>,
-    last_anchor: Option<SemanticBootAnchor>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PresentationFingerprint {
+    anchor: SemanticBootAnchor,
+    health: BootHealth,
+    delayed_domains: DomainMask,
+    degraded_domains: DomainMask,
+    failed_domains: DomainMask,
+    diagnostic_floor: DiagnosticFloor,
+    handoff_ready: bool,
 }
 
-impl LiveEcologyReducer {
-    pub const fn new() -> Self {
-        Self {
-            last_sequence: None,
-            last_anchor: None,
-        }
-    }
-
-    pub fn reset(&mut self) {
-        self.last_sequence = None;
-        self.last_anchor = None;
-    }
-
-    pub fn reduce(
-        &mut self,
-        snapshot: &BootSnapshot,
-    ) -> Result<LiveEcologyModulation, LiveAdapterError> {
-        snapshot
-            .validate()
-            .map_err(|error| LiveAdapterError::InvalidSnapshot(error.to_string()))?;
-
-        if let Some(previous) = self.last_sequence
-            && snapshot.sequence < previous
-        {
-            return Err(LiveAdapterError::SequenceRegressed {
-                previous,
-                observed: snapshot.sequence,
-            });
-        }
-
-        let anchor = SemanticBootAnchor::from(snapshot.phase);
-        if let Some(previous) = self.last_anchor
-            && anchor < previous
-        {
-            return Err(LiveAdapterError::AnchorRegressed {
-                previous,
-                observed: anchor,
-            });
-        }
-
+impl PresentationFingerprint {
+    fn from_snapshot(snapshot: &BootSnapshot) -> Self {
         let mut delayed_domains = DomainMask::empty();
-        let mut repair_domains = DomainMask::empty();
+        let mut degraded_domains = DomainMask::empty();
+        let mut failed_domains = DomainMask::empty();
+
         for domain in &snapshot.domains {
             match domain.state {
                 DomainState::Delayed => delayed_domains.insert(domain.domain),
-                DomainState::Degraded | DomainState::Failed => {
-                    repair_domains.insert(domain.domain);
-                }
+                DomainState::Degraded => degraded_domains.insert(domain.domain),
+                DomainState::Failed => failed_domains.insert(domain.domain),
                 DomainState::Pending | DomainState::Starting | DomainState::Ready => {}
             }
         }
@@ -223,27 +220,177 @@ impl LiveEcologyReducer {
         if !delayed_domains.is_empty() {
             diagnostic_floor = diagnostic_floor.max(DiagnosticFloor::Status);
         }
-        if !repair_domains.is_empty() {
+        if !degraded_domains.is_empty() || !failed_domains.is_empty() {
             diagnostic_floor = DiagnosticFloor::Diagnostics;
         }
 
+        Self {
+            anchor: SemanticBootAnchor::from(snapshot.phase),
+            health: snapshot.health,
+            delayed_domains,
+            degraded_domains,
+            failed_domains,
+            diagnostic_floor,
+            handoff_ready: matches!(snapshot.phase, BootPhase::Ready),
+        }
+    }
+
+    const fn issues_removed_from(self, previous: Self) -> bool {
+        self.delayed_domains.removed_from(previous.delayed_domains)
+            || self.degraded_domains.removed_from(previous.degraded_domains)
+            || self.failed_domains.removed_from(previous.failed_domains)
+    }
+}
+
+/// One reducer instance belongs to one already-validated boot observation lineage.
+/// Callers must create/reset it when the protocol receiver adopts a new lineage.
+#[derive(Debug, Default)]
+pub struct LiveEcologyReducer {
+    last_sequence: Option<u64>,
+    last_fingerprint: Option<PresentationFingerprint>,
+    last_modulation: Option<LiveEcologyModulation>,
+}
+
+impl LiveEcologyReducer {
+    pub const fn new() -> Self {
+        Self {
+            last_sequence: None,
+            last_fingerprint: None,
+            last_modulation: None,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.last_sequence = None;
+        self.last_fingerprint = None;
+        self.last_modulation = None;
+    }
+
+    pub fn reduce(
+        &mut self,
+        snapshot: &BootSnapshot,
+    ) -> Result<LiveEcologyModulation, LiveAdapterError> {
+        snapshot
+            .validate()
+            .map_err(|error| LiveAdapterError::InvalidSnapshot(error.to_string()))?;
+
+        let fingerprint = PresentationFingerprint::from_snapshot(snapshot);
+
+        if let Some(previous_sequence) = self.last_sequence {
+            if snapshot.sequence < previous_sequence {
+                return Err(LiveAdapterError::SequenceRegressed {
+                    previous: previous_sequence,
+                    observed: snapshot.sequence,
+                });
+            }
+            if snapshot.sequence == previous_sequence {
+                if self.last_fingerprint != Some(fingerprint) {
+                    return Err(LiveAdapterError::SequenceEquivocated {
+                        sequence: snapshot.sequence,
+                    });
+                }
+                return Ok(self
+                    .last_modulation
+                    .expect("accepted sequence always has cached modulation"));
+            }
+        }
+
+        if let Some(previous) = self.last_fingerprint
+            && fingerprint.anchor < previous.anchor
+        {
+            return Err(LiveAdapterError::AnchorRegressed {
+                previous: previous.anchor,
+                observed: fingerprint.anchor,
+            });
+        }
+
+        let accent = self
+            .last_fingerprint
+            .map(|previous| classify_accent(previous, fingerprint))
+            .unwrap_or(VisualAccent::None);
+        let previous_token = self.last_modulation.map(|item| item.accent_token).unwrap_or(0);
+        let accent_token = if accent == VisualAccent::None {
+            previous_token
+        } else {
+            snapshot.sequence
+        };
+
         let modulation = LiveEcologyModulation {
             observation_sequence: snapshot.sequence,
-            anchor,
-            health: snapshot.health,
-            reveal_floor: anchor.reveal_floor(),
-            delayed_domains,
-            repair_domains,
-            diagnostic_floor,
-            pulse_token: snapshot.sequence,
-            handoff_ready: matches!(snapshot.phase, BootPhase::Ready),
+            anchor: fingerprint.anchor,
+            health: fingerprint.health,
+            reveal_floor: fingerprint.anchor.reveal_floor(),
+            delayed_domains: fingerprint.delayed_domains,
+            degraded_domains: fingerprint.degraded_domains,
+            failed_domains: fingerprint.failed_domains,
+            diagnostic_floor: fingerprint.diagnostic_floor,
+            accent_token,
+            accent,
+            handoff_ready: fingerprint.handoff_ready,
         };
         debug_assert!(modulation.validate());
 
         self.last_sequence = Some(snapshot.sequence);
-        self.last_anchor = Some(anchor);
+        self.last_fingerprint = Some(fingerprint);
+        self.last_modulation = Some(modulation);
         Ok(modulation)
     }
+}
+
+fn classify_accent(
+    previous: PresentationFingerprint,
+    current: PresentationFingerprint,
+) -> VisualAccent {
+    if current.failed_domains.newly_set_from(previous.failed_domains)
+        || transitioned_to_failed(previous.health, current.health)
+    {
+        return VisualAccent::Failed;
+    }
+    if current
+        .degraded_domains
+        .newly_set_from(previous.degraded_domains)
+        || transitioned_to_degraded(previous.health, current.health)
+    {
+        return VisualAccent::Degraded;
+    }
+    if current.delayed_domains.newly_set_from(previous.delayed_domains)
+        || transitioned_to_delayed(previous.health, current.health)
+    {
+        return VisualAccent::Delay;
+    }
+    if current.handoff_ready && !previous.handoff_ready {
+        return VisualAccent::Ready;
+    }
+    if current.issues_removed_from(previous) || health_recovered(previous.health, current.health) {
+        return VisualAccent::Recovery;
+    }
+    if current.anchor > previous.anchor {
+        return VisualAccent::Progress;
+    }
+    VisualAccent::None
+}
+
+const fn transitioned_to_failed(previous: BootHealth, current: BootHealth) -> bool {
+    !matches!(previous, BootHealth::Failed) && matches!(current, BootHealth::Failed)
+}
+
+const fn transitioned_to_degraded(previous: BootHealth, current: BootHealth) -> bool {
+    matches!(current, BootHealth::Degraded)
+        && !matches!(previous, BootHealth::Degraded | BootHealth::Failed)
+}
+
+const fn transitioned_to_delayed(previous: BootHealth, current: BootHealth) -> bool {
+    matches!(current, BootHealth::Delayed)
+        && matches!(previous, BootHealth::Normal | BootHealth::Unknown)
+}
+
+const fn health_recovered(previous: BootHealth, current: BootHealth) -> bool {
+    matches!(
+        (previous, current),
+        (BootHealth::Failed, BootHealth::Degraded | BootHealth::Delayed | BootHealth::Normal)
+            | (BootHealth::Degraded, BootHealth::Delayed | BootHealth::Normal)
+            | (BootHealth::Delayed, BootHealth::Normal)
+    )
 }
 
 #[cfg(test)]
@@ -294,21 +441,45 @@ mod tests {
     }
 
     #[test]
-    fn slow_boot_holds_last_factual_anchor() {
+    fn slow_boot_holds_last_factual_anchor_without_pulsing_on_telemetry_churn() {
         let mut reducer = LiveEcologyReducer::new();
-        let first = snapshot(7, BootPhase::Network, BootHealth::Delayed);
-        let first = reducer.reduce(&first).unwrap();
-        let later = snapshot(8, BootPhase::Network, BootHealth::Delayed);
-        let later = reducer.reduce(&later).unwrap();
+        let first = reducer
+            .reduce(&snapshot(7, BootPhase::Network, BootHealth::Delayed))
+            .unwrap();
+        let later = reducer
+            .reduce(&snapshot(8, BootPhase::Network, BootHealth::Delayed))
+            .unwrap();
 
         assert_eq!(first.anchor, SemanticBootAnchor::NetworkPhase);
         assert_eq!(later.anchor, first.anchor);
         assert_eq!(later.reveal_floor, first.reveal_floor);
         assert_eq!(later.diagnostic_floor, DiagnosticFloor::Status);
+        assert_eq!(first.accent_token, 0);
+        assert_eq!(later.accent_token, first.accent_token);
+        assert_eq!(later.accent, VisualAccent::None);
     }
 
     #[test]
-    fn ready_is_the_only_handoff_ready_state() {
+    fn meaningful_phase_advance_gets_one_progress_accent() {
+        let mut reducer = LiveEcologyReducer::new();
+        reducer
+            .reduce(&snapshot(1, BootPhase::Filesystems, BootHealth::Normal))
+            .unwrap();
+        let progressed = reducer
+            .reduce(&snapshot(2, BootPhase::Services, BootHealth::Normal))
+            .unwrap();
+        let unchanged = reducer
+            .reduce(&snapshot(3, BootPhase::Services, BootHealth::Normal))
+            .unwrap();
+
+        assert_eq!(progressed.accent, VisualAccent::Progress);
+        assert_eq!(progressed.accent_token, 2);
+        assert_eq!(unchanged.accent, VisualAccent::None);
+        assert_eq!(unchanged.accent_token, progressed.accent_token);
+    }
+
+    #[test]
+    fn ready_is_the_only_handoff_ready_state_and_has_ready_accent() {
         let mut reducer = LiveEcologyReducer::new();
         let session = reducer
             .reduce(&snapshot(1, BootPhase::Session, BootHealth::Normal))
@@ -320,6 +491,8 @@ mod tests {
             .unwrap();
         assert!(ready.handoff_ready);
         assert_eq!(ready.reveal_floor, REVEAL_SCALE);
+        assert_eq!(ready.accent, VisualAccent::Ready);
+        assert_eq!(ready.accent_token, 2);
     }
 
     #[test]
@@ -354,12 +527,12 @@ mod tests {
         let modulation = reducer.reduce(&current).unwrap();
         assert_eq!(modulation.health, BootHealth::Normal);
         assert_eq!(modulation.diagnostic_floor, DiagnosticFloor::Diagnostics);
-        assert!(modulation.repair_domains.contains(BootDomain::Services));
+        assert!(modulation.failed_domains.contains(BootDomain::Services));
     }
 
     #[test]
-    fn delayed_and_repair_domains_are_bounded_masks() {
-        let mut current = snapshot(4, BootPhase::Services, BootHealth::Degraded);
+    fn delay_degraded_and_failed_domains_remain_separate_bounded_masks() {
+        let mut current = snapshot(4, BootPhase::Services, BootHealth::Failed);
         current.domains = vec![
             DomainSnapshot {
                 domain: BootDomain::Network,
@@ -368,6 +541,11 @@ mod tests {
             },
             DomainSnapshot {
                 domain: BootDomain::Services,
+                state: DomainState::Degraded,
+                elapsed_ms: Some(325),
+            },
+            DomainSnapshot {
+                domain: BootDomain::Graphics,
                 state: DomainState::Failed,
                 elapsed_ms: Some(350),
             },
@@ -376,8 +554,27 @@ mod tests {
         let mut reducer = LiveEcologyReducer::new();
         let modulation = reducer.reduce(&current).unwrap();
         assert!(modulation.delayed_domains.contains(BootDomain::Network));
-        assert!(modulation.repair_domains.contains(BootDomain::Services));
-        assert!(!modulation.repair_domains.contains(BootDomain::Network));
+        assert!(modulation.degraded_domains.contains(BootDomain::Services));
+        assert!(modulation.failed_domains.contains(BootDomain::Graphics));
+        assert!(!modulation.failed_domains.contains(BootDomain::Network));
+    }
+
+    #[test]
+    fn new_failure_outranks_other_transient_accents() {
+        let mut reducer = LiveEcologyReducer::new();
+        reducer
+            .reduce(&snapshot(1, BootPhase::Network, BootHealth::Normal))
+            .unwrap();
+
+        let mut failed = snapshot(2, BootPhase::Services, BootHealth::Failed);
+        failed.domains = vec![DomainSnapshot {
+            domain: BootDomain::Network,
+            state: DomainState::Failed,
+            elapsed_ms: Some(200),
+        }];
+        let modulation = reducer.reduce(&failed).unwrap();
+        assert_eq!(modulation.accent, VisualAccent::Failed);
+        assert_eq!(modulation.accent_token, 2);
     }
 
     #[test]
@@ -404,8 +601,10 @@ mod tests {
         assert_eq!(before.reveal_floor, after.reveal_floor);
         assert_eq!(before.diagnostic_floor, DiagnosticFloor::Diagnostics);
         assert_eq!(after.diagnostic_floor, DiagnosticFloor::Ambient);
-        assert!(after.repair_domains.is_empty());
-        assert!(after.pulse_token > before.pulse_token);
+        assert!(after.degraded_domains.is_empty());
+        assert!(after.failed_domains.is_empty());
+        assert_eq!(after.accent, VisualAccent::Recovery);
+        assert_eq!(after.accent_token, 5);
     }
 
     #[test]
@@ -428,6 +627,19 @@ mod tests {
         assert!(reducer
             .reduce(&snapshot(1, BootPhase::Kernel, BootHealth::Unknown))
             .is_ok());
+    }
+
+    #[test]
+    fn same_sequence_with_changed_semantics_is_rejected_as_equivocation() {
+        let mut reducer = LiveEcologyReducer::new();
+        reducer
+            .reduce(&snapshot(7, BootPhase::Network, BootHealth::Normal))
+            .unwrap();
+
+        assert!(matches!(
+            reducer.reduce(&snapshot(7, BootPhase::Services, BootHealth::Normal)),
+            Err(LiveAdapterError::SequenceEquivocated { sequence: 7 })
+        ));
     }
 
     #[test]
@@ -458,12 +670,11 @@ mod tests {
     }
 
     #[test]
-    fn equal_sequence_is_idempotent_not_a_new_pulse_semantic() {
+    fn equal_sequence_is_exactly_idempotent() {
         let mut reducer = LiveEcologyReducer::new();
         let current = snapshot(3, BootPhase::Filesystems, BootHealth::Normal);
         let first = reducer.reduce(&current).unwrap();
         let second = reducer.reduce(&current).unwrap();
         assert_eq!(first, second);
-        assert_eq!(first.pulse_token, second.pulse_token);
     }
 }
