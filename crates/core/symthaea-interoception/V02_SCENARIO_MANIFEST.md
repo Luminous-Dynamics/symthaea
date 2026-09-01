@@ -2,7 +2,7 @@
 
 Status: **design-only / blocked on Native Interoception v0.1 qualification**
 
-This contract defines deterministic scenario identity, discovery/confirmation separation, and anti-leakage scenario families for Observational Regulatory Affect v0.2.
+This contract defines deterministic scenario identity, discovery/confirmation separation, anti-leakage scenario families, and the discriminator structure required for Observational Regulatory Affect v0.2.
 
 ## Why scenario identity must be independent
 
@@ -30,9 +30,10 @@ Each deterministic scenario should bind at minimum:
 - which current/past drive information is visible at each cut point;
 - any legitimate predictive cue available through each cut point;
 - semantic scenario family;
-- paired/twin group ID where applicable;
+- paired/twin/discriminator group ID where applicable;
 - declared nuisance-matching fields;
-- expected mechanical invariants;
+- declared candidate-factor axes intentionally manipulated/held fixed;
+- expected mechanical/structural invariants;
 - explicit invalidation/exclusion conditions;
 - source generator ID/version when generated;
 - generator seed/index where applicable;
@@ -52,6 +53,7 @@ A scenario used to:
 - discover a numerical pathology;
 - select a baseline;
 - alter an exclusion criterion;
+- discover a missing candidate discriminator;
 
 is a discovery scenario and cannot later become confirmatory evidence.
 
@@ -119,15 +121,15 @@ These prevent R1/R2/R3/R4 from collapsing into one generic scalar.
 
 Two scenarios must have byte-identical information available through cut point `t` and may diverge only after `t`.
 
-Every `OnlinePrefixCausal` candidate must be exactly identical through `t`.
+Every `OfflinePrefixCausal` candidate payload must be exactly identical through `t`; full-trace provenance envelopes may differ.
 
-This is a direct future-information leakage test. A difference before the divergence is a hard failure.
+This is a direct future-information leakage test. A payload difference before the divergence is a hard failure.
 
 ### S8 — future-mutation adversarial twins
 
-Take a completed scenario and mutate arbitrary future drives/interventions/states after a chosen cut point while preserving the prefix supplied to the online candidate.
+Take a completed scenario and mutate arbitrary future drives/interventions/states after a chosen cut point while preserving the prefix supplied to the candidate.
 
-The candidate value at the cut point must remain unchanged.
+The candidate payload at the cut point must remain unchanged.
 
 Property-test across multiple valid scenarios and cut points.
 
@@ -143,18 +145,74 @@ Construct regimes where native restorative dynamics or ongoing observed drive sh
 
 No universal winner is assumed.
 
+### S11 — burden / precision discrimination
+
+Implement the P1–P6 families from `V02_WEIGHTING_DECOMPOSITION.md`:
+
+- fixed state with changed precision;
+- fixed precision with changed burden;
+- severe low-confidence breach;
+- crossed mild/high-confidence vs severe/low-confidence cases;
+- precision-only prospective change;
+- importance-only change.
+
+These distinguish normative/viability burden from confidence-dependent legacy aggregation.
+
+### S12 — temporal exposure discrimination
+
+Implement the temporal cases from `V02_ALLOSTATIC_EXPOSURE_DECOMPOSITION.md`:
+
+- constant burden with different duration/horizon;
+- short severe pulse vs long mild burden;
+- equal mean with different cumulative exposure;
+- same terminal state with different path exposure;
+- same peak with different duration;
+- different breach timing;
+- equal terminal recovery with different integrated recovery burden.
+
+These prevent normalized mean, cumulative exposure, peak, terminal state, duration, and latency from collapsing into one quantity.
+
+### S13 — cross-channel aggregation / denominator discrimination
+
+Implement the A-D families from `V02_CHANNEL_AGGREGATION_CONTRACT.md`:
+
+- healthy-channel weight dilution while the deviated channel is unchanged;
+- healthy-channel precision dilution under the legacy weighting rule;
+- matched weighted mean with different burden concentration;
+- matched weighted sum with different distribution;
+- fixed peak with changed healthy background burden;
+- permutation-symmetry fixtures under equal channel geometry/weights;
+- zero-weight channels that remain visible in raw/peak/breach evidence;
+- future channel-set reference diagnostics.
+
+These distinguish vector, single-channel, peak, weighted-mean, weighted-sum, and breadth semantics.
+
+### S14 — candidate identifiability discriminators
+
+The locked scenario/cut-point set must satisfy `V02_IDENTIFIABILITY_AND_DISCRIMINATION.md`.
+
+For every primary-vs-baseline claim the design intends to make, register at least one discriminator capable of separating the pair under their prospectively locked definitions.
+
+A scenario may serve multiple discrimination obligations only when the manifest explicitly names those obligations; broad reuse must not leave another candidate factor axis untested.
+
+If no scenario can distinguish a primary candidate from a simpler baseline, the design records `InsufficientDiscrimination` rather than inventing a winner.
+
 ## Nuisance matching
 
 Scenario pairs should declare which nuisance variables are intentionally matched, such as:
 
 - current weighted homeostatic deviation;
+- raw/importance-only burden where relevant;
 - peak deviation;
 - drive magnitude;
 - perturbation magnitude;
 - elapsed steps;
 - number of active deviated channels;
 - current state velocity magnitude;
-- initial regulatory margin.
+- initial regulatory margin;
+- precision/confidence summaries;
+- channel-set and denominator policy;
+- temporal horizon/discount when they are not the manipulated factor.
 
 A candidate should not receive credit for discriminating paired scenarios when the same discrimination is trivially available from an undeclared nuisance difference.
 
@@ -183,7 +241,8 @@ Recommended confirmatory summaries include:
 - minimum effect margin across a declared core subset;
 - equivalence success/failure for neutral controls;
 - paired candidate-minus-baseline margin per scenario;
-- explicit count/list of failure scenarios;
+- candidate equivalence-class membership under the locked discrimination contract;
+- explicit count/list of failure or insufficient-discrimination scenarios;
 - coverage of the declared parameter/scenario region.
 
 If a generator is used, its scenario space should be described sufficiently to make coverage claims meaningful.
@@ -193,6 +252,8 @@ If a generator is used, its scenario space should be described sufficiently to m
 A scenario should be excluded only under a preregistered mechanical criterion, such as malformed input, invariant failure, non-finite derived value, or execution/replay mismatch.
 
 A surprising or hypothesis-inconsistent outcome is not an exclusion criterion.
+
+A scenario that fails to discriminate two candidates as expected is also not automatically excludable. It may be evidence of candidate equivalence, a flawed structural prediction, or an implementation/design issue and must be preserved/accounted for.
 
 Every scenario in a locked confirmatory cohort must end as one of:
 
@@ -214,11 +275,15 @@ A later `ScenarioCohortManifest` should bind:
 - scenario count;
 - planned cut points/comparison windows;
 - candidate-definition digest set allowed for the cohort;
+- candidate-discrimination-manifest digest;
+- required pairwise discrimination obligations covered by the cohort;
 - analysis-definition digest;
 - canonical SHA-256.
 
-A confirmatory evidence capsule should bind the exact cohort manifest digest.
+A confirmatory evidence capsule/root should bind the exact cohort manifest digest.
 
 ## Claim boundary
 
-A held-out deterministic cohort can demonstrate robustness across prospectively selected cases and parameter regions. It does not by itself establish statistical population generalization, biological emotion, subjective feeling, sentience, or consciousness.
+A held-out deterministic cohort can demonstrate robustness across prospectively selected cases and parameter regions. An identifiability-qualified cohort can additionally establish that the planned comparisons have scenarios capable of separating the candidate explanations under test.
+
+It does not by itself establish statistical population generalization, biological emotion, subjective feeling, sentience, or consciousness.
