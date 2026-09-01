@@ -159,7 +159,7 @@ in {
           }
           {
             unit = "graphical.target";
-            domain = "graphics";
+            domain = "session";
             phase = "ready";
             criticality = "critical";
             boot_ready = true;
