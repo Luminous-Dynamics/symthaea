@@ -1,1 +1,0 @@
-Status: supporting-only integration note. `V02_HISTORY_STATE_SUFFICIENCY.md` is normative and must be registered as `HistoryStateSufficiency` before design freeze. This note is not normative and should be removed after registry integration.
