@@ -25,6 +25,7 @@
 
 use crate::episodic_replay::{Episode, EpisodicMemory};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -63,6 +64,9 @@ impl Default for MemorySignals {
 // GRADUATION EVENTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+const PENDING_GRADUATION_STATE_DOMAIN_V1: &[u8] =
+    b"SYMTHAEA_MEMORY_PENDING_GRADUATION_STATE/v1";
+
 /// Event from working memory signaling an item is ready for consolidation.
 ///
 /// When a working memory item has persisted through enough decay cycles
@@ -87,6 +91,23 @@ pub struct GraduationEvent {
     pub is_verified: bool,
 }
 
+impl GraduationEvent {
+    fn update_pending_commitment_v1(&self, hasher: &mut Sha256) {
+        hasher.update((self.content.as_slice().len() as u64).to_be_bytes());
+        for value in self.content.as_slice() {
+            hasher.update(value.to_bits().to_be_bytes());
+        }
+        hasher.update((self.label.len() as u64).to_be_bytes());
+        hasher.update(self.label.as_bytes());
+        hasher.update(self.steps_survived.to_be_bytes());
+        hasher.update(self.final_activation.to_bits().to_be_bytes());
+        hasher.update(self.psi_at_graduation.to_bits().to_be_bytes());
+        hasher.update(self.coherence_at_graduation.to_bits().to_be_bytes());
+        hasher.update([self.source.pending_commitment_code_v1()]);
+        hasher.update([u8::from(self.is_verified)]);
+    }
+}
+
 /// Source of a memory item
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MemorySource {
@@ -103,6 +124,46 @@ pub enum MemorySource {
     SemanticEviction,
     /// Received via social relay from a peer agent
     Social,
+}
+
+impl MemorySource {
+    const fn pending_commitment_code_v1(self) -> u8 {
+        match self {
+            Self::Internal => 0,
+            Self::WebResearch => 1,
+            Self::UserInteraction => 2,
+            Self::ActionFeedback => 3,
+            Self::SemanticEviction => 4,
+            Self::Social => 5,
+        }
+    }
+}
+
+/// Opaque in-process commitment to the exact pending graduation queue.
+///
+/// Only [`MemoryCoordinator`] can mint this value from its private queue. It has
+/// no serde implementation and no public constructor, so safe external code
+/// cannot deserialize or directly fabricate an owner-produced commitment.
+/// Cloning/copying the commitment does not grant authority; it only preserves the
+/// identity of the owner state that was observed.
+///
+/// ```compile_fail
+/// use symthaea_memory::coordinator::PendingGraduationCommitmentV1;
+/// let _ = PendingGraduationCommitmentV1([0; 32]);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PendingGraduationCommitmentV1([u8; 32]);
+
+impl PendingGraduationCommitmentV1 {
+    /// Borrow the committed bytes for a trusted adapter.
+    pub const fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    /// Consume the local commitment and return its bytes.
+    pub const fn into_bytes(self) -> [u8; 32] {
+        self.0
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -215,6 +276,32 @@ impl MemoryCoordinator {
     /// Graduation events are processed lazily via `process_graduations()`.
     pub fn queue_graduation(&mut self, event: GraduationEvent) {
         self.graduation_queue.push(event);
+    }
+
+    /// Number of currently pending graduation events.
+    ///
+    /// This exposes queue cardinality only; queued memory contents remain private.
+    pub fn pending_graduation_count(&self) -> usize {
+        self.graduation_queue.len()
+    }
+
+    /// Mint an opaque commitment to the exact ordered pending graduation queue.
+    ///
+    /// The commitment binds queue length and order plus every stored event field:
+    /// exact HDC component bits, label bytes, survival count, activation, Psi,
+    /// coherence, legacy source and legacy verification flag. It deliberately does
+    /// not include coordinator configuration, signals, retrieval counters or stats;
+    /// those are separate owner state and require a new schema if later protected.
+    pub fn pending_graduation_commitment_v1(&self) -> PendingGraduationCommitmentV1 {
+        let mut hasher = Sha256::new();
+        hasher.update(PENDING_GRADUATION_STATE_DOMAIN_V1);
+        hasher.update([0]);
+        hasher.update((self.graduation_queue.len() as u64).to_be_bytes());
+        for (index, event) in self.graduation_queue.iter().enumerate() {
+            hasher.update((index as u64).to_be_bytes());
+            event.update_pending_commitment_v1(&mut hasher);
+        }
+        PendingGraduationCommitmentV1(hasher.finalize().into())
     }
 
     /// Process pending graduations into episodic memory.
@@ -400,6 +487,7 @@ mod tests {
         let coord = MemoryCoordinator::default();
         assert_eq!(coord.signals().step, 0);
         assert!((coord.signals().psi - 0.0).abs() < 1e-6);
+        assert_eq!(coord.pending_graduation_count(), 0);
     }
 
     #[test]
@@ -498,6 +586,7 @@ mod tests {
         assert_eq!(coord.stats.graduations_rejected, 1);
         assert_eq!(coord.stats.graduations_processed, 1);
         assert_eq!(stored, 1);
+        assert_eq!(coord.pending_graduation_count(), 0);
     }
 
     #[test]
@@ -532,6 +621,48 @@ mod tests {
             source: MemorySource::Internal,
             is_verified: verified,
         }
+    }
+
+    #[test]
+    fn pending_graduation_commitment_is_deterministic_and_order_sensitive() {
+        let empty_a = MemoryCoordinator::default().pending_graduation_commitment_v1();
+        let empty_b = MemoryCoordinator::default().pending_graduation_commitment_v1();
+        assert_eq!(empty_a, empty_b);
+
+        let first = make_graduation(1, 5, 0.4, false);
+        let second = make_graduation(2, 8, 0.7, true);
+
+        let mut ordered = MemoryCoordinator::default();
+        ordered.queue_graduation(first.clone());
+        ordered.queue_graduation(second.clone());
+
+        let mut reversed = MemoryCoordinator::default();
+        reversed.queue_graduation(second);
+        reversed.queue_graduation(first);
+
+        assert_eq!(ordered.pending_graduation_count(), 2);
+        assert_ne!(
+            ordered.pending_graduation_commitment_v1(),
+            reversed.pending_graduation_commitment_v1()
+        );
+        assert_ne!(ordered.pending_graduation_commitment_v1(), empty_a);
+    }
+
+    #[test]
+    fn pending_graduation_commitment_binds_event_fields() {
+        let base = make_graduation(7, 5, 0.4, false);
+        let mut changed = base.clone();
+        changed.label.push_str("-changed");
+
+        let mut base_coord = MemoryCoordinator::default();
+        base_coord.queue_graduation(base);
+        let mut changed_coord = MemoryCoordinator::default();
+        changed_coord.queue_graduation(changed);
+
+        assert_ne!(
+            base_coord.pending_graduation_commitment_v1(),
+            changed_coord.pending_graduation_commitment_v1()
+        );
     }
 
     #[test]
