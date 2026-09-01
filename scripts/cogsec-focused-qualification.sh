@@ -10,11 +10,16 @@ PACKAGES=(
   -p symthaea-cogsec-qualification
   -p symthaea-cogsec-shadow-runtime
 )
+PACKAGE_SET="symthaea-cogsec,symthaea-cogsec-evidence,symthaea-cogsec-qualification,symthaea-cogsec-shadow-runtime"
 
 RECEIPT_OUT="${COGSEC_RECEIPT_OUT:-}"
 HEAD_SHA="$(git rev-parse HEAD)"
+TREE_SHA="$(git rev-parse 'HEAD^{tree}')"
 RUSTC_VERSION="$(rustc --version 2>/dev/null || printf 'unavailable')"
 CARGO_VERSION="$(cargo --version 2>/dev/null || printf 'unavailable')"
+LOCK_SHA256="$(sha256sum Cargo.lock | awk '{print $1}')"
+MANIFEST_SHA256="$(sha256sum Cargo.toml | awk '{print $1}')"
+SCRIPT_SHA256="$(sha256sum scripts/cogsec-focused-qualification.sh | awk '{print $1}')"
 STATUS="FAIL"
 CURRENT_GATE="bootstrap"
 LAST_COMPLETED_GATE="none"
@@ -24,10 +29,15 @@ write_receipt() {
   [[ -n "$RECEIPT_OUT" ]] || return 0
   mkdir -p "$(dirname "$RECEIPT_OUT")" 2>/dev/null || return 0
   {
-    printf 'schema_version\t1\n'
+    printf 'schema_version\t2\n'
     printf 'status\t%s\n' "$STATUS"
     printf 'exit_code\t%s\n' "$exit_code"
     printf 'head\t%s\n' "$HEAD_SHA"
+    printf 'tree\t%s\n' "$TREE_SHA"
+    printf 'cargo_lock_sha256\t%s\n' "$LOCK_SHA256"
+    printf 'workspace_manifest_sha256\t%s\n' "$MANIFEST_SHA256"
+    printf 'qualification_script_sha256\t%s\n' "$SCRIPT_SHA256"
+    printf 'package_set\t%s\n' "$PACKAGE_SET"
     printf 'rustc\t%s\n' "$RUSTC_VERSION"
     printf 'cargo\t%s\n' "$CARGO_VERSION"
     printf 'current_gate\t%s\n' "$CURRENT_GATE"
@@ -47,8 +57,20 @@ trap on_exit EXIT
 
 printf 'CogSec focused qualification\n'
 printf 'HEAD: %s\n' "$HEAD_SHA"
+printf 'tree: %s\n' "$TREE_SHA"
+printf 'Cargo.lock SHA-256: %s\n' "$LOCK_SHA256"
 printf 'rustc: %s\n' "$RUSTC_VERSION"
 printf 'cargo: %s\n' "$CARGO_VERSION"
+
+CURRENT_GATE="worktree-cleanliness"
+printf '\n[pre] committed-worktree cleanliness\n'
+DIRTY_STATE="$(git status --porcelain=v1 --untracked-files=all)"
+if [[ -n "$DIRTY_STATE" ]]; then
+  printf '%s\n' "$DIRTY_STATE" >&2
+  printf 'ERROR: focused qualification requires a clean committed worktree\n' >&2
+  exit 1
+fi
+LAST_COMPLETED_GATE="$CURRENT_GATE"
 
 CURRENT_GATE="metadata-lockfile"
 printf '\n[1/7] workspace metadata + lockfile consistency\n'
@@ -84,6 +106,16 @@ LAST_COMPLETED_GATE="$CURRENT_GATE"
 CURRENT_GATE="clippy"
 printf '\n[7/7] clippy -D warnings\n'
 cargo clippy --locked --all-targets "${PACKAGES[@]}" -- -D warnings
+LAST_COMPLETED_GATE="$CURRENT_GATE"
+
+CURRENT_GATE="tracked-state-postcondition"
+printf '\n[post] tracked repository state unchanged\n'
+git diff --exit-code
+git diff --cached --exit-code
+[[ "$(git rev-parse HEAD)" == "$HEAD_SHA" ]] || {
+  printf 'ERROR: HEAD changed during focused qualification\n' >&2
+  exit 1
+}
 LAST_COMPLETED_GATE="$CURRENT_GATE"
 
 STATUS="PASS"
