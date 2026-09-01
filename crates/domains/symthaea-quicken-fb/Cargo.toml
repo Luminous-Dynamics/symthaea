@@ -17,6 +17,7 @@ drm-ffi = "0.8"
 nix = { version = "0.29", features = ["mman", "fs", "ioctl"] }
 blake3 = { workspace = true }
 rand = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
