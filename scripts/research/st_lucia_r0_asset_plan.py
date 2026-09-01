@@ -2,7 +2,7 @@
 """Build a zero-download, content-addressed R0 Sentinel asset acquisition plan.
 
 The planner consumes only the frozen St. Lucia discovery/replay evidence and emits the
-exact scientific/provenance asset hrefs that may be acquired next. It performs no
+exact scientific/provenance asset locators that may be acquired next. It performs no
 network access.
 """
 
@@ -18,8 +18,10 @@ from urllib.parse import urljoin, urlparse
 Json = dict[str, Any]
 
 SCHEMA = "symthaea-st-lucia-r0-asset-plan/v1"
-TOOL_VERSION = "1.1.0"
+TOOL_VERSION = "1.2.0"
 APPROVED_STAC_HOST = "stac.dataspace.copernicus.eu"
+APPROVED_S3_BUCKET = "eodata"
+APPROVED_S3_ENDPOINT = "https://eodata.dataspace.copernicus.eu/"
 
 EXPECTED_DISCOVERY_FILE_SHA256 = (
     "bd1c91e4cb92bb6fe51c0b2ec819d7b5a87530b307dbdb4e35631f92f750efe0"
@@ -179,7 +181,35 @@ def item_self_href(item: Json) -> str:
     return checked_approved_https(self_hrefs[0], f"item {item_id} self href")
 
 
-def resolve_asset_href(item: Json, asset_key: str, asset: Any) -> tuple[str, str, str | None]:
+def checked_eodata_s3(raw_href: str, label: str) -> tuple[str, str]:
+    try:
+        parsed = urlparse(raw_href)
+        port = parsed.port
+    except ValueError as exc:
+        raise PlanError(f"{label} has invalid S3 URI syntax") from exc
+
+    if parsed.scheme.lower() != "s3":
+        raise PlanError(f"{label} is not an S3 URI")
+    if parsed.username is not None or parsed.password is not None or port is not None:
+        raise PlanError(f"{label} must not contain S3 userinfo or port")
+    if parsed.netloc != APPROVED_S3_BUCKET:
+        raise PlanError(f"{label} is not in approved bucket {APPROVED_S3_BUCKET}")
+    if parsed.query or parsed.fragment:
+        raise PlanError(f"{label} must not contain query or fragment")
+    if not parsed.path.startswith("/") or parsed.path == "/":
+        raise PlanError(f"{label} has no object key")
+    if parsed.path.startswith("//") or "//" in parsed.path[1:]:
+        raise PlanError(f"{label} contains a non-canonical repeated slash")
+    if "\\" in parsed.path:
+        raise PlanError(f"{label} contains a backslash")
+
+    key = parsed.path[1:]
+    if not key:
+        raise PlanError(f"{label} has no object key")
+    return APPROVED_S3_BUCKET, key
+
+
+def resolve_asset_locator(item: Json, asset_key: str, asset: Any) -> Json:
     item_id = item.get("id")
     if not isinstance(asset, dict):
         raise PlanError(f"asset {item_id}/{asset_key} is not an object")
@@ -188,14 +218,43 @@ def resolve_asset_href(item: Json, asset_key: str, asset: Any) -> tuple[str, str
         raise PlanError(f"asset {item_id}/{asset_key} has no href")
 
     parsed = urlparse(raw_href)
+
+    if parsed.scheme.lower() == "s3":
+        bucket, key = checked_eodata_s3(raw_href, f"asset {item_id}/{asset_key} href")
+        return {
+            "stac_href": raw_href,
+            "access_method": "s3",
+            "href": raw_href,
+            "href_resolution_base": None,
+            "s3_endpoint": APPROVED_S3_ENDPOINT,
+            "s3_bucket": bucket,
+            "s3_key": key,
+        }
+
     if parsed.scheme or parsed.netloc:
         resolved = checked_approved_https(raw_href, f"asset {item_id}/{asset_key} href")
-        return raw_href, resolved, None
+        return {
+            "stac_href": raw_href,
+            "access_method": "https",
+            "href": resolved,
+            "href_resolution_base": None,
+            "s3_endpoint": None,
+            "s3_bucket": None,
+            "s3_key": None,
+        }
 
     base = item_self_href(item)
     resolved = urljoin(base, raw_href)
     checked_approved_https(resolved, f"asset {item_id}/{asset_key} resolved href")
-    return raw_href, resolved, base
+    return {
+        "stac_href": raw_href,
+        "access_method": "https",
+        "href": resolved,
+        "href_resolution_base": base,
+        "s3_endpoint": None,
+        "s3_bucket": None,
+        "s3_key": None,
+    }
 
 
 def asset_entry(item: Json, asset_key: str, purpose: str) -> Json:
@@ -206,16 +265,14 @@ def asset_entry(item: Json, asset_key: str, purpose: str) -> Json:
     if not isinstance(assets, dict) or asset_key not in assets:
         raise PlanError(f"required asset missing: {item_id}/{asset_key}")
     asset = assets[asset_key]
-    raw_href, resolved_href, resolution_base = resolve_asset_href(item, asset_key, asset)
+    locator = resolve_asset_locator(item, asset_key, asset)
     return {
         "collection": item.get("collection"),
         "item_id": item_id,
         "item_sha256": sha256_bytes(canonical_json_bytes(item)),
         "asset_key": asset_key,
         "purpose": purpose,
-        "stac_href": raw_href,
-        "href": resolved_href,
-        "href_resolution_base": resolution_base,
+        **locator,
         "media_type": asset.get("type") if isinstance(asset, dict) else None,
         "roles": asset.get("roles") if isinstance(asset, dict) else None,
         "title": asset.get("title") if isinstance(asset, dict) else None,
@@ -279,8 +336,10 @@ def build_plan(original_dir: Path, replay_path: Path) -> Json:
         "stage": "r0-pre-download-asset-plan",
         "network_access": "forbidden-and-unused",
         "download_permitted_by_this_receipt": False,
-        "claim_boundary": "exact asset selection and href freezing only; no asset bytes fetched",
+        "claim_boundary": "exact asset selection and access-locator freezing only; no asset bytes fetched",
         "approved_stac_host": APPROVED_STAC_HOST,
+        "approved_s3_endpoint": APPROVED_S3_ENDPOINT,
+        "approved_s3_bucket": APPROVED_S3_BUCKET,
         "original_discovery_receipt_file_sha256": EXPECTED_DISCOVERY_FILE_SHA256,
         "original_discovery_receipt_internal_sha256": EXPECTED_DISCOVERY_INTERNAL_SHA256,
         "acquisition_set_receipt_file_sha256": EXPECTED_REPLAY_FILE_SHA256,
