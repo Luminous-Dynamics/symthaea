@@ -113,12 +113,12 @@ fn mode_from_event(event: EventSummary) -> Option<PresentationMode> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use evdev::InputEvent;
+    use evdev::{EventType, InputEvent};
 
-    fn key(code: KeyCode, value: i32) -> EventSummary<'static> {
+    fn key(code: KeyCode, value: i32) -> EventSummary {
         // EventSummary owns the small event wrapper/value; this helper constructs
         // only synthetic unit-test input and never touches /dev/input.
-        InputEvent::new(evdev::EventType::KEY, code.code(), value).destructure()
+        InputEvent::new(EventType::KEY.0, code.code(), value).destructure()
     }
 
     #[test]
