@@ -10,7 +10,8 @@
 /// - `ecology_renderer_base` — deterministic state-aware procedural curve renderer
 /// - `ecology_renderer_holo` — bounded holographic spatial field wrapper
 /// - `ecology_renderer` — final visual-fidelity wrapper used by live + preview paths
-/// - `inoculation_renderer` — distinct installation/incubation visual grammar
+/// - `inoculation_renderer` — shared installation/incubation phase grammar
+/// - `inoculation_ceremony` — install-path-specific visual signatures
 /// - `preview` — exact offline frame capture using the same renderer
 /// - `framebuffer` — DRM device management, dumb buffer allocation, mmap
 /// - `mycelium` — legacy L-system renderer retained for compatibility
@@ -24,6 +25,7 @@ pub mod ecology_renderer_holo;
 #[path = "ecology_renderer_fidelity.rs"]
 pub mod ecology_renderer;
 pub mod framebuffer;
+pub mod inoculation_ceremony;
 pub mod inoculation_renderer;
 pub mod mycelium;
 pub mod preview;
