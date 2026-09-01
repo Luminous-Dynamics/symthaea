@@ -62,6 +62,7 @@ enum Command {
 struct LiveArgs {
     source: RenderSource,
     progress_pipe: Option<PathBuf>,
+    handoff_path: Option<PathBuf>,
     device: String,
 }
 
@@ -113,6 +114,13 @@ fn run_preview(args: PreviewArgs) -> Result<(), String> {
 }
 
 fn run_live(args: LiveArgs) -> Result<(), String> {
+    // The display manager may already have crossed the handoff boundary before
+    // this service got CPU time. In that case do not even attempt DRM ownership.
+    if handoff_requested(args.handoff_path.as_deref()) {
+        eprintln!("quicken-fb: compositor handoff already requested; skipping DRM");
+        return Ok(());
+    }
+
     let (mut fb, resolved_device) = open_framebuffer(&args.device)?;
     eprintln!(
         "quicken-fb: display {}x{} @ {}Hz on {}",
@@ -137,10 +145,20 @@ fn run_live(args: LiveArgs) -> Result<(), String> {
                 genome.seed_hex(),
                 genome.cue,
             );
-            run_ecology_loop(&mut fb, genome, &mut progress);
+            run_ecology_loop(
+                &mut fb,
+                genome,
+                &mut progress,
+                args.handoff_path.as_deref(),
+            );
         }
         RenderSource::LegacyGenesis(genesis_phrase) => {
-            run_legacy_loop(&mut fb, &genesis_phrase, &mut progress);
+            run_legacy_loop(
+                &mut fb,
+                &genesis_phrase,
+                &mut progress,
+                args.handoff_path.as_deref(),
+            );
         }
     }
 
@@ -153,6 +171,7 @@ fn run_ecology_loop(
     fb: &mut DrmFramebuffer,
     genome: symthaea_boot_ecology::BootGenome,
     progress: &mut ProgressMonitor,
+    handoff_path: Option<&Path>,
 ) {
     let fps = genome.render_policy.target_fps.max(1) as u64;
     let hard_deadline = Duration::from_millis(genome.render_policy.hard_deadline_ms as u64);
@@ -164,7 +183,7 @@ fn run_ecology_loop(
     let mut next_frame = start;
 
     loop {
-        if SHUTDOWN.load(Ordering::Relaxed) {
+        if SHUTDOWN.load(Ordering::Relaxed) || handoff_requested(handoff_path) {
             break;
         }
         let now = Instant::now();
@@ -205,6 +224,7 @@ fn run_legacy_loop(
     fb: &mut DrmFramebuffer,
     genesis_phrase: &str,
     progress: &mut ProgressMonitor,
+    handoff_path: Option<&Path>,
 ) {
     let mut network = MycelialNetwork::new(fb.width, fb.height, genesis_phrase);
     let mut render_buf = vec![0u32; (fb.width * fb.height) as usize];
@@ -212,7 +232,10 @@ fn run_legacy_loop(
     let start = Instant::now();
     let mut last_frame = Instant::now();
 
-    while start.elapsed() < LEGACY_HARD_DEADLINE && !SHUTDOWN.load(Ordering::Relaxed) {
+    while start.elapsed() < LEGACY_HARD_DEADLINE
+        && !SHUTDOWN.load(Ordering::Relaxed)
+        && !handoff_requested(handoff_path)
+    {
         let now = Instant::now();
         let dt = now.duration_since(last_frame).as_secs_f32();
         if dt < frame_duration.as_secs_f32() {
@@ -242,6 +265,10 @@ fn run_legacy_loop(
         network.render(&mut render_buf);
         fb.blit_from(&render_buf);
     }
+}
+
+fn handoff_requested(path: Option<&Path>) -> bool {
+    path.is_some_and(Path::exists)
 }
 
 fn open_framebuffer(device: &str) -> Result<(DrmFramebuffer, String), String> {
@@ -293,6 +320,7 @@ fn parse_live_args(args: &[String]) -> Result<LiveArgs, String> {
     let mut receipt = None;
     let mut lineage = None;
     let mut progress_pipe = None;
+    let mut handoff_path = None;
     let mut device = "auto".to_string();
 
     let mut i = 0;
@@ -303,6 +331,9 @@ fn parse_live_args(args: &[String]) -> Result<LiveArgs, String> {
             "--lineage" => lineage = Some(PathBuf::from(next_value(args, &mut i, "--lineage")?)),
             "--progress-pipe" => {
                 progress_pipe = Some(PathBuf::from(next_value(args, &mut i, "--progress-pipe")?))
+            }
+            "--handoff-path" => {
+                handoff_path = Some(PathBuf::from(next_value(args, &mut i, "--handoff-path")?))
             }
             "--device" => device = next_value(args, &mut i, "--device")?,
             "--help" | "-h" => {
@@ -325,6 +356,7 @@ fn parse_live_args(args: &[String]) -> Result<LiveArgs, String> {
     Ok(LiveArgs {
         source,
         progress_pipe,
+        handoff_path,
         device,
     })
 }
@@ -398,6 +430,7 @@ fn print_usage() {
          Live options:\n\
            --device <PATH|auto>        DRM device selection (default: auto)\n\
            --progress-pipe <PATH>      Optional non-authoritative progress events\n\
+           --handoff-path <PATH>       Exit as soon as compositor handoff marker exists\n\
          \n\
          The live renderer is fail-open and time-bounded."
     );
@@ -418,4 +451,37 @@ fn install_signal_handlers() {
 
 extern "C" fn signal_handler(_sig: std::ffi::c_int) {
     SHUTDOWN.store(true, Ordering::Relaxed);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn handoff_marker_is_detected() {
+        let path = std::env::temp_dir().join(format!(
+            "spore-handoff-test-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_file(&path);
+        assert!(!handoff_requested(Some(&path)));
+        fs::write(&path, b"handoff\n").unwrap();
+        assert!(handoff_requested(Some(&path)));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn live_parser_accepts_handoff_path() {
+        let args = vec![
+            "--genesis-phrase".to_string(),
+            "legacy".to_string(),
+            "--handoff-path".to_string(),
+            "/run/spore-boot/handoff".to_string(),
+        ];
+        let parsed = parse_live_args(&args).unwrap();
+        assert_eq!(
+            parsed.handoff_path.as_deref(),
+            Some(Path::new("/run/spore-boot/handoff"))
+        );
+    }
 }
