@@ -4,8 +4,8 @@ Status: **mechanical qualification infrastructure; not scientific result evidenc
 
 `QualificationReceipt` schema v2 replaces free-form gate evidence strings with typed,
 source-bound evidence identities. The purpose is to make stale, cross-head, malformed,
-or category-incompatible qualification evidence detectable before a v0.1 baseline can
-be promoted.
+or semantically substituted qualification evidence detectable before a v0.1 baseline
+can be promoted.
 
 ## Required invariant
 
@@ -26,13 +26,14 @@ The local gates use `QualificationGateEvidence::LocalCommand` and record:
 - SHA-256 of the captured qualification environment descriptor;
 - SHA-256 of the command transcript/result artifact.
 
-The fixed required local gates are:
+The fixed required local gate identities are exactly:
 
-- `local_fmt`;
-- `local_test`;
-- `local_clippy`.
+- `local_fmt` → `cargo fmt --all --check`;
+- `local_test` → `cargo test -p symthaea-interoception`;
+- `local_clippy` → `cargo clippy -p symthaea-interoception --all-targets -- -D warnings`.
 
-Their evidence kind must be `LocalCommand`.
+A different local command cannot be substituted for one of these gate IDs merely
+because it exited successfully.
 
 The environment descriptor should itself record, at minimum, the identities required
 by the v0.1 qualification capsule: locked dependencies, Rust toolchain, target/host,
@@ -49,14 +50,14 @@ The repository gates use `QualificationGateEvidence::GitHubActions` and record:
 - GitHub Actions run ID;
 - run attempt.
 
-The fixed required repository gates are:
+The fixed repository gate identities are exactly:
 
-- `workspace_ci`;
-- `showroom_integrity`.
+- `workspace_ci` → workflow `CI`;
+- `showroom_integrity` → workflow `Showroom Integrity`;
+- optional `benchmark_suite` → workflow `Symthaea Benchmark Suite`.
 
-Their evidence kind must be `GitHubActions`. The optional `benchmark_suite` observation
-uses the same evidence kind when recorded. A skipped benchmark remains skipped and
-never becomes benchmark success.
+An unrelated workflow cannot be relabeled as one of these gates. A skipped benchmark
+remains skipped and never becomes benchmark success.
 
 ## Pending evidence
 
@@ -82,7 +83,7 @@ and verify the referenced evidence:
    paraphrase;
 3. verify that a local transcript artifact hashes to `transcript_sha256`;
 4. verify that its captured environment descriptor hashes to `environment_sha256`;
-5. verify the command and exit result represented by that transcript;
+5. verify the exact declared command and exit result represented by that transcript;
 6. only then construct the corresponding evidence-bearing gate status.
 
 A future stronger layer may use signed attestations or transparency-log inclusion
@@ -98,13 +99,15 @@ A bundle is qualified only when:
 - both embedded artifacts validate;
 - all source/model identities agree;
 - every fixed required gate explicitly reports `Passed`;
-- each evidence-bearing gate has valid typed evidence for the same source commit.
+- each evidence-bearing gate has valid typed evidence for the same source commit;
+- each fixed gate's command/workflow identity matches the qualification contract.
 
-This prevents two classes of accidental promotion:
+This prevents three classes of accidental promotion:
 
 1. cross-pairing a qualification receipt and evidence capsule from different heads;
 2. carrying a local/CI evidence locator forward from an older head inside an otherwise
-   current receipt.
+   current receipt;
+3. substituting an unrelated successful command/workflow for the required gate.
 
 It still does not replace independent verification of external evidence.
 
