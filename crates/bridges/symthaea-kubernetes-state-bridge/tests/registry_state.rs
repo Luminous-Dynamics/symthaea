@@ -132,6 +132,14 @@ fn replay_history_can_prove_persistent_drift_without_inventing_change_time() {
         assessment.continuously_observed_desired_age_lower_bound_ms,
         Some(200)
     );
+    assert_eq!(
+        assessment.continuously_observed_drift_age_lower_bound_ms,
+        Some(200)
+    );
+    assert_eq!(
+        assessment.drift_continuity.as_ref().unwrap().consecutive_snapshots,
+        2
+    );
     assert!(assessment.persistent_drift_proven);
 }
 
