@@ -293,6 +293,16 @@ impl ExperimentPreregistration {
                         metric.metric_id
                     ));
                 }
+                if let ProtocolForecastSpec::DynamicsAwareConstantDrive { config, .. } = forecast {
+                    for arm in &self.arms {
+                        if (config.dt - arm.dynamics_config.step_dt).abs() > f32::EPSILON {
+                            errors.push(format!(
+                                "dynamics-aware metric {} has dt incompatible with arm {}",
+                                metric.metric_id, arm.arm_id
+                            ));
+                        }
+                    }
+                }
             }
         }
 
@@ -316,14 +326,14 @@ impl ExperimentPreregistration {
                 ));
             }
             for outcome in [&hypothesis.left, &hypothesis.right] {
-                let Some(arm) = self.arms.iter().find(|arm| arm.arm_id == outcome.arm_id) else {
+                let Some(_arm) = self.arms.iter().find(|arm| arm.arm_id == outcome.arm_id) else {
                     errors.push(format!(
                         "hypothesis {} references unknown arm {}",
                         hypothesis.hypothesis_id, outcome.arm_id
                     ));
                     continue;
                 };
-                let Some(metric) = self
+                let Some(_metric) = self
                     .metrics
                     .iter()
                     .find(|metric| metric.metric_id == outcome.metric_id)
@@ -334,16 +344,6 @@ impl ExperimentPreregistration {
                     ));
                     continue;
                 };
-                if let Some(ProtocolForecastSpec::DynamicsAwareConstantDrive { config, .. }) =
-                    metric.measure.forecast()
-                {
-                    if (config.dt - arm.dynamics_config.step_dt).abs() > f32::EPSILON {
-                        errors.push(format!(
-                            "hypothesis {} uses dynamics-aware metric {} with dt incompatible with arm {}",
-                            hypothesis.hypothesis_id, metric.metric_id, arm.arm_id
-                        ));
-                    }
-                }
             }
         }
 
