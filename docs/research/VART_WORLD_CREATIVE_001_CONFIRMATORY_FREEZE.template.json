@@ -25,10 +25,14 @@
   "ablation_policy_digests": {},
   "metric_definition_set_sha256": null,
   "analysis_contract_sha256": null,
+  "execution_context_contract_sha256": null,
+  "state_equivalence_contract_sha256": null,
+  "calibration_contract_sha256": null,
   "trial_inventory_sha256": null,
   "trial_manifest_schema_sha256": null,
   "independent_verifier_sha256": null,
   "qualified_verifier_sha256": null,
+  "verifier_bundle_manifest_sha256": null,
   "verifier_negative_suite_sha256": null,
   "campaign": {
     "longitudinal_world_count": null,
@@ -78,6 +82,9 @@
     "post_freeze_source_change_requires_new_lineage": true,
     "post_freeze_contract_change_requires_new_lineage": true,
     "post_freeze_fixture_change_requires_new_lineage": true,
+    "post_freeze_execution_context_change_requires_new_lineage": true,
+    "post_freeze_state_contract_change_requires_new_lineage": true,
+    "post_freeze_calibration_contract_change_requires_new_lineage": true,
     "post_freeze_verifier_change_requires_new_verifier_lineage": true
   },
   "claim": {
@@ -87,6 +94,9 @@
     "requires_complete_trial_accounting": true,
     "requires_independent_reconstruction": true,
     "requires_external_freeze_anchor": true,
-    "requires_n1_n20_verifier_qualification": true
+    "requires_n1_n20_verifier_qualification": true,
+    "requires_prospective_execution_context": true,
+    "requires_world_state_equivalence": true,
+    "requires_independent_calibration_reconstruction": true
   }
 }
