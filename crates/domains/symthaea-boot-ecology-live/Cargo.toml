@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-boot-ecology-live"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Truthful renderer-independent live modulation for Spore Boot Ecology"
+
+[dependencies]
+symthaea-boot-protocol = { path = "../symthaea-boot-protocol" }
