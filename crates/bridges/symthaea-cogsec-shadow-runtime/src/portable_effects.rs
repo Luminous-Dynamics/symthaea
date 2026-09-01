@@ -10,9 +10,10 @@
 
 use std::sync::Arc;
 
-use symthaea_cogsec::{MutationReceipt, ReferenceMonitor};
+use symthaea_cogsec::{MutationReceipt, ReferenceMonitor, ResourceId};
 use symthaea_cogsec_evidence::{
-    EffectBoundEvidenceSnapshot, EventId, LedgerStats, ObservedEffectBinding, QualificationManifest,
+    EffectBoundEvidenceSnapshot, EvidenceCompleteness, EventId, LedgerStats, ObservedEffectBinding,
+    QualificationManifest, ShadowEventDraft, ShadowEventKind,
 };
 use symthaea_evidence_plane::RunId;
 use thiserror::Error;
@@ -20,7 +21,7 @@ use thiserror::Error;
 use crate::{
     EffectBoundAppendError, EffectBoundShadowRuntimeObserver, PendingObservedEffect,
     ShadowAssuranceProfile, ShadowEvaluationDraft, ShadowObservedMutationDraft,
-    ShadowObserverInitError,
+    ShadowObserverInitError, ShadowResource,
 };
 
 #[derive(Debug)]
@@ -122,6 +123,31 @@ impl PortableEffectBoundShadowRuntimeObserver {
         })
     }
 
+    /// Current assurance profile for this observer instance.
+    pub const fn profile(&self) -> ShadowAssuranceProfile {
+        self.inner.profile()
+    }
+
+    /// Qualification-run grouping identity only.
+    pub fn run_id(&self) -> Option<&RunId> {
+        self.inner.run_id()
+    }
+
+    /// Canonical resource identity for one protected shadow domain.
+    pub fn resource_id(&self, resource: ShadowResource) -> &ResourceId {
+        self.inner.resource_id(resource)
+    }
+
+    /// Canonical resource identity expected for one typed stage.
+    pub fn expected_resource_id(&self, kind: ShadowEventKind) -> Option<&ResourceId> {
+        self.inner.expected_resource_id(kind)
+    }
+
+    /// Current evidence completeness from the underlying bounded event ledger.
+    pub fn completeness(&self) -> EvidenceCompleteness {
+        self.inner.completeness()
+    }
+
     /// Whether the sidecar backing vector was reserved for the full declared event capacity.
     pub fn effect_binding_storage_fully_preallocated(&self) -> bool {
         self.observed_effects.capacity() >= self.binding_capacity
@@ -130,6 +156,18 @@ impl PortableEffectBoundShadowRuntimeObserver {
     /// Current local append accounting from the underlying event ledger.
     pub fn ledger_stats(&self) -> LedgerStats {
         self.inner.ledger_stats()
+    }
+
+    /// Append evidence that is not a paired legacy mutation.
+    ///
+    /// This is the only generic live append surface exposed by the strict public
+    /// observer. Paired `...Observed` stages are rejected by the inner
+    /// effect-bound layer and must consume their pending token instead.
+    pub fn try_append_unpaired(
+        &mut self,
+        draft: ShadowEventDraft,
+    ) -> Result<EventId, PortableEffectAppendError> {
+        self.inner.try_append_unpaired(draft).map_err(Into::into)
     }
 
     /// Append a genuine monitor evaluation and return an observer-domain-bound pending token.
@@ -192,7 +230,8 @@ mod tests {
         MutationRequest, PolicyRule, PolicySnapshot, PrincipalId, ResourceId, TaintLevel,
     };
     use symthaea_cogsec_evidence::{
-        EvidenceConfidentiality, PrincipalContext, ShadowEventKind, validate_effect_bound_snapshot,
+        EvidenceConfidentiality, IngressClass, PrincipalContext, ShadowEventKind,
+        ShadowEventPayload, validate_effect_bound_snapshot,
     };
 
     fn d(byte: u8) -> Digest32 {
@@ -268,9 +307,42 @@ mod tests {
         }
     }
 
+    fn ingress() -> ShadowEventDraft {
+        ShadowEventDraft {
+            kind: ShadowEventKind::IngressObserved,
+            proposal_id: None,
+            transaction_id: None,
+            principals: PrincipalContext::default(),
+            resource: None,
+            resource_version_before: None,
+            resource_version_after: None,
+            state_root_before: None,
+            state_root_after: None,
+            policy_root: None,
+            policy_epoch: None,
+            authorization_epoch: None,
+            revocation_epoch: None,
+            causal_parents: BTreeSet::new(),
+            cognitive_tick: None,
+            run_id: None,
+            confidentiality: EvidenceConfidentiality::LocalPrivate,
+            payload: ShadowEventPayload::Ingress {
+                ingress_class: IngressClass::LegacyUnclassified,
+            },
+        }
+    }
+
     #[test]
     fn portable_binding_storage_is_preallocated() {
         assert!(observer().effect_binding_storage_fully_preallocated());
+    }
+
+    #[test]
+    fn strict_public_facade_still_supports_unpaired_ingress() {
+        let mut observer = observer();
+        let event_id = observer.try_append_unpaired(ingress()).unwrap();
+        assert_eq!(event_id.sequence, 1);
+        assert_eq!(observer.ledger_stats().stored_events, 1);
     }
 
     #[test]
