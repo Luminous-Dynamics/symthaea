@@ -164,18 +164,18 @@ impl<'a> BrowserExecutor<'a> {
         let started = Instant::now();
         let decision = self.policy.evaluate_action(&action, self.phi);
         let digest = action_digest(&action);
+        let kind = action_kind(&action).to_string();
         let consequence = consequence_of(&action);
 
         if let PolicyDecision::Deny { ref reason, .. } = decision {
             return self.finish(
-                action,
+                kind,
                 digest,
                 consequence,
                 decision,
                 ActionOutcome::Denied(reason.clone()),
                 ActionOutput::None,
                 started,
-                false,
             );
         }
 
@@ -186,28 +186,26 @@ impl<'a> BrowserExecutor<'a> {
                 .and_then(|approval| approval.validate(&request, unix_time_ms()));
             if let Err(denial) = approval_result {
                 return self.finish(
-                    action,
+                    kind,
                     digest,
                     consequence,
                     decision,
                     ActionOutcome::RuntimeDenied(denial),
                     ActionOutput::None,
                     started,
-                    false,
                 );
             }
         }
 
         if let Err(denial) = self.runtime_lock().reserve(&action) {
             return self.finish(
-                action,
+                kind,
                 digest,
                 consequence,
                 decision,
                 ActionOutcome::RuntimeDenied(denial),
                 ActionOutput::None,
                 started,
-                false,
             );
         }
 
@@ -259,28 +257,26 @@ impl<'a> BrowserExecutor<'a> {
 
         self.runtime_lock().record_result(succeeded);
         self.finish(
-            action,
+            kind,
             digest,
             consequence,
             decision,
             outcome,
             output,
             started,
-            true,
         )
     }
 
     #[allow(clippy::too_many_arguments)]
     fn finish(
         &self,
-        _action: BrowserAction,
+        action_kind: String,
         action_digest: String,
         consequence: BrowserConsequence,
         policy_decision: PolicyDecision,
         outcome: ActionOutcome,
         output: ActionOutput,
         started: Instant,
-        _runtime_admitted: bool,
     ) -> ActionExecution {
         let (output_digest, output_len) = summarize_output(&output);
         let outcome_tag = outcome_tag(&outcome);
@@ -291,7 +287,7 @@ impl<'a> BrowserExecutor<'a> {
         );
         let receipt = ActionReceipt {
             execution_session_id: self.execution_session_id,
-            action_kind: action_kind_from_digest_context(consequence, outcome_tag).to_string(),
+            action_kind,
             action_digest,
             consequence,
             policy_decision,
@@ -309,21 +305,6 @@ impl<'a> BrowserExecutor<'a> {
         self.runtime
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-}
-
-fn action_kind_from_digest_context(
-    consequence: BrowserConsequence,
-    _outcome_tag: &str,
-) -> &'static str {
-    // This fallback exists only because receipts intentionally do not retain the
-    // action object. The exact semantic action is still committed by
-    // `action_digest`; consequence remains independently inspectable.
-    match consequence {
-        BrowserConsequence::Passive => "passive",
-        BrowserConsequence::Navigation => "navigation",
-        BrowserConsequence::Interaction => "click",
-        BrowserConsequence::TextEntry => "type",
     }
 }
 
