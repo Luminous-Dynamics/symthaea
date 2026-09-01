@@ -33,8 +33,9 @@
     "{revision_index}",
     "{paired_block_id}",
     "{runtime_root}",
-    "{pilot_root}"
+    "{output_root}"
   ],
+  "policy_output_isolation": "per-cell-private-staging-root",
   "cells": [
     {
       "cell_id": "P1",
