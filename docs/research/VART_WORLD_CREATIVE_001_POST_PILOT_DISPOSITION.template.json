@@ -1,0 +1,43 @@
+{
+  "schema": "symthaea.vart-world-creative-001.post-pilot-disposition.v1",
+  "experiment_id": "VART-WORLD-CREATIVE-001",
+  "status": "template_not_dispositioned",
+  "pilot": {
+    "pilot_receipt_sha256": null,
+    "pilot_evidence_closure_sha256": null,
+    "pilot_design_sha256": null,
+    "source_head": null,
+    "source_tree": null,
+    "audit_verdict": null,
+    "paired_block_semantics": null
+  },
+  "inspection": {
+    "inspection_started_utc": null,
+    "inspection_completed_utc": null,
+    "inspected_paths": [],
+    "outcome_magnitudes_viewed": false,
+    "comparative_policy_rankings_viewed": false,
+    "human_preference_values_viewed": false,
+    "inspection_purpose": "instrumentation_and_protocol_only"
+  },
+  "defects": [],
+  "allowed_defect_classes": [
+    "instrumentation_plumbing",
+    "scientific_mechanism",
+    "scientific_contract"
+  ],
+  "resolution": {
+    "all_defects_dispositioned": false,
+    "unresolved_defect_count": null,
+    "pilot_rerun_required": null,
+    "pilot_rerun_complete": false,
+    "new_preregistration_lineage_required": null,
+    "new_preregistration_lineage_created": false,
+    "confirmatory_source_fetchable": false,
+    "confirmatory_source_reproducible": false
+  },
+  "confirmatory_freeze_eligible": false,
+  "confirmatory_execution_authorized": false,
+  "claim_authorized": false,
+  "bounded_statement": "Post-pilot disposition can authorize only preparation of a prospective confirmatory freeze; it cannot authorize confirmatory execution or scientific claims."
+}
