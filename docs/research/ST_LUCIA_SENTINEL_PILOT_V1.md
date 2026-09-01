@@ -141,6 +141,53 @@ After source bytes are actually acquired, hashed and qualified, the initial dete
 
 No feature/model result may retroactively change this product-discovery protocol.
 
+## Literature-strength conventional ML floor
+
+A 2026 Frontiers in Remote Sensing study on iSimangaliso Wetland Park provides a relevant external conventional baseline lineage. It used multi-season Sentinel-1/2 predictors and compared Random Forest (RF), Support Vector Machine (SVM), Classification and Regression Trees (CART), and K-Nearest Neighbours (KNN), reporting RF as the strongest of those classifiers and approximately 91% overall accuracy in its own experimental setting.
+
+Reference:
+
+- https://www.frontiersin.org/journals/remote-sensing/articles/10.3389/frsen.2026.1814582/full
+
+The locked pilot therefore must not define `conventional ML` as a weak placeholder. Where the task supports classification, include at least RF and, unless prospectively ruled inapplicable, SVM, CART and KNN.
+
+Initial candidate grids are frozen from the published study rather than invented after our results are visible:
+
+```text
+RF trees            {50, 100, 150, 200}
+RF minimum leaf     {1, 5, 10}
+RF bag fraction     {0.5, 0.7}
+SVM RBF cost        {1, 5, 10, 20}
+SVM gamma           {0.1, 0.5, 1}
+CART minimum leaf   {1, 5, 10, 50, 100}
+KNN k               {3, 5, 7, 9, 11, 21}
+```
+
+The paper's reported RF configuration (`100` trees, minimum leaf `1`, bag fraction `0.7`, max nodes `500`) and SVM configuration (`RBF`, cost `20`, gamma `1`) are named external reference configurations. They are **not** automatic winners for our dataset. Our selected conventional configuration must be chosen only through the frozen Calibration partition and #192 selection receipts.
+
+For compatible classification tasks, report at minimum:
+
+- overall accuracy;
+- per-class precision / user accuracy;
+- per-class recall / producer accuracy;
+- per-class F1;
+- confusion matrix;
+- Quantity Disagreement (QD);
+- Allocation Disagreement (AD);
+- coverage and abstention where applicable.
+
+Wetland boundary and transitional zones must be an explicit diagnostic slice rather than disappearing inside aggregate accuracy.
+
+The external study describes hold-out validation and validation-driven hyperparameter optimisation. This pilot intentionally uses a stricter boundary:
+
+```text
+Training -> Calibration/model selection -> sealed Evaluation
+```
+
+Final Evaluation must never influence hyperparameter selection. Spatial, acquisition and temporal leakage controls remain governed by #179.
+
+Symthaea/HDC receives no scientific credit merely for beating persistence, climatology, or a threshold heuristic. For a classification-style witness it must demonstrate value against the strongest qualified conventional baseline under the same frozen evidence, split and evaluation contract. A conventional-model win or null Symthaea result remains a valid outcome.
+
 ## Non-claims
 
 This preregistration does not claim:
