@@ -10,6 +10,7 @@ on:
       - 'crates/bridges/symthaea-otlp-bridge/**'
       - 'crates/bridges/symthaea-kubernetes-bridge/**'
       - 'crates/bridges/symthaea-kubernetes-state-bridge/**'
+      - 'crates/bridges/symthaea-kubernetes-endpointslice-bridge/**'
       - '.github/workflows/integration-fabric.yml'
       - 'Cargo.lock'
   workflow_dispatch:
@@ -58,6 +59,7 @@ jobs:
             -p symthaea-otlp-bridge \
             -p symthaea-kubernetes-bridge \
             -p symthaea-kubernetes-state-bridge \
+            -p symthaea-kubernetes-endpointslice-bridge \
             -- --check
 
       - name: Test canonical integration contracts
@@ -84,6 +86,9 @@ jobs:
       - name: Test Kubernetes desired-observed state replay
         run: cargo test -p symthaea-kubernetes-state-bridge
 
+      - name: Test Kubernetes EndpointSlice topology augmentation
+        run: cargo test -p symthaea-kubernetes-endpointslice-bridge
+
       - name: Compile all integration targets
         run: |
           cargo check -p symthaea-integration-core --all-targets
@@ -92,6 +97,7 @@ jobs:
           cargo check -p symthaea-otlp-bridge --all-targets
           cargo check -p symthaea-kubernetes-bridge --all-targets
           cargo check -p symthaea-kubernetes-state-bridge --all-targets
+          cargo check -p symthaea-kubernetes-endpointslice-bridge --all-targets
 
       # Cargo may resolve newly introduced adapter dependencies during the
       # preceding commands. A green integration PR must include that exact
