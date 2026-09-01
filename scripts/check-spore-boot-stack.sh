@@ -18,6 +18,7 @@ PACKAGES=(
   symthaea-boot-ecology-live
   symthaea-boot-visual-clock
   symthaea-boot-presentation
+  symthaea-boot-render-projection
   symthaea-spore-continuity
 )
 
