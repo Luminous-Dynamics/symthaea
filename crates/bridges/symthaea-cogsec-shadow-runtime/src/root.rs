@@ -3,8 +3,8 @@
 //! Public root for CogSec shadow-runtime observation.
 //!
 //! The existing observer implementation remains unchanged in `lib.rs`. This
-//! façade adds a stricter effect-bound wrapper for first-runtime integration so
-//! paired observed mutations cannot bypass their exact evaluation token.
+//! façade adds progressively stricter wrappers for first-runtime integration:
+//! exact live effect pairing and automatic portable effect-binding production.
 
 #![forbid(unsafe_code)]
 
@@ -16,4 +16,10 @@ mod effect_pairing;
 pub use effect_pairing::{
     EffectBoundAppendError, EffectBoundShadowRuntimeObserver, PendingObservedEffect,
     ShadowObservedMutationDraft,
+};
+
+mod portable_effects;
+pub use portable_effects::{
+    PortableEffectAppendError, PortableEffectObserverInitError,
+    PortableEffectBoundShadowRuntimeObserver, PortablePendingObservedEffect,
 };
