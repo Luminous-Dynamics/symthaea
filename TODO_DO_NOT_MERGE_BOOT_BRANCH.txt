@@ -1,0 +1,1 @@
+DRAFT integration marker. Remove before merge: wire new Nix module into nix/modules/default.nix, expose protocol submodules from lib.rs, confirm workspace membership, and run/record validation.
