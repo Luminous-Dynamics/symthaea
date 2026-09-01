@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -166,12 +167,13 @@ def expected_inventory(cells: list[dict[str, Any]]) -> dict[str, Any]:
         "noncanonical": True,
         "trial_ids": [c["trial_id"] for c in cells],
         "trial_count": len(cells),
+        "expected_trial_count": len(cells),
         "confirmatory_eligible": False,
     }
 
 
-def validate_emitted_manifest(pilot_root: Path, cell: dict[str, Any]) -> dict[str, Any]:
-    manifest_path = pilot_root / "trials" / cell["trial_id"] / "manifest.json"
+def validate_emitted_manifest(root: Path, cell: dict[str, Any]) -> dict[str, Any]:
+    manifest_path = root / "trials" / cell["trial_id"] / "manifest.json"
     manifest = read_json(manifest_path)
     if not isinstance(manifest, dict):
         raise PilotError(f"{cell['cell_id']}: manifest must be an object")
@@ -194,6 +196,24 @@ def validate_emitted_manifest(pilot_root: Path, cell: dict[str, Any]) -> dict[st
     return manifest
 
 
+def require_isolated_stage_layout(stage_root: Path, trial_id: str) -> Path:
+    children = sorted(p.name for p in stage_root.iterdir())
+    if children != ["trials"]:
+        raise PilotError(
+            f"isolated runtime wrote outside trials/: {children}; expected only ['trials']"
+        )
+    trials_dir = stage_root / "trials"
+    trial_children = sorted(p.name for p in trials_dir.iterdir())
+    if trial_children != [trial_id]:
+        raise PilotError(
+            f"isolated runtime wrote unexpected trial directories: {trial_children}"
+        )
+    trial_dir = trials_dir / trial_id
+    if not trial_dir.is_dir():
+        raise PilotError(f"missing isolated trial directory: {trial_dir}")
+    return trial_dir
+
+
 def tree_closure(root: Path, *, excluded_relpaths: set[str]) -> tuple[str, list[dict[str, str]]]:
     entries: list[dict[str, str]] = []
     for path in sorted(p for p in root.rglob("*") if p.is_file()):
@@ -202,6 +222,16 @@ def tree_closure(root: Path, *, excluded_relpaths: set[str]) -> tuple[str, list[
             continue
         entries.append({"path": rel, "sha256": sha256_file(path)})
     return sha256_bytes(canonical_json_bytes(entries)), entries
+
+
+def command_values(cell: dict[str, Any], runtime_root: Path, output_root: str) -> dict[str, Any]:
+    return {
+        **cell,
+        "runtime_root": str(runtime_root),
+        "output_root": output_root,
+        "experiment_id": EXPERIMENT_ID,
+        "campaign": "pilot",
+    }
 
 
 def main() -> int:
@@ -253,7 +283,7 @@ def main() -> int:
     metric_source_sha = validate_contract_input(metrics_src, "pilot metric definitions")
 
     verifier_path = resolve_path(
-        cfg.get("verifier_path", "../../scripts/verify_vart_world_creative_001.py"),
+        cfg.get("verifier_path", "../../scripts/verify_vart_world_creative_001_pilot.py"),
         base=base,
     )
     if not verifier_path.is_file():
@@ -263,16 +293,16 @@ def main() -> int:
     if not isinstance(runtime_argv_template, list):
         raise PilotError("runtime_argv must be a JSON array")
 
-    resolved_plan: list[dict[str, Any]] = []
-    for cell in cells:
-        values = {
-            **cell,
-            "runtime_root": str(runtime_root),
-            "pilot_root": str(pilot_root),
-            "experiment_id": EXPERIMENT_ID,
-            "campaign": "pilot",
+    preview_plan = [
+        {
+            "cell": cell,
+            "argv": expand_argv(
+                runtime_argv_template,
+                command_values(cell, runtime_root, "<isolated-per-cell-staging-root>"),
+            ),
         }
-        resolved_plan.append({"cell": cell, "argv": expand_argv(runtime_argv_template, values)})
+        for cell in cells
+    ]
 
     if pilot_root.exists() and any(pilot_root.iterdir()):
         raise PilotError(f"pilot_root must be fresh and empty: {pilot_root}")
@@ -281,6 +311,7 @@ def main() -> int:
         print(json.dumps({
             "verdict": "DRY_RUN_READY",
             "side_effect_free": True,
+            "policy_output_isolation": "per-cell-private-staging-root",
             "pilot_root": str(pilot_root),
             "source_head": actual_head,
             "source_tree": actual_tree,
@@ -288,7 +319,7 @@ def main() -> int:
             "metric_definition_set_sha256": metric_source_sha,
             "verifier_source_sha256": sha256_file(verifier_path),
             "cell_count": len(cells),
-            "resolved_commands": [item["argv"] for item in resolved_plan],
+            "resolved_commands": [item["argv"] for item in preview_plan],
             "confirmatory_execution_authorized": False,
             "claim_authorized": False,
         }, sort_keys=True))
@@ -297,6 +328,8 @@ def main() -> int:
     pilot_root.mkdir(parents=True, exist_ok=True)
     orch = pilot_root / "_orchestrator"
     orch.mkdir(exist_ok=False)
+    trials_dest = pilot_root / "trials"
+    trials_dest.mkdir(exist_ok=False)
 
     analysis_sha = copy_contract(analysis_src, pilot_root / "analysis_contract.json")
     metric_sha = copy_contract(metrics_src, pilot_root / "metric_definitions.json")
@@ -341,6 +374,7 @@ def main() -> int:
             "forbidden_primary_aggregates": FORBIDDEN_AGGREGATES,
             "pilot_outcomes_may_set_confirmatory_thresholds": False,
             "pilot_trials_may_enter_confirmatory_analysis": False,
+            "policy_output_isolation": "per-cell-private-staging-root",
         },
     )
 
@@ -352,72 +386,84 @@ def main() -> int:
             "noncanonical": True,
             "source_head": actual_head,
             "source_tree": actual_tree,
-            "cells": resolved_plan,
+            "policy_output_isolation": "per-cell-private-staging-root",
+            "cells": preview_plan,
         },
     )
 
     cell_receipts: list[dict[str, Any]] = []
-    for item in resolved_plan:
-        cell = item["cell"]
-        argv = item["argv"]
-        env = os.environ.copy()
-        env.update({
-            "VART_EXPERIMENT_ID": EXPERIMENT_ID,
-            "VART_CAMPAIGN": "pilot",
-            "VART_NONCANONICAL": "1",
-            "VART_CONFIRMATORY_EXECUTION_AUTHORIZED": "0",
-            "VART_CLAIM_AUTHORIZED": "0",
-            "VART_CELL_ID": str(cell["cell_id"]),
-            "VART_TRIAL_ID": str(cell["trial_id"]),
-            "VART_POLICY": str(cell["policy"]),
-            "VART_FIXTURE": str(cell["fixture"]),
-            "VART_SEED": str(cell["seed"]),
-            "VART_REVISION_INDEX": str(cell["revision_index"]),
-            "VART_PAIRED_BLOCK_ID": str(cell["paired_block_id"]),
-            "VART_OUTPUT_ROOT": str(pilot_root),
-            "VART_ANALYSIS_CONTRACT_SHA256": analysis_sha,
-            "VART_METRIC_DEFINITION_SET_SHA256": metric_sha,
-        })
-        started = datetime.now(timezone.utc).isoformat()
-        proc = subprocess.run(
-            argv,
-            cwd=runtime_root,
-            env=env,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-        )
-        log_dir = orch / "logs"
-        log_dir.mkdir(exist_ok=True)
-        stdout_path = log_dir / f"{cell['cell_id']}.stdout.txt"
-        stderr_path = log_dir / f"{cell['cell_id']}.stderr.txt"
-        stdout_path.write_text(proc.stdout, encoding="utf-8")
-        stderr_path.write_text(proc.stderr, encoding="utf-8")
-        if proc.returncode != 0:
-            raise PilotError(
-                f"{cell['cell_id']}: runtime failed with {proc.returncode}; "
-                f"see {stdout_path} and {stderr_path}"
+    for cell in cells:
+        with tempfile.TemporaryDirectory(prefix=f"vart-{cell['cell_id'].lower()}-") as td:
+            stage_root = Path(td)
+            stage_root.chmod(0o700)
+            argv = expand_argv(
+                runtime_argv_template,
+                command_values(cell, runtime_root, str(stage_root)),
             )
-        manifest = validate_emitted_manifest(pilot_root, cell)
-        if manifest.get("analysis_contract_sha256") != analysis_sha:
-            raise PilotError(f"{cell['cell_id']}: analysis contract digest mismatch")
-        if manifest.get("metric_definition_set_sha256") != metric_sha:
-            raise PilotError(f"{cell['cell_id']}: metric definition digest mismatch")
-        cell_receipts.append({
-            "cell_id": cell["cell_id"],
-            "trial_id": cell["trial_id"],
-            "started_utc": started,
-            "finished_utc": datetime.now(timezone.utc).isoformat(),
-            "argv": argv,
-            "returncode": proc.returncode,
-            "stdout_sha256": sha256_file(stdout_path),
-            "stderr_sha256": sha256_file(stderr_path),
-            "manifest_sha256": sha256_file(
-                pilot_root / "trials" / cell["trial_id"] / "manifest.json"
-            ),
-            "trial_state": manifest.get("trial_state"),
-        })
+            env = os.environ.copy()
+            env.update({
+                "VART_EXPERIMENT_ID": EXPERIMENT_ID,
+                "VART_CAMPAIGN": "pilot",
+                "VART_NONCANONICAL": "1",
+                "VART_CONFIRMATORY_EXECUTION_AUTHORIZED": "0",
+                "VART_CLAIM_AUTHORIZED": "0",
+                "VART_CELL_ID": str(cell["cell_id"]),
+                "VART_TRIAL_ID": str(cell["trial_id"]),
+                "VART_POLICY": str(cell["policy"]),
+                "VART_FIXTURE": str(cell["fixture"]),
+                "VART_SEED": str(cell["seed"]),
+                "VART_REVISION_INDEX": str(cell["revision_index"]),
+                "VART_PAIRED_BLOCK_ID": str(cell["paired_block_id"]),
+                "VART_OUTPUT_ROOT": str(stage_root),
+                "VART_ANALYSIS_CONTRACT_SHA256": analysis_sha,
+                "VART_METRIC_DEFINITION_SET_SHA256": metric_sha,
+            })
+            started = datetime.now(timezone.utc).isoformat()
+            proc = subprocess.run(
+                argv,
+                cwd=runtime_root,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            log_dir = orch / "logs"
+            log_dir.mkdir(exist_ok=True)
+            stdout_path = log_dir / f"{cell['cell_id']}.stdout.txt"
+            stderr_path = log_dir / f"{cell['cell_id']}.stderr.txt"
+            stdout_path.write_text(proc.stdout, encoding="utf-8")
+            stderr_path.write_text(proc.stderr, encoding="utf-8")
+            if proc.returncode != 0:
+                raise PilotError(
+                    f"{cell['cell_id']}: runtime failed with {proc.returncode}; "
+                    f"see {stdout_path} and {stderr_path}"
+                )
+
+            manifest = validate_emitted_manifest(stage_root, cell)
+            if manifest.get("analysis_contract_sha256") != analysis_sha:
+                raise PilotError(f"{cell['cell_id']}: analysis contract digest mismatch")
+            if manifest.get("metric_definition_set_sha256") != metric_sha:
+                raise PilotError(f"{cell['cell_id']}: metric definition digest mismatch")
+            staged_trial = require_isolated_stage_layout(stage_root, cell["trial_id"])
+            dest_trial = trials_dest / cell["trial_id"]
+            if dest_trial.exists():
+                raise PilotError(f"duplicate destination trial directory: {dest_trial}")
+            shutil.move(str(staged_trial), str(dest_trial))
+
+            cell_receipts.append({
+                "cell_id": cell["cell_id"],
+                "trial_id": cell["trial_id"],
+                "started_utc": started,
+                "finished_utc": datetime.now(timezone.utc).isoformat(),
+                "argv": preview_plan[EXPECTED_CELL_IDS.index(cell["cell_id"])]["argv"],
+                "returncode": proc.returncode,
+                "stdout_sha256": sha256_file(stdout_path),
+                "stderr_sha256": sha256_file(stderr_path),
+                "manifest_sha256": sha256_file(dest_trial / "manifest.json"),
+                "trial_state": manifest.get("trial_state"),
+                "output_isolated_from_other_policy_trials": True,
+            })
 
     verifier_proc = subprocess.run(
         [sys.executable, str(verifier_path), str(pilot_root), "--json"],
@@ -459,6 +505,7 @@ def main() -> int:
             "parent_v05a_head": EXPECTED_V05A_HEAD,
             "parent_v05a_tree": EXPECTED_V05A_TREE,
         },
+        "policy_output_isolation": "per-cell-private-staging-root",
         "cell_count": len(cells),
         "cells": cell_receipts,
         "verifier_result": verifier_result,
