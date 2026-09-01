@@ -16,9 +16,9 @@ use opentelemetry_proto::tonic::{
 use serde_json::json;
 use std::sync::Arc;
 use symthaea_integration_core::{
-    IdentityRequest, IntegrationIdentity, IntegrationRegistry, ResolutionStatus,
-    kubernetes_cluster_uid_from_topology, normalize_kubernetes_uid_snapshot,
-    resolve_registry_identity_snapshots,
+    IdentityRequest, IntegrationIdentity, IntegrationRegistry, ResolutionPipelineError,
+    ResolutionStatus, kubernetes_cluster_uid_from_topology, normalize_kubernetes_uid_snapshot,
+    resolve_registry_kubernetes_uid_snapshots,
 };
 use symthaea_kubernetes_bridge::{KubernetesReplayContext, KubernetesReplayDiscoverer};
 use symthaea_otlp_bridge::{OtlpMetricsContext, OtlpMetricsObserver};
@@ -126,27 +126,25 @@ fn same_cluster_and_pod_uid_resolve_across_kubernetes_and_otlp() {
         .expect("kube-system namespace must provide a real cluster UID");
     assert_eq!(cluster_uid, CLUSTER_UID);
 
-    let kubernetes_snapshot = normalize_kubernetes_uid_snapshot(
-        &kubernetes
-            .identity_snapshot_sync(IdentityRequest::default())
-            .unwrap(),
-        &cluster_uid,
-    )
-    .unwrap();
-    let otlp_snapshot = normalize_kubernetes_uid_snapshot(
-        &otlp
-            .identity_snapshot_sync(IdentityRequest::default())
-            .unwrap(),
-        &cluster_uid,
-    )
-    .unwrap();
+    let raw_kubernetes_snapshot = kubernetes
+        .identity_snapshot_sync(IdentityRequest::default())
+        .unwrap();
+    let raw_otlp_snapshot = otlp
+        .identity_snapshot_sync(IdentityRequest::default())
+        .unwrap();
 
-    let kubernetes_pod = kubernetes_snapshot
+    // The normalized forms must carry the same standards-backed identifier,
+    // while the source-local entities remain different references.
+    let normalized_kubernetes =
+        normalize_kubernetes_uid_snapshot(&raw_kubernetes_snapshot, &cluster_uid).unwrap();
+    let normalized_otlp =
+        normalize_kubernetes_uid_snapshot(&raw_otlp_snapshot, &cluster_uid).unwrap();
+    let kubernetes_pod = normalized_kubernetes
         .claims
         .iter()
         .find(|claim| claim.subject.kind == "k8s_pod")
         .unwrap();
-    let otlp_pod = otlp_snapshot
+    let otlp_pod = normalized_otlp
         .claims
         .iter()
         .find(|claim| claim.subject.kind == "k8s_pod")
@@ -154,9 +152,12 @@ fn same_cluster_and_pod_uid_resolve_across_kubernetes_and_otlp() {
     assert_eq!(kubernetes_pod.identifier, otlp_pod.identifier);
     assert_ne!(kubernetes_pod.subject, otlp_pod.subject);
 
-    let resolved = resolve_registry_identity_snapshots(
+    // Production-shaped call: normalization -> registry admission -> bounded
+    // resolver. The raw provider snapshots are supplied here deliberately.
+    let resolved = resolve_registry_kubernetes_uid_snapshots(
         &registry,
-        &[kubernetes_snapshot, otlp_snapshot],
+        &[raw_kubernetes_snapshot, raw_otlp_snapshot],
+        &cluster_uid,
         2_100,
     )
     .unwrap();
@@ -172,7 +173,7 @@ fn same_cluster_and_pod_uid_resolve_across_kubernetes_and_otlp() {
 }
 
 #[test]
-fn identical_pod_uid_in_different_cluster_scope_does_not_resolve() {
+fn otlp_claim_from_other_cluster_cannot_be_reassigned_to_local_cluster() {
     let kubernetes = Arc::new(kubernetes_replay());
     let otlp = Arc::new(OtlpMetricsObserver::new(
         OtlpMetricsContext::default(),
@@ -186,33 +187,21 @@ fn identical_pod_uid_in_different_cluster_scope_does_not_resolve() {
         .unwrap();
     registry.register_identity_provider(otlp.clone()).unwrap();
 
-    let kubernetes_snapshot = normalize_kubernetes_uid_snapshot(
-        &kubernetes
-            .identity_snapshot_sync(IdentityRequest::default())
-            .unwrap(),
-        CLUSTER_UID,
-    )
-    .unwrap();
-    let otlp_snapshot = normalize_kubernetes_uid_snapshot(
-        &otlp
-            .identity_snapshot_sync(IdentityRequest::default())
-            .unwrap(),
-        OTHER_CLUSTER_UID,
-    )
-    .unwrap();
+    let raw_kubernetes_snapshot = kubernetes
+        .identity_snapshot_sync(IdentityRequest::default())
+        .unwrap();
+    let raw_otlp_snapshot = otlp
+        .identity_snapshot_sync(IdentityRequest::default())
+        .unwrap();
 
-    let resolved = resolve_registry_identity_snapshots(
+    let result = resolve_registry_kubernetes_uid_snapshots(
         &registry,
-        &[kubernetes_snapshot, otlp_snapshot],
+        &[raw_kubernetes_snapshot, raw_otlp_snapshot],
+        CLUSTER_UID,
         2_100,
-    )
-    .unwrap();
-    assert!(
-        resolved
-            .proposals
-            .iter()
-            .all(|proposal| !(proposal.left.kind == "k8s_pod"
-                && proposal.right.kind == "k8s_pod")),
-        "the same Pod UID string under different real cluster UIDs must not correlate"
     );
+    assert!(matches!(
+        result,
+        Err(ResolutionPipelineError::IdentityNormalizationRejected { .. })
+    ));
 }
