@@ -1,0 +1,17 @@
+SYMTHAEA_QUALIFICATION_PROFILE_V1
+profile=epidemiology-surveillance-v1
+repository=Luminous-Dynamics/symthaea
+rust_channel=1.96.0
+timeout_seconds=1200
+hash=Cargo.toml
+hash=Cargo.lock
+hash=rust-toolchain.toml
+hash=flake.lock
+hash=crates/domains/symthaea-epidemiology/Cargo.toml
+hash=crates/domains/symthaea-statistics/Cargo.toml
+step=metadata
+step=fmt-epidemiology
+step=test-epidemiology
+step=doc-epidemiology
+step=clippy-epidemiology
+step=wasm-epidemiology

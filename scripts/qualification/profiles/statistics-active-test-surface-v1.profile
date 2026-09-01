@@ -1,0 +1,15 @@
+SYMTHAEA_QUALIFICATION_PROFILE_V1
+profile=statistics-active-test-surface-v1
+repository=Luminous-Dynamics/symthaea
+rust_channel=1.96.0
+timeout_seconds=900
+hash=Cargo.toml
+hash=Cargo.lock
+hash=rust-toolchain.toml
+hash=flake.lock
+hash=crates/domains/symthaea-statistics/Cargo.toml
+step=metadata
+step=fmt-statistics
+step=test-statistics
+step=doc-statistics
+step=wasm-statistics
