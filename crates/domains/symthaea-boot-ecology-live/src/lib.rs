@@ -14,9 +14,9 @@ use symthaea_boot_protocol::{BootDomain, BootHealth, BootPhase, BootSnapshot, Do
 
 pub const REVEAL_SCALE: u32 = 1_000_000;
 
-const _: () = {
-    assert!(BootDomain::COUNT <= u16::BITS as usize);
-};
+const DOMAIN_MASK_CAPACITY: usize = u16::BITS as usize;
+const _: [(); DOMAIN_MASK_CAPACITY - BootDomain::COUNT] =
+    [(); DOMAIN_MASK_CAPACITY - BootDomain::COUNT];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SemanticBootAnchor {
@@ -245,7 +245,7 @@ impl PresentationFingerprint {
             || self.failed_domains.removed_from(previous.failed_domains)
     }
 
-    const fn visual_issue_severity(self) -> u8 {
+    fn visual_issue_severity(self) -> u8 {
         let health = match self.health {
             BootHealth::Normal | BootHealth::Unknown => 0,
             BootHealth::Delayed => 1,
@@ -261,7 +261,7 @@ impl PresentationFingerprint {
         } else {
             0
         };
-        if health > domains { health } else { domains }
+        health.max(domains)
     }
 }
 
