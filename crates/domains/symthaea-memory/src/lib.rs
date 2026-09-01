@@ -22,7 +22,7 @@ pub use conversation::{
 };
 pub use coordinator::{
     CoordinatorConfig, CoordinatorStats, GraduationEvent, MemoryCoordinator, MemorySignals,
-    MemorySource, content_hash,
+    MemorySource, PendingGraduationCommitmentV1, content_hash,
 };
 pub use episodic_replay::{
     Episode, EpisodicMemory, EpisodicMemoryStats, EpisodicReplayConfig, ReplaySessionResult,
