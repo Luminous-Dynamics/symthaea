@@ -6,8 +6,9 @@
 # Composable modules for the God-Tier NixOS boot sequence.
 # Each module is independently enableable:
 #
-#   services.symthaea-boot.enable = true;              # Boot animation (quicken-fb)
-#   services.symthaea-boot.observability.enable = true;# Quiet/diagnostic boot policy
+#   services.symthaea-boot.enable = true;               # Boot animation (quicken-fb)
+#   services.symthaea-boot.observability.enable = true; # Quiet/diagnostic boot policy
+#   services.symthaea-boot.observer.enable = true;      # Structured systemd observer
 #   services.symthaea-dashboard.enable = true;          # Local web dashboard (Sacred Bridge)
 #   services.symthaea-recovery.enable = true;           # Ahimsa recovery timer
 #   services.symthaea-first-boot.enable = true;         # Auto-hardening on first boot
@@ -19,6 +20,7 @@
   imports = [
     ./quicken-fb.nix
     ./symthaea-boot-observability.nix
+    ./symthaea-boot-observer.nix
     ./symthaea-dashboard.nix
     ./recovery-timer.nix
     ./first-boot.nix
