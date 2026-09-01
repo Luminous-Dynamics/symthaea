@@ -105,6 +105,14 @@ fn replay_history_can_prove_persistent_drift_without_inventing_change_time() {
         integration_id: KUBERNETES_INTEGRATION_ID.into(),
         snapshots: vec![first.snapshot().clone(), latest.snapshot().clone()],
     };
+
+    let mut registry = IntegrationRegistry::new();
+    registry
+        .register_discoverer(Arc::new(latest.topology().clone()))
+        .unwrap();
+    let id = IntegrationId::new(KUBERNETES_INTEGRATION_ID);
+    registry.admit_state_history(&id, &history).unwrap();
+
     let assessment = assess_state_dimension_with_history(
         &history,
         &entity,
@@ -141,6 +149,24 @@ fn unregistered_state_source_is_rejected() {
             &IntegrationId::new(KUBERNETES_INTEGRATION_ID),
             replay.snapshot(),
         )
+        .is_err());
+}
+
+#[test]
+fn unregistered_state_history_is_rejected() {
+    let replay = KubernetesStateReplay::from_objects(
+        KubernetesReplayContext::default(),
+        &[deployment()],
+        100,
+    )
+    .unwrap();
+    let history = StateHistory {
+        integration_id: KUBERNETES_INTEGRATION_ID.into(),
+        snapshots: vec![replay.snapshot().clone()],
+    };
+    let registry = IntegrationRegistry::new();
+    assert!(registry
+        .admit_state_history(&IntegrationId::new(KUBERNETES_INTEGRATION_ID), &history)
         .is_err());
 }
 
