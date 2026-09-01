@@ -12,7 +12,8 @@
 
 let
   cfg = config.services.symthaea-boot.observer;
-  inherit (lib) mkEnableOption mkIf mkOption types;
+  telemetry = config.services.symthaea-boot.telemetry;
+  inherit (lib) mkDefault mkEnableOption mkIf mkOption types;
 in {
   options.services.symthaea-boot.observer = {
     enable = mkEnableOption "structured Symthaea boot observer";
@@ -34,15 +35,19 @@ in {
     statePath = mkOption {
       type = types.str;
       default = "/run/symthaea-boot/state-v1.json";
-      description = "Ephemeral normalized snapshot used by late presentation consumers.";
+      description = "Ephemeral lineage-bound snapshot used by presentation consumers.";
     };
   };
 
   config = mkIf (config.services.symthaea-boot.enable && cfg.enable) {
+    # Enabling the observer opts the renderer into the typed channel by default.
+    # Explicit user configuration still wins over mkDefault.
+    services.symthaea-boot.telemetry.enable = mkDefault true;
+
     assertions = [
       {
-        assertion = lib.hasPrefix "/" cfg.outputSocket;
-        message = "services.symthaea-boot.observer.outputSocket must be absolute";
+        assertion = lib.hasPrefix "/run/symthaea/" cfg.outputSocket;
+        message = "services.symthaea-boot.observer.outputSocket must stay beneath /run/symthaea";
       }
       {
         assertion = lib.hasPrefix "/run/symthaea-boot/" cfg.statePath;
@@ -52,6 +57,14 @@ in {
           its DynamicUser runtime directory.
         '';
       }
+      {
+        assertion = !telemetry.enable || cfg.outputSocket == telemetry.eventSocket;
+        message = "observer.outputSocket and telemetry.eventSocket must match when typed boot telemetry is enabled";
+      }
+      {
+        assertion = !telemetry.enable || cfg.statePath == telemetry.statePath;
+        message = "observer.statePath and telemetry.statePath must match when typed boot telemetry is enabled";
+      }
     ];
 
     systemd.services.symthaea-boot-observer = {
@@ -60,16 +73,10 @@ in {
         "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/architecture/BOOT_PROTOCOL_V1.md"
       ];
 
-      # D-Bus is the only structured authority this service needs. Starting at
-      # basic.target is early enough to observe network/services/graphics while
-      # initial systemd monotonic timestamps reconstruct earlier unit readiness.
       after = [ "dbus.service" ];
       wantedBy = [ "basic.target" ];
 
-      unitConfig = {
-        # Never let a presentation observer hold shutdown/recovery transactions.
-        IgnoreOnIsolate = true;
-      };
+      unitConfig.IgnoreOnIsolate = true;
 
       serviceConfig = {
         Type = "simple";
@@ -84,6 +91,8 @@ in {
         DynamicUser = true;
         RuntimeDirectory = "symthaea-boot";
         RuntimeDirectoryMode = "0755";
+        SupplementaryGroups = [ "symthaea-boot" ];
+        UMask = "0022";
 
         NoNewPrivileges = true;
         PrivateTmp = true;
@@ -103,16 +112,10 @@ in {
         RestrictNamespaces = true;
         RestrictAddressFamilies = [ "AF_UNIX" ];
         SystemCallArchitectures = "native";
-
-        # State persistence is the only writable path. Sending to the renderer's
-        # Unix datagram socket does not require filesystem write permission.
         ReadWritePaths = [ "/run/symthaea-boot" ];
       };
     };
 
-    # RuntimeDirectory is created by systemd before ExecStart. Generate the
-    # observer config there from declarative Nix settings without making config
-    # evaluation or the renderer dependent on the observer.
     systemd.services.symthaea-boot-observer.preStart = ''
       cat > /run/symthaea-boot/observer-v1.json <<'JSON'
       ${builtins.toJSON {
