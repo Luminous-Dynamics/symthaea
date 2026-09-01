@@ -9,6 +9,7 @@
 ///
 /// - `ecology_renderer_base` — deterministic state-aware procedural curve renderer
 /// - `ecology_renderer` — holographic presentation wrapper used by live + preview paths
+/// - `inoculation_renderer` — distinct installation/incubation visual grammar
 /// - `preview` — exact offline frame capture using the same renderer
 /// - `framebuffer` — DRM device management, dumb buffer allocation, mmap
 /// - `mycelium` — legacy L-system renderer retained for compatibility
@@ -20,6 +21,7 @@ pub mod ecology_renderer_base;
 #[path = "ecology_renderer_holo.rs"]
 pub mod ecology_renderer;
 pub mod framebuffer;
+pub mod inoculation_renderer;
 pub mod mycelium;
 pub mod preview;
 pub mod progress;
