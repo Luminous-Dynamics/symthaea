@@ -10,11 +10,7 @@
 
 use std::collections::BTreeSet;
 
-use symthaea_cogsec::{
-    CognitiveSecurityLabel, Consequence, ControlIntegrity, Digest32, MutationKind,
-    MutationReceipt, MutationRequest, PolicyRule, PolicySnapshot, PrincipalId, ReferenceMonitor,
-    ResourceId, TaintLevel,
-};
+use symthaea_cogsec::{Digest32, MutationReceipt, ReferenceMonitor, ResourceId};
 use symthaea_cogsec_evidence::{
     CognitiveTick, EvidenceCompleteness, EvidenceConfidentiality, EvidenceLedgerSnapshot, EventId,
     LedgerStats, PrincipalContext, ProposalId, QualificationManifest, ResourceVersion,
@@ -343,6 +339,10 @@ fn paired_observed_kind(kind: ShadowEventKind) -> Option<ShadowEventKind> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_cogsec::{
+        CognitiveSecurityLabel, Consequence, ControlIntegrity, MutationKind, MutationRequest,
+        PolicyRule, PolicySnapshot, PrincipalId, TaintLevel,
+    };
 
     fn d(byte: u8) -> Digest32 {
         Digest32([byte; 32])
