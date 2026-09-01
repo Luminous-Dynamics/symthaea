@@ -1,6 +1,6 @@
 # Boot Ecology Live Adapter v1
 
-Status: convergence contract; implementation follows #238/#257 qualification
+Status: renderer-independent reducer implemented; exact #238 renderer integration follows qualification
 
 ## Purpose
 
@@ -10,7 +10,10 @@ The core model is:
 
 ```text
 historical lifecycle facts -> BootGenome / stable topology
-live BootSnapshot/Event    -> LiveEcologyModulation
+live BootSnapshot          -> LiveEcologyReducer
+                                      |
+                                      v
+                           LiveEcologyModulation
                                       |
                                       v
                          one exact EcologyRenderer
@@ -18,49 +21,72 @@ live BootSnapshot/Event    -> LiveEcologyModulation
 
 The BootGenome is chosen once for a renderer invocation. Live system changes modulate that genome; they do not continuously regenerate its morphology.
 
+## Implemented semantic boundary
+
+The renderer-independent reference reducer lives at:
+
+```text
+crates/domains/symthaea-boot-ecology-live
+```
+
+It depends only on `symthaea-boot-protocol` and carries no DRM, journal, systemd, framebuffer, or Boot Ecology renderer dependency.
+
+Its bounded output contains:
+
+```text
+observation_sequence
+semantic phase anchor
+authoritative coarse health
+fixed-point reveal floor
+delayed-domain bitmask
+repair/degraded-domain bitmask
+minimum diagnostics visibility
+idempotent pulse token
+handoff-ready fact
+```
+
+It retains only the last accepted sequence/anchor for one already-validated observation lineage. The caller must reset it explicitly when the boot-protocol receiver adopts a new lineage.
+
 ## Stable genome, dynamic modulation
 
 A boot may begin with a genome selected from factual history such as first boot, clean return, rollback, recovery, hardware change, or resume. Once rendering starts, live telemetry must not change the morphology family, deterministic seed, or persistent visual lineage merely because a transient service becomes delayed or recovers.
 
 Otherwise a two-second network delay could make the organism appear to change species mid-boot and deterministic preview/live parity would become difficult to reason about.
 
-Live state is therefore represented by a small derived modulation layer.
-
-A future ecology-facing type should contain only bounded presentation facts such as:
-
-```text
-observation sequence
-semantic boot anchor
-coarse health
-stalled/degraded domain classes
-reveal floor
-pulse request
-repair/degraded emphasis
-handoff readiness
-```
-
-It must not contain arbitrary journal strings, process metadata, unit dumps, network identifiers, paths, or authority decisions.
-
-## Semantic anchors
+## Conservative semantic phase anchors
 
 Do not map Linux boot directly to an alleged percentage. Boot is a dependency graph, not a linear progress bar.
 
-Map normalized boot facts to monotonic semantic anchors instead:
+The observer may advance `BootPhase` when a watched unit is `Starting` or `Ready`; therefore the visual adapter must not reinterpret phase entry as stronger readiness/availability semantics.
+
+The reference mapping is deliberately neutral:
 
 ```text
-BootPhase::Kernel      -> KernelActive
-BootPhase::Initrd      -> InitrdActive
-BootPhase::Storage     -> StorageAvailable
-BootPhase::Filesystems -> FilesAvailable
-BootPhase::Security    -> SecurityReady
-BootPhase::Network     -> NetworkAvailable
-BootPhase::Services    -> ServicesAvailable
-BootPhase::Graphics    -> GraphicsAvailable
-BootPhase::Session     -> SessionStarting
+BootPhase::Kernel      -> KernelPhase
+BootPhase::Initrd      -> InitrdPhase
+BootPhase::Storage     -> StoragePhase
+BootPhase::Filesystems -> FilesystemsPhase
+BootPhase::Security    -> SecurityPhase
+BootPhase::Network     -> NetworkPhase
+BootPhase::Services    -> ServicesPhase
+BootPhase::Graphics    -> GraphicsPhase
+BootPhase::Session     -> SessionPhase
 BootPhase::Ready       -> SessionReady
 ```
 
-The exact renderer/RenderPlan assigns a visual location to each supported anchor. A scene may omit an anchor visually, but it may not invent a more advanced factual anchor.
+Only explicit `BootPhase::Ready`, produced from the authoritative boot-ready path, carries readiness semantics.
+
+A scene may omit an anchor visually, but it may not invent a more advanced factual anchor.
+
+## Reveal floors are not percentages
+
+The live reducer assigns monotonic fixed-point reveal floors in `[0, 1_000_000]` so the renderer has a deterministic ordering target.
+
+These values are **presentation constants**, not estimates of completed Linux boot work and must never be displayed as a boot percentage.
+
+They answer only:
+
+> What minimum visual phase is justified by the most advanced authoritative phase observed so far?
 
 ## Elastic visual timeline
 
@@ -70,16 +96,16 @@ Conceptually:
 
 ```text
 historical genome -> visual plan
-live boot anchor  -> minimum truthful visual phase
-renderer time     -> interpolation toward that phase
+live phase anchor -> minimum truthful visual phase
+renderer time     -> interpolation toward/within earned visual range
 ```
 
 Rules:
 
 1. factual progress may pull the visual **forward**;
 2. a visual timer may never claim a factual anchor not yet observed;
-3. visual semantic progress does not regress within one observation lineage;
-4. `Unknown` never renders as `Normal`;
+3. semantic progress does not regress within one observation lineage;
+4. `Unknown` remains distinct from `Normal`;
 5. `Ready` comes only from authoritative boot observation;
 6. loss of telemetry freezes/falls back presentation; it never manufactures progress;
 7. handoff may compress or skip remaining decoration rather than delay the display manager.
@@ -91,15 +117,15 @@ When the OS advances faster than the nominal visual sequence, the renderer shoul
 Example:
 
 ```text
-StorageAvailable
+StoragePhase
       |
 40 ms later
       v
-ServicesAvailable
+ServicesPhase
       |
 60 ms later
       v
-GraphicsAvailable
+GraphicsPhase
 ```
 
 The ecology can compress intermediate reveal while preserving topology and semantic ordering. At display handoff, remaining purely decorative stages may be skipped or shortened to the bounded handoff transition.
@@ -108,67 +134,88 @@ The renderer never extends boot to finish a movie.
 
 ## Slow boot behavior
 
-When the OS remains at one anchor longer than the normal visual transition:
+When the OS remains at one phase longer than the normal visual transition, Spore should not continue marching toward `SessionReady`.
 
-```text
-NetworkAvailable not yet observed
-```
-
-Spore should not continue marching toward SessionReady.
-
-Instead the scene enters a bounded ambient hold at the current truthful phase:
+Instead the scene enters a bounded ambient hold at the last earned phase:
 
 - already-grown structures breathe/pulse subtly;
-- no new factual anchor is implied;
+- no stronger factual state is implied;
 - ordinary delays remain calm;
 - statistically unusual delay may increase diagnostic prominence;
 - degraded/failed health may modulate color/activity without replacing explicit diagnostics.
 
 This avoids both a frozen-looking splash screen and a dishonest progress bar.
 
-## Progress elasticity
+## Health and diagnostics
 
-The renderer should maintain two distinct quantities:
-
-```text
-semantic_floor  = minimum phase justified by observed OS state
-visual_phase    = smoothly rendered phase
-```
-
-`visual_phase` may approach the semantic floor under a bounded catch-up rate. Decorative interpolation between already-earned anchors is allowed, but it must stop before the next unearned factual anchor.
-
-The final implementation should use fixed-point/integer semantic phase for state/replay and floating point only for local rendering interpolation.
-
-## Event accents
-
-Events may request ephemeral accents without mutating the stable genome.
-
-Examples:
-
-```text
-DomainReady       -> one outward pulse
-DomainRecovered   -> restrained repair pulse
-DomainDelayed     -> slower local activity
-DomainDegraded    -> bounded amber/repair emphasis
-DomainFailed      -> diagnostic emphasis
-BootReady         -> handoff-ready illumination
-```
-
-Event accents are rate-limited and presentation-only. A storm of service events must not create unbounded GPU/CPU work or visual noise.
-
-## Health semantics
+The snapshot's `BootHealth` is copied unchanged into `LiveEcologyModulation`; the adapter cannot promote/bless it.
 
 Suggested visual interpretation:
 
 ```text
 Normal   -> ordinary ecology
-Unknown  -> neutral/uncertain; never green-success semantics
-Delayed  -> calm hold + subtle diagnostic cue
-Degraded -> visible structured diagnostics + restrained ecology modulation
+Unknown  -> neutral/uncertain; never success-green semantics
+Delayed  -> calm hold + status cue
+Degraded -> structured diagnostics + restrained ecology modulation
 Failed   -> diagnostics dominate; ecology becomes secondary
 ```
 
+The adapter also applies a defensive **diagnostic floor** from bounded domain state:
+
+```text
+any Delayed domain          -> at least Status
+any Degraded/Failed domain  -> Diagnostics
+```
+
+This affects only visibility. It does not rewrite authoritative global health. Thus an inconsistent future snapshot cannot be visually underreported even though the renderer still exposes the original health value for diagnosis.
+
 Raw logs remain a separate Linux-native visibility layer.
+
+## Domain modulation is bounded
+
+Delayed and degraded/failed domains are stored as fixed bitmasks over the protocol's bounded `BootDomain` enum rather than unbounded vectors or event history.
+
+This lets an exact renderer add localized cues such as:
+
+```text
+Network delayed  -> restrained pulse/hold in network-associated region
+Service degraded -> repair emphasis
+Recovered domain -> repair emphasis clears on next authoritative snapshot
+```
+
+without retaining raw events indefinitely.
+
+## Event/pulse semantics
+
+`pulse_token` is currently the accepted snapshot sequence.
+
+A renderer may trigger an accent only when the token changes. Reprocessing the same snapshot is therefore idempotent and cannot create repeated pulses.
+
+Future event-specific accents may be layered behind their own bounded/rate-limited token if qualification proves them useful.
+
+## Recovery
+
+Recovery does not regenerate the BootGenome and does not rewind the visual timeline.
+
+Example:
+
+```text
+ServicesPhase + Network Degraded
+        |
+        v
+repair emphasis + Diagnostics
+        |
+authoritative recovery snapshot
+        v
+ServicesPhase + Network Ready
+        |
+        v
+same topology / same reveal floor
+repair emphasis clears
+diagnostics de-escalate according to authoritative health
+```
+
+The reference reducer has a regression test for this behavior.
 
 ## Diagnostics and ecology use the same source
 
@@ -181,10 +228,10 @@ BootSnapshot
     |
     +--> structured diagnostics
     |
-    +--> BootEcologyLiveAdapter -> LiveEcologyModulation
+    +--> LiveEcologyReducer -> LiveEcologyModulation
 ```
 
-This prevents contradictions such as the diagnostics saying `Network: Failed` while the visual layer independently concludes that networking is healthy.
+This prevents independent scraping/parsing paths from disagreeing.
 
 ## Historical versus live facts
 
@@ -197,7 +244,7 @@ Historical facts may choose:
 - update rings;
 - rollback/recovery grammar;
 - visual maturity;
-- deterministic machine visual identity.
+- deterministic local visual identity.
 
 Live facts may choose only transient presentation modulation and semantic progress.
 
@@ -214,7 +261,9 @@ When the host requests display handoff:
 5. emit post-release evidence;
 6. exit.
 
-The display manager never waits for a long visual conclusion.
+`LiveEcologyModulation::handoff_ready` is true only for explicit `BootPhase::Ready`; it is presentation input, not permission to start the display manager.
+
+The host's bounded stop/lifecycle policy remains authoritative.
 
 ## Deterministic replay
 
@@ -222,7 +271,8 @@ A visual incident should be reproducible from:
 
 ```text
 BootGenome
-+ ordered validated BootSnapshot/BootEvent trace
++ ordered validated BootSnapshot trace
++ reducer version
 + fixed semantic clock rules
 + renderer version
 ```
@@ -231,31 +281,46 @@ Exact semantic state should replay deterministically. Pixel output across differ
 
 ## Performance
 
-Live modulation must be O(1) or O(number of bounded boot domains), with no journal scanning and no unbounded event history.
+Live modulation is O(number of bounded boot domains), with no journal scanning and no unbounded event history.
 
-The adapter should retain only:
+The adapter retains only:
 
-- current validated snapshot;
-- last accepted sequence/lineage;
-- bounded transient accent state;
-- current semantic/visual phase.
+- last accepted observation sequence;
+- last accepted semantic anchor.
+
+Its output uses fixed-size domain masks and scalar fields.
 
 It must not turn telemetry volume into renderer complexity.
 
-## Qualification gates
+## Current reducer qualification gates
 
-Before replacing the current time-only live ecology schedule:
+Implemented tests cover:
 
-1. golden mapping tests for every `BootPhase` and `BootHealth`;
-2. `Unknown`/telemetry-loss tests;
-3. monotonic semantic-phase tests;
-4. fast-boot compression tests;
-5. slow-boot hold tests;
-6. recovery/degraded event tests;
-7. event-storm rate-limit test;
-8. exact preview/live RenderPlan parity where inputs are equivalent;
-9. handoff during every anchor;
-10. performance evidence proving modulation overhead is negligible relative to raster cost.
+1. monotonic phase-anchor/reveal mapping;
+2. conservative phase naming;
+3. slow-boot hold;
+4. explicit-Ready-only handoff fact;
+5. health-driven diagnostics floor;
+6. defensive domain-driven diagnostics visibility;
+7. bounded delayed/repair masks;
+8. recovery without topology/timeline rewind;
+9. sequence/anchor rewind rejection;
+10. explicit lineage reset behavior;
+11. invalid snapshot rejection;
+12. idempotent equal-sequence handling.
+
+## Deferred exact-renderer gates
+
+After #238/#257 qualify and the exact Ecology renderer is connected:
+
+1. fast-boot compression;
+2. bounded slow-boot ambient hold;
+3. telemetry-loss rendering;
+4. event-storm/rate-limit behavior;
+5. exact preview/live RenderPlan parity where inputs are equivalent;
+6. handoff during every semantic phase;
+7. modulation overhead evidence relative to raster cost;
+8. reduced-motion/high-contrast parity.
 
 ## Invariant
 
