@@ -64,15 +64,17 @@ fn run_case(width: u32, height: u32, args: &Args) -> serde_json::Value {
     }
 
     let bytes_per_surface = width as u64 * height as u64 * 4;
+    let fixed_dt_us = u64::try_from(Duration::from_secs_f32(FIXED_DT).as_micros())
+        .unwrap_or(u64::MAX);
     serde_json::json!({
         "schema": "spore-boot-headless-benchmark-v1",
         "width": width,
         "height": height,
         "frames": args.frames,
         "warmup_frames": args.warmup_frames,
-        "fixed_dt_us": Duration::from_secs_f32(FIXED_DT).as_micros(),
+        "fixed_dt_us": fixed_dt_us,
         "growth_rate": args.growth_rate,
-        "seed": args.seed,
+        "seed": args.seed.as_str(),
         "branch_count": network.branches.len(),
         "bytes_per_xrgb8888_surface": bytes_per_surface,
         "grow": grow.summary().to_json(),
