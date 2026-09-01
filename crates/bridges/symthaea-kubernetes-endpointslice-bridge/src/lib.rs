@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Read-only EndpointSlice topology augmentation for Kubernetes E1 replay.
 //!
-//! This crate is deliberately not a second Kubernetes discoverer. It consumes
-//! the already-built `KubernetesReplayDiscoverer` graph and same-capture decoded
-//! `discovery.k8s.io/v1` EndpointSlice JSON, then returns one augmented
-//! `DiscoverySnapshot` attributed to the existing `kubernetes-object-replay`
-//! integration. It opens no API connection and carries no credentials.
+//! This is deliberately not a second Kubernetes discoverer. It consumes an
+//! already-built `KubernetesReplayDiscoverer` graph plus same-capture decoded
+//! `discovery.k8s.io/v1` EndpointSlice JSON, and returns one augmented snapshot
+//! attributed to the existing `kubernetes-object-replay` integration.
 
 #![forbid(unsafe_code)]
 
@@ -32,11 +31,11 @@ const MAX_HINTS_PER_DIMENSION: usize = 8;
 
 type RelationKey = (EntityRef, EntityRef, RelationKind, RelationBasis);
 
-/// Augment one Kubernetes replay snapshot with EndpointSlice routing topology.
+/// Augment one Kubernetes replay snapshot with EndpointSlice routing evidence.
 ///
-/// E1 requires the base topology and EndpointSlice documents to come from the
-/// same capture instant. Combining different capture times would create a
-/// snapshot that falsely implies simultaneity.
+/// The capture timestamp must equal the base snapshot timestamp. E1 does not
+/// merge asynchronous captures because doing so would falsely imply that all
+/// topology facts were observed simultaneously.
 pub fn augment_endpoint_slices(
     base: &KubernetesReplayDiscoverer,
     documents: &[Value],
@@ -50,22 +49,21 @@ pub fn augment_endpoint_slices(
     }
     if base.topology().discovered_at_unix_ms != collected_at_unix_ms {
         return Err(IntegrationError::InvalidRequest(format!(
-            "EndpointSlice capture time {collected_at_unix_ms} does not match base Kubernetes capture time {}",
+            "EndpointSlice capture time {collected_at_unix_ms} does not match base capture time {}",
             base.topology().discovered_at_unix_ms
         )));
     }
 
-    let cluster_namespace = base
+    let cluster = base
         .topology()
         .entities
         .iter()
         .find(|entity| entity.entity.kind == "k8s_cluster")
-        .map(|entity| entity.entity.namespace.clone())
+        .cloned()
         .ok_or_else(|| {
-            IntegrationError::InvalidOutput(
-                "base Kubernetes topology has no k8s_cluster entity".into(),
-            )
+            IntegrationError::InvalidOutput("base Kubernetes topology has no cluster entity".into())
         })?;
+    let cluster_namespace = cluster.entity.namespace.clone();
 
     let mut entities = base
         .topology()
@@ -81,54 +79,70 @@ pub fn augment_endpoint_slices(
         .cloned()
         .map(|relation| (relation_key(&relation), relation))
         .collect::<BTreeMap<_, _>>();
+    let mut seen_slices = BTreeSet::new();
 
     for document in expand_documents(documents)? {
         let slice = parse_slice(document)?;
-        let slice_entity = endpoint_slice_entity(
-            base,
-            &cluster_namespace,
-            &slice,
-            collected_at_unix_ms,
-        );
-        insert_entity(&mut entities, slice_entity.clone())?;
-
-        if let Some(namespace) = find_entity_by_kind_name(
-            base.topology(),
-            "Namespace",
-            None,
-            &slice.namespace,
-        ) {
-            insert_relation(
-                &mut relations,
-                structural_relation(
-                    slice_entity.entity.clone(),
-                    namespace,
-                    RelationKind::MemberOf,
-                    collected_at_unix_ms,
-                    "endpointslice_namespace_membership",
-                    base.context().source_confidence,
-                ),
-            );
+        let slice_entity = build_slice_entity(base, &cluster_namespace, &slice)?;
+        let slice_key = slice_entity.entity.canonical_key();
+        if !seen_slices.insert(slice_key.clone()) {
+            return Err(IntegrationError::Protocol(format!(
+                "duplicate EndpointSlice replay object `{}`",
+                slice.name
+            )));
         }
+        merge_entity(&mut entities, slice_entity.clone())?;
 
-        let service_entity = if let Some(service_name) = slice.service_name.as_deref() {
-            Some(resolve_or_reference(
+        let namespace = resolve_reference(
+            base.topology(),
+            &mut entities,
+            &cluster_namespace,
+            ReferenceSpec {
+                api_version: Some("v1"),
+                kind: "Namespace",
+                namespace: None,
+                name: &slice.namespace,
+                uid: None,
+                role: "namespace_reference",
+            },
+        )?;
+        insert_relation(
+            &mut relations,
+            structural_relation(
+                slice_entity.entity.clone(),
+                namespace.clone(),
+                RelationKind::MemberOf,
+                collected_at_unix_ms,
+                "endpointslice_namespace_membership",
+                base.context().source_confidence,
+            ),
+        );
+        insert_relation(
+            &mut relations,
+            structural_relation(
+                namespace,
+                cluster.entity.clone(),
+                RelationKind::MemberOf,
+                collected_at_unix_ms,
+                "namespace_cluster_membership",
+                base.context().source_confidence,
+            ),
+        );
+
+        let service = if let Some(service_name) = slice.service_name.as_deref() {
+            let service = resolve_reference(
                 base.topology(),
                 &mut entities,
                 &cluster_namespace,
                 ReferenceSpec {
+                    api_version: Some("v1"),
                     kind: "Service",
                     namespace: Some(&slice.namespace),
                     name: service_name,
                     uid: None,
-                    reference_kind: "k8s_service_reference",
+                    role: "service_reference",
                 },
-            )?)
-        } else {
-            None
-        };
-
-        if let Some(service) = &service_entity {
+            )?;
             insert_relation(
                 &mut relations,
                 structural_relation(
@@ -140,17 +154,27 @@ pub fn augment_endpoint_slices(
                     base.context().source_confidence,
                 ),
             );
-        }
+            Some(service)
+        } else {
+            None
+        };
 
+        let mut seen_endpoints = BTreeSet::new();
         for endpoint in &slice.endpoints {
-            let endpoint_entity = endpoint_membership_entity(
+            let endpoint_entity = build_endpoint_entity(
                 &cluster_namespace,
                 &slice_entity.entity,
                 &slice,
                 endpoint,
             );
-            insert_entity(&mut entities, endpoint_entity.clone())?;
-
+            let endpoint_key = endpoint_entity.entity.canonical_key();
+            if !seen_endpoints.insert(endpoint_key) {
+                return Err(IntegrationError::Protocol(format!(
+                    "EndpointSlice `{}` contains duplicate endpoint memberships",
+                    slice.name
+                )));
+            }
+            merge_entity(&mut entities, endpoint_entity.clone())?;
             insert_relation(
                 &mut relations,
                 structural_relation(
@@ -163,7 +187,7 @@ pub fn augment_endpoint_slices(
                 ),
             );
 
-            if let Some(service) = &service_entity {
+            if let Some(service) = &service {
                 insert_relation(
                     &mut relations,
                     structural_relation(
@@ -178,16 +202,17 @@ pub fn augment_endpoint_slices(
             }
 
             if let Some(target) = &endpoint.target_ref {
-                let target_entity = resolve_or_reference(
+                let target_entity = resolve_reference(
                     base.topology(),
                     &mut entities,
                     &cluster_namespace,
                     ReferenceSpec {
+                        api_version: target.api_version.as_deref(),
                         kind: &target.kind,
                         namespace: target.namespace.as_deref(),
                         name: &target.name,
                         uid: target.uid.as_deref(),
-                        reference_kind: "k8s_object_reference",
+                        role: "target_reference",
                     },
                 )?;
                 insert_relation(
@@ -204,16 +229,17 @@ pub fn augment_endpoint_slices(
             }
 
             if let Some(node_name) = endpoint.node_name.as_deref() {
-                let node = resolve_or_reference(
+                let node = resolve_reference(
                     base.topology(),
                     &mut entities,
                     &cluster_namespace,
                     ReferenceSpec {
+                        api_version: Some("v1"),
                         kind: "Node",
                         namespace: None,
                         name: node_name,
                         uid: None,
-                        reference_kind: "k8s_node_reference",
+                        role: "node_reference",
                     },
                 )?;
                 insert_relation(
@@ -296,6 +322,7 @@ struct Endpoint {
 
 #[derive(Debug, Clone)]
 struct ObjectReference {
+    api_version: Option<String>,
     kind: String,
     name: String,
     namespace: Option<String>,
@@ -310,7 +337,7 @@ struct ConditionValue {
 
 fn parse_slice(value: &Value) -> Result<ParsedSlice, IntegrationError> {
     let object = value.as_object().ok_or_else(|| {
-        IntegrationError::Protocol("EndpointSlice replay document is not a JSON object".into())
+        IntegrationError::Protocol("EndpointSlice replay document is not an object".into())
     })?;
     let api_version = required_string(object.get("apiVersion"), "apiVersion")?;
     let kind = required_string(object.get("kind"), "kind")?;
@@ -329,7 +356,6 @@ fn parse_slice(value: &Value) -> Result<ParsedSlice, IntegrationError> {
     let labels = string_map(metadata.get("labels"), "metadata.labels")?;
     let service_name = labels.get(ENDPOINTSLICE_SERVICE_LABEL).cloned();
     let managed_by = labels.get(ENDPOINTSLICE_MANAGED_BY_LABEL).cloned();
-
     let address_type = match required_string(object.get("addressType"), "addressType")?.as_str() {
         "IPv4" => AddressType::Ipv4,
         "IPv6" => AddressType::Ipv6,
@@ -340,10 +366,6 @@ fn parse_slice(value: &Value) -> Result<ParsedSlice, IntegrationError> {
             )))
         }
     };
-
-    let ports = parse_ports(object.get("ports"))?;
-    let endpoints = parse_endpoints(object.get("endpoints"), address_type)?;
-
     Ok(ParsedSlice {
         name,
         namespace,
@@ -351,18 +373,15 @@ fn parse_slice(value: &Value) -> Result<ParsedSlice, IntegrationError> {
         service_name,
         managed_by,
         address_type,
-        ports,
-        endpoints,
+        ports: parse_ports(object.get("ports"))?,
+        endpoints: parse_endpoints(object.get("endpoints"), address_type)?,
     })
 }
 
 fn parse_ports(value: Option<&Value>) -> Result<Vec<EndpointPort>, IntegrationError> {
-    let Some(value) = value else {
+    let Some(value) = value.filter(|value| !value.is_null()) else {
         return Ok(vec![]);
     };
-    if value.is_null() {
-        return Ok(vec![]);
-    }
     let values = value
         .as_array()
         .ok_or_else(|| IntegrationError::Protocol("EndpointSlice ports is not an array".into()))?;
@@ -372,43 +391,43 @@ fn parse_ports(value: Option<&Value>) -> Result<Vec<EndpointPort>, IntegrationEr
             values.len()
         )));
     }
-    let mut ports = Vec::with_capacity(values.len());
     let mut names = BTreeSet::new();
+    let mut ports = Vec::with_capacity(values.len());
     for value in values {
-        let port = value
+        let value = value
             .as_object()
             .ok_or_else(|| IntegrationError::Protocol("EndpointSlice port is not an object".into()))?;
-        let name = optional_string(port.get("name")).unwrap_or_default();
+        let name = optional_string(value.get("name")).unwrap_or_default();
         if !names.insert(name.clone()) {
             return Err(IntegrationError::Protocol(format!(
                 "EndpointSlice contains duplicate port name `{name}`"
             )));
         }
-        let protocol = optional_string(port.get("protocol")).unwrap_or_else(|| "TCP".into());
+        let protocol = optional_string(value.get("protocol")).unwrap_or_else(|| "TCP".into());
         if !matches!(protocol.as_str(), "TCP" | "UDP" | "SCTP") {
             return Err(IntegrationError::Protocol(format!(
-                "EndpointSlice port protocol `{protocol}` is not TCP, UDP, or SCTP"
+                "EndpointSlice protocol `{protocol}` is not TCP, UDP, or SCTP"
             )));
         }
-        let port_number = match port.get("port") {
+        let port = match value.get("port") {
             None | Some(Value::Null) => None,
             Some(value) => {
-                let value = value.as_i64().ok_or_else(|| {
-                    IntegrationError::Protocol("EndpointSlice port number is not an integer".into())
+                let number = value.as_i64().ok_or_else(|| {
+                    IntegrationError::Protocol("EndpointSlice port is not an integer".into())
                 })?;
-                if !(1..=65_535).contains(&value) {
+                if !(1..=65_535).contains(&number) {
                     return Err(IntegrationError::Protocol(format!(
-                        "EndpointSlice port {value} is outside 1..=65535"
+                        "EndpointSlice port {number} is outside 1..=65535"
                     )));
                 }
-                Some(value as u16)
+                Some(number as u16)
             }
         };
         ports.push(EndpointPort {
             name,
             protocol,
-            port: port_number,
-            app_protocol: optional_string(port.get("appProtocol")),
+            port,
+            app_protocol: optional_string(value.get("appProtocol")),
         });
     }
     ports.sort();
@@ -428,7 +447,6 @@ fn parse_endpoints(
             values.len()
         )));
     }
-
     values
         .iter()
         .map(|value| parse_endpoint(value, address_type))
@@ -439,17 +457,17 @@ fn parse_endpoint(value: &Value, address_type: AddressType) -> Result<Endpoint, 
     let endpoint = value
         .as_object()
         .ok_or_else(|| IntegrationError::Protocol("EndpointSlice endpoint is not an object".into()))?;
-    let addresses = endpoint
+    let raw_addresses = endpoint
         .get("addresses")
         .and_then(Value::as_array)
         .ok_or_else(|| IntegrationError::Protocol("EndpointSlice endpoint requires addresses".into()))?;
-    if addresses.is_empty() || addresses.len() > MAX_ADDRESSES_PER_ENDPOINT {
+    if raw_addresses.is_empty() || raw_addresses.len() > MAX_ADDRESSES_PER_ENDPOINT {
         return Err(IntegrationError::Protocol(format!(
             "EndpointSlice endpoint address count {} is outside 1..={MAX_ADDRESSES_PER_ENDPOINT}",
-            addresses.len()
+            raw_addresses.len()
         )));
     }
-    let mut parsed_addresses = addresses
+    let mut addresses = raw_addresses
         .iter()
         .map(|value| {
             value
@@ -459,38 +477,37 @@ fn parse_endpoint(value: &Value, address_type: AddressType) -> Result<Endpoint, 
                 .map(str::to_string)
                 .ok_or_else(|| {
                     IntegrationError::Protocol(
-                        "EndpointSlice endpoint address must be a non-empty string".into(),
+                        "EndpointSlice address must be a non-empty string".into(),
                     )
                 })
         })
         .collect::<Result<Vec<_>, _>>()?;
-    for address in &parsed_addresses {
+    for address in &addresses {
         validate_address(address_type, address)?;
     }
-    parsed_addresses.sort();
-    parsed_addresses.dedup();
+    addresses.sort();
+    if addresses.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(IntegrationError::Protocol(
+            "EndpointSlice endpoint contains duplicate addresses".into(),
+        ));
+    }
 
     let conditions = endpoint.get("conditions").and_then(Value::as_object);
-    let ready = condition(conditions, "ready", true)?;
-    let serving = condition(conditions, "serving", true)?;
-    let terminating = condition(conditions, "terminating", false)?;
-
     let target_ref = endpoint
         .get("targetRef")
         .filter(|value| !value.is_null())
         .map(parse_target_ref)
         .transpose()?;
     let (hint_zones, hint_nodes) = parse_hints(endpoint.get("hints"))?;
-
     Ok(Endpoint {
-        addresses: parsed_addresses,
+        addresses,
         hostname: optional_string(endpoint.get("hostname")),
         node_name: optional_string(endpoint.get("nodeName")),
         zone: optional_string(endpoint.get("zone")),
         target_ref,
-        ready,
-        serving,
-        terminating,
+        ready: condition(conditions, "ready", true)?,
+        serving: condition(conditions, "serving", true)?,
+        terminating: condition(conditions, "terminating", false)?,
         hint_zones,
         hint_nodes,
     })
@@ -525,6 +542,7 @@ fn parse_target_ref(value: &Value) -> Result<ObjectReference, IntegrationError> 
         IntegrationError::Protocol("EndpointSlice targetRef is not an object".into())
     })?;
     Ok(ObjectReference {
+        api_version: optional_string(target.get("apiVersion")),
         kind: required_string(target.get("kind"), "targetRef.kind")?,
         name: required_string(target.get("name"), "targetRef.name")?,
         namespace: optional_string(target.get("namespace")),
@@ -533,10 +551,10 @@ fn parse_target_ref(value: &Value) -> Result<ObjectReference, IntegrationError> 
 }
 
 fn parse_hints(value: Option<&Value>) -> Result<(Vec<String>, Vec<String>), IntegrationError> {
-    let Some(hints) = value.filter(|value| !value.is_null()) else {
+    let Some(value) = value.filter(|value| !value.is_null()) else {
         return Ok((vec![], vec![]));
     };
-    let hints = hints
+    let hints = value
         .as_object()
         .ok_or_else(|| IntegrationError::Protocol("EndpointSlice hints is not an object".into()))?;
     Ok((
@@ -568,7 +586,7 @@ fn parse_named_hints(value: Option<&Value>, field: &str) -> Result<Vec<String>, 
                         "EndpointSlice hints.{field} entry is not an object"
                     ))
                 })
-                .and_then(|entry| required_string(entry.get("name"), "hints.name"))
+                .and_then(|value| required_string(value.get("name"), "hints.name"))
         })
         .collect::<Result<Vec<_>, _>>()?;
     result.sort();
@@ -590,34 +608,50 @@ fn validate_address(address_type: AddressType, address: &str) -> Result<(), Inte
                 "EndpointSlice IPv6 address `{address}` is not IPv6"
             ))),
         },
-        // Kubernetes documents no defined address semantics for FQDN slices.
-        // Preserve the string without pretending it is routable or canonical IP.
+        // Kubernetes defines no routing semantics for FQDN EndpointSlice
+        // addresses. Preserve the string, but never interpret it as an IP.
         AddressType::Fqdn => Ok(()),
     }
 }
 
-fn endpoint_slice_entity(
+fn build_slice_entity(
     base: &KubernetesReplayDiscoverer,
     cluster_namespace: &str,
     slice: &ParsedSlice,
-    _collected_at_unix_ms: u64,
-) -> DiscoveredEntity {
-    let id = slice.uid.clone().unwrap_or_else(|| {
-        stable_id(&[
-            "symthaea-kubernetes-name-v1",
-            &base.context().cluster_id,
+) -> Result<DiscoveredEntity, IntegrationError> {
+    let existing = if let Some(uid) = slice.uid.as_deref() {
+        find_entity_by_uid_kind(base.topology(), uid, ENDPOINTSLICE_KIND)?
+    } else {
+        find_entity_exact(
+            base.topology(),
             ENDPOINTSLICE_API_VERSION,
             ENDPOINTSLICE_KIND,
-            &slice.namespace,
+            Some(&slice.namespace),
             &slice.name,
-        ])
+        )
+    };
+    let entity = existing.unwrap_or_else(|| {
+        let id = slice.uid.clone().unwrap_or_else(|| {
+            stable_name_id(
+                &base.context().cluster_id,
+                ENDPOINTSLICE_API_VERSION,
+                ENDPOINTSLICE_KIND,
+                Some(&slice.namespace),
+                &slice.name,
+            )
+        });
+        // `k8s_object` is already declared by the Kubernetes E1 manifest. A
+        // dedicated EndpointSlice kind should only be introduced together with
+        // a manifest migration, not silently by this augmenter.
+        EntityRef::new(cluster_namespace, "k8s_object", id)
     });
-    let entity = EntityRef::new(cluster_namespace, "k8s_endpointslice", id);
+
     let mut attributes = BTreeMap::from([
         ("k8s.api_version".into(), ENDPOINTSLICE_API_VERSION.into()),
         ("k8s.kind".into(), ENDPOINTSLICE_KIND.into()),
         ("k8s.name".into(), slice.name.clone()),
         ("k8s.namespace".into(), slice.namespace.clone()),
+        ("symthaea.k8s.role".into(), "endpoint_slice".into()),
         ("k8s.endpointslice.address_type".into(), slice.address_type.as_str().into()),
         ("k8s.endpointslice.endpoint_count".into(), slice.endpoints.len().to_string()),
         ("k8s.endpointslice.port_count".into(), slice.ports.len().to_string()),
@@ -645,10 +679,10 @@ fn endpoint_slice_entity(
             format!("k8s.endpointslice.port.{index}.protocol"),
             port.protocol.clone(),
         );
-        if let Some(number) = port.port {
+        if let Some(port) = port.port {
             attributes.insert(
                 format!("k8s.endpointslice.port.{index}.port"),
-                number.to_string(),
+                port.to_string(),
             );
         }
         if let Some(app_protocol) = &port.app_protocol {
@@ -658,39 +692,43 @@ fn endpoint_slice_entity(
             );
         }
     }
-    DiscoveredEntity {
+    Ok(DiscoveredEntity {
         entity,
         display_name: Some(slice.name.clone()),
         attributes,
-    }
+    })
 }
 
-fn endpoint_membership_entity(
+fn build_endpoint_entity(
     cluster_namespace: &str,
     slice_entity: &EntityRef,
     slice: &ParsedSlice,
     endpoint: &Endpoint,
 ) -> DiscoveredEntity {
-    let mut identity_parts = vec![
+    let mut parts = vec![
         "symthaea-kubernetes-endpoint-membership-v1".to_string(),
         slice_entity.canonical_key(),
         slice.address_type.as_str().to_string(),
     ];
-    identity_parts.extend(endpoint.addresses.iter().cloned());
+    parts.extend(endpoint.addresses.iter().cloned());
     if let Some(target) = &endpoint.target_ref {
-        identity_parts.push(target.kind.clone());
-        identity_parts.push(target.namespace.clone().unwrap_or_default());
-        identity_parts.push(target.name.clone());
-        identity_parts.push(target.uid.clone().unwrap_or_default());
+        parts.push(target.api_version.clone().unwrap_or_default());
+        parts.push(target.kind.clone());
+        parts.push(target.namespace.clone().unwrap_or_default());
+        parts.push(target.name.clone());
+        parts.push(target.uid.clone().unwrap_or_default());
     }
-    identity_parts.push(endpoint.hostname.clone().unwrap_or_default());
-    identity_parts.push(endpoint.node_name.clone().unwrap_or_default());
-    identity_parts.push(endpoint.zone.clone().unwrap_or_default());
-    let refs = identity_parts.iter().map(String::as_str).collect::<Vec<_>>();
-    let id = format!("endpoint:{}", stable_hash(&refs));
-    let entity = EntityRef::new(cluster_namespace, "k8s_endpoint_membership", id);
-
+    parts.push(endpoint.hostname.clone().unwrap_or_default());
+    parts.push(endpoint.node_name.clone().unwrap_or_default());
+    parts.push(endpoint.zone.clone().unwrap_or_default());
+    let refs = parts.iter().map(String::as_str).collect::<Vec<_>>();
+    let entity = EntityRef::new(
+        cluster_namespace,
+        "k8s_object",
+        format!("endpoint:{}", stable_hash(&refs)),
+    );
     let mut attributes = BTreeMap::from([
+        ("symthaea.k8s.role".into(), "endpoint_membership".into()),
         ("k8s.endpoint.address_type".into(), slice.address_type.as_str().into()),
         ("k8s.endpoint.ready".into(), endpoint.ready.effective.to_string()),
         ("k8s.endpoint.ready.explicit".into(), endpoint.ready.explicit.to_string()),
@@ -733,6 +771,9 @@ fn endpoint_membership_entity(
         attributes.insert(format!("k8s.endpoint.hint.node.{index}"), node.clone());
     }
     if let Some(target) = &endpoint.target_ref {
+        if let Some(api_version) = &target.api_version {
+            attributes.insert("k8s.endpoint.target.api_version".into(), api_version.clone());
+        }
         attributes.insert("k8s.endpoint.target.kind".into(), target.kind.clone());
         attributes.insert("k8s.endpoint.target.name".into(), target.name.clone());
         if let Some(namespace) = &target.namespace {
@@ -742,7 +783,6 @@ fn endpoint_membership_entity(
             attributes.insert("k8s.endpoint.target.uid".into(), uid.clone());
         }
     }
-
     DiscoveredEntity {
         entity,
         display_name: endpoint
@@ -754,53 +794,83 @@ fn endpoint_membership_entity(
 }
 
 struct ReferenceSpec<'a> {
+    api_version: Option<&'a str>,
     kind: &'a str,
     namespace: Option<&'a str>,
     name: &'a str,
     uid: Option<&'a str>,
-    reference_kind: &'a str,
+    role: &'a str,
 }
 
-fn resolve_or_reference(
+fn resolve_reference(
     base: &DiscoverySnapshot,
     entities: &mut BTreeMap<String, DiscoveredEntity>,
     cluster_namespace: &str,
     spec: ReferenceSpec<'_>,
 ) -> Result<EntityRef, IntegrationError> {
     if let Some(uid) = spec.uid {
-        if let Some(entity) = base.entities.iter().find(|entity| {
-            entity.attributes.get("k8s.uid").map(String::as_str) == Some(uid)
-        }) {
+        if let Some(entity) = base
+            .entities
+            .iter()
+            .find(|entity| entity.attributes.get("k8s.uid").map(String::as_str) == Some(uid))
+        {
+            let actual_kind = entity.attributes.get("k8s.kind").map(String::as_str);
+            if actual_kind != Some(spec.kind) {
+                return Err(IntegrationError::InvalidOutput(format!(
+                    "EndpointSlice target UID `{uid}` claims kind `{}` but base topology says `{:?}`",
+                    spec.kind, actual_kind
+                )));
+            }
             return Ok(entity.entity.clone());
         }
     }
-    if let Some(entity) = find_entity_by_kind_name(base, spec.kind, spec.namespace, spec.name) {
-        return Ok(entity);
+
+    // Name-only matching requires an API version and exact namespace. An
+    // underspecified namespaced targetRef must not wildcard-match another
+    // namespace merely because kind/name text happens to agree.
+    if let Some(api_version) = spec.api_version {
+        if let Some(entity) = find_entity_exact(
+            base,
+            api_version,
+            spec.kind,
+            spec.namespace,
+            spec.name,
+        ) {
+            return Ok(entity);
+        }
     }
 
-    let id = format!(
-        "ref:{}",
-        stable_hash(&[
-            "symthaea-kubernetes-reference-v1",
-            spec.kind,
-            spec.namespace.unwrap_or(""),
-            spec.name,
-            spec.uid.unwrap_or(""),
-        ])
+    let entity = EntityRef::new(
+        cluster_namespace,
+        "k8s_object",
+        format!(
+            "ref:{}",
+            stable_hash(&[
+                "symthaea-kubernetes-reference-v1",
+                spec.api_version.unwrap_or(""),
+                spec.kind,
+                spec.namespace.unwrap_or(""),
+                spec.name,
+                spec.uid.unwrap_or(""),
+            ])
+        ),
     );
-    let entity = EntityRef::new(cluster_namespace, spec.reference_kind, id);
     let mut attributes = BTreeMap::from([
         ("k8s.reference".into(), "true".into()),
+        ("symthaea.k8s.role".into(), spec.role.into()),
         ("k8s.kind".into(), spec.kind.into()),
         ("k8s.name".into(), spec.name.into()),
     ]);
+    if let Some(api_version) = spec.api_version {
+        attributes.insert("k8s.api_version".into(), api_version.into());
+    }
     if let Some(namespace) = spec.namespace {
         attributes.insert("k8s.namespace".into(), namespace.into());
     }
     if let Some(uid) = spec.uid {
         attributes.insert("k8s.uid".into(), uid.into());
     }
-    insert_entity(
+    merge_entity(
         entities,
         DiscoveredEntity {
             entity: entity.clone(),
@@ -811,8 +881,30 @@ fn resolve_or_reference(
     Ok(entity)
 }
 
-fn find_entity_by_kind_name(
+fn find_entity_by_uid_kind(
     snapshot: &DiscoverySnapshot,
+    uid: &str,
+    kind: &str,
+) -> Result<Option<EntityRef>, IntegrationError> {
+    let Some(entity) = snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.attributes.get("k8s.uid").map(String::as_str) == Some(uid))
+    else {
+        return Ok(None);
+    };
+    let actual_kind = entity.attributes.get("k8s.kind").map(String::as_str);
+    if actual_kind != Some(kind) {
+        return Err(IntegrationError::InvalidOutput(format!(
+            "Kubernetes UID `{uid}` is `{actual_kind:?}`, not `{kind}`"
+        )));
+    }
+    Ok(Some(entity.entity.clone()))
+}
+
+fn find_entity_exact(
+    snapshot: &DiscoverySnapshot,
+    api_version: &str,
     kind: &str,
     namespace: Option<&str>,
     name: &str,
@@ -821,17 +913,50 @@ fn find_entity_by_kind_name(
         .entities
         .iter()
         .find(|entity| {
-            entity.attributes.get("k8s.kind").map(String::as_str) == Some(kind)
+            entity.attributes.get("k8s.api_version").map(String::as_str) == Some(api_version)
+                && entity.attributes.get("k8s.kind").map(String::as_str) == Some(kind)
                 && entity.attributes.get("k8s.name").map(String::as_str) == Some(name)
                 && match namespace {
                     Some(namespace) => {
                         entity.attributes.get("k8s.namespace").map(String::as_str)
                             == Some(namespace)
                     }
-                    None => true,
+                    None => !entity.attributes.contains_key("k8s.namespace"),
                 }
         })
         .map(|entity| entity.entity.clone())
+}
+
+fn merge_entity(
+    entities: &mut BTreeMap<String, DiscoveredEntity>,
+    incoming: DiscoveredEntity,
+) -> Result<(), IntegrationError> {
+    let key = incoming.entity.canonical_key();
+    let Some(existing) = entities.get_mut(&key) else {
+        entities.insert(key, incoming);
+        return Ok(());
+    };
+    if let (Some(existing_name), Some(incoming_name)) = (&existing.display_name, &incoming.display_name) {
+        if existing_name != incoming_name {
+            return Err(IntegrationError::InvalidOutput(format!(
+                "EndpointSlice entity `{key}` has conflicting display names"
+            )));
+        }
+    } else if existing.display_name.is_none() {
+        existing.display_name = incoming.display_name;
+    }
+    for (attribute, value) in incoming.attributes {
+        if let Some(existing_value) = existing.attributes.get(&attribute) {
+            if existing_value != &value {
+                return Err(IntegrationError::InvalidOutput(format!(
+                    "EndpointSlice entity `{key}` has conflicting attribute `{attribute}`"
+                )));
+            }
+        } else {
+            existing.attributes.insert(attribute, value);
+        }
+    }
+    Ok(())
 }
 
 fn structural_relation(
@@ -851,23 +976,6 @@ fn structural_relation(
         observed_at_unix_ms: Some(observed_at_unix_ms),
         evidence_observation_ids: vec![],
         attributes: BTreeMap::from([("k8s.relationship".into(), relationship.into())]),
-    }
-}
-
-fn insert_entity(
-    entities: &mut BTreeMap<String, DiscoveredEntity>,
-    entity: DiscoveredEntity,
-) -> Result<(), IntegrationError> {
-    let key = entity.entity.canonical_key();
-    match entities.get(&key) {
-        Some(existing) if existing != &entity => Err(IntegrationError::InvalidOutput(format!(
-            "EndpointSlice entity key collision for `{key}`"
-        ))),
-        Some(_) => Ok(()),
-        None => {
-            entities.insert(key, entity);
-            Ok(())
-        }
     }
 }
 
@@ -929,10 +1037,7 @@ fn optional_string(value: Option<&Value>) -> Option<String> {
         .map(str::to_string)
 }
 
-fn string_map(
-    value: Option<&Value>,
-    field: &str,
-) -> Result<BTreeMap<String, String>, IntegrationError> {
+fn string_map(value: Option<&Value>, field: &str) -> Result<BTreeMap<String, String>, IntegrationError> {
     let Some(value) = value.filter(|value| !value.is_null()) else {
         return Ok(BTreeMap::new());
     };
@@ -953,8 +1058,24 @@ fn string_map(
         .collect()
 }
 
-fn stable_id(parts: &[&str]) -> String {
-    format!("name:{}", stable_hash(parts))
+fn stable_name_id(
+    cluster_id: &str,
+    api_version: &str,
+    kind: &str,
+    namespace: Option<&str>,
+    name: &str,
+) -> String {
+    format!(
+        "name:{}",
+        stable_hash(&[
+            "symthaea-kubernetes-name-v1",
+            cluster_id,
+            api_version,
+            kind,
+            namespace.unwrap_or(""),
+            name,
+        ])
+    )
 }
 
 fn stable_hash(parts: &[&str]) -> String {
@@ -972,7 +1093,7 @@ mod tests {
     use serde_json::json;
     use std::sync::Arc;
     use symthaea_integration_core::{IntegrationId, IntegrationRegistry};
-    use symthaea_kubernetes_bridge::KubernetesReplayContext;
+    use symthaea_kubernetes_bridge::{KubernetesReplayContext, integration_manifest};
 
     fn base(at: u64) -> KubernetesReplayDiscoverer {
         KubernetesReplayDiscoverer::from_objects(
@@ -982,22 +1103,10 @@ mod tests {
                 ..Default::default()
             },
             &[
-                json!({
-                    "apiVersion":"v1","kind":"Namespace",
-                    "metadata":{"name":"shop","uid":"ns-1"}
-                }),
-                json!({
-                    "apiVersion":"v1","kind":"Node",
-                    "metadata":{"name":"node-a","uid":"node-1"}
-                }),
-                json!({
-                    "apiVersion":"v1","kind":"Pod",
-                    "metadata":{"name":"api-pod","namespace":"shop","uid":"pod-1"}
-                }),
-                json!({
-                    "apiVersion":"v1","kind":"Service",
-                    "metadata":{"name":"api","namespace":"shop","uid":"svc-1"}
-                }),
+                json!({"apiVersion":"v1","kind":"Namespace","metadata":{"name":"shop","uid":"ns-1"}}),
+                json!({"apiVersion":"v1","kind":"Node","metadata":{"name":"node-a","uid":"node-1"}}),
+                json!({"apiVersion":"v1","kind":"Pod","metadata":{"name":"api-pod","namespace":"shop","uid":"pod-1"}}),
+                json!({"apiVersion":"v1","kind":"Service","metadata":{"name":"api","namespace":"shop","uid":"svc-1"}}),
             ],
             at,
         )
@@ -1009,9 +1118,7 @@ mod tests {
             "apiVersion":"discovery.k8s.io/v1",
             "kind":"EndpointSlice",
             "metadata":{
-                "name":"api-abc",
-                "namespace":"shop",
-                "uid":"slice-1",
+                "name":"api-abc","namespace":"shop","uid":"slice-1",
                 "labels":{
                     "kubernetes.io/service-name":"api",
                     "endpointslice.kubernetes.io/managed-by":"endpointslice-controller.k8s.io"
@@ -1022,23 +1129,33 @@ mod tests {
             "endpoints":[{
                 "addresses":["10.1.2.3"],
                 "conditions":{"ready":true,"serving":true,"terminating":false},
-                "nodeName":"node-a",
-                "zone":"zone-a",
+                "nodeName":"node-a","zone":"zone-a",
                 "targetRef":{
-                    "kind":"Pod","name":"api-pod","namespace":"shop","uid":"pod-1"
+                    "apiVersion":"v1","kind":"Pod","name":"api-pod",
+                    "namespace":"shop","uid":"pod-1"
                 },
                 "hints":{"forZones":[{"name":"zone-a"}]}
             }]
         })
     }
 
+    fn role_count(snapshot: &DiscoverySnapshot, role: &str) -> usize {
+        snapshot
+            .entities
+            .iter()
+            .filter(|entity| {
+                entity.attributes.get("symthaea.k8s.role").map(String::as_str) == Some(role)
+            })
+            .count()
+    }
+
     #[test]
-    fn endpoint_slice_adds_service_endpoint_target_and_node_topology() {
+    fn adds_service_slice_endpoint_target_and_node_topology() {
         let base = base(100);
         let snapshot = augment_endpoint_slices(&base, &[slice()], 100).unwrap();
         snapshot.validate().unwrap();
-        assert!(snapshot.entities.iter().any(|entity| entity.entity.kind == "k8s_endpointslice"));
-        assert!(snapshot.entities.iter().any(|entity| entity.entity.kind == "k8s_endpoint_membership"));
+        assert_eq!(role_count(&snapshot, "endpoint_slice"), 1);
+        assert_eq!(role_count(&snapshot, "endpoint_membership"), 1);
         assert!(snapshot.relations.iter().any(|relation| {
             relation.kind == RelationKind::Other("EndpointSliceFor".into())
         }));
@@ -1052,7 +1169,7 @@ mod tests {
     }
 
     #[test]
-    fn nil_conditions_preserve_default_and_presence_semantics() {
+    fn nil_conditions_preserve_effective_value_and_explicitness() {
         let base = base(100);
         let mut slice = slice();
         slice["endpoints"][0]["conditions"] = json!({});
@@ -1060,7 +1177,10 @@ mod tests {
         let endpoint = snapshot
             .entities
             .iter()
-            .find(|entity| entity.entity.kind == "k8s_endpoint_membership")
+            .find(|entity| {
+                entity.attributes.get("symthaea.k8s.role").map(String::as_str)
+                    == Some("endpoint_membership")
+            })
             .unwrap();
         assert_eq!(endpoint.attributes.get("k8s.endpoint.ready").map(String::as_str), Some("true"));
         assert_eq!(endpoint.attributes.get("k8s.endpoint.ready.explicit").map(String::as_str), Some("false"));
@@ -1069,37 +1189,87 @@ mod tests {
     }
 
     #[test]
-    fn different_capture_time_is_rejected() {
+    fn underspecified_target_does_not_wildcard_match_other_namespace() {
+        let base = KubernetesReplayDiscoverer::from_objects(
+            KubernetesReplayContext::default(),
+            &[
+                json!({"apiVersion":"v1","kind":"Namespace","metadata":{"name":"shop","uid":"ns-1"}}),
+                json!({"apiVersion":"v1","kind":"Namespace","metadata":{"name":"other","uid":"ns-2"}}),
+                json!({"apiVersion":"v1","kind":"Pod","metadata":{"name":"api-pod","namespace":"other","uid":"other-pod"}}),
+                json!({"apiVersion":"v1","kind":"Service","metadata":{"name":"api","namespace":"shop","uid":"svc-1"}}),
+            ],
+            100,
+        )
+        .unwrap();
+        let mut slice = slice();
+        slice["endpoints"][0]["targetRef"] = json!({"kind":"Pod","name":"api-pod"});
+        let snapshot = augment_endpoint_slices(&base, &[slice], 100).unwrap();
+        assert!(snapshot.entities.iter().any(|entity| {
+            entity.attributes.get("symthaea.k8s.role").map(String::as_str)
+                == Some("target_reference")
+        }));
+        assert!(!snapshot.relations.iter().any(|relation| {
+            relation.kind == RelationKind::Other("Targets".into())
+                && relation.to.id == "other-pod"
+        }));
+    }
+
+    #[test]
+    fn duplicate_addresses_and_wrong_address_family_fail_closed() {
+        let base = base(100);
+        let mut duplicate = slice();
+        duplicate["endpoints"][0]["addresses"] = json!(["10.1.2.3", "10.1.2.3"]);
+        assert!(augment_endpoint_slices(&base, &[duplicate], 100).is_err());
+
+        let mut wrong_family = slice();
+        wrong_family["endpoints"][0]["addresses"] = json!(["2001:db8::1"]);
+        assert!(augment_endpoint_slices(&base, &[wrong_family], 100).is_err());
+    }
+
+    #[test]
+    fn same_capture_time_is_required() {
         let base = base(100);
         assert!(augment_endpoint_slices(&base, &[slice()], 101).is_err());
     }
 
     #[test]
-    fn invalid_address_family_is_rejected() {
+    fn emitted_entity_kinds_remain_inside_declared_kubernetes_manifest() {
         let base = base(100);
-        let mut slice = slice();
-        slice["endpoints"][0]["addresses"] = json!(["2001:db8::1"]);
-        assert!(augment_endpoint_slices(&base, &[slice], 100).is_err());
+        let snapshot = augment_endpoint_slices(&base, &[slice()], 100).unwrap();
+        let declared = integration_manifest().entity_kinds.into_iter().collect::<BTreeSet<_>>();
+        assert!(snapshot.entities.iter().all(|entity| declared.contains(&entity.entity.kind)));
     }
 
     #[test]
-    fn missing_service_or_target_becomes_reference_not_fake_canonical_entity() {
+    fn existing_generic_endpointslice_object_is_enriched_not_duplicated() {
+        let slice = slice();
         let base = KubernetesReplayDiscoverer::from_objects(
             KubernetesReplayContext::default(),
-            &[json!({
-                "apiVersion":"v1","kind":"Namespace",
-                "metadata":{"name":"shop","uid":"ns-1"}
-            })],
+            &[
+                json!({"apiVersion":"v1","kind":"Namespace","metadata":{"name":"shop","uid":"ns-1"}}),
+                slice.clone(),
+            ],
             100,
         )
         .unwrap();
-        let snapshot = augment_endpoint_slices(&base, &[slice()], 100).unwrap();
-        assert!(snapshot.entities.iter().any(|entity| entity.entity.kind == "k8s_service_reference"));
-        assert!(snapshot.entities.iter().any(|entity| entity.entity.kind == "k8s_object_reference"));
+        let before = base
+            .topology()
+            .entities
+            .iter()
+            .filter(|entity| entity.attributes.get("k8s.uid").map(String::as_str) == Some("slice-1"))
+            .count();
+        let snapshot = augment_endpoint_slices(&base, &[slice], 100).unwrap();
+        let after = snapshot
+            .entities
+            .iter()
+            .filter(|entity| entity.attributes.get("k8s.uid").map(String::as_str) == Some("slice-1"))
+            .count();
+        assert_eq!(before, 1);
+        assert_eq!(after, 1);
     }
 
     #[test]
-    fn augmented_topology_passes_existing_registry_budget_boundary() {
+    fn augmented_topology_passes_existing_registry_boundary() {
         let base = Arc::new(base(100));
         let snapshot = augment_endpoint_slices(base.as_ref(), &[slice()], 100).unwrap();
         let mut registry = IntegrationRegistry::new();
@@ -1113,7 +1283,7 @@ mod tests {
     }
 
     #[test]
-    fn endpointslice_list_is_expanded() {
+    fn endpointslice_list_expands_without_implying_completeness() {
         let base = base(100);
         let list = json!({
             "apiVersion":"discovery.k8s.io/v1",
@@ -1121,13 +1291,8 @@ mod tests {
             "items":[slice()]
         });
         let snapshot = augment_endpoint_slices(&base, &[list], 100).unwrap();
-        assert_eq!(
-            snapshot
-                .entities
-                .iter()
-                .filter(|entity| entity.entity.kind == "k8s_endpointslice")
-                .count(),
-            1
-        );
+        assert_eq!(role_count(&snapshot, "endpoint_slice"), 1);
+        // The augmenter has no Discoverer implementation and therefore cannot
+        // independently claim `discover.snapshot.complete`.
     }
 }
