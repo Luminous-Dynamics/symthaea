@@ -3,10 +3,12 @@
 
 use serde_json::json;
 use symthaea_integration_core::{
-    DiscoveryRequest, IntegrationError, IntegrationId, IntegrationRegistry, TopologyLimits,
+    COMPLETE_DISCOVERY_CAPABILITY, DiscoveryRequest, IntegrationError, IntegrationId,
+    IntegrationRegistry, TopologyLimits,
 };
 use symthaea_kubernetes_bridge::{
     KUBERNETES_INTEGRATION_ID, KubernetesReplayContext, KubernetesReplayDiscoverer,
+    integration_manifest,
 };
 use std::sync::Arc;
 
@@ -123,6 +125,36 @@ fn discovery_kind_filter_keeps_snapshot_structurally_closed() {
     assert_eq!(filtered.entities.len(), 1);
     assert!(filtered.relations.is_empty());
     assert!(filtered.validate().is_ok());
+}
+
+#[test]
+fn e1_replay_never_claims_complete_discovery() {
+    assert!(!integration_manifest().declares(COMPLETE_DISCOVERY_CAPABILITY));
+
+    let replay = Arc::new(
+        KubernetesReplayDiscoverer::from_objects(
+            KubernetesReplayContext::default(),
+            &[json!({
+                "apiVersion":"v1","kind":"Pod",
+                "metadata":{"name":"pod","namespace":"ns","uid":"pod-1"}
+            })],
+            100,
+        )
+        .unwrap(),
+    );
+    let mut registry = IntegrationRegistry::new();
+    registry.register_discoverer(replay).unwrap();
+    let request = DiscoveryRequest {
+        require_complete: true,
+        ..Default::default()
+    };
+    assert!(matches!(
+        registry.admit_discovery_request(
+            &IntegrationId::new(KUBERNETES_INTEGRATION_ID),
+            &request,
+        ),
+        Err(IntegrationError::Unsupported(_))
+    ));
 }
 
 #[test]
