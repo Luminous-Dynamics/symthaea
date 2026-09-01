@@ -47,6 +47,7 @@
     "seed": {"type": "integer", "minimum": 0},
     "revision_index": {"type": "integer", "minimum": 0},
     "world_version_before": {"type": "string", "minLength": 1},
+    "execution_context_sha256": {"$ref": "#/$defs/sha256"},
     "decision_input_sha256": {"$ref": "#/$defs/sha256"},
     "experience_episode_sha256": {"$ref": "#/$defs/sha256"},
     "revision_hypothesis_sha256": {"$ref": "#/$defs/sha256"},
@@ -80,6 +81,16 @@
     {
       "if": {"properties": {"campaign": {"const": "pilot"}}},
       "then": {"properties": {"included_in_confirmatory_analysis": {"const": false}}}
+    },
+    {
+      "if": {
+        "properties": {
+          "campaign": {
+            "enum": ["confirmatory_longitudinal", "confirmatory_generalization", "confirmatory_adversarial"]
+          }
+        }
+      },
+      "then": {"required": ["execution_context_sha256"]}
     },
     {
       "if": {"properties": {"policy": {"const": "random_valid"}}},
