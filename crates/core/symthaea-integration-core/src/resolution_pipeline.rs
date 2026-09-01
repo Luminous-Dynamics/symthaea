@@ -5,14 +5,29 @@
 //! The lower-level resolver remains useful for tests and pure functions, but
 //! infrastructure callers should prefer this pipeline: it refuses snapshots
 //! from unregistered providers, reapplies the registry's identity admission
-//! budget, prevents accidental duplicate-provider snapshots in one pass, and
-//! then applies explicit resolution work limits.
+//! budget, prevents accidental duplicate-provider snapshots in one pass,
+//! source-qualifies provider-local claim IDs, and then applies explicit
+//! resolution work limits.
 
 use crate::{
     EntityResolutionBatch, IdentitySnapshot, IntegrationId, IntegrationRegistry, ResolutionError,
     ResolutionLimits, resolve_identity_claims_with_limits,
 };
 use std::collections::BTreeSet;
+
+/// Collision-safe reference used inside cross-provider resolution proposals.
+///
+/// Adapter claim IDs are only required to be unique inside one provider
+/// snapshot. Qualifying them here prevents two vendors that both emit `claim-1`
+/// from being treated as a duplicate global claim, while retaining a
+/// deterministic mapping back to `(integration_id, local_claim_id)`.
+pub fn source_qualified_claim_id(integration_id: &str, local_claim_id: &str) -> String {
+    format!(
+        "claim-ref-v1|{}:{integration_id}|{}:{local_claim_id}",
+        integration_id.len(),
+        local_claim_id.len()
+    )
+}
 
 pub fn resolve_registry_identity_snapshots(
     registry: &IntegrationRegistry,
@@ -57,8 +72,22 @@ pub fn resolve_registry_identity_snapshots_with_limits(
                 reason: error.to_string(),
             })?;
 
-        identity_claims.extend(snapshot.claims.iter().cloned());
-        separation_claims.extend(snapshot.separation_claims.iter().cloned());
+        for claim in &snapshot.claims {
+            let mut claim = claim.clone();
+            claim.claim_id = source_qualified_claim_id(
+                &snapshot.integration_id,
+                &claim.claim_id,
+            );
+            identity_claims.push(claim);
+        }
+        for claim in &snapshot.separation_claims {
+            let mut claim = claim.clone();
+            claim.claim_id = source_qualified_claim_id(
+                &snapshot.integration_id,
+                &claim.claim_id,
+            );
+            separation_claims.push(claim);
+        }
     }
 
     resolve_identity_claims_with_limits(
@@ -147,7 +176,9 @@ mod tests {
             integration_id: integration.into(),
             collected_at_unix_ms: 100,
             claims: vec![IdentityClaim {
-                claim_id: format!("{integration}:claim-1"),
+                // Deliberately identical across providers. The pipeline must
+                // source-qualify it before global resolution.
+                claim_id: "claim-1".into(),
                 subject: EntityRef::new(namespace, "host", entity_id),
                 identifier: ExternalIdentifier {
                     scheme: "host.id".into(),
@@ -181,6 +212,14 @@ mod tests {
     }
 
     #[test]
+    fn source_qualified_claim_refs_are_unambiguous() {
+        assert_ne!(
+            source_qualified_claim_id("a", "b|c"),
+            source_qualified_claim_id("a|b", "c")
+        );
+    }
+
+    #[test]
     fn registered_admitted_snapshots_resolve_without_merging_local_refs() {
         let left = provider("left-source", "left", "node-a");
         let right = provider("right-source", "right", "node-b");
@@ -192,8 +231,16 @@ mod tests {
 
         let resolved = resolve_registry_identity_snapshots(&registry, &snapshots, 100).unwrap();
         assert_eq!(resolved.proposals.len(), 1);
-        assert_eq!(resolved.proposals[0].status, ResolutionStatus::StrongCandidateSame);
-        assert_ne!(resolved.proposals[0].left, resolved.proposals[0].right);
+        let proposal = &resolved.proposals[0];
+        assert_eq!(proposal.status, ResolutionStatus::StrongCandidateSame);
+        assert_ne!(proposal.left, proposal.right);
+        assert_eq!(proposal.identifier_matches.len(), 1);
+        let matched = &proposal.identifier_matches[0];
+        assert_eq!(matched.left_claim_ids.len(), 1);
+        assert_eq!(matched.right_claim_ids.len(), 1);
+        assert_ne!(matched.left_claim_ids[0], matched.right_claim_ids[0]);
+        assert!(matched.left_claim_ids[0].starts_with("claim-ref-v1|"));
+        assert!(matched.right_claim_ids[0].starts_with("claim-ref-v1|"));
     }
 
     #[test]
