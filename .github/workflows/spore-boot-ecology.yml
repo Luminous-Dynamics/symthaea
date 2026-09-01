@@ -1,0 +1,86 @@
+name: Spore Boot Ecology
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-boot-ecology/**"
+      - "crates/core/symthaea-boot-state/**"
+      - "crates/domains/symthaea-quicken-fb/**"
+      - "nix/packages/spore-boot-tools.nix"
+      - "docs/design/SPORE_BOOT_ECOLOGY_V03.md"
+      - ".github/workflows/spore-boot-ecology.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: spore-boot-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  boot-ecology:
+    name: Rust state + renderer gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Format boot crates
+        run: >-
+          cargo fmt --check
+          -p symthaea-boot-ecology
+          -p symthaea-boot-state
+          -p symthaea-quicken-fb
+
+      - name: Check boot crates
+        run: >-
+          cargo check
+          -p symthaea-boot-ecology
+          -p symthaea-boot-state
+          -p symthaea-quicken-fb
+          --all-targets
+
+      - name: Clippy boot crates
+        run: >-
+          cargo clippy
+          -p symthaea-boot-ecology
+          -p symthaea-boot-state
+          -p symthaea-quicken-fb
+          --all-targets
+          -- -D warnings
+
+      - name: Test boot crates
+        run: >-
+          cargo test
+          -p symthaea-boot-ecology
+          -p symthaea-boot-state
+          -p symthaea-quicken-fb
+
+      - name: Render exact lifecycle preview matrix
+        run: >-
+          cargo run --release
+          -p symthaea-quicken-fb
+          --bin spore_boot_preview_matrix
+          --
+          --out spore-boot-preview-matrix
+          --width 320
+          --height 180
+          --fps 1
+
+      - name: Verify preview manifest and case count
+        run: |
+          test -s spore-boot-preview-matrix/matrix-manifest.json
+          test "$(find spore-boot-preview-matrix -name preview-manifest.json | wc -l)" -eq 16
+          test "$(find spore-boot-preview-matrix -name 'frame-*.ppm' | wc -l)" -ge 16
+
+      - name: Upload exact renderer previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-boot-preview-matrix
+          path: spore-boot-preview-matrix
+          if-no-files-found: warn
+          retention-days: 14
