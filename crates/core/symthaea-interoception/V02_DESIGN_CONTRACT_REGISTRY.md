@@ -46,6 +46,7 @@ Initial normative roles should include at least:
 - `ChannelAggregation`;
 - `AllostaticExposureDecomposition`;
 - `IdentifiabilityAndDiscrimination`;
+- `CausalContrasts`;
 - `ExecutionMode`;
 - `ScenarioManifest`;
 - `BlindingCustody`;
@@ -122,7 +123,7 @@ A freeze is invalid if:
 - the registry belongs to a different design source commit;
 - the registry contract/version is not the one declared by the freeze.
 
-The channel-aggregation and identifiability/discrimination roles are normative even if an older descriptive list inside the prose freeze has not enumerated them individually; authoritative membership is the validated registry, not a stale prose enumeration.
+The channel-aggregation, identifiability/discrimination, and causal-contrast roles are normative even if an older descriptive list inside the prose freeze has not enumerated them individually; authoritative membership is the validated registry, not a stale prose enumeration.
 
 ## 9. Evidence root binding
 
@@ -144,17 +145,27 @@ Before confirmatory freeze, require a valid `CandidateDiscriminationManifest` un
 
 A candidate may not be promoted as superior to a baseline when the locked design lacks a discriminator capable of separating them.
 
-## 11. Change severity
+## 11. Causal-contrast closure
+
+Mechanistic language requires more than numerical matching.
+
+For every primary hypothesis framed as a response to a manipulation, the prospective design should bind one or more `CausalContrastManifest` identities under `V02_CAUSAL_CONTRASTS.md`.
+
+Each contrast must declare manipulated fields, required-equal pre-treatment fields, allowed mediators, forbidden changes, the candidate/baseline discrimination obligation it supports, and whether the comparison is total-path, direct-path, mediator-specific, or diagnostic.
+
+A realized causal claim requires its manipulation-check artifact to pass. Otherwise report descriptive scenario differences rather than causal language.
+
+## 12. Change severity
 
 Registry changes inherit the severity of the contract change they represent.
 
 - adding a purely supporting explanation may be Class I if it is explicitly non-normative and changes no normative registry entry;
-- changing a candidate, weighting, channel aggregation, temporal aggregation, identifiability, scenario, analysis, or evidence contract is Class II;
+- changing a candidate, weighting, channel aggregation, temporal aggregation, identifiability, causal contrast, scenario, analysis, or evidence contract is Class II;
 - changing future-information authority, execution mode, feedback authority, or causal-output boundaries is Class III.
 
 Adding a new active normative contract after freeze always changes the registry and supersedes the old freeze, even if the prose author considers the change small.
 
-## 12. Review and CI gates
+## 13. Review and CI gates
 
 Future implementation should mechanically test:
 
@@ -170,11 +181,13 @@ Future implementation should mechanically test:
 - evidence-root/freeze/registry mismatch rejected;
 - missing aggregation contract rejected;
 - missing identifiability/discrimination contract rejected;
-- confirmatory freeze rejected when a required primary-vs-baseline pair lacks a registered discriminator.
+- missing causal-contrast contract rejected;
+- confirmatory freeze rejected when a required primary-vs-baseline pair lacks a registered discriminator;
+- causal claim rejected when its required contrast/manipulation-check identity is missing or invalid.
 
 A malicious fixture should add an unregistered normative-looking contract and prove the closure audit catches it.
 
-## 13. Initial registry membership
+## 14. Initial registry membership
 
 At the current v0.2 design stage, the active normative set is intended to cover the roles represented by:
 
@@ -187,6 +200,7 @@ At the current v0.2 design stage, the active normative set is intended to cover 
 - `V02_CHANNEL_AGGREGATION_CONTRACT.md`
 - `V02_ALLOSTATIC_EXPOSURE_DECOMPOSITION.md`
 - `V02_IDENTIFIABILITY_AND_DISCRIMINATION.md`
+- `V02_CAUSAL_CONTRASTS.md`
 - `V02_EXECUTION_MODE_CONTRACT.md`
 - `V02_SCENARIO_MANIFEST.md`
 - `V02_BLINDING_CUSTODY.md`
@@ -197,8 +211,8 @@ At the current v0.2 design stage, the active normative set is intended to cover 
 
 This list is descriptive of the current design stage, not a permanently hard-coded schema. Future additions require explicit registry classification and a new registry/freeze identity.
 
-## 14. Claim boundary
+## 15. Claim boundary
 
-A closed contract registry proves only that the frozen evidence lineage names a complete, explicit set of design contracts under the declared closure rule. An identifiability manifest additionally establishes that the locked design contains declared discriminators for the comparisons it intends to make.
+A closed contract registry proves only that the frozen evidence lineage names a complete, explicit set of design contracts under the declared closure rule. Identifiability and causal-contrast manifests additionally establish that the intended comparisons have declared discriminators and manipulation semantics.
 
-Neither proves those contracts are scientifically correct or that any regulatory candidate is affect, emotion, subjective valence, mood, sentience, or consciousness.
+They do not prove those contracts are scientifically correct or that any regulatory candidate is affect, emotion, subjective valence, mood, sentience, or consciousness.
