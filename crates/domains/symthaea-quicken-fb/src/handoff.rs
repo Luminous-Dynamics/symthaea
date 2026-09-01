@@ -33,9 +33,12 @@ impl ExitReason {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DisplayReleaseReceipt {
     pub renderer_pid: u32,
+    /// systemd's per-service-start correlation identifier, when available.
+    /// This is evidence correlation only; it is not a credential or authority token.
+    pub invocation_id: Option<String>,
     pub release_us: u64,
     pub renderer_uptime_us: u64,
     pub reason: ExitReason,
@@ -45,6 +48,7 @@ impl DisplayReleaseReceipt {
     pub fn new(release: Duration, renderer_uptime: Duration, reason: ExitReason) -> Self {
         Self {
             renderer_pid: std::process::id(),
+            invocation_id: current_systemd_invocation_id(),
             release_us: saturating_micros(release),
             renderer_uptime_us: saturating_micros(renderer_uptime),
             reason,
@@ -66,6 +70,7 @@ impl DisplayReleaseReceipt {
         let value = serde_json::json!({
             "version": HANDOFF_RECEIPT_VERSION,
             "renderer_pid": self.renderer_pid,
+            "invocation_id": self.invocation_id,
             "release_us": self.release_us,
             "renderer_uptime_us": self.renderer_uptime_us,
             "reason": self.reason.as_str(),
@@ -75,6 +80,17 @@ impl DisplayReleaseReceipt {
         fs::write(&tmp, bytes)?;
         fs::rename(tmp, path)?;
         Ok(())
+    }
+}
+
+/// Read systemd's per-invocation identifier without accepting arbitrary environment
+/// data into the receipt. A valid `INVOCATION_ID` is exactly 32 ASCII hex digits.
+pub fn current_systemd_invocation_id() -> Option<String> {
+    let value = std::env::var("INVOCATION_ID").ok()?;
+    if value.len() == 32 && value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        Some(value.to_ascii_lowercase())
+    } else {
+        None
     }
 }
 
@@ -112,6 +128,18 @@ mod tests {
     }
 
     #[test]
+    fn invocation_id_validation_is_bounded() {
+        // Keep this test independent from the process environment: validate the
+        // exact predicate through representative values.
+        fn valid(value: &str) -> bool {
+            value.len() == 32 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+        }
+        assert!(valid("0123456789abcdef0123456789ABCDEF"));
+        assert!(!valid("not-an-invocation-id"));
+        assert!(!valid("0123456789abcdef0123456789abcdeg"));
+    }
+
+    #[test]
     fn atomic_receipt_contains_version_and_reason() {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -134,6 +162,7 @@ mod tests {
         assert_eq!(value["version"], HANDOFF_RECEIPT_VERSION);
         assert_eq!(value["reason"], "signal");
         assert_eq!(value["release_us"], 73);
+        assert!(value.get("invocation_id").is_some());
 
         let _ = fs::remove_dir_all(directory);
     }
