@@ -49,10 +49,12 @@ jobs:
 
       - name: Check formatting for integration packages
         run: |
-          cargo fmt --check -p symthaea-integration-core \
+          cargo fmt \
+            -p symthaea-integration-core \
             -p symthaea-logparse \
             -p symthaea-prometheus-bridge \
-            -p symthaea-otlp-bridge
+            -p symthaea-otlp-bridge \
+            -- --check
 
       - name: Test canonical integration contracts
         run: cargo test -p symthaea-integration-core --lib
