@@ -30,7 +30,7 @@ A later study package should create a separate mapping artifact containing at mi
 - optional externally supplied randomization identifier/salt commitment;
 - canonical mapping SHA-256.
 
-The study preregistration/evidence capsule should bind the mapping digest without requiring the mapping contents to be present in the primary-analysis workspace.
+The study preregistration/evidence root should bind the mapping digest without requiring mapping contents to be present in the primary-analysis workspace.
 
 A digest proves commitment, not secrecy. If secrecy is required, storage/encryption/access control must be handled outside this crate or by a separately qualified mechanism.
 
@@ -38,17 +38,19 @@ A digest proves commitment, not secrecy. If secrecy is required, storage/encrypt
 
 Blind codes should not reveal semantic condition meaning.
 
-Avoid codes such as:
-
-- `control`;
-- `threat`;
-- `recovery`;
-- `load-high`;
-- deterministic unsalted hashes of obvious semantic IDs that an analyst can trivially reproduce.
+Avoid codes such as `control`, `threat`, `recovery`, `load-high`, or deterministic unsalted hashes of obvious semantic IDs that an analyst can trivially reproduce.
 
 Prefer externally generated opaque identifiers whose generation mechanism is recorded prospectively.
 
 The same blind code must not be reused for different semantic arms inside one study.
+
+## Mapping-generation separation
+
+The observational crate should not generate semantic blind mappings internally during primary analysis.
+
+Prefer a small external qualification/preparation step that materializes the mapping before study execution. The observatory receives only blind codes already embedded in the qualified study artifacts.
+
+This prevents primary analysis code from retaining an accidental semantic reverse-map in memory or logs.
 
 ## Artifact-flow separation
 
@@ -56,13 +58,14 @@ Recommended confirmatory flow:
 
 1. define semantic arm specifications;
 2. generate and commit `ArmIdentityMapping`;
-3. bind the mapping SHA-256 into the locked study package;
-4. execute the study using only blind codes in primary trace outputs;
-5. extract observational candidate artifacts using blind codes only;
-6. produce and freeze the blinded metric/comparison artifact;
-7. record its SHA-256;
-8. only then make the mapping available to the unblinding/evaluation process;
-9. emit an explicit unblinding receipt that binds both artifacts.
+3. bind the mapping SHA-256 into the locked evidence root;
+4. remove mapping contents from the primary-analysis environment where practical;
+5. execute the study using only blind codes in primary trace outputs;
+6. extract observational candidate artifacts using blind codes only;
+7. produce and freeze the blinded metric/comparison artifact;
+8. record its SHA-256;
+9. only then make the mapping available to the unblinding/evaluation process;
+10. emit an explicit unblinding receipt that binds both artifacts.
 
 A primary-analysis process should not need to deserialize the mapping artifact at all.
 
@@ -71,6 +74,7 @@ A primary-analysis process should not need to deserialize the mapping artifact a
 A later `UnblindingReceipt` should bind:
 
 - schema/version;
+- prospective evidence-root SHA-256;
 - study-preregistration SHA-256;
 - arm-identity-mapping SHA-256;
 - study-execution SHA-256;
@@ -84,14 +88,28 @@ The receipt should validate that the blinded artifact already existed and is unc
 
 ## No pre-unblinding semantic joins
 
-Qualified primary-analysis code must not expose an API that accepts both:
-
-- blinded candidate values; and
-- `arm_id -> blind_code` semantic mapping.
+Qualified primary-analysis code must not expose an API that accepts both blinded candidate values and the `arm_id -> blind_code` semantic mapping.
 
 That join belongs only in the unblinding layer.
 
-A code search/gate should fail if online/primary observatory modules import the semantic mapping type or expose semantic arm IDs.
+A source-structure/code-search gate should fail if online/primary observatory modules import the semantic mapping type, expose semantic arm IDs, or serialize semantic labels into primary artifacts.
+
+## Semantic-label canary test
+
+Add an adversarial fixture whose semantic arm labels contain unique canary strings that should never appear in online or blinded artifacts.
+
+Run the full primary pipeline and scan:
+
+- execution traces;
+- prefix views;
+- forecast trajectories;
+- candidate time series;
+- blinded comparison reports;
+- logs emitted by qualified observatory code.
+
+Any canary occurrence is a hard blinding/information-boundary failure.
+
+This does not prove human cognitive blinding, but it provides a strong mechanical check that semantic labels did not leak into the primary artifact path.
 
 ## Candidate selection must happen before semantic unblinding for confirmatory runs
 
@@ -128,9 +146,7 @@ This makes it possible for an independent reviewer to verify that the semantic r
 
 When the same investigator necessarily designs, runs, and interprets the study, the evidence package should say so explicitly.
 
-Suggested evidence field:
-
-`blinding_strength` with values such as:
+Suggested evidence field `blinding_strength`:
 
 - `ArtifactOnly`;
 - `IndependentPrimaryAnalyst`;
@@ -151,7 +167,8 @@ The eventual implementation should test that:
 - mapping digest changes when any pair changes;
 - a mapping from another study is rejected;
 - a tampered mapping cannot validate against the locked mapping digest;
-- a frozen blinded artifact cannot be replaced after unblinding without breaking the receipt chain.
+- a frozen blinded artifact cannot be replaced after unblinding without breaking the receipt chain;
+- semantic canary strings remain absent from primary artifacts and logs.
 
 ## Information-firewall interaction
 
