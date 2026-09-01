@@ -8,7 +8,9 @@ on:
       - "crates/domains/symthaea-quicken-fb/**"
       - "nix/packages/spore-boot-tools.nix"
       - "scripts/spore_preview_gallery.py"
+      - "scripts/spore_inoculation_gallery.py"
       - "docs/design/SPORE_BOOT_ECOLOGY_V03.md"
+      - "docs/design/SPORE_VISUAL_LANGUAGE_V031.md"
       - ".github/workflows/spore-boot-ecology.yml"
   workflow_dispatch:
 
@@ -20,7 +22,7 @@ jobs:
   boot-ecology:
     name: Rust state + renderer gate
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -71,10 +73,10 @@ jobs:
           --height 180
           --fps 1
 
-      - name: Publish exact preview gallery
+      - name: Publish exact boot preview gallery
         run: python3 scripts/spore_preview_gallery.py spore-boot-preview-matrix
 
-      - name: Verify preview manifest, gallery, and case count
+      - name: Verify boot preview manifest, gallery, and case count
         run: |
           test -s spore-boot-preview-matrix/matrix-manifest.json
           test -s spore-boot-preview-matrix/gallery-manifest.json
@@ -83,11 +85,41 @@ jobs:
           test "$(find spore-boot-preview-matrix -name 'frame-*.ppm' | wc -l)" -ge 16
           test "$(find spore-boot-preview-matrix -name 'frame-*.png' | wc -l)" -ge 16
 
-      - name: Upload exact renderer previews
+      - name: Render exact inoculation preview matrix
+        run: >-
+          cargo run --release
+          -p symthaea-quicken-fb
+          --bin spore_inoculation_preview
+          --
+          --out spore-inoculation-preview
+          --width 320
+          --height 180
+
+      - name: Publish exact inoculation gallery
+        run: python3 scripts/spore_inoculation_gallery.py spore-inoculation-preview
+
+      - name: Verify inoculation preview and phase count
+        run: |
+          test -s spore-inoculation-preview/inoculation-manifest.json
+          test -s spore-inoculation-preview/gallery-manifest.json
+          test -s spore-inoculation-preview/index.html
+          test "$(find spore-inoculation-preview -name 'frame-*.ppm' | wc -l)" -eq 32
+          test "$(find spore-inoculation-preview -name 'frame-*.png' | wc -l)" -eq 32
+
+      - name: Upload exact boot renderer previews
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: spore-boot-preview-matrix
           path: spore-boot-preview-matrix
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload exact inoculation previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-inoculation-preview
+          path: spore-inoculation-preview
           if-no-files-found: warn
           retention-days: 14
