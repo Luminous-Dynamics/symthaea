@@ -12,13 +12,29 @@ Recovery of one domain does not implicitly restore whole-boot health. Only an au
 
 Optional detail strings are operator-facing hints only. They are bounded and must not contain control characters. Raw diagnostic truth belongs to the journal.
 
+## Observation lineage
+
+Every `WireMessage` carries an opaque 128-bit `ObservationId`. The protocol does not generate or interpret this ID; a future authoritative Linux observer may derive it from the kernel boot ID plus an observer-instance nonce.
+
+The ID exists to stop cross-lineage sequence poisoning. A delayed datagram from an old observer may have a sequence number much larger than the new observer's current sequence. Without lineage binding, that stale packet could make legitimate new events look old.
+
+`WireStateReducer` therefore follows these rules:
+
+1. an uninitialized consumer requires a validated **snapshot** before accepting events;
+2. messages from the current `ObservationId` follow normal sequence/time validation;
+3. a message from a different observation is reported as foreign and cannot implicitly reset the reducer;
+4. changing observation lineage requires an explicit `reset_from_snapshot` call with a validated snapshot from the independently established authoritative observer;
+5. an event alone can never establish or reset observation authority.
+
+`ObservationId` is presentation lineage, not authentication. The Unix socket still needs root-owned permissions/peer-policy appropriate to the future observer implementation. Spoofed or lost protocol data must remain incapable of changing boot, authentication, Nix generation, or recovery authority.
+
 ## Wire boundary
 
 The planned v1 transport is a local Unix datagram endpoint with a 4096-byte application message ceiling.
 
 Receivers MUST reject datagrams larger than `MAX_WIRE_BYTES` **before deserialization**, then validate the version and decoded event/snapshot before reducing it. The protocol crate exposes `validate_datagram_size` so this ceiling is an executable contract rather than documentation only.
 
-Malformed, unsupported, oversized, stale, or temporally inconsistent messages affect presentation only. They must never affect boot progress, generation blessing, authentication, or recovery.
+Malformed, unsupported, oversized, stale, foreign-lineage, or temporally inconsistent messages affect presentation only. They must never affect boot progress, generation blessing, authentication, or recovery.
 
 ## Authority boundary
 

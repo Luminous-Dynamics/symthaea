@@ -327,6 +327,7 @@ pub enum ProtocolError {
         bytes: usize,
         max: usize,
     },
+    SnapshotRequiredForObservationReset,
 }
 
 impl std::fmt::Display for ProtocolError {
@@ -354,6 +355,9 @@ impl std::fmt::Display for ProtocolError {
             Self::ControlCharacter => write!(f, "boot detail contains a control character"),
             Self::WireTooLarge { bytes, max } => {
                 write!(f, "boot protocol message exceeds wire budget: {bytes} > {max} bytes")
+            }
+            Self::SnapshotRequiredForObservationReset => {
+                write!(f, "a new boot observation lineage must begin from a validated snapshot")
             }
         }
     }
