@@ -65,9 +65,12 @@ impl ObserverConfig {
                     Criticality::Critical,
                     false,
                 ),
+                // Keep graphical.target separate from the display-manager
+                // domain. One unit's recovery must never visually erase the
+                // other's failure. The target represents session readiness.
                 WatchedUnit::new(
                     "graphical.target",
-                    BootDomain::Graphics,
+                    BootDomain::Session,
                     Some(BootPhase::Ready),
                     Criticality::Critical,
                     true,
@@ -231,6 +234,19 @@ mod tests {
     #[test]
     fn builtin_configuration_is_valid() {
         ObserverConfig::builtin().validate().unwrap();
+    }
+
+    #[test]
+    fn builtin_boot_ready_uses_session_domain() {
+        let config = ObserverConfig::builtin();
+        let ready = config
+            .watched_units
+            .iter()
+            .find(|unit| unit.boot_ready)
+            .expect("builtin config must have a boot-ready unit");
+        assert_eq!(ready.unit, "graphical.target");
+        assert_eq!(ready.domain, BootDomain::Session);
+        assert_eq!(ready.phase, Some(BootPhase::Ready));
     }
 
     #[test]
