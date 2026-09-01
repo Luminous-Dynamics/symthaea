@@ -8,10 +8,11 @@
 //! reference-monitor core.
 //!
 //! Raw hashing helpers and the untyped inner effect representation remain
-//! crate-private. Public callers construct class-bound effect commitments and typed
-//! resource-state commitments, then explicitly unwrap only at the trusted monitor
-//! adapter boundary. This prevents application code from bypassing resource or
-//! taxonomy binding merely because the logical monitor uses a generic digest type.
+//! crate-private. Public callers construct class-bound effect commitments, typed
+//! resource-state commitments, and resource-consistent transition commitments,
+//! then explicitly unwrap only at the trusted monitor adapter boundary. This
+//! prevents application code from bypassing resource or taxonomy binding merely
+//! because the logical monitor uses a generic digest type.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -30,6 +31,7 @@ pub(crate) use state_commitments::{
 
 mod typed_commitments;
 pub use typed_commitments::{
-    CanonicalEffectClassV1, CanonicalResourceV1, EffectCommitmentV1,
-    ResourceCommitmentMismatch, ResourceStateCommitmentV1,
+    CanonicalEffectClassV1, CanonicalResourceV1, CanonicalTransitionCommitmentV1,
+    EffectCommitmentV1, ResourceCommitmentMismatch, ResourceStateCommitmentV1,
+    TransitionCommitmentMismatch,
 };
