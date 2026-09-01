@@ -46,7 +46,9 @@ The test suite must demonstrate all of the following:
 23. primary metric extraction validates the execution trace first and emits only blind codes plus preregistered metric identifiers;
 24. the blinded metric artifact has a stable digest that is bound into the later hypothesis-evaluation report before semantic arm outcomes are emitted;
 25. preregistered minimum-effect relations remain distinct from direction-only relations, preventing arbitrarily tiny differences from satisfying a declared effect-size gate;
-26. `QualificationEvidenceBundle` rejects cross-pairing otherwise-valid qualification receipts and evidence capsules from different source commits or model-semantics lineages, and reports qualified only when the bound receipt passes every required gate.
+26. `QualificationEvidenceBundle` rejects cross-pairing otherwise-valid qualification receipts and evidence capsules from different source commits or model-semantics lineages, and reports qualified only when the bound receipt passes every required gate;
+27. a stored `ConfirmatoryHypothesisEvaluation` can be verified by exact recomputation from the locked study, execution, exclusions, and blinded artifact, and semantic-output tampering is rejected;
+28. every runnable model and preregistered arm has current state plus preferred/viable geometry inside its declared dynamics numerical domain, while snapshot deserialization rejects domain-incompatible evidence without constructing an invalid model.
 
 ## Workspace gates
 
@@ -71,6 +73,11 @@ semantics lineage.
 `INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION` is separate: it changes when the serialized
 snapshot representation changes, even when the underlying scientific semantics do
 not. Evidence artifacts must bind both versions.
+
+The runnable-model domain checks added during hardening enforce the already-declared
+structural numerical domain. They reject inputs that were outside that contract rather
+than changing transition behavior for valid-domain states; the native model-semantics
+version therefore remains unchanged.
 
 ## Machine-readable qualification receipt
 
@@ -116,6 +123,23 @@ The bundle has canonical JSON and its own SHA-256 so a downstream v0.2
 implementation-start receipt can bind one exact v0.1 qualification/evidence lineage
 rather than relying on independently supplied artifacts.
 
+## Runnable model-domain contract
+
+`InteroceptiveDynamicsConfig::try_validate_state` validates a native state against the
+model's declared numerical domain. For each channel, current value and preferred/viable
+bounds must lie inside `[min_value, max_value]`.
+
+This does **not** require current state to be inside its viable band: a non-viable state
+is a legitimate regulatory condition. It only prevents model geometry or current state
+from lying outside the numerical space that the transition law can represent without
+clamping.
+
+`NativeInteroceptiveModel::try_new` is the fallible construction path. The infallible
+`new` constructor delegates to it and is intended for already-validated internal/test
+inputs. Preregistration validates every arm's state/config pair before execution, and
+snapshot deserialization records domain mismatch as a validation error rather than
+constructing an invalid dynamics-aware model.
+
 ## Preregistration contract for later experiments
 
 `ExperimentPreregistration` is the locked prospective plan for an evidence-bearing
@@ -140,6 +164,10 @@ preregistration validation must ensure that every dynamics-aware registered metr
 is executable for every arm, even when a metric is not referenced by a hypothesis.
 This prevents a prospective protocol from validating successfully and then failing
 only after primary metric extraction begins.
+
+Preregistration also validates each arm's initial state against its dynamics numerical
+domain so execution cannot begin from an out-of-domain state that would be silently
+collapsed by the first clamp.
 
 Preregistration does not prove that the runtime obeyed the plan. The evidence capsule
 separately records the preregistration digest and the resolved runtime-configuration
@@ -186,10 +214,16 @@ protocol and the already-produced blinded metric report, maps blind codes back t
 semantic arms, applies the exact preregistered relation, and emits a
 `HypothesisEvaluationReport` that includes the blinded-metric SHA-256.
 
-For study-level confirmatory work, the exported qualified path must additionally
-revalidate the exact execution and exclusion receipt and recompute the submitted
+For study-level confirmatory work, the exported qualified path additionally
+revalidates the exact execution and exclusion receipt and recomputes the submitted
 blinded metric report before semantic evaluation. A fabricated but superficially
 well-formed blinded artifact therefore cannot enter the qualified confirmatory path.
+
+`validate_confirmatory_evaluation_bound` provides the symmetric verification path for
+a stored/serialized `ConfirmatoryHypothesisEvaluation`: it recomputes the qualified
+confirmatory result from the complete locked evidence chain and requires exact equality.
+A semantic report that was altered after production therefore fails validation even if
+it still deserializes and carries plausible-looking digests.
 
 For confirmatory work, the blinded metric digest should be captured before the
 unblinding report is generated. If a primary metric definition or metric value is
