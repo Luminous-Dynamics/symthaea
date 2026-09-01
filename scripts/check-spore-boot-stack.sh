@@ -15,6 +15,7 @@ PACKAGES=(
   symthaea-quicken-fb
   symthaea-boot-control
   symthaea-boot-input
+  symthaea-boot-ecology-live
   symthaea-spore-continuity
 )
 
