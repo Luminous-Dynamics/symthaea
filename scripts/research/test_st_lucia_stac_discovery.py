@@ -19,7 +19,8 @@ def s2_item(item_id: str, when: str, cloud: float = 5.0):
         "id": item_id,
         "collection": "sentinel-2-l2a",
         "properties": {"datetime": when, "eo:cloud_cover": cloud},
-        "assets": {band: {} for band in d.REQUIRED_S2_BANDS},
+        "assets": {f"{band}_10m": {} for band in ("B03", "B04", "B08")}
+        | {f"{band}_20m": {} for band in ("B11", "B12")},
     }
 
 
@@ -32,8 +33,9 @@ def s1_item(item_id: str, when: str, mode: str = "IW", pols=None):
             "datetime": when,
             "sar:instrument_mode": mode,
             "sar:polarizations": ["VV", "VH"] if pols is None else pols,
+            "sat:orbit_state": "ascending",
         },
-        "assets": {},
+        "assets": {"vv": {}, "vh": {}},
     }
 
 
@@ -72,7 +74,7 @@ class DiscoveryTests(unittest.TestCase):
 
     def test_s2_missing_required_band_metadata_is_not_eligible(self):
         item = s2_item("missing-band", "2026-07-02T00:00:00Z")
-        del item["assets"]["B11"]
+        del item["assets"]["B11_20m"]
         selected, audit, ordered = d.select_s2([item])
         self.assertIsNone(selected)
         self.assertEqual(ordered, [])
