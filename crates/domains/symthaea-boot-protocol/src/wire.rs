@@ -47,6 +47,21 @@ impl WireMessage {
     }
 }
 
+/// Validate a transport datagram before deserialization.
+///
+/// The observer/consumer transport MUST call this on the received byte slice
+/// before attempting to decode it. This gives the 4096-byte application ceiling
+/// an executable contract rather than leaving it as documentation only.
+pub fn validate_datagram_size(bytes: &[u8]) -> Result<(), ProtocolError> {
+    if bytes.len() > MAX_WIRE_BYTES {
+        return Err(ProtocolError::WireTooLarge {
+            bytes: bytes.len(),
+            max: MAX_WIRE_BYTES,
+        });
+    }
+    Ok(())
+}
+
 fn validate_version(version: u16) -> Result<(), ProtocolError> {
     if version != PROTOCOL_VERSION {
         return Err(ProtocolError::UnsupportedVersion(version));
@@ -68,10 +83,28 @@ mod tests {
         });
 
         let bytes = serde_json::to_vec(&message).unwrap();
-        assert!(bytes.len() <= MAX_WIRE_BYTES);
+        validate_datagram_size(&bytes).unwrap();
         let decoded: WireMessage = serde_json::from_slice(&bytes).unwrap();
         decoded.validate().unwrap();
         assert_eq!(decoded, message);
+    }
+
+    #[test]
+    fn oversized_datagram_is_rejected_before_decode() {
+        let bytes = vec![b'x'; MAX_WIRE_BYTES + 1];
+        assert_eq!(
+            validate_datagram_size(&bytes),
+            Err(ProtocolError::WireTooLarge {
+                bytes: MAX_WIRE_BYTES + 1,
+                max: MAX_WIRE_BYTES,
+            })
+        );
+    }
+
+    #[test]
+    fn exact_wire_budget_is_accepted() {
+        let bytes = vec![0_u8; MAX_WIRE_BYTES];
+        validate_datagram_size(&bytes).unwrap();
     }
 
     #[test]
