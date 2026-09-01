@@ -7,10 +7,12 @@
 //! an ordinary boot with different text. The inoculation renderer treats the
 //! system as a substrate being prepared inside a projected incubation chamber:
 //! orbital seals, vertical field lines, module seeds, and a progress halo are
-//! layered over the same deterministic organic ecology used for first boot.
+//! layered over the same deterministic organic/holographic fidelity stack used
+//! by first boot — but without the boot-specific Germination identity overlay.
 
 use crate::color::{LEAF_GREEN, MYCELIAL_WHITE, Rgba, SOLAR_GOLD};
-use crate::ecology_renderer::{EcologyFrameState, EcologyRenderer};
+use crate::ecology_renderer_fidelity_v2::{EcologyFrameState, EcologyRenderer};
+use crate::microtype;
 use symthaea_boot_ecology::BootGenome;
 
 const HOLO_CYAN: Rgba = Rgba(0x58, 0xd8, 0xd2, 0xff);
@@ -51,6 +53,19 @@ impl InoculationPhase {
             Self::Complete => "complete",
         }
     }
+
+    pub fn display_label(self) -> &'static str {
+        match self {
+            Self::Attestation => "ATTESTATION",
+            Self::PreparingSubstrate => "PREPARING SUBSTRATE",
+            Self::WeavingSystem => "WEAVING SYSTEM",
+            Self::SeedingSecurity => "SEEDING SECURITY",
+            Self::OpeningChannels => "OPENING CHANNELS",
+            Self::Personalizing => "PERSONALIZING",
+            Self::Finalizing => "FINALIZING",
+            Self::Complete => "INSTALLATION COMPLETE",
+        }
+    }
 }
 
 pub struct InoculationRenderer {
@@ -64,7 +79,7 @@ impl InoculationRenderer {
     pub fn new(width: u32, height: u32, genome: BootGenome) -> Self {
         let mut phase_offsets = [0.0; 8];
         for (index, slot) in phase_offsets.iter_mut().enumerate() {
-            *slot = genome.seed[(index + 9) % 32] as f32 / 255.0;
+            *slot = genome.seed[(index + 9) % genome.seed.len()] as f32 / 255.0;
         }
         Self {
             width: width as usize,
@@ -131,6 +146,14 @@ impl InoculationRenderer {
             progress,
             primary,
         );
+        draw_install_identity(
+            buffer,
+            self.width,
+            self.height,
+            phase,
+            progress,
+            primary,
+        );
         state
     }
 }
@@ -167,6 +190,7 @@ fn phase_color(phase: InoculationPhase, pulse: f32) -> Rgba {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_incubation_chamber(
     buffer: &mut [u32],
     width: usize,
@@ -229,8 +253,6 @@ fn draw_incubation_chamber(
         );
     }
 
-    // Projected cap rings rotate at different apparent depths, creating a
-    // containment-field feel without implying literal hardware in the machine.
     let sweep = (elapsed_ms as f32 * 0.00055).sin() * 0.05;
     for ring in 0..3 {
         let scale = 1.0 - ring as f32 * 0.11;
@@ -248,6 +270,7 @@ fn draw_incubation_chamber(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_module_seeds(
     buffer: &mut [u32],
     width: usize,
@@ -334,6 +357,98 @@ fn draw_progress_halo(
     }
 }
 
+fn draw_install_identity(
+    buffer: &mut [u32],
+    width: usize,
+    height: usize,
+    phase: InoculationPhase,
+    progress: f32,
+    primary: Rgba,
+) {
+    if width < 120 || height < 70 {
+        return;
+    }
+    let scale = (height / 270).clamp(1, 4);
+    let margin_x = (width / 24).max(8);
+    let margin_y = (height / 18).max(8);
+    let title = "SPORE";
+    let subtitle = "INOCULATION";
+    let title_metrics = microtype::measure(title, scale, scale);
+    let subtitle_metrics = microtype::measure(subtitle, scale, scale);
+    let block_height = title_metrics.height + subtitle_metrics.height + scale * 12;
+    let y = height.saturating_sub(margin_y + block_height);
+
+    microtype::draw_text(
+        buffer,
+        width,
+        height,
+        margin_x + 1,
+        y + 1,
+        title,
+        scale,
+        scale,
+        HOLO_CYAN.with_opacity(0.10),
+    );
+    microtype::draw_text(
+        buffer,
+        width,
+        height,
+        margin_x,
+        y,
+        title,
+        scale,
+        scale,
+        MYCELIAL_WHITE.with_opacity(0.86),
+    );
+    microtype::draw_text(
+        buffer,
+        width,
+        height,
+        margin_x,
+        y + title_metrics.height + scale * 4,
+        subtitle,
+        scale,
+        scale,
+        Rgba::lerp(LEAF_GREEN, primary, 0.42).with_opacity(0.68),
+    );
+
+    let phase_text = phase.display_label();
+    let phase_metrics = microtype::measure(phase_text, scale, scale);
+    if phase_metrics.width + margin_x < width {
+        microtype::draw_text(
+            buffer,
+            width,
+            height,
+            width.saturating_sub(margin_x + phase_metrics.width),
+            height.saturating_sub(margin_y + phase_metrics.height),
+            phase_text,
+            scale,
+            scale,
+            primary.with_opacity(0.46),
+        );
+    }
+
+    // Progress is shown as geometry first. A small numeric readout is a factual
+    // supplement, not authority over whether installation is complete.
+    let percent = (progress * 100.0).round().clamp(0.0, 100.0) as u8;
+    let percent_text = format!("{percent}");
+    let percent_metrics = microtype::measure(&percent_text, scale, scale);
+    let px = width.saturating_sub(margin_x + percent_metrics.width);
+    let py = height.saturating_sub(margin_y + phase_metrics.height + scale * 12);
+    microtype::draw_text(
+        buffer,
+        width,
+        height,
+        px,
+        py,
+        &percent_text,
+        scale,
+        scale,
+        Rgba::lerp(primary, MYCELIAL_WHITE, 0.35).with_opacity(0.40),
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
 fn draw_ellipse(
     buffer: &mut [u32],
     width: usize,
@@ -445,7 +560,7 @@ mod tests {
     }
 
     #[test]
-    fn inoculation_overlay_changes_frame() {
+    fn inoculation_overlay_changes_fidelity_frame() {
         let receipt = BootStateReceipt::first_boot([0x71; 32]);
         let genome = BootEcologyComposer::compose(&receipt, &MorphologyLineage::default());
         let ecology = EcologyRenderer::new(320, 180, genome.clone());
@@ -460,5 +575,15 @@ mod tests {
             &mut install,
         );
         assert_ne!(base, install);
+    }
+
+    #[test]
+    fn install_labels_are_factual() {
+        for phase in InoculationPhase::ALL {
+            let label = phase.display_label().to_ascii_lowercase();
+            assert!(!label.contains("conscious"));
+            assert!(!label.contains("sentient"));
+            assert!(!label.contains("aware"));
+        }
     }
 }
