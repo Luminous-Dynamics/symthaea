@@ -28,6 +28,7 @@ pub mod registry;
 pub mod resolution;
 pub mod resolution_pipeline;
 pub mod semantic_identity;
+pub mod state;
 pub mod topology;
 pub mod topology_limits;
 mod topology_registry;
@@ -83,6 +84,11 @@ pub use semantic_identity::{
     K8S_SERVICE_UID_SCHEME, K8S_STATEFULSET_UID_SCHEME,
     kubernetes_cluster_uid_identifier, kubernetes_cluster_uid_scope,
     kubernetes_object_uid_identifier, kubernetes_uid_scheme,
+};
+pub use state::{
+    StateAssessment, StateAssessmentError, StateAssessmentStatus, StateAssertion,
+    StateAssertionSource, StateComparisonPolicy, StateRole, StateValidationError, StateValue,
+    assess_state_dimension,
 };
 pub use topology::{
     DiscoveredEntity, DiscoverySnapshot, EntityRelation, RelationBasis, RelationKind,
