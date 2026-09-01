@@ -2,7 +2,7 @@
 
 Status: **post-discovery / post-replay / pre-asset-download**
 
-This document freezes the exact asset-key selection boundary for the first St. Lucia Sentinel R0 provenance run before any scientific raster asset is downloaded or previewed. It is stacked on the executed discovery/replay lineage in PR #250 and does not alter the already-frozen site, acquisition time, S2 acquisition support set, S1 pairing, baseline ladder, evaluation criteria, or higher-stage claims.
+This document freezes the exact asset-key and access-locator selection boundary for the first St. Lucia Sentinel R0 provenance run before any scientific raster asset is downloaded or previewed. It is stacked on the executed discovery/replay lineage in PR #250 and does not alter the already-frozen site, acquisition time, S2 acquisition support set, S1 pairing, baseline ladder, evaluation criteria, or higher-stage claims.
 
 ## Frozen evidence inputs
 
@@ -105,18 +105,57 @@ The frozen planner is:
 ```text
 scripts/research/st_lucia_r0_asset_plan.py
 schema       symthaea-st-lucia-r0-asset-plan/v1
-tool_version 1.1.0
+tool_version 1.2.0
 ```
 
-The first executed v1.0.0 plan attempt passed all then-current offline tests but correctly stopped on the first real S2 asset because CDSE represented its STAC asset `href` relatively rather than as an absolute URL. No asset bytes were downloaded. This v1.1.0 amendment is therefore post-plan-attempt but still strictly pre-download/pre-preview.
+### Executed pre-download correction history
 
-STAC permits relative references. For each selected item, the planner must preserve the raw asset `href` exactly as retained in the frozen STAC bytes. If that raw `href` is relative, the planner may resolve it only against exactly one unique item `rel=self` link retained in the same frozen item. The self link and the final resolved retrieval URL must both be absolute HTTPS URLs on the pinned host:
+The correction history is preserved rather than rewritten:
+
+1. v1.0.0 passed 21/21 then-current offline tests and failed closed on the first real S2 asset with `href is not absolute HTTPS`.
+2. v1.1.0 added safe relative-URL resolution and passed 26/26 tests, but the exact same real-data failure remained.
+3. A separate zero-network forensic read of the already-frozen STAC pages then established the actual representation: every one of the 29 selected S2/S1 science and metadata assets uses a canonical `s3://eodata/...` locator. No asset bytes were fetched or previewed during any of these steps.
+4. v1.2.0 therefore models the actual CDSE EOData access contract directly instead of converting S3 object locators into invented HTTPS object URLs.
+
+The official Copernicus Data Space Ecosystem S3 documentation identifies the default S3-compatible EOData endpoint as:
 
 ```text
-stac.dataspace.copernicus.eu
+https://eodata.dataspace.copernicus.eu/
 ```
 
-The planner must reject non-HTTPS values, off-origin absolute URLs, scheme-relative off-origin escapes, URL userinfo, non-default HTTPS ports, fragments, missing self links for relative assets, and ambiguous multiple self links. This resolution performs no network request.
+and the unified EOData bucket as:
+
+```text
+eodata
+```
+
+Reference:
+
+- https://documentation.dataspace.copernicus.eu/APIs/S3.html
+
+## S3 locator contract
+
+For an asset whose retained STAC `href` has scheme `s3`, the planner must:
+
+1. preserve the raw `s3://...` locator byte-for-byte in the plan;
+2. require scheme exactly `s3`;
+3. require bucket exactly lowercase `eodata`;
+4. reject S3 userinfo, ports, query strings and fragments;
+5. require a non-empty object key;
+6. reject repeated slash forms and backslashes rather than canonicalizing them silently;
+7. derive and record the immutable tuple:
+
+```text
+endpoint = https://eodata.dataspace.copernicus.eu/
+bucket   = eodata
+key      = exact path after s3://eodata/
+```
+
+The endpoint is the access service; the retained `s3://eodata/...` URI remains the scientific source locator. The planner does not claim that the endpoint URL plus object path is a directly retrievable unauthenticated HTTPS URL. Actual acquisition requires a separately reviewed S3 client invocation and CDSE S3 credentials.
+
+For defensive compatibility only, an absolute HTTPS asset href may still be accepted when it is on the pinned STAC host, and a relative href may be resolved only through one unique retained item `rel=self` link on that host. The executed St. Lucia frozen asset surface does not rely on those fallback forms.
+
+## Planner invariants
 
 The planner must:
 
@@ -127,13 +166,14 @@ The planner must:
 5. verify the exact S1/S2 selected IDs from the acquisition-set receipt;
 6. locate those exact items inside the retained raw STAC pages;
 7. require every frozen asset key above to exist exactly once per selected item;
-8. preserve each raw STAC asset href and deterministically derive a reviewed absolute retrieval href under the rules above;
-9. preserve resolved href, resolution base when used, MIME type, roles, title and item identity from the frozen STAC bytes;
-10. emit all planned entries in deterministic `(collection, item_id, asset_key)` order;
-11. content-address the resulting plan;
-12. perform **no asset download**.
+8. preserve each raw STAC asset href exactly;
+9. validate and decompose each approved `s3://eodata/...` locator into the pinned endpoint/bucket/key tuple;
+10. preserve MIME type, roles, title and item identity from the frozen STAC bytes;
+11. emit all planned entries in deterministic `(collection, item_id, asset_key)` order;
+12. content-address the resulting plan;
+13. perform **no asset download**.
 
-Any missing required asset, duplicate selected item, changed source receipt, changed raw-page hash, unsafe/unresolvable href, or selected-ID mismatch is a hard failure.
+Any missing required asset, duplicate selected item, changed source receipt, changed raw-page hash, unsafe/unrecognized locator, wrong bucket, malformed S3 key, or selected-ID mismatch is a hard failure.
 
 ## Review stop
 
@@ -144,13 +184,16 @@ Review must confirm:
 - expected evidence hashes;
 - exactly two S2 source items and one S1 source item;
 - exactly the frozen asset keys above;
+- exactly 29 asset entries;
 - no thumbnail/preview/TCI scientific substitution;
 - no bulk `Product` archive substituted for exact assets;
-- exact raw STAC hrefs from the frozen catalogue bytes;
-- exact deterministic absolute hrefs produced by the reviewed resolution rule;
+- exact raw `s3://eodata/...` locators from the frozen catalogue bytes;
+- exact S3 endpoint, bucket and object key decomposition;
 - deterministic plan hash.
 
-Only after that review may a separate acquisition step fetch bytes. Each downloaded file must be hashed immediately and its byte length, final URL/redirect chain, HTTP metadata where available, and download tool/environment recorded before any raster inspection or feature computation.
+Only after that review may a separate acquisition step fetch bytes. Each downloaded file must be hashed immediately and its byte length, exact source S3 locator, endpoint, client/tool version, response/object metadata where available, and download environment recorded before any raster inspection or feature computation.
+
+Credentials are execution secrets and must never be written into the plan, receipts, logs, command history examples, or repository.
 
 ## Claim boundary
 
