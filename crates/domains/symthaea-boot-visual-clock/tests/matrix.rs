@@ -53,11 +53,13 @@ fn all_anchor_health_pairs_remain_monotonic_and_inside_their_truth_band() {
         for health in HEALTHS {
             let target = modulation(anchor, health);
             let band = truth_band(anchor);
-            let mut clock = ElasticVisualClock::new(policy);
+            let mut clock = ElasticVisualClock::new(policy).expect("default policy must validate");
             let mut previous = 0;
 
             for step_ms in [0, 1, 8, 16, 33, 100, 250, 1_000, 10_000] {
-                let step = clock.advance_ms(step_ms, &target);
+                let step = clock
+                    .advance_ms(step_ms, &target)
+                    .expect("matrix modulation must remain valid");
                 assert!(step.after >= previous);
                 assert!(step.after <= band.ceiling);
                 previous = step.after;
@@ -78,9 +80,16 @@ fn non_normal_health_never_drift_past_the_factual_floor() {
             BootHealth::Failed,
         ] {
             let target = modulation(anchor, health);
-            let mut clock = ElasticVisualClock::from_phase(target.reveal_floor, policy);
+            let mut clock = ElasticVisualClock::from_phase(
+                anchor,
+                target.reveal_floor,
+                policy,
+            )
+            .expect("factual floor must fit its truth band");
             for _ in 0..100 {
-                clock.advance_ms(250, &target);
+                clock
+                    .advance_ms(250, &target)
+                    .expect("matrix modulation must remain valid");
             }
             assert_eq!(clock.phase(), target.reveal_floor);
         }
