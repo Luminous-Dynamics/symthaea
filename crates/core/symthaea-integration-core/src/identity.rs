@@ -65,6 +65,12 @@ pub struct ExternalIdentifier {
 }
 
 impl ExternalIdentifier {
+    /// Collision-safe canonical identity key used for matching and indexing.
+    ///
+    /// Uniqueness/stability/strength are evidence metadata and intentionally do
+    /// not participate in equality of the underlying external identifier. Scope
+    /// presence does participate: `None` and `Some("")` are encoded distinctly,
+    /// even though a Scoped identifier with an empty scope is rejected.
     pub fn canonical_key(&self) -> Result<String, IdentityValidationError> {
         self.validate()?;
         let value = if self.case_sensitive {
@@ -72,12 +78,18 @@ impl ExternalIdentifier {
         } else {
             self.value.to_ascii_lowercase()
         };
-        Ok(format!(
-            "{}|{}|{}",
-            self.scheme,
-            self.scope.as_deref().unwrap_or(""),
-            value
-        ))
+
+        let mut key = String::from("external-id-v1");
+        push_len_prefixed(&mut key, &self.scheme);
+        match self.scope.as_deref() {
+            None => key.push_str("|0"),
+            Some(scope) => {
+                key.push_str("|1");
+                push_len_prefixed(&mut key, scope);
+            }
+        }
+        push_len_prefixed(&mut key, &value);
+        Ok(key)
     }
 
     pub fn validate(&self) -> Result<(), IdentityValidationError> {
@@ -90,6 +102,13 @@ impl ExternalIdentifier {
         }
         Ok(())
     }
+}
+
+fn push_len_prefixed(output: &mut String, value: &str) {
+    output.push('|');
+    output.push_str(&value.len().to_string());
+    output.push(':');
+    output.push_str(value);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -595,6 +614,43 @@ mod tests {
             valid_until_unix_ms: None,
             evidence_observation_ids: vec![],
         }
+    }
+
+    #[test]
+    fn external_identifier_canonical_key_is_versioned_and_length_prefixed() {
+        let identifier = ExternalIdentifier {
+            scheme: "host.id".into(),
+            value: "uuid-1".into(),
+            scope: Some("tenant:a".into()),
+            uniqueness: IdentifierUniqueness::Scoped,
+            stability: IdentifierStability::Persistent,
+            case_sensitive: true,
+        };
+        assert_eq!(
+            identifier.canonical_key().unwrap(),
+            "external-id-v1|7:host.id|1|8:tenant:a|6:uuid-1"
+        );
+    }
+
+    #[test]
+    fn external_identifier_key_cannot_collide_on_separator_placement() {
+        let left = ExternalIdentifier {
+            scheme: "a".into(),
+            value: "d".into(),
+            scope: Some("b|c".into()),
+            uniqueness: IdentifierUniqueness::Scoped,
+            stability: IdentifierStability::Persistent,
+            case_sensitive: true,
+        };
+        let right = ExternalIdentifier {
+            scheme: "a|b".into(),
+            value: "d".into(),
+            scope: Some("c".into()),
+            uniqueness: IdentifierUniqueness::Scoped,
+            stability: IdentifierStability::Persistent,
+            case_sensitive: true,
+        };
+        assert_ne!(left.canonical_key().unwrap(), right.canonical_key().unwrap());
     }
 
     #[test]
