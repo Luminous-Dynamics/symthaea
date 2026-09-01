@@ -70,7 +70,6 @@ impl BootVisualState {
 
 pub struct BootTelemetry {
     socket: Option<UnixDatagram>,
-    socket_path: Option<PathBuf>,
     state_path: Option<PathBuf>,
     reducer: WireStateReducer,
 }
@@ -81,7 +80,6 @@ impl BootTelemetry {
     pub fn new(socket_path: Option<&Path>, state_path: Option<&Path>) -> Self {
         let mut telemetry = Self {
             socket: None,
-            socket_path: socket_path.map(Path::to_path_buf),
             state_path: state_path.map(Path::to_path_buf),
             reducer: WireStateReducer::default(),
         };
@@ -106,6 +104,8 @@ impl BootTelemetry {
         let Some(socket) = self.socket.as_ref().and_then(|socket| socket.try_clone().ok()) else {
             return report;
         };
+        // MAX + 1 lets us distinguish an oversized datagram from an exact-budget
+        // one before attempting deserialization.
         let mut buffer = [0_u8; MAX_WIRE_BYTES + 1];
 
         loop {
@@ -145,7 +145,7 @@ impl BootTelemetry {
                 report.applied = report.applied.saturating_add(1);
             }
             Ok(WireApply::IgnoredStale) => {}
-            Ok(WireApply::AwaitingSnapshot | WireApply::ForeignObservation) => {
+            Ok(WireApply::AwaitingSnapshot) | Ok(WireApply::ForeignObservation) => {
                 // The persisted snapshot is the independently selected side
                 // channel for authorizing a lineage reset. An event alone can
                 // never reset the reducer.
@@ -198,23 +198,6 @@ impl BootTelemetry {
     }
 }
 
-impl Drop for BootTelemetry {
-    fn drop(&mut self) {
-        // Remove only a socket path, never a regular file/symlink planted at the
-        // configured location. Runtime-directory cleanup is still the ultimate
-        // fallback if deletion races or fails.
-        let Some(path) = self.socket_path.as_deref() else {
-            return;
-        };
-        let Ok(metadata) = fs::symlink_metadata(path) else {
-            return;
-        };
-        if metadata.file_type().is_socket() {
-            let _ = fs::remove_file(path);
-        }
-    }
-}
-
 fn bind_nonblocking(path: &Path) -> io::Result<UnixDatagram> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -222,7 +205,26 @@ fn bind_nonblocking(path: &Path) -> io::Result<UnixDatagram> {
 
     match fs::symlink_metadata(path) {
         Ok(metadata) if metadata.file_type().is_socket() => {
-            fs::remove_file(path)?;
+            // Do not blindly unlink a live renderer's socket. Probe first; a
+            // successful connect means another consumer owns the endpoint.
+            let probe = UnixDatagram::unbound()?;
+            match probe.connect(path) {
+                Ok(()) => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::AddrInUse,
+                        "boot telemetry socket is already active",
+                    ));
+                }
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        io::ErrorKind::ConnectionRefused | io::ErrorKind::NotFound
+                    ) =>
+                {
+                    fs::remove_file(path)?;
+                }
+                Err(error) => return Err(error),
+            }
         }
         Ok(_) => {
             return Err(io::Error::new(
