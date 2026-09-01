@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   prospective-execution-context:
-    name: N1-N20 + C1-C10 + S1-S7 scientific gate
+    name: N1-N20 + C1-C10 + S1-S7 + K1-K7 gate
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -37,12 +37,16 @@ jobs:
             scripts/verify_vart_world_creative_001_qualified.py \
             scripts/verify_vart_world_creative_001_context.py \
             scripts/verify_vart_world_creative_001_state.py \
+            scripts/verify_vart_world_creative_001_calibration.py \
             scripts/test_verify_vart_world_creative_001_n1_n20.py \
             scripts/test_verify_vart_world_creative_001_context.py \
-            scripts/test_verify_vart_world_creative_001_state.py
+            scripts/test_verify_vart_world_creative_001_state.py \
+            scripts/test_verify_vart_world_creative_001_calibration.py
       - name: Run frozen N1-N20 prerequisite gate
         run: python3 scripts/test_verify_vart_world_creative_001_n1_n20.py
       - name: Run prospective execution-context attack suite
         run: python3 scripts/test_verify_vart_world_creative_001_context.py
       - name: Run world-state equivalence attack suite
         run: python3 scripts/test_verify_vart_world_creative_001_state.py
+      - name: Run independent calibration reconstruction suite
+        run: python3 scripts/test_verify_vart_world_creative_001_calibration.py
