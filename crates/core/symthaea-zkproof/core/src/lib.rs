@@ -56,3 +56,51 @@ pub struct BalanceProofOutput {
     /// Replay-prevention nonce (public).
     pub nonce: u64,
 }
+
+// ---------------------------------------------------------------------------
+// Reciprocal-accountability threshold predicate (tag = 2)
+// ---------------------------------------------------------------------------
+
+/// Private/public inputs for the first SIF verifiable-computation circuit.
+///
+/// Only `private_value` remains secret. The guest commits the exact Mycelix
+/// pre-attestation statement plus query/policy commitments and computes the
+/// threshold predicate inside the zkVM. This is intentionally a narrow circuit:
+/// it proves one real minimum-disclosure predicate rather than pretending a
+/// generic digest wrapper proves arbitrary computation correctness.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct AccountabilityThresholdInput {
+    /// Sensitive scalar evaluated inside the zkVM and never journaled.
+    pub private_value: u64,
+    /// Public threshold used by the predicate `private_value >= threshold`.
+    pub threshold: u64,
+    /// Exact pre-attestation accountability receipt commitment from Mycelix.
+    pub statement_digest: [u8; 32],
+    /// Exact canonical query commitment.
+    pub query_digest: [u8; 32],
+    /// Exact policy commitment.
+    pub policy_digest: [u8; 32],
+    /// Public replay/domain nonce chosen for this logical operation.
+    pub operation_nonce: [u8; 32],
+}
+
+/// Public journal for the SIF threshold predicate.
+///
+/// The private value is deliberately absent. A verifier learns only the bounded
+/// boolean predicate and the commitments required to prove which accountability
+/// statement/query/policy the computation belongs to.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct AccountabilityThresholdOutput {
+    /// Exact Mycelix pre-attestation receipt commitment proved by this execution.
+    pub statement_digest: [u8; 32],
+    /// Exact query commitment proved by this execution.
+    pub query_digest: [u8; 32],
+    /// Exact policy commitment proved by this execution.
+    pub policy_digest: [u8; 32],
+    /// Public threshold used by the verified predicate.
+    pub threshold: u64,
+    /// Verified result of `private_value >= threshold`.
+    pub satisfied: bool,
+    /// Public replay/domain nonce for the logical operation.
+    pub operation_nonce: [u8; 32],
+}
