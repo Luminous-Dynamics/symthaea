@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any
 
 import verify_vart_world_creative_001 as core
+import verify_vart_world_creative_001_identity as identity_verify
 import verify_vart_world_creative_001_qualified as qualified
-import verify_vart_world_creative_001_state as state_verify
 
 EXPERIMENT_ID = "VART-WORLD-CREATIVE-001"
 ERROR_METRIC = "l2_over_declared_effects_v1"
@@ -100,7 +100,11 @@ def _contract(root: Path, freeze: dict[str, Any]) -> tuple[dict[str, Any], float
         "numeric_tolerance",
     )
     tol = float(tol_raw)
-    core.require(math.isfinite(tol) and 0.0 <= tol <= 1e-6, "CALIBRATION_CONTRACT_MISMATCH", "numeric_tolerance")
+    core.require(
+        math.isfinite(tol) and 0.0 <= tol <= 1e-6,
+        "CALIBRATION_CONTRACT_MISMATCH",
+        "numeric_tolerance",
+    )
     minimum = contract.get("minimum_revisions_per_world_for_trend")
     core.require(
         isinstance(minimum, int) and minimum >= 2,
@@ -192,24 +196,39 @@ def _trial_calibration(
 
 
 def verify_calibration_qualified(root: Path, expected_freeze_sha256: str) -> dict[str, Any]:
-    result = state_verify.verify_state_qualified(root, expected_freeze_sha256)
+    result = identity_verify.verify_identity_qualified(root, expected_freeze_sha256)
     freeze = qualified.preflight_freeze(root, expected_freeze_sha256)
     _, tol, minimum_revisions = _contract(root, freeze)
-    inventory = _dict(core.read_json(root / "trial_inventory.json"), "PREREGISTRATION_INVALID", "inventory")
+    inventory = _dict(
+        core.read_json(root / "trial_inventory.json"),
+        "PREREGISTRATION_INVALID",
+        "inventory",
+    )
     trial_ids = inventory.get("trial_ids")
     core.require(isinstance(trial_ids, list), "PREREGISTRATION_INVALID", "trial_ids")
 
     reconstructed: dict[str, Any] = {}
-    chains: dict[tuple[str, str, int], list[tuple[int, dict[str, Any]]]] = {}
+    chains: dict[str, list[tuple[int, dict[str, Any]]]] = {}
+    clusters_with_complete_trials: set[str] = set()
     for trial_id in trial_ids:
         trial_dir = root / "trials" / trial_id
-        manifest = _dict(core.read_json(trial_dir / "manifest.json"), "CALIBRATION_EVIDENCE_INCOMPLETE", trial_id)
+        manifest = _dict(
+            core.read_json(trial_dir / "manifest.json"),
+            "CALIBRATION_EVIDENCE_INCOMPLETE",
+            trial_id,
+        )
         value = _trial_calibration(trial_dir, manifest, tol)
         if value is None:
             continue
         reconstructed[trial_id] = value
-        key = (manifest["policy"], manifest["world_fixture_sha256"], manifest["seed"])
-        chains.setdefault(key, []).append((manifest["revision_index"], value))
+        lineage = core.require_sha256(
+            manifest.get("world_lineage_sha256"), "world_lineage_sha256"
+        )
+        cluster = core.require_sha256(
+            manifest.get("world_cluster_sha256"), "world_cluster_sha256"
+        )
+        chains.setdefault(lineage, []).append((manifest["revision_index"], value))
+        clusters_with_complete_trials.add(cluster)
 
     canonical = json.dumps(reconstructed, sort_keys=True, separators=(",", ":")).encode("utf-8")
     reconstruction_sha = hashlib.sha256(canonical).hexdigest()
@@ -221,7 +240,8 @@ def verify_calibration_qualified(root: Path, expected_freeze_sha256: str) -> dic
             "independent_calibration_reconstruction": "PASS",
             "calibration_reconstruction_sha256": reconstruction_sha,
             "calibration_complete_trial_count": len(reconstructed),
-            "calibration_trend_eligible_world_count": trend_eligible,
+            "calibration_complete_world_cluster_count": len(clusters_with_complete_trials),
+            "calibration_trend_eligible_lineage_count": trend_eligible,
             "calibration_improvement_claim_authorized": False,
         }
     )
