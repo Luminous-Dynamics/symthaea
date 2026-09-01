@@ -7,7 +7,7 @@
 
 use crate::{
     BootDomain, BootEvent, BootHealth, BootPhase, BootSnapshot, Criticality, DomainSnapshot,
-    DomainState, PROTOCOL_VERSION,
+    DomainState, PROTOCOL_VERSION, ProtocolError,
 };
 use std::collections::BTreeMap;
 
@@ -33,73 +33,95 @@ impl Default for BootStateReducer {
 }
 
 impl BootStateReducer {
-    pub fn apply(&mut self, event: &BootEvent) -> bool {
+    /// Apply a validated, chronologically newer event.
+    ///
+    /// Returns `Ok(false)` for a duplicate or older sequence number. Malformed
+    /// events and elapsed-time regressions are explicit errors so callers do not
+    /// accidentally turn invalid telemetry into presentation truth.
+    pub fn try_apply(&mut self, event: &BootEvent) -> Result<bool, ProtocolError> {
+        event.validate()?;
+
         if event.sequence() <= self.sequence {
-            return false;
+            return Ok(false);
         }
+        if event.elapsed_ms() < self.elapsed_ms {
+            return Err(ProtocolError::ElapsedRegressed {
+                previous_ms: self.elapsed_ms,
+                observed_ms: event.elapsed_ms(),
+            });
+        }
+
         self.sequence = event.sequence();
+        self.elapsed_ms = event.elapsed_ms();
 
         match event {
-            BootEvent::PhaseEntered {
-                elapsed_ms, phase, ..
-            } => {
-                self.elapsed_ms = *elapsed_ms;
+            BootEvent::PhaseEntered { phase, .. } => {
                 self.phase = *phase;
             }
-            BootEvent::DomainStarting {
-                elapsed_ms, domain, ..
-            } => self.set_domain(*domain, DomainState::Starting, Some(*elapsed_ms)),
-            BootEvent::DomainReady {
-                elapsed_ms, domain, ..
-            } => self.set_domain(*domain, DomainState::Ready, Some(*elapsed_ms)),
-            BootEvent::DomainDelayed {
-                elapsed_ms, domain, ..
-            } => {
-                self.elapsed_ms = *elapsed_ms;
-                self.set_domain(*domain, DomainState::Delayed, Some(*elapsed_ms));
+            BootEvent::DomainStarting { domain, .. } => {
+                self.set_domain(*domain, DomainState::Starting, Some(event.elapsed_ms()));
+            }
+            BootEvent::DomainReady { domain, .. } => {
+                self.set_domain(*domain, DomainState::Ready, Some(event.elapsed_ms()));
+            }
+            BootEvent::DomainDelayed { domain, .. } => {
+                self.set_domain(*domain, DomainState::Delayed, Some(event.elapsed_ms()));
                 self.raise_health(BootHealth::Delayed);
             }
             BootEvent::DomainDegraded {
-                elapsed_ms,
                 domain,
                 criticality,
                 ..
             } => {
-                self.elapsed_ms = *elapsed_ms;
-                self.set_domain(*domain, DomainState::Degraded, Some(*elapsed_ms));
+                self.set_domain(*domain, DomainState::Degraded, Some(event.elapsed_ms()));
                 self.raise_health(match criticality {
                     Criticality::Critical => BootHealth::Failed,
                     _ => BootHealth::Degraded,
                 });
             }
-            BootEvent::DomainFailed {
-                elapsed_ms, domain, ..
-            } => {
-                self.elapsed_ms = *elapsed_ms;
-                self.set_domain(*domain, DomainState::Failed, Some(*elapsed_ms));
+            BootEvent::DomainFailed { domain, .. } => {
+                self.set_domain(*domain, DomainState::Failed, Some(event.elapsed_ms()));
                 self.raise_health(BootHealth::Failed);
             }
-            BootEvent::DomainRecovered {
-                elapsed_ms, domain, ..
-            } => {
-                self.elapsed_ms = *elapsed_ms;
-                self.set_domain(*domain, DomainState::Ready, Some(*elapsed_ms));
+            BootEvent::DomainRecovered { domain, .. } => {
+                self.set_domain(*domain, DomainState::Ready, Some(event.elapsed_ms()));
                 // Deliberately do not lower health here. A recovery event says a
                 // domain recovered; only authoritative snapshot/BootReady data may
                 // declare the whole boot healthy again.
             }
-            BootEvent::BootReady {
-                elapsed_ms, health, ..
-            } => {
-                self.elapsed_ms = *elapsed_ms;
+            BootEvent::BootReady { health, .. } => {
                 self.phase = BootPhase::Ready;
                 self.health = *health;
             }
         }
-        true
+        Ok(true)
     }
 
-    pub fn replace(&mut self, snapshot: BootSnapshot) {
+    /// Backward-compatible convenience wrapper for trusted in-process producers.
+    /// Untrusted/wire consumers should use `try_apply` and surface validation
+    /// failures to diagnostics rather than silently discarding them.
+    pub fn apply(&mut self, event: &BootEvent) -> bool {
+        self.try_apply(event).unwrap_or(false)
+    }
+
+    /// Replace reducer state with a validated authoritative snapshot.
+    ///
+    /// Older snapshots are ignored. Equal-sequence snapshots are allowed because
+    /// an authoritative snapshot may intentionally refine the reduced state at
+    /// the same observation point.
+    pub fn try_replace(&mut self, snapshot: BootSnapshot) -> Result<bool, ProtocolError> {
+        snapshot.validate()?;
+
+        if snapshot.sequence < self.sequence {
+            return Ok(false);
+        }
+        if snapshot.elapsed_ms < self.elapsed_ms {
+            return Err(ProtocolError::ElapsedRegressed {
+                previous_ms: self.elapsed_ms,
+                observed_ms: snapshot.elapsed_ms,
+            });
+        }
+
         self.sequence = snapshot.sequence;
         self.elapsed_ms = snapshot.elapsed_ms;
         self.phase = snapshot.phase;
@@ -108,6 +130,12 @@ impl BootStateReducer {
         for domain in snapshot.domains {
             self.domains.insert(domain_key(domain.domain), domain);
         }
+        Ok(true)
+    }
+
+    /// Convenience wrapper matching the original reducer API style.
+    pub fn replace(&mut self, snapshot: BootSnapshot) -> bool {
+        self.try_replace(snapshot).unwrap_or(false)
     }
 
     pub fn snapshot(&self) -> BootSnapshot {
@@ -156,6 +184,7 @@ const fn domain_key(domain: BootDomain) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     #[test]
     fn ignores_duplicate_or_out_of_order_events() {
@@ -173,26 +202,52 @@ mod tests {
             detail: None,
         };
 
-        assert!(reducer.apply(&first));
-        assert!(!reducer.apply(&stale));
+        assert!(reducer.try_apply(&first).unwrap());
+        assert!(!reducer.try_apply(&stale).unwrap());
         assert_eq!(reducer.snapshot().health, BootHealth::Unknown);
+    }
+
+    #[test]
+    fn rejects_elapsed_time_regression() {
+        let mut reducer = BootStateReducer::default();
+        reducer
+            .try_apply(&BootEvent::DomainReady {
+                sequence: 1,
+                elapsed_ms: 50,
+                domain: BootDomain::Kernel,
+            })
+            .unwrap();
+
+        assert!(matches!(
+            reducer.try_apply(&BootEvent::DomainReady {
+                sequence: 2,
+                elapsed_ms: 49,
+                domain: BootDomain::Initrd,
+            }),
+            Err(ProtocolError::ElapsedRegressed { .. })
+        ));
+        assert_eq!(reducer.snapshot().sequence, 1);
     }
 
     #[test]
     fn recovery_does_not_silently_mark_boot_healthy() {
         let mut reducer = BootStateReducer::default();
-        reducer.apply(&BootEvent::DomainFailed {
-            sequence: 1,
-            elapsed_ms: 10,
-            domain: BootDomain::Network,
-            criticality: Criticality::NonCritical,
-            detail: None,
-        });
-        reducer.apply(&BootEvent::DomainRecovered {
-            sequence: 2,
-            elapsed_ms: 20,
-            domain: BootDomain::Network,
-        });
+        reducer
+            .try_apply(&BootEvent::DomainFailed {
+                sequence: 1,
+                elapsed_ms: 10,
+                domain: BootDomain::Network,
+                criticality: Criticality::NonCritical,
+                detail: None,
+            })
+            .unwrap();
+        reducer
+            .try_apply(&BootEvent::DomainRecovered {
+                sequence: 2,
+                elapsed_ms: 20,
+                domain: BootDomain::Network,
+            })
+            .unwrap();
 
         assert_eq!(reducer.snapshot().health, BootHealth::Failed);
     }
@@ -200,19 +255,48 @@ mod tests {
     #[test]
     fn boot_ready_can_authoritatively_resolve_health() {
         let mut reducer = BootStateReducer::default();
-        reducer.apply(&BootEvent::DomainDelayed {
-            sequence: 1,
-            elapsed_ms: 200,
-            domain: BootDomain::Network,
-        });
-        reducer.apply(&BootEvent::BootReady {
-            sequence: 2,
-            elapsed_ms: 300,
-            health: BootHealth::Normal,
-        });
+        reducer
+            .try_apply(&BootEvent::DomainDelayed {
+                sequence: 1,
+                elapsed_ms: 200,
+                domain: BootDomain::Network,
+            })
+            .unwrap();
+        reducer
+            .try_apply(&BootEvent::BootReady {
+                sequence: 2,
+                elapsed_ms: 300,
+                health: BootHealth::Normal,
+            })
+            .unwrap();
 
         let snapshot = reducer.snapshot();
         assert_eq!(snapshot.phase, BootPhase::Ready);
         assert_eq!(snapshot.health, BootHealth::Normal);
+    }
+
+    #[test]
+    fn authoritative_snapshot_must_validate_and_not_go_backwards() {
+        let mut reducer = BootStateReducer::default();
+        reducer
+            .try_apply(&BootEvent::DomainReady {
+                sequence: 4,
+                elapsed_ms: 40,
+                domain: BootDomain::Kernel,
+            })
+            .unwrap();
+
+        let stale = BootSnapshot::new(3, Duration::from_millis(50), BootPhase::Initrd);
+        assert!(!reducer.try_replace(stale).unwrap());
+
+        let regressed = BootSnapshot::new(4, Duration::from_millis(39), BootPhase::Initrd);
+        assert!(matches!(
+            reducer.try_replace(regressed),
+            Err(ProtocolError::ElapsedRegressed { .. })
+        ));
+
+        let fresh = BootSnapshot::new(4, Duration::from_millis(40), BootPhase::Initrd);
+        assert!(reducer.try_replace(fresh).unwrap());
+        assert_eq!(reducer.snapshot().phase, BootPhase::Initrd);
     }
 }

@@ -13,17 +13,15 @@ let
   inherit (lib) mkEnableOption mkIf mkOption types;
 in {
   options.services.symthaea-boot.observability = {
-    enable = mkEnableOption "Symthaea boot observability policy" // {
-      default = true;
-    };
+    enable = mkEnableOption "Symthaea boot observability policy";
 
     defaultMode = mkOption {
       type = types.enum [ "ambient" "diagnostics" ];
       default = "ambient";
       description = ''
         Default boot presentation. Ambient keeps routine console chatter quiet;
-        diagnostics retains the graphical path but requests systemd status output.
-        Raw diagnostics remain an independent Linux console concern.
+        diagnostics retains native initrd/systemd status visibility. Raw
+        diagnostics remain an independent Linux console concern.
       '';
     };
 
@@ -53,14 +51,14 @@ in {
   };
 
   config = mkIf (config.services.symthaea-boot.enable && cfg.enable) {
+    # Presentation policy is explicitly opt-in. Enabling the renderer alone must
+    # not silently change the host's native console/debugging behavior.
     boot.consoleLogLevel = lib.mkDefault cfg.kernelConsoleLogLevel;
-    boot.initrd.verbose = lib.mkDefault false;
+    boot.initrd.verbose = lib.mkDefault (cfg.defaultMode == "diagnostics");
 
     boot.kernelParams =
-      [
+      lib.optionals (cfg.defaultMode == "ambient") [
         "rd.udev.log_level=3"
-      ]
-      ++ lib.optionals (cfg.defaultMode == "ambient") [
         "quiet"
         "systemd.show_status=${if cfg.autoEscalate then "auto" else "false"}"
         "rd.systemd.show_status=${if cfg.autoEscalate then "auto" else "false"}"

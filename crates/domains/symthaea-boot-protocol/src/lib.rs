@@ -130,11 +130,21 @@ impl BootSnapshot {
 
         let mut seen = [false; BootDomain::COUNT];
         for domain in &self.domains {
-            let index = domain.index();
+            let index = domain.domain.index();
             if seen[index] {
                 return Err(ProtocolError::DuplicateDomain(domain.domain));
             }
             seen[index] = true;
+
+            if let Some(domain_elapsed_ms) = domain.elapsed_ms {
+                if domain_elapsed_ms > self.elapsed_ms {
+                    return Err(ProtocolError::DomainElapsedAfterSnapshot {
+                        domain: domain.domain,
+                        domain_elapsed_ms,
+                        snapshot_elapsed_ms: self.elapsed_ms,
+                    });
+                }
+            }
         }
         Ok(())
     }
@@ -239,6 +249,21 @@ impl BootEvent {
         }
     }
 
+    /// Milliseconds elapsed since the start of the same boot-observation lineage.
+    /// Consumers may use this alongside `sequence` to reject temporal regressions.
+    pub fn elapsed_ms(&self) -> u64 {
+        match self {
+            Self::PhaseEntered { elapsed_ms, .. }
+            | Self::DomainStarting { elapsed_ms, .. }
+            | Self::DomainReady { elapsed_ms, .. }
+            | Self::DomainDelayed { elapsed_ms, .. }
+            | Self::DomainDegraded { elapsed_ms, .. }
+            | Self::DomainFailed { elapsed_ms, .. }
+            | Self::DomainRecovered { elapsed_ms, .. }
+            | Self::BootReady { elapsed_ms, .. } => *elapsed_ms,
+        }
+    }
+
     pub fn validate(&self) -> Result<(), ProtocolError> {
         if let Self::DomainDegraded { detail, .. } | Self::DomainFailed { detail, .. } = self {
             if let Some(detail) = detail {
@@ -287,8 +312,21 @@ pub enum ProtocolError {
     UnsupportedVersion(u16),
     TooManyDomains(usize),
     DuplicateDomain(BootDomain),
+    DomainElapsedAfterSnapshot {
+        domain: BootDomain,
+        domain_elapsed_ms: u64,
+        snapshot_elapsed_ms: u64,
+    },
+    ElapsedRegressed {
+        previous_ms: u64,
+        observed_ms: u64,
+    },
     DetailTooLong(usize),
     ControlCharacter,
+    WireTooLarge {
+        bytes: usize,
+        max: usize,
+    },
 }
 
 impl std::fmt::Display for ProtocolError {
@@ -297,8 +335,26 @@ impl std::fmt::Display for ProtocolError {
             Self::UnsupportedVersion(v) => write!(f, "unsupported boot protocol version {v}"),
             Self::TooManyDomains(n) => write!(f, "boot snapshot contains too many domains: {n}"),
             Self::DuplicateDomain(domain) => write!(f, "boot snapshot repeats domain {domain:?}"),
+            Self::DomainElapsedAfterSnapshot {
+                domain,
+                domain_elapsed_ms,
+                snapshot_elapsed_ms,
+            } => write!(
+                f,
+                "boot snapshot domain {domain:?} elapsed time {domain_elapsed_ms}ms exceeds snapshot elapsed time {snapshot_elapsed_ms}ms"
+            ),
+            Self::ElapsedRegressed {
+                previous_ms,
+                observed_ms,
+            } => write!(
+                f,
+                "boot elapsed time regressed from {previous_ms}ms to {observed_ms}ms"
+            ),
             Self::DetailTooLong(n) => write!(f, "boot detail exceeds {MAX_DETAIL_BYTES} bytes: {n}"),
             Self::ControlCharacter => write!(f, "boot detail contains a control character"),
+            Self::WireTooLarge { bytes, max } => {
+                write!(f, "boot protocol message exceeds wire budget: {bytes} > {max} bytes")
+            }
         }
     }
 }
@@ -339,6 +395,7 @@ mod tests {
         let decoded: BootEvent = serde_json::from_slice(&encoded).unwrap();
         assert_eq!(decoded, event);
         assert_eq!(decoded.sequence(), 12);
+        assert_eq!(decoded.elapsed_ms(), 2200);
         decoded.validate().unwrap();
     }
 
@@ -371,6 +428,20 @@ mod tests {
             snapshot.validate(),
             Err(ProtocolError::DuplicateDomain(BootDomain::Storage))
         );
+    }
+
+    #[test]
+    fn snapshot_rejects_domain_timestamp_from_the_future() {
+        let mut snapshot = BootSnapshot::new(1, Duration::from_millis(5), BootPhase::Storage);
+        snapshot.domains = vec![DomainSnapshot {
+            domain: BootDomain::Storage,
+            state: DomainState::Ready,
+            elapsed_ms: Some(6),
+        }];
+        assert!(matches!(
+            snapshot.validate(),
+            Err(ProtocolError::DomainElapsedAfterSnapshot { .. })
+        ));
     }
 
     #[test]
