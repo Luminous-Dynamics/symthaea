@@ -44,6 +44,8 @@
     "policy": {"enum": ["full_symthaea", "random_valid", "heuristic", "no_embodied_experience", "no_persistent_memory", "no_depth", "no_counterfactual_evaluation", "no_independent_proposal_replay", "no_reality_ledger_context", "random_valid_judgment", "external_model", "human"]},
     "policy_sha256": {"$ref": "#/$defs/sha256"},
     "world_fixture_sha256": {"$ref": "#/$defs/sha256"},
+    "world_cluster_sha256": {"$ref": "#/$defs/sha256"},
+    "world_lineage_sha256": {"$ref": "#/$defs/sha256"},
     "seed": {"type": "integer", "minimum": 0},
     "revision_index": {"type": "integer", "minimum": 0},
     "world_version_before": {"type": "string", "minLength": 1},
@@ -93,7 +95,14 @@
           }
         }
       },
-      "then": {"required": ["execution_context_sha256", "world_state_before_sha256"]}
+      "then": {
+        "required": [
+          "execution_context_sha256",
+          "world_state_before_sha256",
+          "world_cluster_sha256",
+          "world_lineage_sha256"
+        ]
+      }
     },
     {
       "if": {
@@ -137,19 +146,6 @@
           "world_version_after": {"type": "string", "minLength": 1},
           "revisit_observation_sha256": {"$ref": "#/$defs/sha256"},
           "revision_outcome_sha256": {"$ref": "#/$defs/sha256"}
-        }
-      }
-    },
-    {
-      "if": {
-        "required": ["generated_candidate_count", "admissible_candidate_count"]
-      },
-      "then": {
-        "properties": {
-          "generated_candidate_count": {
-            "type": "integer",
-            "minimum": 1
-          }
         }
       }
     }
