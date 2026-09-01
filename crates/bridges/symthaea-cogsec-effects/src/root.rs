@@ -25,8 +25,7 @@ pub(crate) use effects::{CognitiveEffectV1, active_state_digest_v1, effect_diges
 mod state_commitments;
 pub use state_commitments::{GoalRecordView, StateCommitmentError};
 pub(crate) use state_commitments::{
-    affect_state_digest_v1, goal_store_state_digest_v1, graduation_queue_state_digest_v1,
-    working_memory_state_digest_v1,
+    affect_state_digest_v1, goal_store_state_digest_v1, working_memory_state_digest_v1,
 };
 
 mod typed_commitments;
