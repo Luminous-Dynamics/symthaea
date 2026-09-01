@@ -23,6 +23,9 @@ mod checkpoint;
 pub use checkpoint::{
     EVIDENCE_CHECKPOINT_SCHEMA_V1, CheckpointBuildError, CheckpointFork,
     CheckpointVerificationReport, CheckpointViolation, CheckpointedEffectBoundEvidence,
-    EvidenceCheckpoint, checkpoint_effect_bound_snapshot, detect_checkpoint_forks,
-    effect_bound_snapshot_root, verify_checkpoint_chain,
+    EvidenceCheckpoint, checkpoint_effect_bound_snapshot, effect_bound_snapshot_root,
+    verify_checkpoint_chain,
 };
+
+mod fork_semantics;
+pub use fork_semantics::detect_checkpoint_forks;
