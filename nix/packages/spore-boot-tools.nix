@@ -2,7 +2,7 @@
 
 pkgs.rustPlatform.buildRustPackage {
   pname = "spore-boot-tools";
-  version = "0.3.0";
+  version = "0.3.2";
   inherit src;
 
   cargoLock = {
