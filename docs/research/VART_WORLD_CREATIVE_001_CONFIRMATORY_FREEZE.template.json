@@ -27,6 +27,7 @@
   "analysis_contract_sha256": null,
   "execution_context_contract_sha256": null,
   "state_equivalence_contract_sha256": null,
+  "world_identity_contract_sha256": null,
   "calibration_contract_sha256": null,
   "trial_inventory_sha256": null,
   "trial_manifest_schema_sha256": null,
@@ -84,6 +85,7 @@
     "post_freeze_fixture_change_requires_new_lineage": true,
     "post_freeze_execution_context_change_requires_new_lineage": true,
     "post_freeze_state_contract_change_requires_new_lineage": true,
+    "post_freeze_world_identity_change_requires_new_lineage": true,
     "post_freeze_calibration_contract_change_requires_new_lineage": true,
     "post_freeze_verifier_change_requires_new_verifier_lineage": true
   },
@@ -97,6 +99,7 @@
     "requires_n1_n20_verifier_qualification": true,
     "requires_prospective_execution_context": true,
     "requires_world_state_equivalence": true,
+    "requires_explicit_world_identity": true,
     "requires_independent_calibration_reconstruction": true
   }
 }
