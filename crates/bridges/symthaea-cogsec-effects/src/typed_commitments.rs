@@ -15,13 +15,12 @@ use std::fmt;
 use symthaea_cogsec::{Digest32, MutationKind};
 use symthaea_core::hdc::LiquidHolocell;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
-use symthaea_memory::{GraduationEvent, MemorySource};
+use symthaea_memory::{MemorySource, PendingGraduationCommitmentV1};
 
 use crate::{
     CognitiveEffectV1, GoalRecordView, StateCommitmentError, WorkingMemoryItemView,
     active_state_digest_v1, affect_state_digest_v1, effect_digest_v1,
-    goal_store_state_digest_v1, graduation_queue_state_digest_v1,
-    working_memory_state_digest_v1,
+    goal_store_state_digest_v1, working_memory_state_digest_v1,
 };
 
 /// Canonical protected resource classes used by the first CogSec runtime tranche.
@@ -260,8 +259,10 @@ impl EffectCommitmentV1 {
 ///
 /// The resource tag prevents accidental substitution of, for example, a goal
 /// store root where a working-memory root is expected. This type still does not
-/// prove that the protected owner produced or endorsed the commitment; trusted
-/// owner acquisition remains a separate adapter responsibility.
+/// prove that every resource owner produced or endorsed the commitment; trusted
+/// owner acquisition remains a separate adapter responsibility. Graduation is
+/// stronger in-process because its constructor accepts only an opaque token that
+/// `MemoryCoordinator` can mint from its private queue.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ResourceStateCommitmentV1 {
     resource: CanonicalResourceV1,
@@ -313,15 +314,15 @@ impl ResourceStateCommitmentV1 {
         }
     }
 
-    /// Canonical commitment to an explicitly supplied ordered graduation queue.
+    /// Wrap the opaque graduation-queue commitment minted by `MemoryCoordinator`.
     ///
-    /// This is a **reference encoder**, not an owner-read API. Live runtime use
-    /// must obtain the queue commitment through a narrow `MemoryCoordinator`
-    /// owner-side commitment seam rather than exporting private queue contents.
-    pub fn graduation_queue_reference(events: &[GraduationEvent]) -> Self {
+    /// No raw queue slice or arbitrary digest is accepted by this constructor.
+    /// This preserves the memory owner's privacy boundary and makes safe-Rust
+    /// fabrication of an owner-produced graduation root materially harder.
+    pub fn graduation_queue_owner(commitment: PendingGraduationCommitmentV1) -> Self {
         Self {
             resource: CanonicalResourceV1::GraduationQueue,
-            digest: graduation_queue_state_digest_v1(events),
+            digest: Digest32(commitment.into_bytes()),
         }
     }
 
@@ -357,9 +358,8 @@ impl ResourceStateCommitmentV1 {
 /// One effect commitment paired with the exact protected-resource pre-state it targets.
 ///
 /// Construction fails if the effect class and state commitment name different
-/// resources. This remains ordinary canonical data; it is not an owner-issued
-/// trusted fact until the trusted adapter independently establishes the state
-/// commitment at the protected owner boundary.
+/// resources. This remains ordinary canonical data; it is not an authorization
+/// fact until the trusted adapter establishes the relevant owner/state semantics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CanonicalTransitionCommitmentV1 {
     class: CanonicalEffectClassV1,
@@ -375,19 +375,17 @@ impl CanonicalTransitionCommitmentV1 {
         state: ResourceStateCommitmentV1,
     ) -> Result<Self, TransitionCommitmentMismatch> {
         let expected = effect.resource();
-        if state.resource() != expected {
+        if state.resource != expected {
             return Err(TransitionCommitmentMismatch {
                 effect_resource: expected,
-                state_resource: state.resource(),
+                state_resource: state.resource,
             });
         }
         Ok(Self {
-            class: effect.class(),
+            class: effect.class,
             resource: expected,
-            effect_digest: effect.digest(),
-            resource_state_digest: state
-                .digest_for(expected)
-                .expect("resource equality checked above"),
+            effect_digest: effect.digest,
+            resource_state_digest: state.digest,
         })
     }
 
@@ -464,6 +462,7 @@ impl Error for TransitionCommitmentMismatch {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_memory::MemoryCoordinator;
 
     fn hv(a: f32, b: f32) -> ContinuousHV {
         ContinuousHV::from_values(vec![a, b])
@@ -523,6 +522,14 @@ mod tests {
             EffectCommitmentV1::affect_set(0.0, 0.2, 0.06).k0_mutation_kind(),
             Some(MutationKind::Affect)
         );
+    }
+
+    #[test]
+    fn graduation_state_requires_owner_minted_commitment() {
+        let coordinator = MemoryCoordinator::default();
+        let owner = coordinator.pending_graduation_commitment_v1();
+        let state = ResourceStateCommitmentV1::graduation_queue_owner(owner);
+        assert_eq!(state.resource(), CanonicalResourceV1::GraduationQueue);
     }
 
     #[test]
