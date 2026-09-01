@@ -42,6 +42,7 @@
 
 pub mod app_migration;
 pub mod boot_consciousness;
+pub mod boot_ecology;
 pub mod broca;
 #[cfg(feature = "broca-full")]
 pub mod broca_full;
