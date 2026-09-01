@@ -1,0 +1,65 @@
+name: VART World Creative Verifier
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/verify_vart_world_creative_001.py'
+      - 'scripts/verify_vart_world_creative_001_pilot.py'
+      - 'scripts/verify_vart_world_creative_001_qualified.py'
+      - 'scripts/run_vart_world_creative_001_pilot.py'
+      - 'scripts/test_verify_vart_world_creative_001.py'
+      - 'scripts/test_verify_vart_world_creative_001_n1_n20.py'
+      - 'docs/research/VART_WORLD_CREATIVE_001_*.json'
+      - 'docs/research/VART_WORLD_CREATIVE_001_*.md'
+      - '.github/workflows/vart-world-creative-verifier.yml'
+  push:
+    branches:
+      - research/vart-world-creative-001-execution
+    paths:
+      - 'scripts/verify_vart_world_creative_001.py'
+      - 'scripts/verify_vart_world_creative_001_pilot.py'
+      - 'scripts/verify_vart_world_creative_001_qualified.py'
+      - 'scripts/run_vart_world_creative_001_pilot.py'
+      - 'scripts/test_verify_vart_world_creative_001.py'
+      - 'scripts/test_verify_vart_world_creative_001_n1_n20.py'
+      - 'docs/research/VART_WORLD_CREATIVE_001_*.json'
+      - 'docs/research/VART_WORLD_CREATIVE_001_*.md'
+      - '.github/workflows/vart-world-creative-verifier.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: vart-world-creative-verifier-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verifier:
+    name: Canonical + N1-N20 verifier gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Syntax gate
+        run: |
+          python -m py_compile \
+            scripts/verify_vart_world_creative_001.py \
+            scripts/verify_vart_world_creative_001_pilot.py \
+            scripts/verify_vart_world_creative_001_qualified.py \
+            scripts/run_vart_world_creative_001_pilot.py \
+            scripts/test_verify_vart_world_creative_001.py \
+            scripts/test_verify_vart_world_creative_001_n1_n20.py
+
+      - name: Core verifier smoke gate
+        run: python scripts/test_verify_vart_world_creative_001.py
+
+      - name: Qualified verifier N1-N20 gate
+        run: python scripts/test_verify_vart_world_creative_001_n1_n20.py
