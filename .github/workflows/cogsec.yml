@@ -17,7 +17,9 @@ on:
       - 'scripts/cogsec-focused-qualification.sh'
       - 'scripts/cogsec-hydrate-lock-and-qualify.sh'
       - 'scripts/cogsec-lock-diagnostic.sh'
+      - 'scripts/cogsec-verify-qualification-receipt.sh'
       - 'scripts/test-cogsec-lock-hydration.sh'
+      - 'scripts/test-cogsec-qualification-receipt-verifier.sh'
       - '.github/workflows/cogsec.yml'
       - 'Cargo.lock'
       - 'Cargo.toml'
@@ -41,6 +43,9 @@ jobs:
 
       - name: Run lock protocol self-test
         run: bash scripts/test-cogsec-lock-hydration.sh
+
+      - name: Run qualification receipt verifier self-test
+        run: bash scripts/test-cogsec-qualification-receipt-verifier.sh
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -76,10 +81,18 @@ jobs:
           COGSEC_RECEIPT_OUT: target/cogsec-qualification-receipt.tsv
         run: bash scripts/cogsec-focused-qualification.sh
 
+      - name: Verify PASS qualification receipt
+        run: |
+          bash scripts/cogsec-verify-qualification-receipt.sh \
+            target/cogsec-qualification-receipt.tsv \
+            | tee target/cogsec-qualification-verification.txt
+
       - name: Upload CogSec qualification receipt
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cogsec-qualification-${{ github.sha }}
-          path: target/cogsec-qualification-receipt.tsv
+          path: |
+            target/cogsec-qualification-receipt.tsv
+            target/cogsec-qualification-verification.txt
           if-no-files-found: error
