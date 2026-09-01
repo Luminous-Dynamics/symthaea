@@ -48,10 +48,74 @@ pub fn resolve_registry_identity_snapshots_with_limits(
     at_unix_ms: u64,
     limits: &ResolutionLimits,
 ) -> Result<EntityResolutionBatch, ResolutionPipelineError> {
-    let mut seen_providers = BTreeSet::new();
-    let mut identity_claims = Vec::new();
-    let mut separation_claims = Vec::new();
+    preflight_registry_snapshots(registry, snapshots)?;
+    resolve_source_qualified_snapshots_with_limits(snapshots, at_unix_ms, limits)
+}
 
+/// Explicit Kubernetes semantic-normalization + registry-admitted resolution.
+///
+/// This wrapper keeps Kubernetes/OTLP alias knowledge out of the resolver. Raw
+/// provider snapshots first cross registry admission, then are normalized
+/// through the shared semantic vocabulary using a real Kubernetes cluster UID,
+/// then the normalized snapshots cross admission again before bounded
+/// resolution. This prevents unregistered/oversized data from consuming the
+/// normalization path and prevents normalization itself from bypassing output
+/// budgets.
+pub fn resolve_registry_kubernetes_uid_snapshots(
+    registry: &IntegrationRegistry,
+    snapshots: &[IdentitySnapshot],
+    cluster_uid: &str,
+    at_unix_ms: u64,
+) -> Result<EntityResolutionBatch, ResolutionPipelineError> {
+    resolve_registry_kubernetes_uid_snapshots_with_limits(
+        registry,
+        snapshots,
+        cluster_uid,
+        at_unix_ms,
+        &ResolutionLimits::default(),
+    )
+}
+
+pub fn resolve_registry_kubernetes_uid_snapshots_with_limits(
+    registry: &IntegrationRegistry,
+    snapshots: &[IdentitySnapshot],
+    cluster_uid: &str,
+    at_unix_ms: u64,
+    limits: &ResolutionLimits,
+) -> Result<EntityResolutionBatch, ResolutionPipelineError> {
+    // Gate untrusted/raw provider output before doing semantic transformation.
+    preflight_registry_snapshots(registry, snapshots)?;
+
+    let mut normalized = Vec::with_capacity(snapshots.len());
+    for snapshot in snapshots {
+        let normalized_snapshot =
+            normalize_kubernetes_uid_snapshot(snapshot, cluster_uid).map_err(|error| {
+                ResolutionPipelineError::IdentityNormalizationRejected {
+                    integration: snapshot.integration_id.clone(),
+                    reason: error.to_string(),
+                }
+            })?;
+
+        // Re-apply central output budgets after transformation. Normalization
+        // changes schemes/scopes/claim IDs and therefore changes payload size.
+        let id = IntegrationId::new(normalized_snapshot.integration_id.clone());
+        registry
+            .admit_identity_snapshot(&id, &normalized_snapshot)
+            .map_err(|error| ResolutionPipelineError::AdmissionRejected {
+                integration: normalized_snapshot.integration_id.clone(),
+                reason: error.to_string(),
+            })?;
+        normalized.push(normalized_snapshot);
+    }
+
+    resolve_source_qualified_snapshots_with_limits(&normalized, at_unix_ms, limits)
+}
+
+fn preflight_registry_snapshots(
+    registry: &IntegrationRegistry,
+    snapshots: &[IdentitySnapshot],
+) -> Result<(), ResolutionPipelineError> {
+    let mut seen_providers = BTreeSet::new();
     for snapshot in snapshots {
         let id = IntegrationId::new(snapshot.integration_id.clone());
         if registry.identity_provider(&id).is_none() {
@@ -64,14 +128,25 @@ pub fn resolve_registry_identity_snapshots_with_limits(
                 integration: snapshot.integration_id.clone(),
             });
         }
-
         registry
             .admit_identity_snapshot(&id, snapshot)
             .map_err(|error| ResolutionPipelineError::AdmissionRejected {
                 integration: snapshot.integration_id.clone(),
                 reason: error.to_string(),
             })?;
+    }
+    Ok(())
+}
 
+fn resolve_source_qualified_snapshots_with_limits(
+    snapshots: &[IdentitySnapshot],
+    at_unix_ms: u64,
+    limits: &ResolutionLimits,
+) -> Result<EntityResolutionBatch, ResolutionPipelineError> {
+    let mut identity_claims = Vec::new();
+    let mut separation_claims = Vec::new();
+
+    for snapshot in snapshots {
         for claim in &snapshot.claims {
             let mut claim = claim.clone();
             claim.claim_id = source_qualified_claim_id(
@@ -97,48 +172,6 @@ pub fn resolve_registry_identity_snapshots_with_limits(
         limits,
     )
     .map_err(ResolutionPipelineError::Resolution)
-}
-
-/// Explicit Kubernetes semantic-normalization + registry-admitted resolution.
-///
-/// This wrapper keeps Kubernetes/OTLP alias knowledge out of the resolver. Every
-/// supplied snapshot is normalized through the shared semantic vocabulary using
-/// a real Kubernetes cluster UID, then the ordinary registry admission and work
-/// budgets are applied.
-pub fn resolve_registry_kubernetes_uid_snapshots(
-    registry: &IntegrationRegistry,
-    snapshots: &[IdentitySnapshot],
-    cluster_uid: &str,
-    at_unix_ms: u64,
-) -> Result<EntityResolutionBatch, ResolutionPipelineError> {
-    resolve_registry_kubernetes_uid_snapshots_with_limits(
-        registry,
-        snapshots,
-        cluster_uid,
-        at_unix_ms,
-        &ResolutionLimits::default(),
-    )
-}
-
-pub fn resolve_registry_kubernetes_uid_snapshots_with_limits(
-    registry: &IntegrationRegistry,
-    snapshots: &[IdentitySnapshot],
-    cluster_uid: &str,
-    at_unix_ms: u64,
-    limits: &ResolutionLimits,
-) -> Result<EntityResolutionBatch, ResolutionPipelineError> {
-    let mut normalized = Vec::with_capacity(snapshots.len());
-    for snapshot in snapshots {
-        normalized.push(
-            normalize_kubernetes_uid_snapshot(snapshot, cluster_uid).map_err(|error| {
-                ResolutionPipelineError::IdentityNormalizationRejected {
-                    integration: snapshot.integration_id.clone(),
-                    reason: error.to_string(),
-                }
-            })?,
-        );
-    }
-    resolve_registry_identity_snapshots_with_limits(registry, &normalized, at_unix_ms, limits)
 }
 
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
@@ -340,7 +373,7 @@ mod tests {
             "otlp",
             "otel",
             "k8s.pod.uid",
-            Some("old-otel-scope"),
+            Some("k8s.cluster.uid:11:cluster-uid"),
         );
         let left = FixtureProvider {
             manifest: manifest("kubernetes"),
@@ -363,6 +396,28 @@ mod tests {
         .unwrap();
         assert_eq!(resolved.proposals.len(), 1);
         assert_eq!(resolved.proposals[0].status, ResolutionStatus::StrongCandidateSame);
+    }
+
+    #[test]
+    fn kubernetes_pipeline_preflights_registration_before_normalization() {
+        let registry = IntegrationRegistry::new();
+        let unregistered = k8s_snapshot(
+            "unregistered",
+            "k8s-native",
+            LEGACY_K8S_UID_SCHEME,
+            Some("legacy-name-scope"),
+        );
+        // Empty cluster UID would fail normalization if normalization ran first.
+        let result = resolve_registry_kubernetes_uid_snapshots(
+            &registry,
+            &[unregistered],
+            "",
+            100,
+        );
+        assert!(matches!(
+            result,
+            Err(ResolutionPipelineError::UnregisteredIdentityProvider { .. })
+        ));
     }
 
     #[test]
