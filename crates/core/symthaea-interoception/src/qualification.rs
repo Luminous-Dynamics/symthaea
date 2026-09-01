@@ -82,7 +82,9 @@ impl QualificationGateEvidence {
     pub fn validation_errors(&self) -> Vec<String> {
         let mut errors = Vec::new();
         if !is_lower_hex(self.subject_commit(), 40) {
-            errors.push("gate evidence subject_commit must be a 40-character lowercase Git SHA-1".into());
+            errors.push(
+                "gate evidence subject_commit must be a 40-character lowercase Git SHA-1".into(),
+            );
         }
 
         match self {
@@ -226,9 +228,9 @@ impl QualificationReceipt {
                         gate.gate_id
                     ));
                 }
-                if !evidence_kind_matches_gate(&gate.gate_id, evidence) {
+                if !evidence_matches_gate_contract(&gate.gate_id, evidence) {
                     errors.push(format!(
-                        "gate {} uses an incompatible evidence kind",
+                        "gate {} uses an incompatible evidence kind or identity",
                         gate.gate_id
                     ));
                 }
@@ -282,14 +284,35 @@ impl QualificationReceipt {
     }
 }
 
-fn evidence_kind_matches_gate(gate_id: &str, evidence: &QualificationGateEvidence) -> bool {
-    match gate_id {
-        "local_fmt" | "local_test" | "local_clippy" => {
-            matches!(evidence, QualificationGateEvidence::LocalCommand { .. })
-        }
-        "workspace_ci" | "showroom_integrity" | "benchmark_suite" => {
-            matches!(evidence, QualificationGateEvidence::GitHubActions { .. })
-        }
+fn evidence_matches_gate_contract(gate_id: &str, evidence: &QualificationGateEvidence) -> bool {
+    match (gate_id, evidence) {
+        (
+            "local_fmt",
+            QualificationGateEvidence::LocalCommand { command, .. },
+        ) => command == "cargo fmt --all --check",
+        (
+            "local_test",
+            QualificationGateEvidence::LocalCommand { command, .. },
+        ) => command == "cargo test -p symthaea-interoception",
+        (
+            "local_clippy",
+            QualificationGateEvidence::LocalCommand { command, .. },
+        ) => command
+            == "cargo clippy -p symthaea-interoception --all-targets -- -D warnings",
+        (
+            "workspace_ci",
+            QualificationGateEvidence::GitHubActions { workflow, .. },
+        ) => workflow == "CI",
+        (
+            "showroom_integrity",
+            QualificationGateEvidence::GitHubActions { workflow, .. },
+        ) => workflow == "Showroom Integrity",
+        (
+            "benchmark_suite",
+            QualificationGateEvidence::GitHubActions { workflow, .. },
+        ) => workflow == "Symthaea Benchmark Suite",
+        ("local_fmt" | "local_test" | "local_clippy", _) => false,
+        ("workspace_ci" | "showroom_integrity" | "benchmark_suite", _) => false,
         _ => true,
     }
 }
