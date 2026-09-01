@@ -229,10 +229,11 @@ mod tests {
         snapshot.claims[0].identifier.scope = Some("k8s.cluster.uid:11:cluster-uid".into());
         let normalized = normalize_kubernetes_uid_snapshot(&snapshot, "cluster-uid").unwrap();
         let claim = &normalized.claims[0];
+        let expected_scope = kubernetes_cluster_uid_scope("cluster-uid").unwrap();
         assert_eq!(claim.identifier.scheme, "k8s.pod.uid");
         assert_eq!(
             claim.identifier.scope.as_deref(),
-            Some(kubernetes_cluster_uid_scope("cluster-uid").unwrap().as_str())
+            Some(expected_scope.as_str())
         );
     }
 
