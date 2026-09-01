@@ -45,6 +45,7 @@ Initial normative roles should include at least:
 - `WeightingDecomposition`;
 - `ChannelAggregation`;
 - `AllostaticExposureDecomposition`;
+- `HistoryStateSufficiency`;
 - `IdentifiabilityAndDiscrimination`;
 - `CausalContrasts`;
 - `ExecutionMode`;
@@ -123,7 +124,7 @@ A freeze is invalid if:
 - the registry belongs to a different design source commit;
 - the registry contract/version is not the one declared by the freeze.
 
-The channel-aggregation, identifiability/discrimination, and causal-contrast roles are normative even if an older descriptive list inside the prose freeze has not enumerated them individually; authoritative membership is the validated registry, not a stale prose enumeration.
+The channel-aggregation, history/state-sufficiency, identifiability/discrimination, and causal-contrast roles are normative even if an older descriptive list inside the prose freeze has not enumerated them individually; authoritative membership is the validated registry, not a stale prose enumeration.
 
 ## 9. Evidence root binding
 
@@ -137,7 +138,24 @@ Recommended explicit redundancy:
 
 This lets a reproducer inspect the scientific design surface without reconstructing it indirectly.
 
-## 10. Identifiability closure
+## 10. History/state-sufficiency closure
+
+A prefix-causal external replay process may compute history-sensitive statistics that are not represented by the native regulator itself.
+
+Before any result uses persistence-, memory-, cumulative-history-, or mood-adjacent language, require the `HistoryStateSufficiency` contract and explicit `history_access_basis` identity.
+
+Initial v0.2 must distinguish:
+
+- current-native-state-only candidates;
+- externally replayed prefix-history candidates;
+- retrospective/oracle history diagnostics;
+- future separately qualified native persisted memory.
+
+A candidate that differs across matched-current-state histories proves only that prior trace history adds information to the external observatory unless a separately qualified native memory state carries an equivalent sufficient statistic.
+
+The restart/state-sufficiency gate must also verify that matched complete native state/configuration plus identical future inputs produces identical future native execution under the v0.1 deterministic contract.
+
+## 11. Identifiability closure
 
 A complete design registry is not enough if the locked scenarios cannot distinguish the locked candidates.
 
@@ -145,7 +163,9 @@ Before confirmatory freeze, require a valid `CandidateDiscriminationManifest` un
 
 A candidate may not be promoted as superior to a baseline when the locked design lacks a discriminator capable of separating them.
 
-## 11. Causal-contrast closure
+History-sensitive candidates must additionally be discriminated against current-native-state-only baselines on prospectively matched-state history contrasts if the result intends to claim information beyond current state.
+
+## 12. Causal-contrast closure
 
 Mechanistic language requires more than numerical matching.
 
@@ -155,17 +175,19 @@ Each contrast must declare manipulated fields, required-equal pre-treatment fiel
 
 A realized causal claim requires its manipulation-check artifact to pass. Otherwise report descriptive scenario differences rather than causal language.
 
-## 12. Change severity
+History contrasts must state explicitly whether matching current native state is the intended conditioning operation or would improperly control away a mediator of the total historical effect.
+
+## 13. Change severity
 
 Registry changes inherit the severity of the contract change they represent.
 
 - adding a purely supporting explanation may be Class I if it is explicitly non-normative and changes no normative registry entry;
-- changing a candidate, weighting, channel aggregation, temporal aggregation, identifiability, causal contrast, scenario, analysis, or evidence contract is Class II;
-- changing future-information authority, execution mode, feedback authority, or causal-output boundaries is Class III.
+- changing a candidate, weighting, channel aggregation, temporal aggregation, history-access semantics, identifiability, causal contrast, scenario, analysis, or evidence contract is Class II;
+- changing future-information authority, execution mode, feedback authority, causal-output boundaries, or introducing native persisted affect/memory is Class III.
 
 Adding a new active normative contract after freeze always changes the registry and supersedes the old freeze, even if the prose author considers the change small.
 
-## 13. Review and CI gates
+## 14. Review and CI gates
 
 Future implementation should mechanically test:
 
@@ -180,14 +202,17 @@ Future implementation should mechanically test:
 - freeze/registry digest mismatch rejected;
 - evidence-root/freeze/registry mismatch rejected;
 - missing aggregation contract rejected;
+- missing history/state-sufficiency contract rejected;
 - missing identifiability/discrimination contract rejected;
 - missing causal-contrast contract rejected;
 - confirmatory freeze rejected when a required primary-vs-baseline pair lacks a registered discriminator;
+- history-sensitive candidate rejected when its history-access basis is undeclared;
+- native-memory/persistence claim rejected when the candidate relies only on external replay history;
 - causal claim rejected when its required contrast/manipulation-check identity is missing or invalid.
 
 A malicious fixture should add an unregistered normative-looking contract and prove the closure audit catches it.
 
-## 14. Initial registry membership
+## 15. Initial registry membership
 
 At the current v0.2 design stage, the active normative set is intended to cover the roles represented by:
 
@@ -199,6 +224,7 @@ At the current v0.2 design stage, the active normative set is intended to cover 
 - `V02_WEIGHTING_DECOMPOSITION.md`
 - `V02_CHANNEL_AGGREGATION_CONTRACT.md`
 - `V02_ALLOSTATIC_EXPOSURE_DECOMPOSITION.md`
+- `V02_HISTORY_STATE_SUFFICIENCY.md`
 - `V02_IDENTIFIABILITY_AND_DISCRIMINATION.md`
 - `V02_CAUSAL_CONTRASTS.md`
 - `V02_EXECUTION_MODE_CONTRACT.md`
@@ -211,8 +237,8 @@ At the current v0.2 design stage, the active normative set is intended to cover 
 
 This list is descriptive of the current design stage, not a permanently hard-coded schema. Future additions require explicit registry classification and a new registry/freeze identity.
 
-## 15. Claim boundary
+## 16. Claim boundary
 
-A closed contract registry proves only that the frozen evidence lineage names a complete, explicit set of design contracts under the declared closure rule. Identifiability and causal-contrast manifests additionally establish that the intended comparisons have declared discriminators and manipulation semantics.
+A closed contract registry proves only that the frozen evidence lineage names a complete, explicit set of design contracts under the declared closure rule. History/state-sufficiency, identifiability, and causal-contrast manifests additionally constrain whether a result can be described as history-derived, native-state-sufficient, discriminative, or mechanistic.
 
 They do not prove those contracts are scientifically correct or that any regulatory candidate is affect, emotion, subjective valence, mood, sentience, or consciousness.
