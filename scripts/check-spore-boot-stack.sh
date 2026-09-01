@@ -2,7 +2,7 @@
 # Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# Focused qualification lane for the Spore boot stack.
+# Focused qualification lane for the Spore boot/lifecycle stack.
 
 set -euo pipefail
 
@@ -15,6 +15,7 @@ PACKAGES=(
   symthaea-quicken-fb
   symthaea-boot-control
   symthaea-boot-input
+  symthaea-spore-continuity
 )
 
 run_cargo_for_each() {
@@ -75,4 +76,4 @@ if [[ "${1:-}" == "--vm" ]]; then
     nix build .#vm-test
 fi
 
-echo "PASS: focused Spore boot stack qualification"
+echo "PASS: focused Spore boot/lifecycle stack qualification"
