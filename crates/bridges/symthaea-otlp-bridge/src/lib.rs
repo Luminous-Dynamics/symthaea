@@ -16,11 +16,13 @@ use opentelemetry_proto::tonic::{
 };
 use std::collections::BTreeMap;
 use symthaea_integration_core::{
-    AccessMode, CapabilityClass, CapabilityDeclaration, EntityRef, IntegrationError,
-    IntegrationFuture, IntegrationId, IntegrationIdentity, IntegrationManifest, MaturityLevel,
-    ObservationBatch, ObservationEnvelope, ObservationId, ObservationKind, ObservationLineage,
-    ObservationQuality, ObservationRequest, ObservationSource, ObservationState, ObservationValue,
-    Observer, RiskClass, TransformStep, INTEGRATION_MANIFEST_SCHEMA_VERSION,
+    AccessMode, CapabilityClass, CapabilityDeclaration, EntityRef, ExternalIdentifier,
+    IdentifierStability, IdentifierUniqueness, IdentityClaim, IdentityClaimSource,
+    IdentityStrength, IntegrationError, IntegrationFuture, IntegrationId, IntegrationIdentity,
+    IntegrationManifest, MaturityLevel, ObservationBatch, ObservationEnvelope, ObservationId,
+    ObservationKind, ObservationLineage, ObservationQuality, ObservationRequest,
+    ObservationSource, ObservationState, ObservationValue, Observer, RiskClass, TransformStep,
+    INTEGRATION_MANIFEST_SCHEMA_VERSION,
 };
 
 pub const OTLP_METRICS_INTEGRATION_ID: &str = "otlp-metrics";
@@ -121,6 +123,10 @@ impl Observer for OtlpMetricsObserver {
 #[derive(Debug, Clone, PartialEq)]
 pub struct OtlpMetricsTranslation {
     pub batch: ObservationBatch,
+    /// Identity evidence for the primary entity selected for each OTLP Resource.
+    /// A Resource can contain multiple contributing entities; v0.1 deliberately
+    /// does not claim they are all aliases of the selected observation subject.
+    pub identity_claims: Vec<IdentityClaim>,
     /// Histogram, exponential-histogram and summary data are intentionally not
     /// flattened into misleading scalar values in v0.1. They remain explicit
     /// skipped capability surface until the canonical envelope gains a lossless
@@ -165,6 +171,7 @@ pub fn translate_metrics_request(
     ingested_at_unix_ms: u64,
 ) -> Result<OtlpMetricsTranslation, IntegrationError> {
     let mut observations = Vec::new();
+    let mut identity_claims = Vec::new();
     let mut skipped_non_scalar_metrics = 0usize;
 
     for (resource_index, resource_metrics) in request.resource_metrics.iter().enumerate() {
@@ -180,11 +187,15 @@ pub fn translate_metrics_request(
             .resource
             .as_ref()
             .map_or(0, |resource| resource.dropped_attributes_count as usize);
-        let (entity, weak_identity) = resource_entity(
+        let selection = select_primary_resource_entity(
             &resource_attributes.values,
             context,
             resource_index,
-        );
+            ingested_at_unix_ms,
+        )?;
+        if let Some(claim) = selection.identity_claim {
+            identity_claims.push(claim);
+        }
 
         for scope_metrics in &resource_metrics.scope_metrics {
             let scope_name = scope_metrics
@@ -214,8 +225,8 @@ pub fn translate_metrics_request(
                                 metric.description.as_str(),
                                 metric.unit.as_str(),
                                 "gauge",
-                                &entity,
-                                weak_identity,
+                                &selection.entity,
+                                selection.weak_identity,
                                 &resource_attributes,
                                 resource_dropped,
                                 scope_name,
@@ -235,8 +246,8 @@ pub fn translate_metrics_request(
                                 metric.description.as_str(),
                                 metric.unit.as_str(),
                                 "sum",
-                                &entity,
-                                weak_identity,
+                                &selection.entity,
+                                selection.weak_identity,
                                 &resource_attributes,
                                 resource_dropped,
                                 scope_name,
@@ -281,8 +292,15 @@ pub fn translate_metrics_request(
         .validate()
         .map_err(|error| IntegrationError::InvalidOutput(error.to_string()))?;
 
+    for claim in &identity_claims {
+        claim
+            .validate()
+            .map_err(|error| IntegrationError::InvalidOutput(error.to_string()))?;
+    }
+
     Ok(OtlpMetricsTranslation {
         batch,
+        identity_claims,
         skipped_non_scalar_metrics,
     })
 }
@@ -354,9 +372,7 @@ fn number_point_to_observation(
         }
     };
 
-    let omitted_attributes = resource_attributes.omitted
-        + point_attributes.omitted
-        + resource_dropped;
+    let omitted_attributes = resource_attributes.omitted + point_attributes.omitted + resource_dropped;
     if quality.state == ObservationState::Observed && (weak_identity || omitted_attributes > 0) {
         quality.state = ObservationState::Partial;
         quality.completeness = if weak_identity { 0.85 } else { 0.95 };
@@ -521,42 +537,200 @@ fn any_value_to_string(value: &opentelemetry_proto::tonic::common::v1::AnyValue)
     }
 }
 
-fn resource_entity(
+#[derive(Debug, Clone, PartialEq)]
+struct PrimaryEntitySelection {
+    entity: EntityRef,
+    weak_identity: bool,
+    identity_claim: Option<IdentityClaim>,
+}
+
+fn select_primary_resource_entity(
     attributes: &BTreeMap<String, String>,
     context: &OtlpMetricsContext,
     resource_index: usize,
-) -> (EntityRef, bool) {
-    const STRONG_KEYS: [(&str, &str); 5] = [
-        ("service.instance.id", "service_instance"),
-        ("k8s.pod.uid", "k8s_pod"),
-        ("container.id", "container"),
-        ("host.id", "host"),
-        ("cloud.resource_id", "cloud_resource"),
-    ];
-    for (key, kind) in STRONG_KEYS {
-        if let Some(id) = attributes.get(key).filter(|id| !id.trim().is_empty()) {
-            return (EntityRef::new(&context.namespace, kind, id), false);
-        }
+    observed_at_unix_ms: u64,
+) -> Result<PrimaryEntitySelection, IntegrationError> {
+    // OpenTelemetry defines the service.namespace + service.name +
+    // service.instance.id triplet as globally unique. The instance ID alone is
+    // only required to be unique among instances of the same service.
+    if let (Some(service_name), Some(instance_id)) = (
+        non_blank(attributes.get("service.name")),
+        non_blank(attributes.get("service.instance.id")),
+    ) {
+        let service_namespace = non_blank(attributes.get("service.namespace")).unwrap_or("");
+        let composite = length_prefixed_triplet(service_namespace, service_name, instance_id);
+        let entity = EntityRef::new(&context.namespace, "service_instance", &composite);
+        let identifier = ExternalIdentifier {
+            scheme: "otel.service.instance.triplet".into(),
+            value: composite,
+            scope: None,
+            uniqueness: IdentifierUniqueness::Global,
+            stability: IdentifierStability::Session,
+            case_sensitive: true,
+        };
+        return Ok(PrimaryEntitySelection {
+            entity: entity.clone(),
+            weak_identity: false,
+            identity_claim: Some(identity_claim(
+                entity,
+                identifier,
+                IdentityStrength::Strong,
+                context,
+                resource_index,
+                observed_at_unix_ms,
+            )?),
+        });
     }
-    if let Some(service_name) = attributes
-        .get("service.name")
-        .filter(|name| !name.trim().is_empty())
-    {
-        return (
-            EntityRef::new(&context.namespace, "service", service_name),
-            true,
-        );
+
+    if let Some(pod_uid) = non_blank(attributes.get("k8s.pod.uid")) {
+        let (scope, uniqueness) = scoped_by_attribute(attributes, "k8s.cluster.uid", "k8s.cluster.uid");
+        let identifier = ExternalIdentifier {
+            scheme: "k8s.pod.uid".into(),
+            value: pod_uid.into(),
+            scope,
+            uniqueness,
+            stability: IdentifierStability::Persistent,
+            case_sensitive: true,
+        };
+        let entity = EntityRef::new(&context.namespace, "k8s_pod", pod_uid);
+        return Ok(PrimaryEntitySelection {
+            entity: entity.clone(),
+            weak_identity: uniqueness == IdentifierUniqueness::Ambiguous,
+            identity_claim: Some(identity_claim(
+                entity,
+                identifier,
+                IdentityStrength::Strong,
+                context,
+                resource_index,
+                observed_at_unix_ms,
+            )?),
+        });
+    }
+
+    if let Some(container_id) = non_blank(attributes.get("container.id")) {
+        let (scope, uniqueness) = scoped_by_attribute(attributes, "host.id", "host.id");
+        let identifier = ExternalIdentifier {
+            scheme: "container.id".into(),
+            value: container_id.into(),
+            scope,
+            uniqueness,
+            stability: IdentifierStability::Persistent,
+            case_sensitive: true,
+        };
+        let entity = EntityRef::new(&context.namespace, "container", container_id);
+        return Ok(PrimaryEntitySelection {
+            entity: entity.clone(),
+            weak_identity: uniqueness == IdentifierUniqueness::Ambiguous,
+            identity_claim: Some(identity_claim(
+                entity,
+                identifier,
+                IdentityStrength::Strong,
+                context,
+                resource_index,
+                observed_at_unix_ms,
+            )?),
+        });
+    }
+
+    if let Some(host_id) = non_blank(attributes.get("host.id")) {
+        let cloud_scope = cloud_scope(attributes);
+        let (scope, uniqueness) = if let Some(scope) = cloud_scope {
+            (Some(scope), IdentifierUniqueness::Scoped)
+        } else if let Some(tenant) = context.tenant.as_deref().filter(|value| !value.trim().is_empty()) {
+            (Some(format!("tenant:{tenant}")), IdentifierUniqueness::Scoped)
+        } else {
+            (None, IdentifierUniqueness::Ambiguous)
+        };
+        let identifier = ExternalIdentifier {
+            scheme: "host.id".into(),
+            value: host_id.into(),
+            scope,
+            uniqueness,
+            stability: IdentifierStability::Persistent,
+            case_sensitive: true,
+        };
+        let entity = EntityRef::new(&context.namespace, "host", host_id);
+        return Ok(PrimaryEntitySelection {
+            entity: entity.clone(),
+            weak_identity: uniqueness == IdentifierUniqueness::Ambiguous,
+            identity_claim: Some(identity_claim(
+                entity,
+                identifier,
+                IdentityStrength::Strong,
+                context,
+                resource_index,
+                observed_at_unix_ms,
+            )?),
+        });
+    }
+
+    if let Some(resource_id) = non_blank(attributes.get("cloud.resource_id")) {
+        let scope = cloud_scope(attributes);
+        let uniqueness = if scope.is_some() {
+            IdentifierUniqueness::Scoped
+        } else {
+            IdentifierUniqueness::Ambiguous
+        };
+        let identifier = ExternalIdentifier {
+            scheme: "cloud.resource_id".into(),
+            value: resource_id.into(),
+            scope,
+            uniqueness,
+            stability: IdentifierStability::Persistent,
+            case_sensitive: true,
+        };
+        let entity = EntityRef::new(&context.namespace, "cloud_resource", resource_id);
+        return Ok(PrimaryEntitySelection {
+            entity: entity.clone(),
+            weak_identity: uniqueness == IdentifierUniqueness::Ambiguous,
+            identity_claim: Some(identity_claim(
+                entity,
+                identifier,
+                IdentityStrength::Strong,
+                context,
+                resource_index,
+                observed_at_unix_ms,
+            )?),
+        });
+    }
+
+    if let Some(service_name) = non_blank(attributes.get("service.name")) {
+        let service_namespace = non_blank(attributes.get("service.namespace")).unwrap_or("");
+        let scope = format!("otel.service.namespace:{}:{service_namespace}", service_namespace.len());
+        let identifier = ExternalIdentifier {
+            scheme: "service.name".into(),
+            value: service_name.into(),
+            scope: Some(scope),
+            uniqueness: IdentifierUniqueness::Scoped,
+            stability: IdentifierStability::Persistent,
+            case_sensitive: true,
+        };
+        let composite = format!("{}:{}|{}", service_namespace.len(), service_namespace, service_name);
+        let entity = EntityRef::new(&context.namespace, "service", composite);
+        return Ok(PrimaryEntitySelection {
+            entity: entity.clone(),
+            weak_identity: true,
+            identity_claim: Some(identity_claim(
+                entity,
+                identifier,
+                IdentityStrength::Moderate,
+                context,
+                resource_index,
+                observed_at_unix_ms,
+            )?),
+        });
     }
 
     if attributes.is_empty() {
-        return (
-            EntityRef::new(
+        return Ok(PrimaryEntitySelection {
+            entity: EntityRef::new(
                 &context.namespace,
                 "otel_resource",
                 format!("anonymous-resource-{resource_index}"),
             ),
-            true,
-        );
+            weak_identity: true,
+            identity_claim: None,
+        });
     }
 
     let mut canonical = String::new();
@@ -567,14 +741,88 @@ fn resource_entity(
         canonical.push('|');
     }
     let digest = blake3::hash(canonical.as_bytes()).to_hex().to_string();
-    (
-        EntityRef::new(
+    Ok(PrimaryEntitySelection {
+        entity: EntityRef::new(
             &context.namespace,
             "otel_resource",
             format!("attrs-{digest}"),
         ),
-        true,
+        weak_identity: true,
+        identity_claim: None,
+    })
+}
+
+fn identity_claim(
+    subject: EntityRef,
+    identifier: ExternalIdentifier,
+    strength: IdentityStrength,
+    context: &OtlpMetricsContext,
+    resource_index: usize,
+    observed_at_unix_ms: u64,
+) -> Result<IdentityClaim, IntegrationError> {
+    let identifier_key = identifier
+        .canonical_key()
+        .map_err(|error| IntegrationError::InvalidOutput(error.to_string()))?;
+    let material = format!(
+        "{}|{}|{}|resource={resource_index}|observed={observed_at_unix_ms}",
+        OTLP_METRICS_INTEGRATION_ID,
+        subject.canonical_key(),
+        identifier_key,
+    );
+    let digest = blake3::hash(material.as_bytes()).to_hex().to_string();
+    Ok(IdentityClaim {
+        claim_id: format!("otlp-identity:{digest}"),
+        subject,
+        identifier,
+        strength,
+        source_confidence: 1.0,
+        source: IdentityClaimSource {
+            integration_id: OTLP_METRICS_INTEGRATION_ID.into(),
+            collector_id: context.collector_id.clone(),
+            tenant: context.tenant.clone(),
+        },
+        observed_at_unix_ms,
+        valid_from_unix_ms: None,
+        valid_until_unix_ms: None,
+        evidence_observation_ids: vec![],
+    })
+}
+
+fn scoped_by_attribute(
+    attributes: &BTreeMap<String, String>,
+    key: &str,
+    scope_name: &str,
+) -> (Option<String>, IdentifierUniqueness) {
+    if let Some(value) = non_blank(attributes.get(key)) {
+        (
+            Some(format!("{scope_name}:{}:{value}", value.len())),
+            IdentifierUniqueness::Scoped,
+        )
+    } else {
+        (None, IdentifierUniqueness::Ambiguous)
+    }
+}
+
+fn cloud_scope(attributes: &BTreeMap<String, String>) -> Option<String> {
+    let provider = non_blank(attributes.get("cloud.provider"))?;
+    let account = non_blank(attributes.get("cloud.account.id"));
+    Some(match account {
+        Some(account) => format!("cloud:{provider}:account:{}:{account}", account.len()),
+        None => format!("cloud:{provider}"),
+    })
+}
+
+fn length_prefixed_triplet(first: &str, second: &str, third: &str) -> String {
+    format!(
+        "{}:{first}|{}:{second}|{}:{third}",
+        first.len(),
+        second.len(),
+        third.len()
     )
+}
+
+fn non_blank(value: Option<&String>) -> Option<&str> {
+    value.map(String::as_str).filter(|value| !value.trim().is_empty())
 }
 
 fn non_empty(value: &str) -> Option<String> {
@@ -614,35 +862,42 @@ mod tests {
         }
     }
 
-    fn request(data: metric::Data) -> ExportMetricsServiceRequest {
-        ExportMetricsServiceRequest {
-            resource_metrics: vec![ResourceMetrics {
-                resource: Some(Resource {
-                    attributes: vec![
-                        string_kv("service.name", "api"),
-                        string_kv("service.instance.id", "api-17"),
-                    ],
+    fn resource_metrics(resource_attributes: Vec<KeyValue>, data: metric::Data) -> ResourceMetrics {
+        ResourceMetrics {
+            resource: Some(Resource {
+                attributes: resource_attributes,
+                dropped_attributes_count: 0,
+                entity_refs: vec![],
+            }),
+            scope_metrics: vec![ScopeMetrics {
+                scope: Some(InstrumentationScope {
+                    name: "fixture".into(),
+                    version: "1.0".into(),
+                    attributes: vec![],
                     dropped_attributes_count: 0,
-                    entity_refs: vec![],
                 }),
-                scope_metrics: vec![ScopeMetrics {
-                    scope: Some(InstrumentationScope {
-                        name: "fixture".into(),
-                        version: "1.0".into(),
-                        attributes: vec![],
-                        dropped_attributes_count: 0,
-                    }),
-                    metrics: vec![Metric {
-                        name: "system.cpu.utilization".into(),
-                        description: "CPU utilization".into(),
-                        unit: "1".into(),
-                        metadata: vec![],
-                        data: Some(data),
-                    }],
-                    schema_url: "https://opentelemetry.io/schemas/1.0.0".into(),
+                metrics: vec![Metric {
+                    name: "system.cpu.utilization".into(),
+                    description: "CPU utilization".into(),
+                    unit: "1".into(),
+                    metadata: vec![],
+                    data: Some(data),
                 }],
                 schema_url: "https://opentelemetry.io/schemas/1.0.0".into(),
             }],
+            schema_url: "https://opentelemetry.io/schemas/1.0.0".into(),
+        }
+    }
+
+    fn request(data: metric::Data) -> ExportMetricsServiceRequest {
+        ExportMetricsServiceRequest {
+            resource_metrics: vec![resource_metrics(
+                vec![
+                    string_kv("service.name", "api"),
+                    string_kv("service.instance.id", "api-17"),
+                ],
+                data,
+            )],
         }
     }
 
@@ -654,7 +909,7 @@ mod tests {
     }
 
     #[test]
-    fn gauge_maps_service_instance_and_scalar_value() {
+    fn gauge_maps_composite_service_instance_and_identity_claim() {
         let translated = translate_metrics_request(
             &request(metric::Data::Gauge(Gauge {
                 data_points: vec![point(number_data_point::Value::AsDouble(0.75))],
@@ -665,15 +920,80 @@ mod tests {
         .unwrap();
         assert_eq!(translated.skipped_non_scalar_metrics, 0);
         assert_eq!(translated.batch.observations.len(), 1);
+        assert_eq!(translated.identity_claims.len(), 1);
         let observation = &translated.batch.observations[0];
         assert_eq!(observation.entity.kind, "service_instance");
-        assert_eq!(observation.entity.id, "api-17");
+        assert_eq!(observation.entity.id, "0:|3:api|6:api-17");
         assert_eq!(observation.signal, "system.cpu.utilization");
         assert!(matches!(
             observation.value,
             ObservationValue::Number { value, .. } if (value - 0.75).abs() < f64::EPSILON
         ));
         assert_eq!(observation.observed_at_unix_ms, 2_000);
+        let claim = &translated.identity_claims[0];
+        assert_eq!(claim.subject, observation.entity);
+        assert_eq!(claim.identifier.scheme, "otel.service.instance.triplet");
+        assert_eq!(claim.identifier.uniqueness, IdentifierUniqueness::Global);
+        assert_eq!(claim.strength, IdentityStrength::Strong);
+    }
+
+    #[test]
+    fn same_instance_id_under_different_services_does_not_collide() {
+        let request = ExportMetricsServiceRequest {
+            resource_metrics: vec![
+                resource_metrics(
+                    vec![
+                        string_kv("service.name", "api"),
+                        string_kv("service.instance.id", "17"),
+                    ],
+                    metric::Data::Gauge(Gauge {
+                        data_points: vec![point(number_data_point::Value::AsInt(1))],
+                    }),
+                ),
+                resource_metrics(
+                    vec![
+                        string_kv("service.name", "worker"),
+                        string_kv("service.instance.id", "17"),
+                    ],
+                    metric::Data::Gauge(Gauge {
+                        data_points: vec![point(number_data_point::Value::AsInt(2))],
+                    }),
+                ),
+            ],
+        };
+        let translated =
+            translate_metrics_request(&request, &OtlpMetricsContext::default(), 2_100).unwrap();
+        assert_ne!(
+            translated.batch.observations[0].entity,
+            translated.batch.observations[1].entity
+        );
+        assert_ne!(
+            translated.identity_claims[0].identifier.value,
+            translated.identity_claims[1].identifier.value
+        );
+    }
+
+    #[test]
+    fn service_name_without_instance_is_scoped_moderate_identity() {
+        let request = ExportMetricsServiceRequest {
+            resource_metrics: vec![resource_metrics(
+                vec![
+                    string_kv("service.namespace", "shop"),
+                    string_kv("service.name", "payments"),
+                ],
+                metric::Data::Gauge(Gauge {
+                    data_points: vec![point(number_data_point::Value::AsInt(1))],
+                }),
+            )],
+        };
+        let translated =
+            translate_metrics_request(&request, &OtlpMetricsContext::default(), 2_100).unwrap();
+        let observation = &translated.batch.observations[0];
+        assert_eq!(observation.entity.kind, "service");
+        assert_eq!(observation.quality.state, ObservationState::Partial);
+        let claim = &translated.identity_claims[0];
+        assert_eq!(claim.identifier.uniqueness, IdentifierUniqueness::Scoped);
+        assert_eq!(claim.strength, IdentityStrength::Moderate);
     }
 
     #[test]
