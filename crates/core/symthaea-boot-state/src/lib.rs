@@ -195,6 +195,18 @@ impl BootStateStore {
             mesh_peers_last_seen: input.mesh_peers_last_seen,
         };
 
+        // Consume the previous session's clean marker *before* committing any
+        // state that says this boot has started. If power is lost after this
+        // point, the next prepare correctly observes a missing marker and treats
+        // this boot as interrupted. Removing it after the state write could
+        // leave a stale clean marker across a crash and falsely classify the next
+        // boot as clean.
+        match fs::remove_file(self.clean_marker_path()) {
+            Ok(()) => sync_parent_dir(&self.clean_marker_path())?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(format!("remove clean marker: {e}")),
+        }
+
         write_json_atomic(&self.receipt_path(), &receipt)?;
         // Keep a runtime copy of the lineage paired with the receipt so preview
         // and live rendering consume a consistent snapshot.
@@ -207,14 +219,6 @@ impl BootStateStore {
         state.last_boot_started_unix_ms = Some(now_unix_ms());
         state.last_boot_ended_unix_ms = None;
         write_json_atomic(&self.state_path(), &state)?;
-
-        // Consuming the marker makes a missing marker on the next boot
-        // meaningful. Ignore a race where a marker disappeared after read.
-        match fs::remove_file(self.clean_marker_path()) {
-            Ok(()) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => return Err(format!("remove clean marker: {e}")),
-        }
 
         Ok(PrepareResult {
             receipt,
@@ -388,7 +392,16 @@ fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     }
     fs::rename(&tmp, path)
         .map_err(|e| format!("rename {} -> {}: {e}", tmp.display(), path.display()))?;
-    Ok(())
+    sync_parent_dir(path)
+}
+
+fn sync_parent_dir(path: &Path) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("{} has no parent directory", path.display()))?;
+    let dir = File::open(parent).map_err(|e| format!("open directory {}: {e}", parent.display()))?;
+    dir.sync_all()
+        .map_err(|e| format!("sync directory {}: {e}", parent.display()))
 }
 
 #[cfg(test)]
@@ -424,6 +437,7 @@ mod tests {
         assert_eq!(second.receipt.machine_visual_seed, seed);
         assert_eq!(second.receipt.previous_termination, PreviousTermination::CleanReboot);
         assert_eq!(second.receipt.previous_uptime_secs, 42);
+        assert!(!store.clean_marker_path().exists());
     }
 
     #[test]
