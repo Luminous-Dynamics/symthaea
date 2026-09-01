@@ -18,7 +18,7 @@
     "analysis_contract": "VART_WORLD_CREATIVE_001_PILOT_ANALYSIS.json",
     "metric_definitions": "VART_WORLD_CREATIVE_001_PILOT_METRICS.json"
   },
-  "verifier_path": "../../scripts/verify_vart_world_creative_001.py",
+  "verifier_path": "../../scripts/verify_vart_world_creative_001_pilot.py",
   "runtime_argv": [
     "__REPLACE_WITH_LOCAL_VART_TRIAL_ENTRYPOINT__"
   ],
