@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "symthaea.vart-world-creative-001.trial-manifest.v1",
+  "title": "VART-WORLD-CREATIVE-001 Trial Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "experiment_id",
+    "campaign",
+    "trial_id",
+    "paired_block_id",
+    "policy",
+    "policy_sha256",
+    "world_fixture_sha256",
+    "seed",
+    "revision_index",
+    "world_version_before",
+    "experience_episode_sha256",
+    "revision_hypothesis_sha256",
+    "candidate_set_sha256",
+    "admissible_candidate_count",
+    "selected_proposal_sha256",
+    "selection_index",
+    "applied_receipt_sha256",
+    "world_version_after",
+    "revisit_observation_sha256",
+    "revision_outcome_sha256",
+    "included_in_confirmatory_analysis",
+    "trial_state",
+    "evidence_bundle_sha256"
+  ],
+  "properties": {
+    "schema": {"const": "symthaea.vart-world-creative-001.trial-manifest.v1"},
+    "experiment_id": {"const": "VART-WORLD-CREATIVE-001"},
+    "campaign": {"enum": ["pilot", "confirmatory_longitudinal", "confirmatory_generalization", "confirmatory_adversarial"]},
+    "trial_id": {"type": "string", "minLength": 1},
+    "paired_block_id": {"type": "string", "minLength": 1},
+    "policy": {"enum": ["full_symthaea", "random_valid", "heuristic", "no_embodied_experience", "no_persistent_memory", "no_depth", "no_counterfactual_evaluation", "no_independent_proposal_replay", "no_reality_ledger_context", "random_valid_judgment", "external_model", "human"]},
+    "policy_sha256": {"$ref": "#/$defs/sha256"},
+    "world_fixture_sha256": {"$ref": "#/$defs/sha256"},
+    "seed": {"type": "integer", "minimum": 0},
+    "revision_index": {"type": "integer", "minimum": 0},
+    "world_version_before": {"type": "string", "minLength": 1},
+    "experience_episode_sha256": {"$ref": "#/$defs/sha256"},
+    "revision_hypothesis_sha256": {"$ref": "#/$defs/sha256"},
+    "candidate_set_sha256": {"$ref": "#/$defs/sha256"},
+    "admissible_candidate_count": {"type": "integer", "minimum": 1},
+    "selected_proposal_sha256": {"$ref": "#/$defs/sha256"},
+    "selection_index": {"type": "integer", "minimum": 0},
+    "random_draw_receipt_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "applied_receipt_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "world_version_after": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+    "revisit_observation_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "revision_outcome_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "included_in_confirmatory_analysis": {"type": "boolean"},
+    "exclusion_reason": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+    "trial_state": {"enum": ["complete", "aborted", "invalid_integrity", "missing_evidence"]},
+    "abort_stage": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+    "integrity_violations": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "metric_definition_set_sha256": {"$ref": "#/$defs/sha256"},
+    "analysis_contract_sha256": {"$ref": "#/$defs/sha256"},
+    "evidence_bundle_sha256": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"campaign": {"const": "pilot"}}},
+      "then": {"properties": {"included_in_confirmatory_analysis": {"const": false}}}
+    },
+    {
+      "if": {"properties": {"policy": {"const": "random_valid"}}},
+      "then": {"required": ["random_draw_receipt_sha256"]}
+    },
+    {
+      "if": {"properties": {"trial_state": {"const": "complete"}}},
+      "then": {
+        "properties": {
+          "applied_receipt_sha256": {"$ref": "#/$defs/sha256"},
+          "world_version_after": {"type": "string", "minLength": 1},
+          "revisit_observation_sha256": {"$ref": "#/$defs/sha256"},
+          "revision_outcome_sha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    }
+  ]
+}
