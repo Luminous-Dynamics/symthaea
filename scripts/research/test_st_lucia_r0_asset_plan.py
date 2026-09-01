@@ -10,18 +10,48 @@ def _asset(href: str):
     return {"href": href, "type": "application/octet-stream", "roles": ["data"]}
 
 
+def _self_link(collection: str, item_id: str, host: str = plan.APPROVED_STAC_HOST):
+    return {
+        "rel": "self",
+        "href": f"https://{host}/v1/collections/{collection}/items/{item_id}",
+        "type": "application/geo+json",
+    }
+
+
 def _s2_item(item_id: str):
-    assets = {key: _asset(f"https://example.invalid/{item_id}/{key}") for key in plan.S2_SCIENCE_ASSETS + plan.S2_METADATA_ASSETS}
-    assets["thumbnail"] = _asset(f"https://example.invalid/{item_id}/thumbnail")
-    assets["Product"] = _asset(f"https://example.invalid/{item_id}/Product")
-    return {"type": "Feature", "id": item_id, "collection": "sentinel-2-l2a", "properties": {}, "assets": assets}
+    collection = "sentinel-2-l2a"
+    assets = {
+        key: _asset(f"https://{plan.APPROVED_STAC_HOST}/v1/assets/{item_id}/{key}")
+        for key in plan.S2_SCIENCE_ASSETS + plan.S2_METADATA_ASSETS
+    }
+    assets["thumbnail"] = _asset(f"https://{plan.APPROVED_STAC_HOST}/v1/assets/{item_id}/thumbnail")
+    assets["Product"] = _asset(f"https://{plan.APPROVED_STAC_HOST}/v1/assets/{item_id}/Product")
+    return {
+        "type": "Feature",
+        "id": item_id,
+        "collection": collection,
+        "properties": {},
+        "links": [_self_link(collection, item_id)],
+        "assets": assets,
+    }
 
 
 def _s1_item(item_id: str):
-    assets = {key: _asset(f"https://example.invalid/{item_id}/{key}") for key in plan.S1_SCIENCE_ASSETS + plan.S1_METADATA_ASSETS}
-    assets["thumbnail"] = _asset(f"https://example.invalid/{item_id}/thumbnail")
-    assets["Product"] = _asset(f"https://example.invalid/{item_id}/Product")
-    return {"type": "Feature", "id": item_id, "collection": "sentinel-1-grd", "properties": {}, "assets": assets}
+    collection = "sentinel-1-grd"
+    assets = {
+        key: _asset(f"https://{plan.APPROVED_STAC_HOST}/v1/assets/{item_id}/{key}")
+        for key in plan.S1_SCIENCE_ASSETS + plan.S1_METADATA_ASSETS
+    }
+    assets["thumbnail"] = _asset(f"https://{plan.APPROVED_STAC_HOST}/v1/assets/{item_id}/thumbnail")
+    assets["Product"] = _asset(f"https://{plan.APPROVED_STAC_HOST}/v1/assets/{item_id}/Product")
+    return {
+        "type": "Feature",
+        "id": item_id,
+        "collection": collection,
+        "properties": {},
+        "links": [_self_link(collection, item_id)],
+        "assets": assets,
+    }
 
 
 class AssetPlannerTests(unittest.TestCase):
@@ -31,9 +61,46 @@ class AssetPlannerTests(unittest.TestCase):
         self.assertIn("SCL_20m", selected)
         self.assertIn("schema-calibration-vv", selected)
 
-    def test_asset_entry_requires_https(self):
+    def test_asset_entry_rejects_http(self):
         item = _s2_item(plan.EXPECTED_S2_IDS[0])
-        item["assets"]["B03_10m"]["href"] = "http://example.invalid/B03"
+        item["assets"]["B03_10m"]["href"] = "http://stac.dataspace.copernicus.eu/B03"
+        with self.assertRaises(plan.PlanError):
+            plan.asset_entry(item, "B03_10m", "science-payload")
+
+    def test_asset_entry_rejects_absolute_off_origin(self):
+        item = _s2_item(plan.EXPECTED_S2_IDS[0])
+        item["assets"]["B03_10m"]["href"] = "https://evil.invalid/B03"
+        with self.assertRaises(plan.PlanError):
+            plan.asset_entry(item, "B03_10m", "science-payload")
+
+    def test_relative_href_resolves_against_unique_item_self_link(self):
+        item = _s2_item(plan.EXPECTED_S2_IDS[0])
+        item["assets"]["B03_10m"]["href"] = "./assets/B03_10m.tif"
+        entry = plan.asset_entry(item, "B03_10m", "science-payload")
+        self.assertEqual("./assets/B03_10m.tif", entry["stac_href"])
+        self.assertEqual(
+            f"https://{plan.APPROVED_STAC_HOST}/v1/collections/sentinel-2-l2a/items/assets/B03_10m.tif",
+            entry["href"],
+        )
+        self.assertEqual(item["links"][0]["href"], entry["href_resolution_base"])
+
+    def test_relative_href_without_self_link_fails_closed(self):
+        item = _s2_item(plan.EXPECTED_S2_IDS[0])
+        item["links"] = []
+        item["assets"]["B03_10m"]["href"] = "./B03_10m.tif"
+        with self.assertRaises(plan.PlanError):
+            plan.asset_entry(item, "B03_10m", "science-payload")
+
+    def test_relative_href_with_off_origin_self_link_fails_closed(self):
+        item = _s2_item(plan.EXPECTED_S2_IDS[0])
+        item["links"] = [_self_link("sentinel-2-l2a", item["id"], host="evil.invalid")]
+        item["assets"]["B03_10m"]["href"] = "./B03_10m.tif"
+        with self.assertRaises(plan.PlanError):
+            plan.asset_entry(item, "B03_10m", "science-payload")
+
+    def test_scheme_relative_off_origin_escape_fails_closed(self):
+        item = _s2_item(plan.EXPECTED_S2_IDS[0])
+        item["assets"]["B03_10m"]["href"] = "//evil.invalid/B03_10m.tif"
         with self.assertRaises(plan.PlanError):
             plan.asset_entry(item, "B03_10m", "science-payload")
 
