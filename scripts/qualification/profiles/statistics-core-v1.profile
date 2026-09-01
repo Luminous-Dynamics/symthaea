@@ -8,6 +8,7 @@ hash=Cargo.lock
 hash=rust-toolchain.toml
 hash=flake.lock
 hash=crates/domains/symthaea-statistics/Cargo.toml
+hash=.github/workflows/statistics-core.yml
 step=metadata
 step=fmt-statistics
 step=test-statistics

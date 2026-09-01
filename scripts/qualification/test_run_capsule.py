@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 import run_capsule as rc
@@ -63,6 +64,20 @@ class CapsuleTests(unittest.TestCase):
         ):
             self.assertEqual(rc.origin_repo(value), expected)
         self.assertIsNone(rc.origin_repo("https://example.com/Luminous-Dynamics/symthaea"))
+
+    def test_child_environment_strips_common_credentials(self):
+        with patch.dict(os.environ, {
+            "GH_TOKEN": "secret",
+            "AWS_ACCESS_KEY_ID": "secret",
+            "NIX_CONFIG": "access-tokens = secret",
+            "QUALIFICATION_SAFE_VALUE": "visible",
+        }, clear=False):
+            env, removed = rc.child_env()
+            self.assertNotIn("GH_TOKEN", env)
+            self.assertNotIn("AWS_ACCESS_KEY_ID", env)
+            self.assertNotIn("NIX_CONFIG", env)
+            self.assertEqual(env["QUALIFICATION_SAFE_VALUE"], "visible")
+            self.assertIn("GH_TOKEN", removed)
 
     def test_profile_rejects_step_substitution(self):
         with tempfile.TemporaryDirectory() as td:

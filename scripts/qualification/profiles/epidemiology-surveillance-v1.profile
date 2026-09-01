@@ -9,6 +9,7 @@ hash=rust-toolchain.toml
 hash=flake.lock
 hash=crates/domains/symthaea-epidemiology/Cargo.toml
 hash=crates/domains/symthaea-statistics/Cargo.toml
+hash=.github/workflows/epidemiology-surveillance.yml
 step=metadata
 step=fmt-epidemiology
 step=test-epidemiology

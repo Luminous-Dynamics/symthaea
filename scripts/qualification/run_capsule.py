@@ -16,7 +16,35 @@ EXECUTORS = {"LOCAL_NIX", "GITHUB_HOSTED", "SELF_HOSTED_CI"}
 SAFE_ENV = (
     "PATH", "RUSTFLAGS", "RUSTDOCFLAGS", "CARGO_ENCODED_RUSTFLAGS",
     "CARGO_HOME", "CARGO_TARGET_DIR", "RUSTUP_TOOLCHAIN", "NIX_PATH",
+    "IN_NIX_SHELL", "GITHUB_ACTIONS", "RUNNER_ENVIRONMENT",
 )
+SENSITIVE_MARKERS = (
+    "TOKEN", "SECRET", "PASSWORD", "PASSWD", "API_KEY", "ACCESS_KEY",
+    "PRIVATE_KEY", "CREDENTIAL", "COOKIE", "SESSION",
+)
+SENSITIVE_EXACT = {
+    "SSH_AUTH_SOCK", "SSH_ASKPASS", "GIT_ASKPASS", "GPG_AGENT_INFO",
+    "NIX_CONFIG", "NETRC",
+}
+
+def child_env():
+    """Copy the build environment while removing common credential channels."""
+    clean = {}
+    removed = []
+    for name, value in os.environ.items():
+        upper = name.upper()
+        sensitive = (
+            upper in SENSITIVE_EXACT
+            or any(marker in upper for marker in SENSITIVE_MARKERS)
+            or upper.startswith(("AWS_", "AZURE_", "GOOGLE_"))
+        )
+        if sensitive:
+            removed.append(name)
+        else:
+            clean[name] = value
+    clean["CARGO_TERM_COLOR"] = "never"
+    clean["RUST_BACKTRACE"] = "1"
+    return clean, tuple(sorted(removed))
 
 STEP_ARGV = {
     "metadata": ("cargo", "metadata", "--locked", "--format-version", "1"),
@@ -63,9 +91,7 @@ def file_sha(path: Path):
     return h.hexdigest()
 
 def proc(argv, cwd, timeout=None):
-    env = os.environ.copy()
-    env["CARGO_TERM_COLOR"] = "never"
-    env["RUST_BACKTRACE"] = "1"
+    env, _ = child_env()
     return subprocess.run(list(argv), cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                           timeout=timeout, check=False, env=env)
 
@@ -225,11 +251,14 @@ def execute(args):
     if shutil.which("nix"):
         n = proc(("nix","--version"), root, timeout=30)
         if n.returncode == 0: nix = n.stdout.decode("utf-8","replace").strip()
+    _, removed_env = child_env()
     env = [
         f"executor={args.executor}", f"python={platform.python_version()}",
         f"platform={platform.platform()}", f"machine={platform.machine()}",
         f"rustc_stdout_sha256={sha(rustc.stdout)}", f"cargo_stdout_sha256={sha(cargo.stdout)}",
         f"nix_version_sha256={sha(nix.encode())}",
+        f"sanitized_env.removed_count={len(removed_env)}",
+        f"sanitized_env.removed_names_sha256={sha(chr(0).join(removed_env).encode())}",
     ]
     for name in SAFE_ENV:
         value = os.environ.get(name)
