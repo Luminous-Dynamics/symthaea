@@ -15,7 +15,8 @@ Do not let a candidate called “regulatory improvement” silently choose:
 - how channels are projected/reduced into a scalar or vector;
 - how burden is aggregated over time;
 - which forecast policy is used;
-- what information class is permitted.
+- what information class is permitted;
+- whether the candidate uses only current native state or externally replayed history.
 
 Represent these as explicit factors.
 
@@ -29,6 +30,7 @@ A future `CandidateCoordinate` should bind at least:
 - `temporal_aggregation`;
 - `forecast_policy` when applicable;
 - `information_class`;
+- `history_access_basis`;
 - `availability_rule`;
 - `numeric_contract_version`.
 
@@ -118,7 +120,21 @@ Use explicit authority/execution classes:
 
 Changing information class changes candidate identity even if the numerical expression is otherwise identical.
 
-## 9. Compatibility matrix
+## 9. History access basis
+
+From `V02_HISTORY_STATE_SUFFICIENCY.md`:
+
+- `H0CurrentNativeStateOnly` — current validated native state/configuration plus other explicitly current allowed inputs only;
+- `H1ReplayedPrefixHistory` — immutable execution-prefix history is consumed by the external observatory;
+- `H2NativePersistedMemory` — reserved for a future separately qualified native memory/state mechanism; unavailable to initial v0.2;
+- `H3RetrospectiveHistory` — realized post-cut-point history; diagnostic only;
+- `H4OracleFuture` — future information; oracle diagnostic only.
+
+`H1` is still prefix-causal when it uses only history through the cut point, but it supports a different claim from `H0`. It shows that prior trace history helps an external observable, not that the native regulator itself stores that history.
+
+Changing history window, reset semantics, forgetting factor, or sufficient-statistic definition changes candidate identity.
+
+## 10. Compatibility matrix
 
 A future candidate-registry validator should enforce an explicit compatibility table.
 
@@ -133,27 +149,32 @@ Examples:
 - `A1SingleChannel` cannot normalize across unrelated channels;
 - `A6ThreatenedSubsetDiagnostic` is invalid when subset membership depends on future, post-run exclusion, semantic arm identity, or unblinded interpretation;
 - `A5BreachBreadth` cannot claim continuous severity without an additional declared input;
+- `H0CurrentNativeStateOnly` cannot require an arbitrary earlier trace window;
+- `H1ReplayedPrefixHistory` must declare the exact allowed history window/aggregation rule;
+- `H2NativePersistedMemory` is invalid in initial v0.2;
+- `H3RetrospectiveHistory` requires retrospective information authority;
+- `H4OracleFuture` requires oracle information authority;
 - `OracleDiagnostic` candidates cannot be marked primary endogenous candidates;
 - `OnlinePrefixCausalShadow` cannot become confirmatory-primary until its offline equivalence gate is qualified.
 
 The compatibility table itself is versioned evidence-critical design.
 
-## 10. Candidate ID rule
+## 11. Candidate ID rule
 
-Human-readable IDs should expose the coordinate enough to prevent accidental confusion, while the canonical manifest remains authoritative.
+Human-readable IDs should expose enough of the coordinate to prevent accidental confusion, while the canonical manifest remains authoritative.
 
 Example forms:
 
-- `r1_w1_a3_t0_viability_mean_change_v1`
-- `r1_w1_a4_t0_viability_sum_change_v1`
-- `r4_w2_a3_t1_legacy_rolling_mean_change_v1`
-- `r4_w1_a4_t2_viability_cumulative_sum_change_v1`
-- `u1_w0_a2_t8_first_breach_latency_v1`
-- `r0_w3_a3_t0_confidence_mean_v1`
+- `r0_w1_a3_t0_h0_viability_mean_v1`
+- `r1_w1_a3_t0_h1_history_change_v1`
+- `r4_w2_a3_t1_h1_legacy_rolling_mean_change_v1`
+- `r4_w1_a4_t2_h1_viability_cumulative_sum_change_v1`
+- `u1_w0_a2_t8_h0_first_breach_latency_v1`
+- `r0_w3_a3_t0_h0_confidence_mean_v1`
 
 Do not encode interpretation-bearing terms such as `valence`, `fear`, `sadness`, `mood`, or `pain` into v0.2 candidate IDs.
 
-## 11. Candidate-set generation is closed, not Cartesian by default
+## 12. Candidate-set generation is closed, not Cartesian by default
 
 The factor axes define a design space, but v0.2 must not automatically compute every possible Cartesian combination.
 
@@ -168,7 +189,7 @@ Reasons:
 
 The factor coordinate helps explain why each chosen candidate exists; it does not authorize unbounded candidate generation.
 
-## 12. Identifiability requirement
+## 13. Identifiability requirement
 
 A finite candidate set can still be poorly designed if its candidates are observationally redundant under the locked scenarios.
 
@@ -176,18 +197,20 @@ Before exploratory/confirmatory interpretation, apply `V02_IDENTIFIABILITY_AND_D
 
 - every required primary-vs-baseline comparison must have at least one registered discriminator;
 - candidate equivalence classes must be preserved rather than broken by interpretive preference;
-- the scenario/cut-point design matrix should isolate weighting, cross-channel aggregation, temporal aggregation, relation, and forecast-policy axes where possible;
+- the scenario/cut-point design matrix should isolate weighting, cross-channel aggregation, temporal aggregation, relation, forecast-policy, and history-access axes where possible;
+- H1 history-sensitive candidates intended to add information beyond current state must be tested against H0 current-state baselines on matched-current-state histories;
 - `InsufficientDiscrimination` is a valid design outcome.
 
 Candidate complexity cannot substitute for identifiability.
 
-## 13. Exploratory-to-confirmatory promotion
+## 14. Exploratory-to-confirmatory promotion
 
 Exploratory work may compare the locked finite candidate set.
 
 Before confirmatory work:
 
 - compute the locked candidate discrimination/equivalence report;
+- classify history-sensitive candidate gains as external-history gains unless H2 native memory exists in a later lineage;
 - choose the primary candidate by a prospectively declared exploratory selection/parsimony rule;
 - freeze its exact candidate definition and coordinate;
 - freeze required nuisance/baseline candidates;
@@ -198,7 +221,7 @@ A different coordinate that looks better after confirmatory unblinding motivates
 
 If the selected primary remains observationally equivalent to a simpler baseline under all registered discriminators, a claim of superiority over that baseline is not confirmatory-identifiable.
 
-## 14. Interaction tests
+## 15. Interaction tests
 
 The exploratory scenario program should contain factorial discriminators that isolate axes rather than only testing full candidate outputs.
 
@@ -208,13 +231,15 @@ At minimum:
 - healthy-channel dilution/denominator manipulations with deviated-channel state held fixed;
 - concentration/distribution manipulations that separate mean, sum, peak, vector, and breadth;
 - temporal-profile manipulations with weighting/aggregation inputs held fixed;
+- same-current-native-state / different-history manipulations separating H1 from H0;
+- restart-equivalence tests showing native future equality from matched complete state/config + identical future inputs;
 - forecast-policy disagreement with realized prefix held as comparable as possible;
 - relation-basis crossed-sign cases for R1/R2/R3/R4;
 - information-class suffix-mutation tests proving prefix-causal payload invariance.
 
 This supports mechanistic attribution when candidates disagree.
 
-## 15. Evidence identity
+## 16. Evidence identity
 
 The canonical candidate manifest should bind:
 
@@ -223,14 +248,15 @@ The canonical candidate manifest should bind:
 - exact weighting-decomposition contract digest/version;
 - exact channel-aggregation contract digest/version;
 - exact allostatic-exposure contract digest/version;
+- exact history/state-sufficiency contract digest/version;
 - exact temporal-alignment contract digest/version;
 - exact execution/information contract digest/version;
 - exact formula/fixtures/implementation identity.
 
 Changing any coordinate field changes candidate identity even if an accidental numerical coincidence leaves one fixture unchanged.
 
-## 16. Claim boundary
+## 17. Claim boundary
 
-A factorized candidate space makes the experiment easier to audit and helps explain whether observed structure comes from relation semantics, weighting, cross-channel reduction, temporal integration, forecast assumptions, or information authority.
+A factorized candidate space makes the experiment easier to audit and helps explain whether observed structure comes from relation semantics, weighting, cross-channel reduction, temporal integration, forecast assumptions, information authority, or external history access.
 
-It does not establish that any coordinate corresponds to emotion, valence, mood, suffering, sentience, or consciousness.
+It does not establish that any coordinate corresponds to emotion, valence, mood, suffering, sentience, consciousness, or native memory.
