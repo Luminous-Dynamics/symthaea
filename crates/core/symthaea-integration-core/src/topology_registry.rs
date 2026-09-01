@@ -5,14 +5,42 @@
 //! This keeps topology on the same trust path as observations and identity:
 //! the discoverer must already be registered, the request is validated, the
 //! returned integration identity must match the registry slot, and topology
-//! limits are applied independently of adapter code.
+//! limits are applied independently of adapter code. Exhaustive/complete
+//! discovery is a separate named capability so partial replay cannot silently
+//! turn missing objects into negative evidence.
 
 use crate::{
-    DiscoveryRequest, DiscoverySnapshot, IntegrationError, IntegrationFuture, IntegrationId,
-    IntegrationRegistry, TopologyLimits,
+    COMPLETE_DISCOVERY_CAPABILITY, DiscoveryRequest, DiscoverySnapshot, IntegrationError,
+    IntegrationFuture, IntegrationId, IntegrationRegistry, TopologyLimits,
 };
 
 impl IntegrationRegistry {
+    /// Validate a discovery request against the registered adapter's declared
+    /// epistemic capability before invoking it.
+    pub fn admit_discovery_request(
+        &self,
+        id: &IntegrationId,
+        request: &DiscoveryRequest,
+    ) -> Result<(), IntegrationError> {
+        request.validate()?;
+        let manifest = self.manifest(id).ok_or_else(|| {
+            IntegrationError::Unsupported(format!(
+                "no registered integration manifest for `{id}`"
+            ))
+        })?;
+        if self.discoverer(id).is_none() {
+            return Err(IntegrationError::Unsupported(format!(
+                "no discoverer registered for integration `{id}`"
+            )));
+        }
+        if request.require_complete && !manifest.declares(COMPLETE_DISCOVERY_CAPABILITY) {
+            return Err(IntegrationError::Unsupported(format!(
+                "integration `{id}` is not qualified for complete discovery; absence must remain unknown"
+            )));
+        }
+        Ok(())
+    }
+
     /// Validate an already-produced discovery snapshot against a registry slot
     /// and the conservative default topology budget.
     pub fn admit_discovery_snapshot(
@@ -51,11 +79,12 @@ impl IntegrationRegistry {
         request: DiscoveryRequest,
         limits: TopologyLimits,
     ) -> IntegrationFuture<'a, Result<DiscoverySnapshot, IntegrationError>> {
+        let request_admission = self.admit_discovery_request(id, &request);
         let discoverer = self.discoverer(id).cloned();
         let integration_id = id.clone();
 
         Box::pin(async move {
-            request.validate()?;
+            request_admission?;
             let discoverer = discoverer.ok_or_else(|| {
                 IntegrationError::Unsupported(format!(
                     "no discoverer registered for integration `{integration_id}`"
@@ -138,7 +167,25 @@ mod tests {
         }
     }
 
-    fn manifest() -> IntegrationManifest {
+    fn manifest(complete: bool) -> IntegrationManifest {
+        let mut capabilities = vec![CapabilityDeclaration {
+            name: "discover.fixture.topology".into(),
+            class: CapabilityClass::Discover,
+            access: AccessMode::ReadOnly,
+            risk: RiskClass::ReadOnly,
+            reversible: false,
+            default_enabled: true,
+        }];
+        if complete {
+            capabilities.push(CapabilityDeclaration {
+                name: COMPLETE_DISCOVERY_CAPABILITY.into(),
+                class: CapabilityClass::Discover,
+                access: AccessMode::ReadOnly,
+                risk: RiskClass::ReadOnly,
+                reversible: false,
+                default_enabled: true,
+            });
+        }
         IntegrationManifest {
             schema_version: INTEGRATION_MANIFEST_SCHEMA_VERSION,
             id: IntegrationId::new("fixture-topology"),
@@ -147,32 +194,57 @@ mod tests {
             provider: "test".into(),
             protocols: vec!["fixture".into()],
             entity_kinds: vec!["host".into()],
-            capabilities: vec![CapabilityDeclaration {
-                name: "discover.fixture.topology".into(),
-                class: CapabilityClass::Discover,
-                access: AccessMode::ReadOnly,
-                risk: RiskClass::ReadOnly,
-                reversible: false,
-                default_enabled: true,
-            }],
+            capabilities,
             credentials: vec![],
             maturity: MaturityLevel::E1FixtureParsing,
             default_read_only: true,
         }
     }
 
+    fn integration(complete: bool) -> Arc<FixtureDiscoverer> {
+        Arc::new(FixtureDiscoverer {
+            manifest: manifest(complete),
+            integration_id_override: None,
+            entity_count: 1,
+        })
+    }
+
+    #[test]
+    fn partial_discoverer_cannot_claim_complete_absence_semantics() {
+        let mut registry = IntegrationRegistry::new();
+        registry.register_discoverer(integration(false)).unwrap();
+        let request = DiscoveryRequest {
+            require_complete: true,
+            ..Default::default()
+        };
+        assert!(matches!(
+            registry.admit_discovery_request(&IntegrationId::new("fixture-topology"), &request),
+            Err(IntegrationError::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn explicitly_qualified_discoverer_may_accept_complete_request() {
+        let mut registry = IntegrationRegistry::new();
+        registry.register_discoverer(integration(true)).unwrap();
+        let request = DiscoveryRequest {
+            require_complete: true,
+            ..Default::default()
+        };
+        assert!(registry
+            .admit_discovery_request(&IntegrationId::new("fixture-topology"), &request)
+            .is_ok());
+    }
+
     #[test]
     fn source_identity_is_bound_to_registry_slot() {
         let integration = Arc::new(FixtureDiscoverer {
-            manifest: manifest(),
+            manifest: manifest(false),
             integration_id_override: Some("other-source".into()),
             entity_count: 1,
         });
         let mut registry = IntegrationRegistry::new();
-        registry.register_discoverer(integration.clone()).unwrap();
-        let snapshot = integration
-            .discover(DiscoveryRequest::default());
-        let _ = snapshot;
+        registry.register_discoverer(integration).unwrap();
 
         let wrong = DiscoverySnapshot {
             integration_id: "other-source".into(),
@@ -188,13 +260,8 @@ mod tests {
 
     #[test]
     fn central_entity_budget_rejects_oversized_snapshot() {
-        let integration = Arc::new(FixtureDiscoverer {
-            manifest: manifest(),
-            integration_id_override: None,
-            entity_count: 2,
-        });
         let mut registry = IntegrationRegistry::new();
-        registry.register_discoverer(integration).unwrap();
+        registry.register_discoverer(integration(false)).unwrap();
 
         let snapshot = DiscoverySnapshot {
             integration_id: "fixture-topology".into(),
