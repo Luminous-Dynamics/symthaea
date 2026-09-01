@@ -124,6 +124,8 @@ The machine-readable receipt must expose:
 - selected S1 item ID or explicit null;
 - receipt SHA-256.
 
+The selected item IDs are pointers into the retained, content-addressed raw STAC pages. They are not standalone evidence. Review must resolve each selected ID back to the exact item metadata preserved inside the corresponding catalogue snapshot before any asset is downloaded.
+
 The complete raw item metadata remains in the retained STAC pages. This includes orbit/platform/processing metadata exposed by the catalogue even when those fields are not product-selection criteria.
 
 The receipt is not a claim that raster bytes were downloaded or that the selected catalogue record is scientifically valid ground truth.
@@ -155,7 +157,8 @@ Do **not** download selected product assets until reviewers have checked:
 4. all pagination pages are present and hashed;
 5. candidate ordering reproduces from the retained pages;
 6. selection follows the frozen rule exactly;
-7. no preview/quicklook inspection influenced selection;
-8. null/failure states, if any, are retained rather than relaxed post hoc.
+7. selected IDs resolve to exact retained item metadata;
+8. no preview/quicklook inspection influenced selection;
+9. null/failure states, if any, are retained rather than relaxed post hoc.
 
 Only then may a separate evidence step acquire exact source assets and bind their byte digests into PP-05 / #202 lineage.
