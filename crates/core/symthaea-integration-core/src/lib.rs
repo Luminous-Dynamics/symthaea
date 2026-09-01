@@ -73,7 +73,8 @@ pub use resolution::{
 };
 pub use resolution_pipeline::{
     ResolutionPipelineError, resolve_registry_identity_snapshots,
-    resolve_registry_identity_snapshots_with_limits, source_qualified_claim_id,
+    resolve_registry_identity_snapshots_with_limits, resolve_registry_kubernetes_uid_snapshots,
+    resolve_registry_kubernetes_uid_snapshots_with_limits, source_qualified_claim_id,
 };
 pub use semantic_identity::{
     K8S_CLUSTER_UID_SCHEME, K8S_CRONJOB_UID_SCHEME, K8S_DAEMONSET_UID_SCHEME,
