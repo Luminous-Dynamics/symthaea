@@ -48,6 +48,16 @@ https://stac.dataspace.copernicus.eu/v1/
 
 The legacy CDSE STAC endpoint must not be substituted silently. The exact endpoint, query and canonical response snapshot/digest must be retained with discovery evidence.
 
+The first execution is bound to:
+
+```text
+scripts/research/st_lucia_stac_discovery.py
+schema       symthaea-st-lucia-stac-discovery/v1
+tool_version 1.1.0
+```
+
+and the execution/review contract in `ST_LUCIA_STAC_DISCOVERY_EXECUTION_V1.md`. An ad-hoc notebook or alternate catalogue client must not silently replace the frozen runner after product previews or IDs are visible.
+
 ## Sentinel-2 L2A selection
 
 Collection:
@@ -69,14 +79,14 @@ An item is eligible only when all of the following hold:
 2. it is Sentinel-2 Level-2A;
 3. catalogue `eo:cloud_cover <= 20`;
 4. acquisition is inside the frozen interval;
-5. the required optical bands for the first deterministic baseline are available.
+5. the required optical bands for the first deterministic baseline are available (`B03`, `B04`, `B08`, `B11`, `B12`).
 
 Selection among eligible items is deterministic:
 
 1. earliest acquisition datetime;
 2. lexicographically smallest STAC item ID as an exact-time tie-break.
 
-Do not inspect previews and choose the visually clearest scene. If no item qualifies, record `no-eligible-item`. Any relaxation of cloud threshold or time interval requires a prospective protocol amendment before another search.
+Do not inspect previews and choose the visually clearest scene. If no item qualifies in the exhaustively retained catalogue snapshot, record `no-eligible-item-visible`. Any relaxation of cloud threshold, time interval, band requirement, site, or catalogue source requires a prospective protocol amendment before another search.
 
 ## Sentinel-1 GRD pairing
 
@@ -90,8 +100,8 @@ Only after the S2 item is frozen, identify S1 candidates that:
 
 1. intersect the same discovery bbox;
 2. are GRD products;
-3. use IW mode where represented/available under the catalogue contract;
-4. contain the required VV/VH channels for the planned baseline where available;
+3. use `sar:instrument_mode = IW`;
+4. contain both `VV` and `VH` in `sar:polarizations`;
 5. occur within ±72 hours of the frozen S2 acquisition.
 
 Selection order:
@@ -100,7 +110,7 @@ Selection order:
 2. earlier acquisition wins an exact time-distance tie;
 3. lexicographically smallest STAC item ID is the final tie-break.
 
-Orbit direction is recorded but not post-hoc selected in v1. If no candidate satisfies the frozen rules, retain `no-eligible-item` and amend prospectively rather than browsing for a convenient scene.
+Orbit direction is recorded from the retained item metadata but not post-hoc selected in v1. If no candidate satisfies the frozen rules, retain `no-eligible-item-visible` and amend prospectively rather than browsing for a convenient scene.
 
 ## Discovery evidence
 
@@ -108,15 +118,23 @@ Before downloading or processing raster payloads, retain and content-address:
 
 - exact STAC endpoint;
 - exact query parameters/filter expression;
-- canonical full query response snapshot;
-- response digest;
-- retrieval timestamp;
-- selection-algorithm version;
-- every eligible candidate item ID in canonical order;
-- selected item ID or explicit `no-eligible-item`;
-- catalogue/server version metadata if exposed.
+- every raw response page byte-for-byte;
+- per-page SHA-256 and byte length;
+- exhaustive pagination request chain;
+- catalogue-snapshot digest;
+- retrieval timestamps;
+- response/server headers exposed to the client;
+- selection-algorithm schema/version;
+- every candidate with eligibility/ineligibility reasons;
+- every eligible candidate ID in deterministic selection order;
+- selected item ID or explicit null state;
+- final discovery-receipt SHA-256.
 
-The raw catalogue snapshot is discovery evidence, not ground truth.
+Conflicting metadata for the same duplicate STAC item ID is a hard failure. Off-origin pagination and pagination request cycles are hard failures.
+
+The raw catalogue snapshot is discovery evidence, not ground truth. `no-eligible-item-visible` means no eligible record was visible through that exact frozen catalogue snapshot; it does not prove the satellite made no physical acquisition.
+
+After discovery, **stop before asset download** until the retained pages, hashes, protocol/runner identities and deterministic selection have been reviewed under `ST_LUCIA_STAC_DISCOVERY_EXECUTION_V1.md`.
 
 ## Separation of concerns
 
