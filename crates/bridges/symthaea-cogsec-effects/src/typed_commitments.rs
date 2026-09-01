@@ -5,8 +5,8 @@
 //! The reference monitor intentionally accepts the generic [`Digest32`] type so
 //! cryptography stays outside its logical TCB. Application code should not use
 //! that genericity as permission to mix unrelated commitments. This module keeps
-//! effect identity and protected-resource state identity distinct until the
-//! trusted adapter deliberately unwraps them at the monitor boundary.
+//! effect identity, effect taxonomy, and protected-resource state identity bound
+//! until the trusted adapter deliberately unwraps them at the monitor boundary.
 
 use std::collections::HashMap;
 use std::error::Error;
@@ -78,6 +78,19 @@ pub enum CanonicalEffectClassV1 {
 }
 
 impl CanonicalEffectClassV1 {
+    /// Protected resource materially changed by this exact effect class.
+    pub const fn resource(self) -> CanonicalResourceV1 {
+        match self {
+            Self::WorkingMemoryAdmit | Self::WorkingMemoryReplace => {
+                CanonicalResourceV1::WorkingMemory
+            }
+            Self::GraduationEnqueue => CanonicalResourceV1::GraduationQueue,
+            Self::ActiveStateReplace => CanonicalResourceV1::ActiveCognitiveState,
+            Self::GoalActivate => CanonicalResourceV1::GoalStore,
+            Self::AffectSet => CanonicalResourceV1::AffectiveState,
+        }
+    }
+
     /// Exact frozen-K0 mutation mapping when one exists without semantic coercion.
     ///
     /// `None` is intentional for compound WM replacement and active-state
@@ -222,6 +235,11 @@ impl EffectCommitmentV1 {
         self.class
     }
 
+    /// Protected resource changed by this effect.
+    pub const fn resource(&self) -> CanonicalResourceV1 {
+        self.class.resource()
+    }
+
     /// Exact frozen-K0 mutation class when one exists without semantic coercion.
     pub const fn k0_mutation_kind(&self) -> Option<MutationKind> {
         self.class.k0_mutation_kind()
@@ -336,6 +354,69 @@ impl ResourceStateCommitmentV1 {
     }
 }
 
+/// One effect commitment paired with the exact protected-resource pre-state it targets.
+///
+/// Construction fails if the effect class and state commitment name different
+/// resources. This remains ordinary canonical data; it is not an owner-issued
+/// trusted fact until the trusted adapter independently establishes the state
+/// commitment at the protected owner boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CanonicalTransitionCommitmentV1 {
+    class: CanonicalEffectClassV1,
+    resource: CanonicalResourceV1,
+    effect_digest: Digest32,
+    resource_state_digest: Digest32,
+}
+
+impl CanonicalTransitionCommitmentV1 {
+    /// Bind one exact effect to a pre-state commitment for the same resource.
+    pub fn bind(
+        effect: EffectCommitmentV1,
+        state: ResourceStateCommitmentV1,
+    ) -> Result<Self, TransitionCommitmentMismatch> {
+        let expected = effect.resource();
+        if state.resource() != expected {
+            return Err(TransitionCommitmentMismatch {
+                effect_resource: expected,
+                state_resource: state.resource(),
+            });
+        }
+        Ok(Self {
+            class: effect.class(),
+            resource: expected,
+            effect_digest: effect.digest(),
+            resource_state_digest: state
+                .digest_for(expected)
+                .expect("resource equality checked above"),
+        })
+    }
+
+    /// Exact effect class.
+    pub const fn effect_class(&self) -> CanonicalEffectClassV1 {
+        self.class
+    }
+
+    /// Exact protected resource.
+    pub const fn resource(&self) -> CanonicalResourceV1 {
+        self.resource
+    }
+
+    /// Frozen-K0 mutation kind if the exact effect has one.
+    pub const fn k0_mutation_kind(&self) -> Option<MutationKind> {
+        self.class.k0_mutation_kind()
+    }
+
+    /// Exact effect commitment for `MutationRequest::mutation_digest`.
+    pub const fn effect_digest(&self) -> Digest32 {
+        self.effect_digest
+    }
+
+    /// Exact pre-state commitment for the protected resource.
+    pub const fn resource_state_digest(&self) -> Digest32 {
+        self.resource_state_digest
+    }
+}
+
 /// A typed resource-state commitment was supplied for the wrong protected owner.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResourceCommitmentMismatch {
@@ -357,6 +438,28 @@ impl fmt::Display for ResourceCommitmentMismatch {
 }
 
 impl Error for ResourceCommitmentMismatch {}
+
+/// Effect and pre-state commitments name different protected resources.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TransitionCommitmentMismatch {
+    /// Resource implied by the exact effect class.
+    pub effect_resource: CanonicalResourceV1,
+    /// Resource carried by the state commitment.
+    pub state_resource: CanonicalResourceV1,
+}
+
+impl fmt::Display for TransitionCommitmentMismatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "effect targets {}, but state commitment is for {}",
+            self.effect_resource.resource_name(),
+            self.state_resource.resource_name()
+        )
+    }
+}
+
+impl Error for TransitionCommitmentMismatch {}
 
 #[cfg(test)]
 mod tests {
@@ -423,6 +526,35 @@ mod tests {
     }
 
     #[test]
+    fn transition_binding_rejects_effect_state_resource_mismatch() {
+        let effect = EffectCommitmentV1::affect_set(0.0, 0.2, 0.06);
+        let wrong_state = ResourceStateCommitmentV1::goal_store(&[]);
+        assert_eq!(
+            CanonicalTransitionCommitmentV1::bind(effect, wrong_state),
+            Err(TransitionCommitmentMismatch {
+                effect_resource: CanonicalResourceV1::AffectiveState,
+                state_resource: CanonicalResourceV1::GoalStore,
+            })
+        );
+    }
+
+    #[test]
+    fn transition_binding_preserves_effect_and_state_identity() {
+        let effect = EffectCommitmentV1::affect_set(0.0, 0.2, 0.06);
+        let effect_digest = effect.digest();
+        let state = ResourceStateCommitmentV1::affective_state(0.0);
+        let state_digest = state
+            .digest_for(CanonicalResourceV1::AffectiveState)
+            .unwrap();
+        let transition = CanonicalTransitionCommitmentV1::bind(effect, state).unwrap();
+
+        assert_eq!(transition.resource(), CanonicalResourceV1::AffectiveState);
+        assert_eq!(transition.effect_digest(), effect_digest);
+        assert_eq!(transition.resource_state_digest(), state_digest);
+        assert_eq!(transition.k0_mutation_kind(), Some(MutationKind::Affect));
+    }
+
+    #[test]
     fn resource_binding_rejects_cross_resource_substitution() {
         let commitment = ResourceStateCommitmentV1::affective_state(0.25);
         assert_eq!(
@@ -431,16 +563,6 @@ mod tests {
                 expected: CanonicalResourceV1::WorkingMemory,
                 observed: CanonicalResourceV1::AffectiveState,
             })
-        );
-    }
-
-    #[test]
-    fn resource_binding_allows_exact_resource() {
-        let commitment = ResourceStateCommitmentV1::affective_state(0.25);
-        assert!(
-            commitment
-                .digest_for(CanonicalResourceV1::AffectiveState)
-                .is_ok()
         );
     }
 
