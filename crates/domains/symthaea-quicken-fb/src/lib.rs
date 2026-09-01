@@ -8,10 +8,12 @@
 ///
 /// # Architecture
 ///
+/// - `boot_protocol` — fail-open typed boot telemetry consumer
 /// - `framebuffer` — DRM device management, dumb buffer allocation, mmap
 /// - `mycelium` — L-system branch growth, Bresenham rendering, node pulsing
 /// - `progress` — Named pipe reader for installer progress events
 /// - `color` — Solarpunk RGBA palette with interpolation and compositing
+pub mod boot_protocol;
 pub mod color;
 pub mod framebuffer;
 pub mod mycelium;
