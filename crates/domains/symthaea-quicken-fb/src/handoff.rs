@@ -91,6 +91,7 @@ fn saturating_micros(duration: Duration) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn reason_names_are_stable() {
@@ -108,5 +109,32 @@ mod tests {
         );
         assert_eq!(receipt.release_us, 42);
         assert_eq!(receipt.renderer_uptime_us, 9001);
+    }
+
+    #[test]
+    fn atomic_receipt_contains_version_and_reason() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "symthaea-handoff-test-{}-{nonce}",
+            std::process::id()
+        ));
+        let path = directory.join("released.json");
+
+        let receipt = DisplayReleaseReceipt::new(
+            Duration::from_micros(73),
+            Duration::from_millis(250),
+            ExitReason::Signal,
+        );
+        receipt.write_atomic(&path).unwrap();
+
+        let value: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        assert_eq!(value["version"], HANDOFF_RECEIPT_VERSION);
+        assert_eq!(value["reason"], "signal");
+        assert_eq!(value["release_us"], 73);
+
+        let _ = fs::remove_dir_all(directory);
     }
 }
