@@ -7,13 +7,17 @@
 ///
 /// # Architecture
 ///
-/// - `ecology_renderer` — deterministic state-aware procedural curve renderer
+/// - `ecology_renderer_base` — deterministic state-aware procedural curve renderer
+/// - `ecology_renderer` — holographic presentation wrapper used by live + preview paths
 /// - `preview` — exact offline frame capture using the same renderer
 /// - `framebuffer` — DRM device management, dumb buffer allocation, mmap
 /// - `mycelium` — legacy L-system renderer retained for compatibility
 /// - `progress` — optional named-pipe / disk-I/O progress events
 /// - `color` — Solarpunk RGBA palette with interpolation and compositing
 pub mod color;
+#[path = "ecology_renderer.rs"]
+pub mod ecology_renderer_base;
+#[path = "ecology_renderer_holo.rs"]
 pub mod ecology_renderer;
 pub mod framebuffer;
 pub mod mycelium;
