@@ -38,8 +38,8 @@ pub use identity::{
     SeparationClaim, assess_entity_pair,
 };
 pub use identity_provider::{
-    IdentityAdmissionError, IdentityLimits, IdentityProvider, IdentityRequest,
-    IdentitySnapshot, IdentitySnapshotError,
+    IDENTITY_DISCOVERY_CAPABILITY, IdentityAdmissionError, IdentityLimits, IdentityProvider,
+    IdentityRequest, IdentitySnapshot, IdentitySnapshotError,
 };
 pub use independence::{
     IndependenceAssessment, IndependenceAssessmentError, IndependenceMetadataConflict,
