@@ -13,12 +13,13 @@ import hashlib
 import json
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 Json = dict[str, Any]
 
 SCHEMA = "symthaea-st-lucia-r0-asset-plan/v1"
-TOOL_VERSION = "1.0.0"
+TOOL_VERSION = "1.1.0"
+APPROVED_STAC_HOST = "stac.dataspace.copernicus.eu"
 
 EXPECTED_DISCOVERY_FILE_SHA256 = (
     "bd1c91e4cb92bb6fe51c0b2ec819d7b5a87530b307dbdb4e35631f92f750efe0"
@@ -136,16 +137,65 @@ def index_items(page_paths: list[Path]) -> dict[str, Json]:
     return result
 
 
-def checked_https_href(item_id: str, asset_key: str, asset: Any) -> str:
+def checked_approved_https(url: str, label: str) -> str:
+    try:
+        parsed = urlparse(url)
+        port = parsed.port
+    except ValueError as exc:
+        raise PlanError(f"{label} has invalid URL syntax") from exc
+
+    if parsed.scheme.lower() != "https" or not parsed.hostname:
+        raise PlanError(f"{label} is not absolute HTTPS")
+    if parsed.username is not None or parsed.password is not None:
+        raise PlanError(f"{label} must not contain userinfo")
+    if parsed.hostname.lower().rstrip(".") != APPROVED_STAC_HOST:
+        raise PlanError(f"{label} is off approved CDSE STAC origin")
+    if port not in (None, 443):
+        raise PlanError(f"{label} uses a non-HTTPS-default port")
+    if parsed.fragment:
+        raise PlanError(f"{label} must not contain a URL fragment")
+    return url
+
+
+def item_self_href(item: Json) -> str:
+    item_id = item.get("id")
+    links = item.get("links")
+    if not isinstance(links, list):
+        raise PlanError(f"item {item_id} has no STAC links array for relative href resolution")
+
+    self_hrefs: list[str] = []
+    for link in links:
+        if not isinstance(link, dict) or link.get("rel") != "self":
+            continue
+        href = link.get("href")
+        if not isinstance(href, str) or not href:
+            raise PlanError(f"item {item_id} has an invalid self link")
+        if href not in self_hrefs:
+            self_hrefs.append(href)
+
+    if len(self_hrefs) != 1:
+        raise PlanError(f"item {item_id} must have exactly one unique self link for relative href resolution")
+
+    return checked_approved_https(self_hrefs[0], f"item {item_id} self href")
+
+
+def resolve_asset_href(item: Json, asset_key: str, asset: Any) -> tuple[str, str, str | None]:
+    item_id = item.get("id")
     if not isinstance(asset, dict):
         raise PlanError(f"asset {item_id}/{asset_key} is not an object")
-    href = asset.get("href")
-    if not isinstance(href, str) or not href:
+    raw_href = asset.get("href")
+    if not isinstance(raw_href, str) or not raw_href:
         raise PlanError(f"asset {item_id}/{asset_key} has no href")
-    parsed = urlparse(href)
-    if parsed.scheme.lower() != "https" or not parsed.netloc:
-        raise PlanError(f"asset {item_id}/{asset_key} href is not absolute HTTPS")
-    return href
+
+    parsed = urlparse(raw_href)
+    if parsed.scheme or parsed.netloc:
+        resolved = checked_approved_https(raw_href, f"asset {item_id}/{asset_key} href")
+        return raw_href, resolved, None
+
+    base = item_self_href(item)
+    resolved = urljoin(base, raw_href)
+    checked_approved_https(resolved, f"asset {item_id}/{asset_key} resolved href")
+    return raw_href, resolved, base
 
 
 def asset_entry(item: Json, asset_key: str, purpose: str) -> Json:
@@ -156,14 +206,16 @@ def asset_entry(item: Json, asset_key: str, purpose: str) -> Json:
     if not isinstance(assets, dict) or asset_key not in assets:
         raise PlanError(f"required asset missing: {item_id}/{asset_key}")
     asset = assets[asset_key]
-    href = checked_https_href(item_id, asset_key, asset)
+    raw_href, resolved_href, resolution_base = resolve_asset_href(item, asset_key, asset)
     return {
         "collection": item.get("collection"),
         "item_id": item_id,
         "item_sha256": sha256_bytes(canonical_json_bytes(item)),
         "asset_key": asset_key,
         "purpose": purpose,
-        "href": href,
+        "stac_href": raw_href,
+        "href": resolved_href,
+        "href_resolution_base": resolution_base,
         "media_type": asset.get("type") if isinstance(asset, dict) else None,
         "roles": asset.get("roles") if isinstance(asset, dict) else None,
         "title": asset.get("title") if isinstance(asset, dict) else None,
@@ -228,6 +280,7 @@ def build_plan(original_dir: Path, replay_path: Path) -> Json:
         "network_access": "forbidden-and-unused",
         "download_permitted_by_this_receipt": False,
         "claim_boundary": "exact asset selection and href freezing only; no asset bytes fetched",
+        "approved_stac_host": APPROVED_STAC_HOST,
         "original_discovery_receipt_file_sha256": EXPECTED_DISCOVERY_FILE_SHA256,
         "original_discovery_receipt_internal_sha256": EXPECTED_DISCOVERY_INTERNAL_SHA256,
         "acquisition_set_receipt_file_sha256": EXPECTED_REPLAY_FILE_SHA256,
