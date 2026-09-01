@@ -7,7 +7,7 @@ become a GITHUB_HOSTED pass merely because the same profile is used.
 from __future__ import annotations
 import argparse, hashlib, os, platform, shutil, subprocess, sys, time
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 SCHEMA = "symthaea-qualification-capsule-v1"
 PROFILE_MAGIC = "SYMTHAEA_QUALIFICATION_PROFILE_V1"
@@ -62,6 +62,11 @@ STEP_ARGV = {
                             "--all-targets", "--", "-D", "warnings"),
     "wasm-epidemiology": ("cargo", "check", "--locked", "-p", "symthaea-epidemiology",
                           "--target", "wasm32-unknown-unknown"),
+}
+PROFILE_SHA256 = {
+    "statistics-active-test-surface-v1": "bc8f93005a116800bdb583f0b7179c5a518fb38680ec8da12e55edf007427977",
+    "statistics-core-v1": "e6cb524e3f8ce7f58bfd75cc9e93b23003995e6260aa5fb15bb569b3bfbda8a0",
+    "epidemiology-surveillance-v1": "cffc8f1a11090904ce31bfd9c4fcc76dbede9fe8083ded63785eda98439beb9c",
 }
 CONTRACTS = {
     "statistics-active-test-surface-v1": (
@@ -121,6 +126,10 @@ def origin_repo(value: str):
 
 def parse_profile(path: Path):
     raw = path.read_bytes()
+    if b"\r" in raw:
+        raise CapsuleError("profile must use LF line endings only")
+    if not raw.endswith(b"\n"):
+        raise CapsuleError("profile must end with exactly one canonical LF-delimited line")
     try:
         lines = raw.decode("utf-8").splitlines()
     except UnicodeDecodeError as e:
@@ -130,6 +139,8 @@ def parse_profile(path: Path):
     scalars, hashes, steps = {}, [], []
     allowed = {"profile", "repository", "rust_channel", "timeout_seconds"}
     for n, line in enumerate(lines[1:], 2):
+        if line != line.strip():
+            raise CapsuleError(f"profile line {n}: leading/trailing whitespace is forbidden")
         if not line or line.startswith("#"):
             continue
         if "\t" in line or "\r" in line or "=" not in line:
@@ -142,6 +153,9 @@ def parse_profile(path: Path):
                 raise CapsuleError(f"profile line {n}: duplicate {key}")
             scalars[key] = value
         elif key == "hash":
+            posix = PurePosixPath(value)
+            if posix.is_absolute() or ".." in posix.parts or "." in posix.parts or "\\" in value:
+                raise CapsuleError(f"profile line {n}: hash path must stay inside repository")
             hashes.append(value)
         elif key == "step":
             steps.append(value)
@@ -153,6 +167,9 @@ def parse_profile(path: Path):
     name = scalars["profile"]
     if name not in CONTRACTS:
         raise CapsuleError(f"unknown profile {name!r}")
+    digest = sha(raw)
+    if digest != PROFILE_SHA256[name]:
+        raise CapsuleError(f"profile bytes do not match reviewed {name} digest: {digest}")
     if tuple(steps) != CONTRACTS[name]:
         raise CapsuleError("profile step sequence differs from runner's reviewed contract")
     if not hashes or len(hashes) != len(set(hashes)):
@@ -164,7 +181,7 @@ def parse_profile(path: Path):
     if timeout <= 0:
         raise CapsuleError("timeout_seconds must be positive")
     return {**scalars, "timeout_seconds": timeout, "hashes": tuple(hashes),
-            "steps": tuple(steps), "raw": raw, "sha256": sha(raw)}
+            "steps": tuple(steps), "raw": raw, "sha256": digest}
 
 def outside(output: Path, root: Path):
     o, r = output.resolve(), root.resolve()
@@ -254,6 +271,8 @@ def execute(args):
     _, removed_env = child_env()
     env = [
         f"executor={args.executor}", f"python={platform.python_version()}",
+        f"python_executable_path_sha256={sha(str(Path(sys.executable).resolve()).encode())}",
+        f"python_executable_sha256={file_sha(Path(sys.executable).resolve())}",
         f"platform={platform.platform()}", f"machine={platform.machine()}",
         f"rustc_stdout_sha256={sha(rustc.stdout)}", f"cargo_stdout_sha256={sha(cargo.stdout)}",
         f"nix_version_sha256={sha(nix.encode())}",

@@ -4,8 +4,8 @@ import shutil
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
 
 import run_capsule as rc
 
@@ -19,6 +19,7 @@ hash=Cargo.lock
 hash=rust-toolchain.toml
 hash=flake.lock
 hash=crates/domains/symthaea-statistics/Cargo.toml
+hash=.github/workflows/statistics-test-surface.yml
 step=metadata
 step=fmt-statistics
 step=test-statistics
@@ -43,8 +44,11 @@ def make_repo(base: Path):
     git(repo, "config", "user.email", "qualification@example.invalid")
     git(repo, "config", "user.name", "Qualification Test")
     git(repo, "remote", "add", "origin", "https://github.com/Luminous-Dynamics/symthaea.git")
-    for rel in ("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "flake.lock",
-                "crates/domains/symthaea-statistics/Cargo.toml"):
+    for rel in (
+        "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "flake.lock",
+        "crates/domains/symthaea-statistics/Cargo.toml",
+        ".github/workflows/statistics-test-surface.yml",
+    ):
         path = repo / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(rel + "\n", encoding="utf-8")
@@ -78,6 +82,29 @@ class CapsuleTests(unittest.TestCase):
             self.assertNotIn("NIX_CONFIG", env)
             self.assertEqual(env["QUALIFICATION_SAFE_VALUE"], "visible")
             self.assertIn("GH_TOKEN", removed)
+
+    def test_profile_rejects_raw_byte_tamper(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "profile"
+            p.write_text(PROFILE.replace("timeout_seconds=900", "timeout_seconds=901"),
+                         encoding="utf-8")
+            with self.assertRaises(rc.CapsuleError):
+                rc.parse_profile(p)
+
+    def test_profile_rejects_crlf(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "profile"
+            p.write_bytes(PROFILE.replace("\n", "\r\n").encode())
+            with self.assertRaises(rc.CapsuleError):
+                rc.parse_profile(p)
+
+    def test_profile_rejects_hash_path_escape(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "profile"
+            tampered = PROFILE.replace("hash=Cargo.toml", "hash=../Cargo.toml")
+            p.write_text(tampered, encoding="utf-8")
+            with self.assertRaises(rc.CapsuleError):
+                rc.parse_profile(p)
 
     def test_profile_rejects_step_substitution(self):
         with tempfile.TemporaryDirectory() as td:
