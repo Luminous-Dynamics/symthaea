@@ -13,7 +13,10 @@ on:
       - 'src/mind/tests/cogsec_shadow_control.rs'
       - 'src/mind/tests/mod.rs'
       - 'docs/security/cogsec/**'
+      - 'docs/architecture/COGSEC_LOCKFILE_QUALIFICATION_V0.md'
       - 'scripts/cogsec-focused-qualification.sh'
+      - 'scripts/cogsec-hydrate-lock-and-qualify.sh'
+      - 'scripts/test-cogsec-lock-hydration.sh'
       - '.github/workflows/cogsec.yml'
       - 'Cargo.lock'
       - 'Cargo.toml'
@@ -34,6 +37,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      - name: Run lock protocol self-test
+        run: bash scripts/test-cogsec-lock-hydration.sh
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
