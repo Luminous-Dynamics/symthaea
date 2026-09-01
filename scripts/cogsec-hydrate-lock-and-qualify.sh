@@ -5,6 +5,7 @@ ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
 EXPECTED_RUST="1.96.0"
+LOCAL_RECEIPT="${COGSEC_RECEIPT_OUT:-target/cogsec-local-qualification-receipt.tsv}"
 COGSEC_PACKAGES=(
   symthaea-cogsec
   symthaea-cogsec-evidence
@@ -126,12 +127,13 @@ if [[ "$LOCK_BEFORE" != "$LOCK_AFTER" ]]; then
   printf '\nHYDRATED: Cargo.lock changed additively and passes locked metadata validation.\n'
   printf 'Review the Cargo.lock diff and commit it without editing generated entries.\n'
   printf 'Then rerun this same command from the clean committed head; the second pass\n'
-  printf 'will execute the canonical seven-gate CogSec qualification.\n'
+  printf 'will execute the canonical seven-gate CogSec qualification and emit an exact-state receipt.\n'
   exit 0
 fi
 
 printf '\nCargo.lock is already committed and stable. Running focused qualification...\n'
-bash scripts/cogsec-focused-qualification.sh
+printf 'receipt: %s\n' "$LOCAL_RECEIPT"
+COGSEC_RECEIPT_OUT="$LOCAL_RECEIPT" bash scripts/cogsec-focused-qualification.sh
 
 [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]] || \
   fail "qualification mutated the clean worktree"
@@ -143,3 +145,4 @@ trap - EXIT INT TERM
 rm -f "$BACKUP" "$METADATA"
 
 printf '\nPASS: committed CogSec lock state passed focused qualification.\n'
+printf 'qualification receipt: %s\n' "$LOCAL_RECEIPT"
