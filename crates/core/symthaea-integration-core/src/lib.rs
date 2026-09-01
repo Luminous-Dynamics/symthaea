@@ -59,7 +59,8 @@ pub use observation::{
 };
 pub use registry::{IntegrationRegistry, RegistryError};
 pub use resolution::{
-    EntityResolutionBatch, attention_required, resolve_identity_claims,
+    EntityResolutionBatch, ResolutionError, ResolutionLimits, attention_required,
+    resolve_identity_claims, resolve_identity_claims_with_limits,
 };
 pub use topology::{
     DiscoveredEntity, DiscoverySnapshot, EntityRelation, RelationKind,
