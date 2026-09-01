@@ -37,14 +37,31 @@ If one or more CogSec workspace packages are absent from `Cargo.lock`, the utili
 2. records the current HEAD and lockfile SHA-256;
 3. runs Cargo metadata once without `--locked` using pinned Cargo 1.96.0;
 4. permits Cargo to modify only `Cargo.lock`;
-5. verifies that all required CogSec package entries are present;
-6. immediately re-runs `cargo metadata --locked`;
-7. runs `git diff --check -- Cargo.lock`;
-8. preserves only the Cargo-generated lockfile diff.
+5. rejects any deletion or rewrite of pre-existing lockfile material, so CogSec hydration is additive-only;
+6. verifies that all required CogSec package entries are present;
+7. immediately re-runs `cargo metadata --locked`;
+8. runs `git diff --check -- Cargo.lock`;
+9. preserves only the Cargo-generated lockfile diff.
 
 It does **not** run the focused qualification suite while the lockfile is uncommitted.
 
 The operator must review the generated diff and commit it without manually synthesizing or editing dependency entries.
+
+## Additive-only blast-radius ratchet
+
+CogSec lock hydration is not a general dependency refresh.
+
+After Cargo produces the candidate lock, the utility inspects the `Cargo.lock` diff. Any removed pre-existing line causes hydration to fail and the original lockfile to be restored.
+
+This deliberately rejects cases where resolving the CogSec workspace would also rewrite, replace, downgrade, upgrade, or remove pre-existing dependency state. Those changes may be legitimate, but they require a separately reviewed lock-maintenance change rather than being hidden inside CogSec qualification work.
+
+The intended successful pass-1 shape is therefore monotonic:
+
+> existing lock state + Cargo-required CogSec material
+
+not:
+
+> opportunistic workspace dependency re-resolution.
 
 ## Pass 2: qualification
 
@@ -100,6 +117,7 @@ This protocol does not claim:
 - that tests or Clippy pass;
 - that GitHub Actions has executed;
 - that Cargo registry/network inputs are independently authenticated beyond Cargo's normal mechanisms;
+- that an unrelated lockfile rewrite can or should be forced through this narrow hydration path;
 - that a locally successful qualification substitutes for required hosted CI or review policy.
 
-It only defines a deterministic, fail-closed path from an incomplete committed lockfile to a Cargo-generated candidate, and then from a reviewed committed lockfile to focused executable qualification.
+It only defines a deterministic, fail-closed path from an incomplete committed lockfile to a narrowly bounded Cargo-generated candidate, and then from a reviewed committed lockfile to focused executable qualification.
