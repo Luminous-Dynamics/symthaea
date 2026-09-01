@@ -55,7 +55,7 @@ pub struct StateAssertionSource {
 pub struct StateAssertion {
     pub assertion_id: String,
     pub subject: EntityRef,
-    /// Stable semantic dimension, e.g. `replicas.desired`, `service.enabled`,
+    /// Stable semantic dimension such as `replicas`, `service.enabled`,
     /// `image.digest`, `config.generation`, or `filesystem.read_only`.
     pub dimension: String,
     pub role: StateRole,
@@ -112,6 +112,104 @@ impl StateAssertion {
     }
 }
 
+/// Bounded collection of state assertions from one integration source.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StateSnapshot {
+    pub integration_id: String,
+    pub collected_at_unix_ms: u64,
+    pub assertions: Vec<StateAssertion>,
+}
+
+impl StateSnapshot {
+    pub fn validate(&self) -> Result<(), StateBudgetError> {
+        self.validate_with_limits(&StateLimits::default())
+    }
+
+    pub fn validate_with_limits(&self, limits: &StateLimits) -> Result<(), StateBudgetError> {
+        require_non_empty("snapshot.integration_id", &self.integration_id)
+            .map_err(StateBudgetError::InvalidAssertion)?;
+        if self.assertions.len() > limits.max_assertions {
+            return Err(StateBudgetError::TooManyAssertions {
+                actual: self.assertions.len(),
+                max: limits.max_assertions,
+            });
+        }
+
+        let mut ids = BTreeSet::new();
+        let mut total_string_bytes = self.integration_id.len();
+        for assertion in &self.assertions {
+            assertion
+                .validate()
+                .map_err(StateBudgetError::InvalidAssertion)?;
+            if assertion.source.integration_id != self.integration_id {
+                return Err(StateBudgetError::SourceMismatch {
+                    assertion_id: assertion.assertion_id.clone(),
+                    expected: self.integration_id.clone(),
+                    actual: assertion.source.integration_id.clone(),
+                });
+            }
+            if !ids.insert(assertion.assertion_id.clone()) {
+                return Err(StateBudgetError::DuplicateAssertionId(
+                    assertion.assertion_id.clone(),
+                ));
+            }
+            if assertion.evidence_observation_ids.len() > limits.max_evidence_refs_per_assertion {
+                return Err(StateBudgetError::TooManyEvidenceReferences {
+                    assertion_id: assertion.assertion_id.clone(),
+                    actual: assertion.evidence_observation_ids.len(),
+                    max: limits.max_evidence_refs_per_assertion,
+                });
+            }
+            if assertion.attributes.len() > limits.max_attributes_per_assertion {
+                return Err(StateBudgetError::TooManyAttributes {
+                    assertion_id: assertion.assertion_id.clone(),
+                    actual: assertion.attributes.len(),
+                    max: limits.max_attributes_per_assertion,
+                });
+            }
+            let assertion_bytes = assertion_string_bytes(assertion)?;
+            if assertion_bytes > limits.max_string_bytes_per_assertion {
+                return Err(StateBudgetError::AssertionStringBudgetExceeded {
+                    assertion_id: assertion.assertion_id.clone(),
+                    actual: assertion_bytes,
+                    max: limits.max_string_bytes_per_assertion,
+                });
+            }
+            total_string_bytes = total_string_bytes
+                .checked_add(assertion_bytes)
+                .ok_or(StateBudgetError::ArithmeticOverflow)?;
+            if total_string_bytes > limits.max_total_string_bytes {
+                return Err(StateBudgetError::SnapshotStringBudgetExceeded {
+                    actual: total_string_bytes,
+                    max: limits.max_total_string_bytes,
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StateLimits {
+    pub max_assertions: usize,
+    pub max_evidence_refs_per_assertion: usize,
+    pub max_attributes_per_assertion: usize,
+    pub max_string_bytes_per_assertion: usize,
+    pub max_total_string_bytes: usize,
+}
+
+impl Default for StateLimits {
+    fn default() -> Self {
+        Self {
+            max_assertions: 50_000,
+            max_evidence_refs_per_assertion: 64,
+            max_attributes_per_assertion: 128,
+            max_string_bytes_per_assertion: 64 * 1024,
+            max_total_string_bytes: 32 * 1024 * 1024,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum StateComparisonPolicy {
     Exact,
@@ -146,10 +244,12 @@ impl StateComparisonPolicy {
 pub enum StateAssessmentStatus {
     InSync,
     Drift,
+    NoEvidence,
     MissingDesired,
     MissingObserved,
     ConflictingDesired,
     ConflictingObserved,
+    ConflictingBoth,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -207,64 +307,39 @@ pub fn assess_state_dimension(
 
     let desired_ids = sorted_ids(&desired);
     let observed_ids = sorted_ids(&observed);
+    let desired_value = consensus_value(&desired, policy)?;
+    let observed_value = consensus_value(&observed, policy)?;
+    let desired_conflict = !desired.is_empty() && desired_value.is_none();
+    let observed_conflict = !observed.is_empty() && observed_value.is_none();
 
-    if desired.is_empty() {
-        return Ok(StateAssessment {
-            subject: subject.clone(),
-            dimension: dimension.into(),
-            status: StateAssessmentStatus::MissingDesired,
-            desired_value: None,
-            observed_value: consensus_value(&observed, policy)?,
-            desired_assertion_ids: desired_ids,
-            observed_assertion_ids: observed_ids,
-        });
-    }
-    if observed.is_empty() {
-        return Ok(StateAssessment {
-            subject: subject.clone(),
-            dimension: dimension.into(),
-            status: StateAssessmentStatus::MissingObserved,
-            desired_value: consensus_value(&desired, policy)?,
-            observed_value: None,
-            desired_assertion_ids: desired_ids,
-            observed_assertion_ids: observed_ids,
-        });
-    }
-
-    let Some(desired_value) = consensus_value(&desired, policy)? else {
-        return Ok(StateAssessment {
-            subject: subject.clone(),
-            dimension: dimension.into(),
-            status: StateAssessmentStatus::ConflictingDesired,
-            desired_value: None,
-            observed_value: consensus_value(&observed, policy)?,
-            desired_assertion_ids: desired_ids,
-            observed_assertion_ids: observed_ids,
-        });
-    };
-    let Some(observed_value) = consensus_value(&observed, policy)? else {
-        return Ok(StateAssessment {
-            subject: subject.clone(),
-            dimension: dimension.into(),
-            status: StateAssessmentStatus::ConflictingObserved,
-            desired_value: Some(desired_value),
-            observed_value: None,
-            desired_assertion_ids: desired_ids,
-            observed_assertion_ids: observed_ids,
-        });
+    let status = if desired_conflict && observed_conflict {
+        StateAssessmentStatus::ConflictingBoth
+    } else if desired_conflict {
+        StateAssessmentStatus::ConflictingDesired
+    } else if observed_conflict {
+        StateAssessmentStatus::ConflictingObserved
+    } else if desired.is_empty() && observed.is_empty() {
+        StateAssessmentStatus::NoEvidence
+    } else if desired.is_empty() {
+        StateAssessmentStatus::MissingDesired
+    } else if observed.is_empty() {
+        StateAssessmentStatus::MissingObserved
+    } else if values_match(
+        desired_value.as_ref().expect("non-empty consensus"),
+        observed_value.as_ref().expect("non-empty consensus"),
+        policy,
+    )? {
+        StateAssessmentStatus::InSync
+    } else {
+        StateAssessmentStatus::Drift
     };
 
-    let in_sync = values_match(&desired_value, &observed_value, policy)?;
     Ok(StateAssessment {
         subject: subject.clone(),
         dimension: dimension.into(),
-        status: if in_sync {
-            StateAssessmentStatus::InSync
-        } else {
-            StateAssessmentStatus::Drift
-        },
-        desired_value: Some(desired_value),
-        observed_value: Some(observed_value),
+        status,
+        desired_value,
+        observed_value,
         desired_assertion_ids: desired_ids,
         observed_assertion_ids: observed_ids,
     })
@@ -310,6 +385,40 @@ fn sorted_ids(assertions: &[&StateAssertion]) -> Vec<String> {
     ids
 }
 
+fn assertion_string_bytes(assertion: &StateAssertion) -> Result<usize, StateBudgetError> {
+    let mut total = 0usize;
+    add_len(&mut total, &assertion.assertion_id)?;
+    add_len(&mut total, &assertion.subject.namespace)?;
+    add_len(&mut total, &assertion.subject.kind)?;
+    add_len(&mut total, &assertion.subject.id)?;
+    add_len(&mut total, &assertion.dimension)?;
+    add_len(&mut total, &assertion.source.integration_id)?;
+    if let Some(value) = &assertion.source.collector_id {
+        add_len(&mut total, value)?;
+    }
+    if let Some(value) = &assertion.source.tenant {
+        add_len(&mut total, value)?;
+    }
+    if let StateValue::Text(value) = &assertion.value {
+        add_len(&mut total, value)?;
+    }
+    for id in &assertion.evidence_observation_ids {
+        add_len(&mut total, id.as_str())?;
+    }
+    for (key, value) in &assertion.attributes {
+        add_len(&mut total, key)?;
+        add_len(&mut total, value)?;
+    }
+    Ok(total)
+}
+
+fn add_len(total: &mut usize, value: &str) -> Result<(), StateBudgetError> {
+    *total = total
+        .checked_add(value.len())
+        .ok_or(StateBudgetError::ArithmeticOverflow)?;
+    Ok(())
+}
+
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum StateValidationError {
     #[error("required state field `{0}` is empty")]
@@ -322,6 +431,44 @@ pub enum StateValidationError {
     InvertedValidityRange { from: u64, until: u64 },
     #[error("duplicate evidence observation id `{0}`")]
     DuplicateEvidenceObservationId(ObservationId),
+}
+
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+pub enum StateBudgetError {
+    #[error("invalid state assertion: {0}")]
+    InvalidAssertion(StateValidationError),
+    #[error("state assertion `{assertion_id}` is attributed to `{actual}`, expected `{expected}`")]
+    SourceMismatch {
+        assertion_id: String,
+        expected: String,
+        actual: String,
+    },
+    #[error("duplicate state assertion id `{0}`")]
+    DuplicateAssertionId(String),
+    #[error("state snapshot has {actual} assertions, limit is {max}")]
+    TooManyAssertions { actual: usize, max: usize },
+    #[error("state assertion `{assertion_id}` has {actual} evidence references, limit is {max}")]
+    TooManyEvidenceReferences {
+        assertion_id: String,
+        actual: usize,
+        max: usize,
+    },
+    #[error("state assertion `{assertion_id}` has {actual} attributes, limit is {max}")]
+    TooManyAttributes {
+        assertion_id: String,
+        actual: usize,
+        max: usize,
+    },
+    #[error("state assertion `{assertion_id}` uses {actual} string bytes, limit is {max}")]
+    AssertionStringBudgetExceeded {
+        assertion_id: String,
+        actual: usize,
+        max: usize,
+    },
+    #[error("state snapshot uses {actual} string bytes, limit is {max}")]
+    SnapshotStringBudgetExceeded { actual: usize, max: usize },
+    #[error("state admission size arithmetic overflow")]
+    ArithmeticOverflow,
 }
 
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
@@ -448,9 +595,8 @@ mod tests {
     }
 
     #[test]
-    fn contradictory_observed_sources_are_explicit() {
+    fn contradictory_observed_sources_are_explicit_even_without_desired_state() {
         let assertions = vec![
-            assertion("desired", StateRole::Desired, StateValue::Unsigned(5)),
             assertion("api-status", StateRole::Observed, StateValue::Unsigned(5)),
             assertion("metrics", StateRole::Observed, StateValue::Unsigned(3)),
         ];
@@ -466,6 +612,38 @@ mod tests {
             assessment.status,
             StateAssessmentStatus::ConflictingObserved
         );
+    }
+
+    #[test]
+    fn conflict_on_both_sides_is_explicit() {
+        let assertions = vec![
+            assertion("desired-a", StateRole::Desired, StateValue::Unsigned(5)),
+            assertion("desired-b", StateRole::Desired, StateValue::Unsigned(4)),
+            assertion("observed-a", StateRole::Observed, StateValue::Unsigned(3)),
+            assertion("observed-b", StateRole::Observed, StateValue::Unsigned(2)),
+        ];
+        let assessment = assess_state_dimension(
+            &assertions,
+            &subject(),
+            "replicas",
+            100,
+            StateComparisonPolicy::Exact,
+        )
+        .unwrap();
+        assert_eq!(assessment.status, StateAssessmentStatus::ConflictingBoth);
+    }
+
+    #[test]
+    fn no_evidence_is_not_reported_as_drift() {
+        let assessment = assess_state_dimension(
+            &[],
+            &subject(),
+            "replicas",
+            100,
+            StateComparisonPolicy::Exact,
+        )
+        .unwrap();
+        assert_eq!(assessment.status, StateAssessmentStatus::NoEvidence);
     }
 
     #[test]
@@ -488,14 +666,17 @@ mod tests {
 
     #[test]
     fn floating_state_can_use_explicit_absolute_tolerance() {
-        let assertions = vec![
+        let mut assertions = vec![
             assertion("desired", StateRole::Desired, StateValue::Number(0.80)),
             assertion("observed", StateRole::Observed, StateValue::Number(0.79)),
         ];
+        for assertion in &mut assertions {
+            assertion.dimension = "ratio".into();
+        }
         let assessment = assess_state_dimension(
             &assertions,
             &subject(),
-            "replicas",
+            "ratio",
             100,
             StateComparisonPolicy::NumericAbsoluteTolerance { tolerance: 0.02 },
         )
@@ -550,6 +731,29 @@ mod tests {
         assert!(matches!(
             assertion.validate(),
             Err(StateValidationError::NonFiniteNumber(_))
+        ));
+    }
+
+    #[test]
+    fn state_snapshot_enforces_source_binding_and_budget() {
+        let snapshot = StateSnapshot {
+            integration_id: "fixture".into(),
+            collected_at_unix_ms: 100,
+            assertions: vec![assertion(
+                "desired",
+                StateRole::Desired,
+                StateValue::Unsigned(5),
+            )],
+        };
+        assert!(snapshot.validate().is_ok());
+
+        let tight = StateLimits {
+            max_assertions: 0,
+            ..Default::default()
+        };
+        assert!(matches!(
+            snapshot.validate_with_limits(&tight),
+            Err(StateBudgetError::TooManyAssertions { .. })
         ));
     }
 }
