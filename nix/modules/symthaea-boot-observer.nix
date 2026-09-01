@@ -12,7 +12,8 @@
 
 let
   cfg = config.services.symthaea-boot.observer;
-  inherit (lib) mkEnableOption mkIf mkOption types;
+  telemetry = config.services.symthaea-boot.telemetry;
+  inherit (lib) mkDefault mkEnableOption mkIf mkOption types;
 in {
   options.services.symthaea-boot.observer = {
     enable = mkEnableOption "structured Symthaea boot observer";
@@ -34,15 +35,19 @@ in {
     statePath = mkOption {
       type = types.str;
       default = "/run/symthaea-boot/state-v1.json";
-      description = "Ephemeral normalized snapshot used by late presentation consumers.";
+      description = "Ephemeral lineage-bound snapshot used by presentation consumers.";
     };
   };
 
   config = mkIf (config.services.symthaea-boot.enable && cfg.enable) {
+    # Enabling the observer opts the renderer into the typed channel by default.
+    # Explicit user configuration still wins over mkDefault.
+    services.symthaea-boot.telemetry.enable = mkDefault true;
+
     assertions = [
       {
-        assertion = lib.hasPrefix "/" cfg.outputSocket;
-        message = "services.symthaea-boot.observer.outputSocket must be absolute";
+        assertion = lib.hasPrefix "/run/symthaea/" cfg.outputSocket;
+        message = "services.symthaea-boot.observer.outputSocket must stay beneath /run/symthaea";
       }
       {
         assertion = lib.hasPrefix "/run/symthaea-boot/" cfg.statePath;
@@ -51,6 +56,14 @@ in {
           /run/symthaea-boot so the observer remains ephemeral and writable by
           its DynamicUser runtime directory.
         '';
+      }
+      {
+        assertion = !telemetry.enable || cfg.outputSocket == telemetry.eventSocket;
+        message = "observer.outputSocket and telemetry.eventSocket must match when typed boot telemetry is enabled";
+      }
+      {
+        assertion = !telemetry.enable || cfg.statePath == telemetry.statePath;
+        message = "observer.statePath and telemetry.statePath must match when typed boot telemetry is enabled";
       }
     ];
 
@@ -63,9 +76,7 @@ in {
       after = [ "dbus.service" ];
       wantedBy = [ "basic.target" ];
 
-      unitConfig = {
-        IgnoreOnIsolate = true;
-      };
+      unitConfig.IgnoreOnIsolate = true;
 
       serviceConfig = {
         Type = "simple";
@@ -80,6 +91,8 @@ in {
         DynamicUser = true;
         RuntimeDirectory = "symthaea-boot";
         RuntimeDirectoryMode = "0755";
+        SupplementaryGroups = [ "symthaea-boot" ];
+        UMask = "0022";
 
         NoNewPrivileges = true;
         PrivateTmp = true;
