@@ -17,6 +17,7 @@
 #![forbid(unsafe_code)]
 
 pub mod conformance;
+pub mod identity;
 pub mod independence;
 pub mod limits;
 pub mod manifest;
@@ -27,6 +28,12 @@ pub mod traits;
 
 pub use conformance::{
     ReadOnlyConformanceCounters, evaluate_read_only_conformance,
+};
+pub use identity::{
+    EntityPair, EntityResolutionProposal, ExternalIdentifier, IdentifierMatchEvidence,
+    IdentifierStability, IdentifierUniqueness, IdentityClaim, IdentityClaimIndex,
+    IdentityClaimSource, IdentityStrength, IdentityValidationError, ResolutionStatus,
+    SeparationClaim, assess_entity_pair,
 };
 pub use independence::{
     IndependenceAssessment, IndependenceAssessmentError, IndependenceMetadataConflict,
