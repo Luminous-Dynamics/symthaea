@@ -66,6 +66,34 @@ impl InteroceptiveDynamicsConfig {
         Ok(())
     }
 
+    /// Validate that one native state is representable inside this model's
+    /// declared numerical domain. A state may be outside its *viable* band, but
+    /// neither its current value nor its preferred/viable geometry may lie
+    /// outside the model domain and then be silently collapsed by clamping.
+    pub fn try_validate_state(&self, state: &NativeInteroceptiveState) -> Result<(), String> {
+        self.try_validate()?;
+
+        for channel in ViabilityChannel::ALL {
+            let variable = state.get(channel);
+            for (field, value) in [
+                ("value", variable.value()),
+                ("preferred_low", variable.preferred_low()),
+                ("preferred_high", variable.preferred_high()),
+                ("viable_low", variable.viable_low()),
+                ("viable_high", variable.viable_high()),
+            ] {
+                if value < self.min_value || value > self.max_value {
+                    return Err(format!(
+                        "channel {} {field}={value} lies outside model domain [{}, {}]",
+                        channel.stable_id(), self.min_value, self.max_value
+                    ));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn validate(&self) {
         self.try_validate()
             .unwrap_or_else(|error| panic!("{error}"));
@@ -137,13 +165,20 @@ pub struct NativeInteroceptiveModel {
 }
 
 impl NativeInteroceptiveModel {
-    pub fn new(state: NativeInteroceptiveState, config: InteroceptiveDynamicsConfig) -> Self {
-        config.validate();
-        Self {
+    pub fn try_new(
+        state: NativeInteroceptiveState,
+        config: InteroceptiveDynamicsConfig,
+    ) -> Result<Self, String> {
+        config.try_validate_state(&state)?;
+        Ok(Self {
             state,
             config,
             cycle: 0,
-        }
+        })
+    }
+
+    pub fn new(state: NativeInteroceptiveState, config: InteroceptiveDynamicsConfig) -> Self {
+        Self::try_new(state, config).unwrap_or_else(|error| panic!("{error}"))
     }
 
     #[inline]
