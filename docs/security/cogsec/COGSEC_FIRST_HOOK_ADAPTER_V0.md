@@ -1,6 +1,6 @@
 # CogSec First-Hook Evaluation Adapter v0
 
-Status: **design + canonical-commitment substrate on dormant branch; runtime integration still blocked on #270 qualification**.
+Status: **design + canonical effect/state/owner-commitment substrate on dormant branch; runtime integration still blocked on #270 qualification and real Cargo qualification of this branch**.
 
 This contract is stacked conceptually after consolidated pre-runtime PR #270. It does not authorize opening the runtime PR before #270 obtains real pinned-Cargo qualification evidence.
 
@@ -13,7 +13,9 @@ Four roles remain distinct:
 1. **Legacy owner — `ContinuousMind`** performs unchanged cognition.
 2. **Shadow evaluation adapter** owns `ReferenceMonitor`, `TrustedFactAuthority`, sealed shadow policy, truthful read-only state commitments, and a monotonic shadow-evaluation sequence.
 3. **`PortableEffectBoundShadowRuntimeObserver`** owns evidence bookkeeping and exact effect pairing only.
-4. **`symthaea-cogsec-effects`** owns canonical effect/resource-state representations and SHA-256 commitments outside the logical monitor core.
+4. **`symthaea-cogsec-effects`** owns canonical effect/resource/transition commitments outside the logical monitor core.
+
+`MemoryCoordinator` remains the owner of its private graduation queue and now mints its own opaque queue commitment; CogSec never receives the raw queue merely to hash it.
 
 No monitor/policy/fact authority or permit belongs inside ordinary `ContinuousMind` in ObserverOnly mode.
 
@@ -44,32 +46,65 @@ K0 requires concrete expected/current resource roots. Therefore `Digest32::defau
 
 If a truthful root is unavailable, the corresponding monitor-origin claim is unavailable.
 
-## Canonical effect substrate — implemented on dormant branch
+## Public commitment boundary — implemented on dormant branch
 
-`agent/cogsec-canonical-effects-v0` currently defines opaque-by-construction `CognitiveEffectV1` values. External callers provide actual legacy values; they cannot inject arbitrary nested HDC/metadata/active-state digests.
+`agent/cogsec-canonical-effects-v0` no longer exposes raw hashing helpers as the normal application API.
 
-Implemented effect families:
+Public callers use:
 
-- working-memory admission;
-- working-memory replacement/eviction;
-- graduation enqueue;
-- complete active-state replacement;
-- goal activation;
-- affect transition.
+- `EffectCommitmentV1` — exact effect digest + exact semantic effect class;
+- `ResourceStateCommitmentV1` — resource-tagged canonical pre-state commitment;
+- `CanonicalTransitionCommitmentV1` — effect + pre-state pair that can exist only when both name the same protected resource.
 
-Canonicalization rules include:
+The inner `CognitiveEffectV1` representation and raw SHA-256 helper functions are crate-private.
 
-- explicit v1 domain tags and effect discriminants;
+This prevents three different substitution classes:
+
+1. arbitrary nested digests cannot be injected into an effect;
+2. a goal-store root cannot silently stand in for a WM root;
+3. a valid effect digest cannot be paired with the wrong protected resource without an explicit typed error.
+
+The generic `Digest32` is deliberately recovered only at the trusted monitor-adapter boundary because frozen K0 remains cryptography-neutral.
+
+## Exact effect taxonomy
+
+Canonical effect classes are more precise than frozen K0:
+
+- `WorkingMemoryAdmit`;
+- `WorkingMemoryReplace`;
+- `GraduationEnqueue`;
+- `ActiveStateReplace`;
+- `GoalActivate`;
+- `AffectSet`.
+
+The v1 class itself names its canonical protected resource.
+
+Exact frozen-K0 mappings exist only for:
+
+- `WorkingMemoryAdmit -> WorkingMemoryAdmission`;
+- `GraduationEnqueue -> PersistentMemoryCommit`;
+- `GoalActivate -> GoalActivation`;
+- `AffectSet -> Affect`.
+
+`WorkingMemoryReplace` and `ActiveStateReplace` deliberately return **no K0 mapping**. They remain explicit #201 taxonomy gaps rather than being coerced into admission/attention or another convenient existing variant.
+
+This means S1 replacement and working-state influence may be observed canonically before K0.1, but they cannot contribute to a strong all-stage K0 authorization/attribution claim.
+
+## Canonicalization rules
+
+The underlying v1 encoder uses:
+
+- explicit domain tags and effect discriminants;
 - big-endian fixed-width integers;
 - length-prefixed UTF-8 strings;
 - HDC vectors committed as ordered exact `f32::to_bits()` values;
-- metadata maps sorted by UTF-8 key/value bytes;
+- metadata maps sorted deterministically by UTF-8 bytes;
 - explicit `MemorySource` discriminants;
 - floats committed as exact IEEE bits after legacy computation;
 - full `LiquidHolocell` commitment: state, tau, exact dimensionality variant/value, pressure;
 - active state additionally binds separately stored `current_thought`.
 
-Matching effect commitments prove identity only, not authority/authentication/truth.
+Matching commitments prove identity only, not authority/authentication/truth.
 
 ### Working-memory replacement
 
@@ -81,11 +116,11 @@ The replacement effect binds:
 
 The graduation queue write remains a separate effect lineage. Replacement must never silently grant persistence authority.
 
-## Canonical resource roots — implemented substrate
+## Canonical resource states
 
 ### Working memory
 
-`working_memory_state_digest_v1(...)` commits to:
+The typed WM constructor commits to:
 
 - configured WM capacity;
 - item count/order;
@@ -99,43 +134,58 @@ It **fails closed** if the five parallel arrays differ in length instead of zipp
 
 ### Active cognitive state
 
-`active_state_digest_v1(...)` commits to the full `LiquidHolocell` plus `current_thought`.
+The active-state commitment binds the full `LiquidHolocell` plus `current_thought`.
 
 ### Goal store
 
-`goal_store_state_digest_v1(...)` commits to ordered goal records using the same fields as `GoalActivateV1`: ID, description, embedding, priority, progress, active flag.
+The goal-store commitment binds ordered records: ID, description, embedding, priority, progress, active flag.
 
 ### Affect
 
-`affect_state_digest_v1(...)` commits to exact `emotional_valence` bits. Widening the protected affect owner later requires a new schema/domain.
+The v1 affect root commits to exact `emotional_valence` bits. Widening the protected affect owner later requires a new schema/domain.
 
-### Graduation queue
+### Graduation queue — owner seam implemented
 
-`graduation_queue_state_digest_v1(&[GraduationEvent])` canonically commits to an **explicitly supplied ordered queue** using the same fields as `GraduationEnqueueV1`.
+`MemoryCoordinator::graduation_queue` remains private.
 
-This helper does **not** bypass `MemoryCoordinator` privacy. The live owner queue is still private, so general runtime graduation qualification remains blocked on a narrow owner-side commitment seam.
+The memory owner now exposes only:
 
-Preferred owner correction: expose only a read-only commitment API from `MemoryCoordinator` (or equivalently narrow owner-owned commitment capability), not the raw private queue.
+- `pending_graduation_count()` — cardinality, not content;
+- `pending_graduation_commitment_v1()` — an opaque `PendingGraduationCommitmentV1`.
 
-A deterministic test fixture may use the canonical empty-queue root only when it separately proves the coordinator begins empty. Do not generalize that assumption to arbitrary live minds.
+`PendingGraduationCommitmentV1`:
+
+- has a private constructor;
+- has no serde implementation;
+- can only be minted through safe public API by `MemoryCoordinator` from its actual private queue;
+- commits to queue length/order and every stored event field using an owner-specific domain-separated SHA-256 schema;
+- can be passed to `ResourceStateCommitmentV1::graduation_queue_owner(...)` without revealing queued HDCs, labels or metadata.
+
+The memory-owner state schema is intentionally an **owner-state commitment**, not a duplicate of the effect serialization. Effect identity and resource-state identity are separate commitments with separate domains.
+
+Safe external code may copy/forward an already minted token, but cannot construct or deserialize one and claim it originated from the memory owner.
+
+This closes the previous graduation privacy/root blocker for first-hook design. It does **not** create `ResourceVersion` or authorization authority.
 
 ## Exact-effect flow
 
 For each mapped transition:
 
 1. capture exact pre-state;
-2. construct one canonical effect from actual legacy values;
-3. compute its v1 digest;
-4. compute the truthful pre-resource root;
-5. allocate adapter evaluation sequence;
-6. issue verified transition/request using the same digest/root;
-7. obtain opaque monitor receipt;
-8. append `...Evaluated`, receiving one-use pending token;
-9. execute unchanged legacy mutation regardless of decision;
-10. reconstruct the **actual** effect from resulting owner values with the same constructor;
-11. compute actual digest and truthful post-root;
-12. consume pending token through observed-mutation API;
-13. any mismatch/evidence failure invalidates the evidence claim but does not deny/rollback legacy cognition.
+2. construct a class-bound `EffectCommitmentV1` from actual legacy values;
+3. obtain the canonical/resource-owner pre-state commitment;
+4. bind effect + state into `CanonicalTransitionCommitmentV1`;
+5. reject if effect class and state commitment name different resources;
+6. reject a strong K0 claim when `k0_mutation_kind()` is absent;
+7. allocate adapter evaluation sequence;
+8. issue verified transition/request using the bound effect digest and truthful pre-root;
+9. obtain opaque monitor receipt;
+10. append `...Evaluated`, receiving one-use pending token;
+11. execute unchanged legacy mutation regardless of decision;
+12. reconstruct the **actual** effect from resulting owner values with the same typed constructor;
+13. compute actual post-state commitment from the owner;
+14. consume pending token through observed-mutation API;
+15. any mismatch/evidence failure invalidates the evidence claim but does not deny/rollback legacy cognition.
 
 ObserverOnly remains:
 
@@ -147,12 +197,6 @@ Before the real `holocell.step(input, 0.1)`, the trusted adapter may clone the c
 
 The clone is proposal preparation, not a state owner and not permission.
 
-## Graduation owner seam — remaining implementation blocker
-
-Current `MemoryCoordinator::graduation_queue` is private. Before general S1 monitor-origin graduation evidence, add a narrow owner-side commitment seam that returns the canonical queue root without exposing raw queued memory contents or mutable access.
-
-The owner seam should use the same v1 queue/event representation as `symthaea-cogsec-effects`; do not create a second serialization/hashing scheme.
-
 ## First runtime PR prerequisites
 
 Do not add a `ContinuousMind` observer field/hook until:
@@ -160,17 +204,20 @@ Do not add a `ContinuousMind` observer field/hook until:
 1. #270 has a Cargo-generated committed lock state;
 2. #270's seven focused gates pass on that exact head;
 3. its schema-v2 PASS receipt is independently verified;
-4. `symthaea-cogsec-effects` compiles/tests/clippies under pinned Rust/Cargo 1.96.0;
-5. the graduation owner commitment seam is implemented or graduation is explicitly excluded from the first monitor-origin claim;
-6. no placeholder/default resource root remains;
-7. evaluation sequence remains distinct from owner `ResourceVersion`;
-8. no monitor authority, trusted-fact authority, policy authority, or permit is stored in ordinary `ContinuousMind`;
-9. default/no-feature behavior remains unchanged.
+4. `symthaea-cogsec-effects` **and the additive `symthaea-memory` owner-commitment change** compile/test/clippy under pinned Rust/Cargo 1.96.0;
+5. no placeholder/default resource root remains;
+6. evaluation sequence remains distinct from owner `ResourceVersion`;
+7. no monitor authority, trusted-fact authority, policy authority, or permit is stored in ordinary `ContinuousMind`;
+8. default/no-feature behavior remains unchanged;
+9. the first-hook integration uses the typed public commitment boundary rather than internal raw digest helpers;
+10. unresolved `WorkingMemoryReplace` / `ActiveStateReplace` K0 mappings remain limitations, never implicit success.
+
+The former graduation-owner-commitment blocker is now **implemented in source but unqualified** until real Cargo runs.
 
 ## First allowed claim
 
 A successful first hook may claim only:
 
-> For frozen deterministic S0/S1/S2 scenarios with truthful scoped resource commitments, enabling ObserverOnly CogSec instrumentation preserves the reviewed legacy behavior projection exactly while producing structurally valid, monitor-origin, exact-effect-bound shadow evidence for the mapped transitions.
+> For frozen deterministic S0/S1/S2 scenarios with truthful scoped resource commitments, enabling ObserverOnly CogSec instrumentation preserves the reviewed legacy behavior projection exactly while producing structurally valid, monitor-origin, exact-effect-bound shadow evidence for the K0-mapped transitions and explicitly reporting unresolved taxonomy stages as limitations.
 
-It still does not establish P0 enforcement, owner-issued freshness, complete mutation coverage, authenticated/witnessed evidence, trusted-runner attestation, unresolved-taxonomy closure, or production security closure.
+It still does not establish P0 enforcement, owner-issued `ResourceVersion` freshness, complete mutation coverage, authenticated/witnessed evidence, trusted-runner attestation, unresolved-taxonomy closure, or production security closure.
