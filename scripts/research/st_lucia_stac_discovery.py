@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Execute the preregistered St. Lucia Sentinel product discovery.
 
-This tool performs catalogue discovery only. It never downloads raster assets or
-previews. Raw STAC pages are retained byte-for-byte and hashed before any local
-selection logic runs.
+Catalogue discovery only: this tool never downloads raster assets or previews.
+Raw STAC pages are retained byte-for-byte and hashed before local selection.
 
 Python 3 standard library only.
 """
@@ -21,19 +20,21 @@ from pathlib import Path
 from typing import Any, Callable
 
 SCHEMA = "symthaea-st-lucia-stac-discovery/v1"
-TOOL_VERSION = "1.0.0"
+TOOL_VERSION = "1.1.0"
 STAC_ROOT = "https://stac.dataspace.copernicus.eu/v1"
+STAC_HOST = "stac.dataspace.copernicus.eu"
 BBOX = (32.3166667, -28.1500000, 32.6166667, -27.8500000)
 S2_START = datetime(2026, 7, 1, tzinfo=timezone.utc)
 S2_END_EXCLUSIVE = datetime(2026, 8, 1, tzinfo=timezone.utc)
 MAX_CLOUD = 20.0
 PAIR_WINDOW = timedelta(hours=72)
 REQUIRED_S2_BANDS = ("B03", "B04", "B08", "B11", "B12")
-USER_AGENT = "symthaea-st-lucia-discovery/1.0"
+USER_AGENT = "symthaea-st-lucia-discovery/1.1"
 
 Json = dict[str, Any]
 Request = dict[str, Any]
-Fetcher = Callable[[Request, float], bytes]
+FetchResult = tuple[bytes, dict[str, str]]
+Fetcher = Callable[[Request, float], FetchResult]
 
 
 class DiscoveryError(RuntimeError):
@@ -50,6 +51,10 @@ def canonical_json_bytes(value: Any) -> bytes:
     ).encode("utf-8")
 
 
+def now_utc() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 def parse_time(value: str) -> datetime:
     if not value:
         raise DiscoveryError("missing STAC datetime")
@@ -61,6 +66,19 @@ def parse_time(value: str) -> datetime:
 
 def iso_z(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _validate_stac_url(url: str) -> str:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https" or parsed.hostname != STAC_HOST:
+        raise DiscoveryError(f"off-origin STAC URL rejected: {url}")
+    if parsed.username or parsed.password or parsed.port not in (None, 443):
+        raise DiscoveryError(f"noncanonical STAC authority rejected: {url}")
+    if not parsed.path.startswith("/v1/"):
+        raise DiscoveryError(f"STAC URL outside /v1 rejected: {url}")
+    if parsed.fragment:
+        raise DiscoveryError(f"STAC URL fragment rejected: {url}")
+    return url
 
 
 def build_items_url(
@@ -82,26 +100,28 @@ def build_items_url(
                 ("filter", f"eo:cloud_cover<={cloud_limit:g}"),
             ]
         )
-    return f"{STAC_ROOT}/collections/{collection}/items?{urllib.parse.urlencode(params)}"
+    url = f"{STAC_ROOT}/collections/{collection}/items?{urllib.parse.urlencode(params)}"
+    return _validate_stac_url(url)
 
 
 def initial_request(url: str) -> Request:
-    return {"method": "GET", "url": url, "body": None, "headers": {}}
+    return {"method": "GET", "url": _validate_stac_url(url), "body": None, "headers": {}}
 
 
-def _http_fetch(request: Request, timeout: float) -> bytes:
+def _http_fetch(request: Request, timeout: float) -> FetchResult:
     method = str(request.get("method", "GET")).upper()
+    url = _validate_stac_url(str(request["url"]))
     body_obj = request.get("body")
     data = None if body_obj is None else canonical_json_bytes(body_obj)
     headers = {"Accept": "application/geo+json, application/json", "User-Agent": USER_AGENT}
     headers.update({str(k): str(v) for k, v in request.get("headers", {}).items()})
     if data is not None:
         headers.setdefault("Content-Type", "application/json")
-    req = urllib.request.Request(
-        str(request["url"]), data=data, headers=headers, method=method
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as response:  # nosec B310: fixed HTTPS STAC source / pagination links
-        return response.read()
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    with urllib.request.urlopen(req, timeout=timeout) as response:  # nosec B310: URL is pinned above
+        raw = response.read()
+        response_headers = {key.lower(): value for key, value in response.headers.items()}
+    return raw, dict(sorted(response_headers.items()))
 
 
 def _next_request(page: Json) -> Request | None:
@@ -111,6 +131,8 @@ def _next_request(page: Json) -> Request | None:
         href = link.get("href")
         if not isinstance(href, str) or not href:
             raise DiscoveryError("STAC next link has no href")
+        href = urllib.parse.urljoin(STAC_ROOT + "/", href)
+        _validate_stac_url(href)
         method = str(link.get("method", "GET")).upper()
         if method not in {"GET", "POST"}:
             raise DiscoveryError(f"unsupported STAC pagination method: {method}")
@@ -127,6 +149,7 @@ def _request_evidence(request: Request) -> Json:
     return {
         "method": str(request.get("method", "GET")).upper(),
         "url": str(request["url"]),
+        "body": body,
         "body_sha256": None if body is None else sha256_hex(canonical_json_bytes(body)),
     }
 
@@ -147,12 +170,14 @@ def exhaust_pages(
     current = request
 
     for index in range(1, 10_001):
-        request_key = canonical_json_bytes(_request_evidence(current))
+        request_view = _request_evidence(current)
+        request_key = canonical_json_bytes(request_view)
         if request_key in seen_requests:
             raise DiscoveryError("pagination request cycle detected")
         seen_requests.add(request_key)
 
-        raw = fetcher(current, timeout)
+        retrieved_at = now_utc()
+        raw, response_headers = fetcher(current, timeout)
         digest = sha256_hex(raw)
         page_path = output_dir / f"page-{index:04d}.json"
         page_path.write_bytes(raw)
@@ -181,10 +206,12 @@ def exhaust_pages(
         page_evidence.append(
             {
                 "page": index,
-                "path": str(page_path),
+                "path": page_path.name,
                 "sha256": digest,
                 "byte_len": len(raw),
-                "request": _request_evidence(current),
+                "retrieved_at_utc": retrieved_at,
+                "request": request_view,
+                "response_headers": response_headers,
                 "feature_count": len(page.get("features", [])),
             }
         )
@@ -248,7 +275,7 @@ def s2_eligibility(item: Json) -> list[str]:
     cloud = props.get("eo:cloud_cover")
     if not isinstance(cloud, (int, float)) or isinstance(cloud, bool):
         reasons.append("missing-cloud-cover")
-    elif not (float(cloud) <= MAX_CLOUD):
+    elif float(cloud) > MAX_CLOUD:
         reasons.append("cloud-cover-too-high")
     missing = sorted(set(REQUIRED_S2_BANDS) - _band_tokens(item))
     if missing:
@@ -272,14 +299,14 @@ def summarize_item(item: Json, reasons: list[str]) -> Json:
     }
 
 
-def select_s2(items: list[Json]) -> tuple[Json | None, list[Json]]:
+def select_s2(items: list[Json]) -> tuple[Json | None, list[Json], list[str]]:
     audited: list[tuple[Json, list[str]]] = [(item, s2_eligibility(item)) for item in items]
     eligible = [item for item, reasons in audited if not reasons]
     eligible.sort(key=lambda item: (parse_time(item["properties"]["datetime"]), item["id"]))
     selected = eligible[0] if eligible else None
     summaries = [summarize_item(item, reasons) for item, reasons in audited]
     summaries.sort(key=lambda row: row["id"])
-    return selected, summaries
+    return selected, summaries, [item["id"] for item in eligible]
 
 
 def s1_eligibility(item: Json, s2_time: datetime) -> list[str]:
@@ -293,8 +320,7 @@ def s1_eligibility(item: Json, s2_time: datetime) -> list[str]:
             reasons.append("outside-pair-window")
     except DiscoveryError:
         reasons.append("missing-or-invalid-datetime")
-    mode = str(props.get("sar:instrument_mode", "")).upper()
-    if mode != "IW":
+    if str(props.get("sar:instrument_mode", "")).upper() != "IW":
         reasons.append("not-iw-mode")
     pols_raw = props.get("sar:polarizations") or []
     pols = {str(value).upper() for value in pols_raw} if isinstance(pols_raw, list) else set()
@@ -303,7 +329,7 @@ def s1_eligibility(item: Json, s2_time: datetime) -> list[str]:
     return reasons
 
 
-def select_s1(items: list[Json], s2_time: datetime) -> tuple[Json | None, list[Json]]:
+def select_s1(items: list[Json], s2_time: datetime) -> tuple[Json | None, list[Json], list[str]]:
     audited: list[tuple[Json, list[str]]] = [
         (item, s1_eligibility(item, s2_time)) for item in items
     ]
@@ -318,10 +344,12 @@ def select_s1(items: list[Json], s2_time: datetime) -> tuple[Json | None, list[J
     selected = eligible[0] if eligible else None
     summaries = [summarize_item(item, reasons) for item, reasons in audited]
     summaries.sort(key=lambda row: row["id"])
-    return selected, summaries
+    return selected, summaries, [item["id"] for item in eligible]
 
 
 def snapshot_digest(page_evidence: list[Json]) -> str:
+    # Deliberately excludes retrieval timestamps and response headers so the same
+    # exact raw pages under the same requests have the same catalogue snapshot id.
     view = [
         {
             "page": row["page"],
@@ -343,11 +371,13 @@ def _write_receipt(path: Path, receipt: Json) -> None:
 
 def run_discovery(protocol_path: Path, output_dir: Path, timeout: float) -> Json:
     output_dir.mkdir(parents=True, exist_ok=True)
+    started_at = now_utc()
     protocol_bytes = protocol_path.read_bytes()
     receipt: Json = {
         "schema": SCHEMA,
         "tool_version": TOOL_VERSION,
-        "protocol_path": str(protocol_path),
+        "started_at_utc": started_at,
+        "protocol_path": protocol_path.as_posix(),
         "protocol_sha256": sha256_hex(protocol_bytes),
         "stac_root": STAC_ROOT,
         "bbox_wgs84": list(BBOX),
@@ -363,12 +393,13 @@ def run_discovery(protocol_path: Path, output_dir: Path, timeout: float) -> Json
             initial_request(s2_url), output_dir / "s2", timeout=timeout
         )
         s2_items = deduplicated_items(s2_pages)
-        selected_s2, s2_audit = select_s2(s2_items)
+        selected_s2, s2_audit, s2_eligible_ids = select_s2(s2_items)
         receipt["s2"] = {
             "query_url": s2_url,
             "snapshot_sha256": snapshot_digest(s2_page_evidence),
             "pages": s2_page_evidence,
             "candidate_audit": s2_audit,
+            "eligible_candidate_ids_in_selection_order": s2_eligible_ids,
             "selected_item_id": None if selected_s2 is None else selected_s2["id"],
             "status": "no-eligible-item-visible" if selected_s2 is None else "selected",
         }
@@ -384,21 +415,24 @@ def run_discovery(protocol_path: Path, output_dir: Path, timeout: float) -> Json
                 initial_request(s1_url), output_dir / "s1", timeout=timeout
             )
             s1_items = deduplicated_items(s1_pages)
-            selected_s1, s1_audit = select_s1(s1_items, s2_time)
+            selected_s1, s1_audit, s1_eligible_ids = select_s1(s1_items, s2_time)
             receipt["s1"] = {
                 "query_url": s1_url,
                 "paired_to_s2_datetime": iso_z(s2_time),
                 "snapshot_sha256": snapshot_digest(s1_page_evidence),
                 "pages": s1_page_evidence,
                 "candidate_audit": s1_audit,
+                "eligible_candidate_ids_in_selection_order": s1_eligible_ids,
                 "selected_item_id": None if selected_s1 is None else selected_s1["id"],
                 "status": "no-eligible-item-visible" if selected_s1 is None else "selected",
             }
         receipt["status"] = "complete"
+        receipt["completed_at_utc"] = now_utc()
     except Exception as exc:
         receipt["status"] = "catalogue-query-failed"
         receipt["error_type"] = type(exc).__name__
         receipt["error"] = str(exc)
+        receipt["completed_at_utc"] = now_utc()
         _write_receipt(output_dir / "discovery_receipt.json", receipt)
         raise
 
@@ -423,12 +457,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"discovery failed: {exc}", file=sys.stderr)
         return 2
 
-    print(json.dumps({
-        "status": receipt["status"],
-        "s2": receipt["s2"].get("selected_item_id"),
-        "s1": receipt["s1"].get("selected_item_id"),
-        "receipt": str(args.out / "discovery_receipt.json"),
-    }, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "status": receipt["status"],
+                "s2": receipt["s2"].get("selected_item_id"),
+                "s1": receipt["s1"].get("selected_item_id"),
+                "receipt": str(args.out / "discovery_receipt.json"),
+            },
+            sort_keys=True,
+        )
+    )
     return 0
 
 
