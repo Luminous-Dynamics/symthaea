@@ -24,7 +24,8 @@ use symthaea_boot_protocol::wire::{
     MAX_WIRE_BYTES, ObservationId, WireMessage, validate_datagram_size,
 };
 use symthaea_boot_protocol::{
-    BootEvent, BootHealth, BootPhase, BootSnapshot, Criticality, DomainSnapshot, DomainState,
+    BootDomain, BootEvent, BootHealth, BootPhase, BootSnapshot, Criticality, DomainSnapshot,
+    DomainState,
 };
 use zbus::blocking::{Connection, Proxy};
 use zbus::zvariant::OwnedObjectPath;
@@ -60,6 +61,9 @@ fn run() -> Result<(), Box<dyn Error>> {
         SYSTEMD_MANAGER_INTERFACE,
     )?;
 
+    // Subscribe before the initial scan. Signals that arrive during reconstruction
+    // remain queued; each queued signal is later treated only as a trigger to
+    // re-read current structured state.
     let mut job_removed = manager.receive_signal("JobRemoved")?;
     let _: () = manager.call("Subscribe", &())?;
 
@@ -83,9 +87,9 @@ fn run() -> Result<(), Box<dyn Error>> {
             continue;
         };
 
-        // Job completion is only a trigger to re-read authoritative current
-        // state. A queued failure signal must not degrade a unit that has already
-        // recovered by the time this observer handles it.
+        // Never trust a queued textual job result as current health. Re-read the
+        // unit's structured ActiveState so an already-recovered unit cannot be
+        // rendered as failed because an older D-Bus signal was still queued.
         match query_unit_state(&connection, &manager, &unit) {
             Ok(Some(state)) => {
                 if let Err(error) = emitter.apply_current_state(watched, &state) {
@@ -114,7 +118,11 @@ fn build_initial_snapshot(
     config: &ObserverConfig,
 ) -> Result<BootSnapshot, Box<dyn Error>> {
     let elapsed_ms = boot_elapsed_ms();
-    let mut snapshot = BootSnapshot::new(1, std::time::Duration::from_millis(elapsed_ms), BootPhase::Kernel);
+    let mut snapshot = BootSnapshot::new(
+        1,
+        std::time::Duration::from_millis(elapsed_ms),
+        BootPhase::Kernel,
+    );
     let mut highest_phase = BootPhase::Kernel;
     let mut boot_ready = false;
     let mut aggregate_health = BootHealth::Unknown;
@@ -128,11 +136,12 @@ fn build_initial_snapshot(
         };
 
         if state != DomainState::Pending {
-            snapshot.domains.push(DomainSnapshot {
-                domain: watched.domain,
+            upsert_domain(
+                &mut snapshot,
+                watched.domain,
                 state,
-                elapsed_ms: unit.transition_elapsed_ms.map(|ms| ms.min(elapsed_ms)),
-            });
+                unit.transition_elapsed_ms.map(|ms| ms.min(elapsed_ms)),
+            );
         }
 
         if matches!(state, DomainState::Ready | DomainState::Starting) {
@@ -144,16 +153,13 @@ fn build_initial_snapshot(
         }
 
         if state == DomainState::Failed {
-            aggregate_health = match watched.criticality {
+            let observed = match watched.criticality {
                 Criticality::Critical => BootHealth::Failed,
-                Criticality::Informational | Criticality::NonCritical => {
-                    if aggregate_health.severity() < BootHealth::Degraded.severity() {
-                        BootHealth::Degraded
-                    } else {
-                        aggregate_health
-                    }
-                }
+                Criticality::Informational | Criticality::NonCritical => BootHealth::Degraded,
             };
+            if observed.severity() > aggregate_health.severity() {
+                aggregate_health = observed;
+            }
         }
 
         if watched.boot_ready && state == DomainState::Ready {
@@ -161,7 +167,11 @@ fn build_initial_snapshot(
         }
     }
 
-    snapshot.phase = if boot_ready { BootPhase::Ready } else { highest_phase };
+    snapshot.phase = if boot_ready {
+        BootPhase::Ready
+    } else {
+        highest_phase
+    };
     snapshot.health = if boot_ready {
         health_at_boot_ready(aggregate_health)
     } else {
@@ -169,6 +179,26 @@ fn build_initial_snapshot(
     };
     snapshot.validate()?;
     Ok(snapshot)
+}
+
+fn upsert_domain(
+    snapshot: &mut BootSnapshot,
+    domain: BootDomain,
+    state: DomainState,
+    elapsed_ms: Option<u64>,
+) {
+    if let Some(existing) = snapshot.domains.iter_mut().find(|item| item.domain == domain) {
+        if domain_state_rank(state) >= domain_state_rank(existing.state) {
+            existing.state = state;
+            existing.elapsed_ms = elapsed_ms.or(existing.elapsed_ms);
+        }
+        return;
+    }
+    snapshot.domains.push(DomainSnapshot {
+        domain,
+        state,
+        elapsed_ms,
+    });
 }
 
 fn query_unit_state(
@@ -194,7 +224,9 @@ fn query_unit_state(
         SYSTEMD_UNIT_INTERFACE,
     )?;
     let active_state: String = unit.get_property("ActiveState")?;
-    let transition_elapsed_us: u64 = unit.get_property("StateChangeTimestampMonotonic").unwrap_or(0);
+    let transition_elapsed_us: u64 = unit
+        .get_property("StateChangeTimestampMonotonic")
+        .unwrap_or(0);
 
     Ok(Some(UnitState {
         active_state,
@@ -435,6 +467,12 @@ fn derive_observation_id() -> ObservationId {
     if let Ok(boot_id) = fs::read("/proc/sys/kernel/random/boot_id") {
         hasher.update(&boot_id);
     }
+    // `/proc/sys/kernel/random/uuid` yields a fresh kernel-generated nonce on
+    // each read. If unavailable, PID + monotonic uptime still distinguish the
+    // normal restart case; this ID is lineage separation, not authentication.
+    if let Ok(observer_nonce) = fs::read("/proc/sys/kernel/random/uuid") {
+        hasher.update(&observer_nonce);
+    }
     hasher.update(&std::process::id().to_le_bytes());
     hasher.update(&boot_elapsed_ms().to_le_bytes());
     let digest = hasher.finalize();
@@ -457,7 +495,11 @@ fn boot_elapsed_ms() -> u64 {
         return 0;
     }
     let millis = seconds * 1000.0;
-    if millis >= u64::MAX as f64 { u64::MAX } else { millis as u64 }
+    if millis >= u64::MAX as f64 {
+        u64::MAX
+    } else {
+        millis as u64
+    }
 }
 
 const fn phase_rank(phase: BootPhase) -> u8 {
@@ -472,5 +514,67 @@ const fn phase_rank(phase: BootPhase) -> u8 {
         BootPhase::Graphics => 7,
         BootPhase::Session => 8,
         BootPhase::Ready => 9,
+    }
+}
+
+const fn domain_state_rank(state: DomainState) -> u8 {
+    match state {
+        DomainState::Pending => 0,
+        DomainState::Starting => 1,
+        DomainState::Ready => 2,
+        DomainState::Delayed => 3,
+        DomainState::Degraded => 4,
+        DomainState::Failed => 5,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn duplicate_unit_domains_collapse_in_snapshot() {
+        let mut snapshot = BootSnapshot::new(
+            1,
+            std::time::Duration::from_millis(100),
+            BootPhase::Graphics,
+        );
+        upsert_domain(
+            &mut snapshot,
+            BootDomain::Graphics,
+            DomainState::Ready,
+            Some(80),
+        );
+        upsert_domain(
+            &mut snapshot,
+            BootDomain::Graphics,
+            DomainState::Failed,
+            Some(90),
+        );
+        assert_eq!(snapshot.domains.len(), 1);
+        assert_eq!(snapshot.domains[0].state, DomainState::Failed);
+        snapshot.validate().unwrap();
+    }
+
+    #[test]
+    fn lower_severity_duplicate_does_not_hide_failure() {
+        let mut snapshot = BootSnapshot::new(
+            1,
+            std::time::Duration::from_millis(100),
+            BootPhase::Graphics,
+        );
+        upsert_domain(
+            &mut snapshot,
+            BootDomain::Graphics,
+            DomainState::Failed,
+            Some(70),
+        );
+        upsert_domain(
+            &mut snapshot,
+            BootDomain::Graphics,
+            DomainState::Ready,
+            Some(90),
+        );
+        assert_eq!(snapshot.domains[0].state, DomainState::Failed);
     }
 }
