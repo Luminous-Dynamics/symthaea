@@ -16,3 +16,6 @@ pub use effects::*;
 
 mod state_commitments;
 pub use state_commitments::*;
+
+mod typed_commitments;
+pub use typed_commitments::*;
