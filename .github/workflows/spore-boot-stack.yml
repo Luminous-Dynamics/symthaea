@@ -8,11 +8,13 @@ on:
       - 'rust-toolchain.toml'
       - 'crates/domains/symthaea-boot-*/**'
       - 'crates/domains/symthaea-quicken-fb/**'
+      - 'crates/core/symthaea-spore-continuity/**'
       - 'nix/modules/quicken-fb.nix'
       - 'nix/modules/symthaea-boot-*.nix'
       - 'scripts/check-spore-boot-stack.sh'
       - 'scripts/measure-spore-boot.sh'
       - 'docs/architecture/BOOT_*.md'
+      - 'docs/architecture/SPORE_*.md'
   workflow_dispatch:
 
 permissions:
