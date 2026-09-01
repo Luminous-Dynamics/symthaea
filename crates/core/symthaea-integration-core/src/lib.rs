@@ -26,6 +26,7 @@ pub mod observation;
 pub mod registry;
 pub mod resolution;
 pub mod resolution_pipeline;
+pub mod semantic_identity;
 pub mod topology;
 pub mod topology_limits;
 mod topology_registry;
@@ -68,6 +69,14 @@ pub use resolution::{
 pub use resolution_pipeline::{
     ResolutionPipelineError, resolve_registry_identity_snapshots,
     resolve_registry_identity_snapshots_with_limits, source_qualified_claim_id,
+};
+pub use semantic_identity::{
+    K8S_CLUSTER_UID_SCHEME, K8S_CRONJOB_UID_SCHEME, K8S_DAEMONSET_UID_SCHEME,
+    K8S_DEPLOYMENT_UID_SCHEME, K8S_JOB_UID_SCHEME, K8S_NODE_UID_SCHEME,
+    K8S_OBJECT_UID_SCHEME, K8S_POD_UID_SCHEME, K8S_REPLICASET_UID_SCHEME,
+    K8S_SERVICE_UID_SCHEME, K8S_STATEFULSET_UID_SCHEME,
+    kubernetes_cluster_uid_identifier, kubernetes_cluster_uid_scope,
+    kubernetes_object_uid_identifier, kubernetes_uid_scheme,
 };
 pub use topology::{
     DiscoveredEntity, DiscoverySnapshot, EntityRelation, RelationBasis, RelationKind,
