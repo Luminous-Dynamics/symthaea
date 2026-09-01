@@ -16,9 +16,13 @@ use symthaea_integration_core::{
     EntityRef, IntegrationError, StateAssertion, StateAssertionSource, StateRole, StateSnapshot,
     StateValue,
 };
-use symthaea_kubernetes_bridge::{KubernetesReplayContext, KubernetesReplayDiscoverer};
+use symthaea_kubernetes_bridge::{
+    KUBERNETES_INTEGRATION_ID, KubernetesReplayContext, KubernetesReplayDiscoverer,
+};
 
-pub const KUBERNETES_STATE_INTEGRATION_ID: &str = "kubernetes-state-replay";
+/// State evidence is another read-only output of the same Kubernetes replay
+/// source, not a second logical integration identity.
+pub const KUBERNETES_STATE_INTEGRATION_ID: &str = KUBERNETES_INTEGRATION_ID;
 
 #[derive(Debug, Clone)]
 pub struct KubernetesStateReplay {
@@ -459,7 +463,12 @@ mod tests {
         StateAssessmentStatus, StateComparisonPolicy, assess_state_dimension,
     };
 
-    fn deployment(spec: u64, observed: Option<u64>, generation: u64, observed_generation: u64) -> Value {
+    fn deployment(
+        spec: u64,
+        observed: Option<u64>,
+        generation: u64,
+        observed_generation: u64,
+    ) -> Value {
         let mut status = serde_json::Map::new();
         if let Some(observed) = observed {
             status.insert("replicas".into(), json!(observed));
@@ -602,6 +611,7 @@ mod tests {
                 .iter()
                 .all(|assertion| assertion.subject == topology_entity.entity)
         );
+        assert_eq!(replay.snapshot().integration_id, KUBERNETES_INTEGRATION_ID);
     }
 
     #[test]
