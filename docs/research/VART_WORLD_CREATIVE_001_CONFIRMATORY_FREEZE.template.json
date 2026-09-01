@@ -27,6 +27,8 @@
   "analysis_contract_sha256": null,
   "trial_manifest_schema_sha256": null,
   "independent_verifier_sha256": null,
+  "qualified_verifier_sha256": null,
+  "verifier_negative_suite_sha256": null,
   "campaign": {
     "longitudinal_world_count": null,
     "longitudinal_revisions_per_world": null,
@@ -54,7 +56,17 @@
     "confirmatory_root": null,
     "confirmatory_root_must_be_fresh": true,
     "pilot_material_forbidden_from_confirmatory_root": true,
-    "all_preregistered_trial_ids_sha256": null
+    "all_preregistered_trial_ids_sha256": null,
+    "trial_inventory_sha256": null
+  },
+  "external_anchor": {
+    "required": true,
+    "freeze_file_sha256_is_recorded_outside_evidence_root": true,
+    "anchor_record_type": null,
+    "anchor_record_locator": null,
+    "anchor_timestamp_utc": null,
+    "anchor_created_before_confirmatory_execution": true,
+    "qualified_verifier_cli_requires_expected_freeze_sha256": true
   },
   "anti_leakage": {
     "pilot_outcomes_may_change_thresholds": false,
@@ -65,13 +77,16 @@
     "pilot_outcomes_may_change_multiplicity_policy": false,
     "post_freeze_source_change_requires_new_lineage": true,
     "post_freeze_contract_change_requires_new_lineage": true,
-    "post_freeze_fixture_change_requires_new_lineage": true
+    "post_freeze_fixture_change_requires_new_lineage": true,
+    "post_freeze_verifier_change_requires_new_verifier_lineage": true
   },
   "claim": {
     "authorized": false,
     "ceiling": "EvidenceBoundExperienceConditionedWorldImprovementQualified",
     "requires_zero_integrity_violations": true,
     "requires_complete_trial_accounting": true,
-    "requires_independent_reconstruction": true
+    "requires_independent_reconstruction": true,
+    "requires_external_freeze_anchor": true,
+    "requires_n1_n20_verifier_qualification": true
   }
 }
