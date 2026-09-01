@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-action-runtime"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Crash-conservative execution reservation and delegation escrow for bounded Symthaea agency"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+
+[dependencies]
+symthaea-authority = { path = "../symthaea-authority" }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
