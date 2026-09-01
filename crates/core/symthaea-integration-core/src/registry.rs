@@ -5,11 +5,17 @@
 //! Registration is an admission boundary, not a passive lookup table. Every
 //! adapter must pass the strict read-only manifest profile and must declare the
 //! capability class matching the role under which it is registered. Runtime
-//! observation calls also cross this boundary, where centrally configured
-//! resource/cardinality budgets are enforced independently of adapter code.
+//! observations and identity evidence also cross this boundary, where centrally
+//! configured resource/cardinality budgets are enforced independently of
+//! adapter code.
 
+use crate::identity_provider::{
+    IdentityLimits, IdentityProvider, IdentityRequest, IdentitySnapshot,
+};
 use crate::limits::ObservationLimits;
-use crate::manifest::{CapabilityClass, IntegrationId, IntegrationManifest, ManifestValidationError};
+use crate::manifest::{
+    CapabilityClass, IntegrationId, IntegrationManifest, ManifestValidationError,
+};
 use crate::observation::ObservationBatch;
 use crate::traits::{
     Discoverer, IntegrationError, IntegrationFuture, ObservationRequest, Observer,
@@ -21,7 +27,9 @@ pub struct IntegrationRegistry {
     manifests: BTreeMap<IntegrationId, IntegrationManifest>,
     observers: BTreeMap<IntegrationId, Arc<dyn Observer>>,
     discoverers: BTreeMap<IntegrationId, Arc<dyn Discoverer>>,
+    identity_providers: BTreeMap<IntegrationId, Arc<dyn IdentityProvider>>,
     observation_limits: ObservationLimits,
+    identity_limits: IdentityLimits,
 }
 
 impl Default for IntegrationRegistry {
@@ -30,7 +38,9 @@ impl Default for IntegrationRegistry {
             manifests: BTreeMap::new(),
             observers: BTreeMap::new(),
             discoverers: BTreeMap::new(),
+            identity_providers: BTreeMap::new(),
             observation_limits: ObservationLimits::default(),
+            identity_limits: IdentityLimits::default(),
         }
     }
 }
@@ -47,13 +57,33 @@ impl IntegrationRegistry {
         }
     }
 
+    pub fn with_admission_limits(
+        observation_limits: ObservationLimits,
+        identity_limits: IdentityLimits,
+    ) -> Self {
+        Self {
+            observation_limits,
+            identity_limits,
+            ..Self::default()
+        }
+    }
+
     pub fn observation_limits(&self) -> &ObservationLimits {
         &self.observation_limits
     }
 
-    /// Replace the central admission budget. Adapters cannot mutate this value.
+    pub fn identity_limits(&self) -> &IdentityLimits {
+        &self.identity_limits
+    }
+
+    /// Replace the central observation admission budget. Adapters cannot mutate it.
     pub fn set_observation_limits(&mut self, observation_limits: ObservationLimits) {
         self.observation_limits = observation_limits;
+    }
+
+    /// Replace the central identity-evidence admission budget. Adapters cannot mutate it.
+    pub fn set_identity_limits(&mut self, identity_limits: IdentityLimits) {
+        self.identity_limits = identity_limits;
     }
 
     pub fn register_observer(
@@ -96,18 +126,39 @@ impl IntegrationRegistry {
         Ok(())
     }
 
-    /// Independently validate adapter output before world-model admission.
-    ///
-    /// Besides cardinality/resource limits, the producing integration identity
-    /// must match the registry slot that was invoked. This prevents a buggy or
-    /// malicious adapter from returning a structurally valid batch attributed to
-    /// another registered integration.
+    pub fn register_identity_provider(
+        &mut self,
+        provider: Arc<dyn IdentityProvider>,
+    ) -> Result<(), RegistryError> {
+        let manifest = provider.manifest().clone();
+        self.admit_manifest(&manifest, CapabilityClass::Discover)?;
+        let id = manifest.id.clone();
+
+        if self.identity_providers.contains_key(&id) {
+            return Err(RegistryError::DuplicateIdentityProvider { integration: id });
+        }
+
+        self.manifests.entry(id.clone()).or_insert(manifest);
+        self.identity_providers.insert(id, provider);
+        Ok(())
+    }
+
+    /// Independently validate adapter observation output before world-model admission.
     pub fn admit_observation_batch(
         &self,
         id: &IntegrationId,
         batch: &ObservationBatch,
     ) -> Result<(), IntegrationError> {
         validate_batch_for_limits(id, batch, &self.observation_limits)
+    }
+
+    /// Independently validate identity evidence before resolution/world-model admission.
+    pub fn admit_identity_snapshot(
+        &self,
+        id: &IntegrationId,
+        snapshot: &IdentitySnapshot,
+    ) -> Result<(), IntegrationError> {
+        validate_identity_for_limits(id, snapshot, &self.identity_limits)
     }
 
     /// Invoke a registered observer through the central admission boundary.
@@ -132,6 +183,29 @@ impl IntegrationRegistry {
         })
     }
 
+    /// Invoke a registered identity provider through the central admission boundary.
+    pub fn identity_snapshot<'a>(
+        &'a self,
+        id: &IntegrationId,
+        request: IdentityRequest,
+    ) -> IntegrationFuture<'a, Result<IdentitySnapshot, IntegrationError>> {
+        let provider = self.identity_providers.get(id).cloned();
+        let integration_id = id.clone();
+        let limits = self.identity_limits.clone();
+
+        Box::pin(async move {
+            request.validate()?;
+            let provider = provider.ok_or_else(|| {
+                IntegrationError::Unsupported(format!(
+                    "no identity provider registered for integration `{integration_id}`"
+                ))
+            })?;
+            let snapshot = provider.identity_snapshot(request).await?;
+            validate_identity_for_limits(&integration_id, &snapshot, &limits)?;
+            Ok(snapshot)
+        })
+    }
+
     pub fn manifest(&self, id: &IntegrationId) -> Option<&IntegrationManifest> {
         self.manifests.get(id)
     }
@@ -142,6 +216,10 @@ impl IntegrationRegistry {
 
     pub fn discoverer(&self, id: &IntegrationId) -> Option<&Arc<dyn Discoverer>> {
         self.discoverers.get(id)
+    }
+
+    pub fn identity_provider(&self, id: &IntegrationId) -> Option<&Arc<dyn IdentityProvider>> {
+        self.identity_providers.get(id)
     }
 
     pub fn manifests(&self) -> impl Iterator<Item = &IntegrationManifest> {
@@ -158,6 +236,10 @@ impl IntegrationRegistry {
 
     pub fn discoverer_count(&self) -> usize {
         self.discoverers.len()
+    }
+
+    pub fn identity_provider_count(&self) -> usize {
+        self.identity_providers.len()
     }
 
     fn admit_manifest(
@@ -203,7 +285,25 @@ fn validate_batch_for_limits(
     }
     batch.validate_with_limits(limits).map_err(|error| {
         IntegrationError::InvalidOutput(format!(
-            "integration `{id}` output rejected by admission budget: {error}"
+            "integration `{id}` output rejected by observation admission budget: {error}"
+        ))
+    })
+}
+
+fn validate_identity_for_limits(
+    id: &IntegrationId,
+    snapshot: &IdentitySnapshot,
+    limits: &IdentityLimits,
+) -> Result<(), IntegrationError> {
+    if snapshot.integration_id != id.as_str() {
+        return Err(IntegrationError::InvalidOutput(format!(
+            "identity provider `{id}` returned snapshot attributed to `{}`",
+            snapshot.integration_id
+        )));
+    }
+    snapshot.validate_with_limits(limits).map_err(|error| {
+        IntegrationError::InvalidOutput(format!(
+            "integration `{id}` identity output rejected by admission budget: {error}"
         ))
     })
 }
@@ -224,11 +324,17 @@ pub enum RegistryError {
         integration: IntegrationId,
         role: CapabilityClass,
     },
+    #[error("integration `{integration}` already has a registered identity provider")]
+    DuplicateIdentityProvider { integration: IntegrationId },
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::identity::{
+        ExternalIdentifier, IdentifierStability, IdentifierUniqueness, IdentityClaim,
+        IdentityClaimSource, IdentityStrength,
+    };
     use crate::manifest::{
         AccessMode, CapabilityDeclaration, INTEGRATION_MANIFEST_SCHEMA_VERSION, MaturityLevel,
         RiskClass,
@@ -278,6 +384,19 @@ mod tests {
         }
     }
 
+    impl IdentityProvider for FixtureIntegration {
+        fn identity_snapshot<'a>(
+            &'a self,
+            request: IdentityRequest,
+        ) -> IntegrationFuture<'a, Result<IdentitySnapshot, IntegrationError>> {
+            let id = self.manifest.id.0.clone();
+            Box::pin(async move {
+                request.validate()?;
+                Ok(fixture_identity_snapshot(&id))
+            })
+        }
+    }
+
     fn fixture_batch(id: &str) -> ObservationBatch {
         ObservationBatch {
             integration_id: id.into(),
@@ -308,6 +427,37 @@ mod tests {
                     transforms: vec![],
                 },
             )],
+        }
+    }
+
+    fn fixture_identity_snapshot(id: &str) -> IdentitySnapshot {
+        IdentitySnapshot {
+            integration_id: id.into(),
+            collected_at_unix_ms: 2,
+            claims: vec![IdentityClaim {
+                claim_id: "fixture-identity".into(),
+                subject: EntityRef::new("test", "host", "node-1"),
+                identifier: ExternalIdentifier {
+                    scheme: "host.id".into(),
+                    value: "uuid-node-1".into(),
+                    scope: None,
+                    uniqueness: IdentifierUniqueness::Global,
+                    stability: IdentifierStability::Persistent,
+                    case_sensitive: true,
+                },
+                strength: IdentityStrength::Strong,
+                source_confidence: 1.0,
+                source: IdentityClaimSource {
+                    integration_id: id.into(),
+                    collector_id: None,
+                    tenant: None,
+                },
+                observed_at_unix_ms: 1,
+                valid_from_unix_ms: None,
+                valid_until_unix_ms: None,
+                evidence_observation_ids: vec![ObservationId::new("fixture-observation")],
+            }],
+            separation_claims: vec![],
         }
     }
 
@@ -364,16 +514,33 @@ mod tests {
     }
 
     #[test]
-    fn same_manifest_can_register_observe_and_discover_roles() {
+    fn identity_provider_requires_discover_capability() {
+        let integration = Arc::new(FixtureIntegration {
+            manifest: manifest(&[CapabilityClass::Observe]),
+        });
+        let mut registry = IntegrationRegistry::new();
+        assert!(matches!(
+            registry.register_identity_provider(integration),
+            Err(RegistryError::MissingCapabilityClass {
+                role: CapabilityClass::Discover,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn same_manifest_can_register_observe_discover_and_identity_roles() {
         let integration = Arc::new(FixtureIntegration {
             manifest: manifest(&[CapabilityClass::Observe, CapabilityClass::Discover]),
         });
         let mut registry = IntegrationRegistry::new();
         registry.register_observer(integration.clone()).unwrap();
-        registry.register_discoverer(integration).unwrap();
+        registry.register_discoverer(integration.clone()).unwrap();
+        registry.register_identity_provider(integration).unwrap();
         assert_eq!(registry.integration_count(), 1);
         assert_eq!(registry.observer_count(), 1);
         assert_eq!(registry.discoverer_count(), 1);
+        assert_eq!(registry.identity_provider_count(), 1);
     }
 
     #[test]
@@ -404,7 +571,7 @@ mod tests {
         let mut registry = IntegrationRegistry::new();
         registry.register_observer(first).unwrap();
         assert!(matches!(
-            registry.register_discoverer(second),
+            registry.register_identity_provider(second),
             Err(RegistryError::ManifestCollision { .. })
         ));
     }
@@ -423,11 +590,37 @@ mod tests {
     }
 
     #[test]
-    fn registry_admission_rejects_cross_integration_identity_smuggling() {
+    fn registry_admission_rejects_cross_integration_observation_identity_smuggling() {
         let registry = IntegrationRegistry::new();
         let result = registry.admit_observation_batch(
             &IntegrationId::new("fixture"),
             &fixture_batch("other-integration"),
+        );
+        assert!(matches!(result, Err(IntegrationError::InvalidOutput(_))));
+    }
+
+    #[test]
+    fn registry_identity_admission_enforces_central_claim_budget() {
+        let registry = IntegrationRegistry::with_admission_limits(
+            ObservationLimits::default(),
+            IdentityLimits {
+                max_identity_claims: 0,
+                ..IdentityLimits::default()
+            },
+        );
+        let result = registry.admit_identity_snapshot(
+            &IntegrationId::new("fixture"),
+            &fixture_identity_snapshot("fixture"),
+        );
+        assert!(matches!(result, Err(IntegrationError::InvalidOutput(_))));
+    }
+
+    #[test]
+    fn registry_identity_admission_rejects_cross_integration_smuggling() {
+        let registry = IntegrationRegistry::new();
+        let result = registry.admit_identity_snapshot(
+            &IntegrationId::new("fixture"),
+            &fixture_identity_snapshot("other-integration"),
         );
         assert!(matches!(result, Err(IntegrationError::InvalidOutput(_))));
     }
