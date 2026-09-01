@@ -12,7 +12,6 @@ path = "src/root.rs"
 symthaea-cogsec = { path = "../../core/symthaea-cogsec" }
 symthaea-evidence-plane = { path = "../../core/symthaea-evidence-plane" }
 serde = { workspace = true }
-thiserror = { workspace = true }
-
-[dev-dependencies]
 serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
