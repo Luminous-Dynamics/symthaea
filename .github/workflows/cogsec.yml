@@ -16,6 +16,7 @@ on:
       - 'docs/architecture/COGSEC_LOCKFILE_QUALIFICATION_V0.md'
       - 'scripts/cogsec-focused-qualification.sh'
       - 'scripts/cogsec-hydrate-lock-and-qualify.sh'
+      - 'scripts/cogsec-lock-diagnostic.sh'
       - 'scripts/test-cogsec-lock-hydration.sh'
       - '.github/workflows/cogsec.yml'
       - 'Cargo.lock'
@@ -56,6 +57,19 @@ jobs:
           key: ${{ runner.os }}-cargo-cogsec-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-cogsec-
+
+      - name: Diagnose committed CogSec lock state
+        env:
+          COGSEC_LOCK_DIAGNOSTIC_OUT: target/cogsec-lock-diagnostic
+        run: bash scripts/cogsec-lock-diagnostic.sh
+
+      - name: Upload CogSec lock diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cogsec-lock-diagnostic-${{ github.sha }}
+          path: target/cogsec-lock-diagnostic
+          if-no-files-found: error
 
       - name: Run focused CogSec qualification
         env:
