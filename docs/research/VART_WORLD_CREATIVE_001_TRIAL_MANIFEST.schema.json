@@ -52,6 +52,7 @@
     "selected_proposal_sha256": {"$ref": "#/$defs/sha256"},
     "selection_index": {"type": "integer", "minimum": 0},
     "random_draw_receipt_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "ablation_receipt_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
     "applied_receipt_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
     "world_version_after": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
     "revisit_observation_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
@@ -79,6 +80,24 @@
     {
       "if": {"properties": {"policy": {"const": "random_valid"}}},
       "then": {"required": ["random_draw_receipt_sha256"]}
+    },
+    {
+      "if": {
+        "properties": {
+          "policy": {
+            "enum": [
+              "no_embodied_experience",
+              "no_persistent_memory",
+              "no_depth",
+              "no_counterfactual_evaluation",
+              "no_independent_proposal_replay",
+              "no_reality_ledger_context",
+              "random_valid_judgment"
+            ]
+          }
+        }
+      },
+      "then": {"required": ["ablation_receipt_sha256"]}
     },
     {
       "if": {"properties": {"trial_state": {"const": "complete"}}},
