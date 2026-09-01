@@ -1,0 +1,101 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+use serde_json::json;
+use std::sync::Arc;
+use symthaea_integration_core::{
+    IntegrationId, IntegrationRegistry, StateAssessmentStatus, StateComparisonPolicy, StateLimits,
+    assess_state_dimension,
+};
+use symthaea_kubernetes_bridge::{KUBERNETES_INTEGRATION_ID, KubernetesReplayContext};
+use symthaea_kubernetes_state_bridge::KubernetesStateReplay;
+
+fn deployment() -> serde_json::Value {
+    json!({
+        "apiVersion":"apps/v1",
+        "kind":"Deployment",
+        "metadata":{
+            "name":"api",
+            "namespace":"shop",
+            "uid":"deployment-uid",
+            "generation":9,
+            "resourceVersion":"42"
+        },
+        "spec":{"replicas":5},
+        "status":{
+            "replicas":3,
+            "readyReplicas":2,
+            "observedGeneration":8
+        }
+    })
+}
+
+#[test]
+fn registered_kubernetes_source_admits_state_before_drift_assessment() {
+    let replay = KubernetesStateReplay::from_objects(
+        KubernetesReplayContext::default(),
+        &[deployment()],
+        100,
+    )
+    .unwrap();
+
+    let mut registry = IntegrationRegistry::new();
+    registry
+        .register_discoverer(Arc::new(replay.topology().clone()))
+        .unwrap();
+    let id = IntegrationId::new(KUBERNETES_INTEGRATION_ID);
+    registry.admit_state_snapshot(&id, replay.snapshot()).unwrap();
+
+    let entity = replay.snapshot().assertions[0].subject.clone();
+    let assessment = assess_state_dimension(
+        &replay.snapshot().assertions,
+        &entity,
+        "workload.replicas",
+        100,
+        StateComparisonPolicy::Exact,
+    )
+    .unwrap();
+    assert_eq!(assessment.status, StateAssessmentStatus::Drift);
+}
+
+#[test]
+fn unregistered_state_source_is_rejected() {
+    let replay = KubernetesStateReplay::from_objects(
+        KubernetesReplayContext::default(),
+        &[deployment()],
+        100,
+    )
+    .unwrap();
+    let registry = IntegrationRegistry::new();
+    assert!(registry
+        .admit_state_snapshot(
+            &IntegrationId::new(KUBERNETES_INTEGRATION_ID),
+            replay.snapshot(),
+        )
+        .is_err());
+}
+
+#[test]
+fn central_state_budget_rejects_oversized_snapshot() {
+    let replay = KubernetesStateReplay::from_objects(
+        KubernetesReplayContext::default(),
+        &[deployment()],
+        100,
+    )
+    .unwrap();
+    let mut registry = IntegrationRegistry::new();
+    registry
+        .register_discoverer(Arc::new(replay.topology().clone()))
+        .unwrap();
+    let limits = StateLimits {
+        max_assertions: 1,
+        ..Default::default()
+    };
+    assert!(registry
+        .admit_state_snapshot_with_limits(
+            &IntegrationId::new(KUBERNETES_INTEGRATION_ID),
+            replay.snapshot(),
+            &limits,
+        )
+        .is_err());
+}
