@@ -18,14 +18,18 @@ def _self_link(collection: str, item_id: str, host: str = plan.APPROVED_STAC_HOS
     }
 
 
+def _s3_href(item_id: str, key: str) -> str:
+    return f"s3://{plan.APPROVED_S3_BUCKET}/test/{item_id}/{key}"
+
+
 def _s2_item(item_id: str):
     collection = "sentinel-2-l2a"
     assets = {
-        key: _asset(f"https://{plan.APPROVED_STAC_HOST}/v1/assets/{item_id}/{key}")
+        key: _asset(_s3_href(item_id, key))
         for key in plan.S2_SCIENCE_ASSETS + plan.S2_METADATA_ASSETS
     }
-    assets["thumbnail"] = _asset(f"https://{plan.APPROVED_STAC_HOST}/v1/assets/{item_id}/thumbnail")
-    assets["Product"] = _asset(f"https://{plan.APPROVED_STAC_HOST}/v1/assets/{item_id}/Product")
+    assets["thumbnail"] = _asset(_s3_href(item_id, "thumbnail"))
+    assets["Product"] = _asset(_s3_href(item_id, "Product"))
     return {
         "type": "Feature",
         "id": item_id,
@@ -39,11 +43,11 @@ def _s2_item(item_id: str):
 def _s1_item(item_id: str):
     collection = "sentinel-1-grd"
     assets = {
-        key: _asset(f"https://{plan.APPROVED_STAC_HOST}/v1/assets/{item_id}/{key}")
+        key: _asset(_s3_href(item_id, key))
         for key in plan.S1_SCIENCE_ASSETS + plan.S1_METADATA_ASSETS
     }
-    assets["thumbnail"] = _asset(f"https://{plan.APPROVED_STAC_HOST}/v1/assets/{item_id}/thumbnail")
-    assets["Product"] = _asset(f"https://{plan.APPROVED_STAC_HOST}/v1/assets/{item_id}/Product")
+    assets["thumbnail"] = _asset(_s3_href(item_id, "thumbnail"))
+    assets["Product"] = _asset(_s3_href(item_id, "Product"))
     return {
         "type": "Feature",
         "id": item_id,
@@ -60,6 +64,49 @@ class AssetPlannerTests(unittest.TestCase):
         self.assertTrue(plan.FORBIDDEN_KEYS.isdisjoint(selected))
         self.assertIn("SCL_20m", selected)
         self.assertIn("schema-calibration-vv", selected)
+
+    def test_realistic_eodata_s3_locator_is_preserved_and_decomposed(self):
+        item = _s2_item(plan.EXPECTED_S2_IDS[0])
+        href = "s3://eodata/Sentinel-2/MSI/L2A/2026/07/01/example.SAFE/GRANULE/example/IMG_DATA/R10m/B03_10m.jp2"
+        item["assets"]["B03_10m"]["href"] = href
+        entry = plan.asset_entry(item, "B03_10m", "science-payload")
+        self.assertEqual(href, entry["stac_href"])
+        self.assertEqual(href, entry["href"])
+        self.assertEqual("s3", entry["access_method"])
+        self.assertEqual(plan.APPROVED_S3_ENDPOINT, entry["s3_endpoint"])
+        self.assertEqual("eodata", entry["s3_bucket"])
+        self.assertEqual(
+            "Sentinel-2/MSI/L2A/2026/07/01/example.SAFE/GRANULE/example/IMG_DATA/R10m/B03_10m.jp2",
+            entry["s3_key"],
+        )
+        self.assertIsNone(entry["href_resolution_base"])
+
+    def test_s3_wrong_bucket_fails_closed(self):
+        item = _s2_item(plan.EXPECTED_S2_IDS[0])
+        item["assets"]["B03_10m"]["href"] = "s3://evil-bucket/path/B03.jp2"
+        with self.assertRaises(plan.PlanError):
+            plan.asset_entry(item, "B03_10m", "science-payload")
+
+    def test_s3_query_or_fragment_fails_closed(self):
+        item = _s2_item(plan.EXPECTED_S2_IDS[0])
+        item["assets"]["B03_10m"]["href"] = "s3://eodata/path/B03.jp2?x=1"
+        with self.assertRaises(plan.PlanError):
+            plan.asset_entry(item, "B03_10m", "science-payload")
+        item["assets"]["B03_10m"]["href"] = "s3://eodata/path/B03.jp2#fragment"
+        with self.assertRaises(plan.PlanError):
+            plan.asset_entry(item, "B03_10m", "science-payload")
+
+    def test_s3_empty_key_or_repeated_slash_fails_closed(self):
+        item = _s2_item(plan.EXPECTED_S2_IDS[0])
+        item["assets"]["B03_10m"]["href"] = "s3://eodata/"
+        with self.assertRaises(plan.PlanError):
+            plan.asset_entry(item, "B03_10m", "science-payload")
+        item["assets"]["B03_10m"]["href"] = "s3://eodata//Sentinel-2/B03.jp2"
+        with self.assertRaises(plan.PlanError):
+            plan.asset_entry(item, "B03_10m", "science-payload")
+        item["assets"]["B03_10m"]["href"] = "s3://eodata/Sentinel-2//B03.jp2"
+        with self.assertRaises(plan.PlanError):
+            plan.asset_entry(item, "B03_10m", "science-payload")
 
     def test_asset_entry_rejects_http(self):
         item = _s2_item(plan.EXPECTED_S2_IDS[0])
@@ -82,7 +129,9 @@ class AssetPlannerTests(unittest.TestCase):
             f"https://{plan.APPROVED_STAC_HOST}/v1/collections/sentinel-2-l2a/items/assets/B03_10m.tif",
             entry["href"],
         )
+        self.assertEqual("https", entry["access_method"])
         self.assertEqual(item["links"][0]["href"], entry["href_resolution_base"])
+        self.assertIsNone(entry["s3_bucket"])
 
     def test_relative_href_without_self_link_fails_closed(self):
         item = _s2_item(plan.EXPECTED_S2_IDS[0])
@@ -143,6 +192,9 @@ class AssetPlannerTests(unittest.TestCase):
             entries.append(plan.asset_entry(s1, key, "calibration-provenance"))
         self.assertEqual(29, len(entries))
         self.assertFalse(any(row["asset_key"] in plan.FORBIDDEN_KEYS for row in entries))
+        self.assertTrue(all(row["access_method"] == "s3" for row in entries))
+        self.assertTrue(all(row["s3_bucket"] == plan.APPROVED_S3_BUCKET for row in entries))
+        self.assertTrue(all(row["s3_endpoint"] == plan.APPROVED_S3_ENDPOINT for row in entries))
 
 
 if __name__ == "__main__":
