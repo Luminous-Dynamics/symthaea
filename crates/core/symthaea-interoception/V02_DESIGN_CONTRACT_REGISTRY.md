@@ -43,7 +43,9 @@ Initial normative roles should include at least:
 - `CandidateDefinition`;
 - `CandidateFactorSpace`;
 - `WeightingDecomposition`;
+- `ChannelAggregation`;
 - `AllostaticExposureDecomposition`;
+- `IdentifiabilityAndDiscrimination`;
 - `ExecutionMode`;
 - `ScenarioManifest`;
 - `BlindingCustody`;
@@ -120,6 +122,8 @@ A freeze is invalid if:
 - the registry belongs to a different design source commit;
 - the registry contract/version is not the one declared by the freeze.
 
+The channel-aggregation and identifiability/discrimination roles are normative even if an older descriptive list inside the prose freeze has not enumerated them individually; authoritative membership is the validated registry, not a stale prose enumeration.
+
 ## 9. Evidence root binding
 
 The prospective `ObservationalEvidenceRootManifest` should also bind the same exact design-contract-registry digest, directly or through a validated design freeze plus an equality assertion.
@@ -132,17 +136,25 @@ Recommended explicit redundancy:
 
 This lets a reproducer inspect the scientific design surface without reconstructing it indirectly.
 
-## 10. Change severity
+## 10. Identifiability closure
+
+A complete design registry is not enough if the locked scenarios cannot distinguish the locked candidates.
+
+Before confirmatory freeze, require a valid `CandidateDiscriminationManifest` under `V02_IDENTIFIABILITY_AND_DISCRIMINATION.md` that binds the finite candidate set, scenario/cut-point set, required primary-vs-baseline pairwise obligations, equivalence tolerances, and discriminator coverage.
+
+A candidate may not be promoted as superior to a baseline when the locked design lacks a discriminator capable of separating them.
+
+## 11. Change severity
 
 Registry changes inherit the severity of the contract change they represent.
 
 - adding a purely supporting explanation may be Class I if it is explicitly non-normative and changes no normative registry entry;
-- changing a candidate, weighting, temporal, scenario, analysis, or evidence contract is Class II;
+- changing a candidate, weighting, channel aggregation, temporal aggregation, identifiability, scenario, analysis, or evidence contract is Class II;
 - changing future-information authority, execution mode, feedback authority, or causal-output boundaries is Class III.
 
 Adding a new active normative contract after freeze always changes the registry and supersedes the old freeze, even if the prose author considers the change small.
 
-## 11. Review and CI gates
+## 12. Review and CI gates
 
 Future implementation should mechanically test:
 
@@ -155,11 +167,14 @@ Future implementation should mechanically test:
 - source-commit mismatch rejected;
 - supersession cycle rejected;
 - freeze/registry digest mismatch rejected;
-- evidence-root/freeze/registry mismatch rejected.
+- evidence-root/freeze/registry mismatch rejected;
+- missing aggregation contract rejected;
+- missing identifiability/discrimination contract rejected;
+- confirmatory freeze rejected when a required primary-vs-baseline pair lacks a registered discriminator.
 
 A malicious fixture should add an unregistered normative-looking contract and prove the closure audit catches it.
 
-## 12. Initial registry membership
+## 13. Initial registry membership
 
 At the current v0.2 design stage, the active normative set is intended to cover the roles represented by:
 
@@ -169,7 +184,9 @@ At the current v0.2 design stage, the active normative set is intended to cover 
 - `V02_CANDIDATE_DEFINITION_CONTRACT.md`
 - `V02_CANDIDATE_FACTOR_SPACE.md`
 - `V02_WEIGHTING_DECOMPOSITION.md`
+- `V02_CHANNEL_AGGREGATION_CONTRACT.md`
 - `V02_ALLOSTATIC_EXPOSURE_DECOMPOSITION.md`
+- `V02_IDENTIFIABILITY_AND_DISCRIMINATION.md`
 - `V02_EXECUTION_MODE_CONTRACT.md`
 - `V02_SCENARIO_MANIFEST.md`
 - `V02_BLINDING_CUSTODY.md`
@@ -180,6 +197,8 @@ At the current v0.2 design stage, the active normative set is intended to cover 
 
 This list is descriptive of the current design stage, not a permanently hard-coded schema. Future additions require explicit registry classification and a new registry/freeze identity.
 
-## 13. Claim boundary
+## 14. Claim boundary
 
-A closed contract registry proves only that the frozen evidence lineage names a complete, explicit set of design contracts under the declared closure rule. It does not prove those contracts are scientifically correct or that any regulatory candidate is affect, emotion, subjective valence, mood, sentience, or consciousness.
+A closed contract registry proves only that the frozen evidence lineage names a complete, explicit set of design contracts under the declared closure rule. An identifiability manifest additionally establishes that the locked design contains declared discriminators for the comparisons it intends to make.
+
+Neither proves those contracts are scientifically correct or that any regulatory candidate is affect, emotion, subjective valence, mood, sentience, or consciousness.
