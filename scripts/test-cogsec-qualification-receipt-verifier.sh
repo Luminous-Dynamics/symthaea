@@ -44,24 +44,25 @@ LOCK_SHA="$(sha256sum Cargo.lock | awk '{print $1}')"
 MANIFEST_SHA="$(sha256sum Cargo.toml | awk '{print $1}')"
 SCRIPT_SHA="$(sha256sum scripts/cogsec-focused-qualification.sh | awk '{print $1}')"
 PACKAGE_SET='symthaea-cogsec,symthaea-cogsec-evidence,symthaea-cogsec-qualification,symthaea-cogsec-shadow-runtime'
+TAB=$'\t'
 
 write_valid_receipt() {
   local path="$1"
-  cat > "$path" <<EOF_RECEIPT
-schema_version	2
-status	PASS
-exit_code	0
-head	$HEAD_SHA
-tree	$TREE_SHA
-cargo_lock_sha256	$LOCK_SHA
-workspace_manifest_sha256	$MANIFEST_SHA
-qualification_script_sha256	$SCRIPT_SHA
-package_set	$PACKAGE_SET
-rustc	rustc 1.96.0 (synthetic)
-cargo	cargo 1.96.0 (synthetic)
-current_gate	complete
-last_completed_gate	tracked-state-postcondition
-EOF_RECEIPT
+  {
+    printf 'schema_version\t2\n'
+    printf 'status\tPASS\n'
+    printf 'exit_code\t0\n'
+    printf 'head\t%s\n' "$HEAD_SHA"
+    printf 'tree\t%s\n' "$TREE_SHA"
+    printf 'cargo_lock_sha256\t%s\n' "$LOCK_SHA"
+    printf 'workspace_manifest_sha256\t%s\n' "$MANIFEST_SHA"
+    printf 'qualification_script_sha256\t%s\n' "$SCRIPT_SHA"
+    printf 'package_set\t%s\n' "$PACKAGE_SET"
+    printf 'rustc\trustc 1.96.0 (synthetic)\n'
+    printf 'cargo\tcargo 1.96.0 (synthetic)\n'
+    printf 'current_gate\tcomplete\n'
+    printf 'last_completed_gate\ttracked-state-postcondition\n'
+  } > "$path"
 }
 
 expect_pass() {
@@ -104,32 +105,32 @@ expect_fail unknown-field "$UNKNOWN"
 
 TREE_BAD="$TMP/tree-bad.tsv"
 cp "$VALID" "$TREE_BAD"
-sed -i "s/^tree\t.*/tree\t0000000000000000000000000000000000000000/" "$TREE_BAD"
+sed -i "s/^tree${TAB}.*/tree${TAB}0000000000000000000000000000000000000000/" "$TREE_BAD"
 expect_fail tree-mismatch "$TREE_BAD"
 
 LOCK_BAD="$TMP/lock-bad.tsv"
 cp "$VALID" "$LOCK_BAD"
-sed -i "s/^cargo_lock_sha256\t.*/cargo_lock_sha256\t$(printf bad | sha256sum | awk '{print $1}')/" "$LOCK_BAD"
+sed -i "s/^cargo_lock_sha256${TAB}.*/cargo_lock_sha256${TAB}$(printf bad | sha256sum | awk '{print $1}')/" "$LOCK_BAD"
 expect_fail lock-mismatch "$LOCK_BAD"
 
 PACKAGE_BAD="$TMP/package-bad.tsv"
 cp "$VALID" "$PACKAGE_BAD"
-sed -i 's/^package_set\t.*/package_set\tsymthaea-cogsec/' "$PACKAGE_BAD"
+sed -i "s/^package_set${TAB}.*/package_set${TAB}symthaea-cogsec/" "$PACKAGE_BAD"
 expect_fail package-scope "$PACKAGE_BAD"
 
 TOOLCHAIN_BAD="$TMP/toolchain-bad.tsv"
 cp "$VALID" "$TOOLCHAIN_BAD"
-sed -i 's/^rustc\t.*/rustc\trustc 1.95.0 (synthetic)/' "$TOOLCHAIN_BAD"
+sed -i "s/^rustc${TAB}.*/rustc${TAB}rustc 1.95.0 (synthetic)/" "$TOOLCHAIN_BAD"
 expect_fail toolchain "$TOOLCHAIN_BAD"
 
 GATE_BAD="$TMP/gate-bad.tsv"
 cp "$VALID" "$GATE_BAD"
-sed -i 's/^last_completed_gate\t.*/last_completed_gate\tclippy/' "$GATE_BAD"
+sed -i "s/^last_completed_gate${TAB}.*/last_completed_gate${TAB}clippy/" "$GATE_BAD"
 expect_fail incomplete-postcondition "$GATE_BAD"
 
 STATUS_BAD="$TMP/status-bad.tsv"
 cp "$VALID" "$STATUS_BAD"
-sed -i 's/^status\tPASS/status\tFAIL/' "$STATUS_BAD"
+sed -i "s/^status${TAB}PASS/status${TAB}FAIL/" "$STATUS_BAD"
 expect_fail failed-receipt "$STATUS_BAD"
 
 printf 'PASS: CogSec qualification receipt verifier protocol self-test\n'
