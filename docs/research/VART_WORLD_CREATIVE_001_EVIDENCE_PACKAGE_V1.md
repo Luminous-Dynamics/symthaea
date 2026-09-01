@@ -1,148 +1,190 @@
 # VART-WORLD-CREATIVE-001 — Evidence Package v1
 
-Status: pilot-format contract. It defines the exporter/verifier boundary and does not authorize confirmatory execution.
+Status: evidence-format contract. This document defines the byte-level producer/verifier boundary for pilot and confirmatory VART evidence. It does not authorize execution or claims.
 
-## Goal
+## 1. Hashing rule
 
-The runtime producer and independent verifier must exchange evidence through ordinary files and raw-byte SHA-256 digests. The verifier must not import the World Forge decision implementation or trust runtime PASS labels.
+Unless a field explicitly says otherwise, every `*_sha256` value is the lowercase SHA-256 of the **exact raw bytes** of the referenced durable artifact.
 
-All `*_sha256` values in this package refer to the SHA-256 of the exact raw artifact bytes at the referenced path unless a field explicitly states otherwise.
+Do not reconstruct hashes from parsed JSON objects. Do not normalize whitespace after export. The verifier hashes the bytes on disk.
 
-## Root layout
+## 2. Evidence-root structure
 
-A verifier input root contains:
+A complete evidence root contains:
 
-- `confirmatory_freeze.json`
 - `analysis_contract.json`
 - `metric_definitions.json`
 - `trial_inventory.json`
 - `primary_results.json`
-- `trials/<trial-id>/manifest.json`
-- `trials/<trial-id>/evidence_index.json`
-- the per-trial evidence files named by that evidence index
+- `confirmatory_freeze.json`
+- `trials/<trial_id>/...`
 
-Pilot roots may use the same layout, but every pilot `TrialManifest` must set `campaign="pilot"` and `included_in_confirmatory_analysis=false`. Pilot and confirmatory roots must never be the same directory or digest lineage.
+Pilot roots may additionally contain `_orchestrator/**`. Confirmatory roots must be fresh and must not contain pilot trials.
 
-## `evidence_index.json`
+For confirmatory closeout, the raw-byte SHA-256 of `confirmatory_freeze.json` is recorded **outside the evidence root before confirmatory execution** and supplied to `scripts/verify_vart_world_creative_001_qualified.py --expected-freeze-sha256 ...`.
 
-Each trial directory contains an evidence index with at least:
+Self-consistency inside the evidence package is not sufficient to prove a contract was frozen prospectively.
 
-- `trial_id`
-- `files`, a map from logical names to safe relative paths
-- `timestamps_ns`
-- `cross_policy_outcome_observed_before_selection`
-- `prospective_exclusion_reason_classes`
+## 3. Trial manifest
 
-Required logical files for a complete ordinary trial:
+Each trial directory contains `manifest.json` conforming to `VART_WORLD_CREATIVE_001_TRIAL_MANIFEST.schema.json`.
 
-- `experience_episode`
-- `revision_hypothesis`
-- `candidate_set`
-- `selected_proposal`
-- `applied_receipt`
-- `revisit_observation`
-- `revision_outcome`
+Important bindings include:
 
-`random_valid` additionally requires `random_draw_receipt`.
-
-The SHA-256 of the raw `evidence_index.json` bytes is recorded as `evidence_bundle_sha256` in the trial manifest. The index is therefore a closure map, not an unbound convenience file.
-
-Paths must be relative, must not contain `..`, and must remain inside the trial directory.
-
-## Temporal closure
-
-A complete trial exports integer monotonic evidence timestamps:
-
-- `hypothesis_closed`
-- `selection_closed`
-- `applied_receipt`
-- `revisit_closed`
-- `outcome_closed`
-
-The required ordering is:
-
-`hypothesis_closed <= selection_closed < applied_receipt <= revisit_closed <= outcome_closed`
-
-The timestamp source and clock semantics must be frozen before confirmatory execution. These timestamps establish ordering, not cross-host wall-clock truth.
-
-## Candidate-set artifact
-
-`candidate_set` is the exact ordered candidate surface presented to the policy after physical admission work. It contains a `candidates` array. Each candidate contains at minimum:
-
-- `proposal_sha256`: raw-byte SHA-256 of that proposal artifact;
-- `physically_admitted`: boolean.
-
-The order of physically admitted candidates is part of the scientific contract. It must not be re-sorted by policy. FULL, RANDOM_VALID and HEURISTIC paired trials use the exact same candidate-set artifact/digest wherever the preregistered policy definition permits that comparison.
-
-`selection_index` is the index within the ordered subsequence of candidates whose `physically_admitted` value is true.
-
-## Proposal and application closure
-
-For a complete trial:
-
-- the selected admitted candidate's `proposal_sha256` equals `TrialManifest.selected_proposal_sha256`;
-- the `selected_proposal` file bytes hash to that same digest;
-- the applied receipt records the same selected proposal digest;
-- the applied receipt records `world_version_before` and `world_version_after` matching the trial manifest;
-- the revisit observation records the resulting `world_version_after`.
-
-A structurally equal counterfactual cannot substitute for a committed observation. Revisit provenance must remain in an admitted committed/grounded provenance domain.
-
-## RANDOM_VALID receipt
-
-RANDOM_VALID uses `sha256-counter-v1` from `VART_WORLD_CREATIVE_001_RANDOM_VALID_V1.md`.
-
-The receipt contains:
-
-- `algorithm`
-- `seed`
-- `paired_block_id`
+- experiment/campaign/trial identity
+- paired block identity
+- policy and policy digest
+- world fixture, seed, revision index
+- pre-revision world version
+- `decision_input_sha256`
+- `experience_episode_sha256`
+- `revision_hypothesis_sha256`
 - `candidate_set_sha256`
+- `generated_candidate_count`
 - `admissible_candidate_count`
-- `counter`
-- `accepted_digest_sha256`
-- `selected_index`
+- selected proposal/index
+- RANDOM_VALID receipt when applicable
+- ablation receipt when applicable
+- applied receipt/world version after
+- revisit/outcome
+- confirmatory inclusion state
+- integrity state
+- metric-definition and analysis-contract digests
+- evidence-index digest
 
-The independent verifier recomputes all of these values.
+`generated_candidate_count` and `admissible_candidate_count` are distinct. Rejected candidates remain evidence.
 
-## Freeze bindings
+## 4. Decision input
 
-`confirmatory_freeze.json` binds at minimum the raw-byte SHA-256 of:
+Every trial exports a logical `decision_input` artifact through `evidence_index.json`; its raw-byte digest equals `manifest.decision_input_sha256`.
 
-- `analysis_contract.json`
-- `metric_definitions.json`
-- `trial_inventory.json`
+The decision input is the exact policy-visible evidence surface at decision time. For paired FULL/RANDOM_VALID/HEURISTIC comparisons it must be byte-identical wherever the preregistered policy definitions prescribe the same inputs.
 
-Every trial manifest independently repeats the analysis-contract and metric-definition digests. This prevents a trial from being interpreted under a different metric direction or statistical contract after execution.
+It must not contain:
 
-## Trial inventory
+- another policy's selected action or outcome;
+- later revisit/outcome evidence;
+- human evaluation labels unavailable at decision time;
+- unrevealed generalization target/solution/trap annotations.
 
-`trial_inventory.json` prospectively enumerates every confirmatory `trial_id` and an `expected_trial_count` equal to the number of enumerated IDs unless a different preregistered stopping design is introduced in a new contract version.
+## 5. Prospective hypothesis
 
-Missing preregistered trials, duplicate identities, unregistered trials, or selective removal of failures are verifier failures. Aborted, integrity-invalid and missing-evidence trials remain represented rather than disappearing.
+The `RevisionHypothesis` artifact is created and closed before mutation. The typed application receipt for a completed trial binds its exact `revision_hypothesis_sha256` in addition to the manifest.
 
-## Scientific failure versus integrity failure
+This dual binding is necessary: changing both the hypothesis file and manifest after the fact must still conflict with the earlier application receipt.
 
-A complete trial with valid evidence closure may produce a bad outcome. That is a scientific negative result and remains analyzable.
+## 6. Candidate set
 
-A trial with broken hash/provenance/ordering closure is `invalid_integrity`; it cannot be silently treated as merely poor performance.
+The canonical candidate-set artifact contains the full frozen candidate sequence generated for the trial, including rejected candidates.
 
-Conversely, a complete integrity-valid poor trial cannot be relabeled invalid to remove it from analysis. Any allowed confirmatory exclusion class must have been frozen prospectively.
+Every candidate records at least:
 
-## Primary results
+- proposal identity/digest;
+- `physically_admitted: true|false`;
+- admission evidence references required by the World Forge boundary.
 
-`primary_results.json` reports preregistered channels separately. Forbidden primary aggregate keys include at least:
+The array length equals `generated_candidate_count`; the number of admitted entries equals `admissible_candidate_count`.
 
-- `world_quality`
-- `creative_score`
-- `beauty_score`
-- `cinematic_quality`
-- `intelligence_score`
+The ordering is meaningful and frozen. RANDOM_VALID chooses among the admitted subsequence using `sha256-counter-v1`.
 
-Additional forbidden aggregate names may be frozen prospectively.
+Paired primary policies must use the same `candidate_set_sha256` wherever the policy definition allows a shared candidate surface.
 
-## Independent verifier
+## 7. Selected proposal and typed application receipt
 
-`scripts/verify_vart_world_creative_001.py` is the initial standalone verifier implementation for this contract. It checks raw-byte digest closure, paired candidate-set equality, reproducible RANDOM_VALID selection, world-version continuity, provenance boundaries, inventory completeness, pilot contamination, aggregate-score prohibition, analysis/freeze bindings, longitudinal world chains, and information-leak markers.
+For a completed trial, the selected proposal is a physically admitted candidate and the typed application receipt binds:
 
-The verifier itself is not qualified until the full N1–N20 negative suite is implemented and deterministically rejected for the expected reason classes. The synthetic script test is only an implementation smoke gate, not verifier qualification.
+- `decision_input_sha256`
+- `revision_hypothesis_sha256`
+- `candidate_set_sha256`
+- `selected_proposal_sha256`
+- `world_version_before`
+- `world_version_after`
+
+The verifier reconstructs these links from raw evidence instead of trusting a runtime PASS label.
+
+## 8. Revisit and outcome
+
+A completed `RevisionOutcome` is admissible only after a durable revisit observation of `world_version_after`.
+
+The revisit retains a committed/grounded provenance domain. A structurally equal counterfactual observation cannot substitute for a committed historical revisit.
+
+## 9. `evidence_index.json`
+
+The index belongs to one trial and maps logical evidence names to relative paths. Relative paths must remain within the trial directory.
+
+It also carries the temporal/order markers required to prove:
+
+`decision/hypothesis closure -> selection -> application -> revisit -> outcome`
+
+The manifest's `evidence_bundle_sha256` is the raw-byte SHA-256 of `evidence_index.json`.
+
+## 10. RANDOM_VALID receipt
+
+RANDOM_VALID emits a receipt bound to:
+
+- algorithm `sha256-counter-v1`
+- unsigned 64-bit seed
+- paired block ID
+- candidate-set digest
+- admitted candidate count
+- accepted counter
+- accepted SHA-256 digest
+- selected admitted-candidate index
+
+The independent verifier recomputes the draw from scratch.
+
+## 11. Ablation evidence
+
+A preregistered ablation must be explicit evidence, not ambiguous absence.
+
+Every ablation emits an `ablation_receipt` bound by `manifest.ablation_receipt_sha256`.
+
+For `no_embodied_experience`, the fixed experience slot contains a typed ablation sentinel whose hash occupies `experience_episode_sha256`; this distinguishes intentional channel removal from missing evidence.
+
+For `no_counterfactual_evaluation`, the receipt asserts that counterfactual evaluation did not occur and the exported candidate/evidence surface contains no counterfactual observation/render/score artifacts.
+
+## 12. Policy-output isolation in the pilot
+
+The pilot orchestrator executes each cell with a fresh private staging root and never gives the runtime the shared pilot evidence root. Only after the process exits and the one-trial layout is validated is that sealed trial directory moved into the shared package.
+
+This reduces cross-policy information leakage structurally. The verifier still checks decision-input content and explicit leak markers as defense in depth.
+
+## 13. Scientific failure vs integrity failure
+
+A complete, provenance-valid trial with a poor outcome remains scientific evidence.
+
+A trial with broken hash/provenance/temporal closure is an integrity failure and cannot be silently interpreted as merely poor performance.
+
+Conversely, a valid poor-performing trial cannot be relabeled integrity-invalid after outcomes are known in order to exclude it.
+
+## 14. Trial inventory
+
+`trial_inventory.json` prospectively enumerates the complete trial identities and expected count. The confirmatory freeze binds its raw-byte digest at top-level `trial_inventory_sha256`.
+
+Missing interior trials are selective omission. A truncated favorable prefix without a prospectively frozen stopping rule is unauthorized early stopping. Duplicate identities and unregistered trials are rejected.
+
+## 15. Primary results surface
+
+`primary_results.json` may report the preregistered outcome channels but must never add a forbidden synthetic aggregate such as `world_quality`, `creative_score`, `beauty_score`, `cinematic_quality`, or `intelligence_score`.
+
+World improvement and causal prediction calibration remain separate claims.
+
+## 16. Qualification boundary
+
+Pilot evidence is checked by `verify_vart_world_creative_001_pilot.py` and can establish only plumbing/integrity readiness.
+
+Confirmatory claim admission requires:
+
+1. the externally anchored freeze SHA-256;
+2. `verify_vart_world_creative_001_qualified.py`;
+3. canonical valid-bundle acceptance;
+4. deterministic rejection of N1–N20 with the expected reason classes;
+5. complete trial accounting;
+6. zero unresolved integrity-invalid confirmatory trials;
+7. analysis under the frozen cluster-aware contract.
+
+The maximum claim remains:
+
+`EvidenceBoundExperienceConditionedWorldImprovementQualified`
+
+Nothing in this format establishes general creativity, general intelligence, consciousness, universal aesthetic competence, or physical-world transfer.
