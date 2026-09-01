@@ -1,0 +1,77 @@
+{
+  "schema": "symthaea.vart-world-creative-001.confirmatory-freeze.v1",
+  "experiment_id": "VART-WORLD-CREATIVE-001",
+  "frozen": false,
+  "freeze_timestamp_utc": null,
+  "source": {
+    "head": null,
+    "tree": null,
+    "parent_v05a_head": "33820b3d9e904280e6264719fe7717cb2e5dd5bb",
+    "parent_v05a_tree": "e93c6dbfa05b602100ff924efaa5d95f92ef5a65",
+    "integration_receipt_sha256": null,
+    "dirty": false
+  },
+  "environment_digest": null,
+  "fixture_set_sha256": null,
+  "generalization_fixture_set_sha256": null,
+  "seed_list_sha256": null,
+  "candidate_generator_sha256": null,
+  "physical_admission_policy_sha256": null,
+  "policy_digests": {
+    "full_symthaea": null,
+    "random_valid": null,
+    "heuristic": null
+  },
+  "ablation_policy_digests": {},
+  "metric_definition_set_sha256": null,
+  "analysis_contract_sha256": null,
+  "trial_manifest_schema_sha256": null,
+  "independent_verifier_sha256": null,
+  "campaign": {
+    "longitudinal_world_count": null,
+    "longitudinal_revisions_per_world": null,
+    "generalization_world_count": null,
+    "generalization_revisions_per_world": null,
+    "adversarial_fixture_repetitions": null,
+    "candidate_budget_per_revision": null,
+    "maximum_revision_budget": null,
+    "stopping_rule": null
+  },
+  "primary_hypotheses": [],
+  "secondary_hypotheses": [],
+  "metric_directions": {},
+  "noninferiority_margins": {},
+  "uncertainty_method": null,
+  "confidence_level": null,
+  "multiplicity_policy": null,
+  "missingness_policy": null,
+  "abort_policy": null,
+  "trial_inclusion_rule": null,
+  "outlier_policy": null,
+  "human_evaluation_protocol_sha256": null,
+  "evidence": {
+    "pilot_root_sha256": null,
+    "confirmatory_root": null,
+    "confirmatory_root_must_be_fresh": true,
+    "pilot_material_forbidden_from_confirmatory_root": true,
+    "all_preregistered_trial_ids_sha256": null
+  },
+  "anti_leakage": {
+    "pilot_outcomes_may_change_thresholds": false,
+    "pilot_outcomes_may_change_hypotheses": false,
+    "pilot_outcomes_may_change_metric_directions": false,
+    "pilot_outcomes_may_change_candidate_budget": false,
+    "pilot_outcomes_may_change_stopping_rule": false,
+    "pilot_outcomes_may_change_multiplicity_policy": false,
+    "post_freeze_source_change_requires_new_lineage": true,
+    "post_freeze_contract_change_requires_new_lineage": true,
+    "post_freeze_fixture_change_requires_new_lineage": true
+  },
+  "claim": {
+    "authorized": false,
+    "ceiling": "EvidenceBoundExperienceConditionedWorldImprovementQualified",
+    "requires_zero_integrity_violations": true,
+    "requires_complete_trial_accounting": true,
+    "requires_independent_reconstruction": true
+  }
+}
