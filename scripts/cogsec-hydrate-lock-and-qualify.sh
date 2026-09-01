@@ -32,8 +32,8 @@ CARGO_VERSION="$(version_number cargo)"
   fail "cargo $EXPECTED_RUST required; found $CARGO_VERSION"
 
 [[ -f Cargo.lock ]] || fail "Cargo.lock is missing"
-[[ -x scripts/cogsec-focused-qualification.sh ]] || \
-  fail "scripts/cogsec-focused-qualification.sh is missing or not executable"
+[[ -f scripts/cogsec-focused-qualification.sh ]] || \
+  fail "scripts/cogsec-focused-qualification.sh is missing"
 
 # Hydration is evidence-producing maintenance. Refuse any tracked or untracked
 # contamination because workspace globs can make even an untracked crate affect
@@ -49,16 +49,18 @@ METADATA="$(mktemp "${TMPDIR:-/tmp}/cogsec-metadata.XXXXXX.json")"
 cp Cargo.lock "$BACKUP"
 
 SUCCESS=0
-cleanup() {
-  local exit_code=$?
+restore_on_exit() {
   if [[ $SUCCESS -ne 1 ]]; then
     cp "$BACKUP" Cargo.lock
     printf '\nHydration failed; restored the original Cargo.lock.\n' >&2
   fi
   rm -f "$BACKUP" "$METADATA"
-  exit "$exit_code"
 }
-trap cleanup EXIT INT TERM
+interrupt() {
+  exit 130
+}
+trap restore_on_exit EXIT
+trap interrupt INT TERM
 
 printf 'CogSec Cargo.lock hydration + qualification\n'
 printf 'HEAD:   %s\n' "$HEAD_BEFORE"
@@ -105,7 +107,7 @@ printf 'before: %s\n' "$LOCK_BEFORE"
 printf 'after:  %s\n' "$LOCK_AFTER"
 
 printf '\nRunning the canonical seven-gate CogSec qualification...\n'
-scripts/cogsec-focused-qualification.sh
+bash scripts/cogsec-focused-qualification.sh
 
 # Qualification must not mutate tracked state beyond the intentional lock update.
 mapfile -t FINAL_CHANGED < <(git status --porcelain=v1 --untracked-files=all | sed -E 's/^...//')
