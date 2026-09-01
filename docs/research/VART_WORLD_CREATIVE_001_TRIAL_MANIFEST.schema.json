@@ -16,9 +16,11 @@
     "seed",
     "revision_index",
     "world_version_before",
+    "decision_input_sha256",
     "experience_episode_sha256",
     "revision_hypothesis_sha256",
     "candidate_set_sha256",
+    "generated_candidate_count",
     "admissible_candidate_count",
     "selected_proposal_sha256",
     "selection_index",
@@ -45,9 +47,11 @@
     "seed": {"type": "integer", "minimum": 0},
     "revision_index": {"type": "integer", "minimum": 0},
     "world_version_before": {"type": "string", "minLength": 1},
+    "decision_input_sha256": {"$ref": "#/$defs/sha256"},
     "experience_episode_sha256": {"$ref": "#/$defs/sha256"},
     "revision_hypothesis_sha256": {"$ref": "#/$defs/sha256"},
     "candidate_set_sha256": {"$ref": "#/$defs/sha256"},
+    "generated_candidate_count": {"type": "integer", "minimum": 1},
     "admissible_candidate_count": {"type": "integer", "minimum": 1},
     "selected_proposal_sha256": {"$ref": "#/$defs/sha256"},
     "selection_index": {"type": "integer", "minimum": 0},
@@ -107,6 +111,19 @@
           "world_version_after": {"type": "string", "minLength": 1},
           "revisit_observation_sha256": {"$ref": "#/$defs/sha256"},
           "revision_outcome_sha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["generated_candidate_count", "admissible_candidate_count"]
+      },
+      "then": {
+        "properties": {
+          "generated_candidate_count": {
+            "type": "integer",
+            "minimum": 1
+          }
         }
       }
     }
