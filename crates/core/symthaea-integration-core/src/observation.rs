@@ -58,9 +58,26 @@ impl EntityRef {
         }
     }
 
+    /// Collision-safe deterministic encoding for hashes, indexes and evidence.
+    ///
+    /// Length prefixes make component boundaries unambiguous even when vendor-
+    /// controlled namespace/kind/id strings themselves contain `:`, `|`, or
+    /// other separators. The version prefix makes future encoding migrations
+    /// explicit instead of silently changing persisted deterministic IDs.
     pub fn canonical_key(&self) -> String {
-        format!("{}:{}:{}", self.namespace, self.kind, self.id)
+        let mut key = String::from("entity-v1");
+        push_len_prefixed(&mut key, &self.namespace);
+        push_len_prefixed(&mut key, &self.kind);
+        push_len_prefixed(&mut key, &self.id);
+        key
     }
+}
+
+fn push_len_prefixed(output: &mut String, value: &str) {
+    output.push('|');
+    output.push_str(&value.len().to_string());
+    output.push(':');
+    output.push_str(value);
 }
 
 /// Broad semantic class of an observation. Source-specific detail belongs in
@@ -452,6 +469,23 @@ mod tests {
                 transforms: vec![],
             },
         )
+    }
+
+    #[test]
+    fn entity_canonical_key_is_length_prefixed_and_versioned() {
+        let entity = EntityRef::new("site:lab", "host", "node-1");
+        assert_eq!(
+            entity.canonical_key(),
+            "entity-v1|8:site:lab|4:host|6:node-1"
+        );
+    }
+
+    #[test]
+    fn entity_canonical_key_cannot_collide_on_separator_placement() {
+        let left = EntityRef::new("a", "b:c", "d");
+        let right = EntityRef::new("a:b", "c", "d");
+        assert_ne!(left, right);
+        assert_ne!(left.canonical_key(), right.canonical_key());
     }
 
     #[test]
