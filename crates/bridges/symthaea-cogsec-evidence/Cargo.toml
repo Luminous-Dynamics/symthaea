@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-cogsec-evidence"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Typed shadow-mode CogSec event lineage and evidence-plane reconciliation for Symthaea"
+
+[lib]
+path = "src/root.rs"
+
+[dependencies]
+symthaea-cogsec = { path = "../../core/symthaea-cogsec" }
+symthaea-evidence-plane = { path = "../../core/symthaea-evidence-plane" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }

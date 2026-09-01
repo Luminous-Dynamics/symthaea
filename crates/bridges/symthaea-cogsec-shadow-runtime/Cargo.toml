@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-cogsec-shadow-runtime"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Owner-bound shadow runtime bookkeeping for CogSec without cognitive behavior changes"
+
+[lib]
+path = "src/root.rs"
+
+[dependencies]
+symthaea-cogsec = { path = "../../core/symthaea-cogsec" }
+symthaea-cogsec-evidence = { path = "../symthaea-cogsec-evidence" }
+symthaea-evidence-plane = { path = "../../core/symthaea-evidence-plane" }
+thiserror = { workspace = true }

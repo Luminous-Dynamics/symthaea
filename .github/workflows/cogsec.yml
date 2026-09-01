@@ -1,0 +1,98 @@
+name: CogSec Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-cogsec/**'
+      - 'crates/bridges/symthaea-cogsec-evidence/**'
+      - 'crates/bridges/symthaea-cogsec-qualification/**'
+      - 'crates/bridges/symthaea-cogsec-shadow-runtime/**'
+      - 'src/mind/mod.rs'
+      - 'src/mind/config.rs'
+      - 'src/mind/tick.rs'
+      - 'src/mind/tests/cogsec_shadow_control.rs'
+      - 'src/mind/tests/mod.rs'
+      - 'docs/security/cogsec/**'
+      - 'docs/architecture/COGSEC_LOCKFILE_QUALIFICATION_V0.md'
+      - 'scripts/cogsec-focused-qualification.sh'
+      - 'scripts/cogsec-hydrate-lock-and-qualify.sh'
+      - 'scripts/cogsec-lock-diagnostic.sh'
+      - 'scripts/cogsec-verify-qualification-receipt.sh'
+      - 'scripts/test-cogsec-lock-hydration.sh'
+      - 'scripts/test-cogsec-qualification-receipt-verifier.sh'
+      - '.github/workflows/cogsec.yml'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  cogsec:
+    name: CogSec focused qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run lock protocol self-test
+        run: bash scripts/test-cogsec-lock-hydration.sh
+
+      - name: Run qualification receipt verifier self-test
+        run: bash scripts/test-cogsec-qualification-receipt-verifier.sh
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cogsec-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-cogsec-
+
+      - name: Diagnose committed CogSec lock state
+        env:
+          COGSEC_LOCK_DIAGNOSTIC_OUT: target/cogsec-lock-diagnostic
+        run: bash scripts/cogsec-lock-diagnostic.sh
+
+      - name: Upload CogSec lock diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cogsec-lock-diagnostic-${{ github.sha }}
+          path: target/cogsec-lock-diagnostic
+          if-no-files-found: error
+
+      - name: Run focused CogSec qualification
+        env:
+          COGSEC_RECEIPT_OUT: target/cogsec-qualification-receipt.tsv
+        run: bash scripts/cogsec-focused-qualification.sh
+
+      - name: Verify PASS qualification receipt
+        run: |
+          bash scripts/cogsec-verify-qualification-receipt.sh \
+            target/cogsec-qualification-receipt.tsv \
+            | tee target/cogsec-qualification-verification.txt
+
+      - name: Upload CogSec qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cogsec-qualification-${{ github.sha }}
+          path: |
+            target/cogsec-qualification-receipt.tsv
+            target/cogsec-qualification-verification.txt
+          if-no-files-found: error
