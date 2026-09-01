@@ -5,7 +5,8 @@ use serde_json::json;
 use std::sync::Arc;
 use symthaea_integration_core::{
     IntegrationId, IntegrationRegistry, StateAssessmentStatus, StateComparisonPolicy, StateLimits,
-    assess_state_dimension,
+    TemporalStatePolicy, TemporalStateStatus, assess_state_dimension,
+    assess_state_dimension_temporally,
 };
 use symthaea_kubernetes_bridge::{KUBERNETES_INTEGRATION_ID, KubernetesReplayContext};
 use symthaea_kubernetes_state_bridge::KubernetesStateReplay;
@@ -56,6 +57,33 @@ fn registered_kubernetes_source_admits_state_before_drift_assessment() {
     )
     .unwrap();
     assert_eq!(assessment.status, StateAssessmentStatus::Drift);
+}
+
+#[test]
+fn kubernetes_replay_does_not_invent_rollout_age() {
+    let replay = KubernetesStateReplay::from_objects(
+        KubernetesReplayContext::default(),
+        &[deployment()],
+        100,
+    )
+    .unwrap();
+    let entity = replay.snapshot().assertions[0].subject.clone();
+    let assessment = assess_state_dimension_temporally(
+        &replay.snapshot().assertions,
+        &entity,
+        "workload.replicas",
+        100,
+        TemporalStatePolicy {
+            comparison: StateComparisonPolicy::Exact,
+            max_desired_age_ms: Some(1_000),
+            max_observed_age_ms: Some(1_000),
+            convergence_window_ms: 60_000,
+        },
+    )
+    .unwrap();
+    assert_eq!(assessment.instantaneous.status, StateAssessmentStatus::Drift);
+    assert_eq!(assessment.status, TemporalStateStatus::DriftAgeUnknown);
+    assert_eq!(assessment.drift_age_ms, None);
 }
 
 #[test]
