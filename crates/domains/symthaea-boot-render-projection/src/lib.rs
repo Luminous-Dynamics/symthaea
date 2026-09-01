@@ -66,6 +66,10 @@ pub enum ProjectionSource {
 pub struct RenderProjection {
     /// Absolute time supplied to the exact ecology renderer.
     pub elapsed_ms: u32,
+    /// Segment that the exact integer-millisecond renderer will actually see.
+    /// At the exact pre-Handoff boundary the current #238 renderer still returns
+    /// the preceding stage, so this is derived from projected time rather than
+    /// merely from requested semantic tail progress.
     pub segment: RenderSegment,
     pub source: ProjectionSource,
 }
@@ -82,13 +86,14 @@ pub fn project_live_frame(
     layout.validate()?;
 
     if frame.visual_phase <= PRE_HANDOFF_PHASE_MAX {
+        let elapsed_ms = scale_floor(
+            frame.visual_phase,
+            PRE_HANDOFF_PHASE_MAX,
+            layout.pre_handoff_ms,
+        );
         return Ok(RenderProjection {
-            elapsed_ms: scale_floor(
-                frame.visual_phase,
-                PRE_HANDOFF_PHASE_MAX,
-                layout.pre_handoff_ms,
-            ),
-            segment: RenderSegment::PreHandoff,
+            elapsed_ms,
+            segment: segment_for_elapsed(elapsed_ms, layout),
             source: ProjectionSource::LiveSemanticFrame,
         });
     }
@@ -112,7 +117,7 @@ pub fn project_live_frame(
 
     Ok(RenderProjection {
         elapsed_ms,
-        segment: RenderSegment::Handoff,
+        segment: segment_for_elapsed(elapsed_ms, layout),
         source: ProjectionSource::LiveSemanticFrame,
     })
 }
@@ -139,7 +144,7 @@ pub fn project_host_handoff(
 
     Ok(RenderProjection {
         elapsed_ms,
-        segment: RenderSegment::Handoff,
+        segment: segment_for_elapsed(elapsed_ms, layout),
         source: ProjectionSource::HostHandoffRequest,
     })
 }
@@ -157,7 +162,9 @@ impl std::fmt::Display for ProjectionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidFrame(error) => write!(f, "invalid ecology frame: {error}"),
-            Self::ZeroDuration => write!(f, "renderer timeline segments must have non-zero duration"),
+            Self::ZeroDuration => {
+                write!(f, "renderer timeline segments must have non-zero duration")
+            }
             Self::TimelineOverflow => write!(f, "renderer timeline duration overflow"),
             Self::TerminalStageRequiresReady { visual_phase } => write!(
                 f,
@@ -173,6 +180,14 @@ impl std::fmt::Display for ProjectionError {
 
 impl std::error::Error for ProjectionError {}
 
+const fn segment_for_elapsed(elapsed_ms: u32, layout: RenderTimelineLayout) -> RenderSegment {
+    if elapsed_ms <= layout.pre_handoff_ms {
+        RenderSegment::PreHandoff
+    } else {
+        RenderSegment::Handoff
+    }
+}
+
 const fn scale_floor(value: u32, input_max: u32, output_max: u32) -> u32 {
     (((value as u64) * (output_max as u64)) / (input_max as u64)) as u32
 }
@@ -183,9 +198,9 @@ mod tests {
     use symthaea_boot_ecology_live::{
         DiagnosticFloor, DomainMask, LiveEcologyModulation, SemanticBootAnchor, VisualAccent,
     };
+    use symthaea_boot_presentation::PresentationDriver;
     use symthaea_boot_protocol::BootHealth;
     use symthaea_boot_visual_clock::{ClockMode, VisualClockPolicy};
-    use symthaea_boot_presentation::PresentationDriver;
 
     const LAYOUT: RenderTimelineLayout = RenderTimelineLayout {
         pre_handoff_ms: 4_500,
@@ -279,10 +294,28 @@ mod tests {
         let end = project_host_handoff(PHASE_SCALE, LAYOUT).unwrap();
 
         assert_eq!(start.elapsed_ms, LAYOUT.pre_handoff_ms);
+        assert_eq!(start.segment, RenderSegment::PreHandoff);
         assert_eq!(middle.elapsed_ms, 4_750);
+        assert_eq!(middle.segment, RenderSegment::Handoff);
         assert_eq!(end.elapsed_ms, 5_000);
         assert_eq!(end.segment, RenderSegment::Handoff);
         assert_eq!(end.source, ProjectionSource::HostHandoffRequest);
+    }
+
+    #[test]
+    fn quantized_terminal_progress_is_labeled_as_pixels_will_render() {
+        // One normalized terminal unit is far below one renderer millisecond at
+        // this layout. The exact renderer still sees the final pre-Handoff frame,
+        // so projection metadata must say the same thing.
+        let tiny = project_host_handoff(1, LAYOUT).unwrap();
+        assert_eq!(tiny.elapsed_ms, LAYOUT.pre_handoff_ms);
+        assert_eq!(tiny.segment, RenderSegment::PreHandoff);
+
+        // Once projection advances by at least one actual renderer millisecond,
+        // the terminal segment is genuinely visible.
+        let first_visible = project_host_handoff(2_000, LAYOUT).unwrap();
+        assert!(first_visible.elapsed_ms > LAYOUT.pre_handoff_ms);
+        assert_eq!(first_visible.segment, RenderSegment::Handoff);
     }
 
     #[test]
