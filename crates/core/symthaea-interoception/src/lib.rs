@@ -73,5 +73,6 @@ pub use study::{
     STUDY_EXECUTION_SCHEMA_VERSION, STUDY_PREREGISTRATION_SCHEMA_VERSION,
 };
 pub use study_validation::{
-    evaluate_confirmatory_study_bound, validate_study_blinded_metrics,
+    evaluate_confirmatory_study_bound, validate_confirmatory_evaluation_bound,
+    validate_study_blinded_metrics,
 };
