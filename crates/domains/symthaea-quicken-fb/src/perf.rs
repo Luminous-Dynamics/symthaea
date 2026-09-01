@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 pub const PERFORMANCE_RECEIPT_VERSION: u16 = 1;
+pub const MAX_LIVE_SAMPLES: usize = 4096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimingSummary {
@@ -111,6 +112,7 @@ pub struct BootPerformanceRecorder {
     pub first_frame_us: Option<u64>,
     pub frames: u64,
     pub deadline_misses: u64,
+    pub samples_dropped: u64,
     pub grow: TimingSeries,
     pub render: TimingSeries,
     pub blit: TimingSeries,
@@ -119,9 +121,7 @@ pub struct BootPerformanceRecorder {
 
 impl BootPerformanceRecorder {
     pub fn new(process_start: Instant, frame_budget: Duration) -> Self {
-        // A boot normally contains only hundreds of frames, so modest vectors
-        // avoid per-frame file I/O while keeping memory bounded in practice.
-        let capacity = 2048;
+        let capacity = MAX_LIVE_SAMPLES.min(2048);
         Self {
             process_start,
             frame_budget_us: saturating_micros(frame_budget),
@@ -129,6 +129,7 @@ impl BootPerformanceRecorder {
             first_frame_us: None,
             frames: 0,
             deadline_misses: 0,
+            samples_dropped: 0,
             grow: TimingSeries::with_capacity(capacity),
             render: TimingSeries::with_capacity(capacity),
             blit: TimingSeries::with_capacity(capacity),
@@ -154,10 +155,15 @@ impl BootPerformanceRecorder {
         if saturating_micros(frame_work) > self.frame_budget_us {
             self.deadline_misses = self.deadline_misses.saturating_add(1);
         }
-        self.grow.record(grow);
-        self.render.record(render);
-        self.blit.record(blit);
-        self.frame_work.record(frame_work);
+
+        if self.frame_work.len() < MAX_LIVE_SAMPLES {
+            self.grow.record(grow);
+            self.render.record(render);
+            self.blit.record(blit);
+            self.frame_work.record(frame_work);
+        } else {
+            self.samples_dropped = self.samples_dropped.saturating_add(1);
+        }
     }
 
     pub fn write_atomic(
@@ -182,6 +188,8 @@ impl BootPerformanceRecorder {
             "first_frame_us": self.first_frame_us,
             "frames": self.frames,
             "deadline_misses": self.deadline_misses,
+            "retained_samples": self.frame_work.len(),
+            "samples_dropped": self.samples_dropped,
             "branch_count": branch_count,
             "release_us": release_us,
             "grow": self.grow.summary().to_json(),
@@ -248,6 +256,25 @@ mod tests {
         assert_eq!(summary.p50_us, 42);
         assert_eq!(summary.p95_us, 42);
         assert_eq!(summary.p99_us, 42);
+    }
+
+    #[test]
+    fn live_samples_are_hard_bounded() {
+        let mut recorder = BootPerformanceRecorder::new(
+            Instant::now(),
+            Duration::from_millis(34),
+        );
+        for _ in 0..(MAX_LIVE_SAMPLES + 7) {
+            recorder.record_frame(
+                Duration::from_micros(1),
+                Duration::from_micros(2),
+                Duration::from_micros(3),
+                Duration::from_micros(6),
+            );
+        }
+        assert_eq!(recorder.frame_work.len(), MAX_LIVE_SAMPLES);
+        assert_eq!(recorder.samples_dropped, 7);
+        assert_eq!(recorder.frames, (MAX_LIVE_SAMPLES + 7) as u64);
     }
 
     #[test]
