@@ -15,20 +15,48 @@ pub const CONTINUITY_VERSION: u16 = 1;
 pub const MAX_CONTINUITY_BYTES: usize = 2048;
 pub const PHASE_SCALE: u32 = 1_000_000;
 
+/// Every 32-byte digest in this ABI is BLAKE3 unless a future ABI version says otherwise.
 pub type Digest32 = [u8; 32];
 pub type VisualSeed = [u8; 32];
 pub type ContinuityLineage = [u8; 16];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum LifecycleTransition {
-    BootToGreeter,
-    GreeterToSession,
-    SessionToLock,
-    LockToSession,
-    SessionToSuspend,
-    SuspendToSession,
-    SessionToShutdown,
+pub enum LifecycleSurface {
+    Boot,
+    Greeter,
+    Session,
+    Lock,
+    Suspended,
+    Recovery,
+    Shutdown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LifecycleTransition {
+    pub from: LifecycleSurface,
+    pub to: LifecycleSurface,
+}
+
+impl LifecycleTransition {
+    pub const fn new(from: LifecycleSurface, to: LifecycleSurface) -> Self {
+        Self { from, to }
+    }
+
+    /// Conservative lifecycle graph. Direct Boot -> Session permits autologin;
+    /// recovery is reachable without asserting why recovery was entered.
+    pub const fn is_allowed(self) -> bool {
+        use LifecycleSurface::{Boot, Greeter, Lock, Recovery, Session, Shutdown, Suspended};
+        matches!(
+            (self.from, self.to),
+            (Boot, Greeter | Session | Recovery)
+                | (Greeter, Session | Suspended | Recovery | Shutdown)
+                | (Session, Lock | Suspended | Recovery | Shutdown)
+                | (Lock, Session | Suspended | Recovery | Shutdown)
+                | (Suspended, Greeter | Session | Lock | Recovery)
+                | (Recovery, Greeter | Session | Shutdown)
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -56,6 +84,13 @@ pub enum MotionProfile {
     Standard,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ContrastProfile {
+    Standard,
+    High,
+}
+
 /// Bounded semantic state that may cross a lifecycle renderer boundary.
 ///
 /// `scene_digest` names the exact visual scene/package or agreed built-in scene
@@ -80,6 +115,7 @@ pub struct ContinuityState {
     pub health: ContinuityHealth,
     pub quality: QualityProfile,
     pub motion: MotionProfile,
+    pub contrast: ContrastProfile,
 }
 
 impl ContinuityState {
@@ -102,6 +138,7 @@ impl ContinuityState {
             health: ContinuityHealth::Unknown,
             quality: QualityProfile::Standard,
             motion: MotionProfile::Standard,
+            contrast: ContrastProfile::Standard,
         }
     }
 
@@ -114,6 +151,9 @@ impl ContinuityState {
         }
         if self.handoff_sequence == 0 {
             return Err(ContinuityError::ZeroSequence);
+        }
+        if !self.transition.is_allowed() {
+            return Err(ContinuityError::InvalidTransition(self.transition));
         }
         if self.phase_micros > PHASE_SCALE {
             return Err(ContinuityError::PhaseOutOfRange(self.phase_micros));
@@ -174,6 +214,12 @@ impl ContinuityState {
                 observed: next.world_age_ticks,
             });
         }
+        if self.transition.to != next.transition.from {
+            return Err(ContinuityError::SurfaceDiscontinuity {
+                previous_to: self.transition.to,
+                next_from: next.transition.from,
+            });
+        }
         Ok(())
     }
 }
@@ -183,12 +229,17 @@ pub enum ContinuityError {
     UnsupportedVersion(u16),
     ZeroLineage,
     ZeroSequence,
+    InvalidTransition(LifecycleTransition),
     PhaseOutOfRange(u32),
     ZeroSceneDigest,
     ZeroVisualSeed,
     LineageChanged,
     SequenceNotAdvanced { previous: u64, observed: u64 },
     WorldAgeRegressed { previous: u64, observed: u64 },
+    SurfaceDiscontinuity {
+        previous_to: LifecycleSurface,
+        next_from: LifecycleSurface,
+    },
     TooLarge { bytes: usize, max: usize },
     Serialization(String),
 }
@@ -201,6 +252,11 @@ impl std::fmt::Display for ContinuityError {
             }
             Self::ZeroLineage => write!(f, "continuity lineage may not be all-zero"),
             Self::ZeroSequence => write!(f, "continuity handoff sequence must start above zero"),
+            Self::InvalidTransition(transition) => write!(
+                f,
+                "invalid lifecycle transition {:?} -> {:?}",
+                transition.from, transition.to
+            ),
             Self::PhaseOutOfRange(phase) => {
                 write!(f, "continuity phase exceeds {PHASE_SCALE}: {phase}")
             }
@@ -214,6 +270,13 @@ impl std::fmt::Display for ContinuityError {
             Self::WorldAgeRegressed { previous, observed } => write!(
                 f,
                 "continuity world age regressed: previous={previous}, observed={observed}"
+            ),
+            Self::SurfaceDiscontinuity {
+                previous_to,
+                next_from,
+            } => write!(
+                f,
+                "continuity surface chain broke: previous ended at {previous_to:?}, next starts at {next_from:?}"
             ),
             Self::TooLarge { bytes, max } => {
                 write!(f, "continuity payload exceeds size bound: {bytes} > {max}")
@@ -229,6 +292,10 @@ impl std::error::Error for ContinuityError {}
 mod tests {
     use super::*;
 
+    fn transition(from: LifecycleSurface, to: LifecycleSurface) -> LifecycleTransition {
+        LifecycleTransition::new(from, to)
+    }
+
     fn valid_state() -> ContinuityState {
         let mut lineage = [0u8; 16];
         lineage[0] = 9;
@@ -240,8 +307,19 @@ mod tests {
             lineage,
             scene,
             seed,
-            LifecycleTransition::BootToGreeter,
+            transition(LifecycleSurface::Boot, LifecycleSurface::Greeter),
         )
+    }
+
+    #[test]
+    fn representative_real_lifecycle_transitions_are_supported() {
+        assert!(transition(LifecycleSurface::Boot, LifecycleSurface::Greeter).is_allowed());
+        assert!(transition(LifecycleSurface::Boot, LifecycleSurface::Session).is_allowed());
+        assert!(transition(LifecycleSurface::Greeter, LifecycleSurface::Suspended).is_allowed());
+        assert!(transition(LifecycleSurface::Lock, LifecycleSurface::Suspended).is_allowed());
+        assert!(transition(LifecycleSurface::Suspended, LifecycleSurface::Lock).is_allowed());
+        assert!(!transition(LifecycleSurface::Shutdown, LifecycleSurface::Session).is_allowed());
+        assert!(!transition(LifecycleSurface::Session, LifecycleSurface::Session).is_allowed());
     }
 
     #[test]
@@ -251,6 +329,7 @@ mod tests {
         state.world_age_ticks = 12_345;
         state.health = ContinuityHealth::Normal;
         state.motion = MotionProfile::Reduced;
+        state.contrast = ContrastProfile::High;
 
         let bytes = state.encode_json().unwrap();
         assert!(bytes.len() <= MAX_CONTINUITY_BYTES);
@@ -258,7 +337,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_invalid_version_phase_lineage_and_sequence() {
+    fn rejects_invalid_version_phase_lineage_sequence_and_transition() {
         let mut state = valid_state();
         state.version = CONTINUITY_VERSION + 1;
         assert!(matches!(
@@ -280,6 +359,13 @@ mod tests {
         let mut state = valid_state();
         state.handoff_sequence = 0;
         assert_eq!(state.validate(), Err(ContinuityError::ZeroSequence));
+
+        let mut state = valid_state();
+        state.transition = transition(LifecycleSurface::Shutdown, LifecycleSurface::Session);
+        assert!(matches!(
+            state.validate(),
+            Err(ContinuityError::InvalidTransition(_))
+        ));
     }
 
     #[test]
@@ -288,7 +374,7 @@ mod tests {
             [9u8; 16],
             [0u8; 32],
             [1u8; 32],
-            LifecycleTransition::BootToGreeter,
+            transition(LifecycleSurface::Boot, LifecycleSurface::Greeter),
         );
         assert_eq!(state.validate(), Err(ContinuityError::ZeroSceneDigest));
 
@@ -296,13 +382,13 @@ mod tests {
             [9u8; 16],
             [1u8; 32],
             [0u8; 32],
-            LifecycleTransition::BootToGreeter,
+            transition(LifecycleSurface::Boot, LifecycleSurface::Greeter),
         );
         assert_eq!(state.validate(), Err(ContinuityError::ZeroVisualSeed));
     }
 
     #[test]
-    fn successor_rejects_replay_lineage_change_and_age_rewind() {
+    fn successor_rejects_replay_lineage_age_and_surface_errors() {
         let mut previous = valid_state();
         previous.handoff_sequence = 4;
         previous.world_age_ticks = 100;
@@ -323,15 +409,25 @@ mod tests {
         let mut rewind = previous.clone();
         rewind.handoff_sequence = 5;
         rewind.world_age_ticks = 99;
+        rewind.transition = transition(LifecycleSurface::Greeter, LifecycleSurface::Session);
         assert!(matches!(
             previous.validate_successor(&rewind),
             Err(ContinuityError::WorldAgeRegressed { .. })
         ));
 
+        let mut discontinuity = previous.clone();
+        discontinuity.handoff_sequence = 5;
+        discontinuity.world_age_ticks = 101;
+        discontinuity.transition = transition(LifecycleSurface::Session, LifecycleSurface::Lock);
+        assert!(matches!(
+            previous.validate_successor(&discontinuity),
+            Err(ContinuityError::SurfaceDiscontinuity { .. })
+        ));
+
         let mut next = previous.clone();
         next.handoff_sequence = 5;
         next.world_age_ticks = 101;
-        next.transition = LifecycleTransition::GreeterToSession;
+        next.transition = transition(LifecycleSurface::Greeter, LifecycleSurface::Session);
         previous.validate_successor(&next).unwrap();
     }
 }
