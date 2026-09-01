@@ -16,6 +16,7 @@ PACKAGES=(
   symthaea-boot-control
   symthaea-boot-input
   symthaea-boot-ecology-live
+  symthaea-boot-visual-clock
   symthaea-spore-continuity
 )
 
