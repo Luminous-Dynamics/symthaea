@@ -4,8 +4,8 @@
 # NixOS Module: Symthaea / Spore Boot Animation
 #
 # Runs the mycelial colonization animation (symthaea-quicken-fb) on bare-metal
-# DRM/KMS framebuffer during early graphical boot. Optional typed telemetry and
-# handoff receipts are presentation-only: loss or corruption must never block boot.
+# DRM/KMS framebuffer during early graphical boot. Optional typed telemetry,
+# handoff receipts, and performance receipts are presentation-only.
 
 { config, lib, pkgs, ... }:
 
@@ -19,6 +19,9 @@ let
   ];
   handoffArgs = optionals cfg.handoff.enable [
     "--handoff-receipt ${escapeShellArg cfg.handoff.receiptPath}"
+  ];
+  performanceArgs = optionals cfg.performance.enable [
+    "--performance-receipt ${escapeShellArg cfg.performance.receiptPath}"
   ];
 in {
   options.services.symthaea-boot = {
@@ -95,6 +98,23 @@ in {
       };
     };
 
+    performance = {
+      enable = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Collect in-memory renderer timings and write one receipt on exit.
+          Disabled by default so normal boots do not allocate measurement vectors.
+        '';
+      };
+
+      receiptPath = mkOption {
+        type = types.str;
+        default = "/run/symthaea/boot-performance-v1.json";
+        description = "Ephemeral renderer performance receipt path.";
+      };
+    };
+
     device = mkOption {
       type = types.str;
       default = "/dev/dri/card0";
@@ -116,6 +136,10 @@ in {
         {
           assertion = !cfg.handoff.enable || hasPrefix "/run/symthaea/" cfg.handoff.receiptPath;
           message = "services.symthaea-boot.handoff.receiptPath must stay beneath /run/symthaea";
+        }
+        {
+          assertion = !cfg.performance.enable || hasPrefix "/run/symthaea/" cfg.performance.receiptPath;
+          message = "services.symthaea-boot.performance.receiptPath must stay beneath /run/symthaea";
         }
       ];
 
@@ -144,7 +168,15 @@ in {
             "--genesis-phrase ${escapeShellArg cfg.genesisPhrase}"
             "--progress-pipe ${escapeShellArg cfg.progressPipe}"
             "--device ${escapeShellArg cfg.device}"
-          ] ++ telemetryArgs ++ handoffArgs);
+          ] ++ telemetryArgs ++ handoffArgs ++ performanceArgs);
+
+          ExecStartPre =
+            optionals cfg.handoff.enable [
+              "${pkgs.coreutils}/bin/rm -f -- ${escapeShellArg cfg.handoff.receiptPath}"
+            ]
+            ++ optionals cfg.performance.enable [
+              "${pkgs.coreutils}/bin/rm -f -- ${escapeShellArg cfg.performance.receiptPath}"
+            ];
 
           SupplementaryGroups = [ "video" "render" ]
             ++ optional cfg.telemetry.enable "symthaea-boot";
@@ -167,9 +199,6 @@ in {
           RestrictRealtime = true;
           RestrictSUIDSGID = true;
           PrivateTmp = true;
-        } // optionalAttrs cfg.handoff.enable {
-          # A stale receipt must never be confused with this renderer instance.
-          ExecStartPre = "${pkgs.coreutils}/bin/rm -f -- ${escapeShellArg cfg.handoff.receiptPath}";
         };
       };
 

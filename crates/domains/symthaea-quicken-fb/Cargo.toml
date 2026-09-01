@@ -10,6 +10,10 @@ license = "AGPL-3.0-or-later"
 name = "quicken-fb"
 path = "src/main.rs"
 
+[[bin]]
+name = "spore-boot-bench"
+path = "src/bin/spore_boot_bench.rs"
+
 [dependencies]
 drm = "0.12"
 drm-ffi = "0.8"

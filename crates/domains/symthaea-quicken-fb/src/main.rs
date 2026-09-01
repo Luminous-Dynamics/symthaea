@@ -12,6 +12,7 @@
 ///   quicken-fb --genesis-phrase "..." --boot-events-socket /run/symthaea/boot-events.sock \
 ///       --boot-state-path /run/symthaea-boot/state-v1.json
 ///   quicken-fb --genesis-phrase "..." --handoff-receipt /run/symthaea/boot-display-released-v1.json
+///   quicken-fb --genesis-phrase "..." --performance-receipt /run/symthaea/boot-performance-v1.json
 ///   quicken-fb --genesis-phrase "..." --device /dev/dri/card1
 ///
 /// Signal handling:
@@ -25,6 +26,7 @@ use symthaea_quicken_fb::boot_protocol::{BootTelemetry, BootVisualState};
 use symthaea_quicken_fb::framebuffer::DrmFramebuffer;
 use symthaea_quicken_fb::handoff::{DisplayReleaseReceipt, ExitReason};
 use symthaea_quicken_fb::mycelium::MycelialNetwork;
+use symthaea_quicken_fb::perf::BootPerformanceRecorder;
 use symthaea_quicken_fb::progress::{ProgressEvent, ProgressMonitor};
 
 /// Target frame rate for the animation.
@@ -46,9 +48,15 @@ static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 fn main() {
     let process_start = Instant::now();
     let args = parse_args();
+    let frame_duration = Duration::from_nanos(1_000_000_000 / TARGET_FPS as u64);
+    let mut performance = args
+        .performance_receipt
+        .as_ref()
+        .map(|_| BootPerformanceRecorder::new(process_start, frame_duration));
 
     install_signal_handlers();
 
+    let drm_open_start = Instant::now();
     let mut fb = match DrmFramebuffer::open(&args.device) {
         Ok(fb) => fb,
         Err(e) => {
@@ -56,6 +64,9 @@ fn main() {
             std::process::exit(1);
         }
     };
+    if let Some(performance) = performance.as_mut() {
+        performance.mark_drm_open(drm_open_start.elapsed());
+    }
 
     eprintln!(
         "quicken-fb: display {}x{} @ {}Hz on {}",
@@ -64,6 +75,10 @@ fn main() {
         fb.mode.vrefresh(),
         args.device,
     );
+
+    let display_width = fb.width;
+    let display_height = fb.height;
+    let display_refresh_hz = fb.mode.vrefresh();
 
     let mut network = MycelialNetwork::new(fb.width, fb.height, &args.genesis_phrase);
     let mut progress = ProgressMonitor::new(args.progress_pipe.as_deref());
@@ -76,7 +91,6 @@ fn main() {
     let buf_size = (fb.width * fb.height) as usize;
     let mut render_buf = vec![0u32; buf_size];
 
-    let frame_duration = Duration::from_nanos(1_000_000_000 / TARGET_FPS as u64);
     let start_time = Instant::now();
     let mut last_frame = Instant::now();
 
@@ -99,6 +113,7 @@ fn main() {
             continue;
         }
         last_frame = now;
+        let frame_work_start = Instant::now();
 
         let boot_report = boot.poll();
         let current_boot_visual = boot.visual_state();
@@ -162,10 +177,27 @@ fn main() {
             .map(|state| state.growth_floor)
             .unwrap_or(0.0);
         let growth_rate = progress.io_rate.max(boot_growth_floor);
-        network.grow(dt, growth_rate);
 
+        let grow_start = Instant::now();
+        network.grow(dt, growth_rate);
+        let grow_elapsed = grow_start.elapsed();
+
+        let render_start = Instant::now();
         network.render(&mut render_buf);
+        let render_elapsed = render_start.elapsed();
+
+        let blit_start = Instant::now();
         fb.blit_from(&render_buf);
+        let blit_elapsed = blit_start.elapsed();
+
+        if let Some(performance) = performance.as_mut() {
+            performance.record_frame(
+                grow_elapsed,
+                render_elapsed,
+                blit_elapsed,
+                frame_work_start.elapsed(),
+            );
+        }
     }
 
     // Present one deterministic black frame before releasing the KMS objects.
@@ -177,6 +209,7 @@ fn main() {
     let release_start = Instant::now();
     drop(fb);
     let release_elapsed = release_start.elapsed();
+    let release_us = u64::try_from(release_elapsed.as_micros()).unwrap_or(u64::MAX);
 
     if let Some(path) = args.handoff_receipt.as_deref() {
         let receipt = DisplayReleaseReceipt::new(release_elapsed, process_start.elapsed(), exit_reason);
@@ -184,6 +217,21 @@ fn main() {
             // Receipt failure is diagnostic-only and must never turn a successful
             // DRM release into a boot/session failure.
             eprintln!("quicken-fb: failed to write handoff receipt: {error}");
+        }
+    }
+
+    if let (Some(path), Some(performance)) =
+        (args.performance_receipt.as_deref(), performance.as_ref())
+    {
+        if let Err(error) = performance.write_atomic(
+            Path::new(path),
+            display_width,
+            display_height,
+            display_refresh_hz,
+            network.branches.len(),
+            release_us,
+        ) {
+            eprintln!("quicken-fb: failed to write performance receipt: {error}");
         }
     }
 
@@ -211,6 +259,7 @@ struct Args {
     boot_events_socket: Option<String>,
     boot_state_path: Option<String>,
     handoff_receipt: Option<String>,
+    performance_receipt: Option<String>,
     device: String,
 }
 
@@ -222,6 +271,7 @@ fn parse_args() -> Args {
     let mut boot_events_socket = None;
     let mut boot_state_path = None;
     let mut handoff_receipt = None;
+    let mut performance_receipt = None;
     let mut device = "/dev/dri/card0".to_string();
 
     let mut i = 1;
@@ -255,6 +305,12 @@ fn parse_args() -> Args {
                 i += 1;
                 if i < args.len() {
                     handoff_receipt = Some(args[i].clone());
+                }
+            }
+            "--performance-receipt" => {
+                i += 1;
+                if i < args.len() {
+                    performance_receipt = Some(args[i].clone());
                 }
             }
             "--device" => {
@@ -291,6 +347,7 @@ fn parse_args() -> Args {
         boot_events_socket,
         boot_state_path,
         handoff_receipt,
+        performance_receipt,
         device,
     }
 }
@@ -305,6 +362,7 @@ fn print_usage() {
          \x20 --boot-events-socket <PATH> Unix datagram socket for typed boot telemetry\n\
          \x20 --boot-state-path <PATH>    Lineage-bound boot snapshot side channel\n\
          \x20 --handoff-receipt <PATH>    Atomic acknowledgement written after DRM release\n\
+         \x20 --performance-receipt <PATH> Opt-in renderer timing receipt\n\
          \x20 --device <PATH>             DRM device path (default: /dev/dri/card0)\n\
          \x20 --help                      Show this help"
     );
