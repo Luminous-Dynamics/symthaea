@@ -15,7 +15,21 @@ The adapter may execute only from the clean qualified VART runtime:
 
 The orchestrator independently checks HEAD, TREE, and a clean working tree before any pilot evidence root is created.
 
-## 2. Normative environment inputs
+## 2. Policy-output isolation
+
+Each pilot policy executes in a fresh private staging directory owned only by that invocation. The shared pilot evidence root is **not** passed to the runtime process.
+
+The runtime receives only its per-cell `VART_OUTPUT_ROOT`; after the process exits successfully and its trial package is validated, the orchestrator moves the sealed `trials/<trial-id>/` directory into the shared evidence package.
+
+This makes cross-policy output inspection structurally unavailable through the experiment output surface rather than relying only on a self-reported flag.
+
+A runtime invocation must write exactly one subtree:
+
+`$VART_OUTPUT_ROOT/trials/$VART_TRIAL_ID/`
+
+Writing any sibling/top-level artifact causes pilot rejection.
+
+## 3. Normative environment inputs
 
 For every pilot cell the orchestrator exports:
 
@@ -31,44 +45,59 @@ For every pilot cell the orchestrator exports:
 - `VART_SEED`
 - `VART_REVISION_INDEX`
 - `VART_PAIRED_BLOCK_ID`
-- `VART_OUTPUT_ROOT`
+- `VART_OUTPUT_ROOT` — private per-cell staging root
 - `VART_ANALYSIS_CONTRACT_SHA256`
 - `VART_METRIC_DEFINITION_SET_SHA256`
 
 The runtime entrypoint may additionally accept equivalent CLI arguments, but it must fail if CLI and environment values disagree.
 
-## 3. Runtime command
+## 4. Runtime command
 
 `VART_WORLD_CREATIVE_001_PILOT_RUN.template.json` deliberately contains an unresolved `runtime_argv`. Bind it to the actual local VART trial entrypoint only after inspecting the qualified runtime tree.
 
-The command runs once per pilot cell and must be deterministic with respect to the frozen inputs and declared runtime state, except for explicitly measured simulator/renderer behavior whose environment identity is retained in evidence.
+The template exposes `{output_root}`, not the shared pilot root. The command runs once per pilot cell and must be deterministic with respect to the frozen inputs and declared runtime state, except for explicitly measured simulator/renderer behavior whose environment identity is retained in evidence.
 
-## 4. Files owned by the orchestrator
+## 5. Required decision-input artifact
 
-The runtime MUST NOT modify these top-level pilot-root files:
+Every trial exports a canonical logical artifact `decision_input` and binds its raw-byte SHA-256 as `manifest.decision_input_sha256`.
 
-- `analysis_contract.json`
-- `metric_definitions.json`
-- `trial_inventory.json`
-- `primary_results.json`
-- `confirmatory_freeze.json`
-- `_orchestrator/**`
+It contains at minimum:
 
-The orchestrator creates and hashes them before trial execution.
+- `experiment_id`
+- `paired_block_id`
+- `seed`
+- `revision_index`
+- pre-decision world/observation identities required by the policy
 
-## 5. Files owned by one trial
+For FULL / RANDOM_VALID / HEURISTIC paired comparisons, the decision-input artifact is byte-identical wherever the policy definitions specify the same evidence surface.
 
-A runtime invocation may write only below:
+It must not contain another policy's choice/outcome, later revisit/outcome data, human labels, or unrevealed generalization-fixture targets.
 
-`$VART_OUTPUT_ROOT/trials/$VART_TRIAL_ID/`
+The pilot verifier independently checks paired `decision_input_sha256` equality in addition to candidate-set equality.
 
-At minimum it must emit the Evidence Package v1 artifacts required by `scripts/verify_vart_world_creative_001.py`, including:
+## 6. Candidate-set retention
+
+Every manifest binds both:
+
+- `generated_candidate_count`
+- `admissible_candidate_count`
+
+The canonical candidate-set artifact retains **all generated candidates**, including physically rejected candidates, in frozen order. Every entry explicitly records `physically_admitted: true|false`.
+
+The candidate array length equals `generated_candidate_count`; the number of admitted entries equals `admissible_candidate_count`.
+
+This makes rejected-candidate truncation independently detectable.
+
+## 7. Required evidence package
+
+At minimum each trial emits:
 
 - `manifest.json`
 - `evidence_index.json`
-- experience evidence
+- `decision_input`
+- experience evidence or explicit ablation sentinel
 - `RevisionHypothesis`
-- canonical physically admitted candidate-set artifact
+- canonical generated/admitted candidate-set artifact
 - selected proposal
 - typed application receipt for completed trials
 - revisit observation for completed trials
@@ -76,9 +105,20 @@ At minimum it must emit the Evidence Package v1 artifacts required by `scripts/v
 - RANDOM_VALID draw receipt when applicable
 - ablation receipt when applicable
 
-Every manifest must bind the exact pilot analysis-contract and metric-definition digests supplied by the orchestrator.
+Every manifest binds the exact pilot analysis-contract and metric-definition digests supplied by the orchestrator.
 
-## 6. Ablation receipts
+For a completed trial, the typed applied receipt additionally binds:
+
+- `decision_input_sha256`
+- `revision_hypothesis_sha256`
+- `candidate_set_sha256`
+- `selected_proposal_sha256`
+- `world_version_before`
+- `world_version_after`
+
+This prevents replacement of the hypothesis, candidate surface, or decision input after the edit without breaking receipt closure.
+
+## 8. Ablation receipts
 
 Every ablation policy emits an `ablation_receipt` logical artifact whose SHA-256 is bound by `manifest.ablation_receipt_sha256`.
 
@@ -94,8 +134,6 @@ Required identity fields:
 - `removed_channels`
 - `preregistered_ablation = true`
 - `assertions`
-
-Required pilot semantics:
 
 ### `no_embodied_experience`
 
@@ -115,41 +153,47 @@ It binds:
 - `channel = ExperienceEpisode`
 - `available = false`
 
-The sentinel's raw-byte digest occupies `manifest.experience_episode_sha256`. This preserves the fixed trial-manifest closure while making the absence intentional, typed, and independently verifiable.
+The sentinel's raw-byte digest occupies `manifest.experience_episode_sha256`. This preserves fixed manifest closure while making the absence intentional, typed, and independently verifiable.
 
 ### `no_counterfactual_evaluation`
 
 - `removed_channels` contains `counterfactual_evaluation`.
 - `assertions.counterfactual_evaluation_performed = false`.
-- The candidate-set evidence must contain no counterfactual observation/render/score fields.
-- `evidence_index.json` must contain no logical file whose name begins `counterfactual_`.
+- Candidate-set evidence contains no counterfactual observation/render/score fields.
+- `evidence_index.json` contains no logical file whose name begins `counterfactual_`.
 
-## 7. RANDOM_VALID
+## 9. RANDOM_VALID
 
-RANDOM_VALID must implement `sha256-counter-v1` exactly as frozen in `VART_WORLD_CREATIVE_001_RANDOM_VALID_V1.md` and pass the frozen cross-language vectors before pilot execution.
+RANDOM_VALID implements `sha256-counter-v1` exactly as frozen in `VART_WORLD_CREATIVE_001_RANDOM_VALID_V1.md` and passes the frozen cross-language vectors before pilot execution.
 
 It must never use OS entropy, Rust `rand`, Python RNG state, candidate outcome values, FULL/HEURISTIC choices, or later observations.
 
-## 8. Exit semantics
+## 10. Exit semantics
 
 Exit status distinguishes **infrastructure failure** from a **scientifically valid non-successful trial**.
 
-- Exit `0`: the trial reached a scientifically accounted terminal state and emitted a complete evidence package. `trial_state` may be `complete`, `aborted`, or another preregistered scientifically accounted state as permitted by the manifest contract.
-- Non-zero exit: the adapter/runtime itself failed to produce trustworthy trial evidence. The orchestrator stops immediately and the pilot does not pass.
+- Exit `0`: the trial reached a scientifically accounted terminal state and emitted a complete evidence package.
+- Non-zero exit: the adapter/runtime failed to produce trustworthy trial evidence. The orchestrator stops immediately and the pilot does not pass.
 
 A poor FULL outcome is not an infrastructure failure. A broken evidence chain is not an ordinary poor outcome.
 
-## 9. Write ordering
+## 11. Write ordering
 
-For a completed trial the evidence must establish:
+For a completed trial the evidence establishes:
 
-`RevisionHypothesis closed -> selection closed -> typed mutation receipt -> revisit closed -> RevisionOutcome closed`
+`decision input closed -> RevisionHypothesis closed -> selection closed -> typed mutation receipt -> revisit closed -> RevisionOutcome closed`
 
-The manifest and `evidence_index.json` are written last, after the referenced artifacts are durable. The evidence index binds exact raw-byte SHA-256 values.
+The manifest and `evidence_index.json` are written last, after referenced artifacts are durable.
 
-## 10. Pilot boundary
+## 12. Pilot vs confirmatory verifier
 
-Every pilot manifest must contain:
+The pilot runner invokes `scripts/verify_vart_world_creative_001_pilot.py`.
+
+A confirmatory claim MUST NOT use that wrapper. Confirmatory closeout uses `scripts/verify_vart_world_creative_001_qualified.py` with an **externally anchored SHA-256 of `confirmatory_freeze.json`** committed before confirmatory outcomes are observed, and it must pass the N1–N20 verifier qualification suite.
+
+## 13. Pilot boundary
+
+Every pilot manifest contains:
 
 - `campaign = pilot`
 - `included_in_confirmatory_analysis = false`
