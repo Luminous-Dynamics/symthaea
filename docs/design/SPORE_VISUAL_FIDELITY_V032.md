@@ -1,4 +1,4 @@
-# Spore Visual Fidelity v0.3.2 — Light, Membrane, and Ceremony
+# Spore Visual Fidelity v0.3.2 — Light, Membrane, Ceremony, Identity
 
 ## Goal
 
@@ -17,7 +17,8 @@ The exact live and preview renderer is now deliberately layered:
 1. **Organic topology** — deterministic spores, curved hyphae, branching, anastomosis, repair marks, rollback retraction, generation rings, mesh links.
 2. **Holographic field** — projected membranes, segmented orbitals, sparse anchors, spectral echoes, energy sweeps.
 3. **Fidelity pass** — seeded spore membrane detail, bounded caustic interference, thresholded low-resolution bloom.
-4. **Lifecycle-specific wrapper** — Inoculation chamber and install-route signature when the renderer is used for installation.
+4. **Identity layer** — sparse dependency-free factual microtype (`SPORE`, lifecycle cue, current stage).
+5. **Lifecycle-specific wrapper** — Inoculation chamber and install-route signature when the renderer is used for installation.
 
 Each layer is optional presentation. None is allowed to become a dependency of system startup.
 
@@ -67,6 +68,18 @@ Rules:
 - slightly warmer during repair/update;
 - slightly cooler during resume.
 
+## Sparse factual microtype
+
+Concept art also benefits from typography, but pulling a desktop font stack into early boot would be the wrong tradeoff. v0.3.2 adds a tiny built-in 5×7 uppercase raster alphabet with no external assets.
+
+The final renderer draws only:
+
+- `SPORE`;
+- one lifecycle cue such as `GERMINATION`, `RELIGHTING`, `APPLYING GENERATION`, `RESTORING KNOWN GOOD`, or `RECOVERY`;
+- one small current-stage label such as `WEAVING`, `REPAIRING`, `GENERATION RING`, or `HANDOFF`.
+
+The labels fade before compositor takeover and are explicitly tested not to make consciousness/sentience claims. The ecology remains understandable without them.
+
 ## Installation is a family of ceremonies
 
 The shared Inoculation phase model remains:
@@ -108,6 +121,12 @@ Quiet layered substrate contours emphasize local disk/system formation with the 
 
 These route signatures wrap the same factual installation phase state and the same machine-specific morphology. They never change installation authority or success criteria.
 
+## Inoculation narration policy
+
+The web ceremony has also been brought into the same epistemic language as the framebuffer UI. Narration describes verifiable actions — trust establishment, reproducible transition environment, storage layout, derivations, runtime components, configuration, and first verified boot — rather than asserting that hardware has awakened or become sentient.
+
+Optional Phi telemetry can remain visible as a research metric where enabled, but it is explicitly not an installation/boot success signal.
+
 ## Exact evidence
 
 CI renders three independent exact-pixel review artifacts:
@@ -125,7 +144,6 @@ Candidate v0.3.3 work should prioritize continuity over ornament:
 - write a bounded visual handoff receipt before compositor takeover;
 - allow the greeter/session shell to continue the same `BootGenome` rather than cutting to an unrelated login screen;
 - persist shutdown contraction anchors so the next healthy boot can germinate from the same abstract spore positions;
-- add a tiny signed-distance-field factual microtype renderer for `SPORE`, `GERMINATION`, `INOCULATION`, and real phase names;
 - evaluate DRM page flips/double buffering for cleaner motion;
 - measure 1080p/1440p CPU budgets before increasing bloom radius or effect count;
 - add accessibility profiles for reduced motion and reduced bloom.
