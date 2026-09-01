@@ -9,73 +9,108 @@ The live integration report supplied on 2026-09-01 records WORLD-FORGE v0.5-A as
 - HEAD: `33820b3d9e904280e6264719fe7717cb2e5dd5bb`
 - TREE: `e93c6dbfa05b602100ff924efaa5d95f92ef5a65`
 
-and reports the VART-WORLD-CREATIVE-001 integration descendant as commit beginning `844d10609a9f03e26a06...`, tree beginning `38e5506c8f7f88d58e1f...`.
+and the fully qualified local VART-WORLD-CREATIVE-001 integration as:
 
-These runtime commits are not yet reachable through the connected GitHub repository, so this sequence MUST NOT be treated as source qualification until the exact commits or an exact tree-equivalent lineage are pushed and independently fetched.
+- HEAD: `844d10609a9f03e26a06f22778db4b8cdfb6a3ef`
+- TREE: `38e5506c8f7f88d58e1ff03a77585091d9263a98`
 
-## Phase P0 — Source closure
+The runtime commit remains local-only from the connected GitHub view. Do not replace it with an approximate remote tree.
 
-1. Push the exact qualified v0.5-A runtime parent and the VART integration descendant.
-2. Fetch both commits from GitHub and verify exact HEAD/TREE identity.
-3. Bind parent qualification receipts and the VART integration receipt.
-4. Verify no changes to protected authority boundaries.
-5. Keep `execution_authorized=false`, `confirmatory_authorized=false`, and `claim_authorized=false`.
+## Phase P0 — Source and instrument closure
 
-Exit: exact source lineage is remotely reproducible.
+1. Bind the exact qualified VART runtime HEAD/TREE above.
+2. Require a clean runtime working tree.
+3. Preserve the v0.5-A and VART integration qualification receipts.
+4. Bind the research-contract branch and evidence-format versions used by the pilot.
+5. Keep confirmatory execution and claim authorization false.
+
+Exit: the runtime and research instrument are unambiguously identified.
 
 ## Phase P1 — Noncanonical plumbing pilot
 
-Purpose: discover instrumentation or harness defects only. Pilot results are never admissible for the confirmatory claim.
+Purpose: discover instrumentation, serialization, pairing, adapter, or verifier defects only. Pilot results are never admissible for the confirmatory efficacy claim.
 
-Run a deliberately small campaign across:
+Run exactly the frozen eight cells in `VART_WORLD_CREATIVE_001_PILOT_RUN.template.json` after binding its unresolved `runtime_argv` to the real local VART trial entrypoint.
 
-- policies: FULL, RANDOM_VALID, HEURISTIC;
-- fixtures: one ordinary fixture plus PrettyTrap and MemoryTrap;
-- seeds: a small explicitly noncanonical set;
-- cycles: enough to exercise hypothesis -> proposal -> apply -> revisit -> outcome -> calibration closure.
+The orchestrator must:
+
+- verify exact clean runtime HEAD/TREE before creating evidence;
+- use a fresh pilot root;
+- execute each policy in a fresh private staging root so other policy outputs are not visible through the experiment output surface;
+- bind pilot-only analysis and metric-definition digests;
+- retain all generated candidates, including rejected candidates;
+- require byte-identical decision-input and candidate-set surfaces for paired primary policies where preregistered;
+- verify RANDOM_VALID through `sha256-counter-v1`;
+- require explicit ablation receipts/sentinels;
+- invoke `verify_vart_world_creative_001_pilot.py` only after all eight trial directories are sealed.
 
 The pilot must verify:
 
 - every `RevisionHypothesis` predates the corresponding world mutation;
 - every `RevisionOutcome` is generated only after a revisit observation;
+- applied receipts bind the decision input, hypothesis, candidate set, selected proposal, and world transition;
 - `CreativeTrial` closes all hashes and world-version transitions;
-- rejected candidate evidence is retained;
-- random-valid draws only from physically admitted candidates;
-- baseline policies use the same candidate set and physical authority gates;
+- rejected candidates remain evidence;
+- random-valid draws only from admitted candidates and are independently reproducible;
 - no aggregate `world_quality` or equivalent scalar is emitted;
 - calibration records cannot be rewritten after outcome observation;
 - Reality Ledger provenance distinguishes committed, counterfactual, replay and historical observations;
-- aborted/incomplete trials cannot enter the confirmatory evidence root.
+- aborted/incomplete/integrity-invalid trials cannot disappear from accounting;
+- pilot trials cannot enter confirmatory analysis.
 
-If the pilot exposes a production mechanism defect, create a new source lineage. Do not patch the mechanism under confirmatory qualification.
+If the pilot exposes a production mechanism defect, create a new runtime source lineage. If it exposes a scientific-contract defect, create a new preregistration lineage. Do not silently repair either lineage in place after inspecting outcome values.
+
+Pilot exit claim: at most `PILOT_PLUMBING_PASS`.
 
 ## Phase P2 — Freeze the confirmatory protocol
 
 Before inspecting confirmatory outcomes, freeze:
 
-- exact source HEAD/TREE;
+- exact source HEAD/TREE and qualification receipt;
 - environment/toolchain/GPU/renderer identities where causally relevant;
 - fixture corpus and fixture digests;
+- hidden generalization fixture corpus and reveal protocol;
 - seed list;
 - policy implementations and policy digests;
-- ablation matrix;
-- candidate-generation budget;
-- revision budget and stopping rule;
-- prediction channels and confidence-bound semantics;
-- outcome-vector definitions;
-- protected physical/safety invariants;
-- calibration metrics;
-- missing-data/drop policy;
+- ablation implementations and digests;
+- candidate generator and physical-admission policy;
+- candidate/revision budgets and stopping rule;
+- prediction channels and confidence semantics;
+- metric definitions and directions;
+- analysis contract, cluster unit, uncertainty method and multiplicity policy;
+- missingness/abort/exclusion policy;
 - human-evaluation sampling/blinding protocol;
-- success/failure thresholds;
+- complete trial inventory;
 - evidence root;
-- independent verifier identity.
+- independent verifier source;
+- qualified verifier wrapper;
+- N1–N20 verifier qualification suite.
 
-Only then may `confirmatory_authorized=true` be considered.
+Set `frozen=true` only when all required fields are complete.
 
-## Phase P3 — Confirmatory campaign
+Then compute SHA-256 over the exact raw bytes of `confirmatory_freeze.json` and record that digest **outside the confirmatory evidence root** before execution (for example in a dedicated signed/tagged preregistration commit or immutable receipt). The freeze file must not try to contain its own hash.
 
-Run paired trials so FULL, RANDOM_VALID and HEURISTIC see equivalent world/seed conditions and the same admissible candidate set wherever the policy definition permits it.
+Confirmatory closeout must receive that externally anchored digest through:
+
+`verify_vart_world_creative_001_qualified.py --expected-freeze-sha256 <digest>`
+
+Only after that anchor exists may confirmatory execution authorization be considered.
+
+## Phase P3 — Verifier qualification before scientific interpretation
+
+Before confirmatory results may be interpreted for the bounded claim:
+
+1. a canonical valid evidence bundle is accepted;
+2. all N1–N20 attacks are deterministically rejected for their preregistered reason classes;
+3. the verifier source/executable digest is frozen;
+4. the qualified verifier requires the external freeze anchor;
+5. verifier changes after outcome inspection create a new verifier lineage and are disclosed.
+
+CI may execute the synthetic N1–N20 suite continuously, but CI success alone does not authorize a scientific claim; the actual frozen verifier digest must be bound into the confirmatory freeze.
+
+## Phase P4 — Confirmatory campaign
+
+Run paired trials so FULL, RANDOM_VALID and HEURISTIC see equivalent world/seed conditions and the same decision/candidate surfaces wherever the policy definition permits it.
 
 Minimum scientific comparisons:
 
@@ -88,12 +123,12 @@ Minimum scientific comparisons:
 
 Run both:
 
-- longitudinal worlds: repeated revisions in the same persistent world;
-- generalization worlds: fewer revisions across unseen worlds.
+- longitudinal worlds: repeated revisions in the same persistent world, analyzed with world identity as the cluster unit;
+- generalization worlds: fewer revisions across genuinely unseen worlds.
 
-Adversarial fixtures must include PrettyTrap, LocalOptimum, HiddenDependency, DelayedConsequence, CounterfactualDecoy and MemoryTrap.
+Adversarial fixtures include PrettyTrap, LocalOptimum, HiddenDependency, DelayedConsequence, CounterfactualDecoy and MemoryTrap.
 
-## Phase P4 — Analysis without scalar collapse
+## Phase P5 — Analysis without scalar collapse
 
 Report each outcome channel separately. At minimum:
 
@@ -109,25 +144,33 @@ Report each outcome channel separately. At minimum:
 
 Do not publish a single aggregate creative/world-quality score.
 
-For prediction calibration, compare predicted effects against observed effects per channel and over time. Improvement in outcome quality and improvement in causal calibration are separate claims.
+Improvement in outcome quality and improvement in causal calibration remain separate hypotheses and separate claims.
 
-## Phase P5 — Independent closeout
+Repeated revisions from one world are not independent replicates.
 
-An independent verifier must reconstruct trial closure from exported evidence rather than trusting runtime PASS labels.
+## Phase P6 — Independent closeout
 
-It must reject at least:
+The qualified verifier reconstructs trial closure from exported evidence rather than trusting runtime PASS labels.
+
+It rejects at least:
 
 - post-hoc hypothesis mutation;
-- candidate-set substitution;
-- random-valid selection from an inadmissible candidate;
+- candidate-set or decision-input substitution;
+- random-valid selection manipulation;
+- inadmissible selection;
 - world-version mismatch;
-- missing revisit observation;
+- missing revisit;
 - proposal/receipt mismatch;
 - counterfactual/committed provenance substitution;
-- dropped or missing evidence hidden as continuity;
-- aggregate-score insertion into the qualified result surface;
-- duplicate or selectively omitted trials;
-- results from the noncanonical pilot entering confirmatory evidence.
+- pilot contamination;
+- selective omission and unauthorized early stopping;
+- duplicate trial identities;
+- forbidden aggregate scores;
+- metric/threshold/stopping-rule mutation;
+- evidence truncation;
+- cross-policy information leakage;
+- hidden generalization-fixture leakage;
+- scientific/integrity failure reclassification.
 
 Only after this closeout may the bounded claim be admitted:
 
