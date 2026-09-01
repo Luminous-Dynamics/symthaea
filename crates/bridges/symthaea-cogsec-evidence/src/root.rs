@@ -3,8 +3,9 @@
 //! Public root for CogSec shadow evidence.
 //!
 //! The existing v1 event ledger remains unchanged in `lib.rs`. This façade adds
-//! an additive portable effect-binding sidecar so independent qualification can
-//! re-check exact evaluated-effect ↔ observed-effect equality after export.
+//! additive exact-effect bindings and deterministic hash-chain checkpoints so
+//! structural qualification, integrity continuity, and later authentication can
+//! remain separate assurance layers.
 
 #![forbid(unsafe_code)]
 
@@ -16,4 +17,12 @@ mod effect_binding;
 pub use effect_binding::{
     EFFECT_BINDING_SCHEMA_V1, EffectBindingReport, EffectBindingViolation,
     EffectBoundEvidenceSnapshot, ObservedEffectBinding, validate_effect_bound_snapshot,
+};
+
+mod checkpoint;
+pub use checkpoint::{
+    EVIDENCE_CHECKPOINT_SCHEMA_V1, CheckpointBuildError, CheckpointFork,
+    CheckpointVerificationReport, CheckpointViolation, CheckpointedEffectBoundEvidence,
+    EvidenceCheckpoint, checkpoint_effect_bound_snapshot, detect_checkpoint_forks,
+    effect_bound_snapshot_root, verify_checkpoint_chain,
 };
