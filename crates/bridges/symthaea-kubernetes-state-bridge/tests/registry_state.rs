@@ -4,9 +4,9 @@
 use serde_json::json;
 use std::sync::Arc;
 use symthaea_integration_core::{
-    IntegrationId, IntegrationRegistry, StateAssessmentStatus, StateComparisonPolicy, StateLimits,
-    TemporalStatePolicy, TemporalStateStatus, assess_state_dimension,
-    assess_state_dimension_temporally,
+    IntegrationId, IntegrationRegistry, StateAssessmentStatus, StateComparisonPolicy, StateHistory,
+    StateLimits, TemporalStatePolicy, TemporalStateStatus, assess_state_dimension,
+    assess_state_dimension_temporally, assess_state_dimension_with_history,
 };
 use symthaea_kubernetes_bridge::{KUBERNETES_INTEGRATION_ID, KubernetesReplayContext};
 use symthaea_kubernetes_state_bridge::KubernetesStateReplay;
@@ -84,6 +84,47 @@ fn kubernetes_replay_does_not_invent_rollout_age() {
     assert_eq!(assessment.instantaneous.status, StateAssessmentStatus::Drift);
     assert_eq!(assessment.status, TemporalStateStatus::DriftAgeUnknown);
     assert_eq!(assessment.drift_age_ms, None);
+}
+
+#[test]
+fn replay_history_can_prove_persistent_drift_without_inventing_change_time() {
+    let first = KubernetesStateReplay::from_objects(
+        KubernetesReplayContext::default(),
+        &[deployment()],
+        100,
+    )
+    .unwrap();
+    let latest = KubernetesStateReplay::from_objects(
+        KubernetesReplayContext::default(),
+        &[deployment()],
+        300,
+    )
+    .unwrap();
+    let entity = latest.snapshot().assertions[0].subject.clone();
+    let history = StateHistory {
+        integration_id: KUBERNETES_INTEGRATION_ID.into(),
+        snapshots: vec![first.snapshot().clone(), latest.snapshot().clone()],
+    };
+    let assessment = assess_state_dimension_with_history(
+        &history,
+        &entity,
+        "workload.replicas",
+        300,
+        TemporalStatePolicy {
+            comparison: StateComparisonPolicy::Exact,
+            max_desired_age_ms: Some(1_000),
+            max_observed_age_ms: Some(1_000),
+            convergence_window_ms: 150,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(assessment.current.status, TemporalStateStatus::DriftAgeUnknown);
+    assert_eq!(
+        assessment.continuously_observed_desired_age_lower_bound_ms,
+        Some(200)
+    );
+    assert!(assessment.persistent_drift_proven);
 }
 
 #[test]
