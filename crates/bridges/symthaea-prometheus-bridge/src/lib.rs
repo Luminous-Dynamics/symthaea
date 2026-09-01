@@ -37,7 +37,7 @@ use symthaea_integration_core::{
 
 pub const PROMETHEUS_INTEGRATION_ID: &str = "prometheus-text";
 pub const PROMETHEUS_OBSERVE_CAPABILITY: &str = "observe.prometheus.metrics";
-pub const PROMETHEUS_IDENTITY_CAPABILITY: &str = "discover.prometheus.identity";
+pub const PROMETHEUS_IDENTITY_CAPABILITY: &str = "discover.entity.identity";
 
 /// How Prometheus `job`/`instance` labels may be interpreted for entity identity.
 ///
