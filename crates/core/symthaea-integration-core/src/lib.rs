@@ -94,8 +94,9 @@ pub use state::{
     StateSnapshot, StateValidationError, StateValue, assess_state_dimension,
 };
 pub use state_history::{
-    DesiredStateContinuity, HistoricalStateAssessment, StateHistory, StateHistoryError,
-    StateHistoryLimits, assess_state_dimension_with_history, desired_state_continuity,
+    DesiredStateContinuity, DriftContinuity, HistoricalStateAssessment, StateHistory,
+    StateHistoryError, StateHistoryLimits, assess_state_dimension_with_history,
+    desired_state_continuity, drift_state_continuity,
 };
 pub use state_temporal::{
     TemporalStateAssessment, TemporalStateAssessmentError, TemporalStatePolicy,
