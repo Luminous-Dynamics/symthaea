@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-boot-control"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Typed presentation-mode control protocol for the Symthaea/Spore boot experience"
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
