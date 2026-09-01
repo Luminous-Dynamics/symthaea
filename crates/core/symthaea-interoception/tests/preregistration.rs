@@ -64,6 +64,22 @@ fn preregistration() -> ExperimentPreregistration {
     }
 }
 
+fn incompatible_future_debt_metric(metric_id: &str) -> RegisteredMetricSpec {
+    RegisteredMetricSpec {
+        metric_id: metric_id.into(),
+        measure: RegisteredMeasure::TerminalForecastDiscountedDebt {
+            forecast: ProtocolForecastSpec::DynamicsAwareConstantDrive {
+                config: AllostaticConfig {
+                    horizon_steps: 8,
+                    dt: 0.5,
+                    discount: 0.95,
+                },
+                drive: InteroceptiveDrive::ZERO,
+            },
+        },
+    }
+}
+
 #[test]
 fn valid_preregistration_round_trips_and_has_stable_digest() {
     let protocol = preregistration();
@@ -114,21 +130,9 @@ fn preregistration_rejects_out_of_range_interventions() {
 }
 
 #[test]
-fn dynamics_aware_metric_must_match_each_referenced_arm_timestep() {
+fn dynamics_aware_metric_must_match_every_arm_timestep() {
     let mut protocol = preregistration();
-    protocol.metrics[0] = RegisteredMetricSpec {
-        metric_id: "future_debt".into(),
-        measure: RegisteredMeasure::TerminalForecastDiscountedDebt {
-            forecast: ProtocolForecastSpec::DynamicsAwareConstantDrive {
-                config: AllostaticConfig {
-                    horizon_steps: 8,
-                    dt: 0.5,
-                    discount: 0.95,
-                },
-                drive: InteroceptiveDrive::ZERO,
-            },
-        },
-    };
+    protocol.metrics[0] = incompatible_future_debt_metric("future_debt");
     protocol.hypotheses[0].left.metric_id = "future_debt".into();
     protocol.hypotheses[0].right.metric_id = "future_debt".into();
 
@@ -136,4 +140,21 @@ fn dynamics_aware_metric_must_match_each_referenced_arm_timestep() {
         .validate()
         .expect_err("incompatible forecast timestep must fail");
     assert!(errors.iter().any(|error| error.contains("dt incompatible")));
+}
+
+#[test]
+fn unreferenced_dynamics_aware_metric_must_still_match_every_arm_timestep() {
+    let mut protocol = preregistration();
+    protocol
+        .metrics
+        .push(incompatible_future_debt_metric("unreferenced_future_debt"));
+
+    let errors = protocol
+        .validate()
+        .expect_err("every exported metric must be executable for every arm");
+    assert!(errors.iter().any(|error| {
+        error.contains("unreferenced_future_debt")
+            && error.contains("dt incompatible")
+            && error.contains("control")
+    }));
 }
