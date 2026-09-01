@@ -80,6 +80,7 @@ jobs:
               rustc --version
               cargo --version
               rustfmt --version
+              cargo clippy --version
               cargo check --locked -p symthaea-psych-bench --lib
             '
 
