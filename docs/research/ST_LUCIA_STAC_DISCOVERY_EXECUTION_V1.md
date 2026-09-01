@@ -39,6 +39,8 @@ Run the offline discovery tests:
 python3 -m unittest scripts/research/test_st_lucia_stac_discovery.py
 ```
 
+The offline suite covers deterministic S2 selection, half-open time bounds, required-band metadata, S1 time-distance/earlier/ID tie-breaking, IW + VV/VH requirements, exhaustive pagination, raw-page retention, identical-item deduplication, conflicting duplicate IDs, pagination cycles, and off-origin pagination rejection.
+
 A failing offline test blocks live product selection.
 
 ## Live command
@@ -116,6 +118,8 @@ The machine-readable receipt must expose:
 - selected S1 item ID or explicit null;
 - receipt SHA-256.
 
+The complete raw item metadata remains in the retained STAC pages. This includes orbit/platform/processing metadata exposed by the catalogue even when those fields are not product-selection criteria.
+
 The receipt is not a claim that raster bytes were downloaded or that the selected catalogue record is scientifically valid ground truth.
 
 ## Null and failure semantics
@@ -141,10 +145,11 @@ Do **not** download selected product assets until reviewers have checked:
 
 1. protocol hash matches the preregistered document;
 2. runner hash/version matches this execution contract;
-3. all pagination pages are present and hashed;
-4. candidate ordering reproduces from the retained pages;
-5. selection follows the frozen rule exactly;
-6. no preview/quicklook inspection influenced selection;
-7. null/failure states, if any, are retained rather than relaxed post hoc.
+3. offline tests passed on the exact commit;
+4. all pagination pages are present and hashed;
+5. candidate ordering reproduces from the retained pages;
+6. selection follows the frozen rule exactly;
+7. no preview/quicklook inspection influenced selection;
+8. null/failure states, if any, are retained rather than relaxed post hoc.
 
 Only then may a separate evidence step acquire exact source assets and bind their byte digests into PP-05 / #202 lineage.
