@@ -10,8 +10,7 @@
 #![forbid(unsafe_code)]
 
 use symthaea_boot_ecology_live::{
-    DiagnosticFloor, DomainMask, LiveEcologyModulation, REVEAL_SCALE, SemanticBootAnchor,
-    VisualAccent,
+    DiagnosticFloor, LiveEcologyModulation, REVEAL_SCALE, SemanticBootAnchor,
 };
 use symthaea_boot_protocol::BootHealth;
 
@@ -217,6 +216,7 @@ const fn advance_toward(current: u32, target: u32, step: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_boot_ecology_live::{DomainMask, VisualAccent};
 
     fn modulation(anchor: SemanticBootAnchor, health: BootHealth) -> LiveEcologyModulation {
         LiveEcologyModulation {
@@ -287,7 +287,8 @@ mod tests {
         let anchor = SemanticBootAnchor::NetworkPhase;
         let target = modulation(anchor, BootHealth::Normal);
         let band = truth_band(anchor);
-        let mut clock = ElasticVisualClock::from_phase(target.reveal_floor, VisualClockPolicy::default());
+        let mut clock =
+            ElasticVisualClock::from_phase(target.reveal_floor, VisualClockPolicy::default());
 
         for _ in 0..1_000 {
             clock.advance_ms(50, &target);
@@ -305,7 +306,8 @@ mod tests {
         ] {
             let anchor = SemanticBootAnchor::ServicesPhase;
             let target = modulation(anchor, health);
-            let mut clock = ElasticVisualClock::from_phase(target.reveal_floor, VisualClockPolicy::default());
+            let mut clock =
+                ElasticVisualClock::from_phase(target.reveal_floor, VisualClockPolicy::default());
             let step = clock.advance_ms(250, &target);
             assert_eq!(step.mode, ClockMode::Hold);
             assert_eq!(step.before, step.after);
@@ -327,7 +329,8 @@ mod tests {
     #[test]
     fn ready_reaches_complete_without_conferring_host_authority() {
         let target = modulation(SemanticBootAnchor::SessionReady, BootHealth::Normal);
-        let mut clock = ElasticVisualClock::from_phase(950_000, VisualClockPolicy::default());
+        let mut clock =
+            ElasticVisualClock::from_phase(950_000, VisualClockPolicy::default());
         for _ in 0..10 {
             clock.advance_ms(50, &target);
             if clock.phase() == REVEAL_SCALE {
