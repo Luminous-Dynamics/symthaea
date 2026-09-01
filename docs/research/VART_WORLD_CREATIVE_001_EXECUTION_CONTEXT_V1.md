@@ -4,7 +4,7 @@ Status: confirmatory qualification contract. It does not authorize execution by 
 
 ## Purpose
 
-Raw evidence can be internally hash-consistent while still having been produced by the wrong policy implementation, fixture, source tree, environment, candidate generator, or physical-admission policy. VART therefore treats the complete execution context as a preregistered input, not a retrospective runtime label.
+Raw evidence can be internally hash-consistent while still having been produced by the wrong policy implementation, fixture, source tree, environment, candidate generator, physical-admission policy, or starting world state. VART therefore treats the complete execution context as a preregistered input, not a retrospective runtime label.
 
 For every confirmatory trial, the campaign planner creates `execution_context.json` **before any trial outcome exists**. Its exact raw-byte SHA-256 is stored in the frozen `trial_inventory.json` entry for that `trial_id`. The externally anchored `confirmatory_freeze.json` binds the raw-byte SHA-256 of that inventory.
 
@@ -12,7 +12,7 @@ A runtime-produced manifest may only reference the prospectively frozen context 
 
 ## Canonical execution-context object
 
-The v1 object contains exactly the scientific inputs needed to identify the mechanism being tested:
+The v1 object contains exactly the scientific inputs needed to identify the mechanism and starting state being tested:
 
 - `schema = "symthaea.vart-world-creative-001.execution-context.v1"`
 - `experiment_id`
@@ -24,6 +24,7 @@ The v1 object contains exactly the scientific inputs needed to identify the mech
 - `world_fixture_sha256`
 - `seed`
 - `revision_index`
+- `world_state_before_sha256`
 - `source_head`
 - `source_tree`
 - `environment_digest`
@@ -32,6 +33,8 @@ The v1 object contains exactly the scientific inputs needed to identify the mech
 - `metric_definition_set_sha256`
 - `analysis_contract_sha256`
 - `trial_manifest_schema_sha256`
+
+`world_state_before_sha256` is the exact raw-byte SHA-256 of the preregistered committed/grounded pre-intervention state snapshot defined by `VART_WORLD_CREATIVE_001_STATE_EQUIVALENCE_V1.md`. It is known before policy execution and is therefore part of the prospective context rather than a retrospective outcome field.
 
 Canonical bytes are UTF-8 JSON with keys sorted, separators `(',', ':')`, no insignificant whitespace, and a final newline omitted. Any change to bytes changes the digest.
 
@@ -59,18 +62,20 @@ The externally anchored confirmatory freeze supplies:
 - `trial_manifest_schema_sha256`
 - `trial_inventory_sha256`
 
-The qualified verifier reconstructs every execution context and requires equality against both the trial manifest and those frozen campaign-level values.
+The frozen trial inventory supplies the per-trial execution-context digest; the execution context in turn supplies the exact pre-intervention world-state digest. The qualified verifier requires equality across the context, trial manifest, state snapshot evidence, decision input, and applicable candidate surface.
 
 ## Evidence-package binding
 
-Each trial manifest contains `execution_context_sha256`.
+Each trial manifest contains `execution_context_sha256` and `world_state_before_sha256`.
 
 Each trial `evidence_index.json` maps logical name `execution_context` to the exact context artifact. The artifact digest must equal:
 
 1. `manifest.execution_context_sha256`; and
 2. `trial_inventory.trial_contexts[trial_id]`.
 
-For complete trials, the typed application receipt should repeat `execution_context_sha256`, so the committed mutation is tied to the same preregistered mechanism context.
+The execution context's `world_state_before_sha256` must equal the manifest and independently verified pre-state snapshot digest.
+
+For complete trials, the typed application receipt repeats `execution_context_sha256`, so the committed mutation is tied to the same preregistered mechanism and starting-state context.
 
 ## Policy binding
 
@@ -96,6 +101,8 @@ The execution context is not a substitute for independently making the frozen so
 
 The context prospectively freezes the candidate-generator and physical-admission-policy digests. This prevents a producer from changing either mechanism after seeing results while leaving the policy label untouched.
 
+Candidate-set bytes must remain identical across paired decision policies where the preregistration requires a shared surface, so the candidate-set artifact binds the shared generation context (`paired_block_id`, fixture, seed, revision, pre-state, generator, and admission-policy digests) rather than the per-policy execution-context digest.
+
 A future independent simulator replay may provide stronger semantic validation of the resulting candidate/admission evidence; v1 establishes mechanism identity and prospective closure.
 
 ## Required rejection classes
@@ -111,5 +118,7 @@ The execution-context qualification layer adds deterministic rejection classes:
 - `FROZEN_CANDIDATE_GENERATOR_MISMATCH`
 - `FROZEN_ADMISSION_POLICY_MISMATCH`
 - `FROZEN_SCHEMA_MISMATCH`
+
+The state-equivalence layer separately rejects mismatched or substituted pre-state evidence.
 
 These are integrity/qualification failures, not poor scientific outcomes.
