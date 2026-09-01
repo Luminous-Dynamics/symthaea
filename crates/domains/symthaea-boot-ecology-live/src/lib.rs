@@ -14,6 +14,10 @@ use symthaea_boot_protocol::{BootDomain, BootHealth, BootPhase, BootSnapshot, Do
 
 pub const REVEAL_SCALE: u32 = 1_000_000;
 
+const _: () = {
+    assert!(BootDomain::COUNT <= u16::BITS as usize);
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SemanticBootAnchor {
     KernelPhase,
@@ -240,6 +244,25 @@ impl PresentationFingerprint {
             || self.degraded_domains.removed_from(previous.degraded_domains)
             || self.failed_domains.removed_from(previous.failed_domains)
     }
+
+    const fn visual_issue_severity(self) -> u8 {
+        let health = match self.health {
+            BootHealth::Normal | BootHealth::Unknown => 0,
+            BootHealth::Delayed => 1,
+            BootHealth::Degraded => 2,
+            BootHealth::Failed => 3,
+        };
+        let domains = if !self.failed_domains.is_empty() {
+            3
+        } else if !self.degraded_domains.is_empty() {
+            2
+        } else if !self.delayed_domains.is_empty() {
+            1
+        } else {
+            0
+        };
+        if health > domains { health } else { domains }
+    }
 }
 
 /// One reducer instance belongs to one already-validated boot observation lineage.
@@ -341,27 +364,32 @@ fn classify_accent(
     previous: PresentationFingerprint,
     current: PresentationFingerprint,
 ) -> VisualAccent {
-    if current.failed_domains.newly_set_from(previous.failed_domains)
-        || transitioned_to_failed(previous.health, current.health)
-    {
+    let previous_severity = previous.visual_issue_severity();
+    let current_severity = current.visual_issue_severity();
+
+    if current_severity > previous_severity {
+        return accent_for_severity(current_severity);
+    }
+    if current.handoff_ready && !previous.handoff_ready && current_severity == 0 {
+        return VisualAccent::Ready;
+    }
+    if current_severity < previous_severity {
+        return VisualAccent::Recovery;
+    }
+
+    if current.failed_domains.newly_set_from(previous.failed_domains) {
         return VisualAccent::Failed;
     }
     if current
         .degraded_domains
         .newly_set_from(previous.degraded_domains)
-        || transitioned_to_degraded(previous.health, current.health)
     {
         return VisualAccent::Degraded;
     }
-    if current.delayed_domains.newly_set_from(previous.delayed_domains)
-        || transitioned_to_delayed(previous.health, current.health)
-    {
+    if current.delayed_domains.newly_set_from(previous.delayed_domains) {
         return VisualAccent::Delay;
     }
-    if current.handoff_ready && !previous.handoff_ready {
-        return VisualAccent::Ready;
-    }
-    if current.issues_removed_from(previous) || health_recovered(previous.health, current.health) {
+    if current.issues_removed_from(previous) {
         return VisualAccent::Recovery;
     }
     if current.anchor > previous.anchor {
@@ -370,27 +398,13 @@ fn classify_accent(
     VisualAccent::None
 }
 
-const fn transitioned_to_failed(previous: BootHealth, current: BootHealth) -> bool {
-    !matches!(previous, BootHealth::Failed) && matches!(current, BootHealth::Failed)
-}
-
-const fn transitioned_to_degraded(previous: BootHealth, current: BootHealth) -> bool {
-    matches!(current, BootHealth::Degraded)
-        && !matches!(previous, BootHealth::Degraded | BootHealth::Failed)
-}
-
-const fn transitioned_to_delayed(previous: BootHealth, current: BootHealth) -> bool {
-    matches!(current, BootHealth::Delayed)
-        && matches!(previous, BootHealth::Normal | BootHealth::Unknown)
-}
-
-const fn health_recovered(previous: BootHealth, current: BootHealth) -> bool {
-    matches!(
-        (previous, current),
-        (BootHealth::Failed, BootHealth::Degraded | BootHealth::Delayed | BootHealth::Normal)
-            | (BootHealth::Degraded, BootHealth::Delayed | BootHealth::Normal)
-            | (BootHealth::Delayed, BootHealth::Normal)
-    )
+const fn accent_for_severity(severity: u8) -> VisualAccent {
+    match severity {
+        3.. => VisualAccent::Failed,
+        2 => VisualAccent::Degraded,
+        1 => VisualAccent::Delay,
+        _ => VisualAccent::None,
+    }
 }
 
 #[cfg(test)]
@@ -479,7 +493,7 @@ mod tests {
     }
 
     #[test]
-    fn ready_is_the_only_handoff_ready_state_and_has_ready_accent() {
+    fn ready_is_the_only_handoff_ready_state_and_has_ready_accent_when_healthy() {
         let mut reducer = LiveEcologyReducer::new();
         let session = reducer
             .reduce(&snapshot(1, BootPhase::Session, BootHealth::Normal))
@@ -493,6 +507,20 @@ mod tests {
         assert_eq!(ready.reveal_floor, REVEAL_SCALE);
         assert_eq!(ready.accent, VisualAccent::Ready);
         assert_eq!(ready.accent_token, 2);
+    }
+
+    #[test]
+    fn degraded_ready_never_gets_a_celebratory_ready_accent() {
+        let mut reducer = LiveEcologyReducer::new();
+        reducer
+            .reduce(&snapshot(1, BootPhase::Session, BootHealth::Degraded))
+            .unwrap();
+        let ready = reducer
+            .reduce(&snapshot(2, BootPhase::Ready, BootHealth::Degraded))
+            .unwrap();
+        assert!(ready.handoff_ready);
+        assert_eq!(ready.diagnostic_floor, DiagnosticFloor::Diagnostics);
+        assert_ne!(ready.accent, VisualAccent::Ready);
     }
 
     #[test]
@@ -575,6 +603,30 @@ mod tests {
         let modulation = reducer.reduce(&failed).unwrap();
         assert_eq!(modulation.accent, VisualAccent::Failed);
         assert_eq!(modulation.accent_token, 2);
+    }
+
+    #[test]
+    fn severity_downgrade_is_recovery_even_when_domain_moves_masks() {
+        let mut failed = snapshot(4, BootPhase::Services, BootHealth::Failed);
+        failed.domains = vec![DomainSnapshot {
+            domain: BootDomain::Network,
+            state: DomainState::Failed,
+            elapsed_ms: Some(300),
+        }];
+
+        let mut degraded = snapshot(5, BootPhase::Services, BootHealth::Degraded);
+        degraded.domains = vec![DomainSnapshot {
+            domain: BootDomain::Network,
+            state: DomainState::Degraded,
+            elapsed_ms: Some(450),
+        }];
+
+        let mut reducer = LiveEcologyReducer::new();
+        reducer.reduce(&failed).unwrap();
+        let after = reducer.reduce(&degraded).unwrap();
+        assert_eq!(after.accent, VisualAccent::Recovery);
+        assert!(after.failed_domains.is_empty());
+        assert!(after.degraded_domains.contains(BootDomain::Network));
     }
 
     #[test]
