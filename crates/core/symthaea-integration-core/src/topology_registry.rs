@@ -3,11 +3,12 @@
 //! Registry-admitted topology discovery.
 //!
 //! This keeps topology on the same trust path as observations and identity:
-//! the discoverer must already be registered, the request is validated, the
-//! returned integration identity must match the registry slot, declared entity
-//! kinds are enforced, and topology limits are applied independently of adapter
-//! code. Exhaustive/complete discovery is a separate named capability so
-//! partial replay cannot silently turn missing objects into negative evidence.
+//! the discoverer must already be registered, requested and returned entity
+//! kinds must stay within its declared vocabulary, the returned integration
+//! identity must match the registry slot, and topology limits are applied
+//! independently of adapter code. Exhaustive/complete discovery is a separate
+//! named capability so partial replay cannot silently turn missing objects into
+//! negative evidence.
 
 use crate::{
     COMPLETE_DISCOVERY_CAPABILITY, DiscoveryRequest, DiscoverySnapshot, IntegrationError,
@@ -17,7 +18,7 @@ use std::collections::BTreeSet;
 
 impl IntegrationRegistry {
     /// Validate a discovery request against the registered adapter's declared
-    /// epistemic capability before invoking it.
+    /// epistemic capability and entity vocabulary before invoking it.
     pub fn admit_discovery_request(
         &self,
         id: &IntegrationId,
@@ -33,6 +34,18 @@ impl IntegrationRegistry {
             return Err(IntegrationError::Unsupported(format!(
                 "no discoverer registered for integration `{id}`"
             )));
+        }
+        let declared = manifest
+            .entity_kinds
+            .iter()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
+        for kind in &request.entity_kinds {
+            if !declared.contains(kind.as_str()) {
+                return Err(IntegrationError::Unsupported(format!(
+                    "integration `{id}` does not declare requested topology entity kind `{kind}`"
+                )));
+            }
         }
         if request.require_complete && !manifest.declares(COMPLETE_DISCOVERY_CAPABILITY) {
             return Err(IntegrationError::Unsupported(format!(
@@ -253,11 +266,26 @@ mod tests {
     }
 
     #[test]
+    fn undeclared_requested_entity_kind_is_rejected() {
+        let mut registry = IntegrationRegistry::new();
+        registry.register_discoverer(integration(false)).unwrap();
+        let request = DiscoveryRequest {
+            entity_kinds: vec!["database".into()],
+            ..Default::default()
+        };
+        assert!(matches!(
+            registry.admit_discovery_request(&IntegrationId::new("fixture-topology"), &request),
+            Err(IntegrationError::Unsupported(_))
+        ));
+    }
+
+    #[test]
     fn explicitly_qualified_discoverer_may_accept_complete_request() {
         let mut registry = IntegrationRegistry::new();
         registry.register_discoverer(integration(true)).unwrap();
         let request = DiscoveryRequest {
             require_complete: true,
+            entity_kinds: vec!["host".into()],
             ..Default::default()
         };
         assert!(registry
