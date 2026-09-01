@@ -29,6 +29,7 @@ pub mod resolution;
 pub mod resolution_pipeline;
 pub mod semantic_identity;
 pub mod state;
+mod state_registry;
 pub mod topology;
 pub mod topology_limits;
 mod topology_registry;
