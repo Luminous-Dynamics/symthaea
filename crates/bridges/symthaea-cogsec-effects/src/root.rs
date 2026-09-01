@@ -20,7 +20,10 @@
 #[path = "lib.rs"]
 mod effects;
 pub use effects::WorkingMemoryItemView;
-pub(crate) use effects::{CognitiveEffectV1, active_state_digest_v1, effect_digest_v1};
+pub(crate) use effects::{
+    CognitiveEffectV1, active_state_digest_v1, continuous_hv_digest_v1, effect_digest_v1,
+    metadata_digest_v1,
+};
 
 mod state_commitments;
 pub use state_commitments::{GoalRecordView, StateCommitmentError};
@@ -33,4 +36,10 @@ pub use typed_commitments::{
     CanonicalEffectClassV1, CanonicalResourceV1, CanonicalTransitionCommitmentV1,
     EffectCommitmentV1, ResourceCommitmentMismatch, ResourceStateCommitmentV1,
     TransitionCommitmentMismatch,
+};
+
+mod eviction_handoff;
+pub use eviction_handoff::{
+    EVICTION_HANDOFF_RESOURCE_V1, EvictionHandoffItemCommitmentV1,
+    EvictionHandoffItemView, EvictionHandoffStateCommitmentV1,
 };
