@@ -4,8 +4,8 @@
 # NixOS Module: Symthaea / Spore Boot Animation
 #
 # Runs the mycelial colonization animation (symthaea-quicken-fb) on bare-metal
-# DRM/KMS framebuffer during early graphical boot. Optional typed telemetry is
-# presentation-only: loss or corruption of that channel must never block boot.
+# DRM/KMS framebuffer during early graphical boot. Optional typed telemetry and
+# handoff receipts are presentation-only: loss or corruption must never block boot.
 
 { config, lib, pkgs, ... }:
 
@@ -16,6 +16,9 @@ let
   telemetryArgs = optionals cfg.telemetry.enable [
     "--boot-events-socket ${escapeShellArg cfg.telemetry.eventSocket}"
     "--boot-state-path ${escapeShellArg cfg.telemetry.statePath}"
+  ];
+  handoffArgs = optionals cfg.handoff.enable [
+    "--handoff-receipt ${escapeShellArg cfg.handoff.receiptPath}"
   ];
 in {
   options.services.symthaea-boot = {
@@ -64,6 +67,34 @@ in {
       };
     };
 
+    handoff = {
+      enable = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Emit a diagnostic acknowledgement only after quicken-fb has dropped
+          its DRM framebuffer and restored the saved CRTC. This does not by
+          itself authorize display-manager startup.
+        '';
+      };
+
+      receiptPath = mkOption {
+        type = types.str;
+        default = "/run/symthaea/boot-display-released-v1.json";
+        description = "Ephemeral post-DRM-release acknowledgement path.";
+      };
+
+      stopTimeoutMs = mkOption {
+        type = types.ints.between 100 5000;
+        default = 1000;
+        description = ''
+          Hard systemd stop bound for the decorative renderer. Expiry permits
+          systemd to terminate the renderer rather than allowing presentation
+          to hold login or recovery indefinitely.
+        '';
+      };
+    };
+
     device = mkOption {
       type = types.str;
       default = "/dev/dri/card0";
@@ -82,6 +113,10 @@ in {
           assertion = !cfg.telemetry.enable || hasPrefix "/run/symthaea-boot/" cfg.telemetry.statePath;
           message = "services.symthaea-boot.telemetry.statePath must stay beneath /run/symthaea-boot";
         }
+        {
+          assertion = !cfg.handoff.enable || hasPrefix "/run/symthaea/" cfg.handoff.receiptPath;
+          message = "services.symthaea-boot.handoff.receiptPath must stay beneath /run/symthaea";
+        }
       ];
 
       systemd.services.symthaea-boot-animation = {
@@ -96,8 +131,9 @@ in {
 
         unitConfig = {
           ConditionPathExists = cfg.device;
+          # Kept for compatibility until the separately qualified display-manager
+          # handoff trigger replaces the historical lifecycle wiring.
           StopWhenUnneeded = true;
-          TimeoutStopSec = 8;
         };
 
         serviceConfig = {
@@ -108,13 +144,14 @@ in {
             "--genesis-phrase ${escapeShellArg cfg.genesisPhrase}"
             "--progress-pipe ${escapeShellArg cfg.progressPipe}"
             "--device ${escapeShellArg cfg.device}"
-          ] ++ telemetryArgs);
+          ] ++ telemetryArgs ++ handoffArgs);
 
           SupplementaryGroups = [ "video" "render" ]
             ++ optional cfg.telemetry.enable "symthaea-boot";
 
           User = "root";
           KillSignal = "SIGTERM";
+          TimeoutStopSec = "${toString cfg.handoff.stopTimeoutMs}ms";
 
           # When telemetry is enabled, Unix sockets created by the renderer are
           # owner/group accessible but not writable by unrelated local users.
@@ -130,6 +167,9 @@ in {
           RestrictRealtime = true;
           RestrictSUIDSGID = true;
           PrivateTmp = true;
+        } // optionalAttrs cfg.handoff.enable {
+          # A stale receipt must never be confused with this renderer instance.
+          ExecStartPre = "${pkgs.coreutils}/bin/rm -f -- ${escapeShellArg cfg.handoff.receiptPath}";
         };
       };
 
