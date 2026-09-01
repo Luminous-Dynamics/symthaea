@@ -23,6 +23,7 @@ pub mod limits;
 pub mod manifest;
 pub mod observation;
 pub mod registry;
+pub mod resolution;
 pub mod topology;
 pub mod traits;
 
@@ -52,6 +53,9 @@ pub use observation::{
     ObservationValue, TransformStep, OBSERVATION_SCHEMA_VERSION,
 };
 pub use registry::{IntegrationRegistry, RegistryError};
+pub use resolution::{
+    EntityResolutionBatch, attention_required, resolve_identity_claims,
+};
 pub use topology::{
     DiscoveredEntity, DiscoverySnapshot, EntityRelation, RelationKind,
 };
