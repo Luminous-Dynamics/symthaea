@@ -5,10 +5,12 @@ use symthaea_spore_continuity::{
 #[test]
 fn canonical_v1_vector_is_byte_stable() {
     let mut state = ContinuityState::new(
+        [9u8; 16],
         [1u8; 32],
         [2u8; 32],
         LifecycleTransition::BootToGreeter,
     );
+    state.handoff_sequence = 7;
     state.visual_plan_digest = Some([3u8; 32]);
     state.phase_micros = 420_000;
     state.world_age_ticks = 12_345;
