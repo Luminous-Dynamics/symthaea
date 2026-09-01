@@ -1,9 +1,10 @@
 use symthaea_interoception::{
     ArtifactDigest, EvidenceCapsuleManifest, ForecastBasisId, GateStatus,
-    QualificationEvidenceBundle, QualificationGateReceipt, QualificationReceipt,
-    EVIDENCE_CAPSULE_SCHEMA_VERSION, INTEROCEPTIVE_MODEL_SEMANTICS_VERSION,
-    INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION, QUALIFICATION_EVIDENCE_BUNDLE_SCHEMA_VERSION,
-    QUALIFICATION_RECEIPT_SCHEMA_VERSION, REQUIRED_QUALIFICATION_GATES,
+    QualificationEvidenceBundle, QualificationGateEvidence, QualificationGateReceipt,
+    QualificationReceipt, EVIDENCE_CAPSULE_SCHEMA_VERSION,
+    INTEROCEPTIVE_MODEL_SEMANTICS_VERSION, INTEROCEPTIVE_SNAPSHOT_SCHEMA_VERSION,
+    QUALIFICATION_EVIDENCE_BUNDLE_SCHEMA_VERSION, QUALIFICATION_RECEIPT_SCHEMA_VERSION,
+    REQUIRED_QUALIFICATION_GATES,
 };
 
 const SOURCE_A: &str = "0123456789abcdef0123456789abcdef01234567";
@@ -13,6 +14,39 @@ fn digest(ch: char) -> String {
     std::iter::repeat_n(ch, 64).collect()
 }
 
+fn gate_evidence(gate: &str, source_commit: &str) -> QualificationGateEvidence {
+    match gate {
+        "local_fmt" => QualificationGateEvidence::local_command(
+            source_commit,
+            "cargo fmt --all --check",
+            digest('a'),
+            digest('b'),
+        ),
+        "local_test" => QualificationGateEvidence::local_command(
+            source_commit,
+            "cargo test -p symthaea-interoception",
+            digest('a'),
+            digest('c'),
+        ),
+        "local_clippy" => QualificationGateEvidence::local_command(
+            source_commit,
+            "cargo clippy -p symthaea-interoception --all-targets -- -D warnings",
+            digest('a'),
+            digest('d'),
+        ),
+        "workspace_ci" => {
+            QualificationGateEvidence::github_actions(source_commit, "CI", 12345, 1)
+        }
+        "showroom_integrity" => QualificationGateEvidence::github_actions(
+            source_commit,
+            "Showroom Integrity",
+            12346,
+            1,
+        ),
+        other => panic!("unexpected qualification gate fixture: {other}"),
+    }
+}
+
 fn qualification(source_commit: &str, status: GateStatus) -> QualificationReceipt {
     QualificationReceipt {
         schema_version: QUALIFICATION_RECEIPT_SCHEMA_VERSION,
@@ -20,7 +54,17 @@ fn qualification(source_commit: &str, status: GateStatus) -> QualificationReceip
         source_commit: source_commit.into(),
         gates: REQUIRED_QUALIFICATION_GATES
             .iter()
-            .map(|gate| QualificationGateReceipt::new(*gate, status, format!("evidence:{gate}")))
+            .map(|gate| {
+                if status == GateStatus::Pending {
+                    QualificationGateReceipt::pending(*gate)
+                } else {
+                    QualificationGateReceipt::with_evidence(
+                        *gate,
+                        status,
+                        gate_evidence(gate, source_commit),
+                    )
+                }
+            })
             .collect(),
     }
 }
@@ -77,7 +121,9 @@ fn matching_passed_qualification_and_evidence_form_one_qualified_lineage() {
 #[test]
 fn pending_required_gate_keeps_matching_bundle_unqualified() {
     let bundle = bundle(SOURCE_A, GateStatus::Pending);
-    bundle.validate().expect("pending bundle remains structurally valid");
+    bundle
+        .validate()
+        .expect("pending bundle remains structurally valid");
     assert!(!bundle.is_qualified());
 }
 
@@ -100,10 +146,26 @@ fn cross_paired_valid_artifacts_from_different_source_heads_are_rejected() {
 }
 
 #[test]
+fn gate_evidence_from_another_head_invalidates_entire_bundle() {
+    let mut bundle = bundle(SOURCE_A, GateStatus::Passed);
+    bundle.qualification.gates[0].evidence = Some(gate_evidence("local_fmt", SOURCE_B));
+
+    assert!(bundle.evidence.validate().is_ok());
+    assert!(bundle.qualification.validate().is_err());
+    assert!(bundle.validate().is_err());
+    assert!(!bundle.is_qualified());
+}
+
+#[test]
 fn bundle_digest_changes_when_bound_qualification_evidence_changes() {
     let left = bundle(SOURCE_A, GateStatus::Passed);
     let mut right = left.clone();
-    right.qualification.gates[0].evidence = "evidence:local_fmt:alternate".into();
+    right.qualification.gates[0].evidence = Some(QualificationGateEvidence::local_command(
+        SOURCE_A,
+        "cargo fmt --all --check",
+        digest('a'),
+        digest('9'),
+    ));
 
     assert_ne!(
         left.sha256().expect("left digest"),
