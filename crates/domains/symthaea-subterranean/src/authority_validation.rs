@@ -29,6 +29,7 @@ pub enum AuthorityContract {
     HazardBlocksResume,
     RestrictionMonotonicity,
     RecoveryApprovalInvalidation,
+    CheckpointPreservesRestriction,
     AuditChainContinuity,
     UpdateRollback,
     WatchdogRecoveryLock,
@@ -36,12 +37,13 @@ pub enum AuthorityContract {
 }
 
 impl AuthorityContract {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::ReplayResistance,
         Self::IndependentRecoveryQuorum,
         Self::HazardBlocksResume,
         Self::RestrictionMonotonicity,
         Self::RecoveryApprovalInvalidation,
+        Self::CheckpointPreservesRestriction,
         Self::AuditChainContinuity,
         Self::UpdateRollback,
         Self::WatchdogRecoveryLock,
@@ -55,6 +57,7 @@ impl AuthorityContract {
             Self::HazardBlocksResume => "hazard_blocks_resume",
             Self::RestrictionMonotonicity => "restriction_monotonicity",
             Self::RecoveryApprovalInvalidation => "recovery_approval_invalidation",
+            Self::CheckpointPreservesRestriction => "checkpoint_preserves_restriction",
             Self::AuditChainContinuity => "audit_chain_continuity",
             Self::UpdateRollback => "update_rollback",
             Self::WatchdogRecoveryLock => "watchdog_recovery_lock",
@@ -265,6 +268,31 @@ impl AuthorityValidator {
                         "approval collected before a new restriction contributed to clearing it"
                             .to_string(),
                     );
+                }
+                Ok(())
+            }
+            AuthorityContract::CheckpointPreservesRestriction => {
+                let genesis = GenesisSeed::from_phrase("authority restriction checkpoint");
+                let mut source = SubterraneanEmbodiment::new(&genesis);
+                source
+                    .ingest_operator_command(Self::envelope(
+                        1,
+                        1,
+                        1,
+                        OperatorCommand::HoldPosition,
+                    ))
+                    .map_err(|error| format!("source hold rejected: {error:?}"))?;
+                if source.operator_constraint() != OperatorConstraint::HoldPosition {
+                    return Err("source did not retain hold before checkpoint".to_string());
+                }
+
+                let checkpoint = source.operational_checkpoint();
+                let mut restored = SubterraneanEmbodiment::new(&genesis);
+                restored
+                    .load_operational_checkpoint(&checkpoint)
+                    .map_err(|error| format!("checkpoint restore failed: {error:?}"))?;
+                if restored.operator_constraint() != OperatorConstraint::HoldPosition {
+                    return Err("checkpoint restore widened operator authority".to_string());
                 }
                 Ok(())
             }
