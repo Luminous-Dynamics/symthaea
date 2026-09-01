@@ -1,6 +1,10 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Canonical resource-state commitments for first-hook ObserverOnly qualification.
+//!
+//! Graduation queue state is deliberately absent here. Its private owner,
+//! `MemoryCoordinator`, mints `PendingGraduationCommitmentV1` directly so the
+//! CogSec bridge cannot acquire raw queued memories merely to reconstruct a root.
 
 use std::collections::HashMap;
 use std::error::Error;
@@ -9,14 +13,13 @@ use std::fmt;
 use sha2::{Digest, Sha256};
 use symthaea_cogsec::Digest32;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
-use symthaea_memory::{GraduationEvent, MemorySource};
+use symthaea_memory::MemorySource;
 
 use crate::{CognitiveEffectV1, WorkingMemoryItemView, effect_digest_v1};
 
 const WM_STATE_DOMAIN_V1: &[u8] = b"SYMTHAEA_COGSEC_WM_STATE/v1";
 const GOAL_STORE_STATE_DOMAIN_V1: &[u8] = b"SYMTHAEA_COGSEC_GOAL_STORE_STATE/v1";
 const AFFECT_STATE_DOMAIN_V1: &[u8] = b"SYMTHAEA_COGSEC_AFFECT_STATE/v1";
-const GRADUATION_QUEUE_STATE_DOMAIN_V1: &[u8] = b"SYMTHAEA_COGSEC_GRADUATION_QUEUE_STATE/v1";
 
 /// Failure to construct a truthful canonical resource-state commitment.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -78,7 +81,7 @@ pub struct GoalRecordView<'a> {
 /// function rejects misaligned arrays rather than zipping/truncating them, then
 /// commits to capacity, item count, order, HDC content, arrival tick, source,
 /// legacy verification bit, and deterministically ordered metadata for every item.
-pub fn working_memory_state_digest_v1(
+pub(crate) fn working_memory_state_digest_v1(
     contents: &[ContinuousHV],
     ticks: &[u64],
     sources: &[MemorySource],
@@ -124,10 +127,10 @@ pub fn working_memory_state_digest_v1(
 
 /// Commit to an ordered legacy goal store.
 ///
-/// Each record reuses `GoalActivateV1` field semantics, while this state root also
-/// commits to the record's current store index. Reordering otherwise identical
-/// goals therefore changes the resource root.
-pub fn goal_store_state_digest_v1(goals: &[GoalRecordView<'_>]) -> Digest32 {
+/// Each record reuses the exact goal-effect field semantics, while this state
+/// root also commits to the record's current store index. Reordering otherwise
+/// identical goals therefore changes the resource root.
+pub(crate) fn goal_store_state_digest_v1(goals: &[GoalRecordView<'_>]) -> Digest32 {
     let mut out = StateWriter::with_domain(GOAL_STORE_STATE_DOMAIN_V1);
     out.u64(goals.len() as u64);
     for (index, goal) in goals.iter().enumerate() {
@@ -150,35 +153,9 @@ pub fn goal_store_state_digest_v1(goals: &[GoalRecordView<'_>]) -> Digest32 {
 /// The v1 root is intentionally narrow. Widening the protected affect owner to
 /// additional fields requires a new schema/domain rather than silently changing
 /// the meaning of this root.
-pub fn affect_state_digest_v1(emotional_valence: f32) -> Digest32 {
+pub(crate) fn affect_state_digest_v1(emotional_valence: f32) -> Digest32 {
     let mut out = StateWriter::with_domain(AFFECT_STATE_DOMAIN_V1);
     out.u32(emotional_valence.to_bits());
-    sha256(&out.finish())
-}
-
-/// Commit to an explicitly supplied ordered graduation queue.
-///
-/// This function does not bypass `MemoryCoordinator` privacy. A caller must
-/// already possess a truthful ordered slice of the owner's queue (for example a
-/// future owner-side commitment seam or a deterministic test fixture). Each
-/// queue entry reuses the exact `GraduationEnqueueV1` representation.
-pub fn graduation_queue_state_digest_v1(events: &[GraduationEvent]) -> Digest32 {
-    let mut out = StateWriter::with_domain(GRADUATION_QUEUE_STATE_DOMAIN_V1);
-    out.u64(events.len() as u64);
-    for (index, event) in events.iter().enumerate() {
-        let effect = CognitiveEffectV1::graduation_enqueue(
-            &event.content,
-            &event.label,
-            event.steps_survived,
-            event.final_activation,
-            event.psi_at_graduation,
-            event.coherence_at_graduation,
-            event.source,
-            event.is_verified,
-        );
-        out.u64(index as u64);
-        out.digest(effect_digest_v1(&effect));
-    }
     sha256(&out.finish())
 }
 
@@ -343,44 +320,5 @@ mod tests {
     fn affect_root_is_bit_exact() {
         assert_ne!(affect_state_digest_v1(0.0), affect_state_digest_v1(-0.0));
         assert_ne!(affect_state_digest_v1(0.2), affect_state_digest_v1(0.3));
-    }
-
-    #[test]
-    fn graduation_queue_root_binds_order_and_event_fields() {
-        let first = GraduationEvent {
-            content: hv(0.1, 0.2),
-            label: "first".into(),
-            steps_survived: 5,
-            final_activation: 0.5,
-            psi_at_graduation: 0.4,
-            coherence_at_graduation: 0.4,
-            source: MemorySource::Internal,
-            is_verified: false,
-        };
-        let second = GraduationEvent {
-            content: hv(0.3, 0.4),
-            label: "second".into(),
-            steps_survived: 6,
-            final_activation: 0.5,
-            psi_at_graduation: 0.6,
-            coherence_at_graduation: 0.6,
-            source: MemorySource::WebResearch,
-            is_verified: true,
-        };
-        let changed = GraduationEvent {
-            label: "changed".into(),
-            ..first.clone()
-        };
-
-        let base = graduation_queue_state_digest_v1(&[first.clone(), second.clone()]);
-        let reversed = graduation_queue_state_digest_v1(&[second, first.clone()]);
-        let field_changed = graduation_queue_state_digest_v1(&[changed, first]);
-
-        assert_ne!(base, reversed);
-        assert_ne!(base, field_changed);
-        assert_eq!(
-            graduation_queue_state_digest_v1(&[]),
-            graduation_queue_state_digest_v1(&[])
-        );
     }
 }
