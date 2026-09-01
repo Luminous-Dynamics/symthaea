@@ -11,10 +11,11 @@
 ///   quicken-fb --genesis-phrase "..." --progress-pipe /run/quicken-progress
 ///   quicken-fb --genesis-phrase "..." --boot-events-socket /run/symthaea/boot-events.sock \
 ///       --boot-state-path /run/symthaea-boot/state-v1.json
+///   quicken-fb --genesis-phrase "..." --handoff-receipt /run/symthaea/boot-display-released-v1.json
 ///   quicken-fb --genesis-phrase "..." --device /dev/dri/card1
 ///
 /// Signal handling:
-///   SIGTERM — clean exit
+///   SIGTERM — bounded fast display release
 ///   SIGINT  — same as SIGTERM
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -22,13 +23,14 @@ use std::time::{Duration, Instant};
 
 use symthaea_quicken_fb::boot_protocol::{BootTelemetry, BootVisualState};
 use symthaea_quicken_fb::framebuffer::DrmFramebuffer;
+use symthaea_quicken_fb::handoff::{DisplayReleaseReceipt, ExitReason};
 use symthaea_quicken_fb::mycelium::MycelialNetwork;
 use symthaea_quicken_fb::progress::{ProgressEvent, ProgressMonitor};
 
 /// Target frame rate for the animation.
 const TARGET_FPS: u32 = 30;
 
-/// Duration of the final contraction animation in seconds.
+/// Duration of the installation-completion contraction animation in seconds.
 const CONTRACTION_DURATION: f32 = 3.0;
 
 /// Duration to hold the white flash before fading to black.
@@ -37,10 +39,12 @@ const FLASH_HOLD: f32 = 0.5;
 /// Duration of the final fade to black.
 const FADE_DURATION: f32 = 1.5;
 
-/// Global flag set by signal handler.
+/// Global flag set by signal handler. Signal-triggered shutdown deliberately
+/// bypasses the long installation ceremony so login/recovery is never delayed.
 static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
 fn main() {
+    let process_start = Instant::now();
     let args = parse_args();
 
     install_signal_handlers();
@@ -78,12 +82,14 @@ fn main() {
 
     let mut completing = false;
     let mut contraction_start: Option<Instant> = None;
+    let mut exit_reason = ExitReason::Natural;
 
     loop {
         let now = Instant::now();
         let _elapsed_total = now.duration_since(start_time).as_secs_f32();
 
         if SHUTDOWN.load(Ordering::Relaxed) {
+            exit_reason = ExitReason::Signal;
             break;
         }
 
@@ -144,6 +150,7 @@ fn main() {
                 } else if t < CONTRACTION_DURATION + FLASH_HOLD + FADE_DURATION {
                     network.contract(1.0);
                 } else {
+                    exit_reason = ExitReason::InstallComplete;
                     break;
                 }
             }
@@ -161,12 +168,30 @@ fn main() {
         fb.blit_from(&render_buf);
     }
 
-    for pixel in &mut render_buf {
-        *pixel = 0;
-    }
+    // Present one deterministic black frame before releasing the KMS objects.
+    // The authoritative release boundary is the subsequent Drop of `fb`, which
+    // restores the saved CRTC before closing/destroying renderer resources.
+    render_buf.fill(0);
     fb.blit_from(&render_buf);
 
-    eprintln!("quicken-fb: clean exit");
+    let release_start = Instant::now();
+    drop(fb);
+    let release_elapsed = release_start.elapsed();
+
+    if let Some(path) = args.handoff_receipt.as_deref() {
+        let receipt = DisplayReleaseReceipt::new(release_elapsed, process_start.elapsed(), exit_reason);
+        if let Err(error) = receipt.write_atomic(Path::new(path)) {
+            // Receipt failure is diagnostic-only and must never turn a successful
+            // DRM release into a boot/session failure.
+            eprintln!("quicken-fb: failed to write handoff receipt: {error}");
+        }
+    }
+
+    eprintln!(
+        "quicken-fb: display released in {}us; clean exit ({})",
+        release_elapsed.as_micros(),
+        exit_reason.as_str()
+    );
 }
 
 fn visual_changed(previous: Option<BootVisualState>, current: Option<BootVisualState>) -> bool {
@@ -185,6 +210,7 @@ struct Args {
     progress_pipe: Option<String>,
     boot_events_socket: Option<String>,
     boot_state_path: Option<String>,
+    handoff_receipt: Option<String>,
     device: String,
 }
 
@@ -195,6 +221,7 @@ fn parse_args() -> Args {
     let mut progress_pipe = None;
     let mut boot_events_socket = None;
     let mut boot_state_path = None;
+    let mut handoff_receipt = None;
     let mut device = "/dev/dri/card0".to_string();
 
     let mut i = 1;
@@ -222,6 +249,12 @@ fn parse_args() -> Args {
                 i += 1;
                 if i < args.len() {
                     boot_state_path = Some(args[i].clone());
+                }
+            }
+            "--handoff-receipt" => {
+                i += 1;
+                if i < args.len() {
+                    handoff_receipt = Some(args[i].clone());
                 }
             }
             "--device" => {
@@ -257,6 +290,7 @@ fn parse_args() -> Args {
         progress_pipe,
         boot_events_socket,
         boot_state_path,
+        handoff_receipt,
         device,
     }
 }
@@ -270,6 +304,7 @@ fn print_usage() {
          \x20 --progress-pipe <PATH>      Named pipe for installer progress events\n\
          \x20 --boot-events-socket <PATH> Unix datagram socket for typed boot telemetry\n\
          \x20 --boot-state-path <PATH>    Lineage-bound boot snapshot side channel\n\
+         \x20 --handoff-receipt <PATH>    Atomic acknowledgement written after DRM release\n\
          \x20 --device <PATH>             DRM device path (default: /dev/dri/card0)\n\
          \x20 --help                      Show this help"
     );
