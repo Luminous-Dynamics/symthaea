@@ -15,6 +15,15 @@ use std::pin::Pin;
 
 pub type IntegrationFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
+/// Canonical capability an adapter must explicitly declare before the registry
+/// will honor `DiscoveryRequest::require_complete`.
+///
+/// Completeness means the adapter is qualified to treat absence inside the
+/// requested/configured scope as meaningful evidence, not merely that it
+/// returned every object present in one fixture, page, watch cache, or replay
+/// corpus.
+pub const COMPLETE_DISCOVERY_CAPABILITY: &str = "discover.snapshot.complete";
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ObservationRequest {
     /// Empty means all entities visible within the integration's configured scope.
@@ -64,6 +73,11 @@ pub struct DiscoveryRequest {
     pub entity_kinds: Vec<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub filters: BTreeMap<String, String>,
+    /// Require a qualified exhaustive snapshot for the requested/configured
+    /// scope. When false (the default), absence of an entity/relation must not
+    /// be interpreted as evidence that it does not exist.
+    #[serde(default)]
+    pub require_complete: bool,
 }
 
 impl DiscoveryRequest {
@@ -159,9 +173,11 @@ mod tests {
     }
 
     #[test]
-    fn empty_request_means_unrestricted_within_adapter_scope() {
+    fn empty_request_means_unrestricted_but_not_complete() {
         assert!(ObservationRequest::default().validate().is_ok());
-        assert!(DiscoveryRequest::default().validate().is_ok());
+        let discovery = DiscoveryRequest::default();
+        assert!(discovery.validate().is_ok());
+        assert!(!discovery.require_complete);
     }
 
     #[test]
@@ -174,5 +190,11 @@ mod tests {
             request.validate(),
             Err(IntegrationError::InvalidRequest(_))
         ));
+    }
+
+    #[test]
+    fn missing_complete_flag_deserializes_conservatively() {
+        let request: DiscoveryRequest = serde_json::from_str("{}").unwrap();
+        assert!(!request.require_complete);
     }
 }
