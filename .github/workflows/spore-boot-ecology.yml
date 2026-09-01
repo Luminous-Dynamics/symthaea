@@ -25,6 +25,10 @@ jobs:
     name: Rust state + renderer gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # PR workflows normally evaluate a synthetic merge commit. Preserve both
+      # identities in visual evidence: patch lineage (head) and evaluated tree.
+      SPORE_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
 
@@ -179,11 +183,13 @@ jobs:
               "spore-inoculation-preview",
               "spore-inoculation-paths-preview",
           )
-          expected = os.environ["GITHUB_SHA"]
+          expected_source = os.environ["SPORE_SOURCE_COMMIT"]
+          expected_evaluated = os.environ["GITHUB_SHA"]
           for root in roots:
               manifest = json.loads(Path(root, "evidence-manifest.json").read_text())
               assert manifest["schema"] == "spore-visual-evidence-v1"
-              assert manifest["source_commit"] == expected
+              assert manifest["source_commit"] == expected_source
+              assert manifest["evaluated_commit"] == expected_evaluated
               assert manifest["file_count"] > 0
               assert manifest["total_bytes"] > 0
           PY
