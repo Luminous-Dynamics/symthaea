@@ -30,6 +30,7 @@ pub mod resolution_pipeline;
 pub mod semantic_identity;
 pub mod state;
 mod state_registry;
+pub mod state_temporal;
 pub mod topology;
 pub mod topology_limits;
 mod topology_registry;
@@ -90,6 +91,10 @@ pub use state::{
     StateAssessment, StateAssessmentError, StateAssessmentStatus, StateAssertion,
     StateAssertionSource, StateBudgetError, StateComparisonPolicy, StateLimits, StateRole,
     StateSnapshot, StateValidationError, StateValue, assess_state_dimension,
+};
+pub use state_temporal::{
+    TemporalStateAssessment, TemporalStateAssessmentError, TemporalStatePolicy,
+    TemporalStateStatus, assess_state_dimension_temporally,
 };
 pub use topology::{
     DiscoveredEntity, DiscoverySnapshot, EntityRelation, RelationBasis, RelationKind,
