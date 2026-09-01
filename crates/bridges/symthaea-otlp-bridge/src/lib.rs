@@ -193,8 +193,8 @@ pub fn translate_metrics_request(
             resource_index,
             ingested_at_unix_ms,
         )?;
-        if let Some(claim) = selection.identity_claim {
-            identity_claims.push(claim);
+        if let Some(claim) = &selection.identity_claim {
+            identity_claims.push(claim.clone());
         }
 
         for scope_metrics in &resource_metrics.scope_metrics {
@@ -372,7 +372,8 @@ fn number_point_to_observation(
         }
     };
 
-    let omitted_attributes = resource_attributes.omitted + point_attributes.omitted + resource_dropped;
+    let omitted_attributes =
+        resource_attributes.omitted + point_attributes.omitted + resource_dropped;
     if quality.state == ObservationState::Observed && (weak_identity || omitted_attributes > 0) {
         quality.state = ObservationState::Partial;
         quality.completeness = if weak_identity { 0.85 } else { 0.95 };
@@ -583,7 +584,8 @@ fn select_primary_resource_entity(
     }
 
     if let Some(pod_uid) = non_blank(attributes.get("k8s.pod.uid")) {
-        let (scope, uniqueness) = scoped_by_attribute(attributes, "k8s.cluster.uid", "k8s.cluster.uid");
+        let (scope, uniqueness) =
+            scoped_by_attribute(attributes, "k8s.cluster.uid", "k8s.cluster.uid");
         let identifier = ExternalIdentifier {
             scheme: "k8s.pod.uid".into(),
             value: pod_uid.into(),
@@ -636,7 +638,11 @@ fn select_primary_resource_entity(
         let cloud_scope = cloud_scope(attributes);
         let (scope, uniqueness) = if let Some(scope) = cloud_scope {
             (Some(scope), IdentifierUniqueness::Scoped)
-        } else if let Some(tenant) = context.tenant.as_deref().filter(|value| !value.trim().is_empty()) {
+        } else if let Some(tenant) = context
+            .tenant
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
             (Some(format!("tenant:{tenant}")), IdentifierUniqueness::Scoped)
         } else {
             (None, IdentifierUniqueness::Ambiguous)
@@ -696,7 +702,10 @@ fn select_primary_resource_entity(
 
     if let Some(service_name) = non_blank(attributes.get("service.name")) {
         let service_namespace = non_blank(attributes.get("service.namespace")).unwrap_or("");
-        let scope = format!("otel.service.namespace:{}:{service_namespace}", service_namespace.len());
+        let scope = format!(
+            "otel.service.namespace:{}:{service_namespace}",
+            service_namespace.len()
+        );
         let identifier = ExternalIdentifier {
             scheme: "service.name".into(),
             value: service_name.into(),
@@ -705,7 +714,12 @@ fn select_primary_resource_entity(
             stability: IdentifierStability::Persistent,
             case_sensitive: true,
         };
-        let composite = format!("{}:{}|{}", service_namespace.len(), service_namespace, service_name);
+        let composite = format!(
+            "{}:{}|{}",
+            service_namespace.len(),
+            service_namespace,
+            service_name
+        );
         let entity = EntityRef::new(&context.namespace, "service", composite);
         return Ok(PrimaryEntitySelection {
             entity: entity.clone(),
@@ -822,7 +836,9 @@ fn length_prefixed_triplet(first: &str, second: &str, third: &str) -> String {
 }
 
 fn non_blank(value: Option<&String>) -> Option<&str> {
-    value.map(String::as_str).filter(|value| !value.trim().is_empty())
+    value
+        .map(String::as_str)
+        .filter(|value| !value.trim().is_empty())
 }
 
 fn non_empty(value: &str) -> Option<String> {
@@ -862,7 +878,10 @@ mod tests {
         }
     }
 
-    fn resource_metrics(resource_attributes: Vec<KeyValue>, data: metric::Data) -> ResourceMetrics {
+    fn resource_metrics(
+        resource_attributes: Vec<KeyValue>,
+        data: metric::Data,
+    ) -> ResourceMetrics {
         ResourceMetrics {
             resource: Some(Resource {
                 attributes: resource_attributes,
@@ -1008,7 +1027,10 @@ mod tests {
             2_100,
         );
         let batch = observer.observe_sync(ObservationRequest::default()).unwrap();
-        assert!(matches!(batch.observations[0].value, ObservationValue::Integer(9)));
+        assert!(matches!(
+            batch.observations[0].value,
+            ObservationValue::Integer(9)
+        ));
         assert_eq!(
             batch.observations[0].labels.get("otel.sum.monotonic"),
             Some(&"true".to_string())
@@ -1044,7 +1066,10 @@ mod tests {
             &OtlpMetricsContext::default(),
             2_100,
         );
-        assert!(matches!(result, Err(IntegrationError::InvalidOutput(_))));
+        assert!(matches!(
+            result,
+            Err(IntegrationError::InvalidOutput(_))
+        ));
     }
 
     #[test]
@@ -1058,7 +1083,10 @@ mod tests {
             &OtlpMetricsContext::default(),
             2_100,
         );
-        assert!(matches!(result, Err(IntegrationError::InvalidOutput(_))));
+        assert!(matches!(
+            result,
+            Err(IntegrationError::InvalidOutput(_))
+        ));
     }
 
     #[test]
