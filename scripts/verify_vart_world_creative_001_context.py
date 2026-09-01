@@ -59,9 +59,7 @@ def _expected_policy_digest(freeze: dict[str, Any], policy: str) -> str:
     mapping = _require_dict(
         freeze.get(key), "FROZEN_POLICY_IMPLEMENTATION_MISMATCH", f"freeze.{key}"
     )
-    return core.require_sha256(
-        mapping.get(policy), f"freeze.{key}.{policy}"
-    )
+    return core.require_sha256(mapping.get(policy), f"freeze.{key}.{policy}")
 
 
 def _verify_context_file(
@@ -198,6 +196,8 @@ def _verify_context_file(
         f"{trial_id}: context analysis/metric binding",
     )
 
+    # Candidate-set bytes must remain identical across paired decision policies, so
+    # they bind only the shared generation/admission context, never policy/trial identity.
     candidate_path = core.file_from_index(trial_dir, idx, "candidate_set")
     candidate_set = _require_dict(
         core.read_json(candidate_path),
@@ -205,9 +205,12 @@ def _verify_context_file(
         f"{trial_id}: candidate set",
     )
     core.require(
-        candidate_set.get("execution_context_sha256") == manifest_context_sha,
-        "EXECUTION_CONTEXT_DIGEST_MISMATCH",
-        f"{trial_id}: candidate set context",
+        candidate_set.get("paired_block_id") == manifest["paired_block_id"]
+        and candidate_set.get("world_fixture_sha256") == manifest["world_fixture_sha256"]
+        and candidate_set.get("seed") == manifest["seed"]
+        and candidate_set.get("revision_index") == manifest["revision_index"],
+        "PAIRED_BLOCK_IDENTITY_MISMATCH",
+        f"{trial_id}: candidate set generation identity",
     )
     core.require(
         candidate_set.get("candidate_generator_sha256") == frozen_generator,
@@ -249,8 +252,7 @@ def verify_context_qualified(root: Path, expected_freeze_sha256: str) -> dict[st
         "trial_contexts",
     )
     core.require(
-        isinstance(trial_ids, list)
-        and set(contexts) == set(trial_ids),
+        isinstance(trial_ids, list) and set(contexts) == set(trial_ids),
         "EXECUTION_CONTEXT_INVENTORY_MISMATCH",
         "trial_contexts must exactly cover trial_ids",
     )
