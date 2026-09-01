@@ -270,7 +270,7 @@ mod tests {
         let target = modulation(SemanticBootAnchor::GraphicsPhase, BootHealth::Normal);
 
         let mut previous = 0;
-        for _ in 0..20 {
+        for _ in 0..64 {
             let step = clock.advance_ms(16, &target);
             assert!(step.after >= previous);
             assert!(step.after <= target.reveal_floor);
