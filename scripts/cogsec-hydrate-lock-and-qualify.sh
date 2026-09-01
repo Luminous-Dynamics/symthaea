@@ -39,7 +39,7 @@ CARGO_VERSION="$(version_number cargo)"
 # contamination because workspace globs can make even an untracked crate affect
 # Cargo metadata and therefore the lockfile.
 if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
-  fail "working tree must be completely clean before lock hydration"
+  fail "working tree must be completely clean before lock hydration/qualification"
 fi
 
 HEAD_BEFORE="$(git rev-parse HEAD)"
@@ -48,21 +48,20 @@ BACKUP="$(mktemp "${TMPDIR:-/tmp}/cogsec-Cargo.lock.XXXXXX")"
 METADATA="$(mktemp "${TMPDIR:-/tmp}/cogsec-metadata.XXXXXX.json")"
 cp Cargo.lock "$BACKUP"
 
-SUCCESS=0
-restore_on_exit() {
-  if [[ $SUCCESS -ne 1 ]]; then
+KEEP_LOCK=0
+cleanup() {
+  if [[ $KEEP_LOCK -ne 1 ]]; then
     cp "$BACKUP" Cargo.lock
-    printf '\nHydration failed; restored the original Cargo.lock.\n' >&2
   fi
   rm -f "$BACKUP" "$METADATA"
 }
 interrupt() {
   exit 130
 }
-trap restore_on_exit EXIT
+trap cleanup EXIT
 trap interrupt INT TERM
 
-printf 'CogSec Cargo.lock hydration + qualification\n'
+printf 'CogSec Cargo.lock hydration / qualification\n'
 printf 'HEAD:   %s\n' "$HEAD_BEFORE"
 printf 'rustc:  %s\n' "$(rustc --version)"
 printf 'cargo:  %s\n' "$(cargo --version)"
@@ -76,19 +75,19 @@ for package in "${COGSEC_PACKAGES[@]}"; do
 done
 
 if [[ $all_present -eq 1 ]]; then
-  printf '\nAll CogSec package entries are already present; verifying locked metadata.\n'
+  printf '\nAll CogSec package entries are present; verifying committed lock state.\n'
   cargo metadata --locked --format-version=1 > "$METADATA"
 else
-  printf '\nHydrating Cargo.lock with pinned Cargo %s...\n' "$EXPECTED_RUST"
+  printf '\nCogSec entries are missing; hydrating Cargo.lock with pinned Cargo %s...\n' "$EXPECTED_RUST"
   # Intentionally omit --locked exactly once. Cargo is the only authority allowed
   # to rewrite Cargo.lock; this script never synthesizes package/dependency entries.
   cargo metadata --format-version=1 > "$METADATA"
 fi
 
 # Cargo metadata must not have changed any tracked file except Cargo.lock.
-mapfile -t CHANGED_TRACKED < <(git status --porcelain=v1 --untracked-files=all | sed -E 's/^...//')
-for path in "${CHANGED_TRACKED[@]}"; do
-  [[ "$path" == "Cargo.lock" ]] || fail "hydration changed unexpected path: $path"
+mapfile -t CHANGED_PATHS < <(git status --porcelain=v1 --untracked-files=all | sed -E 's/^...//')
+for path in "${CHANGED_PATHS[@]}"; do
+  [[ "$path" == "Cargo.lock" ]] || fail "Cargo changed unexpected path: $path"
 done
 
 for package in "${COGSEC_PACKAGES[@]}"; do
@@ -96,34 +95,41 @@ for package in "${COGSEC_PACKAGES[@]}"; do
     fail "Cargo.lock still lacks package entry: $package"
 done
 
-# Re-enter the strict mode that CI uses. If Cargo would still mutate the lock,
-# qualification stops here.
+# Re-enter the strict mode CI uses. If Cargo would still mutate the hydrated lock,
+# stop before presenting it as a candidate for commit.
 cargo metadata --locked --format-version=1 > /dev/null
 git diff --check -- Cargo.lock
 
 LOCK_AFTER="$(sha256sum Cargo.lock | awk '{print $1}')"
-printf '\nLock hydration verified.\n'
+printf '\nLock consistency verified.\n'
 printf 'before: %s\n' "$LOCK_BEFORE"
 printf 'after:  %s\n' "$LOCK_AFTER"
 
-printf '\nRunning the canonical seven-gate CogSec qualification...\n'
+if [[ "$LOCK_BEFORE" != "$LOCK_AFTER" ]]; then
+  # Do not run focused qualification yet: its first gate intentionally requires
+  # `git diff --exit-code -- Cargo.lock`, so qualifying an uncommitted lock would
+  # weaken the evidence boundary. Preserve only the Cargo-generated lock diff.
+  KEEP_LOCK=1
+  trap - EXIT INT TERM
+  rm -f "$BACKUP" "$METADATA"
+
+  printf '\nHYDRATED: Cargo.lock changed and passes locked metadata validation.\n'
+  printf 'Review the Cargo.lock diff and commit it without editing generated entries.\n'
+  printf 'Then rerun this same command from the clean committed head; the second pass\n'
+  printf 'will execute the canonical seven-gate CogSec qualification.\n'
+  exit 0
+fi
+
+printf '\nCargo.lock is already committed and stable. Running focused qualification...\n'
 bash scripts/cogsec-focused-qualification.sh
 
-# Qualification must not mutate tracked state beyond the intentional lock update.
-mapfile -t FINAL_CHANGED < <(git status --porcelain=v1 --untracked-files=all | sed -E 's/^...//')
-for path in "${FINAL_CHANGED[@]}"; do
-  [[ "$path" == "Cargo.lock" ]] || fail "qualification changed unexpected path: $path"
-done
+[[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]] || \
+  fail "qualification mutated the clean worktree"
+[[ "$(git rev-parse HEAD)" == "$HEAD_BEFORE" ]] || \
+  fail "HEAD changed during qualification"
 
-[[ "$(git rev-parse HEAD)" == "$HEAD_BEFORE" ]] || fail "HEAD changed during qualification"
-
-SUCCESS=1
+KEEP_LOCK=1
 trap - EXIT INT TERM
 rm -f "$BACKUP" "$METADATA"
 
-printf '\nPASS: CogSec lock hydration and focused qualification completed.\n'
-if [[ "$LOCK_BEFORE" == "$LOCK_AFTER" ]]; then
-  printf 'Cargo.lock was already qualified; no lockfile change is required.\n'
-else
-  printf 'Review and commit only the Cargo.lock diff produced by pinned Cargo %s.\n' "$EXPECTED_RUST"
-fi
+printf '\nPASS: committed CogSec lock state passed focused qualification.\n'
