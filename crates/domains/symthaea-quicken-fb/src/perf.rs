@@ -200,10 +200,15 @@ impl BootPerformanceRecorder {
 
 fn percentile(sorted: &[u64], percentile: usize) -> u64 {
     debug_assert!(!sorted.is_empty());
-    let last = sorted.len() - 1;
-    // Nearest-rank-like deterministic index over [0,last].
-    let index = (last.saturating_mul(percentile).saturating_add(99)) / 100;
-    sorted[index.min(last)]
+    debug_assert!((1..=100).contains(&percentile));
+    // Standard nearest-rank percentile: ceil(P/100 * N), converted to a
+    // zero-based index. This makes 1..=100 report p50=50, p95=95, p99=99.
+    let rank = sorted
+        .len()
+        .saturating_mul(percentile)
+        .saturating_add(99)
+        / 100;
+    sorted[rank.saturating_sub(1).min(sorted.len() - 1)]
 }
 
 fn temporary_path(path: &Path) -> PathBuf {
@@ -229,10 +234,20 @@ mod tests {
         let summary = series.summary();
         assert_eq!(summary.count, 100);
         assert_eq!(summary.min_us, 1);
-        assert_eq!(summary.p50_us, 51);
-        assert_eq!(summary.p95_us, 96);
-        assert_eq!(summary.p99_us, 100);
+        assert_eq!(summary.p50_us, 50);
+        assert_eq!(summary.p95_us, 95);
+        assert_eq!(summary.p99_us, 99);
         assert_eq!(summary.max_us, 100);
+    }
+
+    #[test]
+    fn singleton_percentiles_are_the_sample() {
+        let mut series = TimingSeries::default();
+        series.record_us(42);
+        let summary = series.summary();
+        assert_eq!(summary.p50_us, 42);
+        assert_eq!(summary.p95_us, 42);
+        assert_eq!(summary.p99_us, 42);
     }
 
     #[test]
