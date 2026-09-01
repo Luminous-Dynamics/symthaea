@@ -33,6 +33,7 @@ pub enum LifecycleSurface {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LifecycleTransition {
     pub from: LifecycleSurface,
     pub to: LifecycleSurface,
@@ -103,6 +104,7 @@ pub enum ContrastProfile {
 /// chain, not a credential or machine identifier. `handoff_sequence` must
 /// increase within that lineage so consumers can reject stale/replayed state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ContinuityState {
     pub version: u16,
     pub continuity_lineage: ContinuityLineage,
@@ -432,5 +434,26 @@ mod tests {
         next.world_age_ticks = 101;
         next.transition = transition(LifecycleSurface::Greeter, LifecycleSurface::Session);
         previous.validate_successor(&next).unwrap();
+    }
+
+    #[test]
+    fn strict_wire_rejects_unknown_fields_and_oversized_input() {
+        let state = valid_state();
+        let mut value = serde_json::to_value(state).unwrap();
+        value["unexpected"] = serde_json::json!(true);
+        let bytes = serde_json::to_vec(&value).unwrap();
+        assert!(matches!(
+            ContinuityState::decode_json(&bytes),
+            Err(ContinuityError::Serialization(_))
+        ));
+
+        let oversized = vec![b' '; MAX_CONTINUITY_BYTES + 1];
+        assert_eq!(
+            ContinuityState::decode_json(&oversized),
+            Err(ContinuityError::TooLarge {
+                bytes: MAX_CONTINUITY_BYTES + 1,
+                max: MAX_CONTINUITY_BYTES,
+            })
+        );
     }
 }
