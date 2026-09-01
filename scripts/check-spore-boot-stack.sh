@@ -17,6 +17,7 @@ PACKAGES=(
   symthaea-boot-input
   symthaea-boot-ecology-live
   symthaea-boot-visual-clock
+  symthaea-boot-presentation
   symthaea-spore-continuity
 )
 
