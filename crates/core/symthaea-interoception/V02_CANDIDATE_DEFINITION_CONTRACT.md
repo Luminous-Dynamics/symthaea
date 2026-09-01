@@ -2,260 +2,306 @@
 
 Status: **design-only / blocked on Native Interoception v0.1 qualification**
 
-This contract defines how an observational regulatory candidate becomes an immutable research object. It exists to prevent formula drift, hidden weighting/temporal changes, information-class changes, or post-result reinterpretation from being treated as the same candidate.
+This contract defines how an observational regulatory candidate becomes an immutable research object. It prevents formula drift, hidden weighting/aggregation/temporal changes, preprocessing leakage, evaluator-state dependence, information-class changes, or post-result reinterpretation from being treated as the same candidate.
 
-## Principle
+## 1. Principle
 
-A candidate is not just a function name. Its scientific identity includes every choice that can change the emitted value or its interpretation.
+A candidate is not just a function name or mathematical expression.
 
-Changing any identity-bearing field creates a new candidate definition and therefore a new prospective evidence identity.
+Its scientific identity includes every prospectively chosen element that can change:
 
-Candidate identity is now explicitly factorized by `V02_CANDIDATE_FACTOR_SPACE.md`. The factor coordinate does not replace the exact formula manifest; both are required.
+- what information it is allowed to use;
+- what value it emits;
+- when the value is available;
+- how the value is scaled/preprocessed;
+- whether process/evaluator history can affect the value;
+- how the value is interpreted relative to simpler baselines.
 
-## Proposed candidate manifest
+Changing an identity-bearing field creates a new candidate/evidence identity unless an explicit output-preserving equivalence proof applies.
 
-A later `ObservationalCandidateDefinitionManifest` should bind at minimum:
+The factor coordinate from `V02_CANDIDATE_FACTOR_SPACE.md` is necessary but not sufficient: exact formula, preprocessing, evaluator isolation, fixtures, and source identity are also required.
 
-- schema version;
-- stable candidate ID;
-- candidate-definition version;
+## 2. Proposed ObservationalCandidateDefinitionManifest
+
+A future canonical manifest should bind at minimum:
+
+- schema/version;
+- stable candidate ID and definition version;
 - complete `CandidateCoordinate` / factor-space version;
-- neutral relation family (`current_burden`, `realized_change`, `forecast_residual`, `overlap_revision`, `rolling_horizon_change`, `regulatory_urgency`, or explicitly declared baseline);
+- relation basis;
 - weighting basis;
+- cross-channel aggregation basis;
 - temporal aggregation basis;
+- forecast policy/information basis where applicable;
 - execution/information class;
-- forecast-information/policy class when applicable;
-- channel projection when applicable;
+- history-access basis;
 - exact mathematical/sign convention;
-- required input fields;
-- forbidden input classes;
-- forecast horizon;
-- discount factor;
-- temporal-alignment rule;
-- overlap weighting kernel;
-- normalization rule;
-- numerical precision/accumulation rule;
-- undefined/missing-value semantics;
-- minimum time index at which the candidate is defined;
+- required input fields and forbidden input classes;
+- forecast horizon/discount where applicable;
+- temporal-alignment and overlap rules;
+- normalization/scaling semantics;
+- exact preprocessing-manifest digest or explicit `None`;
+- calibration-cohort/fitted-parameter digests where applicable;
+- evaluator-isolation-manifest digest;
+- allowed evaluator persistent-state/cache class;
+- numerical precision/accumulation rules;
+- undefined/missing/out-of-range semantics;
+- minimum defined time index;
 - unit/domain convention;
 - source implementation identity;
 - compatibility-contract version;
-- reference-vector fixture digest;
-- v0.1 model-semantics version;
-- v0.1 snapshot/execution schema identities used by the candidate;
-- design-contract-registry identity or the frozen design identity that transitively binds it.
+- reference fixture digest;
+- v0.1 model-semantics/snapshot/execution identities;
+- frozen design/registry identity;
+- canonical SHA-256.
 
-The validated canonical form should have a deterministic SHA-256.
+Two definitions with identical mathematics but different value-changing preprocessing or evaluator-state policy are different scientific candidates.
 
-## Neutral naming rule
+## 3. Neutral naming
 
-Candidate IDs and causal APIs must remain interpretation-neutral during v0.2.
+Candidate IDs remain interpretation-neutral during v0.2.
 
-Preferred examples expose enough of the factor coordinate to make accidental substitution visible:
+Preferred forms expose the factor coordinate, for example:
 
-- `r0_w1_t0_viability_burden_v1`
-- `r1_w1_t0_viability_change_v1`
-- `r2_w2_t0_legacy_one_step_residual_v1`
-- `r3_w1_t1_overlap_mean_revision_v1`
-- `r4_w1_t2_viability_cumulative_change_v1`
-- `u1_w0_t8_first_breach_latency_v1`
-- `r0_w3_t0_confidence_v1`
+- `r0_w1_a3_t0_h0_viability_mean_v1`
+- `r1_w1_a4_t0_h0_viability_sum_change_v1`
+- `r2_w2_a3_t0_h0_legacy_residual_v1`
+- `r3_w1_a3_t1_h1_overlap_revision_v1`
+- `r4_w1_a4_t2_h1_cumulative_change_v1`
+- `u1_w0_a2_t8_h0_breach_latency_v1`.
 
-Avoid `valence`, `fear`, `joy`, `sadness`, `mood`, `pain`, `arousal`, `dominance`, or similar interpretation-bearing identifiers in the v0.2 metric contract.
+Avoid interpretation-bearing IDs such as `valence`, `fear`, `joy`, `sadness`, `pain`, `mood`, `arousal`, or `dominance`.
 
-Interpretive labels may be discussed only in later reports and must never alter the numerical candidate definition.
-
-## Execution / information classes
+## 4. Execution / information classes
 
 ### OfflinePrefixCausal
 
-Primary initial v0.2 evidence class.
+Primary initial scientific class.
 
-Candidate computation occurs after the native execution trace is complete and frozen, but receives only a validated `ObservationPrefixView(t)` constructed from information available through cut point `t`.
+Native execution completes and freezes first. Candidate computation then receives only a validated `ObservationPrefixView(t)` built from information available through `t`.
 
 It must pass:
 
-- prefix-equivalence;
-- future-suffix mutation invariance;
-- candidate-payload/full-trace-provenance separation;
-- source/dependency authority audits.
+- prefix equivalence;
+- unseen-future/suffix mutation invariance;
+- payload/full-trace-provenance separation;
+- source/dependency authority audits;
+- evaluator isolation/order invariance;
+- preprocessing holdout-leakage gates.
 
-The full source-trace digest is **not** an allowed candidate input because it changes when the unseen suffix changes. It belongs only to the outer evidence envelope.
+The full source-trace digest is forbidden from candidate computation and belongs only to the outer evidence envelope.
 
 ### OnlinePrefixCausalShadow
 
-Later engineering-validation class.
-
-A live/co-resident computation may be compared with the qualified offline payload only after it proves:
-
-- no-observer/native trace equivalence;
-- candidate-order independence;
-- exact offline/online candidate-payload equivalence under the locked contract.
-
-It is not the initial primary scientific evidence class.
+Later engineering-validation class requiring exact offline/online payload equivalence and no-observer/native-trace equivalence. It is not the initial primary scientific evidence class.
 
 ### RetrospectiveDiagnostic
 
-May use realized information after `t`, but the artifact must state the latest time required to compute the value. Retrospective candidates cannot be described as information available through `t`.
+May use information realized after `t`; artifact must declare latest required time. It cannot be described as information available to the system at `t`.
 
 ### OracleDiagnostic
 
-May intentionally use true future experimental schedules or realized future information as an upper-bound/diagnostic control. Oracle metrics can never be selected as the primary endogenous prefix-causal candidate.
+May intentionally consume true future schedule/realized future information as a diagnostic upper bound. It can never be promoted as the primary endogenous prefix-causal candidate.
 
-A change between these classes is a new candidate identity even if the numerical formula text appears unchanged.
+Changing class changes candidate identity.
 
-## Factor-coordinate contract
+## 5. History-access basis
 
-Every candidate has a coordinate binding at least:
+Candidate identity must distinguish at least:
+
+- `H0CurrentNativeStateOnly`;
+- `H1ReplayedPrefixHistory`;
+- future separately qualified `H2NativePersistedMemory`;
+- retrospective/oracle history diagnostics.
+
+H1 means the **external observatory** uses prior events from the same immutable prefix. It does not establish that the native regulator stores or experiences that history.
+
+A rolling window, cumulative accumulator, repeated-breach counter, or history-aware forecast in the observatory remains external history-derived unless a separately qualified native state carries an equivalent sufficient statistic.
+
+## 6. Factor-coordinate contract
+
+Every candidate coordinate binds at least:
 
 - relation basis;
 - weighting basis;
+- cross-channel aggregation basis;
 - temporal aggregation;
 - forecast policy;
 - execution/information class;
-- channel projection;
+- history-access basis;
 - availability rule;
 - numeric-contract version.
 
-The compatibility matrix is evidence-critical. Invalid coordinates fail candidate-manifest validation rather than being interpreted ad hoc.
+Invalid coordinates fail manifest validation.
 
 Examples:
 
-- R3 requires forecast trajectories with overlapping absolute future support;
-- T8 first-breach latency requires a prospective trajectory, not a current-state-only relation;
-- W3 confidence-only candidates must not be labeled as burden unless an explicit cross-quantity formula defines that relation;
+- R3 requires overlapping forecast support;
+- T8 first-breach latency requires a prospective trajectory;
+- W3 confidence cannot silently become normative burden;
+- A0 full vector cannot carry a scalar denominator;
 - OracleDiagnostic cannot be confirmatory-primary;
-- OnlinePrefixCausalShadow cannot replace OfflinePrefixCausal in the initial lineage without a new design identity.
+- H2 is unavailable until a separate native-memory lineage exists.
 
-## Exact formula contract
+## 7. Exact formula contract
 
-Natural-language descriptions are insufficient for confirmatory work.
+Natural-language descriptions are insufficient.
 
-Before a candidate enters confirmatory evidence, lock a formula specification that fixes:
+Before confirmatory use, lock:
 
-- operand order;
-- sign convention;
+- operand order/sign;
 - temporal indices;
 - relation basis;
 - weighting basis;
-- whether quantities are instantaneous, cumulative, normalized means, sums, peaks, terminal values, durations, or latencies;
-- weighting and normalization constants;
+- channel aggregation/denominator;
+- temporal aggregation/support;
 - forecast policy/horizon/discount;
 - boundary handling;
-- tolerance/equality rules;
-- handling of absent forecast breaches (`first_breach_step = None`);
-- conversion rules between v0.1 `f32` native quantities and any v0.2 higher-precision derived arithmetic.
+- equality/tolerance rules;
+- absent-breach handling;
+- numeric representation/conversion rules.
 
-The implementation must have reference fixtures whose expected outputs are independently hand/computer-derived and whose fixture digest is bound into the candidate manifest.
+Reference fixtures must independently reproduce expected outputs and their digest is part of candidate identity.
 
-## Floating-point discipline
+## 8. Preprocessing/calibration identity
 
-v0.2 should not let floating-point implementation details silently define scientific outcomes.
+Every value-changing transform is part of candidate identity under `V02_CALIBRATION_AND_PREPROCESSING.md`.
 
-Recommended contract:
+The manifest binds an exact preprocessing definition or explicit `None`.
 
-- retain exact v0.1 native values as inputs without modifying native execution;
-- use deterministic `f64` accumulation for v0.2 derived weighted sums/means/exposures unless a stronger reason is documented;
-- do not enable fast-math or architecture-dependent approximate reductions in qualified evidence code;
-- define comparison tolerances prospectively;
-- distinguish exact-replay/payload equality from scientific equivalence tolerances;
-- record non-finite derived values as hard validation failures, never clamp them into apparently valid observations.
+Examples of identity-bearing transforms include:
 
-If changing numeric representation changes a confirmatory threshold result, treat that as a sensitivity/failure finding rather than selecting the preferred representation after unblinding.
+- z-score/min-max/reference scaling;
+- clipping/saturation;
+- smoothing/windowing;
+- baseline subtraction;
+- fitted thresholds;
+- unit conversions that alter numerical representation;
+- imputation/missingness transforms.
 
-## Undefined is not zero
+Fitted parameters must come only from prospectively identified discovery/calibration or independent external-reference artifacts and must be frozen before confirmatory execution.
 
-Candidates have different temporal requirements.
+Confirmatory values may not refit or adapt preprocessing.
+
+Same formula + different fitted preprocessing parameters = different candidate identity.
+
+## 9. Evaluator state-lifecycle identity
+
+`V02_OBSERVATORY_STATE_LIFECYCLE.md` governs implementation-state authority.
+
+Initial primary evaluation should behave as scenario-local deterministic computation from the candidate definition plus allowed prefix.
+
+Candidate identity/evidence binds:
+
+- evaluator-isolation manifest;
+- allowed persistent-state class;
+- reset lifecycle;
+- cache policy;
+- concurrency/order contract.
+
+H1 permits within-scenario prefix history; it does not permit state carried from another scenario or arm.
+
+Cross-scenario mutable state, adaptive cohort statistics, candidate-order dependence, or cache-key access to forbidden provenance are integrity failures.
+
+## 10. Floating-point discipline
+
+- retain exact v0.1 native values as inputs;
+- use deterministic `f64` derived accumulation unless prospectively justified otherwise;
+- no fast-math/architecture-dependent approximate reductions in qualified evidence;
+- define scientific comparison tolerances prospectively;
+- distinguish exact replay equality from scientific equivalence;
+- non-finite derived values fail validation rather than being clamped into validity.
+
+If numeric representation changes a confirmatory result, preserve that as sensitivity/failure evidence.
+
+## 11. Undefined is not zero
+
+Different candidates require different support.
 
 Examples:
 
-- R1 requires both `t-1` and `t`;
-- R2 requires a forecast made at `t-1` and the realized state at `t`;
-- R3 requires two forecasts with at least one shared absolute future point;
-- R4 requires two aggregate rolling forecasts;
-- T8 requires a defined breach or an explicit typed no-breach state;
-- T9 requires a prospectively declared perturbation/recovery window and cutoff.
+- R1 requires two realized cut points;
+- R2 requires prior forecast + current realization;
+- R3 requires overlapping forecast support;
+- R4 requires two finite-horizon aggregates;
+- T8 requires a breach or explicit no-breach state;
+- T9 requires a declared perturbation/recovery window.
 
-When a candidate is not defined, emit an explicit typed unavailable state/reason. Do not silently substitute zero, carry forward the previous value, or drop the row.
+Undefined candidates emit typed unavailable states. Do not substitute zero, carry-forward, or silently drop rows.
 
-Missingness itself must be deterministic and auditable.
+## 12. Information dependency declaration
 
-## Information dependency declaration
+Candidate definitions declare dependencies such as:
 
-Each candidate should declare an explicit dependency set. Proposed categories include:
+- current/prior native state;
+- observed drive history;
+- executed intervention history;
+- native dynamics config;
+- prefix forecast trajectory;
+- prefix digest;
+- preprocessing constants;
+- scenario-local evaluator state derived from the same prefix;
+- realized future state;
+- future protocol schedule;
+- full source-trace digest;
+- semantic arm identity.
 
-- `CurrentNativeState`;
-- `PriorNativeState`;
-- `ObservedDriveHistory`;
-- `ExecutedInterventionHistory`;
-- `NativeDynamicsConfig`;
-- `PrefixForecastTrajectory`;
-- `PrefixDigest`;
-- `RealizedFutureState`;
-- `FutureProtocolSchedule`;
-- `FullSourceTraceDigest`;
-- `SemanticArmIdentity`.
+Qualified prefix-causal candidates reject dependencies on realized future state, future schedule, full source-trace digest, semantic arm identity, post-run exclusion outcome, or other candidate results.
 
-Qualified `OfflinePrefixCausal` / `OnlinePrefixCausalShadow` candidates must reject dependency manifests containing:
+## 13. Payload vs evidence envelope
 
-- `RealizedFutureState`;
-- `FutureProtocolSchedule`;
-- `FullSourceTraceDigest`;
-- `SemanticArmIdentity`.
+`CandidatePayload` contains only allowed prefix-derived identity/result information.
 
-The runtime API should be shaped so forbidden dependencies are unavailable by type, not merely discouraged by documentation.
+`CandidateEvidenceEnvelope` binds the payload to full execution provenance, study/evidence root, toolchain, storage artifacts, and outer source-trace identity.
 
-## Payload vs evidence envelope
+For identical allowed prefixes with divergent unseen suffixes:
 
-The candidate's prefix-causal computation emits a `CandidatePayload` containing only allowed prefix-derived identity and result information.
+- candidate payloads must be identical;
+- evidence envelopes may differ.
 
-The outer `CandidateEvidenceEnvelope` binds the payload to the full source execution trace, study/evidence root, toolchain, and storage artifacts.
+Suffix-sensitive identity entering the payload is a prefix-causality failure.
 
-For two traces with identical allowed prefix but different unseen suffix:
+## 14. Candidate equivalence and non-equivalence
 
-- candidate payloads must be byte-identical under the canonical contract;
-- outer evidence envelopes may differ because full-trace provenance differs.
+Automatically new identities include changes to:
 
-A candidate manifest or implementation that makes payload identity depend on full-trace provenance fails prefix causality.
+- factor coordinate;
+- formula/sign/indices;
+- horizon/discount/forecast policy;
+- weighting/aggregation/temporal integration;
+- history-access or information class;
+- preprocessing transform or fitted parameters;
+- evaluator persistent-state/cache authority;
+- normalization;
+- undefined/out-of-range handling;
+- native semantic lineage;
+- implementation changes altering reference outputs.
 
-## Candidate equivalence and non-equivalence
+A source refactor may preserve identity only when all canonical fields, fixtures, preprocessing parameters, evaluator-isolation semantics, and qualified outputs remain identical.
 
-Two candidate manifests are the same scientific candidate only when their canonical identity fields are identical.
+## 15. Finite candidate-set discipline
 
-The following are automatically new candidate identities:
+The factor space is not an unrestricted search space.
 
-- changing factor coordinate;
-- changing sign;
-- changing horizon or discount;
-- changing zero-input to current-drive-persistence forecast policy;
-- changing overlap weighting;
-- changing weighting basis;
-- changing temporal aggregation;
-- changing channel projection;
-- changing normalization;
-- changing OfflinePrefixCausal to OnlinePrefixCausalShadow, RetrospectiveDiagnostic, or OracleDiagnostic;
-- changing treatment of undefined values;
-- changing temporal alignment;
-- changing the v0.1 semantic lineage;
-- changing source implementation in a way that alters reference outputs.
+Before exploratory execution, freeze a finite `ExploratoryCandidateSetManifest` containing every eligible candidate-definition digest.
 
-A pure source refactor may preserve candidate-definition version only when the factor coordinate, all reference fixtures, canonical definition fields, and qualified outputs remain identical.
+Exploratory preprocessing variants must also be finite and prospective.
 
-## Finite candidate-set rule
+Before confirmation, freeze one primary candidate plus required baselines/sensitivity candidates under a declared selection rule.
 
-The factor axes define a design space but do not authorize an unrestricted Cartesian search.
+## 16. Identifiability and parsimony
 
-Before exploratory execution, freeze an explicit finite `ExploratoryCandidateSetManifest` listing every eligible candidate-definition digest.
+Every primary-vs-baseline superiority claim requires a registered discriminator under `V02_IDENTIFIABILITY_AND_DISCRIMINATION.md`.
 
-After exploratory evaluation, a separately frozen confirmatory candidate/baseline set is required.
+Candidate fingerprints may collapse definitions into observational equivalence classes.
 
-This prevents candidate proliferation from becoming post-hoc metric fishing.
+If a complex candidate is indistinguishable from a simpler baseline under all locked discriminators, the correct outcome is `EquivalentToBaseline` or `InsufficientDiscrimination`, not interpretive promotion.
 
-## Candidate comparison states
+H1 candidates claiming history information beyond H0 require matched-current-state history discriminators.
 
-Confirmatory comparison should not force a winner.
+## 17. Candidate comparison states
 
-A preregistered comparison may resolve to states such as:
+Valid states include:
 
 - `SupportedBeyondBaselines`;
 - `EquivalentToBaseline`;
@@ -264,46 +310,42 @@ A preregistered comparison may resolve to states such as:
 - `FailsPrefixCausality`;
 - `FailsSensitivityRegion`;
 - `WeightingAmbiguous`;
+- `AggregationAmbiguous`;
 - `TemporalAggregationAmbiguous`;
+- `PreprocessingSensitive`;
+- `CalibrationSensitive`;
+- `HistoryInformationNotIdentified`;
 - `NumericallyUnstable`;
 - `Indeterminate`;
 - `NoUniqueWinner`.
 
-These are valid scientific outcomes and must not trigger retrospective metric redefinition inside the same confirmatory lineage.
+These outcomes do not authorize retrospective candidate redefinition.
 
-## Primary/secondary promotion rule
+## 18. Required implementation gates
 
-Exploratory work may choose a primary candidate from the prospectively frozen exploratory candidate set under a declared selection rule.
+Before confirmatory eligibility, mechanically require at least:
 
-Once confirmatory study identity is locked:
+1. stable canonical candidate digest;
+2. every identity-bearing field changes the digest;
+3. invalid factor combinations rejected;
+4. reference fixtures reproduce;
+5. prefix/suffix invariance passes;
+6. full source-trace provenance excluded from computation;
+7. diagnostic authority classes cannot enter primary API;
+8. undefined states remain typed;
+9. derived values remain finite on valid domain;
+10. native execution artifact is immutable;
+11. semantic emotion labels absent from candidate API;
+12. finite candidate-set membership frozen;
+13. preprocessing parameters reproduce from their locked calibration source;
+14. confirmatory holdout cannot change preprocessing parameters;
+15. evaluator output is invariant to candidate/scenario order, cache warmth, batch size, and allowed concurrency;
+16. incremental H1 evaluation equals from-scratch prefix computation;
+17. H1-vs-H0 discrimination is present for history-information claims;
+18. candidate/evidence envelope binds exact frozen design and runtime identities.
 
-- the primary candidate cannot be replaced after observing confirmatory results;
-- its factor coordinate cannot be changed;
-- secondary candidates remain secondary;
-- a secondary candidate that looks better may motivate a new confirmatory lineage, not promotion within the current one;
-- the exact baseline set and candidate-ranking rule remain frozen.
+## 19. Claim boundary
 
-## Required implementation gates
+This contract can establish that a regulatory observable—including its information, history, weighting, aggregation, temporal, preprocessing, and evaluator-state semantics—was fixed prospectively and computed reproducibly.
 
-Before any v0.2 candidate is eligible for confirmatory use, tests should require:
-
-1. canonical candidate digest is stable under serialization round trip;
-2. every identity-bearing field and factor coordinate changes the digest when altered;
-3. invalid factor combinations are rejected by the compatibility validator;
-4. reference fixtures reproduce exactly or within the prospectively declared numerical tolerance;
-5. OfflinePrefixCausal candidates pass prefix-equivalence and future-mutation invariance;
-6. full source-trace provenance cannot enter candidate computation;
-7. RetrospectiveDiagnostic/OracleDiagnostic candidates cannot enter the prefix-causal qualified API by construction;
-8. OnlinePrefixCausalShadow cannot be treated as equivalent to offline evidence without its explicit equivalence gates;
-9. undefined cases remain explicitly unavailable rather than zero-filled;
-10. derived values remain finite on the declared valid scenario region;
-11. candidate computation does not mutate or alter the underlying v0.1 execution artifact;
-12. semantic emotion labels are absent from the metric-definition API;
-13. candidate payloads bind prefix/candidate identity while outer envelopes bind full source/study/toolchain provenance;
-14. candidate set membership is finite and prospectively locked.
-
-## Claim boundary
-
-This contract can establish that a numerical regulatory observable and all of its relation, weighting, temporal, forecast, information, and projection choices were fixed prospectively, computed reproducibly, and compared fairly.
-
-It cannot establish that the observable is emotion, subjective valence, feeling, mood, suffering, sentience, or consciousness.
+It cannot establish emotion, subjective valence, native mood, native memory, suffering, sentience, or consciousness.
