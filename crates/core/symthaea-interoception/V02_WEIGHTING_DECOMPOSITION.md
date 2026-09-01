@@ -2,132 +2,135 @@
 
 Status: **design-only / blocked on Native Interoception v0.1 qualification**
 
-This contract addresses issue #268 without changing Native Interoception v0.1 model
-semantics while its exact qualification candidate is pending.
+This contract addresses issue #268 without changing Native Interoception v0.1 model semantics while its exact qualification candidate is pending.
 
-The core concern is that v0.1 currently computes aggregate homeostatic deviation using
-`precision * importance` as the channel weight. That quantity can be a legitimate
-confidence-adjusted estimate, but v0.2 must not silently treat it as the unique
-intrinsic viability burden or as valence by construction.
+The core concern is that v0.1 currently computes aggregate homeostatic deviation using `precision * importance` as the channel weight. That quantity can be a legitimate confidence-adjusted estimate, but v0.2 must not silently treat it as the unique intrinsic viability burden or as valence by construction.
+
+This contract now defines only the **weighting axis**. Temporal aggregation is independently defined by `V02_ALLOSTATIC_EXPOSURE_DECOMPOSITION.md`, and the complete candidate coordinate is defined by `V02_CANDIDATE_FACTOR_SPACE.md`.
 
 ## 1. Principle
 
-Keep **normative/regulatory burden** and **epistemic confidence** distinct until evidence
-supports a particular coupling.
+Keep **normative/regulatory burden** and **epistemic confidence** distinct until evidence supports a particular coupling.
 
-For v0.2, the following are competing observables, not aliases:
+For v0.2, the following are competing weighting observables, not aliases:
 
-1. raw channel deviation;
-2. viability/preference-weighted burden;
-3. legacy precision×importance weighted aggregate;
+1. raw channel values/deviations;
+2. viability/preference-weight-only aggregation;
+3. legacy precision×importance aggregation;
 4. precision/confidence itself;
-5. optional explicit uncertainty/epistemic-pressure summaries.
+5. future explicitly qualified uncertainty/epistemic summaries.
 
-No candidate family may rename the legacy aggregate to `valence`, `badness`, `pain`, or
-another higher-level interpretation.
+No candidate family may rename the legacy aggregate to `valence`, `badness`, `pain`, or another higher-level interpretation.
 
 ## 2. Existing v0.1 quantities
 
 v0.1 already exposes enough structure to avoid changing its native semantics:
 
 - per-channel normalized deviations in `HomeostaticReport.channel_deviations`;
-- per-channel projected debt in `AllostaticReport.channel_debt`;
+- per-channel forecast quantities in `AllostaticReport.channel_debt`;
 - per-channel `importance`;
 - per-channel `precision`;
 - raw breach count/breadth/timing metrics independent of aggregate weight.
 
-Therefore v0.2 can construct alternative read-only aggregates from frozen artifacts
-without rewriting v0.1.
+Important semantic note: v0.1 `AllostaticReport.channel_debt` and aggregate `discounted_debt` are normalized by the total discount weight. They therefore behave as **discount-weighted mean projected burdens**, not cumulative exposure integrals. The temporal contract governs how these values are named and how cumulative alternatives are derived.
 
-## 3. Proposed neutral aggregates
+## 3. Weighting bases
 
-Use interpretation-neutral candidate IDs and exact formula manifests.
+### W0 — RawChannel
 
-### W0 — raw burden vector
+No cross-channel weighting or aggregation.
 
-The vector of per-channel normalized deviations:
+The vector of per-channel deviations remains available directly:
 
 `d_i(t)`
 
-No cross-channel aggregation.
-
 Purpose:
 
-- preserve the full native regulatory geometry;
-- ensure aggregate cancellation/weighting cannot erase a severe channel;
-- support channel-specific and worst-channel baselines.
+- preserve native regulatory geometry;
+- ensure aggregate weighting cannot erase a severe channel;
+- support channel-specific, vector-valued, breach, and peak-channel baselines.
 
-### W1 — viability-weighted burden
+### W1 — ViabilityWeightOnly
 
-Conceptual form:
+Conceptual cross-channel aggregate:
 
-`B_v(t) = sum_i d_i(t) * w_i / sum_i w_i`
+`B_v = sum_i x_i * w_i / sum_i w_i`
 
-where `w_i` is the declared viability/preference significance currently represented by
-`importance`.
+where:
+
+- `x_i` is the temporal quantity supplied by the independently declared temporal basis;
+- `w_i` is the declared viability/preference significance currently represented by `importance`.
 
 Properties:
 
-- changing precision alone does not alter `B_v`;
-- changing importance can alter `B_v`;
-- raw breach count/peak remain separately available;
-- zero total viability weight must be typed unavailable or otherwise handled by a
-  preregistered rule, never silently interpreted as zero burden.
+- changing precision alone does not alter W1;
+- changing importance can alter W1;
+- zero total viability weight must be typed unavailable or handled by a prospectively frozen rule, never silently interpreted as zero burden.
 
-### W2 — legacy confidence-weighted aggregate
+### W2 — LegacyPrecisionTimesImportance
 
-The current v0.1 aggregate:
+Exact v0.1 weighting hypothesis:
 
-`B_legacy(t) = sum_i d_i(t) * precision_i * importance_i / sum_i precision_i * importance_i`
+`B_legacy = sum_i x_i * precision_i * importance_i / sum_i precision_i * importance_i`
 
-Retain it under a neutral identity as a competing hypothesis.
+where `x_i` is again supplied by the temporal basis.
 
-Do not call it intrinsic burden. Its scientific meaning is explicitly:
+Do not call this intrinsic burden. Its scientific meaning is explicitly:
 
-> a precision/confidence-adjusted aggregate under the v0.1 hypothesis.
+> a precision/confidence-adjusted aggregate under the v0.1 weighting hypothesis.
 
-### W3 — aggregate confidence / uncertainty
+For T0 instantaneous deviation, W2 reproduces v0.1 `HomeostaticReport.weighted_deviation`.
 
-Do not infer a single universal formula prematurely.
+For T1 discounted mean forecast burden, W2 reproduces v0.1 `AllostaticReport.discounted_debt` when the trajectory/legacy equivalence contract is satisfied.
 
-Candidate families may include prospectively specified summaries such as:
+### W3 — ConfidenceOnly
+
+Precision/confidence is observed as its own quantity rather than being silently reclassified as viability burden.
+
+Candidate summaries may include prospectively specified forms such as:
 
 - importance-weighted mean precision;
 - minimum precision over threatened channels;
-- precision over the currently peak-deviation channel;
+- precision of the current peak-deviation channel;
 - breadth of low-confidence channels;
-- entropy/variance from a future explicit uncertainty model, once available.
+- later entropy/variance measures once a probabilistic uncertainty contract exists.
 
-Until uncertainty has a generative probabilistic contract, these remain descriptive
-confidence candidates rather than calibrated posterior uncertainty.
+Until uncertainty has a generative probabilistic contract, these are descriptive confidence candidates rather than calibrated posterior uncertainty.
 
-### W4 — projected viability-weighted debt
+### WFutureQualified
 
-Use the v0.1 per-channel `AllostaticReport.channel_debt` with the declared viability
-weights:
+Reserved for a future weighting rule only after its exact semantics, fixtures, evidence identity, and sensitivity behavior are frozen.
 
-`A_v(t) = sum_i channel_debt_i(t) * w_i / sum_i w_i`
+It cannot be used as a generic extension escape hatch in an existing confirmatory lineage.
 
-This creates an importance-only prospective burden candidate without changing v0.1
-allostatic dynamics.
+## 4. Weighting is independent of temporal aggregation
 
-### W5 — legacy projected debt
-
-Retain v0.1 `discounted_debt` under a neutral legacy candidate identity.
-
-W4 and W5 must be compared explicitly before either is used in a regulatory-improvement
-or valence-motivated candidate.
-
-## 4. Regulatory change candidates
-
-R1/R2/R3/R4 candidate families should declare which weighting basis they use.
+Weighting and temporal aggregation form separate axes.
 
 Examples:
 
-- `r1_w1_viability_burden_change`
-- `r1_w2_legacy_weighted_change`
-- `r4_w4_viability_debt_change`
-- `r4_w5_legacy_debt_change`
+- `W1 × T0` — current viability-weighted burden;
+- `W2 × T0` — current legacy confidence-weighted burden;
+- `W1 × T1` — discounted mean viability-weighted forecast burden;
+- `W2 × T1` — exact legacy v0.1 discounted mean aggregate;
+- `W1 × T2` — discounted cumulative viability exposure;
+- `W2 × T2` — discounted cumulative exposure under legacy precision weighting;
+- `W0 × T8` — raw first-breach latency;
+- `W3 × T0` — current confidence observable.
+
+Do not use `debt` in a candidate ID without also specifying the temporal aggregation contract. Prefer `mean_burden`, `cumulative_exposure`, `peak`, `latency`, etc.
+
+## 5. Regulatory relation candidates
+
+R0/R1/R2/R3/R4/urgency candidates declare their weighting basis explicitly through the candidate coordinate.
+
+Examples:
+
+- `r0_w1_t0_viability_burden_v1`
+- `r1_w1_t0_viability_change_v1`
+- `r1_w2_t0_legacy_weighted_change_v1`
+- `r4_w1_t2_viability_cumulative_change_v1`
+- `r4_w2_t1_legacy_rolling_mean_change_v1`
 
 Do not compare formulas while hiding the weighting difference inside one candidate ID.
 
@@ -137,17 +140,17 @@ Candidate identity must bind:
 - exact weights used;
 - treatment of zero weights;
 - precision dependency yes/no;
+- temporal aggregation identity;
 - normalization;
 - forecast basis/horizon/discount where applicable.
 
-## 5. Falsification-oriented scenario family
+## 6. Falsification-oriented scenario family
 
 The first v0.2 exploratory cohort should deliberately decorrelate burden and precision.
 
 ### P1 — fixed state, changed precision
 
-Hold values, preferred/viable geometry, importance, velocity, and drive history fixed.
-Vary precision only.
+Hold values, preferred/viable geometry, importance, velocity, and drive history fixed. Vary precision only.
 
 Expected structural behavior:
 
@@ -157,8 +160,7 @@ Expected structural behavior:
 - W3 changes by definition;
 - raw breach measures unchanged.
 
-If a supposed intrinsic-burden candidate changes here, its precision dependency is
-explicit and must be defended rather than hidden.
+If a supposed precision-independent burden candidate changes here, its contract is wrong or mislabeled.
 
 ### P2 — fixed precision, changed state deviation
 
@@ -184,27 +186,23 @@ Required:
 
 ### P4 — mild high-confidence vs severe low-confidence
 
-Cross burden and precision so the two aggregation hypotheses may rank conditions
-differently.
+Cross burden and precision so W1 and W2 may rank conditions differently.
 
 This is a required discriminating scenario, not an edge case.
 
-### P5 — precision-only prospective change
+### P5 — precision-only prospective fixture change
 
-Hold native state/trajectory fixed while changing only the declared precision field in
-synthetic/reference fixtures.
+Hold native state/trajectory fixed while changing only precision in synthetic/reference fixtures.
 
-Use this to prove which allostatic candidate families are epistemically sensitive and
-which are normatively invariant.
+Use this to prove which weighting candidates are epistemically sensitive and which are normatively invariant.
 
 ### P6 — importance-only change
 
 Hold precision/state fixed and vary importance.
 
-This tests whether the declared viability-weighted candidate responds according to its
-normative weighting contract independently of confidence.
+This tests whether W1 responds according to its normative weighting contract independently of confidence.
 
-## 6. Candidate-selection rule
+## 7. Candidate-selection rule
 
 Do not choose W1 or W2 because it yields a more emotionally intuitive story.
 
@@ -219,10 +217,9 @@ Use preregistered structural criteria such as:
 
 `NoUniqueWinner` and `WeightingAmbiguous` are valid outcomes.
 
-## 7. Relationship to active inference
+## 8. Relationship to active inference
 
-v0.2 should use active-inference concepts as competing computational motivations, not as
-an excuse to collapse them into one scalar.
+v0.2 should use active-inference concepts as competing computational motivations, not as an excuse to collapse them into one scalar.
 
 At minimum preserve the conceptual distinction between:
 
@@ -231,52 +228,45 @@ At minimum preserve the conceptual distinction between:
 - epistemic value or uncertainty reduction;
 - pragmatic value or preferred-state realization.
 
-The exact Symthaea implementation does not have to reproduce one biological or formal
-active-inference model, but it should not use the word `precision` while giving it an
-undeclared normative meaning.
+The exact Symthaea implementation does not have to reproduce one biological or formal active-inference model, but it should not use the word `precision` while giving it an undeclared normative meaning.
 
-## 8. Future native-semantics change
+## 9. Future native-semantics change
 
-If evidence/review later concludes that v0.1's native aggregate should itself be
-redefined, do not silently change `weighted_deviation` in place.
+If evidence/review later concludes that v0.1's native aggregate should itself be redefined, do not silently change `weighted_deviation` or `discounted_debt` in place.
 
-Preferred future report shape:
+Preferred future report shape may include separate fields such as:
 
 - `viability_weighted_deviation`;
 - `confidence_weighted_deviation`;
 - `peak_deviation`;
 - raw channel deviations;
 - explicit confidence/uncertainty summary;
-- corresponding separated allostatic debt fields.
+- `discounted_mean_burden`;
+- explicit cumulative exposure fields.
 
-Such a change alters the scientific meaning of homeostatic/allostatic reports and must:
+Such a change alters scientific report semantics and must:
 
-- increment `INTEROCEPTIVE_MODEL_SEMANTICS_VERSION`;
+- increment `INTEROCEPTIVE_MODEL_SEMANTICS_VERSION` where native model/report meaning changes;
 - use a new snapshot/report schema as required;
 - start a new evidence lineage;
 - rerun qualification;
 - preserve old v0.1 artifacts under their original semantics.
 
-## 9. Design-freeze consequence
+## 10. Design-freeze consequence
 
-Before v0.2 implementation is authorized, classify weighting semantics as follows:
+Before v0.2 implementation is authorized:
 
-- v0.1 legacy aggregate remains available as W2/W5;
-- v0.2 adds importance-only W1/W4 as observational candidates;
-- precision/confidence is exposed separately as W3;
-- no primary affect precursor is permitted to assume W2/W5 are intrinsically normative;
-- the exploratory study must include P1–P6 discriminating scenarios;
-- confirmatory candidate choice remains open until exploratory comparison is frozen into
-  a new confirmatory identity.
+- W0/W1/W2/W3 semantics are frozen;
+- temporal aggregation is always separately identified;
+- no primary affect precursor may assume W2 is intrinsically normative;
+- the exploratory study includes P1–P6 discriminating scenarios;
+- the factor-space compatibility validator rejects invalid/mislabeled combinations;
+- confirmatory candidate choice remains open only until exploratory selection is frozen into a new confirmatory identity.
 
-This resolves issue #268 at the design level without altering the qualifying v0.1
-substrate.
+This resolves issue #268 at the design level without altering the qualifying v0.1 substrate.
 
-## 10. Claim boundary
+## 11. Claim boundary
 
-Separating these quantities reduces a semantic confound. It does not prove that W1 is
-"true valence", that W2 is wrong, or that any candidate corresponds to emotion or
-subjective feeling.
+Separating weighting from temporal aggregation and confidence reduces a semantic confound. It does not prove that W1 is “true valence”, that W2 is wrong, or that any candidate corresponds to emotion, mood, suffering, or subjective feeling.
 
-The point of v0.2 is precisely to let these interpretations compete under controlled,
-label-free evidence rather than choosing one by naming convention.
+The point of v0.2 is precisely to let these interpretations compete under controlled, label-free evidence rather than choosing one by naming convention.
