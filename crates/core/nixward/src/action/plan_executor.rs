@@ -65,7 +65,7 @@ pub struct PlanStep {
     pub description: String,
     /// Current status.
     pub status: StepStatus,
-    /// Whether failure triggers rollback of completed prior steps.
+    /// Whether failure triggers rollback of applied prior steps.
     pub critical: bool,
     /// Optional explicit read-only postcondition command.
     pub verification: Option<NixOSCommand>,
@@ -191,7 +191,7 @@ impl PlanExecutor {
         blocked
     }
 
-    /// Execute the plan, stopping and rolling back on critical failure.
+    /// Execute the plan, stopping and compensating applied steps on critical failure.
     pub async fn execute(&mut self, executor: &mut NixOSExecutor) -> PlanExecutionResult {
         if self.dry_run {
             let mut dry_executor = NixOSExecutor::new().with_dry_run(true);
@@ -240,7 +240,7 @@ impl PlanExecutor {
 
                 if self.steps[index].critical {
                     let (rolled_back_count, rollback_failures) =
-                        self.rollback_completed(executor, &mut results).await;
+                        self.rollback_applied(executor, &mut results).await;
                     for remaining in (index + 1)..self.steps.len() {
                         self.steps[remaining].status = StepStatus::Skipped;
                         results.push((self.steps[remaining].clone(), None));
@@ -273,8 +273,11 @@ impl PlanExecutor {
         }
     }
 
-    /// Roll back the actual completed steps in reverse execution order.
-    async fn rollback_completed(
+    /// Roll back every processed step whose primary execution actually
+    /// succeeded, in reverse execution order. This deliberately keys off the
+    /// recorded effect rather than `StepStatus`: a step whose mutation applied
+    /// but whose postcondition later failed still requires compensation.
+    async fn rollback_applied(
         &mut self,
         executor: &mut NixOSExecutor,
         results: &mut [(PlanStep, Option<ExecutionResult>)],
@@ -283,7 +286,11 @@ impl PlanExecutor {
         let mut failures = Vec::new();
 
         for index in (0..results.len()).rev() {
-            if self.steps[index].status != StepStatus::Completed {
+            let primary_applied = results[index]
+                .1
+                .as_ref()
+                .is_some_and(|result| matches!(result, ExecutionResult::Success { .. }));
+            if !primary_applied || self.steps[index].status == StepStatus::RolledBack {
                 continue;
             }
             let Some(rollback_command) = self.steps[index].command.rollback_command() else {
@@ -485,7 +492,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rollback_tracks_completed_steps_not_completed_count_indices() {
+    async fn rollback_tracks_applied_steps_not_completed_count_indices() {
         let mut executor = NixOSExecutor::new().with_dry_run(true);
         let mut plan = PlanExecutor::new(0.35);
         plan.add_optional_step(
@@ -517,6 +524,30 @@ mod tests {
         assert!(matches!(result.steps[0].0.status, StepStatus::Failed(_)));
         assert_eq!(result.steps[1].0.status, StepStatus::RolledBack);
         assert!(matches!(result.steps[2].0.status, StepStatus::Failed(_)));
+    }
+
+    #[tokio::test]
+    async fn rollback_includes_applied_step_even_when_verification_failed() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let mut plan = PlanExecutor::new(0.5);
+        plan.add_step(
+            NixOSCommand::EnvInstall {
+                packages: vec!["vim".into()],
+            },
+            "Install vim",
+        );
+        plan.steps[0].status = StepStatus::Failed("verification failed".into());
+        let primary = ExecutionResult::Success {
+            stdout: "applied".into(),
+            stderr: String::new(),
+            execution_time_ms: 0,
+        };
+        let mut results = vec![(plan.steps[0].clone(), Some(primary))];
+
+        let (rolled_back, failures) = plan.rollback_applied(&mut executor, &mut results).await;
+        assert_eq!(rolled_back, 1);
+        assert!(failures.is_empty());
+        assert_eq!(results[0].0.status, StepStatus::RolledBack);
     }
 
     #[tokio::test]
