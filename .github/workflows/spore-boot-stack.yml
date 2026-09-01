@@ -20,6 +20,13 @@ on:
 permissions:
   contents: read
 
+# The focused lane is a latest-head qualification signal, not a historical
+# archive of every intermediate commit. Cancel superseded runs on the same PR
+# so rapid semantic-hardening commits do not create their own runner backlog.
+concurrency:
+  group: spore-boot-stack-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   focused-qualification:
     name: Focused Rust qualification
