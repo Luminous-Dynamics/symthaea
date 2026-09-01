@@ -4,9 +4,9 @@
 //! Non-authoritative systemd boot observer.
 //!
 //! This process subscribes to structured systemd job signals, queries unit
-//! `ActiveState`, and emits the intentionally lossy Symthaea boot protocol. It
-//! never parses journal text and failure of this process must never become a
-//! dependency of the machine's boot path.
+//! state/properties, and emits the intentionally lossy Symthaea boot protocol.
+//! It never parses journal text and failure of this process must never become a
+//! machine boot-health fact.
 
 #![forbid(unsafe_code)]
 
@@ -23,7 +23,7 @@ use symthaea_boot_observer::{
 use symthaea_boot_protocol::state::BootStateReducer;
 use symthaea_boot_protocol::wire::{MAX_WIRE_BYTES, WireMessage};
 use symthaea_boot_protocol::{
-    BootEvent, BootHealth, BootPhase, BoundedDetail, Criticality, DomainState,
+    BootEvent, BootPhase, BoundedDetail, Criticality, DomainState,
 };
 use zbus::blocking::{Connection, Proxy};
 use zbus::zvariant::OwnedObjectPath;
@@ -49,8 +49,6 @@ fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    config.validate()?;
-
     let connection = Connection::system()?;
     let manager = Proxy::new(
         &connection,
@@ -60,26 +58,31 @@ fn run() -> Result<(), Box<dyn Error>> {
     )?;
 
     // Install the bus match rule before asking systemd to emit lifecycle
-    // signals, then query current state. Signals that arrive while the initial
-    // scan runs remain queued by the zbus iterator.
+    // signals, then query current state. Signals arriving during the initial
+    // scan remain queued by the zbus iterator.
     let mut job_removed = manager.receive_signal("JobRemoved")?;
     let _: () = manager.call("Subscribe", &())?;
 
     let mut emitter = EventEmitter::new(&config)?;
 
+    // The observer may start after storage/filesystems are already ready. Use
+    // systemd's monotonic transition timestamps and sort the initial snapshot so
+    // we reconstruct the observed history instead of pretending every domain
+    // changed at observer startup.
+    let mut initial = Vec::new();
     for watched in &config.watched_units {
-        match query_active_state(&connection, &manager, &watched.unit) {
-            Ok(Some(active_state)) => {
-                apply_unit_state(&mut emitter, watched, &active_state)?;
-            }
+        match query_unit_observation(&connection, &manager, &watched.unit) {
+            Ok(Some(observation)) => initial.push((watched, observation)),
             Ok(None) => {}
-            Err(error) => {
-                eprintln!(
-                    "symthaea-boot-observer: initial state unavailable for {}: {error}",
-                    watched.unit
-                );
-            }
+            Err(error) => eprintln!(
+                "symthaea-boot-observer: initial state unavailable for {}: {error}",
+                watched.unit
+            ),
         }
+    }
+    initial.sort_by_key(|(_, observation)| observation.elapsed_ms);
+    for (watched, observation) in initial {
+        apply_unit_state(&mut emitter, watched, &observation)?;
     }
 
     while let Some(message) = job_removed.next() {
@@ -99,9 +102,9 @@ fn run() -> Result<(), Box<dyn Error>> {
 
         match classify_job_result(&result) {
             JobOutcome::QueryCurrentState => {
-                match query_active_state(&connection, &manager, &unit) {
-                    Ok(Some(active_state)) => {
-                        if let Err(error) = apply_unit_state(&mut emitter, watched, &active_state) {
+                match query_unit_observation(&connection, &manager, &unit) {
+                    Ok(Some(observation)) => {
+                        if let Err(error) = apply_unit_state(&mut emitter, watched, &observation) {
                             eprintln!(
                                 "symthaea-boot-observer: failed to publish state for {unit}: {error}"
                             );
@@ -114,7 +117,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 }
             }
             JobOutcome::Failed => {
-                if let Err(error) = emitter.unit_failed(watched, &result) {
+                if let Err(error) = emitter.unit_failed(watched, &result, boot_elapsed_ms()) {
                     eprintln!(
                         "symthaea-boot-observer: failed to publish failure for {unit}: {error}"
                     );
@@ -127,32 +130,40 @@ fn run() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[derive(Debug)]
+struct UnitObservation {
+    active_state: String,
+    elapsed_ms: u64,
+}
+
 fn apply_unit_state(
     emitter: &mut EventEmitter,
     watched: &WatchedUnit,
-    active_state: &str,
+    observation: &UnitObservation,
 ) -> Result<(), Box<dyn Error>> {
-    let Some(state) = domain_state_from_active_state(active_state) else {
+    let Some(state) = domain_state_from_active_state(&observation.active_state) else {
         eprintln!(
             "symthaea-boot-observer: ignoring unknown ActiveState {:?} for {}",
-            active_state, watched.unit
+            observation.active_state, watched.unit
         );
         return Ok(());
     };
 
     match state {
         DomainState::Starting => {
-            emitter.enter_phase(watched.phase)?;
-            emitter.domain_starting(watched)?;
+            emitter.enter_phase(watched.phase, observation.elapsed_ms)?;
+            emitter.domain_starting(watched, observation.elapsed_ms)?;
         }
         DomainState::Ready => {
-            emitter.enter_phase(watched.phase)?;
-            emitter.domain_ready(watched)?;
+            emitter.enter_phase(watched.phase, observation.elapsed_ms)?;
+            emitter.domain_ready(watched, observation.elapsed_ms)?;
             if watched.boot_ready {
-                emitter.boot_ready()?;
+                emitter.boot_ready(observation.elapsed_ms)?;
             }
         }
-        DomainState::Failed => emitter.unit_failed(watched, "failed")?,
+        DomainState::Failed => {
+            emitter.unit_failed(watched, "failed", observation.elapsed_ms)?;
+        }
         // An inactive/deactivating unit is not evidence that boot is unhealthy.
         DomainState::Pending => {}
         DomainState::Delayed | DomainState::Degraded => {
@@ -164,11 +175,11 @@ fn apply_unit_state(
     Ok(())
 }
 
-fn query_active_state(
+fn query_unit_observation(
     connection: &Connection,
     manager: &Proxy<'_>,
     unit_name: &str,
-) -> zbus::Result<Option<String>> {
+) -> zbus::Result<Option<UnitObservation>> {
     let unit_path: OwnedObjectPath = match manager.call("GetUnit", &unit_name) {
         Ok(path) => path,
         Err(error) => {
@@ -189,7 +200,26 @@ fn query_active_state(
         SYSTEMD_UNIT_INTERFACE,
     )?;
     let active_state: String = unit.get_property("ActiveState")?;
-    Ok(Some(active_state))
+
+    // Unit timestamps are monotonic microseconds since boot. They let a late
+    // observer reconstruct transitions already completed before it started.
+    let state_change_us: u64 = unit.get_property("StateChangeTimestampMonotonic").unwrap_or(0);
+    let active_enter_us: u64 = unit.get_property("ActiveEnterTimestampMonotonic").unwrap_or(0);
+    let timestamp_us = if matches!(active_state.as_str(), "active" | "reloading" | "refreshing") {
+        active_enter_us.max(state_change_us)
+    } else {
+        state_change_us
+    };
+    let elapsed_ms = if timestamp_us == 0 {
+        boot_elapsed_ms()
+    } else {
+        timestamp_us / 1000
+    };
+
+    Ok(Some(UnitObservation {
+        active_state,
+        elapsed_ms,
+    }))
 }
 
 struct EventEmitter {
@@ -203,10 +233,6 @@ struct EventEmitter {
 
 impl EventEmitter {
     fn new(config: &ObserverConfig) -> io::Result<Self> {
-        if let Some(parent) = config.state_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-
         Ok(Self {
             destination: config.output_socket.clone(),
             state_path: config.state_path.clone(),
@@ -217,31 +243,44 @@ impl EventEmitter {
         })
     }
 
-    fn enter_phase(&mut self, phase: Option<BootPhase>) -> Result<(), Box<dyn Error>> {
+    fn enter_phase(
+        &mut self,
+        phase: Option<BootPhase>,
+        elapsed_ms: u64,
+    ) -> Result<(), Box<dyn Error>> {
         let Some(phase) = phase else {
             return Ok(());
         };
-        if self.reducer.snapshot().phase == phase {
+        let current = self.reducer.snapshot().phase;
+        if phase_rank(phase) <= phase_rank(current) {
             return Ok(());
         }
         let sequence = self.sequence();
         self.publish(BootEvent::PhaseEntered {
             sequence,
-            elapsed_ms: boot_elapsed_ms(),
+            elapsed_ms,
             phase,
         })
     }
 
-    fn domain_starting(&mut self, watched: &WatchedUnit) -> Result<(), Box<dyn Error>> {
+    fn domain_starting(
+        &mut self,
+        watched: &WatchedUnit,
+        elapsed_ms: u64,
+    ) -> Result<(), Box<dyn Error>> {
         let sequence = self.sequence();
         self.publish(BootEvent::DomainStarting {
             sequence,
-            elapsed_ms: boot_elapsed_ms(),
+            elapsed_ms,
             domain: watched.domain,
         })
     }
 
-    fn domain_ready(&mut self, watched: &WatchedUnit) -> Result<(), Box<dyn Error>> {
+    fn domain_ready(
+        &mut self,
+        watched: &WatchedUnit,
+        elapsed_ms: u64,
+    ) -> Result<(), Box<dyn Error>> {
         let before = self
             .reducer
             .snapshot()
@@ -256,7 +295,7 @@ impl EventEmitter {
         let sequence = self.sequence();
         self.publish(BootEvent::DomainReady {
             sequence,
-            elapsed_ms: boot_elapsed_ms(),
+            elapsed_ms,
             domain: watched.domain,
         })
     }
@@ -265,10 +304,10 @@ impl EventEmitter {
         &mut self,
         watched: &WatchedUnit,
         result: &str,
+        elapsed_ms: u64,
     ) -> Result<(), Box<dyn Error>> {
         let detail = BoundedDetail::new(format!("{}: {result}", watched.unit)).ok();
         let sequence = self.sequence();
-        let elapsed_ms = boot_elapsed_ms();
 
         let event = match watched.criticality {
             Criticality::Critical => BootEvent::DomainFailed {
@@ -289,19 +328,20 @@ impl EventEmitter {
         self.publish(event)
     }
 
-    fn boot_ready(&mut self) -> Result<(), Box<dyn Error>> {
+    fn boot_ready(&mut self, elapsed_ms: u64) -> Result<(), Box<dyn Error>> {
         if self.boot_ready_emitted {
             return Ok(());
         }
-        self.boot_ready_emitted = true;
 
         let health = health_at_boot_ready(self.reducer.snapshot().health);
         let sequence = self.sequence();
         self.publish(BootEvent::BootReady {
             sequence,
-            elapsed_ms: boot_elapsed_ms(),
+            elapsed_ms,
             health,
-        })
+        })?;
+        self.boot_ready_emitted = true;
+        Ok(())
     }
 
     fn sequence(&mut self) -> u64 {
@@ -316,7 +356,14 @@ impl EventEmitter {
             return Ok(());
         }
 
-        self.persist_snapshot()?;
+        // Snapshot persistence improves late-consumer recovery, but a state-file
+        // permission/disk problem must never terminate live observation.
+        if let Err(error) = self.persist_snapshot() {
+            eprintln!(
+                "symthaea-boot-observer: snapshot persistence unavailable at {}: {error}",
+                self.state_path.display()
+            );
+        }
 
         let wire = WireMessage::event(event);
         wire.validate()?;
@@ -333,7 +380,7 @@ impl EventEmitter {
             Ok(_) => {}
             Err(error) if error.kind() == io::ErrorKind::NotFound => {
                 // The renderer may not have bound its socket yet. Current state
-                // remains available through the snapshot for late consumers.
+                // can still be recovered from the snapshot when available.
             }
             Err(error) => {
                 // Presentation delivery failure is diagnostic only. Never make it
@@ -359,10 +406,28 @@ impl EventEmitter {
             .into());
         }
 
+        if let Some(parent) = self.state_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
         let temporary = self.state_path.with_extension("json.tmp");
         fs::write(&temporary, encoded)?;
         fs::rename(&temporary, &self.state_path)?;
         Ok(())
+    }
+}
+
+fn phase_rank(phase: BootPhase) -> u8 {
+    match phase {
+        BootPhase::Kernel => 0,
+        BootPhase::Initrd => 1,
+        BootPhase::Storage => 2,
+        BootPhase::Filesystems => 3,
+        BootPhase::Security => 4,
+        BootPhase::Network => 5,
+        BootPhase::Services => 6,
+        BootPhase::Graphics => 7,
+        BootPhase::Session => 8,
+        BootPhase::Ready => 9,
     }
 }
 
@@ -420,21 +485,20 @@ fn boot_elapsed_ms() -> u64 {
     let Ok(contents) = fs::read_to_string("/proc/uptime") else {
         return 0;
     };
-    let Some(seconds) = contents.split_whitespace().next() else {
-        return 0;
-    };
-    let Ok(seconds) = seconds.parse::<f64>() else {
-        return 0;
-    };
+    parse_uptime_ms(&contents).unwrap_or(0)
+}
+
+fn parse_uptime_ms(contents: &str) -> Option<u64> {
+    let seconds = contents.split_whitespace().next()?.parse::<f64>().ok()?;
     if !seconds.is_finite() || seconds.is_sign_negative() {
-        return 0;
+        return None;
     }
     let millis = seconds * 1000.0;
-    if millis >= u64::MAX as f64 {
+    Some(if millis >= u64::MAX as f64 {
         u64::MAX
     } else {
         millis as u64
-    }
+    })
 }
 
 #[cfg(test)]
@@ -442,20 +506,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn boot_elapsed_parser_fallback_is_non_panicking() {
-        let _ = boot_elapsed_ms();
+    fn uptime_parser_is_bounded() {
+        assert_eq!(parse_uptime_ms("12.345 90.0"), Some(12_345));
+        assert_eq!(parse_uptime_ms("bad"), None);
+        assert_eq!(parse_uptime_ms("-1.0 0"), None);
     }
 
     #[test]
-    fn default_args_are_empty() {
-        // Parsing process-global argv is intentionally not unit-tested here; the
-        // behavior is kept tiny and deterministic. This test protects the simple
-        // data shape from growing hidden execution capability.
-        let args = Args {
-            config: None,
-            print_config: false,
-        };
-        assert!(args.config.is_none());
-        assert!(!args.print_config);
+    fn boot_phases_are_strictly_ranked() {
+        assert!(phase_rank(BootPhase::Ready) > phase_rank(BootPhase::Graphics));
+        assert!(phase_rank(BootPhase::Network) > phase_rank(BootPhase::Filesystems));
     }
 }
