@@ -2,327 +2,334 @@
 
 Status: **design-only / blocked on Native Interoception v0.1 qualification**
 
-The v0.2 design has several independently versioned identities: native baseline, complete design-contract registry, design freeze, study protocol, factorized candidate definitions, scenarios, analysis rules, blind mapping, exclusion decisions, execution traces, validation contracts, and derived artifacts. This document defines the proposed root-of-evidence object that binds them into one auditable lineage.
+This contract defines the prospective and realized evidence roots that bind one complete observational-affect lineage.
 
-## Principle
+## 1. Principle
 
-No single SHA-256 can prove scientific validity, but a root manifest can make silent substitution detectable.
+No digest proves scientific validity, but a complete root makes silent substitution, data leakage, and cross-lineage pairing detectable.
 
-The evidence root should answer:
+A result should answer:
 
-> Exactly which qualified baseline, complete frozen design, prospective study, factorized candidate set, scenario cohort, analysis rules, execution/information boundary, adversarial-validation contract, and blinding commitment does this result claim to belong to?
+> Exactly which qualified native baseline, frozen design, candidate definitions, preprocessing/calibration parameters, evaluator-state policy, scenario cohort, analysis plan, information boundary, blinding commitment, and validation suite produced this result?
 
-If any identity changes, the root identity changes.
+If any evidence-critical identity changes, the root identity changes.
 
-## Complete-design dependency
+## 2. Complete-design dependency
 
-The prospective root must bind the same exact `DesignContractRegistryManifest` as the referenced `DesignFreezeManifest`.
+The prospective root binds the same exact `DesignContractRegistryManifest` as the referenced `DesignFreezeManifest`.
 
-Recommended redundant binding:
+Record:
 
 - `design_freeze_sha256`;
 - `design_contract_registry_sha256`;
-- `design_contract_registry_contract_digest`.
+- registry-contract specification digest/version.
 
-Validation requires that the root's registry digest exactly equals the registry embedded in the validated design freeze. A valid freeze paired with a different valid registry is an integrity failure.
+Validator requires exact equality between root and freeze registry identities.
 
-This redundancy makes the complete scientific design surface directly inspectable by a reproducer rather than requiring it to infer registry identity indirectly.
+## 3. Proposed ObservationalEvidenceRootManifest
 
-## Proposed ObservationalEvidenceRootManifest
+Before confirmatory execution, freeze at minimum:
 
-Before confirmatory execution, construct and freeze a prospective root containing at minimum:
-
-- root schema/version;
-- evidence run class (`Confirmatory` for confirmatory inference);
-- exact v0.1 source commit;
-- v0.1 model-semantics version;
-- v0.1 `QualificationEvidenceBundle` SHA-256 as the authoritative baseline-promotion identity;
-- v0.1 qualification-receipt SHA-256 for component-level auditability;
-- v0.1 evidence-capsule SHA-256 for component-level auditability;
-- v0.2 `DesignFreezeManifest` SHA-256;
-- v0.2 `DesignContractRegistryManifest` SHA-256;
-- `V02_DESIGN_CONTRACT_REGISTRY.md` content digest/version;
-- v0.2 `ImplementationStartReceipt` SHA-256;
-- exact v0.2 observatory implementation source commit;
-- primary execution mode (`OfflinePrefixReplay` for the initial lineage);
-- replay-harness contract/version;
-- prefix-view / prefix-digest schema identities;
-- candidate-payload / provenance-envelope schema identities;
-- study-preregistration SHA-256;
-- study-level preregistration SHA-256;
-- finite exploratory/confirmatory candidate-set manifest digest as applicable;
-- ordered primary/secondary candidate-definition digests;
-- explicit primary candidate digest;
-- each candidate's factor-space coordinate digest/identity;
-- ordered nuisance/null baseline candidate digests;
-- candidate factor-space compatibility-contract version;
-- scenario-cohort manifest SHA-256;
-- analysis-plan SHA-256;
+- root schema/version and run class;
+- exact v0.1 source commit/model-semantics version;
+- authoritative v0.1 `QualificationEvidenceBundle` digest;
+- component qualification/evidence-capsule digests for audit;
+- exact design-freeze and contract-registry digests;
+- exact `ImplementationStartReceipt` digest;
+- exact v0.2 observatory source/toolchain/dependency identities;
+- primary execution mode (`OfflinePrefixReplay` initially);
+- replay/prefix/payload/evidence-envelope schema identities;
+- study/preregistration identities;
+- finite candidate-set manifest digest;
+- ordered primary/secondary/baseline candidate-definition digests;
+- candidate factor coordinates;
+- each candidate's preprocessing-manifest digest or explicit `None`;
+- calibration-cohort and fitted-parameter artifact digests where applicable;
+- evaluator-isolation-manifest digest;
+- allowed evaluator persistent-state/cache class;
+- scenario/cohort manifest digest;
+- candidate-discrimination manifest digest;
+- causal-contrast manifest digest set;
+- analysis-plan digest;
 - exclusion-criteria definition digest;
-- arm-identity-mapping commitment SHA-256;
-- weighting-decomposition contract/version;
-- allostatic-exposure-decomposition contract/version;
-- execution-mode contract/version;
-- information-firewall contract/version;
-- temporal-alignment contract/version;
-- candidate-definition contract/version;
-- candidate-factor-space contract/version;
-- scenario/holdout contract/version;
-- capability-typed API contract/version;
-- adversarial-validation contract/version;
-- blinding-custody contract/version;
+- arm-mapping commitment digest;
+- information/capability/history/weighting/aggregation/temporal/calibration/evaluator/adversarial contract versions;
 - blinding-strength declaration;
-- prefix-causality gate definition/version;
-- offline observer/native isolation rule and later online-shadow equivalence definition/version;
-- semantic-label-canary gate definition/version;
-- toolchain/dependency identities required by the v0.2 implementation;
-- canonical SHA-256 of the entire validated root.
+- required integrity-gate versions;
+- canonical root SHA-256.
 
-This prospective root is frozen before confirmatory execution.
+This root freezes before confirmatory execution.
 
-The component qualification-receipt and evidence-capsule digests are retained for inspection, but they do not independently authorize promotion. The bound `QualificationEvidenceBundle` is the authoritative proof that those components belong to the same exact v0.1 source/model-semantics lineage.
+## 4. Baseline qualification dependency
 
-## Design-freeze dependency
+A confirmatory root is invalid unless the referenced v0.1 `QualificationEvidenceBundle`:
 
-The prospective evidence root may not claim `LockedConfirmatory` unless it binds:
+- validates structurally;
+- reports qualified;
+- binds the exact v0.1 source/model-semantics identities recorded by the root;
+- contains the matching qualification receipt/evidence capsule.
 
-- a valid complete design-contract registry;
-- a valid v0.2 design freeze binding exactly that registry;
-- a valid implementation-start receipt binding that same freeze/registry;
-- one exact qualified v0.1 baseline bundle.
+Cross-paired valid components are an integrity failure.
 
-The design freeze establishes which scientific/epistemic contracts governed implementation. The implementation-start receipt proves that runtime work began from the declared qualified v0.1 baseline and complete frozen v0.2 design.
+A drafted root may remain `BlockedOnBaselineQualification`, but cannot become `LockedConfirmatory` until this dependency passes.
 
-A later normative design change that is Class II/III under `V02_DESIGN_FREEZE.md` changes the registry and requires a new freeze/implementation identity before confirmatory use.
+## 5. Candidate identity closure
 
-## Candidate-coordinate closure
+The root binds a finite, prospectively closed candidate set.
 
-Every confirmatory candidate definition must bind its explicit factor-space coordinate from `V02_CANDIDATE_FACTOR_SPACE.md`.
+Every candidate identity includes:
 
-At minimum the coordinate identifies:
+- mathematical factor coordinate (`R × W × A × T × F × I × H` as applicable);
+- exact formula/fixtures/source identity;
+- exact preprocessing/calibration identity;
+- exact evaluator-isolation/state/cache identity;
+- native lineage and frozen design identity.
 
-- regulatory relation basis;
-- weighting basis;
-- temporal aggregation;
-- forecast policy where applicable;
-- information class;
-- channel projection where applicable;
-- availability/numeric contract.
+A formula cannot hide changed preprocessing or evaluator authority. Same coordinate + different value-changing preprocessing or evaluator-state policy is a different scientific candidate unless equivalence is prospectively proven.
 
-The root binds a **finite, prospectively closed candidate set**. The factor space is not an authorization to compute an unrestricted Cartesian product after seeing results.
+No new primary candidate, factor coordinate, preprocessing variant, or baseline may be inserted after confirmatory execution begins.
 
-The exact candidate coordinate and exact formula manifest are both authoritative. A coordinate cannot substitute for the formula, and a formula cannot hide a changed coordinate.
+## 6. Calibration / preprocessing closure
 
-## AnalysisPlan identity
+For every confirmatory primary/baseline candidate, the root binds all fitted preprocessing parameters **before** execution.
 
-The root must bind an independently canonical `AnalysisPlan` rather than relying on prose in a notebook or paper.
+Allowed parameter sources are:
 
-It should include:
+- structural constants;
+- prospectively identified discovery/calibration cohort;
+- independently identified external reference.
+
+The root additionally binds:
+
+- calibration cohort manifest;
+- fitted-parameter artifact;
+- calibration/confirmatory content-overlap audit;
+- preprocessing sensitivity-set identity when required.
+
+Confirmatory cohort outcomes cannot change individual candidate preprocessing.
+
+Adding/removing/reordering a confirmatory scenario must not change another scenario's candidate payload.
+
+## 7. Evaluator-state closure
+
+The root binds one `EvaluatorIsolationManifest` under `V02_OBSERVATORY_STATE_LIFECYCLE.md`.
+
+Initial primary evidence requires persistent-state class:
+
+`NoneAcrossEvaluationCoordinates`.
+
+The realized package must show candidate artifacts are invariant to:
+
+- scenario order;
+- candidate order;
+- duplicate evaluation/removal;
+- cold vs warm process;
+- allowed cache enabled/disabled;
+- serial vs parallel execution;
+- allowed batch-size/chunk changes;
+- incremental vs from-scratch prefix evaluation where incremental H1 computation exists.
+
+Cross-scenario mutable state or order dependence is an `IntegrityFailure`.
+
+## 8. History/state-sufficiency closure
+
+The root records each candidate's history-access basis.
+
+H1 replay history means external observatory information, not native memory.
+
+For claims that H1 adds information beyond H0, bind matched-current-state discriminators.
+
+The realized package also binds the native restart/state-sufficiency report proving identical complete native state/configuration + identical future input produces identical future native execution under the v0.1 deterministic contract.
+
+Any future H2 native persisted memory requires a new qualified architecture lineage.
+
+## 9. Scenario / calibration / holdout closure
+
+Scenario roles are explicit:
+
+- discovery;
+- calibration;
+- confirmatory holdout;
+- diagnostic.
+
+A scenario used to fit preprocessing or choose a formula/threshold is not an untouched confirmatory holdout.
+
+The root binds content-overlap audits, cut points/windows, causal-contrast identities, and required pairwise discrimination obligations.
+
+Every locked confirmatory scenario is finally accounted for as:
+
+- included;
+- excluded with evidence;
+- indeterminate with evidence.
+
+Required equality:
+
+`locked_count == included_count + excluded_count + indeterminate_count`.
+
+## 10. Analysis-plan identity
+
+The canonical `AnalysisPlan` binds at minimum:
 
 - primary hypotheses;
-- exact candidate/baseline IDs and coordinates;
-- scenario subset/cohort references;
-- comparison cut points/windows;
-- directional relations;
-- minimum-effect thresholds;
+- exact candidate/baseline/preprocessing identities;
+- scenario/cut-point references;
+- directional relations/minimum-effect thresholds;
 - equivalence tolerances;
-- parameter/sensitivity region;
-- candidate ranking/model-comparison rule;
-- treatment of ties and `NoUniqueWinner`;
-- treatment of weighting/temporal ambiguity;
-- treatment of indeterminate results;
-- boundary-turnover diagnostic rule;
-- required prefix-causality tests;
-- required burden-vs-precision discriminators;
-- required temporal-aggregation discriminators;
-- required neutrality tests;
-- required offline execution-mode validation and any later online-shadow equivalence tests;
-- required semantic-label-canary test;
-- required adversarial-validation suite/version;
-- deterministic robustness summary rules;
-- exclusion handling;
-- unblinding procedure/version.
+- sensitivity region;
+- candidate ranking/parsimony rule;
+- treatment of ties, ambiguity, preprocessing/calibration sensitivity, and indeterminate outcomes;
+- required discrimination/causal-contrast checks;
+- required prefix/history/restart/isolation/leakage gates;
+- deterministic robustness summaries;
+- exclusion/unblinding procedures.
 
-Changing any of these after confirmatory execution starts creates a new analysis identity and a new confirmatory lineage.
+Changing these after confirmatory execution starts creates a new analysis/root lineage.
 
-## Prospective vs realized evidence
-
-Do not mix prospective identity with realized results.
+## 11. Prospective vs realized evidence
 
 ### Prospective root
 
 Contains what was promised before confirmatory data:
 
-- qualified baseline bundle identity plus component audit identities;
-- complete contract-registry identity;
-- frozen design/implementation-start identity;
-- study/protocol identity;
-- finite factorized candidate set;
-- scenarios;
+- qualified baseline;
+- complete design registry/freeze/start receipt;
+- candidate definitions + preprocessing/calibration + evaluator-isolation identities;
+- finite candidate set;
+- scenario/calibration/holdout cohorts;
+- discrimination/causal contrasts;
 - analysis;
-- execution/information/capability boundaries;
-- weighting and temporal semantics;
-- adversarial-validation contract;
-- blinding commitment;
-- exclusions;
-- environment/toolchain identity.
+- capability/information/history boundaries;
+- blinding;
+- toolchain/environment.
 
-### Realized evidence package
+### Realized package
 
-After execution, produce a result package that binds the prospective root plus:
+After execution, bind the prospective root plus:
 
-- exact native study execution digest(s);
-- canonical prefix artifact/digest identities for each analyzed cut point;
-- candidate payload digests;
-- outer candidate evidence-envelope digests;
-- exact exclusion decision receipt digest(s);
-- exclusion-evidence registry digest(s) when that later schema is part of the qualified study lineage;
-- forecast trajectory artifact digests;
-- weighting-decomposition report digest;
-- temporal-exposure-decomposition report digest;
-- candidate time-series artifact digests;
-- prefix-causality validation report digest;
-- suffix-sensitive-provenance separation validation digest;
-- offline execution-mode/isolation report digest;
-- later online-shadow equivalence report digest if online evidence is included;
-- semantic-label-canary report digest;
-- `ObservatoryAdversarialValidationReport` digest;
-- blinded candidate-comparison report digest;
-- sensitivity/robustness report digest;
-- null-control report digest;
-- unblinding receipt digest;
-- semantic hypothesis evaluation digest;
-- all excluded/indeterminate scenario artifact digests;
-- complete artifact hash list.
+- native execution digests;
+- prefix artifact/digest identities;
+- forecast trajectory artifacts;
+- candidate payloads and outer evidence envelopes;
+- exclusion decisions/evidence;
+- restart/state-sufficiency report;
+- preprocessing reproduction and holdout-leakage audit;
+- evaluator isolation/order/cache/concurrency reports;
+- weighting/aggregation/temporal decomposition reports;
+- candidate fingerprints/equivalence classes;
+- discrimination/manipulation-check reports;
+- prefix/suffix/provenance-separation validation;
+- semantic-label canary;
+- adversarial-validation report;
+- blinded comparison;
+- sensitivity/null-control reports;
+- unblinding receipt;
+- semantic hypothesis evaluation;
+- excluded/indeterminate artifacts;
+- complete artifact hash list;
+- realized package SHA-256.
 
-The realized package has its own canonical SHA-256.
+## 12. Payload vs provenance closure
 
-## Payload vs provenance closure
+For suffix-divergent traces with identical allowed prefix:
 
-For `OfflinePrefixReplay`, the root must preserve the distinction between:
+- prefix digest is identical;
+- candidate payload is identical;
+- outer evidence/source-trace provenance may differ.
 
-- prefix-causal `CandidatePayload`;
-- outer `CandidateEvidenceEnvelope` containing full source-trace provenance.
+Full-trace or suffix-sensitive identity entering candidate computation is an integrity failure.
 
-Given suffix-divergent source traces with byte-identical allowed prefixes:
+## 13. Population analysis occurs after individual artifacts freeze
 
-- prefix digest must be identical;
-- candidate payload digest/value/availability must be identical;
-- outer evidence-envelope/source-trace digests may differ and are expected to differ.
+Individual candidate payloads may not depend on confirmatory cohort mean/variance, ranking, exclusions, or other candidate outputs.
 
-A root or analysis pipeline that supplies full-trace identity to candidate computation violates the information boundary and is an integrity failure.
+Population summaries and model comparison occur only after all locked individual blinded candidate artifacts have been frozen.
 
-## v0.1 qualification dependency
+This prevents cohort-level preprocessing/evaluator state from contaminating per-scenario evidence.
 
-A confirmatory v0.2 prospective root is invalid unless the referenced v0.1 `QualificationEvidenceBundle` validates, reports qualified, and binds the exact v0.1 source commit/model-semantics lineage named by the v0.2 root.
+## 14. Identifiability closure
 
-The root must also require that its component v0.1 qualification-receipt and evidence-capsule digests match the corresponding embedded artifacts inside that bundle. Supplying two independently valid but cross-paired artifacts from different v0.1 heads is an integrity failure.
+A primary result cannot be `QualifiedSupportedResult` for superiority over baseline B when the locked design did not make candidate C vs B identifiable.
 
-The root may be drafted before v0.1 qualifies, but it must carry a status such as `BlockedOnBaselineQualification` and cannot be promoted to `LockedConfirmatory` until the bundle dependency is satisfied.
+The root binds:
 
-Any new v0.1 source commit supersedes an older bundle for implementation-start or confirmatory purposes unless a newly validated bundle explicitly binds the new source head.
+- discrimination manifest;
+- equivalence tolerance;
+- scenario/cut-point discriminator coverage;
+- parsimony rule.
 
-## Candidate-set closure
+Realized evidence binds fingerprints, pairwise results, equivalence classes, and any `InsufficientDiscrimination` findings.
 
-The prospective root contains the complete candidate/baseline set eligible for confirmatory interpretation.
+## 15. Causal-contrast closure
 
-After execution begins:
+Mechanistic claims require the prospective root to bind causal contrasts and the realized package to bind passing manipulation checks.
 
-- no new primary candidate may be added;
-- no factor coordinate may be changed;
-- no weighting or temporal basis may be swapped because it looks more intuitive;
-- no baseline may be removed because it explains the result too well;
-- no failed candidate may be deleted from the package;
-- a new candidate may be computed only as explicitly exploratory post-hoc analysis and must not alter the locked confirmatory root.
+Without these, report descriptive scenario differences only.
 
-## Scenario-set closure
+Nuisance matching must not silently condition away intended mediators.
 
-The root binds the complete confirmatory holdout cohort before candidate outputs are inspected.
+## 16. Capability / causal-isolation closure
 
-Every scenario digest in the cohort must appear in final accounting as included, excluded, or indeterminate.
+Primary candidate code may not access:
 
-The realized evidence package must report:
-
-`locked_count == included_count + excluded_count + indeterminate_count`
-
-A mismatch is a hard integrity failure.
-
-The scenario set must contain the prospectively required discriminators for relation semantics, burden-vs-precision separation, temporal aggregation, future-suffix invariance, forecast-policy disagreement, and relevant channel projections.
-
-## Capability-boundary closure
-
-The prospective root binds the capability-typed API and execution-mode contracts used by qualified computation.
-
-Confirmatory evidence is invalid if the implementation exposes an undeclared authority path that allows prefix-causal candidates to access:
-
-- future protocol/state information;
-- full-trace or suffix-sensitive provenance identity;
+- unseen future state/schedule;
+- full-trace provenance;
 - semantic arm mapping;
 - mutable native execution state;
-- oracle diagnostics through runtime escalation;
-- control/drive/cognitive output authority.
+- oracle authority;
+- action/drive/cognitive output authority;
+- cross-scenario evaluator memory;
+- confirmatory cohort statistics used to adapt individual values.
 
-Capability-boundary violations are integrity failures even when numerical results appear plausible.
+Violations block inference even when numerical results look compelling.
 
-## Adversarial-validation closure
+## 17. Adversarial-validation closure
 
-Before semantic hypothesis evaluation can become qualified evidence, the realized package must bind an adversarial-validation report matching the locked suite/version.
+The realized package binds the exact locked adversarial suite and known-malicious fixtures.
 
-All integrity-blocking adversarial gates must pass. Candidate-disqualifying gates may fail only by producing the corresponding candidate failure status; they may not be reclassified away after unblinding.
-
-The suite must include known-malicious fixtures demonstrating that it catches at least:
+Required attacks include at least:
 
 - future/suffix leakage;
-- full-trace provenance masquerading as prefix information;
+- full-trace provenance leakage;
 - semantic leakage;
-- hidden mutable state;
-- oracle masquerading as prefix-causal;
+- native-observer feedback;
+- hidden global/thread-local evaluator state;
+- evaluation-order dependence;
+- cache-key/value dependence on forbidden information;
+- incremental reset failure;
+- full-confirmatory-cohort z-score/scaler leakage;
+- adaptive clipping/threshold fitting;
 - unavailable-as-zero behavior;
-- weighting conflation;
-- temporal mean/exposure conflation;
+- weighting/denominator/mean-exposure conflation;
 - artifact/scenario/analysis substitution.
 
-## Artifact dependency graph
+Integrity-blocking failures produce `IntegrityFailure`; candidate-theory failures remain negative/null evidence.
 
-Recommended dependency direction:
+## 18. Artifact dependency graph
 
-`v0.1 qualification receipt + evidence capsule`
+Recommended direction:
 
-→ `v0.1 QualificationEvidenceBundle`
-
-→ `v0.2 DesignContractRegistryManifest`
-
-→ `v0.2 design freeze + implementation start`
-
-→ `v0.2 prospective evidence root`
-
-→ `native study execution`
-
-→ `immutable prefix artifacts`
-
-→ `forecast trajectories`
-
-→ `factorized CandidatePayloads`
-
-→ `outer candidate evidence envelopes`
-
-→ `exclusion decisions / exclusion evidence registry when applicable`
-
-→ `prefix-causality + isolation + semantic-leak + weighting/temporal + adversarial validation`
-
+`v0.1 qualification components`
+→ `QualificationEvidenceBundle`
+→ `DesignContractRegistryManifest`
+→ `DesignFreezeManifest`
+→ `ImplementationStartReceipt`
+→ `prospective evidence root`
+→ `native executions`
+→ `prefix artifacts / forecast trajectories`
+→ `preprocessing parameters + evaluator context`
+→ `CandidatePayloads`
+→ `CandidateEvidenceEnvelopes`
+→ `validation / exclusion / discrimination / causal reports`
 → `frozen blinded comparison`
-
 → `unblinding receipt`
-
 → `semantic hypothesis evaluation`
+→ `realized evidence package`.
 
-→ `realized evidence package`
+No downstream artifact may silently rewrite an upstream identity.
 
-No downstream artifact may silently alter an upstream identity.
+## 19. Promotion states
 
-## Fail-closed promotion state
-
-A later typed status should distinguish at least:
+Distinguish at least:
 
 - `DraftDesign`;
 - `BlockedOnBaselineQualification`;
@@ -335,62 +342,53 @@ A later typed status should distinguish at least:
 - `QualifiedSupportedResult`;
 - `IntegrityFailure`.
 
-There should be no generic `Success` state.
+There is no generic `Success` state.
 
-A failed primary hypothesis on an otherwise valid confirmatory study is a **qualified negative/null result**, not an integrity failure.
+A failed hypothesis under an intact lineage is qualified negative/null evidence. A preprocessing leak, evaluator-order effect, future leak, missing scenario, replay mismatch, or cross-lineage substitution is an integrity failure.
 
-An integrity failure means the evidence chain itself cannot support inference.
+## 20. Reproduction contract
 
-Examples include mismatched v0.1 bundle/component identities, contract-registry/freeze/root mismatch, future-information leakage, suffix-sensitive provenance in candidate computation, observational feedback into native execution, semantic-label leakage into blinded primary artifacts, capability escalation, execution replay mismatch, invalid temporal alignment, missing locked scenarios, artifact/hash substitution, or failure of an integrity-blocking adversarial gate.
+An independent reproducer should be able to verify, in dependency order:
 
-## Reproduction contract
+1. source/toolchain identities;
+2. v0.1 qualified bundle;
+3. registry/freeze/start receipt;
+4. candidate definitions/factor coordinates;
+5. preprocessing/calibration parameters from their source cohort;
+6. evaluator isolation/state/cache policy;
+7. scenario/cohort materialization and overlap audits;
+8. native execution replay;
+9. prefix construction;
+10. forecast trajectories and legacy-v0.1 equivalence;
+11. candidate payloads in clean processes;
+12. restart/state-sufficiency, preprocessing-leakage, evaluator-isolation, discrimination, causal, semantic, and adversarial gates;
+13. blinded comparison;
+14. unblinding transformation;
+15. semantic hypothesis outcomes;
+16. final realized digest.
 
-An independent reproducer should be able to start from the prospective root and verify:
+A discrepancy reports the earliest failed dependency edge.
 
-1. exact source/dependency/toolchain identities;
-2. v0.1 `QualificationEvidenceBundle` and its embedded qualification/evidence components;
-3. complete design-contract registry and its exact relation to the design freeze;
-4. design-freeze and implementation-start identities;
-5. candidate definitions and factor-space coordinates;
-6. finite candidate-set closure;
-7. scenario cohort materialization;
-8. native study execution replay;
-9. prefix artifact/digest construction;
-10. forecast trajectories and exact legacy-v0.1 aggregate equivalence;
-11. weighting and temporal alternative candidates;
-12. exclusion decisions and registry-bound evidence when applicable;
-13. capability boundary/source-dependency gates;
-14. prefix-causality, provenance-separation, isolation, semantic-canary, and adversarial gates;
-15. blinded comparison artifact;
-16. unblinding transformation;
-17. semantic hypothesis outcomes;
-18. final realized evidence digest.
+## 21. Human-readable receipt
 
-Any discrepancy must identify the first dependency edge that fails instead of merely reporting a different final number.
+Generate a deterministic view summarizing:
 
-## Human-readable receipt
-
-In addition to machine-readable JSON, generate a concise deterministic text receipt summarizing:
-
-- root digest;
+- root/realized digests;
 - source commits;
-- v0.1 qualification/evidence bundle digest;
-- design-contract-registry digest;
-- design-freeze digest;
-- v0.1 qualification state;
-- run class and execution mode;
-- primary candidate ID and factor coordinate;
-- candidate/baseline counts;
-- scenario counts and disposition accounting;
+- v0.1 qualification bundle/state;
+- design registry/freeze/start identities;
+- run/execution class;
+- primary candidate and preprocessing/calibration identity;
+- evaluator persistent-state class;
+- candidate/baseline/scenario counts;
 - blinding strength;
-- capability-boundary status;
-- prefix-causality/provenance-separation/isolation/semantic-canary/adversarial status;
-- primary hypothesis outcomes;
-- integrity-gate status;
-- realized evidence package digest.
+- prefix/restart/preprocessing/isolation/discrimination/causal/adversarial gate states;
+- scenario disposition accounting;
+- hypothesis outcomes;
+- integrity status.
 
-The human-readable receipt is a view of machine-readable evidence, not an independently editable source of truth.
+The text receipt is a view, not an editable source of truth.
 
-## Claim boundary
+## 22. Claim boundary
 
-A valid evidence root can show that one complete fixed prospective research design led reproducibly to one fixed set of results without silent substitution and with declared information, weighting, temporal, and authority boundaries. It does not by itself establish that any regulatory candidate is emotion, subjective valence, mood, suffering, sentience, or consciousness.
+A valid root can show that one fixed, qualification-bound, leakage-controlled observational design reproducibly produced one fixed result set. It does not establish emotion, subjective valence, native mood, native memory, suffering, sentience, or consciousness.
