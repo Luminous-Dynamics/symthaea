@@ -210,7 +210,7 @@ impl EntityPair {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IdentifierMatchEvidence {
     pub canonical_identifier: String,
     pub left_claim_ids: Vec<String>,
@@ -219,6 +219,9 @@ pub struct IdentifierMatchEvidence {
     pub effective_strength: IdentityStrength,
     pub uniqueness: IdentifierUniqueness,
     pub stability: IdentifierStability,
+    /// Minimum extraction confidence among the strongest claim on each side.
+    /// This qualifies source mapping reliability, not identity probability.
+    pub min_source_confidence: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -228,7 +231,7 @@ pub enum ResolutionStatus {
     CandidateSame,
     /// A strong, non-ambiguous identifier match exists without strong separation evidence.
     StrongCandidateSame,
-    /// Explicit strong separation evidence exists without identity support.
+    /// Explicit strong separation evidence exists and no strong identity match overrides it.
     ExplicitlyDistinct,
     /// Strong identity and strong separation evidence disagree.
     ConflictingEvidence,
@@ -375,6 +378,18 @@ pub fn assess_entity_pair(
             .map(|claim| claim.strength)
             .max()
             .unwrap_or(IdentityStrength::Weak);
+        let left_source_confidence = left_group
+            .iter()
+            .filter(|claim| claim.strength == left_strength)
+            .map(|claim| claim.source_confidence)
+            .max_by(f32::total_cmp)
+            .unwrap_or(0.0);
+        let right_source_confidence = right_group
+            .iter()
+            .filter(|claim| claim.strength == right_strength)
+            .map(|claim| claim.source_confidence)
+            .max_by(f32::total_cmp)
+            .unwrap_or(0.0);
         let uniqueness = left_group
             .iter()
             .chain(right_group.iter())
@@ -408,6 +423,7 @@ pub fn assess_entity_pair(
             effective_strength: left_strength.min(right_strength),
             uniqueness,
             stability,
+            min_source_confidence: left_source_confidence.min(right_source_confidence),
         });
     }
 
@@ -422,6 +438,7 @@ pub fn assess_entity_pair(
         evidence.effective_strength >= IdentityStrength::Strong
             && evidence.uniqueness >= IdentifierUniqueness::Scoped
             && evidence.stability >= IdentifierStability::Session
+            && evidence.min_source_confidence >= 0.9
     });
     let any_identity = !identifier_matches.is_empty();
     let strong_separation = separation_claims.iter().any(|claim| {
@@ -431,12 +448,16 @@ pub fn assess_entity_pair(
             && claim.source_confidence >= 0.9
     });
 
-    let status = match (strong_identity, any_identity, strong_separation) {
-        (true, _, true) => ResolutionStatus::ConflictingEvidence,
-        (true, _, false) => ResolutionStatus::StrongCandidateSame,
-        (false, true, _) => ResolutionStatus::CandidateSame,
-        (false, false, true) => ResolutionStatus::ExplicitlyDistinct,
-        (false, false, false) => ResolutionStatus::Indeterminate,
+    let status = if strong_identity && strong_separation {
+        ResolutionStatus::ConflictingEvidence
+    } else if strong_identity {
+        ResolutionStatus::StrongCandidateSame
+    } else if strong_separation {
+        ResolutionStatus::ExplicitlyDistinct
+    } else if any_identity {
+        ResolutionStatus::CandidateSame
+    } else {
+        ResolutionStatus::Indeterminate
     };
 
     let mut unresolved_identity_claim_ids: Vec<String> = left_claims
@@ -673,6 +694,77 @@ mod tests {
         let proposal =
             assess_entity_pair(&left, &right, &claims, &[separation], 100).unwrap();
         assert_eq!(proposal.status, ResolutionStatus::ConflictingEvidence);
+    }
+
+    #[test]
+    fn strong_separation_beats_only_weak_shared_alias() {
+        let left = entity("otel", "payments-a");
+        let right = entity("cmdb", "payments-b");
+        let claims = vec![
+            claim(
+                "left-name",
+                left.clone(),
+                "service.name",
+                "payments",
+                IdentifierUniqueness::Ambiguous,
+                IdentifierStability::Persistent,
+                IdentityStrength::Weak,
+            ),
+            claim(
+                "right-name",
+                right.clone(),
+                "service.name",
+                "payments",
+                IdentifierUniqueness::Ambiguous,
+                IdentifierStability::Persistent,
+                IdentityStrength::Weak,
+            ),
+        ];
+        let separation = SeparationClaim {
+            claim_id: "reviewed-distinct".into(),
+            left: left.clone(),
+            right: right.clone(),
+            strength: IdentityStrength::Strong,
+            source_confidence: 1.0,
+            source: source("cmdb"),
+            observed_at_unix_ms: 100,
+            valid_from_unix_ms: None,
+            valid_until_unix_ms: None,
+            evidence_observation_ids: vec![],
+        };
+        let proposal =
+            assess_entity_pair(&left, &right, &claims, &[separation], 100).unwrap();
+        assert_eq!(proposal.status, ResolutionStatus::ExplicitlyDistinct);
+        assert_eq!(proposal.identifier_matches.len(), 1);
+    }
+
+    #[test]
+    fn low_extraction_confidence_cannot_create_strong_identity() {
+        let left = entity("otel", "a");
+        let right = entity("cmdb", "b");
+        let mut left_claim = claim(
+            "left-host",
+            left.clone(),
+            "host.id",
+            "uuid-x",
+            IdentifierUniqueness::Global,
+            IdentifierStability::Persistent,
+            IdentityStrength::Strong,
+        );
+        left_claim.source_confidence = 0.5;
+        let right_claim = claim(
+            "right-host",
+            right.clone(),
+            "host.id",
+            "uuid-x",
+            IdentifierUniqueness::Global,
+            IdentifierStability::Persistent,
+            IdentityStrength::Strong,
+        );
+        let proposal =
+            assess_entity_pair(&left, &right, &[left_claim, right_claim], &[], 100).unwrap();
+        assert_eq!(proposal.status, ResolutionStatus::CandidateSame);
+        assert_eq!(proposal.identifier_matches[0].min_source_confidence, 0.5);
     }
 
     #[test]
