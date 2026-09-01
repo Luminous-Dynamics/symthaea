@@ -3,9 +3,9 @@
 //! Public root for independent CogSec shadow qualification.
 //!
 //! The existing verifier remains unchanged in `lib.rs`; this façade adds
-//! explicit assurance-profile scenario types and combined exact-effect
-//! qualification without letting runtime instrumentation redefine its own
-//! expected counts, P0 denominator, or attribution strength.
+//! explicit assurance-profile scenarios, exact-effect attribution, and
+//! checkpoint-integrity composition without collapsing those assurance
+//! dimensions into one generic score or authority claim.
 
 #![forbid(unsafe_code)]
 
@@ -25,4 +25,10 @@ mod effect_qualification;
 pub use effect_qualification::{
     EffectBoundScenarioQualificationReport, qualify_observer_effect_bound_scenario,
     qualify_owner_aware_effect_bound_scenario,
+};
+
+mod integrity_qualification;
+pub use integrity_qualification::{
+    IntegrityBoundScenarioQualificationReport, qualify_checkpointed_observer_scenario,
+    qualify_checkpointed_owner_aware_scenario,
 };
