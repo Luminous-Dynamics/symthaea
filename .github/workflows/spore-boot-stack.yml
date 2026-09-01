@@ -1,0 +1,83 @@
+name: Spore Boot Stack
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/spore-boot-stack.yml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - 'crates/domains/symthaea-boot-*/**'
+      - 'crates/domains/symthaea-quicken-fb/**'
+      - 'nix/modules/quicken-fb.nix'
+      - 'nix/modules/symthaea-boot-*.nix'
+      - 'scripts/check-spore-boot-stack.sh'
+      - 'scripts/measure-spore-boot.sh'
+      - 'docs/architecture/BOOT_*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focused-qualification:
+    name: Focused Rust qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version
+          cargo --version
+
+      - name: Resolve existing workspace lock minimally
+        id: lock
+        run: |
+          # Cargo updates only what the current manifests require while retaining
+          # the existing lock wherever compatible. The artifact lets review use
+          # the resolver-produced file rather than a hand-edited lock.
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          if git diff --quiet -- Cargo.lock; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+            git diff --stat -- Cargo.lock
+          fi
+
+      - name: Upload resolver-produced Cargo.lock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-boot-cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Run focused locked qualification
+        run: bash scripts/check-spore-boot-stack.sh
+
+      - name: Run standard headless benchmark matrix
+        run: |
+          cargo run --locked -p symthaea-quicken-fb --release --bin spore-boot-bench -- --matrix \
+            > spore-boot-headless-matrix.json
+
+      - name: Upload benchmark matrix
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-boot-headless-matrix
+          path: spore-boot-headless-matrix.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Require committed lock consistency
+        if: steps.lock.outputs.changed == 'true'
+        run: |
+          echo 'Cargo.lock changed during resolver qualification.' >&2
+          echo 'Use the uploaded spore-boot-cargo-lock artifact and commit it unchanged.' >&2
+          exit 1
