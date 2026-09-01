@@ -28,6 +28,7 @@ pub mod resolution;
 pub mod resolution_pipeline;
 pub mod topology;
 pub mod topology_limits;
+mod topology_registry;
 pub mod traits;
 
 pub use conformance::{
