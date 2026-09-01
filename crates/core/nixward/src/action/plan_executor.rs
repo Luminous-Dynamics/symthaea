@@ -97,7 +97,7 @@ pub struct PlanExecutionResult {
     ///
     /// As before, non-critical step failures do not make the whole plan fail.
     pub success: bool,
-    /// Number of steps that completed primary execution and required verification.
+    /// Number of steps whose primary execution and required verification completed.
     pub completed_count: usize,
     /// Number of rollback commands attempted.
     pub rolled_back_count: usize,
@@ -239,9 +239,8 @@ impl PlanExecutor {
                 results.push((self.steps[index].clone(), Some(primary)));
 
                 if self.steps[index].critical {
-                    let (rolled_back_count, rollback_failures) = self
-                        .rollback_completed(executor, &mut results, completed)
-                        .await;
+                    let (rolled_back_count, rollback_failures) =
+                        self.rollback_completed(executor, &mut results).await;
                     for remaining in (index + 1)..self.steps.len() {
                         self.steps[remaining].status = StepStatus::Skipped;
                         results.push((self.steps[remaining].clone(), None));
@@ -274,17 +273,19 @@ impl PlanExecutor {
         }
     }
 
-    /// Roll back completed steps in reverse order.
+    /// Roll back the actual completed steps in reverse execution order.
     async fn rollback_completed(
         &mut self,
         executor: &mut NixOSExecutor,
         results: &mut [(PlanStep, Option<ExecutionResult>)],
-        completed: usize,
     ) -> (usize, Vec<(usize, String)>) {
         let mut rolled_back = 0;
         let mut failures = Vec::new();
 
-        for index in (0..completed).rev() {
+        for index in (0..results.len()).rev() {
+            if self.steps[index].status != StepStatus::Completed {
+                continue;
+            }
             let Some(rollback_command) = self.steps[index].command.rollback_command() else {
                 continue;
             };
@@ -302,9 +303,7 @@ impl PlanExecutor {
             match &rollback_result {
                 ExecutionResult::Success { .. } => {
                     self.steps[index].status = StepStatus::RolledBack;
-                    if let Some((step, _)) = results.get_mut(index) {
-                        step.status = StepStatus::RolledBack;
-                    }
+                    results[index].0.status = StepStatus::RolledBack;
                 }
                 ExecutionResult::FailedNoRollback { error, .. } => {
                     failures.push((index, format!("rollback failed: {error}")));
@@ -435,7 +434,7 @@ mod tests {
         assert_eq!(result.completed_count, 1);
         assert_eq!(result.verification_results.len(), 1);
         assert!(matches!(
-            result.verification_results[0].1,
+            &result.verification_results[0].1,
             ExecutionResult::Success { .. }
         ));
     }
@@ -483,6 +482,41 @@ mod tests {
         assert_eq!(result.steps[0].0.status, StepStatus::RolledBack);
         assert!(matches!(result.steps[1].0.status, StepStatus::Failed(_)));
         assert_eq!(result.steps[2].0.status, StepStatus::Skipped);
+    }
+
+    #[tokio::test]
+    async fn rollback_tracks_completed_steps_not_completed_count_indices() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let mut plan = PlanExecutor::new(0.35);
+        plan.add_optional_step(
+            NixOSCommand::RebuildSwitch {
+                flake: None,
+                extra_args: vec![],
+            },
+            "Optional blocked rebuild",
+        );
+        plan.add_step(
+            NixOSCommand::EnvInstall {
+                packages: vec!["vim".into()],
+            },
+            "Install vim",
+        );
+        plan.add_step(
+            NixOSCommand::RebuildSwitch {
+                flake: None,
+                extra_args: vec![],
+            },
+            "Critical blocked rebuild",
+        );
+
+        let result = plan.execute(&mut executor).await;
+        assert!(!result.success);
+        assert_eq!(result.completed_count, 1);
+        assert_eq!(result.rolled_back_count, 1);
+        assert!(result.rollback_failures.is_empty());
+        assert!(matches!(result.steps[0].0.status, StepStatus::Failed(_)));
+        assert_eq!(result.steps[1].0.status, StepStatus::RolledBack);
+        assert!(matches!(result.steps[2].0.status, StepStatus::Failed(_)));
     }
 
     #[tokio::test]
