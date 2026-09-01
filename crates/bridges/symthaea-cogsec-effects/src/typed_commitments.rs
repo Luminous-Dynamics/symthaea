@@ -12,15 +12,16 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 
-use symthaea_cogsec::Digest32;
+use symthaea_cogsec::{Digest32, MutationKind};
 use symthaea_core::hdc::LiquidHolocell;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_memory::{GraduationEvent, MemorySource};
 
 use crate::{
-    CognitiveEffectV1, GoalRecordView, StateCommitmentError, active_state_digest_v1,
-    affect_state_digest_v1, effect_digest_v1, goal_store_state_digest_v1,
-    graduation_queue_state_digest_v1, working_memory_state_digest_v1,
+    CognitiveEffectV1, GoalRecordView, StateCommitmentError, WorkingMemoryItemView,
+    active_state_digest_v1, affect_state_digest_v1, effect_digest_v1,
+    goal_store_state_digest_v1, graduation_queue_state_digest_v1,
+    working_memory_state_digest_v1,
 };
 
 /// Canonical protected resource classes used by the first CogSec runtime tranche.
@@ -54,26 +55,179 @@ impl CanonicalResourceV1 {
     }
 }
 
+/// Exact semantic effect families represented by the v1 canonical encoder.
+///
+/// This is deliberately more precise than frozen K0 [`MutationKind`]. In
+/// particular, replacement/eviction and active-state influence remain explicit
+/// unresolved taxonomy classes rather than being coerced into a convenient K0
+/// variant. That keeps #201 visible in the type system.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CanonicalEffectClassV1 {
+    /// Admit a WM item without eviction.
+    WorkingMemoryAdmit,
+    /// Admit a WM item while evicting/replacing an exact existing item.
+    WorkingMemoryReplace,
+    /// Enqueue one separate persistence/graduation candidate.
+    GraduationEnqueue,
+    /// Replace the active Holocell/current-thought state.
+    ActiveStateReplace,
+    /// Append one exact active goal record.
+    GoalActivate,
+    /// Apply one exact emotional-valence transition.
+    AffectSet,
+}
+
+impl CanonicalEffectClassV1 {
+    /// Exact frozen-K0 mutation mapping when one exists without semantic coercion.
+    ///
+    /// `None` is intentional for compound WM replacement and active-state
+    /// influence. Those classes require the K0.1 taxonomy work in #201 before
+    /// they can participate in a strong all-stage authorization claim.
+    pub const fn k0_mutation_kind(self) -> Option<MutationKind> {
+        match self {
+            Self::WorkingMemoryAdmit => Some(MutationKind::WorkingMemoryAdmission),
+            Self::WorkingMemoryReplace => None,
+            Self::GraduationEnqueue => Some(MutationKind::PersistentMemoryCommit),
+            Self::ActiveStateReplace => None,
+            Self::GoalActivate => Some(MutationKind::GoalActivation),
+            Self::AffectSet => Some(MutationKind::Affect),
+        }
+    }
+}
+
 /// Canonical commitment to one exact cognitive effect.
 ///
 /// This is ordinary effect-identity data, not a permit, owner root, signature,
-/// trusted fact, or authorization. The inner digest is private specifically so
-/// application code has to make an explicit semantic conversion at the monitor
-/// boundary.
+/// trusted fact, or authorization. Both the digest and precise effect class are
+/// private so callers cannot manufacture inconsistent taxonomy/hash pairs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EffectCommitmentV1 {
+    class: CanonicalEffectClassV1,
     digest: Digest32,
 }
 
 impl EffectCommitmentV1 {
-    /// Commit to one canonical effect.
-    pub fn new(effect: &CognitiveEffectV1) -> Self {
+    fn from_effect(class: CanonicalEffectClassV1, effect: CognitiveEffectV1) -> Self {
         Self {
-            digest: effect_digest_v1(effect),
+            class,
+            digest: effect_digest_v1(&effect),
         }
     }
 
-    /// Borrow the generic monitor digest representation explicitly.
+    /// Commit to an admission-only WM effect.
+    pub fn working_memory_admit(item: WorkingMemoryItemView<'_>, insertion_index: u64) -> Self {
+        Self::from_effect(
+            CanonicalEffectClassV1::WorkingMemoryAdmit,
+            CognitiveEffectV1::working_memory_admit(item, insertion_index),
+        )
+    }
+
+    /// Commit to an exact compound WM replacement/eviction effect.
+    pub fn working_memory_replace(
+        admitted: WorkingMemoryItemView<'_>,
+        admitted_index: u64,
+        evicted: WorkingMemoryItemView<'_>,
+        evicted_index: u64,
+        evicted_steps_survived: u64,
+    ) -> Self {
+        Self::from_effect(
+            CanonicalEffectClassV1::WorkingMemoryReplace,
+            CognitiveEffectV1::working_memory_replace(
+                admitted,
+                admitted_index,
+                evicted,
+                evicted_index,
+                evicted_steps_survived,
+            ),
+        )
+    }
+
+    /// Commit to one exact graduation-queue enqueue effect.
+    #[allow(clippy::too_many_arguments)]
+    pub fn graduation_enqueue(
+        content: &ContinuousHV,
+        label: impl Into<String>,
+        steps_survived: u64,
+        final_activation: f64,
+        psi: f64,
+        coherence: f64,
+        source: MemorySource,
+        is_verified: bool,
+    ) -> Self {
+        Self::from_effect(
+            CanonicalEffectClassV1::GraduationEnqueue,
+            CognitiveEffectV1::graduation_enqueue(
+                content,
+                label,
+                steps_survived,
+                final_activation,
+                psi,
+                coherence,
+                source,
+                is_verified,
+            ),
+        )
+    }
+
+    /// Commit to the exact active Holocell/current-thought replacement.
+    pub fn active_state_replace(
+        before_holocell: &LiquidHolocell,
+        before_current_thought: &ContinuousHV,
+        after_holocell: &LiquidHolocell,
+        after_current_thought: &ContinuousHV,
+    ) -> Self {
+        Self::from_effect(
+            CanonicalEffectClassV1::ActiveStateReplace,
+            CognitiveEffectV1::active_state_replace(
+                before_holocell,
+                before_current_thought,
+                after_holocell,
+                after_current_thought,
+            ),
+        )
+    }
+
+    /// Commit to one exact goal-store append.
+    pub fn goal_activate(
+        goal_id: impl Into<String>,
+        description: impl Into<String>,
+        embedding: &ContinuousHV,
+        priority: f32,
+        progress: f32,
+        is_active: bool,
+    ) -> Self {
+        Self::from_effect(
+            CanonicalEffectClassV1::GoalActivate,
+            CognitiveEffectV1::goal_activate(
+                goal_id,
+                description,
+                embedding,
+                priority,
+                progress,
+                is_active,
+            ),
+        )
+    }
+
+    /// Commit to one exact affect transition.
+    pub fn affect_set(before: f32, delta: f32, after: f32) -> Self {
+        Self::from_effect(
+            CanonicalEffectClassV1::AffectSet,
+            CognitiveEffectV1::affect_set(before, delta, after),
+        )
+    }
+
+    /// Precise canonical effect class bound to this digest.
+    pub const fn class(&self) -> CanonicalEffectClassV1 {
+        self.class
+    }
+
+    /// Exact frozen-K0 mutation class when one exists without semantic coercion.
+    pub const fn k0_mutation_kind(&self) -> Option<MutationKind> {
+        self.class.k0_mutation_kind()
+    }
+
+    /// Return the generic monitor digest explicitly.
     pub const fn digest(&self) -> Digest32 {
         self.digest
     }
@@ -143,10 +297,9 @@ impl ResourceStateCommitmentV1 {
 
     /// Canonical commitment to an explicitly supplied ordered graduation queue.
     ///
-    /// This does not bypass `MemoryCoordinator` privacy and therefore does not by
-    /// itself establish owner provenance. Live runtime use must obtain the queue
-    /// commitment from a narrow owner-side commitment seam rather than exporting
-    /// private queue contents merely to call this helper.
+    /// This is a **reference encoder**, not an owner-read API. Live runtime use
+    /// must obtain the queue commitment through a narrow `MemoryCoordinator`
+    /// owner-side commitment seam rather than exporting private queue contents.
     pub fn graduation_queue_reference(events: &[GraduationEvent]) -> Self {
         Self {
             resource: CanonicalResourceV1::GraduationQueue,
@@ -211,6 +364,62 @@ mod tests {
 
     fn hv(a: f32, b: f32) -> ContinuousHV {
         ContinuousHV::from_values(vec![a, b])
+    }
+
+    #[test]
+    fn unresolved_compound_and_active_effects_have_no_k0_mapping() {
+        let metadata = HashMap::new();
+        let admitted_hv = hv(0.1, 0.2);
+        let evicted_hv = hv(0.3, 0.4);
+        let admitted = WorkingMemoryItemView {
+            content: &admitted_hv,
+            arrival_tick: 7,
+            source: MemorySource::UserInteraction,
+            verified: false,
+            metadata: &metadata,
+        };
+        let evicted = WorkingMemoryItemView {
+            content: &evicted_hv,
+            arrival_tick: 2,
+            source: MemorySource::Internal,
+            verified: false,
+            metadata: &metadata,
+        };
+        let replacement = EffectCommitmentV1::working_memory_replace(admitted, 3, evicted, 0, 5);
+        assert_eq!(replacement.k0_mutation_kind(), None);
+
+        let before = LiquidHolocell::new(1);
+        let mut after = before.clone();
+        let input = hv(0.5, 0.6);
+        after.step(&input, 0.1);
+        let active = EffectCommitmentV1::active_state_replace(
+            &before,
+            &before.state,
+            &after,
+            &after.state,
+        );
+        assert_eq!(active.k0_mutation_kind(), None);
+    }
+
+    #[test]
+    fn exact_k0_mappings_remain_explicit() {
+        let metadata = HashMap::new();
+        let item_hv = hv(0.1, 0.2);
+        let item = WorkingMemoryItemView {
+            content: &item_hv,
+            arrival_tick: 7,
+            source: MemorySource::UserInteraction,
+            verified: false,
+            metadata: &metadata,
+        };
+        assert_eq!(
+            EffectCommitmentV1::working_memory_admit(item, 0).k0_mutation_kind(),
+            Some(MutationKind::WorkingMemoryAdmission)
+        );
+        assert_eq!(
+            EffectCommitmentV1::affect_set(0.0, 0.2, 0.06).k0_mutation_kind(),
+            Some(MutationKind::Affect)
+        );
     }
 
     #[test]
