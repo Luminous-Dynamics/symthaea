@@ -1,11 +1,14 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Φ-Gated Action Execution
+//! NixOS Action Execution
 //!
-//! All NixOS actions are routed through the consciousness-gated executor.
-//! Sub-modules produce `NixOSCommand` values; the executor checks Φ
-//! thresholds, handles rollback, and records outcomes for episodic memory.
+//! Sub-modules produce typed `NixOSCommand` values. The current executor uses
+//! Φ as a tier-based caution/confirmation gate, handles command-local rollback,
+//! and records outcomes for episodic memory. `PlanExecutor` adds authoritative
+//! plan dry-run, explicit read-only postcondition verification, and an explicit
+//! distinction between normally gated rollback and compensation that was
+//! pre-authorized by an upstream authority layer.
 
 pub mod config_writer;
 pub mod executor;
@@ -25,5 +28,7 @@ pub use flake_ops::{FlakeCheckResult, FlakeMetadata, FlakeOps};
 pub use gc_manager::{GcAnalysis, GcManager, GcRecommendation};
 pub use generation_manager::{Generation, GenerationDiff, GenerationManager};
 pub use phi_gate::{classify_command_destructiveness, get_nixos_rollback};
-pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus};
+pub use plan_executor::{
+    PlanBuildError, PlanExecutionResult, PlanExecutor, PlanStep, RollbackAuthorization, StepStatus,
+};
 pub use service_manager::{ServiceManager, ServiceStatus};
