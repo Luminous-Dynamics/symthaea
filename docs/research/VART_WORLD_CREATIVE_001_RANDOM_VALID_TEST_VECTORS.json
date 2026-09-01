@@ -1,0 +1,51 @@
+{
+  "schema": "symthaea.vart-random-valid-v1.test-vectors.v1",
+  "algorithm": "sha256-counter-v1",
+  "vectors": [
+    {
+      "seed": 0,
+      "paired_block_id": "block-0",
+      "candidate_set_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "admissible_candidate_count": 1,
+      "counter": 0,
+      "accepted_digest_sha256": "d5d9d0ae96bc55631f080d7861249eca693cd4406f38bfdbfb6b4ca4831b03ff",
+      "selected_index": 0
+    },
+    {
+      "seed": 1,
+      "paired_block_id": "block-1",
+      "candidate_set_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "admissible_candidate_count": 2,
+      "counter": 0,
+      "accepted_digest_sha256": "f1e30de1ab96f374ff8132cc91c9abce0f9dbf2776fa68c7052e5fcc71b008c3",
+      "selected_index": 1
+    },
+    {
+      "seed": 42,
+      "paired_block_id": "worldA:seed42:r0",
+      "candidate_set_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "admissible_candidate_count": 7,
+      "counter": 0,
+      "accepted_digest_sha256": "6af4775cfa327aacb8ba63ad1203523cce989294c1cd60a34af4f9c3e985642a",
+      "selected_index": 2
+    },
+    {
+      "seed": 123456789,
+      "paired_block_id": "pretty-trap/seed-7/rev-3",
+      "candidate_set_sha256": "abababababababababababababababababababababababababababababababab",
+      "admissible_candidate_count": 10,
+      "counter": 0,
+      "accepted_digest_sha256": "0805ac7743b97b74f67afc931985a73debf543f8183471a8d4482f3853da8dc3",
+      "selected_index": 9
+    },
+    {
+      "seed": 18446744073709551615,
+      "paired_block_id": "memory-trap|longitudinal|99",
+      "candidate_set_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "admissible_candidate_count": 257,
+      "counter": 0,
+      "accepted_digest_sha256": "9339bcf376cf07e1525f4a1841b5b4ccd2d3d2ed1310e59b01d1e3e45e03927a",
+      "selected_index": 163
+    }
+  ]
+}
