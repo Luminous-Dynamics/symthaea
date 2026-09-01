@@ -22,8 +22,9 @@ Before confirmatory execution, construct and freeze a prospective root containin
 - evidence run class (`Confirmatory` for confirmatory inference);
 - exact v0.1 source commit;
 - v0.1 model-semantics version;
-- v0.1 qualification-receipt SHA-256;
-- v0.1 evidence-capsule SHA-256;
+- v0.1 `QualificationEvidenceBundle` SHA-256 as the authoritative baseline-promotion identity;
+- v0.1 qualification-receipt SHA-256 for component-level auditability;
+- v0.1 evidence-capsule SHA-256 for component-level auditability;
 - v0.2 `DesignFreezeManifest` SHA-256;
 - v0.2 `ImplementationStartReceipt` SHA-256;
 - exact v0.2 observatory implementation source commit;
@@ -50,6 +51,8 @@ Before confirmatory execution, construct and freeze a prospective root containin
 - canonical SHA-256 of the entire validated root.
 
 This prospective root is frozen before confirmatory execution.
+
+The component qualification-receipt and evidence-capsule digests are retained for inspection, but they do not independently authorize promotion. The bound `QualificationEvidenceBundle` is the authoritative proof that those components belong to the same exact v0.1 source/model-semantics lineage.
 
 ## Design-freeze dependency
 
@@ -96,7 +99,7 @@ Do not mix prospective identity with realized results.
 
 Contains what was promised before confirmatory data:
 
-- qualified baseline identity;
+- qualified baseline bundle identity plus component audit identities;
 - frozen design/implementation-start identity;
 - study/protocol identity;
 - candidates;
@@ -132,11 +135,13 @@ The realized package has its own canonical SHA-256.
 
 ## v0.1 qualification dependency
 
-A confirmatory v0.2 prospective root is invalid unless the referenced v0.1 qualification receipt says the exact native baseline is qualified and the referenced v0.1 evidence capsule validates.
+A confirmatory v0.2 prospective root is invalid unless the referenced v0.1 `QualificationEvidenceBundle` validates, reports qualified, and binds the exact v0.1 source commit/model-semantics lineage named by the v0.2 root.
 
-The root may be drafted before v0.1 qualifies, but it must carry a status such as `BlockedOnBaselineQualification` and cannot be promoted to `LockedConfirmatory` until the dependency is satisfied.
+The root must also require that its component v0.1 qualification-receipt and evidence-capsule digests match the corresponding embedded artifacts inside that bundle. Supplying two independently valid but cross-paired artifacts from different v0.1 heads is an integrity failure.
 
-This prevents a later v0.1 baseline substitution from being hidden beneath the same v0.2 study name.
+The root may be drafted before v0.1 qualifies, but it must carry a status such as `BlockedOnBaselineQualification` and cannot be promoted to `LockedConfirmatory` until the bundle dependency is satisfied.
+
+Any new v0.1 source commit supersedes an older bundle for implementation-start or confirmatory purposes unless a newly validated bundle explicitly binds the new source head.
 
 ## Candidate-set closure
 
@@ -187,7 +192,9 @@ The suite must include known-malicious fixtures demonstrating that it catches at
 
 Recommended dependency direction:
 
-`v0.1 qualification/evidence`
+`v0.1 qualification receipt + evidence capsule`
+
+→ `v0.1 QualificationEvidenceBundle`
 
 → `v0.2 design freeze + implementation start`
 
@@ -232,14 +239,14 @@ A failed primary hypothesis on an otherwise valid confirmatory study is a **qual
 
 An integrity failure means the evidence chain itself cannot support inference.
 
-Examples include future-information leakage, observational feedback into native execution, semantic-label leakage into blinded primary artifacts, capability escalation, execution replay mismatch, invalid temporal alignment, missing locked scenarios, artifact/hash substitution, or failure of an integrity-blocking adversarial gate.
+Examples include mismatched v0.1 bundle/component identities, future-information leakage, observational feedback into native execution, semantic-label leakage into blinded primary artifacts, capability escalation, execution replay mismatch, invalid temporal alignment, missing locked scenarios, artifact/hash substitution, or failure of an integrity-blocking adversarial gate.
 
 ## Reproduction contract
 
 An independent reproducer should be able to start from the prospective root and verify:
 
 1. exact source/dependency/toolchain identities;
-2. v0.1 baseline qualification;
+2. v0.1 `QualificationEvidenceBundle` and its embedded qualification/evidence components;
 3. design-freeze and implementation-start identities;
 4. candidate definitions;
 5. scenario cohort materialization;
@@ -261,6 +268,7 @@ In addition to machine-readable JSON, generate a concise deterministic text rece
 
 - root digest;
 - source commits;
+- v0.1 qualification/evidence bundle digest;
 - design-freeze digest;
 - v0.1 qualification state;
 - run class;
