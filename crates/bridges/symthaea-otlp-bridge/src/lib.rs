@@ -9,6 +9,8 @@
 
 #![forbid(unsafe_code)]
 
+mod identity_provider;
+
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
     common::v1::{KeyValue, any_value},
@@ -26,6 +28,8 @@ use symthaea_integration_core::{
 };
 
 pub const OTLP_METRICS_INTEGRATION_ID: &str = "otlp-metrics";
+pub const OTLP_OBSERVE_CAPABILITY: &str = "observe.otlp.metrics.scalar";
+pub const OTLP_IDENTITY_CAPABILITY: &str = "discover.otlp.identity";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OtlpMetricsContext {
@@ -151,14 +155,24 @@ pub fn integration_manifest() -> IntegrationManifest {
             "service".into(),
             "otel_resource".into(),
         ],
-        capabilities: vec![CapabilityDeclaration {
-            name: "observe.metrics.scalar".into(),
-            class: CapabilityClass::Observe,
-            access: AccessMode::ReadOnly,
-            risk: RiskClass::ReadOnly,
-            reversible: false,
-            default_enabled: true,
-        }],
+        capabilities: vec![
+            CapabilityDeclaration {
+                name: OTLP_OBSERVE_CAPABILITY.into(),
+                class: CapabilityClass::Observe,
+                access: AccessMode::ReadOnly,
+                risk: RiskClass::ReadOnly,
+                reversible: false,
+                default_enabled: true,
+            },
+            CapabilityDeclaration {
+                name: OTLP_IDENTITY_CAPABILITY.into(),
+                class: CapabilityClass::Discover,
+                access: AccessMode::ReadOnly,
+                risk: RiskClass::ReadOnly,
+                reversible: false,
+                default_enabled: true,
+            },
+        ],
         credentials: vec![],
         maturity: MaturityLevel::E1FixtureParsing,
         default_read_only: true,
@@ -925,6 +939,8 @@ mod tests {
         let manifest = integration_manifest();
         assert_eq!(manifest.maturity, MaturityLevel::E1FixtureParsing);
         assert!(manifest.validate_read_only_profile().is_ok());
+        assert!(manifest.declares(OTLP_OBSERVE_CAPABILITY));
+        assert!(manifest.declares(OTLP_IDENTITY_CAPABILITY));
     }
 
     #[test]
