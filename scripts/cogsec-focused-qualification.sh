@@ -109,9 +109,13 @@ cargo clippy --locked --all-targets "${PACKAGES[@]}" -- -D warnings
 LAST_COMPLETED_GATE="$CURRENT_GATE"
 
 CURRENT_GATE="tracked-state-postcondition"
-printf '\n[post] tracked repository state unchanged\n'
-git diff --exit-code
-git diff --cached --exit-code
+printf '\n[post] repository state unchanged\n'
+POST_DIRTY_STATE="$(git status --porcelain=v1 --untracked-files=all)"
+if [[ -n "$POST_DIRTY_STATE" ]]; then
+  printf '%s\n' "$POST_DIRTY_STATE" >&2
+  printf 'ERROR: focused qualification changed tracked, staged, or untracked repository state\n' >&2
+  exit 1
+fi
 [[ "$(git rev-parse HEAD)" == "$HEAD_SHA" ]] || {
   printf 'ERROR: HEAD changed during focused qualification\n' >&2
   exit 1
