@@ -39,13 +39,14 @@ semantic phase anchor
 authoritative coarse health
 fixed-point reveal floor
 delayed-domain bitmask
-repair/degraded-domain bitmask
+degraded-domain bitmask
+failed-domain bitmask
 minimum diagnostics visibility
-idempotent pulse token
+semantic accent + idempotency token
 handoff-ready fact
 ```
 
-It retains only the last accepted sequence/anchor for one already-validated observation lineage. The caller must reset it explicitly when the boot-protocol receiver adopts a new lineage.
+A reducer instance belongs to one already-validated observation lineage. The caller must reset it explicitly when the boot-protocol receiver adopts a new lineage.
 
 ## Stable genome, dynamic modulation
 
@@ -171,27 +172,73 @@ This affects only visibility. It does not rewrite authoritative global health. T
 
 Raw logs remain a separate Linux-native visibility layer.
 
-## Domain modulation is bounded
+## Domain modulation is bounded and severity-aware
 
-Delayed and degraded/failed domains are stored as fixed bitmasks over the protocol's bounded `BootDomain` enum rather than unbounded vectors or event history.
+Delayed, degraded, and failed domains are stored in three separate fixed bitmasks over the protocol's bounded `BootDomain` enum rather than unbounded vectors or event history.
 
-This lets an exact renderer add localized cues such as:
+Separating severity lets the renderer distinguish:
 
 ```text
-Network delayed  -> restrained pulse/hold in network-associated region
-Service degraded -> repair emphasis
-Recovered domain -> repair emphasis clears on next authoritative snapshot
+Delayed  -> restrained hold / lower-frequency local activity
+Degraded -> repair emphasis while normal operation remains possible
+Failed   -> stronger failure emphasis subordinate to explicit diagnostics
 ```
 
-without retaining raw events indefinitely.
+without reparsing raw system state or inferring severity from global health.
 
-## Event/pulse semantics
+Recovery clears transient masks on the next authoritative snapshot; it does not regenerate topology or rewrite persistent visual history.
 
-`pulse_token` is currently the accepted snapshot sequence.
+## Semantic accent protocol
 
-A renderer may trigger an accent only when the token changes. Reprocessing the same snapshot is therefore idempotent and cannot create repeated pulses.
+Transient visual accents are **not** driven by every telemetry packet.
 
-Future event-specific accents may be layered behind their own bounded/rate-limited token if qualification proves them useful.
+`LiveEcologyModulation` carries:
+
+```text
+accent_token
+accent = None | Progress | Delay | Degraded | Failed | Recovery | Ready
+```
+
+The token changes only when presentation-relevant semantics change. A renderer triggers an accent only when the token changes.
+
+Examples:
+
+```text
+same phase/health/domains, newer sequence -> no new accent
+phase advances                           -> Progress
+new delay                                -> Delay
+new degradation                          -> Degraded
+new failure                              -> Failed
+issue clears / health recovers           -> Recovery
+explicit Ready                           -> Ready
+```
+
+New failure/degradation/delay semantics outrank ordinary progress accents so diagnostic meaning is not drowned out by decorative activity.
+
+The first accepted snapshot establishes state without requiring a transient accent.
+
+This prevents high-volume but semantically unchanged observation traffic from becoming animation noise or CPU/GPU work.
+
+## Sequence integrity and idempotency
+
+For one observation lineage:
+
+```text
+sequence < previous sequence
+    -> reject rewind
+
+sequence == previous sequence
++ same presentation semantics
+    -> return exactly the cached modulation
+
+sequence == previous sequence
++ changed presentation semantics
+    -> reject equivocation
+```
+
+A duplicated datagram therefore cannot retrigger an accent, while the same sequence number cannot be reused to smuggle a different visual interpretation.
+
+A new validated protocol observation lineage requires an explicit reducer reset.
 
 ## Recovery
 
@@ -212,10 +259,11 @@ ServicesPhase + Network Ready
         v
 same topology / same reveal floor
 repair emphasis clears
+Recovery accent once
 diagnostics de-escalate according to authoritative health
 ```
 
-The reference reducer has a regression test for this behavior.
+The reference reducer has regression coverage for this behavior.
 
 ## Diagnostics and ecology use the same source
 
@@ -277,16 +325,19 @@ BootGenome
 + renderer version
 ```
 
+The reducer test suite includes representative irregular traces and requires independent reducer instances to produce identical modulation sequences.
+
 Exact semantic state should replay deterministically. Pixel output across different GPU/driver/backend implementations needs only perceptual equivalence unless using the exact CPU renderer/evidence path.
 
 ## Performance
 
 Live modulation is O(number of bounded boot domains), with no journal scanning and no unbounded event history.
 
-The adapter retains only:
+The adapter retains only bounded scalar/mask state for the current observation lineage:
 
-- last accepted observation sequence;
-- last accepted semantic anchor.
+- last accepted sequence;
+- last presentation fingerprint;
+- last modulation.
 
 Its output uses fixed-size domain masks and scalar fields.
 
@@ -299,15 +350,18 @@ Implemented tests cover:
 1. monotonic phase-anchor/reveal mapping;
 2. conservative phase naming;
 3. slow-boot hold;
-4. explicit-Ready-only handoff fact;
-5. health-driven diagnostics floor;
-6. defensive domain-driven diagnostics visibility;
-7. bounded delayed/repair masks;
-8. recovery without topology/timeline rewind;
-9. sequence/anchor rewind rejection;
-10. explicit lineage reset behavior;
-11. invalid snapshot rejection;
-12. idempotent equal-sequence handling.
+4. meaningful-change-only accents;
+5. explicit-Ready-only handoff fact;
+6. health-driven diagnostics floor;
+7. defensive domain-driven diagnostics visibility;
+8. separate bounded delayed/degraded/failed masks;
+9. recovery without topology/timeline rewind;
+10. sequence/anchor rewind rejection;
+11. same-sequence equivocation rejection;
+12. explicit lineage reset behavior;
+13. invalid snapshot rejection;
+14. exact equal-sequence idempotency;
+15. deterministic representative trace replay.
 
 ## Deferred exact-renderer gates
 
