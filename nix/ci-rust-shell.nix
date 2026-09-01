@@ -21,7 +21,7 @@ let
   toolchainToml = builtins.fromTOML (builtins.readFile toolchainFile);
   rustChannel = toolchainToml.toolchain.channel;
   rustToolchain = pkgs.rust-bin.stable.${rustChannel}.default.override {
-    extensions = [ "rustfmt" ];
+    extensions = [ "rustfmt" "clippy" ];
   };
 in
 pkgs.mkShell {
