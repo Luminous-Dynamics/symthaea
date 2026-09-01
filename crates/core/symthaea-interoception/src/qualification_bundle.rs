@@ -7,7 +7,7 @@ use crate::{
     EvidenceCapsuleManifest, QualificationReceipt, INTEROCEPTIVE_MODEL_SEMANTICS_VERSION,
 };
 
-pub const QUALIFICATION_EVIDENCE_BUNDLE_SCHEMA_VERSION: u16 = 1;
+pub const QUALIFICATION_EVIDENCE_BUNDLE_SCHEMA_VERSION: u16 = 2;
 
 /// Self-contained v0.1 promotion artifact binding mechanical qualification to
 /// the exact evidence capsule from the same source lineage.
@@ -15,6 +15,8 @@ pub const QUALIFICATION_EVIDENCE_BUNDLE_SCHEMA_VERSION: u16 = 1;
 /// `QualificationReceipt` and `EvidenceCapsuleManifest` remain independently
 /// useful artifacts. This bundle prevents two individually valid artifacts from
 /// different source heads from being accidentally paired as one qualification.
+/// Qualification receipt schema v2 additionally binds each evidence-bearing gate
+/// to this same exact source lineage through typed evidence identities.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QualificationEvidenceBundle {
     pub schema_version: u16,
