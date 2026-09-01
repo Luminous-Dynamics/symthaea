@@ -14,14 +14,11 @@ use opentelemetry_proto::tonic::{
 };
 use std::sync::Arc;
 use symthaea_integration_core::{
-    IdentityRequest, IntegrationId, IntegrationRegistry, ResolutionStatus, resolve_identity_claims,
+    IdentityRequest, IntegrationRegistry, ResolutionStatus, resolve_registry_identity_snapshots,
 };
-use symthaea_otlp_bridge::{
-    OTLP_METRICS_INTEGRATION_ID, OtlpMetricsContext, OtlpMetricsObserver,
-};
+use symthaea_otlp_bridge::{OtlpMetricsContext, OtlpMetricsObserver};
 use symthaea_prometheus_bridge::{
-    PROMETHEUS_INTEGRATION_ID, PrometheusFixtureContext, PrometheusIdentityMapping,
-    PrometheusTextObserver,
+    PrometheusFixtureContext, PrometheusIdentityMapping, PrometheusTextObserver,
 };
 
 fn string_kv(key: &str, value: &str) -> KeyValue {
@@ -102,18 +99,6 @@ fn registry_admitted_otlp_and_prometheus_resolve_one_service_instance() {
     let prometheus_snapshot = prometheus
         .identity_snapshot_sync(IdentityRequest::default())
         .unwrap();
-    registry
-        .admit_identity_snapshot(
-            &IntegrationId::new(OTLP_METRICS_INTEGRATION_ID),
-            &otlp_snapshot,
-        )
-        .unwrap();
-    registry
-        .admit_identity_snapshot(
-            &IntegrationId::new(PROMETHEUS_INTEGRATION_ID),
-            &prometheus_snapshot,
-        )
-        .unwrap();
 
     assert_eq!(otlp_snapshot.claims.len(), 1);
     assert_eq!(prometheus_snapshot.claims.len(), 1);
@@ -122,13 +107,12 @@ fn registry_admitted_otlp_and_prometheus_resolve_one_service_instance() {
         prometheus_snapshot.claims[0].identifier
     );
 
-    let claims = otlp_snapshot
-        .claims
-        .iter()
-        .chain(prometheus_snapshot.claims.iter())
-        .cloned()
-        .collect::<Vec<_>>();
-    let resolved = resolve_identity_claims(&claims, &[], 2_100).unwrap();
+    let resolved = resolve_registry_identity_snapshots(
+        &registry,
+        &[otlp_snapshot, prometheus_snapshot],
+        2_100,
+    )
+    .unwrap();
 
     assert_eq!(resolved.proposals.len(), 1);
     let proposal = &resolved.proposals[0];
