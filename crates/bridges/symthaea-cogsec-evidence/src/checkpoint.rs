@@ -17,7 +17,7 @@ use sha2::{Digest as _, Sha256};
 use symthaea_cogsec::Digest32;
 use thiserror::Error;
 
-use crate::{EffectBoundEvidenceSnapshot, ObservedEffectBinding};
+use crate::EffectBoundEvidenceSnapshot;
 
 /// Schema version for deterministic effect-bound evidence checkpoints.
 pub const EVIDENCE_CHECKPOINT_SCHEMA_V1: u16 = 1;
@@ -500,8 +500,8 @@ mod tests {
     use super::*;
 
     use crate::{
-        EvidenceCompleteness, EvidenceLedgerSnapshot, LedgerStats, QualificationManifest,
-        SHADOW_EVENT_SCHEMA_V1,
+        EvidenceCompleteness, EvidenceLedgerSnapshot, LedgerStats, ObservedEffectBinding,
+        QualificationManifest, SHADOW_EVENT_SCHEMA_V1,
     };
 
     fn d(byte: u8) -> Digest32 {
@@ -647,7 +647,11 @@ mod tests {
     fn signing_message_is_domain_separated_and_root_bound() {
         let first = checkpoint_effect_bound_snapshot(snapshot(1, 0), None).unwrap();
         let message = first.checkpoint.signing_message();
-        assert!(message.windows(32).any(|window| window == first.checkpoint.checkpoint_root.0));
+        assert!(
+            message
+                .windows(32)
+                .any(|window| window == first.checkpoint.checkpoint_root.0.as_slice())
+        );
         assert_ne!(message.as_slice(), first.checkpoint.checkpoint_root.0.as_slice());
     }
 }
