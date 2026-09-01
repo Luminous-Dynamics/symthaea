@@ -29,50 +29,22 @@ impl TruthBand {
 /// Visual room available after the factual phase floor has been reached but
 /// before the next unearned factual phase would be implied.
 pub const fn truth_band(anchor: SemanticBootAnchor) -> TruthBand {
-    let band = match anchor {
-        SemanticBootAnchor::KernelPhase => TruthBand {
-            floor: 50_000,
-            ceiling: 110_000,
-        },
-        SemanticBootAnchor::InitrdPhase => TruthBand {
-            floor: 120_000,
-            ceiling: 210_000,
-        },
-        SemanticBootAnchor::StoragePhase => TruthBand {
-            floor: 220_000,
-            ceiling: 325_000,
-        },
-        SemanticBootAnchor::FilesystemsPhase => TruthBand {
-            floor: 340_000,
-            ceiling: 430_000,
-        },
-        SemanticBootAnchor::SecurityPhase => TruthBand {
-            floor: 450_000,
-            ceiling: 540_000,
-        },
-        SemanticBootAnchor::NetworkPhase => TruthBand {
-            floor: 560_000,
-            ceiling: 650_000,
-        },
-        SemanticBootAnchor::ServicesPhase => TruthBand {
-            floor: 680_000,
-            ceiling: 790_000,
-        },
-        SemanticBootAnchor::GraphicsPhase => TruthBand {
-            floor: 820_000,
-            ceiling: 900_000,
-        },
-        SemanticBootAnchor::SessionPhase => TruthBand {
-            floor: 920_000,
-            ceiling: 975_000,
-        },
-        SemanticBootAnchor::SessionReady => TruthBand {
-            floor: REVEAL_SCALE,
-            ceiling: REVEAL_SCALE,
-        },
+    let ceiling = match anchor {
+        SemanticBootAnchor::KernelPhase => 110_000,
+        SemanticBootAnchor::InitrdPhase => 210_000,
+        SemanticBootAnchor::StoragePhase => 325_000,
+        SemanticBootAnchor::FilesystemsPhase => 430_000,
+        SemanticBootAnchor::SecurityPhase => 540_000,
+        SemanticBootAnchor::NetworkPhase => 650_000,
+        SemanticBootAnchor::ServicesPhase => 790_000,
+        SemanticBootAnchor::GraphicsPhase => 900_000,
+        SemanticBootAnchor::SessionPhase => 975_000,
+        SemanticBootAnchor::SessionReady => REVEAL_SCALE,
     };
-    debug_assert!(band.validate());
-    band
+    TruthBand {
+        floor: anchor.reveal_floor(),
+        ceiling,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -122,29 +94,91 @@ pub struct ClockAdvance {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClockError {
+    InvalidPolicy,
+    InvalidModulation,
+    RevealFloorMismatch {
+        expected: u32,
+        observed: u32,
+    },
+    AnchorRegressed {
+        previous: SemanticBootAnchor,
+        observed: SemanticBootAnchor,
+    },
+    PhaseBeyondTruthBand {
+        phase: u32,
+        ceiling: u32,
+    },
+}
+
+impl std::fmt::Display for ClockError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidPolicy => write!(f, "invalid Spore visual clock policy"),
+            Self::InvalidModulation => write!(f, "invalid live ecology modulation"),
+            Self::RevealFloorMismatch { expected, observed } => write!(
+                f,
+                "visual reveal floor mismatch: expected={expected}, observed={observed}"
+            ),
+            Self::AnchorRegressed { previous, observed } => write!(
+                f,
+                "visual clock anchor regressed: previous={previous:?}, observed={observed:?}"
+            ),
+            Self::PhaseBeyondTruthBand { phase, ceiling } => write!(
+                f,
+                "visual phase exceeds current truth band: phase={phase}, ceiling={ceiling}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for ClockError {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ElasticVisualClock {
     phase: u32,
     policy: VisualClockPolicy,
+    last_anchor: Option<SemanticBootAnchor>,
 }
 
 impl Default for ElasticVisualClock {
     fn default() -> Self {
-        Self::new(VisualClockPolicy::default())
+        Self::new(VisualClockPolicy::default()).expect("default visual clock policy is valid")
     }
 }
 
 impl ElasticVisualClock {
-    pub fn new(policy: VisualClockPolicy) -> Self {
-        assert!(policy.validate(), "invalid Spore visual clock policy");
-        Self { phase: 0, policy }
+    pub fn new(policy: VisualClockPolicy) -> Result<Self, ClockError> {
+        if !policy.validate() {
+            return Err(ClockError::InvalidPolicy);
+        }
+        Ok(Self {
+            phase: 0,
+            policy,
+            last_anchor: None,
+        })
     }
 
-    pub fn from_phase(phase: u32, policy: VisualClockPolicy) -> Self {
-        assert!(policy.validate(), "invalid Spore visual clock policy");
-        Self {
-            phase: phase.min(REVEAL_SCALE),
-            policy,
+    pub fn from_phase(
+        anchor: SemanticBootAnchor,
+        phase: u32,
+        policy: VisualClockPolicy,
+    ) -> Result<Self, ClockError> {
+        if !policy.validate() {
+            return Err(ClockError::InvalidPolicy);
         }
+        let band = truth_band(anchor);
+        if phase > band.ceiling {
+            return Err(ClockError::PhaseBeyondTruthBand {
+                phase,
+                ceiling: band.ceiling,
+            });
+        }
+        Ok(Self {
+            phase,
+            policy,
+            last_anchor: Some(anchor),
+        })
     }
 
     pub const fn phase(&self) -> u32 {
@@ -153,6 +187,7 @@ impl ElasticVisualClock {
 
     pub fn reset(&mut self) {
         self.phase = 0;
+        self.last_anchor = None;
     }
 
     /// Advance one presentation step. The returned phase is monotonic and can
@@ -161,12 +196,35 @@ impl ElasticVisualClock {
         &mut self,
         elapsed_ms: u32,
         modulation: &LiveEcologyModulation,
-    ) -> ClockAdvance {
-        debug_assert!(modulation.validate());
+    ) -> Result<ClockAdvance, ClockError> {
+        if !modulation.validate() {
+            return Err(ClockError::InvalidModulation);
+        }
+
+        let band = truth_band(modulation.anchor);
+        if band.floor != modulation.reveal_floor {
+            return Err(ClockError::RevealFloorMismatch {
+                expected: band.floor,
+                observed: modulation.reveal_floor,
+            });
+        }
+        if let Some(previous) = self.last_anchor
+            && modulation.anchor < previous
+        {
+            return Err(ClockError::AnchorRegressed {
+                previous,
+                observed: modulation.anchor,
+            });
+        }
+        if self.phase > band.ceiling {
+            return Err(ClockError::PhaseBeyondTruthBand {
+                phase: self.phase,
+                ceiling: band.ceiling,
+            });
+        }
+
         let before = self.phase;
         let elapsed_ms = elapsed_ms.min(self.policy.max_step_ms);
-        let band = truth_band(modulation.anchor);
-        debug_assert_eq!(band.floor, modulation.reveal_floor);
 
         let mode = if self.phase < band.floor {
             self.phase = advance_toward(
@@ -190,13 +248,14 @@ impl ElasticVisualClock {
             ClockMode::Hold
         };
 
+        self.last_anchor = Some(modulation.anchor);
         debug_assert!(self.phase >= before);
         debug_assert!(self.phase <= band.ceiling);
-        ClockAdvance {
+        Ok(ClockAdvance {
             before,
             after: self.phase,
             mode,
-        }
+        })
     }
 }
 
@@ -266,12 +325,12 @@ mod tests {
     #[test]
     fn factual_jump_catches_up_monotonically_without_overshoot() {
         let policy = VisualClockPolicy::default();
-        let mut clock = ElasticVisualClock::new(policy);
+        let mut clock = ElasticVisualClock::new(policy).unwrap();
         let target = modulation(SemanticBootAnchor::GraphicsPhase, BootHealth::Normal);
 
         let mut previous = 0;
         for _ in 0..64 {
-            let step = clock.advance_ms(16, &target);
+            let step = clock.advance_ms(16, &target).unwrap();
             assert!(step.after >= previous);
             assert!(step.after <= target.reveal_floor);
             previous = step.after;
@@ -287,11 +346,15 @@ mod tests {
         let anchor = SemanticBootAnchor::NetworkPhase;
         let target = modulation(anchor, BootHealth::Normal);
         let band = truth_band(anchor);
-        let mut clock =
-            ElasticVisualClock::from_phase(target.reveal_floor, VisualClockPolicy::default());
+        let mut clock = ElasticVisualClock::from_phase(
+            anchor,
+            target.reveal_floor,
+            VisualClockPolicy::default(),
+        )
+        .unwrap();
 
         for _ in 0..1_000 {
-            clock.advance_ms(50, &target);
+            clock.advance_ms(50, &target).unwrap();
         }
         assert_eq!(clock.phase(), band.ceiling);
     }
@@ -306,9 +369,13 @@ mod tests {
         ] {
             let anchor = SemanticBootAnchor::ServicesPhase;
             let target = modulation(anchor, health);
-            let mut clock =
-                ElasticVisualClock::from_phase(target.reveal_floor, VisualClockPolicy::default());
-            let step = clock.advance_ms(250, &target);
+            let mut clock = ElasticVisualClock::from_phase(
+                anchor,
+                target.reveal_floor,
+                VisualClockPolicy::default(),
+            )
+            .unwrap();
+            let step = clock.advance_ms(250, &target).unwrap();
             assert_eq!(step.mode, ClockMode::Hold);
             assert_eq!(step.before, step.after);
         }
@@ -318,30 +385,68 @@ mod tests {
     fn scheduling_gap_is_bounded_by_policy() {
         let policy = VisualClockPolicy::default();
         let target = modulation(SemanticBootAnchor::SessionPhase, BootHealth::Normal);
-        let mut long_gap = ElasticVisualClock::new(policy);
-        let mut bounded = ElasticVisualClock::new(policy);
+        let mut long_gap = ElasticVisualClock::new(policy).unwrap();
+        let mut bounded = ElasticVisualClock::new(policy).unwrap();
 
-        let long = long_gap.advance_ms(10_000, &target);
-        let short = bounded.advance_ms(policy.max_step_ms, &target);
+        let long = long_gap.advance_ms(10_000, &target).unwrap();
+        let short = bounded.advance_ms(policy.max_step_ms, &target).unwrap();
         assert_eq!(long.after, short.after);
     }
 
     #[test]
     fn ready_reaches_complete_without_conferring_host_authority() {
         let target = modulation(SemanticBootAnchor::SessionReady, BootHealth::Normal);
-        let mut clock =
-            ElasticVisualClock::from_phase(950_000, VisualClockPolicy::default());
+        let mut clock = ElasticVisualClock::from_phase(
+            SemanticBootAnchor::SessionReady,
+            950_000,
+            VisualClockPolicy::default(),
+        )
+        .unwrap();
         for _ in 0..10 {
-            clock.advance_ms(50, &target);
+            clock.advance_ms(50, &target).unwrap();
             if clock.phase() == REVEAL_SCALE {
                 break;
             }
         }
         assert_eq!(clock.phase(), REVEAL_SCALE);
-        let final_step = clock.advance_ms(16, &target);
+        let final_step = clock.advance_ms(16, &target).unwrap();
         assert_eq!(final_step.mode, ClockMode::Complete);
         assert!(target.handoff_ready);
         // `handoff_ready` remains a presentation fact; host lifecycle policy is
         // intentionally outside this crate.
+    }
+
+    #[test]
+    fn clock_rejects_regressed_or_mismatched_modulation() {
+        let mut clock = ElasticVisualClock::new(VisualClockPolicy::default()).unwrap();
+        let services = modulation(SemanticBootAnchor::ServicesPhase, BootHealth::Normal);
+        clock.advance_ms(16, &services).unwrap();
+
+        let network = modulation(SemanticBootAnchor::NetworkPhase, BootHealth::Normal);
+        assert!(matches!(
+            clock.advance_ms(16, &network),
+            Err(ClockError::AnchorRegressed { .. })
+        ));
+
+        let mut mismatched = services;
+        mismatched.reveal_floor += 1;
+        assert!(matches!(
+            clock.advance_ms(16, &mismatched),
+            Err(ClockError::RevealFloorMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn restored_phase_must_fit_declared_truth_band() {
+        let anchor = SemanticBootAnchor::NetworkPhase;
+        let band = truth_band(anchor);
+        assert!(matches!(
+            ElasticVisualClock::from_phase(
+                anchor,
+                band.ceiling + 1,
+                VisualClockPolicy::default()
+            ),
+            Err(ClockError::PhaseBeyondTruthBand { .. })
+        ));
     }
 }
