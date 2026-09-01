@@ -9,6 +9,8 @@
 //!
 //! A matching commitment establishes effect identity only. It does not establish
 //! authority, factual correctness, provenance, authentication, or owner freshness.
+//! `CognitiveEffectV1` is intentionally opaque: callers provide the actual legacy
+//! values through typed constructors and this crate computes every nested commitment.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -34,123 +36,146 @@ const EFFECT_ACTIVE_STATE_REPLACE: u8 = 4;
 const EFFECT_GOAL_ACTIVATE: u8 = 5;
 const EFFECT_AFFECT_SET: u8 = 6;
 
-/// Canonical v1 effect families needed by the first S0/S1/S2 shadow-runtime tranche.
+/// Read-only view of one legacy working-memory item across the current parallel arrays.
 ///
-/// Complex values such as HDC vectors, active owner state, and metadata maps enter
-/// as independently canonicalized [`Digest32`] commitments produced by this crate.
-/// Float-bearing fields are stored as IEEE bit patterns after the exact legacy
-/// computation has produced the value to be committed.
+/// This is ordinary effect-construction data, not authority or provenance. The
+/// canonical effect constructor immediately commits to the referenced content and
+/// metadata, so later mutation of the underlying structures cannot alter an already
+/// constructed effect.
+#[derive(Debug, Clone, Copy)]
+pub struct WorkingMemoryItemView<'a> {
+    /// HDC content stored in working memory.
+    pub content: &'a ContinuousHV,
+    /// Arrival tick stored in the parallel tick array.
+    pub arrival_tick: u64,
+    /// Legacy source classification stored with the item.
+    pub source: MemorySource,
+    /// Legacy verification bit stored with the item. This is not CogSec authority.
+    pub verified: bool,
+    /// Legacy metadata map stored with the item.
+    pub metadata: &'a HashMap<String, String>,
+}
+
+/// Canonical v1 cognitive effect.
+///
+/// The inner representation is private so external callers cannot bypass canonical
+/// HDC/metadata/owner-state commitment helpers by inserting arbitrary `Digest32`
+/// values. Construct effects only through the typed associated functions.
+///
+/// ```compile_fail
+/// use symthaea_cogsec_effects::CognitiveEffectV1;
+/// let _ = CognitiveEffectV1 {};
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CognitiveEffectV1 {
-    /// Admit one item into working memory without eviction.
+pub struct CognitiveEffectV1 {
+    kind: EffectKindV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum EffectKindV1 {
     WorkingMemoryAdmit {
-        /// Commitment to the admitted HDC content.
         item: Digest32,
-        /// Arrival tick stored in the parallel working-memory tick array.
         arrival_tick: u64,
-        /// Legacy source classification stored with the item.
         source: MemorySource,
-        /// Legacy verification flag stored with the item. This is not CogSec authority.
         verified: bool,
-        /// Commitment to the stored metadata map.
         metadata: Digest32,
-        /// Exact insertion index in the post-operation ordering rule.
         insertion_index: u64,
     },
-    /// Replace/evict one working-memory item while admitting another.
-    ///
-    /// This binds the actual parallel-array transition and the legacy eviction
-    /// buffer record. The separate graduation queue write remains its own
-    /// [`Self::GraduationEnqueue`] effect so admission/replacement never grants
-    /// persistence authority by implication.
     WorkingMemoryReplace {
-        /// Commitment to the admitted HDC content.
         admitted_item: Digest32,
-        /// Arrival tick stored for the admitted item.
         admitted_arrival_tick: u64,
-        /// Legacy source stored for the admitted item.
         admitted_source: MemorySource,
-        /// Legacy verification flag stored for the admitted item.
         admitted_verified: bool,
-        /// Commitment to the admitted item's metadata map.
         admitted_metadata: Digest32,
-        /// Exact insertion index for the admitted item.
         admitted_index: u64,
-        /// Commitment to the evicted HDC content.
         evicted_item: Digest32,
-        /// Arrival tick removed with the evicted item.
         evicted_arrival_tick: u64,
-        /// Exact `steps_survived` written to the legacy eviction buffer.
         evicted_steps_survived: u64,
-        /// Legacy source stored for the evicted item.
         evicted_source: MemorySource,
-        /// Legacy verification flag stored for the evicted item.
         evicted_verified: bool,
-        /// Commitment to the evicted item's metadata map.
         evicted_metadata: Digest32,
-        /// Exact index removed by the replacement.
         evicted_index: u64,
     },
-    /// Enqueue one graduation/persistence candidate.
     GraduationEnqueue {
-        /// Commitment to the queued HDC content.
         content: Digest32,
-        /// Exact queued label.
         label: String,
-        /// Legacy number of steps survived before graduation.
         steps_survived: u64,
-        /// IEEE-754 bits of the exact queued final activation.
         final_activation_bits: u64,
-        /// IEEE-754 bits of the exact queued Psi value.
         psi_bits: u64,
-        /// IEEE-754 bits of the exact queued coherence value.
         coherence_bits: u64,
-        /// Legacy source classification queued with the candidate.
         source: MemorySource,
-        /// Legacy verification flag queued with the candidate.
         is_verified: bool,
     },
-    /// Replace the complete active cognitive-state owner commitment.
-    ///
-    /// For the first hook these digests should come from [`active_state_digest_v1`],
-    /// which commits to both the full `LiquidHolocell` and `current_thought`.
     ActiveStateReplace {
-        /// Commitment to the complete pre-transition active owner state.
         before: Digest32,
-        /// Commitment to the complete resulting active owner state.
         after: Digest32,
     },
-    /// Append one exact goal record to the goal store.
     GoalActivate {
-        /// Exact generated goal identifier.
         goal_id: String,
-        /// Exact legacy goal description.
         description: String,
-        /// Commitment to the exact goal embedding.
         embedding: Digest32,
-        /// IEEE-754 bits of the exact stored priority.
         priority_bits: u32,
-        /// IEEE-754 bits of the exact stored progress.
         progress_bits: u32,
-        /// Exact stored active flag.
         is_active: bool,
     },
-    /// Apply one emotional-valence transition.
     AffectSet {
-        /// IEEE-754 bits of the valence before the transition.
         before_bits: u32,
-        /// IEEE-754 bits of the parsed input delta used by legacy code.
         delta_bits: u32,
-        /// IEEE-754 bits of the exact post-clamp result.
         after_bits: u32,
     },
 }
 
 impl CognitiveEffectV1 {
-    /// Build a graduation effect from the exact float values queued by legacy code.
+    /// Construct an exact working-memory admission without eviction.
+    pub fn working_memory_admit(item: WorkingMemoryItemView<'_>, insertion_index: u64) -> Self {
+        Self {
+            kind: EffectKindV1::WorkingMemoryAdmit {
+                item: continuous_hv_digest_v1(item.content),
+                arrival_tick: item.arrival_tick,
+                source: item.source,
+                verified: item.verified,
+                metadata: metadata_digest_v1(item.metadata),
+                insertion_index,
+            },
+        }
+    }
+
+    /// Construct an exact working-memory replacement/eviction effect.
+    ///
+    /// This binds the actual parallel-array transition and the legacy eviction
+    /// buffer record. The separate graduation queue write remains its own
+    /// [`Self::graduation_enqueue`] effect so replacement never grants persistence
+    /// authority by implication.
+    pub fn working_memory_replace(
+        admitted: WorkingMemoryItemView<'_>,
+        admitted_index: u64,
+        evicted: WorkingMemoryItemView<'_>,
+        evicted_index: u64,
+        evicted_steps_survived: u64,
+    ) -> Self {
+        Self {
+            kind: EffectKindV1::WorkingMemoryReplace {
+                admitted_item: continuous_hv_digest_v1(admitted.content),
+                admitted_arrival_tick: admitted.arrival_tick,
+                admitted_source: admitted.source,
+                admitted_verified: admitted.verified,
+                admitted_metadata: metadata_digest_v1(admitted.metadata),
+                admitted_index,
+                evicted_item: continuous_hv_digest_v1(evicted.content),
+                evicted_arrival_tick: evicted.arrival_tick,
+                evicted_steps_survived,
+                evicted_source: evicted.source,
+                evicted_verified: evicted.verified,
+                evicted_metadata: metadata_digest_v1(evicted.metadata),
+                evicted_index,
+            },
+        }
+    }
+
+    /// Build a graduation effect from the exact values queued by legacy code.
     #[allow(clippy::too_many_arguments)]
     pub fn graduation_enqueue(
-        content: Digest32,
+        content: &ContinuousHV,
         label: impl Into<String>,
         steps_survived: u64,
         final_activation: f64,
@@ -159,28 +184,36 @@ impl CognitiveEffectV1 {
         source: MemorySource,
         is_verified: bool,
     ) -> Self {
-        Self::GraduationEnqueue {
-            content,
-            label: label.into(),
-            steps_survived,
-            final_activation_bits: final_activation.to_bits(),
-            psi_bits: psi.to_bits(),
-            coherence_bits: coherence.to_bits(),
-            source,
-            is_verified,
+        Self {
+            kind: EffectKindV1::GraduationEnqueue {
+                content: continuous_hv_digest_v1(content),
+                label: label.into(),
+                steps_survived,
+                final_activation_bits: final_activation.to_bits(),
+                psi_bits: psi.to_bits(),
+                coherence_bits: coherence.to_bits(),
+                source,
+                is_verified,
+            },
         }
     }
 
     /// Build an active-state replacement from the exact complete owner states.
+    ///
+    /// The owner commitment includes the full `LiquidHolocell` and the separately
+    /// stored `current_thought`, preventing an accidental divergence between those
+    /// two legacy writes from sharing an effect identity.
     pub fn active_state_replace(
         before_holocell: &LiquidHolocell,
         before_current_thought: &ContinuousHV,
         after_holocell: &LiquidHolocell,
         after_current_thought: &ContinuousHV,
     ) -> Self {
-        Self::ActiveStateReplace {
-            before: active_state_digest_v1(before_holocell, before_current_thought),
-            after: active_state_digest_v1(after_holocell, after_current_thought),
+        Self {
+            kind: EffectKindV1::ActiveStateReplace {
+                before: active_state_digest_v1(before_holocell, before_current_thought),
+                after: active_state_digest_v1(after_holocell, after_current_thought),
+            },
         }
     }
 
@@ -188,27 +221,31 @@ impl CognitiveEffectV1 {
     pub fn goal_activate(
         goal_id: impl Into<String>,
         description: impl Into<String>,
-        embedding: Digest32,
+        embedding: &ContinuousHV,
         priority: f32,
         progress: f32,
         is_active: bool,
     ) -> Self {
-        Self::GoalActivate {
-            goal_id: goal_id.into(),
-            description: description.into(),
-            embedding,
-            priority_bits: priority.to_bits(),
-            progress_bits: progress.to_bits(),
-            is_active,
+        Self {
+            kind: EffectKindV1::GoalActivate {
+                goal_id: goal_id.into(),
+                description: description.into(),
+                embedding: continuous_hv_digest_v1(embedding),
+                priority_bits: priority.to_bits(),
+                progress_bits: progress.to_bits(),
+                is_active,
+            },
         }
     }
 
     /// Build an affect transition from the exact legacy before/delta/after values.
     pub fn affect_set(before: f32, delta: f32, after: f32) -> Self {
-        Self::AffectSet {
-            before_bits: before.to_bits(),
-            delta_bits: delta.to_bits(),
-            after_bits: after.to_bits(),
+        Self {
+            kind: EffectKindV1::AffectSet {
+                before_bits: before.to_bits(),
+                delta_bits: delta.to_bits(),
+                after_bits: after.to_bits(),
+            },
         }
     }
 }
@@ -244,8 +281,8 @@ pub fn liquid_holocell_digest_v1(holocell: &LiquidHolocell) -> Digest32 {
 /// Commit to the complete first-hook active-state owner representation.
 ///
 /// `process_inputs()` mutates the `LiquidHolocell` and then copies its state into
-/// `current_thought`. Both writes are committed so an accidental divergence
-/// between those fields cannot share an effect identity.
+/// `current_thought`. Both writes are committed so a mismatch cannot be hidden by
+/// committing to only one field.
 pub fn active_state_digest_v1(
     holocell: &LiquidHolocell,
     current_thought: &ContinuousHV,
@@ -277,8 +314,8 @@ pub fn metadata_digest_v1(metadata: &HashMap<String, String>) -> Digest32 {
 /// Return the exact canonical v1 byte representation of one cognitive effect.
 pub fn canonical_effect_bytes_v1(effect: &CognitiveEffectV1) -> Vec<u8> {
     let mut out = CanonicalWriter::with_domain(EFFECT_DOMAIN_V1);
-    match effect {
-        CognitiveEffectV1::WorkingMemoryAdmit {
+    match &effect.kind {
+        EffectKindV1::WorkingMemoryAdmit {
             item,
             arrival_tick,
             source,
@@ -294,7 +331,7 @@ pub fn canonical_effect_bytes_v1(effect: &CognitiveEffectV1) -> Vec<u8> {
             out.digest(*metadata);
             out.u64(*insertion_index);
         }
-        CognitiveEffectV1::WorkingMemoryReplace {
+        EffectKindV1::WorkingMemoryReplace {
             admitted_item,
             admitted_arrival_tick,
             admitted_source,
@@ -324,7 +361,7 @@ pub fn canonical_effect_bytes_v1(effect: &CognitiveEffectV1) -> Vec<u8> {
             out.digest(*evicted_metadata);
             out.u64(*evicted_index);
         }
-        CognitiveEffectV1::GraduationEnqueue {
+        EffectKindV1::GraduationEnqueue {
             content,
             label,
             steps_survived,
@@ -344,12 +381,12 @@ pub fn canonical_effect_bytes_v1(effect: &CognitiveEffectV1) -> Vec<u8> {
             out.u8(memory_source_code(*source));
             out.bool(*is_verified);
         }
-        CognitiveEffectV1::ActiveStateReplace { before, after } => {
+        EffectKindV1::ActiveStateReplace { before, after } => {
             out.u8(EFFECT_ACTIVE_STATE_REPLACE);
             out.digest(*before);
             out.digest(*after);
         }
-        CognitiveEffectV1::GoalActivate {
+        EffectKindV1::GoalActivate {
             goal_id,
             description,
             embedding,
@@ -365,7 +402,7 @@ pub fn canonical_effect_bytes_v1(effect: &CognitiveEffectV1) -> Vec<u8> {
             out.u32(*progress_bits);
             out.bool(*is_active);
         }
-        CognitiveEffectV1::AffectSet {
+        EffectKindV1::AffectSet {
             before_bits,
             delta_bits,
             after_bits,
@@ -460,37 +497,16 @@ impl CanonicalWriter {
 mod tests {
     use super::*;
 
-    fn d(byte: u8) -> Digest32 {
-        Digest32([byte; 32])
+    fn metadata(topic: &str) -> HashMap<String, String> {
+        HashMap::from([("topic".to_string(), topic.to_string())])
     }
 
-    fn admit() -> CognitiveEffectV1 {
-        CognitiveEffectV1::WorkingMemoryAdmit {
-            item: d(1),
-            arrival_tick: 7,
-            source: MemorySource::UserInteraction,
-            verified: false,
-            metadata: d(2),
-            insertion_index: 3,
-        }
+    fn admitted_hv() -> ContinuousHV {
+        ContinuousHV::from_values(vec![0.1, -0.2, 0.3])
     }
 
-    fn replacement() -> CognitiveEffectV1 {
-        CognitiveEffectV1::WorkingMemoryReplace {
-            admitted_item: d(1),
-            admitted_arrival_tick: 11,
-            admitted_source: MemorySource::UserInteraction,
-            admitted_verified: false,
-            admitted_metadata: d(2),
-            admitted_index: 3,
-            evicted_item: d(9),
-            evicted_arrival_tick: 4,
-            evicted_steps_survived: 7,
-            evicted_source: MemorySource::Internal,
-            evicted_verified: false,
-            evicted_metadata: d(8),
-            evicted_index: 0,
-        }
+    fn evicted_hv() -> ContinuousHV {
+        ContinuousHV::from_values(vec![-0.4, 0.5, -0.6])
     }
 
     #[test]
@@ -577,20 +593,64 @@ mod tests {
 
     #[test]
     fn admit_and_replace_are_domain_distinct() {
-        assert_ne!(effect_digest_v1(&admit()), effect_digest_v1(&replacement()));
+        let admitted = admitted_hv();
+        let evicted = evicted_hv();
+        let admitted_metadata = metadata("new");
+        let evicted_metadata = metadata("old");
+        let item = WorkingMemoryItemView {
+            content: &admitted,
+            arrival_tick: 7,
+            source: MemorySource::UserInteraction,
+            verified: false,
+            metadata: &admitted_metadata,
+        };
+        let old = WorkingMemoryItemView {
+            content: &evicted,
+            arrival_tick: 2,
+            source: MemorySource::Internal,
+            verified: false,
+            metadata: &evicted_metadata,
+        };
+
+        let admit = CognitiveEffectV1::working_memory_admit(item, 3);
+        let replace = CognitiveEffectV1::working_memory_replace(item, 3, old, 0, 5);
+        assert_ne!(effect_digest_v1(&admit), effect_digest_v1(&replace));
     }
 
     #[test]
     fn working_memory_commitment_binds_arrival_tick_and_legacy_flags() {
-        let base = admit();
-        let mut tick_changed = base.clone();
-        if let CognitiveEffectV1::WorkingMemoryAdmit { arrival_tick, .. } = &mut tick_changed {
-            *arrival_tick += 1;
-        }
-        let mut verified_changed = base.clone();
-        if let CognitiveEffectV1::WorkingMemoryAdmit { verified, .. } = &mut verified_changed {
-            *verified = true;
-        }
+        let content = admitted_hv();
+        let meta = metadata("new");
+        let base = CognitiveEffectV1::working_memory_admit(
+            WorkingMemoryItemView {
+                content: &content,
+                arrival_tick: 7,
+                source: MemorySource::UserInteraction,
+                verified: false,
+                metadata: &meta,
+            },
+            3,
+        );
+        let tick_changed = CognitiveEffectV1::working_memory_admit(
+            WorkingMemoryItemView {
+                content: &content,
+                arrival_tick: 8,
+                source: MemorySource::UserInteraction,
+                verified: false,
+                metadata: &meta,
+            },
+            3,
+        );
+        let verified_changed = CognitiveEffectV1::working_memory_admit(
+            WorkingMemoryItemView {
+                content: &content,
+                arrival_tick: 7,
+                source: MemorySource::UserInteraction,
+                verified: true,
+                metadata: &meta,
+            },
+            3,
+        );
 
         assert_ne!(effect_digest_v1(&base), effect_digest_v1(&tick_changed));
         assert_ne!(effect_digest_v1(&base), effect_digest_v1(&verified_changed));
@@ -598,19 +658,35 @@ mod tests {
 
     #[test]
     fn replacement_binds_exact_eviction_target_and_timing() {
-        let base = replacement();
-        let mut target_changed = base.clone();
-        if let CognitiveEffectV1::WorkingMemoryReplace { evicted_item, .. } = &mut target_changed {
-            *evicted_item = d(10);
-        }
-        let mut timing_changed = base.clone();
-        if let CognitiveEffectV1::WorkingMemoryReplace {
-            evicted_steps_survived,
-            ..
-        } = &mut timing_changed
-        {
-            *evicted_steps_survived += 1;
-        }
+        let admitted = admitted_hv();
+        let evicted = evicted_hv();
+        let alternate_evicted = ContinuousHV::from_values(vec![-0.4, 0.5, -0.7]);
+        let admitted_metadata = metadata("new");
+        let evicted_metadata = metadata("old");
+        let new_item = WorkingMemoryItemView {
+            content: &admitted,
+            arrival_tick: 11,
+            source: MemorySource::UserInteraction,
+            verified: false,
+            metadata: &admitted_metadata,
+        };
+        let old_item = WorkingMemoryItemView {
+            content: &evicted,
+            arrival_tick: 4,
+            source: MemorySource::Internal,
+            verified: false,
+            metadata: &evicted_metadata,
+        };
+        let alternate_old = WorkingMemoryItemView {
+            content: &alternate_evicted,
+            ..old_item
+        };
+
+        let base = CognitiveEffectV1::working_memory_replace(new_item, 3, old_item, 0, 7);
+        let target_changed =
+            CognitiveEffectV1::working_memory_replace(new_item, 3, alternate_old, 0, 7);
+        let timing_changed =
+            CognitiveEffectV1::working_memory_replace(new_item, 3, old_item, 0, 8);
 
         assert_ne!(effect_digest_v1(&base), effect_digest_v1(&target_changed));
         assert_ne!(effect_digest_v1(&base), effect_digest_v1(&timing_changed));
@@ -618,8 +694,9 @@ mod tests {
 
     #[test]
     fn graduation_commitment_binds_label_float_source_and_verification() {
+        let content = admitted_hv();
         let base = CognitiveEffectV1::graduation_enqueue(
-            d(3),
+            &content,
             "topic",
             5,
             0.5,
@@ -629,7 +706,7 @@ mod tests {
             false,
         );
         let label_changed = CognitiveEffectV1::graduation_enqueue(
-            d(3),
+            &content,
             "other",
             5,
             0.5,
@@ -639,7 +716,7 @@ mod tests {
             false,
         );
         let psi_changed = CognitiveEffectV1::graduation_enqueue(
-            d(3),
+            &content,
             "topic",
             5,
             0.5,
@@ -649,7 +726,7 @@ mod tests {
             false,
         );
         let source_changed = CognitiveEffectV1::graduation_enqueue(
-            d(3),
+            &content,
             "topic",
             5,
             0.5,
@@ -659,7 +736,7 @@ mod tests {
             false,
         );
         let verified_changed = CognitiveEffectV1::graduation_enqueue(
-            d(3),
+            &content,
             "topic",
             5,
             0.5,
@@ -677,10 +754,11 @@ mod tests {
 
     #[test]
     fn goal_commitment_binds_description_and_priority() {
+        let embedding = admitted_hv();
         let base = CognitiveEffectV1::goal_activate(
             "goal_0",
             "protect evidence",
-            d(4),
+            &embedding,
             0.8,
             0.0,
             true,
@@ -688,7 +766,7 @@ mod tests {
         let description_changed = CognitiveEffectV1::goal_activate(
             "goal_0",
             "rewrite evidence",
-            d(4),
+            &embedding,
             0.8,
             0.0,
             true,
@@ -696,7 +774,7 @@ mod tests {
         let priority_changed = CognitiveEffectV1::goal_activate(
             "goal_0",
             "protect evidence",
-            d(4),
+            &embedding,
             0.7,
             0.0,
             true,
@@ -715,28 +793,34 @@ mod tests {
 
     #[test]
     fn memory_source_has_stable_effect_discriminants() {
-        let internal = CognitiveEffectV1::WorkingMemoryAdmit {
-            item: d(1),
-            arrival_tick: 7,
-            source: MemorySource::Internal,
-            verified: false,
-            metadata: d(2),
-            insertion_index: 0,
-        };
-        let social = CognitiveEffectV1::WorkingMemoryAdmit {
-            item: d(1),
-            arrival_tick: 7,
-            source: MemorySource::Social,
-            verified: false,
-            metadata: d(2),
-            insertion_index: 0,
-        };
+        let content = admitted_hv();
+        let meta = metadata("x");
+        let internal = CognitiveEffectV1::working_memory_admit(
+            WorkingMemoryItemView {
+                content: &content,
+                arrival_tick: 7,
+                source: MemorySource::Internal,
+                verified: false,
+                metadata: &meta,
+            },
+            0,
+        );
+        let social = CognitiveEffectV1::working_memory_admit(
+            WorkingMemoryItemView {
+                content: &content,
+                arrival_tick: 7,
+                source: MemorySource::Social,
+                verified: false,
+                metadata: &meta,
+            },
+            0,
+        );
         assert_ne!(effect_digest_v1(&internal), effect_digest_v1(&social));
     }
 
     #[test]
     fn canonical_bytes_are_deterministic_for_same_effect() {
-        let effect = replacement();
+        let effect = CognitiveEffectV1::affect_set(0.2, 0.5, 0.35);
         assert_eq!(
             canonical_effect_bytes_v1(&effect),
             canonical_effect_bytes_v1(&effect)
@@ -745,11 +829,7 @@ mod tests {
 
     #[test]
     fn frozen_affect_test_vector_prevents_encoder_drift() {
-        let effect = CognitiveEffectV1::AffectSet {
-            before_bits: 0x3f80_0000,
-            delta_bits: 0xbf00_0000,
-            after_bits: 0x3f00_0000,
-        };
+        let effect = CognitiveEffectV1::affect_set(1.0, -0.5, 0.5);
         assert_eq!(
             effect_digest_v1(&effect),
             Digest32([
