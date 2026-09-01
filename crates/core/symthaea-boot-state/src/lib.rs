@@ -227,6 +227,17 @@ impl BootStateStore {
         self.ensure_dirs()?;
         let receipt: BootStateReceipt = read_json(&self.receipt_path())?
             .ok_or_else(|| format!("missing runtime receipt {}", self.receipt_path().display()))?;
+
+        // Validate authority before mutating lineage. A stale or mismatched
+        // health-gate invocation must never advance Last Known Good.
+        let mut state = self.load_state()?;
+        if state.active_generation.as_deref() != Some(generation) {
+            return Err(format!(
+                "refusing to bless generation {generation}; active generation is {:?}",
+                state.active_generation
+            ));
+        }
+
         let mut lineage = self.load_lineage()?;
         let genome = BootEcologyComposer::compose(&receipt, &lineage);
         lineage.record_outcome(
@@ -237,13 +248,6 @@ impl BootStateStore {
         );
         write_json_atomic(&self.lineage_path(), &lineage)?;
 
-        let mut state = self.load_state()?;
-        if state.active_generation.as_deref() != Some(generation) {
-            return Err(format!(
-                "refusing to bless generation {generation}; active generation is {:?}",
-                state.active_generation
-            ));
-        }
         state.last_boot_blessed = true;
         write_json_atomic(&self.state_path(), &state)?;
         Ok(lineage)
@@ -467,9 +471,13 @@ mod tests {
     }
 
     #[test]
-    fn refuses_to_bless_generation_other_than_active() {
+    fn refuses_to_bless_generation_other_than_active_without_mutating_lineage() {
         let store = temp_store("wrong-bless");
         store.prepare(&PrepareInput::minimal("generation-1")).unwrap();
+        let before = store.load_lineage().unwrap();
         assert!(store.bless("generation-2").is_err());
+        let after = store.load_lineage().unwrap();
+        assert_eq!(after, before);
+        assert!(!store.load_state().unwrap().last_boot_blessed);
     }
 }
