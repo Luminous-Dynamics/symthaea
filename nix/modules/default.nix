@@ -8,6 +8,7 @@
 #
 #   services.symthaea-boot.enable = true;               # Spore boot renderer (quicken-fb)
 #   services.symthaea-boot.observability.enable = true; # Explicit quiet/diagnostic presentation policy
+#   services.symthaea-boot.observer.enable = true;      # Structured systemd observer
 #   services.symthaea-dashboard.enable = true;          # Local web dashboard (Sacred Bridge)
 #   services.symthaea-recovery.enable = true;           # Ahimsa recovery timer
 #   services.symthaea-first-boot.enable = true;         # Auto-hardening on first boot
@@ -19,6 +20,7 @@
   imports = [
     ./quicken-fb.nix
     ./symthaea-boot-observability.nix
+    ./symthaea-boot-observer.nix
     ./symthaea-dashboard.nix
     ./recovery-timer.nix
     ./first-boot.nix
