@@ -36,6 +36,7 @@ Before exploratory execution, create a canonical manifest binding:
 - expected **structural relation class** where derivable from the candidate definitions;
 - numerical/equivalence tolerance contract;
 - minimum discrimination coverage requirement;
+- history-access discrimination obligations where applicable;
 - canonical SHA-256.
 
 This manifest does not predict which candidate will tell the more interesting scientific story. It predicts only whether the chosen experimental manipulations should make the formulas observationally separable.
@@ -60,6 +61,8 @@ For every confirmatory primary candidate `C` and every nuisance/simple baseline 
 Prefer multiple independent discriminator families when the claim is broad.
 
 If no such discriminator exists, the comparison is not identifiable and confirmatory claims of `C beyond B` are invalid regardless of observed numerical differences elsewhere.
+
+For any H1 replay-history candidate whose interpretation includes information beyond current native state, the baseline set must include at least one H0 current-native-state-only candidate and the scenario set must include a matched-complete-current-state history discriminator under `V02_HISTORY_STATE_SUFFICIENCY.md`.
 
 ## 5. Candidate equivalence classes
 
@@ -118,6 +121,23 @@ Match current burden or drive magnitude while changing already-observed trajecto
 
 Identical-prefix/divergent-future twins must leave every prefix-causal payload identical. This diagnoses information leakage; it must never be interpreted as candidate support.
 
+### D8 — history-access / state-sufficiency discrimination
+
+Construct scenarios with the same complete current native state/configuration and, where required, the same current input, but different prior histories.
+
+Use these to compare:
+
+- H0 current-native-state-only candidates;
+- H1 replayed-prefix-history candidates.
+
+If H1 differs while H0 is invariant, the result shows that historical trace information helps the **external observatory** beyond the matched current state.
+
+It does not establish native memory or endogenous persistence.
+
+Separately require restart equivalence: matched native state/configuration plus identical future inputs should produce identical native future execution under the v0.1 deterministic contract.
+
+A failure there is a native state-sufficiency problem, not evidence that the external candidate discovered mood.
+
 ## 7. Design-matrix coverage
 
 Treat the finite exploratory candidate set and finite scenario set as a deterministic experimental design matrix.
@@ -128,6 +148,7 @@ The design review should ask:
 
 - does every factor axis have at least one isolating manipulation?
 - is every primary-vs-baseline comparison identifiable?
+- are H1 history candidates distinguishable from H0 current-state baselines under matched-state histories?
 - are any candidates algebraically redundant under all locked scenarios?
 - do multiple scenarios test the same distinction while leaving another factor untested?
 - is a purportedly rich candidate only distinguishable because of a nuisance difference?
@@ -141,11 +162,12 @@ When two candidates are observationally equivalent under the locked design, v0.2
 A prospective model-selection rule may prefer, in order:
 
 1. simpler information requirements;
-2. fewer free configuration choices;
-3. fewer temporal/forecast dependencies;
-4. greater prefix availability;
-5. stronger numerical stability;
-6. easier independent reproduction.
+2. current-native-state-only over replay-history dependence when predictive/explanatory performance is equivalent;
+3. fewer free configuration choices;
+4. fewer temporal/forecast dependencies;
+5. greater prefix availability;
+6. stronger numerical stability;
+7. easier independent reproduction.
 
 Any alternative complexity penalty must be prospectively defined.
 
@@ -175,6 +197,7 @@ Before confirmatory lock:
 - preserve the exploratory results for all candidates;
 - define equivalence classes;
 - choose at most the preregistered number of representatives under the prospective selection/parsimony rule;
+- classify any H1-over-H0 advantage as external-history information unless a later H2 native memory lineage exists;
 - freeze a new finite confirmatory candidate/baseline set;
 - do not choose representatives based on semantic/emotional intuitiveness.
 
@@ -192,8 +215,10 @@ The eventual observatory should mechanically test:
 6. tolerance-equivalent candidates use only prospectively declared tolerances;
 7. known algebraically equivalent fixture candidates are clustered correctly;
 8. known distinguishable fixture candidates are separated by their declared discriminators;
-9. candidate ranking cannot promote a pseudo-control to a scientific primary candidate;
-10. the realized evidence package preserves the full pairwise/equivalence report.
+9. H1-vs-H0 history/state obligations require matched-current-state discriminators;
+10. native restart-equivalence failures are reported separately from external-history candidate results;
+11. candidate ranking cannot promote a pseudo-control to a scientific primary candidate;
+12. the realized evidence package preserves the full pairwise/equivalence/history-access report.
 
 ## 12. Evidence-root consequence
 
@@ -203,6 +228,7 @@ The prospective root should bind:
 - discrimination-matrix contract/version;
 - finite exploratory/confirmatory candidate-set digest as appropriate;
 - pairwise baseline obligations;
+- history/state-sufficiency contract/version and required H0-vs-H1 obligations;
 - parsimony/model-selection rule identity.
 
 The realized package should bind:
@@ -210,12 +236,15 @@ The realized package should bind:
 - candidate fingerprint digests;
 - pairwise discrimination results;
 - equivalence-class report;
+- history-access/state-sufficiency report;
 - any `InsufficientDiscrimination` findings.
 
 A primary result cannot be `QualifiedSupportedResult` for a claim of superiority over baseline `B` if the locked design never made `C` vs `B` identifiable.
 
+A result also cannot claim native memory/persistence merely because an H1 candidate outperforms H0; that requires a later H2 native-memory lineage.
+
 ## 13. Claim boundary
 
-Identifiability testing can show that the experiment is capable of distinguishing competing regulatory explanations and can prevent redundant formulas from being overinterpreted.
+Identifiability testing can show that the experiment is capable of distinguishing competing regulatory explanations and can prevent redundant formulas from being overinterpreted. It can also show whether external historical information improves an observational candidate beyond current-native-state baselines.
 
-It does not establish that a distinguishable candidate is affect, emotion, subjective valence, mood, sentience, or consciousness.
+It does not establish that a distinguishable or history-sensitive candidate is affect, emotion, subjective valence, mood, native memory, sentience, or consciousness.
