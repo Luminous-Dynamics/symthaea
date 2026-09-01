@@ -18,6 +18,7 @@ from verify_vart_world_creative_001 import (
 )
 
 EXPERIMENT_ID = "VART-WORLD-CREATIVE-001"
+PAIR_POLICIES = {"full_symthaea", "random_valid", "heuristic"}
 ABLATION_CHANNELS = {
     "no_embodied_experience": "embodied_experience",
     "no_persistent_memory": "persistent_memory",
@@ -39,6 +40,77 @@ def walk_keys(value: Any) -> Iterable[str]:
             yield from walk_keys(child)
 
 
+def verify_decision_surface(trial_dir: Path, manifest: dict[str, Any]) -> str:
+    decision_sha = require_sha256(
+        manifest.get("decision_input_sha256"), "decision_input_sha256"
+    )
+    generated = manifest.get("generated_candidate_count")
+    admitted_count = manifest.get("admissible_candidate_count")
+    require(
+        isinstance(generated, int)
+        and generated > 0
+        and isinstance(admitted_count, int)
+        and 0 < admitted_count <= generated,
+        "MANIFEST_SCHEMA_INVALID",
+        f"{manifest['trial_id']}: generated/admitted candidate counts",
+    )
+    idx = read_json(trial_dir / "evidence_index.json")
+    decision_path = file_from_index(trial_dir, idx, "decision_input")
+    require(
+        sha256_file(decision_path) == decision_sha,
+        "EVIDENCE_DIGEST_MISMATCH",
+        f"{manifest['trial_id']}: decision input",
+    )
+    decision_input = read_json(decision_path)
+    require(
+        isinstance(decision_input, dict)
+        and decision_input.get("experiment_id") == EXPERIMENT_ID
+        and decision_input.get("paired_block_id") == manifest["paired_block_id"]
+        and decision_input.get("seed") == manifest["seed"]
+        and decision_input.get("revision_index") == manifest["revision_index"],
+        "PAIRED_BLOCK_IDENTITY_MISMATCH",
+        f"{manifest['trial_id']}: decision input identity",
+    )
+
+    candidate_path = file_from_index(trial_dir, idx, "candidate_set")
+    candidate_set = read_json(candidate_path)
+    candidates = candidate_set.get("candidates") if isinstance(candidate_set, dict) else None
+    require(
+        isinstance(candidates, list) and len(candidates) == generated,
+        "INCOMPLETE_EVIDENCE_CLOSURE",
+        f"{manifest['trial_id']}: rejected/generated candidates were truncated",
+    )
+    require(
+        all(
+            isinstance(candidate, dict)
+            and isinstance(candidate.get("physically_admitted"), bool)
+            for candidate in candidates
+        ),
+        "INCOMPLETE_EVIDENCE_CLOSURE",
+        f"{manifest['trial_id']}: candidate admission state missing",
+    )
+    actual_admitted = sum(1 for c in candidates if c["physically_admitted"])
+    require(
+        actual_admitted == admitted_count,
+        "INCOMPLETE_EVIDENCE_CLOSURE",
+        f"{manifest['trial_id']}: admitted candidate count mismatch",
+    )
+
+    if manifest.get("trial_state") == "complete":
+        receipt_path = file_from_index(trial_dir, idx, "applied_receipt")
+        receipt = read_json(receipt_path)
+        require(
+            isinstance(receipt, dict)
+            and receipt.get("decision_input_sha256") == decision_sha
+            and receipt.get("revision_hypothesis_sha256")
+            == manifest["revision_hypothesis_sha256"]
+            and receipt.get("candidate_set_sha256") == manifest["candidate_set_sha256"],
+            "PROSPECTIVE_BINDING_MISMATCH",
+            f"{manifest['trial_id']}: applied receipt did not bind prospective decision surface",
+        )
+    return decision_sha
+
+
 def verify_ablation_receipt(trial_dir: Path, manifest: dict[str, Any]) -> None:
     policy = manifest.get("policy")
     expected_channel = ABLATION_CHANNELS.get(policy)
@@ -57,25 +129,14 @@ def verify_ablation_receipt(trial_dir: Path, manifest: dict[str, Any]) -> None:
     )
     receipt = read_json(receipt_path)
     require(
-        isinstance(receipt, dict),
-        "ABLATION_SEMANTICS_MISMATCH",
-        f"{manifest['trial_id']}: receipt object",
-    )
-    require(
-        receipt.get("schema") == "symthaea.vart-world-creative-001.ablation-receipt.v1",
-        "ABLATION_SEMANTICS_MISMATCH",
-        f"{manifest['trial_id']}: receipt schema",
-    )
-    require(
-        receipt.get("experiment_id") == EXPERIMENT_ID,
-        "ABLATION_SEMANTICS_MISMATCH",
-        f"{manifest['trial_id']}: receipt experiment",
-    )
-    require(
-        receipt.get("trial_id") == manifest["trial_id"]
+        isinstance(receipt, dict)
+        and receipt.get("schema")
+        == "symthaea.vart-world-creative-001.ablation-receipt.v1"
+        and receipt.get("experiment_id") == EXPERIMENT_ID
+        and receipt.get("trial_id") == manifest["trial_id"]
         and receipt.get("policy") == policy,
         "ABLATION_SEMANTICS_MISMATCH",
-        f"{manifest['trial_id']}: receipt identity",
+        f"{manifest['trial_id']}: ablation receipt identity",
     )
     removed = receipt.get("removed_channels")
     require(
@@ -168,6 +229,7 @@ def verify_pilot(root: Path) -> dict[str, Any]:
     )
 
     ablation_trials = 0
+    by_block: dict[str, list[tuple[str, str]]] = {}
     for trial_id in trial_ids:
         trial_dir = root / "trials" / trial_id
         manifest = read_json(trial_dir / "manifest.json")
@@ -177,14 +239,35 @@ def verify_pilot(root: Path) -> dict[str, Any]:
             "PILOT_CONFIRMATORY_CONTAMINATION",
             trial_id,
         )
+        require(
+            manifest.get("trial_state") != "invalid_integrity"
+            and not (manifest.get("integrity_violations") or []),
+            "PILOT_INTEGRITY_FAILURE",
+            trial_id,
+        )
+        decision_sha = verify_decision_surface(trial_dir, manifest)
+        if manifest.get("policy") in PAIR_POLICIES:
+            by_block.setdefault(manifest["paired_block_id"], []).append(
+                (manifest["policy"], decision_sha)
+            )
         if manifest.get("policy") in ABLATION_CHANNELS:
             ablation_trials += 1
             verify_ablation_receipt(trial_dir, manifest)
+
+    for block_id, entries in by_block.items():
+        if len(entries) > 1:
+            require(
+                len({digest for _, digest in entries}) == 1,
+                "PAIRED_DECISION_INPUT_MISMATCH",
+                block_id,
+            )
 
     result = dict(result)
     result.update(
         {
             "pilot_ablation_semantics": "PASS",
+            "pilot_decision_surface_equality": "PASS",
+            "pilot_candidate_retention": "PASS",
             "ablation_trial_count": ablation_trials,
             "scientific_efficacy_claims_authorized": False,
             "confirmatory_execution_authorized": False,
@@ -216,7 +299,8 @@ def main() -> int:
     else:
         print(
             f"ACCEPT: {result['trial_count']} pilot trials; "
-            f"ablation semantics {result['pilot_ablation_semantics']}"
+            f"ablation semantics {result['pilot_ablation_semantics']}; "
+            f"decision surfaces {result['pilot_decision_surface_equality']}"
         )
     return 0
 
