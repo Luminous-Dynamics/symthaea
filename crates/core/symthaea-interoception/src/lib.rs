@@ -15,6 +15,7 @@ mod homeostasis;
 mod intervention;
 mod protocol;
 mod qualification;
+mod qualification_bundle;
 mod snapshot;
 mod state;
 mod study;
@@ -52,6 +53,9 @@ pub use protocol::{
 pub use qualification::{
     GateStatus, QualificationGateReceipt, QualificationReceipt, QUALIFICATION_RECEIPT_SCHEMA_VERSION,
     REQUIRED_QUALIFICATION_GATES,
+};
+pub use qualification_bundle::{
+    QualificationEvidenceBundle, QUALIFICATION_EVIDENCE_BUNDLE_SCHEMA_VERSION,
 };
 pub use snapshot::{
     AllostaticForecastSnapshot, InteroceptiveSnapshot, INTEROCEPTIVE_MODEL_SEMANTICS_VERSION,
