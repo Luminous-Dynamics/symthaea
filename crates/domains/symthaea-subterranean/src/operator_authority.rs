@@ -74,6 +74,21 @@ impl OperatorConstraint {
         }
     }
 
+    /// Whether `requested` may replace this constraint without going through the
+    /// dedicated recovery protocol.
+    ///
+    /// Ordinary operator commands are safety-monotonic: they may preserve or
+    /// increase restriction, but never widen authority. Mission changes are only
+    /// allowed while the current operator state is `None` or another mission.
+    /// `None` is recovery-only once any explicit operator state has been applied.
+    pub const fn can_replace_without_recovery(self, requested: Self) -> bool {
+        match requested {
+            Self::None => matches!(self, Self::None),
+            Self::Mission(_) => matches!(self, Self::None | Self::Mission(_)),
+            _ => requested.restrictiveness_rank() >= self.restrictiveness_rank(),
+        }
+    }
+
     pub const fn safety_floor(self) -> Option<MotorSafetyLevel> {
         match self {
             Self::EmergencyStop | Self::MaintenanceLock => Some(MotorSafetyLevel::Red),
@@ -131,6 +146,7 @@ pub enum OperatorAuthorityRejection {
     Replay,
     ConflictingProposal,
     PhysicalHazardActive,
+    WouldWeakenActiveConstraint,
 }
 
 impl From<OperatorCommandRejection> for OperatorAuthorityRejection {
@@ -234,6 +250,24 @@ impl OperatorAuthority {
             .retain(|_, pending| now_step <= pending.expires_step);
     }
 
+    fn apply_non_recovery_constraint(
+        &mut self,
+        requested: OperatorConstraint,
+        proposal_id: u64,
+    ) -> Result<OperatorDecision, OperatorAuthorityRejection> {
+        if !self.constraint.can_replace_without_recovery(requested) {
+            return self.reject(OperatorAuthorityRejection::WouldWeakenActiveConstraint);
+        }
+
+        // A fresh operator constraint invalidates approvals collected to clear an
+        // earlier state. This includes an idempotent repeated stop: a newly
+        // asserted stop must not inherit an older recovery quorum.
+        self.pending_resume.clear();
+        self.constraint = requested;
+        self.last_applied_proposal = Some(proposal_id);
+        Ok(OperatorDecision::Applied(requested))
+    }
+
     pub fn ingest(
         &mut self,
         envelope: OperatorCommandEnvelope,
@@ -248,31 +282,26 @@ impl OperatorAuthority {
         self.expire_pending(now_step);
 
         let decision = match envelope.command {
-            OperatorCommand::EmergencyStop => {
-                self.constraint = OperatorConstraint::EmergencyStop;
-                self.last_applied_proposal = Some(envelope.proposal_id);
-                OperatorDecision::Applied(self.constraint)
-            }
-            OperatorCommand::HoldPosition => {
-                self.constraint = OperatorConstraint::HoldPosition;
-                self.last_applied_proposal = Some(envelope.proposal_id);
-                OperatorDecision::Applied(self.constraint)
-            }
-            OperatorCommand::ReturnHome => {
-                self.constraint = OperatorConstraint::ReturnHome;
-                self.last_applied_proposal = Some(envelope.proposal_id);
-                OperatorDecision::Applied(self.constraint)
-            }
-            OperatorCommand::SetMission(intent) => {
-                self.constraint = OperatorConstraint::Mission(intent);
-                self.last_applied_proposal = Some(envelope.proposal_id);
-                OperatorDecision::Applied(self.constraint)
-            }
-            OperatorCommand::EnterMaintenance => {
-                self.constraint = OperatorConstraint::MaintenanceLock;
-                self.last_applied_proposal = Some(envelope.proposal_id);
-                OperatorDecision::Applied(self.constraint)
-            }
+            OperatorCommand::EmergencyStop => self.apply_non_recovery_constraint(
+                OperatorConstraint::EmergencyStop,
+                envelope.proposal_id,
+            )?,
+            OperatorCommand::HoldPosition => self.apply_non_recovery_constraint(
+                OperatorConstraint::HoldPosition,
+                envelope.proposal_id,
+            )?,
+            OperatorCommand::ReturnHome => self.apply_non_recovery_constraint(
+                OperatorConstraint::ReturnHome,
+                envelope.proposal_id,
+            )?,
+            OperatorCommand::SetMission(intent) => self.apply_non_recovery_constraint(
+                OperatorConstraint::Mission(intent),
+                envelope.proposal_id,
+            )?,
+            OperatorCommand::EnterMaintenance => self.apply_non_recovery_constraint(
+                OperatorConstraint::MaintenanceLock,
+                envelope.proposal_id,
+            )?,
             OperatorCommand::ResumeNominal => {
                 if !physical_hazard_clear {
                     return self.reject(OperatorAuthorityRejection::PhysicalHazardActive);
@@ -397,6 +426,139 @@ mod tests {
             result,
             Err(OperatorAuthorityRejection::PhysicalHazardActive)
         );
+    }
+
+    #[test]
+    fn emergency_stop_cannot_be_weakened_by_ordinary_commands() {
+        let mut authority = OperatorAuthority::default();
+        authority
+            .ingest(command(1, 1, 1, OperatorCommand::EmergencyStop), 20, true)
+            .expect("stop is valid");
+
+        let weaker = [
+            OperatorCommand::HoldPosition,
+            OperatorCommand::ReturnHome,
+            OperatorCommand::SetMission(SubterraneanMissionIntent::Explore),
+            OperatorCommand::EnterMaintenance,
+        ];
+
+        for (index, requested) in weaker.into_iter().enumerate() {
+            let result = authority.ingest(
+                command(1, index as u64 + 2, index as u64 + 2, requested),
+                21 + index as u64,
+                true,
+            );
+            assert_eq!(
+                result,
+                Err(OperatorAuthorityRejection::WouldWeakenActiveConstraint)
+            );
+            assert_eq!(authority.constraint(), OperatorConstraint::EmergencyStop);
+        }
+    }
+
+    #[test]
+    fn stronger_non_recovery_constraint_is_allowed() {
+        let mut authority = OperatorAuthority::default();
+        authority
+            .ingest(command(1, 1, 1, OperatorCommand::ReturnHome), 20, true)
+            .expect("return is valid");
+        let decision = authority
+            .ingest(command(1, 2, 2, OperatorCommand::EmergencyStop), 21, true)
+            .expect("stronger stop must remain available");
+        assert_eq!(
+            decision,
+            OperatorDecision::Applied(OperatorConstraint::EmergencyStop)
+        );
+        assert_eq!(authority.constraint(), OperatorConstraint::EmergencyStop);
+    }
+
+    #[test]
+    fn mission_changes_remain_available_at_mission_level() {
+        let mut authority = OperatorAuthority::default();
+        authority
+            .ingest(
+                command(
+                    1,
+                    1,
+                    1,
+                    OperatorCommand::SetMission(SubterraneanMissionIntent::Explore),
+                ),
+                20,
+                true,
+            )
+            .expect("initial mission is valid");
+        let decision = authority
+            .ingest(
+                command(
+                    1,
+                    2,
+                    2,
+                    OperatorCommand::SetMission(SubterraneanMissionIntent::ProbeAhead),
+                ),
+                21,
+                true,
+            )
+            .expect("mission-level change is non-widening");
+        assert_eq!(
+            decision,
+            OperatorDecision::Applied(OperatorConstraint::Mission(
+                SubterraneanMissionIntent::ProbeAhead
+            ))
+        );
+    }
+
+    #[test]
+    fn new_restriction_invalidates_existing_resume_approvals() {
+        let mut authority = OperatorAuthority::default();
+        authority
+            .ingest(command(1, 1, 1, OperatorCommand::HoldPosition), 20, true)
+            .expect("hold is valid");
+        let first = authority
+            .ingest(command(1, 2, 9, OperatorCommand::ResumeNominal), 21, true)
+            .expect("first recovery approval is valid");
+        assert_eq!(
+            first,
+            OperatorDecision::PendingQuorum {
+                approvals: 1,
+                required: 2
+            }
+        );
+        assert_eq!(authority.pending_approvals(9), 1);
+
+        authority
+            .ingest(command(2, 1, 2, OperatorCommand::EmergencyStop), 22, true)
+            .expect("new emergency stop is valid");
+        assert_eq!(authority.pending_approvals(9), 0);
+
+        let stale_second = authority
+            .ingest(command(2, 2, 9, OperatorCommand::ResumeNominal), 23, true)
+            .expect("approval starts a fresh quorum after the new restriction");
+        assert_eq!(
+            stale_second,
+            OperatorDecision::PendingQuorum {
+                approvals: 1,
+                required: 2
+            }
+        );
+        assert_eq!(authority.constraint(), OperatorConstraint::EmergencyStop);
+    }
+
+    #[test]
+    fn repeated_emergency_stop_invalidates_pending_recovery() {
+        let mut authority = OperatorAuthority::default();
+        authority
+            .ingest(command(1, 1, 1, OperatorCommand::EmergencyStop), 20, true)
+            .expect("initial stop is valid");
+        authority
+            .ingest(command(1, 2, 9, OperatorCommand::ResumeNominal), 21, true)
+            .expect("first recovery approval is valid");
+        assert_eq!(authority.pending_approvals(9), 1);
+
+        authority
+            .ingest(command(2, 1, 2, OperatorCommand::EmergencyStop), 22, true)
+            .expect("reasserted stop is valid");
+        assert_eq!(authority.pending_approvals(9), 0);
+        assert_eq!(authority.constraint(), OperatorConstraint::EmergencyStop);
     }
 
     #[test]
