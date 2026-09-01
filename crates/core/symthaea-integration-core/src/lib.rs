@@ -18,6 +18,7 @@
 
 pub mod conformance;
 pub mod identity;
+pub mod identity_provider;
 pub mod independence;
 pub mod limits;
 pub mod manifest;
@@ -35,6 +36,10 @@ pub use identity::{
     IdentifierStability, IdentifierUniqueness, IdentityClaim, IdentityClaimIndex,
     IdentityClaimSource, IdentityStrength, IdentityValidationError, ResolutionStatus,
     SeparationClaim, assess_entity_pair,
+};
+pub use identity_provider::{
+    IdentityAdmissionError, IdentityLimits, IdentityProvider, IdentityRequest,
+    IdentitySnapshot, IdentitySnapshotError,
 };
 pub use independence::{
     IndependenceAssessment, IndependenceAssessmentError, IndependenceMetadataConflict,
