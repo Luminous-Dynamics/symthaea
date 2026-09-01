@@ -9,7 +9,7 @@ use crate::manifest::IntegrationManifest;
 use crate::observation::{EntityRef, ObservationBatch};
 use crate::topology::DiscoverySnapshot;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
 use std::pin::Pin;
 
@@ -45,6 +45,11 @@ impl ObservationRequest {
                 "signal selectors may not contain empty strings".into(),
             ));
         }
+        if self.filters.keys().any(|key| key.trim().is_empty()) {
+            return Err(IntegrationError::InvalidRequest(
+                "observation filter keys may not be empty".into(),
+            ));
+        }
         Ok(())
     }
 }
@@ -59,6 +64,42 @@ pub struct DiscoveryRequest {
     pub entity_kinds: Vec<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub filters: BTreeMap<String, String>,
+}
+
+impl DiscoveryRequest {
+    pub fn validate(&self) -> Result<(), IntegrationError> {
+        if let Some(root) = &self.root {
+            if root.namespace.trim().is_empty()
+                || root.kind.trim().is_empty()
+                || root.id.trim().is_empty()
+            {
+                return Err(IntegrationError::InvalidRequest(
+                    "discovery root must contain non-empty namespace, kind, and id".into(),
+                ));
+            }
+        }
+
+        let mut kinds = BTreeSet::new();
+        for kind in &self.entity_kinds {
+            if kind.trim().is_empty() {
+                return Err(IntegrationError::InvalidRequest(
+                    "discovery entity-kind selectors may not contain empty strings".into(),
+                ));
+            }
+            if !kinds.insert(kind) {
+                return Err(IntegrationError::InvalidRequest(format!(
+                    "duplicate discovery entity-kind selector `{kind}`"
+                )));
+            }
+        }
+
+        if self.filters.keys().any(|key| key.trim().is_empty()) {
+            return Err(IntegrationError::InvalidRequest(
+                "discovery filter keys may not be empty".into(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -120,5 +161,18 @@ mod tests {
     #[test]
     fn empty_request_means_unrestricted_within_adapter_scope() {
         assert!(ObservationRequest::default().validate().is_ok());
+        assert!(DiscoveryRequest::default().validate().is_ok());
+    }
+
+    #[test]
+    fn duplicate_discovery_kind_is_rejected() {
+        let request = DiscoveryRequest {
+            entity_kinds: vec!["pod".into(), "pod".into()],
+            ..Default::default()
+        };
+        assert!(matches!(
+            request.validate(),
+            Err(IntegrationError::InvalidRequest(_))
+        ));
     }
 }
