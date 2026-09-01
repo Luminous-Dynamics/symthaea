@@ -4,15 +4,16 @@
 //!
 //! This keeps topology on the same trust path as observations and identity:
 //! the discoverer must already be registered, the request is validated, the
-//! returned integration identity must match the registry slot, and topology
-//! limits are applied independently of adapter code. Exhaustive/complete
-//! discovery is a separate named capability so partial replay cannot silently
-//! turn missing objects into negative evidence.
+//! returned integration identity must match the registry slot, declared entity
+//! kinds are enforced, and topology limits are applied independently of adapter
+//! code. Exhaustive/complete discovery is a separate named capability so
+//! partial replay cannot silently turn missing objects into negative evidence.
 
 use crate::{
     COMPLETE_DISCOVERY_CAPABILITY, DiscoveryRequest, DiscoverySnapshot, IntegrationError,
     IntegrationFuture, IntegrationId, IntegrationRegistry, TopologyLimits,
 };
+use std::collections::BTreeSet;
 
 impl IntegrationRegistry {
     /// Validate a discovery request against the registered adapter's declared
@@ -59,7 +60,12 @@ impl IntegrationRegistry {
         snapshot: &DiscoverySnapshot,
         limits: &TopologyLimits,
     ) -> Result<(), IntegrationError> {
-        validate_discovery_for_limits(id, snapshot, limits)
+        let manifest = self.manifest(id).ok_or_else(|| {
+            IntegrationError::Unsupported(format!(
+                "no registered integration manifest for topology source `{id}`"
+            ))
+        })?;
+        validate_discovery_for_limits(id, snapshot, limits, &manifest.entity_kinds)
     }
 
     /// Invoke a registered discoverer through the default topology admission
@@ -82,6 +88,10 @@ impl IntegrationRegistry {
         let request_admission = self.admit_discovery_request(id, &request);
         let discoverer = self.discoverer(id).cloned();
         let integration_id = id.clone();
+        let declared_entity_kinds = self
+            .manifest(id)
+            .map(|manifest| manifest.entity_kinds.clone())
+            .unwrap_or_default();
 
         Box::pin(async move {
             request_admission?;
@@ -91,7 +101,12 @@ impl IntegrationRegistry {
                 ))
             })?;
             let snapshot = discoverer.discover(request).await?;
-            validate_discovery_for_limits(&integration_id, &snapshot, &limits)?;
+            validate_discovery_for_limits(
+                &integration_id,
+                &snapshot,
+                &limits,
+                &declared_entity_kinds,
+            )?;
             Ok(snapshot)
         })
     }
@@ -101,12 +116,26 @@ fn validate_discovery_for_limits(
     id: &IntegrationId,
     snapshot: &DiscoverySnapshot,
     limits: &TopologyLimits,
+    declared_entity_kinds: &[String],
 ) -> Result<(), IntegrationError> {
     if snapshot.integration_id != id.as_str() {
         return Err(IntegrationError::InvalidOutput(format!(
             "discoverer `{id}` returned snapshot attributed to `{}`",
             snapshot.integration_id
         )));
+    }
+    let declared = declared_entity_kinds
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    for entity in &snapshot.entities {
+        if !declared.contains(entity.entity.kind.as_str()) {
+            return Err(IntegrationError::InvalidOutput(format!(
+                "integration `{id}` emitted undeclared topology entity kind `{}` for `{}`",
+                entity.entity.kind,
+                entity.entity.canonical_key()
+            )));
+        }
     }
     snapshot.validate_with_limits(limits).map_err(|error| {
         IntegrationError::InvalidOutput(format!(
@@ -254,6 +283,26 @@ mod tests {
         };
         assert!(matches!(
             registry.admit_discovery_snapshot(&IntegrationId::new("fixture-topology"), &wrong),
+            Err(IntegrationError::InvalidOutput(_))
+        ));
+    }
+
+    #[test]
+    fn undeclared_entity_kind_is_rejected() {
+        let mut registry = IntegrationRegistry::new();
+        registry.register_discoverer(integration(false)).unwrap();
+        let snapshot = DiscoverySnapshot {
+            integration_id: "fixture-topology".into(),
+            discovered_at_unix_ms: 1,
+            entities: vec![DiscoveredEntity {
+                entity: EntityRef::new("fixture", "database", "db-1"),
+                display_name: None,
+                attributes: BTreeMap::new(),
+            }],
+            relations: vec![],
+        };
+        assert!(matches!(
+            registry.admit_discovery_snapshot(&IntegrationId::new("fixture-topology"), &snapshot),
             Err(IntegrationError::InvalidOutput(_))
         ));
     }
