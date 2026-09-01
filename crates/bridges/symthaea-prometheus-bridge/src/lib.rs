@@ -13,24 +13,43 @@
 //! - explicit source/upstream lineage rather than treating every scrape as an
 //!   independent measurement;
 //! - non-finite Prometheus values (`NaN`, `+Inf`, `-Inf`) remain visible as
-//!   epistemically unknown observations rather than poisoning numeric state.
+//!   epistemically unknown observations rather than poisoning numeric state;
+//! - Prometheus target identity remains local by default. Cross-protocol
+//!   OpenTelemetry service identity is an explicit opt-in compatibility mode.
 
 #![forbid(unsafe_code)]
 
 use blake3::Hasher;
 use chrono::{TimeZone, Utc};
 use prometheus_parse::{Sample, Scrape, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use symthaea_integration_core::{
-    AccessMode, CapabilityClass, CapabilityDeclaration, EntityRef, IntegrationError,
-    IntegrationFuture, IntegrationId, IntegrationIdentity, IntegrationManifest, MaturityLevel,
-    ObservationBatch, ObservationEnvelope, ObservationId, ObservationKind, ObservationLineage,
-    ObservationQuality, ObservationRequest, ObservationSource, ObservationState, ObservationValue,
-    Observer, RiskClass, TransformStep, INTEGRATION_MANIFEST_SCHEMA_VERSION,
+    AccessMode, CapabilityClass, CapabilityDeclaration, EntityRef, ExternalIdentifier,
+    IdentifierStability, IdentifierUniqueness, IdentityClaim, IdentityClaimSource,
+    IdentityStrength, IntegrationError, IntegrationFuture, IntegrationId, IntegrationIdentity,
+    IntegrationManifest, MaturityLevel, ObservationBatch, ObservationEnvelope, ObservationId,
+    ObservationKind, ObservationLineage, ObservationQuality, ObservationRequest,
+    ObservationSource, ObservationState, ObservationValue, Observer, RiskClass, TransformStep,
+    INTEGRATION_MANIFEST_SCHEMA_VERSION,
 };
 
 pub const PROMETHEUS_INTEGRATION_ID: &str = "prometheus-text";
 pub const PROMETHEUS_OBSERVE_CAPABILITY: &str = "observe.prometheus.metrics";
+
+/// How Prometheus `job`/`instance` labels may be interpreted for entity identity.
+///
+/// `NativeTarget` is deliberately the default because ordinary Prometheus
+/// deployments do not guarantee OpenTelemetry service semantics. The
+/// `OtelPrometheusCompatibility` mode is only correct when the scrape labels are
+/// known to follow OpenTelemetry's Prometheus compatibility mapping:
+/// `job = service.namespace/service.name` (or just service.name) and
+/// `instance = service.instance.id`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PrometheusIdentityMapping {
+    #[default]
+    NativeTarget,
+    OtelPrometheusCompatibility,
+}
 
 /// Boundary context supplied by the collector/replay harness.
 ///
@@ -46,6 +65,7 @@ pub struct PrometheusFixtureContext {
     pub tenant: Option<String>,
     pub upstream_origin: Option<String>,
     pub source_confidence: f32,
+    pub identity_mapping: PrometheusIdentityMapping,
 }
 
 impl Default for PrometheusFixtureContext {
@@ -58,6 +78,7 @@ impl Default for PrometheusFixtureContext {
             tenant: None,
             upstream_origin: None,
             source_confidence: 0.9,
+            identity_mapping: PrometheusIdentityMapping::NativeTarget,
         }
     }
 }
@@ -68,6 +89,7 @@ pub struct PrometheusTextObserver {
     manifest: IntegrationManifest,
     context: PrometheusFixtureContext,
     batch: ObservationBatch,
+    identity_claims: Vec<IdentityClaim>,
 }
 
 impl PrometheusTextObserver {
@@ -104,12 +126,32 @@ impl PrometheusTextObserver {
             .map_err(|error| IntegrationError::Protocol(error.to_string()))?;
 
         let mut observations = Vec::new();
+        let mut identity_claims: BTreeMap<String, IdentityClaim> = BTreeMap::new();
         for sample in &scrape.samples {
-            observations.extend(sample_to_observations(
+            let sample_observations = sample_to_observations(
                 sample,
                 &context,
                 collected_at_unix_ms,
-            )?);
+            )?;
+            let evidence_ids: Vec<ObservationId> = sample_observations
+                .iter()
+                .map(|observation| observation.observation_id.clone())
+                .collect();
+            let labels: BTreeMap<String, String> = sample
+                .labels
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect();
+            let entity = entity_for_labels(&context, &labels);
+            let claim = identity_claim_for_target(
+                &context,
+                &labels,
+                entity,
+                collected_at_unix_ms,
+                evidence_ids,
+            )?;
+            merge_identity_claim(&mut identity_claims, claim)?;
+            observations.extend(sample_observations);
         }
 
         let batch = ObservationBatch {
@@ -121,10 +163,18 @@ impl PrometheusTextObserver {
             .validate()
             .map_err(|error| IntegrationError::InvalidOutput(error.to_string()))?;
 
+        let identity_claims: Vec<IdentityClaim> = identity_claims.into_values().collect();
+        for claim in &identity_claims {
+            claim
+                .validate()
+                .map_err(|error| IntegrationError::InvalidOutput(error.to_string()))?;
+        }
+
         Ok(Self {
             manifest: integration_manifest(),
             context,
             batch,
+            identity_claims,
         })
     }
 
@@ -134,6 +184,10 @@ impl PrometheusTextObserver {
 
     pub fn batch(&self) -> &ObservationBatch {
         &self.batch
+    }
+
+    pub fn identity_claims(&self) -> &[IdentityClaim] {
+        &self.identity_claims
     }
 
     /// Deterministic synchronous implementation used by tests and by the
@@ -442,6 +496,179 @@ fn entity_for_labels(
     EntityRef::new(&context.namespace, "prometheus_target", id)
 }
 
+fn identity_claim_for_target(
+    context: &PrometheusFixtureContext,
+    labels: &BTreeMap<String, String>,
+    subject: EntityRef,
+    collected_at_unix_ms: u64,
+    evidence_observation_ids: Vec<ObservationId>,
+) -> Result<IdentityClaim, IntegrationError> {
+    let (identifier, strength) = match context.identity_mapping {
+        PrometheusIdentityMapping::NativeTarget => {
+            native_target_identifier(context, labels, &subject)
+        }
+        PrometheusIdentityMapping::OtelPrometheusCompatibility => {
+            otel_compatibility_identifier(labels)
+                .map(|identifier| (identifier, IdentityStrength::Strong))
+                .unwrap_or_else(|| native_target_identifier(context, labels, &subject))
+        }
+    };
+
+    let identifier_key = identifier
+        .canonical_key()
+        .map_err(|error| IntegrationError::InvalidOutput(error.to_string()))?;
+    let scope_material = format!(
+        "{}|{}|{}|{}",
+        PROMETHEUS_INTEGRATION_ID,
+        context.scrape_id,
+        subject.canonical_key(),
+        identifier_key
+    );
+    let digest = blake3::hash(scope_material.as_bytes()).to_hex().to_string();
+    Ok(IdentityClaim {
+        claim_id: format!("prometheus-identity:{digest}"),
+        subject,
+        identifier,
+        strength,
+        source_confidence: normalized_confidence(context.source_confidence),
+        source: IdentityClaimSource {
+            integration_id: PROMETHEUS_INTEGRATION_ID.into(),
+            collector_id: context.collector_id.clone(),
+            tenant: context.tenant.clone(),
+        },
+        observed_at_unix_ms: collected_at_unix_ms,
+        valid_from_unix_ms: None,
+        valid_until_unix_ms: None,
+        evidence_observation_ids,
+    })
+}
+
+fn native_target_identifier(
+    context: &PrometheusFixtureContext,
+    labels: &BTreeMap<String, String>,
+    subject: &EntityRef,
+) -> (ExternalIdentifier, IdentityStrength) {
+    let target = labels
+        .get("instance")
+        .filter(|value| !value.trim().is_empty())
+        .cloned()
+        .unwrap_or_else(|| subject.id.clone());
+    let scope = format!(
+        "prometheus:{}:{}|{}:{}",
+        context.namespace.len(),
+        context.namespace,
+        context.scrape_id.len(),
+        context.scrape_id
+    );
+    (
+        ExternalIdentifier {
+            scheme: "prometheus.target".into(),
+            value: target,
+            scope: Some(scope),
+            uniqueness: IdentifierUniqueness::Scoped,
+            stability: IdentifierStability::Session,
+            case_sensitive: true,
+        },
+        IdentityStrength::Moderate,
+    )
+}
+
+fn otel_compatibility_identifier(
+    labels: &BTreeMap<String, String>,
+) -> Option<ExternalIdentifier> {
+    let job = labels
+        .get("job")
+        .map(String::as_str)
+        .filter(|value| !value.trim().is_empty())?;
+    let instance = labels
+        .get("instance")
+        .map(String::as_str)
+        .filter(|value| !value.trim().is_empty())?;
+    let (service_namespace, service_name) = invert_otel_prometheus_job(job)?;
+    Some(ExternalIdentifier {
+        scheme: "otel.service.instance.triplet".into(),
+        value: length_prefixed_triplet(service_namespace, service_name, instance),
+        scope: None,
+        uniqueness: IdentifierUniqueness::Global,
+        stability: IdentifierStability::Session,
+        case_sensitive: true,
+    })
+}
+
+/// Conservatively invert OpenTelemetry's Prometheus `job` mapping.
+///
+/// No slash means an empty service namespace. Exactly one slash maps to
+/// namespace/name. More than one slash is not losslessly invertible without
+/// additional metadata, so the caller must fall back to native target identity.
+fn invert_otel_prometheus_job(job: &str) -> Option<(&str, &str)> {
+    let slash_count = job.as_bytes().iter().filter(|byte| **byte == b'/').count();
+    match slash_count {
+        0 if !job.is_empty() => Some(("", job)),
+        1 => {
+            let (namespace, name) = job.split_once('/')?;
+            if namespace.is_empty() || name.is_empty() {
+                None
+            } else {
+                Some((namespace, name))
+            }
+        }
+        _ => None,
+    }
+}
+
+fn length_prefixed_triplet(first: &str, second: &str, third: &str) -> String {
+    format!(
+        "{}:{first}|{}:{second}|{}:{third}",
+        first.len(),
+        second.len(),
+        third.len()
+    )
+}
+
+fn merge_identity_claim(
+    claims: &mut BTreeMap<String, IdentityClaim>,
+    mut incoming: IdentityClaim,
+) -> Result<(), IntegrationError> {
+    let identifier_key = incoming
+        .identifier
+        .canonical_key()
+        .map_err(|error| IntegrationError::InvalidOutput(error.to_string()))?;
+    let key = format!("{}|{identifier_key}", incoming.subject.canonical_key());
+    match claims.get_mut(&key) {
+        None => {
+            incoming.evidence_observation_ids.sort();
+            incoming.evidence_observation_ids.dedup();
+            claims.insert(key, incoming);
+        }
+        Some(existing) => {
+            if existing.claim_id != incoming.claim_id
+                || existing.subject != incoming.subject
+                || existing.identifier != incoming.identifier
+                || existing.strength != incoming.strength
+                || existing.source != incoming.source
+            {
+                return Err(IntegrationError::InvalidOutput(
+                    "Prometheus identity claim collision has incompatible metadata".into(),
+                ));
+            }
+            existing.source_confidence = existing
+                .source_confidence
+                .min(incoming.source_confidence);
+            existing.observed_at_unix_ms = existing
+                .observed_at_unix_ms
+                .min(incoming.observed_at_unix_ms);
+            let mut evidence: BTreeSet<ObservationId> = existing
+                .evidence_observation_ids
+                .iter()
+                .cloned()
+                .collect();
+            evidence.extend(incoming.evidence_observation_ids);
+            existing.evidence_observation_ids = evidence.into_iter().collect();
+        }
+    }
+    Ok(())
+}
+
 fn sample_lineage_id(
     context: &PrometheusFixtureContext,
     sample: &Sample,
@@ -527,6 +754,7 @@ fn normalized_confidence(value: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_integration_core::{ResolutionStatus, assess_entity_pair};
 
     fn fixture() -> PrometheusTextObserver {
         let payload = r#"
@@ -545,6 +773,7 @@ process_resident_memory_bytes{instance="api-1:9100",job="api"} 12345
                 tenant: Some("tenant-a".into()),
                 upstream_origin: None,
                 source_confidence: 0.95,
+                identity_mapping: PrometheusIdentityMapping::NativeTarget,
             },
             payload,
             1_777_593_600_000,
@@ -570,6 +799,100 @@ process_resident_memory_bytes{instance="api-1:9100",job="api"} 12345
             .observations
             .iter()
             .all(|observation| observation.entity.id == "api-1:9100"));
+    }
+
+    #[test]
+    fn native_target_claim_deduplicates_across_metrics_and_keeps_evidence() {
+        let observer = fixture();
+        assert_eq!(observer.identity_claims().len(), 1);
+        let claim = &observer.identity_claims()[0];
+        assert_eq!(claim.identifier.scheme, "prometheus.target");
+        assert_eq!(claim.identifier.uniqueness, IdentifierUniqueness::Scoped);
+        assert_eq!(claim.strength, IdentityStrength::Moderate);
+        assert_eq!(claim.evidence_observation_ids.len(), 2);
+    }
+
+    #[test]
+    fn otel_compatibility_mode_emits_the_same_service_triplet_scheme() {
+        let observer = PrometheusTextObserver::from_text(
+            PrometheusFixtureContext {
+                identity_mapping: PrometheusIdentityMapping::OtelPrometheusCompatibility,
+                ..PrometheusFixtureContext::default()
+            },
+            "# TYPE up gauge\nup{job=\"shop/api\",instance=\"api-17\"} 1\n",
+            1_777_593_600_000,
+        )
+        .unwrap();
+        let claim = &observer.identity_claims()[0];
+        assert_eq!(claim.identifier.scheme, "otel.service.instance.triplet");
+        assert_eq!(claim.identifier.value, "4:shop|3:api|6:api-17");
+        assert_eq!(claim.identifier.uniqueness, IdentifierUniqueness::Global);
+        assert_eq!(claim.strength, IdentityStrength::Strong);
+    }
+
+    #[test]
+    fn malformed_compatibility_job_falls_back_to_native_identity() {
+        let observer = PrometheusTextObserver::from_text(
+            PrometheusFixtureContext {
+                identity_mapping: PrometheusIdentityMapping::OtelPrometheusCompatibility,
+                ..PrometheusFixtureContext::default()
+            },
+            "# TYPE up gauge\nup{job=\"too/many/slashes\",instance=\"api-17\"} 1\n",
+            1_777_593_600_000,
+        )
+        .unwrap();
+        assert_eq!(
+            observer.identity_claims()[0].identifier.scheme,
+            "prometheus.target"
+        );
+    }
+
+    #[test]
+    fn low_source_confidence_prevents_strong_cross_source_resolution() {
+        let observer = PrometheusTextObserver::from_text(
+            PrometheusFixtureContext {
+                source_confidence: 0.5,
+                identity_mapping: PrometheusIdentityMapping::OtelPrometheusCompatibility,
+                ..PrometheusFixtureContext::default()
+            },
+            "# TYPE up gauge\nup{job=\"shop/api\",instance=\"api-17\"} 1\n",
+            1_777_593_600_000,
+        )
+        .unwrap();
+        let prometheus_claim = observer.identity_claims()[0].clone();
+        let otlp_subject = EntityRef::new("otel", "service_instance", "otlp-api");
+        let otlp_claim = IdentityClaim {
+            claim_id: "otlp-claim".into(),
+            subject: otlp_subject.clone(),
+            identifier: ExternalIdentifier {
+                scheme: "otel.service.instance.triplet".into(),
+                value: "4:shop|3:api|6:api-17".into(),
+                scope: None,
+                uniqueness: IdentifierUniqueness::Global,
+                stability: IdentifierStability::Session,
+                case_sensitive: true,
+            },
+            strength: IdentityStrength::Strong,
+            source_confidence: 1.0,
+            source: IdentityClaimSource {
+                integration_id: "otlp-metrics".into(),
+                collector_id: None,
+                tenant: None,
+            },
+            observed_at_unix_ms: 1_777_593_600_000,
+            valid_from_unix_ms: None,
+            valid_until_unix_ms: None,
+            evidence_observation_ids: vec![],
+        };
+        let proposal = assess_entity_pair(
+            &prometheus_claim.subject,
+            &otlp_subject,
+            &[prometheus_claim, otlp_claim],
+            &[],
+            1_777_593_600_000,
+        )
+        .unwrap();
+        assert_eq!(proposal.status, ResolutionStatus::CandidateSame);
     }
 
     #[test]
@@ -602,6 +925,7 @@ process_resident_memory_bytes{instance="api-1:9100",job="api"} 12345
             .map(|observation| observation.observation_id.clone())
             .collect();
         assert_eq!(ids_a, ids_b);
+        assert_eq!(a.identity_claims(), b.identity_claims());
     }
 
     #[test]
@@ -620,5 +944,6 @@ process_resident_memory_bytes{instance="api-1:9100",job="api"} 12345
         )
         .unwrap();
         assert_eq!(reparsed.batch().observations[0].quality.source_confidence, 0.0);
+        assert_eq!(reparsed.identity_claims()[0].source_confidence, 0.0);
     }
 }
