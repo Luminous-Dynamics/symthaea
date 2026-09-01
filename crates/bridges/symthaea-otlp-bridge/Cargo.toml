@@ -9,3 +9,6 @@ description = "Read-only OTLP metrics replay bridge for the Symthaea infrastruct
 symthaea-integration-core = { path = "../../core/symthaea-integration-core" }
 opentelemetry-proto = { version = "0.32.0", default-features = false, features = ["gen-tonic-messages", "metrics"] }
 blake3 = { workspace = true }
+
+[dev-dependencies]
+symthaea-prometheus-bridge = { path = "../symthaea-prometheus-bridge" }
