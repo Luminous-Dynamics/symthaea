@@ -165,9 +165,6 @@ pub fn domain_state_from_active_state(active_state: &str) -> Option<DomainState>
     }
 }
 
-/// Normalize systemd JobRemoved results without pretending all job outcomes are
-/// boot failures. A successful result still requires an ActiveState query before
-/// it can be rendered as ready.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JobOutcome {
     QueryCurrentState,
@@ -184,9 +181,6 @@ pub fn classify_job_result(result: &str) -> JobOutcome {
     }
 }
 
-/// Once the configured boot-ready unit is authoritatively active, `Unknown`
-/// aggregate health can resolve to `Normal`. Existing delay/degradation/failure
-/// state is preserved.
 pub fn health_at_boot_ready(current: BootHealth) -> BootHealth {
     match current {
         BootHealth::Unknown => BootHealth::Normal,
