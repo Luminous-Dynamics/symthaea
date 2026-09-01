@@ -7,3 +7,8 @@ description = "Truth-preserving projection from Spore semantic boot frames into 
 
 [dependencies]
 symthaea-boot-presentation = { path = "../symthaea-boot-presentation" }
+
+[dev-dependencies]
+symthaea-boot-ecology-live = { path = "../symthaea-boot-ecology-live" }
+symthaea-boot-protocol = { path = "../symthaea-boot-protocol" }
+symthaea-boot-visual-clock = { path = "../symthaea-boot-visual-clock" }
