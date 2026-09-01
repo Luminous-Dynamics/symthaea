@@ -62,6 +62,17 @@ A low-opacity expanding projected ring moves through the ecology. State-sensitiv
 
 Sparse, extremely low-opacity scanline sheen can suggest a projected field on high-DPI displays. It must not become a retro CRT filter.
 
+### L6 — Fidelity pass (v0.3.2)
+
+The real live/preview path now adds a bounded CPU fidelity layer after holography:
+
+- thresholded quarter-resolution bloom;
+- deterministic focal spore membrane cells;
+- low-opacity volumetric-looking caustic arcs;
+- stage-aware highlight gain that fades before compositor handoff.
+
+See `SPORE_VISUAL_FIDELITY_V032.md` for the exact constraints and install-route ceremony work.
+
 ## Motion principles
 
 - Prefer slow coherent motion over noisy particle motion.
@@ -98,7 +109,7 @@ Installation should have its own visual grammar rather than reusing ordinary boo
 7. **Finalizing** — field geometry converges and the progress halo closes.
 8. **Complete** — the chamber dissolves into the first-boot Germination lineage.
 
-The current exact inoculation renderer represents this with a projected cylindrical field, orbital seals, module seeds, and a progress halo over the organic topology.
+The current exact inoculation renderer represents this with a projected cylindrical field, orbital seals, module seeds, and a progress halo over the organic topology. v0.3.2 additionally gives Web Portal, USB Forge, WSL2 Pivot, Asahi Handshake, LAN Inoculation, and Local Direct installation distinct bounded route signatures while preserving the same factual phase model.
 
 ## Lifecycle differentiation
 
@@ -130,23 +141,22 @@ Claims about machine consciousness, emotion, awakening, trauma, or sentience do 
 
 - CPU-only path remains available and is the canonical early-boot renderer.
 - Holographic effects are bounded analytic geometry, not unbounded particles.
+- Bloom works from a reusable 1/16-pixel-count workspace rather than a full-resolution multi-pass GPU pipeline.
 - No shader compiler, window system, cognitive runtime, network dependency, or external font stack is required for boot.
 - The display manager can terminate the renderer at any instant.
 - Exact preview uses the same presentation wrapper as the live DRM path.
-- CI must render both boot lifecycle and inoculation galleries from exact pixels before physical-host enablement.
+- CI must render boot lifecycle, shared inoculation phases, and install-route ceremony galleries from exact pixels before physical-host enablement.
 
 ## Future visual tranches
 
-After v0.3.1 is verified, candidate additions are:
+After v0.3.2 is verified, candidate additions are:
 
 - signed-distance-field microtype for sparse factual labels
 - double-buffered DRM page flips for cleaner motion
 - temporal supersampling / inexpensive anti-aliasing
-- depth-aware bloom pass with a strict CPU budget
 - curved field ribbons derived from topology density
-- spore membrane tessellation / Voronoi shell detail
-- deterministic volumetric-looking caustics
-- continuity between shutdown contraction and next boot germination
-- installer-to-first-boot visual handoff using the same morphology lineage
+- shutdown-to-next-boot morphology continuity
+- compositor/greeter continuation of the same visual genome
+- accessibility profiles for reduced motion and reduced bloom
 
 Every addition should pass the same test: **does this reveal the state and identity of the system more beautifully, or is it merely decoration?**
