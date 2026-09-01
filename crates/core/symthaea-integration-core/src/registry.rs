@@ -10,7 +10,8 @@
 //! adapter code.
 
 use crate::identity_provider::{
-    IdentityLimits, IdentityProvider, IdentityRequest, IdentitySnapshot,
+    IDENTITY_DISCOVERY_CAPABILITY, IdentityLimits, IdentityProvider, IdentityRequest,
+    IdentitySnapshot,
 };
 use crate::limits::ObservationLimits;
 use crate::manifest::{
@@ -132,6 +133,12 @@ impl IntegrationRegistry {
     ) -> Result<(), RegistryError> {
         let manifest = provider.manifest().clone();
         self.admit_manifest(&manifest, CapabilityClass::Discover)?;
+        if !manifest.declares(IDENTITY_DISCOVERY_CAPABILITY) {
+            return Err(RegistryError::MissingNamedCapability {
+                integration: manifest.id.clone(),
+                capability: IDENTITY_DISCOVERY_CAPABILITY,
+            });
+        }
         let id = manifest.id.clone();
 
         if self.identity_providers.contains_key(&id) {
@@ -317,6 +324,11 @@ pub enum RegistryError {
         integration: IntegrationId,
         role: CapabilityClass,
     },
+    #[error("integration `{integration}` does not declare required capability `{capability}`")]
+    MissingNamedCapability {
+        integration: IntegrationId,
+        capability: &'static str,
+    },
     #[error("integration `{integration}` attempted to register conflicting manifests")]
     ManifestCollision { integration: IntegrationId },
     #[error("integration `{integration}` already has a registered {role:?} implementation")]
@@ -498,6 +510,18 @@ mod tests {
         }
     }
 
+    fn identity_manifest(classes: &[CapabilityClass]) -> IntegrationManifest {
+        let mut manifest = manifest(classes);
+        if let Some(capability) = manifest
+            .capabilities
+            .iter_mut()
+            .find(|capability| capability.class == CapabilityClass::Discover)
+        {
+            capability.name = IDENTITY_DISCOVERY_CAPABILITY.into();
+        }
+        manifest
+    }
+
     #[test]
     fn observer_requires_observe_capability() {
         let integration = Arc::new(FixtureIntegration {
@@ -529,9 +553,24 @@ mod tests {
     }
 
     #[test]
+    fn generic_discovery_cannot_masquerade_as_identity_provider() {
+        let integration = Arc::new(FixtureIntegration {
+            manifest: manifest(&[CapabilityClass::Discover]),
+        });
+        let mut registry = IntegrationRegistry::new();
+        assert!(matches!(
+            registry.register_identity_provider(integration),
+            Err(RegistryError::MissingNamedCapability {
+                capability: IDENTITY_DISCOVERY_CAPABILITY,
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn same_manifest_can_register_observe_discover_and_identity_roles() {
         let integration = Arc::new(FixtureIntegration {
-            manifest: manifest(&[CapabilityClass::Observe, CapabilityClass::Discover]),
+            manifest: identity_manifest(&[CapabilityClass::Observe, CapabilityClass::Discover]),
         });
         let mut registry = IntegrationRegistry::new();
         registry.register_observer(integration.clone()).unwrap();
@@ -560,9 +599,10 @@ mod tests {
     #[test]
     fn conflicting_manifest_for_same_id_is_rejected() {
         let first = Arc::new(FixtureIntegration {
-            manifest: manifest(&[CapabilityClass::Observe, CapabilityClass::Discover]),
+            manifest: identity_manifest(&[CapabilityClass::Observe, CapabilityClass::Discover]),
         });
-        let mut second_manifest = manifest(&[CapabilityClass::Observe, CapabilityClass::Discover]);
+        let mut second_manifest =
+            identity_manifest(&[CapabilityClass::Observe, CapabilityClass::Discover]);
         second_manifest.version = "0.2.0".into();
         let second = Arc::new(FixtureIntegration {
             manifest: second_manifest,
