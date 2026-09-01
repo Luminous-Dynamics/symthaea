@@ -48,6 +48,8 @@
     "revision_index": {"type": "integer", "minimum": 0},
     "world_version_before": {"type": "string", "minLength": 1},
     "execution_context_sha256": {"$ref": "#/$defs/sha256"},
+    "world_state_before_sha256": {"$ref": "#/$defs/sha256"},
+    "world_state_after_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
     "decision_input_sha256": {"$ref": "#/$defs/sha256"},
     "experience_episode_sha256": {"$ref": "#/$defs/sha256"},
     "revision_hypothesis_sha256": {"$ref": "#/$defs/sha256"},
@@ -58,6 +60,7 @@
     "selection_index": {"type": "integer", "minimum": 0},
     "random_draw_receipt_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
     "ablation_receipt_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "calibration_receipt_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
     "applied_receipt_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
     "world_version_after": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
     "revisit_observation_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
@@ -90,7 +93,19 @@
           }
         }
       },
-      "then": {"required": ["execution_context_sha256"]}
+      "then": {"required": ["execution_context_sha256", "world_state_before_sha256"]}
+    },
+    {
+      "if": {
+        "properties": {
+          "campaign": {
+            "enum": ["confirmatory_longitudinal", "confirmatory_generalization", "confirmatory_adversarial"]
+          },
+          "trial_state": {"const": "complete"}
+        },
+        "required": ["campaign", "trial_state"]
+      },
+      "then": {"required": ["world_state_after_sha256", "calibration_receipt_sha256"]}
     },
     {
       "if": {"properties": {"policy": {"const": "random_valid"}}},
