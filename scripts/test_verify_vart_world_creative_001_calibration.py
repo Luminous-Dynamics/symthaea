@@ -5,15 +5,14 @@ import math
 import tempfile
 from pathlib import Path
 
+import test_verify_vart_world_creative_001_identity as i
 import test_verify_vart_world_creative_001_n1_n20 as n
-import test_verify_vart_world_creative_001_state as s
 import verify_vart_world_creative_001 as core
 import verify_vart_world_creative_001_calibration as calibration_verify
 
 
 def augment_calibration(root: Path, trial_id: str, predicted: float, actual: float) -> None:
     trial_dir = n.tdir(root, trial_id)
-    manifest = n.load(n.manifest_path(root, trial_id))
 
     hypothesis_path = n.logical_path(root, trial_id, "revision_hypothesis")
     hypothesis = n.load(hypothesis_path)
@@ -64,7 +63,7 @@ def augment_calibration(root: Path, trial_id: str, predicted: float, actual: flo
 
 
 def build_calibration_bundle(root: Path) -> str:
-    s.build_state_bundle(root)
+    i.build_identity_bundle(root)
     calibration_contract_sha = n.dump(
         root / "calibration_contract.json",
         {
@@ -75,6 +74,8 @@ def build_calibration_bundle(root: Path) -> str:
             "minimum_revisions_per_world_for_trend": 3,
             "pool_channels": False,
             "runtime_ledger_authoritative": False,
+            "longitudinal_unit": "world_lineage_sha256",
+            "paired_population_resample_unit": "world_cluster_sha256",
         },
     )
 
@@ -106,7 +107,8 @@ def run_suite(base: Path, freeze_sha: str) -> None:
     assert result["verdict"] == "ACCEPT", result
     assert result["independent_calibration_reconstruction"] == "PASS"
     assert result["calibration_complete_trial_count"] == 4
-    assert result["calibration_trend_eligible_world_count"] == 0
+    assert result["calibration_complete_world_cluster_count"] == 2
+    assert result["calibration_trend_eligible_lineage_count"] == 0
     assert result["calibration_improvement_claim_authorized"] is False
 
     # K1 — runtime receipt lies about a per-channel reconstructed error.
@@ -125,8 +127,6 @@ def run_suite(base: Path, freeze_sha: str) -> None:
     outcome["prediction_error_magnitude"] = 999.0
     outcome_sha = n.save(path, outcome)
     n.update_manifest(b, n.GENERALIZATION, revision_outcome_sha256=outcome_sha)
-    # Keep the calibration receipt bound to the changed outcome digest so the
-    # independent scalar reconstruction, not receipt identity, is the rejection.
     rpath = n.logical_path(b, n.GENERALIZATION, "calibration_receipt")
     receipt = n.load(rpath)
     receipt["revision_outcome_sha256"] = outcome_sha
