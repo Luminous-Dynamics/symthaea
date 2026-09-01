@@ -65,7 +65,7 @@ pub use resolution::{
 };
 pub use resolution_pipeline::{
     ResolutionPipelineError, resolve_registry_identity_snapshots,
-    resolve_registry_identity_snapshots_with_limits,
+    resolve_registry_identity_snapshots_with_limits, source_qualified_claim_id,
 };
 pub use topology::{
     DiscoveredEntity, DiscoverySnapshot, EntityRelation, RelationKind,
