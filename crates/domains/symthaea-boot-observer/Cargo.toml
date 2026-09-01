@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-boot-observer"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Non-authoritative systemd boot observer for Symthaea/Spore presentation"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+symthaea-boot-protocol = { path = "../symthaea-boot-protocol" }
+zbus = "4.4"
+
+[[bin]]
+name = "symthaea-boot-observer"
+path = "src/main.rs"
