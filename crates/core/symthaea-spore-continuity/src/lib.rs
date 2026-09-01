@@ -17,6 +17,7 @@ pub const PHASE_SCALE: u32 = 1_000_000;
 
 pub type Digest32 = [u8; 32];
 pub type VisualSeed = [u8; 32];
+pub type ContinuityLineage = [u8; 16];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -61,9 +62,15 @@ pub enum MotionProfile {
 /// semantics. `visual_seed` carries deterministic identity without carrying a
 /// machine identifier. `phase_micros` is fixed-point in [0, PHASE_SCALE] so
 /// continuity does not depend on cross-runtime floating-point behavior.
+///
+/// `continuity_lineage` is a fresh random value for one ephemeral lifecycle
+/// chain, not a credential or machine identifier. `handoff_sequence` must
+/// increase within that lineage so consumers can reject stale/replayed state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContinuityState {
     pub version: u16,
+    pub continuity_lineage: ContinuityLineage,
+    pub handoff_sequence: u64,
     pub scene_digest: Digest32,
     pub visual_seed: VisualSeed,
     pub visual_plan_digest: Option<Digest32>,
@@ -77,12 +84,15 @@ pub struct ContinuityState {
 
 impl ContinuityState {
     pub fn new(
+        continuity_lineage: ContinuityLineage,
         scene_digest: Digest32,
         visual_seed: VisualSeed,
         transition: LifecycleTransition,
     ) -> Self {
         Self {
             version: CONTINUITY_VERSION,
+            continuity_lineage,
+            handoff_sequence: 1,
             scene_digest,
             visual_seed,
             visual_plan_digest: None,
@@ -98,6 +108,12 @@ impl ContinuityState {
     pub fn validate(&self) -> Result<(), ContinuityError> {
         if self.version != CONTINUITY_VERSION {
             return Err(ContinuityError::UnsupportedVersion(self.version));
+        }
+        if self.continuity_lineage.iter().all(|byte| *byte == 0) {
+            return Err(ContinuityError::ZeroLineage);
+        }
+        if self.handoff_sequence == 0 {
+            return Err(ContinuityError::ZeroSequence);
         }
         if self.phase_micros > PHASE_SCALE {
             return Err(ContinuityError::PhaseOutOfRange(self.phase_micros));
@@ -136,14 +152,43 @@ impl ContinuityState {
         state.validate()?;
         Ok(state)
     }
+
+    /// Validate that `next` may advance this same ephemeral continuity lineage.
+    /// A new lineage is accepted by the owning lifecycle coordinator, not by
+    /// silently treating unrelated packets as successors here.
+    pub fn validate_successor(&self, next: &Self) -> Result<(), ContinuityError> {
+        self.validate()?;
+        next.validate()?;
+        if self.continuity_lineage != next.continuity_lineage {
+            return Err(ContinuityError::LineageChanged);
+        }
+        if next.handoff_sequence <= self.handoff_sequence {
+            return Err(ContinuityError::SequenceNotAdvanced {
+                previous: self.handoff_sequence,
+                observed: next.handoff_sequence,
+            });
+        }
+        if next.world_age_ticks < self.world_age_ticks {
+            return Err(ContinuityError::WorldAgeRegressed {
+                previous: self.world_age_ticks,
+                observed: next.world_age_ticks,
+            });
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ContinuityError {
     UnsupportedVersion(u16),
+    ZeroLineage,
+    ZeroSequence,
     PhaseOutOfRange(u32),
     ZeroSceneDigest,
     ZeroVisualSeed,
+    LineageChanged,
+    SequenceNotAdvanced { previous: u64, observed: u64 },
+    WorldAgeRegressed { previous: u64, observed: u64 },
     TooLarge { bytes: usize, max: usize },
     Serialization(String),
 }
@@ -154,11 +199,22 @@ impl std::fmt::Display for ContinuityError {
             Self::UnsupportedVersion(version) => {
                 write!(f, "unsupported Spore continuity version {version}")
             }
+            Self::ZeroLineage => write!(f, "continuity lineage may not be all-zero"),
+            Self::ZeroSequence => write!(f, "continuity handoff sequence must start above zero"),
             Self::PhaseOutOfRange(phase) => {
                 write!(f, "continuity phase exceeds {PHASE_SCALE}: {phase}")
             }
             Self::ZeroSceneDigest => write!(f, "continuity scene digest may not be all-zero"),
             Self::ZeroVisualSeed => write!(f, "continuity visual seed may not be all-zero"),
+            Self::LineageChanged => write!(f, "continuity successor changed lineage"),
+            Self::SequenceNotAdvanced { previous, observed } => write!(
+                f,
+                "continuity sequence did not advance: previous={previous}, observed={observed}"
+            ),
+            Self::WorldAgeRegressed { previous, observed } => write!(
+                f,
+                "continuity world age regressed: previous={previous}, observed={observed}"
+            ),
             Self::TooLarge { bytes, max } => {
                 write!(f, "continuity payload exceeds size bound: {bytes} > {max}")
             }
@@ -174,11 +230,18 @@ mod tests {
     use super::*;
 
     fn valid_state() -> ContinuityState {
+        let mut lineage = [0u8; 16];
+        lineage[0] = 9;
         let mut scene = [0u8; 32];
         scene[0] = 1;
         let mut seed = [0u8; 32];
         seed[31] = 2;
-        ContinuityState::new(scene, seed, LifecycleTransition::BootToGreeter)
+        ContinuityState::new(
+            lineage,
+            scene,
+            seed,
+            LifecycleTransition::BootToGreeter,
+        )
     }
 
     #[test]
@@ -195,7 +258,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_invalid_version_and_phase() {
+    fn rejects_invalid_version_phase_lineage_and_sequence() {
         let mut state = valid_state();
         state.version = CONTINUITY_VERSION + 1;
         assert!(matches!(
@@ -209,11 +272,20 @@ mod tests {
             state.validate(),
             Err(ContinuityError::PhaseOutOfRange(_))
         ));
+
+        let mut state = valid_state();
+        state.continuity_lineage = [0u8; 16];
+        assert_eq!(state.validate(), Err(ContinuityError::ZeroLineage));
+
+        let mut state = valid_state();
+        state.handoff_sequence = 0;
+        assert_eq!(state.validate(), Err(ContinuityError::ZeroSequence));
     }
 
     #[test]
     fn zero_identity_material_is_rejected() {
         let state = ContinuityState::new(
+            [9u8; 16],
             [0u8; 32],
             [1u8; 32],
             LifecycleTransition::BootToGreeter,
@@ -221,10 +293,45 @@ mod tests {
         assert_eq!(state.validate(), Err(ContinuityError::ZeroSceneDigest));
 
         let state = ContinuityState::new(
+            [9u8; 16],
             [1u8; 32],
             [0u8; 32],
             LifecycleTransition::BootToGreeter,
         );
         assert_eq!(state.validate(), Err(ContinuityError::ZeroVisualSeed));
+    }
+
+    #[test]
+    fn successor_rejects_replay_lineage_change_and_age_rewind() {
+        let mut previous = valid_state();
+        previous.handoff_sequence = 4;
+        previous.world_age_ticks = 100;
+
+        let mut replay = previous.clone();
+        assert!(matches!(
+            previous.validate_successor(&replay),
+            Err(ContinuityError::SequenceNotAdvanced { .. })
+        ));
+
+        replay.handoff_sequence = 5;
+        replay.continuity_lineage = [8u8; 16];
+        assert_eq!(
+            previous.validate_successor(&replay),
+            Err(ContinuityError::LineageChanged)
+        );
+
+        let mut rewind = previous.clone();
+        rewind.handoff_sequence = 5;
+        rewind.world_age_ticks = 99;
+        assert!(matches!(
+            previous.validate_successor(&rewind),
+            Err(ContinuityError::WorldAgeRegressed { .. })
+        ));
+
+        let mut next = previous.clone();
+        next.handoff_sequence = 5;
+        next.world_age_ticks = 101;
+        next.transition = LifecycleTransition::GreeterToSession;
+        previous.validate_successor(&next).unwrap();
     }
 }
