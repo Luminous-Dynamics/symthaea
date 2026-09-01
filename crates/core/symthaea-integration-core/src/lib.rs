@@ -25,6 +25,7 @@ pub mod manifest;
 pub mod observation;
 pub mod registry;
 pub mod resolution;
+pub mod resolution_pipeline;
 pub mod topology;
 pub mod traits;
 
@@ -61,6 +62,10 @@ pub use registry::{IntegrationRegistry, RegistryError};
 pub use resolution::{
     EntityResolutionBatch, ResolutionError, ResolutionLimits, attention_required,
     resolve_identity_claims, resolve_identity_claims_with_limits,
+};
+pub use resolution_pipeline::{
+    ResolutionPipelineError, resolve_registry_identity_snapshots,
+    resolve_registry_identity_snapshots_with_limits,
 };
 pub use topology::{
     DiscoveredEntity, DiscoverySnapshot, EntityRelation, RelationKind,
