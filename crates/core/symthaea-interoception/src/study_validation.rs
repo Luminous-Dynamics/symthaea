@@ -99,3 +99,30 @@ pub fn evaluate_confirmatory_study_bound(
     }
     crate::study::evaluate_confirmatory_study(study, blinded)
 }
+
+/// Validate a serialized/stored confirmatory evaluation by reproducing it from
+/// the complete locked evidence chain.
+///
+/// Production and verification therefore have symmetric trust boundaries: an
+/// artifact cannot become qualified merely because it deserializes as
+/// `ConfirmatoryHypothesisEvaluation` or carries plausible digests.
+pub fn validate_confirmatory_evaluation_bound(
+    study: &StudyPreregistration,
+    execution: &StudyExecutionTrace,
+    exclusions: &ExclusionDecisionReceipt,
+    blinded: &StudyBlindedMetricReport,
+    evaluation: &ConfirmatoryHypothesisEvaluation,
+    limits: ExecutionLimits,
+) -> Result<(), Vec<String>> {
+    match evaluate_confirmatory_study_bound(study, execution, exclusions, blinded, limits) {
+        Ok(expected) if &expected == evaluation => Ok(()),
+        Ok(_) => Err(vec![
+            "confirmatory evaluation does not exactly reproduce from the locked evidence chain"
+                .into(),
+        ]),
+        Err(errors) => Err(errors
+            .into_iter()
+            .map(|error| format!("confirmatory recomputation: {error}"))
+            .collect()),
+    }
+}
