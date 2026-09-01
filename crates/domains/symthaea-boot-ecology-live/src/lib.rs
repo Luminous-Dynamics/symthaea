@@ -16,55 +16,56 @@ pub const REVEAL_SCALE: u32 = 1_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SemanticBootAnchor {
-    KernelActive,
-    InitrdActive,
-    StorageAvailable,
-    FilesAvailable,
-    SecurityReady,
-    NetworkAvailable,
-    ServicesAvailable,
-    GraphicsAvailable,
-    SessionStarting,
+    KernelPhase,
+    InitrdPhase,
+    StoragePhase,
+    FilesystemsPhase,
+    SecurityPhase,
+    NetworkPhase,
+    ServicesPhase,
+    GraphicsPhase,
+    SessionPhase,
     SessionReady,
 }
 
 impl From<BootPhase> for SemanticBootAnchor {
     fn from(phase: BootPhase) -> Self {
         match phase {
-            BootPhase::Kernel => Self::KernelActive,
-            BootPhase::Initrd => Self::InitrdActive,
-            BootPhase::Storage => Self::StorageAvailable,
-            BootPhase::Filesystems => Self::FilesAvailable,
-            BootPhase::Security => Self::SecurityReady,
-            BootPhase::Network => Self::NetworkAvailable,
-            BootPhase::Services => Self::ServicesAvailable,
-            BootPhase::Graphics => Self::GraphicsAvailable,
-            BootPhase::Session => Self::SessionStarting,
+            BootPhase::Kernel => Self::KernelPhase,
+            BootPhase::Initrd => Self::InitrdPhase,
+            BootPhase::Storage => Self::StoragePhase,
+            BootPhase::Filesystems => Self::FilesystemsPhase,
+            BootPhase::Security => Self::SecurityPhase,
+            BootPhase::Network => Self::NetworkPhase,
+            BootPhase::Services => Self::ServicesPhase,
+            BootPhase::Graphics => Self::GraphicsPhase,
+            BootPhase::Session => Self::SessionPhase,
             BootPhase::Ready => Self::SessionReady,
         }
     }
 }
 
 impl SemanticBootAnchor {
-    /// Fixed-point visual reveal floor earned by reaching this factual anchor.
-    /// These are presentation constants, not percentages of Linux boot work.
+    /// Fixed-point visual reveal floor earned by reaching this factual phase.
+    /// These constants order presentation; they are not percentages of Linux
+    /// boot work and must never be described to the user as such.
     pub const fn reveal_floor(self) -> u32 {
         match self {
-            Self::KernelActive => 50_000,
-            Self::InitrdActive => 120_000,
-            Self::StorageAvailable => 220_000,
-            Self::FilesAvailable => 340_000,
-            Self::SecurityReady => 450_000,
-            Self::NetworkAvailable => 560_000,
-            Self::ServicesAvailable => 680_000,
-            Self::GraphicsAvailable => 820_000,
-            Self::SessionStarting => 920_000,
+            Self::KernelPhase => 50_000,
+            Self::InitrdPhase => 120_000,
+            Self::StoragePhase => 220_000,
+            Self::FilesystemsPhase => 340_000,
+            Self::SecurityPhase => 450_000,
+            Self::NetworkPhase => 560_000,
+            Self::ServicesPhase => 680_000,
+            Self::GraphicsPhase => 820_000,
+            Self::SessionPhase => 920_000,
             Self::SessionReady => REVEAL_SCALE,
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DiagnosticFloor {
     Ambient,
     Status,
@@ -91,7 +92,7 @@ impl DomainMask {
         self.0 == 0
     }
 
-    pub fn contains(self, domain: BootDomain) -> bool {
+    pub const fn contains(self, domain: BootDomain) -> bool {
         (self.0 & (1u16 << domain.index())) != 0
     }
 }
@@ -100,12 +101,19 @@ impl DomainMask {
 pub struct LiveEcologyModulation {
     pub observation_sequence: u64,
     pub anchor: SemanticBootAnchor,
+    /// Authoritative coarse health copied from the validated snapshot. The live
+    /// adapter never promotes or blesses this value.
     pub health: BootHealth,
     pub reveal_floor: u32,
     pub delayed_domains: DomainMask,
     pub repair_domains: DomainMask,
+    /// Minimum presentation visibility. This may defensively surface more detail
+    /// than global health alone when domain state is inconsistent, but it never
+    /// rewrites the authoritative `health` field.
     pub diagnostic_floor: DiagnosticFloor,
+    /// Idempotent change token: renderers may pulse only when this value changes.
     pub pulse_token: u64,
+    /// True only for the protocol's explicit `Ready` phase.
     pub handoff_ready: bool,
 }
 
@@ -119,7 +127,10 @@ impl LiveEcologyModulation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LiveAdapterError {
     InvalidSnapshot(String),
-    SequenceRegressed { previous: u64, observed: u64 },
+    SequenceRegressed {
+        previous: u64,
+        observed: u64,
+    },
     AnchorRegressed {
         previous: SemanticBootAnchor,
         observed: SemanticBootAnchor,
@@ -173,23 +184,23 @@ impl LiveEcologyReducer {
             .validate()
             .map_err(|error| LiveAdapterError::InvalidSnapshot(error.to_string()))?;
 
-        if let Some(previous) = self.last_sequence {
-            if snapshot.sequence < previous {
-                return Err(LiveAdapterError::SequenceRegressed {
-                    previous,
-                    observed: snapshot.sequence,
-                });
-            }
+        if let Some(previous) = self.last_sequence
+            && snapshot.sequence < previous
+        {
+            return Err(LiveAdapterError::SequenceRegressed {
+                previous,
+                observed: snapshot.sequence,
+            });
         }
 
         let anchor = SemanticBootAnchor::from(snapshot.phase);
-        if let Some(previous) = self.last_anchor {
-            if anchor < previous {
-                return Err(LiveAdapterError::AnchorRegressed {
-                    previous,
-                    observed: anchor,
-                });
-            }
+        if let Some(previous) = self.last_anchor
+            && anchor < previous
+        {
+            return Err(LiveAdapterError::AnchorRegressed {
+                previous,
+                observed: anchor,
+            });
         }
 
         let mut delayed_domains = DomainMask::empty();
@@ -198,17 +209,23 @@ impl LiveEcologyReducer {
             match domain.state {
                 DomainState::Delayed => delayed_domains.insert(domain.domain),
                 DomainState::Degraded | DomainState::Failed => {
-                    repair_domains.insert(domain.domain)
+                    repair_domains.insert(domain.domain);
                 }
                 DomainState::Pending | DomainState::Starting | DomainState::Ready => {}
             }
         }
 
-        let diagnostic_floor = match snapshot.health {
+        let mut diagnostic_floor = match snapshot.health {
             BootHealth::Normal | BootHealth::Unknown => DiagnosticFloor::Ambient,
             BootHealth::Delayed => DiagnosticFloor::Status,
             BootHealth::Degraded | BootHealth::Failed => DiagnosticFloor::Diagnostics,
         };
+        if !delayed_domains.is_empty() {
+            diagnostic_floor = diagnostic_floor.max(DiagnosticFloor::Status);
+        }
+        if !repair_domains.is_empty() {
+            diagnostic_floor = DiagnosticFloor::Diagnostics;
+        }
 
         let modulation = LiveEcologyModulation {
             observation_sequence: snapshot.sequence,
@@ -265,6 +282,18 @@ mod tests {
     }
 
     #[test]
+    fn phase_anchor_does_not_overclaim_unit_readiness() {
+        assert_eq!(
+            SemanticBootAnchor::from(BootPhase::Network),
+            SemanticBootAnchor::NetworkPhase
+        );
+        assert_eq!(
+            SemanticBootAnchor::from(BootPhase::Graphics),
+            SemanticBootAnchor::GraphicsPhase
+        );
+    }
+
+    #[test]
     fn slow_boot_holds_last_factual_anchor() {
         let mut reducer = LiveEcologyReducer::new();
         let first = snapshot(7, BootPhase::Network, BootHealth::Delayed);
@@ -272,7 +301,7 @@ mod tests {
         let later = snapshot(8, BootPhase::Network, BootHealth::Delayed);
         let later = reducer.reduce(&later).unwrap();
 
-        assert_eq!(first.anchor, SemanticBootAnchor::NetworkAvailable);
+        assert_eq!(first.anchor, SemanticBootAnchor::NetworkPhase);
         assert_eq!(later.anchor, first.anchor);
         assert_eq!(later.reveal_floor, first.reveal_floor);
         assert_eq!(later.diagnostic_floor, DiagnosticFloor::Status);
@@ -294,7 +323,7 @@ mod tests {
     }
 
     #[test]
-    fn health_controls_only_presentation_floor() {
+    fn health_sets_a_minimum_presentation_floor() {
         let cases = [
             (BootHealth::Normal, DiagnosticFloor::Ambient),
             (BootHealth::Unknown, DiagnosticFloor::Ambient),
@@ -310,6 +339,22 @@ mod tests {
                 .unwrap();
             assert_eq!(modulation.diagnostic_floor, expected);
         }
+    }
+
+    #[test]
+    fn domain_state_cannot_be_visually_underreported() {
+        let mut current = snapshot(4, BootPhase::Services, BootHealth::Normal);
+        current.domains = vec![DomainSnapshot {
+            domain: BootDomain::Services,
+            state: DomainState::Failed,
+            elapsed_ms: Some(350),
+        }];
+
+        let mut reducer = LiveEcologyReducer::new();
+        let modulation = reducer.reduce(&current).unwrap();
+        assert_eq!(modulation.health, BootHealth::Normal);
+        assert_eq!(modulation.diagnostic_floor, DiagnosticFloor::Diagnostics);
+        assert!(modulation.repair_domains.contains(BootDomain::Services));
     }
 
     #[test]
@@ -333,6 +378,34 @@ mod tests {
         assert!(modulation.delayed_domains.contains(BootDomain::Network));
         assert!(modulation.repair_domains.contains(BootDomain::Services));
         assert!(!modulation.repair_domains.contains(BootDomain::Network));
+    }
+
+    #[test]
+    fn recovery_clears_transient_visual_emphasis_without_rewinding_phase() {
+        let mut degraded = snapshot(4, BootPhase::Services, BootHealth::Degraded);
+        degraded.domains = vec![DomainSnapshot {
+            domain: BootDomain::Network,
+            state: DomainState::Degraded,
+            elapsed_ms: Some(300),
+        }];
+
+        let mut recovered = snapshot(5, BootPhase::Services, BootHealth::Normal);
+        recovered.domains = vec![DomainSnapshot {
+            domain: BootDomain::Network,
+            state: DomainState::Ready,
+            elapsed_ms: Some(450),
+        }];
+
+        let mut reducer = LiveEcologyReducer::new();
+        let before = reducer.reduce(&degraded).unwrap();
+        let after = reducer.reduce(&recovered).unwrap();
+
+        assert_eq!(before.anchor, after.anchor);
+        assert_eq!(before.reveal_floor, after.reveal_floor);
+        assert_eq!(before.diagnostic_floor, DiagnosticFloor::Diagnostics);
+        assert_eq!(after.diagnostic_floor, DiagnosticFloor::Ambient);
+        assert!(after.repair_domains.is_empty());
+        assert!(after.pulse_token > before.pulse_token);
     }
 
     #[test]
