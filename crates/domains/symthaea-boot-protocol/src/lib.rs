@@ -10,6 +10,10 @@
 
 #![forbid(unsafe_code)]
 
+pub mod prelude;
+pub mod state;
+pub mod wire;
+
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -73,8 +77,8 @@ pub enum BootHealth {
 }
 
 impl BootHealth {
-    /// Health ordering is monotonic during a boot unless an explicit recovery
-    /// event is observed by the authoritative observer.
+    /// Severity is used only by presentation reducers. `Unknown` is deliberately
+    /// worse than `Normal` so absent telemetry is never rendered as healthy.
     pub const fn severity(self) -> u8 {
         match self {
             Self::Normal => 0,
@@ -111,7 +115,7 @@ impl BootSnapshot {
             sequence,
             elapsed_ms: saturating_millis(elapsed),
             phase,
-            health: BootHealth::Normal,
+            health: BootHealth::Unknown,
             domains: Vec::new(),
         }
     }
@@ -122,6 +126,15 @@ impl BootSnapshot {
         }
         if self.domains.len() > BootDomain::COUNT {
             return Err(ProtocolError::TooManyDomains(self.domains.len()));
+        }
+
+        let mut seen = [false; BootDomain::COUNT];
+        for domain in &self.domains {
+            let index = domain.index();
+            if seen[index] {
+                return Err(ProtocolError::DuplicateDomain(domain.domain));
+            }
+            seen[index] = true;
         }
         Ok(())
     }
@@ -147,6 +160,20 @@ pub enum DomainState {
 
 impl BootDomain {
     pub const COUNT: usize = 9;
+
+    pub const fn index(self) -> usize {
+        match self {
+            Self::Kernel => 0,
+            Self::Initrd => 1,
+            Self::Storage => 2,
+            Self::Filesystems => 3,
+            Self::Security => 4,
+            Self::Network => 5,
+            Self::Services => 6,
+            Self::Graphics => 7,
+            Self::Session => 8,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -259,6 +286,7 @@ impl BoundedDetail {
 pub enum ProtocolError {
     UnsupportedVersion(u16),
     TooManyDomains(usize),
+    DuplicateDomain(BootDomain),
     DetailTooLong(usize),
     ControlCharacter,
 }
@@ -268,6 +296,7 @@ impl std::fmt::Display for ProtocolError {
         match self {
             Self::UnsupportedVersion(v) => write!(f, "unsupported boot protocol version {v}"),
             Self::TooManyDomains(n) => write!(f, "boot snapshot contains too many domains: {n}"),
+            Self::DuplicateDomain(domain) => write!(f, "boot snapshot repeats domain {domain:?}"),
             Self::DetailTooLong(n) => write!(f, "boot detail exceeds {MAX_DETAIL_BYTES} bytes: {n}"),
             Self::ControlCharacter => write!(f, "boot detail contains a control character"),
         }
@@ -283,6 +312,12 @@ fn saturating_millis(duration: Duration) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn new_snapshot_starts_unknown_not_healthy() {
+        let snapshot = BootSnapshot::new(1, Duration::from_millis(5), BootPhase::Kernel);
+        assert_eq!(snapshot.health, BootHealth::Unknown);
+    }
 
     #[test]
     fn detail_is_bounded_and_single_line() {
@@ -318,8 +353,30 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_rejects_duplicate_domains() {
+        let mut snapshot = BootSnapshot::new(1, Duration::from_millis(5), BootPhase::Storage);
+        snapshot.domains = vec![
+            DomainSnapshot {
+                domain: BootDomain::Storage,
+                state: DomainState::Starting,
+                elapsed_ms: Some(2),
+            },
+            DomainSnapshot {
+                domain: BootDomain::Storage,
+                state: DomainState::Ready,
+                elapsed_ms: Some(4),
+            },
+        ];
+        assert_eq!(
+            snapshot.validate(),
+            Err(ProtocolError::DuplicateDomain(BootDomain::Storage))
+        );
+    }
+
+    #[test]
     fn health_has_explicit_severity() {
         assert!(BootHealth::Failed.severity() > BootHealth::Degraded.severity());
         assert!(BootHealth::Degraded.severity() > BootHealth::Delayed.severity());
+        assert!(BootHealth::Unknown.severity() > BootHealth::Normal.severity());
     }
 }
