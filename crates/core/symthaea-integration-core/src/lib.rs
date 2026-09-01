@@ -29,6 +29,7 @@ pub mod resolution;
 pub mod resolution_pipeline;
 pub mod semantic_identity;
 pub mod state;
+pub mod state_history;
 mod state_registry;
 pub mod state_temporal;
 pub mod topology;
@@ -91,6 +92,10 @@ pub use state::{
     StateAssessment, StateAssessmentError, StateAssessmentStatus, StateAssertion,
     StateAssertionSource, StateBudgetError, StateComparisonPolicy, StateLimits, StateRole,
     StateSnapshot, StateValidationError, StateValue, assess_state_dimension,
+};
+pub use state_history::{
+    DesiredStateContinuity, HistoricalStateAssessment, StateHistory, StateHistoryError,
+    StateHistoryLimits, assess_state_dimension_with_history, desired_state_continuity,
 };
 pub use state_temporal::{
     TemporalStateAssessment, TemporalStateAssessmentError, TemporalStatePolicy,
