@@ -370,7 +370,11 @@ fn classify_accent(
     if current_severity > previous_severity {
         return accent_for_severity(current_severity);
     }
-    if current.handoff_ready && !previous.handoff_ready && current_severity == 0 {
+    if current.handoff_ready
+        && !previous.handoff_ready
+        && current.health == BootHealth::Normal
+        && current_severity == 0
+    {
         return VisualAccent::Ready;
     }
     if current_severity < previous_severity {
@@ -507,6 +511,20 @@ mod tests {
         assert_eq!(ready.reveal_floor, REVEAL_SCALE);
         assert_eq!(ready.accent, VisualAccent::Ready);
         assert_eq!(ready.accent_token, 2);
+    }
+
+    #[test]
+    fn unknown_ready_is_not_celebrated_as_known_normal() {
+        let mut reducer = LiveEcologyReducer::new();
+        reducer
+            .reduce(&snapshot(1, BootPhase::Session, BootHealth::Unknown))
+            .unwrap();
+        let ready = reducer
+            .reduce(&snapshot(2, BootPhase::Ready, BootHealth::Unknown))
+            .unwrap();
+        assert!(ready.handoff_ready);
+        assert_eq!(ready.health, BootHealth::Unknown);
+        assert_ne!(ready.accent, VisualAccent::Ready);
     }
 
     #[test]
