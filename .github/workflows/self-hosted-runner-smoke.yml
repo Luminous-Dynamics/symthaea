@@ -57,13 +57,16 @@ jobs:
           printf 'rust_channel=%s\n' "$(nix eval --raw --expr '(builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain.channel')"
           sha256sum flake.lock rust-toolchain.toml
 
-      - name: Evaluate runner trust policy
+      - name: Evaluate runner trust and routing policy
         shell: bash
         run: |
           set -euo pipefail
           nix build --no-link --no-write-lock-file \
             --impure \
             --expr 'let f = builtins.getFlake (toString ./.); pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in import ./nix/tests/eval-github-actions-runner.nix { inherit pkgs; }'
+          nix build --no-link --no-write-lock-file \
+            --impure \
+            --expr 'let f = builtins.getFlake (toString ./.); pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in import ./nix/tests/eval-trusted-runner-routing.nix { inherit pkgs; }'
 
       - name: Verify pinned toolchain and smoke-check psych-bench
         shell: bash
