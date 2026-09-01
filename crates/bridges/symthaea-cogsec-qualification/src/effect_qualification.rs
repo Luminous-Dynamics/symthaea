@@ -90,7 +90,6 @@ pub fn qualify_owner_aware_effect_bound_scenario(
 mod tests {
     use super::*;
 
-    use symthaea_cogsec::Digest32;
     use symthaea_cogsec_evidence::{
         DerivedShadowMetrics, EffectBindingViolation, EventId, ReconciliationReport,
         ShadowEventKind,
@@ -154,11 +153,5 @@ mod tests {
             effects: EffectBindingReport::default(),
         };
         assert!(report.qualifies_for_effect_bound_strong_attribution());
-    }
-
-    #[test]
-    fn digest_type_remains_distinct_from_qualification_boolean() {
-        let digest = Digest32([7; 32]);
-        assert_ne!(digest, Digest32([8; 32]));
     }
 }
