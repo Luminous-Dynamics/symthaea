@@ -109,7 +109,7 @@ impl ResourceStateCommitmentV1 {
         Ok(Self {
             resource: CanonicalResourceV1::WorkingMemory,
             digest: working_memory_state_digest_v1(
-                contents, contents, sources, verified, metadata, capacity,
+                contents, ticks, sources, verified, metadata, capacity,
             )?,
         })
     }
