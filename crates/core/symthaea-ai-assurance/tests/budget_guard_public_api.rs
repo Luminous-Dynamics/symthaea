@@ -116,9 +116,7 @@ fn budget_revocation_after_authorization_blocks_adapter_entry() {
         .admit_resolved::<Write, _>(
             actor,
             "edit-source",
-            fixture
-                .resources
-                .resolve(0_u64, resource_identity(), None),
+            fixture.resources.resolve(0_u64, resource_identity(), None),
             b"patch",
         )
         .unwrap()
@@ -154,9 +152,7 @@ fn budget_revocation_after_effect_preserves_evidence_collection() {
         .admit_resolved::<Write, _>(
             actor,
             "edit-source",
-            fixture
-                .resources
-                .resolve(0_u64, resource_identity(), None),
+            fixture.resources.resolve(0_u64, resource_identity(), None),
             b"patch",
         )
         .unwrap()
@@ -222,9 +218,7 @@ fn budget_lease_for_another_action_is_rejected_before_authorization() {
         .admit_resolved::<Write, _>(
             actor,
             "edit-source",
-            fixture
-                .resources
-                .resolve(0_u64, resource_identity(), None),
+            fixture.resources.resolve(0_u64, resource_identity(), None),
             b"patch-a",
         )
         .unwrap()
@@ -248,9 +242,7 @@ fn recoverable_wrong_action_budget_returns_exact_original_lease() {
         .admit_resolved::<Write, _>(
             actor,
             "edit-source",
-            fixture
-                .resources
-                .resolve(0_u64, resource_identity(), None),
+            fixture.resources.resolve(0_u64, resource_identity(), None),
             b"patch-recover",
         )
         .unwrap()
@@ -282,7 +274,10 @@ fn recoverable_wrong_action_budget_returns_exact_original_lease() {
     assert_eq!(fixture.budgets.remaining(), remaining_before);
 
     failure.into_budget_lease().release().unwrap();
-    assert_eq!(fixture.budgets.remaining(), fixture.budgets.profile().limits());
+    assert_eq!(
+        fixture.budgets.remaining(),
+        fixture.budgets.profile().limits()
+    );
 }
 
 #[test]
@@ -294,9 +289,7 @@ fn recoverable_policy_rejection_returns_exact_original_lease() {
         .admit_resolved::<Write, _>(
             actor,
             "edit-source",
-            fixture
-                .resources
-                .resolve(0_u64, resource_identity(), None),
+            fixture.resources.resolve(0_u64, resource_identity(), None),
             b"patch-policy-recover",
         )
         .unwrap()
@@ -349,5 +342,8 @@ fn recoverable_policy_rejection_returns_exact_original_lease() {
     assert_eq!(fixture.budgets.remaining(), remaining_before);
 
     failure.into_budget_lease().release().unwrap();
-    assert_eq!(fixture.budgets.remaining(), fixture.budgets.profile().limits());
+    assert_eq!(
+        fixture.budgets.remaining(),
+        fixture.budgets.profile().limits()
+    );
 }

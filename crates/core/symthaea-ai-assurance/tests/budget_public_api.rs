@@ -70,21 +70,25 @@ fn public_lease_is_exact_action_subject_scope_and_domain_bound() {
         )
         .unwrap();
 
-    assert!(lease
-        .validate_for(
-            &domain.verifier(),
-            actor,
-            &scope(&["root", "child"]),
-            [3; 32]
-        )
-        .is_ok());
+    assert!(
+        lease
+            .validate_for(
+                &domain.verifier(),
+                actor,
+                &scope(&["root", "child"]),
+                [3; 32]
+            )
+            .is_ok()
+    );
     assert!(matches!(
         lease.validate_for(&domain.verifier(), actor, &scope(&["root"]), [4; 32]),
         Err(BudgetError::ActionBindingMismatch)
     ));
-    assert!(lease
-        .validate_for(&other.verifier(), actor, &scope(&["root"]), [3; 32])
-        .is_err());
+    assert!(
+        lease
+            .validate_for(&other.verifier(), actor, &scope(&["root"]), [3; 32])
+            .is_err()
+    );
 }
 
 #[test]
@@ -274,9 +278,11 @@ fn public_budget_epoch_rotation_revokes_outstanding_lease() {
         .unwrap();
     domain.revoke_all().unwrap();
 
-    assert!(lease
-        .validate_for(&domain.verifier(), actor, &scope(&["root"]), [7; 32])
-        .is_err());
+    assert!(
+        lease
+            .validate_for(&domain.verifier(), actor, &scope(&["root"]), [7; 32])
+            .is_err()
+    );
 }
 
 #[test]

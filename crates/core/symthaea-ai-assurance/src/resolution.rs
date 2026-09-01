@@ -81,12 +81,9 @@ impl ResolutionAuthorityDomain {
         binding: [u8; 32],
     ) -> ResolutionGrant {
         ResolutionGrant {
-            inner: self.inner.issue_bound_one_shot::<Observe>(
-                subject,
-                scope,
-                expires_at,
-                binding,
-            ),
+            inner: self
+                .inner
+                .issue_bound_one_shot::<Observe>(subject, scope, expires_at, binding),
         }
     }
 

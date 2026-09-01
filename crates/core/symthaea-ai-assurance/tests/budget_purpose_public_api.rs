@@ -2,14 +2,14 @@ use std::time::{Duration, SystemTime};
 
 use symthaea_ai_assurance::{
     ActionRisk, AdapterSchema, ApprovalEvidence, AuthorityDomain, BudgetAuthorityDomain,
-    BudgetDimension, BudgetEnforcement, BudgetGuardedRuntime, BudgetProfile, BudgetPurposeAuthorityDomain,
-    BudgetPurposeDescriptor, BudgetPurposeError, BudgetPurposeRules, BudgetQuantities,
-    EffectAttemptOutcome, EffectGuardedRuntime, EnforcementClass, IndependenceGuardedRuntime,
-    IndependencePolicy, Observation, Observe, ObservedOutcome, PolicyDescriptor,
-    PolicyGuardedRuntime, PolicyMode, PolicyResourceRuntime, PrincipalId, PurposeGuardedRuntime,
-    ResolutionAuthorityDomain, ResolutionDecision, ResourceIdentity, ResourceResolverDomain,
-    ResourceRuntime, Scope, TemporalPolicyEvaluatorDomain, TemporalPolicyExecutionDomain,
-    TemporalPolicyRules, TrustedRuntime, Write,
+    BudgetDimension, BudgetEnforcement, BudgetGuardedRuntime, BudgetProfile,
+    BudgetPurposeAuthorityDomain, BudgetPurposeDescriptor, BudgetPurposeError, BudgetPurposeRules,
+    BudgetQuantities, EffectAttemptOutcome, EffectGuardedRuntime, EnforcementClass,
+    IndependenceGuardedRuntime, IndependencePolicy, Observation, Observe, ObservedOutcome,
+    PolicyDescriptor, PolicyGuardedRuntime, PolicyMode, PolicyResourceRuntime, PrincipalId,
+    PurposeGuardedRuntime, ResolutionAuthorityDomain, ResolutionDecision, ResourceIdentity,
+    ResourceResolverDomain, ResourceRuntime, Scope, TemporalPolicyEvaluatorDomain,
+    TemporalPolicyExecutionDomain, TemporalPolicyRules, TrustedRuntime, Write,
 };
 
 fn scope() -> Scope {
@@ -52,11 +52,8 @@ fn harness() -> Harness {
         PolicyDescriptor::new("purpose-general", 1, [3; 32], 1).unwrap(),
         rules,
     );
-    let execution = TemporalPolicyExecutionDomain::new(
-        PrincipalId::new(),
-        evaluator.verifier(),
-        rules,
-    );
+    let execution =
+        TemporalPolicyExecutionDomain::new(PrincipalId::new(), evaluator.verifier(), rules);
     let observation = AuthorityDomain::new(PrincipalId::new());
     let resolution = ResolutionAuthorityDomain::new(PrincipalId::new());
     let resources = ResourceResolverDomain::new(PrincipalId::new());
@@ -88,11 +85,7 @@ fn harness() -> Harness {
         evaluator.verifier(),
         execution.verifier(),
     );
-    let runtime = PurposeGuardedRuntime::new(
-        independence,
-        purpose.verifier(),
-        budgets.verifier(),
-    );
+    let runtime = PurposeGuardedRuntime::new(independence, purpose.verifier(), budgets.verifier());
 
     Harness {
         evaluator,
@@ -199,12 +192,18 @@ fn public_end_to_end_evidence_binds_policy_quantity_and_purpose() {
     assert_eq!(purpose.receipt().scope(), &scope());
     assert_eq!(purpose.receipt().purpose_digest(), purpose_digest);
     assert_eq!(
-        purpose.receipt().allocation().get(BudgetDimension::ComputeUnits),
+        purpose
+            .receipt()
+            .allocation()
+            .get(BudgetDimension::ComputeUnits),
         3
     );
     assert_eq!(purpose.receipt().budget_domain(), h.budgets.domain_id());
     assert_eq!(purpose.receipt().policy_domain(), h.evaluator.domain_id());
-    assert_eq!(purpose.receipt().execution_domain(), h.execution.domain_id());
+    assert_eq!(
+        purpose.receipt().execution_domain(),
+        h.execution.domain_id()
+    );
     assert_eq!(purpose.purpose_domain(), h.purpose.domain_id());
     assert_eq!(resolved.purpose_receipt(), &receipt);
 }
@@ -242,13 +241,7 @@ fn public_purpose_approval_rejects_lifetime_wider_than_budget() {
         .unwrap();
     let grant = h
         .execution
-        .issue::<Write>(
-            actor,
-            scope(),
-            Some(parent_expiry),
-            binding,
-            admission,
-        )
+        .issue::<Write>(actor, scope(), Some(parent_expiry), binding, admission)
         .unwrap();
     let lease = h
         .budgets
@@ -332,14 +325,16 @@ fn public_unrelated_purpose_root_cannot_validate_same_lease() {
         h.evaluator.verifier(),
         h.execution.verifier(),
     );
-    assert!(purpose_lease
-        .validate_for(
-            &wrong.verifier(),
-            &h.budgets.verifier(),
-            &grant,
-            actor,
-            &scope(),
-            binding,
-        )
-        .is_err());
+    assert!(
+        purpose_lease
+            .validate_for(
+                &wrong.verifier(),
+                &h.budgets.verifier(),
+                &grant,
+                actor,
+                &scope(),
+                binding,
+            )
+            .is_err()
+    );
 }

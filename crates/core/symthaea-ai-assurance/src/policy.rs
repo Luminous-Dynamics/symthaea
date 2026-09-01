@@ -25,11 +25,11 @@ use crate::action::{
     ResolutionDecision, Resolved, RiskAssessed,
 };
 use crate::capability::{CapabilityKind, GrantId, PrincipalId, Read, Scope};
-use crate::host::{ResolutionError, TrustedRuntime};
-use crate::resolution::{ResolutionAuthorityDomain, ResolutionGrant};
+use crate::host::ResolutionError;
+use crate::resolution::ResolutionGrant;
 use crate::resource::{
     ResolvedResource, ResourceAction, ResourceEvidenceReceipt, ResourceExecutionError,
-    ResourceResolverDomain, ResourceRuntime, ResourceVerifier,
+    ResourceRuntime,
 };
 use crate::trusted::{
     AuthorityDomain, AuthorityDomainId, AuthorityEpoch, AuthorityVerifier, TrustError,
@@ -128,11 +128,7 @@ pub struct ApprovalEvidence {
 
 impl ApprovalEvidence {
     /// Construct a canonical approval summary.
-    pub fn new(
-        policy_digest: [u8; 32],
-        approval_set_digest: [u8; 32],
-        satisfied: bool,
-    ) -> Self {
+    pub fn new(policy_digest: [u8; 32], approval_set_digest: [u8; 32], satisfied: bool) -> Self {
         Self {
             policy_digest,
             approval_set_digest,
@@ -386,11 +382,7 @@ impl PolicyAdmission {
         self.attestation.metadata().grant_id()
     }
 
-    fn validate_with(
-        &self,
-        verifier: &PolicyVerifier,
-        now: SystemTime,
-    ) -> Result<(), PolicyError> {
+    fn validate_with(&self, verifier: &PolicyVerifier, now: SystemTime) -> Result<(), PolicyError> {
         self.attestation
             .validate_with(&verifier.inner, now)
             .map_err(PolicyError::Trust)?;
@@ -463,7 +455,7 @@ impl PolicyExecutionDomain {
             PolicyMode::Denied => return Err(PolicyError::ExecutionDenied),
             PolicyMode::DryRun => return Err(PolicyError::DryRunOnly),
             PolicyMode::Supervised if !admission.receipt.approvals().satisfied() => {
-                return Err(PolicyError::SupervisionUnsatisfied)
+                return Err(PolicyError::SupervisionUnsatisfied);
             }
             PolicyMode::Supervised | PolicyMode::Autonomous => {}
         }
@@ -472,12 +464,9 @@ impl PolicyExecutionDomain {
         let policy_epoch = admission.evaluator_epoch();
         let policy_attestation_grant_id = admission.attestation_grant_id();
         let receipt = admission.receipt.clone();
-        let grant = self.inner.issue_bound_one_shot::<K>(
-            subject,
-            scope,
-            expires_at,
-            action_binding,
-        );
+        let grant =
+            self.inner
+                .issue_bound_one_shot::<K>(subject, scope, expires_at, action_binding);
         let policy_binding = compute_policy_grant_binding(
             action_binding,
             receipt.digest(),
@@ -564,7 +553,12 @@ impl<K: CapabilityKind> PolicyGrant<K> {
         Ok(())
     }
 
-    fn into_parts(self) -> (TrustedBoundOneShotCapability<K>, PolicyAuthorizationEvidence) {
+    fn into_parts(
+        self,
+    ) -> (
+        TrustedBoundOneShotCapability<K>,
+        PolicyAuthorizationEvidence,
+    ) {
         (self.grant, self.evidence)
     }
 }
@@ -875,12 +869,20 @@ impl fmt::Display for PolicyError {
             Self::AdmissionScopeMismatch => write!(f, "policy admission scope mismatch"),
             Self::AdmissionBindingMismatch => write!(f, "policy admission binding mismatch"),
             Self::ActionBindingMismatch => write!(f, "policy admission targets another action"),
-            Self::PolicyScopeMismatch { .. } => write!(f, "policy admission scope differs from execution scope"),
-            Self::RiskMismatch { .. } => write!(f, "policy admission risk differs from action risk"),
+            Self::PolicyScopeMismatch { .. } => {
+                write!(f, "policy admission scope differs from execution scope")
+            }
+            Self::RiskMismatch { .. } => {
+                write!(f, "policy admission risk differs from action risk")
+            }
             Self::ExecutionDenied => write!(f, "policy denied execution"),
             Self::DryRunOnly => write!(f, "policy permits only dry-run execution"),
-            Self::SupervisionUnsatisfied => write!(f, "supervised execution lacks satisfied approval evidence"),
-            Self::PolicyBindingMismatch => write!(f, "policy grant provenance binding is inconsistent"),
+            Self::SupervisionUnsatisfied => {
+                write!(f, "supervised execution lacks satisfied approval evidence")
+            }
+            Self::PolicyBindingMismatch => {
+                write!(f, "policy grant provenance binding is inconsistent")
+            }
         }
     }
 }
@@ -1028,9 +1030,10 @@ impl PolicyClock {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        AdapterSchema, ObservedOutcome, ResourceIdentity, Write,
-    };
+    use crate::host::TrustedRuntime;
+    use crate::resolution::ResolutionAuthorityDomain;
+    use crate::resource::ResourceResolverDomain;
+    use crate::{AdapterSchema, ObservedOutcome, ResourceIdentity, Write};
 
     fn scope() -> Scope {
         Scope::new("workspace", ["symthaea", "src"]).unwrap()
@@ -1119,9 +1122,11 @@ mod tests {
             [5; 32],
             None,
         );
-        assert!(execution
-            .issue::<Write>(PrincipalId::new(), scope(), None, binding, admission)
-            .is_err());
+        assert!(
+            execution
+                .issue::<Write>(PrincipalId::new(), scope(), None, binding, admission)
+                .is_err()
+        );
     }
 
     #[test]
@@ -1203,7 +1208,13 @@ mod tests {
             receipt.policy_evidence().receipt().digest(),
             expected_policy_digest
         );
-        assert_eq!(receipt.policy_evidence().policy_domain(), evaluator.domain_id());
-        assert_eq!(receipt.policy_evidence().execution_domain(), execution.domain_id());
+        assert_eq!(
+            receipt.policy_evidence().policy_domain(),
+            evaluator.domain_id()
+        );
+        assert_eq!(
+            receipt.policy_evidence().execution_domain(),
+            execution.domain_id()
+        );
     }
 }

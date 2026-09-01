@@ -18,13 +18,13 @@
 //! grant after trusted code explicitly separates the pair; a later composition
 //! tranche can carry [`TemporalDerivationEvidence`] directly into final receipts.
 
+use crate::ActionRisk;
 use crate::capability::{CapabilityKind, GrantId, PrincipalId, Scope};
 use crate::policy::{
     ApprovalEvidence, PolicyAdmission, PolicyAdmissionReceipt, PolicyDescriptor, PolicyError,
     PolicyEvaluatorDomain, PolicyExecutionDomain, PolicyGrant, PolicyMode, PolicyVerifier,
 };
 use crate::trusted::{AuthorityDomainId, AuthorityEpoch, AuthorityVerifier, TrustError};
-use crate::ActionRisk;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -48,10 +48,7 @@ impl TemporalPolicyRules {
     }
 
     /// Construct explicit trusted lifetime rules.
-    pub const fn new(
-        allow_unbounded_admission: bool,
-        allow_unbounded_execution: bool,
-    ) -> Self {
+    pub const fn new(allow_unbounded_admission: bool, allow_unbounded_execution: bool) -> Self {
         Self {
             allow_unbounded_admission,
             allow_unbounded_execution,
@@ -287,10 +284,10 @@ impl TemporalPolicyEvaluatorDomain {
         let now = self.clock.now();
         match expires_at {
             None if !self.rules.allow_unbounded_admission => {
-                return Err(TemporalPolicyError::UnboundedAdmissionForbidden)
+                return Err(TemporalPolicyError::UnboundedAdmissionForbidden);
             }
             Some(expiry) if expiry < now => {
-                return Err(TemporalPolicyError::AdmissionAlreadyExpired { expiry, now })
+                return Err(TemporalPolicyError::AdmissionAlreadyExpired { expiry, now });
             }
             _ => {}
         }
@@ -395,11 +392,11 @@ impl TemporalPolicyExecutionDomain {
                     return Err(TemporalPolicyError::ExpiryWidening {
                         policy_expiry: Some(policy_expiry),
                         requested_execution_expiry: expires_at,
-                    })
+                    });
                 }
             },
             None if expires_at.is_none() && !self.rules.allow_unbounded_execution => {
-                return Err(TemporalPolicyError::UnboundedExecutionForbidden)
+                return Err(TemporalPolicyError::UnboundedExecutionForbidden);
             }
             None => {}
         }
@@ -483,10 +480,16 @@ impl fmt::Display for TemporalPolicyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnboundedAdmissionForbidden => {
-                write!(f, "strict temporal policy requires a finite admission lifetime")
+                write!(
+                    f,
+                    "strict temporal policy requires a finite admission lifetime"
+                )
             }
             Self::UnboundedExecutionForbidden => {
-                write!(f, "strict temporal policy forbids an unbounded execution grant")
+                write!(
+                    f,
+                    "strict temporal policy forbids an unbounded execution grant"
+                )
             }
             Self::AdmissionAlreadyExpired { .. } => {
                 write!(f, "policy admission lifetime is already expired")
@@ -495,7 +498,10 @@ impl fmt::Display for TemporalPolicyError {
                 write!(f, "requested execution lifetime is already expired")
             }
             Self::ExpiryWidening { .. } => {
-                write!(f, "derived execution authority would outlive policy admission")
+                write!(
+                    f,
+                    "derived execution authority would outlive policy admission"
+                )
             }
             Self::Policy(error) => write!(f, "policy derivation failed: {error}"),
         }
@@ -607,16 +613,9 @@ mod tests {
     #[test]
     fn finite_admission_cannot_mint_unbounded_execution() {
         let rules = TemporalPolicyRules::new(true, true);
-        let evaluator = TemporalPolicyEvaluatorDomain::new(
-            PrincipalId::new(),
-            descriptor(),
-            rules,
-        );
-        let execution = TemporalPolicyExecutionDomain::new(
-            PrincipalId::new(),
-            evaluator.verifier(),
-            rules,
-        );
+        let evaluator = TemporalPolicyEvaluatorDomain::new(PrincipalId::new(), descriptor(), rules);
+        let execution =
+            TemporalPolicyExecutionDomain::new(PrincipalId::new(), evaluator.verifier(), rules);
         let binding = [11; 32];
         let policy_expiry = SystemTime::now() + Duration::from_secs(60);
         let result = execution.issue::<Write>(
@@ -635,16 +634,9 @@ mod tests {
     #[test]
     fn finite_admission_cannot_mint_later_execution_expiry() {
         let rules = TemporalPolicyRules::new(true, true);
-        let evaluator = TemporalPolicyEvaluatorDomain::new(
-            PrincipalId::new(),
-            descriptor(),
-            rules,
-        );
-        let execution = TemporalPolicyExecutionDomain::new(
-            PrincipalId::new(),
-            evaluator.verifier(),
-            rules,
-        );
+        let evaluator = TemporalPolicyEvaluatorDomain::new(PrincipalId::new(), descriptor(), rules);
+        let execution =
+            TemporalPolicyExecutionDomain::new(PrincipalId::new(), evaluator.verifier(), rules);
         let binding = [12; 32];
         let policy_expiry = SystemTime::now() + Duration::from_secs(60);
         let result = execution.issue::<Write>(
@@ -664,16 +656,10 @@ mod tests {
     fn equal_or_earlier_finite_execution_expiry_is_accepted() {
         for offset in [0_u64, 30_u64] {
             let rules = TemporalPolicyRules::new(true, true);
-            let evaluator = TemporalPolicyEvaluatorDomain::new(
-                PrincipalId::new(),
-                descriptor(),
-                rules,
-            );
-            let execution = TemporalPolicyExecutionDomain::new(
-                PrincipalId::new(),
-                evaluator.verifier(),
-                rules,
-            );
+            let evaluator =
+                TemporalPolicyEvaluatorDomain::new(PrincipalId::new(), descriptor(), rules);
+            let execution =
+                TemporalPolicyExecutionDomain::new(PrincipalId::new(), evaluator.verifier(), rules);
             let binding = [13 + offset as u8; 32];
             let policy_expiry = SystemTime::now() + Duration::from_secs(90);
             let execution_expiry = policy_expiry - Duration::from_secs(offset);
@@ -694,25 +680,16 @@ mod tests {
                 grant.temporal_evidence().execution_expires_at(),
                 Some(execution_expiry)
             );
-            assert!(grant
-                .temporal_evidence()
-                .preserves_finite_parent_bound());
+            assert!(grant.temporal_evidence().preserves_finite_parent_bound());
         }
     }
 
     #[test]
     fn already_stale_execution_request_is_rejected_before_minting() {
         let rules = TemporalPolicyRules::new(true, true);
-        let evaluator = TemporalPolicyEvaluatorDomain::new(
-            PrincipalId::new(),
-            descriptor(),
-            rules,
-        );
-        let execution = TemporalPolicyExecutionDomain::new(
-            PrincipalId::new(),
-            evaluator.verifier(),
-            rules,
-        );
+        let evaluator = TemporalPolicyEvaluatorDomain::new(PrincipalId::new(), descriptor(), rules);
+        let execution =
+            TemporalPolicyExecutionDomain::new(PrincipalId::new(), evaluator.verifier(), rules);
         let binding = [15; 32];
         let policy_expiry = SystemTime::now() + Duration::from_secs(60);
         let stale_execution = SystemTime::now() - Duration::from_secs(1);
@@ -733,20 +710,11 @@ mod tests {
     fn explicit_unbounded_policy_can_derive_finite_or_unbounded_execution() {
         let rules = TemporalPolicyRules::new(true, true);
 
-        for execution_expiry in [
-            Some(SystemTime::now() + Duration::from_secs(60)),
-            None,
-        ] {
-            let evaluator = TemporalPolicyEvaluatorDomain::new(
-                PrincipalId::new(),
-                descriptor(),
-                rules,
-            );
-            let execution = TemporalPolicyExecutionDomain::new(
-                PrincipalId::new(),
-                evaluator.verifier(),
-                rules,
-            );
+        for execution_expiry in [Some(SystemTime::now() + Duration::from_secs(60)), None] {
+            let evaluator =
+                TemporalPolicyEvaluatorDomain::new(PrincipalId::new(), descriptor(), rules);
+            let execution =
+                TemporalPolicyExecutionDomain::new(PrincipalId::new(), evaluator.verifier(), rules);
             let binding = if execution_expiry.is_some() {
                 [16; 32]
             } else {
@@ -771,11 +739,8 @@ mod tests {
     #[test]
     fn unbounded_execution_requires_explicit_execution_rule() {
         let evaluator_rules = TemporalPolicyRules::new(true, false);
-        let evaluator = TemporalPolicyEvaluatorDomain::new(
-            PrincipalId::new(),
-            descriptor(),
-            evaluator_rules,
-        );
+        let evaluator =
+            TemporalPolicyEvaluatorDomain::new(PrincipalId::new(), descriptor(), evaluator_rules);
         let execution = TemporalPolicyExecutionDomain::new(
             PrincipalId::new(),
             evaluator.verifier(),
@@ -798,16 +763,9 @@ mod tests {
     #[test]
     fn temporal_evidence_matches_underlying_policy_lineage() {
         let rules = TemporalPolicyRules::new(true, true);
-        let evaluator = TemporalPolicyEvaluatorDomain::new(
-            PrincipalId::new(),
-            descriptor(),
-            rules,
-        );
-        let execution = TemporalPolicyExecutionDomain::new(
-            PrincipalId::new(),
-            evaluator.verifier(),
-            rules,
-        );
+        let evaluator = TemporalPolicyEvaluatorDomain::new(PrincipalId::new(), descriptor(), rules);
+        let execution =
+            TemporalPolicyExecutionDomain::new(PrincipalId::new(), evaluator.verifier(), rules);
         let binding = [19; 32];
         let policy_expiry = SystemTime::now() + Duration::from_secs(60);
         let execution_expiry = policy_expiry - Duration::from_secs(1);

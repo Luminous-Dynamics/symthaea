@@ -439,7 +439,11 @@ impl<K: CapabilityKind> Action<K, Executed> {
     ) -> Result<Action<K, Observed>, ActionError> {
         observer.validate_at(now).map_err(ActionError::Grant)?;
 
-        if !observer.metadata().scope().contains(self.descriptor.scope()) {
+        if !observer
+            .metadata()
+            .scope()
+            .contains(self.descriptor.scope())
+        {
             return Err(ActionError::ObservationScopeMismatch {
                 granted: observer.metadata().scope().clone(),
                 required: self.descriptor.scope().clone(),
@@ -577,10 +581,7 @@ impl EvidenceReceipt {
 
 impl<K: CapabilityKind> Action<K, Observed> {
     /// Resolve an externally observed action and emit immutable lineage evidence.
-    pub fn resolve(
-        self,
-        resolution: ResolutionDecision,
-    ) -> (Action<K, Resolved>, EvidenceReceipt) {
+    pub fn resolve(self, resolution: ResolutionDecision) -> (Action<K, Resolved>, EvidenceReceipt) {
         let receipt = EvidenceReceipt {
             action_id: self.id,
             action_fingerprint: self.descriptor.fingerprint(),
@@ -705,12 +706,8 @@ mod tests {
         )
         .assess(ActionRisk::Reversible);
         let binding = action.authorization_binding();
-        let grant = issuer.issue_bound_one_shot::<Write>(
-            actor,
-            scope(&["symthaea"]),
-            None,
-            binding,
-        );
+        let grant =
+            issuer.issue_bound_one_shot::<Write>(actor, scope(&["symthaea"]), None, binding);
         let grant_id = grant.metadata().grant_id();
 
         let authorized = action.authorize(grant, SystemTime::now()).unwrap();

@@ -39,7 +39,9 @@ use crate::policy_guard::{
 };
 use crate::resolution::ResolutionGrant;
 use crate::resource::{ResolvedResource, ResourceError};
-use crate::trusted::{AuthorityDomainId, AuthorityEpoch, TrustError, TrustedBoundOneShotCapability};
+use crate::trusted::{
+    AuthorityDomainId, AuthorityEpoch, TrustError, TrustedBoundOneShotCapability,
+};
 use std::fmt;
 
 /// Host wrapper that pins one budget verifier alongside the policy/resource host boundary.
@@ -303,13 +305,8 @@ impl<K: CapabilityKind, H> BudgetGuardedAction<K, Observed, H> {
         self,
         grant: ResolutionGrant,
         decision: ResolutionDecision,
-    ) -> Result<
-        (
-            BudgetGuardedAction<K, Resolved, H>,
-            BudgetedEvidenceReceipt,
-        ),
-        ResolutionError,
-    > {
+    ) -> Result<(BudgetGuardedAction<K, Resolved, H>, BudgetedEvidenceReceipt), ResolutionError>
+    {
         let BudgetGuardedAction {
             inner,
             budget_verifier,
@@ -509,7 +506,11 @@ impl BudgetGuardedAuthorizeFailure {
 
 impl fmt::Display for BudgetGuardedAuthorizeFailure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "recoverable budget authorization rejected: {}", self.error)
+        write!(
+            f,
+            "recoverable budget authorization rejected: {}",
+            self.error
+        )
     }
 }
 

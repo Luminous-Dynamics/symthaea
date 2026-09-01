@@ -40,6 +40,7 @@
 //! purpose transition) rather than treating a raw affine `split` as proof that
 //! the parent policy approved the child's purpose.
 
+use crate::Observe;
 use crate::action::{
     ActionDescriptor, ActionId, ActionRisk, Authorized, Executed, Observation, Observed, Proposed,
     ResolutionDecision, Resolved, RiskAssessed,
@@ -49,7 +50,9 @@ use crate::budget::{
     BudgetVerifier,
 };
 use crate::capability::{CapabilityKind, GrantId, PrincipalId, Read, Scope};
-use crate::effect_guard::{EffectAttemptEvidence, EffectAttemptOutcome, EffectGuardedAuthorizeError};
+use crate::effect_guard::{
+    EffectAttemptEvidence, EffectAttemptOutcome, EffectGuardedAuthorizeError,
+};
 use crate::independence::{
     IndependenceEffectAttemptFailure, IndependenceEvidenceReceipt, IndependenceGuardedAction,
     IndependenceGuardedRuntime, IndependenceObservationError, IndependenceResolutionError,
@@ -62,7 +65,6 @@ use crate::trusted::{
     AuthorityDomain, AuthorityDomainId, AuthorityEpoch, AuthorityVerifier, TrustError,
     TrustedBoundOneShotCapability,
 };
-use crate::Observe;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -845,9 +847,10 @@ impl<K: CapabilityKind, H> PurposeGuardedAction<K, Authorized, H> {
             Err(IndependenceEffectAttemptFailure::RejectedBeforeAttempt { error }) => {
                 Err(PurposeEffectAttemptFailure::RejectedBeforeAttempt { error })
             }
-            Err(IndependenceEffectAttemptFailure::LineageFailedAfterAttempt { evidence, error }) => {
-                Err(PurposeEffectAttemptFailure::LineageFailedAfterAttempt { evidence, error })
-            }
+            Err(IndependenceEffectAttemptFailure::LineageFailedAfterAttempt {
+                evidence,
+                error,
+            }) => Err(PurposeEffectAttemptFailure::LineageFailedAfterAttempt { evidence, error }),
         }
     }
 }
@@ -1100,20 +1103,48 @@ pub enum BudgetPurposeError {
 impl fmt::Display for BudgetPurposeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidPolicyFamily(value) => write!(f, "invalid budget-purpose policy family: {value:?}"),
+            Self::InvalidPolicyFamily(value) => {
+                write!(f, "invalid budget-purpose policy family: {value:?}")
+            }
             Self::Trust(error) => write!(f, "budget-purpose trust validation failed: {error}"),
             Self::Budget(error) => write!(f, "budget validation failed: {error}"),
-            Self::BudgetScopeNotExact { .. } => write!(f, "budget scope is not the exact policy-admitted action scope"),
+            Self::BudgetScopeNotExact { .. } => write!(
+                f,
+                "budget scope is not the exact policy-admitted action scope"
+            ),
             Self::DescriptorMismatch => write!(f, "budget-purpose policy descriptor mismatch"),
-            Self::BudgetLineageMismatch => write!(f, "budget-purpose receipt does not match owned budget lease"),
-            Self::PolicyLineageMismatch => write!(f, "budget-purpose receipt does not match consumed policy lineage"),
-            Self::WrongPolicyLineage => write!(f, "general policy lineage is not current for the pinned policy root"),
-            Self::WrongExecutionLineage => write!(f, "execution lineage is not current for the pinned execution root"),
-            Self::TemporalPolicyMismatch => write!(f, "temporal and ordinary policy evidence disagree"),
-            Self::PurposeAlreadyExpired { .. } => write!(f, "requested budget-purpose admission is already expired"),
-            Self::PurposeExpiryWidening { .. } => write!(f, "budget-purpose lifetime would widen a finite parent authority"),
-            Self::UnboundedPurposeForbidden => write!(f, "strict budget-purpose policy requires a finite lifetime"),
-            Self::AdmissionBindingMismatch => write!(f, "budget-purpose admission binding is inconsistent"),
+            Self::BudgetLineageMismatch => write!(
+                f,
+                "budget-purpose receipt does not match owned budget lease"
+            ),
+            Self::PolicyLineageMismatch => write!(
+                f,
+                "budget-purpose receipt does not match consumed policy lineage"
+            ),
+            Self::WrongPolicyLineage => write!(
+                f,
+                "general policy lineage is not current for the pinned policy root"
+            ),
+            Self::WrongExecutionLineage => write!(
+                f,
+                "execution lineage is not current for the pinned execution root"
+            ),
+            Self::TemporalPolicyMismatch => {
+                write!(f, "temporal and ordinary policy evidence disagree")
+            }
+            Self::PurposeAlreadyExpired { .. } => {
+                write!(f, "requested budget-purpose admission is already expired")
+            }
+            Self::PurposeExpiryWidening { .. } => write!(
+                f,
+                "budget-purpose lifetime would widen a finite parent authority"
+            ),
+            Self::UnboundedPurposeForbidden => {
+                write!(f, "strict budget-purpose policy requires a finite lifetime")
+            }
+            Self::AdmissionBindingMismatch => {
+                write!(f, "budget-purpose admission binding is inconsistent")
+            }
         }
     }
 }
@@ -1176,12 +1207,7 @@ fn validate_derived_expiry(
     {
         match requested {
             Some(child) if child <= parent => {}
-            _ => {
-                return Err(BudgetPurposeError::PurposeExpiryWidening {
-                    requested,
-                    parent,
-                })
-            }
+            _ => return Err(BudgetPurposeError::PurposeExpiryWidening { requested, parent }),
         }
     }
     if requested.is_none()
@@ -1237,8 +1263,14 @@ fn compute_admission_digest(
         &mut hasher,
         policy.policy_attestation_grant_id().as_uuid().as_bytes(),
     );
-    hash_field(&mut hasher, temporal.execution_domain().as_uuid().as_bytes());
-    hash_field(&mut hasher, &temporal.execution_epoch().value().to_le_bytes());
+    hash_field(
+        &mut hasher,
+        temporal.execution_domain().as_uuid().as_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        &temporal.execution_epoch().value().to_le_bytes(),
+    );
     hash_field(
         &mut hasher,
         temporal.execution_grant_id().as_uuid().as_bytes(),
@@ -1254,10 +1286,7 @@ fn compute_admission_digest(
     *hasher.finalize().as_bytes()
 }
 
-fn descriptor_digest(
-    descriptor: &BudgetPurposeDescriptor,
-    rules: BudgetPurposeRules,
-) -> [u8; 32] {
+fn descriptor_digest(descriptor: &BudgetPurposeDescriptor, rules: BudgetPurposeRules) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea-ai-assurance/budget-purpose-policy-v1\0");
     hash_field(&mut hasher, descriptor.family().as_bytes());

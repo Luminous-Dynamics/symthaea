@@ -60,9 +60,11 @@ fn unrelated_policy_evaluator_cannot_justify_execution() {
         None,
     );
 
-    assert!(execution
-        .issue::<Write>(PrincipalId::new(), scope(), None, binding, admission)
-        .is_err());
+    assert!(
+        execution
+            .issue::<Write>(PrincipalId::new(), scope(), None, binding, admission)
+            .is_err()
+    );
 }
 
 #[test]
@@ -83,9 +85,11 @@ fn revoking_policy_epoch_invalidates_unconsumed_admission() {
     );
     evaluator.revoke_all().unwrap();
 
-    assert!(execution
-        .issue::<Write>(PrincipalId::new(), scope(), None, binding, admission)
-        .is_err());
+    assert!(
+        execution
+            .issue::<Write>(PrincipalId::new(), scope(), None, binding, admission)
+            .is_err()
+    );
 }
 
 #[test]
@@ -256,6 +260,12 @@ fn final_evidence_preserves_policy_and_resource_lineage() {
         receipt.resource_receipt().resource_identity(),
         &resource_identity
     );
-    assert_eq!(receipt.policy_evidence().policy_domain(), evaluator.domain_id());
-    assert_eq!(receipt.policy_evidence().execution_domain(), execution.domain_id());
+    assert_eq!(
+        receipt.policy_evidence().policy_domain(),
+        evaluator.domain_id()
+    );
+    assert_eq!(
+        receipt.policy_evidence().execution_domain(),
+        execution.domain_id()
+    );
 }
