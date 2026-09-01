@@ -21,10 +21,15 @@ run_cargo_for_each() {
     local command="$1"
     shift
     for package in "${PACKAGES[@]}"; do
-        echo "== cargo $command -p $package $* =="
-        cargo "$command" -p "$package" "$@"
+        echo "== cargo $command --locked -p $package $* =="
+        cargo "$command" --locked -p "$package" "$@"
     done
 }
+
+# Fail immediately if Cargo.toml/workspace membership and Cargo.lock disagree.
+# Nix builds use the workspace lock, so an unlocked success is not qualification.
+echo "== cargo metadata --locked =="
+cargo metadata --locked --no-deps --format-version 1 >/dev/null
 
 for package in "${PACKAGES[@]}"; do
     echo "== cargo fmt -p $package --check =="
@@ -35,14 +40,14 @@ run_cargo_for_each check --all-targets
 run_cargo_for_each test
 
 for package in "${PACKAGES[@]}"; do
-    echo "== cargo clippy -p $package --all-targets -- -D warnings =="
-    cargo clippy -p "$package" --all-targets -- -D warnings
+    echo "== cargo clippy --locked -p $package --all-targets -- -D warnings =="
+    cargo clippy --locked -p "$package" --all-targets -- -D warnings
 done
 
 echo "== deterministic headless smoke =="
 BENCH_SMOKE="$(mktemp /tmp/spore-boot-bench-smoke.XXXXXX.json)"
 trap 'rm -f "$BENCH_SMOKE"' EXIT
-cargo run -p symthaea-quicken-fb --release --bin spore-boot-bench -- \
+cargo run --locked -p symthaea-quicken-fb --release --bin spore-boot-bench -- \
     --width 320 \
     --height 180 \
     --warmup-frames 2 \
