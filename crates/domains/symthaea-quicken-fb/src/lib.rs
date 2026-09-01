@@ -22,7 +22,7 @@ pub mod color;
 pub mod ecology_renderer_base;
 #[path = "ecology_renderer_holo.rs"]
 pub mod ecology_renderer_holo;
-#[path = "ecology_renderer_fidelity.rs"]
+#[path = "ecology_renderer_fidelity_v2.rs"]
 pub mod ecology_renderer;
 pub mod framebuffer;
 pub mod inoculation_ceremony;
