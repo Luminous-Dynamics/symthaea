@@ -2,7 +2,7 @@
 
 Status: **design-only / blocked on Native Interoception v0.1 qualification**
 
-The v0.2 design now has several independently versioned identities: native baseline, study protocol, candidate definitions, scenarios, analysis rules, blind mapping, exclusion decisions, execution traces, and derived artifacts. This document defines the proposed root-of-evidence object that binds them into one auditable lineage.
+The v0.2 design has several independently versioned identities: native baseline, design freeze, study protocol, candidate definitions, scenarios, analysis rules, blind mapping, exclusion decisions, execution traces, validation contracts, and derived artifacts. This document defines the proposed root-of-evidence object that binds them into one auditable lineage.
 
 ## Principle
 
@@ -10,7 +10,7 @@ No single SHA-256 can prove scientific validity, but a root manifest can make si
 
 The evidence root should answer:
 
-> Exactly which qualified baseline, prospective study, candidate definitions, scenario cohort, analysis rules, and blinding commitment does this result claim to belong to?
+> Exactly which qualified baseline, frozen design, prospective study, candidate definitions, scenario cohort, analysis rules, capability boundary, adversarial-validation contract, and blinding commitment does this result claim to belong to?
 
 If any identity changes, the root identity changes.
 
@@ -24,7 +24,9 @@ Before confirmatory execution, construct and freeze a prospective root containin
 - v0.1 model-semantics version;
 - v0.1 qualification-receipt SHA-256;
 - v0.1 evidence-capsule SHA-256;
-- exact v0.2 observatory/design implementation source commit;
+- v0.2 `DesignFreezeManifest` SHA-256;
+- v0.2 `ImplementationStartReceipt` SHA-256;
+- exact v0.2 observatory implementation source commit;
 - study-preregistration SHA-256;
 - study-level preregistration SHA-256;
 - ordered primary/secondary candidate-definition digests;
@@ -36,6 +38,10 @@ Before confirmatory execution, construct and freeze a prospective root containin
 - arm-identity-mapping commitment SHA-256;
 - information-firewall contract/version;
 - temporal-alignment contract/version;
+- candidate-definition contract/version;
+- scenario/holdout contract/version;
+- capability-typed API contract/version;
+- adversarial-validation contract/version;
 - blinding-custody contract/version;
 - blinding-strength declaration;
 - no-feedback isolation-gate definition/version;
@@ -44,6 +50,14 @@ Before confirmatory execution, construct and freeze a prospective root containin
 - canonical SHA-256 of the entire validated root.
 
 This prospective root is frozen before confirmatory execution.
+
+## Design-freeze dependency
+
+The prospective evidence root may not claim `LockedConfirmatory` unless it binds a valid v0.2 design freeze and implementation-start receipt.
+
+The design freeze establishes which scientific/epistemic contracts governed implementation. The implementation-start receipt proves that runtime work began from the declared qualified v0.1 baseline and frozen v0.2 design.
+
+A later design change that is Class II/III under `V02_DESIGN_FREEZE.md` requires a new freeze/implementation identity before confirmatory use.
 
 ## AnalysisPlan identity
 
@@ -67,6 +81,7 @@ It should include:
 - required neutrality tests;
 - required no-feedback test;
 - required semantic-label-canary test;
+- required adversarial-validation suite/version;
 - deterministic robustness summary rules;
 - exclusion handling;
 - unblinding procedure/version.
@@ -82,10 +97,13 @@ Do not mix prospective identity with realized results.
 Contains what was promised before confirmatory data:
 
 - qualified baseline identity;
+- frozen design/implementation-start identity;
 - study/protocol identity;
 - candidates;
 - scenarios;
 - analysis;
+- capability/information boundaries;
+- adversarial-validation contract;
 - blinding commitment;
 - exclusions;
 - environment/toolchain identity.
@@ -101,6 +119,7 @@ After execution, produce a result package that binds the prospective root plus:
 - prefix-causality validation report digest;
 - no-feedback isolation report digest;
 - semantic-label-canary report digest;
+- `ObservatoryAdversarialValidationReport` digest;
 - blinded candidate-comparison report digest;
 - sensitivity/robustness report digest;
 - null-control report digest;
@@ -142,11 +161,35 @@ The realized evidence package must report:
 
 A mismatch is a hard integrity failure.
 
+## Capability-boundary closure
+
+The prospective root binds the capability-typed API contract/version used by qualified computation.
+
+Confirmatory evidence is invalid if the implementation exposes an undeclared authority path that allows online candidates to access:
+
+- future protocol/state information;
+- semantic arm mapping;
+- mutable native execution state;
+- oracle diagnostics through runtime escalation;
+- control/drive/cognitive output authority.
+
+Capability-boundary violations are integrity failures even when numerical results appear plausible.
+
+## Adversarial-validation closure
+
+Before semantic hypothesis evaluation can become qualified evidence, the realized package must bind an adversarial-validation report matching the locked suite/version.
+
+All integrity-blocking adversarial gates must pass. Candidate-disqualifying gates may fail only by producing the corresponding candidate failure status; they may not be reclassified away after unblinding.
+
+The suite must include known-malicious fixtures demonstrating that it catches at least future leakage, semantic leakage, hidden mutable state, oracle masquerading as online, and unavailable-as-zero behavior.
+
 ## Artifact dependency graph
 
 Recommended dependency direction:
 
 `v0.1 qualification/evidence`
+
+→ `v0.2 design freeze + implementation start`
 
 → `v0.2 prospective evidence root`
 
@@ -156,7 +199,7 @@ Recommended dependency direction:
 
 → `forecast trajectories / candidate time series`
 
-→ `prefix-causality + isolation + semantic-leak validation`
+→ `prefix-causality + isolation + semantic-leak + adversarial validation`
 
 → `frozen blinded comparison`
 
@@ -189,7 +232,7 @@ A failed primary hypothesis on an otherwise valid confirmatory study is a **qual
 
 An integrity failure means the evidence chain itself cannot support inference.
 
-Examples of integrity failure include future-information leakage, observational feedback into native execution, semantic-label leakage into blinded primary artifacts, execution replay mismatch, missing locked scenarios, or artifact/hash substitution.
+Examples include future-information leakage, observational feedback into native execution, semantic-label leakage into blinded primary artifacts, capability escalation, execution replay mismatch, invalid temporal alignment, missing locked scenarios, artifact/hash substitution, or failure of an integrity-blocking adversarial gate.
 
 ## Reproduction contract
 
@@ -197,16 +240,18 @@ An independent reproducer should be able to start from the prospective root and 
 
 1. exact source/dependency/toolchain identities;
 2. v0.1 baseline qualification;
-3. candidate definitions;
-4. scenario cohort materialization;
-5. study execution replay;
-6. exclusion decisions;
-7. derived forecast/candidate artifacts;
-8. prefix-causality, no-feedback, and semantic-canary gates;
-9. blinded comparison artifact;
-10. unblinding transformation;
-11. semantic hypothesis outcomes;
-12. final realized evidence digest.
+3. design-freeze and implementation-start identities;
+4. candidate definitions;
+5. scenario cohort materialization;
+6. study execution replay;
+7. exclusion decisions;
+8. derived forecast/candidate artifacts;
+9. capability boundary/source-dependency gates;
+10. prefix-causality, no-feedback, semantic-canary, and adversarial gates;
+11. blinded comparison artifact;
+12. unblinding transformation;
+13. semantic hypothesis outcomes;
+14. final realized evidence digest.
 
 Any discrepancy must identify the first dependency edge that fails instead of merely reporting a different final number.
 
@@ -216,13 +261,15 @@ In addition to machine-readable JSON, generate a concise deterministic text rece
 
 - root digest;
 - source commits;
+- design-freeze digest;
 - v0.1 qualification state;
 - run class;
 - primary candidate;
 - candidate/baseline counts;
 - scenario counts and disposition accounting;
 - blinding strength;
-- prefix-causality/no-feedback/semantic-canary status;
+- capability-boundary status;
+- prefix-causality/no-feedback/semantic-canary/adversarial status;
 - primary hypothesis outcomes;
 - integrity-gate status;
 - realized evidence package digest.
@@ -231,4 +278,4 @@ The human-readable receipt is a view of machine-readable evidence, not an indepe
 
 ## Claim boundary
 
-A valid evidence root can show that one fixed prospective research plan led reproducibly to one fixed set of results without silent substitution. It does not by itself establish that any regulatory candidate is emotion, subjective valence, sentience, or consciousness.
+A valid evidence root can show that one fixed prospective research plan led reproducibly to one fixed set of results without silent substitution and with declared information/authority boundaries. It does not by itself establish that any regulatory candidate is emotion, subjective valence, sentience, or consciousness.
