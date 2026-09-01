@@ -19,6 +19,8 @@
 
 #![forbid(unsafe_code)]
 
+mod identity_provider;
+
 use blake3::Hasher;
 use chrono::{TimeZone, Utc};
 use prometheus_parse::{Sample, Scrape, Value};
@@ -35,6 +37,7 @@ use symthaea_integration_core::{
 
 pub const PROMETHEUS_INTEGRATION_ID: &str = "prometheus-text";
 pub const PROMETHEUS_OBSERVE_CAPABILITY: &str = "observe.prometheus.metrics";
+pub const PROMETHEUS_IDENTITY_CAPABILITY: &str = "discover.prometheus.identity";
 
 /// How Prometheus `job`/`instance` labels may be interpreted for entity identity.
 ///
@@ -128,11 +131,7 @@ impl PrometheusTextObserver {
         let mut observations = Vec::new();
         let mut identity_claims: BTreeMap<String, IdentityClaim> = BTreeMap::new();
         for sample in &scrape.samples {
-            let sample_observations = sample_to_observations(
-                sample,
-                &context,
-                collected_at_unix_ms,
-            )?;
+            let sample_observations = sample_to_observations(sample, &context, collected_at_unix_ms)?;
             let evidence_ids: Vec<ObservationId> = sample_observations
                 .iter()
                 .map(|observation| observation.observation_id.clone())
@@ -268,14 +267,24 @@ pub fn integration_manifest() -> IntegrationManifest {
         provider: "Prometheus ecosystem".into(),
         protocols: vec!["prometheus-text".into()],
         entity_kinds: vec!["prometheus_target".into()],
-        capabilities: vec![CapabilityDeclaration {
-            name: PROMETHEUS_OBSERVE_CAPABILITY.into(),
-            class: CapabilityClass::Observe,
-            access: AccessMode::ReadOnly,
-            risk: RiskClass::ReadOnly,
-            reversible: false,
-            default_enabled: true,
-        }],
+        capabilities: vec![
+            CapabilityDeclaration {
+                name: PROMETHEUS_OBSERVE_CAPABILITY.into(),
+                class: CapabilityClass::Observe,
+                access: AccessMode::ReadOnly,
+                risk: RiskClass::ReadOnly,
+                reversible: false,
+                default_enabled: true,
+            },
+            CapabilityDeclaration {
+                name: PROMETHEUS_IDENTITY_CAPABILITY.into(),
+                class: CapabilityClass::Discover,
+                access: AccessMode::ReadOnly,
+                risk: RiskClass::ReadOnly,
+                reversible: false,
+                default_enabled: true,
+            },
+        ],
         credentials: vec![],
         maturity: MaturityLevel::E1FixtureParsing,
         default_read_only: true,
@@ -787,6 +796,7 @@ process_resident_memory_bytes{instance="api-1:9100",job="api"} 12345
         assert_eq!(manifest.maturity, MaturityLevel::E1FixtureParsing);
         assert!(manifest.validate_read_only_profile().is_ok());
         assert!(manifest.declares(PROMETHEUS_OBSERVE_CAPABILITY));
+        assert!(manifest.declares(PROMETHEUS_IDENTITY_CAPABILITY));
     }
 
     #[test]
@@ -943,7 +953,10 @@ process_resident_memory_bytes{instance="api-1:9100",job="api"} 12345
             1_777_593_600_000,
         )
         .unwrap();
-        assert_eq!(reparsed.batch().observations[0].quality.source_confidence, 0.0);
+        assert_eq!(
+            reparsed.batch().observations[0].quality.source_confidence,
+            0.0
+        );
         assert_eq!(reparsed.identity_claims()[0].source_confidence, 0.0);
     }
 }
