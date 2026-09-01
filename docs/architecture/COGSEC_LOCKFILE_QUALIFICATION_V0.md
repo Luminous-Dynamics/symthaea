@@ -29,6 +29,25 @@ bash scripts/cogsec-hydrate-lock-and-qualify.sh
 
 The utility is intentionally invokable through `bash`; executable-bit transport is not part of the evidence claim.
 
+## Protocol self-test
+
+The hydration control flow has an independent local contract test:
+
+```bash
+bash scripts/test-cogsec-lock-hydration.sh
+```
+
+The self-test creates disposable Git repositories and stubbed `rustc`/`cargo` executables. It verifies:
+
+- shell syntax;
+- hydration stops before qualification while `Cargo.lock` is uncommitted;
+- the same command enters qualification after the lock candidate is committed;
+- non-additive lock churn is rejected and rolled back;
+- dirty/untracked worktrees are rejected before mutation;
+- wrong pinned toolchains are rejected before mutation.
+
+This is control-flow evidence only. Stubbed Cargo cannot establish that the real Symthaea workspace resolves, compiles, tests, or passes Clippy.
+
 ## Pass 1: hydration
 
 If one or more CogSec workspace packages are absent from `Cargo.lock`, the utility:
@@ -107,6 +126,16 @@ The current focused stack requires lockfile membership for:
 - `symthaea-cogsec-shadow-runtime`
 
 The list is deliberately explicit so newly added CogSec packages cannot silently fall outside this qualification path.
+
+## Assurance levels
+
+Do not collapse these results into one green label:
+
+1. **Protocol self-test** — shell/control-flow and rollback behavior under stubbed tools.
+2. **Pinned local qualification** — real Cargo 1.96.0 hydration followed by the seven focused gates on the exact committed HEAD.
+3. **Hosted qualification** — GitHub Actions execution/check evidence for that HEAD.
+
+A stronger level cannot be inferred from a weaker one.
 
 ## Non-claims
 
