@@ -60,14 +60,10 @@ in {
         "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/architecture/BOOT_PROTOCOL_V1.md"
       ];
 
-      # D-Bus is the only structured authority this service needs. Starting at
-      # basic.target is early enough to observe network/services/graphics while
-      # initial systemd monotonic timestamps reconstruct earlier unit readiness.
       after = [ "dbus.service" ];
       wantedBy = [ "basic.target" ];
 
       unitConfig = {
-        # Never let a presentation observer hold shutdown/recovery transactions.
         IgnoreOnIsolate = true;
       };
 
@@ -103,16 +99,10 @@ in {
         RestrictNamespaces = true;
         RestrictAddressFamilies = [ "AF_UNIX" ];
         SystemCallArchitectures = "native";
-
-        # State persistence is the only writable path. Sending to the renderer's
-        # Unix datagram socket does not require filesystem write permission.
         ReadWritePaths = [ "/run/symthaea-boot" ];
       };
     };
 
-    # RuntimeDirectory is created by systemd before ExecStart. Generate the
-    # observer config there from declarative Nix settings without making config
-    # evaluation or the renderer dependent on the observer.
     systemd.services.symthaea-boot-observer.preStart = ''
       cat > /run/symthaea-boot/observer-v1.json <<'JSON'
       ${builtins.toJSON {
@@ -156,7 +146,7 @@ in {
           }
           {
             unit = "graphical.target";
-            domain = "graphics";
+            domain = "session";
             phase = "ready";
             criticality = "critical";
             boot_ready = true;
