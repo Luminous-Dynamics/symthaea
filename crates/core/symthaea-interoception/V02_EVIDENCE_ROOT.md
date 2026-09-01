@@ -36,8 +36,10 @@ Before confirmatory execution, construct and freeze a prospective root containin
 - arm-identity-mapping commitment SHA-256;
 - information-firewall contract/version;
 - temporal-alignment contract/version;
+- blinding-custody contract/version;
 - blinding-strength declaration;
 - no-feedback isolation-gate definition/version;
+- semantic-label-canary gate definition/version;
 - toolchain/dependency identities required by the v0.2 implementation;
 - canonical SHA-256 of the entire validated root.
 
@@ -64,6 +66,7 @@ It should include:
 - required prefix-causality tests;
 - required neutrality tests;
 - required no-feedback test;
+- required semantic-label-canary test;
 - deterministic robustness summary rules;
 - exclusion handling;
 - unblinding procedure/version.
@@ -97,6 +100,7 @@ After execution, produce a result package that binds the prospective root plus:
 - candidate time-series artifact digests;
 - prefix-causality validation report digest;
 - no-feedback isolation report digest;
+- semantic-label-canary report digest;
 - blinded candidate-comparison report digest;
 - sensitivity/robustness report digest;
 - null-control report digest;
@@ -152,7 +156,7 @@ Recommended dependency direction:
 
 → `forecast trajectories / candidate time series`
 
-→ `prefix-causality + isolation validation`
+→ `prefix-causality + isolation + semantic-leak validation`
 
 → `frozen blinded comparison`
 
@@ -185,6 +189,8 @@ A failed primary hypothesis on an otherwise valid confirmatory study is a **qual
 
 An integrity failure means the evidence chain itself cannot support inference.
 
+Examples of integrity failure include future-information leakage, observational feedback into native execution, semantic-label leakage into blinded primary artifacts, execution replay mismatch, missing locked scenarios, or artifact/hash substitution.
+
 ## Reproduction contract
 
 An independent reproducer should be able to start from the prospective root and verify:
@@ -196,7 +202,7 @@ An independent reproducer should be able to start from the prospective root and 
 5. study execution replay;
 6. exclusion decisions;
 7. derived forecast/candidate artifacts;
-8. prefix-causality and no-feedback gates;
+8. prefix-causality, no-feedback, and semantic-canary gates;
 9. blinded comparison artifact;
 10. unblinding transformation;
 11. semantic hypothesis outcomes;
@@ -216,6 +222,7 @@ In addition to machine-readable JSON, generate a concise deterministic text rece
 - candidate/baseline counts;
 - scenario counts and disposition accounting;
 - blinding strength;
+- prefix-causality/no-feedback/semantic-canary status;
 - primary hypothesis outcomes;
 - integrity-gate status;
 - realized evidence package digest.
