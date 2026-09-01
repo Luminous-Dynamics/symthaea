@@ -15,6 +15,8 @@ The repaired lower source head used for the next qualification attempt is:
 
 The lower repair includes the observed `JoinHandle::join` ownership correction, committed assurance-crate lockfile resolution, rustfmt normalization, test-only import cleanup, and a non-mutating AI Assurance qualification workflow.
 
+On 2026-09-01 the live PR #196 base pointer was explicitly refreshed to `993055b49208ecc6786a382b657ab64722938a92` before this qualification-trigger commit. Any earlier run whose pull-request payload still records `546049fb4c9cbbab27a22781527d795df1bc2cef` remains stale evidence and must be ignored for v1.2 qualification.
+
 ## Previous red-run diagnosis
 
 The previous PR #196 job had two independent failure classes:
