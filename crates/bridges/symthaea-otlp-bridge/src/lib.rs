@@ -29,7 +29,7 @@ use symthaea_integration_core::{
 
 pub const OTLP_METRICS_INTEGRATION_ID: &str = "otlp-metrics";
 pub const OTLP_OBSERVE_CAPABILITY: &str = "observe.otlp.metrics.scalar";
-pub const OTLP_IDENTITY_CAPABILITY: &str = "discover.otlp.identity";
+pub const OTLP_IDENTITY_CAPABILITY: &str = "discover.entity.identity";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OtlpMetricsContext {
