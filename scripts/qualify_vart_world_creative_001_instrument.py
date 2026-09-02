@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -12,61 +13,11 @@ from pathlib import Path
 from typing import Any
 
 EXPERIMENT_ID = "VART-WORLD-CREATIVE-001"
-
-INSTRUMENT_FILES = [
-    ".github/workflows/vart-world-creative-context.yml",
-    ".github/workflows/vart-world-creative-post-pilot.yml",
-    ".github/workflows/vart-world-creative-verifier.yml",
-    "docs/research/VART_WORLD_CREATIVE_001_ANALYSIS_CONTRACT.template.json",
-    "docs/research/VART_WORLD_CREATIVE_001_CALIBRATION_RECONSTRUCTION_V1.md",
-    "docs/research/VART_WORLD_CREATIVE_001_CONFIRMATORY_FREEZE.template.json",
-    "docs/research/VART_WORLD_CREATIVE_001_DUAL_SOURCE_IDENTITY_V1.md",
-    "docs/research/VART_WORLD_CREATIVE_001_EVIDENCE_PACKAGE_V1.md",
-    "docs/research/VART_WORLD_CREATIVE_001_EXECUTION_CONTEXT_V1.md",
-    "docs/research/VART_WORLD_CREATIVE_001_EXECUTION_SEQUENCE.md",
-    "docs/research/VART_WORLD_CREATIVE_001_INSTRUMENT_QUALIFICATION_V1.md",
-    "docs/research/VART_WORLD_CREATIVE_001_PILOT_ANALYSIS.json",
-    "docs/research/VART_WORLD_CREATIVE_001_PILOT_MATRIX.md",
-    "docs/research/VART_WORLD_CREATIVE_001_PILOT_METRICS.json",
-    "docs/research/VART_WORLD_CREATIVE_001_PILOT_RUN.template.json",
-    "docs/research/VART_WORLD_CREATIVE_001_PLAN.template.json",
-    "docs/research/VART_WORLD_CREATIVE_001_POST_PILOT_DISPOSITION.template.json",
-    "docs/research/VART_WORLD_CREATIVE_001_POST_PILOT_DISPOSITION_V1.md",
-    "docs/research/VART_WORLD_CREATIVE_001_RANDOM_VALID_TEST_VECTORS.json",
-    "docs/research/VART_WORLD_CREATIVE_001_RANDOM_VALID_V1.md",
-    "docs/research/VART_WORLD_CREATIVE_001_RUNTIME_ADAPTER_V1.md",
-    "docs/research/VART_WORLD_CREATIVE_001_SOURCE_CLOSURE.template.json",
-    "docs/research/VART_WORLD_CREATIVE_001_SOURCE_CLOSURE_V1.md",
-    "docs/research/VART_WORLD_CREATIVE_001_STATE_EQUIVALENCE_V1.md",
-    "docs/research/VART_WORLD_CREATIVE_001_STOP_GO.md",
-    "docs/research/VART_WORLD_CREATIVE_001_TRIAL_MANIFEST.schema.json",
-    "docs/research/VART_WORLD_CREATIVE_001_VERIFIER_NEGATIVE_SUITE.md",
-    "docs/research/VART_WORLD_CREATIVE_001_WORLD_IDENTITY_V1.md",
-    "scripts/audit_vart_world_creative_001_pilot.py",
-    "scripts/qualify_vart_world_creative_001_instrument.py",
-    "scripts/run_vart_world_creative_001_pilot.py",
-    "scripts/run_vart_world_creative_001_pilot_anchored.py",
-    "scripts/test_audit_vart_world_creative_001_pilot.py",
-    "scripts/test_run_vart_world_creative_001_pilot_anchored.py",
-    "scripts/test_verify_vart_world_creative_001.py",
-    "scripts/test_verify_vart_world_creative_001_calibration.py",
-    "scripts/test_verify_vart_world_creative_001_context.py",
-    "scripts/test_verify_vart_world_creative_001_freeze_eligibility.py",
-    "scripts/test_verify_vart_world_creative_001_identity.py",
-    "scripts/test_verify_vart_world_creative_001_n1_n20.py",
-    "scripts/test_verify_vart_world_creative_001_post_pilot.py",
-    "scripts/test_verify_vart_world_creative_001_state.py",
-    "scripts/verify_vart_world_creative_001.py",
-    "scripts/verify_vart_world_creative_001_calibration.py",
-    "scripts/verify_vart_world_creative_001_context.py",
-    "scripts/verify_vart_world_creative_001_freeze_eligibility.py",
-    "scripts/verify_vart_world_creative_001_identity.py",
-    "scripts/verify_vart_world_creative_001_pilot.py",
-    "scripts/verify_vart_world_creative_001_post_pilot.py",
-    "scripts/verify_vart_world_creative_001_qualified.py",
-    "scripts/verify_vart_world_creative_001_state.py",
-]
-
+INSTRUMENT_PATTERNS = (
+    "scripts/*vart_world_creative_001*.py",
+    "docs/research/VART_WORLD_CREATIVE_001_*",
+    ".github/workflows/vart-world-creative-*.yml",
+)
 SUITES = [
     ("core", "scripts/test_verify_vart_world_creative_001.py"),
     ("n1_n20", "scripts/test_verify_vart_world_creative_001_n1_n20.py"),
@@ -108,8 +59,19 @@ def git(repo: Path, *args: str) -> str:
     return proc.stdout.strip()
 
 
+def meaningful_status_lines(repo: Path) -> list[str]:
+    lines = git(repo, "status", "--porcelain=v1", "--untracked-files=all").splitlines()
+    meaningful: list[str] = []
+    for line in lines:
+        path = line[3:] if len(line) >= 4 else line
+        if "/__pycache__/" in f"/{path}" or path.endswith(".pyc"):
+            continue
+        meaningful.append(line)
+    return meaningful
+
+
 def require_clean(repo: Path, stage: str) -> None:
-    dirty = git(repo, "status", "--porcelain=v1", "--untracked-files=all")
+    dirty = meaningful_status_lines(repo)
     if dirty:
         raise QualificationError(f"instrument checkout dirty at {stage}: {dirty}")
 
@@ -122,18 +84,38 @@ def require_external(path: Path, repo: Path) -> None:
     raise QualificationError(f"qualification receipt must be outside instrument checkout: {path}")
 
 
+def discover_instrument_files(repo: Path) -> list[str]:
+    found: set[str] = set()
+    for pattern in INSTRUMENT_PATTERNS:
+        for path in repo.glob(pattern):
+            if path.is_file():
+                found.add(path.relative_to(repo).as_posix())
+    files = sorted(found)
+    if not files:
+        raise QualificationError("instrument manifest discovery returned no files")
+    for _, suite in SUITES:
+        if suite not in found:
+            raise QualificationError(f"registered suite is outside instrument manifest: {suite}")
+    return files
+
+
 def build_manifest(repo: Path) -> tuple[list[dict[str, str]], str]:
-    entries: list[dict[str, str]] = []
-    for rel in INSTRUMENT_FILES:
-        path = repo / rel
-        if not path.is_file():
-            raise QualificationError(f"missing instrument file: {rel}")
-        entries.append({"path": rel, "sha256": sha256_file(path)})
+    entries = [{"path": rel, "sha256": sha256_file(repo / rel)} for rel in discover_instrument_files(repo)]
     return entries, sha256_bytes(canonical_bytes(entries))
 
 
 def run_suite(repo: Path, name: str, rel: str) -> dict[str, Any]:
-    proc = subprocess.run([sys.executable, rel], cwd=repo, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    env = os.environ.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    proc = subprocess.run(
+        [sys.executable, rel],
+        cwd=repo,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
     return {
         "name": name,
         "argv": [sys.executable, rel],
@@ -181,21 +163,15 @@ def main() -> int:
         "schema": "symthaea.vart-world-creative-001.instrument-qualification.v1",
         "experiment_id": EXPERIMENT_ID,
         "status": "qualified",
-        "instrument_source": {
-            "head": head,
-            "tree": tree,
-            "dirty": False,
-        },
+        "instrument_source": {"head": head, "tree": tree, "dirty": False},
+        "instrument_manifest_patterns": list(INSTRUMENT_PATTERNS),
         "instrument_manifest_sha256": manifest_sha,
         "instrument_file_count": len(manifest),
         "instrument_files": manifest,
         "suites": suites,
         "suite_count": len(suites),
         "all_suites_pass": True,
-        "python": {
-            "executable": sys.executable,
-            "version": platform.python_version(),
-        },
+        "python": {"executable": sys.executable, "version": platform.python_version()},
         "qualified_utc": datetime.now(timezone.utc).isoformat(),
         "confirmatory_execution_authorized": False,
         "claim_authorized": False,
