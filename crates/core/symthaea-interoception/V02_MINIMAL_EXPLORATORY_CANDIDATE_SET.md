@@ -63,6 +63,16 @@ Purpose: simplest normative current-state burden baseline without epistemic prec
 
 `e02_current_drive_magnitude_v1`
 
+Coordinate:
+
+- relation: `BaselineReactive`;
+- weighting: not applicable;
+- aggregation: fixed Euclidean norm of the eight-channel current drive-rate vector;
+- temporal: `T0Instantaneous`;
+- forecast: `None`;
+- information: `OfflinePrefixCausal`;
+- history: `H0CurrentNativeStateOnly`.
+
 Purpose:
 
 - test whether candidate structure is merely stimulus/load magnitude;
@@ -176,15 +186,15 @@ Purpose: test whether absolute projected duration/intensity under current condit
 
 E08 uses the same v0.1 dynamics-aware constant-drive trajectory family/horizon/discount convention as the forecast-bearing candidates, but does not normalize cumulative weighted burden by total discount weight. It is therefore distinct from the legacy v0.1 normalized `discounted_debt`/mean quantity.
 
-### E09 — explicit confidence baseline
+### E09 — explicit confidence nuisance baseline
 
-`e09_r0_w3_a3_t0_h0_confidence_mean_v1`
+`e09_baseline_confidence_w3_a3_t0_h0_v1`
 
 Coordinate:
 
-- relation: descriptive current confidence/precision;
+- relation: `BaselineNuisance`;
 - weighting: `W3ConfidenceOnly`;
-- aggregation: fixed eight-channel arithmetic mean unless a separately frozen confidence aggregation contract supersedes this choice;
+- aggregation: fixed eight-channel arithmetic mean;
 - temporal: `T0Instantaneous`;
 - forecast: `None`;
 - information: `OfflinePrefixCausal`;
@@ -192,7 +202,7 @@ Coordinate:
 
 Purpose: test whether a result attributed to viability is actually tracking confidence/precision.
 
-This is not a burden candidate.
+This is explicitly **not** a burden relation. Its baseline relation class prevents `W3ConfidenceOnly` from silently inheriting burden semantics.
 
 ### E10 — legacy v0.1 burden baseline
 
@@ -255,9 +265,7 @@ Do not add another candidate merely because it is available in the factor space.
 
 ## 4. Primary forecast-policy decision
 
-For the first exploratory lineage, the primary prefix-causal forecast policy for E04, E05, E06, E07, and E08 is:
-
-`ObservedDrivePersistence`.
+For the first exploratory lineage, the primary prefix-causal forecast policy for E04, E05, E06, E07, and E08 is `ObservedDrivePersistence`.
 
 Rationale:
 
@@ -269,7 +277,7 @@ Rationale:
 
 The policy identity includes the exact v0.1 dynamics-aware rollout semantics, horizon, discount, and timestep requirements.
 
-`NativeZeroInputRecovery` and `KinematicVelocity` remain prospectively named **sensitivity/diagnostic policies**, not duplicate primary candidates. They may be used in locked forecast-policy disagreement scenarios and robustness reports, but they do not multiply the E00–E11 primary exploratory registry.
+`NativeZeroInputRecovery` and `KinematicVelocity` remain prospectively named sensitivity/diagnostic policies, not duplicate primary candidates. They may be used in locked forecast-policy disagreement scenarios and robustness reports, but they do not multiply the E00–E11 primary exploratory registry.
 
 `OracleDiagnostic` remains an upper-bound/diagnostic authority only and can never replace the primary policy.
 
@@ -293,22 +301,22 @@ H1 candidates may read same-scenario history directly from the immutable prefix,
 
 The initial scenario/cut-point matrix must include at least one prospective discriminator for:
 
-- E03 vs E01 — change vs current burden;
-- E03 vs E02 — realized change vs drive magnitude;
-- E04 vs E03 — forecast residual vs actual change;
-- E04 vs E02 — forecast residual vs current drive magnitude;
-- E05 vs E04 — future revision vs one-step residual;
-- E05 vs E06 — aligned future revision vs horizon turnover;
-- E05 vs E02 — future revision vs current drive magnitude;
-- E07 vs E01 — urgency vs current burden;
-- E07 vs E02 — urgency vs current drive magnitude;
-- E08 vs E01 — prospective cumulative exposure vs instantaneous burden;
-- E08 vs E07 — cumulative projected burden vs breach latency;
-- E08 vs E02 — projected exposure vs current drive magnitude;
-- E09 vs E01 — confidence vs viability burden;
-- E10 vs E01 — legacy precision×importance vs viability-only burden;
-- E11 vs E01 — trailing history vs current burden;
-- E11 vs E03 — trailing history vs immediate realized change;
+- E03 vs E01;
+- E03 vs E02;
+- E04 vs E03;
+- E04 vs E02;
+- E05 vs E04;
+- E05 vs E06;
+- E05 vs E02;
+- E07 vs E01;
+- E07 vs E02;
+- E08 vs E01;
+- E08 vs E07;
+- E08 vs E02;
+- E09 vs E01;
+- E10 vs E01;
+- E11 vs E01;
+- E11 vs E03;
 - every non-null candidate vs E00.
 
 If any required pair lacks a discriminator, the exploratory design is incomplete.
@@ -317,15 +325,7 @@ If any required pair lacks a discriminator, the exploratory design is incomplete
 
 The exploratory phase does not have to produce a winner.
 
-Prospectively valid outcomes include:
-
-- one candidate supported beyond all required baselines;
-- several candidates in one observational equivalence class;
-- different candidates explaining different scenario families;
-- simpler baseline dominates;
-- no candidate clears the minimum discrimination margin;
-- weighting/temporal/history ambiguity remains unresolved;
-- no unique candidate.
+Prospectively valid outcomes include one candidate supported beyond all required baselines, multiple observational equivalence classes, different target-specific candidates, a simpler baseline dominating, unresolved ambiguity, no unique candidate, or a complete null.
 
 Use a prospective parsimony rule: when two candidates are empirically equivalent under all registered discriminators, retain the simpler/lower-information candidate as the preferred explanation and preserve the equivalence result.
 
@@ -351,21 +351,11 @@ A future `ExploratoryCandidateSetManifest` should bind:
 - preprocessing policy = no fitted preprocessing;
 - evaluator persistent-state policy = `NoneAcrossEvaluationCoordinates`;
 - scenario-discrimination manifest digest;
+- functional-evaluation/promotion contract digest;
 - selection/parsimony rule digest;
 - canonical SHA-256.
 
-Validation must reject:
-
-- missing required role;
-- duplicate role;
-- extra unregistered candidate;
-- candidate-definition digest mismatch;
-- E11 history window other than the frozen trailing-16 definition;
-- absent required discriminator;
-- primary forecast policy other than `ObservedDrivePersistence`;
-- oracle/retrospective candidate in a primary role;
-- fitted/adaptive preprocessing;
-- cross-evaluation mutable-state authority.
+Validation must reject missing/duplicate/extra candidate roles, candidate-definition mismatch, E11 window drift, missing discriminators, primary forecast-policy substitution, oracle/retrospective primary authority, fitted/adaptive preprocessing, or cross-evaluation mutable-state authority.
 
 ## 11. Claim boundary
 
