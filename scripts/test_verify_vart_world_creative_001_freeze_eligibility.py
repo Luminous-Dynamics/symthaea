@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import copy
-import hashlib
 import json
 import tempfile
 from pathlib import Path
@@ -13,17 +11,21 @@ H64_A = "a" * 64
 H64_B = "b" * 64
 H64_C = "c" * 64
 H64_D = "d" * 64
+H64_E = "e" * 64
+H64_F = "f" * 64
 H40_A = "a" * 40
 H40_B = "b" * 40
 H40_C = "c" * 40
 H40_D = "d" * 40
-V05_HEAD = "33820b3d9e904280e6264719fe7717cb2e5dd5bb"
-V05_TREE = "e93c6dbfa05b602100ff924efaa5d95f92ef5a65"
+H40_E = "e" * 40
+H40_F = "f" * 40
+V05_HEAD = gate.V05_HEAD
+V05_TREE = gate.V05_TREE
 
 
 def dump(path: Path, value: object) -> str:
     path.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return gate.sha256_file(path)
 
 
 def disposition() -> dict[str, object]:
@@ -69,31 +71,28 @@ def anchor() -> dict[str, object]:
         "noncanonical": True,
         "pilot_config_sha256": H64_D,
         "pilot_design_sha256": H64_C,
-        "source_head": H40_A,
-        "source_tree": H40_B,
+        "subject_source_head": H40_A,
+        "subject_source_tree": H40_B,
+        "instrument_source_head": H40_E,
+        "instrument_source_tree": H40_F,
+        "runner_source_sha256": H64_E,
+        "auditor_source_sha256": H64_F,
         "confirmatory_execution_authorized": False,
         "claim_authorized": False,
     }
 
 
 def attestation(anchor_sha: str) -> dict[str, object]:
-    return {
-        "schema": "symthaea.vart-world-creative-001.pilot-anchor-attestation.v1",
-        "experiment_id": gate.EXPERIMENT_ID,
-        "campaign": "pilot",
-        "noncanonical": True,
-        "preexecution_anchor_sha256": anchor_sha,
-        "pilot_config_sha256": H64_D,
-        "pilot_design_sha256": H64_C,
-        "pilot_receipt_sha256": H64_A,
-        "pilot_evidence_closure_sha256": H64_B,
-        "audit_verdict": "PILOT_AUDIT_PASS",
-        "confirmatory_execution_authorized": False,
-        "claim_authorized": False,
-    }
+    obj = dict(anchor())
+    obj["schema"] = "symthaea.vart-world-creative-001.pilot-anchor-attestation.v1"
+    obj["preexecution_anchor_sha256"] = anchor_sha
+    obj["pilot_receipt_sha256"] = H64_A
+    obj["pilot_evidence_closure_sha256"] = H64_B
+    obj["audit_verdict"] = "PILOT_AUDIT_PASS"
+    return obj
 
 
-def source_closure() -> dict[str, object]:
+def subject_source_closure() -> dict[str, object]:
     return {
         "schema": "symthaea.vart-world-creative-001.source-closure.v1",
         "experiment_id": gate.EXPERIMENT_ID,
@@ -111,7 +110,7 @@ def source_closure() -> dict[str, object]:
         },
         "remote": {
             "repository_full_name": "Luminous-Dynamics/symthaea",
-            "ref": "refs/heads/research/vart-confirmatory",
+            "ref": "refs/heads/research/vart-confirmatory-subject",
             "fetch_verified": True,
             "fetched_head": H40_C,
             "fetched_tree": H40_D,
@@ -130,7 +129,48 @@ def source_closure() -> dict[str, object]:
     }
 
 
-def expect_reject(paths: tuple[Path, Path, Path, Path], code: str) -> None:
+def instrument_qualification() -> dict[str, object]:
+    return {
+        "schema": "symthaea.vart-world-creative-001.instrument-qualification.v1",
+        "experiment_id": gate.EXPERIMENT_ID,
+        "status": "qualified",
+        "instrument_source": {"head": H40_E, "tree": H40_F, "dirty": False},
+        "instrument_manifest_sha256": H64_D,
+        "instrument_environment_digest": H64_E,
+        "all_suites_pass": True,
+        "confirmatory_execution_authorized": False,
+        "claim_authorized": False,
+    }
+
+
+def instrument_source_closure(qualification_sha: str) -> dict[str, object]:
+    return {
+        "schema": "symthaea.vart-world-creative-001.instrument-source-closure.v1",
+        "experiment_id": gate.EXPERIMENT_ID,
+        "status": "qualified",
+        "instrument_source": {"head": H40_E, "tree": H40_F},
+        "remote": {
+            "repository_full_name": "Luminous-Dynamics/symthaea",
+            "ref": "refs/heads/research/vart-world-creative-001-execution",
+            "fetch_verified": True,
+            "fetched_head": H40_E,
+            "fetched_tree": H40_F,
+            "fresh_checkout_verified": True,
+            "fresh_checkout_head": H40_E,
+            "fresh_checkout_tree": H40_F,
+        },
+        "qualification": {
+            "instrument_qualification_receipt_sha256": qualification_sha,
+            "instrument_manifest_sha256": H64_D,
+            "instrument_environment_digest": H64_E,
+            "all_suites_pass": True,
+        },
+        "confirmatory_execution_authorized": False,
+        "claim_authorized": False,
+    }
+
+
+def expect_reject(paths: tuple[Path, ...], code: str) -> None:
     try:
         gate.verify(*paths)
     except gate.Reject as exc:
@@ -144,66 +184,107 @@ with tempfile.TemporaryDirectory(prefix="vart-freeze-eligibility-") as td:
     disposition_path = root / "disposition.json"
     anchor_path = root / "anchor.json"
     attestation_path = root / "attestation.json"
-    source_path = root / "source.json"
+    subject_path = root / "subject-source.json"
+    instrument_q_path = root / "instrument-qualification.json"
+    instrument_source_path = root / "instrument-source.json"
 
     dump(disposition_path, disposition())
     anchor_sha = dump(anchor_path, anchor())
     dump(attestation_path, attestation(anchor_sha))
-    dump(source_path, source_closure())
-    paths = (disposition_path, anchor_path, attestation_path, source_path)
+    dump(subject_path, subject_source_closure())
+    instrument_q_sha = dump(instrument_q_path, instrument_qualification())
+    dump(instrument_source_path, instrument_source_closure(instrument_q_sha))
+    paths = (
+        disposition_path,
+        anchor_path,
+        attestation_path,
+        subject_path,
+        instrument_q_path,
+        instrument_source_path,
+    )
 
     result = gate.verify(*paths)
     assert result["verdict"] == "CONFIRMATORY_FREEZE_PREPARATION_ELIGIBLE"
+    assert result["instrument_source_head"] == H40_E
     assert result["confirmatory_execution_authorized"] is False
     assert result["claim_authorized"] is False
 
-    # F1 — attestation may not substitute a different pre-execution anchor.
+    # F1 — post-run attestation cannot substitute a different pre-execution anchor.
     obj = attestation(anchor_sha)
     obj["preexecution_anchor_sha256"] = H64_A
     dump(attestation_path, obj)
     expect_reject(paths, "PILOT_ANCHOR_DIGEST_MISMATCH")
     dump(attestation_path, attestation(anchor_sha))
 
-    # F2 — attested semantic design must equal the dispositioned pilot design.
+    # F2 — pilot design may not drift between pre-anchor and post-attestation.
     obj = attestation(anchor_sha)
-    obj["pilot_design_sha256"] = H64_D
+    obj["pilot_design_sha256"] = H64_F
     dump(attestation_path, obj)
     expect_reject(paths, "PILOT_ANCHOR_DIGEST_MISMATCH")
     dump(attestation_path, attestation(anchor_sha))
 
-    # F3 — source closure must descend from the dispositioned pilot source identity.
-    obj = source_closure()
+    # F3 — subject source closure must descend from the dispositioned pilot subject.
+    obj = subject_source_closure()
     obj["pilot_predecessor"]["head"] = H40_D
-    dump(source_path, obj)
+    dump(subject_path, obj)
     expect_reject(paths, "SOURCE_CLOSURE_PILOT_PREDECESSOR_MISMATCH")
-    dump(source_path, source_closure())
+    dump(subject_path, subject_source_closure())
 
-    # F4 — a named remote that resolves to a different HEAD is not closure.
-    obj = source_closure()
+    # F4 — subject remote must resolve to exact confirmatory HEAD/TREE.
+    obj = subject_source_closure()
     obj["remote"]["fetched_head"] = H40_A
-    dump(source_path, obj)
+    dump(subject_path, obj)
     expect_reject(paths, "SOURCE_CLOSURE_REMOTE_IDENTITY_MISMATCH")
-    dump(source_path, source_closure())
+    dump(subject_path, subject_source_closure())
 
-    # F5 — fresh-checkout equivalence is required, not merely ls-remote reachability.
-    obj = source_closure()
-    obj["remote"]["fresh_checkout_verified"] = False
-    dump(source_path, obj)
-    expect_reject(paths, "SOURCE_CLOSURE_REMOTE_NOT_VERIFIED")
-    dump(source_path, source_closure())
+    # F5 — the qualified v0.5-A baseline identity is exact, not any 40-hex pair.
+    obj = subject_source_closure()
+    obj["confirmatory_source"]["parent_v05a_head"] = H40_A
+    dump(subject_path, obj)
+    expect_reject(paths, "SOURCE_CLOSURE_BASELINE_MISMATCH")
+    dump(subject_path, subject_source_closure())
 
-    # F6 — transition evidence can never authorize confirmatory execution itself.
-    obj = source_closure()
+    # F6 — source closure cannot authorize execution itself.
+    obj = subject_source_closure()
     obj["confirmatory_execution_authorized"] = True
-    dump(source_path, obj)
+    dump(subject_path, obj)
     expect_reject(paths, "FREEZE_ELIGIBILITY_AUTHORITY_VIOLATION")
-    dump(source_path, source_closure())
+    dump(subject_path, subject_source_closure())
 
-    # F7 — reproduction context must contain real digests and independent-checkout gate.
-    obj = source_closure()
-    obj["reproduction"]["environment_digest"] = None
-    dump(source_path, obj)
-    expect_reject(paths, "FREEZE_ELIGIBILITY_INVALID")
-    dump(source_path, source_closure())
+    # F7 — instrument qualification must belong to the anchored instrument source.
+    obj = instrument_qualification()
+    obj["instrument_source"]["head"] = H40_A
+    new_q_sha = dump(instrument_q_path, obj)
+    dump(instrument_source_path, instrument_source_closure(new_q_sha))
+    expect_reject(paths, "INSTRUMENT_QUALIFICATION_SOURCE_MISMATCH")
+    instrument_q_sha = dump(instrument_q_path, instrument_qualification())
+    dump(instrument_source_path, instrument_source_closure(instrument_q_sha))
 
-print("PASS: freeze-eligibility canonical acceptance + F1-F7 deterministic rejection")
+    # F8 — instrument source closure must bind the exact qualification receipt bytes.
+    obj = instrument_source_closure(instrument_q_sha)
+    obj["qualification"]["instrument_qualification_receipt_sha256"] = H64_A
+    dump(instrument_source_path, obj)
+    expect_reject(paths, "INSTRUMENT_SOURCE_CLOSURE_QUALIFICATION_MISMATCH")
+    dump(instrument_source_path, instrument_source_closure(instrument_q_sha))
+
+    # F9 — instrument durable ref/fresh checkout identity cannot be substituted.
+    obj = instrument_source_closure(instrument_q_sha)
+    obj["remote"]["fresh_checkout_tree"] = H40_A
+    dump(instrument_source_path, obj)
+    expect_reject(paths, "INSTRUMENT_SOURCE_CLOSURE_REMOTE_IDENTITY_MISMATCH")
+    dump(instrument_source_path, instrument_source_closure(instrument_q_sha))
+
+    # F10 — instrument closure cannot escalate authority.
+    obj = instrument_source_closure(instrument_q_sha)
+    obj["claim_authorized"] = True
+    dump(instrument_source_path, obj)
+    expect_reject(paths, "FREEZE_ELIGIBILITY_AUTHORITY_VIOLATION")
+    dump(instrument_source_path, instrument_source_closure(instrument_q_sha))
+
+    # F11 — instrument identity is part of the pre/post anchor, not a mutable label.
+    obj = attestation(anchor_sha)
+    obj["instrument_source_tree"] = H40_A
+    dump(attestation_path, obj)
+    expect_reject(paths, "PILOT_ANCHOR_DIGEST_MISMATCH")
+
+print("PASS: dual-source freeze eligibility acceptance + F1-F11 deterministic rejection")
