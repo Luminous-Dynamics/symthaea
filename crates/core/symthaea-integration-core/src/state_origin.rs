@@ -19,6 +19,7 @@ pub const DESIRED_STATE_ORIGIN_ATTRIBUTE: &str = "symthaea.desired_origin";
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
+#[serde(rename_all = "snake_case")]
 pub enum DesiredStateOrigin {
     /// Legacy or source data that does not yet identify how the target arose.
     Unspecified,
@@ -67,7 +68,9 @@ impl DesiredStateOrigin {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize,
+)]
 pub struct DesiredStateOriginEvidence {
     pub origin: DesiredStateOrigin,
     /// False only when legacy/missing metadata was conservatively mapped to
