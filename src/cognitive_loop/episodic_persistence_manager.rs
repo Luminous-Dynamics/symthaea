@@ -96,6 +96,32 @@ impl EpisodicPersistenceManager {
         &self.provenance
     }
 
+    /// Behavior-neutral shadow audit of compressed-input episodic recall.
+    ///
+    /// The production recall path is not replaced or mutated. This method reports
+    /// only what provenance-aware retrieval views would have admitted from the same
+    /// similarity-ranked candidate set.
+    pub fn shadow_audit_input_recall(
+        &self,
+        query: &[f32],
+        top_k: usize,
+    ) -> Option<crate::memory::EpisodicShadowRecallAudit> {
+        self.replay.as_ref().map(|replay| {
+            crate::memory::shadow_audit_input_similarity(replay, &self.provenance, query, top_k)
+        })
+    }
+
+    /// Behavior-neutral shadow audit of semantic-embedding episodic recall.
+    pub fn shadow_audit_embedding_recall(
+        &self,
+        query: &[f32],
+        top_k: usize,
+    ) -> Option<crate::memory::EpisodicShadowRecallAudit> {
+        self.replay.as_ref().map(|replay| {
+            crate::memory::shadow_audit_embedding_similarity(replay, &self.provenance, query, top_k)
+        })
+    }
+
     /// Replace the replay store and deliberately reset provenance bindings.
     ///
     /// This prevents stale sidecar entries from surviving a wholesale episodic
@@ -227,6 +253,35 @@ mod tests {
 
         mgr.replace_replay(None);
         assert!(mgr.provenance_index().is_empty());
+    }
+
+    #[test]
+    fn shadow_audit_is_behavior_neutral_for_legacy_unknown_memory() {
+        let ep = episode(10);
+        let query = ep.input.values.clone();
+        let mut replay = crate::memory::EpisodicMemory::new(
+            crate::memory::EpisodicReplayConfig::broad_capture(),
+        );
+        assert!(replay.store_if_significant(ep));
+        let before_len = replay.len();
+        let mgr = EpisodicPersistenceManager::new(Some(replay));
+
+        let audit = mgr.shadow_audit_input_recall(&query, 1).unwrap();
+        assert_eq!(audit.raw_returned, 1);
+        assert_eq!(audit.grounded_history.would_return, 0);
+        assert_eq!(audit.grounded_history.excluded_unknown, 1);
+        assert!(audit.grounded_history.would_change_selection);
+        assert_eq!(mgr.replay.as_ref().unwrap().len(), before_len);
+        assert!(mgr.provenance_index().is_empty());
+    }
+
+    #[test]
+    fn shadow_audit_returns_none_when_replay_is_disabled() {
+        let mgr = EpisodicPersistenceManager::new(None);
+        assert!(mgr.shadow_audit_input_recall(&[0.0, 1.0], 3).is_none());
+        assert!(mgr
+            .shadow_audit_embedding_recall(&[0.0, 1.0], 3)
+            .is_none());
     }
 
     #[test]
