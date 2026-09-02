@@ -73,10 +73,11 @@ def rows_from_inventory(obj: Any) -> list[dict[str, Any]]:
     rows = obj.get("trials")
     require(isinstance(rows, list) and rows, "LAUNCH_INVENTORY_INVALID", "trials")
     seen: set[str] = set()
+    seen_orders: set[int] = set()
     out: list[dict[str, Any]] = []
     for i, raw in enumerate(rows):
         require(isinstance(raw, dict), "LAUNCH_INVENTORY_INVALID", f"trials[{i}]")
-        for key in ("trial_id", "subcampaign", "policy", "fixture", "world_cluster_sha256", "world_lineage_sha256", "revision_index"):
+        for key in ("trial_id", "subcampaign", "policy", "fixture", "seed", "world_cluster_sha256", "world_lineage_sha256", "revision_index", "run_order"):
             require(key in raw, "LAUNCH_INVENTORY_INVALID", f"trials[{i}].{key}")
         trial_id = raw["trial_id"]
         require(isinstance(trial_id, str) and trial_id and trial_id not in seen,
@@ -87,12 +88,23 @@ def rows_from_inventory(obj: Any) -> list[dict[str, Any]]:
         revision = raw["revision_index"]
         require(isinstance(revision, int) and not isinstance(revision, bool) and revision >= 0,
                 "LAUNCH_INVENTORY_INVALID", f"{trial_id}.revision_index")
+        seed = raw["seed"]
+        require(isinstance(seed, int) and not isinstance(seed, bool) and 0 <= seed <= (1 << 64) - 1,
+                "LAUNCH_INVENTORY_INVALID", f"{trial_id}.seed")
+        run_order = raw["run_order"]
+        require(isinstance(run_order, int) and not isinstance(run_order, bool) and run_order >= 0,
+                "LAUNCH_RUN_ORDER_INVALID", f"{trial_id}.run_order")
+        require(run_order not in seen_orders, "LAUNCH_RUN_ORDER_INVALID", f"duplicate run_order={run_order}")
+        seen_orders.add(run_order)
         subcampaign = raw["subcampaign"]
         require(subcampaign in {"001A", "001B"}, "LAUNCH_INVENTORY_INVALID", f"{trial_id}.subcampaign")
         fixture = raw["fixture"]
         require(isinstance(fixture, str) and fixture, "LAUNCH_INVENTORY_INVALID", f"{trial_id}.fixture")
         out.append({**raw, "policy": normalize_policy(raw["policy"]), "world_cluster_sha256": cluster,
-                    "world_lineage_sha256": lineage, "revision_index": revision})
+                    "world_lineage_sha256": lineage, "revision_index": revision, "seed": seed, "run_order": run_order})
+    expected_orders = set(range(len(out)))
+    require(seen_orders == expected_orders, "LAUNCH_RUN_ORDER_INVALID",
+            f"run_order must be contiguous 0..{len(out)-1}; missing={sorted(expected_orders-seen_orders)} extra={sorted(seen_orders-expected_orders)}")
     return out
 
 
@@ -168,7 +180,8 @@ def verify_h3(rows: list[dict[str, Any]]) -> dict[str, Any]:
         is_memory = any("memorytrap" in f for f in fixtures)
         if policies == H3_POLICIES and len(members) == 2 and is_memory:
             good.append(cluster)
-    require(len(good) >= 8, "H3_MEMORYTRAP_CLUSTER_INSUFFICIENT", f"qualified={len(good)} required=8")
+    require(len(good) >= 8, "H3_MEMORYTRAP_CLUSTER_INSUFFICIENT",
+            f"qualified={len(good)} required=8; exact paired sign-flip inference at alpha=0.05 needs at least 5 pairs, and v3 freezes 8")
     return {"qualified_cluster_count": len(good), "clusters": sorted(good)}
 
 
@@ -199,12 +212,15 @@ def verify(freeze_path: Path, expected_freeze_sha256: str, inventory_path: Path)
     require(a_clusters.isdisjoint(b_clusters), "LAUNCH_CLUSTER_REUSE_ACROSS_SUBCAMPAIGNS",
             f"overlap={sorted(a_clusters & b_clusters)}")
 
+    schedule = sorted((r["run_order"], r["trial_id"]) for r in rows)
     return {
         "verdict": "CONFIRMATORY_LAUNCH_READY",
         "experiment_id": EXPERIMENT_ID,
         "freeze_sha256": actual,
         "trial_inventory_sha256": inventory_sha,
         "trial_count": len(rows),
+        "run_order_bound": True,
+        "schedule_sha256": hashlib.sha256(json.dumps(schedule, separators=(",", ":")).encode("utf-8")).hexdigest(),
         "h1": h1,
         "h2": h2,
         "h3": h3,
