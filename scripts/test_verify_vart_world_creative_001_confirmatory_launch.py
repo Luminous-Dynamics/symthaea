@@ -18,7 +18,7 @@ def dump(path: Path, obj: object) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def inventory(longitudinal: bool) -> dict:
+def inventory(longitudinal: bool, memory_clusters: int) -> dict:
     trials: list[dict] = []
     fixtures = ["ordinary", "PrettyTrap", "LocalOptimum", "HiddenDependency", "DelayedConsequence", "CounterfactualDecoy", "Path", "Plaza"]
     for i, fixture in enumerate(fixtures):
@@ -33,7 +33,7 @@ def inventory(longitudinal: bool) -> dict:
                     trials.append({"trial_id": f"A-{i}-{policy}-r{revision}", "subcampaign": "001A", "policy": policy,
                                    "fixture": fixture, "world_cluster_sha256": cluster,
                                    "world_lineage_sha256": lineage, "revision_index": revision})
-    for i in range(4):
+    for i in range(memory_clusters):
         cluster = f"{9000+i:064x}"[-64:]
         for pidx, policy in enumerate(["full_symthaea", "no_reality_ledger_context"]):
             trials.append({"trial_id": f"B-{i}-{policy}-r0", "subcampaign": "001B", "policy": policy,
@@ -59,7 +59,7 @@ with tempfile.TemporaryDirectory(prefix="vart-launch-gate-") as td:
     frz = root / "freeze.json"
 
     # L1: the reported 32-trial shape is structurally insufficient for H2.
-    inv_sha = dump(inv, inventory(longitudinal=False))
+    inv_sha = dump(inv, inventory(longitudinal=False, memory_clusters=4))
     freeze_sha = dump(frz, freeze(inv_sha))
     try:
         gate.verify(frz, freeze_sha, inv)
@@ -68,17 +68,27 @@ with tempfile.TemporaryDirectory(prefix="vart-launch-gate-") as td:
     else:
         raise AssertionError("32-trial shape unexpectedly passed H2 launch gate")
 
-    # Canonical v3 shape: 24 H1 r0 + 24 FULL longitudinal continuation + 8 H3 = 56.
-    inv_sha = dump(inv, inventory(longitudinal=True))
+    # L2: adding H2 depth but keeping only four MemoryTrap clusters remains insufficient for H3.
+    inv_sha = dump(inv, inventory(longitudinal=True, memory_clusters=4))
+    freeze_sha = dump(frz, freeze(inv_sha))
+    try:
+        gate.verify(frz, freeze_sha, inv)
+    except gate.Reject as exc:
+        assert exc.code == "H3_MEMORYTRAP_CLUSTER_INSUFFICIENT", (exc.code, exc.detail)
+    else:
+        raise AssertionError("four-cluster H3 shape unexpectedly passed launch gate")
+
+    # Canonical v3 shape: 24 H1 r0 + 24 FULL longitudinal continuation + 16 H3 = 64.
+    inv_sha = dump(inv, inventory(longitudinal=True, memory_clusters=8))
     freeze_sha = dump(frz, freeze(inv_sha))
     result = gate.verify(frz, freeze_sha, inv)
     assert result["verdict"] == "CONFIRMATORY_LAUNCH_READY"
-    assert result["trial_count"] == 56
+    assert result["trial_count"] == 64
     assert result["h1"]["qualified_cluster_count"] == 8
     assert result["h2"]["qualified_full_lineage_count"] == 8
-    assert result["h3"]["qualified_cluster_count"] == 4
+    assert result["h3"]["qualified_cluster_count"] == 8
 
-    # L2: raw freeze bytes must match the externally supplied anchor.
+    # L3: raw freeze bytes must match the externally supplied anchor.
     try:
         gate.verify(frz, h64("f"), inv)
     except gate.Reject as exc:
@@ -86,4 +96,4 @@ with tempfile.TemporaryDirectory(prefix="vart-launch-gate-") as td:
     else:
         raise AssertionError("wrong freeze anchor unexpectedly passed")
 
-print("PASS: 32-trial H2 rejection + 56-trial v3 canonical launch acceptance")
+print("PASS: 32-trial H2 rejection + four-cluster H3 rejection + 64-trial v3 launch acceptance")
