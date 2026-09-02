@@ -269,7 +269,8 @@ impl SurvivalManager {
     fn process_events(&mut self) {
         self.recent_alerts.clear();
         self.untrusted_alerts.clear();
-        for event in self.pending_events.drain(..) {
+        let events = std::mem::take(&mut self.pending_events);
+        for event in events {
             match event {
                 SurvivalEvent::SensorReading(reading) => {
                     // Parser-originated data remains useful for observability, but it
