@@ -3,6 +3,8 @@ name: VART World Creative Post-Pilot
 on:
   pull_request:
     paths:
+      - 'scripts/run_vart_world_creative_001_pilot_anchored.py'
+      - 'scripts/test_run_vart_world_creative_001_pilot_anchored.py'
       - 'scripts/audit_vart_world_creative_001_pilot.py'
       - 'scripts/test_audit_vart_world_creative_001_pilot.py'
       - 'scripts/verify_vart_world_creative_001_post_pilot.py'
@@ -13,6 +15,8 @@ on:
     branches:
       - 'research/vart-world-creative-001-execution'
     paths:
+      - 'scripts/run_vart_world_creative_001_pilot_anchored.py'
+      - 'scripts/test_run_vart_world_creative_001_pilot_anchored.py'
       - 'scripts/audit_vart_world_creative_001_pilot.py'
       - 'scripts/test_audit_vart_world_creative_001_pilot.py'
       - 'scripts/verify_vart_world_creative_001_post_pilot.py'
@@ -26,7 +30,7 @@ permissions:
 
 jobs:
   post-pilot-transition:
-    name: Pilot audit + disposition gate
+    name: Anchor + audit + disposition gate
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -35,10 +39,14 @@ jobs:
       - name: Python syntax gate
         run: |
           python3 -m py_compile \
+            scripts/run_vart_world_creative_001_pilot_anchored.py \
+            scripts/test_run_vart_world_creative_001_pilot_anchored.py \
             scripts/audit_vart_world_creative_001_pilot.py \
             scripts/test_audit_vart_world_creative_001_pilot.py \
             scripts/verify_vart_world_creative_001_post_pilot.py \
             scripts/test_verify_vart_world_creative_001_post_pilot.py
+      - name: Pre-execution paired-design anchor suite
+        run: python3 scripts/test_run_vart_world_creative_001_pilot_anchored.py
       - name: Paired-design post-pilot adversarial suite
         run: python3 scripts/test_audit_vart_world_creative_001_pilot.py
       - name: Post-pilot disposition adversarial suite
