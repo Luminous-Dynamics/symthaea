@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-kubernetes-service-capacity"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Coverage-aware Kubernetes service capacity evidence assessment for Symthaea"
+
+[dependencies]
+symthaea-integration-core = { path = "../../core/symthaea-integration-core" }
+symthaea-kubernetes-bridge = { path = "../symthaea-kubernetes-bridge" }
+
+[dev-dependencies]
+symthaea-kubernetes-state-bridge = { path = "../symthaea-kubernetes-state-bridge" }
+symthaea-kubernetes-endpointslice-bridge = { path = "../symthaea-kubernetes-endpointslice-bridge" }
+symthaea-kubernetes-state-origin-bridge = { path = "../symthaea-kubernetes-state-origin-bridge" }
+serde_json = { workspace = true }
