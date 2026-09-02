@@ -1,0 +1,56 @@
+name: VART World Creative Context
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/verify_vart_world_creative_001*.py'
+      - 'scripts/test_verify_vart_world_creative_001*.py'
+      - 'docs/research/VART_WORLD_CREATIVE_001_*.md'
+      - 'docs/research/VART_WORLD_CREATIVE_001_*.json'
+      - '.github/workflows/vart-world-creative-context.yml'
+  push:
+    branches:
+      - 'research/vart-world-creative-001-execution'
+    paths:
+      - 'scripts/verify_vart_world_creative_001*.py'
+      - 'scripts/test_verify_vart_world_creative_001*.py'
+      - 'docs/research/VART_WORLD_CREATIVE_001_*.md'
+      - 'docs/research/VART_WORLD_CREATIVE_001_*.json'
+      - '.github/workflows/vart-world-creative-context.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prospective-execution-context:
+    name: N1-N20 + C1-C10 + S1-S7 + I1-I5 + K1-K7 gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Python syntax gate
+        run: |
+          python3 -m py_compile \
+            scripts/verify_vart_world_creative_001.py \
+            scripts/verify_vart_world_creative_001_qualified.py \
+            scripts/verify_vart_world_creative_001_context.py \
+            scripts/verify_vart_world_creative_001_state.py \
+            scripts/verify_vart_world_creative_001_identity.py \
+            scripts/verify_vart_world_creative_001_calibration.py \
+            scripts/test_verify_vart_world_creative_001_n1_n20.py \
+            scripts/test_verify_vart_world_creative_001_context.py \
+            scripts/test_verify_vart_world_creative_001_state.py \
+            scripts/test_verify_vart_world_creative_001_identity.py \
+            scripts/test_verify_vart_world_creative_001_calibration.py
+      - name: Run frozen N1-N20 prerequisite gate
+        run: python3 scripts/test_verify_vart_world_creative_001_n1_n20.py
+      - name: Run prospective execution-context attack suite
+        run: python3 scripts/test_verify_vart_world_creative_001_context.py
+      - name: Run world-state equivalence attack suite
+        run: python3 scripts/test_verify_vart_world_creative_001_state.py
+      - name: Run explicit persistent-world identity attack suite
+        run: python3 scripts/test_verify_vart_world_creative_001_identity.py
+      - name: Run independent calibration reconstruction suite
+        run: python3 scripts/test_verify_vart_world_creative_001_calibration.py

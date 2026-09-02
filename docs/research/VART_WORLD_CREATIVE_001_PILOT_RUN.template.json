@@ -1,0 +1,113 @@
+{
+  "schema": "symthaea.vart-world-creative-001.pilot-run.v1",
+  "experiment_id": "VART-WORLD-CREATIVE-001",
+  "campaign": "pilot",
+  "noncanonical": true,
+  "confirmatory_execution_authorized": false,
+  "claim_authorized": false,
+  "runtime_root": "/tmp/symthaea-clean-live",
+  "pilot_root": "/tmp/vart-world-creative-001-pilot",
+  "expected_source": {
+    "head": "844d10609a9f03e26a06f22778db4b8cdfb6a3ef",
+    "tree": "38e5506c8f7f88d58e1ff03a77585091d9263a98",
+    "parent_v05a_head": "33820b3d9e904280e6264719fe7717cb2e5dd5bb",
+    "parent_v05a_tree": "e93c6dbfa05b602100ff924efaa5d95f92ef5a65",
+    "dirty_required": false
+  },
+  "contract_inputs": {
+    "analysis_contract": "VART_WORLD_CREATIVE_001_PILOT_ANALYSIS.json",
+    "metric_definitions": "VART_WORLD_CREATIVE_001_PILOT_METRICS.json"
+  },
+  "verifier_path": "../../scripts/verify_vart_world_creative_001_pilot.py",
+  "runtime_argv": [
+    "__REPLACE_WITH_LOCAL_VART_TRIAL_ENTRYPOINT__"
+  ],
+  "runtime_argv_placeholders": [
+    "{experiment_id}",
+    "{campaign}",
+    "{cell_id}",
+    "{trial_id}",
+    "{policy}",
+    "{fixture}",
+    "{seed}",
+    "{revision_index}",
+    "{paired_block_id}",
+    "{runtime_root}",
+    "{output_root}"
+  ],
+  "policy_output_isolation": "per-cell-private-staging-root",
+  "cells": [
+    {
+      "cell_id": "P1",
+      "trial_id": "pilot-p1-full-ordinary-s910001-r0",
+      "policy": "full_symthaea",
+      "fixture": "ordinary",
+      "seed": 910001,
+      "revision_index": 0,
+      "paired_block_id": "pilot-ordinary-910001-r0"
+    },
+    {
+      "cell_id": "P2",
+      "trial_id": "pilot-p2-random-valid-ordinary-s910001-r0",
+      "policy": "random_valid",
+      "fixture": "ordinary",
+      "seed": 910001,
+      "revision_index": 0,
+      "paired_block_id": "pilot-ordinary-910001-r0"
+    },
+    {
+      "cell_id": "P3",
+      "trial_id": "pilot-p3-heuristic-ordinary-s910001-r0",
+      "policy": "heuristic",
+      "fixture": "ordinary",
+      "seed": 910001,
+      "revision_index": 0,
+      "paired_block_id": "pilot-ordinary-910001-r0"
+    },
+    {
+      "cell_id": "P4",
+      "trial_id": "pilot-p4-full-pretty-trap-s910002-r0",
+      "policy": "full_symthaea",
+      "fixture": "pretty_trap",
+      "seed": 910002,
+      "revision_index": 0,
+      "paired_block_id": "pilot-pretty-trap-910002-r0"
+    },
+    {
+      "cell_id": "P5",
+      "trial_id": "pilot-p5-random-valid-pretty-trap-s910002-r0",
+      "policy": "random_valid",
+      "fixture": "pretty_trap",
+      "seed": 910002,
+      "revision_index": 0,
+      "paired_block_id": "pilot-pretty-trap-910002-r0"
+    },
+    {
+      "cell_id": "P6",
+      "trial_id": "pilot-p6-full-memory-trap-s910003-r0",
+      "policy": "full_symthaea",
+      "fixture": "memory_trap",
+      "seed": 910003,
+      "revision_index": 0,
+      "paired_block_id": "pilot-memory-trap-910003-r0"
+    },
+    {
+      "cell_id": "P7",
+      "trial_id": "pilot-p7-no-experience-ordinary-s910001-r0",
+      "policy": "no_embodied_experience",
+      "fixture": "ordinary",
+      "seed": 910001,
+      "revision_index": 0,
+      "paired_block_id": "pilot-ordinary-910001-r0"
+    },
+    {
+      "cell_id": "P8",
+      "trial_id": "pilot-p8-no-counterfactuals-ordinary-s910001-r0",
+      "policy": "no_counterfactual_evaluation",
+      "fixture": "ordinary",
+      "seed": 910001,
+      "revision_index": 0,
+      "paired_block_id": "pilot-ordinary-910001-r0"
+    }
+  ]
+}

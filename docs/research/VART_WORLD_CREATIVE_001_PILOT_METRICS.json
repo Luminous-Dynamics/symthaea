@@ -1,0 +1,58 @@
+{
+  "schema": "symthaea.vart-world-creative-001.metric-definitions.v1",
+  "experiment_id": "VART-WORLD-CREATIVE-001",
+  "campaign": "pilot",
+  "noncanonical": true,
+  "scientific_interpretation_authorized": false,
+  "dimensions": {
+    "physical_validity_pass": {
+      "type": "boolean",
+      "pilot_use": "serialization_and_boundary_plumbing_only"
+    },
+    "declared_goal_consequence": {
+      "type": "number_or_structured_channel",
+      "pilot_use": "record_only_do_not_rank_or_threshold"
+    },
+    "perceptual_consequence": {
+      "type": "number_or_structured_channel",
+      "pilot_use": "record_only_do_not_rank_or_threshold"
+    },
+    "protected_side_effects": {
+      "type": "number_or_structured_channel",
+      "pilot_use": "record_only_do_not_rank_or_threshold"
+    },
+    "counterfactual_selection_quality": {
+      "type": "number_or_structured_channel",
+      "pilot_use": "record_only_do_not_rank_or_threshold"
+    },
+    "human_preference": {
+      "type": "optional",
+      "pilot_use": "not_required_and_not_claim_bearing"
+    },
+    "prediction_error": {
+      "type": "number_or_structured_channel",
+      "pilot_use": "record_calibration_plumbing_only_do_not_infer_trend"
+    },
+    "provenance_integrity": {
+      "type": "boolean_or_reason_class",
+      "pilot_use": "required_integrity_channel"
+    }
+  },
+  "integrity_channels": {
+    "evidence_closure": "must_pass",
+    "paired_candidate_set_equality": "must_pass_where_required",
+    "random_valid_receipt_reproducibility": "must_pass_for_random_valid",
+    "world_version_chain": "must_pass",
+    "prospective_temporal_order": "must_pass",
+    "revisit_before_outcome": "must_pass",
+    "pilot_confirmatory_separation": "must_pass"
+  },
+  "forbidden_primary_aggregates": [
+    "world_quality",
+    "creative_score",
+    "beauty_score",
+    "cinematic_quality",
+    "intelligence_score"
+  ],
+  "pilot_rule": "Outcome magnitudes may be preserved in raw evidence but must not be used to set confirmatory hypotheses, directions, thresholds, budgets, stopping rules, or policy rankings."
+}

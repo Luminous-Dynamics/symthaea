@@ -1,0 +1,83 @@
+name: VART World Creative Post-Pilot
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/*vart_world_creative_001*.py'
+      - 'docs/research/VART_WORLD_CREATIVE_001_*'
+      - '.github/workflows/vart-world-creative-*.yml'
+  push:
+    branches:
+      - 'research/vart-world-creative-001-execution'
+    paths:
+      - 'scripts/*vart_world_creative_001*.py'
+      - 'docs/research/VART_WORLD_CREATIVE_001_*'
+      - '.github/workflows/vart-world-creative-*.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  post-pilot-transition:
+    name: Anchor + audit + dual-source closure + freeze eligibility + instrument qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Python syntax gate — all VART instrument scripts
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python3 - <<'PY'
+          import glob, py_compile
+          files = sorted(glob.glob('scripts/*vart_world_creative_001*.py'))
+          assert files, 'no VART scripts found'
+          for path in files:
+              py_compile.compile(path, doraise=True)
+          print(f'PASS: py_compile {len(files)} VART scripts')
+          PY
+          find scripts -type d -name __pycache__ -prune -exec rm -rf {} +
+      - name: Pre-execution paired-design anchor suite
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 scripts/test_run_vart_world_creative_001_pilot_anchored.py
+      - name: Paired-design/dual-source post-pilot adversarial suite
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 scripts/test_audit_vart_world_creative_001_pilot.py
+      - name: Post-pilot disposition adversarial suite
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 scripts/test_verify_vart_world_creative_001_post_pilot.py
+      - name: Subject source-closure adversarial suite
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 scripts/test_qualify_vart_world_creative_001_source_closure.py
+      - name: Instrument source-closure adversarial suite
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 scripts/test_qualify_vart_world_creative_001_instrument_source_closure.py
+      - name: Dual-source freeze-preparation eligibility suite
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 scripts/test_verify_vart_world_creative_001_freeze_eligibility.py
+      - name: Qualify exact VART measurement instrument
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          find scripts -type d -name __pycache__ -prune -exec rm -rf {} +
+          python3 scripts/qualify_vart_world_creative_001_instrument.py \
+            --repo . \
+            --out /tmp/vart-instrument-qualification.json
+          sha256sum /tmp/vart-instrument-qualification.json
+      - name: Upload instrument qualification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vart-instrument-qualification-${{ github.sha }}
+          path: /tmp/vart-instrument-qualification.json
+          if-no-files-found: error
+          retention-days: 30

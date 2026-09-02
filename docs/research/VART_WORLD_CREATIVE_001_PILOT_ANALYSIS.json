@@ -1,0 +1,53 @@
+{
+  "schema": "symthaea.vart-world-creative-001.pilot-analysis.v1",
+  "experiment_id": "VART-WORLD-CREATIVE-001",
+  "campaign": "pilot",
+  "noncanonical": true,
+  "status": "frozen_for_plumbing_only",
+  "scientific_effect_estimation_authorized": false,
+  "confirmatory_threshold_inference_authorized": false,
+  "policy_ranking_authorized": false,
+  "claim_authorized": false,
+  "required_cells": ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"],
+  "required_integrity_checks": {
+    "exact_source_head_tree": true,
+    "fresh_pilot_evidence_root": true,
+    "all_pilot_trials_excluded_from_confirmatory_analysis": true,
+    "prospective_hypothesis_before_mutation": true,
+    "outcome_only_after_revisit": true,
+    "trial_hash_closure": true,
+    "retain_rejected_candidates": true,
+    "retain_aborts_missingness_and_integrity_failures": true,
+    "same_admissible_candidate_set_for_full_random_heuristic_when_applicable": true,
+    "random_valid_draw_reproducible": true,
+    "reality_ledger_provenance_domains_preserved": true,
+    "no_forbidden_primary_scalar_aggregate": true
+  },
+  "paired_blocks": {
+    "pilot-ordinary-910001-r0": ["P1", "P2", "P3", "P7", "P8"],
+    "pilot-pretty-trap-910002-r0": ["P4", "P5"],
+    "pilot-memory-trap-910003-r0": ["P6"]
+  },
+  "paired_candidate_equality_required_for": [
+    ["P1", "P2", "P3"],
+    ["P4", "P5"]
+  ],
+  "outcome_values": {
+    "may_be_recorded": true,
+    "may_be_used_to_set_confirmatory_thresholds": false,
+    "may_be_used_to_select_confirmatory_hypotheses": false,
+    "may_be_used_to_select_metric_directions": false,
+    "may_be_used_to_change_candidate_budget": false,
+    "may_be_used_to_change_stopping_rule": false,
+    "may_be_used_to_rank_policies": false
+  },
+  "pilot_success_definition": "Instrumentation, serialization, pairing, evidence closure, provenance closure, baseline reproducibility, and independent verification all function as specified.",
+  "pilot_success_does_not_mean": [
+    "FULL Symthaea improves worlds",
+    "FULL outperforms RANDOM_VALID",
+    "FULL outperforms HEURISTIC",
+    "causal calibration improves",
+    "competence generalizes",
+    "general creativity is established"
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "schema": "symthaea.vart-world-creative-001.confirmatory-run.v1",
+  "experiment_id": "VART-WORLD-CREATIVE-001",
+  "runtime_root": "__REPLACE_WITH_CLEAN_SUBJECT_CHECKOUT__",
+  "evidence_root": "__REPLACE_WITH_FRESH_CONFIRMATORY_EVIDENCE_ROOT__",
+  "freeze_path": "__REPLACE_WITH_CONFIRMATORY_FREEZE_V3_JSON__",
+  "trial_inventory_path": "__REPLACE_WITH_FROZEN_V3_TRIAL_INVENTORY_JSON__",
+  "expected_freeze_sha256": "ea4868758c16ccf671cd4be1628691418b98af40654c8bd84725af1875f2c4aa",
+  "expected_subject_source": {
+    "head": "ca012c91fecc214490cbf08b8ec6e11a56b5d150",
+    "tree": "fadf8f0b7152c09839967d1232492465390567db"
+  },
+  "expected_instrument_source": {
+    "head": "__REPLACE_WITH_QUALIFIED_INSTRUMENT_HEAD_40_HEX__",
+    "tree": "__REPLACE_WITH_QUALIFIED_INSTRUMENT_TREE_40_HEX__"
+  },
+  "qualified_verifier_path": "scripts/verify_vart_world_creative_001_qualified.py",
+  "contract_inputs": {
+    "analysis_contract": "__REPLACE_WITH_FROZEN_ANALYSIS_CONTRACT__",
+    "metric_definitions": "__REPLACE_WITH_FROZEN_METRIC_DEFINITIONS__"
+  },
+  "runtime_argv": [
+    "__REPLACE_WITH_RUNTIME_ENTRYPOINT__",
+    "--trial-id",
+    "{trial_id}",
+    "--subcampaign",
+    "{subcampaign}",
+    "--policy",
+    "{policy}",
+    "--fixture",
+    "{fixture}",
+    "--seed",
+    "{seed}",
+    "--revision-index",
+    "{revision_index}",
+    "--world-cluster-sha256",
+    "{world_cluster_sha256}",
+    "--world-lineage-sha256",
+    "{world_lineage_sha256}",
+    "--output-root",
+    "{output_root}"
+  ],
+  "claim_authorized": false
+}

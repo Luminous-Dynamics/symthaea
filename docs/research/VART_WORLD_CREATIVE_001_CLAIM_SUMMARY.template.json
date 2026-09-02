@@ -1,0 +1,87 @@
+{
+  "schema": "symthaea.vart-world-creative-001.claim-summary.v1",
+  "experiment_id": "VART-WORLD-CREATIVE-001",
+  "freeze_sha256": "ea4868758c16ccf671cd4be1628691418b98af40654c8bd84725af1875f2c4aa",
+  "campaign_receipt_sha256": "45af8d4d48de9dcd124276b2fb265c99704eca28ec2233c00e67433df6a6092a",
+  "original_analysis_receipt_sha256": "0e18995b0199563f0c3dafa4d1152020be5eecb1bf632e2dd624d2c0e186f7d6",
+  "correction_receipt_sha256": null,
+  "reported_sample_counts": {
+    "campaign_full_total": 40,
+    "h1": {
+      "full_symthaea": 8,
+      "random_valid": 8,
+      "heuristic": 8
+    },
+    "h2_full_lineages": 8,
+    "h3": {
+      "full_symthaea": 8,
+      "no_reality_ledger_context": 8
+    }
+  },
+  "h1": {
+    "status": "inconclusive",
+    "co_primary_channels": {
+      "prediction_error": {
+        "full_vs_random_valid": {
+          "effect": null,
+          "test": "exact_paired_randomization",
+          "nonzero_independent_units": 8,
+          "p_value": null,
+          "confidence_interval": null,
+          "criterion_pass": null
+        },
+        "full_vs_heuristic": {
+          "effect": null,
+          "test": "exact_paired_randomization",
+          "nonzero_independent_units": 8,
+          "p_value": null,
+          "confidence_interval": null,
+          "criterion_pass": null
+        }
+      },
+      "declared_goal_consequence": {
+        "full_vs_random_valid": {},
+        "full_vs_heuristic": {}
+      },
+      "physical_validity": {
+        "full_vs_random_valid": {},
+        "full_vs_heuristic": {}
+      },
+      "protected_side_effects": {
+        "full_vs_random_valid": {},
+        "full_vs_heuristic": {}
+      }
+    },
+    "multiplicity_verdict": "UNRESOLVED_FROM_FROZEN_ANALYSIS_OUTPUT"
+  },
+  "h2": {
+    "status": "inconclusive",
+    "lineage_slopes": [null, null, null, null, null, null, null, null],
+    "test": "exact_sign_flip",
+    "nonzero_independent_units": 8,
+    "p_value": null,
+    "strict_monotonic_sequence_claimed": false
+  },
+  "h3": {
+    "status": "inconclusive",
+    "endpoints": {
+      "counterfactual_history_confusion": {
+        "effect": null,
+        "test": "exact_sign_test",
+        "nonzero_independent_units": null,
+        "p_value": null,
+        "criterion_pass": null
+      },
+      "task_performance": {
+        "effect": null,
+        "test": "exact_paired_randomization",
+        "nonzero_independent_units": null,
+        "p_value": null,
+        "criterion_pass": null
+      }
+    },
+    "multiplicity_verdict": "UNRESOLVED_FROM_FROZEN_ANALYSIS_OUTPUT"
+  },
+  "claim_labels": [],
+  "claim_authorized": false
+}

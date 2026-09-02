@@ -1,5 +1,5 @@
 {
-  "schema": "symthaea.vart-world-creative-001.plan.v1",
+  "schema": "symthaea.vart-world-creative-001.plan.v2",
   "experiment_id": "VART-WORLD-CREATIVE-001",
   "title": "Embodied Experience-Conditioned World Improvement",
   "execution_authorized": false,
@@ -14,7 +14,8 @@
     "repository": "Luminous-Dynamics/symthaea",
     "head": null,
     "tree": null,
-    "dirty": null
+    "dirty": null,
+    "qualification_receipt_sha256": null
   },
   "environment": {
     "nix_flake_lock_sha256": null,
@@ -37,14 +38,26 @@
       "delayed_consequence",
       "counterfactual_decoy",
       "memory_trap"
-    ]
+    ],
+    "unseen_generalization_fixture_digest": null
   },
-  "seeds": null,
+  "randomization": {
+    "seed_list_sha256": null,
+    "seeds": null,
+    "pairing_key": "world_fixture_seed_revision_index",
+    "policy_order_randomization": null,
+    "random_valid_rng_algorithm": null
+  },
   "policies": [
     "full_symthaea",
     "random_valid",
     "heuristic"
   ],
+  "policy_digests": {
+    "full_symthaea": null,
+    "random_valid": null,
+    "heuristic": null
+  },
   "optional_policies": [
     "external_model",
     "human"
@@ -58,33 +71,90 @@
     "no_reality_ledger_context",
     "random_valid_judgment"
   ],
+  "candidate_surface": {
+    "generator_digest": null,
+    "candidate_budget_per_revision": null,
+    "physical_admission_policy_digest": null,
+    "paired_policies_must_share_candidate_set": true,
+    "candidate_set_sha256_required_per_paired_block": true,
+    "rejected_candidates_retained": true
+  },
   "outcome_dimensions": {
-    "physical_validity": null,
-    "declared_goal_consequence": null,
-    "perceptual_consequence": null,
-    "protected_side_effects": null,
-    "counterfactual_selection_quality": null,
-    "human_evaluation": null
+    "physical_validity": {
+      "definition_digest": null,
+      "direction": "higher_is_better"
+    },
+    "declared_goal_consequence": {
+      "definition_digest": null,
+      "direction": null
+    },
+    "perceptual_consequence": {
+      "definition_digest": null,
+      "direction": null
+    },
+    "protected_side_effects": {
+      "definition_digest": null,
+      "direction": "lower_is_better"
+    },
+    "counterfactual_selection_quality": {
+      "definition_digest": null,
+      "direction": null
+    },
+    "human_evaluation": {
+      "definition_digest": null,
+      "direction": null,
+      "optional": true
+    }
   },
   "forbidden_primary_aggregates": [
     "world_quality",
     "beauty_score",
     "cinematic_quality",
-    "intelligence_score"
+    "intelligence_score",
+    "creative_score"
   ],
+  "hypotheses": {
+    "primary": null,
+    "secondary": null,
+    "exploratory": null,
+    "all_confirmatory_hypotheses_sha256": null
+  },
+  "analysis": {
+    "paired_analysis_required": true,
+    "effect_estimator": null,
+    "uncertainty_method": null,
+    "confidence_level": null,
+    "multiplicity_policy": null,
+    "noninferiority_margins": null,
+    "missingness_policy": null,
+    "abort_policy": null,
+    "trial_inclusion_rule": null,
+    "outlier_policy": null,
+    "stopping_rule": null
+  },
   "calibration": {
     "dimensions": null,
     "confidence_representation": null,
-    "bucket_definition": null
+    "bucket_definition": null,
+    "error_metric": null,
+    "temporal_improvement_test": null,
+    "calibration_claim_separate_from_world_improvement_claim": true
   },
   "protected_invariants": null,
   "failure_thresholds": null,
-  "stopping_rule": null,
   "pilot": {
     "authorized": false,
     "noncanonical": true,
-    "may_set_confirmatory_thresholds_after_review": true,
-    "may_be_reported_as_confirmatory": false
+    "outcome_review_for_plumbing_only": true,
+    "may_set_confirmatory_thresholds_after_review": false,
+    "may_change_metric_direction_after_review": false,
+    "may_change_hypotheses_after_review": false,
+    "may_change_stopping_rule_after_review": false,
+    "may_change_candidate_budget_after_review": false,
+    "may_change_multiplicity_policy_after_review": false,
+    "may_be_reported_as_confirmatory": false,
+    "must_use_separate_evidence_root": true,
+    "contamination_requires_new_preregistration_lineage": true
   },
   "campaigns": {
     "longitudinal": {
@@ -94,7 +164,8 @@
     },
     "generalization": {
       "world_count": null,
-      "revisions_per_world": null
+      "revisions_per_world": null,
+      "fixture_identity_hidden_until_freeze": true
     }
   },
   "evidence": {
@@ -102,14 +173,24 @@
     "fresh_path_required": true,
     "retain_rejected_candidates": true,
     "retain_raw_observations": true,
+    "retain_aborts_and_failures": true,
+    "trial_manifest_schema": "symthaea.vart-world-creative-001.trial-manifest.v1",
     "independent_verifier": null,
+    "independent_verifier_digest": null,
     "reproduction_capsule": null
   },
-  "claim_ceiling": "EvidenceBoundExperienceConditionedWorldImprovementQualified",
+  "claim_admission": {
+    "requires_zero_integrity_violations": true,
+    "requires_no_pilot_contamination": true,
+    "requires_independent_reconstruction": true,
+    "requires_all_preregistered_trials_accounted_for": true,
+    "claim_ceiling": "EvidenceBoundExperienceConditionedWorldImprovementQualified"
+  },
   "notes": [
     "Runtime integration must use the exact qualified World Forge v0.5-A lineage, not current GitHub main unless they are proven identical.",
     "Counterfactual candidates remain counterfactual even when structurally equal to a later committed state.",
     "Human preference cannot override physical invalidity.",
-    "Failure results are retained and are scientifically admissible."
+    "Failure, abort, and missing-evidence results are retained and are scientifically admissible according to the frozen inclusion policy.",
+    "Pilot outcomes may diagnose instrumentation defects but may not tune the confirmatory scientific contract."
   ]
 }
