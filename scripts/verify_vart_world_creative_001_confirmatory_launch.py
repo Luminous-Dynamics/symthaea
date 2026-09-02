@@ -168,7 +168,7 @@ def verify_h3(rows: list[dict[str, Any]]) -> dict[str, Any]:
         is_memory = any("memorytrap" in f for f in fixtures)
         if policies == H3_POLICIES and len(members) == 2 and is_memory:
             good.append(cluster)
-    require(len(good) >= 4, "H3_MEMORYTRAP_CLUSTER_INSUFFICIENT", f"qualified={len(good)} required=4")
+    require(len(good) >= 8, "H3_MEMORYTRAP_CLUSTER_INSUFFICIENT", f"qualified={len(good)} required=8")
     return {"qualified_cluster_count": len(good), "clusters": sorted(good)}
 
 
