@@ -3,36 +3,30 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Episodic Persistence Manager — episodic replay + memory database.
 //!
-//! Groups episodic memory replay, persistent SQLite database,
-//! flush guard, reasoning context, and epistemic provenance sidecar into a
-//! single data-holder manager.
+//! Groups episodic memory replay, persistent SQLite database, flush guard, reasoning
+//! context, composite provenance, and component-level epistemic provenance into one
+//! owned persistence boundary.
 //!
-//! The provenance sidecar is deliberately separate from the historical
-//! `Episode` serialization format. Existing episodic stores therefore remain
-//! readable and resolve to explicit `Unknown` provenance until a subject-bound
-//! provenance envelope is attached.
-//!
-//! Science: Tulving (1972) — episodic memory; Stickgold (2005) — replay consolidation.
+//! Provenance remains sidecar state: the historical `Episode` serialization format is
+//! unchanged. Existing episodic stores therefore remain readable and resolve to explicit
+//! `Unknown` provenance until subject-bound metadata is attached.
+
+use std::fmt;
 
 /// Consolidated episodic persistence subsystem.
-///
-/// Holds episodic replay, memory database, flush guard, reasoning context, and
-/// provenance state that were previously scattered across `CognitiveLoopService`.
 pub struct EpisodicPersistenceManager {
-    /// Episodic memory replay for high-Phi moment consolidation.
-    /// When enabled via `config.memory_graduation`, stores high-consciousness episodes
-    /// and periodically replays them to reinforce important patterns.
+    /// Canonical production episodic replay store.
     pub(crate) replay: Option<crate::memory::episodic_replay::EpisodicMemory>,
 
-    /// Epistemic provenance sidecar keyed by immutable episode subject digest.
-    ///
-    /// This does not alter `Episode` serialization. An episode without an entry is
-    /// explicitly `Unknown`, never silently grounded.
+    /// Composite epistemic provenance keyed by immutable episode subject digest.
     pub(crate) provenance: crate::memory::EpisodicProvenanceIndex,
 
+    /// Rich component-level provenance for perception + internal cognition + composite
+    /// derivation. This index is additive and must agree with `provenance` whenever a
+    /// component record exists.
+    pub(crate) component_provenance: crate::memory::EpisodicComponentProvenanceIndex,
+
     /// Persistent memory database for cross-session episode storage.
-    /// Created when `config.memory_db_path` is `Some`. Episodes are periodically
-    /// flushed (every 199 cycles) via the storage runtime or a background thread.
     pub(crate) db: Option<std::sync::Arc<crate::databases::SqliteMemory>>,
 
     /// Optional write-behind runtime for non-blocking durable memory writes.
@@ -41,25 +35,21 @@ pub struct EpisodicPersistenceManager {
     /// Worker backing the storage runtime when it was spawned from this manager.
     storage_worker: Option<std::thread::JoinHandle<()>>,
 
-    /// Guard to prevent overlapping memory flushes. When true, a flush is in progress.
+    /// Guard to prevent overlapping memory flushes.
     pub(crate) flush_in_progress: std::sync::Arc<std::sync::atomic::AtomicBool>,
 
     /// Last assembled reasoning context from the knowledge engine.
-    /// Contains grounded facts, causal chains, and epistemic state.
-    /// Populated after knowledge engine processes each cycle's input.
     pub(crate) last_reasoning_context: Option<crate::knowledge::ReasoningContext>,
 }
 
 impl EpisodicPersistenceManager {
-    /// Create a new EpisodicPersistenceManager.
-    ///
-    /// `replay` is the optional episodic memory (built from config). Existing
-    /// episodes inside it begin with no sidecar bindings and therefore resolve
-    /// to explicit `Unknown` provenance.
+    /// Create a new persistence manager. Existing episodes inside `replay` have no
+    /// sidecar bindings and therefore resolve to explicit `Unknown` provenance.
     pub fn new(replay: Option<crate::memory::episodic_replay::EpisodicMemory>) -> Self {
         Self {
             replay,
             provenance: crate::memory::EpisodicProvenanceIndex::default(),
+            component_provenance: crate::memory::EpisodicComponentProvenanceIndex::default(),
             db: None,
             storage_runtime: None,
             storage_worker: None,
@@ -68,10 +58,7 @@ impl EpisodicPersistenceManager {
         }
     }
 
-    /// Attach subject-bound provenance to an exact episodic record.
-    ///
-    /// The sidecar rejects digest mismatches and conflicting rewrites. This method
-    /// intentionally does not infer provenance from episode contents.
+    /// Attach subject-bound composite provenance to an exact episodic record.
     pub fn attach_episode_provenance(
         &mut self,
         episode: &crate::memory::Episode,
@@ -80,10 +67,36 @@ impl EpisodicPersistenceManager {
         self.provenance.attach(episode, envelope)
     }
 
-    /// Return explicit provenance for an episode.
+    /// Transactionally attach component provenance and publish its composite envelope
+    /// through the existing provenance index.
     ///
-    /// Legacy/unannotated episodes resolve to `RealityDomain::Unknown` with zero
-    /// confidence. This is the fail-closed compatibility behavior.
+    /// Both indexes are preflighted before either is mutated. This prevents the richer
+    /// component record and legacy composite view from diverging.
+    pub fn attach_episode_component_provenance(
+        &mut self,
+        episode: &crate::memory::Episode,
+        record: crate::memory::EpisodicComponentProvenance,
+    ) -> Result<(), EpisodicComponentBindingError> {
+        self.component_provenance.preflight(episode, &record)?;
+        let episode_sha = crate::memory::episode_subject_sha256(episode);
+        if let Some(existing) = self.provenance.get(&episode_sha) {
+            if existing != &record.episode {
+                return Err(EpisodicComponentBindingError::CompositeConflict {
+                    episode_sha256: episode_sha,
+                });
+            }
+        }
+
+        // After both preflight checks, these writes are deterministic/idempotent.
+        self.component_provenance.attach(episode, record.clone())?;
+        self.provenance
+            .attach(episode, record.episode)
+            .map_err(EpisodicComponentBindingError::CompositeProvenance)?;
+        Ok(())
+    }
+
+    /// Return explicit composite provenance for an episode. Legacy/unannotated episodes
+    /// resolve to `RealityDomain::Unknown` with zero confidence.
     pub fn effective_episode_provenance(
         &self,
         episode: &crate::memory::Episode,
@@ -91,16 +104,17 @@ impl EpisodicPersistenceManager {
         self.provenance.effective_provenance(episode)
     }
 
-    /// Expose the provenance index read-only for persistence/audit code.
     pub fn provenance_index(&self) -> &crate::memory::EpisodicProvenanceIndex {
         &self.provenance
     }
 
+    pub fn component_provenance_index(
+        &self,
+    ) -> &crate::memory::EpisodicComponentProvenanceIndex {
+        &self.component_provenance
+    }
+
     /// Behavior-neutral shadow audit of compressed-input episodic recall.
-    ///
-    /// The production recall path is not replaced or mutated. This method reports
-    /// only what provenance-aware retrieval views would have admitted from the same
-    /// similarity-ranked candidate set.
     pub fn shadow_audit_input_recall(
         &self,
         query: &[f32],
@@ -122,20 +136,17 @@ impl EpisodicPersistenceManager {
         })
     }
 
-    /// Replace the replay store and deliberately reset provenance bindings.
-    ///
-    /// This prevents stale sidecar entries from surviving a wholesale episodic
-    /// store replacement. Callers that restore a persisted sidecar should use a
-    /// future paired restore API rather than this reset path.
+    /// Replace the replay store and deliberately reset *all* provenance bindings.
+    /// Restoring persisted replay+provenance must use a future paired restore API.
     pub fn replace_replay(
         &mut self,
         replay: Option<crate::memory::episodic_replay::EpisodicMemory>,
     ) {
         self.replay = replay;
         self.provenance = crate::memory::EpisodicProvenanceIndex::default();
+        self.component_provenance = crate::memory::EpisodicComponentProvenanceIndex::default();
     }
 
-    /// Attach a persistent SQLite memory database for periodic episode flushes.
     pub fn attach_sqlite_db<P: AsRef<std::path::Path>>(
         &mut self,
         path: P,
@@ -154,7 +165,6 @@ impl EpisodicPersistenceManager {
         Ok(())
     }
 
-    /// Attach a write-behind runtime for periodic episode flushes.
     pub fn attach_storage_runtime(
         &mut self,
         runtime: crate::databases::storage_runtime::StorageRuntimeHandle,
@@ -173,6 +183,36 @@ impl EpisodicPersistenceManager {
     }
 }
 
+#[derive(Debug)]
+pub enum EpisodicComponentBindingError {
+    Component(crate::memory::EpisodicComponentIndexError),
+    CompositeConflict { episode_sha256: String },
+    CompositeProvenance(crate::memory::EpisodicProvenanceError),
+}
+
+impl fmt::Display for EpisodicComponentBindingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Component(error) => write!(f, "component provenance preflight failed: {error}"),
+            Self::CompositeConflict { episode_sha256 } => write!(
+                f,
+                "composite provenance conflicts with component record for episode {episode_sha256}"
+            ),
+            Self::CompositeProvenance(error) => {
+                write!(f, "composite provenance attachment failed: {error}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for EpisodicComponentBindingError {}
+
+impl From<crate::memory::EpisodicComponentIndexError> for EpisodicComponentBindingError {
+    fn from(value: crate::memory::EpisodicComponentIndexError) -> Self {
+        Self::Component(value)
+    }
+}
+
 impl Drop for EpisodicPersistenceManager {
     fn drop(&mut self) {
         self.stop_owned_storage_worker();
@@ -183,7 +223,7 @@ impl Drop for EpisodicPersistenceManager {
 mod tests {
     use super::*;
     use symthaea_core::hdc::unified_hv::ContinuousHV;
-    use symthaea_epistemic_types::{ProvenanceEnvelope, RealityDomain};
+    use symthaea_epistemic_types::{GroundingEvidence, ProvenanceEnvelope, RealityDomain};
 
     fn episode(seed: u64) -> crate::memory::Episode {
         crate::memory::Episode::new(
@@ -194,18 +234,45 @@ mod tests {
         )
     }
 
+    fn component_record(ep: &crate::memory::Episode) -> crate::memory::EpisodicComponentProvenance {
+        let perception = ProvenanceEnvelope::from_grounding(
+            GroundingEvidence::direct_observation(
+                crate::memory::episode_perception_subject_sha256(ep),
+                "obs",
+                "sensor",
+                None,
+                0.95,
+            )
+            .unwrap(),
+        );
+        let cognition = ProvenanceEnvelope::new(
+            crate::memory::episode_cognition_subject_sha256(ep),
+            RealityDomain::Unknown,
+            vec!["cognitive-loop".into()],
+            None,
+            0.8,
+        )
+        .unwrap();
+        crate::memory::EpisodicComponentProvenance::compose(
+            ep,
+            perception,
+            cognition,
+            "symthaea.episode-compose",
+            "v1",
+        )
+        .unwrap()
+    }
+
     #[test]
     fn test_episodic_persistence_manager_new() {
         let mgr = EpisodicPersistenceManager::new(None);
         assert!(mgr.replay.is_none());
         assert!(mgr.provenance_index().is_empty());
+        assert!(mgr.component_provenance_index().is_empty());
         assert!(mgr.db.is_none());
         assert!(mgr.storage_runtime.is_none());
         assert!(mgr.storage_worker.is_none());
-        assert!(
-            !mgr.flush_in_progress
-                .load(std::sync::atomic::Ordering::Relaxed)
-        );
+        assert!(!mgr.flush_in_progress.load(std::sync::atomic::Ordering::Relaxed));
         assert!(mgr.last_reasoning_context.is_none());
     }
 
@@ -236,28 +303,51 @@ mod tests {
     }
 
     #[test]
-    fn replacing_replay_resets_provenance_sidecar() {
+    fn component_attachment_publishes_consistent_composite_view() {
         let mut mgr = EpisodicPersistenceManager::new(None);
         let ep = episode(9);
-        let subject = crate::memory::episode_subject_sha256(&ep);
+        let record = component_record(&ep);
+        let expected = record.episode.clone();
+        mgr.attach_episode_component_provenance(&ep, record).unwrap();
+        assert_eq!(mgr.component_provenance_index().len(), 1);
+        assert_eq!(mgr.effective_episode_provenance(&ep), expected);
+    }
+
+    #[test]
+    fn composite_conflict_rejects_before_component_index_mutation() {
+        let mut mgr = EpisodicPersistenceManager::new(None);
+        let ep = episode(10);
         let imported = ProvenanceEnvelope::new(
-            subject,
+            crate::memory::episode_subject_sha256(&ep),
             RealityDomain::Imported,
-            vec!["test-source".into()],
+            vec!["external".into()],
             None,
-            0.6,
+            0.5,
         )
         .unwrap();
         mgr.attach_episode_provenance(&ep, imported).unwrap();
+        let result = mgr.attach_episode_component_provenance(&ep, component_record(&ep));
+        assert!(matches!(result, Err(EpisodicComponentBindingError::CompositeConflict { .. })));
+        assert!(mgr.component_provenance_index().is_empty());
         assert_eq!(mgr.provenance_index().len(), 1);
+    }
 
+    #[test]
+    fn replacing_replay_resets_all_provenance_sidecars() {
+        let mut mgr = EpisodicPersistenceManager::new(None);
+        let ep = episode(11);
+        mgr.attach_episode_component_provenance(&ep, component_record(&ep))
+            .unwrap();
+        assert_eq!(mgr.provenance_index().len(), 1);
+        assert_eq!(mgr.component_provenance_index().len(), 1);
         mgr.replace_replay(None);
         assert!(mgr.provenance_index().is_empty());
+        assert!(mgr.component_provenance_index().is_empty());
     }
 
     #[test]
     fn shadow_audit_is_behavior_neutral_for_legacy_unknown_memory() {
-        let ep = episode(10);
+        let ep = episode(12);
         let query = ep.input.values.clone();
         let mut replay = crate::memory::EpisodicMemory::new(
             crate::memory::EpisodicReplayConfig::broad_capture(),
@@ -265,7 +355,6 @@ mod tests {
         assert!(replay.store_if_significant(ep));
         let before_len = replay.len();
         let mgr = EpisodicPersistenceManager::new(Some(replay));
-
         let audit = mgr.shadow_audit_input_recall(&query, 1).unwrap();
         assert_eq!(audit.raw_returned, 1);
         assert_eq!(audit.grounded_history.would_return, 0);
@@ -273,15 +362,14 @@ mod tests {
         assert!(audit.grounded_history.would_change_selection);
         assert_eq!(mgr.replay.as_ref().unwrap().len(), before_len);
         assert!(mgr.provenance_index().is_empty());
+        assert!(mgr.component_provenance_index().is_empty());
     }
 
     #[test]
     fn shadow_audit_returns_none_when_replay_is_disabled() {
         let mgr = EpisodicPersistenceManager::new(None);
         assert!(mgr.shadow_audit_input_recall(&[0.0, 1.0], 3).is_none());
-        assert!(mgr
-            .shadow_audit_embedding_recall(&[0.0, 1.0], 3)
-            .is_none());
+        assert!(mgr.shadow_audit_embedding_recall(&[0.0, 1.0], 3).is_none());
     }
 
     #[test]
@@ -292,12 +380,10 @@ mod tests {
             std::process::id()
         ));
         let _ = std::fs::remove_file(&path);
-
         mgr.attach_sqlite_db(&path).unwrap();
         assert!(mgr.db.is_some());
         assert!(mgr.storage_runtime.is_some());
         assert!(mgr.storage_worker.is_some());
-
         let _ = std::fs::remove_file(path);
     }
 }
