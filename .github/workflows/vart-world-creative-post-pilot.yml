@@ -20,33 +20,32 @@ permissions:
 
 jobs:
   post-pilot-transition:
-    name: Anchor + audit + disposition + freeze eligibility + instrument qualification
+    name: Anchor + audit + dual-source closure + freeze eligibility + instrument qualification
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Python syntax gate
+      - name: Python syntax gate — all VART instrument scripts
         env:
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
-          python3 -m py_compile \
-            scripts/run_vart_world_creative_001_pilot_anchored.py \
-            scripts/test_run_vart_world_creative_001_pilot_anchored.py \
-            scripts/audit_vart_world_creative_001_pilot.py \
-            scripts/test_audit_vart_world_creative_001_pilot.py \
-            scripts/verify_vart_world_creative_001_post_pilot.py \
-            scripts/test_verify_vart_world_creative_001_post_pilot.py \
-            scripts/verify_vart_world_creative_001_freeze_eligibility.py \
-            scripts/test_verify_vart_world_creative_001_freeze_eligibility.py \
-            scripts/qualify_vart_world_creative_001_instrument.py
+          python3 - <<'PY'
+          import glob, py_compile
+          files = sorted(glob.glob('scripts/*vart_world_creative_001*.py'))
+          assert files, 'no VART scripts found'
+          for path in files:
+              py_compile.compile(path, doraise=True)
+          print(f'PASS: py_compile {len(files)} VART scripts')
+          PY
+          find scripts -type d -name __pycache__ -prune -exec rm -rf {} +
       - name: Pre-execution paired-design anchor suite
         env:
           PYTHONDONTWRITEBYTECODE: '1'
         run: python3 scripts/test_run_vart_world_creative_001_pilot_anchored.py
-      - name: Paired-design post-pilot adversarial suite
+      - name: Paired-design/dual-source post-pilot adversarial suite
         env:
           PYTHONDONTWRITEBYTECODE: '1'
         run: python3 scripts/test_audit_vart_world_creative_001_pilot.py
@@ -54,7 +53,15 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: '1'
         run: python3 scripts/test_verify_vart_world_creative_001_post_pilot.py
-      - name: Freeze-preparation eligibility adversarial suite
+      - name: Subject source-closure adversarial suite
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 scripts/test_qualify_vart_world_creative_001_source_closure.py
+      - name: Instrument source-closure adversarial suite
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 scripts/test_qualify_vart_world_creative_001_instrument_source_closure.py
+      - name: Dual-source freeze-preparation eligibility suite
         env:
           PYTHONDONTWRITEBYTECODE: '1'
         run: python3 scripts/test_verify_vart_world_creative_001_freeze_eligibility.py
