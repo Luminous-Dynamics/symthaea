@@ -3,32 +3,16 @@ name: VART World Creative Post-Pilot
 on:
   pull_request:
     paths:
-      - 'scripts/run_vart_world_creative_001_pilot_anchored.py'
-      - 'scripts/test_run_vart_world_creative_001_pilot_anchored.py'
-      - 'scripts/audit_vart_world_creative_001_pilot.py'
-      - 'scripts/test_audit_vart_world_creative_001_pilot.py'
-      - 'scripts/verify_vart_world_creative_001_post_pilot.py'
-      - 'scripts/test_verify_vart_world_creative_001_post_pilot.py'
-      - 'scripts/verify_vart_world_creative_001_freeze_eligibility.py'
-      - 'scripts/test_verify_vart_world_creative_001_freeze_eligibility.py'
-      - 'docs/research/VART_WORLD_CREATIVE_001_POST_PILOT_*'
-      - 'docs/research/VART_WORLD_CREATIVE_001_SOURCE_CLOSURE_*'
-      - '.github/workflows/vart-world-creative-post-pilot.yml'
+      - 'scripts/*vart_world_creative_001*.py'
+      - 'docs/research/VART_WORLD_CREATIVE_001_*'
+      - '.github/workflows/vart-world-creative-*.yml'
   push:
     branches:
       - 'research/vart-world-creative-001-execution'
     paths:
-      - 'scripts/run_vart_world_creative_001_pilot_anchored.py'
-      - 'scripts/test_run_vart_world_creative_001_pilot_anchored.py'
-      - 'scripts/audit_vart_world_creative_001_pilot.py'
-      - 'scripts/test_audit_vart_world_creative_001_pilot.py'
-      - 'scripts/verify_vart_world_creative_001_post_pilot.py'
-      - 'scripts/test_verify_vart_world_creative_001_post_pilot.py'
-      - 'scripts/verify_vart_world_creative_001_freeze_eligibility.py'
-      - 'scripts/test_verify_vart_world_creative_001_freeze_eligibility.py'
-      - 'docs/research/VART_WORLD_CREATIVE_001_POST_PILOT_*'
-      - 'docs/research/VART_WORLD_CREATIVE_001_SOURCE_CLOSURE_*'
-      - '.github/workflows/vart-world-creative-post-pilot.yml'
+      - 'scripts/*vart_world_creative_001*.py'
+      - 'docs/research/VART_WORLD_CREATIVE_001_*'
+      - '.github/workflows/vart-world-creative-*.yml'
   workflow_dispatch:
 
 permissions:
@@ -36,13 +20,17 @@ permissions:
 
 jobs:
   post-pilot-transition:
-    name: Anchor + audit + disposition + freeze eligibility
+    name: Anchor + audit + disposition + freeze eligibility + instrument qualification
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Python syntax gate
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
         run: |
           python3 -m py_compile \
             scripts/run_vart_world_creative_001_pilot_anchored.py \
@@ -52,12 +40,37 @@ jobs:
             scripts/verify_vart_world_creative_001_post_pilot.py \
             scripts/test_verify_vart_world_creative_001_post_pilot.py \
             scripts/verify_vart_world_creative_001_freeze_eligibility.py \
-            scripts/test_verify_vart_world_creative_001_freeze_eligibility.py
+            scripts/test_verify_vart_world_creative_001_freeze_eligibility.py \
+            scripts/qualify_vart_world_creative_001_instrument.py
       - name: Pre-execution paired-design anchor suite
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
         run: python3 scripts/test_run_vart_world_creative_001_pilot_anchored.py
       - name: Paired-design post-pilot adversarial suite
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
         run: python3 scripts/test_audit_vart_world_creative_001_pilot.py
       - name: Post-pilot disposition adversarial suite
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
         run: python3 scripts/test_verify_vart_world_creative_001_post_pilot.py
       - name: Freeze-preparation eligibility adversarial suite
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
         run: python3 scripts/test_verify_vart_world_creative_001_freeze_eligibility.py
+      - name: Qualify exact VART measurement instrument
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          find scripts -type d -name __pycache__ -prune -exec rm -rf {} +
+          python3 scripts/qualify_vart_world_creative_001_instrument.py \
+            --repo . \
+            --out /tmp/vart-instrument-qualification.json
+          sha256sum /tmp/vart-instrument-qualification.json
+      - name: Upload instrument qualification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vart-instrument-qualification-${{ github.sha }}
+          path: /tmp/vart-instrument-qualification.json
+          if-no-files-found: error
+          retention-days: 30
