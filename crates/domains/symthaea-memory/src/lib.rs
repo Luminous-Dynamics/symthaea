@@ -13,6 +13,7 @@ pub mod conversation;
 pub mod coordinator;
 pub mod episodic_provenance;
 pub mod episodic_replay;
+pub mod episodic_shadow;
 pub mod hippocampus;
 pub mod semantic;
 
@@ -33,6 +34,10 @@ pub use episodic_provenance::{
 pub use episodic_replay::{
     Episode, EpisodicMemory, EpisodicMemoryStats, EpisodicReplayConfig, ReplaySessionResult,
     bath_cosine_similarity,
+};
+pub use episodic_shadow::{
+    EpisodicShadowRecallAudit, ShadowRecallModeAudit, shadow_audit_embedding_similarity,
+    shadow_audit_input_similarity,
 };
 #[allow(deprecated)]
 pub use hippocampus::{
