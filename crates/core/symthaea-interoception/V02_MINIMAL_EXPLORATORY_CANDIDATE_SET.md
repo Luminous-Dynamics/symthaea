@@ -16,7 +16,7 @@ Prefer the smallest candidate set that can separately test:
 - revision of the same future support;
 - rolling-horizon turnover;
 - urgency / breach imminence;
-- cumulative exposure;
+- absolute prospective cumulative exposure;
 - confidence/precision;
 - the legacy v0.1 precision×importance aggregate;
 - external prefix-history information beyond current state;
@@ -68,7 +68,9 @@ Purpose:
 - test whether candidate structure is merely stimulus/load magnitude;
 - remain intentionally simpler than native-state or forecast quantities.
 
-Use a prospectively fixed norm/reduction over the current declared drive only. It must not inspect semantic condition identity or future protocol.
+Use a prospectively fixed Euclidean norm over the eight-channel current `InteroceptiveDrive` rate vector after exact conversion to the locked v0.2 accumulation representation. No fitted normalization is permitted in the first lineage.
+
+It must not inspect semantic condition identity or future protocol.
 
 ### E03 — realized viability change
 
@@ -145,34 +147,34 @@ Purpose: deliberately retain the finite-horizon boundary-turnover quantity as a 
 Coordinate:
 
 - relation: `U1Urgency`;
-- weighting: `W0RawChannel` or an equivalently prospectively fixed non-confidence severity basis;
-- aggregation: `A2PeakDeviation` / declared worst-threat projection;
+- weighting: `W0RawChannel`;
+- aggregation: `A2PeakDeviation` / worst projected channel;
 - temporal: `T8FirstBreachLatency`;
 - forecast: `ObservedDrivePersistence`;
 - information: `OfflinePrefixCausal`;
 - history: `H0CurrentNativeStateOnly` because the forecast uses only current state/configuration and the drive observed at the cut point.
 
-Purpose: test whether an apparently arousal/urgency-like signal is explained by simple breach imminence rather than a broader affect construct.
+Purpose: test whether an apparently urgency-like signal is explained by simple breach imminence rather than a broader affect construct.
 
-Typed no-breach is not zero latency.
+The value is a typed latency to the first projected viability breach under the locked forecast. `NoProjectedBreachWithinHorizon` is a distinct typed state, not zero or infinity substituted ad hoc.
 
-### E08 — cumulative viability exposure
+### E08 — absolute prospective cumulative viability exposure
 
-`e08_r0_w1_a4_t2_h1_cumulative_exposure_v1`
+`e08_p0_w1_a3_t2_h0_drive_persistence_cumulative_v1`
 
 Coordinate:
 
-- relation: declared burden/exposure relation;
+- relation: `P0ProspectiveBurden`;
 - weighting: `W1ViabilityWeightOnly`;
-- aggregation: `A4WeightedSumAllDeclared`;
-- temporal: `T2DiscountedCumulativeExposure`;
-- forecast/history source: explicitly frozen in the exact candidate manifest;
+- aggregation: `A3WeightedMeanAllDeclared` per projected step over the same fixed eight-channel set as E01;
+- temporal: `T2DiscountedCumulativeExposure` — discounted **sum**, not normalized mean;
+- forecast: `ObservedDrivePersistence`;
 - information: `OfflinePrefixCausal`;
-- history: `H1ReplayedPrefixHistory` when exposure uses the observed prior prefix, or H0 only if computed solely over a current prospective trajectory. The exact manifest must choose one and cannot switch post hoc.
+- history: `H0CurrentNativeStateOnly`.
 
-Purpose: test accumulated duration/intensity separately from instantaneous burden and normalized mean burden.
+Purpose: test whether absolute projected duration/intensity under current conditions explains candidate structure beyond instantaneous burden and breach latency.
 
-Before E08 is materialized, its exact historical-vs-prospective exposure source is a `ConfirmatoryBlocking` candidate-definition detail; it cannot remain ambiguous in a locked `ExploratoryCandidateSetManifest`.
+E08 uses the same v0.1 dynamics-aware constant-drive trajectory family/horizon/discount convention as the forecast-bearing candidates, but does not normalize cumulative weighted burden by total discount weight. It is therefore distinct from the legacy v0.1 normalized `discounted_debt`/mean quantity.
 
 ### E09 — explicit confidence baseline
 
@@ -182,7 +184,7 @@ Coordinate:
 
 - relation: descriptive current confidence/precision;
 - weighting: `W3ConfidenceOnly`;
-- aggregation: declared fixed-set mean;
+- aggregation: fixed eight-channel arithmetic mean unless a separately frozen confidence aggregation contract supersedes this choice;
 - temporal: `T0Instantaneous`;
 - forecast: `None`;
 - information: `OfflinePrefixCausal`;
@@ -207,22 +209,30 @@ Coordinate:
 
 Purpose: compare the frozen v0.1 aggregate against the importance-only E01 interpretation rather than silently choosing one.
 
-### E11 — history-added-information candidate
+### E11 — fixed trailing-history nuisance baseline
 
-`e11_h1_history_summary_v1`
+`e11_baseline_history_w1_a3_t3_h1_trailing16_v1`
+
+Coordinate:
+
+- relation: `BaselineNuisance`;
+- weighting: `W1ViabilityWeightOnly`;
+- aggregation: `A3WeightedMeanAllDeclared` at each realized past point;
+- temporal: `T3UndiscountedCumulativeExposure` over exactly the **16 completed realized states immediately preceding `t`**, excluding the current state at `t`;
+- forecast: `None`;
+- information: `OfflinePrefixCausal`;
+- history: `H1ReplayedPrefixHistory`.
 
 Purpose:
 
-- test whether prospectively specified same-scenario prefix history adds information beyond the H0 current-state candidates;
-- serve as the smallest explicit H1-vs-H0 discriminator.
+- test whether a simple amount-of-recent-regulatory-history explanation adds information beyond H0 current burden and E03 one-step change;
+- provide the smallest explicit H1-vs-H0 history baseline without a learned model or arbitrary post-hoc memory kernel.
 
-Its exact sufficient statistic must be frozen prospectively. Prefer one simple history summary, such as cumulative prior viability exposure or repeated-breach exposure, rather than a learned/high-capacity history model.
+E11 is `Unavailable(InsufficientHistory)` until 16 completed prior realized states exist. The window is fixed at 16 because it matches the frozen v0.1 default allostatic horizon length, giving a prospective structural symmetry rather than tuning the window to results.
 
-It must be evaluated on matched-current-native-state / different-history scenarios.
+E11 must be evaluated on matched-current-native-state / different-history scenarios.
 
 A successful E11 supports only **external historical information gain**, not native memory or mood.
-
-Before E11 is materialized, the exact one history summary/window is a `ConfirmatoryBlocking` candidate-definition detail; multiple history summaries cannot be added under E11 after outputs are seen.
 
 ## 3. Why this is enough for the first exploration
 
@@ -235,17 +245,17 @@ The set is intentionally small but covers the primary alternative explanations:
 - E05: changed future outlook;
 - E06: rolling-window artifact/control;
 - E07: urgency;
-- E08: cumulative exposure;
+- E08: absolute prospective cumulative exposure;
 - E09: confidence;
 - E10: legacy precision×importance hypothesis;
-- E11: external history beyond current state;
+- E11: simple recent external history beyond current state;
 - E00: null floor.
 
 Do not add another candidate merely because it is available in the factor space. Addition requires a written discrimination obligation that cannot be answered by the current set and a new candidate-set identity.
 
 ## 4. Primary forecast-policy decision
 
-For the first exploratory lineage, the primary prefix-causal forecast policy for E04, E05, E06, and E07 is:
+For the first exploratory lineage, the primary prefix-causal forecast policy for E04, E05, E06, E07, and E08 is:
 
 `ObservedDrivePersistence`.
 
@@ -255,7 +265,7 @@ Rationale:
 - it asks a simple local counterfactual: what happens if the current observed load continues?;
 - it maps naturally to the frozen v0.1 dynamics-aware constant-drive rollout;
 - it avoids true-future schedule leakage;
-- it gives E02 (current drive magnitude) a strong nuisance baseline against which to test whether the forecast adds anything beyond the load itself.
+- it gives E02 current drive magnitude a strong nuisance baseline against which to test whether forecast simulation adds anything beyond the load itself.
 
 The policy identity includes the exact v0.1 dynamics-aware rollout semantics, horizon, discount, and timestep requirements.
 
@@ -267,16 +277,11 @@ Changing the primary policy requires a new candidate-set/design identity before 
 
 ## 5. Preprocessing discipline
 
-Preferred initial preprocessing for E00–E11 is `None` or purely structural fixed transformation.
+Initial preprocessing for E00–E11 is `None` except exact type conversion / structural arithmetic explicitly included in each candidate formula.
 
-If any candidate requires fitted preprocessing:
+No z-scoring, cohort normalization, fitted clipping, learned threshold, adaptive smoothing, or fitted calibration is permitted in the minimal first exploratory candidate set.
 
-- the candidate definition must bind its `PreprocessingManifest`;
-- fitting may use only prospectively identified discovery/calibration or external-reference artifacts;
-- confirmatory/holdout data cannot contribute fitted parameters;
-- the candidate-set digest changes if preprocessing changes.
-
-For initial exploration, avoid fitting unless needed to answer a specific discrimination question.
+A later need for fitted preprocessing requires a new candidate definition and candidate-set/design identity before the affected exploratory outputs are inspected.
 
 ## 6. Evaluator isolation
 
@@ -297,12 +302,14 @@ The initial scenario/cut-point matrix must include at least one prospective disc
 - E05 vs E02 — future revision vs current drive magnitude;
 - E07 vs E01 — urgency vs current burden;
 - E07 vs E02 — urgency vs current drive magnitude;
-- E08 vs E01 — cumulative exposure vs instantaneous burden;
+- E08 vs E01 — prospective cumulative exposure vs instantaneous burden;
+- E08 vs E07 — cumulative projected burden vs breach latency;
+- E08 vs E02 — projected exposure vs current drive magnitude;
 - E09 vs E01 — confidence vs viability burden;
 - E10 vs E01 — legacy precision×importance vs viability-only burden;
-- E11 vs E01/E03 — external history vs current-state/recent-change explanations;
-- every non-null candidate vs E00;
-- every forecast/history candidate vs E02 nuisance load.
+- E11 vs E01 — trailing history vs current burden;
+- E11 vs E03 — trailing history vs immediate realized change;
+- every non-null candidate vs E00.
 
 If any required pair lacks a discriminator, the exploratory design is incomplete.
 
@@ -326,13 +333,7 @@ Use a prospective parsimony rule: when two candidates are empirically equivalent
 
 Candidate ranking and reduction must use only the preregistered numerical/discrimination criteria.
 
-Do not select based on which time series:
-
-- looks most emotional;
-- resembles human valence intuitively;
-- produces pleasing plots;
-- has the most dramatic excursions;
-- correlates best with semantic scenario names after unblinding.
+Do not select based on which time series looks most emotional, resembles human valence intuitively, produces pleasing plots, has dramatic excursions, or correlates best with semantic scenario names after unblinding.
 
 Interpretation comes after blinded candidate evidence freezes.
 
@@ -347,8 +348,8 @@ A future `ExploratoryCandidateSetManifest` should bind:
 - required pairwise discrimination obligations;
 - primary forecast policy = `ObservedDrivePersistence`;
 - sensitivity/diagnostic forecast policies = `NativeZeroInputRecovery`, `KinematicVelocity`;
-- preprocessing policy summary;
-- evaluator-isolation manifest digest;
+- preprocessing policy = no fitted preprocessing;
+- evaluator persistent-state policy = `NoneAcrossEvaluationCoordinates`;
 - scenario-discrimination manifest digest;
 - selection/parsimony rule digest;
 - canonical SHA-256.
@@ -359,16 +360,15 @@ Validation must reject:
 - duplicate role;
 - extra unregistered candidate;
 - candidate-definition digest mismatch;
-- unresolved E08 exposure-source ambiguity;
-- unresolved E11 history-summary/window ambiguity;
+- E11 history window other than the frozen trailing-16 definition;
 - absent required discriminator;
-- primary forecast policy other than the frozen policy;
+- primary forecast policy other than `ObservedDrivePersistence`;
 - oracle/retrospective candidate in a primary role;
-- confirmatory-fitted preprocessing;
+- fitted/adaptive preprocessing;
 - cross-evaluation mutable-state authority.
 
 ## 11. Claim boundary
 
-This finite set is designed to determine whether any regulatory observable adds reproducible information beyond simple state, load, change, confidence, urgency, history, exposure, and legacy-weighting explanations.
+This finite set is designed to determine whether any regulatory observable adds reproducible information beyond simple state, load, change, confidence, urgency, recent history, prospective exposure, and legacy-weighting explanations.
 
 Even a uniquely successful exploratory candidate is not evidence of emotion, subjective valence, feeling, mood, suffering, sentience, or consciousness. It is only a candidate for later independently frozen confirmatory testing.
