@@ -1,0 +1,17 @@
+{
+  "schema": "symthaea.vart-hidden-benchmark-source.v1",
+  "campaign_id": "__SET_HIDDEN_CAMPAIGN_ID__",
+  "custodian_id": "__SET_INDEPENDENT_CUSTODIAN_ID__",
+  "fixtures": [
+    {
+      "fixture_id": "__PRIVATE_FIXTURE_ID__",
+      "nonce_hex": "__64_LOWERCASE_HEX_RANDOM_NONCE__"
+    }
+  ],
+  "seeds": [
+    {
+      "seed": 0,
+      "nonce_hex": "__64_LOWERCASE_HEX_RANDOM_NONCE__"
+    }
+  ]
+}

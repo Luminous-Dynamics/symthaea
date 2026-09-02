@@ -1,0 +1,142 @@
+{
+  "schema": "symthaea.vart-002.mechanism-matrix.v1",
+  "experiment_id": "VART-002-EPISTEMIC-MECHANISMS",
+  "status": "design_draft_not_preregistered",
+  "confirmatory_execution_authorized": false,
+  "claim_authorized": false,
+  "shared_matching_constraints": {
+    "same_starting_world_snapshot": true,
+    "same_subject_visible_observations": true,
+    "same_candidate_generation_surface": true,
+    "same_physical_admission_policy": true,
+    "same_memory_capacity_budget": true,
+    "same_retrieval_budget": true,
+    "same_compute_budget": true,
+    "same_subject_source": true,
+    "same_action_authority": true,
+    "same_scoring_contract": true
+  },
+  "provenance_primary_conditions": [
+    {
+      "id": "FULL_TYPED_PROVENANCE",
+      "source_identity": true,
+      "epistemic_domain": true,
+      "temporal_order": true,
+      "immutable_history": true,
+      "retrieval_filtering": true,
+      "counterfactual_taint": true
+    },
+    {
+      "id": "NO_PROVENANCE",
+      "source_identity": false,
+      "epistemic_domain": false,
+      "temporal_order": false,
+      "immutable_history": false,
+      "retrieval_filtering": false,
+      "counterfactual_taint": false
+    },
+    {
+      "id": "SOURCE_LABEL_ONLY",
+      "source_identity": true,
+      "epistemic_domain": false,
+      "temporal_order": false,
+      "immutable_history": false,
+      "retrieval_filtering": false,
+      "counterfactual_taint": false
+    },
+    {
+      "id": "DOMAIN_NAMESPACE_ONLY",
+      "source_identity": false,
+      "epistemic_domain": true,
+      "temporal_order": false,
+      "immutable_history": false,
+      "retrieval_filtering": false,
+      "counterfactual_taint": true
+    },
+    {
+      "id": "IMMUTABLE_HISTORY_ONLY",
+      "source_identity": false,
+      "epistemic_domain": false,
+      "temporal_order": true,
+      "immutable_history": true,
+      "retrieval_filtering": false,
+      "counterfactual_taint": false
+    },
+    {
+      "id": "NO_TEMPORAL_ORDER",
+      "source_identity": true,
+      "epistemic_domain": true,
+      "temporal_order": false,
+      "immutable_history": true,
+      "retrieval_filtering": true,
+      "counterfactual_taint": true
+    },
+    {
+      "id": "NO_SOURCE_IDENTITY",
+      "source_identity": false,
+      "epistemic_domain": true,
+      "temporal_order": true,
+      "immutable_history": true,
+      "retrieval_filtering": true,
+      "counterfactual_taint": true
+    },
+    {
+      "id": "RETRIEVAL_FILTER_REMOVED",
+      "source_identity": true,
+      "epistemic_domain": true,
+      "temporal_order": true,
+      "immutable_history": true,
+      "retrieval_filtering": false,
+      "counterfactual_taint": true
+    }
+  ],
+  "provenance_fault_injection_conditions": [
+    "STALE_PROVENANCE",
+    "WRONG_PROVENANCE",
+    "COUNTERFACTUAL_PROMOTION_PRESSURE",
+    "CONFLICTING_SOURCES"
+  ],
+  "uncertainty_block": {
+    "separate_claim_family": true,
+    "conditions": [
+      "UNCERTAINTY_AWARE",
+      "NO_CONFIDENCE_STATE",
+      "FORCED_ACTION_NO_ABSTENTION",
+      "ACTIVE_OBSERVATION_ALLOWED"
+    ]
+  },
+  "candidate_endpoint_families": [
+    "provenance_confusion_rate",
+    "grounded_counterfactual_classification_error",
+    "declared_goal_consequence",
+    "physical_validity",
+    "protected_side_effects",
+    "prediction_error",
+    "abstention_correctness",
+    "unnecessary_action_rate",
+    "information_gathering_efficiency",
+    "irreversible_harm_avoidance"
+  ],
+  "unresolved_before_preregistration": [
+    "hidden_world_families",
+    "independent_cluster_counts",
+    "metric_definitions",
+    "metric_directions",
+    "effect_or_noninferiority_margins",
+    "primary_contrasts",
+    "multiplicity_method",
+    "missingness_policy",
+    "stopping_rule",
+    "exact_estimators",
+    "compute_budget_definition",
+    "reveal_policy"
+  ],
+  "forbidden": [
+    "reuse_of_vart001_confirmatory_fixtures_as_hidden_confirmatory_worlds",
+    "reuse_of_vart001_exact_confirmatory_seeds",
+    "scalar_world_quality",
+    "post_unblinding_threshold_tuning",
+    "memory_capacity_mismatch_masquerading_as_provenance_ablation",
+    "compute_budget_mismatch_masquerading_as_architecture_advantage"
+  ]
+}

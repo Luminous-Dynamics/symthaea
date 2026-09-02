@@ -1,0 +1,45 @@
+{
+  "schema": "symthaea.vart-001.archive-capsule.v1",
+  "experiment_id": "VART-WORLD-CREATIVE-001",
+  "status": "assembled_not_qualified",
+  "development_use": "historical_only_no_tuning",
+  "subject_source": {
+    "head": null,
+    "tree": null,
+    "source_closure_receipt_sha256": null
+  },
+  "instrument_source": {
+    "head": null,
+    "tree": null,
+    "qualification_receipt_sha256": null,
+    "source_closure_receipt_sha256": null
+  },
+  "freeze_v3_sha256": "ea4868758c16ccf671cd4be1628691418b98af40654c8bd84725af1875f2c4aa",
+  "campaign_receipt_sha256": "45af8d4d48de9dcd124276b2fb265c99704eca28ec2233c00e67433df6a6092a",
+  "first_unblinding_analysis_receipt_sha256": "0e18995b0199563f0c3dafa4d1152020be5eecb1bf632e2dd624d2c0e186f7d6",
+  "post_unblinding_claim_audit_receipt_sha256": null,
+  "final_bounded_claim_packet_sha256": null,
+  "evidence_closure_sha256": null,
+  "superseded_lineages": [
+    {
+      "kind": "confirmatory_freeze",
+      "sha256": "ce5f826df78f702272af79f3ec8baea04d7a198d4329e689e5b70a0f48d43f25",
+      "superseded_by_sha256": "414342ef5ea649845955da25382a1d3c0affdd367ed1c08bfee1134a059c233b"
+    },
+    {
+      "kind": "confirmatory_freeze",
+      "sha256": "414342ef5ea649845955da25382a1d3c0affdd367ed1c08bfee1134a059c233b",
+      "superseded_by_sha256": "ea4868758c16ccf671cd4be1628691418b98af40654c8bd84725af1875f2c4aa"
+    }
+  ],
+  "artifact_bindings": [],
+  "external_archive_anchor": {
+    "required": true,
+    "manifest_sha256": null,
+    "record_locator": null
+  },
+  "claim_ceiling": "benchmark_family_bounded",
+  "general_creativity_claim_authorized": false,
+  "general_intelligence_claim_authorized": false,
+  "claim_authorized": false
+}

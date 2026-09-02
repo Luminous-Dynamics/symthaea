@@ -1,0 +1,39 @@
+{
+  "schema": "symthaea.vart-002.provenance-enforcement-preparation.v1",
+  "status": "candidate_not_authorized",
+  "subject_source": {
+    "head": "__40_HEX_SHA1__",
+    "tree": "__40_HEX_SHA1__"
+  },
+  "instrument_source": {
+    "head": "__40_HEX_SHA1__",
+    "tree": "__40_HEX_SHA1__"
+  },
+  "shadow_characterization": {
+    "fresh_devart_campaign_id": "__SET__",
+    "hidden_vart_feedback_used": false,
+    "raw_decision_path_unchanged": true,
+    "audit_cycles": 0,
+    "queries_observed": 0,
+    "raw_vs_grounded_divergence_characterized": false
+  },
+  "component_model": {
+    "perception_subject_binding_complete": false,
+    "cognition_subject_binding_complete": false,
+    "composite_derivation_receipts_complete": false,
+    "composite_never_implicitly_grounded": true,
+    "legacy_unknown_preserved": true,
+    "sidecars_transactionally_consistent": false,
+    "replay_replacement_clears_sidecars": false,
+    "paired_persistence_restore_qualified": false,
+    "occurrence_truth_separate_from_content_truth": false
+  },
+  "promotion_scope": {
+    "fresh_devart_only": true,
+    "hidden_vart_execution_allowed": false,
+    "automatic_production_rollout_allowed": false
+  },
+  "enforcement_preparation_eligible": false,
+  "confirmatory_execution_authorized": false,
+  "claim_authorized": false
+}

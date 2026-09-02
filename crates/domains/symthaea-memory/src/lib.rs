@@ -11,7 +11,13 @@
 pub mod coherence;
 pub mod conversation;
 pub mod coordinator;
+pub mod episodic_component_index;
+pub mod episodic_components;
+pub mod episodic_occurrence;
+pub mod episodic_provenance;
 pub mod episodic_replay;
+pub mod episodic_shadow;
+pub mod episodic_sidecar_bundle;
 pub mod hippocampus;
 pub mod semantic;
 
@@ -24,9 +30,33 @@ pub use coordinator::{
     CoordinatorConfig, CoordinatorStats, GraduationEvent, MemoryCoordinator, MemorySignals,
     MemorySource, content_hash,
 };
+pub use episodic_component_index::{
+    EpisodicComponentIndexError, EpisodicComponentProvenanceIndex,
+};
+pub use episodic_components::{
+    EpisodicComponentProvenance, EpisodicComponentProvenanceError,
+    episode_cognition_subject_sha256, episode_perception_subject_sha256,
+};
+pub use episodic_occurrence::{
+    EpisodicOccurrenceError, EpisodicOccurrenceIndex, EpisodicOccurrenceRecord,
+    episode_occurrence_subject_sha256,
+};
+pub use episodic_provenance::{
+    AuditedEpisodicRecall, EpisodicProvenanceError, EpisodicProvenanceIndex,
+    EpisodicRetrievalAudit, ProvenanceAwareEpisodicMemory, ProvenancedEpisodeMatch,
+    episode_subject_sha256,
+};
 pub use episodic_replay::{
     Episode, EpisodicMemory, EpisodicMemoryStats, EpisodicReplayConfig, ReplaySessionResult,
     bath_cosine_similarity,
+};
+pub use episodic_shadow::{
+    EpisodicShadowRecallAudit, ShadowRecallModeAudit, shadow_audit_embedding_similarity,
+    shadow_audit_input_similarity,
+};
+pub use episodic_sidecar_bundle::{
+    EPISODIC_SIDECAR_BUNDLE_SCHEMA, EpisodicSidecarBundle, EpisodicSidecarBundleError,
+    bytes_sha256 as sidecar_bytes_sha256,
 };
 #[allow(deprecated)]
 pub use hippocampus::{

@@ -12,7 +12,9 @@ chrono = { workspace = true }
 ndarray = { workspace = true }
 rusqlite = { workspace = true }
 serde = { workspace = true }
+sha2 = "0.10"
 symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-epistemic-types = { path = "../symthaea-epistemic-types" }
 tokio = { workspace = true, features = ["sync"] }
 tracing = { workspace = true }
 uuid = { workspace = true }
