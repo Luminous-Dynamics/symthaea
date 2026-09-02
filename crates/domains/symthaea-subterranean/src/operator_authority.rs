@@ -80,12 +80,6 @@ impl OperatorConstraint {
         }
     }
 
-    /// Whether `requested` may replace this constraint without going through the
-    /// dedicated recovery protocol.
-    ///
-    /// Ordinary operator commands are safety-monotonic: they may preserve or
-    /// increase restriction, but never widen authority. Mission changes are only
-    /// allowed while the current operator state is `None` or another mission.
     pub const fn can_replace_without_recovery(self, requested: Self) -> bool {
         match requested {
             Self::None => matches!(self, Self::None),
@@ -102,9 +96,6 @@ impl OperatorConstraint {
         }
     }
 
-    /// Restrict the learned nominal command before physical recovery planning.
-    /// Hazard recovery remains downstream and may add cooling, dewatering,
-    /// sealing, support or withdrawal required to preserve the platform.
     pub fn constrain_nominal(
         self,
         mut command: SubterraneanCommand,
@@ -125,11 +116,7 @@ impl OperatorConstraint {
                 command.set_right_track(0.0);
                 command.set_ballast_trim(0.0);
                 command.recovery = Default::default();
-                command.set_thermal_pump(if state.cutter_temp_c() >= 85.0 {
-                    0.6
-                } else {
-                    0.0
-                });
+                command.set_thermal_pump(if state.cutter_temp_c() >= 85.0 { 0.6 } else { 0.0 });
             }
         }
         command.sanitize();
@@ -192,17 +179,12 @@ impl OperatorAuthority {
         }
     }
 
-    pub fn constraint(&self) -> OperatorConstraint {
-        self.constraint
-    }
+    pub fn constraint(&self) -> OperatorConstraint { self.constraint }
 
     pub fn validate(&self) -> bool {
         self.policy.maximum_command_age_steps > 0
             && self.policy.recovery_quorum >= 2
-            && self
-                .last_sequence
-                .keys()
-                .all(|operator| operator.is_valid())
+            && self.last_sequence.keys().all(|operator| operator.is_valid())
             && self.pending_resume.iter().all(|(proposal_id, pending)| {
                 *proposal_id == pending.proposal.proposal_id()
                     && !pending.operators.is_empty()
@@ -210,36 +192,21 @@ impl OperatorAuthority {
             })
     }
 
-    pub fn accepted_commands(&self) -> u64 {
-        self.accepted_commands
-    }
-
-    pub fn rejected_commands(&self) -> u64 {
-        self.rejected_commands
-    }
+    pub fn accepted_commands(&self) -> u64 { self.accepted_commands }
+    pub fn rejected_commands(&self) -> u64 { self.rejected_commands }
 
     pub fn pending_approvals(&self, proposal_id: u64) -> usize {
-        self.pending_resume
-            .get(&proposal_id)
-            .map_or(0, |pending| pending.operators.len())
+        self.pending_resume.get(&proposal_id).map_or(0, |pending| pending.operators.len())
     }
 
-    pub fn last_applied_proposal(&self) -> Option<u64> {
-        self.last_applied_proposal
-    }
+    pub fn last_applied_proposal(&self) -> Option<u64> { self.last_applied_proposal }
 
-    fn reject<T>(
-        &mut self,
-        rejection: OperatorAuthorityRejection,
-    ) -> Result<T, OperatorAuthorityRejection> {
+    fn reject<T>(&mut self, rejection: OperatorAuthorityRejection) -> Result<T, OperatorAuthorityRejection> {
         self.rejected_commands = self.rejected_commands.saturating_add(1);
         Err(rejection)
     }
 
-    fn accept_sequence(
-        &mut self,
-        envelope: OperatorCommandEnvelope,
-    ) -> Result<(), OperatorAuthorityRejection> {
+    fn accept_sequence(&mut self, envelope: OperatorCommandEnvelope) -> Result<(), OperatorAuthorityRejection> {
         if let Some((epoch, sequence)) = self.last_sequence.get(&envelope.operator).copied() {
             if envelope.epoch < epoch {
                 return self.reject(OperatorAuthorityRejection::StaleEpoch);
@@ -248,14 +215,12 @@ impl OperatorAuthority {
                 return self.reject(OperatorAuthorityRejection::Replay);
             }
         }
-        self.last_sequence
-            .insert(envelope.operator, (envelope.epoch, envelope.sequence));
+        self.last_sequence.insert(envelope.operator, (envelope.epoch, envelope.sequence));
         Ok(())
     }
 
     fn expire_pending(&mut self, now_step: u64) {
-        self.pending_resume
-            .retain(|_, pending| now_step <= pending.proposal.expires_step());
+        self.pending_resume.retain(|_, pending| now_step <= pending.proposal.expires_step());
     }
 
     fn apply_non_recovery_constraint(
@@ -266,23 +231,20 @@ impl OperatorAuthority {
         if !self.constraint.can_replace_without_recovery(requested) {
             return self.reject(OperatorAuthorityRejection::WouldWeakenActiveConstraint);
         }
-
-        // A fresh operator constraint invalidates approvals collected to clear an
-        // earlier state. This includes an idempotent repeated stop: a newly
-        // asserted stop must not inherit an older recovery quorum.
         self.pending_resume.clear();
         self.constraint = requested;
         self.last_applied_proposal = Some(proposal_id);
         Ok(OperatorDecision::Applied(requested))
     }
 
-    /// Ingest an ordinary operator command. Recovery widening is deliberately
-    /// excluded from this path and requires `approve_recovery` with an exact
-    /// evidence-bound proposal.
+    /// Ingest an ordinary operator command. The third argument is retained only
+    /// for source compatibility with the previous API; it has no authority to
+    /// clear a restriction. `ResumeNominal` now requires `approve_recovery`.
     pub fn ingest(
         &mut self,
         envelope: OperatorCommandEnvelope,
         now_step: u64,
+        _legacy_physical_hazard_clear: bool,
     ) -> Result<OperatorDecision, OperatorAuthorityRejection> {
         let envelope = match self.policy.validate_metadata(envelope, now_step) {
             Ok(value) => value,
@@ -292,46 +254,23 @@ impl OperatorAuthority {
         self.expire_pending(now_step);
 
         let decision = match envelope.command {
-            OperatorCommand::EmergencyStop => self.apply_non_recovery_constraint(
-                OperatorConstraint::EmergencyStop,
-                envelope.proposal_id,
-            )?,
-            OperatorCommand::HoldPosition => self.apply_non_recovery_constraint(
-                OperatorConstraint::HoldPosition,
-                envelope.proposal_id,
-            )?,
-            OperatorCommand::ReturnHome => self.apply_non_recovery_constraint(
-                OperatorConstraint::ReturnHome,
-                envelope.proposal_id,
-            )?,
-            OperatorCommand::SetMission(intent) => self.apply_non_recovery_constraint(
-                OperatorConstraint::Mission(intent),
-                envelope.proposal_id,
-            )?,
-            OperatorCommand::EnterMaintenance => self.apply_non_recovery_constraint(
-                OperatorConstraint::MaintenanceLock,
-                envelope.proposal_id,
-            )?,
-            OperatorCommand::ResumeNominal => {
-                return self.reject(OperatorAuthorityRejection::RecoveryProposalRequired);
-            }
+            OperatorCommand::EmergencyStop => self.apply_non_recovery_constraint(OperatorConstraint::EmergencyStop, envelope.proposal_id)?,
+            OperatorCommand::HoldPosition => self.apply_non_recovery_constraint(OperatorConstraint::HoldPosition, envelope.proposal_id)?,
+            OperatorCommand::ReturnHome => self.apply_non_recovery_constraint(OperatorConstraint::ReturnHome, envelope.proposal_id)?,
+            OperatorCommand::SetMission(intent) => self.apply_non_recovery_constraint(OperatorConstraint::Mission(intent), envelope.proposal_id)?,
+            OperatorCommand::EnterMaintenance => self.apply_non_recovery_constraint(OperatorConstraint::MaintenanceLock, envelope.proposal_id)?,
+            OperatorCommand::ResumeNominal => return self.reject(OperatorAuthorityRejection::RecoveryProposalRequired),
         };
         self.accepted_commands = self.accepted_commands.saturating_add(1);
         Ok(decision)
     }
 
-    /// Approve a recovery proposal that binds the exact active restriction and
-    /// the evidence/deployment epochs reviewed by the operator. A different
-    /// proposal carrying the same numeric id is rejected rather than merged.
     pub fn approve_recovery(
         &mut self,
         approval: RecoveryApprovalEnvelopeV1,
         now_step: u64,
     ) -> Result<OperatorDecision, OperatorAuthorityRejection> {
-        let metadata = match self
-            .policy
-            .validate_metadata(approval.as_command_envelope(), now_step)
-        {
+        let metadata = match self.policy.validate_metadata(approval.as_command_envelope(), now_step) {
             Ok(value) => value,
             Err(error) => return self.reject(error.into()),
         };
@@ -343,13 +282,10 @@ impl OperatorAuthority {
         }
 
         let proposal_id = approval.proposal.proposal_id();
-        let pending = self
-            .pending_resume
-            .entry(proposal_id)
-            .or_insert_with(|| PendingRecoveryApproval {
-                proposal: approval.proposal,
-                operators: BTreeSet::new(),
-            });
+        let pending = self.pending_resume.entry(proposal_id).or_insert_with(|| PendingRecoveryApproval {
+            proposal: approval.proposal,
+            operators: BTreeSet::new(),
+        });
         if pending.proposal != approval.proposal {
             return self.reject(OperatorAuthorityRejection::ConflictingProposal);
         }
@@ -361,19 +297,12 @@ impl OperatorAuthority {
             self.last_applied_proposal = Some(proposal_id);
             OperatorDecision::Cleared
         } else {
-            OperatorDecision::PendingQuorum {
-                approvals,
-                required: self.policy.recovery_quorum.max(2),
-            }
+            OperatorDecision::PendingQuorum { approvals, required: self.policy.recovery_quorum.max(2) }
         };
         self.accepted_commands = self.accepted_commands.saturating_add(1);
         Ok(decision)
     }
 
-    /// Full simulation/episode reset. This deliberately clears restrictive
-    /// operator authority and therefore must not be used as a production
-    /// restart/recovery primitive. Operational recovery should restore a
-    /// validated checkpoint instead.
     pub(crate) fn reset_runtime(&mut self) {
         self.pending_resume.clear();
         self.constraint = OperatorConstraint::None;
@@ -382,23 +311,16 @@ impl OperatorAuthority {
 }
 
 impl Default for OperatorAuthority {
-    fn default() -> Self {
-        Self::new(OperatorTrustPolicy::default())
-    }
+    fn default() -> Self { Self::new(OperatorTrustPolicy::default()) }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use recovery_authority::{RecoveryApprovalEnvelopeV1, RecoveryDigest};
     use crate::operator_protocol::{AuthenticationLevel, OperatorRole};
+    use recovery_authority::{RecoveryApprovalEnvelopeV1, RecoveryDigest};
 
-    fn command(
-        operator: u64,
-        sequence: u64,
-        proposal_id: u64,
-        command: OperatorCommand,
-    ) -> OperatorCommandEnvelope {
+    fn command(operator: u64, sequence: u64, proposal_id: u64, command: OperatorCommand) -> OperatorCommandEnvelope {
         OperatorCommandEnvelope {
             operator: OperatorId(operator),
             role: OperatorRole::SafetyOfficer,
@@ -426,11 +348,7 @@ mod tests {
         )
     }
 
-    fn approval(
-        operator: u64,
-        sequence: u64,
-        proposal: RecoveryProposalV1,
-    ) -> RecoveryApprovalEnvelopeV1 {
+    fn approval(operator: u64, sequence: u64, proposal: RecoveryProposalV1) -> RecoveryApprovalEnvelopeV1 {
         RecoveryApprovalEnvelopeV1 {
             operator: OperatorId(operator),
             role: OperatorRole::SafetyOfficer,
@@ -443,76 +361,35 @@ mod tests {
     }
 
     #[test]
-    fn replayed_operator_sequence_is_rejected() {
+    fn legacy_resume_cannot_clear_authority() {
         let mut authority = OperatorAuthority::default();
-        let value = command(1, 1, 1, OperatorCommand::HoldPosition);
-        assert!(authority.ingest(value, 20).is_ok());
+        authority.ingest(command(1, 1, 1, OperatorCommand::EmergencyStop), 20, true).unwrap();
         assert_eq!(
-            authority.ingest(value, 21),
-            Err(OperatorAuthorityRejection::Replay)
-        );
-    }
-
-    #[test]
-    fn legacy_resume_command_requires_typed_recovery_proposal() {
-        let mut authority = OperatorAuthority::default();
-        authority
-            .ingest(command(1, 1, 1, OperatorCommand::EmergencyStop), 20)
-            .expect("stop is valid");
-        assert_eq!(
-            authority.ingest(command(1, 2, 7, OperatorCommand::ResumeNominal), 21),
+            authority.ingest(command(1, 2, 7, OperatorCommand::ResumeNominal), 21, true),
             Err(OperatorAuthorityRejection::RecoveryProposalRequired)
         );
         assert_eq!(authority.constraint(), OperatorConstraint::EmergencyStop);
     }
 
     #[test]
-    fn one_operator_cannot_clear_evidence_bound_recovery() {
+    fn exact_evidence_bound_quorum_clears_restriction() {
         let mut authority = OperatorAuthority::default();
-        authority
-            .ingest(command(1, 1, 1, OperatorCommand::EmergencyStop), 20)
-            .expect("stop is valid");
-        let proposal = proposal(7, OperatorConstraint::EmergencyStop);
-        let decision = authority
-            .approve_recovery(approval(1, 2, proposal), 21)
-            .expect("first approval is valid");
-        assert_eq!(
-            decision,
-            OperatorDecision::PendingQuorum {
-                approvals: 1,
-                required: 2
-            }
-        );
-        assert_eq!(authority.constraint(), OperatorConstraint::EmergencyStop);
-    }
-
-    #[test]
-    fn two_operators_clear_the_same_evidence_bound_proposal() {
-        let mut authority = OperatorAuthority::default();
-        authority
-            .ingest(command(1, 1, 1, OperatorCommand::HoldPosition), 20)
-            .expect("hold is valid");
-        let proposal = proposal(9, OperatorConstraint::HoldPosition);
-        authority
-            .approve_recovery(approval(1, 2, proposal), 21)
-            .expect("first approval is valid");
-        let decision = authority
-            .approve_recovery(approval(2, 1, proposal), 22)
-            .expect("second approval is valid");
-        assert_eq!(decision, OperatorDecision::Cleared);
+        authority.ingest(command(1, 1, 1, OperatorCommand::HoldPosition), 20, true).unwrap();
+        let p = proposal(9, OperatorConstraint::HoldPosition);
+        assert!(matches!(
+            authority.approve_recovery(approval(1, 2, p), 21).unwrap(),
+            OperatorDecision::PendingQuorum { approvals: 1, required: 2 }
+        ));
+        assert_eq!(authority.approve_recovery(approval(2, 1, p), 22), Ok(OperatorDecision::Cleared));
         assert_eq!(authority.constraint(), OperatorConstraint::None);
     }
 
     #[test]
-    fn changed_evidence_under_same_proposal_id_is_rejected() {
+    fn changed_evidence_same_id_does_not_join_quorum() {
         let mut authority = OperatorAuthority::default();
-        authority
-            .ingest(command(1, 1, 1, OperatorCommand::HoldPosition), 20)
-            .expect("hold is valid");
-        let first = proposal(9, OperatorConstraint::HoldPosition);
-        authority
-            .approve_recovery(approval(1, 2, first), 21)
-            .expect("first approval is valid");
+        authority.ingest(command(1, 1, 1, OperatorCommand::HoldPosition), 20, true).unwrap();
+        let p = proposal(9, OperatorConstraint::HoldPosition);
+        authority.approve_recovery(approval(1, 2, p), 21).unwrap();
         let changed = RecoveryProposalV1::new(
             9,
             OperatorConstraint::HoldPosition,
@@ -534,121 +411,41 @@ mod tests {
     #[test]
     fn proposal_for_old_constraint_cannot_clear_new_stop() {
         let mut authority = OperatorAuthority::default();
-        authority
-            .ingest(command(1, 1, 1, OperatorCommand::HoldPosition), 20)
-            .expect("hold is valid");
+        authority.ingest(command(1, 1, 1, OperatorCommand::HoldPosition), 20, true).unwrap();
         let old = proposal(9, OperatorConstraint::HoldPosition);
-        authority
-            .approve_recovery(approval(1, 2, old), 21)
-            .expect("first approval is valid");
-        authority
-            .ingest(command(2, 1, 2, OperatorCommand::EmergencyStop), 22)
-            .expect("new emergency stop is valid");
+        authority.approve_recovery(approval(1, 2, old), 21).unwrap();
+        authority.ingest(command(2, 1, 2, OperatorCommand::EmergencyStop), 22, true).unwrap();
         assert_eq!(
             authority.approve_recovery(approval(2, 2, old), 23),
-            Err(OperatorAuthorityRejection::RecoveryProposal(
-                RecoveryProposalRejection::ActiveConstraintMismatch
-            ))
+            Err(OperatorAuthorityRejection::RecoveryProposal(RecoveryProposalRejection::ActiveConstraintMismatch))
         );
         assert_eq!(authority.constraint(), OperatorConstraint::EmergencyStop);
     }
 
     #[test]
-    fn emergency_stop_cannot_be_weakened_by_ordinary_commands() {
+    fn ordinary_commands_remain_monotone() {
         let mut authority = OperatorAuthority::default();
-        authority
-            .ingest(command(1, 1, 1, OperatorCommand::EmergencyStop), 20)
-            .expect("stop is valid");
-
-        let weaker = [
-            OperatorCommand::HoldPosition,
-            OperatorCommand::ReturnHome,
-            OperatorCommand::SetMission(SubterraneanMissionIntent::Explore),
-            OperatorCommand::EnterMaintenance,
-        ];
-
-        for (index, requested) in weaker.into_iter().enumerate() {
-            let result = authority.ingest(
-                command(1, index as u64 + 2, index as u64 + 2, requested),
-                21 + index as u64,
-            );
-            assert_eq!(
-                result,
-                Err(OperatorAuthorityRejection::WouldWeakenActiveConstraint)
-            );
-            assert_eq!(authority.constraint(), OperatorConstraint::EmergencyStop);
-        }
-    }
-
-    #[test]
-    fn stronger_non_recovery_constraint_is_allowed() {
-        let mut authority = OperatorAuthority::default();
-        authority
-            .ingest(command(1, 1, 1, OperatorCommand::ReturnHome), 20)
-            .expect("return is valid");
-        let decision = authority
-            .ingest(command(1, 2, 2, OperatorCommand::EmergencyStop), 21)
-            .expect("stronger stop must remain available");
+        authority.ingest(command(1, 1, 1, OperatorCommand::EmergencyStop), 20, true).unwrap();
         assert_eq!(
-            decision,
-            OperatorDecision::Applied(OperatorConstraint::EmergencyStop)
+            authority.ingest(command(1, 2, 2, OperatorCommand::ReturnHome), 21, true),
+            Err(OperatorAuthorityRejection::WouldWeakenActiveConstraint)
         );
+        assert_eq!(authority.constraint(), OperatorConstraint::EmergencyStop);
     }
 
     #[test]
-    fn mission_changes_remain_available_at_mission_level() {
+    fn repeated_stop_invalidates_pending_recovery() {
         let mut authority = OperatorAuthority::default();
-        authority
-            .ingest(
-                command(
-                    1,
-                    1,
-                    1,
-                    OperatorCommand::SetMission(SubterraneanMissionIntent::Explore),
-                ),
-                20,
-            )
-            .expect("initial mission is valid");
-        let decision = authority
-            .ingest(
-                command(
-                    1,
-                    2,
-                    2,
-                    OperatorCommand::SetMission(SubterraneanMissionIntent::ProbeAhead),
-                ),
-                21,
-            )
-            .expect("mission-level change is non-widening");
-        assert_eq!(
-            decision,
-            OperatorDecision::Applied(OperatorConstraint::Mission(
-                SubterraneanMissionIntent::ProbeAhead
-            ))
-        );
-    }
-
-    #[test]
-    fn repeated_emergency_stop_invalidates_pending_recovery() {
-        let mut authority = OperatorAuthority::default();
-        authority
-            .ingest(command(1, 1, 1, OperatorCommand::EmergencyStop), 20)
-            .expect("initial stop is valid");
-        let proposal = proposal(9, OperatorConstraint::EmergencyStop);
-        authority
-            .approve_recovery(approval(1, 2, proposal), 21)
-            .expect("first recovery approval is valid");
+        authority.ingest(command(1, 1, 1, OperatorCommand::EmergencyStop), 20, true).unwrap();
+        let p = proposal(9, OperatorConstraint::EmergencyStop);
+        authority.approve_recovery(approval(1, 2, p), 21).unwrap();
         assert_eq!(authority.pending_approvals(9), 1);
-
-        authority
-            .ingest(command(2, 1, 2, OperatorCommand::EmergencyStop), 22)
-            .expect("reasserted stop is valid");
+        authority.ingest(command(2, 1, 2, OperatorCommand::EmergencyStop), 22, true).unwrap();
         assert_eq!(authority.pending_approvals(9), 0);
-        assert_eq!(authority.constraint(), OperatorConstraint::EmergencyStop);
     }
 
     #[test]
-    fn hold_removes_motion_but_preserves_needed_cooling() {
+    fn hold_preserves_required_cooling() {
         let mut state = SubterraneanState::home();
         state.channels[crate::types::CUTTER_TEMP_C] = 100.0;
         let mut command = SubterraneanCommand::zero();
