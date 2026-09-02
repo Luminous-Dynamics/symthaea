@@ -8,6 +8,11 @@
     "pilot_design_sha256": null,
     "source_head": null,
     "source_tree": null,
+    "dual_source_bound": false,
+    "instrument_source_head": null,
+    "instrument_source_tree": null,
+    "preexecution_anchor_sha256": null,
+    "pilot_config_sha256": null,
     "audit_verdict": null,
     "paired_block_semantics": null
   },
@@ -32,12 +37,10 @@
     "pilot_rerun_required": null,
     "pilot_rerun_complete": false,
     "new_preregistration_lineage_required": null,
-    "new_preregistration_lineage_created": false,
-    "confirmatory_source_fetchable": false,
-    "confirmatory_source_reproducible": false
+    "new_preregistration_lineage_created": false
   },
   "confirmatory_freeze_eligible": false,
   "confirmatory_execution_authorized": false,
   "claim_authorized": false,
-  "bounded_statement": "Post-pilot disposition can authorize only preparation of a prospective confirmatory freeze; it cannot authorize confirmatory execution or scientific claims."
+  "bounded_statement": "This disposition can establish only that the pilot transition is ready for independent subject/instrument source closure. Source closure and confirmatory execution remain separate gates."
 }
