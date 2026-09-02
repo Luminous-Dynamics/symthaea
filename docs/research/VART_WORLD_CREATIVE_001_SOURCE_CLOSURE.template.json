@@ -1,0 +1,35 @@
+{
+  "schema": "symthaea.vart-world-creative-001.source-closure.v1",
+  "experiment_id": "VART-WORLD-CREATIVE-001",
+  "status": "template_not_qualified",
+  "confirmatory_source": {
+    "head": null,
+    "tree": null,
+    "parent_v05a_head": "33820b3d9e904280e6264719fe7717cb2e5dd5bb",
+    "parent_v05a_tree": "e93c6dbfa05b602100ff924efaa5d95f92ef5a65"
+  },
+  "pilot_predecessor": {
+    "head": null,
+    "tree": null,
+    "is_ancestor_of_confirmatory_source": false
+  },
+  "remote": {
+    "repository_full_name": "Luminous-Dynamics/symthaea",
+    "ref": null,
+    "fetch_verified": false,
+    "fetched_head": null,
+    "fetched_tree": null,
+    "fresh_checkout_verified": false,
+    "fresh_checkout_head": null,
+    "fresh_checkout_tree": null
+  },
+  "reproduction": {
+    "environment_digest": null,
+    "lock_manifest_sha256": null,
+    "qualification_receipt_sha256": null,
+    "independent_checkout_gate": false
+  },
+  "qualified_utc": null,
+  "confirmatory_execution_authorized": false,
+  "claim_authorized": false
+}
