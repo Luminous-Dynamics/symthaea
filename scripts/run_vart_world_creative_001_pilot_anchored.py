@@ -13,6 +13,16 @@ from typing import Any
 
 EXPERIMENT_ID = "VART-WORLD-CREATIVE-001"
 EXPECTED_CELL_IDS = [f"P{i}" for i in range(1, 9)]
+REQUIRED_CELL_FIELDS = (
+    "cell_id",
+    "trial_id",
+    "policy",
+    "fixture",
+    "seed",
+    "revision_index",
+    "paired_block_id",
+)
+PAIR_KEYS = ("fixture", "seed", "revision_index")
 
 
 class AnchorError(RuntimeError):
@@ -51,7 +61,8 @@ def write_new_json(path: Path, value: Any) -> None:
     path.write_bytes(canonical_bytes(value) + b"\n")
 
 
-def canonical_design(cells: Any) -> dict[str, Any]:
+def paired_design_projection(cells: Any) -> dict[str, Any]:
+    """Return exactly the semantic projection independently reconstructed by the pilot auditor."""
     if not isinstance(cells, list) or len(cells) != 8:
         raise AnchorError("pilot must contain exactly eight cells")
     ids = [c.get("cell_id") if isinstance(c, dict) else None for c in cells]
@@ -60,63 +71,75 @@ def canonical_design(cells: Any) -> dict[str, Any]:
 
     seen_trials: set[str] = set()
     blocks: dict[str, list[dict[str, Any]]] = {}
-    normalized: list[dict[str, Any]] = []
-    for cell in cells:
-        if not isinstance(cell, dict):
+    for raw in cells:
+        if not isinstance(raw, dict):
             raise AnchorError("each cell must be an object")
-        required = ["cell_id", "trial_id", "policy", "fixture", "seed", "revision_index", "paired_block_id"]
-        missing = [name for name in required if name not in cell]
+        missing = [field for field in REQUIRED_CELL_FIELDS if field not in raw]
         if missing:
-            raise AnchorError(f"{cell.get('cell_id', '?')}: missing {missing}")
-        if cell["trial_id"] in seen_trials:
-            raise AnchorError(f"duplicate trial_id: {cell['trial_id']}")
-        seen_trials.add(cell["trial_id"])
-        if not isinstance(cell["seed"], int) or isinstance(cell["seed"], bool) or not (0 <= cell["seed"] <= (1 << 64) - 1):
-            raise AnchorError(f"{cell['cell_id']}: seed must be unsigned 64-bit")
-        if not isinstance(cell["revision_index"], int) or isinstance(cell["revision_index"], bool) or cell["revision_index"] < 0:
-            raise AnchorError(f"{cell['cell_id']}: revision_index must be nonnegative integer")
-        item = {name: cell[name] for name in required}
-        normalized.append(item)
-        blocks.setdefault(str(cell["paired_block_id"]), []).append(item)
+            raise AnchorError(f"{raw.get('cell_id', '?')}: missing {missing}")
+        trial_id = raw["trial_id"]
+        if not isinstance(trial_id, str) or not trial_id:
+            raise AnchorError(f"{raw['cell_id']}: trial_id must be a non-empty string")
+        if trial_id in seen_trials:
+            raise AnchorError(f"duplicate trial_id: {trial_id}")
+        seen_trials.add(trial_id)
+        seed = raw["seed"]
+        revision = raw["revision_index"]
+        if not isinstance(seed, int) or isinstance(seed, bool) or not (0 <= seed <= (1 << 64) - 1):
+            raise AnchorError(f"{raw['cell_id']}: seed must be unsigned 64-bit")
+        if not isinstance(revision, int) or isinstance(revision, bool) or revision < 0:
+            raise AnchorError(f"{raw['cell_id']}: revision_index must be nonnegative integer")
+        block = raw["paired_block_id"]
+        if not isinstance(block, str) or not block:
+            raise AnchorError(f"{raw['cell_id']}: paired_block_id must be non-empty")
+        blocks.setdefault(block, []).append(raw)
 
-    block_summaries: list[dict[str, Any]] = []
-    for block_id in sorted(blocks):
-        members = blocks[block_id]
-        world_inputs = {(m["fixture"], m["seed"], m["revision_index"]) for m in members}
-        if len(world_inputs) != 1:
-            raise AnchorError(
-                f"PAIRED_BLOCK_WORLD_INPUT_MISMATCH {block_id}: "
-                f"{sorted(world_inputs, key=repr)!r}"
-            )
-        policies = [str(m["policy"]) for m in members]
+    projection: dict[str, Any] = {}
+    for block, members in sorted(blocks.items()):
+        policies = [m["policy"] for m in members]
+        if any(not isinstance(policy, str) or not policy for policy in policies):
+            raise AnchorError(f"{block}: policy labels must be non-empty strings")
         if len(policies) != len(set(policies)):
-            raise AnchorError(f"PAIRED_BLOCK_DUPLICATE_POLICY {block_id}: {policies!r}")
-        fixture, seed, revision_index = next(iter(world_inputs))
-        block_summaries.append({
-            "paired_block_id": block_id,
-            "fixture": fixture,
-            "seed": seed,
-            "revision_index": revision_index,
+            raise AnchorError(f"PAIRED_BLOCK_DUPLICATE_POLICY {block}: {policies!r}")
+        anchor = {key: members[0][key] for key in PAIR_KEYS}
+        for member in members[1:]:
+            observed = {key: member[key] for key in PAIR_KEYS}
+            if observed != anchor:
+                raise AnchorError(
+                    f"PAIRED_BLOCK_WORLD_INPUT_MISMATCH {block}: "
+                    f"{member['cell_id']} {observed!r} != {members[0]['cell_id']} {anchor!r}"
+                )
+        projection[block] = {
+            **anchor,
             "policies": sorted(policies),
-            "trial_ids": sorted(str(m["trial_id"]) for m in members),
-        })
-
-    return {
-        "schema": "symthaea.vart-world-creative-001.pilot-design.v1",
-        "experiment_id": EXPERIMENT_ID,
-        "campaign": "pilot",
-        "noncanonical": True,
-        "cells": normalized,
-        "paired_blocks": block_summaries,
-    }
+            "cell_ids": [m["cell_id"] for m in members],
+            "trial_ids": [m["trial_id"] for m in members],
+        }
+    return projection
 
 
 def design_sha256(cells: Any) -> str:
-    return sha256_bytes(canonical_bytes(canonical_design(cells)))
+    return sha256_bytes(canonical_bytes(paired_design_projection(cells)))
+
+
+def require_external_path(path: Path, pilot_root: Path) -> None:
+    try:
+        path.relative_to(pilot_root)
+    except ValueError:
+        return
+    raise AnchorError(f"anchor/attestation must be outside pilot evidence root: {path}")
 
 
 def run_json(argv: list[str], *, cwd: Path, env: dict[str, str] | None = None) -> dict[str, Any]:
-    proc = subprocess.run(argv, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    proc = subprocess.run(
+        argv,
+        cwd=cwd,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
     if proc.returncode != 0:
         raise AnchorError(
             f"command failed ({proc.returncode}): {argv!r}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
@@ -133,8 +156,8 @@ def run_json(argv: list[str], *, cwd: Path, env: dict[str, str] | None = None) -
 def main() -> int:
     parser = argparse.ArgumentParser(description="Externally anchored noncanonical VART pilot launcher")
     parser.add_argument("config", type=Path)
-    parser.add_argument("--anchor-out", type=Path, required=False)
-    parser.add_argument("--attestation-out", type=Path, required=False)
+    parser.add_argument("--anchor-out", type=Path)
+    parser.add_argument("--attestation-out", type=Path)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--validate-design-only", action="store_true")
     parser.add_argument("--runner", type=Path, default=Path(__file__).with_name("run_vart_world_creative_001_pilot.py"))
@@ -150,8 +173,8 @@ def main() -> int:
     if cfg.get("confirmatory_execution_authorized") is not False or cfg.get("claim_authorized") is not False:
         raise AnchorError("confirmatory execution and claims must remain unauthorized")
 
-    design = canonical_design(cfg.get("cells"))
-    design_sha = sha256_bytes(canonical_bytes(design))
+    projection = paired_design_projection(cfg.get("cells"))
+    design_sha = sha256_bytes(canonical_bytes(projection))
     config_sha = sha256_file(config_path)
     source = cfg.get("expected_source")
     if not isinstance(source, dict):
@@ -164,7 +187,7 @@ def main() -> int:
         "noncanonical": True,
         "pilot_config_sha256": config_sha,
         "pilot_design_sha256": design_sha,
-        "paired_block_count": len(design["paired_blocks"]),
+        "paired_block_count": len(projection),
         "source_head": source.get("head"),
         "source_tree": source.get("tree"),
         "confirmatory_execution_authorized": False,
@@ -192,18 +215,16 @@ def main() -> int:
         raise AnchorError("execution requires both --anchor-out and --attestation-out outside the pilot evidence root")
     anchor_path = args.anchor_out.resolve()
     attestation_path = args.attestation_out.resolve()
-    pilot_root = Path(str(cfg.get("pilot_root", ""))).expanduser()
+    raw_root = cfg.get("pilot_root")
+    if not isinstance(raw_root, str) or not raw_root:
+        raise AnchorError("pilot_root must be a non-empty path")
+    pilot_root = Path(raw_root).expanduser()
     if not pilot_root.is_absolute():
         pilot_root = (config_path.parent / pilot_root).resolve()
     else:
         pilot_root = pilot_root.resolve()
-    for external in (anchor_path, attestation_path):
-        try:
-            external.relative_to(pilot_root)
-        except ValueError:
-            pass
-        else:
-            raise AnchorError(f"anchor/attestation must be outside pilot evidence root: {external}")
+    require_external_path(anchor_path, pilot_root)
+    require_external_path(attestation_path, pilot_root)
 
     anchor = {
         "schema": "symthaea.vart-world-creative-001.pilot-preexecution-anchor.v1",
