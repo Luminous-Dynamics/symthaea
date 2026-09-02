@@ -15,6 +15,9 @@ on:
       - 'scripts/verify_vart_002_mechanism_matrix.py'
       - 'scripts/test_verify_vart_002_mechanism_matrix.py'
       - 'crates/domains/symthaea-epistemic-types/**'
+      - 'crates/domains/symthaea-memory/Cargo.toml'
+      - 'crates/domains/symthaea-memory/src/episodic_provenance.rs'
+      - 'crates/domains/symthaea-memory/src/lib.rs'
       - '.github/workflows/vart-evaluation-boundaries.yml'
   push:
     paths:
@@ -30,6 +33,9 @@ on:
       - 'scripts/verify_vart_002_mechanism_matrix.py'
       - 'scripts/test_verify_vart_002_mechanism_matrix.py'
       - 'crates/domains/symthaea-epistemic-types/**'
+      - 'crates/domains/symthaea-memory/Cargo.toml'
+      - 'crates/domains/symthaea-memory/src/episodic_provenance.rs'
+      - 'crates/domains/symthaea-memory/src/lib.rs'
       - '.github/workflows/vart-evaluation-boundaries.yml'
   workflow_dispatch:
 
@@ -61,3 +67,5 @@ jobs:
         run: python scripts/test_verify_vart_002_mechanism_matrix.py
       - name: Epistemic type and policy tests
         run: cargo test -p symthaea-epistemic-types --lib
+      - name: Episodic provenance compatibility and retrieval tests
+        run: cargo test -p symthaea-memory --lib episodic_provenance
