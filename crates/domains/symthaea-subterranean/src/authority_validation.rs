@@ -11,6 +11,9 @@ use crate::embodiment::SubterraneanEmbodiment;
 use crate::operator_authority::{
     OperatorAuthority, OperatorAuthorityRejection, OperatorConstraint, OperatorDecision,
 };
+use crate::operator_authority::recovery_authority::{
+    RecoveryApprovalEnvelopeV1, RecoveryDigest, RecoveryProposalV1,
+};
 use crate::operator_protocol::{
     AuthenticationLevel, OperatorCommand, OperatorCommandEnvelope, OperatorId, OperatorRole,
 };
@@ -29,6 +32,7 @@ pub enum AuthorityContract {
     HazardBlocksResume,
     RestrictionMonotonicity,
     RecoveryApprovalInvalidation,
+    RecoveryProposalBinding,
     CheckpointPreservesRestriction,
     AuditChainContinuity,
     UpdateRollback,
@@ -37,12 +41,13 @@ pub enum AuthorityContract {
 }
 
 impl AuthorityContract {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::ReplayResistance,
         Self::IndependentRecoveryQuorum,
         Self::HazardBlocksResume,
         Self::RestrictionMonotonicity,
         Self::RecoveryApprovalInvalidation,
+        Self::RecoveryProposalBinding,
         Self::CheckpointPreservesRestriction,
         Self::AuditChainContinuity,
         Self::UpdateRollback,
@@ -57,6 +62,7 @@ impl AuthorityContract {
             Self::HazardBlocksResume => "hazard_blocks_resume",
             Self::RestrictionMonotonicity => "restriction_monotonicity",
             Self::RecoveryApprovalInvalidation => "recovery_approval_invalidation",
+            Self::RecoveryProposalBinding => "recovery_proposal_binding",
             Self::CheckpointPreservesRestriction => "checkpoint_preserves_restriction",
             Self::AuditChainContinuity => "audit_chain_continuity",
             Self::UpdateRollback => "update_rollback",
@@ -92,12 +98,7 @@ impl AuthorityValidationReport {
 pub struct AuthorityValidator;
 
 impl AuthorityValidator {
-    fn envelope(
-        operator: u64,
-        sequence: u64,
-        proposal_id: u64,
-        command: OperatorCommand,
-    ) -> OperatorCommandEnvelope {
+    fn envelope(operator: u64, sequence: u64, proposal_id: u64, command: OperatorCommand) -> OperatorCommandEnvelope {
         OperatorCommandEnvelope {
             operator: OperatorId(operator),
             role: OperatorRole::SafetyOfficer,
@@ -111,9 +112,33 @@ impl AuthorityValidator {
         }
     }
 
-    fn digest(byte: u8) -> ArtifactDigest {
-        ArtifactDigest([byte; 32])
+    fn recovery_proposal(proposal_id: u64, active: OperatorConstraint) -> RecoveryProposalV1 {
+        RecoveryProposalV1::new(
+            proposal_id,
+            active,
+            RecoveryDigest([11; 32]),
+            RecoveryDigest([12; 32]),
+            RecoveryDigest([13; 32]),
+            1,
+            1,
+            10,
+            1_000,
+        )
     }
+
+    fn recovery_approval(operator: u64, sequence: u64, proposal: RecoveryProposalV1) -> RecoveryApprovalEnvelopeV1 {
+        RecoveryApprovalEnvelopeV1 {
+            operator: OperatorId(operator),
+            role: OperatorRole::SafetyOfficer,
+            authentication: AuthenticationLevel::HardwareBacked,
+            epoch: 1,
+            sequence,
+            approval_issued_step: 20,
+            proposal,
+        }
+    }
+
+    fn digest(byte: u8) -> ArtifactDigest { ArtifactDigest([byte; 32]) }
 
     fn update_manifest() -> UpdateManifest {
         UpdateManifest {
@@ -143,9 +168,7 @@ impl AuthorityValidator {
             AuthorityContract::ReplayResistance => {
                 let mut authority = OperatorAuthority::default();
                 let command = Self::envelope(1, 1, 1, OperatorCommand::HoldPosition);
-                authority
-                    .ingest(command, 20, true)
-                    .map_err(|error| format!("initial command rejected: {error:?}"))?;
+                authority.ingest(command, 20, true).map_err(|error| format!("initial command rejected: {error:?}"))?;
                 if authority.ingest(command, 21, true) != Err(OperatorAuthorityRejection::Replay) {
                     return Err("replayed sequence was not rejected".to_string());
                 }
@@ -153,143 +176,105 @@ impl AuthorityValidator {
             }
             AuthorityContract::IndependentRecoveryQuorum => {
                 let mut authority = OperatorAuthority::default();
-                authority
-                    .ingest(
-                        Self::envelope(1, 1, 1, OperatorCommand::EmergencyStop),
-                        20,
-                        true,
-                    )
+                authority.ingest(Self::envelope(1, 1, 1, OperatorCommand::EmergencyStop), 20, true)
                     .map_err(|error| format!("stop rejected: {error:?}"))?;
-                let first = authority
-                    .ingest(
-                        Self::envelope(1, 2, 9, OperatorCommand::ResumeNominal),
-                        21,
-                        true,
-                    )
+                let proposal = Self::recovery_proposal(9, OperatorConstraint::EmergencyStop);
+                let first = authority.approve_recovery(Self::recovery_approval(1, 2, proposal), 21)
                     .map_err(|error| format!("first approval rejected: {error:?}"))?;
                 if !matches!(first, OperatorDecision::PendingQuorum { approvals: 1, .. })
                     || authority.constraint() != OperatorConstraint::EmergencyStop
                 {
                     return Err("one operator cleared a restrictive constraint".to_string());
                 }
-                let second = authority
-                    .ingest(
-                        Self::envelope(2, 1, 9, OperatorCommand::ResumeNominal),
-                        22,
-                        true,
-                    )
+                let second = authority.approve_recovery(Self::recovery_approval(2, 1, proposal), 22)
                     .map_err(|error| format!("second approval rejected: {error:?}"))?;
-                if second != OperatorDecision::Cleared
-                    || authority.constraint() != OperatorConstraint::None
-                {
-                    return Err("two independent approvals did not clear recovery".to_string());
+                if second != OperatorDecision::Cleared || authority.constraint() != OperatorConstraint::None {
+                    return Err("two approvals to the exact proposal did not clear recovery".to_string());
                 }
                 Ok(())
             }
             AuthorityContract::HazardBlocksResume => {
                 let mut authority = OperatorAuthority::default();
-                let result = authority.ingest(
-                    Self::envelope(1, 1, 9, OperatorCommand::ResumeNominal),
-                    20,
-                    false,
-                );
-                if result != Err(OperatorAuthorityRejection::PhysicalHazardActive) {
-                    return Err("physical hazard did not block resume".to_string());
+                authority.ingest(Self::envelope(1, 1, 1, OperatorCommand::EmergencyStop), 20, true)
+                    .map_err(|error| format!("stop rejected: {error:?}"))?;
+                let result = authority.ingest(Self::envelope(1, 2, 9, OperatorCommand::ResumeNominal), 21, false);
+                if result != Err(OperatorAuthorityRejection::RecoveryProposalRequired)
+                    || authority.constraint() != OperatorConstraint::EmergencyStop
+                {
+                    return Err("legacy hazard boolean still authorized resume".to_string());
                 }
                 Ok(())
             }
             AuthorityContract::RestrictionMonotonicity => {
                 let mut authority = OperatorAuthority::default();
-                authority
-                    .ingest(
-                        Self::envelope(1, 1, 1, OperatorCommand::EmergencyStop),
-                        20,
-                        true,
-                    )
+                authority.ingest(Self::envelope(1, 1, 1, OperatorCommand::EmergencyStop), 20, true)
                     .map_err(|error| format!("stop rejected: {error:?}"))?;
-                let result = authority.ingest(
-                    Self::envelope(1, 2, 2, OperatorCommand::ReturnHome),
-                    21,
-                    true,
-                );
+                let result = authority.ingest(Self::envelope(1, 2, 2, OperatorCommand::ReturnHome), 21, true);
                 if result != Err(OperatorAuthorityRejection::WouldWeakenActiveConstraint)
                     || authority.constraint() != OperatorConstraint::EmergencyStop
                 {
-                    return Err(
-                        "ordinary operator command weakened an active emergency stop".to_string(),
-                    );
+                    return Err("ordinary command weakened emergency stop".to_string());
                 }
                 Ok(())
             }
             AuthorityContract::RecoveryApprovalInvalidation => {
                 let mut authority = OperatorAuthority::default();
-                authority
-                    .ingest(
-                        Self::envelope(1, 1, 1, OperatorCommand::HoldPosition),
-                        20,
-                        true,
-                    )
+                authority.ingest(Self::envelope(1, 1, 1, OperatorCommand::HoldPosition), 20, true)
                     .map_err(|error| format!("hold rejected: {error:?}"))?;
-                let first = authority
-                    .ingest(
-                        Self::envelope(1, 2, 9, OperatorCommand::ResumeNominal),
-                        21,
-                        true,
-                    )
+                let proposal = Self::recovery_proposal(9, OperatorConstraint::HoldPosition);
+                let first = authority.approve_recovery(Self::recovery_approval(1, 2, proposal), 21)
                     .map_err(|error| format!("first approval rejected: {error:?}"))?;
                 if !matches!(first, OperatorDecision::PendingQuorum { approvals: 1, .. })
                     || authority.pending_approvals(9) != 1
                 {
                     return Err("first recovery approval was not retained".to_string());
                 }
-
-                authority
-                    .ingest(
-                        Self::envelope(2, 1, 2, OperatorCommand::EmergencyStop),
-                        22,
-                        true,
-                    )
+                authority.ingest(Self::envelope(2, 1, 2, OperatorCommand::EmergencyStop), 22, true)
                     .map_err(|error| format!("new stop rejected: {error:?}"))?;
                 if authority.pending_approvals(9) != 0 {
                     return Err("new restriction retained stale recovery approvals".to_string());
                 }
-
-                let second = authority
-                    .ingest(
-                        Self::envelope(2, 2, 9, OperatorCommand::ResumeNominal),
-                        23,
-                        true,
-                    )
-                    .map_err(|error| format!("fresh approval rejected: {error:?}"))?;
-                if !matches!(second, OperatorDecision::PendingQuorum { approvals: 1, .. })
+                let result = authority.approve_recovery(Self::recovery_approval(2, 2, proposal), 23);
+                if !matches!(result, Err(OperatorAuthorityRejection::RecoveryProposal(_)))
                     || authority.constraint() != OperatorConstraint::EmergencyStop
                 {
-                    return Err(
-                        "approval collected before a new restriction contributed to clearing it"
-                            .to_string(),
-                    );
+                    return Err("proposal for earlier restriction survived the new stop".to_string());
+                }
+                Ok(())
+            }
+            AuthorityContract::RecoveryProposalBinding => {
+                let mut authority = OperatorAuthority::default();
+                authority.ingest(Self::envelope(1, 1, 1, OperatorCommand::HoldPosition), 20, true)
+                    .map_err(|error| format!("hold rejected: {error:?}"))?;
+                let proposal = Self::recovery_proposal(9, OperatorConstraint::HoldPosition);
+                authority.approve_recovery(Self::recovery_approval(1, 2, proposal), 21)
+                    .map_err(|error| format!("first approval rejected: {error:?}"))?;
+                let changed = RecoveryProposalV1::new(
+                    9,
+                    OperatorConstraint::HoldPosition,
+                    RecoveryDigest([11; 32]),
+                    RecoveryDigest([99; 32]),
+                    RecoveryDigest([13; 32]),
+                    1,
+                    1,
+                    10,
+                    1_000,
+                );
+                if authority.approve_recovery(Self::recovery_approval(2, 1, changed), 22)
+                    != Err(OperatorAuthorityRejection::ConflictingProposal)
+                {
+                    return Err("changed evidence joined an existing recovery quorum".to_string());
                 }
                 Ok(())
             }
             AuthorityContract::CheckpointPreservesRestriction => {
                 let genesis = GenesisSeed::from_phrase("authority restriction checkpoint");
                 let mut source = SubterraneanEmbodiment::new(&genesis);
-                source
-                    .ingest_operator_command(Self::envelope(
-                        1,
-                        1,
-                        1,
-                        OperatorCommand::HoldPosition,
-                    ))
+                source.ingest_operator_command(Self::envelope(1, 1, 1, OperatorCommand::HoldPosition))
                     .map_err(|error| format!("source hold rejected: {error:?}"))?;
-                if source.operator_constraint() != OperatorConstraint::HoldPosition {
-                    return Err("source did not retain hold before checkpoint".to_string());
-                }
-
                 let checkpoint = source.operational_checkpoint();
                 let mut restored = SubterraneanEmbodiment::new(&genesis);
-                restored
-                    .load_operational_checkpoint(&checkpoint)
+                restored.load_operational_checkpoint(&checkpoint)
                     .map_err(|error| format!("checkpoint restore failed: {error:?}"))?;
                 if restored.operator_constraint() != OperatorConstraint::HoldPosition {
                     return Err("checkpoint restore widened operator authority".to_string());
@@ -299,21 +284,13 @@ impl AuthorityValidator {
             AuthorityContract::AuditChainContinuity => {
                 let provider = DeterministicAuditDigest;
                 let mut ledger = AuditLedger::new(8, Self::digest(7));
-                ledger.append(
-                    &provider,
-                    AuditEvent::OperatorCommand {
-                        operator_id: 1,
-                        proposal_id: 2,
-                        command_code: OperatorCommand::HoldPosition.code(),
-                        accepted: true,
-                    },
-                );
-                ledger.append(
-                    &provider,
-                    AuditEvent::OperatorConstraint {
-                        constraint_code: OperatorConstraint::HoldPosition.code(),
-                    },
-                );
+                ledger.append(&provider, AuditEvent::OperatorCommand {
+                    operator_id: 1,
+                    proposal_id: 2,
+                    command_code: OperatorCommand::HoldPosition.code(),
+                    accepted: true,
+                });
+                ledger.append(&provider, AuditEvent::OperatorConstraint { constraint_code: OperatorConstraint::HoldPosition.code() });
                 if ledger.verify(&provider) != Ok(()) {
                     return Err("valid audit chain did not verify".to_string());
                 }
@@ -324,42 +301,26 @@ impl AuthorityValidator {
                     command_code: OperatorCommand::HoldPosition.code(),
                     accepted: true,
                 };
-                if AuditLedger::verify_records(&provider, &records, ledger.chain_head())
-                    != Err(AuditChainError::DigestMismatch)
-                {
+                if AuditLedger::verify_records(&provider, &records, ledger.chain_head()) != Err(AuditChainError::DigestMismatch) {
                     return Err("modified audit record was not detected".to_string());
                 }
                 Ok(())
             }
             AuthorityContract::UpdateRollback => {
-                let mut manager = UpdateManager::new(Self::digest(1), 1)
-                    .map_err(|error| format!("manager init failed: {error:?}"))?;
-                manager
-                    .stage(Self::update_manifest(), 10, 1, Self::update_preconditions())
-                    .map_err(|error| format!("stage failed: {error:?}"))?;
-                manager
-                    .activate(11, 50, Self::update_preconditions())
-                    .map_err(|error| format!("activation failed: {error:?}"))?;
-                let state = manager
-                    .observe_health(false, 12)
-                    .map_err(|error| format!("health observation failed: {error:?}"))?;
+                let mut manager = UpdateManager::new(Self::digest(1), 1).map_err(|error| format!("manager init failed: {error:?}"))?;
+                manager.stage(Self::update_manifest(), 10, 1, Self::update_preconditions()).map_err(|error| format!("stage failed: {error:?}"))?;
+                manager.activate(11, 50, Self::update_preconditions()).map_err(|error| format!("activation failed: {error:?}"))?;
+                let state = manager.observe_health(false, 12).map_err(|error| format!("health observation failed: {error:?}"))?;
                 if state != UpdateState::RollbackRequired {
                     return Err("failed health did not require rollback".to_string());
                 }
-                if manager
-                    .rollback()
-                    .map_err(|error| format!("rollback failed: {error:?}"))?
-                    != Self::digest(1)
-                {
+                if manager.rollback().map_err(|error| format!("rollback failed: {error:?}"))? != Self::digest(1) {
                     return Err("rollback did not restore previous digest".to_string());
                 }
                 Ok(())
             }
             AuthorityContract::WatchdogRecoveryLock => {
-                let mut supervisor = DegradedOperationsSupervisor::new(DegradedPolicy {
-                    watchdog_failure_limit: 2,
-                    ..Default::default()
-                });
+                let mut supervisor = DegradedOperationsSupervisor::new(DegradedPolicy { watchdog_failure_limit: 2, ..Default::default() });
                 let observation = DegradedObservation {
                     operator_link_fresh: true,
                     control_loop_healthy: false,
@@ -382,26 +343,16 @@ impl AuthorityValidator {
                 let good = DeterministicJournalDigest;
                 struct DifferentDigest;
                 impl crate::recovery_journal::JournalDigestProvider for DifferentDigest {
-                    fn digest(
-                        &self,
-                        generation: u64,
-                        checkpoint: &crate::SubterraneanOperationalCheckpoint,
-                    ) -> ArtifactDigest {
+                    fn digest(&self, generation: u64, checkpoint: &crate::SubterraneanOperationalCheckpoint) -> ArtifactDigest {
                         let mut digest = DeterministicJournalDigest.digest(generation, checkpoint);
                         digest.0[0] ^= 0x55;
                         digest
                     }
                 }
                 let mut journal = RecoveryJournal::new();
-                journal
-                    .write(&good, 1, checkpoint.clone())
-                    .map_err(|error| format!("first write failed: {error:?}"))?;
-                journal
-                    .write(&DifferentDigest, 2, checkpoint)
-                    .map_err(|error| format!("second write failed: {error:?}"))?;
-                let restored = journal
-                    .latest_valid(&good)
-                    .map_err(|error| format!("journal recovery failed: {error:?}"))?;
+                journal.write(&good, 1, checkpoint.clone()).map_err(|error| format!("first write failed: {error:?}"))?;
+                journal.write(&DifferentDigest, 2, checkpoint).map_err(|error| format!("second write failed: {error:?}"))?;
+                let restored = journal.latest_valid(&good).map_err(|error| format!("journal recovery failed: {error:?}"))?;
                 if restored.generation != 1 {
                     return Err("journal did not fall back to older valid slot".to_string());
                 }
