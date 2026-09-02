@@ -90,7 +90,7 @@ This sidecar does **not** prove that every existing Symthaea memory consumer alr
 
 ## Canonical World Forge integration status
 
-The remote VART-002 branch does not currently establish a canonical World Forge proposal-construction hook that can be safely patched here: recursive source-tree inspection at the qualified pre-gate tree found no `world_forge` path and no `WorldRevisionProposal` symbol.
+The remote VART-002 branch does not currently establish a canonical World Forge proposal-construction hook that can be safely patched here: recursive source-tree inspection at the pre-gate tree found no `world_forge` path and no `WorldRevisionProposal` symbol.
 
 Therefore this tranche adds the generic formulation policy primitive but does **not** invent a parallel World Forge author loop or a substitute proposal type.
 
