@@ -15,6 +15,8 @@ on:
       - 'scripts/test_verify_vart_benchmark_firewall.py'
       - 'scripts/verify_vart_002_mechanism_matrix.py'
       - 'scripts/test_verify_vart_002_mechanism_matrix.py'
+      - 'scripts/verify_vart_002_provenance_enforcement_preparation.py'
+      - 'scripts/test_verify_vart_002_provenance_enforcement_preparation.py'
       - 'scripts/vart_hidden_benchmark_commit_reveal.py'
       - 'scripts/test_vart_hidden_benchmark_commit_reveal.py'
       - 'crates/domains/symthaea-epistemic-types/**'
@@ -37,6 +39,8 @@ on:
       - 'scripts/test_verify_vart_benchmark_firewall.py'
       - 'scripts/verify_vart_002_mechanism_matrix.py'
       - 'scripts/test_verify_vart_002_mechanism_matrix.py'
+      - 'scripts/verify_vart_002_provenance_enforcement_preparation.py'
+      - 'scripts/test_verify_vart_002_provenance_enforcement_preparation.py'
       - 'scripts/vart_hidden_benchmark_commit_reveal.py'
       - 'scripts/test_vart_hidden_benchmark_commit_reveal.py'
       - 'crates/domains/symthaea-epistemic-types/**'
@@ -67,6 +71,8 @@ jobs:
             scripts/test_verify_vart_benchmark_firewall.py \
             scripts/verify_vart_002_mechanism_matrix.py \
             scripts/test_verify_vart_002_mechanism_matrix.py \
+            scripts/verify_vart_002_provenance_enforcement_preparation.py \
+            scripts/test_verify_vart_002_provenance_enforcement_preparation.py \
             scripts/vart_hidden_benchmark_commit_reveal.py \
             scripts/test_vart_hidden_benchmark_commit_reveal.py
       - name: Archive capsule adversarial suite
@@ -77,13 +83,19 @@ jobs:
         run: python scripts/test_vart_hidden_benchmark_commit_reveal.py
       - name: VART-002 mechanism matrix adversarial suite
         run: python scripts/test_verify_vart_002_mechanism_matrix.py
+      - name: Provenance enforcement preparation adversarial suite
+        run: python scripts/test_verify_vart_002_provenance_enforcement_preparation.py
       - name: Epistemic type, derivation, policy, and readiness tests
         run: cargo test -p symthaea-epistemic-types --lib
       - name: Episodic provenance compatibility and retrieval tests
         run: cargo test -p symthaea-memory --lib episodic_provenance
       - name: Episodic component provenance and immutable index tests
         run: cargo test -p symthaea-memory --lib episodic_component
+      - name: Episodic occurrence/content separation tests
+        run: cargo test -p symthaea-memory --lib episodic_occurrence
       - name: Behavior-neutral provenance shadow recall tests
         run: cargo test -p symthaea-memory --lib episodic_shadow
-      - name: Cognitive-loop episodic provenance ownership tests
+      - name: Digest-bound paired sidecar persistence tests
+        run: cargo test -p symthaea-memory --lib episodic_sidecar_bundle
+      - name: Cognitive-loop episodic provenance ownership and restore tests
         run: cargo test --lib episodic_persistence_manager::tests
