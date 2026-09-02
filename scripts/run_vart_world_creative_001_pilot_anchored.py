@@ -14,13 +14,7 @@ from typing import Any
 EXPERIMENT_ID = "VART-WORLD-CREATIVE-001"
 EXPECTED_CELL_IDS = [f"P{i}" for i in range(1, 9)]
 REQUIRED_CELL_FIELDS = (
-    "cell_id",
-    "trial_id",
-    "policy",
-    "fixture",
-    "seed",
-    "revision_index",
-    "paired_block_id",
+    "cell_id", "trial_id", "policy", "fixture", "seed", "revision_index", "paired_block_id",
 )
 PAIR_KEYS = ("fixture", "seed", "revision_index")
 
@@ -130,20 +124,15 @@ def require_external_path(path: Path, pilot_root: Path) -> None:
     raise AnchorError(f"anchor/attestation must be outside pilot evidence root: {path}")
 
 
+def run_process(argv: list[str], *, cwd: Path, env: dict[str, str] | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
+    proc = subprocess.run(argv, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    if check and proc.returncode != 0:
+        raise AnchorError(f"command failed ({proc.returncode}): {argv!r}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}")
+    return proc
+
+
 def run_json(argv: list[str], *, cwd: Path, env: dict[str, str] | None = None) -> dict[str, Any]:
-    proc = subprocess.run(
-        argv,
-        cwd=cwd,
-        env=env,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    if proc.returncode != 0:
-        raise AnchorError(
-            f"command failed ({proc.returncode}): {argv!r}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
-        )
+    proc = run_process(argv, cwd=cwd, env=env)
     try:
         value = json.loads(proc.stdout)
     except json.JSONDecodeError as exc:
@@ -153,6 +142,25 @@ def run_json(argv: list[str], *, cwd: Path, env: dict[str, str] | None = None) -
     return value
 
 
+def instrument_identity(script_path: Path) -> tuple[Path, str, str]:
+    probe = run_process(["git", "-C", str(script_path.parent), "rev-parse", "--show-toplevel"], cwd=script_path.parent)
+    root = Path(probe.stdout.strip()).resolve()
+    status = run_process(["git", "-C", str(root), "status", "--porcelain=v1", "--untracked-files=all"], cwd=root).stdout.splitlines()
+    meaningful: list[str] = []
+    for line in status:
+        path = line[3:] if len(line) >= 4 else line
+        if "/__pycache__/" in f"/{path}" or path.endswith(".pyc"):
+            continue
+        meaningful.append(line)
+    if meaningful:
+        raise AnchorError(f"instrument checkout is dirty: {meaningful}")
+    head = run_process(["git", "-C", str(root), "rev-parse", "HEAD"], cwd=root).stdout.strip()
+    tree = run_process(["git", "-C", str(root), "rev-parse", "HEAD^{tree}"], cwd=root).stdout.strip()
+    if len(head) != 40 or len(tree) != 40:
+        raise AnchorError("instrument HEAD/TREE identity invalid")
+    return root, head, tree
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Externally anchored noncanonical VART pilot launcher")
     parser.add_argument("config", type=Path)
@@ -160,7 +168,7 @@ def main() -> int:
     parser.add_argument("--attestation-out", type=Path)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--validate-design-only", action="store_true")
-    parser.add_argument("--runner", type=Path, default=Path(__file__).with_name("run_vart_world_creative_001_pilot.py"))
+    parser.add_argument("--runner", type=Path, default=Path(__file__).with_name("run_vart_world_creative_001_pilot_external.py"))
     parser.add_argument("--auditor", type=Path, default=Path(__file__).with_name("audit_vart_world_creative_001_pilot.py"))
     args = parser.parse_args()
 
@@ -179,6 +187,7 @@ def main() -> int:
     source = cfg.get("expected_source")
     if not isinstance(source, dict):
         raise AnchorError("expected_source must be an object")
+    instrument_root, instrument_head, instrument_tree = instrument_identity(Path(__file__).resolve())
 
     preview = {
         "verdict": "PILOT_DESIGN_VALID",
@@ -188,8 +197,10 @@ def main() -> int:
         "pilot_config_sha256": config_sha,
         "pilot_design_sha256": design_sha,
         "paired_block_count": len(projection),
-        "source_head": source.get("head"),
-        "source_tree": source.get("tree"),
+        "subject_source_head": source.get("head"),
+        "subject_source_tree": source.get("tree"),
+        "instrument_source_head": instrument_head,
+        "instrument_source_tree": instrument_tree,
         "confirmatory_execution_authorized": False,
         "claim_authorized": False,
     }
@@ -205,7 +216,7 @@ def main() -> int:
         raise AnchorError(f"auditor not found: {auditor}")
 
     if args.dry_run:
-        result = run_json([sys.executable, str(runner), str(config_path), "--dry-run"], cwd=runner.parent)
+        result = run_json([sys.executable, str(runner), str(config_path), "--dry-run"], cwd=instrument_root)
         if result.get("verdict") != "DRY_RUN_READY":
             raise AnchorError(f"underlying runner did not return DRY_RUN_READY: {result!r}")
         print(json.dumps({**preview, "verdict": "DRY_RUN_READY", "runner": result}, sort_keys=True))
@@ -219,10 +230,7 @@ def main() -> int:
     if not isinstance(raw_root, str) or not raw_root:
         raise AnchorError("pilot_root must be a non-empty path")
     pilot_root = Path(raw_root).expanduser()
-    if not pilot_root.is_absolute():
-        pilot_root = (config_path.parent / pilot_root).resolve()
-    else:
-        pilot_root = pilot_root.resolve()
+    pilot_root = pilot_root.resolve() if pilot_root.is_absolute() else (config_path.parent / pilot_root).resolve()
     require_external_path(anchor_path, pilot_root)
     require_external_path(attestation_path, pilot_root)
 
@@ -234,8 +242,12 @@ def main() -> int:
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "pilot_config_sha256": config_sha,
         "pilot_design_sha256": design_sha,
-        "source_head": source.get("head"),
-        "source_tree": source.get("tree"),
+        "subject_source_head": source.get("head"),
+        "subject_source_tree": source.get("tree"),
+        "instrument_source_head": instrument_head,
+        "instrument_source_tree": instrument_tree,
+        "runner_source_sha256": sha256_file(runner),
+        "auditor_source_sha256": sha256_file(auditor),
         "confirmatory_execution_authorized": False,
         "claim_authorized": False,
     }
@@ -247,19 +259,20 @@ def main() -> int:
         "VART_PILOT_PREEXECUTION_ANCHOR_SHA256": anchor_sha,
         "VART_PILOT_DESIGN_SHA256": design_sha,
         "VART_PILOT_CONFIG_SHA256": config_sha,
+        "VART_INSTRUMENT_SOURCE_HEAD": instrument_head,
+        "VART_INSTRUMENT_SOURCE_TREE": instrument_tree,
     })
-    run_result = run_json([sys.executable, str(runner), str(config_path)], cwd=runner.parent, env=env)
+    run_result = run_json([sys.executable, str(runner), str(config_path)], cwd=instrument_root, env=env)
     if run_result.get("verdict") != "PILOT_PLUMBING_PASS":
         raise AnchorError(f"underlying pilot did not pass plumbing: {run_result!r}")
+    if run_result.get("instrument_source_head") not in (None, instrument_head):
+        raise AnchorError("runner reported a different instrument HEAD")
 
-    audit_result = run_json([sys.executable, str(auditor), str(pilot_root), "--json"], cwd=auditor.parent)
+    audit_result = run_json([sys.executable, str(auditor), str(pilot_root), "--json"], cwd=instrument_root)
     if audit_result.get("verdict") != "PILOT_AUDIT_PASS":
         raise AnchorError(f"sealed pilot audit did not pass: {audit_result!r}")
     if audit_result.get("pilot_design_sha256") != design_sha:
-        raise AnchorError(
-            "PILOT_DESIGN_ANCHOR_MISMATCH: "
-            f"sealed={audit_result.get('pilot_design_sha256')} anchored={design_sha}"
-        )
+        raise AnchorError(f"PILOT_DESIGN_ANCHOR_MISMATCH: sealed={audit_result.get('pilot_design_sha256')} anchored={design_sha}")
 
     attestation = {
         "schema": "symthaea.vart-world-creative-001.pilot-anchor-attestation.v1",
@@ -271,6 +284,12 @@ def main() -> int:
         "pilot_design_sha256": design_sha,
         "pilot_receipt_sha256": audit_result.get("pilot_receipt_sha256"),
         "pilot_evidence_closure_sha256": audit_result.get("pilot_evidence_closure_sha256"),
+        "subject_source_head": source.get("head"),
+        "subject_source_tree": source.get("tree"),
+        "instrument_source_head": instrument_head,
+        "instrument_source_tree": instrument_tree,
+        "runner_source_sha256": sha256_file(runner),
+        "auditor_source_sha256": sha256_file(auditor),
         "audit_verdict": "PILOT_AUDIT_PASS",
         "completed_utc": datetime.now(timezone.utc).isoformat(),
         "confirmatory_execution_authorized": False,
@@ -285,10 +304,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except (AnchorError, KeyError, TypeError, ValueError) as exc:
-        print(json.dumps({
-            "verdict": "PILOT_ANCHORED_REJECT",
-            "error": str(exc),
-            "confirmatory_execution_authorized": False,
-            "claim_authorized": False,
-        }, sort_keys=True), file=sys.stderr)
+        print(json.dumps({"verdict": "PILOT_ANCHORED_REJECT", "error": str(exc), "confirmatory_execution_authorized": False, "claim_authorized": False}, sort_keys=True), file=sys.stderr)
         raise SystemExit(2)
