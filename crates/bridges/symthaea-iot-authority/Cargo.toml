@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-iot-authority"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Deterministic cyber-physical admission semantics for bounded IoT authority"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "authorization", "cyber-physical", "safety"]
+categories = ["embedded", "authentication"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
