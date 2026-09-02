@@ -39,7 +39,7 @@
     "new_preregistration_lineage_required": null,
     "new_preregistration_lineage_created": false
   },
-  "confirmatory_freeze_eligible": false,
+  "source_closure_eligible": false,
   "confirmatory_execution_authorized": false,
   "claim_authorized": false,
   "bounded_statement": "This disposition can establish only that the pilot transition is ready for independent subject/instrument source closure. Source closure and confirmatory execution remain separate gates."
