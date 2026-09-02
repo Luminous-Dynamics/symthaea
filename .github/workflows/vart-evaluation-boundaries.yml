@@ -12,6 +12,8 @@ on:
       - 'scripts/test_verify_vart_001_archive_capsule.py'
       - 'scripts/verify_vart_benchmark_firewall.py'
       - 'scripts/test_verify_vart_benchmark_firewall.py'
+      - 'scripts/verify_vart_002_mechanism_matrix.py'
+      - 'scripts/test_verify_vart_002_mechanism_matrix.py'
       - 'crates/domains/symthaea-epistemic-types/**'
       - '.github/workflows/vart-evaluation-boundaries.yml'
   push:
@@ -25,6 +27,8 @@ on:
       - 'scripts/test_verify_vart_001_archive_capsule.py'
       - 'scripts/verify_vart_benchmark_firewall.py'
       - 'scripts/test_verify_vart_benchmark_firewall.py'
+      - 'scripts/verify_vart_002_mechanism_matrix.py'
+      - 'scripts/test_verify_vart_002_mechanism_matrix.py'
       - 'crates/domains/symthaea-epistemic-types/**'
       - '.github/workflows/vart-evaluation-boundaries.yml'
   workflow_dispatch:
@@ -46,10 +50,14 @@ jobs:
             scripts/verify_vart_001_archive_capsule.py \
             scripts/test_verify_vart_001_archive_capsule.py \
             scripts/verify_vart_benchmark_firewall.py \
-            scripts/test_verify_vart_benchmark_firewall.py
+            scripts/test_verify_vart_benchmark_firewall.py \
+            scripts/verify_vart_002_mechanism_matrix.py \
+            scripts/test_verify_vart_002_mechanism_matrix.py
       - name: Archive capsule adversarial suite
         run: python scripts/test_verify_vart_001_archive_capsule.py
       - name: DEVART/VART firewall adversarial suite
         run: python scripts/test_verify_vart_benchmark_firewall.py
+      - name: VART-002 mechanism matrix adversarial suite
+        run: python scripts/test_verify_vart_002_mechanism_matrix.py
       - name: Epistemic type and policy tests
         run: cargo test -p symthaea-epistemic-types --lib
