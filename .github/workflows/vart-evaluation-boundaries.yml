@@ -1,0 +1,51 @@
+name: VART Evaluation Boundaries
+
+on:
+  pull_request:
+    paths:
+      - 'docs/research/VART_001_ARCHIVE_CAPSULE_V1.md'
+      - 'docs/research/VART_001_ARCHIVE_CAPSULE.template.json'
+      - 'docs/research/VART_BENCHMARK_FIREWALL_V1.md'
+      - 'docs/research/VART_BENCHMARK_FIREWALL.template.json'
+      - 'docs/research/VART_002_*'
+      - 'scripts/verify_vart_001_archive_capsule.py'
+      - 'scripts/test_verify_vart_001_archive_capsule.py'
+      - 'scripts/verify_vart_benchmark_firewall.py'
+      - 'scripts/test_verify_vart_benchmark_firewall.py'
+      - '.github/workflows/vart-evaluation-boundaries.yml'
+  push:
+    paths:
+      - 'docs/research/VART_001_ARCHIVE_CAPSULE_V1.md'
+      - 'docs/research/VART_001_ARCHIVE_CAPSULE.template.json'
+      - 'docs/research/VART_BENCHMARK_FIREWALL_V1.md'
+      - 'docs/research/VART_BENCHMARK_FIREWALL.template.json'
+      - 'docs/research/VART_002_*'
+      - 'scripts/verify_vart_001_archive_capsule.py'
+      - 'scripts/test_verify_vart_001_archive_capsule.py'
+      - 'scripts/verify_vart_benchmark_firewall.py'
+      - 'scripts/test_verify_vart_benchmark_firewall.py'
+      - '.github/workflows/vart-evaluation-boundaries.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evaluation-boundaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax check
+        run: |
+          python -m py_compile \
+            scripts/verify_vart_001_archive_capsule.py \
+            scripts/test_verify_vart_001_archive_capsule.py \
+            scripts/verify_vart_benchmark_firewall.py \
+            scripts/test_verify_vart_benchmark_firewall.py
+      - name: Archive capsule adversarial suite
+        run: python scripts/test_verify_vart_001_archive_capsule.py
+      - name: DEVART/VART firewall adversarial suite
+        run: python scripts/test_verify_vart_benchmark_firewall.py
