@@ -12,6 +12,8 @@ on:
       - 'scripts/test_verify_vart_001_archive_capsule.py'
       - 'scripts/verify_vart_benchmark_firewall.py'
       - 'scripts/test_verify_vart_benchmark_firewall.py'
+      - 'crates/domains/symthaea-epistemic-types/src/provenance_envelope.rs'
+      - 'crates/domains/symthaea-epistemic-types/src/lib.rs'
       - '.github/workflows/vart-evaluation-boundaries.yml'
   push:
     paths:
@@ -24,6 +26,8 @@ on:
       - 'scripts/test_verify_vart_001_archive_capsule.py'
       - 'scripts/verify_vart_benchmark_firewall.py'
       - 'scripts/test_verify_vart_benchmark_firewall.py'
+      - 'crates/domains/symthaea-epistemic-types/src/provenance_envelope.rs'
+      - 'crates/domains/symthaea-epistemic-types/src/lib.rs'
       - '.github/workflows/vart-evaluation-boundaries.yml'
   workflow_dispatch:
 
@@ -38,7 +42,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Syntax check
+      - name: Python syntax check
         run: |
           python -m py_compile \
             scripts/verify_vart_001_archive_capsule.py \
@@ -49,3 +53,5 @@ jobs:
         run: python scripts/test_verify_vart_001_archive_capsule.py
       - name: DEVART/VART firewall adversarial suite
         run: python scripts/test_verify_vart_benchmark_firewall.py
+      - name: Epistemic provenance envelope tests
+        run: cargo test -p symthaea-epistemic-types --lib provenance_envelope
