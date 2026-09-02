@@ -1,0 +1,59 @@
+{
+  "schema": "symthaea.vart-002.shadow-characterization.v1",
+  "status": "development_measurement_only",
+  "campaign_id": "__SET_FRESH_DEVART_CAMPAIGN__",
+  "benchmark_domain": "DEVART",
+  "subject_source": {
+    "head": "__40_HEX_SHA1__",
+    "tree": "__40_HEX_SHA1__"
+  },
+  "instrument_source": {
+    "head": "__40_HEX_SHA1__",
+    "tree": "__40_HEX_SHA1__"
+  },
+  "paired_behavior_neutrality": {
+    "shadow_disabled_decision_trace_sha256": "__64_HEX_SHA256__",
+    "shadow_enabled_decision_trace_sha256": "__64_HEX_SHA256__",
+    "same_worlds": true,
+    "same_seeds": true,
+    "same_subject_source": true,
+    "same_compute_budget": true,
+    "same_actions_and_receipts": true
+  },
+  "coverage": {
+    "audit_cycles": 0,
+    "queries_observed": 0
+  },
+  "grounded_history": {
+    "queries_observed": 0,
+    "raw_returned_total": 0,
+    "would_return_total": 0,
+    "selection_changed_queries": 0,
+    "excluded_unknown_total": 0,
+    "excluded_taint_total": 0,
+    "excluded_domain_total": 0
+  },
+  "grounded_or_imported": {
+    "queries_observed": 0,
+    "raw_returned_total": 0,
+    "would_return_total": 0,
+    "selection_changed_queries": 0,
+    "excluded_unknown_total": 0,
+    "excluded_taint_total": 0,
+    "excluded_domain_total": 0
+  },
+  "counterfactual_only": {
+    "queries_observed": 0,
+    "raw_returned_total": 0,
+    "would_return_total": 0,
+    "selection_changed_queries": 0,
+    "excluded_unknown_total": 0,
+    "excluded_taint_total": 0,
+    "excluded_domain_total": 0
+  },
+  "hidden_vart_feedback_used": false,
+  "used_to_optimize_hidden_vart": false,
+  "enforcement_enabled_during_measurement": false,
+  "claim_authorized": false,
+  "confirmatory_execution_authorized": false
+}
