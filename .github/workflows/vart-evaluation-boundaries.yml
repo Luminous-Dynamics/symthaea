@@ -17,6 +17,8 @@ on:
       - 'scripts/test_verify_vart_002_mechanism_matrix.py'
       - 'scripts/verify_vart_002_provenance_enforcement_preparation.py'
       - 'scripts/test_verify_vart_002_provenance_enforcement_preparation.py'
+      - 'scripts/verify_vart_002_shadow_characterization.py'
+      - 'scripts/test_verify_vart_002_shadow_characterization.py'
       - 'scripts/vart_hidden_benchmark_commit_reveal.py'
       - 'scripts/test_vart_hidden_benchmark_commit_reveal.py'
       - 'crates/domains/symthaea-epistemic-types/**'
@@ -41,6 +43,8 @@ on:
       - 'scripts/test_verify_vart_002_mechanism_matrix.py'
       - 'scripts/verify_vart_002_provenance_enforcement_preparation.py'
       - 'scripts/test_verify_vart_002_provenance_enforcement_preparation.py'
+      - 'scripts/verify_vart_002_shadow_characterization.py'
+      - 'scripts/test_verify_vart_002_shadow_characterization.py'
       - 'scripts/vart_hidden_benchmark_commit_reveal.py'
       - 'scripts/test_vart_hidden_benchmark_commit_reveal.py'
       - 'crates/domains/symthaea-epistemic-types/**'
@@ -73,6 +77,8 @@ jobs:
             scripts/test_verify_vart_002_mechanism_matrix.py \
             scripts/verify_vart_002_provenance_enforcement_preparation.py \
             scripts/test_verify_vart_002_provenance_enforcement_preparation.py \
+            scripts/verify_vart_002_shadow_characterization.py \
+            scripts/test_verify_vart_002_shadow_characterization.py \
             scripts/vart_hidden_benchmark_commit_reveal.py \
             scripts/test_vart_hidden_benchmark_commit_reveal.py
       - name: Archive capsule adversarial suite
@@ -83,6 +89,8 @@ jobs:
         run: python scripts/test_vart_hidden_benchmark_commit_reveal.py
       - name: VART-002 mechanism matrix adversarial suite
         run: python scripts/test_verify_vart_002_mechanism_matrix.py
+      - name: Provenance shadow characterization adversarial suite
+        run: python scripts/test_verify_vart_002_shadow_characterization.py
       - name: Provenance enforcement preparation adversarial suite
         run: python scripts/test_verify_vart_002_provenance_enforcement_preparation.py
       - name: Epistemic type, derivation, policy, and readiness tests
