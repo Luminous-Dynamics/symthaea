@@ -9,7 +9,10 @@ on:
       - 'scripts/test_audit_vart_world_creative_001_pilot.py'
       - 'scripts/verify_vart_world_creative_001_post_pilot.py'
       - 'scripts/test_verify_vart_world_creative_001_post_pilot.py'
+      - 'scripts/verify_vart_world_creative_001_freeze_eligibility.py'
+      - 'scripts/test_verify_vart_world_creative_001_freeze_eligibility.py'
       - 'docs/research/VART_WORLD_CREATIVE_001_POST_PILOT_*'
+      - 'docs/research/VART_WORLD_CREATIVE_001_SOURCE_CLOSURE_*'
       - '.github/workflows/vart-world-creative-post-pilot.yml'
   push:
     branches:
@@ -21,7 +24,10 @@ on:
       - 'scripts/test_audit_vart_world_creative_001_pilot.py'
       - 'scripts/verify_vart_world_creative_001_post_pilot.py'
       - 'scripts/test_verify_vart_world_creative_001_post_pilot.py'
+      - 'scripts/verify_vart_world_creative_001_freeze_eligibility.py'
+      - 'scripts/test_verify_vart_world_creative_001_freeze_eligibility.py'
       - 'docs/research/VART_WORLD_CREATIVE_001_POST_PILOT_*'
+      - 'docs/research/VART_WORLD_CREATIVE_001_SOURCE_CLOSURE_*'
       - '.github/workflows/vart-world-creative-post-pilot.yml'
   workflow_dispatch:
 
@@ -30,7 +36,7 @@ permissions:
 
 jobs:
   post-pilot-transition:
-    name: Anchor + audit + disposition gate
+    name: Anchor + audit + disposition + freeze eligibility
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -44,10 +50,14 @@ jobs:
             scripts/audit_vart_world_creative_001_pilot.py \
             scripts/test_audit_vart_world_creative_001_pilot.py \
             scripts/verify_vart_world_creative_001_post_pilot.py \
-            scripts/test_verify_vart_world_creative_001_post_pilot.py
+            scripts/test_verify_vart_world_creative_001_post_pilot.py \
+            scripts/verify_vart_world_creative_001_freeze_eligibility.py \
+            scripts/test_verify_vart_world_creative_001_freeze_eligibility.py
       - name: Pre-execution paired-design anchor suite
         run: python3 scripts/test_run_vart_world_creative_001_pilot_anchored.py
       - name: Paired-design post-pilot adversarial suite
         run: python3 scripts/test_audit_vart_world_creative_001_pilot.py
       - name: Post-pilot disposition adversarial suite
         run: python3 scripts/test_verify_vart_world_creative_001_post_pilot.py
+      - name: Freeze-preparation eligibility adversarial suite
+        run: python3 scripts/test_verify_vart_world_creative_001_freeze_eligibility.py
