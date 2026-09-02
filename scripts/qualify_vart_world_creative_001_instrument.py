@@ -31,6 +31,7 @@ SUITES = [
     ("freeze_eligibility", "scripts/test_verify_vart_world_creative_001_freeze_eligibility.py"),
     ("confirmatory_launch", "scripts/test_verify_vart_world_creative_001_confirmatory_launch.py"),
     ("confirmatory_runner", "scripts/test_run_vart_world_creative_001_confirmatory.py"),
+    ("inventory_compat", "scripts/test_verify_vart_world_creative_001_inventory_compat.py"),
     ("subject_source_closure", "scripts/test_qualify_vart_world_creative_001_source_closure.py"),
     ("instrument_source_closure", "scripts/test_qualify_vart_world_creative_001_instrument_source_closure.py"),
 ]
