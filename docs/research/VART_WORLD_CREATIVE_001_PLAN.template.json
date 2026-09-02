@@ -1,0 +1,115 @@
+{
+  "schema": "symthaea.vart-world-creative-001.plan.v1",
+  "experiment_id": "VART-WORLD-CREATIVE-001",
+  "title": "Embodied Experience-Conditioned World Improvement",
+  "execution_authorized": false,
+  "confirmatory_execution_authorized": false,
+  "claim_authorized": false,
+  "qualified_parents": {
+    "world_forge_v05a": null,
+    "reality_ledger": null,
+    "vision_surface": null
+  },
+  "source_identity": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "head": null,
+    "tree": null,
+    "dirty": null
+  },
+  "environment": {
+    "nix_flake_lock_sha256": null,
+    "rustc": null,
+    "target_triple": null,
+    "kernel": null,
+    "cpu": null,
+    "gpu": null,
+    "gpu_driver": null,
+    "render_backend": null,
+    "bevy_version": null,
+    "physics_backend": null
+  },
+  "fixture_set": {
+    "digest": null,
+    "fixtures": [
+      "pretty_trap",
+      "local_optimum",
+      "hidden_dependency",
+      "delayed_consequence",
+      "counterfactual_decoy",
+      "memory_trap"
+    ]
+  },
+  "seeds": null,
+  "policies": [
+    "full_symthaea",
+    "random_valid",
+    "heuristic"
+  ],
+  "optional_policies": [
+    "external_model",
+    "human"
+  ],
+  "ablations": [
+    "no_embodied_experience",
+    "no_persistent_memory",
+    "no_depth",
+    "no_counterfactual_evaluation",
+    "no_independent_proposal_replay",
+    "no_reality_ledger_context",
+    "random_valid_judgment"
+  ],
+  "outcome_dimensions": {
+    "physical_validity": null,
+    "declared_goal_consequence": null,
+    "perceptual_consequence": null,
+    "protected_side_effects": null,
+    "counterfactual_selection_quality": null,
+    "human_evaluation": null
+  },
+  "forbidden_primary_aggregates": [
+    "world_quality",
+    "beauty_score",
+    "cinematic_quality",
+    "intelligence_score"
+  ],
+  "calibration": {
+    "dimensions": null,
+    "confidence_representation": null,
+    "bucket_definition": null
+  },
+  "protected_invariants": null,
+  "failure_thresholds": null,
+  "stopping_rule": null,
+  "pilot": {
+    "authorized": false,
+    "noncanonical": true,
+    "may_set_confirmatory_thresholds_after_review": true,
+    "may_be_reported_as_confirmatory": false
+  },
+  "campaigns": {
+    "longitudinal": {
+      "world_count": null,
+      "revisions_per_world": null,
+      "target_after_pilot": 100
+    },
+    "generalization": {
+      "world_count": null,
+      "revisions_per_world": null
+    }
+  },
+  "evidence": {
+    "root": null,
+    "fresh_path_required": true,
+    "retain_rejected_candidates": true,
+    "retain_raw_observations": true,
+    "independent_verifier": null,
+    "reproduction_capsule": null
+  },
+  "claim_ceiling": "EvidenceBoundExperienceConditionedWorldImprovementQualified",
+  "notes": [
+    "Runtime integration must use the exact qualified World Forge v0.5-A lineage, not current GitHub main unless they are proven identical.",
+    "Counterfactual candidates remain counterfactual even when structurally equal to a later committed state.",
+    "Human preference cannot override physical invalidity.",
+    "Failure results are retained and are scientifically admissible."
+  ]
+}
