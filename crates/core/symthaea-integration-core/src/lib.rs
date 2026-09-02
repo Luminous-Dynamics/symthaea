@@ -30,6 +30,7 @@ pub mod resolution_pipeline;
 pub mod semantic_identity;
 pub mod state;
 pub mod state_history;
+pub mod state_origin;
 mod state_registry;
 pub mod state_temporal;
 pub mod topology;
@@ -97,6 +98,10 @@ pub use state_history::{
     DesiredStateContinuity, DriftContinuity, HistoricalStateAssessment, StateHistory,
     StateHistoryError, StateHistoryLimits, assess_state_dimension_with_history,
     desired_state_continuity, drift_state_continuity,
+};
+pub use state_origin::{
+    DESIRED_STATE_ORIGIN_ATTRIBUTE, DesiredStateOrigin, DesiredStateOriginEvidence,
+    StateOriginError, validate_state_snapshot_origins,
 };
 pub use state_temporal::{
     TemporalStateAssessment, TemporalStateAssessmentError, TemporalStatePolicy,
