@@ -30,6 +30,7 @@ SUITES = [
     ("post_pilot", "scripts/test_verify_vart_world_creative_001_post_pilot.py"),
     ("freeze_eligibility", "scripts/test_verify_vart_world_creative_001_freeze_eligibility.py"),
     ("subject_source_closure", "scripts/test_qualify_vart_world_creative_001_source_closure.py"),
+    ("instrument_source_closure", "scripts/test_qualify_vart_world_creative_001_instrument_source_closure.py"),
 ]
 
 
