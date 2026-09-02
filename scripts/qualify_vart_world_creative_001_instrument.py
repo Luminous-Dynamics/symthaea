@@ -54,7 +54,13 @@ def sha256_file(path: Path) -> str:
 
 
 def git(repo: Path, *args: str) -> str:
-    proc = subprocess.run(["git", "-C", str(repo), *args], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    proc = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
     if proc.returncode != 0:
         raise QualificationError(f"git {' '.join(args)} failed: {proc.stderr.strip()}")
     return proc.stdout.strip()
@@ -101,8 +107,22 @@ def discover_instrument_files(repo: Path) -> list[str]:
 
 
 def build_manifest(repo: Path) -> tuple[list[dict[str, str]], str]:
-    entries = [{"path": rel, "sha256": sha256_file(repo / rel)} for rel in discover_instrument_files(repo)]
+    entries = [
+        {"path": rel, "sha256": sha256_file(repo / rel)}
+        for rel in discover_instrument_files(repo)
+    ]
     return entries, sha256_bytes(canonical_bytes(entries))
+
+
+def environment_identity() -> dict[str, str]:
+    return {
+        "python_executable": sys.executable,
+        "python_version": platform.python_version(),
+        "python_implementation": platform.python_implementation(),
+        "platform_system": platform.system(),
+        "platform_release": platform.release(),
+        "platform_machine": platform.machine(),
+    }
 
 
 def run_suite(repo: Path, name: str, rel: str) -> dict[str, Any]:
@@ -128,7 +148,9 @@ def run_suite(repo: Path, name: str, rel: str) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Qualify the VART-WORLD-CREATIVE-001 measurement instrument")
+    parser = argparse.ArgumentParser(
+        description="Qualify the VART-WORLD-CREATIVE-001 measurement instrument"
+    )
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--manifest-only", action="store_true")
@@ -141,6 +163,8 @@ def main() -> int:
     head = git(repo, "rev-parse", "HEAD")
     tree = git(repo, "rev-parse", "HEAD^{tree}")
     manifest, manifest_sha = build_manifest(repo)
+    env_identity = environment_identity()
+    env_digest = sha256_bytes(canonical_bytes(env_identity))
 
     if args.manifest_only:
         print(json.dumps({
@@ -149,6 +173,7 @@ def main() -> int:
             "instrument_tree": tree,
             "instrument_manifest_sha256": manifest_sha,
             "instrument_file_count": len(manifest),
+            "instrument_environment_digest": env_digest,
             "confirmatory_execution_authorized": False,
             "claim_authorized": False,
         }, sort_keys=True))
@@ -169,10 +194,11 @@ def main() -> int:
         "instrument_manifest_sha256": manifest_sha,
         "instrument_file_count": len(manifest),
         "instrument_files": manifest,
+        "instrument_environment": env_identity,
+        "instrument_environment_digest": env_digest,
         "suites": suites,
         "suite_count": len(suites),
         "all_suites_pass": True,
-        "python": {"executable": sys.executable, "version": platform.python_version()},
         "qualified_utc": datetime.now(timezone.utc).isoformat(),
         "confirmatory_execution_authorized": False,
         "claim_authorized": False,
@@ -186,6 +212,7 @@ def main() -> int:
         "instrument_head": head,
         "instrument_tree": tree,
         "instrument_manifest_sha256": manifest_sha,
+        "instrument_environment_digest": env_digest,
         "qualification_receipt_sha256": sha256_file(out),
         "suite_count": len(suites),
         "confirmatory_execution_authorized": False,
