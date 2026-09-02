@@ -11,6 +11,7 @@
 pub mod coherence;
 pub mod conversation;
 pub mod coordinator;
+pub mod episodic_provenance;
 pub mod episodic_replay;
 pub mod hippocampus;
 pub mod semantic;
@@ -23,6 +24,11 @@ pub use conversation::{
 pub use coordinator::{
     CoordinatorConfig, CoordinatorStats, GraduationEvent, MemoryCoordinator, MemorySignals,
     MemorySource, content_hash,
+};
+pub use episodic_provenance::{
+    AuditedEpisodicRecall, EpisodicProvenanceError, EpisodicProvenanceIndex,
+    EpisodicRetrievalAudit, ProvenanceAwareEpisodicMemory, ProvenancedEpisodeMatch,
+    episode_subject_sha256,
 };
 pub use episodic_replay::{
     Episode, EpisodicMemory, EpisodicMemoryStats, EpisodicReplayConfig, ReplaySessionResult,
