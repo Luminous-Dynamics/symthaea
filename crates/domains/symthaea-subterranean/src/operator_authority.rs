@@ -298,9 +298,11 @@ impl OperatorAuthority {
             Ok(value) => value,
             Err(error) => return self.reject(error.into()),
         };
-        self.accept_sequence(metadata)?;
         self.expire_pending(now_step);
 
+        if let Err(error) = approval.validate_proposal_time() {
+            return self.reject(OperatorAuthorityRejection::RecoveryProposal(error));
+        }
         if let Err(error) = approval.proposal.validate(now_step, self.constraint) {
             return self.reject(OperatorAuthorityRejection::RecoveryProposal(error));
         }
@@ -308,6 +310,9 @@ impl OperatorAuthority {
         if self.issued_recovery.get(&proposal_id) != Some(&approval.proposal) {
             return self.reject(OperatorAuthorityRejection::RecoveryProposalNotIssued);
         }
+        // Consume replay sequence only after the proposal itself is known to be
+        // temporally valid, currently issued, and exactly bound to this state.
+        self.accept_sequence(metadata)?;
 
         let pending = self.pending_resume.entry(proposal_id).or_insert_with(|| PendingRecoveryApproval {
             proposal: approval.proposal,
@@ -367,14 +372,20 @@ mod tests {
     }
 
     #[test]
-    fn unissued_proposal_cannot_start_quorum() {
+    fn unissued_proposal_cannot_start_quorum_or_consume_sequence() {
         let mut authority = OperatorAuthority::default();
         authority.ingest(command(1, 1, 1, OperatorCommand::EmergencyStop), 20, true).unwrap();
         let p = proposal(9, OperatorConstraint::EmergencyStop);
+        let candidate = approval(1, 2, p);
         assert_eq!(
-            authority.approve_recovery(approval(1, 2, p), 21),
+            authority.approve_recovery(candidate, 21),
             Err(OperatorAuthorityRejection::RecoveryProposalNotIssued)
         );
+        authority.issue_recovery_proposal(p, 21).unwrap();
+        assert!(matches!(
+            authority.approve_recovery(candidate, 21).unwrap(),
+            OperatorDecision::PendingQuorum { approvals: 1, required: 2 }
+        ));
     }
 
     #[test]
@@ -386,6 +397,26 @@ mod tests {
         assert!(matches!(authority.approve_recovery(approval(1, 2, p), 21).unwrap(), OperatorDecision::PendingQuorum { approvals: 1, required: 2 }));
         assert_eq!(authority.approve_recovery(approval(2, 1, p), 22), Ok(OperatorDecision::Cleared));
         assert_eq!(authority.constraint(), OperatorConstraint::None);
+    }
+
+    #[test]
+    fn approval_predating_proposal_is_rejected_without_consuming_sequence() {
+        let mut authority = OperatorAuthority::default();
+        authority.ingest(command(1, 1, 1, OperatorCommand::HoldPosition), 20, true).unwrap();
+        let p = proposal(9, OperatorConstraint::HoldPosition);
+        authority.issue_recovery_proposal(p, 20).unwrap();
+        let mut bad = approval(1, 2, p);
+        bad.approval_issued_step = 9;
+        assert_eq!(
+            authority.approve_recovery(bad, 21),
+            Err(OperatorAuthorityRejection::RecoveryProposal(
+                RecoveryProposalRejection::ApprovalPredatesProposal
+            ))
+        );
+        assert!(matches!(
+            authority.approve_recovery(approval(1, 2, p), 21).unwrap(),
+            OperatorDecision::PendingQuorum { approvals: 1, required: 2 }
+        ));
     }
 
     #[test]
