@@ -12,22 +12,14 @@ If a normative contract is added, removed, replaced, or reclassified, the regist
 
 ## 2. Proposed registry schema
 
-A future `DesignContractRegistryManifest` should contain at minimum:
+A future `DesignContractRegistryManifest` contains at minimum:
 
 - registry schema/version;
 - exact v0.2 design source commit;
 - ordered `contracts: Vec<DesignContractEntry>`;
 - canonical registry SHA-256.
 
-Each `DesignContractEntry` binds:
-
-- stable `contract_role` enum;
-- repository-relative path;
-- content SHA-256;
-- contract schema/version or prose-contract version;
-- normative status;
-- optional supersedes/superseded-by identity;
-- optional architecture-blocking flag.
+Each `DesignContractEntry` binds stable role, repository-relative path, content SHA-256, contract version, normative status, optional supersession identity, and optional architecture-blocking flag.
 
 Paths aid auditability but are not sufficient identity; content digest is authoritative.
 
@@ -51,6 +43,7 @@ Initial required roles include at least:
 - `CausalContrasts`;
 - `ExecutionMode`;
 - `ScenarioManifest`;
+- `MinimalExploratoryScenarioBattery`;
 - `BlindingCustody`;
 - `CapabilityTypedApi`;
 - `AdversarialValidation`;
@@ -60,7 +53,7 @@ Initial required roles include at least:
 
 The registry-contract specification itself is bound separately by the design freeze as `design_contract_registry_contract_digest`, avoiding a self-hash cycle.
 
-## 4. Normative status
+## 4. Normative status and closure
 
 Suggested status enum:
 
@@ -69,30 +62,24 @@ Suggested status enum:
 - `Superseded` — retained for history but cannot authorize new evidence;
 - `Invalidated` — known unusable contract.
 
-Only active `Normative` entries satisfy required roles. A singular required role with zero or multiple active normative entries is a validation failure.
-
-## 5. Closure rule
-
-Before `FrozenBlockedOnV01` or `FrozenImplementationAuthorized`, registry validation must prove:
+Before `FrozenBlockedOnV01` or `FrozenImplementationAuthorized`, validation proves:
 
 1. every required role exists exactly once as active normative content;
-2. every listed path resolves to the exact recorded digest in the frozen source tree;
+2. every listed path resolves to the recorded digest in the exact frozen source tree;
 3. no active normative `V02_*` contract file is omitted;
-4. no registry entry points outside the exact v0.2 design source commit;
-5. supersession references are acyclic and resolvable;
-6. no required normative contract is `Superseded` or `Invalidated`;
-7. architecture-blocking contracts are explicitly included;
-8. canonical ordering is deterministic.
+4. no registry entry points outside the exact design source commit;
+5. supersession references are acyclic/resolvable;
+6. no required contract is superseded/invalidated;
+7. architecture-blocking contracts are included;
+8. ordering is deterministic.
 
-The omitted-file gate matters: checking only a known hard-coded role list would let a newly added normative contract disappear from the freeze by accident.
+The omitted-file gate prevents a new normative contract from silently disappearing from the freeze.
 
-## 6. Canonical ordering and self-reference
+## 5. Canonical ordering and self-reference
 
-Prefer deterministic ordering by stable `contract_role`, then path where a role is legitimately multi-valued. Filesystem enumeration order must not become scientific identity.
+Order by stable `contract_role`, then path where a role is legitimately multi-valued. Filesystem enumeration order must not become scientific identity.
 
-Do not include the realized registry's own final SHA-256 inside itself.
-
-Use:
+Use the dependency direction:
 
 `V02_DESIGN_CONTRACT_REGISTRY.md digest`
 → registry schema/validation
@@ -100,152 +87,134 @@ Use:
 → registry SHA-256
 → `DesignFreezeManifest`.
 
-The freeze therefore binds both the registry-specification digest and the realized registry digest.
+Do not include the realized registry's own final SHA-256 inside itself.
 
-## 7. Freeze and evidence-root binding
+## 6. Freeze and evidence-root binding
 
-`DesignFreezeManifest` treats the registry as authoritative. Selected individual contract digests may be repeated for audit convenience, but they must equal corresponding registry entries and cannot substitute for closure.
+`DesignFreezeManifest` treats the registry as authoritative. Repeated individual contract digests are audit anchors only and must equal registry entries.
 
-The prospective `ObservationalEvidenceRootManifest` also binds the same exact registry digest. A valid freeze paired with a different valid registry, or a root paired with a different registry, is an integrity failure.
+The prospective `ObservationalEvidenceRootManifest` binds the same exact registry digest. Freeze/registry or root/registry cross-pairing is an integrity failure.
 
-## 8. Candidate runtime-identity closure
+## 7. Candidate runtime-identity closure
 
-A candidate's scientific identity is not exhausted by its mathematical factor coordinate.
+Candidate identity includes more than `R × W × A × T × F × I × H`.
 
-The prospective candidate/evidence identity must also bind:
+It also binds preprocessing/calibration identity, calibration cohort/fitted parameters when applicable, evaluator-isolation identity, persistent-state/cache policy, implementation/reference fixtures, and exact source/model lineage.
 
-- preprocessing/calibration manifest digest or explicit `None`;
-- calibration cohort/fitted-parameter identities when applicable;
-- evaluator-isolation manifest digest;
-- allowed evaluator persistent-state class;
-- cache/state policy;
-- implementation/reference-fixture identity.
+Different value-changing preprocessing or evaluator authority means a different scientific candidate/evidence identity unless prospective mechanical equivalence proves output preservation over the locked valid domain.
 
-Two candidates with the same `R × W × A × T × F × I × H` coordinate but different value-changing preprocessing, fitted parameters, evaluator state lifecycle, or cache authority are different scientific candidate/evidence identities unless a prospective mechanical equivalence proof shows the difference is output-preserving over the locked valid domain.
-
-## 9. Minimal exploratory candidate-set closure
+## 8. Minimal exploratory candidate-set closure
 
 `V02_MINIMAL_EXPLORATORY_CANDIDATE_SET.md` is normative for the first exploratory lineage.
 
-Before exploratory execution, require one canonical `ExploratoryCandidateSetManifest` that binds exactly the prospectively allowed E00–E11 candidate roles, their candidate-definition digests, required pairwise discrimination obligations, primary forecast-policy choice, preprocessing policy, evaluator-isolation identity, and selection/parsimony rule.
+A canonical `ExploratoryCandidateSetManifest` binds exactly E00–E11, their candidate-definition digests, pairwise discrimination obligations, primary `ObservedDrivePersistence` forecast policy, zero fitted preprocessing, evaluator-isolation identity, and prospective selection/parsimony rule.
 
 The factor space is not permission to add candidates after seeing data.
 
-A new candidate may enter the initial exploratory lineage only by superseding the candidate-set contract/freeze before exploratory outputs are inspected and by declaring a discrimination question the existing finite set cannot answer.
+Extra candidates, missing roles, oracle/retrospective primary candidates, fitted/adaptive preprocessing, cross-evaluation mutable state, or missing discrimination obligations invalidate the set.
 
-Missing required roles, extra unregistered candidates, oracle/retrospective primary candidates, confirmatory-fitted preprocessing, or missing discrimination obligations are hard candidate-set validation failures.
+## 9. Minimal exploratory scenario-battery closure
+
+`V02_MINIMAL_EXPLORATORY_SCENARIO_BATTERY.md` is normative for the first exploratory lineage.
+
+A canonical `ExploratoryScenarioBatteryManifest` binds X00–X11, exact concrete arm/scenario digests, matched groups, cut points/windows, causal contrasts where applicable, and the E00–E11 discriminator coverage matrix.
+
+The preferred primary-arm budget is no more than 24 arms before malicious fixtures and forecast-policy sensitivity diagnostics. Exceeding that budget requires a prospectively documented reason and a superseding battery identity before outputs are inspected.
+
+A large scenario count cannot compensate for missing discriminator coverage.
+
+Candidate-dependent cut points, future-dependent grouping, unregistered extra primary scenario families, or discovery/calibration/confirmatory overlap violations invalidate the battery.
 
 ## 10. History/state-sufficiency closure
 
-Initial v0.2 distinguishes:
+Initial v0.2 distinguishes H0 current native state, H1 externally replayed prefix history, retrospective/oracle diagnostics, and future separately qualified native persisted memory.
 
-- `H0CurrentNativeStateOnly`;
-- `H1ReplayedPrefixHistory`;
-- retrospective/oracle diagnostic history;
-- future separately qualified native persisted memory.
+A candidate differing across matched-current-state histories proves only that prior trace history helps the external observatory unless a later native mechanism carries a qualified sufficient statistic.
 
-A candidate that differs across matched-current-state histories proves only that prior trace history adds information to the external observatory unless a later native memory mechanism carries a qualified sufficient statistic.
-
-The restart/state-sufficiency gate must verify that identical complete native state/configuration plus identical future inputs produces identical future native execution under the v0.1 deterministic contract.
+Restart/state-sufficiency must show identical future native execution from identical complete native state/configuration plus identical future inputs.
 
 ## 11. Observatory-state closure
 
-H1 within-scenario history does not authorize cross-scenario process memory.
+H1 same-scenario history does not authorize cross-scenario process memory.
 
-Primary `OfflinePrefixReplay` candidate evaluation must satisfy `V02_OBSERVATORY_STATE_LIFECYCLE.md`:
+Primary `OfflinePrefixReplay` evaluation requires scenario/candidate order invariance, cold/warm process equivalence, serial/parallel equivalence, cache hit/miss equivalence, and from-scratch/incremental prefix equivalence when incremental evaluation exists.
 
-- scenario-local evaluator lifecycle;
-- no cross-arm/scenario adaptive state;
-- candidate/scenario order invariance;
-- cold/warm process equivalence;
-- serial/parallel equivalence;
-- cache hit/miss equivalence;
-- from-scratch vs incremental prefix equivalence where incremental evaluation exists.
-
-A hidden mutable-state or evaluation-order failure is an `IntegrityFailure`.
+Hidden mutable state or order dependence is an `IntegrityFailure`.
 
 ## 12. Calibration/holdout closure
 
-Primary confirmatory candidate computation satisfies `V02_CALIBRATION_AND_PREPROCESSING.md`:
+Every value-changing transform has a frozen preprocessing manifest. Fitted parameters come only from prospectively identified discovery/calibration or external-reference data.
 
-- every value-changing transform has a frozen manifest;
-- fitted parameters come only from prospectively identified discovery/calibration or external-reference data;
-- confirmatory cohort values cannot refit scaling, thresholds, clipping, smoothing, or normalization;
-- individual confirmatory candidate values are independent of cohort size/order and other confirmatory outcomes;
-- calibration and confirmatory content overlap is audited;
-- preprocessing sensitivity is frozen prospectively when required.
+Confirmatory cases cannot refit scaling, thresholds, clipping, smoothing, normalization, or other parameters. Individual confirmatory values must be invariant to unrelated cohort size/order/outcomes.
 
 Adaptive confirmatory fitting is an `IntegrityFailure`.
 
 ## 13. Identifiability closure
 
-Before confirmatory freeze, require a valid `CandidateDiscriminationManifest` under `V02_IDENTIFIABILITY_AND_DISCRIMINATION.md` binding the finite candidate set, scenario/cut-point set, primary-vs-baseline obligations, equivalence tolerances, discriminator coverage, and prospective parsimony/model-selection rule.
+A valid `CandidateDiscriminationManifest` binds the finite candidate set, scenario/cut-point set, primary-vs-baseline obligations, equivalence tolerances, discriminator coverage, and prospective parsimony/model-selection rule.
 
-A candidate may not be promoted as superior to a baseline when the design lacks a discriminator capable of separating them.
+A candidate cannot be promoted beyond a baseline when the locked design lacks a discriminator capable of separating them.
 
-History-sensitive H1 candidates claiming information beyond current state require matched-current-state H1-vs-H0 discriminators.
+H1 gains beyond H0 require matched-current-state history discriminators.
 
 ## 14. Causal-contrast closure
 
-For every primary hypothesis framed as a response to a manipulation, bind one or more `CausalContrastManifest` identities under `V02_CAUSAL_CONTRASTS.md`.
+Mechanistic hypotheses bind `CausalContrastManifest` identities declaring manipulated fields, pre-treatment equalities, allowed mediators, forbidden changes, supported discrimination obligation, and contrast class.
 
-Each contrast declares manipulated fields, pre-treatment equalities, allowed mediators, forbidden changes, supported discrimination obligation, and contrast class (`total-path`, `direct-path`, `mediator-specific`, or `diagnostic`).
-
-A realized causal claim requires a passing manipulation-check artifact. Otherwise report descriptive scenario differences.
+A causal claim requires a passing manipulation-check artifact. Otherwise report descriptive scenario differences.
 
 ## 15. Malicious-fixture closure
 
 `V02_MINIMAL_MALICIOUS_FIXTURE_MATRIX.md` is normative for validation of the first observatory implementation.
 
-Before exploratory candidate outputs become scientifically interpretable, the implemented contract surface must run a canonical `MaliciousFixtureSuiteManifest` / validation report covering at least M01–M14 or an explicitly superseding suite.
+Before exploratory outputs become scientifically interpretable, a canonical malicious-fixture report must cover M01–M14 or a prospectively superseding suite.
 
-Each malicious fixture must:
+Each malicious case must be rejected by its expected primary gate with the expected failure class, and its nearest valid paired control must pass.
 
-- be rejected by its prospectively expected primary gate;
-- produce the expected failure class;
-- have its nearest valid paired control accepted;
-- bind exact fixture/source/input digests.
+The suite covers future/suffix leakage, semantic leakage, confirmatory preprocessing leakage, cross-scenario state, cache-key poisoning, unavailable-as-zero, temporal misalignment, relation substitution, weighting/aggregation substitution, oracle escalation, observer feedback, and artifact substitution.
 
-A known-malicious fixture that passes is an integrity failure of the validation system, not a candidate result.
+A known-malicious fixture that passes is an integrity failure of the validation architecture.
 
-The minimal malicious suite covers future/suffix leakage, semantic leakage, confirmatory preprocessing leakage, cross-scenario evaluator state, cache-key poisoning, undefined-as-zero behavior, temporal misalignment, relation substitution, weighting/aggregation substitution, oracle escalation, observer feedback, and frozen-artifact substitution.
+## 16. Cross-coverage closure
 
-## 16. Change severity
+Before exploratory execution, validation must prove all three finite surfaces are mutually closed:
 
-Registry changes inherit the severity of the contract change they represent.
+1. every required E00–E11 pairwise discrimination obligation is covered by at least one X00–X11 family/cut point;
+2. every implemented integrity/authority boundary is covered by at least one M01–M14 malicious fixture or an explicitly registered successor;
+3. every X-family and M-fixture maps back to a normative contract and expected result/failure class.
+
+This prevents candidate, scenario, and validation plans from drifting independently.
+
+## 17. Change severity
 
 - purely supporting explanation may be Class I when no normative identity changes;
-- changing candidate set, malicious fixture suite, preprocessing, calibration, evaluator lifecycle, weighting, aggregation, temporal integration, history access, identifiability, causal contrast, scenario, analysis, or evidence semantics is Class II;
+- changing candidate set, scenario battery, malicious suite, preprocessing, evaluator lifecycle, weighting, aggregation, temporal/history semantics, identifiability, causal contrasts, analysis, or evidence is Class II;
 - changing future-information authority, primary execution mode, feedback authority, causal outputs, or introducing native persisted affect/memory is Class III.
 
 Adding any active normative contract after freeze changes the registry and supersedes the old freeze.
 
-## 17. Review and CI gates
+## 18. Review and CI gates
 
-Future implementation should mechanically test:
+Future implementation mechanically tests:
 
 - stable registry round trip/digest;
-- content changes alter entry digests;
-- missing/duplicate required roles rejected;
-- omitted normative file rejected;
-- path/digest/source mismatch rejected;
-- supersession cycle rejected;
+- missing/duplicate/omitted normative roles rejected;
+- path/digest/source/supersession mismatch rejected;
 - freeze/registry/root mismatch rejected;
-- missing minimal candidate-set or malicious-fixture contracts rejected;
-- extra/unregistered exploratory candidate rejected;
-- required candidate discriminator missing rejected;
-- known-malicious fixture unexpectedly accepted rejected;
+- missing E/X/M finite-surface contract rejected;
+- E00–E11 role/count/identity drift rejected;
+- missing candidate discriminator coverage rejected;
+- X00–X11 required-family drift rejected;
+- candidate-dependent cut points rejected;
+- known-malicious M-fixture unexpectedly accepted rejected;
 - paired valid control unexpectedly rejected reported separately;
-- candidate rejected when preprocessing or evaluator-state identity is undeclared;
+- preprocessing/evaluator identity undeclared rejected;
 - fitted confirmatory preprocessing rejected;
 - order-dependent evaluator rejected;
-- history-sensitive candidate rejected when history basis is undeclared;
-- native-memory claim rejected when persistence exists only in external replay/evaluator state;
-- causal claim rejected without a valid contrast/manipulation check.
+- native-memory claim rejected when persistence exists only externally;
+- causal claim rejected without valid contrast/manipulation check.
 
-## 18. Current intended normative membership
-
-The active design set currently includes:
+## 19. Current intended normative membership
 
 - `V02_OBSERVATIONAL_AFFECT_PLAN.md`
 - `V02_INFORMATION_FIREWALL.md`
@@ -263,6 +232,7 @@ The active design set currently includes:
 - `V02_CAUSAL_CONTRASTS.md`
 - `V02_EXECUTION_MODE_CONTRACT.md`
 - `V02_SCENARIO_MANIFEST.md`
+- `V02_MINIMAL_EXPLORATORY_SCENARIO_BATTERY.md`
 - `V02_BLINDING_CUSTODY.md`
 - `V02_CAPABILITY_TYPED_API.md`
 - `V02_ADVERSARIAL_VALIDATION.md`
@@ -272,10 +242,10 @@ The active design set currently includes:
 
 Supporting/non-normative notes such as history claim summaries or future native-persistence notes are classified separately and do not satisfy normative roles.
 
-This list describes the current design stage, not a permanently fixed schema. Future additions require explicit classification and a new registry/freeze identity.
+Future additions require explicit classification and a new registry/freeze identity.
 
-## 19. Claim boundary
+## 20. Claim boundary
 
-A closed registry establishes that one explicit design surface governed an evidence lineage. The candidate-set, malicious-fixture, calibration, evaluator-isolation, history, identifiability, and causal contracts constrain what can legitimately be inferred from the resulting artifacts.
+A closed registry establishes that one explicit design surface governed an evidence lineage. The finite candidate, scenario, and malicious-fixture surfaces plus calibration, evaluator-isolation, history, identifiability, and causal contracts constrain what can legitimately be inferred.
 
 They do not establish affect, emotion, subjective valence, native mood, sentience, or consciousness.
