@@ -24,11 +24,14 @@ V05_TREE = gate.V05_TREE
 
 
 def dump(path: Path, value: object) -> str:
-    path.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
     return gate.sha256_file(path)
 
 
-def disposition() -> dict[str, object]:
+def disposition(anchor_sha: str) -> dict[str, object]:
     return {
         "schema": "symthaea.vart-world-creative-001.post-pilot-disposition.v1",
         "experiment_id": gate.EXPERIMENT_ID,
@@ -39,12 +42,20 @@ def disposition() -> dict[str, object]:
             "pilot_design_sha256": H64_C,
             "source_head": H40_A,
             "source_tree": H40_B,
+            "dual_source_bound": True,
+            "instrument_source_head": H40_E,
+            "instrument_source_tree": H40_F,
+            "preexecution_anchor_sha256": anchor_sha,
+            "pilot_config_sha256": H64_D,
             "audit_verdict": "PILOT_AUDIT_PASS",
             "paired_block_semantics": "PASS",
         },
         "inspection": {
             "inspection_purpose": "instrumentation_and_protocol_only",
             "inspected_paths": ["_orchestrator/resolved_plan.json"],
+            "outcome_magnitudes_viewed": False,
+            "comparative_policy_rankings_viewed": False,
+            "human_preference_values_viewed": False,
         },
         "defects": [],
         "resolution": {
@@ -54,10 +65,8 @@ def disposition() -> dict[str, object]:
             "pilot_rerun_complete": False,
             "new_preregistration_lineage_required": False,
             "new_preregistration_lineage_created": False,
-            "confirmatory_source_fetchable": True,
-            "confirmatory_source_reproducible": True,
         },
-        "confirmatory_freeze_eligible": True,
+        "source_closure_eligible": True,
         "confirmatory_execution_authorized": False,
         "claim_authorized": False,
     }
@@ -188,8 +197,8 @@ with tempfile.TemporaryDirectory(prefix="vart-freeze-eligibility-") as td:
     instrument_q_path = root / "instrument-qualification.json"
     instrument_source_path = root / "instrument-source.json"
 
-    dump(disposition_path, disposition())
     anchor_sha = dump(anchor_path, anchor())
+    dump(disposition_path, disposition(anchor_sha))
     dump(attestation_path, attestation(anchor_sha))
     dump(subject_path, subject_source_closure())
     instrument_q_sha = dump(instrument_q_path, instrument_qualification())
@@ -260,7 +269,7 @@ with tempfile.TemporaryDirectory(prefix="vart-freeze-eligibility-") as td:
     instrument_q_sha = dump(instrument_q_path, instrument_qualification())
     dump(instrument_source_path, instrument_source_closure(instrument_q_sha))
 
-    # F8 — instrument source closure must bind the exact qualification receipt bytes.
+    # F8 — instrument source closure must bind exact qualification receipt bytes.
     obj = instrument_source_closure(instrument_q_sha)
     obj["qualification"]["instrument_qualification_receipt_sha256"] = H64_A
     dump(instrument_source_path, obj)
@@ -287,4 +296,4 @@ with tempfile.TemporaryDirectory(prefix="vart-freeze-eligibility-") as td:
     dump(attestation_path, obj)
     expect_reject(paths, "PILOT_ANCHOR_DIGEST_MISMATCH")
 
-print("PASS: dual-source freeze eligibility acceptance + F1-F11 deterministic rejection")
+print("PASS: scoped-disposition dual-source freeze eligibility + F1-F11 rejection")
