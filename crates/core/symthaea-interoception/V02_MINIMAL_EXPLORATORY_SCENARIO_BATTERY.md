@@ -59,11 +59,11 @@ Primary discriminations:
 
 Causal interpretation: diagnostic/prefix forecast sensitivity unless the native execution contrast separately establishes a realized total effect.
 
-### X02 — same drive magnitude, different viability geometry/state consequence
+### X02 — same drive magnitude, different viability consequence
 
 Create a matched pair with equal Euclidean drive magnitude but different current viability consequence because of different prospectively declared channel state/margin/importance geometry.
 
-Prefer to hold drive direction comparable while changing the distance to preferred/viable boundaries through valid initial/native-state construction.
+Prefer to hold drive direction comparable while changing distance to preferred/viable boundaries through valid initial/native-state construction.
 
 Primary discriminations:
 
@@ -91,9 +91,13 @@ Primary discrimination:
 
 This family is an anti-collapse test; inability to realize the crossed cases is a design finding, not permission to redefine either candidate.
 
-### X04 — future revision vs rolling-horizon turnover
+### X04 — temporal forecast decomposition tuple
 
-Construct a boundary-only pair/transition where the overlapping absolute future support remains self-consistent while the dropped/entering horizon terms differ.
+X04 contains two small deterministic subcases so E05 is separately identifiable from both E04 and E06 without creating a new scenario family.
+
+#### X04-A — boundary-only rolling turnover
+
+Construct a transition where the overlapping absolute future support remains self-consistent while the dropped/entering horizon terms differ.
 
 Required expectation:
 
@@ -104,18 +108,36 @@ Primary discrimination:
 
 - E05 vs E06.
 
-A failure of E05 neutrality indicates temporal alignment/implementation error rather than an affect result.
+#### X04-B — outlook revision with neutral one-step residual
+
+Construct a transition where the prior one-step forecast for the realized current point is accurate/equivalent, while information legitimately available at the current cut point changes the forecast for later **shared absolute future points**.
+
+Required expectation:
+
+- E04 one-step forecast residual neutral/equivalent;
+- E05 aligned overlapping-future revision non-neutral;
+- E06 may move but is not the identifying quantity.
+
+Primary discrimination:
+
+- E05 vs E04.
+
+The current-cut-point forecast change may arise from a legally observed current-state/current-drive change; it may not use unseen future protocol information.
+
+A failure of the expected neutrality relations indicates temporal alignment/fixture failure rather than an affect result.
 
 ### X05 — same current burden, different breach latency
 
 Construct a matched pair with equal E01 current viability burden but different projected first-breach latency under `ObservedDrivePersistence`.
 
-Use a legal difference in current drive, channel velocity/state distribution, or native recovery configuration while preserving the matched current aggregate burden as declared by the causal contrast.
+Use a legal difference in current drive, channel state distribution, or native recovery configuration while preserving the matched current aggregate burden as declared by the causal contrast.
+
+Include a stricter subcase when feasible with matched current drive magnitude but different projected breach latency due to state geometry/distribution.
 
 Primary discriminations:
 
 - E07 vs E01;
-- E07 vs E02 where drive magnitude can also be matched in a stricter subcase;
+- E07 vs E02 in the strict matched-drive subcase;
 - urgency vs current burden.
 
 ### X06 — similar projected cumulative exposure, different urgency profile
@@ -165,21 +187,43 @@ Primary uses:
 
 This is primarily a measurement-semantics discriminator rather than a candidate-ranking world.
 
-### X09 — matched current native state, different prior histories
+### X09 — matched current state with controlled prior histories
 
-Construct two trajectories with materially different prior regulatory histories that converge to the same complete current native state and dynamics configuration at cut point `t`.
+X09 contains two matched-history subcases sharing the same complete current native state/configuration and same current drive at cut point `t`.
 
-Requirements:
+#### X09-A — immediate-change discriminator
 
-- H0 candidates using current state/current allowed inputs agree at the matched cut point when their other current inputs are matched;
-- E11 trailing-16 history baseline differs by construction;
-- subsequent native execution from the matched state/config under identical future inputs must be exactly equal.
+Construct two prior paths that converge to the same current state/current drive but have different immediately preceding realized burden.
+
+Required expectations:
+
+- E01 equal;
+- E02 equal;
+- E03 different;
+- H0 forecast candidates equal when all of their current allowed inputs are equal.
+
+Primary discriminations:
+
+- E03 vs E01;
+- E03 vs E02.
+
+#### X09-B — deeper-history discriminator with matched immediate change
+
+Construct two prior paths that converge to the same current state/current drive **and** have equal/equivalent immediately preceding burden so E03 is equal, while the earlier trailing-16 burden history differs.
+
+Required expectations:
+
+- E01 equal;
+- E02 equal;
+- E03 equal;
+- E11 different by construction.
 
 Primary discriminations:
 
 - E11 vs E01;
-- E11 vs E03 where the immediately prior change can also be matched or separately controlled;
-- external history information vs native state sufficiency.
+- E11 vs E03.
+
+For both subcases, subsequent native execution from the matched current state/configuration under identical future inputs must be exactly equal.
 
 A difference in restarted native future execution is a native-state sufficiency defect, not evidence of hidden mood.
 
@@ -230,14 +274,7 @@ Do not reuse an arm if doing so introduces conditioning that changes the intende
 
 Prefer paired construction over broad parameter grids.
 
-The initial battery should optimize for:
-
-- orthogonality of candidate explanations;
-- exact deterministic reproducibility;
-- low arm count;
-- clear failure interpretation.
-
-It should not optimize for visual richness or anthropomorphic plausibility.
+The initial battery should optimize for orthogonality, deterministic reproducibility, low arm count, and clear failure interpretation—not visual richness or anthropomorphic plausibility.
 
 ## 5. Required candidate-coverage matrix
 
@@ -247,21 +284,26 @@ Before exploratory execution, the scenario manifest must prove coverage for at l
 | --- | --- |
 | E00 neutrality/null floor | X00 |
 | E01 vs E02 | X01, X02 |
-| E03 vs E01/E02 | X02 plus realized transition cases; X03 for sign separation |
+| E03 vs E01 | X09-A |
+| E03 vs E02 | X09-A |
 | E04 vs E03 | X03 |
 | E04 vs E02 | X01/X03 with matched nuisance control |
-| E05 vs E04 | X03 plus a forecast-revision case where shared future support changes independently of one-step residual |
-| E05 vs E06 | X04 |
+| E05 vs E04 | X04-B |
+| E05 vs E06 | X04-A |
 | E07 vs E01 | X05 |
 | E07 vs E02 | X05 strict matched-drive subcase |
 | E08 vs E01 | X01/X05 with equal current burden and divergent prospective exposure |
+| E08 vs E02 | X02 |
 | E08 vs E07 | X06 |
 | E09 vs E01 | X07 |
 | E10 vs E01 | X07 |
-| E11 vs E01/E03 | X09 |
+| E11 vs E01 | X09-B |
+| E11 vs E03 | X09-B |
 | prefix causality | X10 |
 | primary forecast-policy sensitivity | X11 |
 | aggregation denominator interpretation | X08 |
+
+Every non-null E candidate must also have at least one valid non-neutral case somewhere in the locked battery so comparison with E00 is meaningful.
 
 If coverage cannot be proven, the battery is incomplete even if the raw scenario count is large.
 
@@ -307,20 +349,20 @@ A future `ExploratoryScenarioBatteryManifest` should bind:
 - schema/version;
 - design-contract-registry digest;
 - minimal candidate-set manifest digest;
-- ordered X00–X11 family definitions;
+- ordered X00–X11 family/subcase definitions;
 - exact concrete scenario/arm digests;
 - matched-pair/group identities;
 - causal-contrast manifest digests where mechanistic language is intended;
 - prospective cut points/windows;
 - required candidate discrimination obligations;
 - expected invariant/equality relations where known;
-- generator/source identities and seeds if any stochastic generator is later introduced;
+- generator/source identities and seeds if stochastic generation is later introduced;
 - total primary arm count;
 - canonical SHA-256.
 
 Validation rejects:
 
-- missing required family;
+- missing required family/subcase;
 - unregistered extra primary family;
 - missing required discriminator coverage;
 - candidate-dependent cut point;
