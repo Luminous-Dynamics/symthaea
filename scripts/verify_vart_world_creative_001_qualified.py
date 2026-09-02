@@ -83,32 +83,57 @@ def preflight_freeze(root: Path, expected_freeze_sha256: str) -> dict[str, Any]:
     return freeze
 
 
+def expected_trial_ids(inventory: Any) -> list[str]:
+    require(isinstance(inventory, dict), "PREREGISTRATION_INVALID", "trial inventory root")
+    listed = inventory.get("trial_ids")
+    rows = inventory.get("trials")
+    derived: list[str] | None = None
+    if isinstance(rows, list) and rows:
+        derived = []
+        for i, row in enumerate(rows):
+            require(isinstance(row, dict) and isinstance(row.get("trial_id"), str) and row["trial_id"],
+                    "PREREGISTRATION_INVALID", f"trial inventory row {i}")
+            derived.append(row["trial_id"])
+        require(len(derived) == len(set(derived)), "PREREGISTRATION_INVALID", "duplicate trial IDs in trials rows")
+
+    if listed is not None:
+        require(isinstance(listed, list) and listed and all(isinstance(x, str) and x for x in listed),
+                "PREREGISTRATION_INVALID", "trial_ids")
+        require(len(listed) == len(set(listed)), "PREREGISTRATION_INVALID", "duplicate trial_ids")
+        if derived is not None:
+            require(set(listed) == set(derived), "PREREGISTRATION_INVALID",
+                    "trial_ids and trials rows disagree on preregistered membership")
+        return list(listed)
+
+    require(derived is not None and derived, "PREREGISTRATION_INVALID",
+            "trial inventory requires trial_ids or trials rows")
+    return derived
+
+
 def preflight_trial_inventory(root: Path) -> tuple[list[str], list[Path]]:
     inventory = read_json(root / "trial_inventory.json")
-    expected_ids = inventory.get("trial_ids")
-    require(
-        isinstance(expected_ids, list)
-        and expected_ids
-        and all(isinstance(x, str) and x for x in expected_ids),
-        "PREREGISTRATION_INVALID",
-        "trial inventory",
-    )
+    expected_ids = expected_trial_ids(inventory)
     manifests = sorted((root / "trials").glob("*/manifest.json"))
     actual_ids: list[str] = []
     for path in manifests:
         m = read_json(path)
         if isinstance(m, dict) and isinstance(m.get("trial_id"), str):
             actual_ids.append(m["trial_id"])
+    require(len(actual_ids) == len(set(actual_ids)), "PREREGISTRATION_INVALID", "duplicate emitted trial manifests")
+    present = set(actual_ids)
+    expected = set(expected_ids)
+    extras = sorted(present - expected)
+    require(not extras, "PREREGISTRATION_INVALID", f"unexpected confirmatory trials: {extras}")
     if len(actual_ids) < len(expected_ids):
-        present = set(actual_ids)
         prefix = set(expected_ids[: len(actual_ids)])
         if present == prefix:
             raise Reject(
                 "UNAUTHORIZED_EARLY_STOP",
                 f"only frozen prefix {len(actual_ids)}/{len(expected_ids)} trials is present",
             )
-        missing = sorted(set(expected_ids) - present)
+        missing = sorted(expected - present)
         raise Reject("PREREGISTERED_TRIAL_MISSING", ",".join(missing))
+    require(present == expected, "PREREGISTRATION_INVALID", "complete trial membership mismatch")
     return expected_ids, manifests
 
 
