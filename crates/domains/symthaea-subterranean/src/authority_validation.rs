@@ -24,6 +24,7 @@ pub enum AuthorityContract {
     RecoveryProposalIssuance,
     RecoveryProposalBinding,
     CheckpointPreservesRestriction,
+    CheckpointDropsEphemeralRecovery,
     AuditChainContinuity,
     UpdateRollback,
     WatchdogRecoveryLock,
@@ -31,7 +32,7 @@ pub enum AuthorityContract {
 }
 
 impl AuthorityContract {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::ReplayResistance,
         Self::IndependentRecoveryQuorum,
         Self::HazardBlocksResume,
@@ -40,6 +41,7 @@ impl AuthorityContract {
         Self::RecoveryProposalIssuance,
         Self::RecoveryProposalBinding,
         Self::CheckpointPreservesRestriction,
+        Self::CheckpointDropsEphemeralRecovery,
         Self::AuditChainContinuity,
         Self::UpdateRollback,
         Self::WatchdogRecoveryLock,
@@ -56,6 +58,7 @@ impl AuthorityContract {
             Self::RecoveryProposalIssuance => "recovery_proposal_issuance",
             Self::RecoveryProposalBinding => "recovery_proposal_binding",
             Self::CheckpointPreservesRestriction => "checkpoint_preserves_restriction",
+            Self::CheckpointDropsEphemeralRecovery => "checkpoint_drops_ephemeral_recovery",
             Self::AuditChainContinuity => "audit_chain_continuity",
             Self::UpdateRollback => "update_rollback",
             Self::WatchdogRecoveryLock => "watchdog_recovery_lock",
@@ -185,6 +188,38 @@ impl AuthorityValidator {
                 let mut restored = SubterraneanEmbodiment::new(&genesis);
                 restored.load_operational_checkpoint(&checkpoint).map_err(|e| format!("checkpoint restore failed: {e:?}"))?;
                 if restored.operator_constraint() != OperatorConstraint::HoldPosition { return Err("checkpoint restore widened operator authority".into()); }
+                Ok(())
+            }
+            AuthorityContract::CheckpointDropsEphemeralRecovery => {
+                let genesis = GenesisSeed::from_phrase("ephemeral recovery checkpoint");
+                let source = SubterraneanEmbodiment::new(&genesis);
+                let mut checkpoint = source.operational_checkpoint();
+                checkpoint.operator_authority
+                    .ingest(Self::envelope(1, 1, 1, OperatorCommand::HoldPosition), 20, true)
+                    .map_err(|e| format!("checkpoint hold rejected: {e:?}"))?;
+                let proposal = Self::recovery_proposal(9, OperatorConstraint::HoldPosition);
+                checkpoint.operator_authority
+                    .issue_recovery_proposal(proposal, 20)
+                    .map_err(|e| format!("proposal issue rejected: {e:?}"))?;
+                checkpoint.operator_authority
+                    .approve_recovery(Self::recovery_approval(1, 2, proposal), 21)
+                    .map_err(|e| format!("first approval rejected: {e:?}"))?;
+                if checkpoint.operator_authority.pending_approvals(9) != 1 {
+                    return Err("pre-serialization recovery quorum was not established".into());
+                }
+
+                let bytes = serde_json::to_vec(&checkpoint)
+                    .map_err(|e| format!("checkpoint serialization failed: {e}"))?;
+                let restored_checkpoint: crate::SubterraneanOperationalCheckpoint = serde_json::from_slice(&bytes)
+                    .map_err(|e| format!("checkpoint deserialization failed: {e}"))?;
+                if restored_checkpoint.operator_authority.constraint() != OperatorConstraint::HoldPosition {
+                    return Err("checkpoint lost the active operator restriction".into());
+                }
+                if restored_checkpoint.operator_authority.pending_approvals(9) != 0
+                    || restored_checkpoint.operator_authority.issued_recovery_proposal(9).is_some()
+                {
+                    return Err("checkpoint resurrected live recovery authority".into());
+                }
                 Ok(())
             }
             AuthorityContract::AuditChainContinuity => {
