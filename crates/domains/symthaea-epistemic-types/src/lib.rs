@@ -1,3 +1,4 @@
+pub mod epistemic_derivation;
 pub mod epistemic_readiness;
 pub mod epistemic_watchdog;
 pub mod formal_watchdog;
@@ -6,6 +7,7 @@ pub mod proposal_formulation_gate;
 pub mod provenance_envelope;
 pub mod provenance_policy;
 pub mod provenance_retrieval;
+pub use epistemic_derivation::*;
 pub use epistemic_readiness::*;
 pub use epistemic_watchdog::*;
 pub use formal_watchdog::*;
