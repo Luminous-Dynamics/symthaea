@@ -9,7 +9,7 @@
 
 use crate::{
     IntegrationError, IntegrationId, IntegrationRegistry, StateHistory, StateHistoryLimits,
-    StateLimits, StateSnapshot,
+    StateLimits, StateSnapshot, validate_state_snapshot_origins,
 };
 
 impl IntegrationRegistry {
@@ -37,6 +37,11 @@ impl IntegrationRegistry {
         snapshot.validate_with_limits(limits).map_err(|error| {
             IntegrationError::InvalidOutput(format!(
                 "integration `{id}` state evidence rejected by admission budget: {error}"
+            ))
+        })?;
+        validate_state_snapshot_origins(snapshot).map_err(|error| {
+            IntegrationError::InvalidOutput(format!(
+                "integration `{id}` state evidence rejected by origin contract: {error}"
             ))
         })
     }
@@ -66,7 +71,15 @@ impl IntegrationRegistry {
             IntegrationError::InvalidOutput(format!(
                 "integration `{id}` state history rejected by admission budget: {error}"
             ))
-        })
+        })?;
+        for snapshot in &history.snapshots {
+            validate_state_snapshot_origins(snapshot).map_err(|error| {
+                IntegrationError::InvalidOutput(format!(
+                    "integration `{id}` state history rejected by origin contract: {error}"
+                ))
+            })?;
+        }
+        Ok(())
     }
 
     fn require_registered_state_source(&self, id: &IntegrationId) -> Result<(), IntegrationError> {
