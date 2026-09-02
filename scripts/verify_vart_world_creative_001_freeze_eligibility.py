@@ -149,10 +149,24 @@ def verify_anchor(
     )
     subject_head = hex40(anchor.get("subject_source_head"), "subject_source_head")
     subject_tree = hex40(anchor.get("subject_source_tree"), "subject_source_tree")
+    instrument_head = hex40(anchor.get("instrument_source_head"), "instrument_source_head")
+    instrument_tree = hex40(anchor.get("instrument_source_tree"), "instrument_source_tree")
     require(
         subject_head == pilot.get("source_head") and subject_tree == pilot.get("source_tree"),
         "PILOT_ANCHOR_DISPOSITION_MISMATCH",
         "subject source identity",
+    )
+    require(
+        instrument_head == pilot.get("instrument_source_head")
+        and instrument_tree == pilot.get("instrument_source_tree"),
+        "PILOT_ANCHOR_DISPOSITION_MISMATCH",
+        "instrument source identity",
+    )
+    require(
+        anchor_sha == pilot.get("preexecution_anchor_sha256")
+        and anchor.get("pilot_config_sha256") == pilot.get("pilot_config_sha256"),
+        "PILOT_ANCHOR_DISPOSITION_MISMATCH",
+        "anchor/config identity",
     )
 
     return {
@@ -162,8 +176,8 @@ def verify_anchor(
         "pilot_design_sha256": hex64(anchor.get("pilot_design_sha256"), "pilot_design_sha256"),
         "pilot_subject_source_head": subject_head,
         "pilot_subject_source_tree": subject_tree,
-        "instrument_source_head": hex40(anchor.get("instrument_source_head"), "instrument_source_head"),
-        "instrument_source_tree": hex40(anchor.get("instrument_source_tree"), "instrument_source_tree"),
+        "instrument_source_head": instrument_head,
+        "instrument_source_tree": instrument_tree,
         "runner_source_sha256": hex64(anchor.get("runner_source_sha256"), "runner_source_sha256"),
         "auditor_source_sha256": hex64(anchor.get("auditor_source_sha256"), "auditor_source_sha256"),
     }
@@ -185,7 +199,6 @@ def verify_subject_source_closure(path: Path, disposition: dict[str, Any]) -> di
         "FREEZE_ELIGIBILITY_AUTHORITY_VIOLATION",
         "subject source closure",
     )
-
     source = obj.get("confirmatory_source")
     predecessor = obj.get("pilot_predecessor")
     remote = obj.get("remote")
@@ -212,7 +225,6 @@ def verify_subject_source_closure(path: Path, disposition: dict[str, Any]) -> di
         "SOURCE_CLOSURE_ANCESTRY_NOT_PROVEN",
         "pilot predecessor",
     )
-
     pilot = disposition.get("pilot")
     require(isinstance(pilot, dict), "FREEZE_ELIGIBILITY_INVALID", "disposition.pilot")
     require(
@@ -220,7 +232,6 @@ def verify_subject_source_closure(path: Path, disposition: dict[str, Any]) -> di
         "SOURCE_CLOSURE_PILOT_PREDECESSOR_MISMATCH",
         "pilot source identity",
     )
-
     require(
         isinstance(remote.get("repository_full_name"), str) and bool(remote.get("repository_full_name")),
         "SOURCE_CLOSURE_INVALID",
@@ -246,7 +257,6 @@ def verify_subject_source_closure(path: Path, disposition: dict[str, Any]) -> di
         "SOURCE_CLOSURE_REMOTE_IDENTITY_MISMATCH",
         "TREE",
     )
-
     environment = hex64(reproduction.get("environment_digest"), "reproduction.environment_digest")
     locks = hex64(reproduction.get("lock_manifest_sha256"), "reproduction.lock_manifest_sha256")
     qualification = hex64(
@@ -258,7 +268,6 @@ def verify_subject_source_closure(path: Path, disposition: dict[str, Any]) -> di
         "SOURCE_CLOSURE_REPRODUCTION_NOT_VERIFIED",
         "independent checkout gate",
     )
-
     return {
         "subject_source_closure_sha256": sha256_file(path),
         "confirmatory_source_head": head,
@@ -413,8 +422,8 @@ def verify(
             f"{exc.code}: {exc.detail}",
         ) from exc
     require(
-        post_result.get("confirmatory_freeze_eligible") is True,
-        "POST_PILOT_FREEZE_NOT_ELIGIBLE",
+        post_result.get("source_closure_eligible") is True,
+        "POST_PILOT_SOURCE_CLOSURE_NOT_ELIGIBLE",
         "disposition",
     )
     disposition = read_json(disposition_path)
@@ -433,7 +442,6 @@ def verify(
         anchor["instrument_source_tree"],
         instrument_q,
     )
-
     return {
         "verdict": "CONFIRMATORY_FREEZE_PREPARATION_ELIGIBLE",
         "experiment_id": EXPERIMENT_ID,
@@ -445,9 +453,9 @@ def verify(
         "confirmatory_execution_authorized": False,
         "claim_authorized": False,
         "bounded_statement": (
-            "Transition, subject-source, and instrument-source evidence are coherent enough "
-            "to prepare a prospective confirmatory freeze. This verdict does not authorize "
-            "confirmatory execution or scientific claims."
+            "Pilot disposition plus subject/instrument source closure are coherent enough to prepare "
+            "a prospective confirmatory freeze. This verdict does not authorize confirmatory execution "
+            "or scientific claims."
         ),
     }
 
