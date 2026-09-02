@@ -59,6 +59,7 @@ pub enum RecoveryProposalRejection {
     UnsupportedTargetConstraint,
     InvalidControllerEpoch,
     InvalidControlPlaneGeneration,
+    ApprovalPredatesProposal,
 }
 
 impl RecoveryProposalV1 {
@@ -192,6 +193,14 @@ impl RecoveryApprovalEnvelopeV1 {
             command: OperatorCommand::ResumeNominal,
         }
     }
+
+    pub const fn validate_proposal_time(self) -> Result<(), RecoveryProposalRejection> {
+        if self.approval_issued_step < self.proposal.issued_step {
+            Err(RecoveryProposalRejection::ApprovalPredatesProposal)
+        } else {
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]
@@ -213,6 +222,24 @@ mod tests {
         assert_eq!(
             proposal.validate(12, OperatorConstraint::EmergencyStop),
             Err(RecoveryProposalRejection::ActiveConstraintMismatch)
+        );
+    }
+
+    #[test]
+    fn approval_cannot_claim_to_predate_its_proposal() {
+        let proposal = RecoveryProposalV1::new(9, OperatorConstraint::HoldPosition, digest(1), digest(2), digest(3), 4, 5, 10, 20);
+        let approval = RecoveryApprovalEnvelopeV1 {
+            operator: OperatorId(1),
+            role: OperatorRole::SafetyOfficer,
+            authentication: AuthenticationLevel::HardwareBacked,
+            epoch: 1,
+            sequence: 1,
+            approval_issued_step: 9,
+            proposal,
+        };
+        assert_eq!(
+            approval.validate_proposal_time(),
+            Err(RecoveryProposalRejection::ApprovalPredatesProposal)
         );
     }
 }
