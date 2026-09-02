@@ -1,0 +1,22 @@
+{
+  "schema": "symthaea.vart-world-creative-001.frozen-analysis-run.v1",
+  "experiment_id": "VART-WORLD-CREATIVE-001",
+  "evidence_root": "/tmp/symthaea-vart-confirmatory-evidence-20260902",
+  "expected_freeze_sha256": "ea4868758c16ccf671cd4be1628691418b98af40654c8bd84725af1875f2c4aa",
+  "expected_campaign_receipt_sha256": "45af8d4d48de9dcd124276b2fb265c99704eca28ec2233c00e67433df6a6092a",
+  "analysis_program_path": "__REPLACE_WITH_ALREADY_FROZEN_ANALYSIS_PROGRAM__",
+  "expected_analysis_program_sha256": "__REPLACE_WITH_PREUNBLIND_SHA256__",
+  "analysis_output_root": "/tmp/symthaea-vart-confirmatory-analysis-20260902",
+  "preunblind_anchor_path": "/tmp/symthaea-vart-confirmatory-analysis-anchor-20260902.json",
+  "analysis_argv": [
+    "python3",
+    "{analysis_program}",
+    "{evidence_root}",
+    "--expected-freeze-sha256",
+    "{freeze_sha256}",
+    "--output-root",
+    "{output_root}"
+  ],
+  "automatic_retry": false,
+  "claim_authorized": false
+}
