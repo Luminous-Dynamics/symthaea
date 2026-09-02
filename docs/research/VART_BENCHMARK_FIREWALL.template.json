@@ -1,0 +1,37 @@
+{
+  "schema": "symthaea.vart-benchmark-firewall.v1",
+  "firewall_id": "__SET_FIREWALL_ID__",
+  "status": "template_not_frozen",
+  "development_domain_tag": "SYMTHAEA-DEVART-v1",
+  "evaluation_domain_tag": "SYMTHAEA-VART-HIDDEN-v1",
+  "devart": {
+    "benchmark_ids": [],
+    "fixture_commitments_sha256": [],
+    "seed_commitments_sha256": [],
+    "used_as_development_feedback": true
+  },
+  "vart": {
+    "campaign_id": "__SET_CAMPAIGN_ID__",
+    "benchmark_custodian_id": "__SET_CUSTODIAN_ID__",
+    "fixture_count": null,
+    "seed_count": null,
+    "fixture_commitments_sha256": [],
+    "seed_commitments_sha256": [],
+    "generator_policy_sha256": null,
+    "scoring_contract_sha256": null,
+    "custodian_receipt_sha256": null,
+    "hidden_material_root": "__ABSOLUTE_PATH_OUTSIDE_REPOSITORY__",
+    "revealed": false,
+    "plaintext_fixture_ids": [],
+    "plaintext_seeds": [],
+    "expected_solutions": [],
+    "target_defects": [],
+    "trap_labels": []
+  },
+  "reuse_policy": {
+    "prior_vart_fixture_commitments_sha256": [],
+    "prior_vart_seed_commitments_sha256": [],
+    "spent_commitments_may_not_return_to_hidden_confirmatory_use": true
+  },
+  "claim_authorized": false
+}
