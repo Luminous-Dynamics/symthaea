@@ -17,6 +17,7 @@ pub mod episodic_occurrence;
 pub mod episodic_provenance;
 pub mod episodic_replay;
 pub mod episodic_shadow;
+pub mod episodic_sidecar_bundle;
 pub mod hippocampus;
 pub mod semantic;
 
@@ -52,6 +53,10 @@ pub use episodic_replay::{
 pub use episodic_shadow::{
     EpisodicShadowRecallAudit, ShadowRecallModeAudit, shadow_audit_embedding_similarity,
     shadow_audit_input_similarity,
+};
+pub use episodic_sidecar_bundle::{
+    EPISODIC_SIDECAR_BUNDLE_SCHEMA, EpisodicSidecarBundle, EpisodicSidecarBundleError,
+    bytes_sha256 as sidecar_bytes_sha256,
 };
 #[allow(deprecated)]
 pub use hippocampus::{
