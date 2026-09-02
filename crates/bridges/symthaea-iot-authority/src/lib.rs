@@ -4,9 +4,10 @@
 //!
 //! This crate deliberately sits *between* intelligence and physical effects.
 //! It does not perform networking, MQTT/CoAP parsing, cryptographic handshake,
-//! hardware attestation, persistence, or actuator I/O. Higher layers must supply
-//! authenticated identity and trustworthy device state; lower layers must persist
-//! accepted sequence state before dispatch when replay after a crash matters.
+//! hardware attestation, persistence, physical interlocking, or actuator I/O.
+//! Higher layers must supply authenticated identity and trustworthy device state;
+//! lower layers must durably reserve accepted execution state before dispatch when
+//! replay/crash ambiguity matters.
 //!
 //! The reference invariant is:
 //!
@@ -22,8 +23,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 use symthaea_authority::{
-    AuthorityContext, AuthorityDecision, CapabilityGrant, DenyReason, Digest32,
-    NegativeAuthorityFact, Operation, PrincipalId, ResourceRef, TaskId, evaluate_authority,
+    evaluate_authority, AuthorityContext, AuthorityDecision, CapabilityGrant, DenyReason, Digest32,
+    NegativeAuthorityFact, Operation, PrincipalId, ResourceRef, TaskId,
 };
 
 /// Current schema for [`DeviceCommand`].
@@ -82,7 +83,7 @@ pub struct DeviceCommand {
     pub operation: Operation,
     /// Firmware identity the command expects the device to be running.
     pub expected_firmware: Digest32,
-    /// Per-device monotonic sequence supplied by the trusted gateway state.
+    /// Per-device monotonic sequence supplied by trusted gateway state.
     pub sequence: u64,
     /// Command issue time in Unix seconds.
     pub issued_at_unix_s: u64,
@@ -120,6 +121,8 @@ impl DeviceCommand {
 ///
 /// A capability says an actor *may* attempt the operation. This envelope says when
 /// the operation is physically admissible. The two are intentionally independent.
+/// Every entry in `parameter_ranges` is required, and no unrecognized parameter is
+/// accepted: v0.1 therefore has an exact command parameter surface.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SafetyEnvelope {
     /// Fail-closed schema version.
@@ -132,7 +135,7 @@ pub struct SafetyEnvelope {
     pub operation: Operation,
     /// Firmware artifacts under which this safety policy is valid.
     pub allowed_firmware: BTreeSet<Digest32>,
-    /// Every supplied command parameter must appear here and be in range.
+    /// Exact required command-parameter surface and accepted ranges.
     pub parameter_ranges: BTreeMap<String, InclusiveRangeI64>,
     /// Required trusted physical observations and their safe ranges.
     pub required_observations: BTreeMap<String, InclusiveRangeI64>,
@@ -230,6 +233,8 @@ pub enum CyberPhysicalDenyReason {
     RuntimeFirmwareMismatch,
     /// The expected firmware is outside the safety envelope's allowed set.
     FirmwareNotAllowed,
+    /// A command omitted a parameter required by the safety envelope.
+    MissingParameter(String),
     /// A command supplied a parameter the safety envelope does not understand.
     UnknownParameter(String),
     /// Command parameter fell outside its allowed range.
@@ -279,7 +284,7 @@ pub struct CyberPhysicalAdmission {
     pub grant_digest: Digest32,
     /// Exact safety-envelope commitment.
     pub safety_envelope_digest: Digest32,
-    /// Sequence that the durable gateway replay state must advance to before effect.
+    /// Sequence that durable gateway replay state must advance to before effect.
     pub accepted_sequence: u64,
 }
 
@@ -287,7 +292,8 @@ pub struct CyberPhysicalAdmission {
 ///
 /// A caller that will dispatch a real effect must durably reserve/advance execution
 /// state before the external effect according to its crash model. This pure function
-/// does not claim crash-safe execution ordering.
+/// does not claim crash-safe execution ordering and does not replace physical safety
+/// interlocks for hazardous equipment.
 pub fn evaluate_cyber_physical_command(
     grant: &CapabilityGrant,
     authority_context: AuthorityContext,
@@ -364,6 +370,13 @@ pub fn evaluate_cyber_physical_command(
         return CyberPhysicalDecision::Deny(CyberPhysicalDenyReason::FirmwareNotAllowed);
     }
 
+    for name in safety.parameter_ranges.keys() {
+        if !command.parameters.contains_key(name) {
+            return CyberPhysicalDecision::Deny(CyberPhysicalDenyReason::MissingParameter(
+                name.clone(),
+            ));
+        }
+    }
     for (name, value) in &command.parameters {
         let Some(range) = safety.parameter_ranges.get(name) else {
             return CyberPhysicalDecision::Deny(CyberPhysicalDenyReason::UnknownParameter(
@@ -633,6 +646,26 @@ mod tests {
     }
 
     #[test]
+    fn required_parameter_cannot_be_omitted() {
+        let grant = grant();
+        let mut command = command();
+        command.parameters.clear();
+        assert_eq!(
+            evaluate_cyber_physical_command(
+                &grant,
+                context(&grant),
+                &[],
+                &command,
+                &runtime(),
+                &safety(),
+            ),
+            CyberPhysicalDecision::Deny(CyberPhysicalDenyReason::MissingParameter(
+                "duration_ms".into()
+            ))
+        );
+    }
+
+    #[test]
     fn unsafe_parameter_is_rejected_even_with_valid_authority() {
         let grant = grant();
         let mut command = command();
@@ -754,7 +787,11 @@ mod tests {
 
         let safety_a = safety();
         let mut safety_b = safety_a.clone();
-        safety_b.parameter_ranges.get_mut("duration_ms").unwrap().max -= 1;
+        safety_b
+            .parameter_ranges
+            .get_mut("duration_ms")
+            .unwrap()
+            .max -= 1;
         assert_ne!(safety_a.digest(), safety_b.digest());
 
         a.executor = PrincipalId("gateway:other".into());
