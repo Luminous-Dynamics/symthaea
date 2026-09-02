@@ -7,6 +7,7 @@ on:
       - 'docs/research/VART_001_ARCHIVE_CAPSULE.template.json'
       - 'docs/research/VART_BENCHMARK_FIREWALL_V1.md'
       - 'docs/research/VART_BENCHMARK_FIREWALL.template.json'
+      - 'docs/research/VART_HIDDEN_BENCHMARK_*'
       - 'docs/research/VART_002_*'
       - 'scripts/verify_vart_001_archive_capsule.py'
       - 'scripts/test_verify_vart_001_archive_capsule.py'
@@ -14,6 +15,8 @@ on:
       - 'scripts/test_verify_vart_benchmark_firewall.py'
       - 'scripts/verify_vart_002_mechanism_matrix.py'
       - 'scripts/test_verify_vart_002_mechanism_matrix.py'
+      - 'scripts/vart_hidden_benchmark_commit_reveal.py'
+      - 'scripts/test_vart_hidden_benchmark_commit_reveal.py'
       - 'crates/domains/symthaea-epistemic-types/**'
       - 'crates/domains/symthaea-memory/Cargo.toml'
       - 'crates/domains/symthaea-memory/src/episodic_provenance.rs'
@@ -27,6 +30,7 @@ on:
       - 'docs/research/VART_001_ARCHIVE_CAPSULE.template.json'
       - 'docs/research/VART_BENCHMARK_FIREWALL_V1.md'
       - 'docs/research/VART_BENCHMARK_FIREWALL.template.json'
+      - 'docs/research/VART_HIDDEN_BENCHMARK_*'
       - 'docs/research/VART_002_*'
       - 'scripts/verify_vart_001_archive_capsule.py'
       - 'scripts/test_verify_vart_001_archive_capsule.py'
@@ -34,6 +38,8 @@ on:
       - 'scripts/test_verify_vart_benchmark_firewall.py'
       - 'scripts/verify_vart_002_mechanism_matrix.py'
       - 'scripts/test_verify_vart_002_mechanism_matrix.py'
+      - 'scripts/vart_hidden_benchmark_commit_reveal.py'
+      - 'scripts/test_vart_hidden_benchmark_commit_reveal.py'
       - 'crates/domains/symthaea-epistemic-types/**'
       - 'crates/domains/symthaea-memory/Cargo.toml'
       - 'crates/domains/symthaea-memory/src/episodic_provenance.rs'
@@ -62,11 +68,15 @@ jobs:
             scripts/verify_vart_benchmark_firewall.py \
             scripts/test_verify_vart_benchmark_firewall.py \
             scripts/verify_vart_002_mechanism_matrix.py \
-            scripts/test_verify_vart_002_mechanism_matrix.py
+            scripts/test_verify_vart_002_mechanism_matrix.py \
+            scripts/vart_hidden_benchmark_commit_reveal.py \
+            scripts/test_vart_hidden_benchmark_commit_reveal.py
       - name: Archive capsule adversarial suite
         run: python scripts/test_verify_vart_001_archive_capsule.py
       - name: DEVART/VART firewall adversarial suite
         run: python scripts/test_verify_vart_benchmark_firewall.py
+      - name: Hidden benchmark commit-reveal adversarial suite
+        run: python scripts/test_vart_hidden_benchmark_commit_reveal.py
       - name: VART-002 mechanism matrix adversarial suite
         run: python scripts/test_verify_vart_002_mechanism_matrix.py
       - name: Epistemic type, derivation, policy, and readiness tests
