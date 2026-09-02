@@ -18,10 +18,14 @@ import run_vart_world_creative_001_pilot_anchored as anchorlib
 EXPERIMENT_ID = "VART-WORLD-CREATIVE-001"
 V05_HEAD = "33820b3d9e904280e6264719fe7717cb2e5dd5bb"
 V05_TREE = "e93c6dbfa05b602100ff924efaa5d95f92ef5a65"
-EXPECTED_CELL_IDS = [f"P{i}" for i in range(1, 9)]
-FORBIDDEN_AGGREGATES = ["world_quality", "creative_score", "beauty_score", "cinematic_quality", "intelligence_score"]
-HEX40 = set("0123456789abcdef")
-HEX64 = set("0123456789abcdef")
+FORBIDDEN_AGGREGATES = [
+    "world_quality",
+    "creative_score",
+    "beauty_score",
+    "cinematic_quality",
+    "intelligence_score",
+]
+HEX = set("0123456789abcdef")
 
 
 class PilotError(RuntimeError):
@@ -58,10 +62,27 @@ def read_json(path: Path) -> Any:
         raise PilotError(f"invalid JSON at {path}: {exc}") from exc
 
 
-def run(argv: list[str], *, cwd: Path, env: dict[str, str] | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
-    proc = subprocess.run(argv, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+def run(
+    argv: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str] | None = None,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    proc = subprocess.run(
+        argv,
+        cwd=cwd,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
     if check and proc.returncode != 0:
-        raise PilotError(f"command failed ({proc.returncode}): {argv!r}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}")
+        raise PilotError(
+            f"command failed ({proc.returncode}): {argv!r}\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
     return proc
 
 
@@ -70,7 +91,7 @@ def git(repo: Path, *args: str) -> str:
 
 
 def is_hex(value: Any, length: int) -> bool:
-    return isinstance(value, str) and len(value) == length and all(ch in HEX40 for ch in value)
+    return isinstance(value, str) and len(value) == length and all(ch in HEX for ch in value)
 
 
 def resolve_path(value: str, base: Path) -> Path:
@@ -95,11 +116,17 @@ def require_subject_source(runtime_root: Path, source: Any) -> tuple[str, str]:
     actual_head = git(runtime_root, "rev-parse", "HEAD")
     actual_tree = git(runtime_root, "rev-parse", "HEAD^{tree}")
     if actual_head != head or actual_tree != tree:
-        raise PilotError(f"subject identity mismatch: {actual_head}/{actual_tree} != {head}/{tree}")
+        raise PilotError(
+            f"subject identity mismatch: {actual_head}/{actual_tree} != {head}/{tree}"
+        )
     parent_tree = git(runtime_root, "rev-parse", f"{V05_HEAD}^{{tree}}")
     if parent_tree != V05_TREE:
         raise PilotError("qualified v0.5-A TREE mismatch in subject checkout")
-    ancestry = run(["git", "-C", str(runtime_root), "merge-base", "--is-ancestor", V05_HEAD, actual_head], cwd=runtime_root, check=False)
+    ancestry = run(
+        ["git", "-C", str(runtime_root), "merge-base", "--is-ancestor", V05_HEAD, actual_head],
+        cwd=runtime_root,
+        check=False,
+    )
     if ancestry.returncode != 0:
         raise PilotError("qualified v0.5-A parent is not an ancestor of subject HEAD")
     return actual_head, actual_tree
@@ -131,10 +158,21 @@ def expand_argv(template: Any, values: dict[str, Any]) -> list[str]:
 
 
 def command_values(cell: dict[str, Any], runtime_root: Path, output_root: str) -> dict[str, Any]:
-    return {**cell, "runtime_root": str(runtime_root), "output_root": output_root, "experiment_id": EXPERIMENT_ID, "campaign": "pilot"}
+    return {
+        **cell,
+        "runtime_root": str(runtime_root),
+        "output_root": output_root,
+        "experiment_id": EXPERIMENT_ID,
+        "campaign": "pilot",
+    }
 
 
-def validate_manifest(stage_root: Path, cell: dict[str, Any], analysis_sha: str, metrics_sha: str) -> dict[str, Any]:
+def validate_manifest(
+    stage_root: Path,
+    cell: dict[str, Any],
+    analysis_sha: str,
+    metrics_sha: str,
+) -> dict[str, Any]:
     path = stage_root / "trials" / cell["trial_id"] / "manifest.json"
     manifest = read_json(path)
     if not isinstance(manifest, dict):
@@ -144,7 +182,6 @@ def validate_manifest(stage_root: Path, cell: dict[str, Any], analysis_sha: str,
         "campaign": "pilot",
         "trial_id": cell["trial_id"],
         "policy": cell["policy"],
-        "world_fixture_sha256": manifest.get("world_fixture_sha256"),
         "seed": cell["seed"],
         "revision_index": cell["revision_index"],
         "paired_block_id": cell["paired_block_id"],
@@ -154,7 +191,11 @@ def validate_manifest(stage_root: Path, cell: dict[str, Any], analysis_sha: str,
     }
     for key, value in expected.items():
         if manifest.get(key) != value:
-            raise PilotError(f"{cell['cell_id']}: manifest {key} mismatch: {manifest.get(key)!r} != {value!r}")
+            raise PilotError(
+                f"{cell['cell_id']}: manifest {key} mismatch: {manifest.get(key)!r} != {value!r}"
+            )
+    if not is_hex(manifest.get("world_fixture_sha256"), 64):
+        raise PilotError(f"{cell['cell_id']}: world_fixture_sha256 must be 64-hex")
     return manifest
 
 
@@ -178,17 +219,21 @@ def tree_closure(root: Path, excluded: set[str]) -> tuple[str, list[dict[str, st
     return sha256_bytes(canonical_bytes(entries)), entries
 
 
-def require_anchor_env(config_sha: str, design_sha: str) -> str:
+def require_anchor_env(config_sha: str, design_sha: str) -> tuple[str, str, str]:
     anchor_sha = os.environ.get("VART_PILOT_PREEXECUTION_ANCHOR_SHA256")
     observed_design = os.environ.get("VART_PILOT_DESIGN_SHA256")
     observed_config = os.environ.get("VART_PILOT_CONFIG_SHA256")
+    instrument_head = os.environ.get("VART_INSTRUMENT_SOURCE_HEAD")
+    instrument_tree = os.environ.get("VART_INSTRUMENT_SOURCE_TREE")
     if not is_hex(anchor_sha, 64):
         raise PilotError("anchored execution requires VART_PILOT_PREEXECUTION_ANCHOR_SHA256")
     if observed_design != design_sha:
         raise PilotError("preexecution pilot design digest mismatch")
     if observed_config != config_sha:
         raise PilotError("preexecution pilot config digest mismatch")
-    return anchor_sha
+    if not is_hex(instrument_head, 40) or not is_hex(instrument_tree, 40):
+        raise PilotError("anchored execution requires instrument HEAD/TREE")
+    return anchor_sha, instrument_head, instrument_tree
 
 
 def main() -> int:
@@ -222,12 +267,23 @@ def main() -> int:
     metrics_src = resolve_path(contracts["metric_definitions"], base)
     analysis_sha = validate_contract(analysis_src, "pilot analysis contract")
     metrics_sha = validate_contract(metrics_src, "pilot metric definitions")
-    verifier = resolve_path(cfg.get("verifier_path", "../../scripts/verify_vart_world_creative_001_pilot.py"), base)
+    verifier = resolve_path(
+        cfg.get("verifier_path", "../../scripts/verify_vart_world_creative_001_pilot.py"), base
+    )
     if not verifier.is_file():
         raise PilotError(f"independent verifier not found: {verifier}")
 
     argv_template = cfg.get("runtime_argv")
-    preview = [{"cell": cell, "argv": expand_argv(argv_template, command_values(cell, runtime_root, "<isolated-per-cell-staging-root>"))} for cell in cells]
+    preview = [
+        {
+            "cell": cell,
+            "argv": expand_argv(
+                argv_template,
+                command_values(cell, runtime_root, "<isolated-per-cell-staging-root>"),
+            ),
+        }
+        for cell in cells
+    ]
     if pilot_root.exists() and any(pilot_root.iterdir()):
         raise PilotError(f"pilot_root must be fresh and empty: {pilot_root}")
 
@@ -250,7 +306,7 @@ def main() -> int:
         }, sort_keys=True))
         return 0
 
-    anchor_sha = require_anchor_env(config_sha, design_sha)
+    anchor_sha, instrument_head, instrument_tree = require_anchor_env(config_sha, design_sha)
     pilot_root.mkdir(parents=True, exist_ok=True)
     orch = pilot_root / "_orchestrator"
     orch.mkdir(exist_ok=False)
@@ -258,7 +314,10 @@ def main() -> int:
     trials_dest.mkdir(exist_ok=False)
     shutil.copyfile(analysis_src, pilot_root / "analysis_contract.json")
     shutil.copyfile(metrics_src, pilot_root / "metric_definitions.json")
-    if sha256_file(pilot_root / "analysis_contract.json") != analysis_sha or sha256_file(pilot_root / "metric_definitions.json") != metrics_sha:
+    if (
+        sha256_file(pilot_root / "analysis_contract.json") != analysis_sha
+        or sha256_file(pilot_root / "metric_definitions.json") != metrics_sha
+    ):
         raise PilotError("contract copy digest changed")
 
     inventory = {
@@ -275,14 +334,27 @@ def main() -> int:
     inventory_sha = sha256_file(pilot_root / "trial_inventory.json")
     write_json(pilot_root / "primary_results.json", {
         "schema": "symthaea.vart-world-creative-001.pilot-primary-results.v1",
-        "experiment_id": EXPERIMENT_ID, "campaign": "pilot", "noncanonical": True,
-        "scientific_claims_authorized": False, "results": {},
+        "experiment_id": EXPERIMENT_ID,
+        "campaign": "pilot",
+        "noncanonical": True,
+        "scientific_claims_authorized": False,
+        "results": {},
     })
     write_json(pilot_root / "confirmatory_freeze.json", {
         "schema": "symthaea.vart-world-creative-001.pilot-freeze.v1",
-        "experiment_id": EXPERIMENT_ID, "campaign": "pilot", "noncanonical": True,
-        "confirmatory_execution_authorized": False, "claim_authorized": False,
-        "source": {"head": subject_head, "tree": subject_tree, "parent_v05a_head": V05_HEAD, "parent_v05a_tree": V05_TREE, "dirty": False},
+        "experiment_id": EXPERIMENT_ID,
+        "campaign": "pilot",
+        "noncanonical": True,
+        "confirmatory_execution_authorized": False,
+        "claim_authorized": False,
+        "source": {
+            "head": subject_head,
+            "tree": subject_tree,
+            "parent_v05a_head": V05_HEAD,
+            "parent_v05a_tree": V05_TREE,
+            "dirty": False,
+        },
+        "instrument_source": {"head": instrument_head, "tree": instrument_tree, "dirty": False},
         "analysis_contract_sha256": analysis_sha,
         "metric_definition_set_sha256": metrics_sha,
         "trial_inventory_sha256": inventory_sha,
@@ -295,11 +367,18 @@ def main() -> int:
         "policy_output_isolation": "per-cell-private-staging-root",
     })
     write_json(orch / "resolved_plan.json", {
-        "experiment_id": EXPERIMENT_ID, "campaign": "pilot", "noncanonical": True,
-        "subject_source_head": subject_head, "subject_source_tree": subject_tree,
-        "pilot_config_sha256": config_sha, "pilot_design_sha256": design_sha,
+        "experiment_id": EXPERIMENT_ID,
+        "campaign": "pilot",
+        "noncanonical": True,
+        "subject_source_head": subject_head,
+        "subject_source_tree": subject_tree,
+        "instrument_source_head": instrument_head,
+        "instrument_source_tree": instrument_tree,
+        "pilot_config_sha256": config_sha,
+        "pilot_design_sha256": design_sha,
         "preexecution_anchor_sha256": anchor_sha,
-        "policy_output_isolation": "per-cell-private-staging-root", "cells": preview,
+        "policy_output_isolation": "per-cell-private-staging-root",
+        "cells": preview,
     })
 
     cell_receipts: list[dict[str, Any]] = []
@@ -328,6 +407,8 @@ def main() -> int:
                 "VART_PILOT_PREEXECUTION_ANCHOR_SHA256": anchor_sha,
                 "VART_PILOT_CONFIG_SHA256": config_sha,
                 "VART_PILOT_DESIGN_SHA256": design_sha,
+                "VART_INSTRUMENT_SOURCE_HEAD": instrument_head,
+                "VART_INSTRUMENT_SOURCE_TREE": instrument_tree,
             })
             started = datetime.now(timezone.utc).isoformat()
             proc = run(argv, cwd=runtime_root, env=env, check=False)
@@ -346,19 +427,30 @@ def main() -> int:
                 raise PilotError(f"duplicate destination trial directory: {dest}")
             shutil.move(str(staged), str(dest))
             cell_receipts.append({
-                "cell_id": cell["cell_id"], "trial_id": cell["trial_id"],
-                "started_utc": started, "finished_utc": datetime.now(timezone.utc).isoformat(),
-                "argv": preview[index]["argv"], "returncode": proc.returncode,
-                "stdout_sha256": sha256_file(stdout_path), "stderr_sha256": sha256_file(stderr_path),
+                "cell_id": cell["cell_id"],
+                "trial_id": cell["trial_id"],
+                "started_utc": started,
+                "finished_utc": datetime.now(timezone.utc).isoformat(),
+                "argv": preview[index]["argv"],
+                "returncode": proc.returncode,
+                "stdout_sha256": sha256_file(stdout_path),
+                "stderr_sha256": sha256_file(stderr_path),
                 "manifest_sha256": sha256_file(dest / "manifest.json"),
-                "trial_state": manifest.get("trial_state"), "output_isolated_from_other_policy_trials": True,
+                "trial_state": manifest.get("trial_state"),
+                "output_isolated_from_other_policy_trials": True,
             })
 
-    verifier_proc = run([sys.executable, str(verifier), str(pilot_root), "--json"], cwd=runtime_root, check=False)
+    verifier_proc = run(
+        [sys.executable, str(verifier), str(pilot_root), "--json"],
+        cwd=runtime_root,
+        check=False,
+    )
     (orch / "verifier.stdout.txt").write_text(verifier_proc.stdout, encoding="utf-8")
     (orch / "verifier.stderr.txt").write_text(verifier_proc.stderr, encoding="utf-8")
     if verifier_proc.returncode != 0:
-        raise PilotError(f"independent verifier rejected pilot evidence: {verifier_proc.stdout} {verifier_proc.stderr}")
+        raise PilotError(
+            f"independent verifier rejected pilot evidence: {verifier_proc.stdout} {verifier_proc.stderr}"
+        )
     try:
         verifier_result = json.loads(verifier_proc.stdout)
     except json.JSONDecodeError as exc:
@@ -370,18 +462,30 @@ def main() -> int:
     closure_sha, entries = tree_closure(pilot_root, {receipt_rel})
     receipt = {
         "schema": "symthaea.vart-world-creative-001.pilot-receipt.v1",
-        "experiment_id": EXPERIMENT_ID, "campaign": "pilot", "noncanonical": True,
+        "experiment_id": EXPERIMENT_ID,
+        "campaign": "pilot",
+        "noncanonical": True,
         "scientific_efficacy_claims_authorized": False,
-        "confirmatory_execution_authorized": False, "claim_authorized": False,
-        "source": {"head": subject_head, "tree": subject_tree, "parent_v05a_head": V05_HEAD, "parent_v05a_tree": V05_TREE},
+        "confirmatory_execution_authorized": False,
+        "claim_authorized": False,
+        "source": {
+            "head": subject_head,
+            "tree": subject_tree,
+            "parent_v05a_head": V05_HEAD,
+            "parent_v05a_tree": V05_TREE,
+        },
+        "instrument_source": {"head": instrument_head, "tree": instrument_tree},
         "dual_source_instrument_external": True,
         "preexecution_anchor_sha256": anchor_sha,
         "pilot_config_sha256": config_sha,
         "pilot_design_sha256": design_sha,
         "policy_output_isolation": "per-cell-private-staging-root",
-        "cell_count": len(cells), "cells": cell_receipts,
-        "verifier_result": verifier_result, "verifier_source_sha256": sha256_file(verifier),
-        "pilot_evidence_closure_sha256": closure_sha, "closure_entry_count": len(entries),
+        "cell_count": len(cells),
+        "cells": cell_receipts,
+        "verifier_result": verifier_result,
+        "verifier_source_sha256": sha256_file(verifier),
+        "pilot_evidence_closure_sha256": closure_sha,
+        "closure_entry_count": len(entries),
         "completed_utc": datetime.now(timezone.utc).isoformat(),
         "bounded_statement": "The noncanonical pilot establishes instrumentation/evidence plumbing only.",
     }
@@ -394,5 +498,10 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except (PilotError, anchorlib.AnchorError, KeyError, TypeError, ValueError) as exc:
-        print(json.dumps({"verdict": "PILOT_PLUMBING_REJECT", "error": str(exc), "confirmatory_execution_authorized": False, "claim_authorized": False}, sort_keys=True), file=sys.stderr)
+        print(json.dumps({
+            "verdict": "PILOT_PLUMBING_REJECT",
+            "error": str(exc),
+            "confirmatory_execution_authorized": False,
+            "claim_authorized": False,
+        }, sort_keys=True), file=sys.stderr)
         raise SystemExit(2)
