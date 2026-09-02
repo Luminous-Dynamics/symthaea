@@ -40,14 +40,17 @@ The coordinate is not a substitute for the exact formula manifest. It is a typed
 
 Initial neutral relation classes:
 
-- `R0CurrentBurden` — descriptive current condition;
+- `R0CurrentBurden` — descriptive current realized condition;
+- `P0ProspectiveBurden` — absolute projected regulatory burden/exposure over a declared prefix-causal forecast trajectory, without subtracting another time point;
 - `R1RealizedChange` — change from prior realized burden to current realized burden;
 - `R2OneStepForecastResidual` — prior forecast for current point minus realized current burden;
 - `R3OverlappingFutureRevision` — revision of predictions for the same absolute future support;
 - `R4RollingHorizonChange` — change in finite-horizon aggregate, explicitly allowing horizon turnover;
 - `U1Urgency` — breach imminence / breadth / peak / rate family;
 - `BaselineReactive` — simple current-state, drive, or stimulus baseline;
-- `BaselineNuisance` — prospectively declared nuisance control.
+- `BaselineNuisance` — prospectively declared nuisance/history control.
+
+`P0ProspectiveBurden` exists because the frozen v0.1 allostatic layer already computes absolute prospective burden. It must not be forced into R0 current-state semantics or R4 change semantics merely to fit the enum.
 
 A later new relation class is a design/evidence change, not a free-form label.
 
@@ -76,7 +79,7 @@ From `V02_CHANNEL_AGGREGATION_CONTRACT.md`:
 - `A6ThreatenedSubsetDiagnostic` — diagnostic subset reduction with prospectively legal prefix-causal membership;
 - `AFutureQualified` — reserved for later separately frozen aggregation semantics.
 
-The aggregation basis fixes denominator/projection semantics independently of weighting. For example, `W1 × A3` and `W1 × A4` are different candidates even with the same channel weights.
+The aggregation basis fixes denominator/projection semantics independently of weighting. `W1 × A3` and `W1 × A4` are different candidates even with the same channel weights.
 
 Healthy-channel dilution under `A3` is a declared sensitivity, not hidden recovery. `A4`, `A2`, `A1`, and `A0` have different invariances and must not be treated as aliases.
 
@@ -97,6 +100,8 @@ From `V02_ALLOSTATIC_EXPOSURE_DECOMPOSITION.md`:
 
 Not every relation supports every temporal class. Invalid combinations must fail manifest validation rather than being interpreted ad hoc.
 
+`P0ProspectiveBurden` is the natural relation for T1/T2/T4/T5/T6/T7/T8 summaries over one current prefix-causal forecast trajectory when no inter-time subtraction is intended.
+
 ## 7. Forecast policy
 
 Initial prefix-causal forecast policy classes remain separate:
@@ -108,6 +113,8 @@ Initial prefix-causal forecast policy classes remain separate:
 - later separately qualified predictive policy.
 
 Oracle future knowledge is not a forecast-policy variant in this enum. It belongs to `OracleDiagnostic` information authority and cannot enter the primary prefix-causal registry.
+
+The initial minimal exploratory set freezes `ObservedDrivePersistence` as the primary policy for its forecast-bearing roles; zero-input recovery and kinematic velocity remain targeted sensitivity/diagnostic policies rather than duplicate primary candidate families.
 
 ## 8. Information class
 
@@ -140,7 +147,9 @@ A future candidate-registry validator should enforce an explicit compatibility t
 
 Examples:
 
-- `R0CurrentBurden × T8FirstBreachLatency` is invalid without a forecast/trajectory relation;
+- `R0CurrentBurden × T8FirstBreachLatency` is invalid; use a prospective relation such as `P0ProspectiveBurden`/urgency with a declared forecast;
+- `P0ProspectiveBurden` requires a prefix-causal forecast policy and one declared current-origin forecast trajectory;
+- `P0ProspectiveBurden × T2DiscountedCumulativeExposure` is valid for absolute projected exposure when horizon/discount are frozen;
 - `R1RealizedChange × T0Instantaneous` is valid if the two realized cut points are explicitly defined;
 - `R3OverlappingFutureRevision` requires a forecast policy and overlapping absolute future support;
 - `T9RecoveryExposure` requires a declared perturbation/recovery window and cutoff semantics;
@@ -166,9 +175,10 @@ Human-readable IDs should expose enough of the coordinate to prevent accidental 
 Example forms:
 
 - `r0_w1_a3_t0_h0_viability_mean_v1`
-- `r1_w1_a3_t0_h1_history_change_v1`
+- `p0_w1_a3_t2_h0_drive_persistence_cumulative_v1`
+- `r1_w1_a3_t0_h1_realized_change_v1`
+- `r3_w1_a3_t1_h1_drive_persistence_revision_v1`
 - `r4_w2_a3_t1_h1_legacy_rolling_mean_change_v1`
-- `r4_w1_a4_t2_h1_viability_cumulative_sum_change_v1`
 - `u1_w0_a2_t8_h0_first_breach_latency_v1`
 - `r0_w3_a3_t0_h0_confidence_mean_v1`
 
@@ -178,7 +188,7 @@ Do not encode interpretation-bearing terms such as `valence`, `fear`, `sadness`,
 
 The factor axes define a design space, but v0.2 must not automatically compute every possible Cartesian combination.
 
-Before exploratory execution, freeze an explicit finite `ExploratoryCandidateSetManifest` containing the exact candidate-definition digests eligible for comparison.
+The first exploratory lineage is governed by `V02_MINIMAL_EXPLORATORY_CANDIDATE_SET.md`, which freezes a finite E00–E11 role set and required pairwise discrimination obligations.
 
 Reasons:
 
@@ -190,8 +200,6 @@ Reasons:
 The factor coordinate helps explain why each chosen candidate exists; it does not authorize unbounded candidate generation.
 
 ## 13. Identifiability requirement
-
-A finite candidate set can still be poorly designed if its candidates are observationally redundant under the locked scenarios.
 
 Before exploratory/confirmatory interpretation, apply `V02_IDENTIFIABILITY_AND_DISCRIMINATION.md`:
 
@@ -205,7 +213,7 @@ Candidate complexity cannot substitute for identifiability.
 
 ## 14. Exploratory-to-confirmatory promotion
 
-Exploratory work may compare the locked finite candidate set.
+Exploratory work may compare only the locked finite candidate set.
 
 Before confirmatory work:
 
@@ -229,12 +237,13 @@ At minimum:
 
 - weighting-only manipulations with temporal profile and aggregation basis held fixed;
 - healthy-channel dilution/denominator manipulations with deviated-channel state held fixed;
-- concentration/distribution manipulations that separate mean, sum, peak, vector, and breadth;
+- concentration/distribution manipulations separating mean, sum, peak, vector, and breadth;
 - temporal-profile manipulations with weighting/aggregation inputs held fixed;
 - same-current-native-state / different-history manipulations separating H1 from H0;
 - restart-equivalence tests showing native future equality from matched complete state/config + identical future inputs;
 - forecast-policy disagreement with realized prefix held as comparable as possible;
 - relation-basis crossed-sign cases for R1/R2/R3/R4;
+- absolute prospective-burden cases separating P0 from R0 current burden and U1 urgency;
 - information-class suffix-mutation tests proving prefix-causal payload invariance.
 
 This supports mechanistic attribution when candidates disagree.
@@ -245,18 +254,20 @@ The canonical candidate manifest should bind:
 
 - the complete `CandidateCoordinate`;
 - exact compatibility-contract version;
+- exact minimal exploratory candidate-set identity when applicable;
 - exact weighting-decomposition contract digest/version;
 - exact channel-aggregation contract digest/version;
 - exact allostatic-exposure contract digest/version;
 - exact history/state-sufficiency contract digest/version;
 - exact temporal-alignment contract digest/version;
 - exact execution/information contract digest/version;
+- exact preprocessing/evaluator-isolation identities;
 - exact formula/fixtures/implementation identity.
 
 Changing any coordinate field changes candidate identity even if an accidental numerical coincidence leaves one fixture unchanged.
 
 ## 17. Claim boundary
 
-A factorized candidate space makes the experiment easier to audit and helps explain whether observed structure comes from relation semantics, weighting, cross-channel reduction, temporal integration, forecast assumptions, information authority, or external history access.
+A factorized candidate space makes the experiment easier to audit and helps explain whether observed structure comes from current state, absolute prospective burden, realized change, forecast error/revision, weighting, cross-channel reduction, temporal integration, forecast assumptions, information authority, or external history access.
 
 It does not establish that any coordinate corresponds to emotion, valence, mood, suffering, sentience, consciousness, or native memory.
