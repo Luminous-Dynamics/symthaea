@@ -148,7 +148,13 @@ struct PendingRecoveryApproval {
 pub struct OperatorAuthority {
     policy: OperatorTrustPolicy,
     last_sequence: BTreeMap<OperatorId, (u64, u64)>,
+    /// Host-local issuance state. Portable checkpoints/evidence must not
+    /// resurrect an outstanding authority-widening offer after restart.
+    #[serde(skip, default)]
     issued_recovery: BTreeMap<u64, RecoveryProposalV1>,
+    /// Host-local partial quorum state. A restart requires a fresh proposal and
+    /// fresh approvals rather than replaying a pre-restart widening decision.
+    #[serde(skip, default)]
     pending_resume: BTreeMap<u64, PendingRecoveryApproval>,
     constraint: OperatorConstraint,
     last_applied_proposal: Option<u64>,
@@ -405,6 +411,23 @@ mod tests {
         assert_eq!(authority.pending_approvals(9), 0);
         assert_eq!(authority.issued_recovery_proposal(9), None);
         assert_eq!(authority.constraint(), OperatorConstraint::EmergencyStop);
+    }
+
+    #[test]
+    fn live_recovery_state_is_not_deserialized() {
+        let mut authority = OperatorAuthority::default();
+        authority.ingest(command(1, 1, 1, OperatorCommand::HoldPosition), 20, true).unwrap();
+        let p = proposal(9, OperatorConstraint::HoldPosition);
+        authority.issue_recovery_proposal(p, 20).unwrap();
+        authority.approve_recovery(approval(1, 2, p), 21).unwrap();
+        assert_eq!(authority.pending_approvals(9), 1);
+        assert_eq!(authority.issued_recovery_proposal(9), Some(p));
+
+        let encoded = serde_json::to_vec(&authority).expect("authority should serialize");
+        let restored: OperatorAuthority = serde_json::from_slice(&encoded).expect("authority should deserialize");
+        assert_eq!(restored.constraint(), OperatorConstraint::HoldPosition);
+        assert_eq!(restored.pending_approvals(9), 0);
+        assert_eq!(restored.issued_recovery_proposal(9), None);
     }
 
     #[test]
