@@ -11,6 +11,7 @@
 pub mod coherence;
 pub mod conversation;
 pub mod coordinator;
+pub mod episodic_components;
 pub mod episodic_provenance;
 pub mod episodic_replay;
 pub mod episodic_shadow;
@@ -25,6 +26,10 @@ pub use conversation::{
 pub use coordinator::{
     CoordinatorConfig, CoordinatorStats, GraduationEvent, MemoryCoordinator, MemorySignals,
     MemorySource, content_hash,
+};
+pub use episodic_components::{
+    EpisodicComponentProvenance, EpisodicComponentProvenanceError,
+    episode_cognition_subject_sha256, episode_perception_subject_sha256,
 };
 pub use episodic_provenance::{
     AuditedEpisodicRecall, EpisodicProvenanceError, EpisodicProvenanceIndex,
