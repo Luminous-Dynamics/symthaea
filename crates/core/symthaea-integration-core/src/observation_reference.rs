@@ -14,9 +14,10 @@ use std::fmt;
 
 /// Collision-resistant logical reference to one source-local observation.
 ///
-/// `upstream_origin` is deliberately not part of the identity namespace. It is
-/// provenance about how the measurement was produced and may be discovered or
-/// enriched later without changing which local observation is being referenced.
+/// The namespace includes all source context currently available to distinguish
+/// local identifier domains. This is deliberately conservative: if later
+/// provenance enrichment changes the explicit upstream origin, a new reference
+/// is preferable to falsely claiming two different source events are identical.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct SourceQualifiedObservationRef {
     pub integration_id: String,
@@ -24,15 +25,24 @@ pub struct SourceQualifiedObservationRef {
     pub collector_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tenant: Option<String>,
+    pub measurement_method: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upstream_origin: Option<String>,
     pub observation_id: ObservationId,
 }
 
 impl SourceQualifiedObservationRef {
-    pub fn new(integration_id: impl Into<String>, observation_id: ObservationId) -> Self {
+    pub fn new(
+        integration_id: impl Into<String>,
+        measurement_method: impl Into<String>,
+        observation_id: ObservationId,
+    ) -> Self {
         Self {
             integration_id: integration_id.into(),
             collector_id: None,
             tenant: None,
+            measurement_method: measurement_method.into(),
+            upstream_origin: None,
             observation_id,
         }
     }
@@ -42,6 +52,8 @@ impl SourceQualifiedObservationRef {
             integration_id: observation.source.integration_id.clone(),
             collector_id: observation.source.collector_id.clone(),
             tenant: observation.source.tenant.clone(),
+            measurement_method: observation.source.measurement_method.clone(),
+            upstream_origin: observation.source.upstream_origin.clone(),
             observation_id: observation.observation_id.clone(),
         }
     }
@@ -52,20 +64,16 @@ impl SourceQualifiedObservationRef {
 
     pub fn validate(&self) -> Result<(), SourceQualifiedObservationRefError> {
         require_non_empty("integration_id", &self.integration_id)?;
+        require_non_empty("measurement_method", &self.measurement_method)?;
         require_non_empty("observation_id", self.observation_id.as_str())?;
-        if self
-            .collector_id
-            .as_deref()
-            .is_some_and(|value| value.trim().is_empty())
-        {
-            return Err(SourceQualifiedObservationRefError::EmptyField("collector_id"));
-        }
-        if self
-            .tenant
-            .as_deref()
-            .is_some_and(|value| value.trim().is_empty())
-        {
-            return Err(SourceQualifiedObservationRefError::EmptyField("tenant"));
+        for (field, value) in [
+            ("collector_id", self.collector_id.as_deref()),
+            ("tenant", self.tenant.as_deref()),
+            ("upstream_origin", self.upstream_origin.as_deref()),
+        ] {
+            if value.is_some_and(|value| value.trim().is_empty()) {
+                return Err(SourceQualifiedObservationRefError::EmptyField(field));
+            }
         }
         Ok(())
     }
@@ -77,6 +85,8 @@ impl SourceQualifiedObservationRef {
         push_required_component(&mut key, &self.integration_id);
         push_optional_component(&mut key, self.collector_id.as_deref());
         push_optional_component(&mut key, self.tenant.as_deref());
+        push_required_component(&mut key, &self.measurement_method);
+        push_optional_component(&mut key, self.upstream_origin.as_deref());
         push_required_component(&mut key, self.observation_id.as_str());
         Ok(key)
     }
@@ -184,15 +194,36 @@ mod tests {
         let left = observation("obs-1", "source", Some("collector-a"));
         let right = observation("obs-1", "source", Some("collector-b"));
         assert_ne!(left.source_qualified_ref(), right.source_qualified_ref());
+
+        let mut other_tenant = left.clone();
+        other_tenant.source.tenant = Some("tenant-b".into());
+        assert_ne!(left.source_qualified_ref(), other_tenant.source_qualified_ref());
     }
 
     #[test]
-    fn upstream_origin_does_not_change_observation_identity() {
-        let mut left = observation("obs-1", "source", Some("collector"));
+    fn measurement_method_is_part_of_the_local_namespace() {
+        let left = observation("obs-1", "source", None);
+        let mut right = left.clone();
+        right.source.measurement_method = "other-method".into();
+        assert_ne!(left.source_qualified_ref(), right.source_qualified_ref());
+    }
+
+    #[test]
+    fn explicit_upstream_origin_is_part_of_the_local_namespace() {
+        let mut left = observation("obs-1", "source", None);
         let mut right = left.clone();
         left.source.upstream_origin = Some("origin-a".into());
         right.source.upstream_origin = Some("origin-b".into());
-        assert_eq!(left.source_qualified_ref(), right.source_qualified_ref());
+        assert_ne!(left.source_qualified_ref(), right.source_qualified_ref());
+    }
+
+    #[test]
+    fn log_like_feeds_without_collector_do_not_collide_when_origin_is_known() {
+        let mut left = observation("syslog-42", "symthaea-logparse", None);
+        let mut right = left.clone();
+        left.source.upstream_origin = Some("log-stream:syslog:host-a:sshd".into());
+        right.source.upstream_origin = Some("log-stream:syslog:host-b:sshd".into());
+        assert_ne!(left.source_qualified_ref(), right.source_qualified_ref());
     }
 
     #[test]
