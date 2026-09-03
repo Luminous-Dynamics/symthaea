@@ -21,7 +21,12 @@ nix = { version = "0.29", features = ["mman", "fs", "ioctl"] }
 blake3 = { workspace = true }
 rand = { workspace = true }
 serde_json = { workspace = true }
+symthaea-boot-ecology = { path = "../../core/symthaea-boot-ecology" }
+symthaea-boot-ecology-live = { path = "../symthaea-boot-ecology-live" }
+symthaea-boot-presentation = { path = "../symthaea-boot-presentation" }
 symthaea-boot-protocol = { path = "../symthaea-boot-protocol" }
+symthaea-boot-render-projection = { path = "../symthaea-boot-render-projection" }
+symthaea-boot-visual-clock = { path = "../symthaea-boot-visual-clock" }
 
 [dev-dependencies]
 proptest = { workspace = true }

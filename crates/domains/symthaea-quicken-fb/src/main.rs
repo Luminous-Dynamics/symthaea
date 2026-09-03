@@ -28,6 +28,9 @@ use symthaea_quicken_fb::handoff::{DisplayReleaseReceipt, ExitReason};
 use symthaea_quicken_fb::mycelium::MycelialNetwork;
 use symthaea_quicken_fb::perf::BootPerformanceRecorder;
 use symthaea_quicken_fb::progress::{ProgressEvent, ProgressMonitor};
+use symthaea_quicken_fb::renderer_bridge::{
+    EcologyFallbackReason, EcologyRenderOutcome, EcologyRendererBridge,
+};
 
 /// Target frame rate for the animation.
 const TARGET_FPS: u32 = 30;
@@ -80,7 +83,17 @@ fn main() {
     let display_height = fb.height;
     let display_refresh_hz = fb.mode.vrefresh();
 
+    // The legacy network remains live at all times so it can take over on the
+    // very next frame if any semantic projection or ecology render step fails.
     let mut network = MycelialNetwork::new(fb.width, fb.height, &args.genesis_phrase);
+    let mut ecology = match EcologyRendererBridge::new(fb.width, fb.height, &args.genesis_phrase) {
+        Ok(bridge) => Some(bridge),
+        Err(error) => {
+            eprintln!("quicken-fb: ecology renderer unavailable; using legacy fallback: {error}");
+            None
+        }
+    };
+    let mut last_ecology_fallback: Option<EcologyFallbackReason> = None;
     let mut progress = ProgressMonitor::new(args.progress_pipe.as_deref());
     let mut boot = BootTelemetry::new(
         args.boot_events_socket.as_deref().map(Path::new),
@@ -107,15 +120,23 @@ fn main() {
             break;
         }
 
-        let dt = now.duration_since(last_frame).as_secs_f32();
+        let frame_delta = now.duration_since(last_frame);
+        let dt = frame_delta.as_secs_f32();
         if dt < frame_duration.as_secs_f32() {
             std::thread::sleep(Duration::from_micros(500));
             continue;
         }
         last_frame = now;
         let frame_work_start = Instant::now();
+        let presentation_elapsed_ms = u32::try_from(frame_delta.as_millis()).unwrap_or(u32::MAX);
 
         let boot_report = boot.poll();
+        if boot_report.lineage_resets > 0 {
+            if let Some(ecology) = ecology.as_mut() {
+                ecology.reset_semantics();
+            }
+            last_ecology_fallback = None;
+        }
         let current_boot_visual = boot.visual_state();
         if boot_report.applied > 0 || boot_report.lineage_resets > 0 {
             if visual_changed(last_boot_visual, current_boot_visual) {
@@ -171,8 +192,8 @@ fn main() {
             }
         }
 
-        // Installer I/O remains authoritative for installer animation pacing.
-        // Typed boot telemetry contributes only a minimum visual growth rate.
+        // Installer I/O remains authoritative for the legacy fallback's installer
+        // pacing. Typed boot telemetry contributes only a minimum legacy growth rate.
         let boot_growth_floor = current_boot_visual
             .map(|state| state.growth_floor)
             .unwrap_or(0.0);
@@ -183,7 +204,35 @@ fn main() {
         let grow_elapsed = grow_start.elapsed();
 
         let render_start = Instant::now();
-        network.render(&mut render_buf);
+        let mut ecology_rendered = false;
+
+        // The installation-completion contraction belongs to the legacy installer
+        // animation. During ordinary system boot, ecology is driven only by the
+        // validated authoritative snapshot and cannot enter Handoff before Ready.
+        if !completing {
+            let snapshot = boot.snapshot();
+            if let (Some(ecology), Some(snapshot)) = (ecology.as_mut(), snapshot.as_ref()) {
+                match ecology.render_snapshot(snapshot, presentation_elapsed_ms, &mut render_buf) {
+                    EcologyRenderOutcome::Rendered(_) => {
+                        ecology_rendered = true;
+                        last_ecology_fallback = None;
+                    }
+                    EcologyRenderOutcome::Fallback(reason) => {
+                        if last_ecology_fallback != Some(reason) {
+                            eprintln!(
+                                "quicken-fb: ecology frame rejected ({}); using legacy visual fallback",
+                                reason.as_str()
+                            );
+                        }
+                        last_ecology_fallback = Some(reason);
+                    }
+                }
+            }
+        }
+
+        if !ecology_rendered {
+            network.render(&mut render_buf);
+        }
         let render_elapsed = render_start.elapsed();
 
         let blit_start = Instant::now();
