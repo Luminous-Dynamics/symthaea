@@ -4,6 +4,11 @@
 use ed25519_dalek::{Signer, SigningKey};
 use symthaea_action_checkpoint::CheckpointHead;
 use symthaea_authority::{AuthorityEpoch, CapabilityGrant, Digest32, PrincipalId};
+use symthaea_authority_time::{
+    AUTHORITY_TIME_SCHEMA_VERSION, AuthorityTimeStatementV1, PendingAuthorityTimeChallenge,
+    TimeAuthorityId, TrustedTimeAuthorityV1, TrustedTimePolicyV1, VerifiedAuthorityTime,
+    verify_authority_time_v1,
+};
 use symthaea_xenia_authority::{
     AGENT_CAPABILITY_ATTESTATION_SCHEMA, AGENT_CAPABILITY_AUTHORIZATION_SCHEMA_VERSION,
     ED25519_SIGNATURE_ALGORITHM, ExecutorWorkloadV1, TranscriptSignatureSuiteV1,
@@ -145,10 +150,69 @@ fn signed_fixture(
     (attestation, checkpoint, public_key, session)
 }
 
+fn verified_time(grant: &CapabilityGrant, witnessed_unix_s: u64) -> VerifiedAuthorityTime {
+    let key_a = SigningKey::from_bytes(&[31; 32]);
+    let key_b = SigningKey::from_bytes(&[32; 32]);
+    let policy = TrustedTimePolicyV1 {
+        schema_version: AUTHORITY_TIME_SCHEMA_VERSION,
+        policy_id: [33; 16],
+        authorities: vec![
+            TrustedTimeAuthorityV1 {
+                authority_id: TimeAuthorityId([1; 16]),
+                verifying_key: key_a.verifying_key().to_bytes(),
+                organization_binding: [41; 32],
+                service_binding: [51; 32],
+            },
+            TrustedTimeAuthorityV1 {
+                authority_id: TimeAuthorityId([2; 16]),
+                verifying_key: key_b.verifying_key().to_bytes(),
+                organization_binding: [42; 32],
+                service_binding: [52; 32],
+            },
+        ],
+        threshold: 2,
+        minimum_organizations: 2,
+        maximum_uncertainty_s: 1,
+        maximum_challenge_age_ns: 5_000_000_000,
+        maximum_post_verification_age_ns: 5_000_000_000,
+    };
+    let pending = PendingAuthorityTimeChallenge::new(&policy, grant.digest().0).unwrap();
+    let challenge = pending.wire();
+
+    let sign = |authority_id: TimeAuthorityId, key: &SigningKey| {
+        let mut statement = AuthorityTimeStatementV1 {
+            schema_version: AUTHORITY_TIME_SCHEMA_VERSION,
+            authority_id,
+            policy_digest: challenge.policy_digest,
+            subject_digest: challenge.subject_digest,
+            challenge_nonce: challenge.nonce,
+            witnessed_unix_s,
+            uncertainty_s: 1,
+            signature: Vec::new(),
+        };
+        statement.signature = key
+            .sign(&statement.canonical_message().unwrap())
+            .to_bytes()
+            .to_vec();
+        statement
+    };
+
+    verify_authority_time_v1(
+        &policy,
+        pending,
+        &[
+            sign(TimeAuthorityId([1; 16]), &key_a),
+            sign(TimeAuthorityId([2; 16]), &key_b),
+        ],
+    )
+    .unwrap()
+}
+
 #[test]
 fn exact_grant_workload_checkpoint_and_fresh_frontier_verify() {
     let (grant, workload, head) = grant_and_workload();
     let (attestation, checkpoint, public_key, session) = signed_fixture(&grant, &workload, head);
+    let time = verified_time(&grant, 125);
     let verified = verify_xenia_capability_v1(
         &attestation,
         &checkpoint,
@@ -157,7 +221,7 @@ fn exact_grant_workload_checkpoint_and_fresh_frontier_verify() {
         &workload,
         session,
         head,
-        125,
+        &time,
         XeniaFreshnessPolicyV1::strict(30, 5),
     )
     .unwrap();
@@ -178,6 +242,7 @@ fn valid_old_attestation_fails_after_fresh_xenia_frontier_advances() {
         .sign(&checkpoint.signature_message().unwrap())
         .to_bytes()
         .to_vec();
+    let time = verified_time(&grant, 125);
 
     assert!(matches!(
         verify_xenia_capability_v1(
@@ -188,7 +253,7 @@ fn valid_old_attestation_fails_after_fresh_xenia_frontier_advances() {
             &workload,
             session,
             head,
-            125,
+            &time,
             XeniaFreshnessPolicyV1::strict(30, 5),
         ),
         Err(XeniaAuthorityError::AuthorizationFrontierStale)
@@ -199,6 +264,7 @@ fn valid_old_attestation_fails_after_fresh_xenia_frontier_advances() {
 fn stale_freshness_checkpoint_is_rejected_even_when_signatures_are_valid() {
     let (grant, workload, head) = grant_and_workload();
     let (attestation, checkpoint, public_key, session) = signed_fixture(&grant, &workload, head);
+    let time = verified_time(&grant, 200);
     assert!(matches!(
         verify_xenia_capability_v1(
             &attestation,
@@ -208,7 +274,7 @@ fn stale_freshness_checkpoint_is_rejected_even_when_signatures_are_valid() {
             &workload,
             session,
             head,
-            200,
+            &time,
             XeniaFreshnessPolicyV1::strict(30, 5),
         ),
         Err(XeniaAuthorityError::LedgerCheckpointStale)
@@ -219,6 +285,7 @@ fn stale_freshness_checkpoint_is_rejected_even_when_signatures_are_valid() {
 fn workload_or_agent_checkpoint_substitution_fails() {
     let (grant, workload, head) = grant_and_workload();
     let (attestation, checkpoint, public_key, session) = signed_fixture(&grant, &workload, head);
+    let time = verified_time(&grant, 125);
 
     let mut wrong_workload = workload.clone();
     wrong_workload.artifact_digest = Digest32([77; 32]);
@@ -231,7 +298,7 @@ fn workload_or_agent_checkpoint_substitution_fails() {
             &wrong_workload,
             session,
             head,
-            125,
+            &time,
             XeniaFreshnessPolicyV1::strict(30, 5),
         ),
         Err(XeniaAuthorityError::WorkloadDigestMismatch)
@@ -250,9 +317,33 @@ fn workload_or_agent_checkpoint_substitution_fails() {
             &workload,
             session,
             wrong_head,
-            125,
+            &time,
             XeniaFreshnessPolicyV1::strict(30, 5),
         ),
         Err(XeniaAuthorityError::AgentCheckpointMismatch)
+    ));
+}
+
+#[test]
+fn time_for_another_grant_cannot_validate_this_grant() {
+    let (grant, workload, head) = grant_and_workload();
+    let (attestation, checkpoint, public_key, session) = signed_fixture(&grant, &workload, head);
+    let mut other_grant = grant.clone();
+    other_grant.grant_id = "other-grant".into();
+    let wrong_time = verified_time(&other_grant, 125);
+
+    assert!(matches!(
+        verify_xenia_capability_v1(
+            &attestation,
+            &checkpoint,
+            public_key,
+            &grant,
+            &workload,
+            session,
+            head,
+            &wrong_time,
+            XeniaFreshnessPolicyV1::strict(30, 5),
+        ),
+        Err(XeniaAuthorityError::AuthorityTime(_))
     ));
 }

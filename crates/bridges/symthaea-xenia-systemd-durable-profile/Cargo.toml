@@ -16,6 +16,7 @@ symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
 symthaea-authority = { path = "../../core/symthaea-authority" }
 symthaea-authority-frontier = { path = "../symthaea-authority-frontier" }
 symthaea-authority-frontier-sqlite = { path = "../symthaea-authority-frontier-sqlite" }
+symthaea-authority-time = { path = "../symthaea-authority-time" }
 symthaea-system-attempt-evidence = { path = "../symthaea-system-attempt-evidence" }
 symthaea-system-broker = { path = "../symthaea-system-broker" }
 symthaea-xenia-authority = { path = "../symthaea-xenia-authority" }

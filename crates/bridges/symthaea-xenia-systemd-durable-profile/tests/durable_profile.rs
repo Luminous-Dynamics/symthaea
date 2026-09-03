@@ -8,11 +8,14 @@ use std::sync::{Arc, Mutex};
 
 use ed25519_dalek::{Signer, SigningKey};
 use symthaea_action_checkpoint::CheckpointHead;
-use symthaea_action_runtime::{ExecutionId, GrantUseState, ReservationId};
-use symthaea_authority::{
-    AuthorityContext, AuthorityEpoch, CapabilityGrant, Digest32, PrincipalId, TaskId,
-};
+use symthaea_action_runtime::{ExecutionId, ReservationId};
+use symthaea_authority::{AuthorityEpoch, CapabilityGrant, Digest32, PrincipalId, TaskId};
 use symthaea_authority_frontier_sqlite::SqliteCheckpointCasStore;
+use symthaea_authority_time::{
+    AUTHORITY_TIME_SCHEMA_VERSION, AuthorityTimeStatementV1, PendingAuthorityTimeChallenge,
+    TimeAuthorityId, TrustedTimeAuthorityV1, TrustedTimePolicyV1, VerifiedAuthorityTime,
+    verify_authority_time_v1,
+};
 use symthaea_system_attempt_evidence::{
     AttemptEvidenceJournal, AttemptEvidenceState, SqliteAttemptEvidenceJournal,
 };
@@ -142,11 +145,67 @@ fn plan_grant_workload() -> (ServiceObservation, RestartPlan, CapabilityGrant, E
     (before, plan, grant, workload)
 }
 
+fn verified_time(grant: &CapabilityGrant, witnessed_unix_s: u64) -> VerifiedAuthorityTime {
+    let key_a = SigningKey::from_bytes(&[61; 32]);
+    let key_b = SigningKey::from_bytes(&[62; 32]);
+    let policy = TrustedTimePolicyV1 {
+        schema_version: AUTHORITY_TIME_SCHEMA_VERSION,
+        policy_id: [63; 16],
+        authorities: vec![
+            TrustedTimeAuthorityV1 {
+                authority_id: TimeAuthorityId([1; 16]),
+                verifying_key: key_a.verifying_key().to_bytes(),
+                organization_binding: [71; 32],
+                service_binding: [81; 32],
+            },
+            TrustedTimeAuthorityV1 {
+                authority_id: TimeAuthorityId([2; 16]),
+                verifying_key: key_b.verifying_key().to_bytes(),
+                organization_binding: [72; 32],
+                service_binding: [82; 32],
+            },
+        ],
+        threshold: 2,
+        minimum_organizations: 2,
+        maximum_uncertainty_s: 1,
+        maximum_challenge_age_ns: 5_000_000_000,
+        maximum_post_verification_age_ns: 5_000_000_000,
+    };
+    let pending = PendingAuthorityTimeChallenge::new(&policy, grant.digest().0).unwrap();
+    let challenge = pending.wire();
+    let sign = |authority_id: TimeAuthorityId, key: &SigningKey| {
+        let mut statement = AuthorityTimeStatementV1 {
+            schema_version: AUTHORITY_TIME_SCHEMA_VERSION,
+            authority_id,
+            policy_digest: challenge.policy_digest,
+            subject_digest: challenge.subject_digest,
+            challenge_nonce: challenge.nonce,
+            witnessed_unix_s,
+            uncertainty_s: 1,
+            signature: Vec::new(),
+        };
+        statement.signature = key
+            .sign(&statement.canonical_message().unwrap())
+            .to_bytes()
+            .to_vec();
+        statement
+    };
+    verify_authority_time_v1(
+        &policy,
+        pending,
+        &[
+            sign(TimeAuthorityId([1; 16]), &key_a),
+            sign(TimeAuthorityId([2; 16]), &key_b),
+        ],
+    )
+    .unwrap()
+}
+
 fn verified_proof(
     grant: &CapabilityGrant,
     workload: &ExecutorWorkloadV1,
     agent_head: CheckpointHead,
-    now: u64,
+    authority_time: &VerifiedAuthorityTime,
 ) -> symthaea_xenia_authority::VerifiedXeniaCapability {
     let signing_key = SigningKey::from_bytes(&[3; 32]);
     let public_key = signing_key.verifying_key().to_bytes();
@@ -207,18 +266,10 @@ fn verified_proof(
             transcript_signature_suite: TranscriptSignatureSuiteV1::Ed25519Rfc8032,
         },
         agent_head,
-        now,
+        authority_time,
         XeniaFreshnessPolicyV1::strict(30, 5),
     )
     .unwrap()
-}
-
-fn authority_context(now: u64) -> AuthorityContext {
-    AuthorityContext {
-        now_unix_s: now,
-        current_epoch: AuthorityEpoch(7),
-        use_state: GrantUseState::default(),
-    }
 }
 
 #[test]
@@ -238,14 +289,16 @@ fn durable_profile_reopens_exact_xenia_attempt_and_checkpoint_lineage() {
 
     let bootstrap = DurableXeniaSystemdBootstrap::bootstrap(grant.clone(), backend, &path).unwrap();
     let authorized_head = bootstrap.authorization_checkpoint_head();
-    let proof = verified_proof(&grant, &workload, authorized_head, 125);
+    let time = verified_time(&grant, 125);
+    let proof = verified_proof(&grant, &workload, authorized_head, &time);
     let receipt = bootstrap
         .recover_verified_once(
             proof,
+            &time,
+            AuthorityEpoch(7),
             &plan,
             ExecutionId("exec-durable-1".into()),
             ReservationId("reservation-durable-1".into()),
-            authority_context(125),
             &[],
         )
         .unwrap();
@@ -279,7 +332,7 @@ fn durable_profile_reopens_exact_xenia_attempt_and_checkpoint_lineage() {
 }
 
 #[test]
-fn expired_xenia_proof_is_rejected_before_effect_or_attempt_evidence() {
+fn newer_verified_time_rejects_expired_xenia_proof_before_effect_or_attempt_evidence() {
     let path = db_path();
     cleanup(&path);
     let (before, plan, grant, workload) = plan_grant_workload();
@@ -287,15 +340,18 @@ fn expired_xenia_proof_is_rejected_before_effect_or_attempt_evidence() {
     let backend = FakeBackend::new(vec![before], calls.clone());
     let bootstrap = DurableXeniaSystemdBootstrap::bootstrap(grant.clone(), backend, &path).unwrap();
     let head = bootstrap.authorization_checkpoint_head();
-    let proof = verified_proof(&grant, &workload, head, 125);
+    let verification_time = verified_time(&grant, 125);
+    let proof = verified_proof(&grant, &workload, head, &verification_time);
+    let effect_entry_time = verified_time(&grant, 161);
 
     assert!(matches!(
         bootstrap.recover_verified_once(
             proof,
+            &effect_entry_time,
+            AuthorityEpoch(7),
             &plan,
             ExecutionId("exec-expired".into()),
             ReservationId("reservation-expired".into()),
-            authority_context(161),
             &[],
         ),
         Err(DurableRecoveryError::XeniaProofExpiredAtEffectEntry)
@@ -303,8 +359,6 @@ fn expired_xenia_proof_is_rejected_before_effect_or_attempt_evidence() {
     assert_eq!(*calls.lock().unwrap(), 0);
 
     let journal = SqliteAttemptEvidenceJournal::open(&path).unwrap();
-    // No attempt key was ever materialized into the journal because failure
-    // happened before effect admission/instrumentation.
     let count: i64 = rusqlite::Connection::open(&path)
         .unwrap()
         .query_row("SELECT COUNT(*) FROM system_attempt_evidence", [], |row| row.get(0))

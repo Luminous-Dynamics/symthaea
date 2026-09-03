@@ -13,6 +13,7 @@ symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
 symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
 symthaea-system-broker = { path = "../symthaea-system-broker" }
 symthaea-authority-frontier = { path = "../symthaea-authority-frontier" }
+symthaea-authority-time = { path = "../symthaea-authority-time" }
 symthaea-xenia-authority = { path = "../symthaea-xenia-authority" }
 
 [dev-dependencies]

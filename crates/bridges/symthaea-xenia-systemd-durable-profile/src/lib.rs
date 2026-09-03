@@ -5,6 +5,7 @@
 //! This profile composes the existing semantic/security layers rather than
 //! replacing them:
 //! - Xenia proof verification happens upstream in `symthaea-xenia-authority`;
+//! - challenged multi-authority time supplies the admission-time wall-clock bound;
 //! - #305 remains the only systemd execution/accounting state machine;
 //! - #316 supplies checkpoint CAS semantics;
 //! - #320 supplies the concrete SQLite CAS backend;
@@ -16,12 +17,15 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 use symthaea_action_checkpoint::CheckpointHead;
-use symthaea_action_runtime::{ExecutionId, ReservationId};
-use symthaea_authority::{AuthorityContext, CapabilityGrant, Digest32, NegativeAuthorityFact};
+use symthaea_action_runtime::{ExecutionId, GrantUseState, ReservationId};
+use symthaea_authority::{
+    AuthorityContext, AuthorityEpoch, CapabilityGrant, Digest32, NegativeAuthorityFact,
+};
 use symthaea_authority_frontier::{
     CasCheckpointStoreAdapter, EstablishedGrantFrontier, FrontierError, establish_grant_frontier,
 };
 use symthaea_authority_frontier_sqlite::{SqliteCheckpointCasStore, SqliteFrontierError};
+use symthaea_authority_time::{AuthorityTimeError, VerifiedAuthorityTime};
 use symthaea_system_attempt_evidence::{
     AttemptEvidenceContext, AttemptEvidenceHead, SqliteAttemptEvidenceError,
     SqliteAttemptEvidenceJournal, instrument_attempt,
@@ -96,21 +100,25 @@ where
     ///
     /// Consuming `self` is deliberate: a V0.2 object represents one exact
     /// single-use grant lineage. Durable replay prevention still comes from CAS,
-    /// not from Rust move semantics alone.
+    /// not from Rust move semantics alone. Caller wall-clock values and caller
+    /// use counters are not accepted by this production profile.
     #[allow(clippy::too_many_arguments)]
     pub fn recover_verified_once(
         self,
         verified: VerifiedXeniaCapability,
+        authority_time: &VerifiedAuthorityTime,
+        current_epoch: AuthorityEpoch,
         plan: &RestartPlan,
         execution_id: ExecutionId,
         reservation_id: ReservationId,
-        authority_context: AuthorityContext,
         negative_facts: &[NegativeAuthorityFact],
     ) -> Result<DurableXeniaSystemdReceipt, DurableRecoveryError> {
         if verified.grant_digest() != self.grant_digest {
             return Err(DurableRecoveryError::VerifiedGrantMismatch);
         }
-        if authority_context.now_unix_s > verified.expires_at_unix_s() {
+        authority_time.require_subject(self.grant_digest.0)?;
+        let now_unix_s = authority_time.conservative_now_unix_s()?;
+        if now_unix_s > verified.expires_at_unix_s() {
             return Err(DurableRecoveryError::XeniaProofExpiredAtEffectEntry);
         }
         if verified.prior_checkpoint() != self.frontier.head {
@@ -159,7 +167,12 @@ where
             plan,
             execution_id,
             reservation_id,
-            authority_context,
+            AuthorityContext {
+                now_unix_s,
+                current_epoch,
+                // Broker admission replaces this with the exact durable account.
+                use_state: GrantUseState::default(),
+            },
             negative_facts,
         ) {
             Ok(receipt) => receipt,
@@ -255,6 +268,8 @@ pub enum DurableBootstrapError {
 
 #[derive(Debug, Error)]
 pub enum DurableRecoveryError {
+    #[error("verified authority time failed: {0}")]
+    AuthorityTime(#[from] AuthorityTimeError),
     #[error("verified Xenia proof belongs to a different capability grant")]
     VerifiedGrantMismatch,
     #[error("Xenia proof expired before effect entry")]

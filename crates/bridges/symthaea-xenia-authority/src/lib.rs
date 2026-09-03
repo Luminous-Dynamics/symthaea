@@ -10,7 +10,9 @@
 //!
 //! Signature validity is necessary but not sufficient for live authority. A
 //! stale signed authorization is rejected when its ledger frontier no longer
-//! matches the fresh Xenia checkpoint supplied for admission.
+//! matches the fresh Xenia checkpoint supplied for admission. Wall-clock time is
+//! not accepted from the caller: time-sensitive checks consume a short-lived,
+//! challenge-bound [`VerifiedAuthorityTime`] fact.
 
 #![deny(unsafe_code)]
 
@@ -20,12 +22,13 @@ mod workload;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use symthaea_action_checkpoint::CheckpointHead;
 use symthaea_authority::{CapabilityGrant, Digest32, PrincipalId};
+use symthaea_authority_time::{AuthorityTimeError, VerifiedAuthorityTime};
 use thiserror::Error;
 
 pub use protocol::{
     AGENT_CAPABILITY_ATTESTATION_SCHEMA, AGENT_CAPABILITY_AUTHORIZATION_DOMAIN,
     AGENT_CAPABILITY_AUTHORIZATION_SCHEMA_VERSION, ED25519_SIGNATURE_ALGORITHM,
-    TranscriptSignatureSuiteV1, XENIA_LEDGER_CHECKPOINT_SCHEMA, ProtocolError,
+    ProtocolError, TranscriptSignatureSuiteV1, XENIA_LEDGER_CHECKPOINT_SCHEMA,
     XeniaAgentAuthorizationV1, XeniaAgentCapabilityAttestationV1, XeniaCheckpointAnchorV1,
     XeniaLedgerCheckpointV1, XeniaSignatureEnvelopeV1,
 };
@@ -49,7 +52,7 @@ pub struct XeniaSessionExpectationV1 {
 pub struct XeniaFreshnessPolicyV1 {
     /// Maximum checkpoint age accepted at effect admission.
     pub max_checkpoint_age_s: u64,
-    /// Maximum tolerated checkpoint timestamp ahead of trusted wall clock.
+    /// Maximum tolerated checkpoint timestamp ahead of verified authority time.
     pub max_future_skew_s: u64,
 }
 
@@ -111,6 +114,12 @@ impl VerifiedXeniaCapability {
 
 /// Verify a Xenia-bound Symthaea capability before the Action Runtime may
 /// reserve it for consequential execution.
+///
+/// `authority_time` must be challenge-bound to the exact capability digest.
+/// Time is an interval, not a scalar: earliest-plausible time is used to prove
+/// that an authorization/checkpoint is not from the future, while the
+/// latest-plausible time is used to prove it has not expired or gone stale.
+/// This makes uncertainty fail closed in both temporal directions.
 #[allow(clippy::too_many_arguments)]
 pub fn verify_xenia_capability_v1(
     attestation: &XeniaAgentCapabilityAttestationV1,
@@ -120,7 +129,7 @@ pub fn verify_xenia_capability_v1(
     workload: &ExecutorWorkloadV1,
     expected_session: XeniaSessionExpectationV1,
     current_agent_checkpoint: CheckpointHead,
-    now_unix_s: u64,
+    authority_time: &VerifiedAuthorityTime,
     freshness: XeniaFreshnessPolicyV1,
 ) -> Result<VerifiedXeniaCapability, XeniaAuthorityError> {
     let authorization = &attestation.authorization;
@@ -133,10 +142,19 @@ pub fn verify_xenia_capability_v1(
         return Err(XeniaAuthorityError::UnsupportedAttestationSignatureSuite);
     }
 
+    let grant_digest = grant.digest();
+    authority_time.require_subject(grant_digest.0)?;
+    // The verification-time lower bound remains a valid conservative lower
+    // bound during this fact's very short lifetime because real time can only
+    // advance. The moving upper bound accounts for elapsed Linux boot time.
+    let (not_before_unix_s, _) = authority_time.interval_at_verification();
+    let not_after_unix_s = authority_time.conservative_now_unix_s()?;
+
     verify_fresh_xenia_checkpoint(
         fresh_xenia_checkpoint,
         trusted_xenia_ledger_public_key,
-        now_unix_s,
+        not_before_unix_s,
+        not_after_unix_s,
         freshness,
     )?;
 
@@ -159,14 +177,16 @@ pub fn verify_xenia_capability_v1(
         &attestation.signature.signature,
     )?;
 
-    if now_unix_s < authorization.issued_at_unix_s {
+    // To prove "already valid", even the earliest plausible current time must
+    // be at/after issuance. To prove "not expired", even the latest plausible
+    // current time must be at/before expiry.
+    if not_before_unix_s < authorization.issued_at_unix_s {
         return Err(XeniaAuthorityError::AuthorizationNotYetValid);
     }
-    if now_unix_s > authorization.expires_at_unix_s {
+    if not_after_unix_s > authorization.expires_at_unix_s {
         return Err(XeniaAuthorityError::AuthorizationExpired);
     }
 
-    let grant_digest = grant.digest();
     if authorization.capability_digest != grant_digest.0 {
         return Err(XeniaAuthorityError::CapabilityDigestMismatch);
     }
@@ -223,7 +243,8 @@ pub fn verify_xenia_capability_v1(
 fn verify_fresh_xenia_checkpoint(
     checkpoint: &XeniaLedgerCheckpointV1,
     trusted_public_key: [u8; 32],
-    now_unix_s: u64,
+    not_before_unix_s: u64,
+    not_after_unix_s: u64,
     freshness: XeniaFreshnessPolicyV1,
 ) -> Result<(), XeniaAuthorityError> {
     if checkpoint.ledger_public_key != trusted_public_key {
@@ -232,10 +253,16 @@ fn verify_fresh_xenia_checkpoint(
     if checkpoint.entry_count == 0 || checkpoint.head_hash == [0; 32] {
         return Err(XeniaAuthorityError::PreGenesisFreshnessCheckpoint);
     }
-    if checkpoint.timestamp_unix_secs > now_unix_s.saturating_add(freshness.max_future_skew_s) {
+    // A checkpoint is acceptably non-future only if it is no later than the
+    // earliest plausible current time plus explicitly tolerated skew.
+    if checkpoint.timestamp_unix_secs
+        > not_before_unix_s.saturating_add(freshness.max_future_skew_s)
+    {
         return Err(XeniaAuthorityError::LedgerCheckpointFromFuture);
     }
-    if now_unix_s.saturating_sub(checkpoint.timestamp_unix_secs)
+    // A checkpoint is acceptably fresh only if it remains within age even at
+    // the latest plausible current time.
+    if not_after_unix_s.saturating_sub(checkpoint.timestamp_unix_secs)
         > freshness.max_checkpoint_age_s
     {
         return Err(XeniaAuthorityError::LedgerCheckpointStale);
@@ -264,6 +291,8 @@ fn verify_ed25519(
 
 #[derive(Debug, Error)]
 pub enum XeniaAuthorityError {
+    #[error("verified authority time failed: {0}")]
+    AuthorityTime(#[from] AuthorityTimeError),
     #[error("invalid Xenia protocol object: {0}")]
     Protocol(#[from] ProtocolError),
     #[error("invalid executor workload: {0}")]
