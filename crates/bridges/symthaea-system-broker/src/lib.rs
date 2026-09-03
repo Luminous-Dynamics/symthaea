@@ -738,7 +738,7 @@ mod tests {
     use super::*;
     use std::collections::VecDeque;
 
-    #[derive(Debug, Error)]
+    #[derive(Debug, Error, Clone, Copy)]
     #[error("fake backend failure")]
     struct FakeBackendError;
 
