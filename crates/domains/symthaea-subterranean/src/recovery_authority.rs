@@ -6,6 +6,13 @@
 //! reviewed. This module does not verify signatures or the provenance of opaque
 //! digests; those remain responsibilities of the upstream trust/security boundary.
 
+pub mod qualification;
+
+pub use qualification::{
+    QualifiedRecoveryBasisV1, RecoveryHostBindingV1, RecoveryQualificationRejection,
+    qualify_recovery_basis, requalify_recovery_proposal,
+};
+
 use crate::operator_authority::OperatorConstraint;
 use crate::operator_protocol::{
     AuthenticationLevel, OperatorCommand, OperatorCommandEnvelope, OperatorId, OperatorRole,
@@ -93,16 +100,45 @@ impl RecoveryProposalV1 {
         }
     }
 
-    pub const fn proposal_id(self) -> u64 { self.proposal_id }
-    pub const fn active_constraint(self) -> OperatorConstraint { self.active_constraint }
-    pub const fn target_constraint(self) -> OperatorConstraint { self.target_constraint }
-    pub const fn safety_snapshot_digest(self) -> RecoveryDigest { self.safety_snapshot_digest }
-    pub const fn evidence_snapshot_digest(self) -> RecoveryDigest { self.evidence_snapshot_digest }
-    pub const fn deployment_identity_digest(self) -> RecoveryDigest { self.deployment_identity_digest }
-    pub const fn controller_epoch(self) -> u64 { self.controller_epoch }
-    pub const fn control_plane_generation(self) -> u64 { self.control_plane_generation }
-    pub const fn issued_step(self) -> u64 { self.issued_step }
-    pub const fn expires_step(self) -> u64 { self.expires_step }
+    pub const fn proposal_id(self) -> u64 {
+        self.proposal_id
+    }
+
+    pub const fn active_constraint(self) -> OperatorConstraint {
+        self.active_constraint
+    }
+
+    pub const fn target_constraint(self) -> OperatorConstraint {
+        self.target_constraint
+    }
+
+    pub const fn safety_snapshot_digest(self) -> RecoveryDigest {
+        self.safety_snapshot_digest
+    }
+
+    pub const fn evidence_snapshot_digest(self) -> RecoveryDigest {
+        self.evidence_snapshot_digest
+    }
+
+    pub const fn deployment_identity_digest(self) -> RecoveryDigest {
+        self.deployment_identity_digest
+    }
+
+    pub const fn controller_epoch(self) -> u64 {
+        self.controller_epoch
+    }
+
+    pub const fn control_plane_generation(self) -> u64 {
+        self.control_plane_generation
+    }
+
+    pub const fn issued_step(self) -> u64 {
+        self.issued_step
+    }
+
+    pub const fn expires_step(self) -> u64 {
+        self.expires_step
+    }
 
     pub fn validate(
         self,
@@ -133,7 +169,10 @@ impl RecoveryProposalV1 {
         if self.active_constraint != current_constraint {
             return Err(RecoveryProposalRejection::ActiveConstraintMismatch);
         }
-        if matches!(self.active_constraint, OperatorConstraint::None | OperatorConstraint::Mission(_)) {
+        if matches!(
+            self.active_constraint,
+            OperatorConstraint::None | OperatorConstraint::Mission(_)
+        ) {
             return Err(RecoveryProposalRejection::UnsupportedActiveConstraint);
         }
         if self.target_constraint != OperatorConstraint::None {
@@ -207,18 +246,50 @@ impl RecoveryApprovalEnvelopeV1 {
 mod tests {
     use super::*;
 
-    fn digest(byte: u8) -> RecoveryDigest { RecoveryDigest([byte; 32]) }
+    fn digest(byte: u8) -> RecoveryDigest {
+        RecoveryDigest([byte; 32])
+    }
 
     #[test]
     fn canonical_bytes_change_when_bound_evidence_changes() {
-        let a = RecoveryProposalV1::new(9, OperatorConstraint::EmergencyStop, digest(1), digest(2), digest(3), 4, 5, 10, 20);
-        let b = RecoveryProposalV1::new(9, OperatorConstraint::EmergencyStop, digest(1), digest(7), digest(3), 4, 5, 10, 20);
+        let a = RecoveryProposalV1::new(
+            9,
+            OperatorConstraint::EmergencyStop,
+            digest(1),
+            digest(2),
+            digest(3),
+            4,
+            5,
+            10,
+            20,
+        );
+        let b = RecoveryProposalV1::new(
+            9,
+            OperatorConstraint::EmergencyStop,
+            digest(1),
+            digest(7),
+            digest(3),
+            4,
+            5,
+            10,
+            20,
+        );
         assert_ne!(a.canonical_bytes(), b.canonical_bytes());
     }
 
     #[test]
     fn proposal_is_bound_to_exact_active_constraint() {
-        let proposal = RecoveryProposalV1::new(9, OperatorConstraint::HoldPosition, digest(1), digest(2), digest(3), 4, 5, 10, 20);
+        let proposal = RecoveryProposalV1::new(
+            9,
+            OperatorConstraint::HoldPosition,
+            digest(1),
+            digest(2),
+            digest(3),
+            4,
+            5,
+            10,
+            20,
+        );
         assert_eq!(
             proposal.validate(12, OperatorConstraint::EmergencyStop),
             Err(RecoveryProposalRejection::ActiveConstraintMismatch)
@@ -227,7 +298,17 @@ mod tests {
 
     #[test]
     fn approval_cannot_claim_to_predate_its_proposal() {
-        let proposal = RecoveryProposalV1::new(9, OperatorConstraint::HoldPosition, digest(1), digest(2), digest(3), 4, 5, 10, 20);
+        let proposal = RecoveryProposalV1::new(
+            9,
+            OperatorConstraint::HoldPosition,
+            digest(1),
+            digest(2),
+            digest(3),
+            4,
+            5,
+            10,
+            20,
+        );
         let approval = RecoveryApprovalEnvelopeV1 {
             operator: OperatorId(1),
             role: OperatorRole::SafetyOfficer,
