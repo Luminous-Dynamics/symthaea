@@ -194,10 +194,18 @@ impl GenerationLifecycleManifestV1 {
                     facts.generation
                 ));
             }
-            running += usize::from(facts.running);
-            known_good += usize::from(facts.known_good);
-            candidate += usize::from(facts.candidate);
-            previous += usize::from(facts.previous);
+            if facts.running {
+                running += 1;
+            }
+            if facts.known_good {
+                known_good += 1;
+            }
+            if facts.candidate {
+                candidate += 1;
+            }
+            if facts.previous {
+                previous += 1;
+            }
         }
 
         validate_role_cardinality("running", running)?;
@@ -230,7 +238,7 @@ fn validate_store_path(path: &str) -> Result<(), String> {
     if !path.starts_with("/nix/store/") || path == "/nix/store/" {
         return Err(format!("generation store path is outside /nix/store: {path}"));
     }
-    if path.contains(['\n', '\r', '\0']) {
+    if path.chars().any(|ch| matches!(ch, '\n' | '\r' | '\0')) {
         return Err("generation store path contains control characters".into());
     }
     Ok(())
