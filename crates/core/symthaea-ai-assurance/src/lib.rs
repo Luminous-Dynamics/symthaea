@@ -29,13 +29,18 @@
 //! principal/domain guarantee actually enforced rather than overloading the word
 //! “independent.” [`budget_purpose`] adds a separate quantitative-policy
 //! admission proving which trusted purpose policy approved the exact conserved
-//! resource envelope for the exact action.
+//! resource envelope for the exact action. [`effect_permit`] adds a latched
+//! host-owned stop/resume domain that linearizes effect admission against
+//! concurrent revocation without holding a coarse lock across the effect itself.
+//! Its typed commitment joins the exact action, a digest of the complete host
+//! preflight-authority snapshot, and a digest of adapter version/point-of-no-return
+//! semantics so effect admission cannot be replayed across changed safety context.
 //!
 //! Security-sensitive state-changing integrations should compose these layers so
 //! trust anchors, validation time, concrete resources, policy admission,
 //! revocation, temporal bounds, quantitative capacity, approved purpose,
-//! effect-attempt evidence, and separation-of-duties claims remain host-owned
-//! rather than model-selected.
+//! effect-attempt evidence, separation-of-duties claims, and effect-entry
+//! admission remain host-owned rather than model-selected.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
@@ -46,6 +51,7 @@ pub mod budget_guard;
 pub mod budget_purpose;
 pub mod capability;
 pub mod effect_guard;
+pub mod effect_permit;
 pub mod host;
 pub mod independence;
 pub mod policy;
@@ -85,6 +91,12 @@ pub use effect_guard::{
     EffectAssuredEvidenceReceipt, EffectAttemptEvidence, EffectAttemptFailure,
     EffectAttemptOutcome, EffectGuardedAction, EffectGuardedAuthorizeError, EffectGuardedRuntime,
     EffectInnerExecutionError, ExecutionPreflightError,
+};
+pub use effect_permit::{
+    EffectAdmissionCommitment, EffectEntryActivity, EffectEntryDomain, EffectEntryDomainId,
+    EffectEntryEpoch, EffectEntryError, EffectEntryPermit, EffectEntryPermitId, EffectEntryReceipt,
+    EffectEntrySequence, EffectEntryTicket, EffectEntryTicketId, EffectResumeReceipt,
+    EffectRevocationReceipt,
 };
 pub use host::{ResolutionError, ResolutionEvidenceReceipt, RuntimeAction, TrustedRuntime};
 pub use independence::{
