@@ -16,6 +16,9 @@ pub(crate) mod restore_operator;
 pub mod restore_semantics;
 #[path = "operational_checkpoint_validation.rs"]
 mod validation;
+#[cfg(test)]
+#[path = "restore_source_adversarial.rs"]
+mod restore_source_adversarial;
 
 use crate::actuator_isolation::ActuatorIsolationSupervisor;
 use crate::controller::{CheckpointError, ControllerCheckpoint};
