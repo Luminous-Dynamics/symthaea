@@ -239,6 +239,11 @@ in {
           # and owner/group accessible, but unrelated local users cannot write it.
           UMask = if cfg.telemetry.enable then "0007" else "0022";
 
+          # Keep only the one capability that may still be needed for DRM master
+          # transitions. Physical/OVMF qualification must prove whether even this
+          # can be removed; all unrelated root capabilities are dropped now.
+          CapabilityBoundingSet = [ "CAP_SYS_ADMIN" ];
+
           NoNewPrivileges = true;
           ProtectSystem = "strict";
           ProtectHome = true;
