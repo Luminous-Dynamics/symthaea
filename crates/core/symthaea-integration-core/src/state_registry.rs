@@ -39,6 +39,7 @@ impl IntegrationRegistry {
                 "integration `{id}` state evidence rejected by admission budget: {error}"
             ))
         })?;
+        validate_state_snapshot_time_consistency(id, snapshot)?;
         validate_state_snapshot_origins(snapshot).map_err(|error| {
             IntegrationError::InvalidOutput(format!(
                 "integration `{id}` state evidence rejected by origin contract: {error}"
@@ -73,6 +74,7 @@ impl IntegrationRegistry {
             ))
         })?;
         for snapshot in &history.snapshots {
+            validate_state_snapshot_time_consistency(id, snapshot)?;
             validate_state_snapshot_origins(snapshot).map_err(|error| {
                 IntegrationError::InvalidOutput(format!(
                     "integration `{id}` state history rejected by origin contract: {error}"
@@ -90,4 +92,23 @@ impl IntegrationRegistry {
         }
         Ok(())
     }
+}
+
+fn validate_state_snapshot_time_consistency(
+    id: &IntegrationId,
+    snapshot: &StateSnapshot,
+) -> Result<(), IntegrationError> {
+    if let Some(assertion) = snapshot
+        .assertions
+        .iter()
+        .find(|assertion| assertion.observed_at_unix_ms > snapshot.collected_at_unix_ms)
+    {
+        return Err(IntegrationError::InvalidOutput(format!(
+            "integration `{id}` state assertion `{}` is observed at {} after snapshot capture {}",
+            assertion.assertion_id,
+            assertion.observed_at_unix_ms,
+            snapshot.collected_at_unix_ms
+        )));
+    }
+    Ok(())
 }
