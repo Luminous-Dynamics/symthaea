@@ -7,7 +7,6 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use crate::{
     interoception_capsule_archive::{self, VerifiedEvidenceCapsuleArchive},
@@ -34,6 +33,7 @@ pub struct LiveActionsVerification {
     pub run_attempt: u32,
     pub verified_job_count: usize,
     pub workflow_file_sha256: String,
+    pub workflow_git_blob_sha1: String,
     pub verification_transport: String,
 }
 
@@ -90,6 +90,11 @@ struct JobIdentity {
     conclusion: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct ContentIdentity {
+    sha: String,
+}
+
 pub fn authorize_promotion_live(
     bundle_path: &Path,
     repo_root: &Path,
@@ -108,7 +113,7 @@ pub fn authorize_promotion_live(
         );
     }
 
-    let bundle = read_bundle(bundle_path)?;
+    let bundle = read_canonical_bundle(bundle_path)?;
     bundle
         .validate()
         .map_err(|errors| anyhow::anyhow!("qualification bundle validation failed: {}", errors.join("; ")))?;
@@ -195,7 +200,7 @@ pub fn authorize_promotion_live(
         schema_version: PROMOTION_AUTHORIZATION_ENVELOPE_SCHEMA_VERSION,
         verifier_policy_version: VERIFIER_POLICY_VERSION.into(),
         verification_mode:
-            "frozen-source+local-exact-bytes+capsule-bytes+live-github-exact-attempt+content-addressed-archive-v1"
+            "frozen-source+canonical-bundle+local-exact-bytes+capsule-bytes+live-github-exact-attempt+content-addressed-archive-v1"
                 .into(),
         verified_evidence,
         live_actions_verification: live_actions,
@@ -211,8 +216,6 @@ pub fn verify_actions_live(
     archive_dir: &Path,
     repo_root: Option<&Path>,
 ) -> Result<LiveActionsVerification> {
-    // The archive is durable replay evidence, not an authentication oracle.  It must
-    // first verify internally and must then agree with GitHub's live exact-attempt API.
     let archived_verified = interoception_qualification::verify_actions_archive(archive_dir, repo_root)?;
     let manifest_bytes = fs::read(archive_dir.join("manifest.json"))?;
     let manifest: ActionsArchiveManifest =
@@ -295,15 +298,14 @@ pub fn verify_actions_live(
         "repos/{}/contents/{}?ref={}",
         manifest.repository, manifest.workflow_path, manifest.subject_commit
     );
-    let live_workflow = gh_api(&[
-        "-H",
-        "Accept: application/vnd.github.raw+json",
-        &workflow_endpoint,
-    ])?;
-    let live_workflow_sha256 = sha256_bytes(&live_workflow);
-    if live_workflow_sha256 != manifest.workflow_file_sha256 {
+    let live_content_bytes = gh_api(&[&workflow_endpoint])?;
+    let live_content: ContentIdentity =
+        serde_json::from_slice(&live_content_bytes).context("parse live workflow content identity")?;
+    validate_sha1("live workflow Git blob SHA", &live_content.sha)?;
+    let archived_workflow_blob = git_hash_object(&archive_dir.join("workflow.yml"))?;
+    if archived_workflow_blob != live_content.sha {
         bail!(
-            "live exact-SHA workflow source differs from archived workflow source for gate {}",
+            "live exact-SHA workflow Git blob differs from archived workflow source for gate {}",
             manifest.gate_id
         );
     }
@@ -325,7 +327,8 @@ pub fn verify_actions_live(
         run_id: manifest.run_id,
         run_attempt: manifest.run_attempt,
         verified_job_count: declared_total,
-        workflow_file_sha256: live_workflow_sha256,
+        workflow_file_sha256: archived_verified.workflow_file_sha256,
+        workflow_git_blob_sha1: live_content.sha,
         verification_transport: "GitHub REST API via gh authenticated HTTPS request".into(),
     })
 }
@@ -418,15 +421,53 @@ fn bind_actions_to_bundle(
     }
 }
 
-fn read_bundle(path: &Path) -> Result<QualificationEvidenceBundle> {
+fn read_canonical_bundle(path: &Path) -> Result<QualificationEvidenceBundle> {
     let bytes = fs::read(path).with_context(|| format!("read qualification bundle {}", path.display()))?;
-    serde_json::from_slice(&bytes).context("parse qualification evidence bundle")
+    let bundle: QualificationEvidenceBundle =
+        serde_json::from_slice(&bytes).context("parse qualification evidence bundle")?;
+    let canonical = serde_json::to_vec(&bundle).context("re-serialize qualification bundle canonically")?;
+    if bytes != canonical {
+        bail!(
+            "qualification bundle bytes are not the canonical compact JSON representation required by the frozen v0.1 bundle contract"
+        );
+    }
+    Ok(bundle)
 }
 
 fn bundle_sha256(bundle: &QualificationEvidenceBundle) -> Result<String> {
     bundle
         .sha256()
         .map_err(|errors| anyhow::anyhow!("qualification bundle digest failed: {}", errors.join("; ")))
+}
+
+fn git_hash_object(path: &Path) -> Result<String> {
+    let output = Command::new("git")
+        .arg("hash-object")
+        .arg(path)
+        .output()
+        .with_context(|| format!("git hash-object {}", path.display()))?;
+    if !output.status.success() {
+        bail!(
+            "git hash-object failed for {}: {}",
+            path.display(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let value = String::from_utf8(output.stdout).context("git hash-object emitted non-UTF-8 output")?;
+    let value = value.trim().to_string();
+    validate_sha1("archived workflow Git blob SHA", &value)?;
+    Ok(value)
+}
+
+fn validate_sha1(name: &str, value: &str) -> Result<()> {
+    if value.len() != 40
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        bail!("{name} must be 40 lowercase hexadecimal characters");
+    }
+    Ok(())
 }
 
 fn gh_api(args: &[&str]) -> Result<Vec<u8>> {
@@ -443,14 +484,4 @@ fn gh_api(args: &[&str]) -> Result<Vec<u8>> {
         );
     }
     Ok(output.stdout)
-}
-
-fn sha256_bytes(bytes: &[u8]) -> String {
-    let digest = Sha256::digest(bytes);
-    let mut encoded = String::with_capacity(64);
-    use std::fmt::Write as _;
-    for byte in digest {
-        write!(&mut encoded, "{byte:02x}").expect("writing to String cannot fail");
-    }
-    encoded
 }
