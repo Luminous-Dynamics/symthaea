@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Qualification-only CLI for the TPM2 adapter.
 //!
-//! This binary is intentionally not a policy source for production. The
-//! `verify` subcommand derives a temporary reviewed-policy fixture from the
-//! exact files supplied by the qualification workflow so the real production
-//! quote/checkquote path can be exercised against swtpm.
+//! The `verify-nix` path intentionally exercises the production verifier-tool
+//! policy: both reviewed entry points must resolve under `/nix/store`. There is
+//! no host-tool verification mode in this probe.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -33,7 +32,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             Ok(())
         }
         [_, command, quote_tool, check_tool, ak_context, ak_public, profile, pcrs]
-            if command == "verify" =>
+            if command == "verify-nix" =>
         {
             let approved = Digest32(parse_hex_32(profile)?);
             let mut selection = pcrs
@@ -53,9 +52,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 trusted_ak_public_digest: digest_file(Path::new(ak_public))?,
                 sha256_pcr_selection: selection,
                 approved_pcr_profile_digests: vec![approved],
-                // swtpm qualification runs on the GitHub host. Production Nix
-                // policy should set this true and pin Nix-store tool binaries.
-                require_nix_store_tools: false,
+                require_nix_store_tools: true,
                 maximum_challenge_age_ns: 5_000_000_000,
                 maximum_post_verification_age_ns: 5_000_000_000,
             };
@@ -89,7 +86,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             println!("challenge_digest={}", hex(&verified.challenge_digest().0));
             Ok(())
         }
-        _ => Err("usage: tpm2_attestation_probe profile-digest <pcr-file> | verify <tpm2_quote> <tpm2_checkquote> <ak.ctx> <ak-public> <approved-pcr-digest-hex> <comma-separated-pcrs>".into()),
+        _ => Err("usage: tpm2_attestation_probe profile-digest <pcr-file> | verify-nix <nix-tpm2-quote-wrapper> <nix-tpm2-checkquote-wrapper> <ak.ctx> <ak-public> <approved-pcr-digest-hex> <comma-separated-pcrs>".into()),
     }
 }
 
