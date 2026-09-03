@@ -358,7 +358,7 @@ pub fn qualify_recovery_basis(
 
 /// Recompute the live recovery basis and require an existing portable proposal
 /// to match it exactly. A future embodiment-level approval wrapper should call
-/// this before forwarding the approval into `OperatorAuthority::approve_recovery`.
+/// this before forwarding the approval into the internal authority state machine.
 pub fn requalify_recovery_proposal(
     embodiment: &SubterraneanEmbodiment,
     host: RecoveryHostBindingV1,
@@ -372,10 +372,11 @@ pub fn requalify_recovery_proposal(
 }
 
 impl OperatorAuthority {
-    /// Production-oriented issuance path. The safety/evidence commitments are
-    /// copied from a host-local qualified basis rather than supplied by the
-    /// caller as arbitrary digests.
-    pub fn issue_qualified_recovery_proposal(
+    /// Internal qualified issuance primitive. The safety/evidence commitments are
+    /// copied from a host-local qualified basis rather than supplied as arbitrary
+    /// digests. Public issuance must be owned by the embodiment/control-plane
+    /// that owns the authoritative `OperatorAuthority` instance.
+    pub(crate) fn issue_qualified_recovery_proposal(
         &mut self,
         basis: QualifiedRecoveryBasisV1,
         proposal_id: u64,
