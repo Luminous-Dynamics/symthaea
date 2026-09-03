@@ -10,33 +10,18 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RestoreSemantics {
-    /// Historical state may be reconstructed after domain validation, but this
-    /// classification alone never implies productive authority.
     HistoricalReplace,
-    /// Restore may retain or further restrict live authority, but may not widen
-    /// it without a separately verified recovery transition.
     AuthorityMonotone,
-    /// Evidence/replay state must merge conservatively: counters do not move
-    /// backward and counterevidence does not disappear merely because it is old.
     EvidenceMerge,
-    /// The checkpointed value is historical evidence only; current authority is
-    /// re-derived from current physical/evidence inputs before productive use.
     DerivedRequalify,
-    /// The checkpointed transition must be reconciled against an external/live
-    /// fact (for example the actually running software artifact) before use.
     TransitionReconcile,
-    /// Volatile authority must not resurrect from persistence.
     EphemeralDrop,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MissingStatePolicy {
-    /// The representation is incomplete and must be rejected before restore.
     Reject,
-    /// Missing state may deserialize only into an explicitly restrictive /
-    /// unknown state that requires fresh qualification before productive use.
     ConservativeRequalify,
-    /// The field is intentionally ephemeral and absence is the correct state.
     Drop,
 }
 
@@ -57,14 +42,9 @@ pub enum RestoreDomain {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RestoreDomainContract {
     pub domain: RestoreDomain,
-    /// Exact `SubterraneanOperationalCheckpoint` field name.
     pub field: &'static str,
-    /// One domain can carry several restore concerns. For example temporal state
-    /// contains both evidence history and a live authority latch.
     pub semantics: &'static [RestoreSemantics],
     pub missing: MissingStatePolicy,
-    /// True when restoring a less restrictive value could increase productive
-    /// capability directly or indirectly.
     pub authority_relevant: bool,
 }
 
@@ -81,7 +61,10 @@ const OPERATOR_SEMANTICS: &[RestoreSemantics] = &[
     RestoreSemantics::EvidenceMerge,
     RestoreSemantics::EphemeralDrop,
 ];
-const DEGRADED_SEMANTICS: &[RestoreSemantics] = &[RestoreSemantics::AuthorityMonotone];
+const DEGRADED_SEMANTICS: &[RestoreSemantics] = &[
+    RestoreSemantics::AuthorityMonotone,
+    RestoreSemantics::EvidenceMerge,
+];
 const UPDATE_SEMANTICS: &[RestoreSemantics] = &[RestoreSemantics::TransitionReconcile];
 const SENSOR_SEMANTICS: &[RestoreSemantics] = &[RestoreSemantics::EvidenceMerge];
 const ACTUATOR_SEMANTICS: &[RestoreSemantics] = &[
@@ -98,12 +81,6 @@ const TEMPORAL_SEMANTICS: &[RestoreSemantics] = &[
     RestoreSemantics::EvidenceMerge,
 ];
 
-/// Complete restore-contract registry for fields of
-/// `SubterraneanOperationalCheckpoint` at schema v3.
-///
-/// The registry is descriptive until RA-17 migrates `load_operational_checkpoint`
-/// to enforce each contract. Tests deliberately fail if security-critical fields
-/// are later added without extending this table.
 pub const OPERATIONAL_RESTORE_CONTRACTS: &[RestoreDomainContract] = &[
     RestoreDomainContract {
         domain: RestoreDomain::Controller,
@@ -217,12 +194,7 @@ mod tests {
             .iter()
             .filter(|contract| contract.authority_relevant)
         {
-            assert_ne!(
-                contract.missing,
-                MissingStatePolicy::Drop,
-                "authority-relevant checkpoint field {} cannot disappear as ordinary state",
-                contract.field
-            );
+            assert_ne!(contract.missing, MissingStatePolicy::Drop);
         }
     }
 
@@ -235,12 +207,9 @@ mod tests {
             RestoreDomain::PartitionRecovery,
             RestoreDomain::TemporalAssurance,
         ] {
-            assert!(
-                contract_for(domain)
-                    .semantics
-                    .contains(&RestoreSemantics::AuthorityMonotone),
-                "{domain:?} must carry AuthorityMonotone restore semantics"
-            );
+            assert!(contract_for(domain)
+                .semantics
+                .contains(&RestoreSemantics::AuthorityMonotone));
         }
     }
 
@@ -248,6 +217,7 @@ mod tests {
     fn evidence_domains_cannot_use_historical_replacement() {
         for domain in [
             RestoreDomain::OperatorAuthority,
+            RestoreDomain::DegradedSupervisor,
             RestoreDomain::SensorFusion,
             RestoreDomain::ActuatorIsolation,
             RestoreDomain::PartitionRecovery,
@@ -265,6 +235,13 @@ mod tests {
         assert!(contract.semantics.contains(&RestoreSemantics::AuthorityMonotone));
         assert!(contract.semantics.contains(&RestoreSemantics::EvidenceMerge));
         assert!(contract.semantics.contains(&RestoreSemantics::EphemeralDrop));
+    }
+
+    #[test]
+    fn degraded_restore_preserves_latches_and_failure_evidence() {
+        let contract = contract_for(RestoreDomain::DegradedSupervisor);
+        assert!(contract.semantics.contains(&RestoreSemantics::AuthorityMonotone));
+        assert!(contract.semantics.contains(&RestoreSemantics::EvidenceMerge));
     }
 
     #[test]
