@@ -11,7 +11,7 @@
 //! 4. verify the exact Xenia receipt/payload with the fixed hybrid verifier;
 //! 5. require the physical-interlock report to name the same envelope, device, and
 //!    current transport-trust generation; and
-//! 6. return only an audit-bearing `EvidenceVerifiedNoActuation` result.
+//! 6. return only an audit-bearing `IngressValidatedNoActuation` result.
 //!
 //! Caller-selected trust heads, clocks, verifiers, policies, runtime observations,
 //! semantic checkpoints, and HAL configuration are absent from the IPC request. Later
@@ -342,7 +342,7 @@ impl ActuationGuardServer {
     /// Accept and completely process exactly one connection before another may start.
     ///
     /// Unauthorized peers are closed without an application response. Authorized peers
-    /// receive only `EvidenceVerifiedNoActuation` or the generic `Rejected` status; the
+    /// receive only `IngressValidatedNoActuation` or the generic `Rejected` status; the
     /// detailed rejection remains local in the returned outcome for privileged audit.
     pub async fn serve_one(&mut self) -> Result<GuardServeOutcome, GuardServerError> {
         let (mut stream, _) = self.listener.accept().await.map_err(GuardServerError::Accept)?;
@@ -367,10 +367,13 @@ impl ActuationGuardServer {
             Ok(ingress) => {
                 write_response(
                     &mut stream,
-                    GuardResponseStatusV1::EvidenceVerifiedNoActuation,
+                    GuardResponseStatusV1::IngressValidatedNoActuation,
                 )
                 .await?;
-                Ok(GuardServeOutcome::EvidenceVerifiedNoActuation { peer, ingress })
+                Ok(GuardServeOutcome::IngressValidatedNoActuation {
+                    peer,
+                    ingress: Box::new(ingress),
+                })
             }
             Err(error) => {
                 let _ = write_response(&mut stream, GuardResponseStatusV1::Rejected).await;
@@ -391,13 +394,14 @@ impl ActuationGuardServer {
 /// Privileged local outcome from one completely serialized connection.
 #[derive(Debug)]
 pub enum GuardServeOutcome {
-    /// Evidence crossed the ingress boundary and passed fixed transport/cross-binding
-    /// verification. No actuator authority or physical I/O occurred.
-    EvidenceVerifiedNoActuation {
+    /// The ingress stage passed fixed transport/cross-binding verification. The
+    /// controller signature, semantic state, final gate, JIT fence and physical I/O are
+    /// still outstanding.
+    IngressValidatedNoActuation {
         /// Kernel-authenticated caller.
         peer: GuardPeerIdentity,
         /// Non-authorizing verified ingress state for a later local guard stage.
-        ingress: VerifiedGuardIngress,
+        ingress: Box<VerifiedGuardIngress>,
     },
     /// Authorized peer was rejected. Detailed reason is local-only and is never written
     /// to the unprivileged socket.
@@ -413,8 +417,9 @@ pub enum GuardServeOutcome {
 /// reason, trust generation, key identity, device state or policy detail.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GuardResponseStatusV1 {
-    /// Evidence is internally consistent so far; no actuation occurred or was authorized.
-    EvidenceVerifiedNoActuation,
+    /// Only the ingress transport/cross-binding stage passed. No actuation was authorized
+    /// and no controller-signature, semantic/JIT or HAL claim is implied.
+    IngressValidatedNoActuation,
     /// Generic fail-closed result.
     Rejected,
 }
@@ -458,7 +463,8 @@ async fn write_response(
     if bytes.is_empty() || bytes.len() > MAX_GUARD_RESPONSE_FRAME_BYTES {
         return Err(GuardServerError::ResponseEncodingOutOfBounds);
     }
-    let length = u32::try_from(bytes.len()).map_err(|_| GuardServerError::ResponseEncodingOutOfBounds)?;
+    let length =
+        u32::try_from(bytes.len()).map_err(|_| GuardServerError::ResponseEncodingOutOfBounds)?;
     stream
         .write_all(&length.to_le_bytes())
         .await
@@ -661,7 +667,7 @@ mod tests {
     fn response_vocabulary_cannot_claim_authority_or_actuation() {
         let response = GuardResponseV1 {
             schema_version: ACTUATION_GUARD_RESPONSE_SCHEMA_VERSION,
-            status: GuardResponseStatusV1::EvidenceVerifiedNoActuation,
+            status: GuardResponseStatusV1::IngressValidatedNoActuation,
         };
         let bytes = bincode::serialize(&response).unwrap();
         let decoded: GuardResponseV1 = bincode::deserialize(&bytes).unwrap();
