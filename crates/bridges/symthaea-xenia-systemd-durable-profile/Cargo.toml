@@ -9,6 +9,7 @@ publish = false
 [dependencies]
 bincode = { workspace = true }
 blake3 = { workspace = true }
+serde = { workspace = true }
 thiserror = { workspace = true }
 symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
 symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
@@ -18,3 +19,6 @@ symthaea-authority-frontier-sqlite = { path = "../symthaea-authority-frontier-sq
 symthaea-system-attempt-evidence = { path = "../symthaea-system-attempt-evidence" }
 symthaea-system-broker = { path = "../symthaea-system-broker" }
 symthaea-xenia-authority = { path = "../symthaea-xenia-authority" }
+
+[dev-dependencies]
+ed25519-dalek = { workspace = true }
