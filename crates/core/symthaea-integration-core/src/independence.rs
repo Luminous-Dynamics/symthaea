@@ -275,9 +275,9 @@ mod tests {
     #[test]
     fn three_reexports_of_one_measurement_count_as_one_possible_origin() {
         let observations = vec![
-            observation("a", "same", None, None),
-            observation("b", "same", None, None),
-            observation("c", "same", None, None),
+            observation("a", "local-a", None, Some("procfs:node-1")),
+            observation("b", "local-b", None, Some("procfs:node-1")),
+            observation("c", "local-c", None, Some("procfs:node-1")),
         ];
         let assessment = assess_independence(&observations).unwrap();
         assert_eq!(assessment.reports, 3);
