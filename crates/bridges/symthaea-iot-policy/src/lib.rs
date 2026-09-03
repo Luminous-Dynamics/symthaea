@@ -14,8 +14,10 @@
 //!
 //! Registry snapshots are sequence-numbered, hash chained, canonicalized before
 //! hashing, and can be restored only against an externally retained
-//! [`ActuationPolicyHead`]. This makes policy rollback/collision detectable once
-//! the owner persists the latest head.
+//! [`ActuationPolicyHead`]. Policy identities are persistent lifecycle records:
+//! successor snapshots may add policy IDs but may not delete an existing ID,
+//! roll its revision backward, change bytes at the same revision, or reactivate a
+//! retired/revoked policy. Revocation is sticky.
 //!
 //! ## Trust boundary
 //!
@@ -29,7 +31,7 @@
 
 #![deny(unsafe_code)]
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 use symthaea_authority::{Digest32, Operation, ResourceRef, RiskBudget};
@@ -47,6 +49,35 @@ pub const ACTUATION_POLICY_DOMAIN: &[u8] = b"symthaea-iot-actuation-policy-v1\0"
 /// Domain separator for policy-snapshot commitments.
 pub const ACTUATION_POLICY_SNAPSHOT_DOMAIN: &[u8] = b"symthaea-iot-policy-snapshot-v1\0";
 
+/// Monotonic lifecycle of one policy identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ActuationPolicyStatus {
+    /// Policy may be selected while its validity window and registry are fresh.
+    Active,
+    /// Policy has been intentionally retired and may never become active again.
+    Retired,
+    /// Policy has been revoked. Revocation is terminal/sticky.
+    Revoked,
+}
+
+impl ActuationPolicyStatus {
+    const fn tag(self) -> u8 {
+        match self {
+            Self::Active => 0,
+            Self::Retired => 1,
+            Self::Revoked => 2,
+        }
+    }
+
+    fn transition_allowed(self, next: Self) -> bool {
+        match self {
+            Self::Active => true,
+            Self::Retired => matches!(next, Self::Retired | Self::Revoked),
+            Self::Revoked => next == Self::Revoked,
+        }
+    }
+}
+
 /// Trusted-configuration policy for one exact physical resource and operation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ActuationPolicyV1 {
@@ -56,6 +87,8 @@ pub struct ActuationPolicyV1 {
     pub policy_id: String,
     /// Monotonic semantic revision of this policy identity.
     pub revision: u64,
+    /// Monotonic policy lifecycle.
+    pub status: ActuationPolicyStatus,
     /// Exact protected physical resource.
     pub device: ResourceRef,
     /// Exact protected semantic operation.
@@ -125,7 +158,8 @@ impl ActuationPolicyV1 {
 
     /// Whether this policy is selectable at the trusted wall-clock value.
     pub fn active_at(&self, now_unix_s: u64) -> bool {
-        now_unix_s >= self.not_before_unix_s
+        self.status == ActuationPolicyStatus::Active
+            && now_unix_s >= self.not_before_unix_s
             && self
                 .not_after_unix_s
                 .is_none_or(|not_after| now_unix_s < not_after)
@@ -142,6 +176,7 @@ impl ActuationPolicyV1 {
         h.update(&self.schema_version.to_be_bytes());
         update_string(&mut h, &self.policy_id);
         h.update(&self.revision.to_be_bytes());
+        h.update(&[self.status.tag()]);
         update_string(&mut h, &self.device.0);
         update_string(&mut h, &self.operation.0);
         let Digest32(safety_digest) = self.safety.digest();
@@ -154,7 +189,9 @@ impl ActuationPolicyV1 {
                 h.update(&[1]);
                 h.update(&value.to_be_bytes());
             }
-            None => h.update(&[0]),
+            None => {
+                h.update(&[0]);
+            }
         }
         Digest32(*h.finalize().as_bytes())
     }
@@ -173,7 +210,7 @@ pub struct ActuationPolicySnapshotV1 {
     pub expires_at_unix_s: u64,
     /// Previous snapshot commitment; absent only for sequence 1.
     pub previous_snapshot_digest: Option<Digest32>,
-    /// Active policies in this generation. Policy IDs are unique within a snapshot.
+    /// Complete policy lifecycle table for this generation. IDs are unique.
     pub policies: Vec<ActuationPolicyV1>,
 }
 
@@ -234,7 +271,9 @@ impl ActuationPolicySnapshotV1 {
                 h.update(&[1]);
                 h.update(&value);
             }
-            None => h.update(&[0]),
+            None => {
+                h.update(&[0]);
+            }
         }
         h.update(&(policies.len() as u64).to_be_bytes());
         for policy in policies {
@@ -242,6 +281,13 @@ impl ActuationPolicySnapshotV1 {
             h.update(&value);
         }
         Ok(Digest32(*h.finalize().as_bytes()))
+    }
+
+    fn policy_map(&self) -> BTreeMap<&str, &ActuationPolicyV1> {
+        self.policies
+            .iter()
+            .map(|policy| (policy.policy_id.as_str(), policy))
+            .collect()
     }
 }
 
@@ -302,6 +348,7 @@ impl ActuationPolicyRegistry {
         if snapshot.issued_at_unix_s < self.snapshot.issued_at_unix_s {
             return Err(ActuationPolicyError::IssuedAtRegressed);
         }
+        validate_policy_lifecycle_successor(&self.snapshot, &snapshot)?;
         let head = ActuationPolicyHead {
             sequence: snapshot.sequence,
             digest: snapshot.digest()?,
@@ -417,6 +464,43 @@ impl ActuationPolicyHandle<'_> {
     }
 }
 
+fn validate_policy_lifecycle_successor(
+    previous: &ActuationPolicySnapshotV1,
+    next: &ActuationPolicySnapshotV1,
+) -> Result<(), ActuationPolicyError> {
+    let previous_map = previous.policy_map();
+    let next_map = next.policy_map();
+
+    for (policy_id, old) in previous_map {
+        let Some(new) = next_map.get(policy_id).copied() else {
+            return Err(ActuationPolicyError::PolicyIdentityRemoved(
+                policy_id.to_string(),
+            ));
+        };
+        if new.revision < old.revision {
+            return Err(ActuationPolicyError::PolicyRevisionRollback {
+                policy_id: policy_id.to_string(),
+                previous: old.revision,
+                proposed: new.revision,
+            });
+        }
+        if new.revision == old.revision && new.digest() != old.digest() {
+            return Err(ActuationPolicyError::PolicyRevisionCollision {
+                policy_id: policy_id.to_string(),
+                revision: old.revision,
+            });
+        }
+        if !old.status.transition_allowed(new.status) {
+            return Err(ActuationPolicyError::PolicyLifecycleRollback {
+                policy_id: policy_id.to_string(),
+                previous: old.status,
+                proposed: new.status,
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Structural, lineage, or selection failure for actuation policy.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ActuationPolicyError {
@@ -466,6 +550,22 @@ pub enum ActuationPolicyError {
     PredecessorMismatch,
     #[error("policy snapshot issued-at time regressed")]
     IssuedAtRegressed,
+    #[error("policy identity was removed from a successor snapshot: {0}")]
+    PolicyIdentityRemoved(String),
+    #[error("policy revision rolled back for {policy_id}: previous {previous}, proposed {proposed}")]
+    PolicyRevisionRollback {
+        policy_id: String,
+        previous: u64,
+        proposed: u64,
+    },
+    #[error("policy bytes changed without a revision increase for {policy_id} revision {revision}")]
+    PolicyRevisionCollision { policy_id: String, revision: u64 },
+    #[error("policy lifecycle rolled back for {policy_id}: {previous:?} -> {proposed:?}")]
+    PolicyLifecycleRollback {
+        policy_id: String,
+        previous: ActuationPolicyStatus,
+        proposed: ActuationPolicyStatus,
+    },
     #[error("restored policy snapshot does not match externally retained head")]
     TrustedHeadMismatch,
     #[error("policy snapshot is not fresh at the selection time")]
@@ -513,6 +613,7 @@ mod tests {
             schema_version: ACTUATION_POLICY_SCHEMA_VERSION,
             policy_id: id.into(),
             revision,
+            status: ActuationPolicyStatus::Active,
             device: device.clone(),
             operation: operation.clone(),
             safety: SafetyEnvelope {
@@ -554,6 +655,20 @@ mod tests {
         }
     }
 
+    fn successor_snapshot(
+        registry: &ActuationPolicyRegistry,
+        policies: Vec<ActuationPolicyV1>,
+    ) -> ActuationPolicySnapshotV1 {
+        ActuationPolicySnapshotV1 {
+            schema_version: ACTUATION_POLICY_SNAPSHOT_SCHEMA_VERSION,
+            sequence: registry.head().sequence + 1,
+            issued_at_unix_s: 200,
+            expires_at_unix_s: 1_100,
+            previous_snapshot_digest: Some(registry.head().digest),
+            policies,
+        }
+    }
+
     #[test]
     fn snapshot_digest_is_independent_of_policy_input_order() {
         let left = genesis(vec![policy("b", 1), policy("a", 1)]);
@@ -572,16 +687,9 @@ mod tests {
     }
 
     #[test]
-    fn successor_must_be_immediate_and_hash_chained() {
+    fn successor_must_be_immediate_hash_chained_and_monotonic() {
         let registry = ActuationPolicyRegistry::genesis(genesis(vec![policy("a", 1)])).unwrap();
-        let next = ActuationPolicySnapshotV1 {
-            schema_version: ACTUATION_POLICY_SNAPSHOT_SCHEMA_VERSION,
-            sequence: 2,
-            issued_at_unix_s: 200,
-            expires_at_unix_s: 1_100,
-            previous_snapshot_digest: Some(registry.head().digest),
-            policies: vec![policy("a", 2)],
-        };
+        let next = successor_snapshot(&registry, vec![policy("a", 2)]);
         let successor = registry.successor(next).unwrap();
         assert_eq!(successor.head().sequence, 2);
 
@@ -596,6 +704,68 @@ mod tests {
         assert!(matches!(
             successor.successor(skipped),
             Err(ActuationPolicyError::SequenceNotNext { .. })
+        ));
+    }
+
+    #[test]
+    fn successor_cannot_delete_or_roll_back_policy_identity() {
+        let registry = ActuationPolicyRegistry::genesis(genesis(vec![
+            policy("a", 3),
+            policy("b", 1),
+        ]))
+        .unwrap();
+
+        let deleted = successor_snapshot(&registry, vec![policy("a", 4)]);
+        assert!(matches!(
+            registry.successor(deleted),
+            Err(ActuationPolicyError::PolicyIdentityRemoved(id)) if id == "b"
+        ));
+
+        let rollback = successor_snapshot(&registry, vec![policy("a", 2), policy("b", 2)]);
+        assert!(matches!(
+            registry.successor(rollback),
+            Err(ActuationPolicyError::PolicyRevisionRollback { .. })
+        ));
+    }
+
+    #[test]
+    fn same_revision_content_change_is_a_collision() {
+        let registry = ActuationPolicyRegistry::genesis(genesis(vec![policy("a", 3)])).unwrap();
+        let mut changed = policy("a", 3);
+        changed.risk_charge = risk(4);
+        let snapshot = successor_snapshot(&registry, vec![changed]);
+        assert!(matches!(
+            registry.successor(snapshot),
+            Err(ActuationPolicyError::PolicyRevisionCollision { .. })
+        ));
+    }
+
+    #[test]
+    fn retired_and_revoked_policies_cannot_reactivate() {
+        let registry = ActuationPolicyRegistry::genesis(genesis(vec![policy("a", 1)])).unwrap();
+        let mut retired = policy("a", 2);
+        retired.status = ActuationPolicyStatus::Retired;
+        let registry = registry
+            .successor(successor_snapshot(&registry, vec![retired]))
+            .unwrap();
+
+        let reactivated = successor_snapshot(&registry, vec![policy("a", 3)]);
+        assert!(matches!(
+            registry.successor(reactivated),
+            Err(ActuationPolicyError::PolicyLifecycleRollback { .. })
+        ));
+
+        let mut revoked = policy("a", 3);
+        revoked.status = ActuationPolicyStatus::Revoked;
+        let registry = registry
+            .successor(successor_snapshot(&registry, vec![revoked]))
+            .unwrap();
+        let mut retired_again = policy("a", 4);
+        retired_again.status = ActuationPolicyStatus::Retired;
+        let rollback = successor_snapshot(&registry, vec![retired_again]);
+        assert!(matches!(
+            registry.successor(rollback),
+            Err(ActuationPolicyError::PolicyLifecycleRollback { .. })
         ));
     }
 
@@ -623,6 +793,17 @@ mod tests {
         ));
         assert!(matches!(
             registry.policy("a", 950),
+            Err(ActuationPolicyError::PolicyNotActive)
+        ));
+    }
+
+    #[test]
+    fn retired_policy_cannot_mint_handle() {
+        let mut retired = policy("a", 1);
+        retired.status = ActuationPolicyStatus::Retired;
+        let registry = ActuationPolicyRegistry::genesis(genesis(vec![retired])).unwrap();
+        assert!(matches!(
+            registry.policy("a", 500),
             Err(ActuationPolicyError::PolicyNotActive)
         ));
     }
