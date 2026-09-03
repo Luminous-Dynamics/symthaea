@@ -11,6 +11,7 @@ let
   lib = pkgs.lib;
   module = ../modules/github-actions-runner.nix;
   fakeToken = "/run/secrets/github-runner/test-token";
+  fakeHarnessCommit = "0123456789abcdef0123456789abcdef01234567";
   storeToken = builtins.toFile "symthaea-runner-test-token" "not-a-real-secret";
   storeTokenString = toString storeToken;
   upstreamService = "${pkgs.path}/nixos/modules/services/continuous-integration/github-runner/service.nix";
@@ -29,12 +30,25 @@ let
   evaluated = evalWith {
     enable = true;
     tokenFile = fakeToken;
+    trustedHarnessCommit = fakeHarnessCommit;
   };
 
   blankNameEval = evalWith {
     enable = true;
     tokenFile = fakeToken;
+    trustedHarnessCommit = fakeHarnessCommit;
     name = "";
+  };
+
+  missingHarnessEval = evalWith {
+    enable = true;
+    tokenFile = fakeToken;
+  };
+
+  malformedHarnessEval = evalWith {
+    enable = true;
+    tokenFile = fakeToken;
+    trustedHarnessCommit = "not-a-git-commit";
   };
 
   runner = evaluated.config.services.github-runners."symthaea-validation";
@@ -44,6 +58,7 @@ let
   firstExecStartPre = builtins.elemAt service.serviceConfig.ExecStartPre 0;
   secondExecStartPre = builtins.elemAt service.serviceConfig.ExecStartPre 1;
   credentialPreflight = lib.removePrefix "+" firstExecStartPre;
+  jobAdmissionHook = service.environment.ACTIONS_RUNNER_HOOK_JOB_STARTED;
 
   hasFailedAssertion = needle: assertions:
     lib.any (
@@ -65,8 +80,10 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
   test '${toString (builtins.length runner.extraPackages)}' = '0'
 
   # The Symthaea-specific API must expose only the minimal host knobs. Routing,
-  # lifecycle, token mode, labels, packages, and runner groups are fixed.
-  test '${lib.concatStringsSep "," (builtins.attrNames publicOptions)}' = 'enable,name,tokenFile'
+  # lifecycle, token mode, labels, packages, and runner groups are fixed. The
+  # harness commit is deliberately explicit because any main advance must fail
+  # closed until the trusted host is consciously re-pinned and rebuilt.
+  test '${lib.concatStringsSep "," (builtins.attrNames publicOptions)}' = 'enable,name,tokenFile,trustedHarnessCommit'
 
   # Secret-path safety is a type-system invariant, not only a later assertion:
   # accept an external absolute string, reject both a true Nix path and a string
@@ -76,8 +93,10 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
   test '${if tokenFileType.check storeTokenString then "true" else "false"}' = 'false'
   test '${if tokenFileType.check "relative/token" then "true" else "false"}' = 'false'
 
-  # Non-path policy still fails closed through explicit assertions.
+  # Non-path policy fails closed through explicit assertions.
   test '${if hasFailedAssertion "name must be non-empty" blankNameEval.config.assertions then "true" else "false"}' = 'true'
+  test '${if hasFailedAssertion "trustedHarnessCommit" missingHarnessEval.config.assertions then "true" else "false"}' = 'true'
+  test '${if hasFailedAssertion "trustedHarnessCommit" malformedHarnessEval.config.assertions then "true" else "false"}' = 'true'
 
   # Pinned nixpkgs systemd hardening contract.
   test '${if service.serviceConfig.DynamicUser then "true" else "false"}' = 'true'
@@ -121,6 +140,24 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
   # The pinned nixpkgs service's next pre-start stage must still be privileged;
   # the exact generated store-path name is intentionally not asserted here.
   test '${if lib.hasPrefix "+" secondExecStartPre then "true" else "false"}' = 'true'
+
+  # Host-side job admission is defense in depth below GitHub routing/rulesets.
+  # It executes before workflow steps and pins both the server-provided workflow
+  # identity and the exact reviewed harness commit deployed on the host.
+  test -x '${jobAdmissionHook}'
+  grep -F -- 'Luminous-Dynamics/symthaea' '${jobAdmissionHook}'
+  grep -F -- '1136141775' '${jobAdmissionHook}'
+  grep -F -- 'workflow_dispatch' '${jobAdmissionHook}'
+  grep -F -- 'refs/heads/main' '${jobAdmissionHook}'
+  grep -F -- 'GITHUB_REF_PROTECTED' '${jobAdmissionHook}'
+  grep -F -- 'GITHUB_SHA' '${jobAdmissionHook}'
+  grep -F -- 'GITHUB_WORKFLOW_SHA' '${jobAdmissionHook}'
+  grep -F -- '${fakeHarnessCommit}' '${jobAdmissionHook}'
+  grep -F -- 'self-hosted-runner-smoke.yml@refs/heads/main' '${jobAdmissionHook}'
+  grep -F -- 'self-hosted-ai-assurance-foundation-recovery.yml@refs/heads/main' '${jobAdmissionHook}'
+  grep -F -- 'self-hosted-ai-assurance-budget-recovery.yml@refs/heads/main' '${jobAdmissionHook}'
+  grep -F -- 'self-hosted-sym-arch-002a-core-recovery.yml@refs/heads/main' '${jobAdmissionHook}'
+  grep -F -- "reject 'workflow path is not in the trusted capability allowlist'" '${jobAdmissionHook}'
 
   # Network is intentionally available for GitHub/Nix/Cargo access, but the
   # allowed address-family set must not grow to raw packet sockets.
