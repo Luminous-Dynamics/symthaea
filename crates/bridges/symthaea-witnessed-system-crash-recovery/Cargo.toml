@@ -18,5 +18,6 @@ symthaea-system-crash-recovery = { path = "../symthaea-system-crash-recovery" }
 ed25519-dalek = { workspace = true }
 symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
 symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
+symthaea-authority-frontier = { path = "../symthaea-authority-frontier" }
 symthaea-authority-time = { path = "../symthaea-authority-time" }
 symthaea-system-attempt-evidence = { path = "../symthaea-system-attempt-evidence" }
