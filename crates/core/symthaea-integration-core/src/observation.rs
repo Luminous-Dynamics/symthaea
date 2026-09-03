@@ -2,18 +2,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Canonical runtime observation envelope for infrastructure integrations.
 
+use crate::observation_reference::SourceQualifiedObservationRef;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-/// Current serialized observation schema version.
-pub const OBSERVATION_SCHEMA_VERSION: u16 = 1;
-
-/// Caller-supplied, stable identity for an observation.
+/// Caller-supplied, stable **source-local** identity for an observation.
 ///
 /// The library deliberately does not generate IDs internally: collectors that
 /// need replay/deduplication should derive deterministic IDs from their native
-/// event identity or explicitly generate them at the boundary.
+/// event identity or explicitly generate them at the boundary. Cross-source
+/// reasoning must use [`SourceQualifiedObservationRef`] instead of assuming the
+/// raw string is globally unique.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ObservationId(pub String);
 
@@ -193,7 +193,8 @@ pub struct ObservationLineage {
     /// upstream-origin metadata is an independent provenance signal, not part of
     /// this local identifier's namespace.
     pub lineage_id: String,
-    /// Parent observations when this value is derived/aggregated.
+    /// Source-local parent observations when this value is derived/aggregated.
+    /// The enclosing observation source supplies their namespace in v0.1.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parent_ids: Vec<ObservationId>,
     /// Measurements with the same non-empty group are conservatively declared
@@ -315,7 +316,7 @@ impl ObservationEnvelope {
     /// Assess whether two reports share known lineage. Positive independence is
     /// never inferred from different adapter-supplied group labels.
     pub fn lineage_relationship(&self, other: &Self) -> LineageRelationship {
-        if self.observation_id == other.observation_id {
+        if self.source_qualified_ref() == other.source_qualified_ref() {
             return LineageRelationship::SameObservation;
         }
         if self.lineage.lineage_id == other.lineage.lineage_id
@@ -389,10 +390,9 @@ impl ObservationBatch {
                     collected_at_unix_ms: self.collected_at_unix_ms,
                 });
             }
-            if !ids.insert(observation.observation_id.clone()) {
-                return Err(BatchValidationError::DuplicateObservationId(
-                    observation.observation_id.clone(),
-                ));
+            let reference = observation.source_qualified_ref();
+            if !ids.insert(reference.clone()) {
+                return Err(BatchValidationError::DuplicateObservationReference(reference));
             }
         }
         Ok(())
@@ -441,8 +441,8 @@ pub enum BatchValidationError {
         ingested_at_unix_ms: u64,
         collected_at_unix_ms: u64,
     },
-    #[error("duplicate observation id {0} in batch")]
-    DuplicateObservationId(ObservationId),
+    #[error("duplicate source-qualified observation reference {0} in batch")]
+    DuplicateObservationReference(SourceQualifiedObservationRef),
 }
 
 fn require_non_empty(
@@ -555,6 +555,21 @@ mod tests {
     }
 
     #[test]
+    fn equal_raw_observation_ids_across_integrations_are_not_same_observation() {
+        let a = sample("same", "one", None);
+        let b = sample("same", "two", None);
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
+    }
+
+    #[test]
+    fn equal_raw_observation_ids_across_collectors_are_not_same_observation() {
+        let a = sample("same", "one", None);
+        let mut b = a.clone();
+        b.source.collector_id = Some("collector-b".into());
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
+    }
+
+    #[test]
     fn equal_source_local_lineage_ids_across_integrations_do_not_collapse() {
         let mut a = sample("a", "one", None);
         let mut b = sample("b", "two", None);
@@ -612,7 +627,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_batch_ids_fail() {
+    fn duplicate_batch_references_fail() {
         let obs = sample("same", "test", None);
         let batch = ObservationBatch {
             integration_id: "test".into(),
@@ -621,8 +636,22 @@ mod tests {
         };
         assert!(matches!(
             batch.validate(),
-            Err(BatchValidationError::DuplicateObservationId(_))
+            Err(BatchValidationError::DuplicateObservationReference(_))
         ));
+    }
+
+    #[test]
+    fn equal_local_ids_from_distinct_collectors_are_allowed_in_one_batch() {
+        let a = sample("same", "test", None);
+        let mut b = a.clone();
+        b.source.collector_id = Some("collector-b".into());
+        b.lineage.lineage_id = "collector-b-lineage".into();
+        let batch = ObservationBatch {
+            integration_id: "test".into(),
+            collected_at_unix_ms: 2_000,
+            observations: vec![a, b],
+        };
+        assert!(batch.validate().is_ok());
     }
 
     #[test]
