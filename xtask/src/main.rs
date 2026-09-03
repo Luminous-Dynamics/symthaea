@@ -7,6 +7,7 @@ mod interoception_actions_archive;
 mod interoception_archive_fs;
 mod interoception_capsule_archive;
 mod interoception_github_live;
+mod interoception_promotion_guard;
 mod interoception_qualification;
 mod manifest;
 mod rhn_sweep;
@@ -389,8 +390,7 @@ fn main() -> anyhow::Result<()> {
             ] {
                 interoception_archive_fs::require_external_directory(&repo_root, dir)?;
             }
-            interoception_archive_fs::require_external_new_file(&repo_root, &out)?;
-            let envelope = interoception_github_live::authorize_promotion_live(
+            let envelope = interoception_promotion_guard::authorize_promotion_strict(
                 &bundle,
                 &repo_root,
                 &evidence_root,
