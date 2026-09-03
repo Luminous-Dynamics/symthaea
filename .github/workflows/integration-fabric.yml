@@ -54,6 +54,8 @@ jobs:
         run: cargo metadata --format-version 1 --no-deps >/dev/null
 
       - name: Check formatting for integration packages
+        id: formatting
+        continue-on-error: true
         run: |
           cargo fmt \
             -p symthaea-integration-core \
@@ -67,6 +69,58 @@ jobs:
             -p symthaea-kubernetes-state-origin-bridge \
             -p symthaea-kubernetes-service-capacity \
             -- --check
+
+      # If committed source is not rustfmt-clean, produce the exact repair using
+      # the same pinned toolchain rather than reconstructing console diffs by hand.
+      # Tests below then exercise rustfmt-equivalent source, while the job still
+      # fails at the end until the exact formatting output is committed.
+      - name: Produce exact formatting repair artifact
+        if: steps.formatting.outcome == 'failure'
+        run: |
+          cargo fmt \
+            -p symthaea-integration-core \
+            -p symthaea-logparse \
+            -p symthaea-prometheus-bridge \
+            -p symthaea-otlp-bridge \
+            -p symthaea-kubernetes-bridge \
+            -p symthaea-kubernetes-state-bridge \
+            -p symthaea-kubernetes-endpointslice-bridge \
+            -p symthaea-kubernetes-workload-state-bridge \
+            -p symthaea-kubernetes-state-origin-bridge \
+            -p symthaea-kubernetes-service-capacity
+          git diff -- \
+            crates/core/symthaea-integration-core \
+            crates/core/symthaea-logparse \
+            crates/bridges/symthaea-prometheus-bridge \
+            crates/bridges/symthaea-otlp-bridge \
+            crates/bridges/symthaea-kubernetes-bridge \
+            crates/bridges/symthaea-kubernetes-state-bridge \
+            crates/bridges/symthaea-kubernetes-endpointslice-bridge \
+            crates/bridges/symthaea-kubernetes-workload-state-bridge \
+            crates/bridges/symthaea-kubernetes-state-origin-bridge \
+            crates/bridges/symthaea-kubernetes-service-capacity \
+            > integration-format.patch
+          tar -czf integration-formatted-sources.tar.gz \
+            crates/core/symthaea-integration-core \
+            crates/core/symthaea-logparse \
+            crates/bridges/symthaea-prometheus-bridge \
+            crates/bridges/symthaea-otlp-bridge \
+            crates/bridges/symthaea-kubernetes-bridge \
+            crates/bridges/symthaea-kubernetes-state-bridge \
+            crates/bridges/symthaea-kubernetes-endpointslice-bridge \
+            crates/bridges/symthaea-kubernetes-workload-state-bridge \
+            crates/bridges/symthaea-kubernetes-state-origin-bridge \
+            crates/bridges/symthaea-kubernetes-service-capacity
+
+      - name: Upload exact formatting repair artifact
+        if: steps.formatting.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-fabric-rustfmt-${{ github.sha }}
+          path: |
+            integration-format.patch
+            integration-formatted-sources.tar.gz
+          retention-days: 7
 
       - name: Test canonical integration contracts
         run: cargo test -p symthaea-integration-core --lib
@@ -132,3 +186,7 @@ jobs:
           name: integration-fabric-lockfile-${{ github.sha }}
           path: Cargo.lock
           retention-days: 7
+
+      - name: Require committed rustfmt output
+        if: always()
+        run: test "${{ steps.formatting.outcome }}" = "success"
