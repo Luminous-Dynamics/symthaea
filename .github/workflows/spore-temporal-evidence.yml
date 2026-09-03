@@ -1,0 +1,83 @@
+name: Spore Temporal Visual Evidence
+
+on:
+  pull_request:
+    paths:
+      - scripts/spore_temporal_evidence.py
+      - scripts/spore_temporal_compare.py
+      - scripts/spore_preview_gallery.py
+      - docs/design/SPORE_VISUAL_REVIEW_PROTOCOL_V1.json
+      - docs/design/SPORE_TEMPORAL_VISUAL_EVIDENCE_V033.md
+      - .github/workflows/spore-temporal-evidence.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spore-temporal-evidence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  temporal-evidence:
+    name: Standard-library semantic-time evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout evaluated source exactly
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify evaluated source identity
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Compile evidence tools
+        run: >-
+          python3 -m py_compile
+          scripts/spore_preview_gallery.py
+          scripts/spore_temporal_evidence.py
+          scripts/spore_temporal_compare.py
+
+      - name: Parse and bind shared review protocol
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          path = Path("docs/design/SPORE_VISUAL_REVIEW_PROTOCOL_V1.json")
+          raw = path.read_bytes()
+          protocol = json.loads(raw)
+          assert protocol["schema"] == "spore.visual.review-protocol.v1"
+          assert protocol["matrix_progress"] == [0.2, 0.5, 0.8]
+          assert protocol["contact_sheet_progress"] == [0.0, 0.15, 0.35, 0.5, 0.65, 0.85, 1.0]
+          print("review_protocol_sha256=" + hashlib.sha256(raw).hexdigest())
+          PY
+
+      - name: Guard exact PPM binary payload boundary
+        run: |
+          python3 - <<'PY'
+          import sys
+          import tempfile
+          from pathlib import Path
+
+          sys.path.insert(0, "scripts")
+          from spore_preview_gallery import read_ppm
+
+          with tempfile.TemporaryDirectory(prefix="spore-ppm-boundary-") as directory:
+              path = Path(directory) / "boundary.ppm"
+              pixels = bytes([0x0A, 0x05, 0x00, 0x20, 0x00, 0x00])
+              path.write_bytes(b"P6\n2 1\n255\n" + pixels)
+              width, height, decoded = read_ppm(path)
+              assert (width, height) == (2, 1)
+              assert decoded == pixels
+          PY
+
+      - name: Run deterministic evidence self-test
+        run: python3 scripts/spore_temporal_evidence.py --self-test
+
+      - name: Run deterministic control-treatment pairing self-test
+        run: python3 scripts/spore_temporal_compare.py --self-test
