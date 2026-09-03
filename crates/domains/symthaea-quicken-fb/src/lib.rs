@@ -12,6 +12,7 @@
 /// - `ecology_renderer_fidelity_v2` — membrane, caustics, and CPU bloom
 /// - `ecology_renderer` — final factual identity wrapper used by live + preview paths
 /// - `visual_composition` — pure bounded perceptual-attention policy
+/// - `temporal_choreography` — semantic-progress-driven motion policy
 /// - `visual_sampling` — deterministic node-density / negative-space selector
 /// - `hardware_bud` — deterministic localized structure for persistent hardware change
 /// - `inoculation_renderer` — shared installation/incubation phase grammar
@@ -38,5 +39,6 @@ pub mod microtype;
 pub mod mycelium;
 pub mod preview;
 pub mod progress;
+pub mod temporal_choreography;
 pub mod visual_composition;
 pub mod visual_sampling;
