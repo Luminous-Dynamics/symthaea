@@ -1,0 +1,227 @@
+name: Agency TPM2 Platform Attestation
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agency-tpm2-platform-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  source:
+    name: TPM2 attestation source qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy,rustfmt
+
+      - name: Preserve checked-in lockfile
+        run: cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+
+      - name: Ask Cargo to reconcile workspace metadata
+        run: cargo metadata --format-version 1 >/dev/null
+
+      - name: Prove lock reconciliation is additive workspace metadata only
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, sys, tomllib
+          before = tomllib.loads((pathlib.Path(os.environ["RUNNER_TEMP"]) / "Cargo.lock.before").read_text())
+          after = tomllib.loads(pathlib.Path("Cargo.lock").read_text())
+          key = lambda p: (p["name"], p["version"], p.get("source"))
+          b = {key(p): p for p in before.get("package", [])}
+          a = {key(p): p for p in after.get("package", [])}
+          removed = sorted(set(b) - set(a), key=repr)
+          changed = sorted((k for k in b.keys() & a if b[k] != a[k]), key=repr)
+          added = sorted(set(a) - set(b), key=repr)
+          sourced = [k for k in added if k[2] is not None]
+          if removed or changed or sourced:
+              print("Cargo reconciliation changed sourced dependency state")
+              print("removed:", removed)
+              print("changed:", changed)
+              print("new sourced:", sourced)
+              sys.exit(1)
+          print("additive workspace/path nodes:", len(added))
+          for item in added:
+              print(" +", item)
+          PY
+
+      - name: Record lock freshness
+        run: |
+          if git diff --quiet -- Cargo.lock; then
+            echo clean > "$RUNNER_TEMP/agency-lock-status"
+          else
+            echo stale > "$RUNNER_TEMP/agency-lock-status"
+            git --no-pager diff -- Cargo.lock
+          fi
+
+      - name: Rustfmt diagnostic
+        continue-on-error: true
+        run: cargo fmt --check --package symthaea-platform-attestation
+
+      - name: Test TPM2 attestation crate
+        run: cargo test --locked -p symthaea-platform-attestation
+
+      - name: Clippy TPM2 attestation crate
+        run: cargo clippy --locked -p symthaea-platform-attestation --all-targets -- -D warnings
+
+      - name: Upload Cargo-produced lock candidate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agency-tpm2-platform-cargo-lock-${{ github.sha }}
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Record source evidence
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/agency-tpm2-source-evidence"
+          git rev-parse HEAD > "$RUNNER_TEMP/agency-tpm2-source-evidence/HEAD"
+          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/agency-tpm2-source-evidence/TREE"
+          rustc -Vv > "$RUNNER_TEMP/agency-tpm2-source-evidence/RUSTC.txt"
+          cargo -V > "$RUNNER_TEMP/agency-tpm2-source-evidence/CARGO.txt"
+          sha256sum Cargo.lock > "$RUNNER_TEMP/agency-tpm2-source-evidence/CARGO_LOCK_SHA256.txt"
+
+      - name: Upload source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agency-tpm2-source-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/agency-tpm2-source-evidence
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Require checked-in Cargo.lock to be fresh
+        run: test "$(cat "$RUNNER_TEMP/agency-lock-status")" = clean
+
+  swtpm:
+    name: Fresh quote + approved PCR profile + mutation rejection
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Install swtpm and TPM2 tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y swtpm swtpm-tools tpm2-tools
+
+      - name: Reconcile workspace lock with Cargo
+        run: cargo metadata --format-version 1 >/dev/null
+
+      - name: Build exact Rust TPM2 qualification probe
+        run: cargo build --locked -p symthaea-platform-attestation --bin tpm2_attestation_probe
+
+      - name: Start isolated software TPM 2.0
+        run: |
+          mkdir -p "$RUNNER_TEMP/swtpm-state"
+          swtpm socket \
+            --tpm2 \
+            --tpmstate dir="$RUNNER_TEMP/swtpm-state" \
+            --ctrl type=tcp,port=2322 \
+            --server type=tcp,port=2321 \
+            --flags not-need-init \
+            --daemon
+          echo 'TPM2TOOLS_TCTI=swtpm:host=127.0.0.1,port=2321' >> "$GITHUB_ENV"
+
+      - name: Initialize TPM and create exact attestation key
+        run: |
+          tpm2_startup -c
+          tpm2_createek -Q \
+            -c "$RUNNER_TEMP/ek.ctx" \
+            -G rsa \
+            -u "$RUNNER_TEMP/ekpub.pem" \
+            -f pem
+          tpm2_createak -Q \
+            -C "$RUNNER_TEMP/ek.ctx" \
+            -c "$RUNNER_TEMP/ak.ctx" \
+            -G rsa \
+            -s rsassa \
+            -g sha256 \
+            -u "$RUNNER_TEMP/akpub.pem" \
+            -f pem \
+            -n "$RUNNER_TEMP/ak.name"
+
+      - name: Establish reviewed PCR-16 qualification profile
+        run: |
+          tpm2_quote -Q \
+            -c "$RUNNER_TEMP/ak.ctx" \
+            -l sha256:16 \
+            -m "$RUNNER_TEMP/baseline.msg" \
+            -s "$RUNNER_TEMP/baseline.sig" \
+            -o "$RUNNER_TEMP/baseline.pcrs" \
+            -g sha256
+          profile="$(target/debug/tpm2_attestation_probe profile-digest "$RUNNER_TEMP/baseline.pcrs")"
+          test "${#profile}" -eq 64
+          echo "APPROVED_PCR_PROFILE=$profile" >> "$GITHUB_ENV"
+          printf '%s\n' "$profile" | tee "$RUNNER_TEMP/APPROVED_PCR_PROFILE.txt"
+
+      - name: Verify fresh challenged quote through production adapter
+        run: |
+          target/debug/tpm2_attestation_probe verify \
+            "$(command -v tpm2_quote)" \
+            "$(command -v tpm2_checkquote)" \
+            "$RUNNER_TEMP/ak.ctx" \
+            "$RUNNER_TEMP/akpub.pem" \
+            "$APPROVED_PCR_PROFILE" \
+            16 | tee "$RUNNER_TEMP/TPM2_VERIFIED.txt"
+          grep -qx 'platform_attestation=verified' "$RUNNER_TEMP/TPM2_VERIFIED.txt"
+
+      - name: Mutate quoted PCR and require old profile to fail closed
+        run: |
+          mutation="$(printf 'symthaea-pcr16-adversarial-mutation' | sha256sum | awk '{print $1}')"
+          tpm2_pcrextend "16:sha256=$mutation"
+          set +e
+          target/debug/tpm2_attestation_probe verify \
+            "$(command -v tpm2_quote)" \
+            "$(command -v tpm2_checkquote)" \
+            "$RUNNER_TEMP/ak.ctx" \
+            "$RUNNER_TEMP/akpub.pem" \
+            "$APPROVED_PCR_PROFILE" \
+            16 > "$RUNNER_TEMP/TPM2_MUTATED.stdout" 2> "$RUNNER_TEMP/TPM2_MUTATED.stderr"
+          rc=$?
+          set -e
+          test "$rc" -ne 0
+          grep -q 'PCR state is not an approved profile' "$RUNNER_TEMP/TPM2_MUTATED.stderr"
+
+      - name: Record TPM2 protocol evidence
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/agency-tpm2-protocol-evidence"
+          git rev-parse HEAD > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/HEAD"
+          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/TREE"
+          rustc -Vv > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/RUSTC.txt"
+          cargo -V > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/CARGO.txt"
+          swtpm --version > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/SWTPM.txt" 2>&1 || true
+          tpm2_quote --version > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/TPM2_TOOLS.txt" 2>&1 || true
+          sha256sum target/debug/tpm2_attestation_probe > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/PROBE_SHA256.txt" 2>/dev/null || true
+          cp "$RUNNER_TEMP/APPROVED_PCR_PROFILE.txt" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/TPM2_VERIFIED.txt" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/TPM2_MUTATED.stdout" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/TPM2_MUTATED.stderr" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+
+      - name: Upload TPM2 protocol evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agency-tpm2-protocol-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/agency-tpm2-protocol-evidence
+          if-no-files-found: error
+          retention-days: 14
