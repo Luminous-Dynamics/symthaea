@@ -21,7 +21,7 @@ use crate::{
 /// into historical archive code:
 ///
 /// 1. the promotion checkout toolchain/target identity must exactly equal the
-///    identity declared by the evidence capsule; and
+///    identity declared by the evidence capsule before and after verification; and
 /// 2. the only user-visible authorization artifact is created atomically with
 ///    create-new semantics.
 pub fn authorize_promotion_strict(
@@ -59,6 +59,15 @@ pub fn authorize_promotion_strict(
             return Err(error);
         }
     };
+
+    // Re-establish the exact capsule-bound toolchain identity after all local
+    // reruns and live network verification. This brackets the authorization
+    // operation against toolchain/target mutation rather than treating parity as
+    // a one-time preflight.
+    if let Err(error) = verify_toolchain_identity(bundle_path, repo_root) {
+        let _ = fs::remove_dir_all(&scratch_dir);
+        return Err(error);
+    }
 
     // The provisional file is never trusted or copied. Remove the entire private
     // scratch tree before creating the durable authorization artifact so a cleanup
