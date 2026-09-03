@@ -13,14 +13,34 @@
 //! - Tasmota JSON: `{"ENERGY": {"Power": 150, "Voltage": 230}}`
 //! - ESPHome JSON: `{"id": "sensor.temp", "value": 22.5, "state": "22.5°C"}`
 //!
+//! # Resource boundary
+//!
+//! This parser accepts untrusted network-originated bytes. Topic length, payload
+//! length, numeric field count/name length, buffered readings, per-series history,
+//! and the total number of tracked sensor series are all bounded before data is
+//! retained. Manually constructed [`IoTReading`] values are revalidated at ingest,
+//! so callers cannot bypass the resource envelope by skipping [`parse_message`].
+//!
 //! # Design
 //! This is a sync adapter (no tokio) that processes pre-received messages.
 //! The actual MQTT/CoAP transport is handled externally (behind `survival-mqtt` feature).
 
 use std::collections::HashMap;
 
+/// Maximum MQTT/topic-style identifier retained in one reading.
+pub const MAX_IOT_TOPIC_BYTES: usize = 256;
+/// Maximum raw JSON payload accepted before parsing or retention.
+pub const MAX_IOT_PAYLOAD_BYTES: usize = 16 * 1024;
+/// Maximum numeric fields retained from one IoT message.
+pub const MAX_IOT_NUMERIC_FIELDS: usize = 64;
+/// Maximum field/id name retained from one IoT message.
+pub const MAX_IOT_FIELD_NAME_BYTES: usize = 128;
+/// Maximum sensor-series histories retained by one adapter.
+pub const MAX_TRACKED_SENSOR_SERIES: usize = 1024;
 /// Maximum sensor readings buffered before oldest are dropped.
-const MAX_BUFFERED_READINGS: usize = 256;
+pub const MAX_BUFFERED_READINGS: usize = 256;
+/// Maximum history samples retained per sensor series.
+pub const MAX_HISTORY_PER_SENSOR: usize = 100;
 
 /// A parsed IoT sensor reading.
 #[derive(Debug, Clone)]
@@ -33,7 +53,8 @@ pub struct IoTReading {
     pub platform: IoTPlatform,
     /// Timestamp (Unix seconds).
     pub timestamp_secs: u64,
-    /// Raw JSON payload (for debugging).
+    /// Raw JSON payload (for debugging), bounded by [`MAX_IOT_PAYLOAD_BYTES`]
+    /// when admitted by [`IoTSensorAdapter`].
     pub raw_payload: String,
 }
 
@@ -176,10 +197,10 @@ pub struct IoTSensorAdapter {
     max_alerts: usize,
     /// Sensor value history for anomaly detection (sensor_id → recent values).
     history: HashMap<String, Vec<f64>>,
-    /// Maximum history per sensor.
-    max_history_per_sensor: usize,
     /// Total readings processed.
     total_processed: u64,
+    /// Readings rejected by the resource envelope.
+    rejected_readings: u64,
 }
 
 impl IoTSensorAdapter {
@@ -191,8 +212,8 @@ impl IoTSensorAdapter {
             alerts: Vec::new(),
             max_alerts: 64,
             history: HashMap::new(),
-            max_history_per_sensor: 100,
             total_processed: 0,
+            rejected_readings: 0,
         }
     }
 
@@ -203,13 +224,20 @@ impl IoTSensorAdapter {
         adapter
     }
 
-    /// Parse a JSON message from an IoT platform.
+    /// Parse a bounded JSON message from an IoT platform.
     pub fn parse_message(
         &self,
         topic: &str,
         payload: &str,
         timestamp_secs: u64,
     ) -> Option<IoTReading> {
+        if topic.is_empty()
+            || topic.len() > MAX_IOT_TOPIC_BYTES
+            || payload.len() > MAX_IOT_PAYLOAD_BYTES
+        {
+            return None;
+        }
+
         let parsed: serde_json::Value = serde_json::from_str(payload).ok()?;
         let obj = parsed.as_object()?;
 
@@ -228,7 +256,7 @@ impl IoTSensorAdapter {
                         }
                     }
                 }
-                // Also capture top-level numerics
+                // Also capture top-level numerics.
                 for (key, val) in obj {
                     if let Some(n) = val.as_f64() {
                         values.insert(key.clone(), n);
@@ -242,7 +270,7 @@ impl IoTSensorAdapter {
                 }
             }
             _ => {
-                // Zigbee2MQTT and Generic: all top-level numeric fields
+                // Zigbee2MQTT and Generic: all top-level numeric fields.
                 for (key, val) in obj {
                     if let Some(n) = val.as_f64() {
                         values.insert(key.clone(), n);
@@ -251,7 +279,12 @@ impl IoTSensorAdapter {
             }
         }
 
-        if values.is_empty() {
+        if values.is_empty()
+            || values.len() > MAX_IOT_NUMERIC_FIELDS
+            || values
+                .iter()
+                .any(|(key, value)| !valid_field(key) || !value.is_finite())
+        {
             return None;
         }
 
@@ -265,23 +298,32 @@ impl IoTSensorAdapter {
     }
 
     /// Ingest a reading and check for alerts.
+    ///
+    /// Manually constructed readings are checked against the same bounds as parsed
+    /// readings. Rejected values produce no alerts and mutate no retained history.
     pub fn ingest(&mut self, reading: IoTReading) -> Vec<ResourceAlert> {
+        if !reading_within_bounds(&reading) || !self.has_series_capacity(&reading) {
+            self.rejected_readings = self.rejected_readings.saturating_add(1);
+            return Vec::new();
+        }
+
         let mut new_alerts = Vec::new();
 
         for (key, &value) in &reading.values {
             let resource_type = ResourceType::classify(key);
 
-            // Update history
+            // Update history. Series-capacity was checked transactionally before
+            // any mutation, so this cannot partially admit a reading.
             let hist = self
                 .history
-                .entry(format!("{}:{}", reading.sensor_id, key))
+                .entry(series_key(&reading.sensor_id, key))
                 .or_default();
-            if hist.len() >= self.max_history_per_sensor {
+            if hist.len() >= MAX_HISTORY_PER_SENSOR {
                 hist.remove(0);
             }
             hist.push(value);
 
-            // Check thresholds
+            // Check thresholds.
             if let Some(alert) = self.check_threshold(
                 &reading.sensor_id,
                 resource_type,
@@ -293,14 +335,14 @@ impl IoTSensorAdapter {
             }
         }
 
-        // Buffer the reading
+        // Buffer the reading.
         if self.readings.len() >= MAX_BUFFERED_READINGS {
             self.readings.remove(0);
         }
         self.readings.push(reading);
-        self.total_processed += 1;
+        self.total_processed = self.total_processed.saturating_add(1);
 
-        // Buffer alerts
+        // Buffer alerts.
         for alert in &new_alerts {
             if self.alerts.len() >= self.max_alerts {
                 self.alerts.remove(0);
@@ -321,14 +363,28 @@ impl IoTSensorAdapter {
         &self.alerts
     }
 
-    /// Total readings processed.
+    /// Total readings admitted by the resource envelope.
     pub fn total_processed(&self) -> u64 {
         self.total_processed
     }
 
-    /// Number of unique sensors seen.
+    /// Total readings rejected by the resource envelope.
+    pub fn rejected_readings(&self) -> u64 {
+        self.rejected_readings
+    }
+
+    /// Number of unique sensor series tracked for history/anomaly detection.
     pub fn sensor_count(&self) -> usize {
         self.history.len()
+    }
+
+    fn has_series_capacity(&self, reading: &IoTReading) -> bool {
+        let new_series = reading
+            .values
+            .keys()
+            .filter(|key| !self.history.contains_key(&series_key(&reading.sensor_id, key)))
+            .count();
+        self.history.len().saturating_add(new_series) <= MAX_TRACKED_SENSOR_SERIES
     }
 
     fn detect_platform(
@@ -431,6 +487,26 @@ impl Default for IoTSensorAdapter {
     }
 }
 
+fn valid_field(key: &str) -> bool {
+    !key.is_empty() && key.len() <= MAX_IOT_FIELD_NAME_BYTES
+}
+
+fn reading_within_bounds(reading: &IoTReading) -> bool {
+    !reading.sensor_id.is_empty()
+        && reading.sensor_id.len() <= MAX_IOT_TOPIC_BYTES
+        && reading.raw_payload.len() <= MAX_IOT_PAYLOAD_BYTES
+        && !reading.values.is_empty()
+        && reading.values.len() <= MAX_IOT_NUMERIC_FIELDS
+        && reading
+            .values
+            .iter()
+            .all(|(key, value)| valid_field(key) && value.is_finite())
+}
+
+fn series_key(sensor_id: &str, field: &str) -> String {
+    format!("{sensor_id}:{field}")
+}
+
 // ============================================================================
 // TESTS
 // ============================================================================
@@ -483,6 +559,27 @@ mod tests {
     }
 
     #[test]
+    fn oversized_topic_and_payload_fail_before_retention() {
+        let adapter = IoTSensorAdapter::new();
+        let topic = "t".repeat(MAX_IOT_TOPIC_BYTES + 1);
+        assert!(adapter.parse_message(&topic, r#"{"x":1}"#, 0).is_none());
+
+        let payload = format!(r#"{{"x":1,"padding":"{}"}}"#, "a".repeat(MAX_IOT_PAYLOAD_BYTES));
+        assert!(adapter.parse_message("topic", &payload, 0).is_none());
+    }
+
+    #[test]
+    fn too_many_numeric_fields_are_rejected() {
+        let adapter = IoTSensorAdapter::new();
+        let fields = (0..=MAX_IOT_NUMERIC_FIELDS)
+            .map(|i| format!(r#""f{i}":{i}"#))
+            .collect::<Vec<_>>()
+            .join(",");
+        let payload = format!("{{{fields}}}");
+        assert!(adapter.parse_message("topic", &payload, 0).is_none());
+    }
+
+    #[test]
     fn test_water_alert() {
         let mut adapter = IoTSensorAdapter::new();
         let reading = IoTReading {
@@ -525,6 +622,69 @@ mod tests {
         };
         let alerts = adapter.ingest(reading);
         assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn manually_constructed_unbounded_reading_is_rejected_without_state_mutation() {
+        let mut adapter = IoTSensorAdapter::new();
+        let reading = IoTReading {
+            sensor_id: "s".repeat(MAX_IOT_TOPIC_BYTES + 1),
+            values: HashMap::from([("water_level".to_string(), 0.01)]),
+            platform: IoTPlatform::Generic,
+            timestamp_secs: 1,
+            raw_payload: String::new(),
+        };
+        assert!(adapter.ingest(reading).is_empty());
+        assert_eq!(adapter.total_processed(), 0);
+        assert_eq!(adapter.sensor_count(), 0);
+        assert_eq!(adapter.rejected_readings(), 1);
+    }
+
+    #[test]
+    fn non_finite_manual_value_is_rejected() {
+        let mut adapter = IoTSensorAdapter::new();
+        let reading = IoTReading {
+            sensor_id: "sensor".to_string(),
+            values: HashMap::from([("temperature".to_string(), f64::NAN)]),
+            platform: IoTPlatform::Generic,
+            timestamp_secs: 1,
+            raw_payload: String::new(),
+        };
+        assert!(adapter.ingest(reading).is_empty());
+        assert_eq!(adapter.rejected_readings(), 1);
+        assert_eq!(adapter.sensor_count(), 0);
+    }
+
+    #[test]
+    fn tracked_series_cardinality_is_bounded_transactionally() {
+        let mut adapter = IoTSensorAdapter::new();
+        for i in 0..MAX_TRACKED_SENSOR_SERIES {
+            adapter.ingest(IoTReading {
+                sensor_id: format!("s{i}"),
+                values: HashMap::from([("x".to_string(), i as f64)]),
+                platform: IoTPlatform::Generic,
+                timestamp_secs: i as u64,
+                raw_payload: String::new(),
+            });
+        }
+        assert_eq!(adapter.sensor_count(), MAX_TRACKED_SENSOR_SERIES);
+
+        let processed_before = adapter.total_processed();
+        adapter.ingest(IoTReading {
+            sensor_id: "overflow".to_string(),
+            values: HashMap::from([
+                ("x".to_string(), 1.0),
+                ("y".to_string(), 2.0),
+            ]),
+            platform: IoTPlatform::Generic,
+            timestamp_secs: 9_999,
+            raw_payload: String::new(),
+        });
+        assert_eq!(adapter.sensor_count(), MAX_TRACKED_SENSOR_SERIES);
+        assert_eq!(adapter.total_processed(), processed_before);
+        assert_eq!(adapter.rejected_readings(), 1);
+        assert!(!adapter.history.contains_key("overflow:x"));
+        assert!(!adapter.history.contains_key("overflow:y"));
     }
 
     #[test]
@@ -572,6 +732,7 @@ mod tests {
     fn test_default() {
         let adapter = IoTSensorAdapter::default();
         assert_eq!(adapter.total_processed(), 0);
+        assert_eq!(adapter.rejected_readings(), 0);
     }
 
     #[test]
