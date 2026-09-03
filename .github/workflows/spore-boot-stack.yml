@@ -3,7 +3,6 @@ name: Spore Boot Stack
 on:
   pull_request:
     paths:
-      - '.github/workflows/spore-boot-stack.yml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
       - 'crates/domains/symthaea-boot-*/**'
@@ -24,6 +23,8 @@ permissions:
 # additive to repository-wide CI until the scoped-routing migration in #400 is
 # separately proven. Once that migration lands, boot-only PRs can rely on this
 # lane plus the governance gate below without spawning unrelated workspace jobs.
+# Changes to this workflow itself remain under general CI during bootstrap; the
+# focused lane starts only when an actual boot/Spore qualification surface moves.
 concurrency:
   group: spore-boot-stack-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
