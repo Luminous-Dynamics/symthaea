@@ -10,6 +10,7 @@
 pkgs.mkShellNoCC {
   packages = with pkgs; [
     rustToolchain
+    nix
     git
     python3
     swtpm
