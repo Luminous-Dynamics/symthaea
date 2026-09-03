@@ -14,6 +14,7 @@
 /// - `visual_composition` — pure bounded perceptual-attention policy
 /// - `temporal_choreography` — semantic-progress-driven motion policy
 /// - `visual_semantics` — descriptive anti-collapse regression signatures
+/// - `visual_review_sampling` — frozen semantic contact-sheet sampling protocol
 /// - `visual_sampling` — deterministic node-density / negative-space selector
 /// - `hardware_bud` — deterministic localized structure for persistent hardware change
 /// - `inoculation_renderer` — shared installation/incubation phase grammar
@@ -42,5 +43,6 @@ pub mod preview;
 pub mod progress;
 pub mod temporal_choreography;
 pub mod visual_composition;
+pub mod visual_review_sampling;
 pub mod visual_sampling;
 pub mod visual_semantics;
