@@ -2,40 +2,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Protocol-neutral physical-effect envelope and device-side semantic acceptance.
 //!
-//! This crate closes a different boundary from host authorization. A perfectly
-//! authorized host command is still unsafe if a device endpoint accepts arbitrary
-//! bytes, replays an old generation after reboot, ignores expiry, or fails open on
-//! local firmware/safety state.
-//!
-//! The serialized [`PhysicalEffectEnvelopeV1`] is deliberately **not authority**.
-//! It is canonical semantic content that a future Xenia/device transport must
-//! authenticate before any actuator layer can combine it with device-side semantic
-//! acceptance. This crate never treats possession of envelope bytes as identity.
-//!
-//! Device semantic ordering is crash-conservative:
-//!
-//! ```text
-//! authenticated envelope bytes (future transport layer)
-//!   -> local semantic checks
-//!   -> burn monotonically increasing device sequence
-//!   -> build successor DeviceSemanticCheckpointV1
-//!   -> persist checkpoint + external head
-//!   -> SemanticallyAcceptedEffect   (still non-authorizing)
-//!   -> future authenticated-transport + interlock composition
-//!   -> actuator
-//! ```
-//!
-//! Sequence numbers intentionally never roll back, including when the physical
-//! effect later proves not to have happened.
+//! The serialized envelope is semantic content, not authority. A future Xenia/device
+//! transport must authenticate the exact envelope independently. Device semantic
+//! acceptance also remains non-authorizing until composed with authenticated transport
+//! and device-local physical interlocks.
 
 #![deny(unsafe_code)]
 
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
-use symthaea_authority::{Digest32, Operation, ResourceRef};
-use symthaea_iot_authority::{DeviceCommand, DeviceRuntimeState, SafetyEnvelope};
-use symthaea_iot_durable_runtime::{DurableIoTHead, DurableUnknownPhysicalEffect};
+use symthaea_action_runtime::GrantAccount;
+use symthaea_authority::{CapabilityGrant, Digest32, Operation, ResourceRef};
+use symthaea_iot_actuation::ActuationError;
+use symthaea_iot_authority::{
+    DEVICE_COMMAND_SCHEMA_VERSION, DeviceCommand, DeviceRuntimeState,
+    SAFETY_ENVELOPE_SCHEMA_VERSION, SafetyEnvelope,
+};
+use symthaea_iot_durable_runtime::{
+    DurableEffectTransition, DurableIoTHead, DurableUnknownPhysicalEffect,
+};
 use symthaea_iot_egress_guard::PostureBoundEgressPermit;
 use symthaea_iot_policy::ActuationPolicyHead;
 use symthaea_iot_posture::VerifierTrustHead;
@@ -51,11 +35,10 @@ const PHYSICAL_EFFECT_ENVELOPE_DOMAIN: &[u8] = b"symthaea-iot-physical-effect-en
 const DEVICE_CONFIG_DOMAIN: &[u8] = b"symthaea-iot-device-enforcement-config-v1\0";
 const DEVICE_CHECKPOINT_DOMAIN: &[u8] = b"symthaea-iot-device-semantic-checkpoint-v1\0";
 
-/// Canonical semantic payload sent toward one physical device.
+/// Canonical semantic payload for one physical effect.
 ///
-/// This object is serializable because it is wire data. It is not signed here and
-/// is not an authorization token. The future transport adapter must authenticate
-/// the exact bytes/digest independently.
+/// This is intentionally serializable and therefore forgeable as bytes. It must never
+/// be treated as authenticated identity or physical authority by itself.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PhysicalEffectEnvelopeV1 {
     pub schema_version: u16,
@@ -80,11 +63,19 @@ impl PhysicalEffectEnvelopeV1 {
         if self.schema_version != PHYSICAL_EFFECT_ENVELOPE_SCHEMA_VERSION {
             return Err(DeviceProtocolError::UnsupportedEnvelopeSchema);
         }
-        if self.command.command_id.is_empty() {
+        if self.command.schema_version != DEVICE_COMMAND_SCHEMA_VERSION {
+            return Err(DeviceProtocolError::UnsupportedCommandSchema);
+        }
+        if self.command.command_id.is_empty()
+            || self.command.sequence == 0
+            || self.command.expires_at_unix_s < self.command.issued_at_unix_s
+        {
             return Err(DeviceProtocolError::MalformedCommand);
         }
-        if self.command.expires_at_unix_s < self.command.issued_at_unix_s {
-            return Err(DeviceProtocolError::MalformedCommand);
+        if self.policy_registry_head.sequence == 0
+            || self.posture_verifier_trust_head.sequence == 0
+        {
+            return Err(DeviceProtocolError::SecurityGenerationZero);
         }
         if self.host_preflight_at_unix_s < self.command.issued_at_unix_s
             || self.host_preflight_at_unix_s > self.command.expires_at_unix_s
@@ -106,11 +97,15 @@ impl PhysicalEffectEnvelopeV1 {
         for digest in [
             self.proposal_digest,
             self.policy_digest,
+            self.policy_registry_head.digest,
+            self.durable_host_head.action_head.digest,
+            self.durable_host_head.digest,
             self.posture_result_digest,
             self.posture_evidence_digest,
             self.posture_reference_values_digest,
             self.posture_appraisal_policy_digest,
             self.posture_challenge_digest,
+            self.posture_verifier_trust_head.digest,
         ] {
             if digest == Digest32([0; 32]) {
                 return Err(DeviceProtocolError::ZeroSecurityDigest);
@@ -146,8 +141,7 @@ impl PhysicalEffectEnvelopeV1 {
     }
 }
 
-/// Host-side affine state carrying the only posture-bound permit alongside its exact
-/// canonical device envelope.
+/// Host-side affine state carrying the posture-bound permit alongside its one envelope.
 #[derive(Debug)]
 pub struct PreparedDeviceEgress {
     permit: PostureBoundEgressPermit,
@@ -164,13 +158,28 @@ impl PreparedDeviceEgress {
         self.envelope_digest
     }
 
-    /// Transport/device outcome is ambiguous. Host consequence capacity remains charged.
     pub fn into_unknown(self) -> DurableUnknownPhysicalEffect {
         self.permit.into_unknown()
     }
+
+    pub fn observed_applied(
+        self,
+        account: &mut GrantAccount,
+        grant: &CapabilityGrant,
+    ) -> Result<DurableEffectTransition, ActuationError> {
+        self.permit.observed_applied(account, grant)
+    }
+
+    pub fn proven_not_dispatched(
+        self,
+        account: &mut GrantAccount,
+        grant: &CapabilityGrant,
+    ) -> Result<DurableEffectTransition, ActuationError> {
+        self.permit.proven_not_dispatched(account, grant)
+    }
 }
 
-/// Consume the final posture-bound host permit into exactly one canonical envelope.
+/// Consume one final posture-bound host permit into exactly one canonical envelope.
 pub fn prepare_device_egress(
     permit: PostureBoundEgressPermit,
     send_not_after_unix_s: u64,
@@ -200,11 +209,7 @@ pub fn prepare_device_egress(
     })
 }
 
-/// Device-local semantic configuration independent of host claims.
-///
-/// A device can provision this from secure local configuration/firmware. It does not
-/// trust the envelope's policy digest, firmware or operation merely because they are
-/// present on the wire.
+/// Device-local policy independent of host claims.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeviceEnforcementConfigV1 {
     pub schema_version: u16,
@@ -227,10 +232,14 @@ impl DeviceEnforcementConfigV1 {
         if self.minimum_policy_registry_sequence == 0 {
             return Err(DeviceProtocolError::PolicyRegistrySequenceZero);
         }
+        if self.safety.schema_version != SAFETY_ENVELOPE_SCHEMA_VERSION {
+            return Err(DeviceProtocolError::UnsupportedLocalSafetySchema);
+        }
         if self.safety.device != self.device || self.safety.operation != self.operation {
             return Err(DeviceProtocolError::LocalSafetyBindingMismatch);
         }
-        if self.safety.allowed_firmware.is_empty()
+        if self.safety.policy_id.is_empty()
+            || self.safety.allowed_firmware.is_empty()
             || self
                 .safety
                 .parameter_ranges
@@ -273,7 +282,7 @@ pub struct DeviceSemanticHead {
     pub digest: Digest32,
 }
 
-/// Device-local replay journal. Persist this before any later actuator authority is minted.
+/// Device-local replay journal. The successor must be durable before later actuator authority.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeviceSemanticCheckpointV1 {
     pub schema_version: u16,
@@ -307,11 +316,16 @@ impl DeviceSemanticCheckpointV1 {
             {
                 return Err(DeviceProtocolError::MalformedDeviceGenesis);
             }
-        } else if self.previous_checkpoint_digest.is_none()
-            || self.highest_accepted_sequence.is_none()
-            || self.last_envelope_digest.is_none()
-        {
-            return Err(DeviceProtocolError::IncompleteDeviceCheckpoint);
+        } else {
+            let sequence = self
+                .highest_accepted_sequence
+                .ok_or(DeviceProtocolError::IncompleteDeviceCheckpoint)?;
+            if sequence == 0
+                || self.previous_checkpoint_digest.is_none()
+                || self.last_envelope_digest.is_none()
+            {
+                return Err(DeviceProtocolError::IncompleteDeviceCheckpoint);
+            }
         }
         Ok(())
     }
@@ -347,7 +361,6 @@ impl DeviceSemanticCheckpointV1 {
     }
 }
 
-/// Pending semantic acceptance waiting for the exact device replay journal to be durable.
 #[derive(Debug)]
 pub struct PendingSemanticAcceptance {
     envelope: PhysicalEffectEnvelopeV1,
@@ -384,11 +397,10 @@ impl PendingSemanticAcceptance {
     }
 }
 
-/// Opaque result of device semantic checks and durable replay-state advancement.
+/// Opaque semantic acceptance after durable replay-state advancement.
 ///
-/// This is explicitly **not an actuator permit**. It proves no transport identity
-/// and no physical interlock state. A future product adapter must combine it with an
-/// authenticated Xenia session/message before exposing actuator I/O.
+/// This is not an actuator permit: it carries no transport identity and no proof of a
+/// physical interlock. The future device product adapter must compose both separately.
 #[derive(Debug)]
 pub struct SemanticallyAcceptedEffect {
     envelope: PhysicalEffectEnvelopeV1,
@@ -410,8 +422,9 @@ impl SemanticallyAcceptedEffect {
     }
 }
 
-/// Validate semantic content against device-local configuration/state and burn the
-/// sequence in a successor checkpoint. This does not authenticate the envelope.
+/// Validate semantic content against device-local state and burn its sequence.
+///
+/// This function does not authenticate the envelope.
 pub fn prepare_semantic_acceptance(
     envelope: PhysicalEffectEnvelopeV1,
     config: &DeviceEnforcementConfigV1,
@@ -482,11 +495,11 @@ fn validate_envelope_against_device(
     {
         return Err(DeviceProtocolError::EnvelopeNotFresh);
     }
-    let envelope_lifetime = envelope
+    let lifetime = envelope
         .send_not_after_unix_s
         .checked_sub(envelope.host_preflight_at_unix_s)
         .ok_or(DeviceProtocolError::InvalidEgressWindow)?;
-    if envelope_lifetime > config.maximum_envelope_lifetime_s {
+    if lifetime > config.maximum_envelope_lifetime_s {
         return Err(DeviceProtocolError::EnvelopeLifetimeExceedsDevicePolicy);
     }
     if envelope.command.device != config.device {
@@ -579,8 +592,12 @@ fn optional_u64(h: &mut blake3::Hasher, value: Option<u64>) {
 pub enum DeviceProtocolError {
     #[error("unsupported physical-effect envelope schema")]
     UnsupportedEnvelopeSchema,
+    #[error("unsupported physical command schema")]
+    UnsupportedCommandSchema,
     #[error("malformed physical command")]
     MalformedCommand,
+    #[error("security generation must be non-zero")]
+    SecurityGenerationZero,
     #[error("invalid host preflight timestamp")]
     InvalidHostPreflightTime,
     #[error("invalid host-to-device egress window")]
@@ -593,6 +610,8 @@ pub enum DeviceProtocolError {
     UnsupportedDeviceConfigSchema,
     #[error("device policy registry sequence must be non-zero")]
     PolicyRegistrySequenceZero,
+    #[error("unsupported device-local safety schema")]
+    UnsupportedLocalSafetySchema,
     #[error("device-local safety policy binds another device/operation")]
     LocalSafetyBindingMismatch,
     #[error("malformed device-local safety envelope")]
@@ -648,12 +667,7 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
 
     use super::*;
-    use symthaea_authority::RiskBudget;
-    use symthaea_iot_authority::{
-        DEVICE_COMMAND_SCHEMA_VERSION, InclusiveRangeI64, SAFETY_ENVELOPE_SCHEMA_VERSION,
-    };
-    use symthaea_iot_durable_runtime::DurableIoTHead;
-    use symthaea_iot_posture::VerifierTrustHead;
+    use symthaea_iot_authority::InclusiveRangeI64;
 
     fn digest(byte: u8) -> Digest32 {
         Digest32([byte; 32])
@@ -764,9 +778,8 @@ mod tests {
         .unwrap();
         assert_eq!(pending.checkpoint().highest_accepted_sequence, Some(7));
         assert_eq!(pending.checkpoint().generation, 1);
-        let accepted = pending
-            .confirm_persisted(pending.expected_head())
-            .expect("exact device head");
+        let expected = pending.expected_head();
+        let accepted = pending.confirm_persisted(expected).expect("exact device head");
         assert_eq!(accepted.command().sequence, 7);
     }
 
@@ -774,12 +787,13 @@ mod tests {
     fn wrong_device_head_cannot_mint_semantic_token() {
         let cfg = config();
         let state = DeviceSemanticCheckpointV1::genesis(cfg.device.clone());
+        let state_head = state.head().unwrap();
         let pending = prepare_semantic_acceptance(
             envelope(7),
             &cfg,
             &runtime(None),
             &state,
-            state.head().unwrap(),
+            state_head,
             5_001,
         )
         .unwrap();
@@ -817,7 +831,7 @@ mod tests {
     }
 
     #[test]
-    fn expired_or_wrong_policy_envelope_fails_closed() {
+    fn expired_wrong_policy_and_unknown_schema_fail_closed() {
         let cfg = config();
         let state = DeviceSemanticCheckpointV1::genesis(cfg.device.clone());
         let head = state.head().unwrap();
@@ -836,15 +850,15 @@ mod tests {
         let mut wrong = envelope(8);
         wrong.policy_digest = digest(99);
         assert!(matches!(
-            prepare_semantic_acceptance(
-                wrong,
-                &cfg,
-                &runtime(None),
-                &state,
-                head,
-                5_001,
-            ),
+            prepare_semantic_acceptance(wrong, &cfg, &runtime(None), &state, head, 5_001),
             Err(DeviceProtocolError::EnvelopePolicyMismatch)
+        ));
+
+        let mut unknown = envelope(8);
+        unknown.command.schema_version += 1;
+        assert!(matches!(
+            prepare_semantic_acceptance(unknown, &cfg, &runtime(None), &state, head, 5_001),
+            Err(DeviceProtocolError::UnsupportedCommandSchema)
         ));
     }
 
@@ -868,7 +882,7 @@ mod tests {
     }
 
     #[test]
-    fn envelope_commitment_changes_with_posture_or_deadline() {
+    fn envelope_commitment_binds_posture_and_deadline() {
         let a = envelope(7);
         let mut b = a.clone();
         b.posture_result_digest = digest(99);
@@ -879,17 +893,10 @@ mod tests {
     }
 
     #[test]
-    fn config_commitment_changes_with_local_policy() {
+    fn local_config_commitment_is_independent() {
         let a = config();
         let mut b = a.clone();
         b.exact_policy_digest = digest(22);
         assert_ne!(a.digest().unwrap(), b.digest().unwrap());
-    }
-
-    #[test]
-    fn risk_budget_type_remains_unrelated_to_device_semantic_auth() {
-        // Compile-time/documentation guard: device semantic acceptance does not
-        // receive a host RiskBudget or CapabilityGrant as an authentication proxy.
-        let _ = RiskBudget::default();
     }
 }
