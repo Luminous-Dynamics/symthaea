@@ -132,11 +132,19 @@ fn has_evidence(actions: &[RestoreAction]) -> bool {
 
 fn semantic_present(semantic: RestoreSemantics, actions: &[RestoreAction]) -> bool {
     match semantic {
-        RestoreSemantics::HistoricalReplace => has(actions, RestoreAction::ReplaceValidatedHistorical),
-        RestoreSemantics::AuthorityMonotone => has(actions, RestoreAction::PreserveOrNarrowAuthority),
+        RestoreSemantics::HistoricalReplace => {
+            has(actions, RestoreAction::ReplaceValidatedHistorical)
+        }
+        RestoreSemantics::AuthorityMonotone => {
+            has(actions, RestoreAction::PreserveOrNarrowAuthority)
+        }
         RestoreSemantics::EvidenceMerge => has_evidence(actions),
-        RestoreSemantics::DerivedRequalify => has(actions, RestoreAction::RequalifyFromCurrentInputs),
-        RestoreSemantics::TransitionReconcile => has(actions, RestoreAction::ReconcileBeforeActivation),
+        RestoreSemantics::DerivedRequalify => {
+            has(actions, RestoreAction::RequalifyFromCurrentInputs)
+        }
+        RestoreSemantics::TransitionReconcile => {
+            has(actions, RestoreAction::ReconcileBeforeActivation)
+        }
         RestoreSemantics::EphemeralDrop => has(actions, RestoreAction::DropEphemeral),
     }
 }
@@ -147,10 +155,16 @@ fn action_supported(
     action: RestoreAction,
 ) -> bool {
     match action {
-        RestoreAction::ReplaceValidatedHistorical => semantics.contains(&RestoreSemantics::HistoricalReplace),
-        RestoreAction::PreserveOrNarrowAuthority => semantics.contains(&RestoreSemantics::AuthorityMonotone),
+        RestoreAction::ReplaceValidatedHistorical => {
+            semantics.contains(&RestoreSemantics::HistoricalReplace)
+        }
+        RestoreAction::PreserveOrNarrowAuthority => {
+            semantics.contains(&RestoreSemantics::AuthorityMonotone)
+        }
         RestoreAction::MergeEvidence(_) => semantics.contains(&RestoreSemantics::EvidenceMerge),
-        RestoreAction::RequalifyFromCurrentInputs => semantics.contains(&RestoreSemantics::DerivedRequalify),
+        RestoreAction::RequalifyFromCurrentInputs => {
+            semantics.contains(&RestoreSemantics::DerivedRequalify)
+        }
         RestoreAction::ReconcileBeforeActivation => {
             semantics.contains(&RestoreSemantics::TransitionReconcile)
                 || verdict == RestoreAdmissionVerdict::ReconciliationRequired
@@ -164,7 +178,10 @@ fn validate_verdict(
     verdict: RestoreAdmissionVerdict,
     actions: &[RestoreAction],
 ) -> Result<(), RestorePlanError> {
-    if matches!(verdict, RestoreAdmissionVerdict::Widening | RestoreAdmissionVerdict::NotProvable) {
+    if matches!(
+        verdict,
+        RestoreAdmissionVerdict::Widening | RestoreAdmissionVerdict::NotProvable
+    ) {
         return Err(RestorePlanError::DecisionNotAdmissible { domain, verdict });
     }
 
@@ -227,19 +244,28 @@ fn validate_actions(
     actions.sort_unstable();
     for pair in actions.windows(2) {
         if pair[0] == pair[1] {
-            return Err(RestorePlanError::DuplicateAction { domain, action: pair[0] });
+            return Err(RestorePlanError::DuplicateAction {
+                domain,
+                action: pair[0],
+            });
         }
     }
 
     let contract = contract_for(domain);
     for action in &actions {
         if !action_supported(contract.semantics, verdict, *action) {
-            return Err(RestorePlanError::UnexpectedAction { domain, action: *action });
+            return Err(RestorePlanError::UnexpectedAction {
+                domain,
+                action: *action,
+            });
         }
     }
     for semantic in contract.semantics {
         if !semantic_present(*semantic, &actions) {
-            return Err(RestorePlanError::MissingSemanticAction { domain, semantic: *semantic });
+            return Err(RestorePlanError::MissingSemanticAction {
+                domain,
+                semantic: *semantic,
+            });
         }
     }
 
@@ -249,13 +275,19 @@ fn validate_actions(
         };
         for policy in required {
             if !has(&actions, RestoreAction::MergeEvidence(*policy)) {
-                return Err(RestorePlanError::MissingEvidencePolicy { domain, policy: *policy });
+                return Err(RestorePlanError::MissingEvidencePolicy {
+                    domain,
+                    policy: *policy,
+                });
             }
         }
         for action in &actions {
             if let RestoreAction::MergeEvidence(policy) = action {
                 if !required.contains(policy) {
-                    return Err(RestorePlanError::UnexpectedEvidencePolicy { domain, policy: *policy });
+                    return Err(RestorePlanError::UnexpectedEvidencePolicy {
+                        domain,
+                        policy: *policy,
+                    });
                 }
             }
         }
@@ -268,6 +300,72 @@ fn validate_actions(
     }
 
     Ok(RestoreDomainPlan { decision, actions })
+}
+
+fn push_unique(actions: &mut Vec<RestoreAction>, action: RestoreAction) {
+    if !actions.contains(&action) {
+        actions.push(action);
+    }
+}
+
+/// Derive the one canonical action-complete plan for a committed decision.
+///
+/// Callers choose evidence and later provide execution receipts; they do not
+/// choose restore semantics. Unaudited evidence domains remain fail-closed.
+pub(super) fn canonical_plan_for_decision(
+    decision: RestoreDomainDecision,
+) -> Result<RestoreDomainPlan, RestorePlanError> {
+    let domain = decision.domain();
+    let verdict = decision.verdict();
+    if matches!(
+        verdict,
+        RestoreAdmissionVerdict::Widening | RestoreAdmissionVerdict::NotProvable
+    ) {
+        return Err(RestorePlanError::DecisionNotAdmissible { domain, verdict });
+    }
+
+    let contract = contract_for(domain);
+    let mut actions = Vec::new();
+    for semantic in contract.semantics {
+        match semantic {
+            RestoreSemantics::HistoricalReplace => {
+                push_unique(&mut actions, RestoreAction::ReplaceValidatedHistorical)
+            }
+            RestoreSemantics::AuthorityMonotone => {
+                push_unique(&mut actions, RestoreAction::PreserveOrNarrowAuthority)
+            }
+            RestoreSemantics::EvidenceMerge => {
+                let Some(policies) = required_evidence_policies(domain) else {
+                    return Err(RestorePlanError::EvidencePolicyUnderspecified { domain });
+                };
+                for policy in policies {
+                    push_unique(&mut actions, RestoreAction::MergeEvidence(*policy));
+                }
+            }
+            RestoreSemantics::DerivedRequalify => {
+                push_unique(&mut actions, RestoreAction::RequalifyFromCurrentInputs)
+            }
+            RestoreSemantics::TransitionReconcile => {
+                push_unique(&mut actions, RestoreAction::ReconcileBeforeActivation)
+            }
+            RestoreSemantics::EphemeralDrop => {
+                push_unique(&mut actions, RestoreAction::DropEphemeral)
+            }
+        }
+    }
+
+    match verdict {
+        RestoreAdmissionVerdict::ReconciliationRequired => {
+            push_unique(&mut actions, RestoreAction::ReconcileBeforeActivation)
+        }
+        RestoreAdmissionVerdict::ConservativeRequalification => {
+            push_unique(&mut actions, RestoreAction::RequalifyFromCurrentInputs)
+        }
+        RestoreAdmissionVerdict::ProvenNonWidening => {}
+        RestoreAdmissionVerdict::Widening | RestoreAdmissionVerdict::NotProvable => unreachable!(),
+    }
+
+    RestoreDomainPlan::new(decision, actions)
 }
 
 #[cfg(test)]
@@ -290,12 +388,18 @@ mod tests {
     #[test]
     fn operator_plan_is_action_complete() {
         let plan = RestoreDomainPlan::new(
-            d(RestoreDomain::OperatorAuthority, RestoreAdmissionVerdict::ReconciliationRequired),
+            d(
+                RestoreDomain::OperatorAuthority,
+                RestoreAdmissionVerdict::ReconciliationRequired,
+            ),
             operator_actions(),
         )
         .unwrap();
         assert_eq!(plan.domain(), RestoreDomain::OperatorAuthority);
-        assert_eq!(plan.verdict(), RestoreAdmissionVerdict::ReconciliationRequired);
+        assert_eq!(
+            plan.verdict(),
+            RestoreAdmissionVerdict::ReconciliationRequired
+        );
     }
 
     #[test]
@@ -304,7 +408,10 @@ mod tests {
         actions.retain(|a| *a != RestoreAction::ReconcileBeforeActivation);
         assert_eq!(
             RestoreDomainPlan::new(
-                d(RestoreDomain::OperatorAuthority, RestoreAdmissionVerdict::ReconciliationRequired),
+                d(
+                    RestoreDomain::OperatorAuthority,
+                    RestoreAdmissionVerdict::ReconciliationRequired,
+                ),
                 actions,
             )
             .err(),
@@ -322,7 +429,10 @@ mod tests {
         actions.push(RestoreAction::ReplaceValidatedHistorical);
         assert_eq!(
             RestoreDomainPlan::new(
-                d(RestoreDomain::OperatorAuthority, RestoreAdmissionVerdict::ReconciliationRequired),
+                d(
+                    RestoreDomain::OperatorAuthority,
+                    RestoreAdmissionVerdict::ReconciliationRequired,
+                ),
                 actions,
             )
             .err(),
@@ -336,7 +446,10 @@ mod tests {
     #[test]
     fn degraded_plan_distinguishes_adverse_and_recovery_evidence() {
         RestoreDomainPlan::new(
-            d(RestoreDomain::DegradedSupervisor, RestoreAdmissionVerdict::ReconciliationRequired),
+            d(
+                RestoreDomain::DegradedSupervisor,
+                RestoreAdmissionVerdict::ReconciliationRequired,
+            ),
             vec![
                 RestoreAction::PreserveOrNarrowAuthority,
                 RestoreAction::MergeEvidence(EvidenceRestorePolicy::RestrictionSupporting),
@@ -351,7 +464,10 @@ mod tests {
     fn degraded_plan_cannot_omit_fresh_only_recovery_policy() {
         assert_eq!(
             RestoreDomainPlan::new(
-                d(RestoreDomain::DegradedSupervisor, RestoreAdmissionVerdict::ReconciliationRequired),
+                d(
+                    RestoreDomain::DegradedSupervisor,
+                    RestoreAdmissionVerdict::ReconciliationRequired,
+                ),
                 vec![
                     RestoreAction::PreserveOrNarrowAuthority,
                     RestoreAction::MergeEvidence(EvidenceRestorePolicy::RestrictionSupporting),
@@ -369,7 +485,10 @@ mod tests {
     #[test]
     fn sensor_plan_covers_replay_reliability_fresh_report_and_policy() {
         let plan = RestoreDomainPlan::new(
-            d(RestoreDomain::SensorFusion, RestoreAdmissionVerdict::ReconciliationRequired),
+            d(
+                RestoreDomain::SensorFusion,
+                RestoreAdmissionVerdict::ReconciliationRequired,
+            ),
             vec![
                 RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier),
                 RestoreAction::MergeEvidence(EvidenceRestorePolicy::RestrictionSupporting),
@@ -386,7 +505,10 @@ mod tests {
     fn sensor_plan_cannot_restore_previous_report_as_current_truth() {
         assert_eq!(
             RestoreDomainPlan::new(
-                d(RestoreDomain::SensorFusion, RestoreAdmissionVerdict::ReconciliationRequired),
+                d(
+                    RestoreDomain::SensorFusion,
+                    RestoreAdmissionVerdict::ReconciliationRequired,
+                ),
                 vec![
                     RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier),
                     RestoreAction::MergeEvidence(EvidenceRestorePolicy::RestrictionSupporting),
@@ -406,7 +528,10 @@ mod tests {
     fn unaudited_actuator_evidence_fails_closed() {
         assert_eq!(
             RestoreDomainPlan::new(
-                d(RestoreDomain::ActuatorIsolation, RestoreAdmissionVerdict::ReconciliationRequired),
+                d(
+                    RestoreDomain::ActuatorIsolation,
+                    RestoreAdmissionVerdict::ReconciliationRequired,
+                ),
                 vec![
                     RestoreAction::PreserveOrNarrowAuthority,
                     RestoreAction::MergeEvidence(EvidenceRestorePolicy::RestrictionSupporting),
@@ -423,7 +548,10 @@ mod tests {
     #[test]
     fn field_envelope_requires_requalification_and_policy_reconcile() {
         RestoreDomainPlan::new(
-            d(RestoreDomain::FieldEnvelope, RestoreAdmissionVerdict::ReconciliationRequired),
+            d(
+                RestoreDomain::FieldEnvelope,
+                RestoreAdmissionVerdict::ReconciliationRequired,
+            ),
             vec![
                 RestoreAction::RequalifyFromCurrentInputs,
                 RestoreAction::ReconcileBeforeActivation,
@@ -436,7 +564,10 @@ mod tests {
     fn proven_non_widening_cannot_carry_reconciliation_action() {
         assert_eq!(
             RestoreDomainPlan::new(
-                d(RestoreDomain::UpdateManager, RestoreAdmissionVerdict::ProvenNonWidening),
+                d(
+                    RestoreDomain::UpdateManager,
+                    RestoreAdmissionVerdict::ProvenNonWidening,
+                ),
                 vec![RestoreAction::ReconcileBeforeActivation],
             )
             .err(),
@@ -454,7 +585,10 @@ mod tests {
         actions.push(RestoreAction::PreserveOrNarrowAuthority);
         assert_eq!(
             RestoreDomainPlan::new(
-                d(RestoreDomain::OperatorAuthority, RestoreAdmissionVerdict::ReconciliationRequired),
+                d(
+                    RestoreDomain::OperatorAuthority,
+                    RestoreAdmissionVerdict::ReconciliationRequired,
+                ),
                 actions,
             )
             .err(),
@@ -463,5 +597,137 @@ mod tests {
                 action: RestoreAction::PreserveOrNarrowAuthority,
             })
         );
+    }
+
+    #[test]
+    fn canonical_reference_plans_match_audited_contracts() {
+        let operator = canonical_plan_for_decision(d(
+            RestoreDomain::OperatorAuthority,
+            RestoreAdmissionVerdict::ReconciliationRequired,
+        ))
+        .unwrap();
+        assert_eq!(
+            operator.actions(),
+            &[
+                RestoreAction::PreserveOrNarrowAuthority,
+                RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier),
+                RestoreAction::ReconcileBeforeActivation,
+                RestoreAction::DropEphemeral,
+            ]
+        );
+
+        let sensor = canonical_plan_for_decision(d(
+            RestoreDomain::SensorFusion,
+            RestoreAdmissionVerdict::ReconciliationRequired,
+        ))
+        .unwrap();
+        assert_eq!(
+            sensor.actions(),
+            &[
+                RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier),
+                RestoreAction::MergeEvidence(EvidenceRestorePolicy::RestrictionSupporting),
+                RestoreAction::MergeEvidence(EvidenceRestorePolicy::RecoverySupportingFreshOnly),
+                RestoreAction::RequalifyFromCurrentInputs,
+                RestoreAction::ReconcileBeforeActivation,
+            ]
+        );
+
+        let field = canonical_plan_for_decision(d(
+            RestoreDomain::FieldEnvelope,
+            RestoreAdmissionVerdict::ReconciliationRequired,
+        ))
+        .unwrap();
+        assert_eq!(
+            field.actions(),
+            &[
+                RestoreAction::RequalifyFromCurrentInputs,
+                RestoreAction::ReconcileBeforeActivation,
+            ]
+        );
+    }
+
+    #[test]
+    fn canonical_plan_keeps_unaudited_evidence_domains_closed() {
+        for domain in [
+            RestoreDomain::ActuatorIsolation,
+            RestoreDomain::PartitionRecovery,
+            RestoreDomain::TemporalAssurance,
+        ] {
+            assert_eq!(
+                canonical_plan_for_decision(d(
+                    domain,
+                    RestoreAdmissionVerdict::ReconciliationRequired,
+                ))
+                .err(),
+                Some(RestorePlanError::EvidencePolicyUnderspecified { domain })
+            );
+        }
+    }
+
+    fn action_universe() -> [RestoreAction; 10] {
+        [
+            RestoreAction::ReplaceValidatedHistorical,
+            RestoreAction::PreserveOrNarrowAuthority,
+            RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier),
+            RestoreAction::MergeEvidence(EvidenceRestorePolicy::RestrictionSupporting),
+            RestoreAction::MergeEvidence(EvidenceRestorePolicy::CounterexamplePreserving),
+            RestoreAction::MergeEvidence(EvidenceRestorePolicy::RecoverySupportingFreshOnly),
+            RestoreAction::MergeEvidence(EvidenceRestorePolicy::NeutralHistory),
+            RestoreAction::RequalifyFromCurrentInputs,
+            RestoreAction::ReconcileBeforeActivation,
+            RestoreAction::DropEphemeral,
+        ]
+    }
+
+    #[test]
+    fn audited_decisions_have_exactly_one_valid_action_set() {
+        let decisions = [
+            d(
+                RestoreDomain::Controller,
+                RestoreAdmissionVerdict::ReconciliationRequired,
+            ),
+            d(
+                RestoreDomain::Mission,
+                RestoreAdmissionVerdict::ReconciliationRequired,
+            ),
+            d(
+                RestoreDomain::OperatorAuthority,
+                RestoreAdmissionVerdict::ReconciliationRequired,
+            ),
+            d(
+                RestoreDomain::DegradedSupervisor,
+                RestoreAdmissionVerdict::ReconciliationRequired,
+            ),
+            d(
+                RestoreDomain::UpdateManager,
+                RestoreAdmissionVerdict::ReconciliationRequired,
+            ),
+            d(
+                RestoreDomain::SensorFusion,
+                RestoreAdmissionVerdict::ReconciliationRequired,
+            ),
+            d(
+                RestoreDomain::FieldEnvelope,
+                RestoreAdmissionVerdict::ReconciliationRequired,
+            ),
+        ];
+        let universe = action_universe();
+
+        for decision in decisions {
+            let canonical = canonical_plan_for_decision(decision).expect("audited canonical plan");
+            let mut accepted = 0usize;
+            for mask in 0usize..(1usize << universe.len()) {
+                let candidate = universe
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, action)| ((mask >> index) & 1 == 1).then_some(*action))
+                    .collect::<Vec<_>>();
+                if let Ok(plan) = RestoreDomainPlan::new(decision, candidate) {
+                    accepted += 1;
+                    assert_eq!(plan.actions(), canonical.actions());
+                }
+            }
+            assert_eq!(accepted, 1, "audited decision must have one valid plan");
+        }
     }
 }
