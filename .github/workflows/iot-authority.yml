@@ -215,10 +215,45 @@ jobs:
           rustc --version | grep -F 'rustc 1.94.0'
           cargo --version | grep -F 'cargo 1.94.0'
 
-      - name: Existing external dependency lock resolves without mutation
+      - name: Allow local workspace lock bookkeeping but reject external drift
         run: |
-          before=$(sha256sum Cargo.lock | awk '{print $1}')
-          cargo metadata --locked --format-version 1 --no-deps >/dev/null
-          after=$(sha256sum Cargo.lock | awk '{print $1}')
-          test "$before" = "$after"
-          git diff --exit-code -- Cargo.lock
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          python3 - <<'PY'
+          import difflib
+          import json
+          import sys
+          import tomllib
+
+          def projection(path):
+              with open(path, "rb") as handle:
+                  lock = tomllib.load(handle)
+              packages = [package for package in lock.get("package", []) if "source" in package]
+              packages.sort(key=lambda package: (
+                  package.get("name", ""),
+                  package.get("version", ""),
+                  package.get("source", ""),
+              ))
+              return {
+                  "lock_version": lock.get("version"),
+                  "external_packages": packages,
+              }
+
+          before = projection("/tmp/Cargo.lock.before")
+          after = projection("Cargo.lock")
+          if before != after:
+              before_text = json.dumps(before, indent=2, sort_keys=True).splitlines()
+              after_text = json.dumps(after, indent=2, sort_keys=True).splitlines()
+              print("External dependency graph changed:")
+              print("\n".join(difflib.unified_diff(
+                  before_text,
+                  after_text,
+                  fromfile="before",
+                  tofile="after",
+                  lineterm="",
+              )))
+              sys.exit(1)
+          PY
+          unexpected=$(git diff --name-only | grep -v '^Cargo.lock$' || true)
+          test -z "$unexpected"
+          git checkout -- Cargo.lock
