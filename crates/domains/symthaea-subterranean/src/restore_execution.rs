@@ -3,16 +3,19 @@
 //! Affine execution transaction for committed operational restore.
 //!
 //! Restore execution is a single owner-scoped transaction. A committed restore
-//! is consumed into one session; the session owns every unused action permit and
-//! every executor-earned receipt. Executor failure aborts the session and drops
-//! all remaining execution authority. Productive activation may eventually
-//! consume only a fully completed session token.
+//! is consumed into one session; the session owns the exact validated checkpoint
+//! source, every unused action permit, and every executor-earned receipt.
+//! Executor failure aborts the session and drops all remaining execution
+//! authority. Productive activation may eventually consume only a fully
+//! completed session token, which retains the same exact source.
 
 use super::restore_actions::{
     canonical_plan_for_decision, EvidenceRestorePolicy, RestoreAction, RestoreDomainPlan,
     RestorePlanError,
 };
-use super::restore_admission::{CommittedOperationalRestore, RestoreDigest, RestoreGenerationFence};
+use super::restore_admission::{
+    CommittedOperationalRestore, OperationalRestoreSource, RestoreDigest, RestoreGenerationFence,
+};
 use super::restore_semantics::RestoreDomain;
 use crate::actuator_isolation::ActuatorIsolationSupervisor;
 use crate::operator_authority::OperatorAuthority;
@@ -220,11 +223,12 @@ pub(super) enum RestoreFinishError {
 
 /// Fully executed restore transaction.
 ///
-/// Deliberately affine and non-serializable. A later activation integration may
-/// consume this token, but checkpoint bytes can never deserialize into it.
-/// Its fields remain opaque until that activation boundary is implemented.
+/// Deliberately affine and non-serializable. The exact validated checkpoint
+/// source survives into this token so final activation can consume the same
+/// source that preparation, commit, executors and receipts were bound to.
 pub(super) struct CompletedRestoreExecution {
     _binding: RestoreExecutionBinding,
+    _source: OperationalRestoreSource,
     _receipts: Vec<RestoreActionReceipt>,
 }
 
@@ -232,9 +236,12 @@ pub(super) struct CompletedRestoreExecution {
 ///
 /// `begin` consumes the non-Clone `CommittedOperationalRestore`, preventing one
 /// committed authority decision from spawning multiple independent permit sets.
+/// It also takes ownership of the exact validated checkpoint source. Executors
+/// therefore have no API for supplying replacement checkpoint-domain objects.
 /// The session itself is non-Clone/non-Copy/non-serializable.
 pub(super) struct RestoreExecutionSession {
     binding: RestoreExecutionBinding,
+    source: OperationalRestoreSource,
     plans: Vec<RestoreDomainPlan>,
     permits: Vec<RestoreActionPermit>,
     receipts: Vec<RestoreActionReceipt>,
@@ -248,8 +255,11 @@ impl RestoreExecutionSession {
         let binding = RestoreExecutionBinding::from_committed(&committed);
         let plans = canonical_plans_for_committed(&committed).map_err(plan_session_error)?;
         let permits = permits_for_plans(binding, &plans);
+        let source = committed.into_source();
+        debug_assert_eq!(binding.checkpoint_digest, source.digest());
         Ok(Self {
             binding,
+            source,
             plans,
             permits,
             receipts: Vec::new(),
@@ -293,16 +303,20 @@ impl RestoreExecutionSession {
         Ok(self.permits.remove(index))
     }
 
-    /// Execute and internally record the operator replay barrier obligation.
+    /// Execute and internally record the operator replay barrier obligation using
+    /// only the operator source owned by this exact restore session.
     pub(super) fn execute_operator_replay_merge(
         &mut self,
         live: &mut OperatorAuthority,
-        checkpoint: &OperatorAuthority,
     ) -> Result<(), RestoreSessionError> {
         let domain = RestoreDomain::OperatorAuthority;
         let action = RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier);
         let permit = self.take_exact_permit(domain, action)?;
-        match permit.execute_operator_replay_merge(live, checkpoint) {
+        let result = {
+            let checkpoint = &self.source.checkpoint().operator_authority;
+            permit.execute_operator_replay_merge(live, checkpoint)
+        };
+        match result {
             Ok(receipt) => {
                 self.receipts.push(receipt);
                 Ok(())
@@ -314,7 +328,8 @@ impl RestoreExecutionSession {
         }
     }
 
-    /// Preserve the union of live and checkpointed actuator isolation authority.
+    /// Preserve the union of live and session-owned checkpoint actuator
+    /// isolation authority.
     ///
     /// This consumes only `ActuatorIsolation + PreserveOrNarrowAuthority`. The
     /// remaining actuator evidence/requalification/reconciliation obligations
@@ -322,12 +337,15 @@ impl RestoreExecutionSession {
     pub(super) fn execute_actuator_authority_join(
         &mut self,
         live: &mut ActuatorIsolationSupervisor,
-        checkpoint: &ActuatorIsolationSupervisor,
     ) -> Result<(), RestoreSessionError> {
         let domain = RestoreDomain::ActuatorIsolation;
         let action = RestoreAction::PreserveOrNarrowAuthority;
         let permit = self.take_exact_permit(domain, action)?;
-        match permit.execute_actuator_authority_join(live, checkpoint) {
+        let result = {
+            let checkpoint = &self.source.checkpoint().actuator_isolation;
+            permit.execute_actuator_authority_join(live, checkpoint)
+        };
+        match result {
             Ok(receipt) => {
                 self.receipts.push(receipt);
                 Ok(())
@@ -339,8 +357,8 @@ impl RestoreExecutionSession {
         }
     }
 
-    /// Preserve temporal review authority without importing historical runtime
-    /// measurements as current truth.
+    /// Preserve temporal review authority from the exact session-owned source
+    /// without importing historical runtime measurements as current truth.
     ///
     /// This consumes only `TemporalAssurance + PreserveOrNarrowAuthority`.
     /// Replay/counterexample/history merge, fresh requalification and final
@@ -348,12 +366,15 @@ impl RestoreExecutionSession {
     pub(super) fn execute_temporal_authority_join(
         &mut self,
         live: &mut TemporalAssuranceSupervisor,
-        checkpoint: &TemporalAssuranceSupervisor,
     ) -> Result<(), RestoreSessionError> {
         let domain = RestoreDomain::TemporalAssurance;
         let action = RestoreAction::PreserveOrNarrowAuthority;
         let permit = self.take_exact_permit(domain, action)?;
-        match permit.execute_temporal_authority_join(live, checkpoint) {
+        let result = {
+            let checkpoint = &self.source.checkpoint().temporal;
+            permit.execute_temporal_authority_join(live, checkpoint)
+        };
+        match result {
             Ok(receipt) => {
                 self.receipts.push(receipt);
                 Ok(())
@@ -384,6 +405,7 @@ impl RestoreExecutionSession {
             .map_err(RestoreFinishError::InvalidExecution)?;
         Ok(CompletedRestoreExecution {
             _binding: self.binding,
+            _source: self.source,
             _receipts: self.receipts,
         })
     }
@@ -523,13 +545,18 @@ fn validate_execution(
 mod tests {
     use super::*;
     use crate::actuator_isolation::PhysicalActuator;
+    use crate::embodiment::SubterraneanEmbodiment;
     use crate::operational_checkpoint::restore_admission::{
-        commit_operational_restore, prepare_operational_restore, RestoreAdmissionVerdict,
-        RestoreDomainDecision, RestorePreparationContext,
+        commit_operational_restore, prepare_operational_restore, OperationalRestoreSource,
+        RestoreAdmissionVerdict, RestoreDomainDecision, RestorePreparationContext,
     };
     use crate::operational_checkpoint::restore_semantics::OPERATIONAL_RESTORE_CONTRACTS;
+    use crate::operator_protocol::{
+        AuthenticationLevel, OperatorCommand, OperatorCommandEnvelope, OperatorId, OperatorRole,
+    };
     use crate::plan_freshness::RuntimeRevisions;
     use crate::temporal_assurance::{TemporalAuthority, TemporalRuntimeFrame};
+    use symthaea_core::genesis::GenesisSeed;
 
     fn digest(byte: u8) -> RestoreDigest {
         RestoreDigest::new([byte; 32])
@@ -555,12 +582,75 @@ mod tests {
             .collect()
     }
 
+    fn source(phrase: &str) -> OperationalRestoreSource {
+        let mut checkpoint =
+            SubterraneanEmbodiment::new(&GenesisSeed::from_phrase(phrase)).operational_checkpoint();
+
+        // Give the owned source concrete replay evidence.
+        checkpoint
+            .operator_authority
+            .ingest(
+                OperatorCommandEnvelope {
+                    operator: OperatorId(91),
+                    role: OperatorRole::SafetyOfficer,
+                    authentication: AuthenticationLevel::HardwareBacked,
+                    epoch: 1,
+                    sequence: 4,
+                    proposal_id: 91,
+                    issued_step: 0,
+                    expires_step: 100,
+                    command: OperatorCommand::HoldPosition,
+                },
+                0,
+                true,
+            )
+            .expect("source replay evidence");
+
+        // Give the same owned source one actuator latch.
+        checkpoint
+            .actuator_isolation
+            .force_health_for_test(PhysicalActuator::LeftTrack, 0.0);
+        let mut command = crate::types::SubterraneanCommand::zero();
+        command.set_left_track(1.0);
+        let state = crate::types::SubterraneanState::home();
+        for _ in 0..64 {
+            checkpoint.actuator_isolation.observe(&command, &state, &state);
+            if checkpoint
+                .actuator_isolation
+                .report()
+                .is_isolated(PhysicalActuator::LeftTrack)
+            {
+                break;
+            }
+        }
+        assert!(
+            checkpoint
+                .actuator_isolation
+                .report()
+                .is_isolated(PhysicalActuator::LeftTrack)
+        );
+
+        // Give the source a temporal review hold without importing any of its
+        // measurements as live truth during the later authority join.
+        checkpoint.temporal.assess(
+            0.005,
+            0,
+            RuntimeRevisions::default(),
+            &TemporalRuntimeFrame::default(),
+            true,
+            false,
+        );
+        assert!(checkpoint.temporal.hold_latched());
+
+        OperationalRestoreSource::capture(checkpoint).expect("valid owned restore source")
+    }
+
     fn committed_with(
-        checkpoint_byte: u8,
+        phrase: &str,
         live_fence: RestoreGenerationFence,
     ) -> CommittedOperationalRestore {
         let prepared = prepare_operational_restore(
-            RestorePreparationContext::new(digest(checkpoint_byte), live_fence),
+            RestorePreparationContext::new(source(phrase), live_fence),
             decisions(),
         )
         .expect("prepare");
@@ -568,11 +658,11 @@ mod tests {
     }
 
     fn committed() -> CommittedOperationalRestore {
-        committed_with(7, fence())
+        committed_with("restore-execution-source", fence())
     }
 
     #[test]
-    fn begin_owns_exact_canonical_obligation_set() {
+    fn begin_owns_exact_canonical_obligation_set_and_source_identity() {
         let expected = decisions()
             .iter()
             .map(|decision| canonical_plan_for_decision(*decision).unwrap().actions().len())
@@ -581,16 +671,16 @@ mod tests {
         assert_eq!(session.state(), RestoreExecutionSessionState::Open);
         assert_eq!(session.remaining_permits(), expected);
         assert_eq!(session.receipt_count(), 0);
+        assert_eq!(session.binding.checkpoint_digest, session.source.digest());
     }
 
     #[test]
-    fn operator_replay_execution_consumes_permit_and_stores_receipt_internally() {
+    fn operator_replay_execution_consumes_only_session_owned_source() {
         let mut session = RestoreExecutionSession::begin(committed()).expect("session");
         let before = session.remaining_permits();
         let mut live = OperatorAuthority::default();
-        let checkpoint = OperatorAuthority::default();
         session
-            .execute_operator_replay_merge(&mut live, &checkpoint)
+            .execute_operator_replay_merge(&mut live)
             .expect("operator replay execution");
         assert_eq!(session.remaining_permits(), before - 1);
         assert_eq!(session.receipt_count(), 1);
@@ -603,34 +693,39 @@ mod tests {
             RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier)
         );
         assert_eq!(receipt.outcome, RestoreActionOutcome::Applied);
+
+        // Sequence 4 came only from the session-owned checkpoint. If its replay
+        // evidence was actually merged, replaying it against live must fail.
+        let replay = live.ingest(
+            OperatorCommandEnvelope {
+                operator: OperatorId(91),
+                role: OperatorRole::SafetyOfficer,
+                authentication: AuthenticationLevel::HardwareBacked,
+                epoch: 1,
+                sequence: 4,
+                proposal_id: 92,
+                issued_step: 0,
+                expires_step: 100,
+                command: OperatorCommand::EmergencyStop,
+            },
+            0,
+            true,
+        );
+        assert_eq!(
+            replay.err(),
+            Some(crate::operator_authority::OperatorAuthorityRejection::Replay)
+        );
     }
 
     #[test]
-    fn actuator_authority_executor_unions_latches_and_earns_only_one_receipt() {
+    fn actuator_authority_executor_uses_owned_source_and_earns_only_one_receipt() {
         let mut session = RestoreExecutionSession::begin(committed()).expect("session");
         let before_permits = session.remaining_permits();
         let before_receipts = session.receipt_count();
         let mut live = ActuatorIsolationSupervisor::default();
-        let mut checkpoint = ActuatorIsolationSupervisor::default();
-        live.force_health_for_test(PhysicalActuator::Cutter, 0.0);
-        live.service(PhysicalActuator::Cutter);
-        checkpoint.force_health_for_test(PhysicalActuator::LeftTrack, 0.0);
-        // Tests in this module cannot set the private latch directly, so drive
-        // both supervisors through the public monitor until the desired latch
-        // state exists.
-        let mut command = crate::types::SubterraneanCommand::zero();
-        command.set_left_track(1.0);
-        let state = crate::types::SubterraneanState::home();
-        for _ in 0..64 {
-            checkpoint.observe(&command, &state, &state);
-            if checkpoint.report().is_isolated(PhysicalActuator::LeftTrack) {
-                break;
-            }
-        }
-        assert!(checkpoint.report().is_isolated(PhysicalActuator::LeftTrack));
 
         session
-            .execute_actuator_authority_join(&mut live, &checkpoint)
+            .execute_actuator_authority_join(&mut live)
             .expect("actuator authority join");
 
         assert!(live.report().is_isolated(PhysicalActuator::LeftTrack));
@@ -644,24 +739,14 @@ mod tests {
     }
 
     #[test]
-    fn temporal_authority_executor_preserves_hold_and_earns_only_one_receipt() {
+    fn temporal_authority_executor_uses_owned_source_and_earns_only_one_receipt() {
         let mut session = RestoreExecutionSession::begin(committed()).expect("session");
         let before_permits = session.remaining_permits();
         let before_receipts = session.receipt_count();
         let mut live = TemporalAssuranceSupervisor::default();
-        let mut checkpoint = TemporalAssuranceSupervisor::default();
-        checkpoint.assess(
-            0.005,
-            0,
-            RuntimeRevisions::default(),
-            &TemporalRuntimeFrame::default(),
-            true,
-            false,
-        );
-        assert!(checkpoint.hold_latched());
 
         session
-            .execute_temporal_authority_join(&mut live, &checkpoint)
+            .execute_temporal_authority_join(&mut live)
             .expect("temporal authority join");
 
         assert!(live.hold_latched());
@@ -680,14 +765,11 @@ mod tests {
     fn duplicate_executor_attempt_aborts_and_destroys_remaining_authority() {
         let mut session = RestoreExecutionSession::begin(committed()).expect("session");
         let mut live = OperatorAuthority::default();
-        let checkpoint = OperatorAuthority::default();
         session
-            .execute_operator_replay_merge(&mut live, &checkpoint)
+            .execute_operator_replay_merge(&mut live)
             .expect("first execution");
         assert_eq!(
-            session
-                .execute_operator_replay_merge(&mut live, &checkpoint)
-                .err(),
+            session.execute_operator_replay_merge(&mut live).err(),
             Some(RestoreSessionError::MissingPermit {
                 domain: RestoreDomain::OperatorAuthority,
                 action: RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier),
@@ -702,15 +784,12 @@ mod tests {
     fn aborted_session_rejects_all_future_execution() {
         let mut session = RestoreExecutionSession::begin(committed()).expect("session");
         let mut live = OperatorAuthority::default();
-        let checkpoint = OperatorAuthority::default();
         session
-            .execute_operator_replay_merge(&mut live, &checkpoint)
+            .execute_operator_replay_merge(&mut live)
             .expect("first execution");
-        let _ = session.execute_operator_replay_merge(&mut live, &checkpoint);
+        let _ = session.execute_operator_replay_merge(&mut live);
         assert_eq!(
-            session
-                .execute_operator_replay_merge(&mut live, &checkpoint)
-                .err(),
+            session.execute_operator_replay_merge(&mut live).err(),
             Some(RestoreSessionError::Aborted)
         );
     }
@@ -731,18 +810,31 @@ mod tests {
     fn aborted_session_cannot_finish() {
         let mut session = RestoreExecutionSession::begin(committed()).expect("session");
         let mut live = OperatorAuthority::default();
-        let checkpoint = OperatorAuthority::default();
         session
-            .execute_operator_replay_merge(&mut live, &checkpoint)
+            .execute_operator_replay_merge(&mut live)
             .expect("first execution");
-        let _ = session.execute_operator_replay_merge(&mut live, &checkpoint);
+        let _ = session.execute_operator_replay_merge(&mut live);
         assert_eq!(session.finish().err(), Some(RestoreFinishError::Aborted));
     }
 
     #[test]
-    fn same_checkpoint_under_different_live_fence_creates_different_session_binding() {
-        let first = RestoreExecutionSession::begin(committed_with(7, fence())).expect("first");
-        let second = RestoreExecutionSession::begin(committed_with(7, alternate_fence())).expect("second");
+    fn same_source_under_different_live_fence_creates_different_session_binding() {
+        let first =
+            RestoreExecutionSession::begin(committed_with("same-source", fence())).expect("first");
+        let second = RestoreExecutionSession::begin(committed_with(
+            "same-source",
+            alternate_fence(),
+        ))
+        .expect("second");
+        assert_eq!(first.binding.checkpoint_digest, second.binding.checkpoint_digest);
+        assert_ne!(first.binding, second.binding);
+    }
+
+    #[test]
+    fn different_source_creates_different_session_binding_under_same_live_fence() {
+        let first = RestoreExecutionSession::begin(committed_with("source-a", fence())).expect("a");
+        let second = RestoreExecutionSession::begin(committed_with("source-b", fence())).expect("b");
+        assert_ne!(first.binding.checkpoint_digest, second.binding.checkpoint_digest);
         assert_ne!(first.binding, second.binding);
     }
 
