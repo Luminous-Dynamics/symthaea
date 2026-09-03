@@ -150,19 +150,11 @@ impl DecodedGuardEvidence {
         &self.raw_interlock_evidence
     }
 
-    /// Consume the parser result for the privileged guard's local verification pipeline.
-    pub fn into_parts(
-        self,
-    ) -> (
-        Vec<u8>,
-        Vec<u8>,
-        PhysicalInterlockReportV1,
-        Vec<u8>,
-        Digest32,
-    ) {
+    /// After the guard has borrowed the transport receipt/payload for its local
+    /// transport-verification stage, consume the remaining interlock evidence without
+    /// cloning it. The returned request digest remains audit-only.
+    pub fn into_interlock_parts(self) -> (PhysicalInterlockReportV1, Vec<u8>, Digest32) {
         (
-            self.raw_transport_receipt,
-            self.raw_physical_effect_payload,
             self.interlock_report,
             self.raw_interlock_evidence,
             self.request_digest,
@@ -247,10 +239,10 @@ pub enum GuardProtocolError {
     InterlockEvidenceSizeOutOfBounds,
     /// Outer request could not be decoded.
     #[error("actuation guard request decode failed: {0}")]
-    Decoding(#[source] Box<bincode::ErrorKind>),
+    Decoding(#[source] bincode::Error),
     /// Outer request could not be encoded canonically.
     #[error("actuation guard request encode failed: {0}")]
-    Encoding(#[source] Box<bincode::ErrorKind>),
+    Encoding(#[source] bincode::Error),
     /// Outer request had an alternate/trailing encoding.
     #[error("actuation guard request is not canonically encoded")]
     NonCanonicalRequestEncoding,
@@ -323,10 +315,13 @@ mod tests {
         let frame = request.canonical_bytes().unwrap();
         let decoded = decode_canonical_guard_request(&frame).unwrap();
         assert_eq!(decoded.request_digest(), request.digest().unwrap());
-        assert_eq!(decoded.raw_transport_receipt(), request.raw_transport_receipt);
+        assert_eq!(
+            decoded.raw_transport_receipt(),
+            request.raw_transport_receipt.as_slice()
+        );
         assert_eq!(
             decoded.raw_physical_effect_payload(),
-            request.raw_physical_effect_payload
+            request.raw_physical_effect_payload.as_slice()
         );
         assert_eq!(decoded.interlock_report().controller_id, "safety-plc:field-a");
     }
