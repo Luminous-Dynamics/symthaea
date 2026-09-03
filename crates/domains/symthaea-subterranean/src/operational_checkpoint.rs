@@ -6,6 +6,8 @@
 pub(crate) mod restore_actions;
 #[path = "restore_admission.rs"]
 pub(crate) mod restore_admission;
+#[path = "restore_execution.rs"]
+pub(crate) mod restore_execution;
 #[path = "restore_operator.rs"]
 pub(crate) mod restore_operator;
 #[path = "restore_semantics.rs"]
