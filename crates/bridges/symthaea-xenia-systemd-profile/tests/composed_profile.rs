@@ -8,8 +8,15 @@ use std::sync::{Arc, Mutex};
 use ed25519_dalek::{Signer, SigningKey};
 use symthaea_action_checkpoint::{CheckpointHead, GrantAccountCheckpoint};
 use symthaea_action_runtime::{ExecutionId, ReservationId};
-use symthaea_authority::{AuthorityEpoch, CapabilityGrant, Digest32, PrincipalId, TaskId};
+use symthaea_authority::{
+    AuthorityEpoch, CapabilityGrant, Digest32, NegativeAuthorityFact, PrincipalId, TaskId,
+};
 use symthaea_authority_frontier::CheckpointCasStore;
+use symthaea_authority_state::{
+    AUTHORITY_STATE_SCHEMA_VERSION, AuthorityStatePolicyV1, AuthorityStateStatementV1,
+    AuthorityStateWitnessId, PendingAuthorityStateChallenge, TrustedAuthorityStateWitnessV1,
+    VerifiedAuthorityState, verify_authority_state_v1,
+};
 use symthaea_authority_time::{
     AUTHORITY_TIME_SCHEMA_VERSION, AuthorityTimeStatementV1, PendingAuthorityTimeChallenge,
     TimeAuthorityId, TrustedTimeAuthorityV1, TrustedTimePolicyV1, VerifiedAuthorityTime,
@@ -211,11 +218,79 @@ fn verified_time(grant: &CapabilityGrant, witnessed_unix_s: u64) -> VerifiedAuth
     .unwrap()
 }
 
+fn verified_state(
+    grant: &CapabilityGrant,
+    time: &VerifiedAuthorityTime,
+    state_sequence: u64,
+    facts: Vec<NegativeAuthorityFact>,
+) -> VerifiedAuthorityState {
+    let key_a = SigningKey::from_bytes(&[91; 32]);
+    let key_b = SigningKey::from_bytes(&[92; 32]);
+    let policy = AuthorityStatePolicyV1 {
+        schema_version: AUTHORITY_STATE_SCHEMA_VERSION,
+        policy_id: [93; 16],
+        witnesses: vec![
+            TrustedAuthorityStateWitnessV1 {
+                witness_id: AuthorityStateWitnessId([1; 16]),
+                verifying_key: key_a.verifying_key().to_bytes(),
+                organization_binding: [101; 32],
+                service_binding: [111; 32],
+            },
+            TrustedAuthorityStateWitnessV1 {
+                witness_id: AuthorityStateWitnessId([2; 16]),
+                verifying_key: key_b.verifying_key().to_bytes(),
+                organization_binding: [102; 32],
+                service_binding: [112; 32],
+            },
+        ],
+        threshold: 2,
+        minimum_organizations: 2,
+        maximum_challenge_age_s: 60,
+        maximum_post_verification_age_s: 60,
+    };
+    let pending = PendingAuthorityStateChallenge::new(&policy, grant, time).unwrap();
+    let challenge = pending.wire();
+    let sign = |id: AuthorityStateWitnessId, key: &SigningKey, generation: u64| {
+        let mut statement = AuthorityStateStatementV1 {
+            schema_version: AUTHORITY_STATE_SCHEMA_VERSION,
+            witness_id: id,
+            challenge_nonce: challenge.nonce,
+            grant_digest: challenge.grant_digest,
+            state_policy_digest: challenge.state_policy_digest,
+            time_policy_digest: challenge.time_policy_digest,
+            source_frontier_sequence: 20,
+            source_frontier_digest: Digest32([45; 32]),
+            state_sequence,
+            authority_epoch: grant.authority_epoch,
+            negative_facts: facts.clone(),
+            witness_generation: generation,
+            signature: Vec::new(),
+        };
+        statement.signature = key
+            .sign(&statement.canonical_message().unwrap())
+            .to_bytes()
+            .to_vec();
+        statement
+    };
+    verify_authority_state_v1(
+        &policy,
+        grant,
+        pending,
+        time,
+        &[
+            sign(AuthorityStateWitnessId([1; 16]), &key_a, 1),
+            sign(AuthorityStateWitnessId([2; 16]), &key_b, 2),
+        ],
+    )
+    .unwrap()
+}
+
 fn verified_proof(
     grant: &CapabilityGrant,
     workload: &ExecutorWorkloadV1,
     agent_head: CheckpointHead,
     authority_time: &VerifiedAuthorityTime,
+    authority_state: &VerifiedAuthorityState,
 ) -> symthaea_xenia_authority::VerifiedXeniaCapability {
     let signing_key = SigningKey::from_bytes(&[3; 32]);
     let public_key = signing_key.verifying_key().to_bytes();
@@ -277,13 +352,14 @@ fn verified_proof(
         },
         agent_head,
         authority_time,
+        authority_state,
         XeniaFreshnessPolicyV1::strict(30, 5),
     )
     .unwrap()
 }
 
 #[test]
-fn exact_xenia_proof_drives_one_cas_backed_typed_restart() {
+fn exact_state_bound_xenia_proof_drives_one_cas_backed_typed_restart() {
     let (before, plan, grant, workload) = plan_and_grant();
     let calls = Arc::new(Mutex::new(0usize));
     let backend = FakeBackend::new(
@@ -300,20 +376,22 @@ fn exact_xenia_proof_drives_one_cas_backed_typed_restart() {
     assert_eq!(profile.authorization_checkpoint_head().unwrap(), frontier.head);
 
     let time = verified_time(&grant, 125);
-    let proof = verified_proof(&grant, &workload, frontier.head, &time);
+    let state = verified_state(&grant, &time, 20, Vec::new());
+    let state_digest = state.snapshot_digest();
+    let proof = verified_proof(&grant, &workload, frontier.head, &time, &state);
     let receipt = profile
         .recover_verified_once(
             proof,
             &time,
-            AuthorityEpoch(7),
+            state,
             &plan,
             ExecutionId("exec-1".into()),
             ReservationId("reservation-1".into()),
-            &[],
         )
         .unwrap();
 
     assert_eq!(*calls.lock().unwrap(), 1);
+    assert_eq!(receipt.authority_state_digest, state_digest);
     assert_eq!(receipt.recovery.verification, VerificationResult::Healthy);
     assert_ne!(receipt.recovery.checkpoint_head, frontier.head);
     assert_eq!(receipt.recovery.use_state.committed, 1);
@@ -349,30 +427,30 @@ fn two_processes_can_verify_same_attestation_but_only_one_crosses_cas() {
     .unwrap();
 
     let time_a = verified_time(&grant, 125);
+    let state_a = verified_state(&grant, &time_a, 20, Vec::new());
+    let proof_a = verified_proof(&grant, &workload, frontier.head, &time_a, &state_a);
     let time_b = verified_time(&grant, 125);
-    let proof_a = verified_proof(&grant, &workload, frontier.head, &time_a);
-    let proof_b = verified_proof(&grant, &workload, frontier.head, &time_b);
+    let state_b = verified_state(&grant, &time_b, 20, Vec::new());
+    let proof_b = verified_proof(&grant, &workload, frontier.head, &time_b, &state_b);
 
     profile_a
         .recover_verified_once(
             proof_a,
             &time_a,
-            AuthorityEpoch(7),
+            state_a,
             &plan,
             ExecutionId("exec-a".into()),
             ReservationId("reservation-a".into()),
-            &[],
         )
         .unwrap();
 
     let second = profile_b.recover_verified_once(
         proof_b,
         &time_b,
-        AuthorityEpoch(7),
+        state_b,
         &plan,
         ExecutionId("exec-b".into()),
         ReservationId("reservation-b".into()),
-        &[],
     );
     assert!(matches!(second, Err(ProfileRecoveryError::Broker(_))));
     assert_eq!(*calls_a.lock().unwrap(), 1);
@@ -389,20 +467,61 @@ fn proof_is_rechecked_for_expiry_at_effect_entry() {
         XeniaSystemdRecoveryProfile::bootstrap(grant.clone(), backend, SharedCasStore::default())
             .unwrap();
     let verification_time = verified_time(&grant, 125);
-    let proof = verified_proof(&grant, &workload, frontier.head, &verification_time);
+    let state = verified_state(&grant, &verification_time, 20, Vec::new());
+    let proof = verified_proof(&grant, &workload, frontier.head, &verification_time, &state);
     let effect_entry_time = verified_time(&grant, 161);
 
     assert!(matches!(
         profile.recover_verified_once(
             proof,
             &effect_entry_time,
-            AuthorityEpoch(7),
+            state,
             &plan,
             ExecutionId("exec-expired".into()),
             ReservationId("reservation-expired".into()),
-            &[],
         ),
         Err(ProfileRecoveryError::XeniaProofExpiredAtEffectEntry)
+    ));
+    assert_eq!(*calls.lock().unwrap(), 0);
+    assert_eq!(profile.authorization_checkpoint_head().unwrap(), frontier.head);
+}
+
+#[test]
+fn authority_state_cannot_change_between_xenia_verification_and_effect_entry() {
+    let (before, plan, grant, workload) = plan_and_grant();
+    let calls = Arc::new(Mutex::new(0usize));
+    let backend = FakeBackend::new(vec![before], calls.clone());
+    let (mut profile, frontier) =
+        XeniaSystemdRecoveryProfile::bootstrap(grant.clone(), backend, SharedCasStore::default())
+            .unwrap();
+    let time = verified_time(&grant, 125);
+    let original_state = verified_state(&grant, &time, 20, Vec::new());
+    let proof = verified_proof(
+        &grant,
+        &workload,
+        frontier.head,
+        &time,
+        &original_state,
+    );
+    let changed_state = verified_state(
+        &grant,
+        &time,
+        21,
+        vec![NegativeAuthorityFact::RevokeGrant {
+            grant_digest: grant.digest(),
+        }],
+    );
+
+    assert!(matches!(
+        profile.recover_verified_once(
+            proof,
+            &time,
+            changed_state,
+            &plan,
+            ExecutionId("exec-state-changed".into()),
+            ReservationId("reservation-state-changed".into()),
+        ),
+        Err(ProfileRecoveryError::AuthorityStateChangedAfterXeniaVerification)
     ));
     assert_eq!(*calls.lock().unwrap(), 0);
     assert_eq!(profile.authorization_checkpoint_head().unwrap(), frontier.head);
