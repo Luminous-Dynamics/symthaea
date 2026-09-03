@@ -1,0 +1,101 @@
+name: Spore v0.3.2 format-only baseline
+
+on:
+  push:
+    branches:
+      - spore/boot-ecology-v0.3.2-format-baseline
+    paths:
+      - .github/workflows/spore-v032-format-baseline.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format-baseline:
+    name: Format, verify semantics compile, commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout baseline branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: spore/boot-ecology-v0.3.2-format-baseline
+          fetch-depth: 1
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Apply rustfmt only to focused Spore crates
+        run: >-
+          cargo fmt
+          -p symthaea-boot-ecology
+          -p symthaea-boot-state
+          -p symthaea-quicken-fb
+
+      - name: Enforce format-only change scope
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          allowed = (
+              "crates/core/symthaea-boot-ecology/",
+              "crates/core/symthaea-boot-state/",
+              "crates/domains/symthaea-quicken-fb/",
+          )
+          changed = subprocess.check_output(
+              ["git", "diff", "--name-only"], text=True
+          ).splitlines()
+          unexpected = [path for path in changed if not path.startswith(allowed)]
+          if unexpected:
+              raise SystemExit(f"unexpected rustfmt paths: {unexpected}")
+          if not changed:
+              raise SystemExit("expected rustfmt reconciliation but no files changed")
+          print(f"rustfmt-only files: {len(changed)}")
+          PY
+          git diff --check
+
+      - name: Verify focused formatting
+        run: >-
+          cargo fmt --check
+          -p symthaea-boot-ecology
+          -p symthaea-boot-state
+          -p symthaea-quicken-fb
+
+      - name: Check focused Spore crates
+        run: >-
+          cargo check
+          -p symthaea-boot-ecology
+          -p symthaea-boot-state
+          -p symthaea-quicken-fb
+          --all-targets
+
+      - name: Clippy focused Spore crates
+        run: >-
+          cargo clippy
+          -p symthaea-boot-ecology
+          -p symthaea-boot-state
+          -p symthaea-quicken-fb
+          --all-targets
+          -- -D warnings
+
+      - name: Test focused Spore crates
+        run: >-
+          cargo test
+          -p symthaea-boot-ecology
+          -p symthaea-boot-state
+          -p symthaea-quicken-fb
+
+      - name: Remove one-shot workflow and commit format-only baseline
+        run: |
+          rm .github/workflows/spore-v032-format-baseline.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/core/symthaea-boot-ecology \
+                  crates/core/symthaea-boot-state \
+                  crates/domains/symthaea-quicken-fb
+          git rm --cached .github/workflows/spore-v032-format-baseline.yml
+          git diff --cached --check
+          git commit -m "chore(spore): rustfmt v0.3.2 qualification baseline"
+          git push origin HEAD:spore/boot-ecology-v0.3.2-format-baseline
