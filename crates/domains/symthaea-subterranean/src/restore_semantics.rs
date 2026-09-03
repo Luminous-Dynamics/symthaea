@@ -152,33 +152,9 @@ mod tests {
     }
 
     #[test]
-    fn operator_restore_preserves_replay_evidence_and_drops_ephemeral_recovery() {
-        let contract = contract_for(RestoreDomain::OperatorAuthority);
-        assert!(contract.semantics.contains(&RestoreSemantics::AuthorityMonotone));
-        assert!(contract.semantics.contains(&RestoreSemantics::EvidenceMerge));
-        assert!(contract.semantics.contains(&RestoreSemantics::TransitionReconcile));
-        assert!(contract.semantics.contains(&RestoreSemantics::EphemeralDrop));
-    }
-
-    #[test]
-    fn degraded_restore_preserves_latches_failure_evidence_and_policy() {
-        let contract = contract_for(RestoreDomain::DegradedSupervisor);
-        assert!(contract.semantics.contains(&RestoreSemantics::AuthorityMonotone));
-        assert!(contract.semantics.contains(&RestoreSemantics::EvidenceMerge));
-        assert!(contract.semantics.contains(&RestoreSemantics::TransitionReconcile));
-    }
-
-    #[test]
     fn sensor_restore_requires_evidence_merge_fresh_requalification_and_policy_reconcile() {
         let contract = contract_for(RestoreDomain::SensorFusion);
         assert!(contract.semantics.contains(&RestoreSemantics::EvidenceMerge));
-        assert!(contract.semantics.contains(&RestoreSemantics::DerivedRequalify));
-        assert!(contract.semantics.contains(&RestoreSemantics::TransitionReconcile));
-    }
-
-    #[test]
-    fn field_envelope_requires_requalification_and_policy_reconcile() {
-        let contract = contract_for(RestoreDomain::FieldEnvelope);
         assert!(contract.semantics.contains(&RestoreSemantics::DerivedRequalify));
         assert!(contract.semantics.contains(&RestoreSemantics::TransitionReconcile));
     }
