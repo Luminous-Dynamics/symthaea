@@ -1,9 +1,7 @@
-use std::sync::{mpsc, Arc, Barrier};
+use std::sync::{Arc, Barrier, mpsc};
 use std::thread;
 
-use symthaea_ai_assurance::{
-    EffectAdmissionCommitment, EffectEntryDomain, EffectEntryError,
-};
+use symthaea_ai_assurance::{EffectAdmissionCommitment, EffectEntryDomain, EffectEntryError};
 
 fn commitment(tag: u8) -> EffectAdmissionCommitment {
     EffectAdmissionCommitment::new(
