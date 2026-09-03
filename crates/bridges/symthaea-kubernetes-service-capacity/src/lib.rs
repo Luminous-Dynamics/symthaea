@@ -46,6 +46,17 @@ pub struct DesiredOriginObservation {
     pub explicit: bool,
 }
 
+/// Consensus over effective boolean condition values for unique resolved Pod
+/// targets. Duplicate memberships for the same Pod do not increase these
+/// counts. If different memberships disagree about the same Pod, that Pod is
+/// counted once under `conflicting_targets` rather than forced to true/false.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct UniquePodConditionConsensus {
+    pub true_targets: usize,
+    pub false_targets: usize,
+    pub conflicting_targets: usize,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ServiceCapacityAssessment {
     pub service: EntityRef,
@@ -54,6 +65,9 @@ pub struct ServiceCapacityAssessment {
     pub replica_state: StateAssessment,
     pub desired_origins: Vec<DesiredOriginObservation>,
     pub endpoint_coverage: EndpointCoverage,
+    /// EndpointSlice membership-level observations. A Pod repeated across slices
+    /// contributes multiple memberships here because the duplicate references
+    /// are themselves topology evidence.
     pub endpoint_memberships_observed: usize,
     pub endpoint_ready_observed: usize,
     pub endpoint_ready_explicit: usize,
@@ -67,6 +81,11 @@ pub struct ServiceCapacityAssessment {
     /// Unique resolved Pod targets observed across all EndpointSlice memberships.
     /// A Pod repeated during slice churn/rebalancing is counted once here.
     pub pod_targets_observed: usize,
+    /// Effective ready/serving/terminating evidence deduplicated by Pod target.
+    /// These are separate from the membership-level counters above.
+    pub unique_pod_ready: UniquePodConditionConsensus,
+    pub unique_pod_serving: UniquePodConditionConsensus,
+    pub unique_pod_terminating: UniquePodConditionConsensus,
     /// Unique observed Pod targets with a structural ownership path to the
     /// requested workload.
     pub workload_owned_pod_targets_confirmed: usize,
@@ -133,9 +152,9 @@ pub fn assess_service_capacity(
         at,
         StateComparisonPolicy::Exact,
     )
-    .map_err(|error| IntegrationError::InvalidOutput(format!(
-        "replica-state assessment failed: {error}"
-    )))?;
+    .map_err(|error| {
+        IntegrationError::InvalidOutput(format!("replica-state assessment failed: {error}"))
+    })?;
     let desired_origins = collect_desired_origins(
         &state.assertions,
         &request.workload,
@@ -189,21 +208,27 @@ pub fn assess_service_capacity(
         unresolved_target_references: 0,
         non_pod_target_references: 0,
         pod_targets_observed: 0,
+        unique_pod_ready: UniquePodConditionConsensus::default(),
+        unique_pod_serving: UniquePodConditionConsensus::default(),
+        unique_pod_terminating: UniquePodConditionConsensus::default(),
         workload_owned_pod_targets_confirmed: 0,
         workload_ownership_unresolved: 0,
     };
     let mut pod_targets = BTreeSet::new();
+    let mut pod_condition_evidence = BTreeMap::<EntityRef, PodConditionEvidence>::new();
     let mut workload_owned_pod_targets = BTreeSet::new();
     let mut workload_ownership_unresolved = BTreeSet::new();
 
     for membership in memberships {
         let entity = entity_map
             .get(&membership.canonical_key())
-            .ok_or_else(|| IntegrationError::InvalidOutput(format!(
-                "EndpointSlice membership `{}` is missing from topology entities",
-                membership.canonical_key()
-            )))?;
-        accumulate_condition_counts(&mut assessment, &entity.attributes)?;
+            .ok_or_else(|| {
+                IntegrationError::InvalidOutput(format!(
+                    "EndpointSlice membership `{}` is missing from topology entities",
+                    membership.canonical_key()
+                ))
+            })?;
+        let conditions = accumulate_condition_counts(&mut assessment, &entity.attributes)?;
 
         let targets = topology
             .relations
@@ -222,10 +247,12 @@ pub fn assess_service_capacity(
             [target] => {
                 let target_entity = entity_map
                     .get(&target.canonical_key())
-                    .ok_or_else(|| IntegrationError::InvalidOutput(format!(
-                        "EndpointSlice target `{}` is missing from topology entities",
-                        target.canonical_key()
-                    )))?;
+                    .ok_or_else(|| {
+                        IntegrationError::InvalidOutput(format!(
+                            "EndpointSlice target `{}` is missing from topology entities",
+                            target.canonical_key()
+                        ))
+                    })?;
                 if target_entity
                     .attributes
                     .get("k8s.reference")
@@ -246,6 +273,10 @@ pub fn assess_service_capacity(
                     continue;
                 }
                 pod_targets.insert(target.clone());
+                pod_condition_evidence
+                    .entry(target.clone())
+                    .or_default()
+                    .observe(conditions);
                 if ownership_reaches(topology, target, &request.workload) {
                     workload_owned_pod_targets.insert(target.clone());
                     workload_ownership_unresolved.remove(target);
@@ -263,6 +294,19 @@ pub fn assess_service_capacity(
     }
 
     assessment.pod_targets_observed = pod_targets.len();
+    assessment.unique_pod_ready = summarize_unique_pod_condition(
+        pod_condition_evidence.values().map(|evidence| &evidence.ready),
+    );
+    assessment.unique_pod_serving = summarize_unique_pod_condition(
+        pod_condition_evidence
+            .values()
+            .map(|evidence| &evidence.serving),
+    );
+    assessment.unique_pod_terminating = summarize_unique_pod_condition(
+        pod_condition_evidence
+            .values()
+            .map(|evidence| &evidence.terminating),
+    );
     assessment.workload_owned_pod_targets_confirmed = workload_owned_pod_targets.len();
     assessment.workload_ownership_unresolved = workload_ownership_unresolved.len();
     Ok(assessment)
@@ -274,8 +318,14 @@ fn validate_request(request: &ServiceCapacityRequest) -> Result<(), IntegrationE
             "service-capacity replica_dimension is empty".into(),
         ));
     }
-    for (name, entity) in [("service", &request.service), ("workload", &request.workload)] {
-        if entity.namespace.trim().is_empty() || entity.kind.trim().is_empty() || entity.id.trim().is_empty() {
+    for (name, entity) in [
+        ("service", &request.service),
+        ("workload", &request.workload),
+    ] {
+        if entity.namespace.trim().is_empty()
+            || entity.kind.trim().is_empty()
+            || entity.id.trim().is_empty()
+        {
             return Err(IntegrationError::InvalidRequest(format!(
                 "service-capacity {name} EntityRef contains an empty field"
             )));
@@ -289,7 +339,11 @@ fn require_entity(
     entity: &EntityRef,
     role: &str,
 ) -> Result<(), IntegrationError> {
-    if topology.entities.iter().any(|candidate| candidate.entity == *entity) {
+    if topology
+        .entities
+        .iter()
+        .any(|candidate| candidate.entity == *entity)
+    {
         Ok(())
     } else {
         Err(IntegrationError::InvalidRequest(format!(
@@ -335,10 +389,32 @@ fn collect_desired_origins(
     Ok(origins)
 }
 
+#[derive(Debug, Clone, Copy)]
+struct EndpointConditionValues {
+    ready: bool,
+    serving: bool,
+    terminating: bool,
+}
+
+#[derive(Debug, Default)]
+struct PodConditionEvidence {
+    ready: BTreeSet<bool>,
+    serving: BTreeSet<bool>,
+    terminating: BTreeSet<bool>,
+}
+
+impl PodConditionEvidence {
+    fn observe(&mut self, values: EndpointConditionValues) {
+        self.ready.insert(values.ready);
+        self.serving.insert(values.serving);
+        self.terminating.insert(values.terminating);
+    }
+}
+
 fn accumulate_condition_counts(
     assessment: &mut ServiceCapacityAssessment,
     attributes: &BTreeMap<String, String>,
-) -> Result<(), IntegrationError> {
+) -> Result<EndpointConditionValues, IntegrationError> {
     let ready = bool_attribute(attributes, "k8s.endpoint.ready")?;
     let ready_explicit = bool_attribute(attributes, "k8s.endpoint.ready.explicit")?;
     let serving = bool_attribute(attributes, "k8s.endpoint.serving")?;
@@ -352,7 +428,26 @@ fn accumulate_condition_counts(
     assessment.endpoint_serving_explicit += usize::from(serving_explicit);
     assessment.endpoint_terminating_observed += usize::from(terminating);
     assessment.endpoint_terminating_explicit += usize::from(terminating_explicit);
-    Ok(())
+    Ok(EndpointConditionValues {
+        ready,
+        serving,
+        terminating,
+    })
+}
+
+fn summarize_unique_pod_condition<'a>(
+    evidence: impl Iterator<Item = &'a BTreeSet<bool>>,
+) -> UniquePodConditionConsensus {
+    let mut summary = UniquePodConditionConsensus::default();
+    for values in evidence {
+        match (values.contains(&true), values.contains(&false)) {
+            (true, true) => summary.conflicting_targets += 1,
+            (true, false) => summary.true_targets += 1,
+            (false, true) => summary.false_targets += 1,
+            (false, false) => {}
+        }
+    }
+    summary
 }
 
 fn bool_attribute(
@@ -487,7 +582,7 @@ mod tests {
         })
     }
 
-    fn duplicate_api_1_slice() -> serde_json::Value {
+    fn duplicate_api_1_slice(ready: bool) -> serde_json::Value {
         json!({
             "apiVersion":"discovery.k8s.io/v1",
             "kind":"EndpointSlice",
@@ -498,7 +593,7 @@ mod tests {
             "addressType":"IPv4",
             "endpoints":[{
                 "addresses":["10.0.1.1"],
-                "conditions":{"ready":true,"serving":true,"terminating":false},
+                "conditions":{"ready":ready,"serving":true,"terminating":false},
                 "targetRef":{"apiVersion":"v1","kind":"Pod","namespace":"shop","name":"api-1","uid":"pod-1"}
             }]
         })
@@ -547,18 +642,39 @@ mod tests {
         .unwrap();
 
         assert_eq!(assessment.replica_state.status, StateAssessmentStatus::InSync);
-        assert_eq!(assessment.replica_state.desired_value, Some(StateValue::Unsigned(3)));
-        assert_eq!(assessment.replica_state.observed_value, Some(StateValue::Unsigned(3)));
-        assert_eq!(assessment.endpoint_coverage, EndpointCoverage::ObservedSubsetLowerBound);
+        assert_eq!(
+            assessment.replica_state.desired_value,
+            Some(StateValue::Unsigned(3))
+        );
+        assert_eq!(
+            assessment.replica_state.observed_value,
+            Some(StateValue::Unsigned(3))
+        );
+        assert_eq!(
+            assessment.endpoint_coverage,
+            EndpointCoverage::ObservedSubsetLowerBound
+        );
         assert_eq!(assessment.endpoint_memberships_observed, 3);
         assert_eq!(assessment.endpoint_ready_observed, 2);
         assert_eq!(assessment.endpoint_serving_observed, 3);
         assert_eq!(assessment.endpoint_terminating_observed, 1);
         assert_eq!(assessment.pod_targets_observed, 3);
+        assert_eq!(assessment.unique_pod_ready.true_targets, 2);
+        assert_eq!(assessment.unique_pod_ready.false_targets, 1);
+        assert_eq!(assessment.unique_pod_ready.conflicting_targets, 0);
+        assert_eq!(assessment.unique_pod_serving.true_targets, 3);
+        assert_eq!(assessment.unique_pod_serving.false_targets, 0);
+        assert_eq!(assessment.unique_pod_serving.conflicting_targets, 0);
+        assert_eq!(assessment.unique_pod_terminating.true_targets, 1);
+        assert_eq!(assessment.unique_pod_terminating.false_targets, 2);
+        assert_eq!(assessment.unique_pod_terminating.conflicting_targets, 0);
         assert_eq!(assessment.workload_owned_pod_targets_confirmed, 3);
         assert_eq!(assessment.workload_ownership_unresolved, 0);
         assert_eq!(assessment.desired_origins.len(), 1);
-        assert_eq!(assessment.desired_origins[0].origin, DesiredStateOrigin::Unspecified);
+        assert_eq!(
+            assessment.desired_origins[0].origin,
+            DesiredStateOrigin::Unspecified
+        );
         assert!(!assessment.desired_origins[0].explicit);
     }
 
@@ -573,17 +689,46 @@ mod tests {
         .unwrap();
         let topology = augment_endpoint_slices(
             replay.topology(),
-            &[endpoints(), duplicate_api_1_slice()],
+            &[endpoints(), duplicate_api_1_slice(true)],
             100,
         )
         .unwrap();
-        let assessment = assess_service_capacity(&topology, replay.snapshot(), &request(&topology))
-            .unwrap();
+        let assessment =
+            assess_service_capacity(&topology, replay.snapshot(), &request(&topology)).unwrap();
+
+        assert_eq!(assessment.endpoint_memberships_observed, 4);
+        assert_eq!(assessment.endpoint_ready_observed, 3);
+        assert_eq!(assessment.pod_targets_observed, 3);
+        assert_eq!(assessment.unique_pod_ready.true_targets, 2);
+        assert_eq!(assessment.unique_pod_ready.false_targets, 1);
+        assert_eq!(assessment.unique_pod_ready.conflicting_targets, 0);
+        assert_eq!(assessment.workload_owned_pod_targets_confirmed, 3);
+        assert_eq!(assessment.workload_ownership_unresolved, 0);
+    }
+
+    #[test]
+    fn conflicting_slice_conditions_surface_per_unique_pod() {
+        let docs = documents();
+        let replay = KubernetesStateReplay::from_objects(
+            KubernetesReplayContext::default(),
+            &docs,
+            100,
+        )
+        .unwrap();
+        let topology = augment_endpoint_slices(
+            replay.topology(),
+            &[endpoints(), duplicate_api_1_slice(false)],
+            100,
+        )
+        .unwrap();
+        let assessment =
+            assess_service_capacity(&topology, replay.snapshot(), &request(&topology)).unwrap();
 
         assert_eq!(assessment.endpoint_memberships_observed, 4);
         assert_eq!(assessment.pod_targets_observed, 3);
-        assert_eq!(assessment.workload_owned_pod_targets_confirmed, 3);
-        assert_eq!(assessment.workload_ownership_unresolved, 0);
+        assert_eq!(assessment.unique_pod_ready.true_targets, 1);
+        assert_eq!(assessment.unique_pod_ready.false_targets, 1);
+        assert_eq!(assessment.unique_pod_ready.conflicting_targets, 1);
     }
 
     #[test]
@@ -624,8 +769,8 @@ mod tests {
             }]
         });
         let topology = augment_endpoint_slices(replay.topology(), &[slice], 100).unwrap();
-        let assessment = assess_service_capacity(&topology, replay.snapshot(), &request(&topology))
-            .unwrap();
+        let assessment =
+            assess_service_capacity(&topology, replay.snapshot(), &request(&topology)).unwrap();
         assert_eq!(assessment.unresolved_target_references, 1);
         assert_eq!(assessment.workload_ownership_unresolved, 0);
     }
