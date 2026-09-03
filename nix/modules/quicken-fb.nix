@@ -59,7 +59,9 @@ in {
       default = "/var/lib/symthaea/boot-visual-seed";
       description = ''
         Persistent presentation-only seed file for deterministic boot artwork.
-        The module creates it from random bytes when absent. This file is not a
+        It must be a direct child of /var/lib/symthaea so the renderer's writable
+        state remains confined to its systemd-managed StateDirectory. The module
+        creates the file from random bytes when absent. This file is not a
         credential, recovery secret, key-derivation input, or authority-bearing
         machine identity and should not be reused for any security purpose.
       '';
@@ -161,12 +163,8 @@ in {
     {
       assertions = [
         {
-          assertion = cfg.genesisPhrase != null || hasPrefix "/" cfg.visualSeedFile;
-          message = "services.symthaea-boot.visualSeedFile must be an absolute path";
-        }
-        {
-          assertion = cfg.genesisPhrase != null || !hasPrefix "/run/" cfg.visualSeedFile;
-          message = "services.symthaea-boot.visualSeedFile must be persistent, not beneath /run";
+          assertion = cfg.genesisPhrase != null || builtins.dirOf cfg.visualSeedFile == "/var/lib/symthaea";
+          message = "services.symthaea-boot.visualSeedFile must be a direct child of /var/lib/symthaea";
         }
         {
           assertion = !cfg.telemetry.enable || hasPrefix "/run/symthaea/" cfg.telemetry.eventSocket;
@@ -231,12 +229,18 @@ in {
           KillSignal = "SIGTERM";
           TimeoutStopSec = "${toString cfg.handoff.stopTimeoutMs}ms";
 
+          # StateDirectory is the only persistent write surface. /run/symthaea
+          # remains writable for the socket, FIFO and bounded diagnostic receipts.
+          StateDirectory = "symthaea";
+          StateDirectoryMode = "0755";
+          ReadWritePaths = [ "/run/symthaea" ];
+
           # When telemetry is enabled, the renderer socket is root:symthaea-boot
           # and owner/group accessible, but unrelated local users cannot write it.
           UMask = if cfg.telemetry.enable then "0007" else "0022";
 
           NoNewPrivileges = true;
-          ProtectSystem = "full";
+          ProtectSystem = "strict";
           ProtectHome = true;
           ProtectKernelTunables = true;
           ProtectKernelModules = true;
