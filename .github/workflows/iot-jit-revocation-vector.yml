@@ -1,0 +1,143 @@
+name: IoT JIT Revocation Vector
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-jit-revocation-vector/**'
+      - 'crates/bridges/symthaea-iot-jit-fence/**'
+      - 'crates/bridges/symthaea-iot-interlock-trust/**'
+      - 'crates/bridges/symthaea-iot-final-gate/**'
+      - 'crates/bridges/symthaea-iot-device-protocol/**'
+      - 'crates/bridges/symthaea-iot-transport-receipt/**'
+      - '.github/workflows/iot-jit-revocation-vector.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  RUSTUP_TOOLCHAIN: 1.94.0
+
+concurrency:
+  group: iot-jit-revocation-vector-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-format:
+    name: JIT revocation vector source format
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact formatter
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Check exact successor source formatting
+        run: rustfmt --edition 2024 --check crates/bridges/symthaea-iot-jit-revocation-vector/src/lib.rs
+
+  implementation:
+    name: Complete JIT revocation implementation (MSRV 1.94)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact Rust compiler
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      - name: Workspace metadata resolves
+        run: cargo metadata --format-version 1 --no-deps >/dev/null
+
+      - name: Check complete JIT revocation vector
+        run: cargo check -p symthaea-iot-jit-revocation-vector --all-targets
+
+      - name: Test complete JIT revocation vector
+        run: cargo test -p symthaea-iot-jit-revocation-vector --all-targets
+
+      - name: Clippy complete JIT revocation vector
+        run: cargo clippy -p symthaea-iot-jit-revocation-vector --all-targets -- -D warnings
+
+  external-lock-stability:
+    name: External dependency lock stability (MSRV 1.94)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact Rust toolchain
+        run: rustup toolchain install 1.94.0 --profile minimal
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      - name: Permit local workspace bookkeeping but reject external drift
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          python3 - <<'PY'
+          import difflib
+          import json
+          import sys
+          import tomllib
+
+          def projection(path):
+              with open(path, "rb") as handle:
+                  lock = tomllib.load(handle)
+              packages = [package for package in lock.get("package", []) if "source" in package]
+              packages.sort(key=lambda package: (
+                  package.get("name", ""),
+                  package.get("version", ""),
+                  package.get("source", ""),
+              ))
+              return {
+                  "lock_version": lock.get("version"),
+                  "external_packages": packages,
+              }
+
+          before = projection("/tmp/Cargo.lock.before")
+          after = projection("Cargo.lock")
+          if before != after:
+              before_text = json.dumps(before, indent=2, sort_keys=True).splitlines()
+              after_text = json.dumps(after, indent=2, sort_keys=True).splitlines()
+              print("External dependency graph changed:")
+              print("\n".join(difflib.unified_diff(
+                  before_text,
+                  after_text,
+                  fromfile="before",
+                  tofile="after",
+                  lineterm="",
+              )))
+              sys.exit(1)
+          PY
+          unexpected=$(git diff --name-only | grep -v '^Cargo.lock$' || true)
+          test -z "$unexpected"
+          git checkout -- Cargo.lock
