@@ -197,14 +197,23 @@ impl PreparedOperationalRestore {
 }
 
 /// Single-use committed restore plan.
+///
+/// The exact generation fence that passed commit is retained so later execution
+/// receipts can bind to the same live context instead of only to checkpoint
+/// identity. The fence remains owner-internal and is not a portable credential.
 pub(super) struct CommittedOperationalRestore {
     checkpoint_digest: RestoreDigest,
+    fence: RestoreGenerationFence,
     decisions: Vec<RestoreDomainDecision>,
 }
 
 impl CommittedOperationalRestore {
     pub(super) fn checkpoint_digest(&self) -> RestoreDigest {
         self.checkpoint_digest
+    }
+
+    pub(super) const fn fence(&self) -> RestoreGenerationFence {
+        self.fence
     }
 
     pub(super) fn decisions(&self) -> &[RestoreDomainDecision] {
@@ -330,6 +339,7 @@ pub(super) fn commit_operational_restore(
 
     Ok(CommittedOperationalRestore {
         checkpoint_digest: prepared.checkpoint_digest,
+        fence: expected,
         decisions: prepared.decisions,
     })
 }
@@ -373,6 +383,7 @@ mod tests {
         assert_eq!(prepared.decisions().len(), OPERATIONAL_RESTORE_CONTRACTS.len());
         let committed = commit_operational_restore(prepared, fence()).expect("fence unchanged");
         assert_eq!(committed.checkpoint_digest().bytes(), [29; 32]);
+        assert_eq!(committed.fence(), fence());
         assert_eq!(committed.decisions().len(), OPERATIONAL_RESTORE_CONTRACTS.len());
     }
 
@@ -536,8 +547,9 @@ mod tests {
     #[test]
     fn checkpoint_identity_is_preserved_across_prepare_and_commit() {
         let prepared = prepared();
-        let expected = prepared.checkpoint_digest();
+        let expected_checkpoint = prepared.checkpoint_digest();
         let committed = commit_operational_restore(prepared, fence()).expect("unchanged fence");
-        assert_eq!(committed.checkpoint_digest(), expected);
+        assert_eq!(committed.checkpoint_digest(), expected_checkpoint);
+        assert_eq!(committed.fence(), fence());
     }
 }
