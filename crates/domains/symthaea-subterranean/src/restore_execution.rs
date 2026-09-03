@@ -14,6 +14,7 @@ use super::restore_actions::{
 };
 use super::restore_admission::{CommittedOperationalRestore, RestoreDigest, RestoreGenerationFence};
 use super::restore_semantics::RestoreDomain;
+use crate::actuator_isolation::ActuatorIsolationSupervisor;
 use crate::operator_authority::OperatorAuthority;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,6 +96,36 @@ impl RestoreActionPermit {
             action,
         } = self;
         live.merge_restore_replay_evidence_from(checkpoint);
+        Ok(RestoreActionReceipt {
+            binding,
+            domain,
+            action,
+            outcome: RestoreActionOutcome::Applied,
+        })
+    }
+
+    fn execute_actuator_authority_join(
+        self,
+        live: &mut ActuatorIsolationSupervisor,
+        checkpoint: &ActuatorIsolationSupervisor,
+    ) -> Result<RestoreActionReceipt, RestoreExecutorError> {
+        let expected_domain = RestoreDomain::ActuatorIsolation;
+        let expected_action = RestoreAction::PreserveOrNarrowAuthority;
+        if self.domain != expected_domain || self.action != expected_action {
+            return Err(RestoreExecutorError::PermitMismatch {
+                expected_domain,
+                expected_action,
+                actual_domain: self.domain,
+                actual_action: self.action,
+            });
+        }
+
+        let Self {
+            binding,
+            domain,
+            action,
+        } = self;
+        live.preserve_restore_isolation_latches_from(checkpoint);
         Ok(RestoreActionReceipt {
             binding,
             domain,
@@ -231,10 +262,7 @@ impl RestoreExecutionSession {
         Ok(self.permits.remove(index))
     }
 
-    /// Execute and internally record the first concrete restore receipt.
-    ///
-    /// The raw permit and resulting receipt never leave the session. Any failure
-    /// aborts the complete transaction and clears every unused permit.
+    /// Execute and internally record the operator replay barrier obligation.
     pub(super) fn execute_operator_replay_merge(
         &mut self,
         live: &mut OperatorAuthority,
@@ -244,6 +272,31 @@ impl RestoreExecutionSession {
         let action = RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier);
         let permit = self.take_exact_permit(domain, action)?;
         match permit.execute_operator_replay_merge(live, checkpoint) {
+            Ok(receipt) => {
+                self.receipts.push(receipt);
+                Ok(())
+            }
+            Err(error) => {
+                self.abort();
+                Err(RestoreSessionError::Executor(error))
+            }
+        }
+    }
+
+    /// Preserve the union of live and checkpointed actuator isolation authority.
+    ///
+    /// This consumes only `ActuatorIsolation + PreserveOrNarrowAuthority`. The
+    /// remaining actuator evidence/requalification/reconciliation obligations
+    /// stay in the session and continue to block completion.
+    pub(super) fn execute_actuator_authority_join(
+        &mut self,
+        live: &mut ActuatorIsolationSupervisor,
+        checkpoint: &ActuatorIsolationSupervisor,
+    ) -> Result<(), RestoreSessionError> {
+        let domain = RestoreDomain::ActuatorIsolation;
+        let action = RestoreAction::PreserveOrNarrowAuthority;
+        let permit = self.take_exact_permit(domain, action)?;
+        match permit.execute_actuator_authority_join(live, checkpoint) {
             Ok(receipt) => {
                 self.receipts.push(receipt);
                 Ok(())
@@ -412,6 +465,7 @@ fn validate_execution(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::actuator_isolation::PhysicalActuator;
     use crate::operational_checkpoint::restore_admission::{
         commit_operational_restore, prepare_operational_restore, RestoreAdmissionVerdict,
         RestoreDomainDecision, RestorePreparationContext,
@@ -490,6 +544,44 @@ mod tests {
             RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier)
         );
         assert_eq!(receipt.outcome, RestoreActionOutcome::Applied);
+    }
+
+    #[test]
+    fn actuator_authority_executor_unions_latches_and_earns_only_one_receipt() {
+        let mut session = RestoreExecutionSession::begin(committed()).expect("session");
+        let before_permits = session.remaining_permits();
+        let before_receipts = session.receipt_count();
+        let mut live = ActuatorIsolationSupervisor::default();
+        let mut checkpoint = ActuatorIsolationSupervisor::default();
+        live.force_health_for_test(PhysicalActuator::Cutter, 0.0);
+        live.service(PhysicalActuator::Cutter);
+        checkpoint.force_health_for_test(PhysicalActuator::LeftTrack, 0.0);
+        // Tests in this module cannot set the private latch directly, so drive
+        // both supervisors through the public monitor until the desired latch
+        // state exists.
+        let mut command = crate::types::SubterraneanCommand::zero();
+        command.set_left_track(1.0);
+        let state = crate::types::SubterraneanState::home();
+        for _ in 0..64 {
+            checkpoint.observe(&command, &state, &state);
+            if checkpoint.report().is_isolated(PhysicalActuator::LeftTrack) {
+                break;
+            }
+        }
+        assert!(checkpoint.report().is_isolated(PhysicalActuator::LeftTrack));
+
+        session
+            .execute_actuator_authority_join(&mut live, &checkpoint)
+            .expect("actuator authority join");
+
+        assert!(live.report().is_isolated(PhysicalActuator::LeftTrack));
+        assert_eq!(session.remaining_permits(), before_permits - 1);
+        assert_eq!(session.receipt_count(), before_receipts + 1);
+        let receipt = session.receipts.last().expect("actuator receipt");
+        assert_eq!(receipt.domain, RestoreDomain::ActuatorIsolation);
+        assert_eq!(receipt.action, RestoreAction::PreserveOrNarrowAuthority);
+        assert_eq!(receipt.outcome, RestoreActionOutcome::Applied);
+        assert_eq!(session.state(), RestoreExecutionSessionState::Open);
     }
 
     #[test]
