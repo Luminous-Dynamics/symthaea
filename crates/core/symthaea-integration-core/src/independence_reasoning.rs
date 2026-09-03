@@ -83,6 +83,14 @@ pub enum QualifiedIndependenceError {
     AttestationAdmission(String),
     #[error("qualified-independence reasoning policy must use non-zero limits")]
     InvalidPolicy,
+    #[error(
+        "observation `{observation_id}` was ingested at {ingested_at_unix_ms} after historical query time {at_unix_ms}"
+    )]
+    ObservationNotYetIngested {
+        observation_id: ObservationId,
+        ingested_at_unix_ms: u64,
+        at_unix_ms: u64,
+    },
     #[error("cohort has {actual} shared-origin components, limit is {max}")]
     TooManyComponents { actual: usize, max: usize },
     #[error("cohort has {actual} active attestations, limit is {max}")]
@@ -102,7 +110,10 @@ pub enum QualifiedIndependenceError {
 /// `IndependenceAuthorityPolicy` admission is intentionally repeated here so a
 /// direct caller cannot bypass the authority qualification allowlist. This does
 /// **not** authenticate the attestation bytes; authentication must have happened
-/// before this call.
+/// before this call. Because `at_unix_ms` is a historical knowledge-time query,
+/// every observation must also have been locally ingested by that time. Source-
+/// native observation time remains independent and may be ahead because clock
+/// skew is explicitly tolerated.
 pub fn assess_qualified_independence(
     observations: &[ObservationEnvelope],
     attestations: &IndependenceAttestationSet,
@@ -118,6 +129,16 @@ pub fn assess_qualified_independence(
     }
 
     let base = assess_independence(observations).map_err(map_base_error)?;
+    for observation in observations {
+        if observation.ingested_at_unix_ms > at_unix_ms {
+            return Err(QualifiedIndependenceError::ObservationNotYetIngested {
+                observation_id: observation.observation_id.clone(),
+                ingested_at_unix_ms: observation.ingested_at_unix_ms,
+                at_unix_ms,
+            });
+        }
+    }
+
     attestations
         .validate_with_policy(authority_policy)
         .map_err(map_attestation_error)?;
@@ -596,6 +617,41 @@ mod tests {
         .unwrap();
         assert_eq!(assessment.qualified_independent_lower_bound, 1);
         assert_eq!(assessment.inactive_attestations, 1);
+    }
+
+    #[test]
+    fn future_ingested_observation_cannot_enter_historical_independence_reasoning() {
+        let a = observation("a", "kubernetes");
+        let mut b = observation("b", "prometheus");
+        b.ingested_at_unix_ms = 101;
+        let set = IndependenceAttestationSet { attestations: vec![] };
+        assert!(matches!(
+            assess_qualified_independence(
+                &[a, b],
+                &set,
+                &authority_policy(),
+                &QualifiedIndependenceReasoningPolicy::default(),
+                100,
+            ),
+            Err(QualifiedIndependenceError::ObservationNotYetIngested { .. })
+        ));
+    }
+
+    #[test]
+    fn source_clock_ahead_does_not_block_known_observation() {
+        let mut a = observation("a", "kubernetes");
+        a.observed_at_unix_ms = 200;
+        a.ingested_at_unix_ms = 100;
+        let set = IndependenceAttestationSet { attestations: vec![] };
+        let assessment = assess_qualified_independence(
+            &[a],
+            &set,
+            &authority_policy(),
+            &QualifiedIndependenceReasoningPolicy::default(),
+            100,
+        )
+        .unwrap();
+        assert_eq!(assessment.qualified_independent_lower_bound, 1);
     }
 
     #[test]
