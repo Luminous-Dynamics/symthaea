@@ -12,6 +12,12 @@
 //! No reusable "safety passed" token crosses this boundary. If the embodiment
 //! advances or its material recovery basis changes, the next approval attempt
 //! re-evaluates that new state.
+//!
+//! Important ownership boundary: `SubterraneanEmbodiment` owns the authoritative
+//! `OperatorAuthority`. Until recovery admission is exposed as an embodiment-owned
+//! transaction, this helper remains crate-private. A public API taking an arbitrary
+//! separate `OperatorAuthority` could otherwise qualify evidence from one authority
+//! owner while mutating quorum state in another.
 
 use super::{
     RecoveryApprovalEnvelopeV1, RecoveryHostBindingV1, RecoveryProposalRejection,
@@ -55,11 +61,15 @@ impl OperatorAuthority {
     /// Requalify and admit one recovery approval using the latest evidence step
     /// from the live embodiment as the authoritative admission time.
     ///
-    /// This method intentionally does not accept `now_step` from the caller.
+    /// This helper intentionally does not accept `now_step` from the caller.
     /// The latest qualifying evidence must be at least as recent as the human
     /// approval itself, and the reviewed proposal must still match current live
     /// state before the approval is allowed to enter quorum.
-    pub fn approve_recovery_from_live_state(
+    ///
+    /// Crate-private until an embodiment-owned wrapper can guarantee that `self`
+    /// is the exact `OperatorAuthority` whose state produced `embodiment`'s
+    /// authority evidence.
+    pub(crate) fn approve_recovery_from_live_state(
         &mut self,
         embodiment: &SubterraneanEmbodiment,
         host: RecoveryHostBindingV1,
