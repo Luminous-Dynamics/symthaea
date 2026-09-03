@@ -16,6 +16,7 @@ use super::restore_admission::{CommittedOperationalRestore, RestoreDigest, Resto
 use super::restore_semantics::RestoreDomain;
 use crate::actuator_isolation::ActuatorIsolationSupervisor;
 use crate::operator_authority::OperatorAuthority;
+use crate::temporal_assurance::TemporalAssuranceSupervisor;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct RestoreExecutionBinding {
@@ -126,6 +127,36 @@ impl RestoreActionPermit {
             action,
         } = self;
         live.preserve_restore_isolation_latches_from(checkpoint);
+        Ok(RestoreActionReceipt {
+            binding,
+            domain,
+            action,
+            outcome: RestoreActionOutcome::Applied,
+        })
+    }
+
+    fn execute_temporal_authority_join(
+        self,
+        live: &mut TemporalAssuranceSupervisor,
+        checkpoint: &TemporalAssuranceSupervisor,
+    ) -> Result<RestoreActionReceipt, RestoreExecutorError> {
+        let expected_domain = RestoreDomain::TemporalAssurance;
+        let expected_action = RestoreAction::PreserveOrNarrowAuthority;
+        if self.domain != expected_domain || self.action != expected_action {
+            return Err(RestoreExecutorError::PermitMismatch {
+                expected_domain,
+                expected_action,
+                actual_domain: self.domain,
+                actual_action: self.action,
+            });
+        }
+
+        let Self {
+            binding,
+            domain,
+            action,
+        } = self;
+        live.preserve_restore_hold_latch_from(checkpoint);
         Ok(RestoreActionReceipt {
             binding,
             domain,
@@ -308,6 +339,32 @@ impl RestoreExecutionSession {
         }
     }
 
+    /// Preserve temporal review authority without importing historical runtime
+    /// measurements as current truth.
+    ///
+    /// This consumes only `TemporalAssurance + PreserveOrNarrowAuthority`.
+    /// Replay/counterexample/history merge, fresh requalification and final
+    /// reconciliation remain separate unconsumed obligations.
+    pub(super) fn execute_temporal_authority_join(
+        &mut self,
+        live: &mut TemporalAssuranceSupervisor,
+        checkpoint: &TemporalAssuranceSupervisor,
+    ) -> Result<(), RestoreSessionError> {
+        let domain = RestoreDomain::TemporalAssurance;
+        let action = RestoreAction::PreserveOrNarrowAuthority;
+        let permit = self.take_exact_permit(domain, action)?;
+        match permit.execute_temporal_authority_join(live, checkpoint) {
+            Ok(receipt) => {
+                self.receipts.push(receipt);
+                Ok(())
+            }
+            Err(error) => {
+                self.abort();
+                Err(RestoreSessionError::Executor(error))
+            }
+        }
+    }
+
     /// Consume a completed session into the only token eligible for later
     /// productive activation.
     ///
@@ -471,6 +528,8 @@ mod tests {
         RestoreDomainDecision, RestorePreparationContext,
     };
     use crate::operational_checkpoint::restore_semantics::OPERATIONAL_RESTORE_CONTRACTS;
+    use crate::plan_freshness::RuntimeRevisions;
+    use crate::temporal_assurance::{TemporalAuthority, TemporalRuntimeFrame};
 
     fn digest(byte: u8) -> RestoreDigest {
         RestoreDigest::new([byte; 32])
@@ -579,6 +638,39 @@ mod tests {
         assert_eq!(session.receipt_count(), before_receipts + 1);
         let receipt = session.receipts.last().expect("actuator receipt");
         assert_eq!(receipt.domain, RestoreDomain::ActuatorIsolation);
+        assert_eq!(receipt.action, RestoreAction::PreserveOrNarrowAuthority);
+        assert_eq!(receipt.outcome, RestoreActionOutcome::Applied);
+        assert_eq!(session.state(), RestoreExecutionSessionState::Open);
+    }
+
+    #[test]
+    fn temporal_authority_executor_preserves_hold_and_earns_only_one_receipt() {
+        let mut session = RestoreExecutionSession::begin(committed()).expect("session");
+        let before_permits = session.remaining_permits();
+        let before_receipts = session.receipt_count();
+        let mut live = TemporalAssuranceSupervisor::default();
+        let mut checkpoint = TemporalAssuranceSupervisor::default();
+        checkpoint.assess(
+            0.005,
+            0,
+            RuntimeRevisions::default(),
+            &TemporalRuntimeFrame::default(),
+            true,
+            false,
+        );
+        assert!(checkpoint.hold_latched());
+
+        session
+            .execute_temporal_authority_join(&mut live, &checkpoint)
+            .expect("temporal authority join");
+
+        assert!(live.hold_latched());
+        assert_eq!(live.last().authority, TemporalAuthority::HoldForReview);
+        assert_eq!(live.clean_dwell_steps(), 0);
+        assert_eq!(session.remaining_permits(), before_permits - 1);
+        assert_eq!(session.receipt_count(), before_receipts + 1);
+        let receipt = session.receipts.last().expect("temporal receipt");
+        assert_eq!(receipt.domain, RestoreDomain::TemporalAssurance);
         assert_eq!(receipt.action, RestoreAction::PreserveOrNarrowAuthority);
         assert_eq!(receipt.outcome, RestoreActionOutcome::Applied);
         assert_eq!(session.state(), RestoreExecutionSessionState::Open);
