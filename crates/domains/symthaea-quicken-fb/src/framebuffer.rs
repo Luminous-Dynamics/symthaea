@@ -8,7 +8,9 @@ use drm::Device;
 /// native resolution, and maps it for direct pixel access on each frame.
 /// No display server required — this runs on bare metal during NixOS installation.
 use drm::buffer::Buffer;
-use drm::control::connector::{Info as ConnectorInfo, State as ConnectorState};
+use drm::control::connector::{
+    Handle as ConnectorHandle, Info as ConnectorInfo, State as ConnectorState,
+};
 use drm::control::crtc::Handle as CrtcHandle;
 use drm::control::framebuffer::Handle as FbHandle;
 use drm::control::{self, Device as ControlDevice, Mode, ResourceHandles};
@@ -46,6 +48,7 @@ pub enum DrmError {
     NoMode,
     NoEncoder,
     NoCrtc,
+    UnrestorableCrtcState(&'static str),
     ResourceQuery(std::io::Error),
     BufferCreate(std::io::Error),
     BufferMap(std::io::Error),
@@ -61,6 +64,9 @@ impl std::fmt::Display for DrmError {
             Self::NoMode => write!(f, "no display mode available"),
             Self::NoEncoder => write!(f, "no encoder for connector"),
             Self::NoCrtc => write!(f, "no CRTC available"),
+            Self::UnrestorableCrtcState(reason) => {
+                write!(f, "active CRTC state cannot be restored safely: {reason}")
+            }
             Self::ResourceQuery(e) => write!(f, "DRM resource query failed: {e}"),
             Self::BufferCreate(e) => write!(f, "dumb buffer creation failed: {e}"),
             Self::BufferMap(e) => write!(f, "dumb buffer map failed: {e}"),
@@ -87,8 +93,14 @@ pub struct DrmFramebuffer {
     pub mode: Mode,
     /// Dumb buffer for cleanup and mapping.
     dumb_buffer: control::dumbbuffer::DumbBuffer,
-    /// Original CRTC state for restore on drop.
-    original_crtc: Option<control::crtc::Info>,
+    /// Complete original CRTC state captured before renderer takeover.
+    original_crtc: control::crtc::Info,
+    /// Exact connectors routed to the original CRTC before renderer takeover.
+    ///
+    /// Legacy SETCRTC restores connector routing as well as framebuffer/mode
+    /// state. Passing an empty connector array would detach the restored CRTC
+    /// from its sinks, so capture this topology before changing anything.
+    original_connectors: Vec<ConnectorHandle>,
 }
 
 impl DrmFramebuffer {
@@ -110,8 +122,32 @@ impl DrmFramebuffer {
             .map_err(DrmError::ResourceQuery)?;
         let crtc = encoder.crtc().ok_or(DrmError::NoCrtc)?;
 
-        // Save original CRTC for restoration
-        let original_crtc = card.get_crtc(crtc).ok();
+        // Save the complete legacy KMS routing before takeover. If either the
+        // CRTC state or connector topology cannot be captured, do not modeset a
+        // display we cannot faithfully restore.
+        let original_crtc = card.get_crtc(crtc).map_err(DrmError::ResourceQuery)?;
+        let original_connectors = Self::connectors_for_crtc(&card, &res, crtc)?;
+
+        // This branch is deliberately the active-topology path. A connector that
+        // resolves to a CRTC is not enough evidence that the CRTC has an active
+        // framebuffer/mode that can be restored with legacy SETCRTC. Until the
+        // separately qualified cold-start path exists, fail before takeover if
+        // any essential restore component is absent.
+        if original_crtc.framebuffer().is_none() {
+            return Err(DrmError::UnrestorableCrtcState(
+                "original CRTC has no framebuffer",
+            ));
+        }
+        if original_crtc.mode().is_none() {
+            return Err(DrmError::UnrestorableCrtcState(
+                "original CRTC has no active mode",
+            ));
+        }
+        if original_connectors.is_empty() {
+            return Err(DrmError::UnrestorableCrtcState(
+                "original CRTC has no routed connectors",
+            ));
+        }
 
         let width = mode.size().0 as u32;
         let height = mode.size().1 as u32;
@@ -141,7 +177,37 @@ impl DrmFramebuffer {
             mode,
             dumb_buffer: db,
             original_crtc,
+            original_connectors,
         })
+    }
+
+    /// Capture every connector currently routed through `crtc`.
+    ///
+    /// This is part of the restore transaction, not renderer presentation data.
+    /// We fail before takeover if any connector/encoder query needed to snapshot
+    /// the current topology fails, because a partial snapshot cannot prove a
+    /// faithful restore later.
+    fn connectors_for_crtc(
+        card: &Card,
+        res: &ResourceHandles,
+        crtc: CrtcHandle,
+    ) -> Result<Vec<ConnectorHandle>, DrmError> {
+        let mut connectors = Vec::new();
+        for &handle in res.connectors() {
+            let connector = card
+                .get_connector(handle, false)
+                .map_err(DrmError::ResourceQuery)?;
+            let Some(encoder_handle) = connector.current_encoder() else {
+                continue;
+            };
+            let encoder = card
+                .get_encoder(encoder_handle)
+                .map_err(DrmError::ResourceQuery)?;
+            if encoder.crtc() == Some(crtc) {
+                connectors.push(handle);
+            }
+        }
+        Ok(connectors)
     }
 
     /// Find the first connected connector and its preferred mode.
@@ -225,16 +291,16 @@ impl DrmFramebuffer {
 
 impl Drop for DrmFramebuffer {
     fn drop(&mut self) {
-        // Restore original CRTC if we saved it
-        if let Some(ref orig) = self.original_crtc {
-            let _ = self.card.set_crtc(
-                self.crtc,
-                orig.framebuffer(),
-                orig.position(),
-                &[],
-                orig.mode(),
-            );
-        }
+        // Restore the complete original legacy KMS state: framebuffer, position,
+        // mode and connector routing. The connector array is semantically part of
+        // SETCRTC; restoring with `&[]` would detach the CRTC from its display.
+        let _ = self.card.set_crtc(
+            self.crtc,
+            self.original_crtc.framebuffer(),
+            self.original_crtc.position(),
+            &self.original_connectors,
+            self.original_crtc.mode(),
+        );
 
         // Destroy framebuffer
         let _ = self.card.destroy_framebuffer(self.fb);
