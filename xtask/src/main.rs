@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod duplicate_scan;
+mod interoception_qualification;
 mod manifest;
 mod rhn_sweep;
 
@@ -35,6 +36,55 @@ enum Commands {
         strict: bool,
         #[arg(long, default_value = "docs/crate-status.toml")]
         registry: PathBuf,
+    },
+    /// Capture one fixed Native Interoception v0.1 local qualification gate.
+    InteroceptionCaptureLocal {
+        #[arg(long)]
+        subject_commit: String,
+        #[arg(long)]
+        gate: String,
+        #[arg(long, default_value = ".")]
+        repo_root: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Recompute and verify a captured local qualification gate package.
+    InteroceptionVerifyLocal {
+        #[arg(long)]
+        evidence_dir: PathBuf,
+        #[arg(long)]
+        repo_root: Option<PathBuf>,
+    },
+    /// Verify a durable GitHub Actions archive for one required workspace gate.
+    InteroceptionVerifyActions {
+        #[arg(long)]
+        archive_dir: PathBuf,
+        #[arg(long)]
+        repo_root: Option<PathBuf>,
+    },
+    /// Inspect only the structural v0.1 bundle state. This never authorizes promotion.
+    InteroceptionInspectBundle {
+        #[arg(long)]
+        bundle: PathBuf,
+    },
+    /// Verify all five required evidence packages and emit promotion authorization.
+    InteroceptionAuthorizePromotion {
+        #[arg(long)]
+        bundle: PathBuf,
+        #[arg(long)]
+        repo_root: PathBuf,
+        #[arg(long)]
+        local_fmt: PathBuf,
+        #[arg(long)]
+        local_test: PathBuf,
+        #[arg(long)]
+        local_clippy: PathBuf,
+        #[arg(long)]
+        workspace_ci: PathBuf,
+        #[arg(long)]
+        showroom_integrity: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
     },
     RhnSweep {
         #[arg(long, default_value = "1024")]
@@ -147,6 +197,67 @@ fn main() -> anyhow::Result<()> {
             } else {
                 crate_status::check(&root, &registry_path, require_classified, strict)?;
             }
+        }
+        Commands::InteroceptionCaptureLocal {
+            subject_commit,
+            gate,
+            repo_root,
+            out,
+        } => {
+            let verified = interoception_qualification::capture_local_gate(
+                &repo_root,
+                &subject_commit,
+                &gate,
+                &out,
+            )?;
+            println!("{}", serde_json::to_string_pretty(&verified)?);
+        }
+        Commands::InteroceptionVerifyLocal {
+            evidence_dir,
+            repo_root,
+        } => {
+            let verified = interoception_qualification::verify_local_gate(
+                &interoception_qualification::local_manifest_path(&evidence_dir),
+                &interoception_qualification::local_transcript_path(&evidence_dir),
+                repo_root.as_deref(),
+            )?;
+            println!("{}", serde_json::to_string_pretty(&verified)?);
+        }
+        Commands::InteroceptionVerifyActions {
+            archive_dir,
+            repo_root,
+        } => {
+            let verified = interoception_qualification::verify_actions_archive(
+                &archive_dir,
+                repo_root.as_deref(),
+            )?;
+            println!("{}", serde_json::to_string_pretty(&verified)?);
+        }
+        Commands::InteroceptionInspectBundle { bundle } => {
+            let report = interoception_qualification::inspect_structural_bundle(&bundle)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Commands::InteroceptionAuthorizePromotion {
+            bundle,
+            repo_root,
+            local_fmt,
+            local_test,
+            local_clippy,
+            workspace_ci,
+            showroom_integrity,
+            out,
+        } => {
+            let attestation = interoception_qualification::authorize_promotion(
+                &bundle,
+                &repo_root,
+                &local_fmt,
+                &local_test,
+                &local_clippy,
+                &workspace_ci,
+                &showroom_integrity,
+                &out,
+            )?;
+            println!("{}", serde_json::to_string_pretty(&attestation)?);
         }
     }
     Ok(())
