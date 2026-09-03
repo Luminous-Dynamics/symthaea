@@ -5,6 +5,73 @@
 //! A recovery quorum must approve the exact restriction and evidence snapshot it
 //! reviewed. This module does not verify signatures or the provenance of opaque
 //! digests; those remain responsibilities of the upstream trust/security boundary.
+//!
+//! ## Public API boundary
+//!
+//! `OperatorAuthority` remains a public type for ordinary restriction/narrowing
+//! operations, but recovery widening is intentionally not a downstream-callable
+//! method on an arbitrary authority instance. The eventual positive public
+//! widening path is owned by `SubterraneanEmbodiment` (see HA-06A / #331).
+//!
+//! This normal doctest makes the crate path explicit so the compile-fail tests
+//! below cannot succeed merely because the crate import itself is wrong.
+//!
+//! ```no_run
+//! use symthaea_subterranean::OperatorAuthority;
+//! let _authority = OperatorAuthority::default();
+//! ```
+//!
+//! Raw proposal issuance is internal:
+//!
+//! ```compile_fail
+//! use symthaea_subterranean::OperatorAuthority;
+//! use symthaea_subterranean::operator_authority::recovery_authority::{
+//!     RecoveryDigest, RecoveryProposalV1,
+//! };
+//! use symthaea_subterranean::OperatorConstraint;
+//!
+//! let mut authority = OperatorAuthority::default();
+//! let proposal = RecoveryProposalV1::new(
+//!     1,
+//!     OperatorConstraint::HoldPosition,
+//!     RecoveryDigest([1; 32]),
+//!     RecoveryDigest([2; 32]),
+//!     RecoveryDigest([3; 32]),
+//!     1,
+//!     1,
+//!     1,
+//!     10,
+//! );
+//! let _ = authority.issue_recovery_proposal(proposal, 1);
+//! ```
+//!
+//! Raw approval admission is internal:
+//!
+//! ```compile_fail
+//! use symthaea_subterranean::OperatorAuthority;
+//! let _raw_approve = OperatorAuthority::approve_recovery;
+//! ```
+//!
+//! Qualified issuance/admission on arbitrary authority instances are also
+//! internal until the embodiment-owned wrapper exists:
+//!
+//! ```compile_fail
+//! use symthaea_subterranean::OperatorAuthority;
+//! let _qualified_issue = OperatorAuthority::issue_qualified_recovery_proposal;
+//! ```
+//!
+//! ```compile_fail
+//! use symthaea_subterranean::OperatorAuthority;
+//! let _qualified_approve = OperatorAuthority::approve_qualified_recovery;
+//! ```
+//!
+//! The evidence-derived live helper is likewise internal because its two-object
+//! signature is not itself an ownership guarantee:
+//!
+//! ```compile_fail
+//! use symthaea_subterranean::OperatorAuthority;
+//! let _live_gate = OperatorAuthority::approve_recovery_from_live_state;
+//! ```
 
 pub mod approval;
 pub mod live_gate;
@@ -78,8 +145,8 @@ pub enum RecoveryProposalRejection {
 
 impl RecoveryProposalV1 {
     /// Construct portable proposal evidence. Construction alone does not make a
-    /// proposal authoritative: `OperatorAuthority` must explicitly issue the
-    /// exact proposal before any approvals can count toward recovery.
+    /// proposal authoritative: the trusted owner must explicitly issue the exact
+    /// proposal before any approvals can count toward recovery.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         proposal_id: u64,
