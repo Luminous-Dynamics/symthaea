@@ -222,15 +222,17 @@ in {
               "${pkgs.coreutils}/bin/rm -f -- ${escapeShellArg cfg.performance.receiptPath}"
             ];
 
-          SupplementaryGroups = [ "video" "render" ]
-            ++ optional cfg.telemetry.enable "symthaea-boot";
-
+          # Unix-domain socket ownership follows the process primary GID, not
+          # supplementary groups. Use the telemetry group as the primary group
+          # so the observer DynamicUser can actually write boot-events.sock.
           User = "root";
+          Group = if cfg.telemetry.enable then "symthaea-boot" else "root";
+          SupplementaryGroups = [ "video" "render" ];
           KillSignal = "SIGTERM";
           TimeoutStopSec = "${toString cfg.handoff.stopTimeoutMs}ms";
 
-          # When telemetry is enabled, Unix sockets created by the renderer are
-          # owner/group accessible but not writable by unrelated local users.
+          # When telemetry is enabled, the renderer socket is root:symthaea-boot
+          # and owner/group accessible, but unrelated local users cannot write it.
           UMask = if cfg.telemetry.enable then "0007" else "0022";
 
           NoNewPrivileges = true;
