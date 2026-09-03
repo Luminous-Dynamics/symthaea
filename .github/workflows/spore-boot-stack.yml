@@ -153,6 +153,63 @@ jobs:
           cargo run --locked -p symthaea-quicken-fb --release --bin spore-boot-bench -- --matrix \
             > spore-boot-headless-matrix.json
 
+      - name: Seal exact-head qualification receipt
+        env:
+          RUST_CHANNEL: ${{ steps.toolchain.outputs.channel }}
+        run: |
+          set -euo pipefail
+          RECEIPT=spore-boot-qualification-receipt-v1.tsv
+
+          # Qualification may create untracked benchmark/evidence files, but no
+          # tracked byte is allowed to drift from the source head being claimed.
+          git diff --quiet
+          git diff --cached --quiet
+          test "$(git rev-parse HEAD)" = "$SPORE_SOURCE_COMMIT"
+
+          sha() { sha256sum "$1" | awk '{print $1}'; }
+          {
+            printf 'schema\tspore-boot-qualification-receipt-v1\n'
+            printf 'status\tPASS\n'
+            printf 'source_commit\t%s\n' "$SPORE_SOURCE_COMMIT"
+            printf 'evaluated_commit\t%s\n' "$(git rev-parse HEAD)"
+            printf 'evaluated_tree\t%s\n' "$(git rev-parse 'HEAD^{tree}')"
+            printf 'rust_channel\t%s\n' "$RUST_CHANNEL"
+            printf 'rustc_version\t%s\n' "$(rustc --version)"
+            printf 'cargo_version\t%s\n' "$(cargo --version)"
+            printf 'cargo_lock_sha256\t%s\n' "$(sha Cargo.lock)"
+            printf 'workspace_manifest_sha256\t%s\n' "$(sha Cargo.toml)"
+            printf 'rust_toolchain_toml_sha256\t%s\n' "$(sha rust-toolchain.toml)"
+            printf 'qualification_script_sha256\t%s\n' "$(sha scripts/check-spore-boot-stack.sh)"
+            printf 'workflow_sha256\t%s\n' "$(sha .github/workflows/spore-boot-stack.yml)"
+            printf 'benchmark_matrix_sha256\t%s\n' "$(sha spore-boot-headless-matrix.json)"
+            printf 'github_run_id\t%s\n' "$GITHUB_RUN_ID"
+            printf 'github_run_attempt\t%s\n' "$GITHUB_RUN_ATTEMPT"
+          } > "$RECEIPT"
+
+          # Self-check the byte bindings before publishing the receipt. This does
+          # not establish runner authenticity; it prevents internally inconsistent
+          # PASS evidence from being uploaded as if it were coherent.
+          field() { awk -F '\t' -v key="$1" '$1 == key { print $2 }' "$RECEIPT"; }
+          test "$(field status)" = PASS
+          test "$(field source_commit)" = "$SPORE_SOURCE_COMMIT"
+          test "$(field evaluated_commit)" = "$(git rev-parse HEAD)"
+          test "$(field evaluated_tree)" = "$(git rev-parse 'HEAD^{tree}')"
+          test "$(field cargo_lock_sha256)" = "$(sha Cargo.lock)"
+          test "$(field qualification_script_sha256)" = "$(sha scripts/check-spore-boot-stack.sh)"
+          test "$(field workflow_sha256)" = "$(sha .github/workflows/spore-boot-stack.yml)"
+          test "$(field benchmark_matrix_sha256)" = "$(sha spore-boot-headless-matrix.json)"
+          cat "$RECEIPT"
+
+      - name: Upload exact-head qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-boot-exact-head-evidence
+          path: |
+            spore-boot-qualification-receipt-v1.tsv
+            spore-boot-headless-matrix.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload benchmark matrix
         if: always()
         uses: actions/upload-artifact@v4
