@@ -218,6 +218,10 @@ pub(super) enum RestoreExecutionError {
 pub(super) enum RestoreFinishError {
     Aborted,
     Incomplete { remaining_permits: usize },
+    StaleFence {
+        expected: RestoreGenerationFence,
+        current: RestoreGenerationFence,
+    },
     InvalidExecution(RestoreExecutionError),
 }
 
@@ -226,6 +230,10 @@ pub(super) enum RestoreFinishError {
 /// Deliberately affine and non-serializable. The exact validated checkpoint
 /// source survives into this token so final activation can consume the same
 /// source that preparation, commit, executors and receipts were bound to.
+///
+/// Completion is not activation authority: a later activation boundary must
+/// recheck the owner/source/live generations again immediately before its own
+/// point of no return.
 pub(super) struct CompletedRestoreExecution {
     _binding: RestoreExecutionBinding,
     _source: OperationalRestoreSource,
@@ -386,19 +394,34 @@ impl RestoreExecutionSession {
         }
     }
 
-    /// Consume a completed session into the only token eligible for later
+    /// Consume a fully executed session into the only token eligible for later
     /// productive activation.
+    ///
+    /// The caller must provide the owner's **current** generation fence. A
+    /// complete receipt set is insufficient if owner identity, authority,
+    /// evidence, physical state, control plane, boot epoch, or the exact live
+    /// snapshot changed after commit/execution. The future owner-bound API must
+    /// derive this argument from the exact live owner rather than caller input.
     ///
     /// There is intentionally no all-green fixture yet: until every canonical
     /// action has a concrete executor, ordinary sessions remain incomplete and
     /// this function must fail closed.
-    pub(super) fn finish(self) -> Result<CompletedRestoreExecution, RestoreFinishError> {
+    pub(super) fn finish(
+        self,
+        current_fence: RestoreGenerationFence,
+    ) -> Result<CompletedRestoreExecution, RestoreFinishError> {
         if self.state == RestoreExecutionSessionState::Aborted {
             return Err(RestoreFinishError::Aborted);
         }
         if !self.permits.is_empty() {
             return Err(RestoreFinishError::Incomplete {
                 remaining_permits: self.permits.len(),
+            });
+        }
+        if current_fence != self.binding.fence {
+            return Err(RestoreFinishError::StaleFence {
+                expected: self.binding.fence,
+                current: current_fence,
             });
         }
         validate_execution(self.binding, &self.plans, &self.receipts)
@@ -799,7 +822,7 @@ mod tests {
         let session = RestoreExecutionSession::begin(committed()).expect("session");
         let remaining = session.remaining_permits();
         assert_eq!(
-            session.finish().err(),
+            session.finish(fence()).err(),
             Some(RestoreFinishError::Incomplete {
                 remaining_permits: remaining,
             })
@@ -814,7 +837,28 @@ mod tests {
             .execute_operator_replay_merge(&mut live)
             .expect("first execution");
         let _ = session.execute_operator_replay_merge(&mut live);
-        assert_eq!(session.finish().err(), Some(RestoreFinishError::Aborted));
+        assert_eq!(
+            session.finish(fence()).err(),
+            Some(RestoreFinishError::Aborted)
+        );
+    }
+
+    #[test]
+    fn completion_rejects_generation_movement_after_executor_receipt() {
+        let mut session = RestoreExecutionSession::begin(committed()).expect("session");
+        let mut live = OperatorAuthority::default();
+        session
+            .execute_operator_replay_merge(&mut live)
+            .expect("executor receipt");
+        let expected = session.binding.fence;
+        session.permits.clear();
+        assert_eq!(
+            session.finish(alternate_fence()).err(),
+            Some(RestoreFinishError::StaleFence {
+                expected,
+                current: alternate_fence(),
+            })
+        );
     }
 
     #[test]
@@ -843,7 +887,7 @@ mod tests {
         let mut session = RestoreExecutionSession::begin(committed()).expect("session");
         session.permits.clear();
         assert!(matches!(
-            session.finish(),
+            session.finish(fence()),
             Err(RestoreFinishError::InvalidExecution(
                 RestoreExecutionError::MissingReceipt { .. }
             ))
