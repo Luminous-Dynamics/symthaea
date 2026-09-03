@@ -111,6 +111,13 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
   grep -F -- 'must be owned by root' '${credentialPreflight}'
   grep -F -- 'mode must be exactly 0400 or 0600' '${credentialPreflight}'
 
+  # The policy checker may inspect metadata/content predicates, but it must never
+  # reproduce the credential value through common output/hash utilities.
+  if grep -Eq '(cat|head|tail|printf|echo|md5sum|sha[0-9]*sum).*["'"']?\$token' '${credentialPreflight}'; then
+    echo 'credential preflight can reproduce token contents' >&2
+    exit 1
+  fi
+
   # The pinned nixpkgs service's next pre-start stage must still be privileged;
   # the exact generated store-path name is intentionally not asserted here.
   test '${if lib.hasPrefix "+" secondExecStartPre then "true" else "false"}' = 'true'
