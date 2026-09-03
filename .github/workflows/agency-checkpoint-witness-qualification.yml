@@ -1,0 +1,128 @@
+name: Agency Checkpoint Witness Qualification
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agency-checkpoint-witness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  checkpoint-witness:
+    name: Checkpoint witness lock + exact package qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy
+
+      - name: Preserve checked-in lockfile
+        run: cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+
+      - name: Ask Cargo to reconcile workspace metadata
+        run: cargo metadata --format-version 1 >/dev/null
+
+      - name: Prove lock reconciliation is additive workspace metadata only
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import sys
+          import tomllib
+
+          before = tomllib.loads((pathlib.Path(os.environ["RUNNER_TEMP"]) / "Cargo.lock.before").read_text())
+          after = tomllib.loads(pathlib.Path("Cargo.lock").read_text())
+
+          def key(package):
+              return (package["name"], package["version"], package.get("source"))
+
+          before_map = {key(p): p for p in before.get("package", [])}
+          after_map = {key(p): p for p in after.get("package", [])}
+          order = lambda value: repr(value)
+          removed = sorted(set(before_map) - set(after_map), key=order)
+          changed = sorted(
+              (k for k in before_map.keys() & after_map if before_map[k] != after_map[k]),
+              key=order,
+          )
+          added = sorted(set(after_map) - set(before_map), key=order)
+          sourced_additions = [k for k in added if k[2] is not None]
+
+          if removed or changed or sourced_additions:
+              print("Cargo reconciliation is not a pure additive workspace-node repair.")
+              print("removed:", removed)
+              print("changed:", changed)
+              print("new sourced packages:", sourced_additions)
+              sys.exit(1)
+
+          print(f"additive workspace/path package nodes: {len(added)}")
+          for name, version, _source in added:
+              print(f"  + {name} {version}")
+          PY
+
+      - name: Record lock freshness
+        run: |
+          if git diff --quiet -- Cargo.lock; then
+            echo clean > "$RUNNER_TEMP/agency-lock-status"
+          else
+            echo stale > "$RUNNER_TEMP/agency-lock-status"
+            git --no-pager diff -- Cargo.lock
+          fi
+
+      - name: Upload Cargo-produced lock candidate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agency-checkpoint-witness-cargo-lock-${{ github.sha }}
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Test checkpoint witness recovery lineage
+        run: >-
+          cargo test --locked
+          -p symthaea-checkpoint-witness
+          -p symthaea-system-crash-recovery
+          -p symthaea-witnessed-system-crash-recovery
+
+      - name: Clippy checkpoint witness recovery lineage
+        run: >-
+          cargo clippy --locked
+          -p symthaea-checkpoint-witness
+          -p symthaea-system-crash-recovery
+          -p symthaea-witnessed-system-crash-recovery
+          --all-targets -- -D warnings
+
+      - name: Record exact qualification evidence
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/agency-checkpoint-witness-evidence"
+          git rev-parse HEAD > "$RUNNER_TEMP/agency-checkpoint-witness-evidence/HEAD"
+          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/agency-checkpoint-witness-evidence/TREE"
+          rustc -Vv > "$RUNNER_TEMP/agency-checkpoint-witness-evidence/RUSTC.txt"
+          cargo -V > "$RUNNER_TEMP/agency-checkpoint-witness-evidence/CARGO.txt"
+          sha256sum Cargo.lock > "$RUNNER_TEMP/agency-checkpoint-witness-evidence/CARGO_LOCK_SHA256.txt"
+          cp Cargo.lock "$RUNNER_TEMP/agency-checkpoint-witness-evidence/Cargo.lock"
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agency-checkpoint-witness-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/agency-checkpoint-witness-evidence
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Require checked-in Cargo.lock to be fresh
+        run: test "$(cat "$RUNNER_TEMP/agency-lock-status")" = clean

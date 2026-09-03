@@ -1,0 +1,23 @@
+[package]
+name = "symthaea-witnessed-system-crash-recovery"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Externally witnessed production profile for Symthaea system crash recovery"
+publish = false
+
+[dependencies]
+thiserror = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-authority-frontier-sqlite = { path = "../symthaea-authority-frontier-sqlite" }
+symthaea-checkpoint-witness = { path = "../symthaea-checkpoint-witness" }
+symthaea-system-attempt-recovery-index = { path = "../symthaea-system-attempt-recovery-index" }
+symthaea-system-crash-recovery = { path = "../symthaea-system-crash-recovery" }
+
+[dev-dependencies]
+ed25519-dalek = { workspace = true }
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
+symthaea-authority-frontier = { path = "../symthaea-authority-frontier" }
+symthaea-authority-time = { path = "../symthaea-authority-time" }
+symthaea-system-attempt-evidence = { path = "../symthaea-system-attempt-evidence" }
