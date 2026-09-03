@@ -3,6 +3,8 @@ name: Spore Boot Ecology
 on:
   pull_request:
     paths:
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
       - "crates/core/symthaea-boot-ecology/**"
       - "crates/core/symthaea-boot-state/**"
       - "crates/domains/symthaea-quicken-fb/**"
@@ -17,6 +19,9 @@ on:
       - ".github/workflows/spore-boot-ecology.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: spore-boot-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -27,16 +32,121 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      # PR workflows normally evaluate a synthetic merge commit. Preserve both
-      # identities in visual evidence: patch lineage (head) and evaluated tree.
+      # This focused lane qualifies the exact source head. Repository-wide CI
+      # separately owns synthetic PR-merge integration.
       SPORE_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-    steps:
-      - uses: actions/checkout@v4
+      SPORE_EVALUATED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Install pinned Rust toolchain
-        uses: dtolnay/rust-toolchain@1.96.0
+    steps:
+      - name: Checkout exact source head
+        uses: actions/checkout@v4
         with:
-          components: rustfmt,clippy
+          ref: ${{ env.SPORE_SOURCE_COMMIT }}
+
+      - name: Verify exact-head identity
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SPORE_SOURCE_COMMIT"
+          test "$SPORE_EVALUATED_COMMIT" = "$SPORE_SOURCE_COMMIT"
+          echo "head=$(git rev-parse HEAD)"
+          echo "tree=$(git rev-parse 'HEAD^{tree}')"
+
+      - name: Install repository-pinned Rust toolchain
+        id: toolchain
+        run: |
+          set -euo pipefail
+          RUST_CHANNEL="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$RUST_CHANNEL"
+          echo "channel=$RUST_CHANNEL" >> "$GITHUB_OUTPUT"
+          rustup toolchain install "$RUST_CHANNEL" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --no-self-update
+          rustup override set "$RUST_CHANNEL"
+          test "$(rustc --version | awk '{print $2}')" = "$RUST_CHANNEL"
+          rustc --version
+          cargo --version
+
+      - name: Resolve existing workspace lock minimally
+        id: lock
+        run: |
+          set -euo pipefail
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          if git diff --quiet -- Cargo.lock; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+            git diff --stat -- Cargo.lock
+          fi
+
+      - name: Upload resolver-produced Cargo.lock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-boot-ecology-cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Capture pinned rustfmt candidate
+        id: rustfmt
+        run: |
+          set -euo pipefail
+          cargo fmt \
+            -p symthaea-boot-ecology \
+            -p symthaea-boot-state \
+            -p symthaea-quicken-fb
+
+          if git diff --quiet -- . ':(exclude)Cargo.lock'; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+          git diff --binary -- . ':(exclude)Cargo.lock' > spore-boot-ecology-rustfmt.patch
+          {
+            echo 'schema=spore-boot-ecology-rustfmt-candidate-v1'
+            echo "source_commit=$SPORE_SOURCE_COMMIT"
+            echo "evaluated_commit=$(git rev-parse HEAD)"
+            echo "evaluated_tree=$(git rev-parse 'HEAD^{tree}')"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            sha256sum spore-boot-ecology-rustfmt.patch
+          } > spore-boot-ecology-rustfmt-evidence.txt
+          git diff --stat -- . ':(exclude)Cargo.lock'
+
+          # Restore formatter-mutated tracked source. A resolver-produced lock
+          # candidate remains separate so neither candidate can silently repair
+          # the exact committed state being qualified.
+          git diff --name-only -z -- . ':(exclude)Cargo.lock' \
+            | xargs -0 -r git checkout --
+
+      - name: Upload exact rustfmt candidate
+        if: steps.rustfmt.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-boot-ecology-rustfmt-candidate
+          path: |
+            spore-boot-ecology-rustfmt.patch
+            spore-boot-ecology-rustfmt-evidence.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Require committed qualification inputs
+        if: steps.lock.outputs.changed == 'true' || steps.rustfmt.outputs.changed == 'true'
+        env:
+          RUST_CHANNEL: ${{ steps.toolchain.outputs.channel }}
+        run: |
+          if [[ "${{ steps.lock.outputs.changed }}" == 'true' ]]; then
+            echo "Cargo.lock differs from Cargo $RUST_CHANNEL resolver output." >&2
+            echo 'Commit the uploaded spore-boot-ecology-cargo-lock candidate unchanged.' >&2
+          fi
+          if [[ "${{ steps.rustfmt.outputs.changed }}" == 'true' ]]; then
+            echo "Rust $RUST_CHANNEL formatting differs from the exact source head." >&2
+            echo 'Apply the uploaded spore-boot-ecology-rustfmt-candidate patch unchanged.' >&2
+          fi
+          exit 1
 
       - name: Format boot crates
         run: >-
@@ -47,7 +157,7 @@ jobs:
 
       - name: Check boot crates
         run: >-
-          cargo check
+          cargo check --locked
           -p symthaea-boot-ecology
           -p symthaea-boot-state
           -p symthaea-quicken-fb
@@ -55,7 +165,7 @@ jobs:
 
       - name: Clippy boot crates
         run: >-
-          cargo clippy
+          cargo clippy --locked
           -p symthaea-boot-ecology
           -p symthaea-boot-state
           -p symthaea-quicken-fb
@@ -64,14 +174,14 @@ jobs:
 
       - name: Test boot crates
         run: >-
-          cargo test
+          cargo test --locked
           -p symthaea-boot-ecology
           -p symthaea-boot-state
           -p symthaea-quicken-fb
 
       - name: Probe complete renderer CPU cost
         run: >-
-          cargo run --release
+          cargo run --locked --release
           -p symthaea-quicken-fb
           --bin spore_render_probe
           --
@@ -99,7 +209,7 @@ jobs:
 
       - name: Render exact lifecycle preview matrix
         run: >-
-          cargo run --release
+          cargo run --locked --release
           -p symthaea-quicken-fb
           --bin spore_boot_preview_matrix
           --
@@ -122,7 +232,7 @@ jobs:
 
       - name: Render exact inoculation phase matrix
         run: >-
-          cargo run --release
+          cargo run --locked --release
           -p symthaea-quicken-fb
           --bin spore_inoculation_preview
           --
@@ -143,7 +253,7 @@ jobs:
 
       - name: Render exact install-path ceremony matrix
         run: >-
-          cargo run --release
+          cargo run --locked --release
           -p symthaea-quicken-fb
           --bin spore_inoculation_paths_preview
           --
@@ -212,7 +322,8 @@ jobs:
               "spore-inoculation-paths-preview",
           )
           expected_source = os.environ["SPORE_SOURCE_COMMIT"]
-          expected_evaluated = os.environ["GITHUB_SHA"]
+          expected_evaluated = os.environ["SPORE_EVALUATED_COMMIT"]
+          assert expected_source == expected_evaluated
           for root in roots:
               manifest = json.loads(Path(root, "evidence-manifest.json").read_text())
               assert manifest["schema"] == "spore-visual-evidence-v1"
@@ -222,6 +333,13 @@ jobs:
               assert manifest["total_bytes"] > 0
               assert any(item["path"] == "visual-lint.json" for item in manifest["files"])
           PY
+
+      - name: Verify tracked exact-head state after evidence generation
+        run: |
+          set -euo pipefail
+          git diff --quiet
+          git diff --cached --quiet
+          test "$(git rev-parse HEAD)" = "$SPORE_SOURCE_COMMIT"
 
       - name: Upload renderer cost evidence
         if: always()
