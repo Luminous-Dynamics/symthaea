@@ -227,7 +227,8 @@ impl BudgetProfile {
         {
             return Err(BudgetError::MissingExternalEnforcementEvidence);
         }
-        let digest = compute_profile_digest(limits, enforcement, external_enforcement_evidence_digest);
+        let digest =
+            compute_profile_digest(limits, enforcement, external_enforcement_evidence_digest);
         Ok(Self {
             limits,
             enforcement,
@@ -338,7 +339,9 @@ impl BudgetAuthorityDomain {
                 .ledger
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if let Some((dimension, requested, remaining)) = allocation.first_excess(ledger.remaining) {
+            if let Some((dimension, requested, remaining)) =
+                allocation.first_excess(ledger.remaining)
+            {
                 return Err(BudgetError::InsufficientBudget {
                     dimension,
                     requested,
@@ -833,9 +836,14 @@ impl fmt::Display for BudgetError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MissingExternalEnforcementEvidence => {
-                write!(f, "external hard budget claim requires enforcement evidence")
+                write!(
+                    f,
+                    "external hard budget claim requires enforcement evidence"
+                )
             }
-            Self::ExpiredReservationRequest => write!(f, "requested budget lease is already expired"),
+            Self::ExpiredReservationRequest => {
+                write!(f, "requested budget lease is already expired")
+            }
             Self::ExpiredDelegationRequest { .. } => {
                 write!(f, "requested child budget lease is already expired")
             }
@@ -843,7 +851,9 @@ impl fmt::Display for BudgetError {
                 write!(f, "insufficient remaining budget for {dimension:?}")
             }
             Self::ScopeWidening { .. } => write!(f, "child budget scope would widen parent scope"),
-            Self::ExpiryWidening { .. } => write!(f, "child budget expiry would widen parent expiry"),
+            Self::ExpiryWidening { .. } => {
+                write!(f, "child budget expiry would widen parent expiry")
+            }
             Self::Trust(error) => write!(f, "budget trust validation failed: {error}"),
             Self::ProfileMismatch => write!(f, "budget lease belongs to another profile"),
             Self::LeaseBindingMismatch => write!(f, "budget lease binding is inconsistent"),
@@ -992,7 +1002,9 @@ mod tests {
         let actor = PrincipalId::new();
         let first = BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 7);
         let second = BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 4);
-        domain.reserve(actor, scope(&["root"]), [1; 32], first, None).unwrap();
+        domain
+            .reserve(actor, scope(&["root"]), [1; 32], first, None)
+            .unwrap();
         assert!(matches!(
             domain.reserve(actor, scope(&["root"]), [2; 32], second, None),
             Err(BudgetError::InsufficientBudget {
@@ -1027,7 +1039,8 @@ mod tests {
         barrier.wait();
         let successes = threads
             .into_iter()
-            .filter(|thread| thread.join().unwrap().is_ok())
+            .map(|thread| thread.join().unwrap())
+            .filter(Result::is_ok)
             .count();
         assert_eq!(successes, 1);
         assert_eq!(domain.remaining().get(BudgetDimension::ComputeUnits), 0);
@@ -1047,20 +1060,17 @@ mod tests {
                 None,
             )
             .unwrap();
-        assert!(lease
-            .validate_for(&verifier, actor, &scope(&["root"]), [4; 32])
-            .is_ok());
+        assert!(
+            lease
+                .validate_for(&verifier, actor, &scope(&["root"]), [4; 32])
+                .is_ok()
+        );
         assert!(matches!(
             lease.validate_for(&verifier, actor, &scope(&["root"]), [5; 32]),
             Err(BudgetError::ActionBindingMismatch)
         ));
         assert!(matches!(
-            lease.validate_for(
-                &verifier,
-                PrincipalId::new(),
-                &scope(&["root"]),
-                [4; 32]
-            ),
+            lease.validate_for(&verifier, PrincipalId::new(), &scope(&["root"]), [4; 32]),
             Err(BudgetError::WrongSubject { .. })
         ));
     }
@@ -1079,13 +1089,17 @@ mod tests {
                 None,
             )
             .unwrap();
-        assert!(lease
-            .validate_for(&other.verifier(), actor, &scope(&["root"]), [6; 32])
-            .is_err());
+        assert!(
+            lease
+                .validate_for(&other.verifier(), actor, &scope(&["root"]), [6; 32])
+                .is_err()
+        );
         domain.revoke_all().unwrap();
-        assert!(lease
-            .validate_for(&domain.verifier(), actor, &scope(&["root"]), [6; 32])
-            .is_err());
+        assert!(
+            lease
+                .validate_for(&domain.verifier(), actor, &scope(&["root"]), [6; 32])
+                .is_err()
+        );
     }
 
     #[test]

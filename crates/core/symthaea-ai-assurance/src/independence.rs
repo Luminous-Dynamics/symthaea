@@ -405,10 +405,7 @@ impl<K: CapabilityKind, H> IndependenceGuardedAction<K, Authorized, H> {
     pub fn execute_attempt_with<F>(
         self,
         attempt: F,
-    ) -> Result<
-        IndependenceGuardedAction<K, Executed, H>,
-        IndependenceEffectAttemptFailure<K, H>,
-    >
+    ) -> Result<IndependenceGuardedAction<K, Executed, H>, IndependenceEffectAttemptFailure<K, H>>
     where
         F: FnOnce(&mut H) -> EffectAttemptOutcome,
     {
@@ -452,9 +449,9 @@ impl<K: CapabilityKind, H> IndependenceGuardedAction<K, Authorized, H> {
             Err(EffectAttemptFailure::RejectedBeforeAttempt { error }) => {
                 Err(IndependenceEffectAttemptFailure::RejectedBeforeAttempt { error })
             }
-            Err(EffectAttemptFailure::LineageFailedAfterAttempt { evidence, error }) => Err(
-                IndependenceEffectAttemptFailure::LineageFailedAfterAttempt { evidence, error },
-            ),
+            Err(EffectAttemptFailure::LineageFailedAfterAttempt { evidence, error }) => {
+                Err(IndependenceEffectAttemptFailure::LineageFailedAfterAttempt { evidence, error })
+            }
         }
     }
 }
@@ -841,7 +838,7 @@ mod tests {
         BudgetEnforcement, BudgetGuardedRuntime, BudgetProfile, BudgetQuantities,
         EffectGuardedRuntime, EnforcementClass, ObservedOutcome, PolicyDescriptor,
         PolicyGuardedRuntime, PolicyMode, PolicyResourceRuntime, ResolutionAuthorityDomain,
-        ResourceIdentity, ResourceResolverDomain, ResourceRuntime, Scope,
+        ResourceIdentity, ResourceResolverDomain, ResourceRuntime,
         TemporalPolicyEvaluatorDomain, TemporalPolicyExecutionDomain, TemporalPolicyRules,
         TrustedRuntime, Write,
     };
@@ -906,11 +903,8 @@ mod tests {
             PolicyDescriptor::new("independence", 1, [3; 32], 1).unwrap(),
             rules,
         );
-        let execution = TemporalPolicyExecutionDomain::new(
-            PrincipalId::new(),
-            evaluator.verifier(),
-            rules,
-        );
+        let execution =
+            TemporalPolicyExecutionDomain::new(PrincipalId::new(), evaluator.verifier(), rules);
         let observation = AuthorityDomain::new(PrincipalId::new());
         let resolution = ResolutionAuthorityDomain::new(PrincipalId::new());
         let resources = ResourceResolverDomain::new(PrincipalId::new());
@@ -1007,11 +1001,8 @@ mod tests {
             PolicyDescriptor::new("independence", 1, [10; 32], 1).unwrap(),
             rules,
         );
-        let execution = TemporalPolicyExecutionDomain::new(
-            PrincipalId::new(),
-            evaluator.verifier(),
-            rules,
-        );
+        let execution =
+            TemporalPolicyExecutionDomain::new(PrincipalId::new(), evaluator.verifier(), rules);
         let resolution = ResolutionAuthorityDomain::new(PrincipalId::new());
         let resources = ResourceResolverDomain::new(PrincipalId::new());
         let budgets = BudgetAuthorityDomain::new(PrincipalId::new(), budget_profile());
@@ -1048,11 +1039,8 @@ mod tests {
             PolicyDescriptor::new("independence", 1, [11; 32], 1).unwrap(),
             rules,
         );
-        let execution = TemporalPolicyExecutionDomain::new(
-            PrincipalId::new(),
-            evaluator.verifier(),
-            rules,
-        );
+        let execution =
+            TemporalPolicyExecutionDomain::new(PrincipalId::new(), evaluator.verifier(), rules);
         let resolution = ResolutionAuthorityDomain::new(PrincipalId::new());
         let resources = ResourceResolverDomain::new(PrincipalId::new());
         let budgets = BudgetAuthorityDomain::new(PrincipalId::new(), budget_profile());
