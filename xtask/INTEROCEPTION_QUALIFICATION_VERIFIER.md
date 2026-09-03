@@ -10,7 +10,7 @@ The verifier distinguishes three states:
 
 1. **Structurally qualified** — the schema-v2 `QualificationEvidenceBundle` is internally coherent and all five required receipts say `Passed`.
 2. **Evidence verified** — archived local, scientific-capsule, and GitHub Actions objects reproduce the identities named by the bundle.
-3. **Promotion authorized** — the verifier has additionally re-run all three local gates on the exact frozen clean checkout and re-resolved both Actions gates from GitHub using their exact run ID and run attempt.
+3. **Promotion authorized** — the verifier has additionally re-run all three local gates on the exact frozen clean checkout, required the promotion-time toolchain/target identity to equal the evidence capsule, re-resolved both Actions gates from GitHub using their exact run ID and run attempt, and atomically created the final authorization artifact.
 
 Only state 3 authorizes the v0.2 implementation-start transition. `QualificationEvidenceBundle::is_qualified()`, `InteroceptionInspectBundle`, and archive-only verification are not promotion authority.
 
@@ -117,11 +117,14 @@ Run `InteroceptionAuthorizePromotion` with:
 - Showroom Actions archive;
 - a new output path outside the frozen checkout.
 
-The authorizer fails closed unless all of the following hold:
+The CLI routes this command through the strict outer promotion guard. The guard fails closed unless all of the following hold:
 
 - frozen checkout is exactly the policy source and clean;
 - raw bundle is canonical and structurally qualified;
 - scientific capsule bytes reproduce all declared digests;
+- promotion-time `rustc -vV` exactly equals `bundle.evidence.rustc_vv`;
+- promotion-time `cargo -Vv` exactly equals `bundle.evidence.cargo_vv`;
+- promotion-time host target triple and architecture equal the capsule identities;
 - archived local packages bind exactly to the bundle;
 - all three fixed local gates independently pass again at authorization time;
 - archived Actions packages bind exactly to the bundle;
@@ -132,7 +135,9 @@ The authorizer fails closed unless all of the following hold:
 - GitHub's exact-SHA workflow Git blob equals the archived workflow bytes;
 - frozen checkout remains clean after local reexecution.
 
-Only then may the final typed envelope contain `PromotionAuthorized`.
+The older inner live verifier writes its provisional envelope only inside a private scratch directory. Those provisional bytes are never trusted or copied. The scratch tree must be removed successfully before the strict guard serializes the returned in-memory envelope and creates the final output with `create_new` no-overwrite semantics. A concurrent final-path writer can therefore cause authorization to fail, but cannot cause the verifier to overwrite an existing authorization artifact.
+
+Only then may the durable typed envelope contain `PromotionAuthorized`.
 
 ## Reruns
 
@@ -150,7 +155,8 @@ Qualification archives are treated as closed trees:
 - traversed components and file leaves may not be symlinks;
 - leaves must be regular files;
 - canonical objects must remain beneath the canonical archive root;
-- promotion inputs/outputs must live outside the frozen source checkout.
+- promotion inputs/outputs must live outside the frozen source checkout;
+- durable authorization output is created with create-new semantics rather than check-then-overwrite behavior.
 
 This is intended to prevent a content-addressed evidence package from quietly depending on mutable bytes elsewhere on the filesystem.
 
@@ -158,4 +164,8 @@ This is intended to prevent a content-addressed evidence package from quietly de
 
 Promotion authorization establishes provenance and qualification of the frozen Native Interoception v0.1 substrate. It does **not** establish emotion, affect, sentience, consciousness, or the scientific success of any later v0.2 candidate.
 
-The verifier itself must pass its own format/test/clippy review before this tooling lineage is relied on for promotion. Until then, this document and branch describe an implementation candidate, not qualified verifier software.
+## Tooling-lineage blocker
+
+The CLI promotion path is now the strict live path described above. However, `interoception_qualification.rs` still contains a legacy private archive-only `PromotionAuthorized` variant/helper that is not CLI-reachable. Issue #346 requires that obsolete path to be removed or renamed before this verifier lineage is opened for review or relied on as authority.
+
+The verifier itself must also pass its own format/test/clippy review before this tooling lineage is relied on for promotion. Until then, this document and branch describe an implementation candidate, not qualified verifier software.
