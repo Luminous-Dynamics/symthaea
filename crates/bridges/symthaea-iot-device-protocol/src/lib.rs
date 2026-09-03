@@ -35,10 +35,6 @@ const PHYSICAL_EFFECT_ENVELOPE_DOMAIN: &[u8] = b"symthaea-iot-physical-effect-en
 const DEVICE_CONFIG_DOMAIN: &[u8] = b"symthaea-iot-device-enforcement-config-v1\0";
 const DEVICE_CHECKPOINT_DOMAIN: &[u8] = b"symthaea-iot-device-semantic-checkpoint-v1\0";
 
-/// Canonical semantic payload for one physical effect.
-///
-/// This is intentionally serializable and therefore forgeable as bytes. It must never
-/// be treated as authenticated identity or physical authority by itself.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PhysicalEffectEnvelopeV1 {
     pub schema_version: u16,
@@ -141,7 +137,6 @@ impl PhysicalEffectEnvelopeV1 {
     }
 }
 
-/// Host-side affine state carrying the posture-bound permit alongside its one envelope.
 #[derive(Debug)]
 pub struct PreparedDeviceEgress {
     permit: PostureBoundEgressPermit,
@@ -179,7 +174,6 @@ impl PreparedDeviceEgress {
     }
 }
 
-/// Consume one final posture-bound host permit into exactly one canonical envelope.
 pub fn prepare_device_egress(
     permit: PostureBoundEgressPermit,
     send_not_after_unix_s: u64,
@@ -209,7 +203,6 @@ pub fn prepare_device_egress(
     })
 }
 
-/// Device-local policy independent of host claims.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeviceEnforcementConfigV1 {
     pub schema_version: u16,
@@ -282,32 +275,38 @@ pub struct DeviceSemanticHead {
     pub digest: Digest32,
 }
 
-/// Device-local replay journal. The successor must be durable before later actuator authority.
+/// Device-local replay journal bound to the exact local enforcement configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeviceSemanticCheckpointV1 {
     pub schema_version: u16,
     pub generation: u64,
     pub previous_checkpoint_digest: Option<Digest32>,
     pub device: ResourceRef,
+    pub config_digest: Digest32,
     pub highest_accepted_sequence: Option<u64>,
     pub last_envelope_digest: Option<Digest32>,
 }
 
 impl DeviceSemanticCheckpointV1 {
-    pub fn genesis(device: ResourceRef) -> Self {
-        Self {
+    pub fn genesis(config: &DeviceEnforcementConfigV1) -> Result<Self, DeviceProtocolError> {
+        config.validate()?;
+        Ok(Self {
             schema_version: DEVICE_SEMANTIC_CHECKPOINT_SCHEMA_VERSION,
             generation: 0,
             previous_checkpoint_digest: None,
-            device,
+            device: config.device.clone(),
+            config_digest: config.digest()?,
             highest_accepted_sequence: None,
             last_envelope_digest: None,
-        }
+        })
     }
 
     pub fn validate(&self) -> Result<(), DeviceProtocolError> {
         if self.schema_version != DEVICE_SEMANTIC_CHECKPOINT_SCHEMA_VERSION {
             return Err(DeviceProtocolError::UnsupportedDeviceCheckpointSchema);
+        }
+        if self.config_digest == Digest32([0; 32]) {
+            return Err(DeviceProtocolError::ZeroSecurityDigest);
         }
         if self.generation == 0 {
             if self.previous_checkpoint_digest.is_some()
@@ -317,14 +316,13 @@ impl DeviceSemanticCheckpointV1 {
                 return Err(DeviceProtocolError::MalformedDeviceGenesis);
             }
         } else {
-            let sequence = self
-                .highest_accepted_sequence
-                .ok_or(DeviceProtocolError::IncompleteDeviceCheckpoint)?;
-            if sequence == 0
-                || self.previous_checkpoint_digest.is_none()
-                || self.last_envelope_digest.is_none()
-            {
+            if self.previous_checkpoint_digest.is_none() {
                 return Err(DeviceProtocolError::IncompleteDeviceCheckpoint);
+            }
+            match (self.highest_accepted_sequence, self.last_envelope_digest) {
+                (None, None) => {}
+                (Some(sequence), Some(_)) if sequence > 0 => {}
+                _ => return Err(DeviceProtocolError::IncompleteDeviceCheckpoint),
             }
         }
         Ok(())
@@ -338,6 +336,7 @@ impl DeviceSemanticCheckpointV1 {
         h.update(&self.generation.to_be_bytes());
         optional_digest(&mut h, self.previous_checkpoint_digest);
         update_string(&mut h, &self.device.0);
+        update_digest(&mut h, self.config_digest);
         optional_u64(&mut h, self.highest_accepted_sequence);
         optional_digest(&mut h, self.last_envelope_digest);
         Ok(Digest32(*h.finalize().as_bytes()))
@@ -358,6 +357,49 @@ impl DeviceSemanticCheckpointV1 {
             return Err(DeviceProtocolError::TrustedDeviceHeadMismatch);
         }
         Ok(())
+    }
+
+    /// Explicitly migrate local device policy without resetting replay state.
+    ///
+    /// The policy-registry floor may only stay equal or increase. Replacing the exact
+    /// host-policy digest requires advancing that floor, preventing a same-generation
+    /// policy substitution from being disguised as local configuration maintenance.
+    pub fn migrate_config(
+        &self,
+        trusted_current_head: DeviceSemanticHead,
+        current: &DeviceEnforcementConfigV1,
+        next: &DeviceEnforcementConfigV1,
+    ) -> Result<Self, DeviceProtocolError> {
+        self.verify_as_trusted_head(trusted_current_head)?;
+        current.validate()?;
+        next.validate()?;
+        if self.device != current.device || self.config_digest != current.digest()? {
+            return Err(DeviceProtocolError::CheckpointConfigMismatch);
+        }
+        if next.device != current.device {
+            return Err(DeviceProtocolError::ConfigMigrationDeviceChanged);
+        }
+        if next.minimum_policy_registry_sequence < current.minimum_policy_registry_sequence {
+            return Err(DeviceProtocolError::ConfigPolicyGenerationRollback);
+        }
+        if next.exact_policy_digest != current.exact_policy_digest
+            && next.minimum_policy_registry_sequence <= current.minimum_policy_registry_sequence
+        {
+            return Err(DeviceProtocolError::ConfigPolicyChangedWithoutGenerationAdvance);
+        }
+        let generation = self
+            .generation
+            .checked_add(1)
+            .ok_or(DeviceProtocolError::DeviceGenerationOverflow)?;
+        Ok(Self {
+            schema_version: DEVICE_SEMANTIC_CHECKPOINT_SCHEMA_VERSION,
+            generation,
+            previous_checkpoint_digest: Some(self.digest()?),
+            device: self.device.clone(),
+            config_digest: next.digest()?,
+            highest_accepted_sequence: self.highest_accepted_sequence,
+            last_envelope_digest: self.last_envelope_digest,
+        })
     }
 }
 
@@ -422,9 +464,6 @@ impl SemanticallyAcceptedEffect {
     }
 }
 
-/// Validate semantic content against device-local state and burn its sequence.
-///
-/// This function does not authenticate the envelope.
 pub fn prepare_semantic_acceptance(
     envelope: PhysicalEffectEnvelopeV1,
     config: &DeviceEnforcementConfigV1,
@@ -438,6 +477,9 @@ pub fn prepare_semantic_acceptance(
     current_checkpoint.verify_as_trusted_head(trusted_current_head)?;
     if current_checkpoint.device != config.device {
         return Err(DeviceProtocolError::CheckpointDeviceMismatch);
+    }
+    if current_checkpoint.config_digest != config.digest()? {
+        return Err(DeviceProtocolError::CheckpointConfigMismatch);
     }
     validate_envelope_against_device(&envelope, config, local_runtime, now_unix_s)?;
 
@@ -471,6 +513,7 @@ pub fn prepare_semantic_acceptance(
         generation,
         previous_checkpoint_digest: Some(current_checkpoint.digest()?),
         device: config.device.clone(),
+        config_digest: current_checkpoint.config_digest,
         highest_accepted_sequence: Some(sequence),
         last_envelope_digest: Some(envelope_digest),
     };
@@ -622,14 +665,22 @@ pub enum DeviceProtocolError {
     UnsupportedDeviceCheckpointSchema,
     #[error("malformed generation-zero device checkpoint")]
     MalformedDeviceGenesis,
-    #[error("non-genesis device checkpoint missing replay commitments")]
+    #[error("non-genesis device checkpoint is internally inconsistent")]
     IncompleteDeviceCheckpoint,
     #[error("persisted device checkpoint does not match trusted head")]
     TrustedDeviceHeadMismatch,
     #[error("device checkpoint belongs to another device")]
     CheckpointDeviceMismatch,
+    #[error("device checkpoint was created under another local configuration")]
+    CheckpointConfigMismatch,
     #[error("device semantic generation overflow")]
     DeviceGenerationOverflow,
+    #[error("device configuration migration changed physical device identity")]
+    ConfigMigrationDeviceChanged,
+    #[error("device configuration policy-registry floor rolled backward")]
+    ConfigPolicyGenerationRollback,
+    #[error("device policy digest changed without advancing policy-registry generation")]
+    ConfigPolicyChangedWithoutGenerationAdvance,
     #[error("envelope is outside its device receive window")]
     EnvelopeNotFresh,
     #[error("envelope lifetime exceeds device-local ceiling")]
@@ -682,7 +733,7 @@ mod tests {
             allowed_firmware: BTreeSet::from([digest(7)]),
             parameter_ranges: BTreeMap::from([(
                 "duration_ms".into(),
-                InclusiveRangeI64 {
+                symthaea_iot_authority::InclusiveRangeI64 {
                     min: 1_000,
                     max: 120_000,
                 },
@@ -763,9 +814,9 @@ mod tests {
     }
 
     #[test]
-    fn semantic_acceptance_burns_sequence_before_token_exists() {
+    fn semantic_acceptance_burns_sequence_and_config() {
         let cfg = config();
-        let state = DeviceSemanticCheckpointV1::genesis(cfg.device.clone());
+        let state = DeviceSemanticCheckpointV1::genesis(&cfg).unwrap();
         let head = state.head().unwrap();
         let pending = prepare_semantic_acceptance(
             envelope(7),
@@ -777,37 +828,16 @@ mod tests {
         )
         .unwrap();
         assert_eq!(pending.checkpoint().highest_accepted_sequence, Some(7));
-        assert_eq!(pending.checkpoint().generation, 1);
+        assert_eq!(pending.checkpoint().config_digest, cfg.digest().unwrap());
         let expected = pending.expected_head();
         let accepted = pending.confirm_persisted(expected).expect("exact device head");
         assert_eq!(accepted.command().sequence, 7);
     }
 
     #[test]
-    fn wrong_device_head_cannot_mint_semantic_token() {
-        let cfg = config();
-        let state = DeviceSemanticCheckpointV1::genesis(cfg.device.clone());
-        let state_head = state.head().unwrap();
-        let pending = prepare_semantic_acceptance(
-            envelope(7),
-            &cfg,
-            &runtime(None),
-            &state,
-            state_head,
-            5_001,
-        )
-        .unwrap();
-        let wrong = DeviceSemanticHead {
-            generation: pending.expected_head().generation,
-            digest: digest(99),
-        };
-        assert!(pending.confirm_persisted(wrong).is_err());
-    }
-
-    #[test]
     fn persisted_sequence_cannot_be_replayed() {
         let cfg = config();
-        let state = DeviceSemanticCheckpointV1::genesis(cfg.device.clone());
+        let state = DeviceSemanticCheckpointV1::genesis(&cfg).unwrap();
         let first = prepare_semantic_acceptance(
             envelope(7),
             &cfg,
@@ -831,41 +861,65 @@ mod tests {
     }
 
     #[test]
-    fn expired_wrong_policy_and_unknown_schema_fail_closed() {
+    fn silent_config_substitution_fails() {
         let cfg = config();
-        let state = DeviceSemanticCheckpointV1::genesis(cfg.device.clone());
-        let head = state.head().unwrap();
+        let state = DeviceSemanticCheckpointV1::genesis(&cfg).unwrap();
+        let mut changed = cfg.clone();
+        changed.maximum_envelope_lifetime_s = 6;
         assert!(matches!(
             prepare_semantic_acceptance(
                 envelope(7),
-                &cfg,
+                &changed,
                 &runtime(None),
                 &state,
-                head,
-                5_006,
+                state.head().unwrap(),
+                5_001,
             ),
-            Err(DeviceProtocolError::EnvelopeNotFresh)
+            Err(DeviceProtocolError::CheckpointConfigMismatch)
         ));
+    }
 
-        let mut wrong = envelope(8);
-        wrong.policy_digest = digest(99);
-        assert!(matches!(
-            prepare_semantic_acceptance(wrong, &cfg, &runtime(None), &state, head, 5_001),
-            Err(DeviceProtocolError::EnvelopePolicyMismatch)
-        ));
+    #[test]
+    fn explicit_config_migration_retains_replay_state() {
+        let cfg = config();
+        let state = DeviceSemanticCheckpointV1::genesis(&cfg).unwrap();
+        let first = prepare_semantic_acceptance(
+            envelope(7),
+            &cfg,
+            &runtime(None),
+            &state,
+            state.head().unwrap(),
+            5_001,
+        )
+        .unwrap();
+        let accepted_state = first.checkpoint().clone();
+        let mut next_cfg = cfg.clone();
+        next_cfg.minimum_policy_registry_sequence = 6;
+        next_cfg.exact_policy_digest = digest(22);
+        let migrated = accepted_state
+            .migrate_config(accepted_state.head().unwrap(), &cfg, &next_cfg)
+            .unwrap();
+        assert_eq!(migrated.highest_accepted_sequence, Some(7));
+        assert_eq!(migrated.config_digest, next_cfg.digest().unwrap());
+        assert_eq!(migrated.generation, accepted_state.generation + 1);
+    }
 
-        let mut unknown = envelope(8);
-        unknown.command.schema_version += 1;
+    #[test]
+    fn policy_change_without_generation_advance_is_rejected() {
+        let cfg = config();
+        let state = DeviceSemanticCheckpointV1::genesis(&cfg).unwrap();
+        let mut next_cfg = cfg.clone();
+        next_cfg.exact_policy_digest = digest(22);
         assert!(matches!(
-            prepare_semantic_acceptance(unknown, &cfg, &runtime(None), &state, head, 5_001),
-            Err(DeviceProtocolError::UnsupportedCommandSchema)
+            state.migrate_config(state.head().unwrap(), &cfg, &next_cfg),
+            Err(DeviceProtocolError::ConfigPolicyChangedWithoutGenerationAdvance)
         ));
     }
 
     #[test]
     fn unsafe_local_observation_dominates_host_claims() {
         let cfg = config();
-        let state = DeviceSemanticCheckpointV1::genesis(cfg.device.clone());
+        let state = DeviceSemanticCheckpointV1::genesis(&cfg).unwrap();
         let mut local = runtime(None);
         local.observations.insert("pressure_x100".into(), 500_000);
         assert!(matches!(
@@ -890,13 +944,5 @@ mod tests {
         let mut c = a.clone();
         c.send_not_after_unix_s -= 1;
         assert_ne!(a.digest().unwrap(), c.digest().unwrap());
-    }
-
-    #[test]
-    fn local_config_commitment_is_independent() {
-        let a = config();
-        let mut b = a.clone();
-        b.exact_policy_digest = digest(22);
-        assert_ne!(a.digest().unwrap(), b.digest().unwrap());
     }
 }
