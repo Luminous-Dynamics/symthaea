@@ -25,7 +25,7 @@
 compile_error!("symthaea-iot-actuation-guard is Linux-only and requires kernel Unix peer credentials");
 
 use std::collections::BTreeSet;
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -46,8 +46,9 @@ use tokio::time::timeout;
 
 /// Current minimal response schema.
 pub const ACTUATION_GUARD_RESPONSE_SCHEMA_VERSION: u16 = 1;
-/// Socket mode: only the service identity may open the endpoint through filesystem ACLs.
-pub const ACTUATION_GUARD_SOCKET_MODE: u32 = 0o600;
+/// Socket mode. The runtime directory/socket group grants connection reachability to a
+/// separately sandboxed client identity; kernel peer UID checking remains authoritative.
+pub const ACTUATION_GUARD_SOCKET_MODE: u32 = 0o660;
 /// Upper bound on one authorized client's time holding the single-flight ingress slot.
 pub const MAX_GUARD_REQUEST_TIMEOUT_MS: u64 = 2_000;
 /// Response frames are intentionally tiny and contain no trust/security internals.
@@ -266,6 +267,10 @@ impl VerifiedGuardIngress {
 pub struct ActuationGuardServerConfig {
     /// Absolute Unix socket path inside a service-manager-owned runtime directory.
     pub socket_path: PathBuf,
+    /// Exact group that must own both the runtime directory and newly created socket.
+    /// This permits a separate unprivileged client UID to reach the socket while the
+    /// kernel peer UID policy still decides who is accepted.
+    pub expected_socket_gid: u32,
     /// Exact kernel UID allowlist.
     pub peer_policy: GuardPeerPolicy,
     /// Whole-request deadline for one authorized peer.
@@ -301,9 +306,9 @@ pub struct ActuationGuardServer {
 }
 
 impl ActuationGuardServer {
-    /// Bind a fresh socket. The parent directory must already exist and the socket path
-    /// must not: service-manager runtime-directory lifecycle is intentionally not hidden
-    /// inside this privileged process.
+    /// Bind a fresh socket. The parent directory must already exist, be a real directory
+    /// (not a symlink), be non-world-writable, and have the explicitly provisioned IPC
+    /// group. The socket path itself must not already exist.
     pub async fn bind(
         config: ActuationGuardServerConfig,
         ingress: GuardIngressState,
@@ -313,11 +318,23 @@ impl ActuationGuardServer {
             .socket_path
             .parent()
             .ok_or(GuardServerError::SocketPathMustBeAbsolute)?;
-        let metadata = tokio::fs::metadata(parent)
+        let metadata = tokio::fs::symlink_metadata(parent)
             .await
             .map_err(GuardServerError::RuntimeDirectoryMetadata)?;
+        if metadata.file_type().is_symlink() {
+            return Err(GuardServerError::RuntimeDirectorySymlink);
+        }
         if !metadata.is_dir() {
             return Err(GuardServerError::RuntimeDirectoryNotDirectory);
+        }
+        if metadata.mode() & 0o002 != 0 {
+            return Err(GuardServerError::RuntimeDirectoryWorldWritable);
+        }
+        if metadata.gid() != config.expected_socket_gid {
+            return Err(GuardServerError::RuntimeDirectoryGroupMismatch {
+                expected: config.expected_socket_gid,
+                actual: metadata.gid(),
+            });
         }
         if path_exists(&config.socket_path).await? {
             return Err(GuardServerError::SocketPathAlreadyExists);
@@ -330,6 +347,32 @@ impl ActuationGuardServer {
             drop(listener);
             let _ = tokio::fs::remove_file(&config.socket_path).await;
             return Err(GuardServerError::SocketPermissions(error));
+        }
+        let socket_metadata = match tokio::fs::symlink_metadata(&config.socket_path).await {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                drop(listener);
+                let _ = tokio::fs::remove_file(&config.socket_path).await;
+                return Err(GuardServerError::SocketPathMetadata(error));
+            }
+        };
+        if socket_metadata.gid() != config.expected_socket_gid {
+            let actual = socket_metadata.gid();
+            drop(listener);
+            let _ = tokio::fs::remove_file(&config.socket_path).await;
+            return Err(GuardServerError::SocketGroupMismatch {
+                expected: config.expected_socket_gid,
+                actual,
+            });
+        }
+        if socket_metadata.mode() & 0o777 != ACTUATION_GUARD_SOCKET_MODE {
+            let actual = socket_metadata.mode() & 0o777;
+            drop(listener);
+            let _ = tokio::fs::remove_file(&config.socket_path).await;
+            return Err(GuardServerError::SocketModeMismatch {
+                expected: ACTUATION_GUARD_SOCKET_MODE,
+                actual,
+            });
         }
 
         Ok(Self {
@@ -572,9 +615,18 @@ pub enum GuardServerError {
     /// Runtime directory metadata could not be read.
     #[error("actuation guard runtime directory metadata failed: {0}")]
     RuntimeDirectoryMetadata(#[source] std::io::Error),
+    /// Runtime directory path must not itself be a symlink.
+    #[error("actuation guard runtime directory must not be a symlink")]
+    RuntimeDirectorySymlink,
     /// Runtime parent exists but is not a directory.
     #[error("actuation guard runtime parent is not a directory")]
     RuntimeDirectoryNotDirectory,
+    /// World-writable runtime directories permit unsafe path manipulation.
+    #[error("actuation guard runtime directory must not be world-writable")]
+    RuntimeDirectoryWorldWritable,
+    /// Runtime directory group differs from deployment provisioning.
+    #[error("actuation guard runtime directory group mismatch: expected {expected}, actual {actual}")]
+    RuntimeDirectoryGroupMismatch { expected: u32, actual: u32 },
     /// Socket-path metadata check failed.
     #[error("actuation guard socket-path metadata failed: {0}")]
     SocketPathMetadata(#[source] std::io::Error),
@@ -584,9 +636,15 @@ pub enum GuardServerError {
     /// Unix socket bind failed.
     #[error("actuation guard socket bind failed: {0}")]
     Bind(#[source] std::io::Error),
-    /// Socket could not be forced to mode 0600.
+    /// Socket could not be forced to the configured group-reachable mode.
     #[error("actuation guard socket permission hardening failed: {0}")]
     SocketPermissions(#[source] std::io::Error),
+    /// Newly created socket did not inherit the provisioned IPC group.
+    #[error("actuation guard socket group mismatch: expected {expected}, actual {actual}")]
+    SocketGroupMismatch { expected: u32, actual: u32 },
+    /// Newly created socket did not retain the exact fixed mode.
+    #[error("actuation guard socket mode mismatch: expected {expected:#o}, actual {actual:#o}")]
+    SocketModeMismatch { expected: u32, actual: u32 },
     /// Accept failed.
     #[error("actuation guard socket accept failed: {0}")]
     Accept(#[source] std::io::Error),
@@ -644,6 +702,7 @@ mod tests {
         let policy = GuardPeerPolicy::new(BTreeSet::from([1000])).unwrap();
         let relative = ActuationGuardServerConfig {
             socket_path: PathBuf::from("guard.sock"),
+            expected_socket_gid: 1000,
             peer_policy: policy.clone(),
             request_timeout: Duration::from_millis(500),
         };
@@ -654,6 +713,7 @@ mod tests {
 
         let too_long = ActuationGuardServerConfig {
             socket_path: PathBuf::from("/run/symthaea-actuation/guard.sock"),
+            expected_socket_gid: 1000,
             peer_policy: policy,
             request_timeout: Duration::from_millis(MAX_GUARD_REQUEST_TIMEOUT_MS + 1),
         };
