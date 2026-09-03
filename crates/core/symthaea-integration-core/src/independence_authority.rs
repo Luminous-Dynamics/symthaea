@@ -17,16 +17,16 @@ use crate::{ObservationEnvelope, ObservationId, SourceQualifiedObservationRef};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-/// Schema v2 replaces ambiguous raw supporting `ObservationId`s with explicit
-/// source-qualified observation references.
-pub const INDEPENDENCE_ATTESTATION_SCHEMA_VERSION: u16 = 2;
+/// Schema v3 source-qualifies both supporting observations and attested lineage
+/// subjects by their full measurement-source namespace.
+pub const INDEPENDENCE_ATTESTATION_SCHEMA_VERSION: u16 = 3;
 
 /// Source-qualified reference to one measurement lineage.
 ///
-/// The reference binds not just an adapter id and local lineage string but also
-/// the available collector, tenant, and upstream-origin context. This prevents a
-/// lineage id reused by separate collectors or administrative domains from
-/// silently becoming the same attestation subject.
+/// The reference binds the local lineage string to integration, collector,
+/// tenant, measurement method, and explicit upstream-origin context. A bridge
+/// may therefore reuse a local lineage id in another measurement namespace
+/// without accidentally making the two subjects identical.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct EvidenceLineageRef {
     pub integration_id: String,
@@ -34,17 +34,23 @@ pub struct EvidenceLineageRef {
     pub collector_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tenant: Option<String>,
+    pub measurement_method: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub upstream_origin: Option<String>,
     pub lineage_id: String,
 }
 
 impl EvidenceLineageRef {
-    pub fn new(integration_id: impl Into<String>, lineage_id: impl Into<String>) -> Self {
+    pub fn new(
+        integration_id: impl Into<String>,
+        measurement_method: impl Into<String>,
+        lineage_id: impl Into<String>,
+    ) -> Self {
         Self {
             integration_id: integration_id.into(),
             collector_id: None,
             tenant: None,
+            measurement_method: measurement_method.into(),
             upstream_origin: None,
             lineage_id: lineage_id.into(),
         }
@@ -56,6 +62,7 @@ impl EvidenceLineageRef {
             integration_id: observation.source.integration_id.clone(),
             collector_id: observation.source.collector_id.clone(),
             tenant: observation.source.tenant.clone(),
+            measurement_method: observation.source.measurement_method.clone(),
             upstream_origin: observation.source.upstream_origin.clone(),
             lineage_id: observation.lineage.lineage_id.clone(),
         }
@@ -66,15 +73,17 @@ impl EvidenceLineageRef {
         self.integration_id == observation.source.integration_id
             && self.collector_id == observation.source.collector_id
             && self.tenant == observation.source.tenant
+            && self.measurement_method == observation.source.measurement_method
             && self.upstream_origin == observation.source.upstream_origin
             && self.lineage_id == observation.lineage.lineage_id
     }
 
     pub fn canonical_key(&self) -> String {
-        let mut key = String::from("lineage-ref-v1");
+        let mut key = String::from("lineage-ref-v2");
         push_required_component(&mut key, &self.integration_id);
         push_optional_component(&mut key, self.collector_id.as_deref());
         push_optional_component(&mut key, self.tenant.as_deref());
+        push_required_component(&mut key, &self.measurement_method);
         push_optional_component(&mut key, self.upstream_origin.as_deref());
         push_required_component(&mut key, &self.lineage_id);
         key
@@ -375,6 +384,12 @@ fn validate_lineage(
             _ => "right.integration_id",
         }));
     }
+    if lineage.measurement_method.trim().is_empty() {
+        return Err(IndependenceAttestationError::EmptyField(match prefix {
+            "left" => "left.measurement_method",
+            _ => "right.measurement_method",
+        }));
+    }
     if lineage.lineage_id.trim().is_empty() {
         return Err(IndependenceAttestationError::EmptyField(match prefix {
             "left" => "left.lineage_id",
@@ -439,11 +454,13 @@ fn attestation_string_bytes(
         Some(attestation.left.integration_id.as_str()),
         attestation.left.collector_id.as_deref(),
         attestation.left.tenant.as_deref(),
+        Some(attestation.left.measurement_method.as_str()),
         attestation.left.upstream_origin.as_deref(),
         Some(attestation.left.lineage_id.as_str()),
         Some(attestation.right.integration_id.as_str()),
         attestation.right.collector_id.as_deref(),
         attestation.right.tenant.as_deref(),
+        Some(attestation.right.measurement_method.as_str()),
         attestation.right.upstream_origin.as_deref(),
         Some(attestation.right.lineage_id.as_str()),
         Some(attestation.authority.authority_id.as_str()),
@@ -501,8 +518,16 @@ mod tests {
         IndependenceAttestation {
             schema_version: INDEPENDENCE_ATTESTATION_SCHEMA_VERSION,
             attestation_id: "attestation-1".into(),
-            left: EvidenceLineageRef::new("kubernetes", "kubelet-readiness"),
-            right: EvidenceLineageRef::new("prometheus", "blackbox-probe"),
+            left: EvidenceLineageRef::new(
+                "kubernetes",
+                "kubernetes-object-replay",
+                "kubelet-readiness",
+            ),
+            right: EvidenceLineageRef::new(
+                "prometheus",
+                "prometheus-text",
+                "blackbox-probe",
+            ),
             basis: IndependenceBasis::DistinctMeasurementTechnique,
             authority: authority(),
             issued_at_unix_ms: 100,
@@ -592,6 +617,24 @@ mod tests {
         let mut other_tenant = observation.clone();
         other_tenant.source.tenant = Some("tenant-b".into());
         assert!(!reference.matches_observation(&other_tenant));
+
+        let mut other_method = observation.clone();
+        other_method.source.measurement_method = "otlp-metric".into();
+        assert!(!reference.matches_observation(&other_method));
+
+        let mut other_origin = observation.clone();
+        other_origin.source.upstream_origin = Some("node-exporter:node-2".into());
+        assert!(!reference.matches_observation(&other_origin));
+    }
+
+    #[test]
+    fn lineage_reference_key_changes_with_measurement_namespace() {
+        let observation = observation();
+        let reference = EvidenceLineageRef::from_observation(&observation);
+        let mut other = reference.clone();
+        other.measurement_method = "otlp-metric".into();
+        assert_ne!(reference.canonical_key(), other.canonical_key());
+        assert!(reference.canonical_key().starts_with("lineage-ref-v2|"));
     }
 
     #[test]
@@ -644,8 +687,9 @@ mod tests {
     }
 
     #[test]
-    fn evidence_source_strings_are_counted_in_attestation_budget() {
+    fn evidence_and_lineage_source_strings_are_counted_in_attestation_budget() {
         let mut oversized = attestation();
+        oversized.left.measurement_method = "l".repeat(128);
         oversized.evidence_observations[0].measurement_method = "m".repeat(128);
         oversized.evidence_observations[0].upstream_origin = Some("o".repeat(128));
         let set = IndependenceAttestationSet {

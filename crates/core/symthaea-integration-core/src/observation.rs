@@ -192,9 +192,10 @@ pub struct TransformStep {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObservationLineage {
     /// Stable source-local lineage identifier assigned by the source/bridge.
-    /// It is meaningful together with integration, collector, and tenant scope;
-    /// upstream-origin metadata is an independent provenance signal, not part of
-    /// this local identifier's namespace.
+    /// It is meaningful only together with the source namespace: integration,
+    /// collector, tenant, measurement method, and explicit upstream origin when
+    /// present. Equal local strings outside that namespace do not prove shared
+    /// lineage.
     pub lineage_id: String,
     /// Source-local parent observations when this value is derived/aggregated.
     /// The enclosing observation source supplies their namespace in v0.1.
@@ -346,10 +347,14 @@ impl ObservationEnvelope {
             && !other.lineage.lineage_id.trim().is_empty()
             && !self.source.integration_id.trim().is_empty()
             && !other.source.integration_id.trim().is_empty()
+            && !self.source.measurement_method.trim().is_empty()
+            && !other.source.measurement_method.trim().is_empty()
             && self.lineage.lineage_id == other.lineage.lineage_id
             && self.source.integration_id == other.source.integration_id
             && self.source.collector_id == other.source.collector_id
             && self.source.tenant == other.source.tenant
+            && self.source.measurement_method == other.source.measurement_method
+            && self.source.upstream_origin == other.source.upstream_origin
         {
             return LineageRelationship::SharedOrigin;
         }
@@ -662,14 +667,37 @@ mod tests {
     }
 
     #[test]
-    fn same_local_lineage_remains_shared_when_upstream_metadata_differs() {
+    fn equal_lineage_ids_with_different_measurement_methods_do_not_collapse() {
+        let mut a = sample("a", "same", None);
+        let mut b = sample("b", "same", None);
+        a.lineage.lineage_id = "same-lineage".into();
+        b.lineage.lineage_id = "same-lineage".into();
+        b.source.measurement_method = "other-method".into();
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
+    }
+
+    #[test]
+    fn equal_lineage_ids_with_different_upstream_origins_do_not_collapse() {
         let mut a = sample("a", "same", None);
         let mut b = sample("b", "same", None);
         a.lineage.lineage_id = "same-lineage".into();
         b.lineage.lineage_id = "same-lineage".into();
         a.source.upstream_origin = Some("upstream-a".into());
         b.source.upstream_origin = Some("upstream-b".into());
-        assert_eq!(a.lineage_relationship(&b), LineageRelationship::SharedOrigin);
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
+    }
+
+    #[test]
+    fn reused_log_like_id_with_distinct_origins_is_not_shared_lineage() {
+        let mut a = sample("syslog-42", "symthaea-logparse", None);
+        let mut b = a.clone();
+        a.source.collector_id = None;
+        b.source.collector_id = None;
+        a.source.measurement_method = "syslog".into();
+        b.source.measurement_method = "syslog".into();
+        a.source.upstream_origin = Some("log-stream:host-a:sshd".into());
+        b.source.upstream_origin = Some("log-stream:host-b:sshd".into());
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
     }
 
     #[test]
