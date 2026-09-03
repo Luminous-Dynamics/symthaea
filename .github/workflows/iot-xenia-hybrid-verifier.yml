@@ -102,10 +102,17 @@ jobs:
 
           package = a[next(iter(expected))]
           assert package.get('checksum') == 'c9fb5a367b9846933e271a3c2a992930743f82ae5e8cb7faa780715a80fa0b15', package
-          allowed_dependencies = {'rand_core 0.6.4', 'sha2 0.10.9', 'sha3 0.10.8', 'zeroize'}
-          actual_dependencies = set(package.get('dependencies', []))
-          assert actual_dependencies <= allowed_dependencies, (
-              'fips204 resolved an unexpected dependency edge', actual_dependencies
+
+          # Cargo version-qualifies dependency labels only when a package name is
+          # ambiguous in the complete lock. Compare dependency families rather than
+          # overfitting this admission gate to that rendering detail.
+          actual_dependency_families = {
+              dep.split(' ', 1)[0] for dep in package.get('dependencies', [])
+          }
+          expected_dependency_families = {'rand_core', 'sha2', 'sha3', 'zeroize'}
+          assert actual_dependency_families == expected_dependency_families, (
+              'fips204 dependency families differ from reviewed closure',
+              actual_dependency_families,
           )
           PY
 
