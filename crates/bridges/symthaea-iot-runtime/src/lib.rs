@@ -30,9 +30,7 @@
 
 use std::fmt::Write as _;
 
-use symthaea_action_checkpoint::{
-    CheckpointError, CheckpointHead, GrantAccountCheckpoint,
-};
+use symthaea_action_checkpoint::{CheckpointError, CheckpointHead, GrantAccountCheckpoint};
 use symthaea_action_runtime::{
     ExecutionId, GrantAccount, ReservationId, ReservationState, RuntimeAccountingError,
 };
@@ -55,8 +53,6 @@ pub enum IoTRuntimeError {
     TrustedHeadMismatch,
     #[error("runtime account state diverged from the trusted checkpoint snapshot")]
     AccountCheckpointDiverged,
-    #[error("reservation is not in the expected outcome-unknown state")]
-    ReservationNotOutcomeUnknown,
     #[error("runtime accounting failed: {0}")]
     Runtime(#[from] RuntimeAccountingError),
     #[error("checkpoint operation failed: {0}")]
@@ -423,7 +419,6 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
 
     use super::*;
-    use symthaea_action_runtime::ReservationState;
     use symthaea_authority::{
         AuthorityContext, AuthorityEpoch, GrantUseState, Operation, PrincipalId, ResourceRef,
         RiskBudget, TaskId,
@@ -587,8 +582,9 @@ mod tests {
         let mut account = GrantAccount::new(&grant);
         let admission = admission(&grant, &account, 1);
         let pending = prepare_dispatch(&grant, &mut account, &admission, None, None).unwrap();
+        let durable_head = pending.expected_head();
         let permit = pending
-            .confirm_persisted(pending.expected_head())
+            .confirm_persisted(durable_head)
             .expect("exact durable head");
         let unknown = permit.into_unknown();
         assert_eq!(account.authority_use_state().reserved, 1);
@@ -622,8 +618,9 @@ mod tests {
         let mut account = GrantAccount::new(&grant);
         let admission = admission(&grant, &account, 1);
         let pending = prepare_dispatch(&grant, &mut account, &admission, None, None).unwrap();
+        let durable_head = pending.expected_head();
         let permit = pending
-            .confirm_persisted(pending.expected_head())
+            .confirm_persisted(durable_head)
             .expect("exact durable head");
         let transition = permit.proven_not_dispatched(&mut account, &grant).unwrap();
 
