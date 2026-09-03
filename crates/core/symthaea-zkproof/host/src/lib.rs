@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use anyhow::{Result, ensure};
-use risc0_zkvm::{ExecutorEnv, ProveInfo, default_prover};
+use risc0_zkvm::{ExecutorEnv, ProveInfo, VerifierContext, default_prover};
 use symthaea_zkproof_core::{
     AccountabilityThresholdInput, AccountabilityThresholdOutput, BalanceProofInput,
     BalanceProofOutput, EvolutionInput, EvolutionOutput,
@@ -17,7 +17,12 @@ use symthaea_zkproof_methods::{SYMTHAEA_ZKPROOF_GUEST_ELF, SYMTHAEA_ZKPROOF_GUES
 pub const SIF_ACCOUNTABILITY_THRESHOLD_SCHEME: &str =
     "symthaea/risc0/sif-u64-threshold-computation/v1";
 
+/// Stable verifier profile exported to the provider-neutral accountability layer.
+pub const SIF_ACCOUNTABILITY_THRESHOLD_VERIFIER_PROFILE: &str =
+    "symthaea-zkproof/risc0/sif-u64-threshold/v1";
+
 const SIF_PREDICATE_RESULT_DOMAIN: &[u8] = b"symthaea:sif:u64-threshold-result:v1";
+const SIF_PROOF_ARTIFACT_DOMAIN: &[u8] = b"symthaea:sif:risc0-proof-artifact:v1";
 
 // ---------------------------------------------------------------------------
 // Consciousness attestation prover (tag = 0)
@@ -104,7 +109,26 @@ pub struct AccountabilityThresholdExpectation {
     pub policy_digest: [u8; 32],
     pub result_digest: [u8; 32],
     pub threshold: u64,
+    /// Opaque nonce for the exact live operation. In the SIF cross-stack profile,
+    /// this is derived by Xenia from its authenticated operation/session plus the
+    /// receipt/query commitments.
     pub operation_nonce: [u8; 32],
+}
+
+/// Stable, commitment-only metadata exported after a SIF computation proof has
+/// passed real (non-dev-mode) RISC Zero verification and exact-context checks.
+///
+/// This is intentionally provider-neutral metadata rather than an authorization
+/// token. `proof_digest` identifies the concrete proof artifact; Mycelix can map
+/// the common fields into its `AttestationRole::ComputationProof` reference.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VerifiedAccountabilityComputationRef {
+    pub scheme: &'static str,
+    pub statement_digest: [u8; 32],
+    pub proof_digest: [u8; 32],
+    pub verifier_profile: &'static str,
+    pub operation_nonce: [u8; 32],
+    pub result_digest: [u8; 32],
 }
 
 /// RISC Zero prover/verifier for one minimum-disclosure `u64 >= threshold`
@@ -131,9 +155,17 @@ impl AccountabilityThresholdProver {
         Ok(prove_info)
     }
 
-    /// Verify the RISC Zero receipt and decode its public journal.
+    /// Verify a SIF receipt with dev mode explicitly disabled, then decode its
+    /// public journal.
+    ///
+    /// This deliberately does not inherit `RISC0_DEV_MODE` from the environment.
+    /// A fake development receipt must never cross the SIF disclosure boundary as
+    /// if it were cryptographic evidence.
     pub fn verify(prove_info: &ProveInfo) -> Result<AccountabilityThresholdOutput> {
-        prove_info.receipt.verify(SYMTHAEA_ZKPROOF_GUEST_ID)?;
+        let verifier_context = VerifierContext::default().with_dev_mode(false);
+        prove_info
+            .receipt
+            .verify_with_context(&verifier_context, SYMTHAEA_ZKPROOF_GUEST_ID)?;
         let output: AccountabilityThresholdOutput = prove_info.receipt.journal.decode()?;
         validate_public_bindings(
             &output.statement_digest,
@@ -191,6 +223,23 @@ impl AccountabilityThresholdProver {
         );
         Ok(output)
     }
+
+    /// Verify an exact SIF proof and export the opaque reference metadata consumed
+    /// by the higher accountability layer.
+    pub fn verify_to_reference(
+        prove_info: &ProveInfo,
+        expected: &AccountabilityThresholdExpectation,
+    ) -> Result<VerifiedAccountabilityComputationRef> {
+        Self::verify_for_expectation(prove_info, expected)?;
+        Ok(VerifiedAccountabilityComputationRef {
+            scheme: SIF_ACCOUNTABILITY_THRESHOLD_SCHEME,
+            statement_digest: expected.statement_digest,
+            proof_digest: sif_proof_artifact_digest(prove_info)?,
+            verifier_profile: SIF_ACCOUNTABILITY_THRESHOLD_VERIFIER_PROFILE,
+            operation_nonce: expected.operation_nonce,
+            result_digest: expected.result_digest,
+        })
+    }
 }
 
 /// Canonical result commitment profile for the v1 boolean threshold proof.
@@ -204,6 +253,28 @@ pub fn sif_predicate_result_commitment(satisfied: bool) -> [u8; 32] {
     hasher.update(&[0]);
     hasher.update(&[u8::from(satisfied)]);
     *hasher.finalize().as_bytes()
+}
+
+/// Stable SIF reference digest for the concrete RISC Zero proof artifact.
+///
+/// The digest is deliberately computed over the Borsh serialization of
+/// `Receipt::inner` (the actual cryptographic proof/seal and claim) plus the
+/// authenticated journal bytes. Untrusted `ReceiptMetadata` is excluded. This is
+/// an SIF artifact identifier, not a replacement for RISC Zero verification.
+pub fn sif_proof_artifact_digest(prove_info: &ProveInfo) -> Result<[u8; 32]> {
+    let proof_bytes = borsh::to_vec(&prove_info.receipt.inner)?;
+    let journal_bytes = &prove_info.receipt.journal.bytes;
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(SIF_PROOF_ARTIFACT_DOMAIN);
+    hasher.update(&[0]);
+    hasher.update(SIF_ACCOUNTABILITY_THRESHOLD_SCHEME.as_bytes());
+    hasher.update(&[0]);
+    hasher.update(&(proof_bytes.len() as u64).to_be_bytes());
+    hasher.update(&proof_bytes);
+    hasher.update(&(journal_bytes.len() as u64).to_be_bytes());
+    hasher.update(journal_bytes);
+    Ok(*hasher.finalize().as_bytes())
 }
 
 fn validate_public_bindings(
@@ -290,8 +361,7 @@ mod tests {
         assert_eq!(output.episode_count, 1);
     }
 
-    #[test]
-    fn test_sif_threshold_proof_binds_exact_accountability_context() {
+    fn sif_fixture() -> (ProveInfo, AccountabilityThresholdExpectation) {
         let statement_digest = [10u8; 32];
         let query_digest = [11u8; 32];
         let policy_digest = [12u8; 32];
@@ -314,6 +384,12 @@ mod tests {
             threshold: 500,
             operation_nonce,
         };
+        (prove_info, expected)
+    }
+
+    #[test]
+    fn test_sif_threshold_proof_binds_exact_accountability_context() {
+        let (prove_info, expected) = sif_fixture();
         let output = AccountabilityThresholdProver::verify_for_expectation(&prove_info, &expected)
             .unwrap();
         assert!(output.satisfied);
@@ -322,6 +398,31 @@ mod tests {
         replayed.statement_digest = [99u8; 32];
         assert!(
             AccountabilityThresholdProver::verify_for_expectation(&prove_info, &replayed).is_err()
+        );
+    }
+
+    #[test]
+    fn test_sif_threshold_proof_rejects_wrong_live_operation_nonce() {
+        let (prove_info, mut expected) = sif_fixture();
+        expected.operation_nonce = [77u8; 32];
+        assert!(
+            AccountabilityThresholdProver::verify_for_expectation(&prove_info, &expected).is_err()
+        );
+    }
+
+    #[test]
+    fn test_sif_verified_reference_identifies_real_proof_artifact() {
+        let (prove_info, expected) = sif_fixture();
+        let verified = AccountabilityThresholdProver::verify_to_reference(&prove_info, &expected)
+            .unwrap();
+        assert_eq!(verified.scheme, SIF_ACCOUNTABILITY_THRESHOLD_SCHEME);
+        assert_eq!(verified.statement_digest, expected.statement_digest);
+        assert_eq!(verified.operation_nonce, expected.operation_nonce);
+        assert_eq!(verified.result_digest, expected.result_digest);
+        assert_ne!(verified.proof_digest, [0u8; 32]);
+        assert_eq!(
+            verified.proof_digest,
+            sif_proof_artifact_digest(&prove_info).unwrap()
         );
     }
 
