@@ -31,6 +31,14 @@ fn deployment() -> serde_json::Value {
     })
 }
 
+fn registered_registry(replay: &KubernetesStateReplay) -> IntegrationRegistry {
+    let mut registry = IntegrationRegistry::new();
+    registry
+        .register_discoverer(Arc::new(replay.topology().clone()))
+        .unwrap();
+    registry
+}
+
 #[test]
 fn registered_kubernetes_source_admits_state_before_drift_assessment() {
     let replay = KubernetesStateReplay::from_objects(
@@ -40,10 +48,7 @@ fn registered_kubernetes_source_admits_state_before_drift_assessment() {
     )
     .unwrap();
 
-    let mut registry = IntegrationRegistry::new();
-    registry
-        .register_discoverer(Arc::new(replay.topology().clone()))
-        .unwrap();
+    let registry = registered_registry(&replay);
     let id = IntegrationId::new(KUBERNETES_INTEGRATION_ID);
     registry.admit_state_snapshot(&id, replay.snapshot()).unwrap();
 
@@ -106,10 +111,7 @@ fn replay_history_supports_persistence_without_claiming_proof() {
         snapshots: vec![first.snapshot().clone(), latest.snapshot().clone()],
     };
 
-    let mut registry = IntegrationRegistry::new();
-    registry
-        .register_discoverer(Arc::new(latest.topology().clone()))
-        .unwrap();
+    let registry = registered_registry(&latest);
     let id = IntegrationId::new(KUBERNETES_INTEGRATION_ID);
     registry.admit_state_history(&id, &history).unwrap();
 
@@ -145,6 +147,42 @@ fn replay_history_supports_persistence_without_claiming_proof() {
 }
 
 #[test]
+fn future_dated_assertion_is_rejected_at_snapshot_admission() {
+    let replay = KubernetesStateReplay::from_objects(
+        KubernetesReplayContext::default(),
+        &[deployment()],
+        100,
+    )
+    .unwrap();
+    let registry = registered_registry(&replay);
+    let id = IntegrationId::new(KUBERNETES_INTEGRATION_ID);
+    let mut snapshot = replay.snapshot().clone();
+    snapshot.assertions[0].observed_at_unix_ms = 101;
+
+    assert!(registry.admit_state_snapshot(&id, &snapshot).is_err());
+}
+
+#[test]
+fn future_dated_assertion_is_rejected_inside_history_admission() {
+    let replay = KubernetesStateReplay::from_objects(
+        KubernetesReplayContext::default(),
+        &[deployment()],
+        100,
+    )
+    .unwrap();
+    let registry = registered_registry(&replay);
+    let id = IntegrationId::new(KUBERNETES_INTEGRATION_ID);
+    let mut snapshot = replay.snapshot().clone();
+    snapshot.assertions[0].observed_at_unix_ms = 101;
+    let history = StateHistory {
+        integration_id: KUBERNETES_INTEGRATION_ID.into(),
+        snapshots: vec![snapshot],
+    };
+
+    assert!(registry.admit_state_history(&id, &history).is_err());
+}
+
+#[test]
 fn unregistered_state_source_is_rejected() {
     let replay = KubernetesStateReplay::from_objects(
         KubernetesReplayContext::default(),
@@ -153,12 +191,14 @@ fn unregistered_state_source_is_rejected() {
     )
     .unwrap();
     let registry = IntegrationRegistry::new();
-    assert!(registry
-        .admit_state_snapshot(
-            &IntegrationId::new(KUBERNETES_INTEGRATION_ID),
-            replay.snapshot(),
-        )
-        .is_err());
+    assert!(
+        registry
+            .admit_state_snapshot(
+                &IntegrationId::new(KUBERNETES_INTEGRATION_ID),
+                replay.snapshot(),
+            )
+            .is_err()
+    );
 }
 
 #[test]
@@ -174,9 +214,11 @@ fn unregistered_state_history_is_rejected() {
         snapshots: vec![replay.snapshot().clone()],
     };
     let registry = IntegrationRegistry::new();
-    assert!(registry
-        .admit_state_history(&IntegrationId::new(KUBERNETES_INTEGRATION_ID), &history)
-        .is_err());
+    assert!(
+        registry
+            .admit_state_history(&IntegrationId::new(KUBERNETES_INTEGRATION_ID), &history)
+            .is_err()
+    );
 }
 
 #[test]
@@ -187,19 +229,18 @@ fn central_state_budget_rejects_oversized_snapshot() {
         100,
     )
     .unwrap();
-    let mut registry = IntegrationRegistry::new();
-    registry
-        .register_discoverer(Arc::new(replay.topology().clone()))
-        .unwrap();
+    let registry = registered_registry(&replay);
     let limits = StateLimits {
         max_assertions: 1,
         ..Default::default()
     };
-    assert!(registry
-        .admit_state_snapshot_with_limits(
-            &IntegrationId::new(KUBERNETES_INTEGRATION_ID),
-            replay.snapshot(),
-            &limits,
-        )
-        .is_err());
+    assert!(
+        registry
+            .admit_state_snapshot_with_limits(
+                &IntegrationId::new(KUBERNETES_INTEGRATION_ID),
+                replay.snapshot(),
+                &limits,
+            )
+            .is_err()
+    );
 }
