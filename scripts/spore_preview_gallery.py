@@ -48,8 +48,18 @@ def read_ppm(path: Path) -> tuple[int, int, bytes]:
     width, height, max_value = (int(token) for token in tokens)
     if width <= 0 or height <= 0 or max_value != 255:
         raise ValueError(f"{path}: unsupported PPM dimensions/max value")
-    while index < length and data[index] in b" \t\r\n":
+
+    # P6 becomes binary immediately after the max-value separator. Consume only
+    # that separator (or CRLF), never an arbitrary run of whitespace: the first
+    # red byte is allowed to equal an ASCII whitespace value and remains pixel
+    # data. This matters because the resulting PNG is presented as exact pixels.
+    if index >= length or data[index] not in b" \t\r\n":
+        raise ValueError(f"{path}: missing PPM header/payload separator")
+    if data[index : index + 2] == b"\r\n":
+        index += 2
+    else:
         index += 1
+
     pixels = data[index:]
     expected = width * height * 3
     if len(pixels) != expected:
