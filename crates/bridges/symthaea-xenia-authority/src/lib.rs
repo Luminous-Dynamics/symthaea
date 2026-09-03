@@ -12,7 +12,9 @@
 //! stale signed authorization is rejected when its ledger frontier no longer
 //! matches the fresh Xenia checkpoint supplied for admission. Wall-clock time is
 //! not accepted from the caller: time-sensitive checks consume a short-lived,
-//! challenge-bound [`VerifiedAuthorityTime`] fact.
+//! challenge-bound [`VerifiedAuthorityTime`] fact. Current authority epoch and
+//! negative-authority facts likewise arrive as one indivisible, fresh
+//! [`VerifiedAuthorityState`] snapshot rather than caller-selected inputs.
 
 #![deny(unsafe_code)]
 
@@ -22,6 +24,7 @@ mod workload;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use symthaea_action_checkpoint::CheckpointHead;
 use symthaea_authority::{CapabilityGrant, Digest32, PrincipalId};
+use symthaea_authority_state::{AuthorityStateError, VerifiedAuthorityState};
 use symthaea_authority_time::{AuthorityTimeError, VerifiedAuthorityTime};
 use thiserror::Error;
 
@@ -79,6 +82,8 @@ pub struct VerifiedXeniaCapability {
     xenia_ledger_entry_count: u64,
     xenia_ledger_head_hash: [u8; 32],
     prior_checkpoint: CheckpointHead,
+    authority_state_digest: Digest32,
+    authority_state_sequence: u64,
     expires_at_unix_s: u64,
 }
 
@@ -107,6 +112,14 @@ impl VerifiedXeniaCapability {
         self.prior_checkpoint
     }
 
+    pub fn authority_state_digest(&self) -> Digest32 {
+        self.authority_state_digest
+    }
+
+    pub fn authority_state_sequence(&self) -> u64 {
+        self.authority_state_sequence
+    }
+
     pub fn expires_at_unix_s(&self) -> u64 {
         self.expires_at_unix_s
     }
@@ -119,7 +132,11 @@ impl VerifiedXeniaCapability {
 /// Time is an interval, not a scalar: earliest-plausible time is used to prove
 /// that an authorization/checkpoint is not from the future, while the
 /// latest-plausible time is used to prove it has not expired or gone stale.
-/// This makes uncertainty fail closed in both temporal directions.
+///
+/// `authority_state` must be a fresh threshold-authenticated snapshot for the
+/// same grant. Its source frontier must be exactly the fresh Xenia ledger
+/// frontier used in this verification. This prevents mixing a fresh Xenia proof
+/// with a stale epoch or stale revocation set.
 #[allow(clippy::too_many_arguments)]
 pub fn verify_xenia_capability_v1(
     attestation: &XeniaAgentCapabilityAttestationV1,
@@ -130,6 +147,7 @@ pub fn verify_xenia_capability_v1(
     expected_session: XeniaSessionExpectationV1,
     current_agent_checkpoint: CheckpointHead,
     authority_time: &VerifiedAuthorityTime,
+    authority_state: &VerifiedAuthorityState,
     freshness: XeniaFreshnessPolicyV1,
 ) -> Result<VerifiedXeniaCapability, XeniaAuthorityError> {
     let authorization = &attestation.authorization;
@@ -144,6 +162,17 @@ pub fn verify_xenia_capability_v1(
 
     let grant_digest = grant.digest();
     authority_time.require_subject(grant_digest.0)?;
+    authority_state.ensure_fresh(grant, authority_time)?;
+    if authority_state.authority_epoch() != grant.authority_epoch {
+        return Err(XeniaAuthorityError::GrantEpochStaleAgainstCurrentState);
+    }
+    let (state_frontier_sequence, state_frontier_digest) = authority_state.source_frontier();
+    if state_frontier_sequence != fresh_xenia_checkpoint.entry_count
+        || state_frontier_digest.0 != fresh_xenia_checkpoint.head_hash
+    {
+        return Err(XeniaAuthorityError::AuthorityStateFrontierMismatch);
+    }
+
     // The verification-time lower bound remains a valid conservative lower
     // bound during this fact's very short lifetime because real time can only
     // advance. The moving upper bound accounts for elapsed Linux boot time.
@@ -236,6 +265,8 @@ pub fn verify_xenia_capability_v1(
         xenia_ledger_entry_count: authorization.ledger_entry_count,
         xenia_ledger_head_hash: authorization.ledger_head_hash,
         prior_checkpoint: current_agent_checkpoint,
+        authority_state_digest: authority_state.snapshot_digest(),
+        authority_state_sequence: authority_state.state_sequence(),
         expires_at_unix_s: authorization.expires_at_unix_s,
     })
 }
@@ -293,6 +324,8 @@ fn verify_ed25519(
 pub enum XeniaAuthorityError {
     #[error("verified authority time failed: {0}")]
     AuthorityTime(#[from] AuthorityTimeError),
+    #[error("verified authority state failed: {0}")]
+    AuthorityState(#[from] AuthorityStateError),
     #[error("invalid Xenia protocol object: {0}")]
     Protocol(#[from] ProtocolError),
     #[error("invalid executor workload: {0}")]
@@ -309,6 +342,10 @@ pub enum XeniaAuthorityError {
     LedgerCheckpointFromFuture,
     #[error("freshness checkpoint exceeded the configured maximum age")]
     LedgerCheckpointStale,
+    #[error("fresh authority-state source frontier differs from the signed Xenia checkpoint")]
+    AuthorityStateFrontierMismatch,
+    #[error("capability grant epoch is stale relative to fresh authority-state evidence")]
+    GrantEpochStaleAgainstCurrentState,
     #[error("fresh Xenia frontier differs from signed authorization frontier")]
     AuthorizationFrontierStale,
     #[error("freshness checkpoint predates the signed authorization")]
