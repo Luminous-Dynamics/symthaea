@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: agency-kernel-qualification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
@@ -83,13 +87,14 @@ jobs:
 
       - name: Record lock freshness and print exact Cargo diff
         run: |
+          mkdir -p "$RUNNER_TEMP/agency-kernel-evidence"
           if git diff --quiet -- Cargo.lock; then
-            echo clean > "$RUNNER_TEMP/agency-lock-status"
+            echo clean | tee "$RUNNER_TEMP/agency-lock-status" > "$RUNNER_TEMP/agency-kernel-evidence/lock-status.txt"
             echo "Cargo.lock is already fresh."
           else
-            echo stale > "$RUNNER_TEMP/agency-lock-status"
+            echo stale | tee "$RUNNER_TEMP/agency-lock-status" > "$RUNNER_TEMP/agency-kernel-evidence/lock-status.txt"
             echo "Cargo.lock is stale; exact Cargo-generated diff follows:"
-            git --no-pager diff -- Cargo.lock
+            git --no-pager diff -- Cargo.lock | tee "$RUNNER_TEMP/agency-kernel-evidence/Cargo.lock.patch"
           fi
 
       # Always retain the Cargo-produced candidate. When the checked-in lock is
@@ -103,6 +108,17 @@ jobs:
           path: Cargo.lock
           if-no-files-found: error
           retention-days: 7
+
+      - name: Capture exact qualification provenance
+        run: |
+          E="$RUNNER_TEMP/agency-kernel-evidence"
+          git rev-parse HEAD > "$E/HEAD.txt"
+          git status --porcelain=v1 > "$E/git-status.txt"
+          rustc -vV > "$E/rustc-vV.txt"
+          cargo -vV > "$E/cargo-vV.txt"
+          sha256sum Cargo.lock > "$E/Cargo.lock.sha256"
+          cargo metadata --locked --format-version 1 > "$E/cargo-metadata.json"
+          cargo tree --locked -p symthaea-xenia-systemd-durable-profile > "$E/durable-profile-cargo-tree.txt"
 
       # Compile/test the exact Agency Kernel lineage against Cargo's reconciled
       # candidate even when the checked-in lock is stale. This separates source
@@ -135,6 +151,18 @@ jobs:
           -p symthaea-system-attempt-evidence
           -p symthaea-xenia-systemd-durable-profile
           --all-targets -- -D warnings
+
+      - name: Mark source qualification complete
+        run: echo PASS > "$RUNNER_TEMP/agency-kernel-evidence/source-qualification.txt"
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agency-kernel-qualification-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/agency-kernel-evidence
+          if-no-files-found: warn
+          retention-days: 14
 
       # Qualification is green only after the exact Cargo-generated candidate is
       # checked in. This makes lock freshness a durable repository invariant.
