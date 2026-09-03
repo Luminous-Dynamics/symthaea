@@ -4,9 +4,12 @@ use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use crate::interoception_qualification::{
-    verify_actions_archive, ActionsArchiveManifest, VerifiedActionsGate,
-    ACTIONS_ARCHIVE_SCHEMA_VERSION, VERIFIER_POLICY_VERSION,
+use crate::{
+    interoception_archive_fs::{canonical_closed_root, closed_relative_file},
+    interoception_qualification::{
+        verify_actions_archive, ActionsArchiveManifest, VerifiedActionsGate,
+        ACTIONS_ARCHIVE_SCHEMA_VERSION, VERIFIER_POLICY_VERSION,
+    },
 };
 
 #[derive(Debug, Deserialize)]
@@ -21,8 +24,9 @@ struct RunIdentity {
 /// Build `manifest.json` from immutable raw GitHub API responses already saved as
 /// `run.json`, `jobs.json`, plus the exact workflow source saved as `workflow.yml`.
 ///
-/// The builder never fetches a "latest" attempt.  The supplied `run.json` itself
+/// The builder never fetches a "latest" attempt. The supplied `run.json` itself
 /// carries the exact run ID and attempt that become part of the archive identity.
+/// Archive roots and objects must be regular, non-symlink filesystem objects.
 pub fn build_actions_archive(
     archive_dir: &Path,
     gate_id: &str,
@@ -32,6 +36,7 @@ pub fn build_actions_archive(
     if repository != "Luminous-Dynamics/symthaea" {
         bail!("unexpected repository identity {repository}");
     }
+    canonical_closed_root(archive_dir)?;
 
     let manifest_path = archive_dir.join("manifest.json");
     if manifest_path.exists() {
@@ -41,18 +46,14 @@ pub fn build_actions_archive(
         );
     }
 
-    let run_path = archive_dir.join("run.json");
-    let jobs_path = archive_dir.join("jobs.json");
-    let workflow_file = archive_dir.join("workflow.yml");
-    for path in [&run_path, &jobs_path, &workflow_file] {
-        if !path.is_file() {
-            bail!("required Actions archive object is missing: {}", path.display());
-        }
-    }
+    let run_path = closed_relative_file(archive_dir, "run.json")?;
+    let jobs_path = closed_relative_file(archive_dir, "jobs.json")?;
+    let workflow_file = closed_relative_file(archive_dir, "workflow.yml")?;
 
     let run_bytes = fs::read(&run_path)
         .with_context(|| format!("read archived run JSON {}", run_path.display()))?;
-    let run: RunIdentity = serde_json::from_slice(&run_bytes).context("parse archived run identity")?;
+    let run: RunIdentity =
+        serde_json::from_slice(&run_bytes).context("parse archived run identity")?;
     let (workflow, workflow_path) = required_actions_identity(gate_id)?;
     if run.name != workflow || run.path != workflow_path {
         bail!(
@@ -81,27 +82,28 @@ pub fn build_actions_archive(
         workflow_file_sha256: sha256_file(&workflow_file)?,
     };
 
-    let manifest_bytes = serde_json::to_vec(&manifest).context("serialize Actions archive manifest")?;
+    let manifest_bytes =
+        serde_json::to_vec(&manifest).context("serialize Actions archive manifest")?;
     fs::write(&manifest_path, manifest_bytes)
         .with_context(|| format!("write Actions archive manifest {}", manifest_path.display()))?;
 
-    // Building the manifest is not enough: immediately execute the same fail-closed
-    // verifier used by promotion authorization so an incomplete jobs archive, wrong
-    // conclusion, wrong attempt, or workflow/source mismatch cannot be mistaken for a
-    // completed archive.
     verify_actions_archive(archive_dir, repo_root)
 }
 
 fn required_actions_identity(gate_id: &str) -> Result<(&'static str, &'static str)> {
     match gate_id {
         "workspace_ci" => Ok(("CI", ".github/workflows/ci.yml")),
-        "showroom_integrity" => Ok(("Showroom Integrity", ".github/workflows/showroom-integrity.yml")),
+        "showroom_integrity" => Ok((
+            "Showroom Integrity",
+            ".github/workflows/showroom-integrity.yml",
+        )),
         other => bail!("unsupported Actions qualification gate {other}"),
     }
 }
 
 fn sha256_file(path: &Path) -> Result<String> {
-    let mut file = fs::File::open(path).with_context(|| format!("open {} for hashing", path.display()))?;
+    let mut file =
+        fs::File::open(path).with_context(|| format!("open {} for hashing", path.display()))?;
     let mut hasher = Sha256::new();
     let mut buf = [0_u8; 64 * 1024];
     loop {
