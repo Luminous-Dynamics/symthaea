@@ -19,6 +19,9 @@ on:
 permissions:
   contents: read
 
+# The small authority/runtime crates declare Rust 1.94 MSRV. Root Symthaea is
+# intentionally a separate integration claim and follows the repository-pinned
+# 1.96 toolchain because current root dependencies require Rust >= 1.95.
 env:
   RUSTUP_TOOLCHAIN: 1.94.0
 
@@ -30,21 +33,23 @@ jobs:
   telemetry-format:
     name: IoT telemetry source format
     runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Install exact Rust formatter
-        run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt
+      - name: Install workspace Rust formatter
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
 
       - name: Verify exact checkout and toolchain
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
           fi
-          rustc --version | grep -F 'rustc 1.94.0'
-          cargo --version | grep -F 'cargo 1.94.0'
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
 
       - name: Check parser and trust-boundary formatting
         run: >-
@@ -53,7 +58,7 @@ jobs:
           src/cognitive_loop/managers/survival_manager.rs
 
   runtime-implementation:
-    name: IoT crash-safe runtime implementation
+    name: IoT crash-safe runtime implementation (MSRV 1.94)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -108,23 +113,25 @@ jobs:
           --all-targets -- -D warnings
 
   telemetry-boundary:
-    name: IoT parser and survival trust boundary
+    name: IoT parser and survival trust boundary (workspace 1.96)
     runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Install exact Rust compiler
-        run: rustup toolchain install 1.94.0 --profile minimal
+      - name: Install workspace Rust compiler
+        run: rustup toolchain install 1.96.0 --profile minimal
 
       - name: Verify exact checkout and toolchain
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
           fi
-          rustc --version | grep -F 'rustc 1.94.0'
-          cargo --version | grep -F 'cargo 1.94.0'
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
 
       - name: Focused sensor parser/resource regressions
         run: cargo test -p symthaea --no-default-features --features survival --lib sensor_iot::tests
@@ -133,7 +140,7 @@ jobs:
         run: cargo test -p symthaea --no-default-features --features survival --lib survival_manager::tests
 
   locked-metadata:
-    name: IoT runtime locked metadata
+    name: IoT runtime locked metadata (MSRV 1.94)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
