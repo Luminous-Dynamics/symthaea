@@ -1,0 +1,23 @@
+[package]
+name = "symthaea-iot-egress-guard"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Fresh verified-posture gate before authenticated cyber-physical egress"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "attestation", "cyber-physical", "security"]
+categories = ["embedded", "authentication"]
+
+[dependencies]
+symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-actuation = { path = "../symthaea-iot-actuation" }
+symthaea-iot-authority = { path = "../symthaea-iot-authority" }
+symthaea-iot-durable-runtime = { path = "../symthaea-iot-durable-runtime" }
+symthaea-iot-execution = { path = "../symthaea-iot-execution" }
+symthaea-iot-policy = { path = "../symthaea-iot-policy" }
+symthaea-iot-posture = { path = "../symthaea-iot-posture" }
+thiserror = { workspace = true }
