@@ -9,6 +9,7 @@
 /// # Architecture
 ///
 /// - `boot_protocol` — fail-open typed boot telemetry consumer
+/// - `renderer_bridge` — validated semantic ecology projection with explicit legacy fallback
 /// - `framebuffer` — DRM device management, dumb buffer allocation, mmap
 /// - `handoff` — post-DRM-release diagnostic acknowledgement
 /// - `mycelium` — L-system branch growth, Bresenham rendering, node pulsing
@@ -17,8 +18,15 @@
 /// - `color` — Solarpunk RGBA palette with interpolation and compositing
 pub mod boot_protocol;
 pub mod color;
+#[path = "ecology_renderer.rs"]
+pub mod ecology_renderer_base;
+pub mod ecology_renderer_fidelity_v2;
+pub mod ecology_renderer_holo;
+pub mod ecology_renderer_identity;
 pub mod framebuffer;
 pub mod handoff;
+pub mod microtype;
 pub mod mycelium;
 pub mod perf;
 pub mod progress;
+pub mod renderer_bridge;
