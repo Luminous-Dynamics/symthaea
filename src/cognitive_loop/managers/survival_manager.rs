@@ -16,6 +16,10 @@
 //! [`VerifiedIoTReading`] minted by a crate-owned trusted ingress boundary may
 //! enter those paths.
 //!
+//! Verified and untrusted telemetry use physically separate [`IoTSensorAdapter`]
+//! instances. Unauthenticated sensor-series churn therefore cannot poison or fill
+//! the history/buffer state used to interpret verified readings.
+//!
 //! `VerifiedIoTReading` is not itself cryptographic proof. Its constructor is
 //! crate-private so a future Xenia/HAL ingress adapter can mint it only after
 //! source authentication and device-appropriate evidence verification. External
@@ -31,7 +35,9 @@
 use crate::cognitive_loop::subsystem_trait::{CognitiveSubsystem, CycleSnapshot, SubsystemOutput};
 use crate::swarm::mesh::sensor_forecast::{DemandForecast, DemandForecaster};
 use crate::swarm::mesh::sensor_iot::{
-    AlertSeverity, IoTReading, IoTSensorAdapter, ResourceAlert, ResourceType,
+    AlertSeverity, IoTReading, IoTSensorAdapter, MAX_IOT_FIELD_NAME_BYTES,
+    MAX_IOT_NUMERIC_FIELDS, MAX_IOT_PAYLOAD_BYTES, MAX_IOT_TOPIC_BYTES, ResourceAlert,
+    ResourceType,
 };
 
 /// Neuromodulatory gain: scarcity → NE + cortisol (stress response).
@@ -58,8 +64,12 @@ pub struct SurvivalTelemetry {
     pub food_days: f64,
     /// Whether an emergency is currently active.
     pub emergency_active: bool,
-    /// Number of observed sensors, including untrusted discovery telemetry.
+    /// Number of verified sensor series retained by the authoritative adapter.
     pub sensor_count: usize,
+    /// Number of untrusted sensor series retained for observation-only diagnostics.
+    pub untrusted_sensor_count: usize,
+    /// Number of untrusted readings rejected by the parser/ingest resource envelope.
+    pub untrusted_rejected_readings: u64,
     /// Number of active authoritative alerts.
     pub alert_count: usize,
     /// Number of active forecasts derived from verified telemetry.
@@ -83,7 +93,8 @@ impl VerifiedIoTReading {
     /// authentication/attestation checks.
     ///
     /// This function is crate-private by design. It does not perform cryptography;
-    /// the caller owns that proof obligation.
+    /// the caller owns that proof obligation. The reading must also satisfy the
+    /// same basic allocation/value bounds enforced at the parser boundary.
     pub(crate) fn from_trusted_ingress(
         reading: IoTReading,
         source_principal: impl Into<String>,
@@ -91,7 +102,11 @@ impl VerifiedIoTReading {
         sequence: u64,
     ) -> Option<Self> {
         let source_principal = source_principal.into();
-        if source_principal.is_empty() || evidence_digest == [0; 32] || sequence == 0 {
+        if source_principal.is_empty()
+            || evidence_digest == [0; 32]
+            || sequence == 0
+            || !reading_within_ingress_bounds(&reading)
+        {
             return None;
         }
         Some(Self {
@@ -143,8 +158,10 @@ pub enum SurvivalEvent {
 
 /// Survival Manager — monitors physical infrastructure via IoT sensors.
 pub struct SurvivalManager {
-    /// IoT sensor adapter.
-    sensor_adapter: IoTSensorAdapter,
+    /// Adapter state for verified telemetry only.
+    verified_sensor_adapter: IoTSensorAdapter,
+    /// Physically separate adapter state for untrusted observation-only telemetry.
+    untrusted_sensor_adapter: IoTSensorAdapter,
     /// Demand forecaster. Only verified telemetry is admitted.
     forecaster: DemandForecaster,
     /// Pending events.
@@ -172,7 +189,8 @@ impl SurvivalManager {
     /// Create a new SurvivalManager.
     pub fn new(enabled: bool) -> Self {
         Self {
-            sensor_adapter: IoTSensorAdapter::new(),
+            verified_sensor_adapter: IoTSensorAdapter::new(),
+            untrusted_sensor_adapter: IoTSensorAdapter::new(),
             forecaster: DemandForecaster::new(),
             pending_events: Vec::new(),
             enabled,
@@ -192,9 +210,17 @@ impl SurvivalManager {
         }
     }
 
-    /// Access the IoT adapter.
+    /// Access the authoritative/verified sensor adapter.
+    ///
+    /// Parsing is stateless and may still be performed through this reference, but
+    /// only `VerifiedSensorReading` events can mutate this adapter's retained state.
     pub fn sensor_adapter(&self) -> &IoTSensorAdapter {
-        &self.sensor_adapter
+        &self.verified_sensor_adapter
+    }
+
+    /// Access observation-only untrusted sensor state.
+    pub fn untrusted_sensor_adapter(&self) -> &IoTSensorAdapter {
+        &self.untrusted_sensor_adapter
     }
 
     /// Access the forecaster.
@@ -245,6 +271,10 @@ impl SurvivalManager {
         {
             return;
         }
+
+        // The trusted-ingress constructor already enforces the basic resource
+        // envelope. Advance replay state before any authoritative cognition so a
+        // duplicate cannot retrigger those effects.
         self.verified_sequences
             .insert(replay_domain, verified.sequence);
 
@@ -257,7 +287,7 @@ impl SurvivalManager {
             self.resource_levels.insert(type_name, value);
         }
 
-        let alerts = self.sensor_adapter.ingest(verified.reading);
+        let alerts = self.verified_sensor_adapter.ingest(verified.reading);
         for alert in &alerts {
             if alert.severity >= AlertSeverity::Critical {
                 self.emergency_active = true;
@@ -274,8 +304,9 @@ impl SurvivalManager {
             match event {
                 SurvivalEvent::SensorReading(reading) => {
                     // Parser-originated data remains useful for observability, but it
-                    // cannot mutate forecasts/resources/emergency cognition.
-                    let alerts = self.sensor_adapter.ingest(reading);
+                    // cannot mutate verified adapter history, forecasts, resources,
+                    // emergency state, or neuromodulation.
+                    let alerts = self.untrusted_sensor_adapter.ingest(reading);
                     self.untrusted_alerts.extend(alerts);
                 }
                 SurvivalEvent::VerifiedSensorReading(verified) => {
@@ -314,7 +345,9 @@ impl SurvivalManager {
                 .copied()
                 .unwrap_or(0.0), // Proxy
             emergency_active: self.emergency_active,
-            sensor_count: self.sensor_adapter.sensor_count(),
+            sensor_count: self.verified_sensor_adapter.sensor_count(),
+            untrusted_sensor_count: self.untrusted_sensor_adapter.sensor_count(),
+            untrusted_rejected_readings: self.untrusted_sensor_adapter.rejected_readings(),
             alert_count: self.recent_alerts.len(),
             forecast_count: self.forecaster.resource_count(),
         };
@@ -380,7 +413,7 @@ impl CognitiveSubsystem for SurvivalManager {
         // Layout: [emergency_active: u8 = 1][enabled: u8 = 1]
         // Total: 2 bytes
         //
-        // Note: resource_levels (HashMap), sensor_adapter, forecaster, and
+        // Note: resource_levels, verified/untrusted adapter state, forecaster, and
         // verified sequence state contain complex state not serialized here.
         // Until a durable ingress checkpoint lands, a restart must reacquire
         // fresh verified sequence evidence before consequential use.
@@ -405,6 +438,17 @@ impl CognitiveSubsystem for SurvivalManager {
     }
 }
 
+fn reading_within_ingress_bounds(reading: &IoTReading) -> bool {
+    !reading.sensor_id.is_empty()
+        && reading.sensor_id.len() <= MAX_IOT_TOPIC_BYTES
+        && reading.raw_payload.len() <= MAX_IOT_PAYLOAD_BYTES
+        && !reading.values.is_empty()
+        && reading.values.len() <= MAX_IOT_NUMERIC_FIELDS
+        && reading.values.iter().all(|(key, value)| {
+            !key.is_empty() && key.len() <= MAX_IOT_FIELD_NAME_BYTES && value.is_finite()
+        })
+}
+
 // ============================================================================
 // TESTS
 // ============================================================================
@@ -413,6 +457,7 @@ impl CognitiveSubsystem for SurvivalManager {
 mod tests {
     use super::*;
     use crate::cognitive_loop::subsystem_trait::CycleSnapshot;
+    use crate::swarm::mesh::sensor_iot::MAX_TRACKED_SENSOR_SERIES;
     use std::collections::HashMap;
 
     fn default_snapshot() -> CycleSnapshot {
@@ -489,7 +534,39 @@ mod tests {
         assert!(!mgr.is_emergency());
         assert_eq!(mgr.telemetry().water_pct, 0.0);
         assert_eq!(mgr.telemetry().forecast_count, 0);
+        assert_eq!(mgr.telemetry().sensor_count, 0);
+        assert_eq!(mgr.telemetry().untrusted_sensor_count, 1);
         assert_eq!(output.arousal_delta, 0.0);
+    }
+
+    #[test]
+    fn untrusted_series_churn_cannot_fill_verified_history() {
+        let mut mgr = SurvivalManager::new(true);
+        for i in 0..=MAX_TRACKED_SENSOR_SERIES {
+            mgr.inject_event(SurvivalEvent::SensorReading(IoTReading {
+                sensor_id: format!("untrusted-{i}"),
+                values: HashMap::from([("x".to_string(), i as f64)]),
+                platform: crate::swarm::mesh::sensor_iot::IoTPlatform::Generic,
+                timestamp_secs: i as u64,
+                raw_payload: String::new(),
+            }));
+        }
+        mgr.process(&default_snapshot());
+
+        assert_eq!(mgr.sensor_adapter().sensor_count(), 0);
+        assert_eq!(
+            mgr.untrusted_sensor_adapter().sensor_count(),
+            MAX_TRACKED_SENSOR_SERIES
+        );
+        assert_eq!(mgr.untrusted_sensor_adapter().rejected_readings(), 1);
+        assert!(!mgr.is_emergency());
+
+        mgr.inject_event(SurvivalEvent::VerifiedSensorReading(
+            verified_water_reading(1),
+        ));
+        mgr.process(&default_snapshot());
+        assert_eq!(mgr.sensor_adapter().sensor_count(), 1);
+        assert!(mgr.is_emergency());
     }
 
     #[test]
@@ -505,6 +582,8 @@ mod tests {
         assert!(mgr.is_emergency());
         assert!(mgr.telemetry().water_pct > 0.0);
         assert!(mgr.telemetry().forecast_count > 0);
+        assert_eq!(mgr.telemetry().sensor_count, 1);
+        assert_eq!(mgr.telemetry().untrusted_sensor_count, 0);
         assert!(output.arousal_delta > 0.0);
     }
 
@@ -530,7 +609,7 @@ mod tests {
     }
 
     #[test]
-    fn verified_ingress_rejects_empty_self_asserted_evidence() {
+    fn verified_ingress_rejects_empty_or_unbounded_self_asserted_evidence() {
         assert!(
             VerifiedIoTReading::from_trusted_ingress(
                 critical_water_reading(),
@@ -544,6 +623,18 @@ mod tests {
             VerifiedIoTReading::from_trusted_ingress(
                 critical_water_reading(),
                 "",
+                [1; 32],
+                1,
+            )
+            .is_none()
+        );
+
+        let mut oversized = critical_water_reading();
+        oversized.sensor_id = "x".repeat(MAX_IOT_TOPIC_BYTES + 1);
+        assert!(
+            VerifiedIoTReading::from_trusted_ingress(
+                oversized,
+                "device:tank-controller",
                 [1; 32],
                 1,
             )
