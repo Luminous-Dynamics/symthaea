@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-iot-xenia-hybrid-verifier"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Fixed independent Ed25519 + ML-DSA-65 verifier for Xenia physical-effect receipts"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "security", "xenia", "post-quantum"]
+categories = ["cryptography", "embedded"]
+
+[dependencies]
+ed25519-dalek = { workspace = true }
+fips204 = { version = "=0.4.6", default-features = false, features = ["ml-dsa-65"] }
+symthaea-iot-transport-receipt = { path = "../symthaea-iot-transport-receipt" }

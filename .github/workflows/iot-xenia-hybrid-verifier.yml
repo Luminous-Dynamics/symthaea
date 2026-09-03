@@ -1,0 +1,138 @@
+name: IoT Xenia Hybrid Verifier
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-xenia-hybrid-verifier/**'
+      - 'crates/bridges/symthaea-iot-transport-receipt/**'
+      - '.github/workflows/iot-xenia-hybrid-verifier.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-xenia-hybrid-verifier-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-format:
+    name: Xenia hybrid verifier source format (Rust 1.96)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact formatter
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Check fixed verifier formatting
+        run: rustfmt --edition 2024 --check crates/bridges/symthaea-iot-xenia-hybrid-verifier/src/lib.rs
+
+  dependency-admission:
+    name: Exact fips204 dependency admission (MSRV 1.94)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.94.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact compiler and Clippy
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      - name: Resolve candidate and permit exactly one reviewed external package
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          before = tomllib.loads(Path('/tmp/Cargo.lock.before').read_text())
+          after = tomllib.loads(Path('Cargo.lock').read_text())
+
+          def sourced(doc):
+              return {
+                  (p['name'], p['version'], p['source']): p
+                  for p in doc.get('package', [])
+                  if 'source' in p
+              }
+
+          b = sourced(before)
+          a = sourced(after)
+          added = sorted(set(a) - set(b))
+          removed = sorted(set(b) - set(a))
+          changed = sorted(k for k in set(a) & set(b) if a[k] != b[k])
+
+          print('added external package identities:', added)
+          print('removed external package identities:', removed)
+          print('changed existing external package identities:', changed)
+          for key in added:
+              print('ADDED PACKAGE RECORD:', a[key])
+
+          expected = {
+              ('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')
+          }
+          assert set(added) == expected, f'unreviewed external package delta: {added!r}'
+          assert not removed, f'external package removal is not allowed: {removed!r}'
+          assert not changed, f'existing external package record changed: {changed!r}'
+
+          package = a[next(iter(expected))]
+          assert package.get('checksum') == 'c9fb5a367b9846933e271a3c2a992930743f82ae5e8cb7faa780715a80fa0b15', package
+
+          # Cargo version-qualifies dependency labels only when a package name is
+          # ambiguous in the complete lock. Compare dependency families rather than
+          # overfitting this admission gate to that rendering detail.
+          actual_dependency_families = {
+              dep.split(' ', 1)[0] for dep in package.get('dependencies', [])
+          }
+          expected_dependency_families = {'rand_core', 'sha2', 'sha3', 'zeroize'}
+          assert actual_dependency_families == expected_dependency_families, (
+              'fips204 dependency families differ from reviewed closure',
+              actual_dependency_families,
+          )
+          PY
+
+      - name: Check fixed verifier
+        run: cargo check -p symthaea-iot-xenia-hybrid-verifier --all-targets
+
+      - name: Test fixed verifier
+        run: cargo test -p symthaea-iot-xenia-hybrid-verifier --all-targets
+
+      - name: Clippy fixed verifier
+        run: cargo clippy -p symthaea-iot-xenia-hybrid-verifier --all-targets -- -D warnings
+
+      - name: Show generated reviewed lock record
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+          doc = tomllib.loads(Path('Cargo.lock').read_text())
+          for package in doc.get('package', []):
+              if package.get('name') == 'fips204' and package.get('version') == '0.4.6':
+                  print(package)
+          PY
