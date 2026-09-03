@@ -20,3 +20,4 @@ symthaea-xenia-authority = { path = "../symthaea-xenia-authority" }
 [dev-dependencies]
 blake3 = { workspace = true }
 ed25519-dalek = { workspace = true }
+symthaea-executor-workload = { path = "../symthaea-executor-workload" }
