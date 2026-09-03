@@ -236,15 +236,28 @@ in {
           UMask = if cfg.telemetry.enable then "0007" else "0022";
 
           NoNewPrivileges = true;
+          ProtectSystem = "full";
           ProtectHome = true;
           ProtectKernelTunables = true;
           ProtectKernelModules = true;
+          ProtectKernelLogs = true;
           ProtectControlGroups = true;
+          ProtectClock = true;
+          ProtectHostname = true;
           RestrictNamespaces = true;
           LockPersonality = true;
+          MemoryDenyWriteExecute = true;
           RestrictRealtime = true;
           RestrictSUIDSGID = true;
+          RestrictAddressFamilies = [ "AF_UNIX" ];
+          SystemCallArchitectures = "native";
           PrivateTmp = true;
+
+          # Presentation needs exactly one DRM primary node. DevicePolicy=closed
+          # retains systemd's standard pseudo-devices (including /dev/urandom)
+          # while denying access to unrelated hardware.
+          DevicePolicy = "closed";
+          DeviceAllow = [ "${cfg.device} rw" ];
         };
       };
 
