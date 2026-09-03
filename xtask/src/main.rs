@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod interoception_actions_archive;
+mod interoception_github_live;
 mod interoception_qualification;
 mod manifest;
 mod rhn_sweep;
@@ -75,12 +76,19 @@ enum Commands {
         #[arg(long)]
         repo_root: Option<PathBuf>,
     },
+    /// Compare a durable Actions archive against the live exact GitHub run attempt.
+    InteroceptionVerifyActionsLive {
+        #[arg(long)]
+        archive_dir: PathBuf,
+        #[arg(long)]
+        repo_root: Option<PathBuf>,
+    },
     /// Inspect only the structural v0.1 bundle state. This never authorizes promotion.
     InteroceptionInspectBundle {
         #[arg(long)]
         bundle: PathBuf,
     },
-    /// Verify all five required evidence packages and emit promotion authorization.
+    /// Verify all five evidence packages plus live exact-attempt GitHub state and authorize promotion.
     InteroceptionAuthorizePromotion {
         #[arg(long)]
         bundle: PathBuf,
@@ -261,6 +269,16 @@ fn main() -> anyhow::Result<()> {
             )?;
             println!("{}", serde_json::to_string_pretty(&verified)?);
         }
+        Commands::InteroceptionVerifyActionsLive {
+            archive_dir,
+            repo_root,
+        } => {
+            let verified = interoception_github_live::verify_actions_live(
+                &archive_dir,
+                repo_root.as_deref(),
+            )?;
+            println!("{}", serde_json::to_string_pretty(&verified)?);
+        }
         Commands::InteroceptionInspectBundle { bundle } => {
             let report = interoception_qualification::inspect_structural_bundle(&bundle)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
@@ -275,7 +293,7 @@ fn main() -> anyhow::Result<()> {
             showroom_integrity,
             out,
         } => {
-            let attestation = interoception_qualification::authorize_promotion(
+            let envelope = interoception_github_live::authorize_promotion_live(
                 &bundle,
                 &repo_root,
                 &local_fmt,
@@ -285,7 +303,7 @@ fn main() -> anyhow::Result<()> {
                 &showroom_integrity,
                 &out,
             )?;
-            println!("{}", serde_json::to_string_pretty(&attestation)?);
+            println!("{}", serde_json::to_string_pretty(&envelope)?);
         }
     }
     Ok(())
