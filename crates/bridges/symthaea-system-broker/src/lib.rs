@@ -182,6 +182,9 @@ impl RestartPlan {
 pub enum DispatchEvidence {
     /// Backend proved the restart request was accepted/applied.
     Applied,
+    /// Backend proved that no external dispatch occurred, so the reservation may
+    /// be released and a later fresh attempt can be considered.
+    NotDispatched { diagnostic_digest: Digest32 },
     /// A process was dispatched but the broker cannot prove whether/how much of
     /// the external effect occurred. The use remains charged.
     OutcomeUnknown { diagnostic_digest: Digest32 },
@@ -334,10 +337,17 @@ impl ServiceBackend for SystemctlBackend {
         unit: &ServiceUnit,
     ) -> Result<DispatchEvidence, Self::Error> {
         self.require_local(host)?;
-        let output = Command::new("systemctl")
+        let output = match Command::new("systemctl")
             .args(["restart", "--", unit.as_str()])
             .output()
-            .map_err(SystemctlError::Spawn)?;
+        {
+            Ok(output) => output,
+            Err(error) => {
+                return Ok(DispatchEvidence::NotDispatched {
+                    diagnostic_digest: digest_text(&error.to_string()),
+                });
+            }
+        };
         if output.status.success() {
             Ok(DispatchEvidence::Applied)
         } else {
@@ -367,6 +377,9 @@ pub struct SystemdRecoveryBroker<B, S> {
     checkpoint: Option<GrantAccountCheckpoint>,
     backend: B,
     store: S,
+    /// Persistence/checkpoint uncertainty is a latching containment condition.
+    /// A fresh broker must be reconstructed from an externally trusted head.
+    contained: bool,
 }
 
 impl<B, S> SystemdRecoveryBroker<B, S>
@@ -382,6 +395,7 @@ where
             checkpoint: None,
             backend,
             store,
+            contained: false,
         }
     }
 
@@ -406,11 +420,16 @@ where
             checkpoint: Some(checkpoint),
             backend,
             store,
+            contained: false,
         })
     }
 
     pub fn account_use_state(&self) -> GrantUseState {
         self.account.authority_use_state()
+    }
+
+    pub fn is_contained(&self) -> bool {
+        self.contained
     }
 
     pub fn current_checkpoint_head(&self) -> Result<Option<CheckpointHead>, BrokerError> {
@@ -434,6 +453,9 @@ where
         authority_context: AuthorityContext,
         negative_facts: &[NegativeAuthorityFact],
     ) -> Result<RecoveryReceipt, BrokerError> {
+        if self.contained {
+            return Err(BrokerError::ContainmentRequired);
+        }
         self.validate_plan_and_authority(plan, authority_context, negative_facts)?;
 
         // Independent re-observation before reserving authority. The authorized
@@ -452,18 +474,26 @@ where
             .map_err(BrokerError::Runtime)?;
 
         // The reservation MUST be durably acknowledged before an effect is
-        // dispatched. If persistence fails, release the never-dispatched use.
+        // dispatched. If persistence is uncertain, this broker latches into
+        // containment and must be reconstructed from a trusted checkpoint head.
         if let Err(error) = self.persist_successor() {
-            self.account
-                .cancel_before_dispatch(&reservation_id)
-                .map_err(BrokerError::Runtime)?;
+            let _ = self.account.cancel_before_dispatch(&reservation_id);
             return Err(error);
         }
 
         // Close the time-of-check/time-of-use window after the potentially slow
-        // durability step. Any material service-state change invalidates this
-        // exact plan and releases the reservation before actuation.
-        let predispatch = self.observe_backend(&plan.host, &plan.unit)?;
+        // durability step. A failed read before dispatch is known to precede
+        // actuation, so release the reservation and persist that release.
+        let predispatch = match self.observe_backend(&plan.host, &plan.unit) {
+            Ok(value) => value,
+            Err(error) => {
+                self.account
+                    .cancel_before_dispatch(&reservation_id)
+                    .map_err(BrokerError::Runtime)?;
+                self.persist_successor()?;
+                return Err(error);
+            }
+        };
         if predispatch.digest() != plan.world_digest {
             self.account
                 .cancel_before_dispatch(&reservation_id)
@@ -475,10 +505,8 @@ where
         let dispatch = match self.backend.restart(&plan.host, &plan.unit) {
             Ok(value) => value,
             Err(error) => {
-                // Backend failure means the typed backend could not establish a
-                // dispatch result. Conservatively move to unknown unless the
-                // backend failed before spawning; the trait cannot prove that
-                // distinction generically, so this branch remains charged.
+                // An unclassified backend error cannot prove that no external
+                // effect occurred, so remain conservatively charged.
                 self.account
                     .mark_outcome_unknown(&reservation_id)
                     .map_err(BrokerError::Runtime)?;
@@ -495,6 +523,13 @@ where
                     .commit_observed(&reservation_id)
                     .map_err(BrokerError::Runtime)?;
                 RecoveryOutcome::Applied
+            }
+            DispatchEvidence::NotDispatched { diagnostic_digest } => {
+                self.account
+                    .cancel_before_dispatch(&reservation_id)
+                    .map_err(BrokerError::Runtime)?;
+                self.persist_successor()?;
+                return Err(BrokerError::BackendNotDispatched(diagnostic_digest));
             }
             DispatchEvidence::OutcomeUnknown { .. } => {
                 self.account
@@ -625,14 +660,32 @@ where
         let checkpoint = match &self.checkpoint {
             Some(previous) => GrantAccountCheckpoint::successor(previous, &self.grant, snapshot),
             None => GrantAccountCheckpoint::first(&self.grant, snapshot),
-        }
-        .map_err(BrokerError::Checkpoint)?;
-        let expected_head = checkpoint.head().map_err(BrokerError::Checkpoint)?;
-        let acknowledged = self
-            .store
-            .persist(&checkpoint)
-            .map_err(|error| BrokerError::CheckpointStore(digest_text(&error.to_string())))?;
+        };
+        let checkpoint = match checkpoint {
+            Ok(value) => value,
+            Err(error) => {
+                self.contained = true;
+                return Err(BrokerError::Checkpoint(error));
+            }
+        };
+        let expected_head = match checkpoint.head() {
+            Ok(value) => value,
+            Err(error) => {
+                self.contained = true;
+                return Err(BrokerError::Checkpoint(error));
+            }
+        };
+        let acknowledged = match self.store.persist(&checkpoint) {
+            Ok(value) => value,
+            Err(error) => {
+                self.contained = true;
+                return Err(BrokerError::CheckpointStore(digest_text(
+                    &error.to_string(),
+                )));
+            }
+        };
         if acknowledged != expected_head {
+            self.contained = true;
             return Err(BrokerError::CheckpointHeadMismatch);
         }
         self.checkpoint = Some(checkpoint);
@@ -717,6 +770,8 @@ pub enum BrokerError {
     StaleWorld,
     #[error("service is already healthy; restart is not minimally necessary")]
     ServiceAlreadyHealthy,
+    #[error("broker is contained after checkpoint/persistence uncertainty; reconstruct from a trusted head")]
+    ContainmentRequired,
     #[error("runtime accounting error: {0}")]
     Runtime(#[from] RuntimeAccountingError),
     #[error("checkpoint validation failed: {0}")]
@@ -729,6 +784,8 @@ pub enum BrokerError {
     MissingCheckpoint,
     #[error("backend observation failed; diagnostic commitment {0:?}")]
     BackendObservation(Digest32),
+    #[error("backend proved the restart was not dispatched; diagnostic commitment {0:?}")]
+    BackendNotDispatched(Digest32),
     #[error("backend dispatch outcome is unknown; diagnostic commitment {0:?}")]
     BackendOutcomeUnknown(Digest32),
 }
@@ -936,7 +993,7 @@ mod tests {
     }
 
     #[test]
-    fn checkpoint_failure_prevents_dispatch_and_releases_use() {
+    fn checkpoint_failure_prevents_dispatch_and_latches_containment() {
         let before = obs("failed", "failed", "inv-1");
         let p = plan(&before);
         let grant = grant_for(&p);
@@ -959,8 +1016,46 @@ mod tests {
             ),
             Err(BrokerError::CheckpointStore(_))
         ));
+        assert!(broker.is_contained());
         assert_eq!(broker.account_use_state(), GrantUseState::default());
         assert_eq!(broker.backend.restart_calls, 0);
+        assert!(matches!(
+            broker.recover_once(
+                &p,
+                ExecutionId("exec-after-containment".into()),
+                ReservationId("res-after-containment".into()),
+                ctx(),
+                &[],
+            ),
+            Err(BrokerError::ContainmentRequired)
+        ));
+    }
+
+    #[test]
+    fn proven_not_dispatched_releases_capacity() {
+        let before = obs("failed", "failed", "inv-1");
+        let p = plan(&before);
+        let grant = grant_for(&p);
+        let backend = FakeBackend::new(
+            vec![before.clone(), before],
+            Ok(DispatchEvidence::NotDispatched {
+                diagnostic_digest: digest_text("spawn failed"),
+            }),
+        );
+        let mut broker = SystemdRecoveryBroker::new(grant, backend, FakeStore::default());
+        assert!(matches!(
+            broker.recover_once(
+                &p,
+                ExecutionId("exec-not-dispatched".into()),
+                ReservationId("res-not-dispatched".into()),
+                ctx(),
+                &[],
+            ),
+            Err(BrokerError::BackendNotDispatched(_))
+        ));
+        assert_eq!(broker.account_use_state(), GrantUseState::default());
+        assert_eq!(broker.backend.restart_calls, 1);
+        assert!(!broker.is_contained());
     }
 
     #[test]
