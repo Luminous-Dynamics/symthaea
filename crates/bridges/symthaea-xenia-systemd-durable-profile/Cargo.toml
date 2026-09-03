@@ -22,3 +22,4 @@ symthaea-xenia-authority = { path = "../symthaea-xenia-authority" }
 
 [dev-dependencies]
 ed25519-dalek = { workspace = true }
+rusqlite = { workspace = true }
