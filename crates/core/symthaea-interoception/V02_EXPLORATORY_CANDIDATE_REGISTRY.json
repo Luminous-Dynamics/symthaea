@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "status": "normative-design-only",
+  "base_v01_sha": "1007949d5c60fd2d7dd650e8bb4521e2b2803c48",
+  "candidate_set_id": "affective-emergence-v0.2-exploratory-e00-e11-v1",
+  "primary_information_class": "OfflinePrefixCausal",
+  "primary_forecast_policy": "ObservedDrivePersistence",
+  "diagnostic_forecast_policies": [
+    "NativeZeroInputRecovery",
+    "KinematicVelocity"
+  ],
+  "preprocessing_policy": "NoneOrStructuralOnly",
+  "evaluator_persistent_state_policy": "NoneAcrossEvaluationCoordinates",
+  "candidates": [
+    {
+      "role": "E00",
+      "candidate_id": "e00_constant_zero_v1",
+      "relation": "BaselineNull",
+      "weighting": "None",
+      "aggregation": "ScalarConstant",
+      "temporal": "T0Instantaneous",
+      "forecast": "None",
+      "history": "H0CurrentNativeStateOnly",
+      "purpose": "null floor"
+    },
+    {
+      "role": "E01",
+      "candidate_id": "e01_r0_w1_a3_t0_h0_viability_mean_v1",
+      "relation": "R0CurrentBurden",
+      "weighting": "W1ViabilityWeightOnly",
+      "aggregation": "A3WeightedMeanAllDeclared",
+      "temporal": "T0Instantaneous",
+      "forecast": "None",
+      "history": "H0CurrentNativeStateOnly",
+      "purpose": "current viability burden"
+    },
+    {
+      "role": "E02",
+      "candidate_id": "e02_current_drive_magnitude_v1",
+      "relation": "BaselineReactive",
+      "weighting": "None",
+      "aggregation": "EuclideanNormEightChannelDrive",
+      "temporal": "T0Instantaneous",
+      "forecast": "None",
+      "history": "H0CurrentNativeStateOnly",
+      "purpose": "current load nuisance baseline"
+    },
+    {
+      "role": "E03",
+      "candidate_id": "e03_r1_w1_a3_t0_h1_realized_change_v1",
+      "relation": "R1RealizedChange",
+      "weighting": "W1ViabilityWeightOnly",
+      "aggregation": "A3WeightedMeanAllDeclared",
+      "temporal": "T0Instantaneous",
+      "forecast": "None",
+      "history": "H1ReplayedPrefixHistory",
+      "purpose": "realized viability change"
+    },
+    {
+      "role": "E04",
+      "candidate_id": "e04_r2_w1_a3_t0_h1_drive_persistence_residual_v1",
+      "relation": "R2OneStepForecastResidual",
+      "weighting": "W1ViabilityWeightOnly",
+      "aggregation": "A3WeightedMeanAllDeclared",
+      "temporal": "T0Instantaneous",
+      "forecast": "ObservedDrivePersistence",
+      "history": "H1ReplayedPrefixHistory",
+      "purpose": "one-step forecast residual"
+    },
+    {
+      "role": "E05",
+      "candidate_id": "e05_r3_w1_a3_t1_h1_drive_persistence_revision_v1",
+      "relation": "R3OverlappingFutureRevision",
+      "weighting": "W1ViabilityWeightOnly",
+      "aggregation": "A3WeightedMeanAllDeclared",
+      "temporal": "T1AlignedDiscountedMeanSharedSupport",
+      "forecast": "ObservedDrivePersistence",
+      "history": "H1ReplayedPrefixHistory",
+      "purpose": "aligned future-outlook revision"
+    },
+    {
+      "role": "E06",
+      "candidate_id": "e06_r4_w1_a3_t1_h1_drive_persistence_rolling_change_v1",
+      "relation": "R4RollingHorizonChange",
+      "weighting": "W1ViabilityWeightOnly",
+      "aggregation": "A3WeightedMeanAllDeclared",
+      "temporal": "T1DiscountedMean",
+      "forecast": "ObservedDrivePersistence",
+      "history": "H1ReplayedPrefixHistory",
+      "purpose": "rolling-horizon turnover control"
+    },
+    {
+      "role": "E07",
+      "candidate_id": "e07_u1_w0_a2_t8_h0_drive_persistence_breach_latency_v1",
+      "relation": "U1Urgency",
+      "weighting": "W0RawChannel",
+      "aggregation": "A2PeakDeviation",
+      "temporal": "T8FirstBreachLatency",
+      "forecast": "ObservedDrivePersistence",
+      "history": "H0CurrentNativeStateOnly",
+      "purpose": "projected breach imminence"
+    },
+    {
+      "role": "E08",
+      "candidate_id": "e08_p0_w1_a3_t2_h0_drive_persistence_cumulative_v1",
+      "relation": "P0ProspectiveBurden",
+      "weighting": "W1ViabilityWeightOnly",
+      "aggregation": "A3WeightedMeanAllDeclaredPerProjectedStep",
+      "temporal": "T2DiscountedCumulativeExposure",
+      "forecast": "ObservedDrivePersistence",
+      "history": "H0CurrentNativeStateOnly",
+      "purpose": "absolute prospective cumulative viability exposure"
+    },
+    {
+      "role": "E09",
+      "candidate_id": "e09_confidence_mean_v1",
+      "relation": "BaselineNuisance",
+      "weighting": "W3ConfidenceOnly",
+      "aggregation": "ArithmeticMeanEightDeclaredChannels",
+      "temporal": "T0Instantaneous",
+      "forecast": "None",
+      "history": "H0CurrentNativeStateOnly",
+      "purpose": "confidence nuisance baseline"
+    },
+    {
+      "role": "E10",
+      "candidate_id": "e10_r0_w2_a3_t0_h0_legacy_weighted_burden_v1",
+      "relation": "R0CurrentBurden",
+      "weighting": "W2LegacyPrecisionTimesImportance",
+      "aggregation": "A3WeightedMeanAllDeclared",
+      "temporal": "T0Instantaneous",
+      "forecast": "None",
+      "history": "H0CurrentNativeStateOnly",
+      "purpose": "legacy v0.1 aggregate baseline"
+    },
+    {
+      "role": "E11",
+      "candidate_id": "e11_baseline_history_w1_a3_t3_h1_trailing16_v1",
+      "relation": "BaselineNuisance",
+      "weighting": "W1ViabilityWeightOnly",
+      "aggregation": "A3WeightedMeanAllDeclaredPerRealizedStep",
+      "temporal": "T3UndiscountedCumulativeExposureTrailing16ExcludingCurrent",
+      "forecast": "None",
+      "history": "H1ReplayedPrefixHistory",
+      "purpose": "fixed recent-history nuisance baseline"
+    }
+  ],
+  "promotion_limit_nonredundant_classes": 3,
+  "claim_boundary": "regulatory-observable-only"
+}
