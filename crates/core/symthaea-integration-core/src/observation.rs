@@ -289,6 +289,20 @@ impl ObservationEnvelope {
         require_non_empty("source.measurement_method", &self.source.measurement_method)?;
         require_non_empty("lineage.lineage_id", &self.lineage.lineage_id)?;
 
+        for (field, value) in [
+            ("source.collector_id", self.source.collector_id.as_deref()),
+            ("source.upstream_origin", self.source.upstream_origin.as_deref()),
+            ("source.tenant", self.source.tenant.as_deref()),
+            (
+                "lineage.independence_group",
+                self.lineage.independence_group.as_deref(),
+            ),
+        ] {
+            if let Some(value) = value {
+                require_non_empty(field, value)?;
+            }
+        }
+
         validate_probability("quality.source_confidence", self.quality.source_confidence)?;
         validate_probability("quality.completeness", self.quality.completeness)?;
 
@@ -313,33 +327,59 @@ impl ObservationEnvelope {
             require_non_empty("lineage.transform.name", &transform.name)?;
         }
 
+        debug_assert!(self.source_qualified_ref().validate().is_ok());
         Ok(())
     }
 
     /// Assess whether two reports share known lineage. Positive independence is
-    /// never inferred from different adapter-supplied group labels.
+    /// never inferred from different adapter-supplied group labels. This method
+    /// also stays conservative for invalid/unadmitted envelopes: empty optional
+    /// provenance strings never become shared-origin evidence.
     pub fn lineage_relationship(&self, other: &Self) -> LineageRelationship {
-        if self.source_qualified_ref() == other.source_qualified_ref() {
+        let self_ref = self.source_qualified_ref();
+        let other_ref = other.source_qualified_ref();
+        if self_ref.validate().is_ok() && other_ref.validate().is_ok() && self_ref == other_ref {
             return LineageRelationship::SameObservation;
         }
-        if self.lineage.lineage_id == other.lineage.lineage_id
+
+        if !self.lineage.lineage_id.trim().is_empty()
+            && !other.lineage.lineage_id.trim().is_empty()
+            && !self.source.integration_id.trim().is_empty()
+            && !other.source.integration_id.trim().is_empty()
+            && self.lineage.lineage_id == other.lineage.lineage_id
             && self.source.integration_id == other.source.integration_id
             && self.source.collector_id == other.source.collector_id
             && self.source.tenant == other.source.tenant
         {
             return LineageRelationship::SharedOrigin;
         }
+
         if let (Some(a), Some(b)) = (
-            self.source.upstream_origin.as_deref(),
-            other.source.upstream_origin.as_deref(),
+            self.source
+                .upstream_origin
+                .as_deref()
+                .filter(|value| !value.trim().is_empty()),
+            other
+                .source
+                .upstream_origin
+                .as_deref()
+                .filter(|value| !value.trim().is_empty()),
         ) {
             if a == b {
                 return LineageRelationship::SharedOrigin;
             }
         }
+
         match (
-            self.lineage.independence_group.as_deref(),
-            other.lineage.independence_group.as_deref(),
+            self.lineage
+                .independence_group
+                .as_deref()
+                .filter(|value| !value.trim().is_empty()),
+            other
+                .lineage
+                .independence_group
+                .as_deref()
+                .filter(|value| !value.trim().is_empty()),
         ) {
             (Some(a), Some(b)) if a == b => LineageRelationship::SharedOrigin,
             _ => LineageRelationship::Unknown,
@@ -522,7 +562,37 @@ mod tests {
 
     #[test]
     fn valid_observation_passes() {
-        assert!(sample("obs-1", "test", Some("sensor-a")).validate().is_ok());
+        let observation = sample("obs-1", "test", Some("sensor-a"));
+        assert!(observation.validate().is_ok());
+        assert!(observation.source_qualified_ref().validate().is_ok());
+    }
+
+    #[test]
+    fn optional_provenance_fields_cannot_be_present_but_empty() {
+        for mutate in [
+            |observation: &mut ObservationEnvelope| observation.source.collector_id = Some("".into()),
+            |observation: &mut ObservationEnvelope| observation.source.upstream_origin = Some(" ".into()),
+            |observation: &mut ObservationEnvelope| observation.source.tenant = Some("".into()),
+            |observation: &mut ObservationEnvelope| observation.lineage.independence_group = Some("\t".into()),
+        ] {
+            let mut observation = sample("obs-1", "test", None);
+            mutate(&mut observation);
+            assert!(matches!(
+                observation.validate(),
+                Err(ObservationValidationError::EmptyField(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn invalid_empty_provenance_cannot_create_shared_origin() {
+        let mut a = sample("a", "one", None);
+        let mut b = sample("b", "two", None);
+        a.source.upstream_origin = Some("".into());
+        b.source.upstream_origin = Some("".into());
+        a.lineage.independence_group = Some("".into());
+        b.lineage.independence_group = Some("".into());
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
     }
 
     #[test]
