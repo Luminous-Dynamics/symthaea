@@ -27,12 +27,12 @@ jobs:
       - name: Preserve checked-in lockfile
         run: cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
 
-      # Cargo, not this workflow, owns dependency resolution. Running metadata
-      # without --locked lets Cargo reconcile missing workspace/path package
-      # nodes against the existing lock while preferentially retaining already
-      # locked registry/git packages.
+      # Cargo, not this workflow, owns dependency resolution. Running full
+      # metadata without --locked lets Cargo reconcile missing workspace/path
+      # package nodes against the existing lock while preferentially retaining
+      # already locked registry/git packages.
       - name: Ask Cargo to reconcile workspace lock metadata
-        run: cargo metadata --format-version 1 --no-deps >/dev/null
+        run: cargo metadata --format-version 1 >/dev/null
 
       # The current repair is intentionally narrower than a dependency update.
       # It may add source-less workspace/path package nodes, but it must not
@@ -57,9 +57,13 @@ jobs:
           before_map = {key(p): p for p in before.get("package", [])}
           after_map = {key(p): p for p in after.get("package", [])}
 
-          removed = sorted(set(before_map) - set(after_map))
-          changed = sorted(k for k in before_map.keys() & after_map if before_map[k] != after_map[k])
-          added = sorted(set(after_map) - set(before_map))
+          key_order = lambda value: repr(value)
+          removed = sorted(set(before_map) - set(after_map), key=key_order)
+          changed = sorted(
+              (k for k in before_map.keys() & after_map if before_map[k] != after_map[k]),
+              key=key_order,
+          )
+          added = sorted(set(after_map) - set(before_map), key=key_order)
           sourced_additions = [k for k in added if k[2] is not None]
 
           if removed or changed or sourced_additions:
