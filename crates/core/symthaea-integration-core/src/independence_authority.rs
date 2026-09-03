@@ -10,7 +10,8 @@
 //! v0.1 deliberately stops at validation/admission. These attestations do **not**
 //! yet raise [`crate::IndependenceAssessment::independent_lower_bound`]. Wiring
 //! positive attestations into corroboration is deferred to a separately
-//! qualified reasoning tranche.
+//! qualified reasoning tranche. Known shared-origin evidence always dominates a
+//! positive-independence claim.
 
 use crate::{ObservationEnvelope, ObservationId};
 use serde::{Deserialize, Serialize};
@@ -160,6 +161,16 @@ impl IndependenceAttestation {
         if left_key > right_key {
             return Err(IndependenceAttestationError::NonCanonicalPair);
         }
+        if let (Some(left_origin), Some(right_origin)) = (
+            self.left.upstream_origin.as_deref(),
+            self.right.upstream_origin.as_deref(),
+        ) {
+            if left_origin == right_origin {
+                return Err(IndependenceAttestationError::KnownSharedOriginConflict {
+                    upstream_origin: left_origin.to_string(),
+                });
+            }
+        }
 
         if let (Some(from), Some(until)) = (self.valid_from_unix_ms, self.valid_until_unix_ms) {
             if from > until {
@@ -293,6 +304,8 @@ pub enum IndependenceAttestationError {
     SameLineage,
     #[error("independence-attestation lineage pair is not in canonical order")]
     NonCanonicalPair,
+    #[error("positive independence contradicts known shared upstream origin `{upstream_origin}`")]
+    KnownSharedOriginConflict { upstream_origin: String },
     #[error(
         "invalid independence-attestation validity window: {valid_from_unix_ms} > {valid_until_unix_ms}"
     )]
@@ -550,6 +563,17 @@ mod tests {
         let mut other_tenant = observation.clone();
         other_tenant.source.tenant = Some("tenant-b".into());
         assert!(!reference.matches_observation(&other_tenant));
+    }
+
+    #[test]
+    fn known_shared_upstream_origin_cannot_be_attested_independent() {
+        let mut conflicting = attestation();
+        conflicting.left.upstream_origin = Some("procfs:node-1".into());
+        conflicting.right.upstream_origin = Some("procfs:node-1".into());
+        assert!(matches!(
+            conflicting.validate(),
+            Err(IndependenceAttestationError::KnownSharedOriginConflict { .. })
+        ));
     }
 
     #[test]
