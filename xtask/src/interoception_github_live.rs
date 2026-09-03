@@ -9,6 +9,8 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    interoception_actions_archive::verify_actions_archive_closed,
+    interoception_archive_fs::closed_relative_file,
     interoception_capsule_archive::{self, VerifiedEvidenceCapsuleArchive},
     interoception_qualification::{
         self, ActionsArchiveManifest, VerifiedActionsGate, VerifiedLocalGate,
@@ -114,9 +116,12 @@ pub fn authorize_promotion_live(
     }
 
     let bundle = read_canonical_bundle(bundle_path)?;
-    bundle
-        .validate()
-        .map_err(|errors| anyhow::anyhow!("qualification bundle validation failed: {}", errors.join("; ")))?;
+    bundle.validate().map_err(|errors| {
+        anyhow::anyhow!(
+            "qualification bundle validation failed: {}",
+            errors.join("; ")
+        )
+    })?;
     if !bundle.is_qualified() {
         bail!("raw bundle does not satisfy structural qualification");
     }
@@ -144,8 +149,8 @@ pub fn authorize_promotion_live(
         verify_local_dir(local_clippy_dir, repo_root)?,
     ];
     let archives = [
-        interoception_qualification::verify_actions_archive(workspace_ci_dir, Some(repo_root))?,
-        interoception_qualification::verify_actions_archive(showroom_dir, Some(repo_root))?,
+        verify_actions_archive_closed(workspace_ci_dir, Some(repo_root))?,
+        verify_actions_archive_closed(showroom_dir, Some(repo_root))?,
     ];
 
     for verified in &local {
@@ -206,7 +211,8 @@ pub fn authorize_promotion_live(
         live_actions_verification: live_actions,
         decision: "PromotionAuthorized".into(),
     };
-    let bytes = serde_json::to_vec(&envelope).context("serialize promotion authorization envelope")?;
+    let bytes =
+        serde_json::to_vec(&envelope).context("serialize promotion authorization envelope")?;
     fs::write(out_path, bytes)
         .with_context(|| format!("write promotion authorization envelope {}", out_path.display()))?;
     Ok(envelope)
@@ -216,14 +222,19 @@ pub fn verify_actions_live(
     archive_dir: &Path,
     repo_root: Option<&Path>,
 ) -> Result<LiveActionsVerification> {
-    let archived_verified = interoception_qualification::verify_actions_archive(archive_dir, repo_root)?;
-    let manifest_bytes = fs::read(archive_dir.join("manifest.json"))?;
+    let archived_verified = verify_actions_archive_closed(archive_dir, repo_root)?;
+    let manifest_path = closed_relative_file(archive_dir, "manifest.json")?;
+    let run_path = closed_relative_file(archive_dir, "run.json")?;
+    let jobs_path = closed_relative_file(archive_dir, "jobs.json")?;
+    let workflow_path = closed_relative_file(archive_dir, "workflow.yml")?;
+
+    let manifest_bytes = fs::read(&manifest_path)?;
     let manifest: ActionsArchiveManifest =
         serde_json::from_slice(&manifest_bytes).context("parse Actions archive manifest")?;
 
-    let archived_run: RunIdentity = serde_json::from_slice(&fs::read(archive_dir.join("run.json"))?)
+    let archived_run: RunIdentity = serde_json::from_slice(&fs::read(&run_path)?)
         .context("parse archived run identity for live comparison")?;
-    let archived_jobs: JobsPage = serde_json::from_slice(&fs::read(archive_dir.join("jobs.json"))?)
+    let archived_jobs: JobsPage = serde_json::from_slice(&fs::read(&jobs_path)?)
         .context("parse archived jobs identity for live comparison")?;
     if archived_jobs.total_count != archived_jobs.jobs.len() || archived_jobs.jobs.is_empty() {
         bail!("archived jobs object is incomplete or empty before live verification");
@@ -302,7 +313,7 @@ pub fn verify_actions_live(
     let live_content: ContentIdentity =
         serde_json::from_slice(&live_content_bytes).context("parse live workflow content identity")?;
     validate_sha1("live workflow Git blob SHA", &live_content.sha)?;
-    let archived_workflow_blob = git_hash_object(&archive_dir.join("workflow.yml"))?;
+    let archived_workflow_blob = git_hash_object(&workflow_path)?;
     if archived_workflow_blob != live_content.sha {
         bail!(
             "live exact-SHA workflow Git blob differs from archived workflow source for gate {}",
@@ -341,7 +352,11 @@ fn jobs_by_id<'a>(
     for job in jobs {
         let previous = mapped.insert(
             job.id,
-            (job.name.as_str(), job.status.as_str(), job.conclusion.as_deref()),
+            (
+                job.name.as_str(),
+                job.status.as_str(),
+                job.conclusion.as_deref(),
+            ),
         );
         if previous.is_some() {
             bail!("{label} jobs contain duplicate job id {}", job.id);
@@ -358,7 +373,10 @@ fn verify_local_dir(dir: &Path, repo_root: &Path) -> Result<VerifiedLocalGate> {
     )
 }
 
-fn bind_local_to_bundle(bundle: &QualificationEvidenceBundle, verified: &VerifiedLocalGate) -> Result<()> {
+fn bind_local_to_bundle(
+    bundle: &QualificationEvidenceBundle,
+    verified: &VerifiedLocalGate,
+) -> Result<()> {
     if verified.subject_commit != FROZEN_V01_SOURCE_COMMIT {
         bail!("verified local evidence is not bound to the frozen v0.1 source");
     }
@@ -422,10 +440,12 @@ fn bind_actions_to_bundle(
 }
 
 fn read_canonical_bundle(path: &Path) -> Result<QualificationEvidenceBundle> {
-    let bytes = fs::read(path).with_context(|| format!("read qualification bundle {}", path.display()))?;
+    let bytes =
+        fs::read(path).with_context(|| format!("read qualification bundle {}", path.display()))?;
     let bundle: QualificationEvidenceBundle =
         serde_json::from_slice(&bytes).context("parse qualification evidence bundle")?;
-    let canonical = serde_json::to_vec(&bundle).context("re-serialize qualification bundle canonically")?;
+    let canonical =
+        serde_json::to_vec(&bundle).context("re-serialize qualification bundle canonically")?;
     if bytes != canonical {
         bail!(
             "qualification bundle bytes are not the canonical compact JSON representation required by the frozen v0.1 bundle contract"
@@ -435,9 +455,12 @@ fn read_canonical_bundle(path: &Path) -> Result<QualificationEvidenceBundle> {
 }
 
 fn bundle_sha256(bundle: &QualificationEvidenceBundle) -> Result<String> {
-    bundle
-        .sha256()
-        .map_err(|errors| anyhow::anyhow!("qualification bundle digest failed: {}", errors.join("; ")))
+    bundle.sha256().map_err(|errors| {
+        anyhow::anyhow!(
+            "qualification bundle digest failed: {}",
+            errors.join("; ")
+        )
+    })
 }
 
 fn git_hash_object(path: &Path) -> Result<String> {
@@ -453,7 +476,8 @@ fn git_hash_object(path: &Path) -> Result<String> {
             String::from_utf8_lossy(&output.stderr)
         );
     }
-    let value = String::from_utf8(output.stdout).context("git hash-object emitted non-UTF-8 output")?;
+    let value =
+        String::from_utf8(output.stdout).context("git hash-object emitted non-UTF-8 output")?;
     let value = value.trim().to_string();
     validate_sha1("archived workflow Git blob SHA", &value)?;
     Ok(value)
