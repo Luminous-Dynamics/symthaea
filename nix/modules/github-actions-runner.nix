@@ -9,13 +9,58 @@
 # access-token registration, default-label suppression, and the unique CPU
 # capability label cannot be weakened by a host configuration typo.
 
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   cfg = config.services.symthaea-ci-runner;
   runnerKey = "symthaea-validation";
   repositoryUrl = "https://github.com/Luminous-Dynamics/symthaea";
   capabilityLabel = "symthaea-trusted-cpu-v1";
+  tokenPath = if cfg.tokenFile == null then "/dev/null" else toString cfg.tokenFile;
+
+  credentialPreflight = pkgs.writeShellScript "symthaea-ci-runner-credential-preflight" ''
+    set -euo pipefail
+
+    token=${lib.escapeShellArg tokenPath}
+
+    if [ ! -f "$token" ]; then
+      echo 'Symthaea CI runner credential must be a regular file' >&2
+      exit 1
+    fi
+
+    owner_uid="$(${pkgs.coreutils}/bin/stat -Lc '%u' -- "$token")"
+    if [ "$owner_uid" != '0' ]; then
+      echo 'Symthaea CI runner credential must be owned by root' >&2
+      exit 1
+    fi
+
+    mode="$(${pkgs.coreutils}/bin/stat -Lc '%a' -- "$token")"
+    case "$mode" in
+      400|600) ;;
+      *)
+        echo 'Symthaea CI runner credential mode must be exactly 0400 or 0600' >&2
+        exit 1
+        ;;
+    esac
+
+    size="$(${pkgs.coreutils}/bin/stat -Lc '%s' -- "$token")"
+    if [ "$size" -le 0 ] || [ "$size" -gt 4096 ]; then
+      echo 'Symthaea CI runner credential must be non-empty and at most 4096 bytes' >&2
+      exit 1
+    fi
+
+    # GitHub access tokens are single printable, non-whitespace strings. Reject
+    # newlines and all other whitespace/control bytes without ever echoing,
+    # hashing, or otherwise reproducing the credential value.
+    if [ "$(${pkgs.coreutils}/bin/wc -l < "$token")" -ne 0 ]; then
+      echo 'Symthaea CI runner credential must not contain a newline' >&2
+      exit 1
+    fi
+    if ! LC_ALL=C ${pkgs.gnugrep}/bin/grep -Eq '^[[:graph:]]+$' "$token"; then
+      echo 'Symthaea CI runner credential contains whitespace or control bytes' >&2
+      exit 1
+    fi
+  '';
 in
 {
   options.services.symthaea-ci-runner = {
@@ -39,9 +84,9 @@ in
         used to obtain short-lived runner registration tokens. For the v1
         static-secret deployment, use a fine-grained PAT restricted to
         Luminous-Dynamics/symthaea with only repository Administration: write
-        permission. Keep the credential in a root-owned runtime secret file;
-        sops-nix or agenix are recommended. The file should not be group- or
-        world-readable.
+        permission. Keep the credential in a root-owned runtime secret file with
+        mode exactly 0400 or 0600. The service rejects empty credentials and any
+        credential containing whitespace or control bytes before registration.
       '';
     };
   };
@@ -81,5 +126,13 @@ in
       # live in a pinned per-job Nix shell.
       extraPackages = [ ];
     };
+
+    # Enforce runtime credential invariants immediately before the pinned
+    # upstream root bootstrap copies the access token into private runner state.
+    # The leading '+' keeps this check in the same privileged ExecStartPre phase
+    # as the upstream credential-copy lifecycle; the job process never receives
+    # this privilege or access to the original token path.
+    systemd.services."github-runner-${runnerKey}".serviceConfig.ExecStartPre =
+      lib.mkBefore [ "+${credentialPreflight}" ];
   };
 }
