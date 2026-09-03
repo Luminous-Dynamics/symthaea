@@ -35,11 +35,16 @@ jobs:
           toolchain: 1.96.0
           components: rustfmt,clippy
 
-      - name: Require one-shot patch source
-        run: test -s scripts/spore_v033_apply_v2.py
+      - name: Require one-shot patch sources
+        run: |
+          test -s scripts/spore_v033_apply_v2.py
+          test -s scripts/spore_v033_apply_semantics.py
 
-      - name: Apply guarded renderer integration
+      - name: Apply guarded composition integration
         run: python3 scripts/spore_v033_apply_v2.py
+
+      - name: Apply guarded semantic choreography integration
+        run: python3 scripts/spore_v033_apply_semantics.py
 
       - name: Format focused Spore crates
         run: >-
@@ -80,12 +85,16 @@ jobs:
           -p symthaea-quicken-fb
 
       - name: Remove one-shot machinery
-        run: rm scripts/spore_v033_apply_v2.py .github/workflows/spore-v033-autopatch.yml
+        run: >-
+          rm
+          scripts/spore_v033_apply_v2.py
+          scripts/spore_v033_apply_semantics.py
+          .github/workflows/spore-v033-autopatch.yml
 
       - name: Verify patch cleanliness and scope
         run: |
           git diff --check
-          unexpected="$(git status --porcelain | awk '{print $2}' | grep -Ev '^(crates/core/symthaea-boot-ecology/|crates/core/symthaea-boot-state/|crates/domains/symthaea-quicken-fb/|scripts/spore_v033_apply_v2.py$|\.github/workflows/spore-v033-autopatch.yml$)' || true)"
+          unexpected="$(git status --porcelain | awk '{print $2}' | grep -Ev '^(crates/core/symthaea-boot-ecology/|crates/core/symthaea-boot-state/|crates/domains/symthaea-quicken-fb/|scripts/spore_v033_apply_v2.py$|scripts/spore_v033_apply_semantics.py$|\.github/workflows/spore-v033-autopatch.yml$)' || true)"
           test -z "$unexpected"
 
       - name: Commit verified integration only if branch has not moved
@@ -96,9 +105,10 @@ jobs:
                   crates/core/symthaea-boot-state \
                   crates/domains/symthaea-quicken-fb \
                   scripts/spore_v033_apply_v2.py \
+                  scripts/spore_v033_apply_semantics.py \
                   .github/workflows/spore-v033-autopatch.yml
           git diff --cached --check
-          git commit -m "feat(spore): thread v0.3.3 composition budget through renderer"
+          git commit -m "feat(spore): integrate v0.3.3 composition and choreography"
           git fetch origin spore/visual-composition-v0.3.3-design
           test "$(git rev-parse origin/spore/visual-composition-v0.3.3-design)" = "$GITHUB_SHA"
           git push origin HEAD:spore/visual-composition-v0.3.3-design
