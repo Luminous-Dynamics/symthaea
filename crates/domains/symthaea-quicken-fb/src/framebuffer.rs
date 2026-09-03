@@ -48,6 +48,7 @@ pub enum DrmError {
     NoMode,
     NoEncoder,
     NoCrtc,
+    UnrestorableCrtcState(&'static str),
     ResourceQuery(std::io::Error),
     BufferCreate(std::io::Error),
     BufferMap(std::io::Error),
@@ -63,6 +64,9 @@ impl std::fmt::Display for DrmError {
             Self::NoMode => write!(f, "no display mode available"),
             Self::NoEncoder => write!(f, "no encoder for connector"),
             Self::NoCrtc => write!(f, "no CRTC available"),
+            Self::UnrestorableCrtcState(reason) => {
+                write!(f, "active CRTC state cannot be restored safely: {reason}")
+            }
             Self::ResourceQuery(e) => write!(f, "DRM resource query failed: {e}"),
             Self::BufferCreate(e) => write!(f, "dumb buffer creation failed: {e}"),
             Self::BufferMap(e) => write!(f, "dumb buffer map failed: {e}"),
@@ -123,6 +127,27 @@ impl DrmFramebuffer {
         // display we cannot faithfully restore.
         let original_crtc = card.get_crtc(crtc).map_err(DrmError::ResourceQuery)?;
         let original_connectors = Self::connectors_for_crtc(&card, &res, crtc)?;
+
+        // This branch is deliberately the active-topology path. A connector that
+        // resolves to a CRTC is not enough evidence that the CRTC has an active
+        // framebuffer/mode that can be restored with legacy SETCRTC. Until the
+        // separately qualified cold-start path exists, fail before takeover if
+        // any essential restore component is absent.
+        if original_crtc.framebuffer().is_none() {
+            return Err(DrmError::UnrestorableCrtcState(
+                "original CRTC has no framebuffer",
+            ));
+        }
+        if original_crtc.mode().is_none() {
+            return Err(DrmError::UnrestorableCrtcState(
+                "original CRTC has no active mode",
+            ));
+        }
+        if original_connectors.is_empty() {
+            return Err(DrmError::UnrestorableCrtcState(
+                "original CRTC has no routed connectors",
+            ));
+        }
 
         let width = mode.size().0 as u32;
         let height = mode.size().1 as u32;
