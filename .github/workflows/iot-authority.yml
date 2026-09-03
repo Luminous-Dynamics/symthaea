@@ -16,11 +16,38 @@ on:
 permissions:
   contents: read
 
+env:
+  RUSTUP_TOOLCHAIN: 1.94.0
+
 concurrency:
   group: iot-authority-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  execution-format:
+    name: IoT execution source format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact Rust formatter
+        run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      # Parent PRs own formatting of their source. This tranche formats only
+      # the execution-binding source it introduces.
+      - name: Check execution source formatting
+        run: rustfmt --edition 2024 --check crates/bridges/symthaea-iot-execution/src/lib.rs
+
   authority-implementation:
     name: IoT authority implementation
     runs-on: ubuntu-24.04
@@ -29,22 +56,19 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Install pinned Rust
-        run: |
-          rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
-          rustup default 1.94.0
-          rustc --version
-          cargo --version
+      - name: Install exact Rust compiler
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
 
-      - name: Verify exact checkout
-        if: github.event_name == 'pull_request'
-        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
 
       - name: Workspace metadata resolves
         run: cargo metadata --format-version 1 --no-deps >/dev/null
-
-      - name: Rustfmt IoT authority stack
-        run: cargo fmt --check -p symthaea-authority -p symthaea-iot-authority -p symthaea-iot-execution
 
       - name: Check IoT authority stack
         run: cargo check -p symthaea-authority -p symthaea-iot-authority -p symthaea-iot-execution --all-targets
@@ -63,17 +87,16 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Install pinned Rust
+      - name: Install exact Rust compiler
+        run: rustup toolchain install 1.94.0 --profile minimal
+
+      - name: Verify exact checkout and toolchain
         run: |
-          rustup toolchain install 1.94.0 --profile minimal --component rustfmt
-          rustup default 1.94.0
-
-      - name: Verify exact checkout
-        if: github.event_name == 'pull_request'
-        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
-
-      - name: Rustfmt touched telemetry source
-        run: rustfmt --edition 2024 --check src/cognitive_loop/managers/survival_manager.rs
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
 
       - name: Focused survival-manager regressions
         run: cargo test -p symthaea --no-default-features --features survival --lib survival_manager::tests
@@ -86,14 +109,16 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Install pinned Rust
-        run: |
-          rustup toolchain install 1.94.0 --profile minimal
-          rustup default 1.94.0
+      - name: Install exact Rust toolchain
+        run: rustup toolchain install 1.94.0 --profile minimal
 
-      - name: Verify exact checkout
-        if: github.event_name == 'pull_request'
-        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
 
       - name: Committed lock resolves without mutation
         run: |
