@@ -10,6 +10,7 @@ on:
       - 'crates/bridges/symthaea-iot-execution/**'
       - 'crates/bridges/symthaea-iot-runtime/**'
       - 'crates/bridges/symthaea-iot-durable-runtime/**'
+      - 'crates/bridges/symthaea-iot-actuation/**'
       - 'src/swarm/mesh/sensor_iot.rs'
       - 'src/cognitive_loop/managers/survival_manager.rs'
       - '.github/workflows/iot-authority.yml'
@@ -52,15 +53,16 @@ jobs:
           rustc --version | grep -F 'rustc 1.96.0'
           cargo --version | grep -F 'cargo 1.96.0'
 
-      - name: Check parser, trust-boundary, and durable-runtime formatting
+      - name: Check parser, trust-boundary, and physical-runtime formatting
         run: >-
           rustfmt --edition 2024 --check
           src/swarm/mesh/sensor_iot.rs
           src/cognitive_loop/managers/survival_manager.rs
           crates/bridges/symthaea-iot-durable-runtime/src/lib.rs
+          crates/bridges/symthaea-iot-actuation/src/lib.rs
 
   runtime-implementation:
-    name: IoT durable runtime implementation (MSRV 1.94)
+    name: IoT validated actuation implementation (MSRV 1.94)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -91,6 +93,7 @@ jobs:
           -p symthaea-iot-execution
           -p symthaea-iot-runtime
           -p symthaea-iot-durable-runtime
+          -p symthaea-iot-actuation
           --all-targets
 
       - name: Test merged authority/runtime/IoT stack
@@ -103,6 +106,7 @@ jobs:
           -p symthaea-iot-execution
           -p symthaea-iot-runtime
           -p symthaea-iot-durable-runtime
+          -p symthaea-iot-actuation
           --all-targets
 
       - name: Clippy merged authority/runtime/IoT stack
@@ -115,6 +119,7 @@ jobs:
           -p symthaea-iot-execution
           -p symthaea-iot-runtime
           -p symthaea-iot-durable-runtime
+          -p symthaea-iot-actuation
           --all-targets -- -D warnings
 
   telemetry-boundary:
@@ -145,7 +150,7 @@ jobs:
         run: cargo test -p symthaea --no-default-features --features survival --lib survival_manager::tests
 
   locked-metadata:
-    name: IoT runtime locked metadata (MSRV 1.94)
+    name: External dependency lock stability (MSRV 1.94)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -163,7 +168,7 @@ jobs:
           rustc --version | grep -F 'rustc 1.94.0'
           cargo --version | grep -F 'cargo 1.94.0'
 
-      - name: Committed lock resolves without mutation
+      - name: Existing external dependency lock resolves without mutation
         run: |
           before=$(sha256sum Cargo.lock | awk '{print $1}')
           cargo metadata --locked --format-version 1 --no-deps >/dev/null
