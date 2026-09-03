@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-iot-interlock-trust"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Anti-rollback controller-key trust for hardware interlock evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "safety", "trust", "interlock"]
+categories = ["embedded"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-final-gate = { path = "../symthaea-iot-final-gate" }
+thiserror = { workspace = true }
