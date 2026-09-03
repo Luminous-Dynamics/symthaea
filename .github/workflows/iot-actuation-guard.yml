@@ -1,0 +1,165 @@
+name: IoT Actuation Guard
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-guard/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard-protocol/**'
+      - 'crates/bridges/symthaea-iot-xenia-hybrid-verifier/**'
+      - 'crates/bridges/symthaea-iot-transport-receipt/**'
+      - '.github/workflows/iot-actuation-guard.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-actuation-guard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    name: Guard source/dependency contract (Rust 1.96)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact formatter
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Format guard source only
+        run: |
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard/src/lib.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard/tests/ingress.rs
+
+      - name: Enforce minimal non-actuating production dependency surface
+        run: |
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          manifest = tomllib.loads(Path('crates/bridges/symthaea-iot-actuation-guard/Cargo.toml').read_text())
+          deps = set(manifest.get('dependencies', {}))
+          expected = {
+              'bincode',
+              'serde',
+              'thiserror',
+              'tokio',
+              'symthaea-authority',
+              'symthaea-iot-actuation-guard-protocol',
+              'symthaea-iot-transport-receipt',
+              'symthaea-iot-xenia-hybrid-verifier',
+          }
+          print('guard production dependencies:', sorted(deps))
+          assert deps == expected, f'guard production TCB dependency drift: {sorted(deps)!r}'
+          assert 'bin' not in manifest, 'guard v0.1 must remain a non-actuating ingress library'
+
+          source = Path('crates/bridges/symthaea-iot-actuation-guard/src/lib.rs').read_text()
+          required = [
+              '#![deny(unsafe_code)]',
+              '#[cfg(not(target_os = "linux"))]',
+              'verify_xenia_physical_effect_receipt',
+              'decode_canonical_guard_request',
+              'peer_cred()',
+          ]
+          for needle in required:
+              assert needle in source, f'missing guard invariant marker: {needle!r}'
+
+          forbidden = [
+              'tokio::spawn',
+              'TcpListener',
+              'TcpStream',
+              'std::process',
+              'Command::new',
+              'unsafe {',
+          ]
+          for needle in forbidden:
+              assert needle not in source, f'forbidden privileged guard surface: {needle!r}'
+          PY
+
+  implementation:
+    name: Guard ingress implementation + exact crypto admission (MSRV 1.94)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.94.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact compiler and Clippy
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      - name: Resolve candidate and permit only reviewed fips204 external delta
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          before = tomllib.loads(Path('/tmp/Cargo.lock.before').read_text())
+          after = tomllib.loads(Path('Cargo.lock').read_text())
+
+          def sourced(doc):
+              return {
+                  (p['name'], p['version'], p['source']): p
+                  for p in doc.get('package', [])
+                  if 'source' in p
+              }
+
+          b = sourced(before)
+          a = sourced(after)
+          added = sorted(set(a) - set(b))
+          removed = sorted(set(b) - set(a))
+          changed = sorted(k for k in set(a) & set(b) if a[k] != b[k])
+
+          expected = {
+              ('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')
+          }
+          print('added external package identities:', added)
+          print('removed external package identities:', removed)
+          print('changed existing external package identities:', changed)
+          assert set(added) == expected, f'unreviewed external package delta: {added!r}'
+          assert not removed, f'external package removal is not allowed: {removed!r}'
+          assert not changed, f'existing external package record changed: {changed!r}'
+
+          package = a[next(iter(expected))]
+          assert package.get('checksum') == 'c9fb5a367b9846933e271a3c2a992930743f82ae5e8cb7faa780715a80fa0b15', package
+          families = {dep.split(' ', 1)[0] for dep in package.get('dependencies', [])}
+          assert families == {'rand_core', 'sha2', 'sha3', 'zeroize'}, families
+          PY
+
+      - name: Check guard and all test targets
+        run: cargo check -p symthaea-iot-actuation-guard --all-targets
+
+      - name: Run fixed hybrid ingress regressions
+        run: cargo test -p symthaea-iot-actuation-guard --test ingress
+
+      - name: Test guard package
+        run: cargo test -p symthaea-iot-actuation-guard --all-targets
+
+      - name: Strict Clippy guard package
+        run: cargo clippy -p symthaea-iot-actuation-guard --all-targets -- -D warnings
