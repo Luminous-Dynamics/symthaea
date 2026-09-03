@@ -17,7 +17,7 @@ use super::restore_actions::EvidenceRestorePolicy;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum MergePrimitive {
     ReplayBarrierJoin,
-    RestrictionCounterJoin,
+    ScopedRestrictionCounterJoin,
     FreshOnlyReset,
     Unsupported,
 }
@@ -25,7 +25,9 @@ pub(super) enum MergePrimitive {
 pub(super) const fn primitive_for_policy(policy: EvidenceRestorePolicy) -> MergePrimitive {
     match policy {
         EvidenceRestorePolicy::ReplayBarrier => MergePrimitive::ReplayBarrierJoin,
-        EvidenceRestorePolicy::RestrictionSupporting => MergePrimitive::RestrictionCounterJoin,
+        EvidenceRestorePolicy::RestrictionSupporting => {
+            MergePrimitive::ScopedRestrictionCounterJoin
+        }
         EvidenceRestorePolicy::RecoverySupportingFreshOnly => MergePrimitive::FreshOnlyReset,
         EvidenceRestorePolicy::CounterexamplePreserving | EvidenceRestorePolicy::NeutralHistory => {
             MergePrimitive::Unsupported
@@ -68,27 +70,74 @@ impl ReplayBarrier {
     }
 }
 
-/// Restriction-supporting evidence counter.
+/// Identity of the evidence window in which a restriction-supporting counter is
+/// meaningful.
 ///
-/// This is appropriate only after a domain audit proves that a larger value can
-/// justify equal or narrower authority. Examples include consecutive watchdog
-/// failures before a restrictive latch. It must not be used for healthy/recovery
-/// dwell or other widening-supporting evidence.
+/// A numeric counter is not portable across arbitrary time/boot windows. The
+/// trusted owner must derive these values from its actual boot/evidence timeline;
+/// they are equality fences, not self-authenticating authority.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct RestrictionEvidenceCounter(u64);
+pub(super) struct EvidenceScope {
+    boot_epoch: u64,
+    window_id: u64,
+}
 
-impl RestrictionEvidenceCounter {
-    pub(super) const fn new(value: u64) -> Self {
-        Self(value)
+impl EvidenceScope {
+    pub(super) const fn new(boot_epoch: u64, window_id: u64) -> Self {
+        Self {
+            boot_epoch,
+            window_id,
+        }
+    }
+}
+
+/// Restriction-supporting evidence within one exact evidence scope.
+///
+/// A larger value is safe to preserve only after the domain audit has proved
+/// that the counter is adverse/restriction-supporting *and* both values refer to
+/// the same boot/window semantics. A consecutive watchdog-failure streak from a
+/// historical window must not be numerically joined into a different current
+/// streak merely because both are integers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct ScopedRestrictionEvidence {
+    scope: EvidenceScope,
+    value: u64,
+}
+
+impl ScopedRestrictionEvidence {
+    pub(super) const fn new(scope: EvidenceScope, value: u64) -> Self {
+        Self { scope, value }
+    }
+
+    pub(super) const fn scope(self) -> EvidenceScope {
+        self.scope
     }
 
     pub(super) const fn value(self) -> u64 {
-        self.0
+        self.value
     }
 
-    pub(super) const fn merge(self, other: Self) -> Self {
-        if other.0 > self.0 { other } else { self }
+    pub(super) const fn merge(self, other: Self) -> RestrictionEvidenceMerge {
+        if self.scope != other.scope {
+            RestrictionEvidenceMerge::ReconciliationRequired {
+                current_scope: self.scope,
+                checkpoint_scope: other.scope,
+            }
+        } else if other.value > self.value {
+            RestrictionEvidenceMerge::Merged(other)
+        } else {
+            RestrictionEvidenceMerge::Merged(self)
+        }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RestrictionEvidenceMerge {
+    Merged(ScopedRestrictionEvidence),
+    ReconciliationRequired {
+        current_scope: EvidenceScope,
+        checkpoint_scope: EvidenceScope,
+    },
 }
 
 /// Recovery/widening-supporting progress.
@@ -175,7 +224,7 @@ mod tests {
         );
         assert_eq!(
             primitive_for_policy(EvidenceRestorePolicy::RestrictionSupporting),
-            MergePrimitive::RestrictionCounterJoin
+            MergePrimitive::ScopedRestrictionCounterJoin
         );
         assert_eq!(
             primitive_for_policy(EvidenceRestorePolicy::RecoverySupportingFreshOnly),
@@ -241,43 +290,54 @@ mod tests {
         assert_eq!(barrier.sequence(), 23);
     }
 
-    fn counters() -> [RestrictionEvidenceCounter; 6] {
-        [0, 1, 2, 7, 99, u32::MAX as u64]
-            .map(RestrictionEvidenceCounter::new)
+    fn scoped(value: u64) -> ScopedRestrictionEvidence {
+        ScopedRestrictionEvidence::new(EvidenceScope::new(9, 17), value)
     }
 
     #[test]
-    fn restriction_counter_merge_is_inflationary_commutative_idempotent() {
-        for left in counters() {
-            assert_eq!(left.merge(left), left);
-            for right in counters() {
-                let merged = left.merge(right);
-                assert!(merged >= left);
-                assert!(merged >= right);
-                assert_eq!(left.merge(right), right.merge(left));
+    fn same_scope_restriction_merge_preserves_greater_adverse_evidence() {
+        for left in [0, 1, 7, 99] {
+            for right in [0, 1, 7, 99] {
+                let expected = left.max(right);
+                assert_eq!(
+                    scoped(left).merge(scoped(right)),
+                    RestrictionEvidenceMerge::Merged(scoped(expected))
+                );
+                assert_eq!(scoped(left).merge(scoped(right)), scoped(right).merge(scoped(left)));
             }
         }
     }
 
     #[test]
-    fn restriction_counter_merge_is_associative() {
-        for a in counters() {
-            for b in counters() {
-                for c in counters() {
-                    assert_eq!(a.merge(b).merge(c), a.merge(b.merge(c)));
+    fn same_scope_restriction_merge_is_associative() {
+        for a in [0, 1, 7] {
+            for b in [0, 1, 7] {
+                for c in [0, 1, 7] {
+                    let ab = match scoped(a).merge(scoped(b)) {
+                        RestrictionEvidenceMerge::Merged(value) => value,
+                        _ => unreachable!(),
+                    };
+                    let bc = match scoped(b).merge(scoped(c)) {
+                        RestrictionEvidenceMerge::Merged(value) => value,
+                        _ => unreachable!(),
+                    };
+                    assert_eq!(ab.merge(scoped(c)), scoped(a).merge(bc));
                 }
             }
         }
     }
 
     #[test]
-    fn restriction_counter_never_moves_adverse_evidence_backward() {
-        let current = RestrictionEvidenceCounter::new(9);
-        let stale_checkpoint = RestrictionEvidenceCounter::new(3);
-        assert_eq!(current.merge(stale_checkpoint).value(), 9);
-
-        let checkpoint_with_unseen_adverse_history = RestrictionEvidenceCounter::new(12);
-        assert_eq!(current.merge(checkpoint_with_unseen_adverse_history).value(), 12);
+    fn mismatched_restriction_scope_requires_reconciliation_not_max() {
+        let current = ScopedRestrictionEvidence::new(EvidenceScope::new(4, 10), 1);
+        let historical = ScopedRestrictionEvidence::new(EvidenceScope::new(3, 99), 1000);
+        assert_eq!(
+            current.merge(historical),
+            RestrictionEvidenceMerge::ReconciliationRequired {
+                current_scope: current.scope(),
+                checkpoint_scope: historical.scope(),
+            }
+        );
     }
 
     #[test]
