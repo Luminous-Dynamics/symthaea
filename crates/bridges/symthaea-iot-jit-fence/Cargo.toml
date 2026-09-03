@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-iot-jit-fence"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Just-in-time anti-rollback trust fence for final cyber-physical HAL handoff"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "safety", "trust", "interlock"]
+categories = ["embedded"]
+
+[dependencies]
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-authority = { path = "../symthaea-iot-authority" }
+symthaea-iot-interlock-trust = { path = "../symthaea-iot-interlock-trust" }
+thiserror = { workspace = true }

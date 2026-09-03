@@ -18,6 +18,7 @@ on:
       - 'crates/bridges/symthaea-iot-transport-receipt/**'
       - 'crates/bridges/symthaea-iot-final-gate/**'
       - 'crates/bridges/symthaea-iot-interlock-trust/**'
+      - 'crates/bridges/symthaea-iot-jit-fence/**'
       - 'src/swarm/mesh/sensor_iot.rs'
       - 'src/cognitive_loop/managers/survival_manager.rs'
       - '.github/workflows/iot-authority.yml'
@@ -71,9 +72,10 @@ jobs:
           crates/bridges/symthaea-iot-transport-receipt/src/lib.rs
           crates/bridges/symthaea-iot-final-gate/src/lib.rs
           crates/bridges/symthaea-iot-interlock-trust/src/lib.rs
+          crates/bridges/symthaea-iot-jit-fence/src/lib.rs
 
   runtime-implementation:
-    name: IoT host + transport + device + final trust implementation (MSRV 1.94)
+    name: IoT host + transport + device + JIT trust implementation (MSRV 1.94)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -112,6 +114,7 @@ jobs:
           -p symthaea-iot-transport-receipt
           -p symthaea-iot-final-gate
           -p symthaea-iot-interlock-trust
+          -p symthaea-iot-jit-fence
           --all-targets
 
       - name: Test merged authority/runtime/IoT stack
@@ -132,6 +135,7 @@ jobs:
           -p symthaea-iot-transport-receipt
           -p symthaea-iot-final-gate
           -p symthaea-iot-interlock-trust
+          -p symthaea-iot-jit-fence
           --all-targets
 
       - name: Clippy merged authority/runtime/IoT stack
@@ -152,6 +156,7 @@ jobs:
           -p symthaea-iot-transport-receipt
           -p symthaea-iot-final-gate
           -p symthaea-iot-interlock-trust
+          -p symthaea-iot-jit-fence
           --all-targets -- -D warnings
 
   telemetry-boundary:
