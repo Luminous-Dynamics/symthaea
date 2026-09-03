@@ -285,16 +285,7 @@ pub fn verify_actions_live(
             live_jobs.len()
         );
     }
-    for job in &live_jobs {
-        if job.status != "completed" || job.conclusion.as_deref() != Some("success") {
-            bail!(
-                "required v0.1 evidence attempt contains non-success job {:?}: status={}, conclusion={:?}",
-                job.name,
-                job.status,
-                job.conclusion
-            );
-        }
-    }
+    validate_success_jobs(&live_jobs)?;
 
     let archived_by_id = jobs_by_id(&archived_jobs.jobs, "archived")?;
     let live_by_id = jobs_by_id(&live_jobs, "live")?;
@@ -344,6 +335,23 @@ pub fn verify_actions_live(
     })
 }
 
+fn validate_success_jobs(jobs: &[JobIdentity]) -> Result<()> {
+    if jobs.is_empty() {
+        bail!("required v0.1 evidence attempt contains zero jobs");
+    }
+    for job in jobs {
+        if job.status != "completed" || job.conclusion.as_deref() != Some("success") {
+            bail!(
+                "required v0.1 evidence attempt contains non-success job {:?}: status={}, conclusion={:?}",
+                job.name,
+                job.status,
+                job.conclusion
+            );
+        }
+    }
+    Ok(())
+}
+
 fn jobs_by_id<'a>(
     jobs: &'a [JobIdentity],
     label: &str,
@@ -366,11 +374,9 @@ fn jobs_by_id<'a>(
 }
 
 fn verify_local_dir(dir: &Path, repo_root: &Path) -> Result<VerifiedLocalGate> {
-    interoception_qualification::verify_local_gate(
-        &interoception_qualification::local_manifest_path(dir),
-        &interoception_qualification::local_transcript_path(dir),
-        Some(repo_root),
-    )
+    let manifest = closed_relative_file(dir, "environment.json")?;
+    let transcript = closed_relative_file(dir, "transcript.bin")?;
+    interoception_qualification::verify_local_gate(&manifest, &transcript, Some(repo_root))
 }
 
 fn bind_local_to_bundle(
@@ -508,4 +514,39 @@ fn gh_api(args: &[&str]) -> Result<Vec<u8>> {
         );
     }
     Ok(output.stdout)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn success_job(id: u64) -> JobIdentity {
+        JobIdentity {
+            id,
+            name: format!("job-{id}"),
+            status: "completed".into(),
+            conclusion: Some("success".into()),
+        }
+    }
+
+    #[test]
+    fn rejects_non_success_required_job() {
+        let mut jobs = vec![success_job(1)];
+        jobs[0].conclusion = Some("skipped".into());
+        assert!(validate_success_jobs(&jobs).is_err());
+    }
+
+    #[test]
+    fn rejects_duplicate_job_ids() {
+        let jobs = vec![success_job(7), success_job(7)];
+        assert!(jobs_by_id(&jobs, "fixture").is_err());
+    }
+
+    #[test]
+    fn accepts_only_terminal_success_jobs() {
+        let jobs = vec![success_job(1), success_job(2)];
+        validate_success_jobs(&jobs).expect("all-success jobs should pass");
+        let map = jobs_by_id(&jobs, "fixture").expect("unique job ids should map");
+        assert_eq!(map.len(), 2);
+    }
 }
