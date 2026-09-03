@@ -569,12 +569,13 @@ mod tests {
 
     #[test]
     fn optional_provenance_fields_cannot_be_present_but_empty() {
-        for mutate in [
-            |observation: &mut ObservationEnvelope| observation.source.collector_id = Some("".into()),
-            |observation: &mut ObservationEnvelope| observation.source.upstream_origin = Some(" ".into()),
-            |observation: &mut ObservationEnvelope| observation.source.tenant = Some("".into()),
-            |observation: &mut ObservationEnvelope| observation.lineage.independence_group = Some("\t".into()),
-        ] {
+        let mutations: [fn(&mut ObservationEnvelope); 4] = [
+            |observation| observation.source.collector_id = Some("".into()),
+            |observation| observation.source.upstream_origin = Some(" ".into()),
+            |observation| observation.source.tenant = Some("".into()),
+            |observation| observation.lineage.independence_group = Some("\t".into()),
+        ];
+        for mutate in mutations {
             let mut observation = sample("obs-1", "test", None);
             mutate(&mut observation);
             assert!(matches!(
