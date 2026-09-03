@@ -116,9 +116,14 @@ impl VisualCompositionBudget {
             ),
             BootStageKind::Handoff => {
                 let departure = 1.0 - smoothstep(progress);
+                // v0.3.3 still owns a standalone DRM surface. Without an explicit
+                // morphology-transfer consumer downstream, retaining a visible
+                // structural seed would merely create a hard cut when DRM is
+                // released. Resolve almost entirely to darkness instead. A future
+                // continuity handoff must be an explicit, separately tested mode.
                 Self::from_layers(
                     VisualHero::Handoff,
-                    0.45 + 0.45 * departure,
+                    0.008 + 0.892 * departure,
                     [
                         0.18 * departure,
                         0.10 * departure,
@@ -326,7 +331,7 @@ mod tests {
     }
 
     #[test]
-    fn update_and_mesh_have_distinct_heroes() {
+    fn update_mesh_and_hardware_have_distinct_attention() {
         let update = VisualCompositionBudget::derive(
             BootStageKind::GrowthRing,
             0.5,
@@ -339,10 +344,19 @@ mod tests {
             1.0,
             VisualProfile::Standard,
         );
+        let hardware = VisualCompositionBudget::derive(
+            BootStageKind::HardwareBud,
+            0.5,
+            1.0,
+            VisualProfile::Standard,
+        );
         assert_eq!(update.hero, VisualHero::Generation);
         assert_eq!(mesh.hero, VisualHero::Mesh);
+        assert_eq!(hardware.hero, VisualHero::Hardware);
         assert!(update.accent > update.mesh);
         assert!(mesh.mesh > mesh.accent);
+        assert!(hardware.accent > hardware.holography * 3.0);
+        assert!(hardware.mesh < hardware.accent * 0.10);
     }
 
     #[test]
@@ -376,8 +390,8 @@ mod tests {
     }
 
     #[test]
-    fn handoff_monotonically_simplifies() {
-        let mut previous = f32::INFINITY;
+    fn handoff_every_layer_monotonically_simplifies() {
+        let mut previous = [f32::INFINITY; 8];
         for progress in [0.0, 0.2, 0.4, 0.6, 0.8, 1.0] {
             let budget = VisualCompositionBudget::derive(
                 BootStageKind::Handoff,
@@ -385,19 +399,28 @@ mod tests {
                 1.0,
                 VisualProfile::Standard,
             );
-            let complexity = budget.topology + budget.secondary_sum();
-            assert!(complexity <= previous + f32::EPSILON);
-            previous = complexity;
+            let current = gains(budget);
+            for (before, after) in previous.into_iter().zip(current) {
+                assert!(after <= before + f32::EPSILON);
+            }
+            previous = current;
         }
-        let final_budget = VisualCompositionBudget::derive(
-            BootStageKind::Handoff,
-            1.0,
-            1.0,
-            VisualProfile::Standard,
-        );
-        assert_eq!(final_budget.hero, VisualHero::Handoff);
-        assert!(final_budget.secondary_sum() <= 0.001);
-        assert!(final_budget.topology > 0.0);
+    }
+
+    #[test]
+    fn standalone_handoff_finishes_below_render_threshold() {
+        for profile in PROFILES {
+            let final_budget = VisualCompositionBudget::derive(
+                BootStageKind::Handoff,
+                1.0,
+                1.0,
+                profile,
+            );
+            assert_eq!(final_budget.hero, VisualHero::Handoff);
+            assert!(final_budget.secondary_sum() <= 0.001);
+            assert!(final_budget.topology < 0.01);
+            assert!(!VisualCompositionBudget::should_render(final_budget.topology));
+        }
     }
 
     #[test]
