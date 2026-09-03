@@ -32,5 +32,13 @@ pkgs.mkShellNoCC {
     export LANG=C
     export LC_ALL=C
     export RUST_BACKTRACE=1
+
+    # `nix develop` has already evaluated the exact detached HEAD before this
+    # hook runs. The inner qualifier immediately verifies that the worktree is
+    # still clean. After that point no later `nix flake metadata`/`nix build`
+    # operation is allowed to rewrite the reviewed lock in-place.
+    if [ -f flake.lock ]; then
+      chmod a-w flake.lock
+    fi
   '';
 }
