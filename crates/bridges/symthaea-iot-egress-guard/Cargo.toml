@@ -12,6 +12,7 @@ keywords = ["iot", "attestation", "cyber-physical", "security"]
 categories = ["embedded", "authentication"]
 
 [dependencies]
+blake3 = { workspace = true }
 symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
 symthaea-authority = { path = "../../core/symthaea-authority" }
 symthaea-iot-actuation = { path = "../symthaea-iot-actuation" }
@@ -20,4 +21,3 @@ symthaea-iot-durable-runtime = { path = "../symthaea-iot-durable-runtime" }
 symthaea-iot-execution = { path = "../symthaea-iot-execution" }
 symthaea-iot-policy = { path = "../symthaea-iot-policy" }
 symthaea-iot-posture = { path = "../symthaea-iot-posture" }
-thiserror = { workspace = true }
