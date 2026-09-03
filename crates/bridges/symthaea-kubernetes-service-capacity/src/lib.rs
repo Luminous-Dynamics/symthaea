@@ -509,9 +509,7 @@ mod tests {
 
         let mut registry = IntegrationRegistry::new();
         registry
-            .register_discoverer(Arc::new(
-                KubernetesReplayDiscoverer::from_objects(context, &docs, 100).unwrap(),
-            ))
+            .register_discoverer(Arc::new(replay.topology().clone()))
             .unwrap();
         let assessment = assess_registry_service_capacity(
             &registry,
