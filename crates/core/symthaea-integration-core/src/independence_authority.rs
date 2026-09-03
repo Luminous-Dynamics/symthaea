@@ -13,11 +13,13 @@
 //! qualified reasoning tranche. Known shared-origin evidence always dominates a
 //! positive-independence claim.
 
-use crate::{ObservationEnvelope, ObservationId};
+use crate::{ObservationEnvelope, SourceQualifiedObservationRef};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-pub const INDEPENDENCE_ATTESTATION_SCHEMA_VERSION: u16 = 1;
+/// Schema v2 replaces ambiguous raw supporting `ObservationId`s with explicit
+/// source-qualified observation references.
+pub const INDEPENDENCE_ATTESTATION_SCHEMA_VERSION: u16 = 2;
 
 /// Source-qualified reference to one measurement lineage.
 ///
@@ -130,8 +132,10 @@ pub struct IndependenceAttestation {
     pub valid_from_unix_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub valid_until_unix_ms: Option<u64>,
+    /// Cross-source supporting evidence must be source-qualified. Equal local
+    /// IDs from different integrations/collectors are therefore distinct refs.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub evidence_observation_ids: Vec<ObservationId>,
+    pub evidence_observations: Vec<SourceQualifiedObservationRef>,
 }
 
 impl IndependenceAttestation {
@@ -182,12 +186,19 @@ impl IndependenceAttestation {
         }
 
         let mut evidence = BTreeSet::new();
-        for observation_id in &self.evidence_observation_ids {
-            require_non_empty("evidence_observation_id", observation_id.as_str())?;
-            if !evidence.insert(observation_id.clone()) {
-                return Err(IndependenceAttestationError::DuplicateEvidenceObservationId(
-                    observation_id.clone(),
-                ));
+        for (index, observation_ref) in self.evidence_observations.iter().enumerate() {
+            observation_ref.validate().map_err(|reason| {
+                IndependenceAttestationError::InvalidEvidenceObservationReference {
+                    index,
+                    reason: reason.to_string(),
+                }
+            })?;
+            if !evidence.insert(observation_ref.clone()) {
+                return Err(
+                    IndependenceAttestationError::DuplicateEvidenceObservationReference(
+                        observation_ref.clone(),
+                    ),
+                );
             }
         }
 
@@ -267,10 +278,10 @@ impl IndependenceAttestationSet {
                 });
             }
 
-            if attestation.evidence_observation_ids.len() > policy.max_evidence_refs_per_attestation {
+            if attestation.evidence_observations.len() > policy.max_evidence_refs_per_attestation {
                 return Err(IndependenceAttestationSetError::TooManyEvidenceRefs {
                     index,
-                    actual: attestation.evidence_observation_ids.len(),
+                    actual: attestation.evidence_observations.len(),
                     max: policy.max_evidence_refs_per_attestation,
                 });
             }
@@ -313,8 +324,10 @@ pub enum IndependenceAttestationError {
         valid_from_unix_ms: u64,
         valid_until_unix_ms: u64,
     },
-    #[error("duplicate supporting observation id `{0}`")]
-    DuplicateEvidenceObservationId(ObservationId),
+    #[error("supporting observation reference {index} is invalid: {reason}")]
+    InvalidEvidenceObservationReference { index: usize, reason: String },
+    #[error("duplicate supporting observation reference `{0}`")]
+    DuplicateEvidenceObservationReference(SourceQualifiedObservationRef),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -448,10 +461,20 @@ fn attestation_string_bytes(
             .checked_add(value.len())
             .ok_or(IndependenceAttestationSetError::StringBudgetOverflow)?;
     }
-    for id in &attestation.evidence_observation_ids {
-        total = total
-            .checked_add(id.as_str().len())
-            .ok_or(IndependenceAttestationSetError::StringBudgetOverflow)?;
+    for reference in &attestation.evidence_observations {
+        for value in [
+            Some(reference.integration_id.as_str()),
+            reference.collector_id.as_deref(),
+            reference.tenant.as_deref(),
+            Some(reference.observation_id.as_str()),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            total = total
+                .checked_add(value.len())
+                .ok_or(IndependenceAttestationSetError::StringBudgetOverflow)?;
+        }
     }
     Ok(total)
 }
@@ -460,12 +483,16 @@ fn attestation_string_bytes(
 mod tests {
     use super::*;
     use crate::{
-        EntityRef, ObservationKind, ObservationLineage, ObservationQuality, ObservationSource,
-        ObservationValue,
+        EntityRef, ObservationId, ObservationKind, ObservationLineage, ObservationQuality,
+        ObservationSource, ObservationValue,
     };
 
     fn authority() -> IndependenceAuthorityQualification {
         IndependenceAuthorityQualification::new("security-review", "independence-v1")
+    }
+
+    fn evidence(integration: &str, id: &str) -> SourceQualifiedObservationRef {
+        SourceQualifiedObservationRef::new(integration, ObservationId::new(id))
     }
 
     fn attestation() -> IndependenceAttestation {
@@ -479,7 +506,7 @@ mod tests {
             issued_at_unix_ms: 100,
             valid_from_unix_ms: None,
             valid_until_unix_ms: None,
-            evidence_observation_ids: vec![ObservationId::new("obs-1")],
+            evidence_observations: vec![evidence("prometheus", "obs-1")],
         }
     }
 
@@ -596,12 +623,22 @@ mod tests {
     #[test]
     fn duplicate_supporting_observations_fail_closed() {
         let mut duplicate = attestation();
-        duplicate.evidence_observation_ids =
-            vec![ObservationId::new("same"), ObservationId::new("same")];
+        let supporting = evidence("prometheus", "same");
+        duplicate.evidence_observations = vec![supporting.clone(), supporting];
         assert!(matches!(
             duplicate.validate(),
-            Err(IndependenceAttestationError::DuplicateEvidenceObservationId(_))
+            Err(IndependenceAttestationError::DuplicateEvidenceObservationReference(_))
         ));
+    }
+
+    #[test]
+    fn equal_local_support_ids_from_different_sources_are_distinct() {
+        let mut qualified = attestation();
+        qualified.evidence_observations = vec![
+            evidence("prometheus", "same"),
+            evidence("otlp", "same"),
+        ];
+        assert!(qualified.validate().is_ok());
     }
 
     #[test]
