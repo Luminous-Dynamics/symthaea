@@ -35,10 +35,14 @@ jobs:
           toolchain: 1.96.0
           components: rustfmt,clippy
 
-      - name: Require one-shot patch sources
+      - name: Require one-shot patch sources and evidence tool
         run: |
           test -s scripts/spore_v033_apply_v2.py
           test -s scripts/spore_v033_apply_semantics.py
+          test -s scripts/spore_visual_contact_sheet.py
+
+      - name: Verify temporal evidence tool syntax
+        run: python3 -m py_compile scripts/spore_visual_contact_sheet.py
 
       - name: Apply guarded composition integration
         run: python3 scripts/spore_v033_apply_v2.py
