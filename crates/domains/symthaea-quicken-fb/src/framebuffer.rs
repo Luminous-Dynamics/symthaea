@@ -89,8 +89,8 @@ pub struct DrmFramebuffer {
     pub mode: Mode,
     /// Dumb buffer for cleanup and mapping.
     dumb_buffer: control::dumbbuffer::DumbBuffer,
-    /// Original CRTC state for restore on drop.
-    original_crtc: Option<control::crtc::Info>,
+    /// Complete original CRTC state captured before renderer takeover.
+    original_crtc: control::crtc::Info,
     /// Exact connectors routed to the original CRTC before renderer takeover.
     ///
     /// Legacy SETCRTC restores connector routing as well as framebuffer/mode
@@ -118,10 +118,11 @@ impl DrmFramebuffer {
             .map_err(DrmError::ResourceQuery)?;
         let crtc = encoder.crtc().ok_or(DrmError::NoCrtc)?;
 
-        // Save the complete legacy KMS routing before takeover. If topology
-        // capture fails, do not modeset a display we cannot faithfully restore.
+        // Save the complete legacy KMS routing before takeover. If either the
+        // CRTC state or connector topology cannot be captured, do not modeset a
+        // display we cannot faithfully restore.
+        let original_crtc = card.get_crtc(crtc).map_err(DrmError::ResourceQuery)?;
         let original_connectors = Self::connectors_for_crtc(&card, &res, crtc)?;
-        let original_crtc = card.get_crtc(crtc).ok();
 
         let width = mode.size().0 as u32;
         let height = mode.size().1 as u32;
@@ -268,15 +269,13 @@ impl Drop for DrmFramebuffer {
         // Restore the complete original legacy KMS state: framebuffer, position,
         // mode and connector routing. The connector array is semantically part of
         // SETCRTC; restoring with `&[]` would detach the CRTC from its display.
-        if let Some(ref orig) = self.original_crtc {
-            let _ = self.card.set_crtc(
-                self.crtc,
-                orig.framebuffer(),
-                orig.position(),
-                &self.original_connectors,
-                orig.mode(),
-            );
-        }
+        let _ = self.card.set_crtc(
+            self.crtc,
+            self.original_crtc.framebuffer(),
+            self.original_crtc.position(),
+            &self.original_connectors,
+            self.original_crtc.mode(),
+        );
 
         // Destroy framebuffer
         let _ = self.card.destroy_framebuffer(self.fb);
