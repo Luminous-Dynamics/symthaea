@@ -19,6 +19,7 @@ pkgs.runCommand "eval-trusted-runner-routing" { } ''
   # Capability ownership is intentionally tiny. Any new consumer must receive a
   # separate threat-model review and update this exact allowlist deliberately.
   expected="$(cat <<'EOF'
+self-hosted-ai-assurance-budget-recovery.yml
 self-hosted-ai-assurance-foundation-recovery.yml
 self-hosted-runner-smoke.yml
 self-hosted-sym-arch-002a-core-recovery.yml
