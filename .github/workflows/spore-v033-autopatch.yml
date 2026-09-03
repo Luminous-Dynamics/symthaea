@@ -10,17 +10,24 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: spore-v033-guarded-integration
+  cancel-in-progress: true
+
 jobs:
   integrate:
     name: Apply, format, verify, commit
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout exact branch head
+      - name: Checkout triggering commit exactly
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: spore/visual-composition-v0.3.3-design
+          ref: ${{ github.sha }}
           fetch-depth: 1
+
+      - name: Verify event/source identity
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
 
       - name: Install pinned Rust 1.96.0
         uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e
@@ -29,10 +36,10 @@ jobs:
           components: rustfmt,clippy
 
       - name: Require one-shot patch source
-        run: test -s scripts/spore_v033_apply.py
+        run: test -s scripts/spore_v033_apply_v2.py
 
       - name: Apply guarded renderer integration
-        run: python3 scripts/spore_v033_apply.py
+        run: python3 scripts/spore_v033_apply_v2.py
 
       - name: Format focused Spore crates
         run: >-
@@ -72,22 +79,26 @@ jobs:
           -p symthaea-boot-state
           -p symthaea-quicken-fb
 
-      - name: Remove one-shot patch source
-        run: rm scripts/spore_v033_apply.py
+      - name: Remove one-shot machinery
+        run: rm scripts/spore_v033_apply_v2.py .github/workflows/spore-v033-autopatch.yml
 
-      - name: Verify patch cleanliness
+      - name: Verify patch cleanliness and scope
         run: |
           git diff --check
-          test -z "$(git status --porcelain | grep -E '^\?\?' || true)"
+          unexpected="$(git status --porcelain | awk '{print $2}' | grep -Ev '^(crates/core/symthaea-boot-ecology/|crates/core/symthaea-boot-state/|crates/domains/symthaea-quicken-fb/|scripts/spore_v033_apply_v2.py$|\.github/workflows/spore-v033-autopatch.yml$)' || true)"
+          test -z "$unexpected"
 
-      - name: Commit verified integration
+      - name: Commit verified integration only if branch has not moved
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add crates/core/symthaea-boot-ecology \
                   crates/core/symthaea-boot-state \
                   crates/domains/symthaea-quicken-fb \
-                  scripts/spore_v033_apply.py
+                  scripts/spore_v033_apply_v2.py \
+                  .github/workflows/spore-v033-autopatch.yml
           git diff --cached --check
           git commit -m "feat(spore): thread v0.3.3 composition budget through renderer"
+          git fetch origin spore/visual-composition-v0.3.3-design
+          test "$(git rev-parse origin/spore/visual-composition-v0.3.3-design)" = "$GITHUB_SHA"
           git push origin HEAD:spore/visual-composition-v0.3.3-design
