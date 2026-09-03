@@ -87,6 +87,17 @@ pub fn build_actions_archive(
     fs::write(&manifest_path, manifest_bytes)
         .with_context(|| format!("write Actions archive manifest {}", manifest_path.display()))?;
 
+    verify_actions_archive_closed(archive_dir, repo_root)
+}
+
+pub fn verify_actions_archive_closed(
+    archive_dir: &Path,
+    repo_root: Option<&Path>,
+) -> Result<VerifiedActionsGate> {
+    canonical_closed_root(archive_dir)?;
+    for relative in ["manifest.json", "run.json", "jobs.json", "workflow.yml"] {
+        closed_relative_file(archive_dir, relative)?;
+    }
     verify_actions_archive(archive_dir, repo_root)
 }
 
