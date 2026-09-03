@@ -20,6 +20,7 @@ on:
       - 'crates/bridges/symthaea-iot-interlock-trust/**'
       - 'crates/bridges/symthaea-iot-jit-fence/**'
       - 'crates/bridges/symthaea-iot-interlock-ed25519/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard-protocol/**'
       - 'src/swarm/mesh/sensor_iot.rs'
       - 'src/cognitive_loop/managers/survival_manager.rs'
       - '.github/workflows/iot-authority.yml'
@@ -75,9 +76,10 @@ jobs:
           crates/bridges/symthaea-iot-interlock-trust/src/lib.rs
           crates/bridges/symthaea-iot-jit-fence/src/lib.rs
           crates/bridges/symthaea-iot-interlock-ed25519/src/lib.rs
+          crates/bridges/symthaea-iot-actuation-guard-protocol/src/lib.rs
 
   runtime-implementation:
-    name: IoT host + transport + device + concrete trust implementation (MSRV 1.94)
+    name: IoT host + transport + device + guard protocol implementation (MSRV 1.94)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -118,6 +120,7 @@ jobs:
           -p symthaea-iot-interlock-trust
           -p symthaea-iot-jit-fence
           -p symthaea-iot-interlock-ed25519
+          -p symthaea-iot-actuation-guard-protocol
           --all-targets
 
       - name: Test merged authority/runtime/IoT stack
@@ -140,6 +143,7 @@ jobs:
           -p symthaea-iot-interlock-trust
           -p symthaea-iot-jit-fence
           -p symthaea-iot-interlock-ed25519
+          -p symthaea-iot-actuation-guard-protocol
           --all-targets
 
       - name: Clippy merged authority/runtime/IoT stack
@@ -162,6 +166,7 @@ jobs:
           -p symthaea-iot-interlock-trust
           -p symthaea-iot-jit-fence
           -p symthaea-iot-interlock-ed25519
+          -p symthaea-iot-actuation-guard-protocol
           --all-targets -- -D warnings
 
   telemetry-boundary:
