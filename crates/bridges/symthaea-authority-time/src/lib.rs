@@ -27,7 +27,6 @@
 
 use std::collections::BTreeSet;
 use std::fs;
-use std::time::Duration;
 
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
@@ -211,7 +210,8 @@ pub struct AuthorityTimeStatementV1 {
     pub challenge_nonce: [u8; 32],
     pub witnessed_unix_s: u64,
     pub uncertainty_s: u64,
-    pub signature: [u8; 64],
+    /// Ed25519 signature bytes. V1 requires exactly 64 bytes at verification.
+    pub signature: Vec<u8>,
 }
 
 impl AuthorityTimeStatementV1 {
@@ -359,7 +359,12 @@ pub fn verify_authority_time_v1(
         let message = statement.canonical_message()?;
         let key = VerifyingKey::from_bytes(&authority.verifying_key)
             .map_err(|_| AuthorityTimeError::InvalidPolicy)?;
-        key.verify(&message, &Signature::from_bytes(&statement.signature))
+        let signature_bytes: [u8; 64] = statement
+            .signature
+            .as_slice()
+            .try_into()
+            .map_err(|_| AuthorityTimeError::BadSignatureLength)?;
+        key.verify(&message, &Signature::from_bytes(&signature_bytes))
             .map_err(|_| AuthorityTimeError::BadSignature)?;
 
         let lower = statement
@@ -404,8 +409,8 @@ pub fn verify_authority_time_v1(
 ///
 /// `/proc/uptime` is treated as kernel evidence under the Agency Kernel threat
 /// model. A fully compromised kernel/hypervisor remains outside the guarantee.
-/// Linux uptime includes suspended time; this avoids the lease-extension issue
-/// of clocks that stop while the machine sleeps.
+/// Linux `/proc/uptime` includes suspended time, avoiding the authority lease
+/// extension that occurs with clocks that stop while the machine sleeps.
 fn linux_boottime_ns() -> Result<u64, AuthorityTimeError> {
     let text = fs::read_to_string("/proc/uptime").map_err(AuthorityTimeError::BootTimeRead)?;
     let token = text
@@ -448,12 +453,14 @@ fn parse_decimal_seconds_ns(value: &str) -> Result<u64, AuthorityTimeError> {
 }
 
 fn ceil_ns_to_s(ns: u64) -> Result<u64, AuthorityTimeError> {
-    if ns == 0 {
-        return Ok(0);
+    let whole = ns / 1_000_000_000;
+    if ns % 1_000_000_000 == 0 {
+        Ok(whole)
+    } else {
+        whole
+            .checked_add(1)
+            .ok_or(AuthorityTimeError::ArithmeticOverflow)
     }
-    ns.checked_add(999_999_999)
-        .map(|value| value / 1_000_000_000)
-        .ok_or(AuthorityTimeError::ArithmeticOverflow)
 }
 
 struct Transcript {
@@ -509,6 +516,8 @@ pub enum AuthorityTimeError {
     UnknownAuthority,
     #[error("signed time statement is malformed or does not bind the challenge")]
     InvalidStatement,
+    #[error("time statement Ed25519 signature must be exactly 64 bytes")]
+    BadSignatureLength,
     #[error("time statement signature verification failed")]
     BadSignature,
     #[error("time authorities do not satisfy the configured organizational/service diversity")]
@@ -598,9 +607,12 @@ mod tests {
             challenge_nonce: challenge.nonce,
             witnessed_unix_s,
             uncertainty_s,
-            signature: [0; 64],
+            signature: Vec::new(),
         };
-        statement.signature = key.sign(&statement.canonical_message().unwrap()).to_bytes();
+        statement.signature = key
+            .sign(&statement.canonical_message().unwrap())
+            .to_bytes()
+            .to_vec();
         statement
     }
 
@@ -631,8 +643,6 @@ mod tests {
         let wire = pending.wire();
         let mut first = statement(&policy, wire, &keys[0], TimeAuthorityId([1; 16]), 1_000, 2);
         first.challenge_nonce = [99; 32];
-        // Keep the original signature: the modified nonce must fail either the
-        // exact challenge check or signature check, never become fresh time.
         let second = statement(&policy, wire, &keys[1], TimeAuthorityId([2; 16]), 1_001, 2);
         assert!(matches!(
             verify_authority_time_v1(&policy, pending, &[first, second]),
@@ -655,11 +665,23 @@ mod tests {
     }
 
     #[test]
+    fn short_signature_fails_closed_before_crypto() {
+        let (policy, keys) = policy();
+        let pending = pending(&policy, [44; 32]);
+        let wire = pending.wire();
+        let mut first = statement(&policy, wire, &keys[0], TimeAuthorityId([1; 16]), 1_000, 2);
+        first.signature.truncate(63);
+        let second = statement(&policy, wire, &keys[1], TimeAuthorityId([2; 16]), 1_001, 2);
+        assert!(matches!(
+            verify_authority_time_v1(&policy, pending, &[first, second]),
+            Err(AuthorityTimeError::BadSignatureLength)
+        ));
+    }
+
+    #[test]
     fn duplicate_organization_cannot_satisfy_diversity() {
         let (mut policy, keys) = policy();
         policy.authorities[1].organization_binding = policy.authorities[0].organization_binding;
-        // Policy still has a third organization, so it is valid globally, but
-        // selecting the first two signers does not meet the per-admission rule.
         policy.validate().unwrap();
         let pending = pending(&policy, [44; 32]);
         let wire = pending.wire();
@@ -716,10 +738,10 @@ mod tests {
             statement(&policy, wire, &keys[1], TimeAuthorityId([2; 16]), 1_001, 2),
         ];
         let verified = verify_authority_time_v1(&policy, pending, &statements).unwrap();
-        assert_eq!(
-            verified.require_subject([55; 32]).unwrap_err().to_string(),
-            AuthorityTimeError::SubjectMismatch.to_string()
-        );
+        assert!(matches!(
+            verified.require_subject([55; 32]),
+            Err(AuthorityTimeError::SubjectMismatch)
+        ));
     }
 
     #[test]
@@ -734,7 +756,7 @@ mod tests {
     fn ceil_duration_never_rounds_elapsed_time_down() {
         assert_eq!(ceil_ns_to_s(0).unwrap(), 0);
         assert_eq!(ceil_ns_to_s(1).unwrap(), 1);
-        assert_eq!(ceil_ns_to_s(Duration::from_secs(1).as_nanos() as u64).unwrap(), 1);
+        assert_eq!(ceil_ns_to_s(1_000_000_000).unwrap(), 1);
         assert_eq!(ceil_ns_to_s(1_000_000_001).unwrap(), 2);
     }
 }
