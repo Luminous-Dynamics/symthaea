@@ -21,3 +21,6 @@ symthaea-iot-egress-guard = { path = "../symthaea-iot-egress-guard" }
 symthaea-iot-policy = { path = "../symthaea-iot-policy" }
 symthaea-iot-posture = { path = "../symthaea-iot-posture" }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
