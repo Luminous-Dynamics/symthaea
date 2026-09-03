@@ -13,11 +13,38 @@ on:
 permissions:
   contents: read
 
+env:
+  RUSTUP_TOOLCHAIN: 1.94.0
+
 concurrency:
   group: iot-authority-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  source-format:
+    name: IoT authority source format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact Rust formatter
+        run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      # #279 owns formatting of symthaea-authority. This PR's format claim is
+      # deliberately scoped to the source introduced by this IoT tranche.
+      - name: Check IoT source formatting
+        run: rustfmt --edition 2024 --check crates/bridges/symthaea-iot-authority/src/lib.rs
+
   implementation:
     name: IoT authority implementation
     runs-on: ubuntu-24.04
@@ -26,25 +53,21 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Install pinned Rust
+      - name: Install exact Rust compiler
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
+
+      - name: Verify exact checkout and toolchain
         run: |
-          rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
-          rustup default 1.94.0
-          rustc --version
-          cargo --version
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
 
-      - name: Verify exact checkout
-        if: github.event_name == 'pull_request'
-        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
-
-      # This lane establishes compiler/test/lint evidence even while the workspace
-      # lockfile status is reported independently below. It must not be cited as a
-      # locked-resolution/reproducibility claim.
+      # Compiler/test/lint evidence is independent of source-format evidence so
+      # formatting drift cannot hide semantic/compiler failures.
       - name: Workspace metadata resolves
         run: cargo metadata --format-version 1 --no-deps >/dev/null
-
-      - name: Rustfmt
-        run: cargo fmt --check -p symthaea-authority -p symthaea-iot-authority
 
       - name: Check
         run: cargo check -p symthaea-authority -p symthaea-iot-authority --all-targets
@@ -63,17 +86,17 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Install pinned Rust
+      - name: Install exact Rust toolchain
+        run: rustup toolchain install 1.94.0 --profile minimal
+
+      - name: Verify exact checkout and toolchain
         run: |
-          rustup toolchain install 1.94.0 --profile minimal
-          rustup default 1.94.0
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
 
-      - name: Verify exact checkout
-        if: github.event_name == 'pull_request'
-        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
-
-      # Separate claim: the committed dependency graph must already resolve.
-      # This job never repairs Cargo.lock on the runner.
       - name: Committed lock resolves without mutation
         run: |
           before=$(sha256sum Cargo.lock | awk '{print $1}')
