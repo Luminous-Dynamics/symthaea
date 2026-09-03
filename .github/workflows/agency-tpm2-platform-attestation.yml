@@ -2,6 +2,16 @@ name: Agency TPM2 Platform Attestation
 
 on:
   pull_request:
+    paths:
+      - 'crates/core/symthaea-authority/**'
+      - 'crates/bridges/symthaea-platform-attestation/**'
+      - 'nix/agency-tpm2-verifier-tools.nix'
+      - 'flake.nix'
+      - 'flake.lock'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/agency-tpm2-platform-attestation.yml'
   workflow_dispatch:
 
 permissions:

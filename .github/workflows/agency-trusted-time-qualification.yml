@@ -2,6 +2,19 @@ name: Agency Trusted Time Qualification
 
 on:
   pull_request:
+    paths:
+      - 'crates/core/symthaea-authority/**'
+      - 'crates/core/symthaea-action-*/**'
+      - 'crates/bridges/symthaea-authority-time/**'
+      - 'crates/bridges/symthaea-authority-state/**'
+      - 'crates/bridges/symthaea-executor-workload/**'
+      - 'crates/bridges/symthaea-xenia-*/**'
+      - 'crates/bridges/symthaea-system-*/**'
+      - 'crates/bridges/symthaea-authority-frontier*/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/agency-trusted-time-qualification.yml'
   workflow_dispatch:
 
 permissions:

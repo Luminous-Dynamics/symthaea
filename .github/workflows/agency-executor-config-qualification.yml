@@ -2,6 +2,12 @@ name: Agency Executor Configuration Qualification
 
 on:
   pull_request:
+    paths:
+      - 'crates/bridges/symthaea-executor-configuration/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/agency-executor-config-qualification.yml'
   workflow_dispatch:
 
 permissions:
