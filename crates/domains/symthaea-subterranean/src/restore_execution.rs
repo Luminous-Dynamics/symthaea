@@ -4,7 +4,7 @@
 //!
 //! A committed restore is not activation authority by itself. Every typed
 //! restore action must execute against the exact committed generation binding
-//! and produce one owner-minted receipt before activation may proceed.
+//! and produce one executor-authenticated receipt before activation may proceed.
 
 use super::restore_actions::{
     canonical_plan_for_decision, RestoreAction, RestoreDomainPlan, RestorePlanError,
@@ -38,7 +38,12 @@ pub(super) enum RestoreActionOutcome {
     Dropped,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Evidence that one exact canonical restore action completed.
+///
+/// Deliberately not `Clone`, `Copy`, `Serialize` or `Deserialize`. There is no
+/// production constructor in this module. A future domain executor may create
+/// a receipt only while consuming the matching affine `RestoreActionPermit`.
+#[derive(Debug, PartialEq, Eq)]
 pub(super) struct RestoreActionReceipt {
     binding: RestoreExecutionBinding,
     domain: RestoreDomain,
@@ -46,20 +51,68 @@ pub(super) struct RestoreActionReceipt {
     outcome: RestoreActionOutcome,
 }
 
-impl RestoreActionReceipt {
-    pub(super) const fn new(
-        binding: RestoreExecutionBinding,
+/// Single-use authority to execute one exact canonical restore obligation.
+///
+/// Deliberately not `Clone`, `Copy`, `Serialize` or `Deserialize`. Fields are
+/// private and raw construction is unavailable outside this module.
+#[derive(Debug)]
+pub(super) struct RestoreActionPermit {
+    binding: RestoreExecutionBinding,
+    domain: RestoreDomain,
+    action: RestoreAction,
+}
+
+impl RestoreActionPermit {
+    pub(super) const fn domain(&self) -> RestoreDomain {
+        self.domain
+    }
+
+    pub(super) const fn action(&self) -> RestoreAction {
+        self.action
+    }
+}
+
+/// Transaction-owned set of still-unconsumed restore action permits.
+///
+/// A permit disappears from this set when taken. The type is affine and has no
+/// serialization surface, so a checkpoint cannot deserialize into execution
+/// authority and the same obligation cannot be issued twice by this set.
+pub(super) struct RestoreExecutionPermitSet {
+    binding: RestoreExecutionBinding,
+    permits: Vec<RestoreActionPermit>,
+}
+
+impl RestoreExecutionPermitSet {
+    pub(super) fn remaining(&self) -> usize {
+        self.permits.len()
+    }
+
+    pub(super) fn take(
+        &mut self,
         domain: RestoreDomain,
         action: RestoreAction,
-        outcome: RestoreActionOutcome,
-    ) -> Self {
-        Self {
-            binding,
-            domain,
-            action,
-            outcome,
-        }
+    ) -> Result<RestoreActionPermit, RestorePermitError> {
+        let Some(index) = self
+            .permits
+            .iter()
+            .position(|permit| permit.domain == domain && permit.action == action)
+        else {
+            return Err(RestorePermitError::MissingPermit { domain, action });
+        };
+        Ok(self.permits.remove(index))
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RestorePermitError {
+    PlanUnavailable {
+        domain: RestoreDomain,
+        error: RestorePlanError,
+    },
+    MissingPermit {
+        domain: RestoreDomain,
+        action: RestoreAction,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,6 +144,53 @@ pub(super) enum RestoreExecutionError {
     },
 }
 
+fn canonical_plans_for_committed(
+    committed: &CommittedOperationalRestore,
+) -> Result<Vec<RestoreDomainPlan>, RestorePlanError> {
+    committed
+        .decisions()
+        .iter()
+        .map(|decision| canonical_plan_for_decision(*decision))
+        .collect()
+}
+
+/// Issue the complete affine action-permit set for one committed restore.
+///
+/// The caller does not supply domains or actions. Every permit is derived from
+/// the committed decisions and canonical RA-20/RA-24 plans.
+pub(super) fn issue_restore_action_permits(
+    committed: &CommittedOperationalRestore,
+) -> Result<RestoreExecutionPermitSet, RestorePermitError> {
+    let binding = RestoreExecutionBinding::from_committed(committed);
+    let plans = canonical_plans_for_committed(committed).map_err(|error| {
+        let domain = match error {
+            RestorePlanError::DecisionNotAdmissible { domain, .. }
+            | RestorePlanError::DuplicateAction { domain, .. }
+            | RestorePlanError::MissingSemanticAction { domain, .. }
+            | RestorePlanError::MissingVerdictAction { domain, .. }
+            | RestorePlanError::UnexpectedAction { domain, .. }
+            | RestorePlanError::EvidencePolicyUnderspecified { domain }
+            | RestorePlanError::MissingEvidencePolicy { domain, .. }
+            | RestorePlanError::UnexpectedEvidencePolicy { domain, .. }
+            | RestorePlanError::VerdictActionMismatch { domain, .. } => domain,
+        };
+        RestorePermitError::PlanUnavailable { domain, error }
+    })?;
+
+    let permits = plans
+        .iter()
+        .flat_map(|plan| {
+            plan.actions().iter().copied().map(move |action| RestoreActionPermit {
+                binding,
+                domain: plan.domain(),
+                action,
+            })
+        })
+        .collect();
+
+    Ok(RestoreExecutionPermitSet { binding, permits })
+}
+
 fn outcome_matches(action: RestoreAction, outcome: RestoreActionOutcome) -> bool {
     match action {
         RestoreAction::ReplaceValidatedHistorical
@@ -107,14 +207,14 @@ fn validate_receipts_for_plan(
     plan: &RestoreDomainPlan,
     receipts: &[RestoreActionReceipt],
 ) -> Result<(), RestoreExecutionError> {
-    for receipt in receipts {
+    for receipt in receipts.iter().filter(|receipt| receipt.domain == plan.domain()) {
         if receipt.binding != binding {
             return Err(RestoreExecutionError::WrongBinding {
                 domain: receipt.domain,
                 action: receipt.action,
             });
         }
-        if receipt.domain != plan.domain() || !plan.actions().contains(&receipt.action) {
+        if !plan.actions().contains(&receipt.action) {
             return Err(RestoreExecutionError::UnexpectedReceipt {
                 domain: receipt.domain,
                 action: receipt.action,
@@ -156,38 +256,36 @@ fn validate_receipts_for_plan(
 /// Activation gate for a complete restore transaction.
 ///
 /// Plans are derived canonically from the committed RA-19 decisions. Callers
-/// provide only receipts; they cannot choose or replace restore semantics after
-/// commit. All plans are derived before any receipt is evaluated so semantic
-/// incompleteness is distinguished from missing execution evidence.
+/// provide only executor-produced receipts; they cannot choose restore semantics
+/// or mint success evidence through this module.
 pub(super) fn validate_restore_execution(
     committed: &CommittedOperationalRestore,
     receipts: &[RestoreActionReceipt],
 ) -> Result<(), RestoreExecutionError> {
     let binding = RestoreExecutionBinding::from_committed(committed);
-    let plans = committed
-        .decisions()
-        .iter()
-        .map(|decision| {
-            canonical_plan_for_decision(*decision).map_err(|error| {
-                RestoreExecutionError::PlanUnavailable {
-                    domain: decision.domain(),
-                    error,
-                }
-            })
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    let plans = canonical_plans_for_committed(committed).map_err(|error| {
+        let domain = match error {
+            RestorePlanError::DecisionNotAdmissible { domain, .. }
+            | RestorePlanError::DuplicateAction { domain, .. }
+            | RestorePlanError::MissingSemanticAction { domain, .. }
+            | RestorePlanError::MissingVerdictAction { domain, .. }
+            | RestorePlanError::UnexpectedAction { domain, .. }
+            | RestorePlanError::EvidencePolicyUnderspecified { domain }
+            | RestorePlanError::MissingEvidencePolicy { domain, .. }
+            | RestorePlanError::UnexpectedEvidencePolicy { domain, .. }
+            | RestorePlanError::VerdictActionMismatch { domain, .. } => domain,
+        };
+        RestoreExecutionError::PlanUnavailable { domain, error }
+    })?;
 
     for plan in &plans {
-        let domain_receipts = receipts
-            .iter()
-            .copied()
-            .filter(|receipt| receipt.domain == plan.domain())
-            .collect::<Vec<_>>();
-        validate_receipts_for_plan(binding, plan, &domain_receipts)?;
+        validate_receipts_for_plan(binding, plan, receipts)?;
     }
 
     for receipt in receipts {
-        if !plans.iter().any(|plan| plan.domain() == receipt.domain) {
+        if !plans.iter().any(|plan| {
+            plan.domain() == receipt.domain && plan.actions().contains(&receipt.action)
+        }) {
             return Err(RestoreExecutionError::UnexpectedReceipt {
                 domain: receipt.domain,
                 action: receipt.action,
@@ -258,33 +356,107 @@ mod tests {
         .expect("operator canonical plan")
     }
 
+    fn test_receipt(
+        binding: RestoreExecutionBinding,
+        domain: RestoreDomain,
+        action: RestoreAction,
+        outcome: RestoreActionOutcome,
+    ) -> RestoreActionReceipt {
+        RestoreActionReceipt {
+            binding,
+            domain,
+            action,
+            outcome,
+        }
+    }
+
     fn operator_receipts(binding: RestoreExecutionBinding) -> Vec<RestoreActionReceipt> {
         vec![
-            RestoreActionReceipt::new(
+            test_receipt(
                 binding,
                 RestoreDomain::OperatorAuthority,
                 RestoreAction::PreserveOrNarrowAuthority,
                 RestoreActionOutcome::Applied,
             ),
-            RestoreActionReceipt::new(
+            test_receipt(
                 binding,
                 RestoreDomain::OperatorAuthority,
                 RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier),
                 RestoreActionOutcome::Applied,
             ),
-            RestoreActionReceipt::new(
+            test_receipt(
                 binding,
                 RestoreDomain::OperatorAuthority,
                 RestoreAction::ReconcileBeforeActivation,
                 RestoreActionOutcome::Reconciled,
             ),
-            RestoreActionReceipt::new(
+            test_receipt(
                 binding,
                 RestoreDomain::OperatorAuthority,
                 RestoreAction::DropEphemeral,
                 RestoreActionOutcome::Dropped,
             ),
         ]
+    }
+
+    #[test]
+    fn permit_set_exactly_matches_canonical_obligations() {
+        let committed = committed();
+        let expected = committed
+            .decisions()
+            .iter()
+            .map(|decision| canonical_plan_for_decision(*decision).unwrap().actions().len())
+            .sum::<usize>();
+        let permits = issue_restore_action_permits(&committed).expect("canonical permits");
+        assert_eq!(permits.remaining(), expected);
+        assert_eq!(permits.binding, RestoreExecutionBinding::from_committed(&committed));
+    }
+
+    #[test]
+    fn taking_permit_consumes_exact_obligation_once() {
+        let committed = committed();
+        let mut permits = issue_restore_action_permits(&committed).expect("canonical permits");
+        let before = permits.remaining();
+        let permit = permits
+            .take(
+                RestoreDomain::OperatorAuthority,
+                RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier),
+            )
+            .expect("operator replay permit");
+        assert_eq!(permit.domain(), RestoreDomain::OperatorAuthority);
+        assert_eq!(
+            permit.action(),
+            RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier)
+        );
+        assert_eq!(permit.binding, RestoreExecutionBinding::from_committed(&committed));
+        assert_eq!(permits.remaining(), before - 1);
+        assert_eq!(
+            permits
+                .take(
+                    RestoreDomain::OperatorAuthority,
+                    RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier),
+                )
+                .err(),
+            Some(RestorePermitError::MissingPermit {
+                domain: RestoreDomain::OperatorAuthority,
+                action: RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier),
+            })
+        );
+    }
+
+    #[test]
+    fn action_not_in_canonical_plan_has_no_permit() {
+        let committed = committed();
+        let mut permits = issue_restore_action_permits(&committed).expect("canonical permits");
+        assert_eq!(
+            permits
+                .take(RestoreDomain::Controller, RestoreAction::DropEphemeral)
+                .err(),
+            Some(RestorePermitError::MissingPermit {
+                domain: RestoreDomain::Controller,
+                action: RestoreAction::DropEphemeral,
+            })
+        );
     }
 
     #[test]
@@ -334,11 +506,31 @@ mod tests {
     }
 
     #[test]
+    fn permit_from_other_committed_context_carries_other_binding() {
+        let first = committed_with(7, fence());
+        let second = committed_with(7, alternate_fence());
+        let mut first_permits = issue_restore_action_permits(&first).expect("first permits");
+        let mut second_permits = issue_restore_action_permits(&second).expect("second permits");
+        let first_permit = first_permits
+            .take(RestoreDomain::Controller, RestoreAction::ReplaceValidatedHistorical)
+            .unwrap();
+        let second_permit = second_permits
+            .take(RestoreDomain::Controller, RestoreAction::ReplaceValidatedHistorical)
+            .unwrap();
+        assert_ne!(first_permit.binding, second_permit.binding);
+    }
+
+    #[test]
     fn duplicate_receipt_is_rejected() {
         let committed = committed();
         let binding = RestoreExecutionBinding::from_committed(&committed);
         let mut receipts = operator_receipts(binding);
-        receipts.push(receipts[0]);
+        receipts.push(test_receipt(
+            binding,
+            RestoreDomain::OperatorAuthority,
+            RestoreAction::PreserveOrNarrowAuthority,
+            RestoreActionOutcome::Applied,
+        ));
         assert!(matches!(
             validate_receipts_for_plan(binding, &operator_plan(), &receipts),
             Err(RestoreExecutionError::DuplicateReceipt { .. })
@@ -350,7 +542,7 @@ mod tests {
         let committed = committed();
         let binding = RestoreExecutionBinding::from_committed(&committed);
         let mut receipts = operator_receipts(binding);
-        receipts[3] = RestoreActionReceipt::new(
+        receipts[3] = test_receipt(
             binding,
             RestoreDomain::OperatorAuthority,
             RestoreAction::DropEphemeral,
