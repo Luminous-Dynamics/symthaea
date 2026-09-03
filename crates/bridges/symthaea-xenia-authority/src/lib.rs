@@ -15,6 +15,10 @@
 //! challenge-bound [`VerifiedAuthorityTime`] fact. Current authority epoch and
 //! negative-authority facts likewise arrive as one indivisible, fresh
 //! [`VerifiedAuthorityState`] snapshot rather than caller-selected inputs.
+//!
+//! V1 consumes that state proof into [`VerifiedXeniaCapability`]. Once Xenia
+//! verification succeeds, callers cannot substitute a different epoch,
+//! revocation set, source frontier, or witness policy before effect admission.
 
 #![deny(unsafe_code)]
 
@@ -70,7 +74,9 @@ impl XeniaFreshnessPolicyV1 {
 
 /// Affine proof that one exact Xenia attestation passed all V1 admission checks.
 ///
-/// This type intentionally does not implement `Clone`. It is still not a
+/// This type intentionally does not implement `Clone`. It owns the exact
+/// [`VerifiedAuthorityState`] that participated in verification, preventing
+/// point-of-use substitution of epoch/revocation state. It is still not a
 /// durable one-use reservation by itself; the Action Runtime must consume it in
 /// the same transaction that reserves the underlying `CapabilityGrant`.
 #[derive(Debug)]
@@ -82,8 +88,7 @@ pub struct VerifiedXeniaCapability {
     xenia_ledger_entry_count: u64,
     xenia_ledger_head_hash: [u8; 32],
     prior_checkpoint: CheckpointHead,
-    authority_state_digest: Digest32,
-    authority_state_sequence: u64,
+    authority_state: VerifiedAuthorityState,
     expires_at_unix_s: u64,
 }
 
@@ -112,12 +117,16 @@ impl VerifiedXeniaCapability {
         self.prior_checkpoint
     }
 
+    pub fn authority_state(&self) -> &VerifiedAuthorityState {
+        &self.authority_state
+    }
+
     pub fn authority_state_digest(&self) -> Digest32 {
-        self.authority_state_digest
+        self.authority_state.snapshot_digest()
     }
 
     pub fn authority_state_sequence(&self) -> u64 {
-        self.authority_state_sequence
+        self.authority_state.state_sequence()
     }
 
     pub fn expires_at_unix_s(&self) -> u64 {
@@ -133,10 +142,10 @@ impl VerifiedXeniaCapability {
 /// that an authorization/checkpoint is not from the future, while the
 /// latest-plausible time is used to prove it has not expired or gone stale.
 ///
-/// `authority_state` must be a fresh threshold-authenticated snapshot for the
-/// same grant. Its source frontier must be exactly the fresh Xenia ledger
-/// frontier used in this verification. This prevents mixing a fresh Xenia proof
-/// with a stale epoch or stale revocation set.
+/// `authority_state` is consumed by value. It must be a fresh
+/// threshold-authenticated snapshot for the same grant, and its source frontier
+/// must be exactly the fresh Xenia ledger frontier used in this verification.
+/// The resulting proof therefore owns the exact state that admission must use.
 #[allow(clippy::too_many_arguments)]
 pub fn verify_xenia_capability_v1(
     attestation: &XeniaAgentCapabilityAttestationV1,
@@ -147,7 +156,7 @@ pub fn verify_xenia_capability_v1(
     expected_session: XeniaSessionExpectationV1,
     current_agent_checkpoint: CheckpointHead,
     authority_time: &VerifiedAuthorityTime,
-    authority_state: &VerifiedAuthorityState,
+    authority_state: VerifiedAuthorityState,
     freshness: XeniaFreshnessPolicyV1,
 ) -> Result<VerifiedXeniaCapability, XeniaAuthorityError> {
     let authorization = &attestation.authorization;
@@ -265,8 +274,7 @@ pub fn verify_xenia_capability_v1(
         xenia_ledger_entry_count: authorization.ledger_entry_count,
         xenia_ledger_head_hash: authorization.ledger_head_hash,
         prior_checkpoint: current_agent_checkpoint,
-        authority_state_digest: authority_state.snapshot_digest(),
-        authority_state_sequence: authority_state.state_sequence(),
+        authority_state,
         expires_at_unix_s: authorization.expires_at_unix_s,
     })
 }
@@ -284,15 +292,11 @@ fn verify_fresh_xenia_checkpoint(
     if checkpoint.entry_count == 0 || checkpoint.head_hash == [0; 32] {
         return Err(XeniaAuthorityError::PreGenesisFreshnessCheckpoint);
     }
-    // A checkpoint is acceptably non-future only if it is no later than the
-    // earliest plausible current time plus explicitly tolerated skew.
     if checkpoint.timestamp_unix_secs
         > not_before_unix_s.saturating_add(freshness.max_future_skew_s)
     {
         return Err(XeniaAuthorityError::LedgerCheckpointFromFuture);
     }
-    // A checkpoint is acceptably fresh only if it remains within age even at
-    // the latest plausible current time.
     if not_after_unix_s.saturating_sub(checkpoint.timestamp_unix_secs)
         > freshness.max_checkpoint_age_s
     {
