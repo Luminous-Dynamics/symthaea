@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-system-attempt-evidence"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Crash-conservative durable dispatch evidence for typed Symthaea system actions"
+publish = false
+
+[dependencies]
+bincode = { workspace = true }
+blake3 = { workspace = true }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-system-broker = { path = "../symthaea-system-broker" }
