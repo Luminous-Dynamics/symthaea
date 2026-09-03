@@ -1,0 +1,170 @@
+name: Agency Kernel Qualification
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agency-kernel-qualification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  agency-kernel:
+    name: Agency Kernel lock + exact package qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy
+
+      - name: Preserve checked-in lockfile
+        run: cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+
+      # Cargo, not this workflow, owns dependency resolution. Running full
+      # metadata without --locked lets Cargo reconcile missing workspace/path
+      # package nodes against the existing lock while preferentially retaining
+      # already locked registry/git packages.
+      - name: Ask Cargo to reconcile workspace lock metadata
+        run: cargo metadata --format-version 1 >/dev/null
+
+      # The current repair is intentionally narrower than a dependency update.
+      # It may add source-less workspace/path package nodes, but it must not
+      # mutate/remove an existing package entry or introduce a newly resolved
+      # registry/git package. A non-additive diff needs separate review.
+      - name: Prove lock reconciliation is additive workspace metadata only
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import sys
+          import tomllib
+
+          before_path = pathlib.Path(os.environ["RUNNER_TEMP"]) / "Cargo.lock.before"
+          after_path = pathlib.Path("Cargo.lock")
+          before = tomllib.loads(before_path.read_text())
+          after = tomllib.loads(after_path.read_text())
+
+          def key(package):
+              return (package["name"], package["version"], package.get("source"))
+
+          before_map = {key(p): p for p in before.get("package", [])}
+          after_map = {key(p): p for p in after.get("package", [])}
+
+          key_order = lambda value: repr(value)
+          removed = sorted(set(before_map) - set(after_map), key=key_order)
+          changed = sorted(
+              (k for k in before_map.keys() & after_map if before_map[k] != after_map[k]),
+              key=key_order,
+          )
+          added = sorted(set(after_map) - set(before_map), key=key_order)
+          sourced_additions = [k for k in added if k[2] is not None]
+
+          if removed or changed or sourced_additions:
+              print("Cargo reconciliation is not a pure additive workspace-node repair.")
+              if removed:
+                  print("removed existing packages:", removed)
+              if changed:
+                  print("changed existing packages:", changed)
+              if sourced_additions:
+                  print("new registry/git packages:", sourced_additions)
+              sys.exit(1)
+
+          print(f"additive workspace/path package nodes: {len(added)}")
+          for name, version, _source in added:
+              print(f"  + {name} {version}")
+          PY
+
+      - name: Record lock freshness and print exact Cargo diff
+        run: |
+          mkdir -p "$RUNNER_TEMP/agency-kernel-evidence"
+          if git diff --quiet -- Cargo.lock; then
+            echo clean | tee "$RUNNER_TEMP/agency-lock-status" > "$RUNNER_TEMP/agency-kernel-evidence/lock-status.txt"
+            echo "Cargo.lock is already fresh."
+          else
+            echo stale | tee "$RUNNER_TEMP/agency-lock-status" > "$RUNNER_TEMP/agency-kernel-evidence/lock-status.txt"
+            echo "Cargo.lock is stale; exact Cargo-generated diff follows:"
+            git --no-pager diff -- Cargo.lock | tee "$RUNNER_TEMP/agency-kernel-evidence/Cargo.lock.patch"
+          fi
+
+      # Always retain the Cargo-produced candidate. When the checked-in lock is
+      # stale this artifact is the byte-for-byte file to review/commit; nobody
+      # needs to reconstruct lock entries by hand from CI logs.
+      - name: Upload Cargo-produced lock candidate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agency-kernel-cargo-lock-${{ github.sha }}
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Capture exact qualification provenance
+        run: |
+          E="$RUNNER_TEMP/agency-kernel-evidence"
+          git rev-parse HEAD > "$E/HEAD.txt"
+          git status --porcelain=v1 > "$E/git-status.txt"
+          rustc -vV > "$E/rustc-vV.txt"
+          cargo -vV > "$E/cargo-vV.txt"
+          sha256sum Cargo.lock > "$E/Cargo.lock.sha256"
+          cargo metadata --locked --format-version 1 > "$E/cargo-metadata.json"
+          cargo tree --locked -p symthaea-xenia-systemd-durable-profile > "$E/durable-profile-cargo-tree.txt"
+
+      # Compile/test the exact Agency Kernel lineage against Cargo's reconciled
+      # candidate even when the checked-in lock is stale. This separates source
+      # errors from lock-metadata errors in one run.
+      - name: Test Agency Kernel lineage with reconciled lock
+        run: >-
+          cargo test --locked
+          -p symthaea-authority
+          -p symthaea-action-runtime
+          -p symthaea-action-checkpoint
+          -p symthaea-system-broker
+          -p symthaea-authority-frontier
+          -p symthaea-xenia-authority
+          -p symthaea-xenia-systemd-profile
+          -p symthaea-authority-frontier-sqlite
+          -p symthaea-system-attempt-evidence
+          -p symthaea-xenia-systemd-durable-profile
+
+      - name: Clippy Agency Kernel lineage with reconciled lock
+        run: >-
+          cargo clippy --locked
+          -p symthaea-authority
+          -p symthaea-action-runtime
+          -p symthaea-action-checkpoint
+          -p symthaea-system-broker
+          -p symthaea-authority-frontier
+          -p symthaea-xenia-authority
+          -p symthaea-xenia-systemd-profile
+          -p symthaea-authority-frontier-sqlite
+          -p symthaea-system-attempt-evidence
+          -p symthaea-xenia-systemd-durable-profile
+          --all-targets -- -D warnings
+
+      - name: Mark source qualification complete
+        run: echo PASS > "$RUNNER_TEMP/agency-kernel-evidence/source-qualification.txt"
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agency-kernel-qualification-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/agency-kernel-evidence
+          if-no-files-found: warn
+          retention-days: 14
+
+      # Qualification is green only after the exact Cargo-generated candidate is
+      # checked in. This makes lock freshness a durable repository invariant.
+      - name: Require checked-in Cargo.lock to be fresh
+        run: test "$(cat "$RUNNER_TEMP/agency-lock-status")" = clean
