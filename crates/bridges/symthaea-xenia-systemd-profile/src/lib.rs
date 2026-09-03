@@ -2,19 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Composed Xenia-authorized systemd recovery profile.
 //!
-//! This crate adds no new system effect. It composes:
-//!
-//! - #305 typed `service.restart` broker semantics;
-//! - CAS-backed checkpoint frontiers;
-//! - independently verified Xenia capability/workload evidence;
-//! - challenge-bound multi-authority time evidence;
-//! - threshold-authenticated current authority epoch + negative facts.
-//!
-//! A verified Xenia proof is consumed by value immediately before the broker
-//! enters its reservation/checkpoint/effect state machine. The proof itself owns
-//! the exact authority-state snapshot used during Xenia verification, so callers
-//! cannot substitute epoch/revocation state at effect entry. Cross-process replay
-//! is constrained by the CAS frontier rather than Rust affinity alone.
+//! This crate adds no new system effect. It composes typed broker semantics,
+//! CAS-backed authority accounting, challenged time, authenticated current
+//! authority state, and a fresh witnessed process-bound executor workload.
 
 #![deny(unsafe_code)]
 
@@ -32,10 +22,9 @@ use symthaea_authority_time::{AuthorityTimeError, VerifiedAuthorityTime};
 use symthaea_system_broker::{
     BrokerError, RecoveryReceipt, RestartPlan, ServiceBackend, SystemdRecoveryBroker,
 };
-use symthaea_xenia_authority::VerifiedXeniaCapability;
+use symthaea_xenia_authority::{VerifiedXeniaCapability, WorkloadIdentityError};
 use thiserror::Error;
 
-/// Xenia evidence attached to one successful typed systemd recovery receipt.
 #[derive(Debug)]
 pub struct XeniaSystemdRecoveryReceipt {
     pub xenia_authorization_id: [u8; 16],
@@ -48,7 +37,6 @@ pub struct XeniaSystemdRecoveryReceipt {
     pub recovery: RecoveryReceipt,
 }
 
-/// Ready-to-authorize systemd recovery session.
 pub struct XeniaSystemdRecoveryProfile<B, S>
 where
     B: ServiceBackend,
@@ -64,7 +52,6 @@ where
     B: ServiceBackend,
     S: CheckpointCasStore,
 {
-    /// Establish generation zero before requesting Xenia authority.
     pub fn bootstrap(
         grant: CapabilityGrant,
         backend: B,
@@ -92,7 +79,6 @@ where
         ))
     }
 
-    /// Restore an already-established profile from one externally trusted head.
     pub fn restore(
         grant: CapabilityGrant,
         checkpoint: GrantAccountCheckpoint,
@@ -117,7 +103,6 @@ where
         })
     }
 
-    /// Exact Agency Kernel frontier Xenia must bind before this profile mutates.
     pub fn authorization_checkpoint_head(&self) -> Result<CheckpointHead, ProfileRecoveryError> {
         self.broker
             .current_checkpoint_head()?
@@ -128,13 +113,15 @@ where
         self.broker.is_contained()
     }
 
-    /// Consume one independently verified Xenia authority proof and attempt the
-    /// exact typed recovery.
+    /// Consume one independently verified Xenia proof and attempt exactly one
+    /// typed recovery.
     ///
-    /// No caller-selected wall clock, current epoch, negative-fact list, or
-    /// authority-state object is accepted. The proof owns the exact state that
-    /// participated in Xenia verification; this method only rechecks that state
-    /// and trusted time remain fresh at the effect boundary.
+    /// Effect entry accepts no caller-selected wall clock, epoch, revocation
+    /// list, authority-state object, workload identity, or use counter. The
+    /// Xenia proof owns both authenticated authority state and witnessed
+    /// executor identity. Immediately before broker admission we re-check that
+    /// the workload proof is fresh and still describes this exact Linux process
+    /// instance/artifact.
     pub fn recover_verified_once(
         &mut self,
         verified: VerifiedXeniaCapability,
@@ -150,6 +137,10 @@ where
         verified
             .authority_state()
             .ensure_fresh(&self.grant, authority_time)?;
+        verified
+            .executor_workload()
+            .ensure_fresh(&self.grant, authority_time)?;
+        verified.executor_workload().require_current_process()?;
 
         let now_unix_s = authority_time.conservative_now_unix_s()?;
         if now_unix_s > verified.expires_at_unix_s() {
@@ -175,8 +166,6 @@ where
             AuthorityContext {
                 now_unix_s,
                 current_epoch,
-                // The broker explicitly ignores caller use accounting and
-                // substitutes its own durable GrantAccount state.
                 use_state: GrantUseState::default(),
             },
             verified.authority_state().negative_facts(),
@@ -212,6 +201,8 @@ pub enum ProfileRecoveryError {
     AuthorityTime(#[from] AuthorityTimeError),
     #[error("verified authority state failed: {0}")]
     AuthorityState(#[from] AuthorityStateError),
+    #[error("verified executor workload failed at effect entry: {0}")]
+    Workload(#[from] WorkloadIdentityError),
     #[error("typed systemd broker failed: {0}")]
     Broker(#[from] BrokerError),
     #[error("profile has no established checkpoint")]
