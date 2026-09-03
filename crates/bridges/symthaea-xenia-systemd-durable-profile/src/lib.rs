@@ -164,21 +164,34 @@ where
         ) {
             Ok(receipt) => receipt,
             Err(source) => {
-                let attempt_evidence_head = evidence_handle.latest_head().unwrap_or(None);
+                let attempt_evidence = match evidence_handle.latest_head() {
+                    Ok(head) => DurableEvidenceLocator::Known(head),
+                    Err(error) => DurableEvidenceLocator::Unavailable {
+                        diagnostic_digest: diagnostic(&error),
+                    },
+                };
                 return Err(DurableRecoveryError::BrokerAttempt {
                     source,
                     attempt_key,
-                    attempt_evidence_head,
+                    attempt_evidence,
                 });
             }
         };
 
         let attempt_evidence = match evidence_handle.append_recovery_receipt(&recovery) {
             Ok(head) => DurableAttemptEvidenceStatus::RecoveryCompleted(head),
-            Err(error) => DurableAttemptEvidenceStatus::FinalizationIncomplete {
-                last_durable_head: evidence_handle.latest_head().unwrap_or(None),
-                diagnostic_digest: diagnostic(&error),
-            },
+            Err(error) => {
+                let last_durable_evidence = match evidence_handle.latest_head() {
+                    Ok(head) => DurableEvidenceLocator::Known(head),
+                    Err(locator_error) => DurableEvidenceLocator::Unavailable {
+                        diagnostic_digest: diagnostic(&locator_error),
+                    },
+                };
+                DurableAttemptEvidenceStatus::FinalizationIncomplete {
+                    last_durable_evidence,
+                    diagnostic_digest: diagnostic(&error),
+                }
+            }
         };
 
         Ok(DurableXeniaSystemdReceipt {
@@ -209,6 +222,16 @@ pub struct DurableXeniaSystemdReceipt {
     pub attempt_evidence: DurableAttemptEvidenceStatus,
 }
 
+/// Explicitly distinguish a known absence/presence of an evidence head from a
+/// failure to read the in-process evidence locator. The latter must never be
+/// collapsed into `Known(None)` because that could be misread as proof that the
+/// effect frontier was never crossed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DurableEvidenceLocator {
+    Known(Option<AttemptEvidenceHead>),
+    Unavailable { diagnostic_digest: Digest32 },
+}
+
 /// Whether broker-level success could also be appended as the final attempt
 /// evidence record. A finalization failure does not erase the earlier durable
 /// `DispatchArmed`/dispatch classification records or the successful #305
@@ -217,7 +240,7 @@ pub struct DurableXeniaSystemdReceipt {
 pub enum DurableAttemptEvidenceStatus {
     RecoveryCompleted(AttemptEvidenceHead),
     FinalizationIncomplete {
-        last_durable_head: Option<AttemptEvidenceHead>,
+        last_durable_evidence: DurableEvidenceLocator,
         diagnostic_digest: Digest32,
     },
 }
@@ -243,13 +266,13 @@ pub enum DurableRecoveryError {
     #[error("failed to restore typed broker at the authorized frontier: {0}")]
     BrokerRestore(#[source] BrokerError),
     #[error(
-        "typed broker failed after admission; attempt {attempt_key:?}; latest durable attempt evidence: {attempt_evidence_head:?}: {source}"
+        "typed broker failed after admission; attempt {attempt_key:?}; durable attempt evidence locator {attempt_evidence:?}: {source}"
     )]
     BrokerAttempt {
         #[source]
         source: BrokerError,
         attempt_key: Digest32,
-        attempt_evidence_head: Option<AttemptEvidenceHead>,
+        attempt_evidence: DurableEvidenceLocator,
     },
 }
 
