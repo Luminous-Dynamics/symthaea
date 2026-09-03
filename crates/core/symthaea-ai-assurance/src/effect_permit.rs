@@ -741,7 +741,10 @@ impl fmt::Display for EffectEntryError {
         match self {
             Self::WrongDomain { .. } => write!(f, "effect-entry ticket belongs to another domain"),
             Self::CommitmentMismatch => {
-                write!(f, "effect-entry ticket targets another exact preflight commitment")
+                write!(
+                    f,
+                    "effect-entry ticket targets another exact preflight commitment"
+                )
             }
             Self::AdmissionStopped { .. } => write!(f, "effect admission is stopped"),
             Self::Revoked { .. } => {
@@ -749,7 +752,10 @@ impl fmt::Display for EffectEntryError {
             }
             Self::AlreadyRunning => write!(f, "effect admission is already running"),
             Self::ResumeWhileActive { .. } => {
-                write!(f, "effect admission cannot resume while admitted work remains active")
+                write!(
+                    f,
+                    "effect admission cannot resume while admitted work remains active"
+                )
             }
             Self::EpochExhausted => write!(f, "effect-entry epoch counter exhausted"),
             Self::SequenceExhausted => write!(f, "effect-entry sequence counter exhausted"),
@@ -810,8 +816,8 @@ fn hash_field(hasher: &mut blake3::Hasher, bytes: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::panic::{catch_unwind, AssertUnwindSafe};
-    use std::sync::{mpsc, Arc, Barrier};
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+    use std::sync::{Arc, Barrier, mpsc};
     use std::thread;
 
     fn commitment(tag: u8) -> EffectAdmissionCommitment {
@@ -995,7 +1001,10 @@ mod tests {
     fn resume_while_running_fails_without_changing_sequence() {
         let domain = EffectEntryDomain::new();
         let before = domain.current_sequence();
-        assert!(matches!(domain.resume(), Err(EffectEntryError::AlreadyRunning)));
+        assert!(matches!(
+            domain.resume(),
+            Err(EffectEntryError::AlreadyRunning)
+        ));
         assert_eq!(domain.current_sequence(), before);
     }
 
