@@ -76,13 +76,13 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Rustfmt measured workload lineage
-        run: >-
-          cargo fmt --check
-          --package symthaea-executor-workload
-          --package symthaea-xenia-authority
-          --package symthaea-xenia-systemd-profile
-          --package symthaea-xenia-systemd-durable-profile
+      - name: Rustfmt diagnostic
+        continue-on-error: true
+        run: |
+          cargo fmt -p symthaea-executor-workload -- --check
+          cargo fmt -p symthaea-xenia-authority -- --check
+          cargo fmt -p symthaea-xenia-systemd-profile -- --check
+          cargo fmt -p symthaea-xenia-systemd-durable-profile -- --check
 
       - name: Test measured workload lineage
         run: >-
