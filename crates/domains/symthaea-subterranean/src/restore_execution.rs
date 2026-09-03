@@ -7,10 +7,12 @@
 //! and produce one executor-authenticated receipt before activation may proceed.
 
 use super::restore_actions::{
-    canonical_plan_for_decision, RestoreAction, RestoreDomainPlan, RestorePlanError,
+    canonical_plan_for_decision, EvidenceRestorePolicy, RestoreAction, RestoreDomainPlan,
+    RestorePlanError,
 };
 use super::restore_admission::{CommittedOperationalRestore, RestoreDigest, RestoreGenerationFence};
 use super::restore_semantics::RestoreDomain;
+use crate::operator_authority::OperatorAuthority;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct RestoreExecutionBinding {
@@ -41,14 +43,25 @@ pub(super) enum RestoreActionOutcome {
 /// Evidence that one exact canonical restore action completed.
 ///
 /// Deliberately not `Clone`, `Copy`, `Serialize` or `Deserialize`. There is no
-/// production constructor in this module. A future domain executor may create
-/// a receipt only while consuming the matching affine `RestoreActionPermit`.
+/// generic production constructor. A receipt may be created only by an executor
+/// path that consumes the matching affine `RestoreActionPermit` and performs the
+/// corresponding mutation/requalification before returning success.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct RestoreActionReceipt {
     binding: RestoreExecutionBinding,
     domain: RestoreDomain,
     action: RestoreAction,
     outcome: RestoreActionOutcome,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RestoreExecutorError {
+    PermitMismatch {
+        expected_domain: RestoreDomain,
+        expected_action: RestoreAction,
+        actual_domain: RestoreDomain,
+        actual_action: RestoreAction,
+    },
 }
 
 /// Single-use authority to execute one exact canonical restore obligation.
@@ -69,6 +82,42 @@ impl RestoreActionPermit {
 
     pub(super) const fn action(&self) -> RestoreAction {
         self.action
+    }
+
+    /// Execute the first concrete receipt-bearing restore action.
+    ///
+    /// This method is intentionally action-specific. It consumes the permit,
+    /// checks the exact canonical obligation, performs the owner-local operator
+    /// replay merge, and only then constructs the success receipt. A mismatched
+    /// permit is consumed fail-closed and cannot mutate operator state.
+    pub(super) fn execute_operator_replay_merge(
+        self,
+        live: &mut OperatorAuthority,
+        checkpoint: &OperatorAuthority,
+    ) -> Result<RestoreActionReceipt, RestoreExecutorError> {
+        let expected_domain = RestoreDomain::OperatorAuthority;
+        let expected_action = RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier);
+        if self.domain != expected_domain || self.action != expected_action {
+            return Err(RestoreExecutorError::PermitMismatch {
+                expected_domain,
+                expected_action,
+                actual_domain: self.domain,
+                actual_action: self.action,
+            });
+        }
+
+        let Self {
+            binding,
+            domain,
+            action,
+        } = self;
+        live.merge_restore_replay_evidence_from(checkpoint);
+        Ok(RestoreActionReceipt {
+            binding,
+            domain,
+            action,
+            outcome: RestoreActionOutcome::Applied,
+        })
     }
 }
 
@@ -299,9 +348,7 @@ pub(super) fn validate_restore_execution(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::operational_checkpoint::restore_actions::{
-        canonical_plan_for_decision, EvidenceRestorePolicy,
-    };
+    use crate::operational_checkpoint::restore_actions::canonical_plan_for_decision;
     use crate::operational_checkpoint::restore_admission::{
         commit_operational_restore, prepare_operational_restore, RestoreAdmissionVerdict,
         RestoreDomainDecision, RestorePreparationContext,
@@ -455,6 +502,55 @@ mod tests {
             Some(RestorePermitError::MissingPermit {
                 domain: RestoreDomain::Controller,
                 action: RestoreAction::DropEphemeral,
+            })
+        );
+    }
+
+    #[test]
+    fn operator_replay_executor_mints_receipt_only_after_owner_merge_path() {
+        let committed = committed();
+        let binding = RestoreExecutionBinding::from_committed(&committed);
+        let mut permits = issue_restore_action_permits(&committed).expect("canonical permits");
+        let permit = permits
+            .take(
+                RestoreDomain::OperatorAuthority,
+                RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier),
+            )
+            .expect("operator replay permit");
+        let mut live = OperatorAuthority::default();
+        let checkpoint = OperatorAuthority::default();
+        let receipt = permit
+            .execute_operator_replay_merge(&mut live, &checkpoint)
+            .expect("matching executor");
+        assert_eq!(receipt.binding, binding);
+        assert_eq!(receipt.domain, RestoreDomain::OperatorAuthority);
+        assert_eq!(
+            receipt.action,
+            RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier)
+        );
+        assert_eq!(receipt.outcome, RestoreActionOutcome::Applied);
+    }
+
+    #[test]
+    fn wrong_permit_cannot_mint_operator_replay_receipt() {
+        let committed = committed();
+        let mut permits = issue_restore_action_permits(&committed).expect("canonical permits");
+        let wrong = permits
+            .take(RestoreDomain::Controller, RestoreAction::ReplaceValidatedHistorical)
+            .expect("controller permit");
+        let mut live = OperatorAuthority::default();
+        let checkpoint = OperatorAuthority::default();
+        assert_eq!(
+            wrong
+                .execute_operator_replay_merge(&mut live, &checkpoint)
+                .err(),
+            Some(RestoreExecutorError::PermitMismatch {
+                expected_domain: RestoreDomain::OperatorAuthority,
+                expected_action: RestoreAction::MergeEvidence(
+                    EvidenceRestorePolicy::ReplayBarrier,
+                ),
+                actual_domain: RestoreDomain::Controller,
+                actual_action: RestoreAction::ReplaceValidatedHistorical,
             })
         );
     }

@@ -8,6 +8,8 @@ pub(crate) mod restore_actions;
 pub(crate) mod restore_admission;
 #[path = "restore_execution.rs"]
 pub(crate) mod restore_execution;
+#[path = "restore_merge.rs"]
+pub(crate) mod restore_merge;
 #[path = "restore_operator.rs"]
 pub(crate) mod restore_operator;
 #[path = "restore_semantics.rs"]
