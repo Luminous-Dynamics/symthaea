@@ -2,16 +2,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Two-phase admission for operational checkpoint restore.
 //!
-//! Restore is not deserialization. A checkpoint is first compared with the
-//! current live authority/evidence/physical context without mutating runtime
-//! state. The resulting prepared plan is affine, bound to that exact context,
-//! and can be committed only while every generation fence still matches.
+//! Restore is not deserialization. A checkpoint is first normalized into its
+//! exact portable representation and captured in an opaque, validated owner-local
+//! source capsule, then compared with the current live authority/evidence/physical
+//! context without mutating runtime state. The resulting prepared plan is affine,
+//! bound to that exact source and context, and can be committed only while every
+//! generation fence still matches.
 //!
 //! This module intentionally does **not** mutate `SubterraneanEmbodiment` yet.
-//! It is the pure transaction primitive that a later owner-bound integration
-//! can use after domain-specific RA-17 restore semantics are implemented.
+//! It is the pure transaction primitive that later owner-bound execution uses.
 
 use super::restore_semantics::{OPERATIONAL_RESTORE_CONTRACTS, RestoreDomain};
+use super::{OperationalCheckpointError, SubterraneanOperationalCheckpoint};
+
+const RESTORE_SOURCE_COMMITMENT_DOMAIN_V1: &[u8] =
+    b"symthaea-subterranean:operational-restore-source:v1\0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct RestoreDigest([u8; 32]);
@@ -34,6 +39,79 @@ impl RestoreDigest {
             index += 1;
         }
         false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum RestoreSourceError {
+    InvalidCheckpoint(OperationalCheckpointError),
+    Encoding,
+    NonCanonicalRoundTrip,
+    SourceTooLarge,
+}
+
+impl From<OperationalCheckpointError> for RestoreSourceError {
+    fn from(value: OperationalCheckpointError) -> Self {
+        Self::InvalidCheckpoint(value)
+    }
+}
+
+/// Exact portable checkpoint source owned by one restore transaction lineage.
+///
+/// Deliberately not `Clone`, `Copy`, `Serialize` or `Deserialize`. Raw
+/// checkpoint bytes/objects remain freely portable data, but they do not become
+/// this owner-local source capability without normalization, pure structural
+/// validation, and a locally derived commitment.
+///
+/// Normalization is security-relevant: checkpoint domain types intentionally use
+/// `serde(skip)` for host-local/ephemeral state. The capsule therefore stores the
+/// object obtained by decoding the exact portable serialization, not the original
+/// in-memory object. Executors can never observe state the commitment omitted.
+///
+/// The V1 commitment uses the crate's deterministic serde representation plus
+/// explicit domain separation. It is an internal transaction identity, not a
+/// cross-language wire-canonicalization claim. If the encoding contract changes,
+/// the commitment domain/version must change with it.
+pub(super) struct OperationalRestoreSource {
+    checkpoint: SubterraneanOperationalCheckpoint,
+    digest: RestoreDigest,
+}
+
+impl OperationalRestoreSource {
+    pub(super) fn capture(
+        checkpoint: SubterraneanOperationalCheckpoint,
+    ) -> Result<Self, RestoreSourceError> {
+        let encoded = serde_json::to_vec(&checkpoint).map_err(|_| RestoreSourceError::Encoding)?;
+        let encoded_len =
+            u64::try_from(encoded.len()).map_err(|_| RestoreSourceError::SourceTooLarge)?;
+        let normalized: SubterraneanOperationalCheckpoint =
+            serde_json::from_slice(&encoded).map_err(|_| RestoreSourceError::Encoding)?;
+        normalized.validate_source()?;
+        let canonical =
+            serde_json::to_vec(&normalized).map_err(|_| RestoreSourceError::Encoding)?;
+        if canonical != encoded {
+            return Err(RestoreSourceError::NonCanonicalRoundTrip);
+        }
+
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(RESTORE_SOURCE_COMMITMENT_DOMAIN_V1);
+        hasher.update(&normalized.schema_version.to_le_bytes());
+        hasher.update(&encoded_len.to_le_bytes());
+        hasher.update(&canonical);
+        let digest = RestoreDigest::new(*hasher.finalize().as_bytes());
+        debug_assert!(digest.is_valid());
+        Ok(Self {
+            checkpoint: normalized,
+            digest,
+        })
+    }
+
+    pub(super) const fn digest(&self) -> RestoreDigest {
+        self.digest
+    }
+
+    pub(super) const fn checkpoint(&self) -> &SubterraneanOperationalCheckpoint {
+        &self.checkpoint
     }
 }
 
@@ -73,21 +151,19 @@ impl RestoreGenerationFence {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Preparation owns the exact validated checkpoint source rather than accepting
+/// a caller-supplied checkpoint digest beside unrelated state.
 pub(super) struct RestorePreparationContext {
-    checkpoint_digest: RestoreDigest,
+    source: OperationalRestoreSource,
     fence: RestoreGenerationFence,
 }
 
 impl RestorePreparationContext {
     pub(super) const fn new(
-        checkpoint_digest: RestoreDigest,
+        source: OperationalRestoreSource,
         fence: RestoreGenerationFence,
     ) -> Self {
-        Self {
-            checkpoint_digest,
-            fence,
-        }
+        Self { source, fence }
     }
 }
 
@@ -130,7 +206,6 @@ impl RestoreDomainDecision {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum RestorePrepareError {
-    InvalidCheckpointDigest,
     InvalidLiveSnapshotDigest,
     MissingDomain(RestoreDomain),
     DuplicateDomain(RestoreDomain),
@@ -178,17 +253,18 @@ impl RestoreCommitError {
 
 /// Affine prepared restore authority.
 ///
-/// Deliberately not `Clone`, `Copy`, `Serialize` or `Deserialize`. Raw portable
-/// checkpoint/evidence data must never deserialize into this live transaction.
+/// Deliberately not `Clone`, `Copy`, `Serialize` or `Deserialize`. The exact
+/// normalized source is retained by value; raw portable checkpoint data cannot
+/// deserialize into this live transaction.
 pub(super) struct PreparedOperationalRestore {
-    checkpoint_digest: RestoreDigest,
+    source: OperationalRestoreSource,
     fence: RestoreGenerationFence,
     decisions: Vec<RestoreDomainDecision>,
 }
 
 impl PreparedOperationalRestore {
-    pub(super) fn checkpoint_digest(&self) -> RestoreDigest {
-        self.checkpoint_digest
+    pub(super) const fn checkpoint_digest(&self) -> RestoreDigest {
+        self.source.digest()
     }
 
     pub(super) fn decisions(&self) -> &[RestoreDomainDecision] {
@@ -198,18 +274,19 @@ impl PreparedOperationalRestore {
 
 /// Single-use committed restore plan.
 ///
-/// The exact generation fence that passed commit is retained so later execution
-/// receipts can bind to the same live context instead of only to checkpoint
-/// identity. The fence remains owner-internal and is not a portable credential.
+/// The exact normalized source and generation fence that passed commit are
+/// retained so execution cannot substitute a different checkpoint-domain object
+/// after admission. The source remains owner-internal and is not a portable
+/// credential.
 pub(super) struct CommittedOperationalRestore {
-    checkpoint_digest: RestoreDigest,
+    source: OperationalRestoreSource,
     fence: RestoreGenerationFence,
     decisions: Vec<RestoreDomainDecision>,
 }
 
 impl CommittedOperationalRestore {
-    pub(super) fn checkpoint_digest(&self) -> RestoreDigest {
-        self.checkpoint_digest
+    pub(super) const fn checkpoint_digest(&self) -> RestoreDigest {
+        self.source.digest()
     }
 
     pub(super) const fn fence(&self) -> RestoreGenerationFence {
@@ -219,6 +296,10 @@ impl CommittedOperationalRestore {
     pub(super) fn decisions(&self) -> &[RestoreDomainDecision] {
         &self.decisions
     }
+
+    pub(super) fn into_source(self) -> OperationalRestoreSource {
+        self.source
+    }
 }
 
 /// Prepare a complete, canonical restore plan without mutating live state.
@@ -226,9 +307,6 @@ pub(super) fn prepare_operational_restore(
     context: RestorePreparationContext,
     decisions: Vec<RestoreDomainDecision>,
 ) -> Result<PreparedOperationalRestore, RestorePrepareError> {
-    if !context.checkpoint_digest.is_valid() {
-        return Err(RestorePrepareError::InvalidCheckpointDigest);
-    }
     if !context.fence.live_snapshot_digest.is_valid() {
         return Err(RestorePrepareError::InvalidLiveSnapshotDigest);
     }
@@ -270,7 +348,7 @@ pub(super) fn prepare_operational_restore(
     }
 
     Ok(PreparedOperationalRestore {
-        checkpoint_digest: context.checkpoint_digest,
+        source: context.source,
         fence: context.fence,
         decisions: canonical,
     })
@@ -338,7 +416,7 @@ pub(super) fn commit_operational_restore(
     }
 
     Ok(CommittedOperationalRestore {
-        checkpoint_digest: prepared.checkpoint_digest,
+        source: prepared.source,
         fence: expected,
         decisions: prepared.decisions,
     })
@@ -347,9 +425,17 @@ pub(super) fn commit_operational_restore(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::embodiment::SubterraneanEmbodiment;
+    use symthaea_core::genesis::GenesisSeed;
 
     fn digest(byte: u8) -> RestoreDigest {
         RestoreDigest::new([byte; 32])
+    }
+
+    fn source(phrase: &str) -> OperationalRestoreSource {
+        let checkpoint =
+            SubterraneanEmbodiment::new(&GenesisSeed::from_phrase(phrase)).operational_checkpoint();
+        OperationalRestoreSource::capture(checkpoint).expect("valid restore source")
     }
 
     fn fence() -> RestoreGenerationFence {
@@ -357,7 +443,7 @@ mod tests {
     }
 
     fn context() -> RestorePreparationContext {
-        RestorePreparationContext::new(digest(29), fence())
+        RestorePreparationContext::new(source("restore-admission-source"), fence())
     }
 
     fn nominal_decisions() -> Vec<RestoreDomainDecision> {
@@ -377,14 +463,54 @@ mod tests {
     }
 
     #[test]
-    fn complete_non_widening_restore_prepares_and_commits() {
+    fn complete_non_widening_restore_prepares_and_commits_with_derived_source_identity() {
         let prepared = prepared();
-        assert_eq!(prepared.checkpoint_digest().bytes(), [29; 32]);
+        let expected_source = prepared.checkpoint_digest();
+        assert!(expected_source.is_valid());
         assert_eq!(prepared.decisions().len(), OPERATIONAL_RESTORE_CONTRACTS.len());
         let committed = commit_operational_restore(prepared, fence()).expect("fence unchanged");
-        assert_eq!(committed.checkpoint_digest().bytes(), [29; 32]);
+        assert_eq!(committed.checkpoint_digest(), expected_source);
         assert_eq!(committed.fence(), fence());
         assert_eq!(committed.decisions().len(), OPERATIONAL_RESTORE_CONTRACTS.len());
+    }
+
+    #[test]
+    fn source_commitment_is_deterministic_and_changes_with_valid_source_state() {
+        let first = source("source-identity");
+        let second = source("source-identity");
+        assert_eq!(first.digest(), second.digest());
+
+        let mut changed =
+            SubterraneanEmbodiment::new(&GenesisSeed::from_phrase("source-identity"))
+                .operational_checkpoint();
+        changed.controller.bias[0] = 0.01;
+        let changed = OperationalRestoreSource::capture(changed).expect("valid changed source");
+        assert_ne!(first.digest(), changed.digest());
+    }
+
+    #[test]
+    fn source_capsule_stores_exact_portable_round_trip() {
+        let checkpoint =
+            SubterraneanEmbodiment::new(&GenesisSeed::from_phrase("portable-normalization"))
+                .operational_checkpoint();
+        let portable = serde_json::to_vec(&checkpoint).expect("portable encode");
+        let source = OperationalRestoreSource::capture(checkpoint).expect("capture");
+        let stored = serde_json::to_vec(source.checkpoint()).expect("stored encode");
+        assert_eq!(stored, portable);
+    }
+
+    #[test]
+    fn malformed_source_cannot_enter_preparation_context() {
+        let mut checkpoint =
+            SubterraneanEmbodiment::new(&GenesisSeed::from_phrase("invalid-source"))
+                .operational_checkpoint();
+        checkpoint.controller.hdc_dimension = checkpoint.controller.hdc_dimension.saturating_add(1);
+        assert!(matches!(
+            OperationalRestoreSource::capture(checkpoint),
+            Err(RestoreSourceError::InvalidCheckpoint(
+                OperationalCheckpointError::Controller(_)
+            ))
+        ));
     }
 
     #[test]
@@ -527,15 +653,9 @@ mod tests {
     }
 
     #[test]
-    fn invalid_digests_fail_before_preparation() {
-        let invalid_checkpoint = RestorePreparationContext::new(RestoreDigest::new([0; 32]), fence());
-        assert_eq!(
-            prepare_operational_restore(invalid_checkpoint, nominal_decisions()).err(),
-            Some(RestorePrepareError::InvalidCheckpointDigest)
-        );
-
+    fn invalid_live_snapshot_digest_fails_before_preparation() {
         let invalid_live = RestorePreparationContext::new(
-            digest(29),
+            source("invalid-live-digest"),
             RestoreGenerationFence::new(7, 11, 13, 17, 19, RestoreDigest::new([0; 32])),
         );
         assert_eq!(
