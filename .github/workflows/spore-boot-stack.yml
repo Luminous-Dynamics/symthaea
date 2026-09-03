@@ -21,8 +21,9 @@ permissions:
   contents: read
 
 # The focused lane is a latest-head qualification signal, not a historical
-# archive of every intermediate commit. Cancel superseded runs on the same PR
-# so rapid semantic-hardening commits do not create their own runner backlog.
+# archive of every intermediate commit. Repository-wide CI remains responsible
+# for synthetic PR-merge integration; this lane binds evidence to the exact
+# source head that would actually be reviewed and committed.
 concurrency:
   group: spore-boot-stack-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -32,10 +33,21 @@ jobs:
     name: Focused Rust qualification
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      SPORE_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
-      - name: Checkout
+      - name: Checkout exact source head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SPORE_SOURCE_COMMIT }}
+
+      - name: Verify exact-head identity
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SPORE_SOURCE_COMMIT"
+          echo "head=$(git rev-parse HEAD)"
+          echo "tree=$(git rev-parse 'HEAD^{tree}')"
 
       - name: Install pinned Rust toolchain
         run: |
@@ -47,9 +59,10 @@ jobs:
       - name: Resolve existing workspace lock minimally
         id: lock
         run: |
-          # Cargo updates only what the current manifests require while retaining
-          # the existing lock wherever compatible. The artifact lets review use
-          # the resolver-produced file rather than a hand-edited lock.
+          set -euo pipefail
+          # Cargo updates only what the exact source head requires while retaining
+          # the existing lock wherever compatible. A changed file is evidence that
+          # the committed head is not yet lock-qualified, never an implicit repair.
           cargo metadata --format-version 1 --no-deps >/dev/null
           if git diff --quiet -- Cargo.lock; then
             echo 'changed=false' >> "$GITHUB_OUTPUT"
@@ -67,6 +80,59 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Capture pinned rustfmt candidate
+        id: rustfmt
+        run: |
+          set -euo pipefail
+          SPORE_BOOT_FORMAT_ONLY=1 bash scripts/check-spore-boot-stack.sh
+
+          if git diff --quiet -- . ':(exclude)Cargo.lock'; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+          git diff --binary -- . ':(exclude)Cargo.lock' > spore-boot-rustfmt.patch
+          {
+            echo 'schema=spore-boot-rustfmt-candidate-v1'
+            echo "source_commit=$SPORE_SOURCE_COMMIT"
+            echo "evaluated_commit=$(git rev-parse HEAD)"
+            echo "evaluated_tree=$(git rev-parse 'HEAD^{tree}')"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            sha256sum spore-boot-rustfmt.patch
+          } > spore-boot-rustfmt-evidence.txt
+          git diff --stat -- . ':(exclude)Cargo.lock'
+
+          # Restore all formatter-mutated tracked source. Cargo.lock, if the
+          # resolver changed it, intentionally remains as a separate candidate.
+          git diff --name-only -z -- . ':(exclude)Cargo.lock' \
+            | xargs -0 -r git checkout --
+
+      - name: Upload exact rustfmt candidate
+        if: steps.rustfmt.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: spore-boot-rustfmt-candidate
+          path: |
+            spore-boot-rustfmt.patch
+            spore-boot-rustfmt-evidence.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Require committed qualification inputs
+        if: steps.lock.outputs.changed == 'true' || steps.rustfmt.outputs.changed == 'true'
+        run: |
+          if [[ "${{ steps.lock.outputs.changed }}" == 'true' ]]; then
+            echo 'Cargo.lock differs from Cargo 1.96 resolver output.' >&2
+            echo 'Commit the uploaded spore-boot-cargo-lock candidate unchanged.' >&2
+          fi
+          if [[ "${{ steps.rustfmt.outputs.changed }}" == 'true' ]]; then
+            echo 'Rust 1.96 formatting differs from the exact source head.' >&2
+            echo 'Apply the uploaded spore-boot-rustfmt-candidate patch unchanged.' >&2
+          fi
+          exit 1
+
       - name: Run focused locked qualification
         run: bash scripts/check-spore-boot-stack.sh
 
@@ -83,10 +149,3 @@ jobs:
           path: spore-boot-headless-matrix.json
           if-no-files-found: warn
           retention-days: 7
-
-      - name: Require committed lock consistency
-        if: steps.lock.outputs.changed == 'true'
-        run: |
-          echo 'Cargo.lock changed during resolver qualification.' >&2
-          echo 'Use the uploaded spore-boot-cargo-lock artifact and commit it unchanged.' >&2
-          exit 1
