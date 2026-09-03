@@ -78,7 +78,9 @@ if [[ "${1:-}" != "--inside" ]]; then
     fi
     rm -rf "$BOOTSTRAP_TMP"
   }
-  trap cleanup_outer EXIT INT TERM
+  trap cleanup_outer EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
 
   git -C "$ROOT" worktree add --detach "$WORKTREE" "$HEAD_SHA" >/dev/null
   [[ -f "$WORKTREE/$SCRIPT_REL" ]] || {
@@ -92,7 +94,7 @@ let
   system = builtins.currentSystem;
   pkgs = import flake.inputs.nixpkgs {
     inherit system;
-    overlays = [ (import flake.inputs.rust-overlay) ];
+    overlays = [ flake.inputs.rust-overlay.overlays.default ];
   };
   toolchainToml = builtins.fromTOML (builtins.readFile ./rust-toolchain.toml);
   rustChannel = toolchainToml.toolchain.channel;
@@ -205,7 +207,9 @@ PY
   echo "qualification_archive=$ARCHIVE"
   exit "$rc"
 }
-trap finalize EXIT INT TERM
+trap finalize EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 run_capture() {
   local phase="$1"
