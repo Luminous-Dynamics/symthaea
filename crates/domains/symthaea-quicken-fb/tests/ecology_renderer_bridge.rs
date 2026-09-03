@@ -80,6 +80,47 @@ fn presentation_never_reverses_progress_or_smooths_bad_health_to_healthy() {
 }
 
 #[test]
+fn lineage_reset_preserves_visual_progress_for_same_or_later_truth() {
+    let mut bridge = EcologyRendererBridge::new(WIDTH, HEIGHT, "lineage-continuity-seed").unwrap();
+    let mut pixels = vec![0u32; (WIDTH * HEIGHT) as usize];
+
+    let graphics = snapshot(50, BootPhase::Graphics, BootHealth::Normal);
+    let mut previous_projection = 0u32;
+    for _ in 0..4 {
+        previous_projection = rendered(bridge.render_snapshot(&graphics, STEP_MS, &mut pixels))
+            .projection
+            .elapsed_ms;
+    }
+    assert!(previous_projection > 0);
+
+    bridge.reset_semantics();
+
+    // A replacement observation lineage starts its sequence over, but the
+    // machine has not rebooted and presentation must not rewind.
+    let replacement = snapshot(1, BootPhase::Graphics, BootHealth::Normal);
+    let frame = rendered(bridge.render_snapshot(&replacement, STEP_MS, &mut pixels));
+    assert!(frame.projection.elapsed_ms >= previous_projection);
+}
+
+#[test]
+fn regressed_replacement_lineage_falls_back_instead_of_rewinding() {
+    let mut bridge = EcologyRendererBridge::new(WIDTH, HEIGHT, "lineage-regression-seed").unwrap();
+    let mut pixels = vec![0u32; (WIDTH * HEIGHT) as usize];
+
+    let graphics = snapshot(60, BootPhase::Graphics, BootHealth::Normal);
+    let previous = rendered(bridge.render_snapshot(&graphics, STEP_MS, &mut pixels));
+    assert!(previous.projection.elapsed_ms > 0);
+
+    bridge.reset_semantics();
+    let regressed = snapshot(1, BootPhase::Network, BootHealth::Normal);
+
+    assert_eq!(
+        bridge.render_snapshot(&regressed, STEP_MS, &mut pixels),
+        EcologyRenderOutcome::Fallback(EcologyFallbackReason::PresentationRejected)
+    );
+}
+
+#[test]
 fn ecology_cannot_present_terminal_handoff_before_authoritative_ready() {
     let mut bridge = EcologyRendererBridge::new(WIDTH, HEIGHT, "ready-gate-seed").unwrap();
     let mut pixels = vec![0u32; (WIDTH * HEIGHT) as usize];

@@ -138,12 +138,15 @@ impl EcologyRendererBridge {
         })
     }
 
-    /// Reset only semantic lineage state. The deterministic visual genome remains
-    /// stable so a telemetry lineage change cannot itself mutate visual identity.
+    /// Reset only observation-lineage sequencing state.
+    ///
+    /// A telemetry producer may restart or rotate its observation identifier while
+    /// the same machine boot continues. That is not permission for presentation to
+    /// rewind. Keep the visual clock and last projected renderer time intact; if a
+    /// replacement lineage reports an earlier semantic anchor, the presentation
+    /// driver rejects it and the caller falls back visually until truth catches up.
     pub fn reset_semantics(&mut self) {
         self.reducer.reset();
-        self.presentation.reset();
-        self.last_projected_ms = 0;
     }
 
     pub const fn layout(&self) -> RenderTimelineLayout {
