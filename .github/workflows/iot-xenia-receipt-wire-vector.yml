@@ -72,6 +72,10 @@ jobs:
           assert not unexpected, f'production or unreviewed files changed: {sorted(unexpected)!r}'
           assert changed, 'wire qualification diff unexpectedly empty'
           PY
+      - name: Pin neutral vector blob identity
+        run: |
+          path=crates/bridges/symthaea-iot-transport-receipt/tests/test-vectors/authenticated-payload-receipt-body-v1.hex
+          test "$(git hash-object "$path")" = "a0f527efad65ee157f160aa4837503e01e31c8cd"
       - name: Install exact MSRV toolchain
         run: rustup toolchain install 1.94.0 --profile minimal --component clippy
       - name: Verify exact checkout and toolchain
