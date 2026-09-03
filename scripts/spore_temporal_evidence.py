@@ -80,8 +80,17 @@ def read_ppm(path: Path) -> tuple[int, int, bytes]:
     width, height, max_value = (int(token) for token in tokens)
     if width <= 0 or height <= 0 or max_value != 255:
         raise ValueError(f"{path}: unsupported PPM dimensions/max value")
-    while index < len(data) and data[index] in b" \t\r\n":
+
+    # P6 is binary after the max-value separator. Consume the separator itself,
+    # not an arbitrary run of whitespace: a valid first pixel byte may be 0x09,
+    # 0x0a, 0x0d, or 0x20 and must never be mistaken for more header padding.
+    if index >= len(data) or data[index] not in b" \t\r\n":
+        raise ValueError(f"{path}: missing PPM header/payload separator")
+    if data[index : index + 2] == b"\r\n":
+        index += 2
+    else:
         index += 1
+
     pixels = data[index:]
     expected = width * height * 3
     if len(pixels) != expected:
@@ -398,8 +407,14 @@ def self_test() -> None:
                 }
             )
         )
-        for index, value in enumerate([0, 40, 80, 120, 180]):
+        # The first frame begins with red=0x0a. A binary-safe P6 parser must
+        # preserve this as pixel data rather than treating it as header whitespace.
+        for index, value in enumerate([10, 40, 80, 120, 180]):
             synthetic_ppm(frames / f"frame-{index:05}.ppm", 4, 2, value)
+        width, height, first_pixels = read_ppm(frames / "frame-00000.ppm")
+        assert (width, height) == (4, 2)
+        assert first_pixels[0] == 10
+
         (root / "matrix-manifest.json").write_text(
             json.dumps(
                 {
