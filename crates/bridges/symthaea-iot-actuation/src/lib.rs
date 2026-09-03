@@ -511,9 +511,7 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
 
     use super::*;
-    use symthaea_authority::{
-        Operation, PrincipalId, ResourceRef, RiskBudget, TaskId,
-    };
+    use symthaea_authority::{Operation, PrincipalId, ResourceRef, RiskBudget, TaskId};
     use symthaea_iot_authority::{
         DEVICE_COMMAND_SCHEMA_VERSION, InclusiveRangeI64, SAFETY_ENVELOPE_SCHEMA_VERSION,
     };
@@ -658,15 +656,17 @@ mod tests {
 
         let mut changed = proposal(&runtime, &safety);
         changed.world_digest = digest(99);
-        assert!(validate_actuation(
-            &grant,
-            context(&grant, &account),
-            &[],
-            changed,
-            &runtime,
-            &safety,
-        )
-        .is_err());
+        assert!(
+            validate_actuation(
+                &grant,
+                context(&grant, &account),
+                &[],
+                changed,
+                &runtime,
+                &safety,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -762,6 +762,7 @@ mod tests {
         let (grant, runtime, safety) = bound_grant(1);
         let mut account = GrantAccount::new(&grant);
         let permit = armed(&grant, &mut account, &runtime, &safety);
+        let head = permit.armed_head();
         let mut advanced = runtime.clone();
         advanced.last_accepted_sequence = Some(43);
 
@@ -781,17 +782,7 @@ mod tests {
         };
         assert_eq!(ambiguous.last_accepted_sequence, 43);
         assert_eq!(account.authority_use_state().reserved, 1);
-        assert_eq!(ambiguous.effect.head().digest, permit_head_digest_placeholder());
-    }
-
-    // Helper used only to make the ambiguity test assert on a real property without
-    // exposing the internal permit after it has been consumed. The digest is checked
-    // indirectly in the dedicated armed-head test below; this returns the value from
-    // a deterministic fixture lineage.
-    fn permit_head_digest_placeholder() -> Digest32 {
-        // This function is replaced by the test below's direct equality check during
-        // source review; keeping no hard-coded crypto fixture avoids brittle hashes.
-        Digest32([0; 32])
+        assert_eq!(ambiguous.effect.head(), head);
     }
 
     #[test]
