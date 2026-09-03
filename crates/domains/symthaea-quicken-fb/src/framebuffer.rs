@@ -8,7 +8,9 @@ use drm::Device;
 /// native resolution, and maps it for direct pixel access on each frame.
 /// No display server required — this runs on bare metal during NixOS installation.
 use drm::buffer::Buffer;
-use drm::control::connector::{Info as ConnectorInfo, State as ConnectorState};
+use drm::control::connector::{
+    Handle as ConnectorHandle, Info as ConnectorInfo, State as ConnectorState,
+};
 use drm::control::crtc::Handle as CrtcHandle;
 use drm::control::framebuffer::Handle as FbHandle;
 use drm::control::{self, Device as ControlDevice, Mode, ResourceHandles};
@@ -89,6 +91,12 @@ pub struct DrmFramebuffer {
     dumb_buffer: control::dumbbuffer::DumbBuffer,
     /// Original CRTC state for restore on drop.
     original_crtc: Option<control::crtc::Info>,
+    /// Exact connectors routed to the original CRTC before renderer takeover.
+    ///
+    /// Legacy SETCRTC restores connector routing as well as framebuffer/mode
+    /// state. Passing an empty connector array would detach the restored CRTC
+    /// from its sinks, so capture this topology before changing anything.
+    original_connectors: Vec<ConnectorHandle>,
 }
 
 impl DrmFramebuffer {
@@ -110,7 +118,9 @@ impl DrmFramebuffer {
             .map_err(DrmError::ResourceQuery)?;
         let crtc = encoder.crtc().ok_or(DrmError::NoCrtc)?;
 
-        // Save original CRTC for restoration
+        // Save the complete legacy KMS routing before takeover. If topology
+        // capture fails, do not modeset a display we cannot faithfully restore.
+        let original_connectors = Self::connectors_for_crtc(&card, &res, crtc)?;
         let original_crtc = card.get_crtc(crtc).ok();
 
         let width = mode.size().0 as u32;
@@ -141,7 +151,37 @@ impl DrmFramebuffer {
             mode,
             dumb_buffer: db,
             original_crtc,
+            original_connectors,
         })
+    }
+
+    /// Capture every connector currently routed through `crtc`.
+    ///
+    /// This is part of the restore transaction, not renderer presentation data.
+    /// We fail before takeover if any connector/encoder query needed to snapshot
+    /// the current topology fails, because a partial snapshot cannot prove a
+    /// faithful restore later.
+    fn connectors_for_crtc(
+        card: &Card,
+        res: &ResourceHandles,
+        crtc: CrtcHandle,
+    ) -> Result<Vec<ConnectorHandle>, DrmError> {
+        let mut connectors = Vec::new();
+        for &handle in res.connectors() {
+            let connector = card
+                .get_connector(handle, false)
+                .map_err(DrmError::ResourceQuery)?;
+            let Some(encoder_handle) = connector.current_encoder() else {
+                continue;
+            };
+            let encoder = card
+                .get_encoder(encoder_handle)
+                .map_err(DrmError::ResourceQuery)?;
+            if encoder.crtc() == Some(crtc) {
+                connectors.push(handle);
+            }
+        }
+        Ok(connectors)
     }
 
     /// Find the first connected connector and its preferred mode.
@@ -225,13 +265,15 @@ impl DrmFramebuffer {
 
 impl Drop for DrmFramebuffer {
     fn drop(&mut self) {
-        // Restore original CRTC if we saved it
+        // Restore the complete original legacy KMS state: framebuffer, position,
+        // mode and connector routing. The connector array is semantically part of
+        // SETCRTC; restoring with `&[]` would detach the CRTC from its display.
         if let Some(ref orig) = self.original_crtc {
             let _ = self.card.set_crtc(
                 self.crtc,
                 orig.framebuffer(),
                 orig.position(),
-                &[],
+                &self.original_connectors,
                 orig.mode(),
             );
         }
