@@ -19,3 +19,10 @@ symthaea-iot-authority = { path = "../symthaea-iot-authority" }
 symthaea-iot-device-protocol = { path = "../symthaea-iot-device-protocol" }
 symthaea-iot-transport-receipt = { path = "../symthaea-iot-transport-receipt" }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+bincode = { workspace = true }
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-iot-durable-runtime = { path = "../symthaea-iot-durable-runtime" }
+symthaea-iot-policy = { path = "../symthaea-iot-policy" }
+symthaea-iot-posture = { path = "../symthaea-iot-posture" }
