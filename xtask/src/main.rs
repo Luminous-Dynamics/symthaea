@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod interoception_actions_archive;
+mod interoception_archive_fs;
 mod interoception_capsule_archive;
 mod interoception_github_live;
 mod interoception_qualification;
@@ -29,13 +30,10 @@ enum Commands {
     /// Crate truth registry: join `cargo metadata` with `docs/crate-status.toml`.
     /// A crate's existence does not imply endorsement.
     CrateStatus {
-        /// Emit the generated markdown inventory instead of checking.
         #[arg(long)]
         report: bool,
-        /// Fail if any workspace member is unclassified.
         #[arg(long)]
         require_classified: bool,
-        /// Fail on evidence-gap findings, not just integrity errors.
         #[arg(long)]
         strict: bool,
         #[arg(long, default_value = "docs/crate-status.toml")]
@@ -190,7 +188,6 @@ fn main() -> anyhow::Result<()> {
             let redundancy_ks = parse_list(&redundancy_ks)?;
             let fanouts = parse_list(&fanouts)?;
             let policies = policies.split(',').map(|s| s.to_string()).collect();
-
             rhn_sweep::run_sweep(
                 dims,
                 objects,
@@ -266,6 +263,9 @@ fn main() -> anyhow::Result<()> {
             evidence_dir,
             repo_root,
         } => {
+            if let Some(root) = repo_root.as_deref() {
+                interoception_archive_fs::require_external_directory(root, &evidence_dir)?;
+            }
             let verified = interoception_qualification::verify_local_gate(
                 &interoception_qualification::local_manifest_path(&evidence_dir),
                 &interoception_qualification::local_transcript_path(&evidence_dir),
@@ -280,7 +280,7 @@ fn main() -> anyhow::Result<()> {
             repo_root,
         } => {
             if let Some(root) = repo_root.as_deref() {
-                guard_external_existing_dir(root, &archive_dir)?;
+                interoception_archive_fs::require_external_directory(root, &archive_dir)?;
             }
             let verified = interoception_actions_archive::build_actions_archive(
                 &archive_dir,
@@ -294,6 +294,9 @@ fn main() -> anyhow::Result<()> {
             archive_dir,
             repo_root,
         } => {
+            if let Some(root) = repo_root.as_deref() {
+                interoception_archive_fs::require_external_directory(root, &archive_dir)?;
+            }
             let verified = interoception_qualification::verify_actions_archive(
                 &archive_dir,
                 repo_root.as_deref(),
@@ -304,6 +307,9 @@ fn main() -> anyhow::Result<()> {
             archive_dir,
             repo_root,
         } => {
+            if let Some(root) = repo_root.as_deref() {
+                interoception_archive_fs::require_external_directory(root, &archive_dir)?;
+            }
             let verified = interoception_github_live::verify_actions_live(
                 &archive_dir,
                 repo_root.as_deref(),
@@ -320,7 +326,7 @@ fn main() -> anyhow::Result<()> {
             repo_root,
         } => {
             if let Some(root) = repo_root.as_deref() {
-                guard_external_existing_dir(root, &evidence_root)?;
+                interoception_archive_fs::require_external_directory(root, &evidence_root)?;
             }
             let verified = interoception_capsule_archive::build_capsule_archive_manifest(
                 &bundle,
@@ -340,6 +346,9 @@ fn main() -> anyhow::Result<()> {
             evidence_root,
             repo_root,
         } => {
+            if let Some(root) = repo_root.as_deref() {
+                interoception_archive_fs::require_external_directory(root, &evidence_root)?;
+            }
             let verified = interoception_capsule_archive::verify_capsule_archive(
                 &bundle,
                 &evidence_root,
@@ -362,8 +371,17 @@ fn main() -> anyhow::Result<()> {
             showroom_integrity,
             out,
         } => {
-            guard_external_existing_dir(&repo_root, &evidence_root)?;
-            guard_external_new_file(&repo_root, &out)?;
+            for dir in [
+                evidence_root.as_path(),
+                local_fmt.as_path(),
+                local_test.as_path(),
+                local_clippy.as_path(),
+                workspace_ci.as_path(),
+                showroom_integrity.as_path(),
+            ] {
+                interoception_archive_fs::require_external_directory(&repo_root, dir)?;
+            }
+            interoception_archive_fs::require_external_new_file(&repo_root, &out)?;
             let envelope = interoception_github_live::authorize_promotion_live(
                 &bundle,
                 &repo_root,
@@ -385,7 +403,6 @@ fn guard_external_empty_output_dir(
     repo_root: &std::path::Path,
     out: &std::path::Path,
 ) -> anyhow::Result<()> {
-    let canonical_repo = std::fs::canonicalize(repo_root)?;
     let created = !out.exists();
     if created {
         std::fs::create_dir_all(out)?;
@@ -399,52 +416,11 @@ fn guard_external_empty_output_dir(
             out.display()
         );
     }
-    let canonical_out = std::fs::canonicalize(out)?;
-    if canonical_out.starts_with(&canonical_repo) {
+    if let Err(error) = interoception_archive_fs::require_external_directory(repo_root, out) {
         if created {
             let _ = std::fs::remove_dir_all(out);
         }
-        anyhow::bail!(
-            "qualification evidence output must live outside the target source checkout: {}",
-            out.display()
-        );
-    }
-    Ok(())
-}
-
-fn guard_external_existing_dir(
-    repo_root: &std::path::Path,
-    dir: &std::path::Path,
-) -> anyhow::Result<()> {
-    let canonical_repo = std::fs::canonicalize(repo_root)?;
-    let canonical_dir = std::fs::canonicalize(dir)?;
-    if !canonical_dir.is_dir() {
-        anyhow::bail!("expected directory: {}", dir.display());
-    }
-    if canonical_dir.starts_with(canonical_repo) {
-        anyhow::bail!(
-            "qualification evidence/archive directory must live outside the target source checkout: {}",
-            dir.display()
-        );
-    }
-    Ok(())
-}
-
-fn guard_external_new_file(
-    repo_root: &std::path::Path,
-    out: &std::path::Path,
-) -> anyhow::Result<()> {
-    if out.exists() {
-        anyhow::bail!("refusing to overwrite existing output file: {}", out.display());
-    }
-    let canonical_repo = std::fs::canonicalize(repo_root)?;
-    let parent = out.parent().unwrap_or_else(|| std::path::Path::new("."));
-    let canonical_parent = std::fs::canonicalize(parent)?;
-    if canonical_parent.starts_with(canonical_repo) {
-        anyhow::bail!(
-            "promotion authorization output must live outside the target source checkout: {}",
-            out.display()
-        );
+        return Err(error);
     }
     Ok(())
 }
