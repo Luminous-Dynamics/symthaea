@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "status": "normative-design-only",
+  "base_v01_sha": "1007949d5c60fd2d7dd650e8bb4521e2b2803c48",
+  "scenario_battery_id": "affective-emergence-v0.2-exploratory-x00-x11-v1",
+  "preferred_primary_arm_limit": 24,
+  "cut_point_policy": "prospective-non-candidate-dependent",
+  "families": [
+    {"role":"X00","name":"neutral_fixed_point","kind":"control","obligations":["E00 neutrality","E01/E03/E04/E05/E06/E08 neutrality","E07 typed no-breach","forecast self-consistency"]},
+    {"role":"X01","name":"same_state_different_current_drive","kind":"matched_pair","obligations":["E02 vs E01","forecast candidates vs E01","forecast candidates vs E02"]},
+    {"role":"X02","name":"same_drive_magnitude_different_viability_consequence","kind":"matched_pair","obligations":["E01 vs E02","E07 vs E02","E08 vs E02"]},
+    {"role":"X03","name":"crossed_realized_change_forecast_residual","kind":"crossed_pair","obligations":["E04 vs E03","worsening-better-than-predicted","improving-worse-than-predicted"]},
+    {"role":"X04","name":"forecast_revision_decomposition","kind":"two_subcase_family","subcases":["boundary_turnover_r3_neutral_r4_changes","one_step_neutral_r3_changes"],"obligations":["E05 vs E06","E05 vs E04","temporal alignment"]},
+    {"role":"X05","name":"same_current_burden_different_breach_latency","kind":"matched_pair","obligations":["E07 vs E01","E07 vs E02 strict subcase","E08 vs E01"]},
+    {"role":"X06","name":"matched_cumulative_exposure_different_urgency","kind":"matched_pair","obligations":["E08 vs E07"]},
+    {"role":"X07","name":"precision_confidence_orthogonalization","kind":"matched_pair","obligations":["E09 vs E01","E10 vs E01","W1 vs W2 semantic separation"]},
+    {"role":"X08","name":"healthy_channel_denominator_dilution","kind":"matched_pair","obligations":["aggregation denominator audit","intrinsic deviation unchanged"]},
+    {"role":"X09","name":"matched_current_state_different_histories","kind":"two_subcase_family","subcases":["different_immediate_past_same_current_state_drive","same_immediate_change_different_older_trailing16_history"],"obligations":["E03 vs E01/E02","E11 vs E01/E03","native restart sufficiency"]},
+    {"role":"X10","name":"exact_prefix_divergent_future_twins","kind":"integrity_pair","obligations":["prefix payload identity","future suffix invariance","full-trace provenance separation"]},
+    {"role":"X11","name":"forecast_policy_disagreement_diagnostic","kind":"diagnostic","obligations":["ObservedDrivePersistence vs NativeZeroInputRecovery vs KinematicVelocity sensitivity"]}
+  ],
+  "required_coverage": [
+    "E03:E01","E03:E02","E04:E03","E04:E02","E05:E04","E05:E06","E05:E02","E07:E01","E07:E02","E08:E01","E08:E07","E08:E02","E09:E01","E10:E01","E11:E01","E11:E03"
+  ],
+  "parameter_materialization_rule": "exact numeric arms and cut points must be frozen only after implementation demonstrates constructibility without inspecting candidate rankings",
+  "claim_boundary": "deterministic-discrimination-instrument"
+}

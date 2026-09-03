@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "status": "normative-design-only",
+  "target_set_id": "affective-emergence-v0.2-functional-y0-y3-v1",
+  "availability": "retrospective-evaluation-only-after-candidate-payload-freeze",
+  "targets": [
+    {
+      "role": "Y0",
+      "target_id": "y0_next_step_realized_viability_change_v1",
+      "definition": "realized W1/A3 current viability burden at t minus realized W1/A3 burden at t+1 under the frozen sign convention",
+      "horizon_steps": 1,
+      "candidate_input_authority": "forbidden"
+    },
+    {
+      "role": "Y1",
+      "target_id": "y1_next16_realized_cumulative_viability_exposure_v1",
+      "definition": "undiscounted cumulative realized W1/A3 viability burden over the next 16 completed realized states after t",
+      "horizon_steps": 16,
+      "candidate_input_authority": "forbidden"
+    },
+    {
+      "role": "Y2",
+      "target_id": "y2_next16_realized_first_viability_breach_latency_v1",
+      "definition": "typed latency from t to the first realized viability-boundary breach within the next 16 transitions, otherwise NoRealizedBreachWithinWindow",
+      "horizon_steps": 16,
+      "candidate_input_authority": "forbidden"
+    },
+    {
+      "role": "Y3",
+      "target_id": "y3_realized_terminal_viability_burden_plus16_v1",
+      "definition": "realized W1/A3 viability burden at exactly t+16",
+      "horizon_steps": 16,
+      "candidate_input_authority": "forbidden"
+    }
+  ],
+  "evaluation_rules": {
+    "no_universal_affect_score": true,
+    "multi_target_reporting_required": true,
+    "candidate_payloads_freeze_before_targets": true,
+    "near_tautology_pairs_must_be_flagged": true,
+    "incremental_information_beyond_simpler_baselines_required_for_promotion": true,
+    "max_nonredundant_classes_for_confirmatory_design": 3,
+    "zero_winners_allowed": true
+  },
+  "claim_boundary": "functional-regulatory-prediction-only"
+}
