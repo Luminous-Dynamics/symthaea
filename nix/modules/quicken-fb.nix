@@ -13,6 +13,18 @@ with lib;
 
 let
   cfg = config.services.symthaea-boot;
+  # Prefix checks alone are not confinement checks: `/run/symthaea/../x`
+  # satisfies a string prefix but escapes after path resolution. Keep runtime
+  # paths absolute under the declared directory and reject traversal components.
+  confinedRuntimePath = prefix: path:
+    hasPrefix prefix path
+    && removePrefix prefix path != ""
+    && !(elem ".." (splitString "/" path));
+  directChildPath = parent: path:
+    builtins.dirOf path == parent
+    && baseNameOf path != "."
+    && baseNameOf path != ".."
+    && !(elem ".." (splitString "/" path));
   telemetryArgs = optionals cfg.telemetry.enable [
     "--boot-events-socket ${escapeShellArg cfg.telemetry.eventSocket}"
     "--boot-state-path ${escapeShellArg cfg.telemetry.statePath}"
@@ -163,24 +175,28 @@ in {
     {
       assertions = [
         {
-          assertion = cfg.genesisPhrase != null || builtins.dirOf cfg.visualSeedFile == "/var/lib/symthaea";
-          message = "services.symthaea-boot.visualSeedFile must be a direct child of /var/lib/symthaea";
+          assertion = cfg.genesisPhrase != null || directChildPath "/var/lib/symthaea" cfg.visualSeedFile;
+          message = "services.symthaea-boot.visualSeedFile must be a traversal-free direct child of /var/lib/symthaea";
         }
         {
-          assertion = !cfg.telemetry.enable || hasPrefix "/run/symthaea/" cfg.telemetry.eventSocket;
-          message = "services.symthaea-boot.telemetry.eventSocket must stay beneath /run/symthaea";
+          assertion = confinedRuntimePath "/run/symthaea/" cfg.progressPipe;
+          message = "services.symthaea-boot.progressPipe must stay beneath /run/symthaea without '..' traversal";
         }
         {
-          assertion = !cfg.telemetry.enable || hasPrefix "/run/symthaea-boot/" cfg.telemetry.statePath;
-          message = "services.symthaea-boot.telemetry.statePath must stay beneath /run/symthaea-boot";
+          assertion = !cfg.telemetry.enable || confinedRuntimePath "/run/symthaea/" cfg.telemetry.eventSocket;
+          message = "services.symthaea-boot.telemetry.eventSocket must stay beneath /run/symthaea without '..' traversal";
         }
         {
-          assertion = !cfg.handoff.enable || hasPrefix "/run/symthaea/" cfg.handoff.receiptPath;
-          message = "services.symthaea-boot.handoff.receiptPath must stay beneath /run/symthaea";
+          assertion = !cfg.telemetry.enable || confinedRuntimePath "/run/symthaea-boot/" cfg.telemetry.statePath;
+          message = "services.symthaea-boot.telemetry.statePath must stay beneath /run/symthaea-boot without '..' traversal";
         }
         {
-          assertion = !cfg.performance.enable || hasPrefix "/run/symthaea/" cfg.performance.receiptPath;
-          message = "services.symthaea-boot.performance.receiptPath must stay beneath /run/symthaea";
+          assertion = !cfg.handoff.enable || confinedRuntimePath "/run/symthaea/" cfg.handoff.receiptPath;
+          message = "services.symthaea-boot.handoff.receiptPath must stay beneath /run/symthaea without '..' traversal";
+        }
+        {
+          assertion = !cfg.performance.enable || confinedRuntimePath "/run/symthaea/" cfg.performance.receiptPath;
+          message = "services.symthaea-boot.performance.receiptPath must stay beneath /run/symthaea without '..' traversal";
         }
       ];
 
@@ -230,7 +246,10 @@ in {
           TimeoutStopSec = "${toString cfg.handoff.stopTimeoutMs}ms";
 
           # StateDirectory is the only persistent write surface. /run/symthaea
-          # remains writable for the socket, FIFO and bounded diagnostic receipts.
+          # remains writable by the renderer for the socket, FIFO and bounded
+          # diagnostic receipts. The directory itself is not group-writable;
+          # the observer needs search permission plus write permission on the
+          # socket inode, not authority to create sibling runtime files.
           StateDirectory = "symthaea";
           StateDirectoryMode = "0755";
           ReadWritePaths = [ "/run/symthaea" ];
@@ -272,7 +291,7 @@ in {
 
       systemd.tmpfiles.rules = [
         (if cfg.telemetry.enable
-          then "d /run/symthaea 0770 root symthaea-boot -"
+          then "d /run/symthaea 0750 root symthaea-boot -"
           else "d /run/symthaea 0755 root root -")
         "p ${cfg.progressPipe} 0644 root root -"
       ];
