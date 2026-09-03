@@ -3,10 +3,8 @@
 //! Machine-readable restore contracts for the operational checkpoint.
 //!
 //! Checkpoint fields are not semantically interchangeable. Historical state,
-//! live authority, evidence/replay state, derived physical envelopes and
-//! ephemeral authority require different restore rules. This registry makes
-//! those differences reviewable and testable before the restore engine is
-//! migrated away from whole-structure replacement.
+//! live authority, evidence/replay state, derived physical envelopes, embedded
+//! safety policy and ephemeral authority require different restore rules.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RestoreSemantics {
@@ -59,26 +57,38 @@ const MISSION_SEMANTICS: &[RestoreSemantics] = &[
 const OPERATOR_SEMANTICS: &[RestoreSemantics] = &[
     RestoreSemantics::AuthorityMonotone,
     RestoreSemantics::EvidenceMerge,
+    RestoreSemantics::TransitionReconcile,
     RestoreSemantics::EphemeralDrop,
 ];
 const DEGRADED_SEMANTICS: &[RestoreSemantics] = &[
     RestoreSemantics::AuthorityMonotone,
     RestoreSemantics::EvidenceMerge,
+    RestoreSemantics::TransitionReconcile,
 ];
 const UPDATE_SEMANTICS: &[RestoreSemantics] = &[RestoreSemantics::TransitionReconcile];
-const SENSOR_SEMANTICS: &[RestoreSemantics] = &[RestoreSemantics::EvidenceMerge];
+const SENSOR_SEMANTICS: &[RestoreSemantics] = &[
+    RestoreSemantics::EvidenceMerge,
+    RestoreSemantics::DerivedRequalify,
+    RestoreSemantics::TransitionReconcile,
+];
 const ACTUATOR_SEMANTICS: &[RestoreSemantics] = &[
     RestoreSemantics::AuthorityMonotone,
     RestoreSemantics::EvidenceMerge,
+    RestoreSemantics::TransitionReconcile,
 ];
-const ENVELOPE_SEMANTICS: &[RestoreSemantics] = &[RestoreSemantics::DerivedRequalify];
+const ENVELOPE_SEMANTICS: &[RestoreSemantics] = &[
+    RestoreSemantics::DerivedRequalify,
+    RestoreSemantics::TransitionReconcile,
+];
 const PARTITION_SEMANTICS: &[RestoreSemantics] = &[
     RestoreSemantics::AuthorityMonotone,
     RestoreSemantics::EvidenceMerge,
+    RestoreSemantics::TransitionReconcile,
 ];
 const TEMPORAL_SEMANTICS: &[RestoreSemantics] = &[
     RestoreSemantics::AuthorityMonotone,
     RestoreSemantics::EvidenceMerge,
+    RestoreSemantics::TransitionReconcile,
 ];
 
 pub const OPERATIONAL_RESTORE_CONTRACTS: &[RestoreDomainContract] = &[
@@ -230,25 +240,54 @@ mod tests {
     }
 
     #[test]
+    fn checkpointed_safety_policy_requires_reconciliation() {
+        for domain in [
+            RestoreDomain::OperatorAuthority,
+            RestoreDomain::DegradedSupervisor,
+            RestoreDomain::SensorFusion,
+            RestoreDomain::ActuatorIsolation,
+            RestoreDomain::FieldEnvelope,
+            RestoreDomain::PartitionRecovery,
+            RestoreDomain::TemporalAssurance,
+        ] {
+            assert!(
+                contract_for(domain)
+                    .semantics
+                    .contains(&RestoreSemantics::TransitionReconcile),
+                "{domain:?} persists safety/configuration semantics and must reconcile them"
+            );
+        }
+    }
+
+    #[test]
     fn operator_restore_preserves_replay_evidence_and_drops_ephemeral_recovery() {
         let contract = contract_for(RestoreDomain::OperatorAuthority);
         assert!(contract.semantics.contains(&RestoreSemantics::AuthorityMonotone));
         assert!(contract.semantics.contains(&RestoreSemantics::EvidenceMerge));
+        assert!(contract.semantics.contains(&RestoreSemantics::TransitionReconcile));
         assert!(contract.semantics.contains(&RestoreSemantics::EphemeralDrop));
     }
 
     #[test]
-    fn degraded_restore_preserves_latches_and_failure_evidence() {
+    fn degraded_restore_preserves_latches_failure_evidence_and_policy() {
         let contract = contract_for(RestoreDomain::DegradedSupervisor);
         assert!(contract.semantics.contains(&RestoreSemantics::AuthorityMonotone));
         assert!(contract.semantics.contains(&RestoreSemantics::EvidenceMerge));
+        assert!(contract.semantics.contains(&RestoreSemantics::TransitionReconcile));
     }
 
     #[test]
-    fn derived_field_envelope_requires_requalification() {
-        assert_eq!(
-            contract_for(RestoreDomain::FieldEnvelope).semantics,
-            &[RestoreSemantics::DerivedRequalify]
-        );
+    fn sensor_restore_requires_evidence_merge_fresh_requalification_and_policy_reconcile() {
+        let contract = contract_for(RestoreDomain::SensorFusion);
+        assert!(contract.semantics.contains(&RestoreSemantics::EvidenceMerge));
+        assert!(contract.semantics.contains(&RestoreSemantics::DerivedRequalify));
+        assert!(contract.semantics.contains(&RestoreSemantics::TransitionReconcile));
+    }
+
+    #[test]
+    fn field_envelope_requires_requalification_and_policy_reconcile() {
+        let contract = contract_for(RestoreDomain::FieldEnvelope);
+        assert!(contract.semantics.contains(&RestoreSemantics::DerivedRequalify));
+        assert!(contract.semantics.contains(&RestoreSemantics::TransitionReconcile));
     }
 }
