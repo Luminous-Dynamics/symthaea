@@ -6,7 +6,8 @@
 //! RA-19 says *whether* a proposed restore can proceed and binds the decision to
 //! an exact live generation. This module closes the translation gap: a domain
 //! plan is valid only when its typed actions discharge every registered restore
-//! semantic, and evidence merge uses an explicitly audited polarity.
+//! semantic, unsupported actions are absent, and evidence merge uses an
+//! explicitly audited polarity.
 
 use super::restore_admission::{RestoreAdmissionVerdict, RestoreDomainDecision};
 use super::restore_semantics::{contract_for, RestoreDomain, RestoreSemantics};
@@ -36,10 +37,6 @@ pub(super) enum RestoreAction {
     DropEphemeral,
 }
 
-/// Owner-minted action plan for one checkpoint domain.
-///
-/// Actions are canonicalized and deduplicated by validation. The plan remains a
-/// pure description until a later apply layer implements the actions atomically.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct RestoreDomainPlan {
     decision: RestoreDomainDecision,
@@ -81,6 +78,15 @@ pub(super) enum RestorePlanError {
         domain: RestoreDomain,
         semantic: RestoreSemantics,
     },
+    MissingVerdictAction {
+        domain: RestoreDomain,
+        verdict: RestoreAdmissionVerdict,
+        action: RestoreAction,
+    },
+    UnexpectedAction {
+        domain: RestoreDomain,
+        action: RestoreAction,
+    },
     EvidencePolicyUnderspecified {
         domain: RestoreDomain,
     },
@@ -99,9 +105,6 @@ pub(super) enum RestorePlanError {
     },
 }
 
-/// Evidence polarity is intentionally audited domain-by-domain. An `EvidenceMerge`
-/// semantic without an entry here is *not* permission to use a generic merge.
-/// It remains under-specified and fails action-plan validation until audited.
 fn required_evidence_policies(domain: RestoreDomain) -> Option<&'static [EvidenceRestorePolicy]> {
     match domain {
         RestoreDomain::OperatorAuthority => Some(&[EvidenceRestorePolicy::ReplayBarrier]),
@@ -109,10 +112,6 @@ fn required_evidence_policies(domain: RestoreDomain) -> Option<&'static [Evidenc
             EvidenceRestorePolicy::RestrictionSupporting,
             EvidenceRestorePolicy::RecoverySupportingFreshOnly,
         ]),
-        // Sensor fusion, actuator isolation, partition recovery and temporal
-        // assurance each contain mixed positive/adverse/replay state. Their
-        // exact polarity must be audited before they can produce a complete
-        // action plan rather than guessed here.
         RestoreDomain::SensorFusion
         | RestoreDomain::ActuatorIsolation
         | RestoreDomain::PartitionRecovery
@@ -155,6 +154,34 @@ fn semantic_action_present(semantic: RestoreSemantics, actions: &[RestoreAction]
     }
 }
 
+fn action_supported(
+    semantic_set: &[RestoreSemantics],
+    verdict: RestoreAdmissionVerdict,
+    action: RestoreAction,
+) -> bool {
+    match action {
+        RestoreAction::ReplaceValidatedHistorical => {
+            semantic_set.contains(&RestoreSemantics::HistoricalReplace)
+        }
+        RestoreAction::PreserveOrNarrowAuthority => {
+            semantic_set.contains(&RestoreSemantics::AuthorityMonotone)
+        }
+        RestoreAction::MergeEvidence(_) => {
+            semantic_set.contains(&RestoreSemantics::EvidenceMerge)
+        }
+        RestoreAction::RequalifyFromCurrentInputs => {
+            semantic_set.contains(&RestoreSemantics::DerivedRequalify)
+        }
+        RestoreAction::ReconcileBeforeActivation => {
+            semantic_set.contains(&RestoreSemantics::TransitionReconcile)
+                || verdict == RestoreAdmissionVerdict::ReconciliationRequired
+        }
+        RestoreAction::DropEphemeral => {
+            semantic_set.contains(&RestoreSemantics::EphemeralDrop)
+        }
+    }
+}
+
 fn validate_verdict_action_consistency(
     domain: RestoreDomain,
     verdict: RestoreAdmissionVerdict,
@@ -165,6 +192,29 @@ fn validate_verdict_action_consistency(
         RestoreAdmissionVerdict::Widening | RestoreAdmissionVerdict::NotProvable
     ) {
         return Err(RestorePlanError::DecisionNotAdmissible { domain, verdict });
+    }
+
+    match verdict {
+        RestoreAdmissionVerdict::ReconciliationRequired => {
+            if !has_action(actions, RestoreAction::ReconcileBeforeActivation) {
+                return Err(RestorePlanError::MissingVerdictAction {
+                    domain,
+                    verdict,
+                    action: RestoreAction::ReconcileBeforeActivation,
+                });
+            }
+        }
+        RestoreAdmissionVerdict::ConservativeRequalification => {
+            if !has_action(actions, RestoreAction::RequalifyFromCurrentInputs) {
+                return Err(RestorePlanError::MissingVerdictAction {
+                    domain,
+                    verdict,
+                    action: RestoreAction::RequalifyFromCurrentInputs,
+                });
+            }
+        }
+        RestoreAdmissionVerdict::ProvenNonWidening => {}
+        RestoreAdmissionVerdict::Widening | RestoreAdmissionVerdict::NotProvable => unreachable!(),
     }
 
     if has_action(actions, RestoreAction::ReconcileBeforeActivation)
@@ -213,6 +263,15 @@ fn validate_actions(
     }
 
     let contract = contract_for(domain);
+    for action in &actions {
+        if !action_supported(contract.semantics, verdict, *action) {
+            return Err(RestorePlanError::UnexpectedAction {
+                domain,
+                action: *action,
+            });
+        }
+    }
+
     for semantic in contract.semantics {
         if !semantic_action_present(*semantic, &actions) {
             return Err(RestorePlanError::MissingSemanticAction {
@@ -267,7 +326,7 @@ mod tests {
     }
 
     #[test]
-    fn operator_plan_must_discharge_all_three_obligations() {
+    fn operator_plan_must_discharge_all_obligations_and_reconciliation_barrier() {
         let plan = RestoreDomainPlan::new(
             decision(
                 RestoreDomain::OperatorAuthority,
@@ -284,6 +343,52 @@ mod tests {
         assert_eq!(plan.domain(), RestoreDomain::OperatorAuthority);
         assert_eq!(plan.verdict(), RestoreAdmissionVerdict::ReconciliationRequired);
         assert!(plan.actions().contains(&RestoreAction::DropEphemeral));
+        assert!(
+            plan.actions()
+                .contains(&RestoreAction::ReconcileBeforeActivation)
+        );
+    }
+
+    #[test]
+    fn reconciliation_verdict_requires_non_activation_barrier() {
+        assert_eq!(
+            RestoreDomainPlan::new(
+                decision(
+                    RestoreDomain::OperatorAuthority,
+                    RestoreAdmissionVerdict::ReconciliationRequired,
+                ),
+                vec![
+                    RestoreAction::PreserveOrNarrowAuthority,
+                    RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier),
+                    RestoreAction::DropEphemeral,
+                ],
+            )
+            .err(),
+            Some(RestorePlanError::MissingVerdictAction {
+                domain: RestoreDomain::OperatorAuthority,
+                verdict: RestoreAdmissionVerdict::ReconciliationRequired,
+                action: RestoreAction::ReconcileBeforeActivation,
+            })
+        );
+    }
+
+    #[test]
+    fn conservative_requalification_verdict_requires_requalification_action() {
+        assert_eq!(
+            RestoreDomainPlan::new(
+                decision(
+                    RestoreDomain::FieldEnvelope,
+                    RestoreAdmissionVerdict::ConservativeRequalification,
+                ),
+                vec![],
+            )
+            .err(),
+            Some(RestorePlanError::MissingVerdictAction {
+                domain: RestoreDomain::FieldEnvelope,
+                verdict: RestoreAdmissionVerdict::ConservativeRequalification,
+                action: RestoreAction::RequalifyFromCurrentInputs,
+            })
+        );
     }
 
     #[test]
@@ -329,6 +434,30 @@ mod tests {
             Some(RestorePlanError::MissingEvidencePolicy {
                 domain: RestoreDomain::OperatorAuthority,
                 policy: EvidenceRestorePolicy::ReplayBarrier,
+            })
+        );
+    }
+
+    #[test]
+    fn operator_plan_rejects_unjustified_historical_replace() {
+        assert_eq!(
+            RestoreDomainPlan::new(
+                decision(
+                    RestoreDomain::OperatorAuthority,
+                    RestoreAdmissionVerdict::ReconciliationRequired,
+                ),
+                vec![
+                    RestoreAction::ReplaceValidatedHistorical,
+                    RestoreAction::PreserveOrNarrowAuthority,
+                    RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier),
+                    RestoreAction::DropEphemeral,
+                    RestoreAction::ReconcileBeforeActivation,
+                ],
+            )
+            .err(),
+            Some(RestorePlanError::UnexpectedAction {
+                domain: RestoreDomain::OperatorAuthority,
+                action: RestoreAction::ReplaceValidatedHistorical,
             })
         );
     }
