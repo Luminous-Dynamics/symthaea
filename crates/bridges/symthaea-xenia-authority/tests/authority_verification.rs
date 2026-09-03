@@ -3,7 +3,12 @@
 
 use ed25519_dalek::{Signer, SigningKey};
 use symthaea_action_checkpoint::CheckpointHead;
-use symthaea_authority::{AuthorityEpoch, CapabilityGrant, Digest32, PrincipalId};
+use symthaea_authority::{AuthorityEpoch, CapabilityGrant, Digest32, NegativeAuthorityFact, PrincipalId};
+use symthaea_authority_state::{
+    AUTHORITY_STATE_SCHEMA_VERSION, AuthorityStatePolicyV1, AuthorityStateStatementV1,
+    AuthorityStateWitnessId, PendingAuthorityStateChallenge, TrustedAuthorityStateWitnessV1,
+    VerifiedAuthorityState, verify_authority_state_v1,
+};
 use symthaea_authority_time::{
     AUTHORITY_TIME_SCHEMA_VERSION, AuthorityTimeStatementV1, PendingAuthorityTimeChallenge,
     TimeAuthorityId, TrustedTimeAuthorityV1, TrustedTimePolicyV1, VerifiedAuthorityTime,
@@ -208,11 +213,89 @@ fn verified_time(grant: &CapabilityGrant, witnessed_unix_s: u64) -> VerifiedAuth
     .unwrap()
 }
 
+fn verified_state(
+    grant: &CapabilityGrant,
+    time: &VerifiedAuthorityTime,
+    source_sequence: u64,
+    source_digest: Digest32,
+    epoch: AuthorityEpoch,
+    facts: Vec<NegativeAuthorityFact>,
+) -> VerifiedAuthorityState {
+    let key_a = SigningKey::from_bytes(&[51; 32]);
+    let key_b = SigningKey::from_bytes(&[52; 32]);
+    let policy = AuthorityStatePolicyV1 {
+        schema_version: AUTHORITY_STATE_SCHEMA_VERSION,
+        policy_id: [53; 16],
+        witnesses: vec![
+            TrustedAuthorityStateWitnessV1 {
+                witness_id: AuthorityStateWitnessId([1; 16]),
+                verifying_key: key_a.verifying_key().to_bytes(),
+                organization_binding: [61; 32],
+                service_binding: [71; 32],
+            },
+            TrustedAuthorityStateWitnessV1 {
+                witness_id: AuthorityStateWitnessId([2; 16]),
+                verifying_key: key_b.verifying_key().to_bytes(),
+                organization_binding: [62; 32],
+                service_binding: [72; 32],
+            },
+        ],
+        threshold: 2,
+        minimum_organizations: 2,
+        maximum_challenge_age_s: 10,
+        maximum_post_verification_age_s: 10,
+    };
+    let pending = PendingAuthorityStateChallenge::new(&policy, grant, time).unwrap();
+    let challenge = pending.wire();
+    let sign = |id: AuthorityStateWitnessId, key: &SigningKey, generation: u64| {
+        let mut statement = AuthorityStateStatementV1 {
+            schema_version: AUTHORITY_STATE_SCHEMA_VERSION,
+            witness_id: id,
+            challenge_nonce: challenge.nonce,
+            grant_digest: challenge.grant_digest,
+            state_policy_digest: challenge.state_policy_digest,
+            time_policy_digest: challenge.time_policy_digest,
+            source_frontier_sequence: source_sequence,
+            source_frontier_digest: source_digest,
+            state_sequence: source_sequence,
+            authority_epoch: epoch,
+            negative_facts: facts.clone(),
+            witness_generation: generation,
+            signature: Vec::new(),
+        };
+        statement.signature = key
+            .sign(&statement.canonical_message().unwrap())
+            .to_bytes()
+            .to_vec();
+        statement
+    };
+    verify_authority_state_v1(
+        &policy,
+        grant,
+        pending,
+        time,
+        &[
+            sign(AuthorityStateWitnessId([1; 16]), &key_a, 100),
+            sign(AuthorityStateWitnessId([2; 16]), &key_b, 101),
+        ],
+    )
+    .unwrap()
+}
+
 #[test]
-fn exact_grant_workload_checkpoint_and_fresh_frontier_verify() {
+fn exact_grant_workload_checkpoint_fresh_frontier_and_state_verify() {
     let (grant, workload, head) = grant_and_workload();
     let (attestation, checkpoint, public_key, session) = signed_fixture(&grant, &workload, head);
     let time = verified_time(&grant, 125);
+    let state = verified_state(
+        &grant,
+        &time,
+        checkpoint.entry_count,
+        Digest32(checkpoint.head_hash),
+        grant.authority_epoch,
+        Vec::new(),
+    );
+    let state_digest = state.snapshot_digest();
     let verified = verify_xenia_capability_v1(
         &attestation,
         &checkpoint,
@@ -222,11 +305,13 @@ fn exact_grant_workload_checkpoint_and_fresh_frontier_verify() {
         session,
         head,
         &time,
+        state,
         XeniaFreshnessPolicyV1::strict(30, 5),
     )
     .unwrap();
     assert_eq!(verified.grant_digest(), grant.digest());
     assert_eq!(verified.prior_checkpoint(), head);
+    assert_eq!(verified.authority_state_digest(), state_digest);
 }
 
 #[test]
@@ -243,6 +328,14 @@ fn valid_old_attestation_fails_after_fresh_xenia_frontier_advances() {
         .to_bytes()
         .to_vec();
     let time = verified_time(&grant, 125);
+    let state = verified_state(
+        &grant,
+        &time,
+        checkpoint.entry_count,
+        Digest32(checkpoint.head_hash),
+        grant.authority_epoch,
+        Vec::new(),
+    );
 
     assert!(matches!(
         verify_xenia_capability_v1(
@@ -254,6 +347,7 @@ fn valid_old_attestation_fails_after_fresh_xenia_frontier_advances() {
             session,
             head,
             &time,
+            state,
             XeniaFreshnessPolicyV1::strict(30, 5),
         ),
         Err(XeniaAuthorityError::AuthorizationFrontierStale)
@@ -265,6 +359,14 @@ fn stale_freshness_checkpoint_is_rejected_even_when_signatures_are_valid() {
     let (grant, workload, head) = grant_and_workload();
     let (attestation, checkpoint, public_key, session) = signed_fixture(&grant, &workload, head);
     let time = verified_time(&grant, 200);
+    let state = verified_state(
+        &grant,
+        &time,
+        checkpoint.entry_count,
+        Digest32(checkpoint.head_hash),
+        grant.authority_epoch,
+        Vec::new(),
+    );
     assert!(matches!(
         verify_xenia_capability_v1(
             &attestation,
@@ -275,6 +377,7 @@ fn stale_freshness_checkpoint_is_rejected_even_when_signatures_are_valid() {
             session,
             head,
             &time,
+            state,
             XeniaFreshnessPolicyV1::strict(30, 5),
         ),
         Err(XeniaAuthorityError::LedgerCheckpointStale)
@@ -289,6 +392,14 @@ fn workload_or_agent_checkpoint_substitution_fails() {
 
     let mut wrong_workload = workload.clone();
     wrong_workload.artifact_digest = Digest32([77; 32]);
+    let state_for_workload = verified_state(
+        &grant,
+        &time,
+        checkpoint.entry_count,
+        Digest32(checkpoint.head_hash),
+        grant.authority_epoch,
+        Vec::new(),
+    );
     assert!(matches!(
         verify_xenia_capability_v1(
             &attestation,
@@ -299,6 +410,7 @@ fn workload_or_agent_checkpoint_substitution_fails() {
             session,
             head,
             &time,
+            state_for_workload,
             XeniaFreshnessPolicyV1::strict(30, 5),
         ),
         Err(XeniaAuthorityError::WorkloadDigestMismatch)
@@ -308,6 +420,14 @@ fn workload_or_agent_checkpoint_substitution_fails() {
         sequence: head.sequence + 1,
         digest: Digest32([88; 32]),
     };
+    let state_for_head = verified_state(
+        &grant,
+        &time,
+        checkpoint.entry_count,
+        Digest32(checkpoint.head_hash),
+        grant.authority_epoch,
+        Vec::new(),
+    );
     assert!(matches!(
         verify_xenia_capability_v1(
             &attestation,
@@ -318,6 +438,7 @@ fn workload_or_agent_checkpoint_substitution_fails() {
             session,
             wrong_head,
             &time,
+            state_for_head,
             XeniaFreshnessPolicyV1::strict(30, 5),
         ),
         Err(XeniaAuthorityError::AgentCheckpointMismatch)
@@ -328,6 +449,15 @@ fn workload_or_agent_checkpoint_substitution_fails() {
 fn time_for_another_grant_cannot_validate_this_grant() {
     let (grant, workload, head) = grant_and_workload();
     let (attestation, checkpoint, public_key, session) = signed_fixture(&grant, &workload, head);
+    let correct_time = verified_time(&grant, 125);
+    let state = verified_state(
+        &grant,
+        &correct_time,
+        checkpoint.entry_count,
+        Digest32(checkpoint.head_hash),
+        grant.authority_epoch,
+        Vec::new(),
+    );
     let mut other_grant = grant.clone();
     other_grant.grant_id = "other-grant".into();
     let wrong_time = verified_time(&other_grant, 125);
@@ -342,8 +472,71 @@ fn time_for_another_grant_cannot_validate_this_grant() {
             session,
             head,
             &wrong_time,
+            state,
             XeniaFreshnessPolicyV1::strict(30, 5),
         ),
         Err(XeniaAuthorityError::AuthorityTime(_))
+    ));
+}
+
+#[test]
+fn fresh_state_from_a_different_source_frontier_is_rejected() {
+    let (grant, workload, head) = grant_and_workload();
+    let (attestation, checkpoint, public_key, session) = signed_fixture(&grant, &workload, head);
+    let time = verified_time(&grant, 125);
+    let state = verified_state(
+        &grant,
+        &time,
+        checkpoint.entry_count + 1,
+        Digest32([90; 32]),
+        grant.authority_epoch,
+        Vec::new(),
+    );
+
+    assert!(matches!(
+        verify_xenia_capability_v1(
+            &attestation,
+            &checkpoint,
+            public_key,
+            &grant,
+            &workload,
+            session,
+            head,
+            &time,
+            state,
+            XeniaFreshnessPolicyV1::strict(30, 5),
+        ),
+        Err(XeniaAuthorityError::AuthorityStateFrontierMismatch)
+    ));
+}
+
+#[test]
+fn fresh_newer_epoch_rejects_old_grant_before_capability_becomes_verified() {
+    let (grant, workload, head) = grant_and_workload();
+    let (attestation, checkpoint, public_key, session) = signed_fixture(&grant, &workload, head);
+    let time = verified_time(&grant, 125);
+    let state = verified_state(
+        &grant,
+        &time,
+        checkpoint.entry_count,
+        Digest32(checkpoint.head_hash),
+        AuthorityEpoch(grant.authority_epoch.0 + 1),
+        Vec::new(),
+    );
+
+    assert!(matches!(
+        verify_xenia_capability_v1(
+            &attestation,
+            &checkpoint,
+            public_key,
+            &grant,
+            &workload,
+            session,
+            head,
+            &time,
+            state,
+            XeniaFreshnessPolicyV1::strict(30, 5),
+        ),
+        Err(XeniaAuthorityError::GrantEpochStaleAgainstCurrentState)
     ));
 }

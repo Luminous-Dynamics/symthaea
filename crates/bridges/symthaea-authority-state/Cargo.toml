@@ -1,17 +1,16 @@
 [package]
-name = "symthaea-xenia-authority"
+name = "symthaea-authority-state"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
-description = "Independent verifier for Xenia-authenticated Symthaea capability delegations"
+description = "Fresh threshold-authenticated authority epoch and revocation snapshots for Symthaea"
 publish = false
 
 [dependencies]
 blake3 = { workspace = true }
 ed25519-dalek = { workspace = true }
+getrandom = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 symthaea-authority = { path = "../../core/symthaea-authority" }
-symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
 symthaea-authority-time = { path = "../symthaea-authority-time" }
-symthaea-authority-state = { path = "../symthaea-authority-state" }

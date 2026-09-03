@@ -6,6 +6,7 @@
 //! replacing them:
 //! - Xenia proof verification happens upstream in `symthaea-xenia-authority`;
 //! - challenged multi-authority time supplies the admission-time wall-clock bound;
+//! - the verified Xenia proof owns fresh threshold authority-state evidence;
 //! - #305 remains the only systemd execution/accounting state machine;
 //! - #316 supplies checkpoint CAS semantics;
 //! - #320 supplies the concrete SQLite CAS backend;
@@ -18,13 +19,12 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use symthaea_action_checkpoint::CheckpointHead;
 use symthaea_action_runtime::{ExecutionId, GrantUseState, ReservationId};
-use symthaea_authority::{
-    AuthorityContext, AuthorityEpoch, CapabilityGrant, Digest32, NegativeAuthorityFact,
-};
+use symthaea_authority::{AuthorityContext, CapabilityGrant, Digest32};
 use symthaea_authority_frontier::{
     CasCheckpointStoreAdapter, EstablishedGrantFrontier, FrontierError, establish_grant_frontier,
 };
 use symthaea_authority_frontier_sqlite::{SqliteCheckpointCasStore, SqliteFrontierError};
+use symthaea_authority_state::AuthorityStateError;
 use symthaea_authority_time::{AuthorityTimeError, VerifiedAuthorityTime};
 use symthaea_system_attempt_evidence::{
     AttemptEvidenceContext, AttemptEvidenceHead, SqliteAttemptEvidenceError,
@@ -40,10 +40,6 @@ const XENIA_AUTHORITY_EVIDENCE_DOMAIN: &[u8] =
     b"symthaea.xenia-systemd.authority-evidence.v0.2\0";
 
 /// Bootstrap object that exists before Xenia issues authority.
-///
-/// Generation zero is already durable when this object is returned. Callers
-/// should obtain Xenia authorization bound to [`Self::authorization_checkpoint_head`]
-/// and then consume this object through [`Self::recover_verified_once`].
 pub struct DurableXeniaSystemdBootstrap<B>
 where
     B: ServiceBackend,
@@ -61,8 +57,7 @@ where
     B: ServiceBackend,
 {
     /// Create a fresh generation-zero Agency Kernel frontier in the SQLite
-    /// state database. The database must not already contain a frontier for a
-    /// previous session; restore/recovery is intentionally a separate future API.
+    /// state database.
     pub fn bootstrap(
         grant: CapabilityGrant,
         backend: B,
@@ -95,28 +90,28 @@ where
         &self.frontier.checkpoint
     }
 
-    /// Consume the one-use bootstrap plus one verified Xenia capability and run
-    /// the existing typed broker with SQLite CAS + durable attempt evidence.
+    /// Consume one Xenia proof and run the typed broker with SQLite CAS and
+    /// write-ahead attempt evidence.
     ///
-    /// Consuming `self` is deliberate: a V0.2 object represents one exact
-    /// single-use grant lineage. Durable replay prevention still comes from CAS,
-    /// not from Rust move semantics alone. Caller wall-clock values and caller
-    /// use counters are not accepted by this production profile.
-    #[allow(clippy::too_many_arguments)]
+    /// No caller-selected wall clock, current epoch, revocation list, use
+    /// counter, or authority-state object is accepted. The affine Xenia proof
+    /// owns the exact state that participated in verification.
     pub fn recover_verified_once(
         self,
         verified: VerifiedXeniaCapability,
         authority_time: &VerifiedAuthorityTime,
-        current_epoch: AuthorityEpoch,
         plan: &RestartPlan,
         execution_id: ExecutionId,
         reservation_id: ReservationId,
-        negative_facts: &[NegativeAuthorityFact],
     ) -> Result<DurableXeniaSystemdReceipt, DurableRecoveryError> {
         if verified.grant_digest() != self.grant_digest {
             return Err(DurableRecoveryError::VerifiedGrantMismatch);
         }
         authority_time.require_subject(self.grant_digest.0)?;
+        verified
+            .authority_state()
+            .ensure_fresh(&self.grant, authority_time)?;
+
         let now_unix_s = authority_time.conservative_now_unix_s()?;
         if now_unix_s > verified.expires_at_unix_s() {
             return Err(DurableRecoveryError::XeniaProofExpiredAtEffectEntry);
@@ -128,6 +123,9 @@ where
         let xenia_authorization_id = verified.authorization_id();
         let xenia_session_id = verified.session_id();
         let workload_digest = verified.workload_digest();
+        let authority_state_digest = verified.authority_state_digest();
+        let authority_state_sequence = verified.authority_state_sequence();
+        let current_epoch = verified.authority_state().authority_epoch();
         let (xenia_ledger_entry_count, xenia_ledger_head_hash) = verified.xenia_frontier();
         let authority_evidence_digest =
             xenia_authority_evidence_digest(self.grant_digest, &verified);
@@ -158,11 +156,6 @@ where
         )
         .map_err(DurableRecoveryError::BrokerRestore)?;
 
-        // The affine verifier proof has now been reduced to fixed evidence
-        // commitments. Durable one-use semantics come from the next CAS-backed
-        // reservation checkpoint, not from retaining the Rust proof value.
-        drop(verified);
-
         let recovery = match broker.recover_once(
             plan,
             execution_id,
@@ -173,7 +166,7 @@ where
                 // Broker admission replaces this with the exact durable account.
                 use_state: GrantUseState::default(),
             },
-            negative_facts,
+            verified.authority_state().negative_facts(),
         ) {
             Ok(receipt) => receipt,
             Err(source) => {
@@ -213,6 +206,8 @@ where
             xenia_ledger_entry_count,
             xenia_ledger_head_hash,
             workload_digest,
+            authority_state_digest,
+            authority_state_sequence,
             authority_evidence_digest,
             attempt_key,
             recovery,
@@ -221,7 +216,8 @@ where
     }
 }
 
-/// Success receipt joining Xenia provenance, #305 accounting, and attempt evidence.
+/// Success receipt joining Xenia provenance, authority state, #305 accounting,
+/// and durable attempt evidence.
 #[derive(Debug)]
 pub struct DurableXeniaSystemdReceipt {
     pub xenia_authorization_id: [u8; 16],
@@ -229,26 +225,20 @@ pub struct DurableXeniaSystemdReceipt {
     pub xenia_ledger_entry_count: u64,
     pub xenia_ledger_head_hash: [u8; 32],
     pub workload_digest: Digest32,
+    pub authority_state_digest: Digest32,
+    pub authority_state_sequence: u64,
     pub authority_evidence_digest: Digest32,
     pub attempt_key: Digest32,
     pub recovery: RecoveryReceipt,
     pub attempt_evidence: DurableAttemptEvidenceStatus,
 }
 
-/// Explicitly distinguish a known absence/presence of an evidence head from a
-/// failure to read the in-process evidence locator. The latter must never be
-/// collapsed into `Known(None)` because that could be misread as proof that the
-/// effect frontier was never crossed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DurableEvidenceLocator {
     Known(Option<AttemptEvidenceHead>),
     Unavailable { diagnostic_digest: Digest32 },
 }
 
-/// Whether broker-level success could also be appended as the final attempt
-/// evidence record. A finalization failure does not erase the earlier durable
-/// `DispatchArmed`/dispatch classification records or the successful #305
-/// accounting checkpoint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DurableAttemptEvidenceStatus {
     RecoveryCompleted(AttemptEvidenceHead),
@@ -270,6 +260,8 @@ pub enum DurableBootstrapError {
 pub enum DurableRecoveryError {
     #[error("verified authority time failed: {0}")]
     AuthorityTime(#[from] AuthorityTimeError),
+    #[error("verified authority state failed: {0}")]
+    AuthorityState(#[from] AuthorityStateError),
     #[error("verified Xenia proof belongs to a different capability grant")]
     VerifiedGrantMismatch,
     #[error("Xenia proof expired before effect entry")]
@@ -301,6 +293,10 @@ struct XeniaAuthorityEvidenceCommitmentV1 {
     ledger_entry_count: u64,
     ledger_head_hash: [u8; 32],
     prior_checkpoint: CheckpointHead,
+    authority_state_digest: Digest32,
+    authority_state_sequence: u64,
+    authority_state_policy_digest: [u8; 32],
+    authority_state_time_policy_digest: [u8; 32],
     expires_at_unix_s: u64,
 }
 
@@ -318,6 +314,10 @@ fn xenia_authority_evidence_digest(
         ledger_entry_count,
         ledger_head_hash,
         prior_checkpoint: verified.prior_checkpoint(),
+        authority_state_digest: verified.authority_state_digest(),
+        authority_state_sequence: verified.authority_state_sequence(),
+        authority_state_policy_digest: verified.authority_state().state_policy_digest(),
+        authority_state_time_policy_digest: verified.authority_state().time_policy_digest(),
         expires_at_unix_s: verified.expires_at_unix_s(),
     };
     let encoded = bincode::serialize(&commitment)
