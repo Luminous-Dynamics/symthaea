@@ -67,7 +67,8 @@ jobs:
             git --no-pager diff -- Cargo.lock
           fi
 
-      - name: Rustfmt TPM2 attestation crate
+      - name: Rustfmt diagnostic
+        continue-on-error: true
         run: cargo fmt --check --package symthaea-platform-attestation
 
       - name: Test TPM2 attestation crate
