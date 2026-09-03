@@ -15,3 +15,4 @@ symthaea-authority = { path = "../../core/symthaea-authority" }
 symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
 symthaea-authority-time = { path = "../symthaea-authority-time" }
 symthaea-authority-state = { path = "../symthaea-authority-state" }
+symthaea-executor-workload = { path = "../symthaea-executor-workload" }
