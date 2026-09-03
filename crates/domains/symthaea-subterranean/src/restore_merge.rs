@@ -7,6 +7,32 @@
 //! may select one of these primitives. There is deliberately no generic
 //! `merge_any_evidence` operation.
 
+use super::restore_actions::EvidenceRestorePolicy;
+
+/// Executable merge primitive licensed by one audited evidence polarity.
+///
+/// Unsupported means the evidence class has not yet received an executable
+/// conservative algebra in this module; callers must fail closed rather than
+/// substitute another primitive.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum MergePrimitive {
+    ReplayBarrierJoin,
+    RestrictionCounterJoin,
+    FreshOnlyReset,
+    Unsupported,
+}
+
+pub(super) const fn primitive_for_policy(policy: EvidenceRestorePolicy) -> MergePrimitive {
+    match policy {
+        EvidenceRestorePolicy::ReplayBarrier => MergePrimitive::ReplayBarrierJoin,
+        EvidenceRestorePolicy::RestrictionSupporting => MergePrimitive::RestrictionCounterJoin,
+        EvidenceRestorePolicy::RecoverySupportingFreshOnly => MergePrimitive::FreshOnlyReset,
+        EvidenceRestorePolicy::CounterexamplePreserving | EvidenceRestorePolicy::NeutralHistory => {
+            MergePrimitive::Unsupported
+        }
+    }
+}
+
 /// Replay barrier for one principal/source stream.
 ///
 /// Ordering is lexicographic: a newer epoch dominates every sequence from an
@@ -140,6 +166,30 @@ pub(super) const fn reconcile_policy(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn evidence_polarity_maps_only_to_its_licensed_primitive() {
+        assert_eq!(
+            primitive_for_policy(EvidenceRestorePolicy::ReplayBarrier),
+            MergePrimitive::ReplayBarrierJoin
+        );
+        assert_eq!(
+            primitive_for_policy(EvidenceRestorePolicy::RestrictionSupporting),
+            MergePrimitive::RestrictionCounterJoin
+        );
+        assert_eq!(
+            primitive_for_policy(EvidenceRestorePolicy::RecoverySupportingFreshOnly),
+            MergePrimitive::FreshOnlyReset
+        );
+        assert_eq!(
+            primitive_for_policy(EvidenceRestorePolicy::CounterexamplePreserving),
+            MergePrimitive::Unsupported
+        );
+        assert_eq!(
+            primitive_for_policy(EvidenceRestorePolicy::NeutralHistory),
+            MergePrimitive::Unsupported
+        );
+    }
 
     fn barriers() -> [ReplayBarrier; 6] {
         [
