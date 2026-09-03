@@ -13,6 +13,7 @@
 /// - `ecology_renderer` — final factual identity wrapper used by live + preview paths
 /// - `visual_composition` — pure bounded perceptual-attention policy
 /// - `visual_sampling` — deterministic node-density / negative-space selector
+/// - `hardware_bud` — deterministic localized structure for persistent hardware change
 /// - `inoculation_renderer` — shared installation/incubation phase grammar
 /// - `inoculation_ceremony` — install-path-specific visual signatures
 /// - `microtype` — tiny dependency-free uppercase factual label renderer
@@ -30,6 +31,7 @@ pub mod ecology_renderer_fidelity_v2;
 #[path = "ecology_renderer_identity.rs"]
 pub mod ecology_renderer;
 pub mod framebuffer;
+pub mod hardware_bud;
 pub mod inoculation_ceremony;
 pub mod inoculation_renderer;
 pub mod microtype;
