@@ -8,8 +8,9 @@
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_subterranean::embodiment::SubterraneanEmbodiment;
 use symthaea_subterranean::{
-    AuthenticationLevel, OperatorCommand, OperatorCommandEnvelope, OperatorConstraint, OperatorId,
-    OperatorRole,
+    AuthenticationLevel, MIN_SUPPORTED_OPERATIONAL_CHECKPOINT_SCHEMA_VERSION, OperatorCommand,
+    OperatorCommandEnvelope, OperatorConstraint, OperatorId, OperatorRole,
+    SubterraneanOperationalCheckpoint,
 };
 
 fn command(sequence: u64, proposal_id: u64, command: OperatorCommand) -> OperatorCommandEnvelope {
@@ -71,6 +72,53 @@ fn stale_checkpoint_must_not_clear_a_newer_operator_restriction() {
         embodiment.operator_constraint(),
         OperatorConstraint::HoldPosition,
         "historical checkpoint authority must not replace a newer live restriction"
+    );
+}
+
+#[test]
+fn legacy_checkpoint_missing_operator_authority_must_not_widen_live_authority() {
+    let genesis = GenesisSeed::from_phrase("recovery lifecycle legacy checkpoint");
+    let mut embodiment = SubterraneanEmbodiment::new(&genesis);
+
+    // Model a checkpoint produced by a supported older schema before the
+    // operator-authority field existed. Current serde compatibility defaults a
+    // missing authority field, so the restore boundary must still fail closed.
+    let checkpoint = embodiment.operational_checkpoint();
+    let mut encoded = serde_json::to_value(checkpoint).expect("checkpoint should serialize");
+    let object = encoded
+        .as_object_mut()
+        .expect("checkpoint serialization should be an object");
+    object.remove("operator_authority");
+    object.insert(
+        "schema_version".to_string(),
+        serde_json::json!(MIN_SUPPORTED_OPERATIONAL_CHECKPOINT_SCHEMA_VERSION),
+    );
+
+    // Rejecting such a legacy checkpoint at deserialization is an acceptable
+    // future policy. If compatibility keeps accepting it, loading it must not
+    // weaken a newer live restriction.
+    let legacy = match serde_json::from_value::<SubterraneanOperationalCheckpoint>(encoded) {
+        Ok(value) => value,
+        Err(_) => return,
+    };
+
+    embodiment
+        .ingest_operator_command(command(1, 1, OperatorCommand::EmergencyStop))
+        .expect("emergency stop should be accepted");
+    assert_eq!(
+        embodiment.operator_constraint(),
+        OperatorConstraint::EmergencyStop
+    );
+
+    let restore = embodiment.load_operational_checkpoint(&legacy);
+    assert!(
+        restore.is_err() || embodiment.operator_constraint() == OperatorConstraint::EmergencyStop,
+        "legacy checkpoint compatibility synthesized wider operator authority"
+    );
+    assert_eq!(
+        embodiment.operator_constraint(),
+        OperatorConstraint::EmergencyStop,
+        "missing historical authority state must not become current permission"
     );
 }
 
