@@ -3,17 +3,19 @@
 //! Fresh TPM2 platform evidence for bounded Symthaea agency.
 //!
 //! This crate deliberately has no software-qualified fallback. V1 accepts only
-//! a locally collected TPM2 quote that is generated with an exact reviewed PCR
-//! selection and independently checked by a reviewed `tpm2_checkquote` binary.
-//! The TPM qualifying data is a fresh challenge bound to the exact capability,
-//! measured executor workload, measured executor configuration, and attestation
-//! policy.
+//! a locally collected TPM2 quote generated for an exact reviewed PCR selection
+//! and independently checked by a reviewed `tpm2_checkquote` binary.
 //!
-//! V1 is still a software/kernel-rooted adapter: it trusts the operating system
-//! to provide the configured TPM device/TCTI and to execute the reviewed
-//! `tpm2-tools` binaries. A later IMA/measured-boot/TPM quote profile can retain
-//! the same opaque proof boundary while moving more of the trust root below the
-//! host kernel.
+//! TPM `qualifyingData` is intentionally the fixed 32-byte, domain-separated
+//! digest of the complete canonical challenge rather than the raw challenge.
+//! TPM2B_DATA is hash-sized on real TPMs; hashing preserves binding to the exact
+//! capability/workload/configuration/policy/nonce tuple without exceeding that
+//! structure's platform-dependent size bound.
+//!
+//! V1 still trusts the host OS to provide the configured TPM/TCTI and execute
+//! the reviewed verifier binaries. IMA/event-log replay and physical-TPM remote
+//! attestation can strengthen that root later without changing the opaque proof
+//! boundary exposed here.
 
 #![deny(unsafe_code)]
 
@@ -43,25 +45,16 @@ const MAX_PCR_BLOB_BYTES: u64 = 256 * 1024;
 pub struct PlatformAttestationPolicyV1 {
     pub schema_version: u16,
     pub policy_id: [u8; 16],
-    /// Absolute reviewed `tpm2_quote` executable path.
     pub tpm2_quote_path: String,
-    /// BLAKE3 of the exact `tpm2_quote` executable bytes.
     pub tpm2_quote_digest: Digest32,
-    /// Absolute reviewed `tpm2_checkquote` executable path.
     pub tpm2_checkquote_path: String,
-    /// BLAKE3 of the exact `tpm2_checkquote` executable bytes.
     pub tpm2_checkquote_digest: Digest32,
-    /// BLAKE3 of the exact trusted AK public-key file bytes.
     pub trusted_ak_public_digest: Digest32,
-    /// Exact SHA-256 PCR indices to quote. Must be sorted and unique.
+    /// Exact sorted, unique SHA-256 PCR indices.
     pub sha256_pcr_selection: Vec<u8>,
-    /// Approved serialized PCR blobs for the exact selection above.
-    ///
-    /// These are reviewed known-good profiles; a fresh valid quote over an
-    /// unapproved state still fails admission.
+    /// Sorted, unique commitments to the serialized PCR blob emitted for the
+    /// exact selection above.
     pub approved_pcr_profile_digests: Vec<Digest32>,
-    /// Production Nix deployments should require the verifier tools themselves
-    /// to resolve underneath `/nix/store`.
     pub require_nix_store_tools: bool,
     pub maximum_challenge_age_ns: u64,
     pub maximum_post_verification_age_ns: u64,
@@ -88,21 +81,20 @@ impl PlatformAttestationPolicyV1 {
             return Err(PlatformAttestationError::InvalidPolicy);
         }
 
-        let mut previous = None;
+        let mut previous_pcr = None;
         for pcr in &self.sha256_pcr_selection {
-            if *pcr > 23 || previous.is_some_and(|old| old >= *pcr) {
+            if *pcr > 23 || previous_pcr.is_some_and(|old| old >= *pcr) {
                 return Err(PlatformAttestationError::InvalidPolicy);
             }
-            previous = Some(*pcr);
+            previous_pcr = Some(*pcr);
         }
-        let mut previous_profile: Option<[u8; 32]> = None;
+
+        let mut previous_profile = None;
         for profile in &self.approved_pcr_profile_digests {
-            if profile.0 == [0; 32]
-                || previous_profile.is_some_and(|old| old >= profile.0)
-            {
+            if profile.0 == [0; 32] || previous_profile.is_some_and(|old| old >= *profile) {
                 return Err(PlatformAttestationError::InvalidPolicy);
             }
-            previous_profile = Some(profile.0);
+            previous_profile = Some(*profile);
         }
         Ok(())
     }
@@ -117,11 +109,17 @@ impl PlatformAttestationPolicyV1 {
         t.bytes(self.tpm2_checkquote_path.as_bytes())?;
         t.fixed(&self.tpm2_checkquote_digest.0);
         t.fixed(&self.trusted_ak_public_digest.0);
-        t.u32(u32::try_from(self.sha256_pcr_selection.len()).map_err(|_| PlatformAttestationError::Encoding)?);
+        t.u32(
+            u32::try_from(self.sha256_pcr_selection.len())
+                .map_err(|_| PlatformAttestationError::Encoding)?,
+        );
         for pcr in &self.sha256_pcr_selection {
             t.u8(*pcr);
         }
-        t.u32(u32::try_from(self.approved_pcr_profile_digests.len()).map_err(|_| PlatformAttestationError::Encoding)?);
+        t.u32(
+            u32::try_from(self.approved_pcr_profile_digests.len())
+                .map_err(|_| PlatformAttestationError::Encoding)?,
+        );
         for profile in &self.approved_pcr_profile_digests {
             t.fixed(&profile.0);
         }
@@ -133,13 +131,14 @@ impl PlatformAttestationPolicyV1 {
 
     pub fn pcr_selection_string(&self) -> Result<String, PlatformAttestationError> {
         self.validate()?;
-        let suffix = self
-            .sha256_pcr_selection
-            .iter()
-            .map(u8::to_string)
-            .collect::<Vec<_>>()
-            .join(",");
-        Ok(format!("sha256:{suffix}"))
+        Ok(format!(
+            "sha256:{}",
+            self.sha256_pcr_selection
+                .iter()
+                .map(u8::to_string)
+                .collect::<Vec<_>>()
+                .join(",")
+        ))
     }
 }
 
@@ -176,6 +175,11 @@ impl PlatformAttestationChallengeV1 {
 
     pub fn digest(&self) -> Result<Digest32, PlatformAttestationError> {
         Ok(Digest32(*blake3::hash(&self.canonical_bytes()?).as_bytes()))
+    }
+
+    /// Fixed-size TPM qualifying data for this complete challenge.
+    pub fn qualification_bytes(&self) -> Result<[u8; 32], PlatformAttestationError> {
+        Ok(self.digest()?.0)
     }
 }
 
@@ -225,16 +229,12 @@ impl PendingPlatformAttestationChallenge {
 
 #[derive(Debug, Clone)]
 pub struct LocalTpm2QuoteInputs {
-    /// TPM2-tools key context used only to ask the TPM to sign the quote.
+    /// Context used only to request the quote. Identity terminates in the
+    /// separately pinned AK public key checked by `tpm2_checkquote`.
     pub ak_context_path: PathBuf,
-    /// Public AK file. Its exact bytes must match the digest pinned in policy.
     pub ak_public_path: PathBuf,
 }
 
-/// Opaque short-lived fact that a reviewed TPM2 verifier accepted the exact
-/// challenge under an approved PCR profile.
-///
-/// There is intentionally no public constructor and no software fallback.
 #[derive(Debug)]
 pub struct VerifiedPlatformAttestation {
     grant_digest: Digest32,
@@ -281,10 +281,6 @@ impl VerifiedPlatformAttestation {
         self.quote_signature_digest
     }
 
-    /// Require exact subject/policy continuity and a still-short-lived proof.
-    ///
-    /// This does not regenerate a quote. Production effect entry should keep
-    /// this lifetime short and obtain a new challenged quote after it expires.
     pub fn ensure_fresh(
         &self,
         policy: &PlatformAttestationPolicyV1,
@@ -301,6 +297,7 @@ impl VerifiedPlatformAttestation {
         {
             return Err(PlatformAttestationError::SubjectMismatch);
         }
+
         verify_tool_identity(
             Path::new(&policy.tpm2_quote_path),
             policy.tpm2_quote_digest,
@@ -316,8 +313,8 @@ impl VerifiedPlatformAttestation {
         {
             return Err(PlatformAttestationError::ToolIdentityChanged);
         }
-        let now = linux_boottime_ns()?;
-        let age = now
+
+        let age = linux_boottime_ns()?
             .checked_sub(self.verified_boottime_ns)
             .ok_or(PlatformAttestationError::BootTimeMovedBackward)?;
         if age > self.maximum_post_verification_age_ns {
@@ -327,8 +324,6 @@ impl VerifiedPlatformAttestation {
     }
 }
 
-/// Generate and verify a fresh local TPM2 quote using only reviewed tool paths
-/// and an exact AK public key pinned by the policy.
 pub fn verify_local_tpm2_attestation_v1(
     policy: &PlatformAttestationPolicyV1,
     challenge: PendingPlatformAttestationChallenge,
@@ -349,11 +344,12 @@ fn verify_with_runner<R: Tpm2Runner>(
     {
         return Err(PlatformAttestationError::InvalidChallenge);
     }
+
     let received_boottime_ns = linux_boottime_ns()?;
-    let challenge_age = received_boottime_ns
+    let challenge_age_ns = received_boottime_ns
         .checked_sub(challenge.sent_boottime_ns)
         .ok_or(PlatformAttestationError::BootTimeMovedBackward)?;
-    if challenge_age > policy.maximum_challenge_age_ns {
+    if challenge_age_ns > policy.maximum_challenge_age_ns {
         return Err(PlatformAttestationError::ChallengeExpired);
     }
 
@@ -376,11 +372,13 @@ fn verify_with_runner<R: Tpm2Runner>(
 
     let temp = EvidenceDir::new()?;
     let qualification_path = temp.path.join("qualification.bin");
-    let quote_message_path = temp.path.join("quote.msg");
-    let quote_signature_path = temp.path.join("quote.sig");
-    let pcr_blob_path = temp.path.join("quote.pcrs");
+    let message_path = temp.path.join("quote.msg");
+    let signature_path = temp.path.join("quote.sig");
+    let pcrs_path = temp.path.join("quote.pcrs");
     let ak_public_copy_path = temp.path.join("ak-public.bin");
-    fs::write(&qualification_path, challenge.wire.canonical_bytes()?)?;
+
+    let challenge_digest = challenge.wire.digest()?;
+    fs::write(&qualification_path, challenge.wire.qualification_bytes()?)?;
     fs::write(&ak_public_copy_path, &ak_public)?;
 
     let selection = policy.pcr_selection_string()?;
@@ -389,12 +387,12 @@ fn verify_with_runner<R: Tpm2Runner>(
         ak_context: &inputs.ak_context_path,
         selection: &selection,
         qualification: &qualification_path,
-        message: &quote_message_path,
-        signature: &quote_signature_path,
-        pcrs: &pcr_blob_path,
+        message: &message_path,
+        signature: &signature_path,
+        pcrs: &pcrs_path,
     })?;
 
-    let pcr_blob = read_bounded(&pcr_blob_path, MAX_PCR_BLOB_BYTES)?;
+    let pcr_blob = read_bounded(&pcrs_path, MAX_PCR_BLOB_BYTES)?;
     let pcr_profile_digest = digest_bytes(&pcr_blob);
     if policy
         .approved_pcr_profile_digests
@@ -408,13 +406,13 @@ fn verify_with_runner<R: Tpm2Runner>(
         tool: &checkquote_tool,
         ak_public: &ak_public_copy_path,
         qualification: &qualification_path,
-        message: &quote_message_path,
-        signature: &quote_signature_path,
-        pcrs: &pcr_blob_path,
+        message: &message_path,
+        signature: &signature_path,
+        pcrs: &pcrs_path,
     })?;
 
-    let quote_message = read_bounded(&quote_message_path, MAX_QUOTE_MESSAGE_BYTES)?;
-    let quote_signature = read_bounded(&quote_signature_path, MAX_QUOTE_SIGNATURE_BYTES)?;
+    let quote_message = read_bounded(&message_path, MAX_QUOTE_MESSAGE_BYTES)?;
+    let quote_signature = read_bounded(&signature_path, MAX_QUOTE_SIGNATURE_BYTES)?;
     if quote_message.is_empty() || quote_signature.is_empty() || pcr_blob.is_empty() {
         return Err(PlatformAttestationError::EmptyQuoteEvidence);
     }
@@ -424,7 +422,7 @@ fn verify_with_runner<R: Tpm2Runner>(
         workload_digest: challenge.wire.workload_digest,
         configuration_digest: challenge.wire.configuration_digest,
         policy_digest: challenge.wire.policy_digest,
-        challenge_digest: challenge.wire.digest()?,
+        challenge_digest,
         ak_public_digest,
         pcr_profile_digest,
         quote_message_digest: digest_bytes(&quote_message),
@@ -528,8 +526,7 @@ fn verify_tool_identity(
     if require_nix_store && !path_is_in_nix_store(&resolved) {
         return Err(PlatformAttestationError::ToolOutsideNixStore);
     }
-    let bytes = read_bounded(&resolved, MAX_TOOL_BYTES)?;
-    if digest_bytes(&bytes) != expected_digest {
+    if digest_bytes(&read_bounded(&resolved, MAX_TOOL_BYTES)?) != expected_digest {
         return Err(PlatformAttestationError::ToolDigestMismatch);
     }
     Ok(resolved)
@@ -579,32 +576,29 @@ impl Drop for EvidenceDir {
 
 fn linux_boottime_ns() -> Result<u64, PlatformAttestationError> {
     let uptime = fs::read_to_string("/proc/uptime")?;
-    let token = uptime
-        .split_whitespace()
-        .next()
-        .ok_or(PlatformAttestationError::InvalidBootTime)?;
-    decimal_seconds_to_ns(token)
+    decimal_seconds_to_ns(
+        uptime
+            .split_whitespace()
+            .next()
+            .ok_or(PlatformAttestationError::InvalidBootTime)?,
+    )
 }
 
 fn decimal_seconds_to_ns(value: &str) -> Result<u64, PlatformAttestationError> {
     let (seconds, fractional) = value.split_once('.').unwrap_or((value, ""));
-    let seconds: u64 = seconds
-        .parse()
+    let seconds = seconds
+        .parse::<u64>()
         .map_err(|_| PlatformAttestationError::InvalidBootTime)?;
     if fractional.len() > 9 || !fractional.bytes().all(|b| b.is_ascii_digit()) {
         return Err(PlatformAttestationError::InvalidBootTime);
     }
-    let mut nanos_text = fractional.to_string();
-    while nanos_text.len() < 9 {
-        nanos_text.push('0');
+    let mut nanos = fractional.to_string();
+    while nanos.len() < 9 {
+        nanos.push('0');
     }
-    let nanos = if nanos_text.is_empty() {
-        0
-    } else {
-        nanos_text
-            .parse::<u64>()
-            .map_err(|_| PlatformAttestationError::InvalidBootTime)?
-    };
+    let nanos = nanos
+        .parse::<u64>()
+        .map_err(|_| PlatformAttestationError::InvalidBootTime)?;
     seconds
         .checked_mul(1_000_000_000)
         .and_then(|base| base.checked_add(nanos))
@@ -625,7 +619,7 @@ pub enum PlatformAttestationError {
     PolicyMismatch,
     #[error("platform-attestation subject changed")]
     SubjectMismatch,
-    #[error("TPM2 verifier tool resolved outside the required Nix store")]
+    #[error("TPM2 verifier tool resolved outside required Nix store")]
     ToolOutsideNixStore,
     #[error("TPM2 verifier tool digest does not match reviewed policy")]
     ToolDigestMismatch,
@@ -683,8 +677,7 @@ impl Transcript {
         self.bytes.extend_from_slice(value);
     }
     fn bytes(&mut self, value: &[u8]) -> Result<(), PlatformAttestationError> {
-        let len = u32::try_from(value.len()).map_err(|_| PlatformAttestationError::Encoding)?;
-        self.u32(len);
+        self.u32(u32::try_from(value.len()).map_err(|_| PlatformAttestationError::Encoding)?);
         self.bytes.extend_from_slice(value);
         Ok(())
     }
@@ -710,7 +703,12 @@ mod tests {
         path
     }
 
-    fn policy(quote_tool: &Path, check_tool: &Path, ak_public: &Path, pcr: Digest32) -> PlatformAttestationPolicyV1 {
+    fn policy(
+        quote_tool: &Path,
+        check_tool: &Path,
+        ak_public: &Path,
+        pcr: Digest32,
+    ) -> PlatformAttestationPolicyV1 {
         PlatformAttestationPolicyV1 {
             schema_version: PLATFORM_ATTESTATION_SCHEMA_VERSION,
             policy_id: [1; 16],
@@ -729,28 +727,55 @@ mod tests {
 
     struct FakeRunner {
         pcr_blob: Vec<u8>,
+        expected_qualification: [u8; 32],
         check_calls: Mutex<u32>,
     }
 
     impl Tpm2Runner for FakeRunner {
         fn quote(&self, invocation: QuoteInvocation<'_>) -> Result<(), PlatformAttestationError> {
             assert_eq!(invocation.selection, "sha256:0,7,16");
-            assert!(!fs::read(invocation.qualification)?.is_empty());
+            let qualification = fs::read(invocation.qualification)?;
+            assert_eq!(qualification.len(), 32);
+            assert_eq!(qualification, self.expected_qualification);
             fs::write(invocation.message, b"signed quote message")?;
             fs::write(invocation.signature, b"tpm signature")?;
             fs::write(invocation.pcrs, &self.pcr_blob)?;
             Ok(())
         }
 
-        fn checkquote(&self, invocation: CheckQuoteInvocation<'_>) -> Result<(), PlatformAttestationError> {
+        fn checkquote(
+            &self,
+            invocation: CheckQuoteInvocation<'_>,
+        ) -> Result<(), PlatformAttestationError> {
+            assert_eq!(fs::read(invocation.qualification)?, self.expected_qualification);
             assert!(!fs::read(invocation.ak_public)?.is_empty());
-            assert!(!fs::read(invocation.qualification)?.is_empty());
             assert_eq!(fs::read(invocation.message)?, b"signed quote message");
             assert_eq!(fs::read(invocation.signature)?, b"tpm signature");
             assert_eq!(fs::read(invocation.pcrs)?, self.pcr_blob);
             *self.check_calls.lock().unwrap() += 1;
             Ok(())
         }
+    }
+
+    #[test]
+    fn challenge_qualification_is_exactly_32_byte_digest() {
+        let tool_a = temp_file("tool-a", b"quote-tool");
+        let tool_b = temp_file("tool-b", b"check-tool");
+        let ak = temp_file("ak", b"ak-public");
+        let p = policy(&tool_a, &tool_b, &ak, digest_bytes(b"pcrs"));
+        let pending = PendingPlatformAttestationChallenge::new(
+            &p,
+            Digest32([2; 32]),
+            Digest32([3; 32]),
+            Digest32([4; 32]),
+        )
+        .unwrap();
+        let wire = pending.wire();
+        assert_eq!(wire.qualification_bytes().unwrap().len(), 32);
+        assert_eq!(wire.qualification_bytes().unwrap(), wire.digest().unwrap().0);
+        let _ = fs::remove_file(tool_a);
+        let _ = fs::remove_file(tool_b);
+        let _ = fs::remove_file(ak);
     }
 
     #[test]
@@ -794,8 +819,10 @@ mod tests {
             Digest32([4; 32]),
         )
         .unwrap();
+        let expected_qualification = challenge.wire().qualification_bytes().unwrap();
         let runner = FakeRunner {
             pcr_blob: pcr_blob.clone(),
+            expected_qualification,
             check_calls: Mutex::new(0),
         };
         let verified = verify_with_runner(
@@ -828,8 +855,10 @@ mod tests {
             Digest32([4; 32]),
         )
         .unwrap();
+        let expected_qualification = challenge.wire().qualification_bytes().unwrap();
         let runner = FakeRunner {
             pcr_blob: b"different".to_vec(),
+            expected_qualification,
             check_calls: Mutex::new(0),
         };
         assert!(matches!(
