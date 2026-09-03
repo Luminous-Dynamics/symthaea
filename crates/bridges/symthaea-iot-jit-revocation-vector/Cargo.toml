@@ -1,0 +1,23 @@
+[package]
+name = "symthaea-iot-jit-revocation-vector"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Complete just-in-time revocation fencing across transport, device state, and interlock trust"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "safety", "revocation", "actuation"]
+categories = ["embedded"]
+
+[dependencies]
+bincode = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-authority = { path = "../symthaea-iot-authority" }
+symthaea-iot-device-protocol = { path = "../symthaea-iot-device-protocol" }
+symthaea-iot-final-gate = { path = "../symthaea-iot-final-gate" }
+symthaea-iot-interlock-trust = { path = "../symthaea-iot-interlock-trust" }
+symthaea-iot-jit-fence = { path = "../symthaea-iot-jit-fence" }
+symthaea-iot-transport-receipt = { path = "../symthaea-iot-transport-receipt" }
+thiserror = { workspace = true }
