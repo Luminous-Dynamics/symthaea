@@ -15,8 +15,12 @@ let
   cfg = config.services.symthaea-ci-runner;
   runnerKey = "symthaea-validation";
   repositoryUrl = "https://github.com/Luminous-Dynamics/symthaea";
+  repositoryName = "Luminous-Dynamics/symthaea";
+  repositoryId = "1136141775";
   capabilityLabel = "symthaea-trusted-cpu-v1";
   tokenPath = if cfg.tokenFile == null then "/dev/null" else toString cfg.tokenFile;
+  trustedHarnessCommit =
+    if cfg.trustedHarnessCommit == null then "" else cfg.trustedHarnessCommit;
 
   credentialPreflight = pkgs.writeShellScript "symthaea-ci-runner-credential-preflight" ''
     set -euo pipefail
@@ -61,6 +65,54 @@ let
       exit 1
     fi
   '';
+
+  # Defense in depth for the privileged self-hosted capability. GitHub executes
+  # this hook synchronously after job assignment and before workflow steps. The
+  # hook pins the reviewed harness commit deployed by the operator and rejects
+  # every other repository/ref/event/workflow identity. This does not replace
+  # server-side branch/ruleset protection; trusted main must still be protected.
+  jobAdmissionHook = pkgs.writeShellScript "symthaea-ci-runner-job-admission" ''
+    set -euo pipefail
+
+    reject() {
+      echo "Symthaea trusted-runner admission rejected: $1" >&2
+      exit 1
+    }
+
+    expected_harness=${lib.escapeShellArg trustedHarnessCommit}
+
+    [ "${GITHUB_REPOSITORY:-}" = ${lib.escapeShellArg repositoryName} ] \
+      || reject 'wrong repository'
+    [ "${GITHUB_REPOSITORY_ID:-}" = ${lib.escapeShellArg repositoryId} ] \
+      || reject 'wrong repository id'
+    [ "${GITHUB_SERVER_URL:-}" = 'https://github.com' ] \
+      || reject 'wrong GitHub server'
+    [ "${GITHUB_EVENT_NAME:-}" = 'workflow_dispatch' ] \
+      || reject 'workflow is not manually dispatched'
+    [ "${GITHUB_REF:-}" = 'refs/heads/main' ] \
+      || reject 'workflow ref is not main'
+    [ "${GITHUB_REF_TYPE:-}" = 'branch' ] \
+      || reject 'workflow ref is not a branch'
+    [ "${GITHUB_REF_PROTECTED:-}" = 'true' ] \
+      || reject 'main is not protected by GitHub policy'
+    [ -n "$expected_harness" ] \
+      || reject 'trusted harness commit is not configured'
+    [ "${GITHUB_SHA:-}" = "$expected_harness" ] \
+      || reject 'job commit does not match deployed trusted harness'
+    [ "${GITHUB_WORKFLOW_SHA:-}" = "$expected_harness" ] \
+      || reject 'workflow commit does not match deployed trusted harness'
+
+    case "${GITHUB_WORKFLOW_REF:-}" in
+      '${repositoryName}/.github/workflows/self-hosted-runner-smoke.yml@refs/heads/main'|\
+      '${repositoryName}/.github/workflows/self-hosted-ai-assurance-foundation-recovery.yml@refs/heads/main'|\
+      '${repositoryName}/.github/workflows/self-hosted-ai-assurance-budget-recovery.yml@refs/heads/main'|\
+      '${repositoryName}/.github/workflows/self-hosted-sym-arch-002a-core-recovery.yml@refs/heads/main')
+        ;;
+      *)
+        reject 'workflow path is not in the trusted capability allowlist'
+        ;;
+    esac
+  '';
 in
 {
   options.services.symthaea-ci-runner = {
@@ -81,12 +133,23 @@ in
       example = "/run/secrets/github-runner/symthaea-pat";
       description = ''
         External runtime path containing a repository-scoped GitHub access token
-        used to obtain short-lived runner registration tokens. For the v1
+        used to obtain short-lived runner registration tokens. For the v2
         static-secret deployment, use a fine-grained PAT restricted to
         Luminous-Dynamics/symthaea with only repository Administration: write
         permission. Keep the credential in a root-owned runtime secret file with
         mode exactly 0400 or 0600. The service rejects empty credentials and any
         credential containing whitespace or control bytes before registration.
+      '';
+    };
+
+    trustedHarnessCommit = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "0123456789abcdef0123456789abcdef01234567";
+      description = ''
+        Exact reviewed main commit allowed to schedule onto the trusted CPU
+        capability. Any later main commit fails the host-side pre-job admission
+        hook until this pin is deliberately updated and the host is rebuilt.
       '';
     };
   };
@@ -100,6 +163,12 @@ in
       {
         assertion = cfg.name != "";
         message = "services.symthaea-ci-runner.name must be non-empty";
+      }
+      {
+        assertion =
+          cfg.trustedHarnessCommit != null
+          && builtins.match "[0-9a-f]{40}" cfg.trustedHarnessCommit != null;
+        message = "services.symthaea-ci-runner.trustedHarnessCommit must be an exact lowercase 40-hex Git commit";
       }
     ];
 
@@ -127,12 +196,17 @@ in
       extraPackages = [ ];
     };
 
-    # Enforce runtime credential invariants immediately before the pinned
-    # upstream root bootstrap copies the access token into private runner state.
-    # The leading '+' keeps this check in the same privileged ExecStartPre phase
-    # as the upstream credential-copy lifecycle; the job process never receives
-    # this privilege or access to the original token path.
-    systemd.services."github-runner-${runnerKey}".serviceConfig.ExecStartPre =
-      lib.mkBefore [ "+${credentialPreflight}" ];
+    systemd.services."github-runner-${runnerKey}" = {
+      # Host-owned, Nix-store-pinned gate executed by the GitHub runner before
+      # any workflow-defined step. A non-zero exit rejects the job.
+      environment.ACTIONS_RUNNER_HOOK_JOB_STARTED = toString jobAdmissionHook;
+
+      # Enforce runtime credential invariants immediately before the pinned
+      # upstream root bootstrap copies the access token into private runner state.
+      # The leading '+' keeps this check in the same privileged ExecStartPre phase
+      # as the upstream credential-copy lifecycle; the job process never receives
+      # this privilege or access to the original token path.
+      serviceConfig.ExecStartPre = lib.mkBefore [ "+${credentialPreflight}" ];
+    };
   };
 }
