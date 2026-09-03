@@ -2,6 +2,15 @@ name: Agency Executor Configuration NixOS VM
 
 on:
   pull_request:
+    paths:
+      - 'crates/bridges/symthaea-executor-configuration/**'
+      - 'nix/agency-executor-config-vm.nix'
+      - 'flake.nix'
+      - 'flake.lock'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/agency-executor-config-vm.yml'
   workflow_dispatch:
 
 permissions:
