@@ -161,11 +161,9 @@ jobs:
 
       - name: Establish reviewed PCR-16 qualification profile
         run: |
-          printf 'symthaea-pcr-profile-candidate-v1' > "$RUNNER_TEMP/baseline.qual"
           tpm2_quote -Q \
             -c "$RUNNER_TEMP/ak.ctx" \
             -l sha256:16 \
-            -q "$RUNNER_TEMP/baseline.qual" \
             -m "$RUNNER_TEMP/baseline.msg" \
             -s "$RUNNER_TEMP/baseline.sig" \
             -o "$RUNNER_TEMP/baseline.pcrs" \
