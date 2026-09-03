@@ -49,10 +49,20 @@ jobs:
           echo "head=$(git rev-parse HEAD)"
           echo "tree=$(git rev-parse 'HEAD^{tree}')"
 
-      - name: Install pinned Rust toolchain
+      - name: Install repository-pinned Rust toolchain
+        id: toolchain
         run: |
-          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
-          rustup override set 1.96.0
+          set -euo pipefail
+          RUST_CHANNEL="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$RUST_CHANNEL"
+          echo "channel=$RUST_CHANNEL" >> "$GITHUB_OUTPUT"
+          rustup toolchain install "$RUST_CHANNEL" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --no-self-update
+          rustup override set "$RUST_CHANNEL"
+          test "$(rustc --version | awk '{print $2}')" = "$RUST_CHANNEL"
           rustc --version
           cargo --version
 
@@ -122,13 +132,15 @@ jobs:
 
       - name: Require committed qualification inputs
         if: steps.lock.outputs.changed == 'true' || steps.rustfmt.outputs.changed == 'true'
+        env:
+          RUST_CHANNEL: ${{ steps.toolchain.outputs.channel }}
         run: |
           if [[ "${{ steps.lock.outputs.changed }}" == 'true' ]]; then
-            echo 'Cargo.lock differs from Cargo 1.96 resolver output.' >&2
+            echo "Cargo.lock differs from Cargo $RUST_CHANNEL resolver output." >&2
             echo 'Commit the uploaded spore-boot-cargo-lock candidate unchanged.' >&2
           fi
           if [[ "${{ steps.rustfmt.outputs.changed }}" == 'true' ]]; then
-            echo 'Rust 1.96 formatting differs from the exact source head.' >&2
+            echo "Rust $RUST_CHANNEL formatting differs from the exact source head." >&2
             echo 'Apply the uploaded spore-boot-rustfmt-candidate patch unchanged.' >&2
           fi
           exit 1
