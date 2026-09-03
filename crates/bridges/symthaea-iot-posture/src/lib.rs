@@ -199,7 +199,7 @@ pub enum VerifierKeyStatus {
 }
 
 impl VerifierKeyStatus {
-    fn tag(self) -> u8 {
+    const fn tag(self) -> u8 {
         match self {
             Self::Active => 0,
             Self::Retired => 1,
@@ -207,11 +207,11 @@ impl VerifierKeyStatus {
         }
     }
 
-    fn transition_allowed(self, next: Self) -> bool {
+    const fn transition_allowed(self, next: Self) -> bool {
         match self {
             Self::Active => true,
             Self::Retired => matches!(next, Self::Retired | Self::Revoked),
-            Self::Revoked => next == Self::Revoked,
+            Self::Revoked => matches!(next, Self::Revoked),
         }
     }
 }
@@ -343,7 +343,9 @@ impl VerifierTrustSnapshotV1 {
                     h.update(&[1]);
                     h.update(&end.to_be_bytes());
                 }
-                None => h.update(&[0]),
+                None => {
+                    h.update(&[0]);
+                }
             }
             h.update(&key.max_result_lifetime_s.to_be_bytes());
             h.update(&[key.status.tag()]);
@@ -755,7 +757,7 @@ mod tests {
             message: &[u8],
             signature: &[u8],
         ) -> Result<bool, String> {
-            Ok(blake3::hash(message).as_bytes() == signature)
+            Ok(signature == blake3::hash(message).as_bytes().as_slice())
         }
     }
 
@@ -843,10 +845,10 @@ mod tests {
         let result = signed_result(&challenge);
         let mut other = challenge.clone();
         other.nonce = [0xB6; 32];
-        assert_eq!(
+        assert!(matches!(
             verify_device_posture(result, &other, &trust(), 5_000, &TestVerifier),
             Err(PostureError::ChallengeBindingMismatch)
-        );
+        ));
     }
 
     #[test]
@@ -861,7 +863,7 @@ mod tests {
             keys: vec![key(VerifierKeyStatus::Revoked)],
         })
         .unwrap();
-        assert_eq!(
+        assert!(matches!(
             verify_device_posture(
                 signed_result(&challenge),
                 &challenge,
@@ -870,7 +872,7 @@ mod tests {
                 &TestVerifier,
             ),
             Err(PostureError::VerifierKeyNotActive)
-        );
+        ));
     }
 
     #[test]
@@ -878,10 +880,10 @@ mod tests {
         let challenge = challenge();
         let mut result = signed_result(&challenge);
         result.signature[0] ^= 0xFF;
-        assert_eq!(
+        assert!(matches!(
             verify_device_posture(result, &challenge, &trust(), 5_000, &TestVerifier),
             Err(PostureError::InvalidAttestationSignature)
-        );
+        ));
     }
 
     #[test]
@@ -892,10 +894,10 @@ mod tests {
         result.signature = blake3::hash(&result.body.signature_message().unwrap())
             .as_bytes()
             .to_vec();
-        assert_eq!(
+        assert!(matches!(
             verify_device_posture(result, &challenge, &trust(), 5_000, &TestVerifier),
             Err(PostureError::ResultNotFreshForChallenge)
-        );
+        ));
     }
 
     #[test]
@@ -917,7 +919,10 @@ mod tests {
                 status: VerifierKeyStatus::Active,
             }],
         };
-        assert_eq!(first.successor(second), Err(PostureError::VerifierKeyDeleted));
+        assert!(matches!(
+            first.successor(second),
+            Err(PostureError::VerifierKeyDeleted)
+        ));
     }
 
     #[test]
@@ -931,19 +936,17 @@ mod tests {
             keys: vec![key(VerifierKeyStatus::Revoked)],
         })
         .unwrap();
-        let mut reactivated = key(VerifierKeyStatus::Active);
-        reactivated.not_before_unix_s = 1_000;
         let next = VerifierTrustSnapshotV1 {
             schema_version: VERIFIER_TRUST_SNAPSHOT_SCHEMA_VERSION,
             sequence: 2,
             issued_at_unix_s: 2_000,
             expires_at_unix_s: 9_000,
             previous_snapshot_digest: Some(first.head().digest),
-            keys: vec![reactivated],
+            keys: vec![key(VerifierKeyStatus::Active)],
         };
-        assert_eq!(
+        assert!(matches!(
             first.successor(next),
             Err(PostureError::VerifierKeyLifecycleRollback)
-        );
+        ));
     }
 }
