@@ -2,14 +2,8 @@
 """Build semantic-time evidence from exact Spore Boot Ecology preview frames.
 
 This tool never renders, modifies, or scores the boot experience. It reads the
-existing exact PPM captures plus their serialized BootGenome and emits:
-
-- deterministic samples at sequence start, every stage midpoint, and sequence end;
-- exact source-frame hashes and timing error for every requested semantic sample;
-- descriptive luminance/occupancy/centroid metrics (never an aesthetic score);
-- per-case PPM + PNG contact sheets built from the exact captured pixels.
-
-Only Python's standard library is used so the evidence layer stays disposable.
+existing exact PPM captures, their serialized BootGenome, and the versioned
+visual-review protocol, then emits deterministic descriptive evidence.
 """
 
 from __future__ import annotations
@@ -25,12 +19,18 @@ import tempfile
 import zlib
 
 SCHEMA = "spore-temporal-evidence-v1"
+REVIEW_PROTOCOL_SCHEMA = "spore.visual.review-protocol.v1"
+DEFAULT_PROTOCOL_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "docs/design/SPORE_VISUAL_REVIEW_PROTOCOL_V1.json"
+)
 BRIGHT_THRESHOLD = 96
 VERY_BRIGHT_THRESHOLD = 160
 NEAR_BLACK_THRESHOLD = 18
 CENTROID_THRESHOLD = 64
 GUTTER = 2
 CONTACT_COLUMNS = 4
+EXPECTED_SELECTION = "nearest existing exact renderer frame; ties choose earlier frame"
 
 
 def png_chunk(kind: bytes, payload: bytes) -> bytes:
@@ -81,9 +81,9 @@ def read_ppm(path: Path) -> tuple[int, int, bytes]:
     if width <= 0 or height <= 0 or max_value != 255:
         raise ValueError(f"{path}: unsupported PPM dimensions/max value")
 
-    # P6 is binary after the max-value separator. Consume the separator itself,
-    # not an arbitrary run of whitespace: a valid first pixel byte may be 0x09,
-    # 0x0a, 0x0d, or 0x20 and must never be mistaken for more header padding.
+    # P6 becomes binary after the max-value separator. Consume exactly the
+    # separator (or CRLF), never arbitrary following whitespace, because the
+    # first pixel byte itself may legally equal 0x09, 0x0a, 0x0d, or 0x20.
     if index >= len(data) or data[index] not in b" \t\r\n":
         raise ValueError(f"{path}: missing PPM header/payload separator")
     if data[index : index + 2] == b"\r\n":
@@ -106,11 +106,54 @@ def write_ppm(path: Path, width: int, height: int, pixels: bytes) -> None:
     path.write_bytes(f"P6\n{width} {height}\n255\n".encode() + pixels)
 
 
+def progress_array(protocol: dict, field: str) -> list[float]:
+    raw = protocol.get(field)
+    if not isinstance(raw, list) or not raw:
+        raise ValueError(f"review protocol {field!r} must be a non-empty array")
+    values: list[float] = []
+    for item in raw:
+        if not isinstance(item, (int, float)):
+            raise ValueError(f"review protocol {field!r} values must be numeric")
+        value = float(item)
+        if not math.isfinite(value) or not 0.0 <= value <= 1.0:
+            raise ValueError(f"review protocol {field!r} values must be finite in [0,1]")
+        values.append(value)
+    if any(left >= right for left, right in zip(values, values[1:])):
+        raise ValueError(f"review protocol {field!r} must be strictly increasing")
+    return values
+
+
+def load_review_protocol(path: Path) -> tuple[dict, str]:
+    raw = path.read_bytes()
+    protocol = json.loads(raw)
+    if protocol.get("schema") != REVIEW_PROTOCOL_SCHEMA:
+        raise ValueError(f"{path}: expected schema {REVIEW_PROTOCOL_SCHEMA}")
+    if protocol.get("semantic_basis") != "BootStageKind + stage-local progress":
+        raise ValueError(f"{path}: unsupported semantic basis")
+    if protocol.get("selection") != EXPECTED_SELECTION:
+        raise ValueError(f"{path}: unsupported frame-selection rule")
+    progress_array(protocol, "contact_sheet_progress")
+    progress_array(protocol, "matrix_progress")
+    return protocol, hashlib.sha256(raw).hexdigest()
+
+
 def frame_elapsed_ms(frame_index: int, fps: int, duration_ms: int) -> int:
     return min((frame_index * 1_000) // fps, duration_ms)
 
 
-def semantic_targets(genome: dict, duration_ms: int) -> list[dict]:
+def stage_target_ms(cursor: int, duration_ms: int, progress: float) -> int:
+    # Quantize protocol progress to millionths before integer arithmetic. This
+    # prevents platform floating-point details from changing sample timestamps.
+    progress_q = int(round(progress * 1_000_000))
+    local = (duration_ms * progress_q + 500_000) // 1_000_000
+    return cursor + local
+
+
+def semantic_targets(
+    genome: dict,
+    duration_ms: int,
+    matrix_progress: list[float],
+) -> list[dict]:
     stages = genome.get("stages")
     if not isinstance(stages, list) or not stages:
         raise ValueError("boot-genome.json must contain a non-empty stages array")
@@ -121,6 +164,7 @@ def semantic_targets(genome: dict, duration_ms: int) -> list[dict]:
             "role": "sequence-start",
             "stage_index": None,
             "stage_kind": None,
+            "stage_progress": None,
             "stage_intensity": None,
             "target_elapsed_ms": 0,
         }
@@ -138,17 +182,22 @@ def semantic_targets(genome: dict, duration_ms: int) -> list[dict]:
         if not isinstance(intensity, (int, float)) or not math.isfinite(float(intensity)):
             raise ValueError(f"stage {stage_index}: invalid intensity")
 
-        midpoint = cursor + stage_duration // 2
-        targets.append(
-            {
-                "sample_key": f"{stage_index + 1:02d}-{kind.lower()}-mid",
-                "role": "stage-midpoint",
-                "stage_index": stage_index,
-                "stage_kind": kind,
-                "stage_intensity": float(intensity),
-                "target_elapsed_ms": min(midpoint, duration_ms),
-            }
-        )
+        for progress in matrix_progress:
+            percent = int(round(progress * 100))
+            targets.append(
+                {
+                    "sample_key": f"{stage_index + 1:02d}-{kind.lower()}-p{percent:03d}",
+                    "role": "stage-progress",
+                    "stage_index": stage_index,
+                    "stage_kind": kind,
+                    "stage_progress": progress,
+                    "stage_intensity": float(intensity),
+                    "target_elapsed_ms": min(
+                        stage_target_ms(cursor, stage_duration, progress),
+                        duration_ms,
+                    ),
+                }
+            )
         cursor += stage_duration
 
     if cursor != duration_ms:
@@ -162,6 +211,7 @@ def semantic_targets(genome: dict, duration_ms: int) -> list[dict]:
             "role": "sequence-final",
             "stage_index": None,
             "stage_kind": None,
+            "stage_progress": None,
             "stage_intensity": None,
             "target_elapsed_ms": duration_ms,
         }
@@ -169,7 +219,12 @@ def semantic_targets(genome: dict, duration_ms: int) -> list[dict]:
     return targets
 
 
-def choose_frame(target_ms: int, frame_count: int, fps: int, duration_ms: int) -> tuple[int, int]:
+def choose_frame(
+    target_ms: int,
+    frame_count: int,
+    fps: int,
+    duration_ms: int,
+) -> tuple[int, int]:
     if frame_count <= 0:
         raise ValueError("frame_count must be positive")
     best_index = min(
@@ -195,19 +250,16 @@ def frame_metrics(width: int, height: int, pixels: bytes) -> dict:
     luminous_weight = 0
     weighted_x = 0
     weighted_y = 0
-
     pixel_count = width * height
+
     for pixel_index in range(pixel_count):
         offset = pixel_index * 3
         luma = luma_u8(pixels[offset], pixels[offset + 1], pixels[offset + 2])
         histogram[luma] += 1
         total_luma += luma
-        if luma >= BRIGHT_THRESHOLD:
-            bright += 1
-        if luma >= VERY_BRIGHT_THRESHOLD:
-            very_bright += 1
-        if luma > NEAR_BLACK_THRESHOLD:
-            non_near_black += 1
+        bright += luma >= BRIGHT_THRESHOLD
+        very_bright += luma >= VERY_BRIGHT_THRESHOLD
+        non_near_black += luma > NEAR_BLACK_THRESHOLD
         if luma >= CENTROID_THRESHOLD:
             x = pixel_index % width
             y = pixel_index // width
@@ -248,12 +300,15 @@ def frame_metrics(width: int, height: int, pixels: bytes) -> dict:
     }
 
 
-def contact_sheet(frames: list[tuple[int, int, bytes]], columns: int = CONTACT_COLUMNS) -> tuple[int, int, bytes]:
+def contact_sheet(
+    frames: list[tuple[int, int, bytes]],
+    columns: int = CONTACT_COLUMNS,
+) -> tuple[int, int, bytes]:
     if not frames:
         raise ValueError("contact sheet requires at least one frame")
     width = frames[0][0]
     height = frames[0][1]
-    if any(frame_width != width or frame_height != height for frame_width, frame_height, _ in frames):
+    if any(w != width or h != height for w, h, _ in frames):
         raise ValueError("contact sheet frames must have identical dimensions")
 
     columns = max(1, min(columns, len(frames)))
@@ -269,16 +324,15 @@ def contact_sheet(frames: list[tuple[int, int, bytes]], columns: int = CONTACT_C
         origin_y = row * (height + GUTTER)
         for y in range(height):
             source_start = y * width * 3
-            source_end = source_start + width * 3
             destination_start = ((origin_y + y) * sheet_width + origin_x) * 3
             sheet[destination_start : destination_start + width * 3] = pixels[
-                source_start:source_end
+                source_start : source_start + width * 3
             ]
 
     return sheet_width, sheet_height, bytes(sheet)
 
 
-def build_case(root: Path, case: dict) -> dict:
+def build_case(root: Path, case: dict, matrix_progress: list[float]) -> dict:
     name = case["name"]
     frames_dir = root / case["frames"]
     preview_manifest = json.loads((frames_dir / "preview-manifest.json").read_text())
@@ -288,21 +342,21 @@ def build_case(root: Path, case: dict) -> dict:
         raise ValueError(f"{name}: unsupported preview manifest schema")
     fps = int(preview_manifest["fps"])
     duration_ms = int(preview_manifest["duration_ms"])
-    manifest_frame_count = int(preview_manifest["frame_count"])
+    frame_count = int(preview_manifest["frame_count"])
     ppm_frames = sorted(frames_dir.glob("frame-*.ppm"))
-    if len(ppm_frames) != manifest_frame_count:
+    if len(ppm_frames) != frame_count:
         raise ValueError(
-            f"{name}: manifest frame_count={manifest_frame_count}, files={len(ppm_frames)}"
+            f"{name}: manifest frame_count={frame_count}, files={len(ppm_frames)}"
         )
 
-    targets = semantic_targets(genome, duration_ms)
-    samples = []
-    sheet_frames = []
+    targets = semantic_targets(genome, duration_ms, matrix_progress)
+    samples: list[dict] = []
+    sheet_frames: list[tuple[int, int, bytes]] = []
     max_timing_error = 0
 
     for target in targets:
         frame_index, actual_ms = choose_frame(
-            target["target_elapsed_ms"], manifest_frame_count, fps, duration_ms
+            target["target_elapsed_ms"], frame_count, fps, duration_ms
         )
         frame_path = ppm_frames[frame_index]
         width, height, pixels = read_ppm(frame_path)
@@ -336,7 +390,7 @@ def build_case(root: Path, case: dict) -> dict:
         "cue": case.get("cue"),
         "duration_ms": duration_ms,
         "fps": fps,
-        "source_frame_count": manifest_frame_count,
+        "source_frame_count": frame_count,
         "sample_count": len(samples),
         "max_timing_error_ms": max_timing_error,
         "terminal_frame_exact": bool(final_sample["exact_semantic_time"]),
@@ -347,30 +401,45 @@ def build_case(root: Path, case: dict) -> dict:
     }
 
 
-def build(root: Path) -> dict:
-    matrix_path = root / "matrix-manifest.json"
-    matrix = json.loads(matrix_path.read_text())
+def build(root: Path, protocol_path: Path = DEFAULT_PROTOCOL_PATH) -> dict:
+    protocol, protocol_sha = load_review_protocol(protocol_path)
+    matrix_progress = progress_array(protocol, "matrix_progress")
+    contact_progress = progress_array(protocol, "contact_sheet_progress")
+
+    matrix = json.loads((root / "matrix-manifest.json").read_text())
     if matrix.get("schema") != "spore-boot-preview-matrix-v1":
         raise ValueError("unsupported matrix manifest schema")
 
-    cases = [build_case(root, case) for case in matrix["cases"]]
+    cases = [build_case(root, case, matrix_progress) for case in matrix["cases"]]
     report = {
         "schema": SCHEMA,
         "renderer": matrix.get("renderer"),
         "width": matrix.get("width"),
         "height": matrix.get("height"),
         "source_capture_fps": matrix.get("fps"),
+        "review_protocol": {
+            "schema": protocol["schema"],
+            "sha256": protocol_sha,
+            "semantic_basis": protocol["semantic_basis"],
+            "matrix_progress": matrix_progress,
+            "contact_sheet_progress": contact_progress,
+            "selection": protocol["selection"],
+            "terminal_policy": protocol.get("terminal_policy"),
+            "metrics_policy": protocol.get("metrics_policy"),
+        },
         "policy": {
             "purpose": "descriptive-temporal-review-not-aesthetic-scoring",
-            "sample_rule": "sequence-start + every BootStage midpoint + sequence-final",
-            "selection": "nearest existing exact renderer frame; ties choose earlier frame",
+            "sample_rule": "sequence endpoints + review_protocol.matrix_progress for every BootStage",
+            "selection": protocol["selection"],
             "metrics_are_scores": False,
             "contact_sheet_pixels": "exact captured PPM pixels; black gutters only",
         },
         "coverage": {
             "case_count": len(cases),
             "terminal_exact_case_count": sum(case["terminal_frame_exact"] for case in cases),
-            "max_timing_error_ms": max((case["max_timing_error_ms"] for case in cases), default=0),
+            "max_timing_error_ms": max(
+                (case["max_timing_error_ms"] for case in cases), default=0
+            ),
         },
         "cases": cases,
     }
@@ -386,6 +455,9 @@ def synthetic_ppm(path: Path, width: int, height: int, value: int) -> None:
 
 
 def self_test() -> None:
+    protocol, _ = load_review_protocol(DEFAULT_PROTOCOL_PATH)
+    assert progress_array(protocol, "matrix_progress") == [0.2, 0.5, 0.8]
+
     with tempfile.TemporaryDirectory(prefix="spore-temporal-evidence-") as directory:
         root = Path(directory)
         frames = root / "case-a" / "frames"
@@ -401,16 +473,16 @@ def self_test() -> None:
             json.dumps(
                 {
                     "schema": "spore-boot-preview-v1",
-                    "fps": 2,
+                    "fps": 10,
                     "duration_ms": 2_000,
-                    "frame_count": 5,
+                    "frame_count": 21,
                 }
             )
         )
-        # The first frame begins with red=0x0a. A binary-safe P6 parser must
-        # preserve this as pixel data rather than treating it as header whitespace.
-        for index, value in enumerate([10, 40, 80, 120, 180]):
-            synthetic_ppm(frames / f"frame-{index:05}.ppm", 4, 2, value)
+
+        # First red byte = 0x0a guards the exact binary PPM payload boundary.
+        for index in range(21):
+            synthetic_ppm(frames / f"frame-{index:05}.ppm", 4, 2, 10 + index * 10)
         width, height, first_pixels = read_ppm(frames / "frame-00000.ppm")
         assert (width, height) == (4, 2)
         assert first_pixels[0] == 10
@@ -422,7 +494,7 @@ def self_test() -> None:
                     "renderer": "synthetic",
                     "width": 4,
                     "height": 2,
-                    "fps": 2,
+                    "fps": 10,
                     "cases": [
                         {
                             "name": "case-a",
@@ -437,30 +509,43 @@ def self_test() -> None:
 
         report = build(root)
         assert report["schema"] == SCHEMA
-        assert report["coverage"]["case_count"] == 1
+        assert report["review_protocol"]["schema"] == REVIEW_PROTOCOL_SCHEMA
+        assert report["review_protocol"]["matrix_progress"] == [0.2, 0.5, 0.8]
         case = report["cases"][0]
         assert case["terminal_frame_exact"] is True
         assert [sample["target_elapsed_ms"] for sample in case["samples"]] == [
             0,
+            200,
             500,
+            800,
+            1_200,
             1_500,
+            1_800,
             2_000,
         ]
-        assert [sample["frame_index"] for sample in case["samples"]] == [0, 1, 3, 4]
+        assert [sample["frame_index"] for sample in case["samples"]] == [
+            0,
+            2,
+            5,
+            8,
+            12,
+            15,
+            18,
+            20,
+        ]
         assert all(sample["timing_error_ms"] == 0 for sample in case["samples"])
         assert (root / case["contact_sheet_ppm"]).is_file()
         assert (root / case["contact_sheet_png"]).is_file()
 
-        # Reproduce the current endpoint-omission shape: four frames at 2 fps
-        # over a 2 s sequence cover 0, 0.5, 1.0, 1.5 s but not 2.0 s.
-        (frames / "frame-00004.ppm").unlink()
+        # Reproduce endpoint omission without synthesizing a fake final state.
+        (frames / "frame-00020.ppm").unlink()
         preview = json.loads((frames / "preview-manifest.json").read_text())
-        preview["frame_count"] = 4
+        preview["frame_count"] = 20
         (frames / "preview-manifest.json").write_text(json.dumps(preview))
         report = build(root)
         case = report["cases"][0]
         assert case["terminal_frame_exact"] is False
-        assert case["terminal_timing_error_ms"] == 500
+        assert case["terminal_timing_error_ms"] == 100
 
     print("spore_temporal_evidence self-test: PASS")
 
@@ -468,6 +553,12 @@ def self_test() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("root", nargs="?", type=Path, help="Spore boot preview matrix root")
+    parser.add_argument(
+        "--protocol",
+        type=Path,
+        default=DEFAULT_PROTOCOL_PATH,
+        help="versioned Spore visual-review protocol JSON",
+    )
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
 
@@ -476,7 +567,7 @@ def main() -> None:
         return
     if args.root is None:
         parser.error("root is required unless --self-test is used")
-    build(args.root)
+    build(args.root, args.protocol)
 
 
 if __name__ == "__main__":
