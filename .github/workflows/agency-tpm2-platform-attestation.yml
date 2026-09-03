@@ -5,6 +5,9 @@ on:
     paths:
       - 'crates/core/symthaea-authority/**'
       - 'crates/bridges/symthaea-platform-attestation/**'
+      - 'nix/agency-tpm2-verifier-tools.nix'
+      - 'flake.nix'
+      - 'flake.lock'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -116,25 +119,92 @@ jobs:
         run: test "$(cat "$RUNNER_TEMP/agency-lock-status")" = clean
 
   swtpm:
-    name: Fresh quote + approved PCR profile + mutation rejection
+    name: Hermetic Nix verifier + fresh quote + PCR mutation rejection
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
-      - name: Install swtpm and TPM2 tools
+      - name: Install swtpm fixture tools and ELF inspection tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y swtpm swtpm-tools tpm2-tools
+          sudo apt-get install -y swtpm swtpm-tools tpm2-tools binutils file
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v25
 
       - name: Reconcile workspace lock with Cargo
         run: cargo metadata --format-version 1 >/dev/null
 
       - name: Build exact Rust TPM2 qualification probe
         run: cargo build --locked -p symthaea-platform-attestation --bin tpm2_attestation_probe
+
+      - name: Record exact locked nixpkgs input
+        run: |
+          nix flake metadata --json . > "$RUNNER_TEMP/FLAKE_METADATA.json"
+          python3 - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path(os.environ["RUNNER_TEMP"])
+          meta = json.loads((root / "FLAKE_METADATA.json").read_text())
+          locked = meta["locks"]["nodes"]["nixpkgs"]["locked"]
+          (root / "NIXPKGS_LOCKED.json").write_text(
+              json.dumps(locked, sort_keys=True, indent=2) + "\n"
+          )
+          print(json.dumps(locked, sort_keys=True))
+          PY
+
+      - name: Build static hermetic TPM2 verifier launchers from locked nixpkgs
+        run: |
+          verifier_store="$(nix build --impure --no-link --print-out-paths --expr '
+            let
+              flake = builtins.getFlake (toString ./.);
+              pkgs = import flake.inputs.nixpkgs { system = "x86_64-linux"; };
+            in
+              import ./nix/agency-tpm2-verifier-tools.nix {
+                inherit pkgs;
+                tcti = "swtpm:host=127.0.0.1,port=2321";
+              }
+          ')"
+          quote_wrapper="$verifier_store/bin/symthaea-tpm2-quote"
+          check_wrapper="$verifier_store/bin/symthaea-tpm2-checkquote"
+          test -x "$quote_wrapper"
+          test -x "$check_wrapper"
+
+          echo "TPM2_VERIFIER_STORE=$verifier_store" >> "$GITHUB_ENV"
+          echo "QUOTE_WRAPPER=$quote_wrapper" >> "$GITHUB_ENV"
+          echo "CHECKQUOTE_WRAPPER=$check_wrapper" >> "$GITHUB_ENV"
+
+          printf '%s\n' "$verifier_store" | tee "$RUNNER_TEMP/TPM2_VERIFIER_STORE.txt"
+          printf '%s\n' "$quote_wrapper" | tee "$RUNNER_TEMP/QUOTE_WRAPPER_PATH.txt"
+          printf '%s\n' "$check_wrapper" | tee "$RUNNER_TEMP/CHECKQUOTE_WRAPPER_PATH.txt"
+          sha256sum "$quote_wrapper" | tee "$RUNNER_TEMP/QUOTE_WRAPPER_SHA256.txt"
+          sha256sum "$check_wrapper" | tee "$RUNNER_TEMP/CHECKQUOTE_WRAPPER_SHA256.txt"
+          file "$quote_wrapper" "$check_wrapper" | tee "$RUNNER_TEMP/TPM2_WRAPPER_FILE.txt"
+          readelf -l "$quote_wrapper" | tee "$RUNNER_TEMP/QUOTE_WRAPPER_ELF.txt"
+          readelf -l "$check_wrapper" | tee "$RUNNER_TEMP/CHECKQUOTE_WRAPPER_ELF.txt"
+          ! grep -q 'INTERP' "$RUNNER_TEMP/QUOTE_WRAPPER_ELF.txt"
+          ! grep -q 'INTERP' "$RUNNER_TEMP/CHECKQUOTE_WRAPPER_ELF.txt"
+          nix-store --query --references "$verifier_store" | sort | tee "$RUNNER_TEMP/TPM2_VERIFIER_REFERENCES.txt"
+
+      - name: Prove caller cannot override bound TCTI or PCR format
+        run: |
+          set +e
+          "$QUOTE_WRAPPER" -T device:/dev/null >/dev/null 2>"$RUNNER_TEMP/QUOTE_TCTI_OVERRIDE.stderr"
+          quote_tcti_rc=$?
+          "$QUOTE_WRAPPER" -F values >/dev/null 2>"$RUNNER_TEMP/QUOTE_FORMAT_OVERRIDE.stderr"
+          quote_format_rc=$?
+          "$CHECKQUOTE_WRAPPER" -T device:/dev/null >/dev/null 2>"$RUNNER_TEMP/CHECK_TCTI_OVERRIDE.stderr"
+          check_tcti_rc=$?
+          set -e
+          test "$quote_tcti_rc" -eq 64
+          test "$quote_format_rc" -eq 64
+          test "$check_tcti_rc" -eq 64
+          grep -q 'option override rejected' "$RUNNER_TEMP/QUOTE_TCTI_OVERRIDE.stderr"
+          grep -q 'option override rejected' "$RUNNER_TEMP/QUOTE_FORMAT_OVERRIDE.stderr"
+          grep -q 'option override rejected' "$RUNNER_TEMP/CHECK_TCTI_OVERRIDE.stderr"
 
       - name: Start isolated software TPM 2.0
         run: |
@@ -146,17 +216,19 @@ jobs:
             --server type=tcp,port=2321 \
             --flags not-need-init \
             --daemon
-          echo 'TPM2TOOLS_TCTI=swtpm:host=127.0.0.1,port=2321' >> "$GITHUB_ENV"
 
-      - name: Initialize TPM and create exact attestation key
+      - name: Initialize TPM fixture and create attestation key
         run: |
-          tpm2_startup -c
+          fixture_tcti='swtpm:host=127.0.0.1,port=2321'
+          tpm2_startup -T "$fixture_tcti" -c
           tpm2_createek -Q \
+            -T "$fixture_tcti" \
             -c "$RUNNER_TEMP/ek.ctx" \
             -G rsa \
             -u "$RUNNER_TEMP/ekpub.pem" \
             -f pem
           tpm2_createak -Q \
+            -T "$fixture_tcti" \
             -C "$RUNNER_TEMP/ek.ctx" \
             -c "$RUNNER_TEMP/ak.ctx" \
             -G rsa \
@@ -166,25 +238,34 @@ jobs:
             -f pem \
             -n "$RUNNER_TEMP/ak.name"
 
-      - name: Establish reviewed PCR-16 qualification profile
+      - name: Establish reviewed serialized PCR-16 profile through hermetic launcher
         run: |
-          tpm2_quote -Q \
-            -c "$RUNNER_TEMP/ak.ctx" \
-            -l sha256:16 \
-            -m "$RUNNER_TEMP/baseline.msg" \
-            -s "$RUNNER_TEMP/baseline.sig" \
-            -o "$RUNNER_TEMP/baseline.pcrs" \
-            -g sha256
+          env \
+            TPM2TOOLS_TCTI='device:/definitely-not-the-swtpm' \
+            LD_PRELOAD='/definitely/not/a/real/preload.so' \
+            BASH_ENV='/definitely/not/a/bash/env' \
+            "$QUOTE_WRAPPER" -Q \
+              -c "$RUNNER_TEMP/ak.ctx" \
+              -l sha256:16 \
+              -m "$RUNNER_TEMP/baseline.msg" \
+              -s "$RUNNER_TEMP/baseline.sig" \
+              -o "$RUNNER_TEMP/baseline.pcrs" \
+              -g sha256 \
+              2>"$RUNNER_TEMP/HERMETIC_BASELINE.stderr"
+          ! grep -Eqi 'LD_PRELOAD|cannot be preloaded|ld\.so' "$RUNNER_TEMP/HERMETIC_BASELINE.stderr"
+
           profile="$(target/debug/tpm2_attestation_probe profile-digest "$RUNNER_TEMP/baseline.pcrs")"
           test "${#profile}" -eq 64
           echo "APPROVED_PCR_PROFILE=$profile" >> "$GITHUB_ENV"
           printf '%s\n' "$profile" | tee "$RUNNER_TEMP/APPROVED_PCR_PROFILE.txt"
 
-      - name: Verify fresh challenged quote through production adapter
+      - name: Verify fresh challenged quote through Nix-store production boundary
         run: |
-          target/debug/tpm2_attestation_probe verify \
-            "$(command -v tpm2_quote)" \
-            "$(command -v tpm2_checkquote)" \
+          TPM2TOOLS_TCTI='device:/ambient-tcti-must-not-win' \
+          OPENSSL_CONF='/definitely/not/an/openssl/config' \
+          target/debug/tpm2_attestation_probe verify-nix \
+            "$QUOTE_WRAPPER" \
+            "$CHECKQUOTE_WRAPPER" \
             "$RUNNER_TEMP/ak.ctx" \
             "$RUNNER_TEMP/akpub.pem" \
             "$APPROVED_PCR_PROFILE" \
@@ -193,12 +274,13 @@ jobs:
 
       - name: Mutate quoted PCR and require old profile to fail closed
         run: |
+          fixture_tcti='swtpm:host=127.0.0.1,port=2321'
           mutation="$(printf 'symthaea-pcr16-adversarial-mutation' | sha256sum | awk '{print $1}')"
-          tpm2_pcrextend "16:sha256=$mutation"
+          tpm2_pcrextend -T "$fixture_tcti" "16:sha256=$mutation"
           set +e
-          target/debug/tpm2_attestation_probe verify \
-            "$(command -v tpm2_quote)" \
-            "$(command -v tpm2_checkquote)" \
+          target/debug/tpm2_attestation_probe verify-nix \
+            "$QUOTE_WRAPPER" \
+            "$CHECKQUOTE_WRAPPER" \
             "$RUNNER_TEMP/ak.ctx" \
             "$RUNNER_TEMP/akpub.pem" \
             "$APPROVED_PCR_PROFILE" \
@@ -216,9 +298,25 @@ jobs:
           git rev-parse HEAD^{tree} > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/TREE"
           rustc -Vv > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/RUSTC.txt"
           cargo -V > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/CARGO.txt"
+          nix --version > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/NIX.txt" 2>&1 || true
           swtpm --version > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/SWTPM.txt" 2>&1 || true
-          tpm2_quote --version > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/TPM2_TOOLS.txt" 2>&1 || true
+          sha256sum Cargo.lock > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/CARGO_LOCK_SHA256.txt" 2>/dev/null || true
+          sha256sum flake.lock > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/FLAKE_LOCK_SHA256.txt" 2>/dev/null || true
           sha256sum target/debug/tpm2_attestation_probe > "$RUNNER_TEMP/agency-tpm2-protocol-evidence/PROBE_SHA256.txt" 2>/dev/null || true
+          cp "$RUNNER_TEMP/NIXPKGS_LOCKED.json" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/TPM2_VERIFIER_STORE.txt" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/QUOTE_WRAPPER_PATH.txt" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/CHECKQUOTE_WRAPPER_PATH.txt" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/QUOTE_WRAPPER_SHA256.txt" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/CHECKQUOTE_WRAPPER_SHA256.txt" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/TPM2_WRAPPER_FILE.txt" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/QUOTE_WRAPPER_ELF.txt" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/CHECKQUOTE_WRAPPER_ELF.txt" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/TPM2_VERIFIER_REFERENCES.txt" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/QUOTE_TCTI_OVERRIDE.stderr" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/QUOTE_FORMAT_OVERRIDE.stderr" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/CHECK_TCTI_OVERRIDE.stderr" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/HERMETIC_BASELINE.stderr" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
           cp "$RUNNER_TEMP/APPROVED_PCR_PROFILE.txt" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
           cp "$RUNNER_TEMP/TPM2_VERIFIED.txt" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
           cp "$RUNNER_TEMP/TPM2_MUTATED.stdout" "$RUNNER_TEMP/agency-tpm2-protocol-evidence/" 2>/dev/null || true
