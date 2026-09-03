@@ -78,6 +78,7 @@ const MISSION_SEMANTICS: &[RestoreSemantics] = &[
 ];
 const OPERATOR_SEMANTICS: &[RestoreSemantics] = &[
     RestoreSemantics::AuthorityMonotone,
+    RestoreSemantics::EvidenceMerge,
     RestoreSemantics::EphemeralDrop,
 ];
 const DEGRADED_SEMANTICS: &[RestoreSemantics] = &[RestoreSemantics::AuthorityMonotone];
@@ -246,6 +247,7 @@ mod tests {
     #[test]
     fn evidence_domains_cannot_use_historical_replacement() {
         for domain in [
+            RestoreDomain::OperatorAuthority,
             RestoreDomain::SensorFusion,
             RestoreDomain::ActuatorIsolation,
             RestoreDomain::PartitionRecovery,
@@ -255,6 +257,14 @@ mod tests {
             assert!(contract.semantics.contains(&RestoreSemantics::EvidenceMerge));
             assert!(!contract.semantics.contains(&RestoreSemantics::HistoricalReplace));
         }
+    }
+
+    #[test]
+    fn operator_restore_preserves_replay_evidence_and_drops_ephemeral_recovery() {
+        let contract = contract_for(RestoreDomain::OperatorAuthority);
+        assert!(contract.semantics.contains(&RestoreSemantics::AuthorityMonotone));
+        assert!(contract.semantics.contains(&RestoreSemantics::EvidenceMerge));
+        assert!(contract.semantics.contains(&RestoreSemantics::EphemeralDrop));
     }
 
     #[test]
