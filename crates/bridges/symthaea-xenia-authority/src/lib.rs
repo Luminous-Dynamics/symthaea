@@ -116,8 +116,10 @@ impl VerifiedXeniaCapability {
 /// reserve it for consequential execution.
 ///
 /// `authority_time` must be challenge-bound to the exact capability digest.
-/// Its conservative upper bound is used for expiry and checkpoint-freshness
-/// checks, so uncertainty can only make authority expire earlier.
+/// Time is an interval, not a scalar: earliest-plausible time is used to prove
+/// that an authorization/checkpoint is not from the future, while the
+/// latest-plausible time is used to prove it has not expired or gone stale.
+/// This makes uncertainty fail closed in both temporal directions.
 #[allow(clippy::too_many_arguments)]
 pub fn verify_xenia_capability_v1(
     attestation: &XeniaAgentCapabilityAttestationV1,
@@ -142,12 +144,17 @@ pub fn verify_xenia_capability_v1(
 
     let grant_digest = grant.digest();
     authority_time.require_subject(grant_digest.0)?;
-    let now_unix_s = authority_time.conservative_now_unix_s()?;
+    // The verification-time lower bound remains a valid conservative lower
+    // bound during this fact's very short lifetime because real time can only
+    // advance. The moving upper bound accounts for elapsed Linux boot time.
+    let (not_before_unix_s, _) = authority_time.interval_at_verification();
+    let not_after_unix_s = authority_time.conservative_now_unix_s()?;
 
     verify_fresh_xenia_checkpoint(
         fresh_xenia_checkpoint,
         trusted_xenia_ledger_public_key,
-        now_unix_s,
+        not_before_unix_s,
+        not_after_unix_s,
         freshness,
     )?;
 
@@ -170,10 +177,13 @@ pub fn verify_xenia_capability_v1(
         &attestation.signature.signature,
     )?;
 
-    if now_unix_s < authorization.issued_at_unix_s {
+    // To prove "already valid", even the earliest plausible current time must
+    // be at/after issuance. To prove "not expired", even the latest plausible
+    // current time must be at/before expiry.
+    if not_before_unix_s < authorization.issued_at_unix_s {
         return Err(XeniaAuthorityError::AuthorizationNotYetValid);
     }
-    if now_unix_s > authorization.expires_at_unix_s {
+    if not_after_unix_s > authorization.expires_at_unix_s {
         return Err(XeniaAuthorityError::AuthorizationExpired);
     }
 
@@ -233,7 +243,8 @@ pub fn verify_xenia_capability_v1(
 fn verify_fresh_xenia_checkpoint(
     checkpoint: &XeniaLedgerCheckpointV1,
     trusted_public_key: [u8; 32],
-    now_unix_s: u64,
+    not_before_unix_s: u64,
+    not_after_unix_s: u64,
     freshness: XeniaFreshnessPolicyV1,
 ) -> Result<(), XeniaAuthorityError> {
     if checkpoint.ledger_public_key != trusted_public_key {
@@ -242,10 +253,16 @@ fn verify_fresh_xenia_checkpoint(
     if checkpoint.entry_count == 0 || checkpoint.head_hash == [0; 32] {
         return Err(XeniaAuthorityError::PreGenesisFreshnessCheckpoint);
     }
-    if checkpoint.timestamp_unix_secs > now_unix_s.saturating_add(freshness.max_future_skew_s) {
+    // A checkpoint is acceptably non-future only if it is no later than the
+    // earliest plausible current time plus explicitly tolerated skew.
+    if checkpoint.timestamp_unix_secs
+        > not_before_unix_s.saturating_add(freshness.max_future_skew_s)
+    {
         return Err(XeniaAuthorityError::LedgerCheckpointFromFuture);
     }
-    if now_unix_s.saturating_sub(checkpoint.timestamp_unix_secs)
+    // A checkpoint is acceptably fresh only if it remains within age even at
+    // the latest plausible current time.
+    if not_after_unix_s.saturating_sub(checkpoint.timestamp_unix_secs)
         > freshness.max_checkpoint_age_s
     {
         return Err(XeniaAuthorityError::LedgerCheckpointStale);
