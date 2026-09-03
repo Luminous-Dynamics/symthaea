@@ -33,6 +33,17 @@ pub enum AuditEvent {
     CheckpointRestored {
         generation: u64,
     },
+    ActuatorServiceAuthorization {
+        operator_id: u64,
+        service_proposal_id: u64,
+        actuator_code: u16,
+        accepted: bool,
+    },
+    ActuatorServiceTransition {
+        service_proposal_id: u64,
+        actuator_code: u16,
+        state_code: u16,
+    },
 }
 
 impl AuditEvent {
@@ -59,6 +70,29 @@ impl AuditEvent {
                 [4, from_code as u64, to_code as u64, 0, 0]
             }
             Self::CheckpointRestored { generation } => [5, generation, 0, 0, 0],
+            Self::ActuatorServiceAuthorization {
+                operator_id,
+                service_proposal_id,
+                actuator_code,
+                accepted,
+            } => [
+                6,
+                operator_id,
+                service_proposal_id,
+                actuator_code as u64,
+                accepted as u64,
+            ],
+            Self::ActuatorServiceTransition {
+                service_proposal_id,
+                actuator_code,
+                state_code,
+            } => [
+                7,
+                service_proposal_id,
+                actuator_code as u64,
+                state_code as u64,
+                0,
+            ],
         }
     }
 }
@@ -276,5 +310,30 @@ mod tests {
             forged.verify(&provider),
             Err(AuditChainError::DigestMismatch)
         );
+    }
+
+    #[test]
+    fn actuator_service_events_are_distinct_in_canonical_chain() {
+        let provider = DeterministicAuditDigest;
+        let mut authorization = AuditLedger::new(4, genesis());
+        authorization.append(
+            &provider,
+            AuditEvent::ActuatorServiceAuthorization {
+                operator_id: 7,
+                service_proposal_id: 9,
+                actuator_code: 2,
+                accepted: true,
+            },
+        );
+        let mut transition = AuditLedger::new(4, genesis());
+        transition.append(
+            &provider,
+            AuditEvent::ActuatorServiceTransition {
+                service_proposal_id: 9,
+                actuator_code: 2,
+                state_code: 1,
+            },
+        );
+        assert_ne!(authorization.chain_head(), transition.chain_head());
     }
 }

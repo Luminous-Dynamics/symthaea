@@ -5,7 +5,12 @@
 //! Mechanical maintenance estimates long-term wear. This supervisor addresses a
 //! different failure class: a commanded actuator that no longer produces a
 //! compatible short-horizon plant response. Persistent mismatches remove only
-//! that actuator's authority and remain latched until an explicit reset/service.
+//! that actuator's authority. Maintenance service may reset diagnostic state,
+//! but productive authority remains latched until a separately qualified
+//! reauthorization path is implemented.
+
+#[path = "actuator_service.rs"]
+pub mod service;
 
 use crate::types::{
     CUTTER_TEMP_C, FORWARD_VELOCITY_MPS, PITCH_RAD, RELAY_LINK_QUALITY, ROOF_STABILITY,
@@ -100,6 +105,12 @@ pub struct ActuatorIsolationReport {
     pub health: [f64; NUM_MONITORED_ACTUATORS],
     pub isolated: [bool; NUM_MONITORED_ACTUATORS],
     pub mismatch_streaks: [u16; NUM_MONITORED_ACTUATORS],
+    /// A completed maintenance-service transition exists, but fresh
+    /// post-service qualification has not yet earned authority restoration.
+    /// This is restrictive state: `true` always implies the actuator remains
+    /// isolated.
+    #[serde(default)]
+    pub requalification_required: [bool; NUM_MONITORED_ACTUATORS],
     pub isolated_count: usize,
     pub mobility_degraded: bool,
     pub cooling_degraded: bool,
@@ -112,6 +123,7 @@ impl ActuatorIsolationReport {
             health: [1.0; NUM_MONITORED_ACTUATORS],
             isolated: [false; NUM_MONITORED_ACTUATORS],
             mismatch_streaks: [0; NUM_MONITORED_ACTUATORS],
+            requalification_required: [false; NUM_MONITORED_ACTUATORS],
             isolated_count: 0,
             mobility_degraded: false,
             cooling_degraded: false,
@@ -122,6 +134,10 @@ impl ActuatorIsolationReport {
     pub fn is_isolated(self, actuator: PhysicalActuator) -> bool {
         self.isolated[actuator.index()]
     }
+
+    pub fn requires_requalification(self, actuator: PhysicalActuator) -> bool {
+        self.requalification_required[actuator.index()]
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,6 +146,11 @@ pub struct ActuatorIsolationSupervisor {
     health: [f64; NUM_MONITORED_ACTUATORS],
     mismatch_streaks: [u16; NUM_MONITORED_ACTUATORS],
     isolated: [bool; NUM_MONITORED_ACTUATORS],
+    /// Restrictive service lifecycle state. Historical checkpoints that predate
+    /// RA-29 default to `false`; a missing historical marker therefore never
+    /// opens an actuator because `isolated[]` remains the authority latch.
+    #[serde(default)]
+    requalification_required: [bool; NUM_MONITORED_ACTUATORS],
     total_isolations: u64,
 }
 
@@ -140,6 +161,7 @@ impl ActuatorIsolationSupervisor {
             health: [1.0; NUM_MONITORED_ACTUATORS],
             mismatch_streaks: [0; NUM_MONITORED_ACTUATORS],
             isolated: [false; NUM_MONITORED_ACTUATORS],
+            requalification_required: [false; NUM_MONITORED_ACTUATORS],
             total_isolations: 0,
         }
     }
@@ -158,6 +180,11 @@ impl ActuatorIsolationSupervisor {
                 .health
                 .iter()
                 .all(|value| value.is_finite() && (0.0..=1.0).contains(value))
+            && self
+                .requalification_required
+                .iter()
+                .zip(self.isolated.iter())
+                .all(|(required, isolated)| !*required || *isolated)
     }
 
     fn demanded(command: &SubterraneanCommand, actuator: PhysicalActuator) -> f32 {
@@ -275,6 +302,7 @@ impl ActuatorIsolationSupervisor {
             health: self.health,
             isolated: self.isolated,
             mismatch_streaks: self.mismatch_streaks,
+            requalification_required: self.requalification_required,
             isolated_count,
             mobility_degraded: self.isolated[PhysicalActuator::LeftTrack.index()]
                 || self.isolated[PhysicalActuator::RightTrack.index()],
@@ -289,8 +317,9 @@ impl ActuatorIsolationSupervisor {
     ///
     /// This is the restore implementation of `PreserveOrNarrowAuthority` only.
     /// It cannot clear a live latch and intentionally does not import health,
-    /// mismatch streaks, diagnostic counters, or policy from the checkpoint.
-    /// Those values have different restore semantics and separate obligations.
+    /// mismatch streaks, service/requalification state, diagnostic counters, or
+    /// policy from the checkpoint. Those values have different restore semantics
+    /// and separate obligations.
     pub(crate) fn preserve_restore_isolation_latches_from(&mut self, checkpoint: &Self) {
         for actuator in PhysicalActuator::ALL {
             let index = actuator.index();
@@ -302,11 +331,24 @@ impl ActuatorIsolationSupervisor {
         self.total_isolations
     }
 
+    /// Begin maintenance service without restoring productive authority.
+    ///
+    /// This legacy surface is retained for source compatibility, but RA-29
+    /// deliberately changes its authority semantics: service may reset local
+    /// diagnostic progress only for an actuator that is already isolated, while
+    /// the isolation latch remains closed. Calling it on a healthy actuator is a
+    /// no-op. The embodiment-owned typed service flow is required before this
+    /// transition is considered authorized, and a later independent
+    /// requalification flow must earn any actual authority restoration.
     pub fn service(&mut self, actuator: PhysicalActuator) {
         let index = actuator.index();
-        self.health[index] = 1.0;
+        if !self.isolated[index] {
+            return;
+        }
+        self.health[index] = 0.0;
         self.mismatch_streaks[index] = 0;
-        self.isolated[index] = false;
+        self.isolated[index] = true;
+        self.requalification_required[index] = true;
     }
 
     pub fn force_health_for_test(&mut self, actuator: PhysicalActuator, health: f64) {
@@ -345,6 +387,7 @@ mod tests {
         }
         let report = supervisor.report();
         assert!(report.is_isolated(PhysicalActuator::LeftTrack));
+        assert!(!report.requires_requalification(PhysicalActuator::LeftTrack));
         assert!(!report.is_isolated(PhysicalActuator::RightTrack));
         let constrained = supervisor.constrain(command);
         assert_eq!(constrained.left_track(), 0.0);
@@ -368,12 +411,33 @@ mod tests {
     }
 
     #[test]
-    fn service_explicitly_restores_latched_authority() {
+    fn service_never_restores_latched_authority_or_claims_health() {
         let mut supervisor = ActuatorIsolationSupervisor::default();
-        supervisor.force_health_for_test(PhysicalActuator::Cutter, 0.0);
+        supervisor.force_health_for_test(PhysicalActuator::Cutter, 0.8);
+        supervisor.mismatch_streaks[PhysicalActuator::Cutter.index()] = 3;
         supervisor.isolated[PhysicalActuator::Cutter.index()] = true;
         supervisor.service(PhysicalActuator::Cutter);
-        assert!(!supervisor.report().is_isolated(PhysicalActuator::Cutter));
+        let report = supervisor.report();
+        assert!(report.is_isolated(PhysicalActuator::Cutter));
+        assert!(report.requires_requalification(PhysicalActuator::Cutter));
+        assert_eq!(report.health[PhysicalActuator::Cutter.index()], 0.0);
+        assert_eq!(report.mismatch_streaks[PhysicalActuator::Cutter.index()], 0);
+        assert!(supervisor.validate());
+    }
+
+    #[test]
+    fn service_is_noop_when_actuator_is_not_isolated() {
+        let mut supervisor = ActuatorIsolationSupervisor::default();
+        let before = supervisor.report();
+        supervisor.service(PhysicalActuator::Cutter);
+        assert_eq!(supervisor.report(), before);
+    }
+
+    #[test]
+    fn requalification_requirement_without_isolation_is_invalid_state() {
+        let mut supervisor = ActuatorIsolationSupervisor::default();
+        supervisor.requalification_required[PhysicalActuator::Cutter.index()] = true;
+        assert!(!supervisor.validate());
     }
 
     #[test]
@@ -410,6 +474,7 @@ mod tests {
         checkpoint.mismatch_streaks[PhysicalActuator::Cutter.index()] = 99;
         checkpoint.total_isolations = 999;
         checkpoint.isolated[PhysicalActuator::Cutter.index()] = true;
+        checkpoint.requalification_required[PhysicalActuator::Cutter.index()] = true;
 
         live.preserve_restore_isolation_latches_from(&checkpoint);
 
@@ -418,6 +483,7 @@ mod tests {
         assert_eq!(live.mismatch_streaks[PhysicalActuator::Cutter.index()], 3);
         assert_eq!(live.total_isolations, 7);
         assert!(live.isolated[PhysicalActuator::Cutter.index()]);
+        assert!(!live.requalification_required[PhysicalActuator::Cutter.index()]);
     }
 
     #[test]
