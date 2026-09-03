@@ -1,0 +1,237 @@
+name: Trusted Recovery - AI Assurance Budget Recovery
+
+on:
+  workflow_dispatch:
+
+# One-purpose recovery harness for the frozen #186 budget-recovery tree. It
+# accepts no ref/SHA inputs and grants no GITHUB_TOKEN permissions.
+permissions: {}
+
+env:
+  NIX_CONFIG: experimental-features = nix-command flakes
+  GIT_TERMINAL_PROMPT: "0"
+  TARGET_COMMIT: 251c47c5a1f09015ab6c29794df7ac5b6efae373
+  TARGET_TREE: 1451a57e2dcaf50de6b5b43776364a5af8b78f15
+  TARGET_BASE: 6ca61356c6ff49b2ba77cae332f006d054d5f84d
+  TARGET_HOSTED_WORKFLOW_BLOB: 35bbddd9d6a7f8ad77073e4ab4faf6722f00deea
+
+concurrency:
+  # Each manual recovery attempt is deliberate evidence. Do not supersede it.
+  group: ${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  exact-tree-budget-recovery:
+    name: Validate frozen #186 budget recovery
+    if: >-
+      github.repository == 'Luminous-Dynamics/symthaea' &&
+      github.ref == 'refs/heads/main'
+    runs-on: [symthaea-trusted-cpu-v1]
+    timeout-minutes: 30
+
+    steps:
+      - name: Fetch trusted harness and authenticate frozen source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/main'
+
+          HARNESS_DIR="$RUNNER_TEMP/trusted-harness"
+          SOURCE_DIR="$RUNNER_TEMP/frozen-source"
+          rm -rf -- "$HARNESS_DIR" "$SOURCE_DIR"
+          mkdir -p "$HARNESS_DIR" "$SOURCE_DIR"
+
+          # Runner/Nix helper code comes only from trusted main.
+          git -C "$HARNESS_DIR" init
+          git -C "$HARNESS_DIR" remote add origin https://github.com/Luminous-Dynamics/symthaea.git
+          git -C "$HARNESS_DIR" -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git -C "$HARNESS_DIR" checkout --detach FETCH_HEAD
+          test "$(git -C "$HARNESS_DIR" rev-parse HEAD)" = "$GITHUB_SHA"
+
+          # Fetch only the known lower-stack base and frozen target.
+          git -C "$SOURCE_DIR" init
+          git -C "$SOURCE_DIR" remote add origin https://github.com/Luminous-Dynamics/symthaea.git
+          git -C "$SOURCE_DIR" -c protocol.version=2 fetch --no-tags origin "$TARGET_BASE" "$TARGET_COMMIT"
+
+          test "$(git -C "$SOURCE_DIR" rev-parse "$TARGET_COMMIT^{commit}")" = "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse "$TARGET_COMMIT^{tree}")" = "$TARGET_TREE"
+          git -C "$SOURCE_DIR" merge-base --is-ancestor "$TARGET_BASE" "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse "$TARGET_COMMIT:.github/workflows/ai-assurance.yml")" = "$TARGET_HOSTED_WORKFLOW_BLOB"
+
+          # Freeze the complete #186 target diff. Unrelated workspace, root
+          # manifests other than Cargo.lock, Nix, .cargo, and build infrastructure
+          # changes are not accepted by this recovery profile.
+          actual_paths="$(git -C "$SOURCE_DIR" diff --name-only "$TARGET_BASE" "$TARGET_COMMIT" | LC_ALL=C sort)"
+          expected_paths="$(cat <<'EOF'
+          .github/workflows/ai-assurance.yml
+          Cargo.lock
+          crates/core/symthaea-ai-assurance/src/action.rs
+          crates/core/symthaea-ai-assurance/src/budget.rs
+          crates/core/symthaea-ai-assurance/src/budget_guard.rs
+          crates/core/symthaea-ai-assurance/src/budget_purpose.rs
+          crates/core/symthaea-ai-assurance/src/capability.rs
+          crates/core/symthaea-ai-assurance/src/effect_guard.rs
+          crates/core/symthaea-ai-assurance/src/host.rs
+          crates/core/symthaea-ai-assurance/src/independence.rs
+          crates/core/symthaea-ai-assurance/src/lib.rs
+          crates/core/symthaea-ai-assurance/src/policy.rs
+          crates/core/symthaea-ai-assurance/src/policy_guard.rs
+          crates/core/symthaea-ai-assurance/src/resolution.rs
+          crates/core/symthaea-ai-assurance/src/resource.rs
+          crates/core/symthaea-ai-assurance/src/temporal_policy.rs
+          crates/core/symthaea-ai-assurance/src/trusted.rs
+          crates/core/symthaea-ai-assurance/tests/budget_guard_public_api.rs
+          crates/core/symthaea-ai-assurance/tests/budget_public_api.rs
+          crates/core/symthaea-ai-assurance/tests/budget_purpose_public_api.rs
+          crates/core/symthaea-ai-assurance/tests/policy_public_api.rs
+          crates/core/symthaea-ai-assurance/tests/policy_revocation_public_api.rs
+          crates/core/symthaea-ai-assurance/tests/trust_domain_attacks.rs
+          EOF
+          )"
+          test "$actual_paths" = "$expected_paths"
+
+          git -C "$SOURCE_DIR" checkout --detach "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD)" = "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD^{tree})" = "$TARGET_TREE"
+
+          printf 'HARNESS_DIR=%s\nSOURCE_DIR=%s\n' "$HARNESS_DIR" "$SOURCE_DIR" >> "$GITHUB_ENV"
+
+      - name: Report frozen-source provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$HARNESS_DIR" rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD)" = "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD^{tree})" = "$TARGET_TREE"
+
+          uname -a
+          cat /etc/os-release
+          nix --version
+          git --version
+          printf 'recovery_harness=%s\n' "$GITHUB_SHA"
+          printf 'source_commit=%s\n' "$TARGET_COMMIT"
+          printf 'source_tree=%s\n' "$TARGET_TREE"
+          printf 'source_base=%s\n' "$TARGET_BASE"
+          printf 'hosted_workflow_blob=%s\n' "$TARGET_HOSTED_WORKFLOW_BLOB"
+
+          cd "$SOURCE_DIR"
+          printf 'nixpkgs_rev=%s\n' "$(nix eval --raw --expr 'let l = builtins.fromJSON (builtins.readFile ./flake.lock); n = l.nodes.root.inputs.nixpkgs; in (builtins.getAttr n l.nodes).locked.rev')"
+          printf 'rust_channel=%s\n' "$(nix eval --raw --expr '(builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain.channel')"
+          sha256sum flake.lock rust-toolchain.toml Cargo.lock
+
+      - name: Evaluate trusted-runner policy from trusted harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$HARNESS_DIR"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          nix build --no-link --no-write-lock-file \
+            --impure \
+            --expr 'let f = builtins.getFlake (toString ./.); pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in import ./nix/tests/eval-github-actions-runner.nix { inherit pkgs; }'
+          nix build --no-link --no-write-lock-file \
+            --impure \
+            --expr 'let f = builtins.getFlake (toString ./.); pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in import ./nix/tests/eval-trusted-runner-routing.nix { inherit pkgs; }'
+
+      - name: Reproduce frozen AI Assurance #186 gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+          test "$(git rev-parse HEAD)" = "$TARGET_COMMIT"
+          test "$(git rev-parse HEAD^{tree})" = "$TARGET_TREE"
+
+          export CARGO_HOME="$RUNNER_TEMP/cargo-home"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/cargo-target"
+          mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
+
+          nix develop --no-write-lock-file \
+            --impure \
+            --expr 'let
+              f = builtins.getFlake (toString ./.);
+              harness = builtins.getEnv "HARNESS_DIR";
+              shellFile = builtins.toPath (harness + "/nix/ci-rust-shell.nix");
+            in import shellFile {
+              nixpkgs = f.inputs.nixpkgs;
+              rust-overlay = f.inputs.rust-overlay;
+              toolchainFile = ./rust-toolchain.toml;
+              system = builtins.currentSystem;
+            }' \
+            --command bash -c '
+              set -euo pipefail
+              rustc --version
+              cargo --version
+              rustfmt --version
+              cargo clippy --version
+
+              cargo fmt --package symthaea-ai-assurance -- --check
+              cargo metadata --locked --format-version 1 > /dev/null
+              cargo test --locked -p symthaea-ai-assurance
+              cargo clippy --locked -p symthaea-ai-assurance --all-targets -- -D warnings
+            '
+
+      - name: Verify immutability and emit recovery attestation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$HARNESS_DIR" rev-parse HEAD)" = "$GITHUB_SHA"
+          git -C "$HARNESS_DIR" diff --exit-code
+          git -C "$HARNESS_DIR" diff --cached --exit-code
+          test -z "$(git -C "$HARNESS_DIR" status --porcelain=v1 --untracked-files=all --ignored=matching)"
+
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD)" = "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD^{tree})" = "$TARGET_TREE"
+          git -C "$SOURCE_DIR" diff --exit-code
+          git -C "$SOURCE_DIR" diff --cached --exit-code
+          test -z "$(git -C "$SOURCE_DIR" status --porcelain=v1 --untracked-files=all --ignored=matching)"
+
+          cd "$SOURCE_DIR"
+          nixpkgs_rev="$(nix eval --raw --expr 'let l = builtins.fromJSON (builtins.readFile ./flake.lock); n = l.nodes.root.inputs.nixpkgs; in (builtins.getAttr n l.nodes).locked.rev')"
+          rust_channel="$(nix eval --raw --expr '(builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain.channel')"
+          flake_lock_sha="$(sha256sum flake.lock | awk '{print $1}')"
+          rust_toolchain_sha="$(sha256sum rust-toolchain.toml | awk '{print $1}')"
+          cargo_lock_sha="$(sha256sum Cargo.lock | awk '{print $1}')"
+
+          manifest="$RUNNER_TEMP/ai-assurance-budget-recovery-trusted-recovery-v1.txt"
+          cat > "$manifest" <<EOF
+          schema=symthaea.ai-assurance.budget-recovery.trusted-recovery.v1
+          result=PASS
+          github_run_id=$GITHUB_RUN_ID
+          github_run_attempt=$GITHUB_RUN_ATTEMPT
+          runner_name=${RUNNER_NAME:-unknown}
+          runner_os=${RUNNER_OS:-unknown}
+          runner_arch=${RUNNER_ARCH:-unknown}
+          harness_commit=$GITHUB_SHA
+          target_commit=$TARGET_COMMIT
+          target_tree=$TARGET_TREE
+          target_base=$TARGET_BASE
+          hosted_workflow_blob=$TARGET_HOSTED_WORKFLOW_BLOB
+          nixpkgs_rev=$nixpkgs_rev
+          rust_channel=$rust_channel
+          flake_lock_sha256=$flake_lock_sha
+          rust_toolchain_sha256=$rust_toolchain_sha
+          cargo_lock_sha256=$cargo_lock_sha
+          gate=cargo-fmt+locked-metadata+unit-integration-doctests+clippy-deny-warnings
+          cargo_dependency_mode=locked
+          evidence_scope=correctness-and-reproducibility-not-performance
+          EOF
+
+          attestation_sha="$(sha256sum "$manifest" | awk '{print $1}')"
+          cat "$manifest"
+          printf 'attestation_sha256=%s\n' "$attestation_sha"
+
+          {
+            echo '## AI Assurance #186 trusted recovery: PASS'
+            echo
+            echo "- Harness commit: \`$GITHUB_SHA\`"
+            echo "- Frozen source commit: \`$TARGET_COMMIT\`"
+            echo "- Frozen source tree: \`$TARGET_TREE\`"
+            echo "- Known base: \`$TARGET_BASE\`"
+            echo "- Hosted workflow blob: \`$TARGET_HOSTED_WORKFLOW_BLOB\`"
+            echo "- Runner: \`${RUNNER_NAME:-unknown}\` / \`${RUNNER_OS:-unknown}\` / \`${RUNNER_ARCH:-unknown}\`"
+            echo "- Rust: \`$rust_channel\`"
+            echo "- nixpkgs: \`$nixpkgs_rev\`"
+            echo "- Cargo.lock SHA-256: \`$cargo_lock_sha\`"
+            echo "- Attestation SHA-256: \`$attestation_sha\`"
+            echo
+            echo 'Correctness/reproducibility evidence only; not hosted-runner or performance evidence.'
+          } >> "$GITHUB_STEP_SUMMARY"
