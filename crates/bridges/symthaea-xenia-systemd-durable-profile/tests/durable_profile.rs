@@ -182,9 +182,12 @@ fn verified_time(grant: &CapabilityGrant, witnessed_unix_s: u64) -> VerifiedAuth
             challenge_nonce: challenge.nonce,
             witnessed_unix_s,
             uncertainty_s: 1,
-            signature: [0; 64],
+            signature: Vec::new(),
         };
-        statement.signature = key.sign(&statement.canonical_message().unwrap()).to_bytes();
+        statement.signature = key
+            .sign(&statement.canonical_message().unwrap())
+            .to_bytes()
+            .to_vec();
         statement
     };
     verify_authority_time_v1(
@@ -356,8 +359,6 @@ fn newer_verified_time_rejects_expired_xenia_proof_before_effect_or_attempt_evid
     assert_eq!(*calls.lock().unwrap(), 0);
 
     let journal = SqliteAttemptEvidenceJournal::open(&path).unwrap();
-    // No attempt key was ever materialized into the journal because failure
-    // happened before effect admission/instrumentation.
     let count: i64 = rusqlite::Connection::open(&path)
         .unwrap()
         .query_row("SELECT COUNT(*) FROM system_attempt_evidence", [], |row| row.get(0))
