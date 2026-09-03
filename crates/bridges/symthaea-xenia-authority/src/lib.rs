@@ -10,7 +10,9 @@
 //!
 //! Signature validity is necessary but not sufficient for live authority. A
 //! stale signed authorization is rejected when its ledger frontier no longer
-//! matches the fresh Xenia checkpoint supplied for admission.
+//! matches the fresh Xenia checkpoint supplied for admission. Wall-clock time is
+//! not accepted from the caller: time-sensitive checks consume a short-lived,
+//! challenge-bound [`VerifiedAuthorityTime`] fact.
 
 #![deny(unsafe_code)]
 
@@ -20,12 +22,13 @@ mod workload;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use symthaea_action_checkpoint::CheckpointHead;
 use symthaea_authority::{CapabilityGrant, Digest32, PrincipalId};
+use symthaea_authority_time::{AuthorityTimeError, VerifiedAuthorityTime};
 use thiserror::Error;
 
 pub use protocol::{
     AGENT_CAPABILITY_ATTESTATION_SCHEMA, AGENT_CAPABILITY_AUTHORIZATION_DOMAIN,
     AGENT_CAPABILITY_AUTHORIZATION_SCHEMA_VERSION, ED25519_SIGNATURE_ALGORITHM,
-    TranscriptSignatureSuiteV1, XENIA_LEDGER_CHECKPOINT_SCHEMA, ProtocolError,
+    ProtocolError, TranscriptSignatureSuiteV1, XENIA_LEDGER_CHECKPOINT_SCHEMA,
     XeniaAgentAuthorizationV1, XeniaAgentCapabilityAttestationV1, XeniaCheckpointAnchorV1,
     XeniaLedgerCheckpointV1, XeniaSignatureEnvelopeV1,
 };
@@ -49,7 +52,7 @@ pub struct XeniaSessionExpectationV1 {
 pub struct XeniaFreshnessPolicyV1 {
     /// Maximum checkpoint age accepted at effect admission.
     pub max_checkpoint_age_s: u64,
-    /// Maximum tolerated checkpoint timestamp ahead of trusted wall clock.
+    /// Maximum tolerated checkpoint timestamp ahead of verified authority time.
     pub max_future_skew_s: u64,
 }
 
@@ -111,6 +114,10 @@ impl VerifiedXeniaCapability {
 
 /// Verify a Xenia-bound Symthaea capability before the Action Runtime may
 /// reserve it for consequential execution.
+///
+/// `authority_time` must be challenge-bound to the exact capability digest.
+/// Its conservative upper bound is used for expiry and checkpoint-freshness
+/// checks, so uncertainty can only make authority expire earlier.
 #[allow(clippy::too_many_arguments)]
 pub fn verify_xenia_capability_v1(
     attestation: &XeniaAgentCapabilityAttestationV1,
@@ -120,7 +127,7 @@ pub fn verify_xenia_capability_v1(
     workload: &ExecutorWorkloadV1,
     expected_session: XeniaSessionExpectationV1,
     current_agent_checkpoint: CheckpointHead,
-    now_unix_s: u64,
+    authority_time: &VerifiedAuthorityTime,
     freshness: XeniaFreshnessPolicyV1,
 ) -> Result<VerifiedXeniaCapability, XeniaAuthorityError> {
     let authorization = &attestation.authorization;
@@ -132,6 +139,10 @@ pub fn verify_xenia_capability_v1(
     if attestation.signature.algorithm != ED25519_SIGNATURE_ALGORITHM {
         return Err(XeniaAuthorityError::UnsupportedAttestationSignatureSuite);
     }
+
+    let grant_digest = grant.digest();
+    authority_time.require_subject(grant_digest.0)?;
+    let now_unix_s = authority_time.conservative_now_unix_s()?;
 
     verify_fresh_xenia_checkpoint(
         fresh_xenia_checkpoint,
@@ -166,7 +177,6 @@ pub fn verify_xenia_capability_v1(
         return Err(XeniaAuthorityError::AuthorizationExpired);
     }
 
-    let grant_digest = grant.digest();
     if authorization.capability_digest != grant_digest.0 {
         return Err(XeniaAuthorityError::CapabilityDigestMismatch);
     }
@@ -264,6 +274,8 @@ fn verify_ed25519(
 
 #[derive(Debug, Error)]
 pub enum XeniaAuthorityError {
+    #[error("verified authority time failed: {0}")]
+    AuthorityTime(#[from] AuthorityTimeError),
     #[error("invalid Xenia protocol object: {0}")]
     Protocol(#[from] ProtocolError),
     #[error("invalid executor workload: {0}")]
