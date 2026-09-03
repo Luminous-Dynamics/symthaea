@@ -21,6 +21,7 @@ mod identity;
 pub mod identity_normalization;
 pub mod identity_provider;
 pub mod independence;
+pub mod independence_authority;
 pub mod limits;
 pub mod manifest;
 pub mod observation;
@@ -58,6 +59,12 @@ pub use identity_provider::{
 pub use independence::{
     IndependenceAssessment, IndependenceAssessmentError, IndependenceMetadataConflict,
     assess_independence,
+};
+pub use independence_authority::{
+    EvidenceLineageRef, IndependenceAttestation, IndependenceAttestationError,
+    IndependenceAttestationSet, IndependenceAttestationSetError, IndependenceAuthorityPolicy,
+    IndependenceAuthorityQualification, IndependenceBasis,
+    INDEPENDENCE_ATTESTATION_SCHEMA_VERSION,
 };
 pub use limits::{ObservationBudgetError, ObservationLimits};
 pub use manifest::{
