@@ -6,24 +6,28 @@
 //!
 //! - #305 typed `service.restart` broker semantics;
 //! - CAS-backed checkpoint frontiers;
-//! - independently verified Xenia capability/workload evidence.
+//! - independently verified Xenia capability/workload evidence;
+//! - challenge-bound multi-authority time evidence.
 //!
 //! A verified Xenia proof is consumed by value immediately before the broker
 //! enters its reservation/checkpoint/effect state machine. Cross-process replay
 //! is constrained by the CAS frontier rather than by relying on Rust affinity
-//! alone.
+//! alone. Caller-provided wall-clock time is not part of the production profile.
 
 #![deny(unsafe_code)]
 
 use std::error::Error as StdError;
 
 use symthaea_action_checkpoint::{CheckpointHead, GrantAccountCheckpoint};
-use symthaea_action_runtime::{ExecutionId, ReservationId};
-use symthaea_authority::{AuthorityContext, CapabilityGrant, Digest32, NegativeAuthorityFact};
+use symthaea_action_runtime::{ExecutionId, GrantUseState, ReservationId};
+use symthaea_authority::{
+    AuthorityContext, AuthorityEpoch, CapabilityGrant, Digest32, NegativeAuthorityFact,
+};
 use symthaea_authority_frontier::{
     CasCheckpointStoreAdapter, CheckpointCasStore, EstablishedGrantFrontier, FrontierError,
     establish_grant_frontier,
 };
+use symthaea_authority_time::{AuthorityTimeError, VerifiedAuthorityTime};
 use symthaea_system_broker::{
     BrokerError, RecoveryReceipt, RestartPlan, ServiceBackend, SystemdRecoveryBroker,
 };
@@ -124,22 +128,26 @@ where
     /// exact typed recovery.
     ///
     /// The proof must still bind this profile's exact current checkpoint at the
-    /// instant immediately before the broker enters effect admission. This
-    /// closes the gap where a proof was verified correctly but another actor
-    /// advanced local authority state before it was exercised.
+    /// instant immediately before the broker enters effect admission. Time is
+    /// re-derived from the short-lived challenged fact at this same boundary.
+    /// The caller cannot supply use accounting; the broker substitutes its own
+    /// durable account state before evaluating authority.
     pub fn recover_verified_once(
         &mut self,
         verified: VerifiedXeniaCapability,
+        authority_time: &VerifiedAuthorityTime,
+        current_epoch: AuthorityEpoch,
         plan: &RestartPlan,
         execution_id: ExecutionId,
         reservation_id: ReservationId,
-        authority_context: AuthorityContext,
         negative_facts: &[NegativeAuthorityFact],
     ) -> Result<XeniaSystemdRecoveryReceipt, ProfileRecoveryError> {
         if verified.grant_digest() != self.grant_digest {
             return Err(ProfileRecoveryError::VerifiedGrantMismatch);
         }
-        if authority_context.now_unix_s > verified.expires_at_unix_s() {
+        authority_time.require_subject(self.grant_digest.0)?;
+        let now_unix_s = authority_time.conservative_now_unix_s()?;
+        if now_unix_s > verified.expires_at_unix_s() {
             return Err(ProfileRecoveryError::XeniaProofExpiredAtEffectEntry);
         }
         let current_head = self.authorization_checkpoint_head()?;
@@ -161,7 +169,13 @@ where
             plan,
             execution_id,
             reservation_id,
-            authority_context,
+            AuthorityContext {
+                now_unix_s,
+                current_epoch,
+                // The broker explicitly ignores caller use accounting and
+                // substitutes its own durable GrantAccount state.
+                use_state: GrantUseState::default(),
+            },
             negative_facts,
         )?;
 
@@ -189,6 +203,8 @@ where
 
 #[derive(Debug, Error)]
 pub enum ProfileRecoveryError {
+    #[error("verified authority time failed: {0}")]
+    AuthorityTime(#[from] AuthorityTimeError),
     #[error("typed systemd broker failed: {0}")]
     Broker(#[from] BrokerError),
     #[error("profile has no established checkpoint")]
