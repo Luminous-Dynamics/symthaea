@@ -104,10 +104,19 @@ pub fn recover_to_quiescent(
         .ok_or(CrashRecoveryError::GrantMissingWorldBinding)?;
     let mut account = checkpoint.verify_payload(grant)?;
 
-    // Evidence is advisory for consequence reconstruction but never an
-    // authority source. Validate all incomplete chains and their exact binding
-    // to this grant before changing the durable account.
-    let incomplete = attempt_index.scan_incomplete()?;
+    // First validate the local database structurally. Then select only
+    // incomplete attempts for the exact authenticated grant. A shared journal
+    // may legitimately contain unfinished work for other grants; those attempts
+    // belong to their own recovery sessions and must not create a confused
+    // deputy relationship with this one.
+    let grant_digest = grant.digest();
+    let incomplete: Vec<DiscoveredAttempt> = attempt_index
+        .scan_all()?
+        .into_iter()
+        .filter(|attempt| {
+            !attempt.is_closed() && attempt.context.grant_digest == grant_digest
+        })
+        .collect();
     validate_attempt_bindings(
         grant,
         plan_digest,
@@ -475,6 +484,45 @@ mod tests {
             recovered.incomplete_attempts[0].last_state,
             AttemptEvidenceState::DispatchArmed
         );
+        assert_eq!(recovered.normalized_reservations, vec![reservation_id]);
+        cleanup(&frontier_path);
+        cleanup(&attempt_path);
+    }
+
+    #[test]
+    fn unrelated_incomplete_grant_does_not_become_this_recovery_sessions_authority() {
+        let frontier_path = temp_path("frontier-foreign-grant");
+        let attempt_path = temp_path("attempt-foreign-grant");
+        let grant = grant();
+        let reservation_id = ReservationId("reservation-foreign-main".into());
+        let (mut frontier, trusted_head) =
+            durable_reserved_frontier(&frontier_path, &grant, reservation_id.clone());
+
+        let mut foreign = grant();
+        foreign.grant_id = "foreign-grant".into();
+        foreign.plan_digest = Some(Digest32([71; 32]));
+        foreign.world_digest = Some(Digest32([72; 32]));
+        let foreign_record = armed_record(
+            &foreign,
+            &ReservationId("foreign-reservation".into()),
+            trusted_head,
+        );
+        {
+            let mut journal = SqliteAttemptEvidenceJournal::open(&attempt_path).unwrap();
+            journal.append(&foreign_record).unwrap();
+        }
+        let index = SqliteAttemptRecoveryIndex::open_read_only(&attempt_path).unwrap();
+
+        let recovered = recover_to_quiescent(
+            &grant,
+            TrustedRecoveryAnchor {
+                checkpoint_head: trusted_head,
+            },
+            &mut frontier,
+            &index,
+        )
+        .unwrap();
+        assert!(recovered.incomplete_attempts.is_empty());
         assert_eq!(recovered.normalized_reservations, vec![reservation_id]);
         cleanup(&frontier_path);
         cleanup(&attempt_path);
