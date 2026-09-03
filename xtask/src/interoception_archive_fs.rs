@@ -1,4 +1,8 @@
-use std::{fs, path::{Component, Path, PathBuf}};
+use std::{
+    fs::{self, OpenOptions},
+    io::Write,
+    path::{Component, Path, PathBuf},
+};
 
 use anyhow::{bail, Context, Result};
 
@@ -47,7 +51,10 @@ pub fn closed_relative_file(root: &Path, relative: &str) -> Result<PathBuf> {
     let metadata = fs::symlink_metadata(&current)
         .with_context(|| format!("inspect archive object {}", current.display()))?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {
-        bail!("archive object is not a regular non-symlink file: {}", current.display());
+        bail!(
+            "archive object is not a regular non-symlink file: {}",
+            current.display()
+        );
     }
 
     let canonical_object = fs::canonicalize(&current)
@@ -90,6 +97,25 @@ pub fn require_external_new_file(repo_root: &Path, out: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Create a new qualification artifact without a check-then-write race.
+///
+/// `create_new(true)` is the authoritative no-overwrite guard. The preceding
+/// path-policy check exists to enforce source-checkout separation, not to provide
+/// mutual exclusion. Bytes are flushed to the file before success is returned.
+pub fn create_new_external_file(repo_root: &Path, out: &Path, bytes: &[u8]) -> Result<()> {
+    require_external_new_file(repo_root, out)?;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(out)
+        .with_context(|| format!("create new qualification output {}", out.display()))?;
+    file.write_all(bytes)
+        .with_context(|| format!("write qualification output {}", out.display()))?;
+    file.sync_all()
+        .with_context(|| format!("sync qualification output {}", out.display()))?;
+    Ok(())
+}
+
 fn canonical_non_symlink_directory(path: &Path, role: &str) -> Result<PathBuf> {
     let metadata = fs::symlink_metadata(path)
         .with_context(|| format!("inspect {role} {}", path.display()))?;
@@ -105,7 +131,10 @@ fn canonical_non_symlink_directory(path: &Path, role: &str) -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{fs, process, time::{SystemTime, UNIX_EPOCH}};
+    use std::{
+        fs, process,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     fn unique_dir(label: &str) -> PathBuf {
         let nonce = SystemTime::now()
@@ -120,6 +149,24 @@ mod tests {
         assert!(validate_relative_path("test", "../escape").is_err());
         assert!(validate_relative_path("test", "/absolute").is_err());
         assert!(validate_relative_path("test", "safe/object.json").is_ok());
+    }
+
+    #[test]
+    fn create_new_external_file_never_replaces_existing_bytes() {
+        let repo = unique_dir("source-checkout");
+        let outside = unique_dir("promotion-out");
+        fs::create_dir_all(&repo).expect("create repo");
+        fs::create_dir_all(&outside).expect("create outside");
+        let out = outside.join("authorization.json");
+
+        create_new_external_file(&repo, &out, b"first").expect("create first artifact");
+        assert_eq!(fs::read(&out).expect("read first artifact"), b"first");
+
+        assert!(create_new_external_file(&repo, &out, b"second").is_err());
+        assert_eq!(fs::read(&out).expect("read preserved artifact"), b"first");
+
+        let _ = fs::remove_dir_all(&repo);
+        let _ = fs::remove_dir_all(&outside);
     }
 
     #[cfg(unix)]
