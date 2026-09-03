@@ -12,8 +12,9 @@
 #![forbid(unsafe_code)]
 
 use std::fmt;
-use std::fs;
-use std::io;
+use std::fs::OpenOptions;
+use std::io::{self, Read};
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 
 /// Hard input bound before seed material reaches hashing/RNG initialization.
@@ -25,6 +26,7 @@ pub enum VisualSeedError {
     Empty,
     TooLarge { bytes: usize, max: usize },
     InvalidUtf8,
+    NotRegularFile,
 }
 
 impl From<io::Error> for VisualSeedError {
@@ -42,6 +44,7 @@ impl fmt::Display for VisualSeedError {
                 write!(f, "visual seed is too large: {bytes} bytes (max {max})")
             }
             Self::InvalidUtf8 => write!(f, "visual seed file is not valid UTF-8"),
+            Self::NotRegularFile => write!(f, "visual seed path is not a regular file"),
         }
     }
 }
@@ -66,20 +69,24 @@ pub fn normalize_visual_seed(input: &str) -> Result<String, VisualSeedError> {
     Ok(trimmed.to_owned())
 }
 
-/// Load a bounded UTF-8 seed from a dedicated presentation-only file.
+/// Load a bounded UTF-8 seed from a dedicated presentation-only regular file.
 ///
-/// Metadata is checked before allocation and the byte length is checked again
-/// after reading so a concurrently replaced file cannot bypass the bound.
+/// `O_NOFOLLOW` prevents a configured path from becoming a root-readable
+/// symlink oracle. Reading is capped at `MAX + 1` bytes from the opened file
+/// descriptor, eliminating the metadata/read replacement race and bounding
+/// allocation even if the file changes while it is being read.
 pub fn load_visual_seed_file(path: &Path) -> Result<String, VisualSeedError> {
-    let metadata = fs::metadata(path)?;
-    if metadata.len() > MAX_VISUAL_SEED_BYTES as u64 {
-        return Err(VisualSeedError::TooLarge {
-            bytes: usize::try_from(metadata.len()).unwrap_or(usize::MAX),
-            max: MAX_VISUAL_SEED_BYTES,
-        });
+    let file = OpenOptions::new()
+        .read(true)
+        .custom_flags(nix::libc::O_NOFOLLOW | nix::libc::O_CLOEXEC)
+        .open(path)?;
+    if !file.metadata()?.file_type().is_file() {
+        return Err(VisualSeedError::NotRegularFile);
     }
 
-    let bytes = fs::read(path)?;
+    let mut bytes = Vec::with_capacity(MAX_VISUAL_SEED_BYTES + 1);
+    file.take((MAX_VISUAL_SEED_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)?;
     if bytes.len() > MAX_VISUAL_SEED_BYTES {
         return Err(VisualSeedError::TooLarge {
             bytes: bytes.len(),
@@ -93,6 +100,8 @@ pub fn load_visual_seed_file(path: &Path) -> Result<String, VisualSeedError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::os::unix::fs::symlink;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -140,5 +149,18 @@ mod tests {
             Err(VisualSeedError::TooLarge { .. })
         ));
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn file_loader_refuses_symlink_seed_paths() {
+        let target = temp_seed_path();
+        let link = target.with_extension("link");
+        fs::write(&target, b"public-seed\n").unwrap();
+        symlink(&target, &link).unwrap();
+
+        assert!(load_visual_seed_file(&link).is_err());
+
+        let _ = fs::remove_file(link);
+        let _ = fs::remove_file(target);
     }
 }
