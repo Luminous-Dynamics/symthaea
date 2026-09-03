@@ -153,8 +153,11 @@ impl IdentityClaim {
         Ok(())
     }
 
+    /// A claim cannot participate in a historical resolution before it was
+    /// actually observed, even if its validity interval covers that time.
     pub fn is_active_at(&self, at_unix_ms: u64) -> bool {
-        self.valid_from_unix_ms.is_none_or(|from| at_unix_ms >= from)
+        self.observed_at_unix_ms <= at_unix_ms
+            && self.valid_from_unix_ms.is_none_or(|from| at_unix_ms >= from)
             && self.valid_until_unix_ms.is_none_or(|until| at_unix_ms <= until)
     }
 }
@@ -195,8 +198,10 @@ impl SeparationClaim {
         Ok(())
     }
 
+    /// Separation evidence is likewise unavailable before its observation time.
     pub fn is_active_at(&self, at_unix_ms: u64) -> bool {
-        self.valid_from_unix_ms.is_none_or(|from| at_unix_ms >= from)
+        self.observed_at_unix_ms <= at_unix_ms
+            && self.valid_from_unix_ms.is_none_or(|from| at_unix_ms >= from)
             && self.valid_until_unix_ms.is_none_or(|until| at_unix_ms <= until)
     }
 
@@ -681,6 +686,81 @@ mod tests {
         assert_eq!(proposal.status, ResolutionStatus::StrongCandidateSame);
         assert_eq!(proposal.identifier_matches.len(), 1);
         assert_ne!(proposal.left, proposal.right);
+    }
+
+    #[test]
+    fn future_observed_identity_claims_do_not_time_travel_into_past_resolution() {
+        let left = entity("otel", "service-a");
+        let right = entity("aws", "i-123");
+        let mut left_claim = claim(
+            "left-id",
+            left.clone(),
+            "cloud.resource_id",
+            "arn:example:123",
+            IdentifierUniqueness::Global,
+            IdentifierStability::Persistent,
+            IdentityStrength::Strong,
+        );
+        let mut right_claim = claim(
+            "right-id",
+            right.clone(),
+            "cloud.resource_id",
+            "arn:example:123",
+            IdentifierUniqueness::Global,
+            IdentifierStability::Persistent,
+            IdentityStrength::Strong,
+        );
+        left_claim.observed_at_unix_ms = 200;
+        right_claim.observed_at_unix_ms = 200;
+        let claims = vec![left_claim, right_claim];
+
+        assert_eq!(
+            assess_entity_pair(&left, &right, &claims, &[], 100)
+                .unwrap()
+                .status,
+            ResolutionStatus::Indeterminate
+        );
+        assert_eq!(
+            assess_entity_pair(&left, &right, &claims, &[], 200)
+                .unwrap()
+                .status,
+            ResolutionStatus::StrongCandidateSame
+        );
+
+        let index = IdentityClaimIndex::build(claims).unwrap();
+        assert!(index.candidate_pairs_at(100).is_empty());
+        assert_eq!(index.candidate_pairs_at(200).len(), 1);
+    }
+
+    #[test]
+    fn future_observed_separation_does_not_time_travel_into_past_resolution() {
+        let left = entity("otel", "node-a");
+        let right = entity("cmdb", "ci-7");
+        let separation = SeparationClaim {
+            claim_id: "reviewed-distinct".into(),
+            left: left.clone(),
+            right: right.clone(),
+            strength: IdentityStrength::Strong,
+            source_confidence: 1.0,
+            source: source("cmdb"),
+            observed_at_unix_ms: 200,
+            valid_from_unix_ms: None,
+            valid_until_unix_ms: None,
+            evidence_observation_ids: vec![],
+        };
+
+        assert_eq!(
+            assess_entity_pair(&left, &right, &[], &[separation.clone()], 100)
+                .unwrap()
+                .status,
+            ResolutionStatus::Indeterminate
+        );
+        assert_eq!(
+            assess_entity_pair(&left, &right, &[], &[separation], 200)
+                .unwrap()
+                .status,
+            ResolutionStatus::ExplicitlyDistinct
+        );
     }
 
     #[test]
