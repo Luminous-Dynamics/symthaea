@@ -13,6 +13,7 @@ on:
       - 'crates/bridges/symthaea-iot-actuation/**'
       - 'crates/bridges/symthaea-iot-policy/**'
       - 'crates/bridges/symthaea-iot-posture/**'
+      - 'crates/bridges/symthaea-iot-egress-guard/**'
       - 'src/swarm/mesh/sensor_iot.rs'
       - 'src/cognitive_loop/managers/survival_manager.rs'
       - '.github/workflows/iot-authority.yml'
@@ -61,9 +62,10 @@ jobs:
           crates/bridges/symthaea-iot-actuation/src/lib.rs
           crates/bridges/symthaea-iot-policy/src/lib.rs
           crates/bridges/symthaea-iot-posture/src/lib.rs
+          crates/bridges/symthaea-iot-egress-guard/src/lib.rs
 
   runtime-implementation:
-    name: IoT policy + posture + validated actuation implementation (MSRV 1.94)
+    name: IoT policy + posture + egress implementation (MSRV 1.94)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -97,6 +99,7 @@ jobs:
           -p symthaea-iot-policy
           -p symthaea-iot-posture
           -p symthaea-iot-actuation
+          -p symthaea-iot-egress-guard
           --all-targets
 
       - name: Test merged authority/runtime/IoT stack
@@ -112,6 +115,7 @@ jobs:
           -p symthaea-iot-policy
           -p symthaea-iot-posture
           -p symthaea-iot-actuation
+          -p symthaea-iot-egress-guard
           --all-targets
 
       - name: Clippy merged authority/runtime/IoT stack
@@ -127,6 +131,7 @@ jobs:
           -p symthaea-iot-policy
           -p symthaea-iot-posture
           -p symthaea-iot-actuation
+          -p symthaea-iot-egress-guard
           --all-targets -- -D warnings
 
   telemetry-boundary:
