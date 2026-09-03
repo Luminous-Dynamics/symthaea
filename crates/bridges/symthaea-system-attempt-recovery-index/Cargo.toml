@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-system-attempt-recovery-index"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Read-only validated recovery discovery for durable Symthaea system-attempt evidence"
+publish = false
+
+[dependencies]
+bincode = { workspace = true }
+blake3 = { workspace = true }
+rusqlite = { workspace = true }
+thiserror = { workspace = true }
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-system-attempt-evidence = { path = "../symthaea-system-attempt-evidence" }
