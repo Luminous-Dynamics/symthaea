@@ -11,6 +11,7 @@
 /// - `ecology_renderer_holo` — bounded holographic spatial field wrapper
 /// - `ecology_renderer_fidelity_v2` — membrane, caustics, and CPU bloom
 /// - `ecology_renderer` — final factual identity wrapper used by live + preview paths
+/// - `visual_composition` — pure bounded perceptual-attention policy
 /// - `inoculation_renderer` — shared installation/incubation phase grammar
 /// - `inoculation_ceremony` — install-path-specific visual signatures
 /// - `microtype` — tiny dependency-free uppercase factual label renderer
@@ -34,3 +35,4 @@ pub mod microtype;
 pub mod mycelium;
 pub mod preview;
 pub mod progress;
+pub mod visual_composition;
