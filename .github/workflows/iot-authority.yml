@@ -4,8 +4,11 @@ on:
   pull_request:
     paths:
       - 'crates/core/symthaea-authority/**'
+      - 'crates/core/symthaea-action-runtime/**'
+      - 'crates/core/symthaea-action-checkpoint/**'
       - 'crates/bridges/symthaea-iot-authority/**'
       - 'crates/bridges/symthaea-iot-execution/**'
+      - 'crates/bridges/symthaea-iot-runtime/**'
       - 'src/swarm/mesh/sensor_iot.rs'
       - 'src/cognitive_loop/managers/survival_manager.rs'
       - '.github/workflows/iot-authority.yml'
@@ -24,8 +27,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  execution-format:
-    name: IoT execution source format
+  runtime-format:
+    name: IoT runtime source format
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -43,13 +46,12 @@ jobs:
           rustc --version | grep -F 'rustc 1.94.0'
           cargo --version | grep -F 'cargo 1.94.0'
 
-      # Parent PRs own formatting of their source. This tranche formats only
-      # the execution-binding source it introduces.
-      - name: Check execution source formatting
-        run: rustfmt --edition 2024 --check crates/bridges/symthaea-iot-execution/src/lib.rs
+      # Parent PRs own formatting of authority/execution/runtime substrate source.
+      - name: Check IoT runtime bridge formatting
+        run: rustfmt --edition 2024 --check crates/bridges/symthaea-iot-runtime/src/lib.rs
 
-  authority-implementation:
-    name: IoT authority implementation
+  runtime-implementation:
+    name: IoT crash-safe runtime implementation
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -70,14 +72,38 @@ jobs:
       - name: Workspace metadata resolves
         run: cargo metadata --format-version 1 --no-deps >/dev/null
 
-      - name: Check IoT authority stack
-        run: cargo check -p symthaea-authority -p symthaea-iot-authority -p symthaea-iot-execution --all-targets
+      - name: Check merged authority/runtime/IoT stack
+        run: >-
+          cargo check
+          -p symthaea-authority
+          -p symthaea-action-runtime
+          -p symthaea-action-checkpoint
+          -p symthaea-iot-authority
+          -p symthaea-iot-execution
+          -p symthaea-iot-runtime
+          --all-targets
 
-      - name: Test IoT authority stack
-        run: cargo test -p symthaea-authority -p symthaea-iot-authority -p symthaea-iot-execution --all-targets
+      - name: Test merged authority/runtime/IoT stack
+        run: >-
+          cargo test
+          -p symthaea-authority
+          -p symthaea-action-runtime
+          -p symthaea-action-checkpoint
+          -p symthaea-iot-authority
+          -p symthaea-iot-execution
+          -p symthaea-iot-runtime
+          --all-targets
 
-      - name: Clippy IoT authority stack
-        run: cargo clippy -p symthaea-authority -p symthaea-iot-authority -p symthaea-iot-execution --all-targets -- -D warnings
+      - name: Clippy merged authority/runtime/IoT stack
+        run: >-
+          cargo clippy
+          -p symthaea-authority
+          -p symthaea-action-runtime
+          -p symthaea-action-checkpoint
+          -p symthaea-iot-authority
+          -p symthaea-iot-execution
+          -p symthaea-iot-runtime
+          --all-targets -- -D warnings
 
   telemetry-boundary:
     name: Survival telemetry trust boundary
@@ -102,7 +128,7 @@ jobs:
         run: cargo test -p symthaea --no-default-features --features survival --lib survival_manager::tests
 
   locked-metadata:
-    name: IoT authority locked metadata
+    name: IoT runtime locked metadata
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
