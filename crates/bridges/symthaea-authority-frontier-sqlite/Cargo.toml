@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-authority-frontier-sqlite"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "SQLite-backed linearizable CAS persistence for Symthaea Agency Kernel checkpoints"
+publish = false
+
+[dependencies]
+bincode = { workspace = true }
+rusqlite = { workspace = true }
+thiserror = { workspace = true }
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-authority-frontier = { path = "../symthaea-authority-frontier" }
+
+[dev-dependencies]
+symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
+symthaea-authority = { path = "../../core/symthaea-authority" }
