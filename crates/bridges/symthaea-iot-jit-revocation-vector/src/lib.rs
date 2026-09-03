@@ -168,6 +168,7 @@ pub fn fence_final_permit_for_hal<'a>(
     now_unix_ms: u64,
     interlock_verifier: &impl InterlockControllerEvidenceVerifier,
 ) -> Result<CompleteJitHalLease<'a>, JitRevocationError> {
+    validate_interlock_anchor(current.interlock_registry.head(), current.interlock_head)?;
     validate_transport_heads(
         current.transport_registry.head(),
         current.transport_head,
@@ -228,6 +229,16 @@ pub fn fence_final_permit_for_hal<'a>(
         transport_key_digest: transport.key_digest,
         must_attempt_by_unix_ms,
     })
+}
+
+fn validate_interlock_anchor(
+    registry_head: InterlockTrustHead,
+    externally_anchored_head: InterlockTrustHead,
+) -> Result<(), JitRevocationError> {
+    if registry_head != externally_anchored_head {
+        return Err(JitRevocationError::ExternallyAnchoredInterlockHeadMismatch);
+    }
+    Ok(())
 }
 
 fn validate_transport_heads(
@@ -355,6 +366,9 @@ fn validate_current_transport_binding(
 /// Fail-closed errors for the complete HAL-time revocation vector.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum JitRevocationError {
+    /// Current interlock registry differs from its independently retained head.
+    #[error("current interlock registry does not match externally anchored head")]
+    ExternallyAnchoredInterlockHeadMismatch,
     /// Current transport registry differs from its independently retained head.
     #[error("current transport registry does not match externally anchored head")]
     ExternallyAnchoredTransportHeadMismatch,
@@ -493,7 +507,13 @@ mod tests {
     }
 
     #[test]
-    fn exact_transport_and_device_heads_pass() {
+    fn exact_current_heads_pass() {
+        let interlock = InterlockTrustHead {
+            sequence: 3,
+            digest: d(3),
+        };
+        assert_eq!(validate_interlock_anchor(interlock, interlock), Ok(()));
+
         let transport = TransportTrustHead {
             sequence: 7,
             digest: d(7),
@@ -505,6 +525,22 @@ mod tests {
             digest: d(9),
         };
         assert_eq!(validate_device_heads(device, device, device), Ok(()));
+    }
+
+    #[test]
+    fn unanchored_interlock_registry_fails_before_provider_use() {
+        let registry = InterlockTrustHead {
+            sequence: 3,
+            digest: d(3),
+        };
+        let anchored = InterlockTrustHead {
+            sequence: 4,
+            digest: d(4),
+        };
+        assert_eq!(
+            validate_interlock_anchor(registry, anchored),
+            Err(JitRevocationError::ExternallyAnchoredInterlockHeadMismatch)
+        );
     }
 
     #[test]
