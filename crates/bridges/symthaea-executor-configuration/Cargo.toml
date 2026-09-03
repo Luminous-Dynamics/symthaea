@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-executor-configuration"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Read-only systemd/Nix executor configuration measurement for bounded Symthaea agency"
+publish = false
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
