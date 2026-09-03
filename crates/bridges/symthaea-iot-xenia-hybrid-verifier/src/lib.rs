@@ -23,8 +23,9 @@ use fips204::{
     traits::{SerDes, Verifier as MlDsaVerifier},
 };
 use symthaea_iot_transport_receipt::{
-    HybridReceiptSignatureVerifier, XENIA_ED25519_SIGNATURE_LEN,
-    XENIA_ML_DSA_65_PUBLIC_KEY_LEN, XENIA_ML_DSA_65_SIGNATURE_LEN,
+    HybridReceiptSignatureVerifier, TransportReceiptError, TransportTrustRegistry,
+    VerifiedTransportEnvelope, XENIA_ED25519_SIGNATURE_LEN, XENIA_ML_DSA_65_PUBLIC_KEY_LEN,
+    XENIA_ML_DSA_65_SIGNATURE_LEN, verify_xenia_transport_receipt,
 };
 
 const _: () = assert!(XENIA_ED25519_SIGNATURE_LEN == 64);
@@ -75,10 +76,31 @@ impl HybridReceiptSignatureVerifier for XeniaHybridReceiptVerifier {
     }
 }
 
+/// Guard-facing Xenia verification path with no caller-selectable crypto provider.
+///
+/// A privileged actuation guard should call this function rather than the lower-level
+/// generic `verify_xenia_transport_receipt`. The concrete hybrid verifier is selected
+/// here, inside the reviewed TCB, so unprivileged request data and ordinary call sites
+/// cannot substitute a permissive verifier implementation.
+pub fn verify_xenia_physical_effect_receipt(
+    registry: &TransportTrustRegistry,
+    raw_receipt: &[u8],
+    raw_payload: &[u8],
+    now_unix_ms: u64,
+) -> Result<VerifiedTransportEnvelope, TransportReceiptError> {
+    verify_xenia_transport_receipt(
+        registry,
+        raw_receipt,
+        raw_payload,
+        now_unix_ms,
+        &XeniaHybridReceiptVerifier,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use ed25519_dalek::{Signer as Ed25519Signer, SigningKey};
-    use fips204::traits::{KeyGen, Signer as MlDsaSigner};
+    use fips204::traits::{KeyGen, SerDes, Signer as MlDsaSigner};
 
     use super::*;
 
