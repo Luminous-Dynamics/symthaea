@@ -6,6 +6,10 @@
 //! derived from existing registered read-only sources, then rebound to that
 //! registry slot and subjected to centrally chosen limits before they can enter
 //! the world model or temporal reasoning path.
+//!
+//! Structural and chronology validation live on [`StateSnapshot`] itself. The
+//! registry intentionally reuses that canonical validator rather than maintaining
+//! a second timestamp policy that could drift from direct state consumers.
 
 use crate::{
     IntegrationError, IntegrationId, IntegrationRegistry, StateHistory, StateHistoryLimits,
