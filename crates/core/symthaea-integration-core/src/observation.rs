@@ -188,7 +188,8 @@ pub struct TransformStep {
 /// Provenance lineage for correlation-resistant evidence handling.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObservationLineage {
-    /// Stable lineage identifier assigned by the source/bridge.
+    /// Stable source-local lineage identifier assigned by the source/bridge.
+    /// It is meaningful only together with the observation's source context.
     pub lineage_id: String,
     /// Parent observations when this value is derived/aggregated.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -315,7 +316,12 @@ impl ObservationEnvelope {
         if self.observation_id == other.observation_id {
             return LineageRelationship::SameObservation;
         }
-        if self.lineage.lineage_id == other.lineage.lineage_id {
+        if self.lineage.lineage_id == other.lineage.lineage_id
+            && self.source.integration_id == other.source.integration_id
+            && self.source.collector_id == other.source.collector_id
+            && self.source.tenant == other.source.tenant
+            && self.source.upstream_origin == other.source.upstream_origin
+        {
             return LineageRelationship::SharedOrigin;
         }
         if let (Some(a), Some(b)) = (
@@ -544,6 +550,35 @@ mod tests {
     fn missing_independence_metadata_is_unknown() {
         let a = sample("a", "one", None);
         let b = sample("b", "two", None);
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
+    }
+
+    #[test]
+    fn equal_source_local_lineage_ids_across_integrations_do_not_collapse() {
+        let mut a = sample("a", "one", None);
+        let mut b = sample("b", "two", None);
+        a.lineage.lineage_id = "local-lineage".into();
+        b.lineage.lineage_id = "local-lineage".into();
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
+    }
+
+    #[test]
+    fn equal_lineage_ids_with_same_source_context_share_origin() {
+        let mut a = sample("a", "same", None);
+        let mut b = sample("b", "same", None);
+        a.lineage.lineage_id = "same-lineage".into();
+        b.lineage.lineage_id = "same-lineage".into();
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::SharedOrigin);
+    }
+
+    #[test]
+    fn equal_lineage_ids_across_tenants_do_not_collapse() {
+        let mut a = sample("a", "same", None);
+        let mut b = sample("b", "same", None);
+        a.lineage.lineage_id = "same-lineage".into();
+        b.lineage.lineage_id = "same-lineage".into();
+        a.source.tenant = Some("tenant-a".into());
+        b.source.tenant = Some("tenant-b".into());
         assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
     }
 
