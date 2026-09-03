@@ -78,6 +78,14 @@ impl IdentitySnapshot {
                     claim: claim.source.integration_id.clone(),
                 });
             }
+            if claim.observed_at_unix_ms > self.collected_at_unix_ms {
+                return Err(IdentitySnapshotError::FutureIdentityClaim {
+                    index,
+                    claim_id: claim.claim_id.clone(),
+                    observed_at_unix_ms: claim.observed_at_unix_ms,
+                    collected_at_unix_ms: self.collected_at_unix_ms,
+                });
+            }
             if !claim_ids.insert(claim.claim_id.clone()) {
                 return Err(IdentitySnapshotError::DuplicateClaimId(claim.claim_id.clone()));
             }
@@ -92,6 +100,14 @@ impl IdentitySnapshot {
                     index,
                     snapshot: self.integration_id.clone(),
                     claim: claim.source.integration_id.clone(),
+                });
+            }
+            if claim.observed_at_unix_ms > self.collected_at_unix_ms {
+                return Err(IdentitySnapshotError::FutureSeparationClaim {
+                    index,
+                    claim_id: claim.claim_id.clone(),
+                    observed_at_unix_ms: claim.observed_at_unix_ms,
+                    collected_at_unix_ms: self.collected_at_unix_ms,
                 });
             }
             if !claim_ids.insert(claim.claim_id.clone()) {
@@ -241,6 +257,24 @@ pub enum IdentitySnapshotError {
         snapshot: String,
         claim: String,
     },
+    #[error(
+        "identity claim {index} `{claim_id}` is observed in the future: {observed_at_unix_ms} > snapshot capture {collected_at_unix_ms}"
+    )]
+    FutureIdentityClaim {
+        index: usize,
+        claim_id: String,
+        observed_at_unix_ms: u64,
+        collected_at_unix_ms: u64,
+    },
+    #[error(
+        "separation claim {index} `{claim_id}` is observed in the future: {observed_at_unix_ms} > snapshot capture {collected_at_unix_ms}"
+    )]
+    FutureSeparationClaim {
+        index: usize,
+        claim_id: String,
+        observed_at_unix_ms: u64,
+        collected_at_unix_ms: u64,
+    },
     #[error("duplicate identity/separation claim id `{0}`")]
     DuplicateClaimId(String),
 }
@@ -361,6 +395,25 @@ mod tests {
         }
     }
 
+    fn separation(integration_id: &str) -> SeparationClaim {
+        SeparationClaim {
+            claim_id: "separation-1".into(),
+            left: EntityRef::new("test", "host", "node-1"),
+            right: EntityRef::new("test", "host", "node-2"),
+            strength: IdentityStrength::Strong,
+            source_confidence: 1.0,
+            source: IdentityClaimSource {
+                integration_id: integration_id.into(),
+                collector_id: None,
+                tenant: None,
+            },
+            observed_at_unix_ms: 100,
+            valid_from_unix_ms: None,
+            valid_until_unix_ms: None,
+            evidence_observation_ids: vec![],
+        }
+    }
+
     #[test]
     fn valid_snapshot_passes_default_limits() {
         let snapshot = IdentitySnapshot {
@@ -384,6 +437,51 @@ mod tests {
             snapshot.validate(),
             Err(IdentitySnapshotError::IdentitySourceMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn future_identity_claim_is_rejected_by_snapshot_validation() {
+        let mut identity = claim("fixture");
+        identity.observed_at_unix_ms = 101;
+        let snapshot = IdentitySnapshot {
+            integration_id: "fixture".into(),
+            collected_at_unix_ms: 100,
+            claims: vec![identity],
+            separation_claims: vec![],
+        };
+        assert!(matches!(
+            snapshot.validate(),
+            Err(IdentitySnapshotError::FutureIdentityClaim { .. })
+        ));
+    }
+
+    #[test]
+    fn future_separation_claim_is_rejected_by_snapshot_validation() {
+        let mut separation = separation("fixture");
+        separation.observed_at_unix_ms = 101;
+        let snapshot = IdentitySnapshot {
+            integration_id: "fixture".into(),
+            collected_at_unix_ms: 100,
+            claims: vec![],
+            separation_claims: vec![separation],
+        };
+        assert!(matches!(
+            snapshot.validate(),
+            Err(IdentitySnapshotError::FutureSeparationClaim { .. })
+        ));
+    }
+
+    #[test]
+    fn future_validity_does_not_mean_future_observation() {
+        let mut identity = claim("fixture");
+        identity.valid_from_unix_ms = Some(200);
+        let snapshot = IdentitySnapshot {
+            integration_id: "fixture".into(),
+            collected_at_unix_ms: 100,
+            claims: vec![identity],
+            separation_claims: vec![],
+        };
+        assert!(snapshot.validate().is_ok());
     }
 
     #[test]
