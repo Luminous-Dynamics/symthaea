@@ -2,26 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Verified-posture composition immediately before physical egress.
 //!
-//! `symthaea-iot-actuation` deliberately keeps policy/authority evaluation separate
-//! from device attestation. This crate composes those independent proofs without
-//! collapsing them into one ambient "trusted" bit.
-//!
-//! The safe product path is:
-//!
-//! ```text
-//! ArmedActuationPermit
-//!   + original registry-issued ActuationPolicyHandle
-//!   + fresh VerifiedDevicePosture
-//!   + current verifier-trust registry
-//!   + current actuation-policy registry
-//!   -> existing exact preflight, using ONLY verified posture runtime state
-//!   -> PostureBoundEgressPermit
-//!   -> authenticated Xenia/device egress
-//! ```
-//!
-//! Shipped transport adapters should consume [`PostureBoundEgressPermit`], not a
-//! raw lower-layer ready permit. The lower crates remain independently useful for
-//! deterministic policy/accounting tests and non-product composition.
+//! The safe product path composes independent authority, policy, persistence and
+//! attestation proofs. A posture Attestation Result is additionally bound to the
+//! exact already-armed effect by deriving its challenge nonce from the proposal,
+//! configured-policy generation and durable checkpoint head.
 
 #![deny(unsafe_code)]
 
@@ -40,11 +24,63 @@ use symthaea_iot_durable_runtime::{
 use symthaea_iot_policy::{
     ActuationPolicyHandle, ActuationPolicyHead, ActuationPolicyRegistry,
 };
-use symthaea_iot_posture::{VerifiedDevicePosture, VerifierTrustHead, VerifierTrustRegistry};
+use symthaea_iot_posture::{
+    PostureChallengeV1, PostureError, VerifiedDevicePosture, VerifierTrustHead,
+    VerifierTrustRegistry, POSTURE_CHALLENGE_SCHEMA_VERSION,
+};
+
+pub const ACTUATION_POSTURE_NONCE_DOMAIN: &[u8] =
+    b"symthaea-iot-actuation-posture-nonce-v1\0";
+
+/// Deterministically derive the challenge nonce for this exact armed effect.
+///
+/// The proposal already commits command/plan/world/risk. The policy binding and
+/// durable heads make the nonce specific to the exact configured and persisted
+/// execution generation. Reusing a posture result for another effect therefore
+/// fails the verifier-result challenge commitment.
+pub fn actuation_posture_nonce(armed: &ArmedActuationPermit) -> [u8; 32] {
+    let policy_head = armed.policy_registry_head();
+    let durable_head = armed.armed_head();
+    let mut h = blake3::Hasher::new();
+    h.update(ACTUATION_POSTURE_NONCE_DOMAIN);
+    update_digest(&mut h, armed.proposal_digest());
+    update_digest(&mut h, armed.policy_digest());
+    h.update(&policy_head.sequence.to_be_bytes());
+    update_digest(&mut h, policy_head.digest);
+    h.update(&durable_head.action_head.sequence.to_be_bytes());
+    update_digest(&mut h, durable_head.action_head.digest);
+    update_digest(&mut h, durable_head.digest);
+    *h.finalize().as_bytes()
+}
+
+/// Construct the RATS relying-party challenge for one exact armed actuation.
+pub fn actuation_posture_challenge(
+    armed: &ArmedActuationPermit,
+    device: ResourceRef,
+    issued_at_unix_s: u64,
+    expires_at_unix_s: u64,
+) -> Result<PostureChallengeV1, PostureError> {
+    let challenge = PostureChallengeV1 {
+        schema_version: POSTURE_CHALLENGE_SCHEMA_VERSION,
+        nonce: actuation_posture_nonce(armed),
+        device,
+        issued_at_unix_s,
+        expires_at_unix_s,
+    };
+    challenge.validate()?;
+    Ok(challenge)
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PostureGuardBlockReason {
     AdmittedPolicyBindingMismatch,
+    InvalidActuationChallenge(PostureError),
+    ActuationChallengeDeviceMismatch {
+        expected: ResourceRef,
+        challenge: ResourceRef,
+    },
+    ActuationChallengeNonceMismatch,
+    ActuationChallengeDigestMismatch,
     PostureDeviceMismatch {
         expected: ResourceRef,
         attested: ResourceRef,
@@ -204,6 +240,7 @@ pub fn revalidate_armed_with_verified_posture(
     now_unix_s: u64,
     current_epoch: AuthorityEpoch,
     negative_facts: &[NegativeAuthorityFact],
+    challenge: &PostureChallengeV1,
     posture: &VerifiedDevicePosture,
     current_verifier_trust: &VerifierTrustRegistry,
     admitted_policy: &ActuationPolicyHandle<'_>,
@@ -212,57 +249,84 @@ pub fn revalidate_armed_with_verified_posture(
     if admitted_policy.registry_head() != armed.policy_registry_head()
         || admitted_policy.policy_digest() != armed.policy_digest()
     {
-        return Ok(PostureBindingOutcome::NotAttempted(Box::new(
-            PostureGuardBlocked {
-                reason: PostureGuardBlockReason::AdmittedPolicyBindingMismatch,
-                armed,
+        return Ok(not_attempted(
+            PostureGuardBlockReason::AdmittedPolicyBindingMismatch,
+            armed,
+        ));
+    }
+
+    if let Err(error) = challenge.validate() {
+        return Ok(not_attempted(
+            PostureGuardBlockReason::InvalidActuationChallenge(error),
+            armed,
+        ));
+    }
+
+    if challenge.device != admitted_policy.policy().device {
+        return Ok(not_attempted(
+            PostureGuardBlockReason::ActuationChallengeDeviceMismatch {
+                expected: admitted_policy.policy().device.clone(),
+                challenge: challenge.device.clone(),
             },
-        )));
+            armed,
+        ));
+    }
+
+    if challenge.nonce != actuation_posture_nonce(&armed) {
+        return Ok(not_attempted(
+            PostureGuardBlockReason::ActuationChallengeNonceMismatch,
+            armed,
+        ));
+    }
+
+    let challenge_digest = match challenge.digest() {
+        Ok(digest) => digest,
+        Err(error) => {
+            return Ok(not_attempted(
+                PostureGuardBlockReason::InvalidActuationChallenge(error),
+                armed,
+            ));
+        }
+    };
+    if posture.challenge_digest() != challenge_digest {
+        return Ok(not_attempted(
+            PostureGuardBlockReason::ActuationChallengeDigestMismatch,
+            armed,
+        ));
     }
 
     if posture.device() != &admitted_policy.policy().device {
-        return Ok(PostureBindingOutcome::NotAttempted(Box::new(
-            PostureGuardBlocked {
-                reason: PostureGuardBlockReason::PostureDeviceMismatch {
-                    expected: admitted_policy.policy().device.clone(),
-                    attested: posture.device().clone(),
-                },
-                armed,
+        return Ok(not_attempted(
+            PostureGuardBlockReason::PostureDeviceMismatch {
+                expected: admitted_policy.policy().device.clone(),
+                attested: posture.device().clone(),
             },
-        )));
+            armed,
+        ));
     }
 
     if posture.trust_head() != current_verifier_trust.head() {
-        return Ok(PostureBindingOutcome::NotAttempted(Box::new(
-            PostureGuardBlocked {
-                reason: PostureGuardBlockReason::VerifierTrustGenerationChanged {
-                    attested: posture.trust_head(),
-                    current: current_verifier_trust.head(),
-                },
-                armed,
+        return Ok(not_attempted(
+            PostureGuardBlockReason::VerifierTrustGenerationChanged {
+                attested: posture.trust_head(),
+                current: current_verifier_trust.head(),
             },
-        )));
+            armed,
+        ));
     }
 
     if !posture.is_fresh_at(now_unix_s) {
-        return Ok(PostureBindingOutcome::NotAttempted(Box::new(
-            PostureGuardBlocked {
-                reason: PostureGuardBlockReason::PostureNotFresh,
-                armed,
-            },
-        )));
+        return Ok(not_attempted(PostureGuardBlockReason::PostureNotFresh, armed));
     }
 
     if posture.appraised_at_unix_s() < admitted_policy.selected_at_unix_s() {
-        return Ok(PostureBindingOutcome::NotAttempted(Box::new(
-            PostureGuardBlocked {
-                reason: PostureGuardBlockReason::PosturePredatesPolicySelection {
-                    appraised_at_unix_s: posture.appraised_at_unix_s(),
-                    policy_selected_at_unix_s: admitted_policy.selected_at_unix_s(),
-                },
-                armed,
+        return Ok(not_attempted(
+            PostureGuardBlockReason::PosturePredatesPolicySelection {
+                appraised_at_unix_s: posture.appraised_at_unix_s(),
+                policy_selected_at_unix_s: admitted_policy.selected_at_unix_s(),
             },
-        )));
+            armed,
+        ));
     }
 
     match armed.revalidate_before_send(
@@ -292,6 +356,17 @@ pub fn revalidate_armed_with_verified_posture(
             Ok(PostureBindingOutcome::SequenceAmbiguous(ambiguous))
         }
     }
+}
+
+fn not_attempted(
+    reason: PostureGuardBlockReason,
+    armed: ArmedActuationPermit,
+) -> PostureBindingOutcome {
+    PostureBindingOutcome::NotAttempted(Box::new(PostureGuardBlocked { reason, armed }))
+}
+
+fn update_digest(h: &mut blake3::Hasher, Digest32(value): Digest32) {
+    h.update(&value);
 }
 
 #[cfg(test)]
