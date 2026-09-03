@@ -11,6 +11,7 @@ on:
       - 'crates/bridges/symthaea-iot-runtime/**'
       - 'crates/bridges/symthaea-iot-durable-runtime/**'
       - 'crates/bridges/symthaea-iot-actuation/**'
+      - 'crates/bridges/symthaea-iot-policy/**'
       - 'src/swarm/mesh/sensor_iot.rs'
       - 'src/cognitive_loop/managers/survival_manager.rs'
       - '.github/workflows/iot-authority.yml'
@@ -53,16 +54,17 @@ jobs:
           rustc --version | grep -F 'rustc 1.96.0'
           cargo --version | grep -F 'cargo 1.96.0'
 
-      - name: Check parser, trust-boundary, and physical-runtime formatting
+      - name: Check parser, trust-boundary, policy, and physical-runtime formatting
         run: >-
           rustfmt --edition 2024 --check
           src/swarm/mesh/sensor_iot.rs
           src/cognitive_loop/managers/survival_manager.rs
           crates/bridges/symthaea-iot-durable-runtime/src/lib.rs
           crates/bridges/symthaea-iot-actuation/src/lib.rs
+          crates/bridges/symthaea-iot-policy/src/lib.rs
 
   runtime-implementation:
-    name: IoT validated actuation implementation (MSRV 1.94)
+    name: IoT policy + validated actuation implementation (MSRV 1.94)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -93,6 +95,7 @@ jobs:
           -p symthaea-iot-execution
           -p symthaea-iot-runtime
           -p symthaea-iot-durable-runtime
+          -p symthaea-iot-policy
           -p symthaea-iot-actuation
           --all-targets
 
@@ -106,6 +109,7 @@ jobs:
           -p symthaea-iot-execution
           -p symthaea-iot-runtime
           -p symthaea-iot-durable-runtime
+          -p symthaea-iot-policy
           -p symthaea-iot-actuation
           --all-targets
 
@@ -119,6 +123,7 @@ jobs:
           -p symthaea-iot-execution
           -p symthaea-iot-runtime
           -p symthaea-iot-durable-runtime
+          -p symthaea-iot-policy
           -p symthaea-iot-actuation
           --all-targets -- -D warnings
 
