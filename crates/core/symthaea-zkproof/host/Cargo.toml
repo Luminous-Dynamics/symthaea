@@ -6,6 +6,8 @@ description = "RISC Zero host-side prover for Symthaea ZK proofs"
 
 [dependencies]
 anyhow = "1.0"
+blake3 = "1.5"
+borsh = "1.5"
 risc0-zkvm = "3.0"
 symthaea-zkproof-core = { path = "../core" }
 symthaea-zkproof-methods = { path = "../methods" }
