@@ -15,6 +15,7 @@ on:
       - 'crates/bridges/symthaea-iot-posture/**'
       - 'crates/bridges/symthaea-iot-egress-guard/**'
       - 'crates/bridges/symthaea-iot-device-protocol/**'
+      - 'crates/bridges/symthaea-iot-transport-receipt/**'
       - 'src/swarm/mesh/sensor_iot.rs'
       - 'src/cognitive_loop/managers/survival_manager.rs'
       - '.github/workflows/iot-authority.yml'
@@ -54,7 +55,7 @@ jobs:
           rustc --version | grep -F 'rustc 1.96.0'
           cargo --version | grep -F 'cargo 1.96.0'
 
-      - name: Check parser, trust, host and device physical-runtime formatting
+      - name: Check parser, trust, host, transport and device runtime formatting
         run: >-
           rustfmt --edition 2024 --check
           src/swarm/mesh/sensor_iot.rs
@@ -65,9 +66,10 @@ jobs:
           crates/bridges/symthaea-iot-posture/src/lib.rs
           crates/bridges/symthaea-iot-egress-guard/src/lib.rs
           crates/bridges/symthaea-iot-device-protocol/src/lib.rs
+          crates/bridges/symthaea-iot-transport-receipt/src/lib.rs
 
   runtime-implementation:
-    name: IoT host + device security implementation (MSRV 1.94)
+    name: IoT host + transport + device security implementation (MSRV 1.94)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -103,6 +105,7 @@ jobs:
           -p symthaea-iot-actuation
           -p symthaea-iot-egress-guard
           -p symthaea-iot-device-protocol
+          -p symthaea-iot-transport-receipt
           --all-targets
 
       - name: Test merged authority/runtime/IoT stack
@@ -120,6 +123,7 @@ jobs:
           -p symthaea-iot-actuation
           -p symthaea-iot-egress-guard
           -p symthaea-iot-device-protocol
+          -p symthaea-iot-transport-receipt
           --all-targets
 
       - name: Clippy merged authority/runtime/IoT stack
@@ -137,6 +141,7 @@ jobs:
           -p symthaea-iot-actuation
           -p symthaea-iot-egress-guard
           -p symthaea-iot-device-protocol
+          -p symthaea-iot-transport-receipt
           --all-targets -- -D warnings
 
   telemetry-boundary:
