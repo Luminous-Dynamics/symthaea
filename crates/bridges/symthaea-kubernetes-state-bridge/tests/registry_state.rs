@@ -8,7 +8,9 @@ use symthaea_integration_core::{
     StateLimits, TemporalStatePolicy, TemporalStateStatus, assess_state_dimension,
     assess_state_dimension_temporally, assess_state_dimension_with_history,
 };
-use symthaea_kubernetes_bridge::{KUBERNETES_INTEGRATION_ID, KubernetesReplayContext};
+use symthaea_kubernetes_bridge::{
+    KUBERNETES_INTEGRATION_ID, KubernetesReplayContext, KubernetesReplayDiscoverer,
+};
 use symthaea_kubernetes_state_bridge::KubernetesStateReplay;
 
 fn deployment() -> serde_json::Value {
@@ -31,6 +33,16 @@ fn deployment() -> serde_json::Value {
     })
 }
 
+fn register_kubernetes_discoverer(registry: &mut IntegrationRegistry, collected_at_unix_ms: u64) {
+    let discoverer = KubernetesReplayDiscoverer::from_objects(
+        KubernetesReplayContext::default(),
+        &[deployment()],
+        collected_at_unix_ms,
+    )
+    .unwrap();
+    registry.register_discoverer(Arc::new(discoverer)).unwrap();
+}
+
 #[test]
 fn registered_kubernetes_source_admits_state_before_drift_assessment() {
     let replay = KubernetesStateReplay::from_objects(
@@ -41,9 +53,7 @@ fn registered_kubernetes_source_admits_state_before_drift_assessment() {
     .unwrap();
 
     let mut registry = IntegrationRegistry::new();
-    registry
-        .register_discoverer(Arc::new(replay.topology().clone()))
-        .unwrap();
+    register_kubernetes_discoverer(&mut registry, 100);
     let id = IntegrationId::new(KUBERNETES_INTEGRATION_ID);
     registry.admit_state_snapshot(&id, replay.snapshot()).unwrap();
 
@@ -107,9 +117,7 @@ fn replay_history_can_prove_persistent_drift_without_inventing_change_time() {
     };
 
     let mut registry = IntegrationRegistry::new();
-    registry
-        .register_discoverer(Arc::new(latest.topology().clone()))
-        .unwrap();
+    register_kubernetes_discoverer(&mut registry, 300);
     let id = IntegrationId::new(KUBERNETES_INTEGRATION_ID);
     registry.admit_state_history(&id, &history).unwrap();
 
@@ -187,9 +195,7 @@ fn central_state_budget_rejects_oversized_snapshot() {
     )
     .unwrap();
     let mut registry = IntegrationRegistry::new();
-    registry
-        .register_discoverer(Arc::new(replay.topology().clone()))
-        .unwrap();
+    register_kubernetes_discoverer(&mut registry, 100);
     let limits = StateLimits {
         max_assertions: 1,
         ..Default::default()
