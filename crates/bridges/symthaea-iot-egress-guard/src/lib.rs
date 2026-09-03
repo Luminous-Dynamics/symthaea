@@ -42,50 +42,35 @@ use symthaea_iot_policy::{
 };
 use symthaea_iot_posture::{VerifiedDevicePosture, VerifierTrustHead, VerifierTrustRegistry};
 
-/// Why the posture gate refused to start the lower pre-send evaluator.
-///
-/// The armed permit is returned unchanged for these cases, so callers can acquire
-/// fresh evidence or deliberately reconcile it rather than losing affine state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PostureGuardBlockReason {
-    /// Caller paired the armed effect with another registry-issued policy handle.
     AdmittedPolicyBindingMismatch,
-    /// Verified posture belongs to another physical device.
     PostureDeviceMismatch {
         expected: ResourceRef,
         attested: ResourceRef,
     },
-    /// The verifier trust generation moved after this posture was verified.
     VerifierTrustGenerationChanged {
         attested: VerifierTrustHead,
         current: VerifierTrustHead,
     },
-    /// Cryptographically verified posture has aged out at the intended send time.
     PostureNotFresh,
-    /// Posture predates the policy selection that initiated this actuation.
     PosturePredatesPolicySelection {
         appraised_at_unix_s: u64,
         policy_selected_at_unix_s: u64,
     },
 }
 
-/// Preflight was deliberately not attempted; the original armed permit is retained.
 #[derive(Debug)]
 pub struct PostureGuardBlocked {
     pub reason: PostureGuardBlockReason,
     pub armed: ArmedActuationPermit,
 }
 
-/// Result of composing verified device posture with the existing exact preflight.
 #[derive(Debug)]
 pub enum PostureBindingOutcome {
-    /// Authority, policy, durable accounting, and verified device posture agree.
     Ready(Box<PostureBoundEgressPermit>),
-    /// The lower exact preflight denied and produced its crash-safe rejection state.
     Rejected(Box<PreflightRejection>),
-    /// Verified device posture says this sequence may already have been accepted.
     SequenceAmbiguous(Box<PreflightSequenceAmbiguity>),
-    /// Posture/policy provenance failed before lower preflight; armed state retained.
     NotAttempted(Box<PostureGuardBlocked>),
 }
 
@@ -120,11 +105,6 @@ impl PostureBinding {
     }
 }
 
-/// Final in-process physical egress permit after the existing durable/authority
-/// preflight was rerun against cryptographically verified device posture.
-///
-/// This type remains independent of transport identity. A Xenia adapter should
-/// consume it together with Xenia's authenticated-session evidence.
 #[derive(Debug)]
 pub struct PostureBoundEgressPermit {
     inner: ReadyActuationPermit,
@@ -132,7 +112,6 @@ pub struct PostureBoundEgressPermit {
 }
 
 impl PostureBoundEgressPermit {
-    /// Exact command admitted against verified posture.
     pub fn command(&self) -> &DeviceCommand {
         self.inner.command()
     }
@@ -218,12 +197,6 @@ impl PostureBoundEgressPermit {
     }
 }
 
-/// Run the final actuation preflight using only verified device posture.
-///
-/// The original policy handle is an opaque registry-issued identity check. It is
-/// not used as the *current* policy: `ArmedActuationPermit::revalidate_before_send`
-/// still consults `current_policy_registry`, so policy retirement/revocation or
-/// registry-generation changes remain effective before send.
 pub fn revalidate_armed_with_verified_posture(
     armed: ArmedActuationPermit,
     grant: &CapabilityGrant,
@@ -302,7 +275,7 @@ pub fn revalidate_armed_with_verified_posture(
         current_policy_registry,
     )? {
         PreflightOutcome::Ready(ready) => {
-            debug_assert_eq!(ready.command().device, *posture.device());
+            debug_assert_eq!(&ready.command().device, posture.device());
             debug_assert_eq!(
                 ready.command().expected_firmware,
                 posture.runtime_state().running_firmware
@@ -314,9 +287,7 @@ pub fn revalidate_armed_with_verified_posture(
                 },
             )))
         }
-        PreflightOutcome::Rejected(rejected) => {
-            Ok(PostureBindingOutcome::Rejected(rejected))
-        }
+        PreflightOutcome::Rejected(rejected) => Ok(PostureBindingOutcome::Rejected(rejected)),
         PreflightOutcome::SequenceAmbiguous(ambiguous) => {
             Ok(PostureBindingOutcome::SequenceAmbiguous(ambiguous))
         }
@@ -325,9 +296,6 @@ pub fn revalidate_armed_with_verified_posture(
 
 #[cfg(test)]
 mod tests {
-    // End-to-end construction of ArmedActuationPermit is exercised in the lower
-    // actuation crate. This crate's exact type composition is compiler-checked here;
-    // integration vectors will be added with the concrete EAT/Xenia verifier adapter.
     use super::*;
 
     #[test]
