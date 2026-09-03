@@ -166,7 +166,6 @@ pub fn evaluate_bound_execution(
     }
 
     let Some(runtime_world_digest) = safety_world_digest(runtime, safety) else {
-        // Normally unreachable after successful lower-layer safety admission.
         return BoundExecutionDecision::Deny(BoundExecutionDenyReason::RuntimeWorldMismatch);
     };
     if proposal.world_digest != runtime_world_digest {
@@ -221,7 +220,9 @@ impl Transcript {
                 self.0.update(&[1]);
                 self.digest(value);
             }
-            None => self.0.update(&[0]),
+            None => {
+                self.0.update(&[0]);
+            }
         }
     }
 
@@ -246,7 +247,9 @@ mod tests {
     use symthaea_authority::{
         AuthorityEpoch, GrantUseState, Operation, PrincipalId, ResourceRef, TaskId,
     };
-    use symthaea_iot_authority::{InclusiveRangeI64, DEVICE_COMMAND_SCHEMA_VERSION, SAFETY_ENVELOPE_SCHEMA_VERSION};
+    use symthaea_iot_authority::{
+        DEVICE_COMMAND_SCHEMA_VERSION, InclusiveRangeI64, SAFETY_ENVELOPE_SCHEMA_VERSION,
+    };
 
     fn digest(byte: u8) -> Digest32 {
         Digest32([byte; 32])
@@ -333,7 +336,10 @@ mod tests {
         }
     }
 
-    fn proposal(runtime: &DeviceRuntimeState, safety: &SafetyEnvelope) -> PhysicalExecutionProposal {
+    fn proposal(
+        runtime: &DeviceRuntimeState,
+        safety: &SafetyEnvelope,
+    ) -> PhysicalExecutionProposal {
         PhysicalExecutionProposal {
             command: command(),
             plan_digest: Some(digest(3)),
@@ -365,7 +371,10 @@ mod tests {
         assert_eq!(admission.proposal_digest, proposal.digest());
         assert_eq!(admission.runtime_world_digest, proposal.world_digest);
         assert_eq!(admission.risk_charge, risk(1));
-        assert_eq!(admission.cyber_physical.command_digest, proposal.command.digest());
+        assert_eq!(
+            admission.cyber_physical.command_digest,
+            proposal.command.digest()
+        );
     }
 
     #[test]
