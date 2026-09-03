@@ -158,12 +158,15 @@ pub fn assess_state_dimension_with_history(
 
     let desired_continuity = desired_state_continuity(history, subject, dimension, at_unix_ms)?;
     let drift_continuity = drift_state_continuity(history, subject, dimension, at_unix_ms)?;
-    let desired_lower_bound = desired_continuity
-        .as_ref()
-        .map(|continuity| at_unix_ms - continuity.first_seen_at_unix_ms);
-    let drift_lower_bound = drift_continuity
-        .as_ref()
-        .map(|continuity| at_unix_ms - continuity.first_seen_at_unix_ms);
+    // A sampled continuity lower bound is supported only by the interval between
+    // the first and last supporting snapshots. Querying the same history later
+    // cannot make the evidence older in the absence of another sample.
+    let desired_lower_bound = desired_continuity.as_ref().map(|continuity| {
+        continuity.last_seen_at_unix_ms - continuity.first_seen_at_unix_ms
+    });
+    let drift_lower_bound = drift_continuity.as_ref().map(|continuity| {
+        continuity.last_seen_at_unix_ms - continuity.first_seen_at_unix_ms
+    });
     let lower_bound_proves_persistence = current.status == TemporalStateStatus::DriftAgeUnknown
         && drift_lower_bound.is_some_and(|age| age > policy.convergence_window_ms);
     let persistent_drift_proven = current.status == TemporalStateStatus::PersistentDrift
@@ -442,7 +445,7 @@ mod tests {
     }
 
     #[test]
-    fn recent_first_drift_observation_cannot_prove_convergence_or_persistence() {
+    fn query_time_does_not_age_sampled_continuity() {
         let history = history(vec![
             snapshot(100, Some(4), Some(3)),
             snapshot(300, Some(5), Some(3)),
@@ -458,7 +461,38 @@ mod tests {
         assert_eq!(result.current.status, TemporalStateStatus::DriftAgeUnknown);
         assert_eq!(
             result.continuously_observed_drift_age_lower_bound_ms,
-            Some(50)
+            Some(0)
+        );
+        assert!(!result.persistent_drift_proven);
+    }
+
+    #[test]
+    fn query_time_cannot_inflate_persistence_without_freshness_limits() {
+        let history = history(vec![
+            snapshot(100, Some(5), Some(3)),
+            snapshot(200, Some(5), Some(3)),
+        ]);
+        let result = assess_state_dimension_with_history(
+            &history,
+            &subject(),
+            "workload.replicas",
+            1_000,
+            TemporalStatePolicy {
+                comparison: crate::StateComparisonPolicy::Exact,
+                max_desired_age_ms: None,
+                max_observed_age_ms: None,
+                convergence_window_ms: 150,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.current.status, TemporalStateStatus::DriftAgeUnknown);
+        assert_eq!(
+            result.continuously_observed_desired_age_lower_bound_ms,
+            Some(100)
+        );
+        assert_eq!(
+            result.continuously_observed_drift_age_lower_bound_ms,
+            Some(100)
         );
         assert!(!result.persistent_drift_proven);
     }
