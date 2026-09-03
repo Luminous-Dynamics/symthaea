@@ -73,15 +73,17 @@ pub fn normalize_visual_seed(input: &str) -> Result<String, VisualSeedError> {
 /// Load a bounded UTF-8 seed from a dedicated presentation-only regular file.
 ///
 /// `O_NOFOLLOW` prevents a configured path from becoming a root-readable
-/// symlink oracle. Reading is capped at `MAX + 1` bytes from the opened file
-/// descriptor, eliminating the metadata/read replacement race and bounding
-/// allocation even if the file changes while it is being read. One conventional
-/// terminal LF (or CRLF) is excluded from seed material so text seed files are
-/// stable across ordinary POSIX file writers; all other bytes are preserved.
+/// symlink oracle. `O_NONBLOCK` prevents FIFO/device-like paths from trapping
+/// the decorative renderer before the opened descriptor is verified as a
+/// regular file. Reading is capped at `MAX + 1` bytes from that descriptor,
+/// eliminating the metadata/read replacement race and bounding allocation even
+/// if the file changes while it is being read. One conventional terminal LF
+/// (or CRLF) is excluded from seed material so text seed files are stable across
+/// ordinary POSIX file writers; all other bytes are preserved.
 pub fn load_visual_seed_file(path: &Path) -> Result<String, VisualSeedError> {
     let file = OpenOptions::new()
         .read(true)
-        .custom_flags(nix::libc::O_NOFOLLOW | nix::libc::O_CLOEXEC)
+        .custom_flags(nix::libc::O_NOFOLLOW | nix::libc::O_CLOEXEC | nix::libc::O_NONBLOCK)
         .open(path)?;
     if !file.metadata()?.file_type().is_file() {
         return Err(VisualSeedError::NotRegularFile);
