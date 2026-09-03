@@ -60,17 +60,18 @@ pub fn authorize_promotion_strict(
         }
     };
 
-    // Never trust or copy the provisional file. Serialize the independently
-    // returned in-memory envelope and create the durable artifact with O_EXCL-like
-    // create-new semantics. A concurrent writer can only make this operation fail;
-    // it cannot replace an already-created authorization artifact.
-    let bytes = serde_json::to_vec(&envelope).context("serialize strict promotion envelope")?;
-    let write_result = create_new_external_file(repo_root, out_path, &bytes);
-    let cleanup_result = fs::remove_dir_all(&scratch_dir)
-        .with_context(|| format!("remove promotion scratch directory {}", scratch_dir.display()));
+    // The provisional file is never trusted or copied. Remove the entire private
+    // scratch tree before creating the durable authorization artifact so a cleanup
+    // failure cannot coexist with a final-looking PromotionAuthorized file.
+    fs::remove_dir_all(&scratch_dir)
+        .with_context(|| format!("remove promotion scratch directory {}", scratch_dir.display()))?;
 
-    write_result?;
-    cleanup_result?;
+    // Serialize the independently returned in-memory envelope and create the
+    // durable artifact with O_EXCL-like create-new semantics. A concurrent writer
+    // can only make this operation fail; it cannot replace existing authorization
+    // bytes.
+    let bytes = serde_json::to_vec(&envelope).context("serialize strict promotion envelope")?;
+    create_new_external_file(repo_root, out_path, &bytes)?;
     Ok(envelope)
 }
 
