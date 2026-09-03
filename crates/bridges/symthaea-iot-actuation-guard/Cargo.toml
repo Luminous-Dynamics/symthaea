@@ -20,3 +20,15 @@ symthaea-authority = { path = "../../core/symthaea-authority" }
 symthaea-iot-actuation-guard-protocol = { path = "../symthaea-iot-actuation-guard-protocol" }
 symthaea-iot-transport-receipt = { path = "../symthaea-iot-transport-receipt" }
 symthaea-iot-xenia-hybrid-verifier = { path = "../symthaea-iot-xenia-hybrid-verifier" }
+
+[dev-dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+fips204 = { version = "=0.4.6", default-features = false, features = ["ml-dsa-65"] }
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-iot-authority = { path = "../symthaea-iot-authority" }
+symthaea-iot-device-protocol = { path = "../symthaea-iot-device-protocol" }
+symthaea-iot-durable-runtime = { path = "../symthaea-iot-durable-runtime" }
+symthaea-iot-final-gate = { path = "../symthaea-iot-final-gate" }
+symthaea-iot-policy = { path = "../symthaea-iot-policy" }
+symthaea-iot-posture = { path = "../symthaea-iot-posture" }
