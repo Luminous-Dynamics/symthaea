@@ -84,6 +84,7 @@ pub(crate) enum RestorePrepareError {
     InvalidLiveSnapshotDigest,
     MissingDomain(RestoreDomain),
     DuplicateDomain(RestoreDomain),
+    UnregisteredDomain(RestoreDomain),
     Widening(RestoreDomain),
     NotProvable(RestoreDomain),
 }
@@ -99,8 +100,16 @@ pub(crate) enum RestoreFenceField {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RestoreFenceValue {
+    Counter(u64),
+    Digest(RestoreDigest),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct RestoreCommitError {
     pub(crate) changed: RestoreFenceField,
+    pub(crate) expected: RestoreFenceValue,
+    pub(crate) current: RestoreFenceValue,
 }
 
 /// Affine prepared restore authority.
@@ -160,18 +169,28 @@ pub(crate) fn prepare_operational_restore(
         return Err(RestorePrepareError::InvalidLiveSnapshotDigest);
     }
 
+    for decision in &decisions {
+        if !OPERATIONAL_RESTORE_CONTRACTS
+            .iter()
+            .any(|contract| contract.domain == decision.domain)
+        {
+            return Err(RestorePrepareError::UnregisteredDomain(decision.domain));
+        }
+    }
+
     let mut canonical = Vec::with_capacity(OPERATIONAL_RESTORE_CONTRACTS.len());
     for contract in OPERATIONAL_RESTORE_CONTRACTS {
-        let mut matches = decisions
+        let matching = decisions
             .iter()
             .copied()
-            .filter(|decision| decision.domain == contract.domain);
-        let Some(decision) = matches.next() else {
-            return Err(RestorePrepareError::MissingDomain(contract.domain));
+            .filter(|decision| decision.domain == contract.domain)
+            .collect::<Vec<_>>();
+        let decision = match matching.as_slice() {
+            [] => return Err(RestorePrepareError::MissingDomain(contract.domain)),
+            [decision] => *decision,
+            _ => return Err(RestorePrepareError::DuplicateDomain(contract.domain)),
         };
-        if matches.next().is_some() {
-            return Err(RestorePrepareError::DuplicateDomain(contract.domain));
-        }
+
         match decision.verdict {
             RestoreAdmissionVerdict::Widening => {
                 return Err(RestorePrepareError::Widening(decision.domain));
@@ -186,32 +205,23 @@ pub(crate) fn prepare_operational_restore(
         canonical.push(decision);
     }
 
-    // Exact coverage above also rejects extra/unknown duplicate entries. The
-    // enum currently contains exactly the registered domains, so a longer input
-    // can only be produced by duplicating a registered domain.
-    if decisions.len() != OPERATIONAL_RESTORE_CONTRACTS.len() {
-        for contract in OPERATIONAL_RESTORE_CONTRACTS {
-            let count = decisions
-                .iter()
-                .filter(|decision| decision.domain == contract.domain)
-                .count();
-            if count > 1 {
-                return Err(RestorePrepareError::DuplicateDomain(contract.domain));
-            }
-        }
-        // Defensive fallback: if RestoreDomain later gains a variant before the
-        // registry is updated, preparation still fails closed rather than
-        // accepting an unclassified decision set.
-        return Err(RestorePrepareError::MissingDomain(
-            OPERATIONAL_RESTORE_CONTRACTS[0].domain,
-        ));
-    }
-
     Ok(PreparedOperationalRestore {
         checkpoint_digest: context.checkpoint_digest,
         fence: context.fence,
         decisions: canonical,
     })
+}
+
+fn fence_error(
+    changed: RestoreFenceField,
+    expected: RestoreFenceValue,
+    current: RestoreFenceValue,
+) -> RestoreCommitError {
+    RestoreCommitError {
+        changed,
+        expected,
+        current,
+    }
 }
 
 /// Commit consumes the prepared token and rechecks the complete live fence.
@@ -223,24 +233,47 @@ pub(crate) fn commit_operational_restore(
     current: RestoreGenerationFence,
 ) -> Result<CommittedOperationalRestore, RestoreCommitError> {
     let expected = prepared.fence;
-    let changed = if current.boot_epoch != expected.boot_epoch {
-        Some(RestoreFenceField::BootEpoch)
-    } else if current.control_plane_generation != expected.control_plane_generation {
-        Some(RestoreFenceField::ControlPlaneGeneration)
-    } else if current.authority_generation != expected.authority_generation {
-        Some(RestoreFenceField::AuthorityGeneration)
-    } else if current.evidence_generation != expected.evidence_generation {
-        Some(RestoreFenceField::EvidenceGeneration)
-    } else if current.physical_state_generation != expected.physical_state_generation {
-        Some(RestoreFenceField::PhysicalStateGeneration)
-    } else if current.live_snapshot_digest != expected.live_snapshot_digest {
-        Some(RestoreFenceField::LiveSnapshotDigest)
-    } else {
-        None
-    };
-
-    if let Some(changed) = changed {
-        return Err(RestoreCommitError { changed });
+    if current.boot_epoch != expected.boot_epoch {
+        return Err(fence_error(
+            RestoreFenceField::BootEpoch,
+            RestoreFenceValue::Counter(expected.boot_epoch),
+            RestoreFenceValue::Counter(current.boot_epoch),
+        ));
+    }
+    if current.control_plane_generation != expected.control_plane_generation {
+        return Err(fence_error(
+            RestoreFenceField::ControlPlaneGeneration,
+            RestoreFenceValue::Counter(expected.control_plane_generation),
+            RestoreFenceValue::Counter(current.control_plane_generation),
+        ));
+    }
+    if current.authority_generation != expected.authority_generation {
+        return Err(fence_error(
+            RestoreFenceField::AuthorityGeneration,
+            RestoreFenceValue::Counter(expected.authority_generation),
+            RestoreFenceValue::Counter(current.authority_generation),
+        ));
+    }
+    if current.evidence_generation != expected.evidence_generation {
+        return Err(fence_error(
+            RestoreFenceField::EvidenceGeneration,
+            RestoreFenceValue::Counter(expected.evidence_generation),
+            RestoreFenceValue::Counter(current.evidence_generation),
+        ));
+    }
+    if current.physical_state_generation != expected.physical_state_generation {
+        return Err(fence_error(
+            RestoreFenceField::PhysicalStateGeneration,
+            RestoreFenceValue::Counter(expected.physical_state_generation),
+            RestoreFenceValue::Counter(current.physical_state_generation),
+        ));
+    }
+    if current.live_snapshot_digest != expected.live_snapshot_digest {
+        return Err(fence_error(
+            RestoreFenceField::LiveSnapshotDigest,
+            RestoreFenceValue::Digest(expected.live_snapshot_digest),
+            RestoreFenceValue::Digest(current.live_snapshot_digest),
+        ));
     }
 
     Ok(CommittedOperationalRestore {
@@ -306,7 +339,25 @@ mod tests {
     }
 
     #[test]
-    fn missing_domain_fails_preparation() {
+    fn caller_order_is_canonicalized_to_restore_registry_order() {
+        let mut decisions = nominal_decisions();
+        decisions.reverse();
+        let prepared =
+            prepare_operational_restore(context(), decisions).expect("order is not authority");
+        let actual = prepared
+            .decisions()
+            .iter()
+            .map(|decision| decision.domain)
+            .collect::<Vec<_>>();
+        let expected = OPERATIONAL_RESTORE_CONTRACTS
+            .iter()
+            .map(|contract| contract.domain)
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn missing_domain_fails_preparation_with_exact_domain() {
         let mut decisions = nominal_decisions();
         let missing = decisions.pop().expect("non-empty registry").domain;
         assert_eq!(
@@ -316,7 +367,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_domain_fails_preparation() {
+    fn duplicate_domain_fails_preparation_with_exact_domain() {
         let mut decisions = nominal_decisions();
         let duplicate = decisions[0];
         decisions.push(duplicate);
@@ -375,33 +426,70 @@ mod tests {
 
         let mut changed = base;
         changed.boot_epoch += 1;
-        changed_fences.push((RestoreFenceField::BootEpoch, changed));
+        changed_fences.push((
+            RestoreFenceField::BootEpoch,
+            RestoreFenceValue::Counter(base.boot_epoch),
+            RestoreFenceValue::Counter(changed.boot_epoch),
+            changed,
+        ));
 
         let mut changed = base;
         changed.control_plane_generation += 1;
-        changed_fences.push((RestoreFenceField::ControlPlaneGeneration, changed));
+        changed_fences.push((
+            RestoreFenceField::ControlPlaneGeneration,
+            RestoreFenceValue::Counter(base.control_plane_generation),
+            RestoreFenceValue::Counter(changed.control_plane_generation),
+            changed,
+        ));
 
         let mut changed = base;
         changed.authority_generation += 1;
-        changed_fences.push((RestoreFenceField::AuthorityGeneration, changed));
+        changed_fences.push((
+            RestoreFenceField::AuthorityGeneration,
+            RestoreFenceValue::Counter(base.authority_generation),
+            RestoreFenceValue::Counter(changed.authority_generation),
+            changed,
+        ));
 
         let mut changed = base;
         changed.evidence_generation += 1;
-        changed_fences.push((RestoreFenceField::EvidenceGeneration, changed));
+        changed_fences.push((
+            RestoreFenceField::EvidenceGeneration,
+            RestoreFenceValue::Counter(base.evidence_generation),
+            RestoreFenceValue::Counter(changed.evidence_generation),
+            changed,
+        ));
 
         let mut changed = base;
         changed.physical_state_generation += 1;
-        changed_fences.push((RestoreFenceField::PhysicalStateGeneration, changed));
+        changed_fences.push((
+            RestoreFenceField::PhysicalStateGeneration,
+            RestoreFenceValue::Counter(base.physical_state_generation),
+            RestoreFenceValue::Counter(changed.physical_state_generation),
+            changed,
+        ));
 
         let mut changed = base;
         changed.live_snapshot_digest = digest(31);
-        changed_fences.push((RestoreFenceField::LiveSnapshotDigest, changed));
+        changed_fences.push((
+            RestoreFenceField::LiveSnapshotDigest,
+            RestoreFenceValue::Digest(base.live_snapshot_digest),
+            RestoreFenceValue::Digest(changed.live_snapshot_digest),
+            changed,
+        ));
 
-        for (expected, changed) in changed_fences {
+        for (field, expected, current, changed) in changed_fences {
             let error = commit_operational_restore(prepared(), changed)
                 .err()
                 .expect("stale prepared restore must fail");
-            assert_eq!(error.changed, expected);
+            assert_eq!(
+                error,
+                RestoreCommitError {
+                    changed: field,
+                    expected,
+                    current,
+                }
+            );
         }
     }
 
