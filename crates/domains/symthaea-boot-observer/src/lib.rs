@@ -184,11 +184,12 @@ pub fn classify_job_result(result: &str) -> JobOutcome {
     }
 }
 
-pub fn health_at_boot_ready(current: BootHealth) -> BootHealth {
-    match current {
-        BootHealth::Unknown => BootHealth::Normal,
-        other => other,
-    }
+/// Entering the protocol's Ready phase is a readiness fact, not a health proof.
+///
+/// In particular, absent health evidence remains `Unknown`; presentation must
+/// never infer `Normal` merely because the boot-ready unit became active.
+pub const fn health_at_boot_ready(current: BootHealth) -> BootHealth {
+    current
 }
 
 fn validate_absolute(path: &Path, field: &'static str) -> Result<(), ConfigError> {
@@ -257,10 +258,12 @@ mod tests {
     }
 
     #[test]
-    fn missing_telemetry_only_becomes_normal_at_boot_ready() {
-        assert_eq!(health_at_boot_ready(BootHealth::Unknown), BootHealth::Normal);
+    fn boot_ready_does_not_upgrade_unknown_health() {
+        assert_eq!(health_at_boot_ready(BootHealth::Unknown), BootHealth::Unknown);
+        assert_eq!(health_at_boot_ready(BootHealth::Normal), BootHealth::Normal);
         assert_eq!(health_at_boot_ready(BootHealth::Failed), BootHealth::Failed);
         assert_eq!(health_at_boot_ready(BootHealth::Delayed), BootHealth::Delayed);
+        assert_eq!(health_at_boot_ready(BootHealth::Degraded), BootHealth::Degraded);
     }
 
     #[test]
