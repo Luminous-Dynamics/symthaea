@@ -5,8 +5,8 @@
 //!
 //! This crate implements a genuine NixOS world model using Symthaea's cognitive
 //! architecture: active inference (Free Energy Principle), hierarchical predictive
-//! processing, causal reasoning with HDC role markers, episodic memory with
-//! Φ-weighted consolidation, and a 2D consciousness space (Φ × Confidence).
+//! processing, causal reasoning with HDC role markers, episodic memory, and
+//! explicit separation between execution authority and cognitive telemetry.
 //!
 //! ## Architecture Layers
 //!
@@ -15,9 +15,10 @@
 //! 3. **Mind** — Cognition: world model, active inference, causal graph
 //! 4. **Observe** — Sensory input: system state observation
 //! 5. **Action** — Explicit authority + cognitive telemetry + rollback-capable execution
-//! 6. **Plugin** — Integration with full Symthaea brain
-//! 7. **CLI** — Command-line interface
-//! 8. **TUI** — Terminal UI with consciousness visualization
+//! 6. **Generation lifecycle** — advisory-only facts for boot presentation consumers
+//! 7. **Plugin** — Integration with full Symthaea brain
+//! 8. **CLI** — Command-line interface
+//! 9. **TUI** — Terminal UI with consciousness visualization
 
 #![deny(unsafe_code)]
 #![allow(deprecated)]
@@ -36,6 +37,9 @@ pub mod encoding;
 
 /// Layer 3: Cognition — World model, active inference, causal graph
 pub mod mind;
+
+/// Advisory-only NixOS generation lifecycle facts for Limine/Spore-style consumers.
+pub mod generation_lifecycle;
 
 /// App intelligence database — package search, migration analysis
 pub mod app_database;
@@ -60,7 +64,7 @@ pub mod observe;
 #[cfg(feature = "native")]
 pub mod action;
 
-/// Layer 6: Integration with full Symthaea brain
+/// Layer 7: Integration with full Symthaea brain
 #[cfg(feature = "native")]
 pub mod plugin;
 
@@ -71,17 +75,22 @@ pub mod support;
 /// Daemon ↔ TUI inter-process communication
 pub mod ipc;
 
-/// Layer 7: Command-line interface
+/// Layer 8: Command-line interface
 #[cfg(feature = "cli")]
 pub mod cli;
 
-/// Layer 8: Terminal UI
+/// Layer 9: Terminal UI
 #[cfg(feature = "tui")]
 pub mod tui;
 
 /// Production observability
 #[cfg(feature = "observability")]
 pub mod observability;
+
+pub use generation_lifecycle::{
+    CognitiveAdvisoryV1, GenerationFactsV1, GenerationHealth, GenerationLifecycleManifestV1,
+    ManifestAuthority, MeasuredValueV1, GENERATION_LIFECYCLE_SCHEMA_VERSION,
+};
 
 // Re-export key types (native only — these depend on parser/action/plugin)
 #[cfg(feature = "native")]
