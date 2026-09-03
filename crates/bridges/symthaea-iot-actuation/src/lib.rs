@@ -151,11 +151,12 @@ impl PendingActuationPersistence {
     }
 
     /// Consume the pending state only when the persistence owner returns the exact
-    /// combined head. A mismatched head returns this value unchanged.
+    /// combined head. A mismatched head returns this value unchanged in a box so
+    /// the normal success-path `Result` stays pointer-sized on the error side.
     pub fn confirm_persisted(
         self,
         durable_head: DurableIoTHead,
-    ) -> Result<ArmedActuationPermit, PendingActuationPersistence> {
+    ) -> Result<ArmedActuationPermit, Box<PendingActuationPersistence>> {
         let PendingActuationPersistence {
             inner,
             proposal,
@@ -170,12 +171,12 @@ impl PendingActuationPersistence {
                 prior_reservation_ids,
                 checkpoint,
             }),
-            Err(inner) => Err(PendingActuationPersistence {
+            Err(inner) => Err(Box::new(PendingActuationPersistence {
                 inner,
                 proposal,
                 prior_reservation_ids,
                 checkpoint,
-            }),
+            })),
         }
     }
 }
@@ -311,15 +312,16 @@ impl ArmedActuationPermit {
 
         // A device/gateway report at or beyond this sequence means the command may
         // already have crossed some dispatch boundary. Do not claim non-dispatch.
-        if let Some(last_accepted_sequence) = runtime.last_accepted_sequence {
-            if last_accepted_sequence >= proposal.command.sequence {
-                return Ok(PreflightOutcome::SequenceAmbiguous(
-                    PreflightSequenceAmbiguity {
-                        last_accepted_sequence,
-                        effect: inner.into_unknown(),
-                    },
-                ));
-            }
+        if let Some(last_accepted_sequence) = runtime
+            .last_accepted_sequence
+            .filter(|last| *last >= proposal.command.sequence)
+        {
+            return Ok(PreflightOutcome::SequenceAmbiguous(Box::new(
+                PreflightSequenceAmbiguity {
+                    last_accepted_sequence,
+                    effect: inner.into_unknown(),
+                },
+            )));
         }
 
         let GrantUseState {
@@ -354,11 +356,11 @@ impl ArmedActuationPermit {
                 {
                     return Err(ActuationError::FreshAdmissionBindingMismatch);
                 }
-                Ok(PreflightOutcome::Ready(ReadyActuationPermit {
+                Ok(PreflightOutcome::Ready(Box::new(ReadyActuationPermit {
                     inner,
                     proposal,
                     validated_at_unix_s: now_unix_s,
-                }))
+                })))
             }
             BoundExecutionDecision::Deny(reason) => {
                 // No network I/O has occurred through this permit. With no device
@@ -366,10 +368,10 @@ impl ArmedActuationPermit {
                 // reconciled as not dispatched; the durable device sequence remains
                 // burned in the successor checkpoint.
                 let transition = inner.proven_not_dispatched(account, grant)?;
-                Ok(PreflightOutcome::Rejected(PreflightRejection {
+                Ok(PreflightOutcome::Rejected(Box::new(PreflightRejection {
                     reason,
                     transition,
-                }))
+                })))
             }
         }
     }
@@ -379,13 +381,13 @@ impl ArmedActuationPermit {
 #[derive(Debug)]
 pub enum PreflightOutcome {
     /// Current authority, firmware, safety and exact world commitment still match.
-    Ready(ReadyActuationPermit),
+    Ready(Box<ReadyActuationPermit>),
     /// Fresh policy/safety denied before network I/O; use/risk was released in a
     /// successor checkpoint while the device sequence remained burned.
-    Rejected(PreflightRejection),
+    Rejected(Box<PreflightRejection>),
     /// Fresh runtime state says this sequence (or a later one) was already accepted;
     /// outcome remains charged and must be reconciled from evidence.
-    SequenceAmbiguous(PreflightSequenceAmbiguity),
+    SequenceAmbiguous(Box<PreflightSequenceAmbiguity>),
 }
 
 /// Clean pre-send rejection and its crash-safe not-dispatched transition.
@@ -453,7 +455,7 @@ impl ReadyActuationPermit {
         account: &mut GrantAccount,
         grant: &CapabilityGrant,
     ) -> Result<DurableEffectTransition, ActuationError> {
-        Ok(self.inner.observed_applied(account, grant)?)
+        self.inner.observed_applied(account, grant).map_err(Into::into)
     }
 
     /// Independent evidence proves the ready command never crossed the physical
@@ -463,7 +465,9 @@ impl ReadyActuationPermit {
         account: &mut GrantAccount,
         grant: &CapabilityGrant,
     ) -> Result<DurableEffectTransition, ActuationError> {
-        Ok(self.inner.proven_not_dispatched(account, grant)?)
+        self.inner
+            .proven_not_dispatched(account, grant)
+            .map_err(Into::into)
     }
 }
 
