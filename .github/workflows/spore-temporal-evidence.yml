@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - scripts/spore_temporal_evidence.py
+      - scripts/spore_temporal_compare.py
       - docs/design/SPORE_TEMPORAL_VISUAL_EVIDENCE_V033.md
       - .github/workflows/spore-temporal-evidence.yml
   workflow_dispatch:
@@ -24,8 +25,14 @@ jobs:
       - name: Checkout evaluated source exactly
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
-      - name: Compile evidence tool
-        run: python3 -m py_compile scripts/spore_temporal_evidence.py
+      - name: Compile evidence tools
+        run: >-
+          python3 -m py_compile
+          scripts/spore_temporal_evidence.py
+          scripts/spore_temporal_compare.py
 
-      - name: Run deterministic synthetic self-test
+      - name: Run deterministic evidence self-test
         run: python3 scripts/spore_temporal_evidence.py --self-test
+
+      - name: Run deterministic control-treatment pairing self-test
+        run: python3 scripts/spore_temporal_compare.py --self-test
