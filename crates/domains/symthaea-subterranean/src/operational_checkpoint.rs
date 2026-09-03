@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Combined learned-controller, mission, operator and recovery-state checkpoint.
 
+#[path = "restore_semantics.rs"]
+pub mod restore_semantics;
+
 use crate::actuator_isolation::ActuatorIsolationSupervisor;
 use crate::controller::{CheckpointError, ControllerCheckpoint};
 use crate::degraded_operations::DegradedOperationsSupervisor;
