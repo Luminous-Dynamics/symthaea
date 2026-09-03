@@ -23,9 +23,8 @@ use symthaea_authority_frontier::{
 };
 use symthaea_authority_frontier_sqlite::{SqliteCheckpointCasStore, SqliteFrontierError};
 use symthaea_system_attempt_evidence::{
-    AttemptEvidenceAccessError, AttemptEvidenceCompletion, AttemptEvidenceContext,
-    AttemptEvidenceHead, SqliteAttemptEvidenceError, SqliteAttemptEvidenceJournal,
-    instrument_attempt,
+    AttemptEvidenceContext, AttemptEvidenceHead, SqliteAttemptEvidenceError,
+    SqliteAttemptEvidenceJournal, instrument_attempt,
 };
 use symthaea_system_broker::{
     BrokerError, RecoveryReceipt, RestartPlan, ServiceBackend, SystemdRecoveryBroker,
@@ -87,6 +86,7 @@ where
         self.frontier.head
     }
 
+    /// Exact generation-zero checkpoint payload corresponding to the head.
     pub fn authorization_checkpoint(&self) -> &symthaea_action_checkpoint::GrantAccountCheckpoint {
         &self.frontier.checkpoint
     }
@@ -121,10 +121,8 @@ where
         let xenia_session_id = verified.session_id();
         let workload_digest = verified.workload_digest();
         let (xenia_ledger_entry_count, xenia_ledger_head_hash) = verified.xenia_frontier();
-        let authority_evidence_digest = xenia_authority_evidence_digest(
-            self.grant_digest,
-            &verified,
-        );
+        let authority_evidence_digest =
+            xenia_authority_evidence_digest(self.grant_digest, &verified);
 
         let attempt_context = AttemptEvidenceContext::new(
             &execution_id,
@@ -134,17 +132,14 @@ where
             plan.world_digest,
             Some(authority_evidence_digest),
         );
+        let attempt_key = attempt_context.attempt_key();
         let journal = SqliteAttemptEvidenceJournal::open(&self.state_path)
             .map_err(DurableRecoveryError::OpenAttemptJournal)?;
 
         let cas_adapter =
             CasCheckpointStoreAdapter::from_trusted_head(self.store, self.frontier.head);
-        let (backend, checkpoint_store, evidence_handle) = instrument_attempt(
-            self.backend,
-            cas_adapter,
-            journal,
-            attempt_context,
-        );
+        let (backend, checkpoint_store, evidence_handle) =
+            instrument_attempt(self.backend, cas_adapter, journal, attempt_context);
 
         let mut broker = SystemdRecoveryBroker::from_checkpoint(
             self.grant,
@@ -172,6 +167,7 @@ where
                 let attempt_evidence_head = evidence_handle.latest_head().unwrap_or(None);
                 return Err(DurableRecoveryError::BrokerAttempt {
                     source,
+                    attempt_key,
                     attempt_evidence_head,
                 });
             }
@@ -192,6 +188,7 @@ where
             xenia_ledger_head_hash,
             workload_digest,
             authority_evidence_digest,
+            attempt_key,
             recovery,
             attempt_evidence,
         })
@@ -207,11 +204,12 @@ pub struct DurableXeniaSystemdReceipt {
     pub xenia_ledger_head_hash: [u8; 32],
     pub workload_digest: Digest32,
     pub authority_evidence_digest: Digest32,
+    pub attempt_key: Digest32,
     pub recovery: RecoveryReceipt,
     pub attempt_evidence: DurableAttemptEvidenceStatus,
 }
 
-/// Whether the broker-level success could also be appended as the final attempt
+/// Whether broker-level success could also be appended as the final attempt
 /// evidence record. A finalization failure does not erase the earlier durable
 /// `DispatchArmed`/dispatch classification records or the successful #305
 /// accounting checkpoint.
@@ -245,11 +243,12 @@ pub enum DurableRecoveryError {
     #[error("failed to restore typed broker at the authorized frontier: {0}")]
     BrokerRestore(#[source] BrokerError),
     #[error(
-        "typed broker failed after admission; latest durable attempt evidence: {attempt_evidence_head:?}: {source}"
+        "typed broker failed after admission; attempt {attempt_key:?}; latest durable attempt evidence: {attempt_evidence_head:?}: {source}"
     )]
     BrokerAttempt {
         #[source]
         source: BrokerError,
+        attempt_key: Digest32,
         attempt_evidence_head: Option<AttemptEvidenceHead>,
     },
 }
