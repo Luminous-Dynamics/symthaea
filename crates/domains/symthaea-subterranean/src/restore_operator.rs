@@ -20,7 +20,7 @@ use super::restore_semantics::RestoreDomain;
 /// deliberately `NotProvable`: today that covers `None <-> Mission(_)` and
 /// different mission intents, whose mission-level effects are not represented
 /// by the scalar safety rank.
-pub(crate) fn operator_constraint_restore_verdict(
+pub(super) fn operator_constraint_restore_verdict(
     current: OperatorConstraint,
     candidate: OperatorConstraint,
 ) -> RestoreAdmissionVerdict {
@@ -45,7 +45,7 @@ pub(crate) fn operator_constraint_restore_verdict(
 /// currently `ReconciliationRequired` because stale checkpoint replay history
 /// must be merged rather than replaced. This prevents a partial constraint-only
 /// fix from reopening already-consumed operator sequences.
-pub(crate) fn operator_authority_restore_decision(
+pub(super) fn operator_authority_restore_decision(
     current: &OperatorAuthority,
     candidate: &OperatorAuthority,
 ) -> RestoreDomainDecision {
@@ -60,10 +60,7 @@ pub(crate) fn operator_authority_restore_decision(
             RestoreAdmissionVerdict::ReconciliationRequired
         }
     };
-    RestoreDomainDecision {
-        domain: RestoreDomain::OperatorAuthority,
-        verdict,
-    }
+    RestoreDomainDecision::new(RestoreDomain::OperatorAuthority, verdict)
 }
 
 #[cfg(test)]
@@ -159,10 +156,10 @@ mod tests {
         let candidate = OperatorAuthority::default();
         assert_eq!(
             operator_authority_restore_decision(&current, &candidate),
-            RestoreDomainDecision {
-                domain: RestoreDomain::OperatorAuthority,
-                verdict: RestoreAdmissionVerdict::ReconciliationRequired,
-            }
+            RestoreDomainDecision::new(
+                RestoreDomain::OperatorAuthority,
+                RestoreAdmissionVerdict::ReconciliationRequired,
+            )
         );
     }
 
@@ -175,10 +172,10 @@ mod tests {
         let candidate = OperatorAuthority::default();
         assert_eq!(
             operator_authority_restore_decision(&current, &candidate),
-            RestoreDomainDecision {
-                domain: RestoreDomain::OperatorAuthority,
-                verdict: RestoreAdmissionVerdict::Widening,
-            }
+            RestoreDomainDecision::new(
+                RestoreDomain::OperatorAuthority,
+                RestoreAdmissionVerdict::Widening,
+            )
         );
     }
 }
