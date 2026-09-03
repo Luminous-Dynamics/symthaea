@@ -41,7 +41,7 @@ use crate::action::{
     ResolutionDecision, Resolved, RiskAssessed,
 };
 use crate::capability::{CapabilityKind, GrantId, PrincipalId, Read, Scope};
-use crate::host::{ResolutionEvidenceReceipt, ResolutionError, RuntimeAction, TrustedRuntime};
+use crate::host::{ResolutionError, ResolutionEvidenceReceipt, RuntimeAction, TrustedRuntime};
 use crate::resolution::ResolutionGrant;
 use crate::trusted::{
     AuthorityDomain, AuthorityDomainId, AuthorityEpoch, AuthorityVerifier, TrustError,
@@ -476,8 +476,8 @@ impl<K: CapabilityKind, H> ResourceAction<K, Authorized, H> {
         self.resource
             .validate_with(&self.resource_verifier, self.clock.now())
             .map_err(ResourceExecutionError::Resource)?;
-        let output_digest = execute(&mut self.resource.handle)
-            .map_err(ResourceExecutionError::Adapter)?;
+        let output_digest =
+            execute(&mut self.resource.handle).map_err(ResourceExecutionError::Adapter)?;
         let inner = self
             .inner
             .record_execution(output_digest)
@@ -524,13 +524,7 @@ impl<K: CapabilityKind, H> ResourceAction<K, Observed, H> {
         self,
         grant: ResolutionGrant,
         decision: ResolutionDecision,
-    ) -> Result<
-        (
-            ResourceAction<K, Resolved, H>,
-            ResourceEvidenceReceipt,
-        ),
-        ResolutionError,
-    > {
+    ) -> Result<(ResourceAction<K, Resolved, H>, ResourceEvidenceReceipt), ResolutionError> {
         let (inner, resolution_receipt) = self.inner.resolve(grant, decision)?;
         let receipt = ResourceEvidenceReceipt {
             resolution_receipt,
@@ -746,9 +740,7 @@ impl ResourceClock {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        AuthorityDomain, ObservedOutcome, ResolutionAuthorityDomain, Write,
-    };
+    use crate::{AuthorityDomain, ObservedOutcome, ResolutionAuthorityDomain, Write};
     use std::sync::atomic::{AtomicBool, Ordering};
 
     fn scope() -> Scope {
@@ -809,12 +801,8 @@ mod tests {
         let (_, _, _, runtime) = runtime(&expected);
         let resource = attacker.resolve((), identity(1, 1), None);
 
-        let result = runtime.admit_resolved::<Write, _>(
-            PrincipalId::new(),
-            "edit",
-            resource,
-            b"patch",
-        );
+        let result =
+            runtime.admit_resolved::<Write, _>(PrincipalId::new(), "edit", resource, b"patch");
         assert!(result.is_err());
     }
 
@@ -956,7 +944,10 @@ mod tests {
             action.resolution_binding(decision),
         );
         let (resolved, receipt) = action.resolve(resolution_grant, decision).unwrap();
-        assert_eq!(receipt.resource_identity().binding(), identity(4, 5).binding());
+        assert_eq!(
+            receipt.resource_identity().binding(),
+            identity(4, 5).binding()
+        );
         let resource = resolved.into_resource();
         assert_eq!(resource.handle, 11);
     }

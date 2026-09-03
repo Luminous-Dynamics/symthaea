@@ -192,9 +192,7 @@ impl<K: CapabilityKind> RuntimeAction<K, RiskAssessed> {
         grant: TrustedBoundOneShotCapability<K>,
     ) -> Result<RuntimeAction<K, Authorized>, TrustError> {
         let now = self.clock.now();
-        let inner = self
-            .inner
-            .authorize(grant, &self.execution_verifier, now)?;
+        let inner = self.inner.authorize(grant, &self.execution_verifier, now)?;
         Ok(RuntimeAction {
             inner,
             execution_verifier: self.execution_verifier,
@@ -300,7 +298,11 @@ impl<K: CapabilityKind> RuntimeAction<K, Observed> {
             .validate_with(&self.resolver_verifier, now)
             .map_err(ResolutionError::Trust)?;
 
-        if !grant.metadata().scope().contains(self.inner.descriptor().scope()) {
+        if !grant
+            .metadata()
+            .scope()
+            .contains(self.inner.descriptor().scope())
+        {
             return Err(ResolutionError::ScopeMismatch {
                 granted: grant.metadata().scope().clone(),
                 required: self.inner.descriptor().scope().clone(),
@@ -446,7 +448,10 @@ impl fmt::Display for ResolutionError {
                 write!(f, "resolution authority does not cover action scope")
             }
             Self::BindingMismatch { .. } => {
-                write!(f, "resolution grant is bound to another lineage or decision")
+                write!(
+                    f,
+                    "resolution grant is bound to another lineage or decision"
+                )
             }
         }
     }
@@ -478,7 +483,10 @@ fn compute_resolution_binding(
     hash_field(&mut hasher, observer_domain.as_uuid().as_bytes());
     hash_field(&mut hasher, resolver_domain.as_uuid().as_bytes());
     hash_field(&mut hasher, &context.observation_binding);
-    hash_field(&mut hasher, &[observed_outcome_code(context.observation.outcome())]);
+    hash_field(
+        &mut hasher,
+        &[observed_outcome_code(context.observation.outcome())],
+    );
     hash_field(&mut hasher, &context.observation.evidence_digest());
     hash_field(&mut hasher, &[resolution_decision_code(decision)]);
     *hasher.finalize().as_bytes()
@@ -546,17 +554,14 @@ impl MonotonicWallClock {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        ActionRisk, AuthorityDomain, ObservedOutcome, ResolutionAuthorityDomain, Write,
-    };
+    use crate::{ActionRisk, AuthorityDomain, ObservedOutcome, ResolutionAuthorityDomain, Write};
     use std::time::Duration;
 
     fn scope() -> Scope {
         Scope::new("workspace", ["symthaea", "src"]).unwrap()
     }
 
-    fn runtime(
-    ) -> (
+    fn runtime() -> (
         AuthorityDomain,
         AuthorityDomain,
         ResolutionAuthorityDomain,
@@ -663,7 +668,10 @@ mod tests {
         );
 
         let result = observed.resolve(grant, ResolutionDecision::Contradicted);
-        assert!(matches!(result, Err(ResolutionError::BindingMismatch { .. })));
+        assert!(matches!(
+            result,
+            Err(ResolutionError::BindingMismatch { .. })
+        ));
     }
 
     #[test]
@@ -692,7 +700,10 @@ mod tests {
             observed.resolve(grant, ResolutionDecision::Confirmed),
             Err(ResolutionError::Trust(_))
         ));
-        assert_ne!(wrong_resolution.domain_id(), expected_resolution.domain_id());
+        assert_ne!(
+            wrong_resolution.domain_id(),
+            expected_resolution.domain_id()
+        );
     }
 
     #[test]

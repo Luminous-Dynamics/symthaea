@@ -62,11 +62,13 @@ pub use action::{
 };
 pub use budget::{
     BudgetAuthorityDomain, BudgetDimension, BudgetEnforcement, BudgetError, BudgetLease,
-    BudgetProfile, BudgetQuantities, BudgetReleaseReceipt, BudgetVerifier, EnforcementClass,
+    BudgetProfile, BudgetQuantities, BudgetReleaseReceipt, BudgetSplitFailure, BudgetVerifier,
+    EnforcementClass,
 };
 pub use budget_guard::{
-    BudgetAdapterError, BudgetGuardedAction, BudgetGuardedAuthorizeError, BudgetGuardedRuntime,
-    BudgetLeaseEvidence, BudgetedEvidenceReceipt,
+    BudgetAdapterError, BudgetGuardedAction, BudgetGuardedAuthorizeError,
+    BudgetGuardedAuthorizeFailure, BudgetGuardedRuntime, BudgetLeaseEvidence,
+    BudgetedEvidenceReceipt,
 };
 pub use budget_purpose::{
     BudgetPurposeAdmissionReceipt, BudgetPurposeAuthorityDomain, BudgetPurposeAuthorizeError,

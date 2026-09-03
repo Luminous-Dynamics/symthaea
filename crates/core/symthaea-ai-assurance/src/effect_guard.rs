@@ -45,9 +45,7 @@ use crate::action::{
     ActionDescriptor, ActionId, ActionRisk, Authorized, Executed, Observation, Observed, Proposed,
     ResolutionDecision, Resolved, RiskAssessed,
 };
-use crate::budget::{
-    BudgetError, BudgetLease, BudgetQuantities, BudgetReleaseReceipt,
-};
+use crate::budget::{BudgetError, BudgetLease, BudgetQuantities, BudgetReleaseReceipt};
 use crate::budget_guard::{
     BudgetAdapterError, BudgetGuardedAction, BudgetGuardedAuthorizeError, BudgetGuardedRuntime,
     BudgetedEvidenceReceipt,
@@ -502,10 +500,9 @@ impl<K: CapabilityKind, H> EffectGuardedAction<K, Authorized, H> {
                 })
             }
             Err(error) => match attempt_evidence {
-                Some(evidence) => Err(EffectAttemptFailure::LineageFailedAfterAttempt {
-                    evidence,
-                    error,
-                }),
+                Some(evidence) => {
+                    Err(EffectAttemptFailure::LineageFailedAfterAttempt { evidence, error })
+                }
                 None => Err(EffectAttemptFailure::RejectedBeforeAttempt { error }),
             },
         }
@@ -637,7 +634,10 @@ impl fmt::Display for ExecutionPreflightError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::TemporalLineageMismatch => {
-                write!(f, "temporal evidence does not match policy/execution lineage")
+                write!(
+                    f,
+                    "temporal evidence does not match policy/execution lineage"
+                )
             }
             Self::TemporalBoundViolation => {
                 write!(f, "temporal evidence widens a finite policy lifetime")
@@ -686,8 +686,7 @@ impl std::error::Error for EffectGuardedAuthorizeError {
 
 /// Existing lower execution error type when the adapter callback itself is
 /// assurance-level infallible and reports outcomes through [`EffectAttemptOutcome`].
-pub type EffectInnerExecutionError =
-    PolicyGuardedExecutionError<BudgetAdapterError<Infallible>>;
+pub type EffectInnerExecutionError = PolicyGuardedExecutionError<BudgetAdapterError<Infallible>>;
 
 /// Failure while attempting an effect through the strongest current facade.
 ///
@@ -950,11 +949,8 @@ mod tests {
             PolicyDescriptor::new("effect-guard", 1, [3; 32], 1).unwrap(),
             rules,
         );
-        let execution = TemporalPolicyExecutionDomain::new(
-            PrincipalId::new(),
-            evaluator.verifier(),
-            rules,
-        );
+        let execution =
+            TemporalPolicyExecutionDomain::new(PrincipalId::new(), evaluator.verifier(), rules);
         let observation = AuthorityDomain::new(PrincipalId::new());
         let resolution = ResolutionAuthorityDomain::new(PrincipalId::new());
         let resources = ResourceResolverDomain::new(PrincipalId::new());
@@ -1125,9 +1121,11 @@ mod tests {
             receipt.effect_attempt().outcome(),
             EffectAttemptOutcome::ReportedFailure { .. }
         ));
-        assert!(receipt
-            .temporal_derivation()
-            .preserves_finite_parent_bound());
+        assert!(
+            receipt
+                .temporal_derivation()
+                .preserves_finite_parent_bound()
+        );
         assert_eq!(resolved.assurance_receipt(), &receipt);
     }
 

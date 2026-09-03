@@ -26,7 +26,9 @@ use crate::policy::{
 };
 use crate::resolution::ResolutionGrant;
 use crate::resource::{ResolvedResource, ResourceError, ResourceExecutionError, ResourceIdentity};
-use crate::trusted::{AuthorityDomainId, AuthorityEpoch, TrustError, TrustedBoundOneShotCapability};
+use crate::trusted::{
+    AuthorityDomainId, AuthorityEpoch, TrustError, TrustedBoundOneShotCapability,
+};
 use std::fmt;
 
 /// Strict policy-revocation-aware wrapper around the policy/resource runtime.
@@ -259,7 +261,10 @@ impl fmt::Display for PolicyGuardError {
                 write!(f, "policy grant belongs to another evaluator domain")
             }
             Self::RevokedPolicyEpoch { .. } => {
-                write!(f, "policy admission was revoked by evaluator epoch rotation")
+                write!(
+                    f,
+                    "policy admission was revoked by evaluator epoch rotation"
+                )
             }
         }
     }
@@ -379,8 +384,7 @@ mod tests {
         let descriptor = PolicyDescriptor::new("magi-gate", 1, [3; 32], 1).unwrap();
         let evaluator = PolicyEvaluatorDomain::new(PrincipalId::new(), descriptor);
         let policy_verifier = evaluator.verifier();
-        let execution =
-            PolicyExecutionDomain::new(PrincipalId::new(), policy_verifier.clone());
+        let execution = PolicyExecutionDomain::new(PrincipalId::new(), policy_verifier.clone());
         let observation = AuthorityDomain::new(PrincipalId::new());
         let resolution = ResolutionAuthorityDomain::new(PrincipalId::new());
         let resources = ResourceResolverDomain::new(PrincipalId::new());

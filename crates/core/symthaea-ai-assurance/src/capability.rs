@@ -550,11 +550,8 @@ mod tests {
         let now = SystemTime::now();
         let parent_expiry = now + Duration::from_secs(60);
         let root = AuthorityRoot::new(PrincipalId::new());
-        let grant = root.issue::<Write>(
-            PrincipalId::new(),
-            scope(&["scratch"]),
-            Some(parent_expiry),
-        );
+        let grant =
+            root.issue::<Write>(PrincipalId::new(), scope(&["scratch"]), Some(parent_expiry));
 
         assert!(matches!(
             grant.delegate(PrincipalId::new(), scope(&["scratch"]), None, now),

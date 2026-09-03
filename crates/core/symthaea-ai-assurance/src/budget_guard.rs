@@ -13,6 +13,10 @@
 //! have run but immediately before user adapter code. A budget epoch rotation
 //! between authorization and effect therefore fails closed on this path.
 //!
+//! Pre-effect authorization can use the recoverable API so a policy rejection
+//! returns the exact quantitative lease instead of silently stranding conserved
+//! capacity. This does not imply that post-entry failures are refundable.
+//!
 //! This module still does not claim that every dimension is physically hard
 //! enforced. It proves that the host admitted an exact quantitative reservation
 //! and that the reservation remained valid at adapter entry. Concrete adapters
@@ -35,7 +39,9 @@ use crate::policy_guard::{
 };
 use crate::resolution::ResolutionGrant;
 use crate::resource::{ResolvedResource, ResourceError};
-use crate::trusted::{AuthorityDomainId, AuthorityEpoch, TrustError, TrustedBoundOneShotCapability};
+use crate::trusted::{
+    AuthorityDomainId, AuthorityEpoch, TrustError, TrustedBoundOneShotCapability,
+};
 use std::fmt;
 
 /// Host wrapper that pins one budget verifier alongside the policy/resource host boundary.
@@ -141,28 +147,64 @@ impl<K: CapabilityKind, H> BudgetGuardedAction<K, RiskAssessed, H> {
             .expect("RiskAssessed budget action always carries action binding")
     }
 
-    /// Consume both policy-bound permission and an exact quantitative budget lease.
+    /// Compatibility authorization API retaining the original lossy error shape.
+    ///
+    /// Trusted pre-effect callers should prefer [`Self::authorize_recoverable`]
+    /// so a rejected join cannot strand conserved budget capacity.
     pub fn authorize(
         self,
         policy_grant: PolicyGrant<K>,
         budget_lease: BudgetLease,
     ) -> Result<BudgetGuardedAction<K, Authorized, H>, BudgetGuardedAuthorizeError> {
+        self.authorize_recoverable(policy_grant, budget_lease)
+            .map_err(BudgetGuardedAuthorizeFailure::into_error)
+    }
+
+    /// Consume policy-bound permission and quantitative authority while
+    /// returning the exact budget lease on any rejection before authorization
+    /// succeeds.
+    ///
+    /// The policy grant/action may remain consumed when the underlying one-shot
+    /// policy transition rejects. The quantitative lease is independent affine
+    /// authority, so it is returned unchanged because no external effect has
+    /// occurred at this stage.
+    pub fn authorize_recoverable(
+        self,
+        policy_grant: PolicyGrant<K>,
+        budget_lease: BudgetLease,
+    ) -> Result<BudgetGuardedAction<K, Authorized, H>, BudgetGuardedAuthorizeFailure> {
         let action_binding = self.authorization_binding();
-        budget_lease
-            .validate_for(
-                &self.budget_verifier,
-                self.inner.actor(),
-                self.inner.descriptor().scope(),
-                action_binding,
-            )
-            .map_err(BudgetGuardedAuthorizeError::Budget)?;
-        let inner = self
-            .inner
-            .authorize(policy_grant)
-            .map_err(BudgetGuardedAuthorizeError::Policy)?;
+        if let Err(error) = budget_lease.validate_for(
+            &self.budget_verifier,
+            self.inner.actor(),
+            self.inner.descriptor().scope(),
+            action_binding,
+        ) {
+            return Err(BudgetGuardedAuthorizeFailure::new(
+                budget_lease,
+                BudgetGuardedAuthorizeError::Budget(error),
+            ));
+        }
+
+        let BudgetGuardedAction {
+            inner,
+            budget_verifier,
+            action_binding: _,
+            budget_lease: _,
+        } = self;
+        let inner = match inner.authorize(policy_grant) {
+            Ok(inner) => inner,
+            Err(error) => {
+                return Err(BudgetGuardedAuthorizeFailure::new(
+                    budget_lease,
+                    BudgetGuardedAuthorizeError::Policy(error),
+                ));
+            }
+        };
+
         Ok(BudgetGuardedAction {
             inner,
-            budget_verifier: self.budget_verifier,
+            budget_verifier,
             action_binding: Some(action_binding),
             budget_lease: Some(budget_lease),
         })
@@ -263,13 +305,8 @@ impl<K: CapabilityKind, H> BudgetGuardedAction<K, Observed, H> {
         self,
         grant: ResolutionGrant,
         decision: ResolutionDecision,
-    ) -> Result<
-        (
-            BudgetGuardedAction<K, Resolved, H>,
-            BudgetedEvidenceReceipt,
-        ),
-        ResolutionError,
-    > {
+    ) -> Result<(BudgetGuardedAction<K, Resolved, H>, BudgetedEvidenceReceipt), ResolutionError>
+    {
         let BudgetGuardedAction {
             inner,
             budget_verifier,
@@ -420,6 +457,66 @@ impl std::error::Error for BudgetGuardedAuthorizeError {
             Self::Budget(error) => Some(error),
             Self::Policy(error) => Some(error),
         }
+    }
+}
+
+/// Recoverable pre-effect authorization failure that retains the exact budget lease.
+///
+/// This failure is intentionally not `Clone`: it owns affine quantitative
+/// authority that may be retried, retained, or explicitly released by the host.
+#[derive(Debug)]
+pub struct BudgetGuardedAuthorizeFailure {
+    budget_lease: BudgetLease,
+    error: BudgetGuardedAuthorizeError,
+}
+
+impl BudgetGuardedAuthorizeFailure {
+    fn new(budget_lease: BudgetLease, error: BudgetGuardedAuthorizeError) -> Self {
+        Self {
+            budget_lease,
+            error,
+        }
+    }
+
+    /// Authorization rejection reason.
+    pub fn error(&self) -> &BudgetGuardedAuthorizeError {
+        &self.error
+    }
+
+    /// Exact original lease recovered from the failed join.
+    pub fn budget_lease(&self) -> &BudgetLease {
+        &self.budget_lease
+    }
+
+    /// Consume the failure and recover the exact original lease.
+    pub fn into_budget_lease(self) -> BudgetLease {
+        self.budget_lease
+    }
+
+    /// Consume the failure into the original lease plus rejection reason.
+    pub fn into_parts(self) -> (BudgetLease, BudgetGuardedAuthorizeError) {
+        (self.budget_lease, self.error)
+    }
+
+    /// Consume the failure and retain only the compatibility error.
+    pub fn into_error(self) -> BudgetGuardedAuthorizeError {
+        self.error
+    }
+}
+
+impl fmt::Display for BudgetGuardedAuthorizeFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "recoverable budget authorization rejected: {}",
+            self.error
+        )
+    }
+}
+
+impl std::error::Error for BudgetGuardedAuthorizeFailure {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.error)
     }
 }
 

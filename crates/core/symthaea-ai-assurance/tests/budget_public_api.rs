@@ -48,7 +48,8 @@ fn public_pool_is_conserved_under_concurrent_reservation() {
     barrier.wait();
     let successes = workers
         .into_iter()
-        .filter(|worker| worker.join().unwrap().is_ok())
+        .map(|worker| worker.join().unwrap())
+        .filter(Result::is_ok)
         .count();
     assert_eq!(successes, 1);
     assert_eq!(domain.remaining().get(BudgetDimension::ComputeUnits), 0);
@@ -69,16 +70,25 @@ fn public_lease_is_exact_action_subject_scope_and_domain_bound() {
         )
         .unwrap();
 
-    assert!(lease
-        .validate_for(&domain.verifier(), actor, &scope(&["root", "child"]), [3; 32])
-        .is_ok());
+    assert!(
+        lease
+            .validate_for(
+                &domain.verifier(),
+                actor,
+                &scope(&["root", "child"]),
+                [3; 32]
+            )
+            .is_ok()
+    );
     assert!(matches!(
         lease.validate_for(&domain.verifier(), actor, &scope(&["root"]), [4; 32]),
         Err(BudgetError::ActionBindingMismatch)
     ));
-    assert!(lease
-        .validate_for(&other.verifier(), actor, &scope(&["root"]), [3; 32])
-        .is_err());
+    assert!(
+        lease
+            .validate_for(&other.verifier(), actor, &scope(&["root"]), [3; 32])
+            .is_err()
+    );
 }
 
 #[test]
@@ -133,6 +143,127 @@ fn public_affine_split_and_release_conserve_root_capacity() {
 }
 
 #[test]
+fn public_recoverable_split_preserves_exact_parent_on_scope_rejection() {
+    let domain = BudgetAuthorityDomain::new(PrincipalId::new(), profile(10, 2));
+    let actor = PrincipalId::new();
+    let allocation = BudgetQuantities::zero()
+        .with(BudgetDimension::ComputeUnits, 7)
+        .with(BudgetDimension::Subprocesses, 1);
+    let parent = domain
+        .reserve(
+            actor,
+            scope(&["root"]),
+            [20; 32],
+            allocation,
+            Some(SystemTime::now() + Duration::from_secs(60)),
+        )
+        .unwrap();
+    let id = parent.lease_id();
+    let budget_domain = parent.domain_id();
+    let epoch = parent.epoch();
+    let action_binding = parent.action_binding();
+    let profile_digest = parent.profile().digest();
+    let remaining_before = domain.remaining();
+
+    let failure = domain
+        .split_recoverable(
+            parent,
+            PrincipalId::new(),
+            scope(&["other"]),
+            [21; 32],
+            BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 2),
+            Some(SystemTime::now() + Duration::from_secs(30)),
+        )
+        .unwrap_err();
+
+    assert!(matches!(failure.error(), BudgetError::ScopeWidening { .. }));
+    assert_eq!(failure.parent().lease_id(), id);
+    assert_eq!(failure.parent().allocation(), allocation);
+    assert_eq!(failure.parent().domain_id(), budget_domain);
+    assert_eq!(failure.parent().epoch(), epoch);
+    assert_eq!(failure.parent().action_binding(), action_binding);
+    assert_eq!(failure.parent().profile().digest(), profile_digest);
+    assert_eq!(domain.remaining(), remaining_before);
+
+    failure.into_parent().release().unwrap();
+    assert_eq!(domain.remaining(), domain.profile().limits());
+}
+
+#[test]
+fn public_recoverable_split_rejects_stale_child_without_capacity_loss() {
+    let domain = BudgetAuthorityDomain::new(PrincipalId::new(), profile(10, 2));
+    let actor = PrincipalId::new();
+    let parent = domain
+        .reserve(
+            actor,
+            scope(&["root"]),
+            [22; 32],
+            BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 6),
+            Some(SystemTime::now() + Duration::from_secs(60)),
+        )
+        .unwrap();
+    let id = parent.lease_id();
+    let remaining_before = domain.remaining();
+
+    let failure = domain
+        .split_recoverable(
+            parent,
+            PrincipalId::new(),
+            scope(&["root", "child"]),
+            [23; 32],
+            BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 2),
+            Some(SystemTime::UNIX_EPOCH),
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        failure.error(),
+        BudgetError::ExpiredDelegationRequest { .. }
+    ));
+    assert_eq!(failure.parent().lease_id(), id);
+    assert_eq!(domain.remaining(), remaining_before);
+    failure.into_parent().release().unwrap();
+    assert_eq!(domain.remaining(), domain.profile().limits());
+}
+
+#[test]
+fn public_recoverable_split_rejects_overallocation_without_capacity_loss() {
+    let domain = BudgetAuthorityDomain::new(PrincipalId::new(), profile(10, 2));
+    let actor = PrincipalId::new();
+    let parent = domain
+        .reserve(
+            actor,
+            scope(&["root"]),
+            [24; 32],
+            BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 4),
+            Some(SystemTime::now() + Duration::from_secs(60)),
+        )
+        .unwrap();
+    let id = parent.lease_id();
+    let remaining_before = domain.remaining();
+
+    let failure = domain
+        .split_recoverable(
+            parent,
+            PrincipalId::new(),
+            scope(&["root", "child"]),
+            [25; 32],
+            BudgetQuantities::zero().with(BudgetDimension::ComputeUnits, 5),
+            Some(SystemTime::now() + Duration::from_secs(30)),
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        failure.error(),
+        BudgetError::InsufficientBudget { .. }
+    ));
+    assert_eq!(failure.parent().lease_id(), id);
+    assert_eq!(domain.remaining(), remaining_before);
+    failure.into_parent().release().unwrap();
+    assert_eq!(domain.remaining(), domain.profile().limits());
+}
+
+#[test]
 fn public_budget_epoch_rotation_revokes_outstanding_lease() {
     let domain = BudgetAuthorityDomain::new(PrincipalId::new(), profile(5, 1));
     let actor = PrincipalId::new();
@@ -147,9 +278,11 @@ fn public_budget_epoch_rotation_revokes_outstanding_lease() {
         .unwrap();
     domain.revoke_all().unwrap();
 
-    assert!(lease
-        .validate_for(&domain.verifier(), actor, &scope(&["root"]), [7; 32])
-        .is_err());
+    assert!(
+        lease
+            .validate_for(&domain.verifier(), actor, &scope(&["root"]), [7; 32])
+            .is_err()
+    );
 }
 
 #[test]

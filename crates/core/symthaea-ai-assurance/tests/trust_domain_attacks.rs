@@ -27,12 +27,8 @@ fn model_substituted_verifier_cannot_cross_execution_boundary() {
         b"patch-v1",
     )
     .assess(ActionRisk::Reversible);
-    let grant = host.issue_bound_one_shot::<Write>(
-        actor,
-        scope(),
-        None,
-        action.authorization_binding(),
-    );
+    let grant =
+        host.issue_bound_one_shot::<Write>(actor, scope(), None, action.authorization_binding());
     let authorized = action
         .authorize(grant, &host_verifier, SystemTime::now())
         .unwrap();
@@ -56,12 +52,8 @@ fn pre_revocation_proposal_cannot_consume_post_revocation_grant() {
     )
     .assess(ActionRisk::Reversible);
     host.revoke_all().unwrap();
-    let fresh_grant = host.issue_bound_one_shot::<Write>(
-        actor,
-        scope(),
-        None,
-        action.authorization_binding(),
-    );
+    let fresh_grant =
+        host.issue_bound_one_shot::<Write>(actor, scope(), None, action.authorization_binding());
 
     let result = action.authorize(fresh_grant, &verifier, SystemTime::now());
     assert!(matches!(result, Err(TrustError::RevokedEpoch { .. })));

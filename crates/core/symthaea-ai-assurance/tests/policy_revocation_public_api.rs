@@ -204,5 +204,8 @@ fn policy_rotation_after_effect_does_not_block_evidence_collection() {
     );
     let (_, receipt) = action.resolve(resolver_grant, decision).unwrap();
 
-    assert_eq!(receipt.policy_evidence().policy_domain(), fixture.evaluator.domain_id());
+    assert_eq!(
+        receipt.policy_evidence().policy_domain(),
+        fixture.evaluator.domain_id()
+    );
 }
