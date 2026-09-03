@@ -5,11 +5,13 @@
 //!
 //! Nixward separates **authority** from **cognitive telemetry**. Sub-modules
 //! produce `NixOSCommand` values; `execution_context` describes who/what may
-//! authorize an action and carries optional cognition metrics, while the legacy
-//! executor remains available during migration for rollback and outcome
-//! handling.
+//! authorize an action and carries optional cognition metrics. `ContextualExecutor`
+//! is the preferred migration path: it enforces explicit authority and exact
+//! action binding before delegating to the legacy executor for mature rollback
+//! and outcome handling.
 
 pub mod config_writer;
+pub mod context_executor;
 pub mod execution_context;
 pub mod executor;
 pub mod flake_ops;
@@ -20,6 +22,7 @@ pub mod plan_executor;
 pub mod service_manager;
 
 pub use config_writer::{ConfigPatch, ConfigWriter, WriteResult};
+pub use context_executor::{ContextExecutionRecord, ContextualExecutor};
 pub use execution_context::{
     AuthorityContext, AuthoritySource, CognitiveContext, ExecutionContext, PhiMeasurement,
     EXECUTION_CONTEXT_SCHEMA_VERSION,
