@@ -59,139 +59,75 @@ impl VisualCompositionBudget {
 
         let mut budget = match stage {
             BootStageKind::Blackout => Self::zero(VisualHero::Substrate),
-            BootStageKind::DormantCore => Self::new(
+            BootStageKind::DormantCore => Self::from_layers(
                 VisualHero::Topology,
                 0.95,
-                0.24,
-                0.00,
-                0.15,
-                0.25,
-                0.02,
-                0.12,
-                0.55,
+                [0.24, 0.00, 0.15, 0.25, 0.02, 0.12, 0.55],
             ),
-            BootStageKind::Relight => Self::new(
+            BootStageKind::Relight => Self::from_layers(
                 VisualHero::Relight,
                 1.00,
-                0.50,
-                0.08,
-                0.45,
-                0.32,
-                0.05,
-                0.22,
-                0.55,
+                [0.50, 0.08, 0.45, 0.32, 0.05, 0.22, 0.55],
             ),
-            BootStageKind::Germinate => Self::new(
+            BootStageKind::Germinate => Self::from_layers(
                 VisualHero::Topology,
                 1.00,
-                0.40,
-                0.00,
-                0.18,
-                0.32,
-                0.04,
-                0.18,
-                0.52,
+                [0.40, 0.00, 0.18, 0.32, 0.04, 0.18, 0.52],
             ),
-            BootStageKind::Grow => Self::new(
+            BootStageKind::Grow => Self::from_layers(
                 VisualHero::Topology,
                 1.00,
-                0.32,
-                0.08,
-                0.28,
-                0.20,
-                0.06,
-                0.18,
-                0.52,
+                [0.32, 0.08, 0.28, 0.20, 0.06, 0.18, 0.52],
             ),
-            BootStageKind::Anastomose => Self::new(
+            BootStageKind::Anastomose => Self::from_layers(
                 VisualHero::Topology,
                 1.00,
-                0.38,
-                0.20,
-                0.28,
-                0.18,
-                0.05,
-                0.17,
-                0.52,
+                [0.38, 0.20, 0.28, 0.18, 0.05, 0.17, 0.52],
             ),
-            BootStageKind::Repair => Self::new(
+            BootStageKind::Repair => Self::from_layers(
                 VisualHero::Repair,
                 1.00,
-                0.78,
-                0.04,
-                0.12,
-                0.24,
-                0.05,
-                0.24,
-                0.58,
+                [0.78, 0.04, 0.12, 0.24, 0.05, 0.24, 0.58],
             ),
-            BootStageKind::GrowthRing => Self::new(
+            BootStageKind::GrowthRing => Self::from_layers(
                 VisualHero::Generation,
                 1.00,
-                0.82,
-                0.05,
-                0.16,
-                0.18,
-                0.03,
-                0.24,
-                0.56,
+                [0.82, 0.05, 0.16, 0.18, 0.03, 0.24, 0.56],
             ),
-            BootStageKind::HardwareBud => Self::new(
+            BootStageKind::HardwareBud => Self::from_layers(
                 VisualHero::Hardware,
                 1.00,
-                0.64,
-                0.05,
-                0.18,
-                0.18,
-                0.04,
-                0.18,
-                0.55,
+                [0.64, 0.05, 0.18, 0.18, 0.04, 0.18, 0.55],
             ),
-            BootStageKind::RetractFailedGrowth => Self::new(
+            BootStageKind::RetractFailedGrowth => Self::from_layers(
                 VisualHero::Rollback,
                 1.00,
-                0.76,
-                0.02,
-                0.10,
-                0.20,
-                0.04,
-                0.20,
-                0.60,
+                [0.76, 0.02, 0.10, 0.20, 0.04, 0.20, 0.60],
             ),
-            BootStageKind::MeshLink => Self::new(
+            BootStageKind::MeshLink => Self::from_layers(
                 VisualHero::Mesh,
                 1.00,
-                0.42,
-                0.78,
-                0.40,
-                0.12,
-                0.02,
-                0.18,
-                0.54,
+                [0.42, 0.78, 0.40, 0.12, 0.02, 0.18, 0.54],
             ),
-            BootStageKind::Settle => Self::new(
+            BootStageKind::Settle => Self::from_layers(
                 VisualHero::Topology,
                 0.92,
-                0.18,
-                0.14,
-                0.16,
-                0.16,
-                0.02,
-                0.12,
-                0.50,
+                [0.18, 0.14, 0.16, 0.16, 0.02, 0.12, 0.50],
             ),
             BootStageKind::Handoff => {
                 let departure = 1.0 - smoothstep(progress);
-                Self::new(
+                Self::from_layers(
                     VisualHero::Handoff,
                     0.45 + 0.45 * departure,
-                    0.18 * departure,
-                    0.10 * departure,
-                    0.18 * departure,
-                    0.14 * departure,
-                    0.02 * departure,
-                    0.10 * departure,
-                    0.42 * departure,
+                    [
+                        0.18 * departure,
+                        0.10 * departure,
+                        0.18 * departure,
+                        0.14 * departure,
+                        0.02 * departure,
+                        0.10 * departure,
+                        0.42 * departure,
+                    ],
                 )
             }
         };
@@ -218,17 +154,8 @@ impl VisualCompositionBudget {
         gain.is_finite() && gain >= 0.01
     }
 
-    fn new(
-        hero: VisualHero,
-        topology: f32,
-        accent: f32,
-        mesh: f32,
-        holography: f32,
-        membrane: f32,
-        caustics: f32,
-        bloom: f32,
-        identity: f32,
-    ) -> Self {
+    fn from_layers(hero: VisualHero, topology: f32, layers: [f32; 7]) -> Self {
+        let [accent, mesh, holography, membrane, caustics, bloom, identity] = layers;
         Self {
             hero,
             topology,
@@ -243,7 +170,7 @@ impl VisualCompositionBudget {
     }
 
     fn zero(hero: VisualHero) -> Self {
-        Self::new(hero, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        Self::from_layers(hero, 0.0, [0.0; 7])
     }
 
     fn scale_secondaries(&mut self, scale: f32) {
