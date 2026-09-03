@@ -4,6 +4,8 @@
 
 #[path = "restore_admission.rs"]
 pub(crate) mod restore_admission;
+#[path = "restore_operator.rs"]
+pub(crate) mod restore_operator;
 #[path = "restore_semantics.rs"]
 pub mod restore_semantics;
 
