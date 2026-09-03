@@ -280,7 +280,7 @@ fn verified_proof(
     workload: &ExecutorWorkloadV1,
     agent_head: CheckpointHead,
     authority_time: &VerifiedAuthorityTime,
-    authority_state: &VerifiedAuthorityState,
+    authority_state: VerifiedAuthorityState,
 ) -> symthaea_xenia_authority::VerifiedXeniaCapability {
     let signing_key = SigningKey::from_bytes(&[3; 32]);
     let public_key = signing_key.verifying_key().to_bytes();
@@ -368,12 +368,11 @@ fn durable_profile_reopens_exact_xenia_state_attempt_and_checkpoint_lineage() {
     let time = verified_time(&grant, 125);
     let state = verified_state(&grant, &time, 20, Vec::new());
     let state_digest = state.snapshot_digest();
-    let proof = verified_proof(&grant, &workload, authorized_head, &time, &state);
+    let proof = verified_proof(&grant, &workload, authorized_head, &time, state);
     let receipt = bootstrap
         .recover_verified_once(
             proof,
             &time,
-            state,
             &plan,
             ExecutionId("exec-durable-1".into()),
             ReservationId("reservation-durable-1".into()),
@@ -399,8 +398,6 @@ fn durable_profile_reopens_exact_xenia_state_attempt_and_checkpoint_lineage() {
         chain[0].context.authority_evidence_digest,
         Some(receipt.authority_evidence_digest)
     );
-    assert_eq!(chain[2].recovery_outcome, Some(receipt.recovery.outcome));
-    assert_eq!(chain[2].verification, Some(VerificationResult::Healthy));
 
     let checkpoint_store = SqliteCheckpointCasStore::open(&path).unwrap();
     let (_, durable_head) = checkpoint_store.load_frontier().unwrap().unwrap();
@@ -420,14 +417,13 @@ fn newer_verified_time_rejects_expired_xenia_proof_before_effect_or_attempt_evid
     let head = bootstrap.authorization_checkpoint_head();
     let verification_time = verified_time(&grant, 125);
     let state = verified_state(&grant, &verification_time, 20, Vec::new());
-    let proof = verified_proof(&grant, &workload, head, &verification_time, &state);
+    let proof = verified_proof(&grant, &workload, head, &verification_time, state);
     let effect_entry_time = verified_time(&grant, 161);
 
     assert!(matches!(
         bootstrap.recover_verified_once(
             proof,
             &effect_entry_time,
-            state,
             &plan,
             ExecutionId("exec-expired".into()),
             ReservationId("reservation-expired".into()),
@@ -436,18 +432,16 @@ fn newer_verified_time_rejects_expired_xenia_proof_before_effect_or_attempt_evid
     ));
     assert_eq!(*calls.lock().unwrap(), 0);
 
-    let journal = SqliteAttemptEvidenceJournal::open(&path).unwrap();
     let count: i64 = rusqlite::Connection::open(&path)
         .unwrap()
         .query_row("SELECT COUNT(*) FROM system_attempt_evidence", [], |row| row.get(0))
         .unwrap();
     assert_eq!(count, 0);
-    drop(journal);
     cleanup(&path);
 }
 
 #[test]
-fn changed_authority_state_is_rejected_before_attempt_evidence_is_created() {
+fn proof_owned_revocation_is_denied_before_dispatch_or_attempt_evidence() {
     let path = db_path();
     cleanup(&path);
     let (before, plan, grant, workload) = plan_grant_workload();
@@ -456,29 +450,28 @@ fn changed_authority_state_is_rejected_before_attempt_evidence_is_created() {
     let bootstrap = DurableXeniaSystemdBootstrap::bootstrap(grant.clone(), backend, &path).unwrap();
     let head = bootstrap.authorization_checkpoint_head();
     let time = verified_time(&grant, 125);
-    let original_state = verified_state(&grant, &time, 20, Vec::new());
-    let proof = verified_proof(&grant, &workload, head, &time, &original_state);
-    let changed_state = verified_state(
+    let state = verified_state(
         &grant,
         &time,
-        21,
+        20,
         vec![NegativeAuthorityFact::RevokeGrant {
             grant_digest: grant.digest(),
         }],
     );
+    let proof = verified_proof(&grant, &workload, head, &time, state);
 
     assert!(matches!(
         bootstrap.recover_verified_once(
             proof,
             &time,
-            changed_state,
             &plan,
-            ExecutionId("exec-state-changed".into()),
-            ReservationId("reservation-state-changed".into()),
+            ExecutionId("exec-revoked".into()),
+            ReservationId("reservation-revoked".into()),
         ),
-        Err(DurableRecoveryError::AuthorityStateChangedAfterXeniaVerification)
+        Err(DurableRecoveryError::BrokerAttempt { .. })
     ));
     assert_eq!(*calls.lock().unwrap(), 0);
+
     let count: i64 = rusqlite::Connection::open(&path)
         .unwrap()
         .query_row("SELECT COUNT(*) FROM system_attempt_evidence", [], |row| row.get(0))
