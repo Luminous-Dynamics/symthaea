@@ -2,15 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Durable one-use Xenia-authorized systemd recovery profile.
 //!
-//! This profile composes the existing semantic/security layers rather than
-//! replacing them:
-//! - Xenia proof verification happens upstream in `symthaea-xenia-authority`;
-//! - challenged multi-authority time supplies the admission-time wall-clock bound;
-//! - the verified Xenia proof owns fresh threshold authority-state evidence;
-//! - #305 remains the only systemd execution/accounting state machine;
-//! - #316 supplies checkpoint CAS semantics;
-//! - #320 supplies the concrete SQLite CAS backend;
-//! - #326 supplies durable write-ahead attempt evidence.
+//! This profile composes Xenia delegation, challenged time, authenticated
+//! authority state, a fresh witnessed process-bound executor, SQLite CAS
+//! accounting, the typed systemd broker, and durable write-ahead attempt
+//! evidence.
 
 #![deny(unsafe_code)]
 
@@ -33,13 +28,14 @@ use symthaea_system_attempt_evidence::{
 use symthaea_system_broker::{
     BrokerError, RecoveryReceipt, RestartPlan, ServiceBackend, SystemdRecoveryBroker,
 };
-use symthaea_xenia_authority::VerifiedXeniaCapability;
+use symthaea_xenia_authority::{
+    VerifiedXeniaCapability, WorkloadIdentityError,
+};
 use thiserror::Error;
 
 const XENIA_AUTHORITY_EVIDENCE_DOMAIN: &[u8] =
-    b"symthaea.xenia-systemd.authority-evidence.v0.2\0";
+    b"symthaea.xenia-systemd.authority-evidence.v0.3\0";
 
-/// Bootstrap object that exists before Xenia issues authority.
 pub struct DurableXeniaSystemdBootstrap<B>
 where
     B: ServiceBackend,
@@ -56,8 +52,6 @@ impl<B> DurableXeniaSystemdBootstrap<B>
 where
     B: ServiceBackend,
 {
-    /// Create a fresh generation-zero Agency Kernel frontier in the SQLite
-    /// state database.
     pub fn bootstrap(
         grant: CapabilityGrant,
         backend: B,
@@ -80,22 +74,20 @@ where
         })
     }
 
-    /// Exact generation-zero checkpoint Xenia must bind.
     pub fn authorization_checkpoint_head(&self) -> CheckpointHead {
         self.frontier.head
     }
 
-    /// Exact generation-zero checkpoint payload corresponding to the head.
     pub fn authorization_checkpoint(&self) -> &symthaea_action_checkpoint::GrantAccountCheckpoint {
         &self.frontier.checkpoint
     }
 
-    /// Consume one Xenia proof and run the typed broker with SQLite CAS and
-    /// write-ahead attempt evidence.
+    /// Consume one verified Xenia capability and run the existing typed broker.
     ///
-    /// No caller-selected wall clock, current epoch, revocation list, use
-    /// counter, or authority-state object is accepted. The affine Xenia proof
-    /// owns the exact state that participated in verification.
+    /// Before any attempt journal is opened, the proof-owned workload is checked
+    /// for freshness and re-measured against this exact Linux process instance.
+    /// A process/artifact mismatch therefore cannot create `DispatchArmed`
+    /// evidence, reserve a use, or call the backend.
     pub fn recover_verified_once(
         self,
         verified: VerifiedXeniaCapability,
@@ -111,6 +103,10 @@ where
         verified
             .authority_state()
             .ensure_fresh(&self.grant, authority_time)?;
+        verified
+            .executor_workload()
+            .ensure_fresh(&self.grant, authority_time)?;
+        verified.executor_workload().require_current_process()?;
 
         let now_unix_s = authority_time.conservative_now_unix_s()?;
         if now_unix_s > verified.expires_at_unix_s() {
@@ -163,7 +159,6 @@ where
             AuthorityContext {
                 now_unix_s,
                 current_epoch,
-                // Broker admission replaces this with the exact durable account.
                 use_state: GrantUseState::default(),
             },
             verified.authority_state().negative_facts(),
@@ -216,8 +211,6 @@ where
     }
 }
 
-/// Success receipt joining Xenia provenance, authority state, #305 accounting,
-/// and durable attempt evidence.
 #[derive(Debug)]
 pub struct DurableXeniaSystemdReceipt {
     pub xenia_authorization_id: [u8; 16],
@@ -262,6 +255,8 @@ pub enum DurableRecoveryError {
     AuthorityTime(#[from] AuthorityTimeError),
     #[error("verified authority state failed: {0}")]
     AuthorityState(#[from] AuthorityStateError),
+    #[error("verified executor workload failed at effect entry: {0}")]
+    Workload(#[from] WorkloadIdentityError),
     #[error("verified Xenia proof belongs to a different capability grant")]
     VerifiedGrantMismatch,
     #[error("Xenia proof expired before effect entry")]
@@ -290,6 +285,9 @@ struct XeniaAuthorityEvidenceCommitmentV1 {
     session_id: [u8; 16],
     grant_digest: Digest32,
     workload_digest: Digest32,
+    workload_process_digest: Digest32,
+    workload_policy_digest: [u8; 32],
+    workload_time_policy_digest: [u8; 32],
     ledger_entry_count: u64,
     ledger_head_hash: [u8; 32],
     prior_checkpoint: CheckpointHead,
@@ -305,12 +303,20 @@ fn xenia_authority_evidence_digest(
     verified: &VerifiedXeniaCapability,
 ) -> Digest32 {
     let (ledger_entry_count, ledger_head_hash) = verified.xenia_frontier();
+    let workload_process_digest = verified
+        .executor_workload()
+        .process()
+        .digest()
+        .expect("verified executor process commitment must remain valid");
     let commitment = XeniaAuthorityEvidenceCommitmentV1 {
         schema_version: 1,
         authorization_id: verified.authorization_id(),
         session_id: verified.session_id(),
         grant_digest,
         workload_digest: verified.workload_digest(),
+        workload_process_digest,
+        workload_policy_digest: verified.executor_workload().workload_policy_digest(),
+        workload_time_policy_digest: verified.executor_workload().time_policy_digest(),
         ledger_entry_count,
         ledger_head_hash,
         prior_checkpoint: verified.prior_checkpoint(),
@@ -330,7 +336,7 @@ fn xenia_authority_evidence_digest(
 
 fn diagnostic(error: &impl std::fmt::Display) -> Digest32 {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea.xenia-systemd.durable-profile.diagnostic.v0.2\0");
+    hasher.update(b"symthaea.xenia-systemd.durable-profile.diagnostic.v0.3\0");
     hasher.update(error.to_string().as_bytes());
     Digest32(*hasher.finalize().as_bytes())
 }
