@@ -6,8 +6,13 @@
 //! reviewed. This module does not verify signatures or the provenance of opaque
 //! digests; those remain responsibilities of the upstream trust/security boundary.
 
+pub mod approval;
 pub mod qualification;
 
+pub use approval::{
+    QualifiedRecoveryApprovalV1, RecoveryApprovalAdmissionRejection,
+    RecoveryApprovalQualificationRejection, qualify_recovery_approval,
+};
 pub use qualification::{
     QualifiedRecoveryBasisV1, RecoveryHostBindingV1, RecoveryQualificationRejection,
     qualify_recovery_basis, requalify_recovery_proposal,
