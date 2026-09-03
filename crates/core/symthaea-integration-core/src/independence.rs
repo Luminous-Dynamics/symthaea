@@ -70,6 +70,10 @@ impl IndependenceAssessment {
 pub enum IndependenceAssessmentError {
     #[error("evidence cohort is empty")]
     EmptyCohort,
+    #[error("observation {index} is invalid: {reason}")]
+    InvalidObservation { index: usize, reason: String },
+    #[error("duplicate observation id `{0}` in evidence cohort")]
+    DuplicateObservationId(String),
     #[error("cohort mixes entities: expected {expected}, found {found}")]
     MixedEntity { expected: String, found: String },
     #[error("cohort mixes signals: expected `{expected}`, found `{found}`")]
@@ -80,7 +84,9 @@ pub enum IndependenceAssessmentError {
 ///
 /// The caller chooses the temporal cohort/window. This function deliberately
 /// refuses to compare different entities or signals, because provenance
-/// independence is meaningful only after semantic alignment.
+/// independence is meaningful only after semantic alignment. It also validates
+/// each envelope and rejects duplicate observation IDs so direct callers cannot
+/// bypass basic evidence-admission invariants.
 pub fn assess_independence(
     observations: &[ObservationEnvelope],
 ) -> Result<IndependenceAssessment, IndependenceAssessmentError> {
@@ -90,7 +96,19 @@ pub fn assess_independence(
     let entity = first.entity.clone();
     let signal = first.signal.clone();
 
-    for observation in observations.iter().skip(1) {
+    let mut observation_ids = BTreeSet::new();
+    for (index, observation) in observations.iter().enumerate() {
+        observation
+            .validate()
+            .map_err(|reason| IndependenceAssessmentError::InvalidObservation {
+                index,
+                reason: reason.to_string(),
+            })?;
+        if !observation_ids.insert(observation.observation_id.clone()) {
+            return Err(IndependenceAssessmentError::DuplicateObservationId(
+                observation.observation_id.to_string(),
+            ));
+        }
         if observation.entity != entity {
             return Err(IndependenceAssessmentError::MixedEntity {
                 expected: entity.canonical_key(),
@@ -319,6 +337,27 @@ mod tests {
         assert_eq!(assessment.independent_upper_bound, 1);
         assert_eq!(assessment.metadata_conflicts.len(), 1);
         assert!(!assessment.fully_resolved());
+    }
+
+    #[test]
+    fn malformed_observation_is_rejected_before_independence_reasoning() {
+        let mut malformed = observation("a", "lineage-a", None, None);
+        malformed.signal.clear();
+        assert!(matches!(
+            assess_independence(&[malformed]),
+            Err(IndependenceAssessmentError::InvalidObservation { .. })
+        ));
+    }
+
+    #[test]
+    fn duplicate_observation_ids_are_rejected_instead_of_counted_as_reports() {
+        let a = observation("same", "lineage-a", None, None);
+        let mut b = observation("same", "lineage-b", None, None);
+        b.source.integration_id = "source-b".into();
+        assert!(matches!(
+            assess_independence(&[a, b]),
+            Err(IndependenceAssessmentError::DuplicateObservationId(_))
+        ));
     }
 
     #[test]
