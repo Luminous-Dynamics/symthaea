@@ -112,6 +112,20 @@ struct UnitState {
     transition_elapsed_ms: Option<u64>,
 }
 
+/// Convert a raw structured systemd state into the protocol domain state for a
+/// particular watched unit.
+///
+/// A non-critical systemd failure is represented as `Degraded`, not `Failed`,
+/// regardless of whether it was discovered during initial reconstruction or by
+/// a later signal. This keeps semantic truth independent of observer start time.
+fn semantic_domain_state(watched: &WatchedUnit, raw: DomainState) -> DomainState {
+    if raw == DomainState::Failed && watched.criticality != Criticality::Critical {
+        DomainState::Degraded
+    } else {
+        raw
+    }
+}
+
 fn build_initial_snapshot(
     connection: &Connection,
     manager: &Proxy<'_>,
@@ -131,9 +145,10 @@ fn build_initial_snapshot(
         let Some(unit) = query_unit_state(connection, manager, &watched.unit)? else {
             continue;
         };
-        let Some(state) = domain_state_from_active_state(&unit.active_state) else {
+        let Some(raw_state) = domain_state_from_active_state(&unit.active_state) else {
             continue;
         };
+        let state = semantic_domain_state(watched, raw_state);
 
         if state != DomainState::Pending {
             upsert_domain(
@@ -152,11 +167,13 @@ fn build_initial_snapshot(
             }
         }
 
-        if state == DomainState::Failed {
-            let observed = match watched.criticality {
-                Criticality::Critical => BootHealth::Failed,
-                Criticality::Informational | Criticality::NonCritical => BootHealth::Degraded,
-            };
+        let observed_health = match state {
+            DomainState::Failed => Some(BootHealth::Failed),
+            DomainState::Degraded => Some(BootHealth::Degraded),
+            DomainState::Delayed => Some(BootHealth::Delayed),
+            DomainState::Pending | DomainState::Starting | DomainState::Ready => None,
+        };
+        if let Some(observed) = observed_health {
             if observed.severity() > aggregate_health.severity() {
                 aggregate_health = observed;
             }
@@ -281,9 +298,10 @@ impl EventEmitter {
         watched: &WatchedUnit,
         unit: &UnitState,
     ) -> Result<(), Box<dyn Error>> {
-        let Some(state) = domain_state_from_active_state(&unit.active_state) else {
+        let Some(raw_state) = domain_state_from_active_state(&unit.active_state) else {
             return Ok(());
         };
+        let state = semantic_domain_state(watched, raw_state);
 
         let previous = self
             .reducer
@@ -321,23 +339,26 @@ impl EventEmitter {
                 elapsed_ms,
                 domain: watched.domain,
             },
-            DomainState::Failed => match watched.criticality {
-                Criticality::Critical => BootEvent::DomainFailed {
-                    sequence,
-                    elapsed_ms,
-                    domain: watched.domain,
-                    criticality: watched.criticality,
-                    detail: None,
-                },
-                Criticality::Informational | Criticality::NonCritical => BootEvent::DomainDegraded {
-                    sequence,
-                    elapsed_ms,
-                    domain: watched.domain,
-                    criticality: watched.criticality,
-                    detail: None,
-                },
+            DomainState::Delayed => BootEvent::DomainDelayed {
+                sequence,
+                elapsed_ms,
+                domain: watched.domain,
             },
-            DomainState::Pending | DomainState::Delayed | DomainState::Degraded => return Ok(()),
+            DomainState::Degraded => BootEvent::DomainDegraded {
+                sequence,
+                elapsed_ms,
+                domain: watched.domain,
+                criticality: watched.criticality,
+                detail: None,
+            },
+            DomainState::Failed => BootEvent::DomainFailed {
+                sequence,
+                elapsed_ms,
+                domain: watched.domain,
+                criticality: watched.criticality,
+                detail: None,
+            },
+            DomainState::Pending => return Ok(()),
         };
         self.publish_event(event)?;
 
@@ -576,5 +597,32 @@ mod tests {
             Some(90),
         );
         assert_eq!(snapshot.domains[0].state, DomainState::Failed);
+    }
+
+    #[test]
+    fn noncritical_failure_has_same_semantics_before_or_after_observer_start() {
+        let watched = WatchedUnit::new(
+            "network.target",
+            BootDomain::Network,
+            Some(BootPhase::Network),
+            Criticality::NonCritical,
+            false,
+        );
+        assert_eq!(
+            semantic_domain_state(&watched, DomainState::Failed),
+            DomainState::Degraded
+        );
+
+        let critical = WatchedUnit::new(
+            "local-fs.target",
+            BootDomain::Filesystems,
+            Some(BootPhase::Filesystems),
+            Criticality::Critical,
+            false,
+        );
+        assert_eq!(
+            semantic_domain_state(&critical, DomainState::Failed),
+            DomainState::Failed
+        );
     }
 }
