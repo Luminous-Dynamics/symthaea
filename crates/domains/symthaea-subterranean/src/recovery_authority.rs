@@ -88,7 +88,8 @@ pub use qualification::{
     qualify_recovery_basis, requalify_recovery_proposal,
 };
 
-use crate::operator_authority::OperatorConstraint;
+use crate::operational_checkpoint::restore_merge::merge_replay_barrier_values;
+use crate::operator_authority::{OperatorAuthority, OperatorConstraint};
 use crate::operator_protocol::{
     AuthenticationLevel, OperatorCommand, OperatorCommandEnvelope, OperatorId, OperatorRole,
 };
@@ -317,12 +318,87 @@ impl RecoveryApprovalEnvelopeV1 {
     }
 }
 
+impl OperatorAuthority {
+    /// Merge only the replay/evidence component of a historical operator
+    /// checkpoint into the live authority owner.
+    ///
+    /// This intentionally does not restore `constraint`, `policy`, diagnostic
+    /// counters, or proposal history. It preserves every live replay barrier,
+    /// incorporates any strictly newer checkpoint barrier, and invalidates all
+    /// live recovery issuance/partial-quorum state because unfinished widening
+    /// authority must never survive a restore transaction.
+    pub(crate) fn merge_restore_replay_evidence_from(&mut self, checkpoint: &Self) {
+        for (operator, checkpoint_barrier) in &checkpoint.last_sequence {
+            let merged = self
+                .last_sequence
+                .get(operator)
+                .copied()
+                .map_or(*checkpoint_barrier, |current| {
+                    merge_replay_barrier_values(current, *checkpoint_barrier)
+                });
+            self.last_sequence.insert(*operator, merged);
+        }
+        self.invalidate_recovery_state();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::operator_authority::OperatorAuthorityRejection;
 
     fn digest(byte: u8) -> RecoveryDigest {
         RecoveryDigest([byte; 32])
+    }
+
+    fn command(
+        operator: u64,
+        epoch: u64,
+        sequence: u64,
+        proposal_id: u64,
+        command: OperatorCommand,
+    ) -> OperatorCommandEnvelope {
+        OperatorCommandEnvelope {
+            operator: OperatorId(operator),
+            role: OperatorRole::SafetyOfficer,
+            authentication: AuthenticationLevel::HardwareBacked,
+            epoch,
+            sequence,
+            proposal_id,
+            issued_step: 1,
+            expires_step: 1_000,
+            command,
+        }
+    }
+
+    fn proposal(id: u64, active: OperatorConstraint) -> RecoveryProposalV1 {
+        RecoveryProposalV1::new(
+            id,
+            active,
+            digest(1),
+            digest(2),
+            digest(3),
+            1,
+            1,
+            10,
+            100,
+        )
+    }
+
+    fn approval(
+        operator: u64,
+        sequence: u64,
+        proposal: RecoveryProposalV1,
+    ) -> RecoveryApprovalEnvelopeV1 {
+        RecoveryApprovalEnvelopeV1 {
+            operator: OperatorId(operator),
+            role: OperatorRole::SafetyOfficer,
+            authentication: AuthenticationLevel::HardwareBacked,
+            epoch: 1,
+            sequence,
+            approval_issued_step: 20,
+            proposal,
+        }
     }
 
     #[test]
@@ -397,5 +473,118 @@ mod tests {
             approval.validate_proposal_time(),
             Err(RecoveryProposalRejection::ApprovalPredatesProposal)
         );
+    }
+
+    #[test]
+    fn stale_checkpoint_cannot_move_live_replay_barrier_backward() {
+        let mut live = OperatorAuthority::default();
+        live.ingest(
+            command(1, 1, 1, 1, OperatorCommand::EmergencyStop),
+            10,
+            true,
+        )
+        .unwrap();
+        let checkpoint = live.clone();
+        live.ingest(
+            command(1, 1, 5, 2, OperatorCommand::EmergencyStop),
+            11,
+            true,
+        )
+        .unwrap();
+
+        live.merge_restore_replay_evidence_from(&checkpoint);
+
+        assert_eq!(
+            live.ingest(
+                command(1, 1, 5, 3, OperatorCommand::EmergencyStop),
+                12,
+                true,
+            ),
+            Err(OperatorAuthorityRejection::Replay)
+        );
+    }
+
+    #[test]
+    fn checkpoint_with_newer_epoch_advances_live_replay_barrier() {
+        let mut live = OperatorAuthority::default();
+        live.ingest(
+            command(1, 1, 9, 1, OperatorCommand::EmergencyStop),
+            10,
+            true,
+        )
+        .unwrap();
+        let mut checkpoint = OperatorAuthority::default();
+        checkpoint
+            .ingest(
+                command(1, 2, 1, 2, OperatorCommand::EmergencyStop),
+                10,
+                true,
+            )
+            .unwrap();
+
+        live.merge_restore_replay_evidence_from(&checkpoint);
+
+        assert_eq!(
+            live.ingest(
+                command(1, 1, u64::MAX, 3, OperatorCommand::EmergencyStop),
+                11,
+                true,
+            ),
+            Err(OperatorAuthorityRejection::StaleEpoch)
+        );
+        assert_eq!(
+            live.ingest(
+                command(1, 2, 1, 4, OperatorCommand::EmergencyStop),
+                11,
+                true,
+            ),
+            Err(OperatorAuthorityRejection::Replay)
+        );
+    }
+
+    #[test]
+    fn replay_merge_drops_unfinished_recovery_authority() {
+        let mut live = OperatorAuthority::default();
+        live.ingest(
+            command(1, 1, 1, 1, OperatorCommand::HoldPosition),
+            10,
+            true,
+        )
+        .unwrap();
+        let checkpoint = live.clone();
+        let p = proposal(9, OperatorConstraint::HoldPosition);
+        live.issue_recovery_proposal(p, 20).unwrap();
+        live.approve_recovery(approval(1, 2, p), 20).unwrap();
+        assert_eq!(live.pending_approvals(9), 1);
+        assert_eq!(live.issued_recovery_proposal(9), Some(p));
+
+        live.merge_restore_replay_evidence_from(&checkpoint);
+
+        assert_eq!(live.pending_approvals(9), 0);
+        assert_eq!(live.issued_recovery_proposal(9), None);
+        assert_eq!(live.constraint(), OperatorConstraint::HoldPosition);
+    }
+
+    #[test]
+    fn replay_merge_never_replaces_active_constraint() {
+        let mut live = OperatorAuthority::default();
+        live.ingest(
+            command(1, 1, 1, 1, OperatorCommand::EmergencyStop),
+            10,
+            true,
+        )
+        .unwrap();
+        let mut checkpoint = OperatorAuthority::default();
+        checkpoint
+            .ingest(
+                command(2, 1, 1, 2, OperatorCommand::ReturnHome),
+                10,
+                true,
+            )
+            .unwrap();
+
+        live.merge_restore_replay_evidence_from(&checkpoint);
+
+        assert_eq!(live.constraint(), OperatorConstraint::EmergencyStop);
     }
 }
