@@ -23,6 +23,28 @@ let
   performanceArgs = optionals cfg.performance.enable [
     "--performance-receipt ${escapeShellArg cfg.performance.receiptPath}"
   ];
+  seedArgs = if cfg.genesisPhrase == null then [
+    "--visual-seed-file ${escapeShellArg cfg.visualSeedFile}"
+  ] else [
+    # Compatibility only. This value is presentation input and MUST NOT contain
+    # credentials, recovery phrases, key material, or private identity data.
+    "--genesis-phrase ${escapeShellArg cfg.genesisPhrase}"
+  ];
+  visualSeedInit = pkgs.writeShellScript "symthaea-boot-visual-seed-init" ''
+    set -eu
+    seed_file=${escapeShellArg cfg.visualSeedFile}
+    seed_dir="$(${pkgs.coreutils}/bin/dirname -- "$seed_file")"
+    ${pkgs.coreutils}/bin/mkdir -p -- "$seed_dir"
+
+    if [ ! -s "$seed_file" ]; then
+      tmp="$seed_file.tmp.$$"
+      trap '${pkgs.coreutils}/bin/rm -f -- "$tmp"' EXIT
+      ${pkgs.coreutils}/bin/head -c 32 /dev/urandom | ${pkgs.coreutils}/bin/base64 > "$tmp"
+      ${pkgs.coreutils}/bin/chmod 0644 "$tmp"
+      ${pkgs.coreutils}/bin/mv -f -- "$tmp" "$seed_file"
+      trap - EXIT
+    fi
+  '';
 in {
   options.services.symthaea-boot = {
     enable = mkEnableOption "Symthaea/Spore boot animation";
@@ -32,12 +54,25 @@ in {
       description = "The symthaea-quicken-fb package containing the quicken-fb binary.";
     };
 
-    genesisPhrase = mkOption {
+    visualSeedFile = mkOption {
       type = types.str;
-      default = "consciousness awakens";
+      default = "/var/lib/symthaea/boot-visual-seed";
       description = ''
-        Genesis phrase for deterministic boot animation seeding. Each unique
-        phrase produces a distinct mycelial growth pattern via BLAKE3 hashing.
+        Persistent presentation-only seed file for deterministic boot artwork.
+        The module creates it from random bytes when absent. This file is not a
+        credential, recovery secret, key-derivation input, or authority-bearing
+        machine identity and should not be reused for any security purpose.
+      '';
+    };
+
+    genesisPhrase = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = ''
+        DEPRECATED compatibility input for historical quicken-fb deployments.
+        When non-null it is passed through the deprecated --genesis-phrase flag.
+        It is presentation-only and MUST NOT contain credentials, recovery
+        phrases, key material, or private identity data. Prefer visualSeedFile.
       '';
     };
 
@@ -126,6 +161,14 @@ in {
     {
       assertions = [
         {
+          assertion = cfg.genesisPhrase != null || hasPrefix "/" cfg.visualSeedFile;
+          message = "services.symthaea-boot.visualSeedFile must be an absolute path";
+        }
+        {
+          assertion = cfg.genesisPhrase != null || !hasPrefix "/run/" cfg.visualSeedFile;
+          message = "services.symthaea-boot.visualSeedFile must be persistent, not beneath /run";
+        }
+        {
           assertion = !cfg.telemetry.enable || hasPrefix "/run/symthaea/" cfg.telemetry.eventSocket;
           message = "services.symthaea-boot.telemetry.eventSocket must stay beneath /run/symthaea";
         }
@@ -165,13 +208,14 @@ in {
 
           ExecStart = concatStringsSep " " ([
             "${cfg.package}/bin/quicken-fb"
-            "--genesis-phrase ${escapeShellArg cfg.genesisPhrase}"
+          ] ++ seedArgs ++ [
             "--progress-pipe ${escapeShellArg cfg.progressPipe}"
             "--device ${escapeShellArg cfg.device}"
           ] ++ telemetryArgs ++ handoffArgs ++ performanceArgs);
 
           ExecStartPre =
-            optionals cfg.handoff.enable [
+            optional (cfg.genesisPhrase == null) "${visualSeedInit}"
+            ++ optionals cfg.handoff.enable [
               "${pkgs.coreutils}/bin/rm -f -- ${escapeShellArg cfg.handoff.receiptPath}"
             ]
             ++ optionals cfg.performance.enable [
