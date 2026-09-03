@@ -5,6 +5,9 @@ on:
     paths:
       - 'crates/core/symthaea-authority/**'
       - 'crates/bridges/symthaea-platform-attestation/**'
+      - 'nix/agency-tpm2-verifier-tools.nix'
+      - 'flake.nix'
+      - 'flake.lock'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
