@@ -266,9 +266,17 @@ fn main() -> anyhow::Result<()> {
             if let Some(root) = repo_root.as_deref() {
                 interoception_archive_fs::require_external_directory(root, &evidence_dir)?;
             }
+            let manifest = interoception_archive_fs::closed_relative_file(
+                &evidence_dir,
+                "environment.json",
+            )?;
+            let transcript = interoception_archive_fs::closed_relative_file(
+                &evidence_dir,
+                "transcript.bin",
+            )?;
             let verified = interoception_qualification::verify_local_gate(
-                &interoception_qualification::local_manifest_path(&evidence_dir),
-                &interoception_qualification::local_transcript_path(&evidence_dir),
+                &manifest,
+                &transcript,
                 repo_root.as_deref(),
             )?;
             println!("{}", serde_json::to_string_pretty(&verified)?);
@@ -297,7 +305,7 @@ fn main() -> anyhow::Result<()> {
             if let Some(root) = repo_root.as_deref() {
                 interoception_archive_fs::require_external_directory(root, &archive_dir)?;
             }
-            let verified = interoception_qualification::verify_actions_archive(
+            let verified = interoception_actions_archive::verify_actions_archive_closed(
                 &archive_dir,
                 repo_root.as_deref(),
             )?;
