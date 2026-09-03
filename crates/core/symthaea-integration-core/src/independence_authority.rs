@@ -12,7 +12,7 @@
 //! positive attestations into corroboration is deferred to a separately
 //! qualified reasoning tranche.
 
-use crate::ObservationId;
+use crate::{ObservationEnvelope, ObservationId};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -20,11 +20,19 @@ pub const INDEPENDENCE_ATTESTATION_SCHEMA_VERSION: u16 = 1;
 
 /// Source-qualified reference to one measurement lineage.
 ///
-/// The integration id prevents two adapters that happen to reuse the same local
-/// lineage string from becoming the same attestation subject.
+/// The reference binds not just an adapter id and local lineage string but also
+/// the available collector, tenant, and upstream-origin context. This prevents a
+/// lineage id reused by separate collectors or administrative domains from
+/// silently becoming the same attestation subject.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct EvidenceLineageRef {
     pub integration_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collector_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upstream_origin: Option<String>,
     pub lineage_id: String,
 }
 
@@ -32,18 +40,41 @@ impl EvidenceLineageRef {
     pub fn new(integration_id: impl Into<String>, lineage_id: impl Into<String>) -> Self {
         Self {
             integration_id: integration_id.into(),
+            collector_id: None,
+            tenant: None,
+            upstream_origin: None,
             lineage_id: lineage_id.into(),
         }
     }
 
+    /// Construct the exact source-qualified lineage represented by an observation.
+    pub fn from_observation(observation: &ObservationEnvelope) -> Self {
+        Self {
+            integration_id: observation.source.integration_id.clone(),
+            collector_id: observation.source.collector_id.clone(),
+            tenant: observation.source.tenant.clone(),
+            upstream_origin: observation.source.upstream_origin.clone(),
+            lineage_id: observation.lineage.lineage_id.clone(),
+        }
+    }
+
+    /// Exact match against the source context carried by an observation.
+    pub fn matches_observation(&self, observation: &ObservationEnvelope) -> bool {
+        self.integration_id == observation.source.integration_id
+            && self.collector_id == observation.source.collector_id
+            && self.tenant == observation.source.tenant
+            && self.upstream_origin == observation.source.upstream_origin
+            && self.lineage_id == observation.lineage.lineage_id
+    }
+
     pub fn canonical_key(&self) -> String {
-        format!(
-            "lineage-v1|{}:{}|{}:{}",
-            self.integration_id.len(),
-            self.integration_id,
-            self.lineage_id.len(),
-            self.lineage_id
-        )
+        let mut key = String::from("lineage-ref-v1");
+        push_required_component(&mut key, &self.integration_id);
+        push_optional_component(&mut key, self.collector_id.as_deref());
+        push_optional_component(&mut key, self.tenant.as_deref());
+        push_optional_component(&mut key, self.upstream_origin.as_deref());
+        push_required_component(&mut key, &self.lineage_id);
+        key
     }
 }
 
@@ -166,9 +197,11 @@ impl IndependenceAttestation {
 
 /// Local trust policy for positive-independence authority admission.
 ///
-/// The attestation object is not self-authenticating. A caller must explicitly
-/// allow the exact `(authority_id, qualification_id)` pair through trusted local
-/// policy before the statement is admitted.
+/// The attestation object is **not self-authenticating**. This allowlist is only
+/// an admission policy; it does not verify that bytes truly came from the named
+/// authority. Signature, secure-transport, or equivalent authority verification
+/// must occur before this policy is applied. The exact `(authority_id,
+/// qualification_id)` pair must then be explicitly trusted locally.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndependenceAuthorityPolicy {
     pub trusted_qualifications: BTreeSet<IndependenceAuthorityQualification>,
@@ -322,6 +355,22 @@ fn validate_lineage(
             _ => "right.lineage_id",
         }));
     }
+    for (suffix, value) in [
+        ("collector_id", lineage.collector_id.as_deref()),
+        ("tenant", lineage.tenant.as_deref()),
+        ("upstream_origin", lineage.upstream_origin.as_deref()),
+    ] {
+        if value.is_some_and(|value| value.trim().is_empty()) {
+            return Err(IndependenceAttestationError::EmptyField(match (prefix, suffix) {
+                ("left", "collector_id") => "left.collector_id",
+                ("left", "tenant") => "left.tenant",
+                ("left", _) => "left.upstream_origin",
+                (_, "collector_id") => "right.collector_id",
+                (_, "tenant") => "right.tenant",
+                _ => "right.upstream_origin",
+            }));
+        }
+    }
     Ok(())
 }
 
@@ -336,19 +385,47 @@ fn require_non_empty(
     }
 }
 
+fn push_required_component(output: &mut String, value: &str) {
+    output.push('|');
+    output.push_str(value.len().to_string().as_str());
+    output.push(':');
+    output.push_str(value);
+}
+
+fn push_optional_component(output: &mut String, value: Option<&str>) {
+    match value {
+        None => output.push_str("|N"),
+        Some(value) => {
+            output.push_str("|S");
+            output.push_str(value.len().to_string().as_str());
+            output.push(':');
+            output.push_str(value);
+        }
+    }
+}
+
 fn attestation_string_bytes(
     attestation: &IndependenceAttestation,
 ) -> Result<usize, IndependenceAttestationSetError> {
     let mut total = 0usize;
     for value in [
-        attestation.attestation_id.as_str(),
-        attestation.left.integration_id.as_str(),
-        attestation.left.lineage_id.as_str(),
-        attestation.right.integration_id.as_str(),
-        attestation.right.lineage_id.as_str(),
-        attestation.authority.authority_id.as_str(),
-        attestation.authority.qualification_id.as_str(),
-    ] {
+        Some(attestation.attestation_id.as_str()),
+        Some(attestation.left.integration_id.as_str()),
+        attestation.left.collector_id.as_deref(),
+        attestation.left.tenant.as_deref(),
+        attestation.left.upstream_origin.as_deref(),
+        Some(attestation.left.lineage_id.as_str()),
+        Some(attestation.right.integration_id.as_str()),
+        attestation.right.collector_id.as_deref(),
+        attestation.right.tenant.as_deref(),
+        attestation.right.upstream_origin.as_deref(),
+        Some(attestation.right.lineage_id.as_str()),
+        Some(attestation.authority.authority_id.as_str()),
+        Some(attestation.authority.qualification_id.as_str()),
+    ]
+    .into_iter()
+    .flatten()
+    {
         total = total
             .checked_add(value.len())
             .ok_or(IndependenceAttestationSetError::StringBudgetOverflow)?;
@@ -369,6 +446,10 @@ fn attestation_string_bytes(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        EntityRef, ObservationKind, ObservationLineage, ObservationQuality, ObservationSource,
+        ObservationValue,
+    };
 
     fn authority() -> IndependenceAuthorityQualification {
         IndependenceAuthorityQualification::new("security-review", "independence-v1")
@@ -394,6 +475,32 @@ mod tests {
             trusted_qualifications: BTreeSet::from([authority()]),
             ..IndependenceAuthorityPolicy::default()
         }
+    }
+
+    fn observation() -> ObservationEnvelope {
+        ObservationEnvelope::new(
+            ObservationId::new("obs-source"),
+            100,
+            100,
+            EntityRef::new("site:lab", "host", "node-1"),
+            ObservationKind::Metric,
+            "system.cpu.utilization",
+            ObservationValue::Unsigned(1),
+            ObservationSource {
+                integration_id: "prometheus".into(),
+                collector_id: Some("collector-a".into()),
+                upstream_origin: Some("node-exporter:node-1".into()),
+                measurement_method: "prometheus-text".into(),
+                tenant: Some("tenant-a".into()),
+            },
+            ObservationQuality::observed(1.0),
+            ObservationLineage {
+                lineage_id: "blackbox-probe".into(),
+                parent_ids: vec![],
+                independence_group: None,
+                transforms: vec![],
+            },
+        )
     }
 
     #[test]
@@ -428,6 +535,21 @@ mod tests {
             set.validate_with_policy(&policy()),
             Err(IndependenceAttestationSetError::UntrustedQualification { .. })
         ));
+    }
+
+    #[test]
+    fn lineage_reference_binds_exact_source_context() {
+        let observation = observation();
+        let reference = EvidenceLineageRef::from_observation(&observation);
+        assert!(reference.matches_observation(&observation));
+
+        let mut other_collector = observation.clone();
+        other_collector.source.collector_id = Some("collector-b".into());
+        assert!(!reference.matches_observation(&other_collector));
+
+        let mut other_tenant = observation.clone();
+        other_tenant.source.tenant = Some("tenant-b".into());
+        assert!(!reference.matches_observation(&other_tenant));
     }
 
     #[test]
