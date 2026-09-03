@@ -1,0 +1,22 @@
+[package]
+name = "symthaea-iot-actuation-guard"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Minimal privileged non-actuating ingress guard for cyber-physical evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "security", "ipc", "actuation"]
+categories = ["embedded"]
+
+[dependencies]
+bincode = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-actuation-guard-protocol = { path = "../symthaea-iot-actuation-guard-protocol" }
+symthaea-iot-transport-receipt = { path = "../symthaea-iot-transport-receipt" }
+symthaea-iot-xenia-hybrid-verifier = { path = "../symthaea-iot-xenia-hybrid-verifier" }
