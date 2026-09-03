@@ -42,6 +42,8 @@ let
   publicOptions = evaluated.options.services.symthaea-ci-runner;
   tokenFileType = publicOptions.tokenFile.type;
   firstExecStartPre = builtins.elemAt service.serviceConfig.ExecStartPre 0;
+  secondExecStartPre = builtins.elemAt service.serviceConfig.ExecStartPre 1;
+  credentialPreflight = lib.removePrefix "+" firstExecStartPre;
 
   hasFailedAssertion = needle: assertions:
     lib.any (
@@ -94,11 +96,27 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
   test '${service.serviceConfig.UMask}' = '0066'
   test '${service.serviceConfig.StateDirectoryMode}' = '0700'
 
-  # A root-owned 0400/0600 token file is intentionally supported. The pinned
-  # nixpkgs service performs its first pre-start stage as root, copies the
-  # credential into the private state directory, then configures the DynamicUser
-  # runner from that temporary copy.
+  # Symthaea prepends a root-only credential-policy check before the upstream
+  # root bootstrap. Pin both the ordering and the checks themselves so a future
+  # module/nixpkgs edit cannot silently turn operator guidance back into a soft
+  # convention.
   test '${if lib.hasPrefix "+" firstExecStartPre then "true" else "false"}' = 'true'
+  echo '${firstExecStartPre}' | grep -F 'symthaea-ci-runner-credential-preflight'
+  test -x '${credentialPreflight}'
+  grep -F -- "stat -Lc '%u'" '${credentialPreflight}'
+  grep -F -- "stat -Lc '%a'" '${credentialPreflight}'
+  grep -F -- "stat -Lc '%s'" '${credentialPreflight}'
+  grep -F -- 'wc -l' '${credentialPreflight}'
+  grep -F -- "grep -Eq '^[[:graph:]]+$'" '${credentialPreflight}'
+  grep -F -- 'must be owned by root' '${credentialPreflight}'
+  grep -F -- 'mode must be exactly 0400 or 0600' '${credentialPreflight}'
+  test '${if lib.hasPrefix "+" secondExecStartPre then "true" else "false"}' = 'true'
+
+  # A root-owned 0400/0600 token file is intentionally supported. The pinned
+  # nixpkgs service's next pre-start stage copies the credential into the private
+  # state directory, then configures the DynamicUser runner from that temporary
+  # copy.
+  grep -F -- 'github-runner' <(printf '%s\n' '${secondExecStartPre}') >/dev/null
 
   # Network is intentionally available for GitHub/Nix/Cargo access, but the
   # allowed address-family set must not grow to raw packet sockets.
