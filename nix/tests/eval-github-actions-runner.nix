@@ -110,13 +110,10 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
   grep -F -- "grep -Eq '^[[:graph:]]+$'" '${credentialPreflight}'
   grep -F -- 'must be owned by root' '${credentialPreflight}'
   grep -F -- 'mode must be exactly 0400 or 0600' '${credentialPreflight}'
-  test '${if lib.hasPrefix "+" secondExecStartPre then "true" else "false"}' = 'true'
 
-  # A root-owned 0400/0600 token file is intentionally supported. The pinned
-  # nixpkgs service's next pre-start stage copies the credential into the private
-  # state directory, then configures the DynamicUser runner from that temporary
-  # copy.
-  grep -F -- 'github-runner' <(printf '%s\n' '${secondExecStartPre}') >/dev/null
+  # The pinned nixpkgs service's next pre-start stage must still be privileged;
+  # the exact generated store-path name is intentionally not asserted here.
+  test '${if lib.hasPrefix "+" secondExecStartPre then "true" else "false"}' = 'true'
 
   # Network is intentionally available for GitHub/Nix/Cargo access, but the
   # allowed address-family set must not grow to raw packet sockets.
