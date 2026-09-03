@@ -113,7 +113,7 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
 
   # The policy checker may inspect metadata/content predicates, but it must never
   # reproduce the credential value through common output/hash utilities.
-  if grep -Eq '(cat|head|tail|printf|echo|md5sum|sha[0-9]*sum).*["'"']?\$token' '${credentialPreflight}'; then
+  if grep -Eq '(cat|head|tail|printf|echo|md5sum|sha[0-9]*sum).*\$token' '${credentialPreflight}'; then
     echo 'credential preflight can reproduce token contents' >&2
     exit 1
   fi
