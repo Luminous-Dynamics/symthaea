@@ -27,8 +27,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  runtime-format:
-    name: IoT runtime source format
+  telemetry-format:
+    name: IoT telemetry source format
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -46,9 +46,11 @@ jobs:
           rustc --version | grep -F 'rustc 1.94.0'
           cargo --version | grep -F 'cargo 1.94.0'
 
-      # Parent PRs own formatting of authority/execution/runtime substrate source.
-      - name: Check IoT runtime bridge formatting
-        run: rustfmt --edition 2024 --check crates/bridges/symthaea-iot-runtime/src/lib.rs
+      - name: Check parser and trust-boundary formatting
+        run: >-
+          rustfmt --edition 2024 --check
+          src/swarm/mesh/sensor_iot.rs
+          src/cognitive_loop/managers/survival_manager.rs
 
   runtime-implementation:
     name: IoT crash-safe runtime implementation
@@ -106,7 +108,7 @@ jobs:
           --all-targets -- -D warnings
 
   telemetry-boundary:
-    name: Survival telemetry trust boundary
+    name: IoT parser and survival trust boundary
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -124,7 +126,10 @@ jobs:
           rustc --version | grep -F 'rustc 1.94.0'
           cargo --version | grep -F 'cargo 1.94.0'
 
-      - name: Focused survival-manager regressions
+      - name: Focused sensor parser/resource regressions
+        run: cargo test -p symthaea --no-default-features --features survival --lib sensor_iot::tests
+
+      - name: Focused survival-manager trust regressions
         run: cargo test -p symthaea --no-default-features --features survival --lib survival_manager::tests
 
   locked-metadata:
