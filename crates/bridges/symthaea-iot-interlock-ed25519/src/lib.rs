@@ -75,7 +75,7 @@ impl InterlockControllerEvidenceVerifier for Ed25519Rfc8032InterlockVerifier {
         let Ok(verifying_key) = VerifyingKey::from_bytes(public_key_bytes) else {
             return false;
         };
-        let Ok(signature) = Signature::from_slice(raw_evidence) else {
+        let Ok(signature) = Signature::try_from(raw_evidence) else {
             return false;
         };
 
