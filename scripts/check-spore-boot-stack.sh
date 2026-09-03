@@ -2,7 +2,7 @@
 # Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# Focused qualification lane for the Spore boot stack.
+# Focused qualification lane for the Spore boot/lifecycle stack.
 
 set -euo pipefail
 
@@ -15,7 +15,39 @@ PACKAGES=(
   symthaea-quicken-fb
   symthaea-boot-control
   symthaea-boot-input
+  symthaea-boot-ecology-live
+  symthaea-boot-visual-clock
+  symthaea-boot-presentation
+  symthaea-spore-continuity
 )
+
+# Projection is the final renderer-independent seam and is present only on the
+# descendant integration branch. Keep one qualification entrypoint usable on
+# both the convergence base and that descendant without duplicating package
+# lists in workflow YAML.
+if [[ -f crates/domains/symthaea-boot-render-projection/Cargo.toml ]]; then
+    PACKAGES+=(symthaea-boot-render-projection)
+fi
+
+format_packages() {
+    local mode="${1:-check}"
+    for package in "${PACKAGES[@]}"; do
+        if [[ "$mode" == "apply" ]]; then
+            echo "== cargo fmt -p $package =="
+            cargo fmt -p "$package"
+        else
+            echo "== cargo fmt -p $package --check =="
+            cargo fmt -p "$package" --check
+        fi
+    done
+}
+
+# CI uses this mode to produce an exact rustfmt candidate without pretending
+# that a formatter-mutated checkout is the committed state being qualified.
+if [[ "${SPORE_BOOT_FORMAT_ONLY:-0}" == "1" ]]; then
+    format_packages apply
+    exit 0
+fi
 
 run_cargo_for_each() {
     local command="$1"
@@ -31,10 +63,7 @@ run_cargo_for_each() {
 echo "== cargo metadata --locked =="
 cargo metadata --locked --no-deps --format-version 1 >/dev/null
 
-for package in "${PACKAGES[@]}"; do
-    echo "== cargo fmt -p $package --check =="
-    cargo fmt -p "$package" --check
-done
+format_packages check
 
 run_cargo_for_each check --all-targets
 run_cargo_for_each test
@@ -75,4 +104,4 @@ if [[ "${1:-}" == "--vm" ]]; then
     nix build .#vm-test
 fi
 
-echo "PASS: focused Spore boot stack qualification"
+echo "PASS: focused Spore boot/lifecycle stack qualification"

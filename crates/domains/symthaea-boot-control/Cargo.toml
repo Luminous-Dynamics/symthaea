@@ -1,12 +1,13 @@
 [package]
 name = "symthaea-boot-control"
 version = "0.1.0"
-edition = "2024"
-license = "AGPL-3.0-or-later"
+edition.workspace = true
+license.workspace = true
 description = "Typed presentation-mode control protocol for the Symthaea/Spore boot experience"
 
 [dependencies]
 serde = { workspace = true }
+symthaea-boot-ecology-live = { path = "../symthaea-boot-ecology-live" }
 
 [dev-dependencies]
 serde_json = { workspace = true }
