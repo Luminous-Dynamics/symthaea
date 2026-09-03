@@ -70,6 +70,18 @@ impl ReplayBarrier {
     }
 }
 
+/// Crate-internal adapter for domain owners whose private replay ledger is stored
+/// as raw `(epoch, sequence)` tuples. The ordering rule remains centralized in
+/// RA-21 without exposing the `ReplayBarrier` type downstream.
+pub(crate) const fn merge_replay_barrier_values(
+    current: (u64, u64),
+    checkpoint: (u64, u64),
+) -> (u64, u64) {
+    let merged = ReplayBarrier::new(current.0, current.1)
+        .merge(ReplayBarrier::new(checkpoint.0, checkpoint.1));
+    (merged.epoch(), merged.sequence())
+}
+
 /// Identity of the evidence window in which a restriction-supporting counter is
 /// meaningful.
 ///
@@ -260,6 +272,16 @@ mod tests {
     }
 
     #[test]
+    fn raw_tuple_adapter_uses_exact_replay_algebra() {
+        assert_eq!(
+            merge_replay_barrier_values((4, u64::MAX), (5, 0)),
+            (5, 0)
+        );
+        assert_eq!(merge_replay_barrier_values((5, 3), (5, 9)), (5, 9));
+        assert_eq!(merge_replay_barrier_values((5, 9), (5, 3)), (5, 9));
+    }
+
+    #[test]
     fn replay_merge_is_inflationary_commutative_and_idempotent() {
         for left in barriers() {
             assert_eq!(left.merge(left), left);
@@ -303,7 +325,10 @@ mod tests {
                     scoped(left).merge(scoped(right)),
                     RestrictionEvidenceMerge::Merged(scoped(expected))
                 );
-                assert_eq!(scoped(left).merge(scoped(right)), scoped(right).merge(scoped(left)));
+                assert_eq!(
+                    scoped(left).merge(scoped(right)),
+                    scoped(right).merge(scoped(left))
+                );
             }
         }
     }
