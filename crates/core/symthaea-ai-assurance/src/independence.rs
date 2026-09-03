@@ -838,7 +838,7 @@ mod tests {
         BudgetEnforcement, BudgetGuardedRuntime, BudgetProfile, BudgetQuantities,
         EffectGuardedRuntime, EnforcementClass, ObservedOutcome, PolicyDescriptor,
         PolicyGuardedRuntime, PolicyMode, PolicyResourceRuntime, ResolutionAuthorityDomain,
-        ResourceIdentity, ResourceResolverDomain, ResourceRuntime, Scope,
+        ResourceIdentity, ResourceResolverDomain, ResourceRuntime,
         TemporalPolicyEvaluatorDomain, TemporalPolicyExecutionDomain, TemporalPolicyRules,
         TrustedRuntime, Write,
     };
