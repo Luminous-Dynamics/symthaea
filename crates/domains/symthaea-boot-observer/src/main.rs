@@ -126,6 +126,38 @@ fn semantic_domain_state(watched: &WatchedUnit, raw: DomainState) -> DomainState
     }
 }
 
+/// Resolve aggregate health from the currently represented domain facts.
+///
+/// This is intentionally current-state based at the `BootReady` boundary. A
+/// historical failure that has fully recovered may stop claiming Failed or
+/// Degraded, but recovery alone does not prove Normal: absent current negative
+/// evidence resolves to Unknown unless Normal was independently established.
+fn aggregate_health_from_domains(
+    domains: &[DomainSnapshot],
+    previously_established: BootHealth,
+) -> BootHealth {
+    let mut aggregate = BootHealth::Unknown;
+    for domain in domains {
+        let observed = match domain.state {
+            DomainState::Failed => Some(BootHealth::Failed),
+            DomainState::Degraded => Some(BootHealth::Degraded),
+            DomainState::Delayed => Some(BootHealth::Delayed),
+            DomainState::Pending | DomainState::Starting | DomainState::Ready => None,
+        };
+        if let Some(observed) = observed {
+            if observed.severity() > aggregate.severity() {
+                aggregate = observed;
+            }
+        }
+    }
+
+    if aggregate == BootHealth::Unknown && previously_established == BootHealth::Normal {
+        BootHealth::Normal
+    } else {
+        aggregate
+    }
+}
+
 fn build_initial_snapshot(
     connection: &Connection,
     manager: &Proxy<'_>,
@@ -139,7 +171,6 @@ fn build_initial_snapshot(
     );
     let mut highest_phase = BootPhase::Kernel;
     let mut boot_ready = false;
-    let mut aggregate_health = BootHealth::Unknown;
 
     for watched in &config.watched_units {
         let Some(unit) = query_unit_state(connection, manager, &watched.unit)? else {
@@ -167,23 +198,12 @@ fn build_initial_snapshot(
             }
         }
 
-        let observed_health = match state {
-            DomainState::Failed => Some(BootHealth::Failed),
-            DomainState::Degraded => Some(BootHealth::Degraded),
-            DomainState::Delayed => Some(BootHealth::Delayed),
-            DomainState::Pending | DomainState::Starting | DomainState::Ready => None,
-        };
-        if let Some(observed) = observed_health {
-            if observed.severity() > aggregate_health.severity() {
-                aggregate_health = observed;
-            }
-        }
-
         if watched.boot_ready && state == DomainState::Ready {
             boot_ready = true;
         }
     }
 
+    let aggregate_health = aggregate_health_from_domains(&snapshot.domains, BootHealth::Unknown);
     snapshot.phase = if boot_ready {
         BootPhase::Ready
     } else {
@@ -385,11 +405,15 @@ impl EventEmitter {
             return Ok(());
         }
         self.boot_ready_emitted = true;
-        let health = health_at_boot_ready(self.reducer.snapshot().health);
+        let current = self.reducer.snapshot();
+        let health = health_at_boot_ready(aggregate_health_from_domains(
+            &current.domains,
+            current.health,
+        ));
         let sequence = self.sequence();
         self.publish_event(BootEvent::BootReady {
             sequence,
-            elapsed_ms: boot_elapsed_ms().max(self.reducer.snapshot().elapsed_ms),
+            elapsed_ms: boot_elapsed_ms().max(current.elapsed_ms),
             health,
         })
     }
@@ -623,6 +647,33 @@ mod tests {
         assert_eq!(
             semantic_domain_state(&critical, DomainState::Failed),
             DomainState::Failed
+        );
+    }
+
+    #[test]
+    fn ready_health_uses_current_domains_and_does_not_invent_normal() {
+        let degraded = vec![DomainSnapshot {
+            domain: BootDomain::Network,
+            state: DomainState::Degraded,
+            elapsed_ms: Some(10),
+        }];
+        assert_eq!(
+            aggregate_health_from_domains(&degraded, BootHealth::Failed),
+            BootHealth::Degraded
+        );
+
+        let recovered = vec![DomainSnapshot {
+            domain: BootDomain::Network,
+            state: DomainState::Ready,
+            elapsed_ms: Some(20),
+        }];
+        assert_eq!(
+            aggregate_health_from_domains(&recovered, BootHealth::Failed),
+            BootHealth::Unknown
+        );
+        assert_eq!(
+            aggregate_health_from_domains(&recovered, BootHealth::Normal),
+            BootHealth::Normal
         );
     }
 }
