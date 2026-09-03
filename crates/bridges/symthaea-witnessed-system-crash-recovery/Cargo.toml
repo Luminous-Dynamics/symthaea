@@ -13,3 +13,10 @@ symthaea-authority-frontier-sqlite = { path = "../symthaea-authority-frontier-sq
 symthaea-checkpoint-witness = { path = "../symthaea-checkpoint-witness" }
 symthaea-system-attempt-recovery-index = { path = "../symthaea-system-attempt-recovery-index" }
 symthaea-system-crash-recovery = { path = "../symthaea-system-crash-recovery" }
+
+[dev-dependencies]
+ed25519-dalek = { workspace = true }
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
+symthaea-authority-time = { path = "../symthaea-authority-time" }
+symthaea-system-attempt-evidence = { path = "../symthaea-system-attempt-evidence" }
