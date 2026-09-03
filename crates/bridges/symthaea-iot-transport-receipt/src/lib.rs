@@ -2,30 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Relying-party verification for exact Xenia-authenticated physical-effect payloads.
 //!
-//! This crate intentionally does **not** depend on `xenia-peer-core`. Symthaea's
-//! supply-chain policy disallows ad-hoc Git dependencies, and an opaque in-process
-//! Xenia token is not portable across a process/repository boundary anyway.
+//! This crate deliberately has no `xenia-peer-core` dependency. It verifies the
+//! stable portable receipt contract at a repository/process boundary while retaining
+//! Symthaea's existing no-ad-hoc-Git-dependency supply-chain policy.
 //!
-//! Instead this crate implements the stable signed-receipt wire contract emitted by
-//! Xenia and applies independent relying-party policy:
-//!
-//! ```text
-//! raw Xenia receipt bytes + raw physical-effect payload bytes
-//!   -> canonical receipt decode
-//!   -> current anti-rollback transport-attestor trust
-//!   -> exact peer/capability policy
-//!   -> Ed25519 verification AND ML-DSA-65 verification
-//!   -> exact raw-payload digest/length binding
-//!   -> canonical PhysicalEffectEnvelopeV1 decode/re-encode equality
-//!   -> send-deadline check
-//!   -> VerifiedTransportEnvelope  (opaque; non-authorizing by itself)
-//! ```
-//!
-//! The concrete ML-DSA implementation is deliberately behind
-//! [`HybridReceiptSignatureVerifier`] in v0.1. Symthaea does not yet standardize on
-//! Xenia's exact RustCrypto `ml-dsa` package in its workspace dependency policy. A
-//! production provider must verify both signatures over the same digest; this crate
-//! calls the two verification methods independently and requires both to succeed.
+//! A receipt is evidence, not physical authority. Successful verification proves that
+//! a currently trusted Xenia transport attestor says the exact raw payload crossed an
+//! authenticated AEAD/replay boundary under an allowed peer/session context. Device
+//! semantic safety, consequence accounting and physical interlocks remain independent.
 
 #![deny(unsafe_code)]
 
@@ -37,56 +21,56 @@ use symthaea_authority::Digest32;
 use symthaea_iot_device_protocol::PhysicalEffectEnvelopeV1;
 use thiserror::Error;
 
-/// Receipt schema shared with Xenia PR #238.
+/// Receipt schema shared with Xenia's exact-payload receipt implementation.
 pub const XENIA_AUTHENTICATED_PAYLOAD_RECEIPT_SCHEMA: &str =
     "xenia-authenticated-payload-receipt-v1";
-/// Domain separator shared with the Xenia receipt signer.
+/// Domain separator signed by both Xenia receipt signature suites.
 pub const XENIA_AUTHENTICATED_PAYLOAD_RECEIPT_DOMAIN: &[u8] =
     b"xenia-authenticated-payload-receipt-v1\0";
-/// Xenia's current mandatory hybrid receipt/transcript signature suite.
+/// Xenia's mandatory hybrid receipt signature suite.
 pub const XENIA_HYBRID_SIGNATURE_SUITE: &str = "ed25519-rfc8032+ml-dsa-65-fips204";
-/// Application payload type reserved by this integration for physical-effect envelopes.
+/// Xenia application payload type reserved for physical-effect envelopes.
 pub const XENIA_PHYSICAL_EFFECT_PAYLOAD_TYPE: u8 = 0x70;
-/// Xenia ML-DSA-65 public-key length.
+/// Xenia ML-DSA-65 public-key byte length.
 pub const XENIA_ML_DSA_65_PUBLIC_KEY_LEN: usize = 1_952;
-/// Xenia ML-DSA-65 signature length.
+/// Xenia ML-DSA-65 signature byte length.
 pub const XENIA_ML_DSA_65_SIGNATURE_LEN: usize = 3_309;
-/// Xenia Ed25519 signature length.
+/// Xenia Ed25519 signature byte length.
 pub const XENIA_ED25519_SIGNATURE_LEN: usize = 64;
-/// Maximum signed-receipt lifetime accepted by Xenia and this relying party.
+/// Maximum Xenia receipt lifetime accepted by this relying party.
 pub const MAX_XENIA_RECEIPT_LIFETIME_MS: u64 = 5_000;
-/// Maximum physical-effect payload size accepted before decoding.
+/// Maximum physical-effect plaintext accepted before decoding.
 pub const MAX_XENIA_PHYSICAL_EFFECT_PAYLOAD_BYTES: usize = 64 * 1024;
-/// Maximum serialized receipt size accepted before decoding.
+/// Maximum serialized portable receipt accepted before decoding.
 pub const MAX_XENIA_RECEIPT_BYTES: usize = 16 * 1024;
-/// Maximum configured Xenia transport-attestor entries per trust snapshot.
+/// Maximum configured attestor/key lifecycle records in one trust generation.
 pub const MAX_TRANSPORT_ATTESTOR_KEYS: usize = 512;
-/// Current trust-snapshot schema.
+/// Current transport trust-snapshot schema.
 pub const TRANSPORT_TRUST_SNAPSHOT_SCHEMA_VERSION: u16 = 1;
-/// Domain separator for one trusted attestor-key record.
+/// Domain separator for one transport-attestor key/policy record.
 pub const TRANSPORT_ATTESTOR_KEY_DOMAIN: &[u8] = b"symthaea-xenia-transport-key-v1\0";
-/// Domain separator for anti-rollback transport-trust snapshots.
+/// Domain separator for transport-trust snapshot commitments.
 pub const TRANSPORT_TRUST_SNAPSHOT_DOMAIN: &[u8] = b"symthaea-xenia-transport-trust-v1\0";
 
-/// Remote Xenia role carried by a portable signed receipt.
+/// Authenticated remote Xenia role recorded in the signed receipt.
 ///
-/// Variant order intentionally matches Xenia's `ReceiptPeerRoleV1` bincode layout.
+/// Variant order intentionally matches Xenia's receipt bincode schema.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum XeniaReceiptPeerRoleV1 {
-    /// Authenticated remote peer is the controlled/serving host.
+    /// Remote peer is the controlled/serving host.
     Host,
-    /// Authenticated remote peer is the viewer/operator side.
+    /// Remote peer is the viewer/operator side.
     Viewer,
 }
 
-/// Exact Xenia receipt body. Field order and types are part of the v1 bincode contract.
+/// Exact signed Xenia receipt body. Field order/types are part of v1 wire identity.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct XeniaAuthenticatedPayloadReceiptBodyV1 {
     /// Stable schema label.
     pub schema: String,
-    /// Deployment/operator identifier for the Xenia receipt signer.
+    /// Transport attestor service identity.
     pub attestor_id: String,
-    /// Key lifecycle identifier.
+    /// Transport attestor key lifecycle identity.
     pub key_id: String,
     /// Mandatory hybrid signature-suite label.
     pub signature_algorithm: String,
@@ -94,11 +78,11 @@ pub struct XeniaAuthenticatedPayloadReceiptBodyV1 {
     pub session_evidence_digest: [u8; 32],
     /// Authenticated remote role.
     pub peer_role: XeniaReceiptPeerRoleV1,
-    /// Authenticated hybrid peer-identity fingerprint.
+    /// Authenticated remote hybrid-identity fingerprint.
     pub peer_identity_fingerprint: [u8; 32],
-    /// Canonical handshake transcript hash.
+    /// Canonical Xenia handshake transcript commitment.
     pub transcript_hash: [u8; 32],
-    /// Exact capability-authenticated Xenia session context.
+    /// Exact capability-authenticated application-session context.
     pub session_context_hash: [u8; 32],
     /// Authenticated telemetry capability bit.
     pub telemetry_enabled: bool,
@@ -106,31 +90,25 @@ pub struct XeniaAuthenticatedPayloadReceiptBodyV1 {
     pub input_control_enabled: bool,
     /// Exact Xenia application payload type.
     pub payload_type: u8,
-    /// Exact opened plaintext length.
+    /// Exact opened plaintext byte length.
     pub payload_len: u32,
     /// BLAKE3-256 of the exact opened plaintext.
     pub payload_digest: [u8; 32],
-    /// BLAKE3-256 of the exact sealed Xenia envelope admitted by AEAD/replay checks.
+    /// BLAKE3-256 of the sealed Xenia envelope admitted by AEAD/replay checks.
     pub sealed_envelope_digest: [u8; 32],
-    /// Receiver-local AEAD/replay acceptance time in Unix milliseconds.
+    /// Receiver-local acceptance time in Unix milliseconds.
     pub opened_at_unix_ms: u64,
     /// Exclusive receipt expiry in Unix milliseconds.
     pub expires_at_unix_ms: u64,
 }
 
 impl XeniaAuthenticatedPayloadReceiptBodyV1 {
-    /// Validate the shared Xenia receipt schema independent of key trust.
+    /// Validate shared receipt structure independent of trusted-key selection.
     pub fn validate_structure(&self) -> Result<(), TransportReceiptError> {
         if self.schema != XENIA_AUTHENTICATED_PAYLOAD_RECEIPT_SCHEMA {
             return Err(TransportReceiptError::UnsupportedReceiptSchema);
         }
-        if self.attestor_id.is_empty()
-            || self.key_id.is_empty()
-            || self.attestor_id.len() > 128
-            || self.key_id.len() > 128
-            || self.attestor_id.trim() != self.attestor_id
-            || self.key_id.trim() != self.key_id
-        {
+        if !valid_label(&self.attestor_id) || !valid_label(&self.key_id) {
             return Err(TransportReceiptError::InvalidAttestorIdentity);
         }
         if self.signature_algorithm != XENIA_HYBRID_SIGNATURE_SUITE {
@@ -166,13 +144,13 @@ impl XeniaAuthenticatedPayloadReceiptBodyV1 {
         Ok(())
     }
 
-    /// Canonical bincode-v1 receipt body bytes, matching Xenia's signer.
+    /// Canonical bincode-v1 body bytes, matching Xenia's signer.
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, TransportReceiptError> {
         self.validate_structure()?;
         bincode::serialize(self).map_err(TransportReceiptError::Encoding)
     }
 
-    /// Exact domain-separated digest covered by both Xenia signatures.
+    /// Exact domain-separated digest covered by both receipt signatures.
     pub fn signing_digest(&self) -> Result<[u8; 32], TransportReceiptError> {
         let bytes = self.canonical_bytes()?;
         let mut h = blake3::Hasher::new();
@@ -187,22 +165,22 @@ impl XeniaAuthenticatedPayloadReceiptBodyV1 {
 pub struct XeniaAuthenticatedPayloadReceiptV1 {
     /// Signed receipt body.
     pub body: XeniaAuthenticatedPayloadReceiptBodyV1,
-    /// Mandatory Ed25519 signature over the body signing digest.
+    /// Ed25519 signature over the body signing digest.
     #[serde(with = "BigArray")]
     pub ed25519_signature: [u8; XENIA_ED25519_SIGNATURE_LEN],
-    /// Mandatory ML-DSA-65 signature over the identical digest.
+    /// ML-DSA-65 signature over the identical body signing digest.
     #[serde(with = "BigArray")]
     pub ml_dsa_signature: [u8; XENIA_ML_DSA_65_SIGNATURE_LEN],
 }
 
-/// Lifecycle state for one trusted Xenia transport-attestor key identity.
+/// Lifecycle of one trusted Xenia transport-attestor key identity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TransportAttestorStatus {
     /// Key may authenticate receipts during its validity window.
     Active,
-    /// Key is retired and may never become active again.
+    /// Key has been retired and may not become active again.
     Retired,
-    /// Key is revoked; revocation is terminal.
+    /// Key has been revoked; revocation is terminal.
     Revoked,
 }
 
@@ -224,43 +202,37 @@ impl TransportAttestorStatus {
     }
 }
 
-/// Trusted Xenia transport-attestor identity and relying-party peer policy.
+/// Trusted Xenia receipt-signing identity and downstream peer/capability policy.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransportAttestorKeyV1 {
-    /// Exact attestor service identity expected in a receipt.
+    /// Exact receipt `attestor_id` allowed under this record.
     pub attestor_id: String,
-    /// Exact key lifecycle identity expected in a receipt.
+    /// Exact receipt `key_id` allowed under this record.
     pub key_id: String,
     /// Ed25519 verifying-key bytes.
     pub ed25519_public_key: [u8; 32],
-    /// Exact ML-DSA-65 verifying-key encoding used by Xenia.
+    /// Xenia ML-DSA-65 verifying-key bytes.
     pub ml_dsa_public_key: Vec<u8>,
-    /// Monotonic key lifecycle state.
+    /// Monotonic lifecycle state.
     pub status: TransportAttestorStatus,
-    /// Earliest Unix millisecond at which this key may authenticate a receipt.
+    /// Earliest trusted receipt/open time.
     pub not_before_unix_ms: u64,
-    /// Exclusive Unix-millisecond expiry for this key.
+    /// Exclusive key expiry; successor snapshots may shrink but never extend it.
     pub not_after_unix_ms: u64,
     /// Maximum receipt lifetime permitted under this key.
     pub max_receipt_lifetime_ms: u64,
-    /// Authenticated remote role permitted for consequential receipts.
+    /// Required authenticated remote role.
     pub required_peer_role: XeniaReceiptPeerRoleV1,
-    /// Exact authenticated peer fingerprints allowed under this key policy.
+    /// Exact authenticated peer fingerprints permitted under this key.
     pub allowed_peer_fingerprints: BTreeSet<[u8; 32]>,
-    /// Whether the sealed Xenia capability surface must permit input/control.
+    /// Whether Xenia's sealed session capabilities must permit input/control.
     pub require_input_control: bool,
 }
 
 impl TransportAttestorKeyV1 {
-    /// Validate one trust record independent of current time.
+    /// Validate one configured key/policy record.
     pub fn validate(&self) -> Result<(), TransportReceiptError> {
-        if self.attestor_id.is_empty()
-            || self.key_id.is_empty()
-            || self.attestor_id.trim() != self.attestor_id
-            || self.key_id.trim() != self.key_id
-            || self.attestor_id.len() > 128
-            || self.key_id.len() > 128
-        {
+        if !valid_label(&self.attestor_id) || !valid_label(&self.key_id) {
             return Err(TransportReceiptError::InvalidAttestorIdentity);
         }
         if self.ed25519_public_key == [0; 32]
@@ -288,7 +260,7 @@ impl TransportAttestorKeyV1 {
         Ok(())
     }
 
-    /// Domain-separated commitment to immutable key and peer-policy bytes plus lifecycle.
+    /// Domain-separated commitment to key bytes, peer policy, lifecycle and expiry.
     pub fn digest(&self) -> Result<Digest32, TransportReceiptError> {
         self.validate()?;
         let mut h = blake3::Hasher::new();
@@ -314,6 +286,8 @@ impl TransportAttestorKeyV1 {
         Ok(Digest32(*h.finalize().as_bytes()))
     }
 
+    /// Compare fields that may never change under the same `(attestor_id,key_id)`.
+    /// Lifecycle and expiry are handled separately so expiry may only shrink.
     fn immutable_policy_eq(&self, other: &Self) -> bool {
         self.attestor_id == other.attestor_id
             && self.key_id == other.key_id
@@ -333,25 +307,25 @@ impl TransportAttestorKeyV1 {
     }
 }
 
-/// Public anti-rollback trust snapshot for Xenia receipt attestors.
+/// Public anti-rollback snapshot of trusted Xenia receipt-attestor lifecycle state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransportTrustSnapshotV1 {
     /// Fail-closed schema version.
     pub schema_version: u16,
     /// Monotonic snapshot generation; zero is invalid.
     pub sequence: u64,
-    /// Trusted snapshot issue time in Unix milliseconds.
+    /// Trusted snapshot issue time.
     pub issued_at_unix_ms: u64,
-    /// Exclusive snapshot expiry in Unix milliseconds.
+    /// Exclusive snapshot expiry.
     pub expires_at_unix_ms: u64,
-    /// Previous snapshot commitment; absent only for generation one.
+    /// Previous snapshot commitment, absent only at generation one.
     pub previous_snapshot_digest: Option<Digest32>,
-    /// Complete persistent lifecycle table for attestor/key identities.
+    /// Complete persistent lifecycle table for known key identities.
     pub keys: Vec<TransportAttestorKeyV1>,
 }
 
 impl TransportTrustSnapshotV1 {
-    /// Validate snapshot and key structure.
+    /// Validate snapshot and contained key records.
     pub fn validate(&self) -> Result<(), TransportReceiptError> {
         if self.schema_version != TRANSPORT_TRUST_SNAPSHOT_SCHEMA_VERSION {
             return Err(TransportReceiptError::UnsupportedTrustSnapshotSchema);
@@ -371,7 +345,6 @@ impl TransportTrustSnapshotV1 {
         if self.sequence > 1 && self.previous_snapshot_digest.is_none() {
             return Err(TransportReceiptError::TrustSuccessorMissingPredecessor);
         }
-
         let mut identities = BTreeSet::new();
         for key in &self.keys {
             key.validate()?;
@@ -382,7 +355,7 @@ impl TransportTrustSnapshotV1 {
         Ok(())
     }
 
-    /// Canonical snapshot commitment independent of input key-vector order.
+    /// Canonical commitment independent of input vector ordering.
     pub fn digest(&self) -> Result<Digest32, TransportReceiptError> {
         self.validate()?;
         let mut keys = self.keys.iter().collect::<Vec<_>>();
@@ -400,8 +373,10 @@ impl TransportTrustSnapshotV1 {
                 h.update(&[1]);
                 h.update(&bytes);
             }
-            None => h.update(&[0]),
-        };
+            None => {
+                h.update(&[0]);
+            }
+        }
         h.update(&(keys.len() as u32).to_be_bytes());
         for key in keys {
             let Digest32(bytes) = key.digest()?;
@@ -418,19 +393,19 @@ impl TransportTrustSnapshotV1 {
     }
 }
 
-/// Externally retainable anti-rollback anchor for transport trust.
+/// Externally retainable anti-rollback anchor for one trust generation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransportTrustHead {
-    /// Current snapshot generation.
+    /// Current trust generation.
     pub sequence: u64,
-    /// Commitment to the exact trust snapshot.
+    /// Commitment to the exact public snapshot.
     pub digest: Digest32,
 }
 
-/// In-process verified transport-attestor trust state.
+/// Verified in-process transport trust state.
 ///
-/// Persist the public snapshot plus [`TransportTrustHead`] separately; this type is
-/// intentionally not serializable/deserializable.
+/// This type is intentionally not serializable. Persist the public snapshot and
+/// independently retain/authenticate [`TransportTrustHead`].
 #[derive(Debug)]
 pub struct TransportTrustRegistry {
     snapshot: TransportTrustSnapshotV1,
@@ -438,7 +413,7 @@ pub struct TransportTrustRegistry {
 }
 
 impl TransportTrustRegistry {
-    /// Create generation one of a transport-trust lineage.
+    /// Accept generation one of a new trust lineage.
     pub fn genesis(snapshot: TransportTrustSnapshotV1) -> Result<Self, TransportReceiptError> {
         snapshot.validate()?;
         if snapshot.sequence != 1 || snapshot.previous_snapshot_digest.is_some() {
@@ -451,7 +426,7 @@ impl TransportTrustRegistry {
         Ok(Self { snapshot, head })
     }
 
-    /// Verify and accept the immediate successor trust generation.
+    /// Verify and accept the immediate successor generation.
     pub fn successor(
         &self,
         snapshot: TransportTrustSnapshotV1,
@@ -482,7 +457,7 @@ impl TransportTrustRegistry {
         Ok(Self { snapshot, head })
     }
 
-    /// Restore a persisted snapshot only against its separately retained trusted head.
+    /// Restore a snapshot only when it matches the independently retained head.
     pub fn restore(
         snapshot: TransportTrustSnapshotV1,
         trusted_head: TransportTrustHead,
@@ -498,12 +473,12 @@ impl TransportTrustRegistry {
         Ok(Self { snapshot, head })
     }
 
-    /// Current externally retainable trust head.
+    /// Current anti-rollback head.
     pub const fn head(&self) -> TransportTrustHead {
         self.head
     }
 
-    /// Read-only trust snapshot for persistence/audit.
+    /// Read-only current snapshot for persistence/audit.
     pub fn snapshot(&self) -> &TransportTrustSnapshotV1 {
         &self.snapshot
     }
@@ -556,12 +531,12 @@ fn validate_trust_successor(
     Ok(())
 }
 
-/// Concrete signature provider contract used by the relying party.
+/// Provider boundary for the exact receipt signature encodings.
 ///
-/// A production provider must implement Xenia's exact Ed25519 and ML-DSA-65 wire
-/// encodings. The two methods are called independently and both must return true.
+/// Symthaea invokes the two methods independently and rejects if either fails. A
+/// production implementation must match Xenia's exact Ed25519 and ML-DSA-65 formats.
 pub trait HybridReceiptSignatureVerifier {
-    /// Verify the Ed25519 signature over the exact receipt digest.
+    /// Verify Ed25519 over the exact receipt digest.
     fn verify_ed25519(
         &self,
         public_key: &[u8; 32],
@@ -569,7 +544,7 @@ pub trait HybridReceiptSignatureVerifier {
         signature: &[u8; XENIA_ED25519_SIGNATURE_LEN],
     ) -> bool;
 
-    /// Verify the ML-DSA-65 signature over the exact same receipt digest.
+    /// Verify ML-DSA-65 over the same exact receipt digest.
     fn verify_ml_dsa_65(
         &self,
         public_key: &[u8],
@@ -578,11 +553,11 @@ pub trait HybridReceiptSignatureVerifier {
     ) -> bool;
 }
 
-/// Opaque transport proof binding one exact canonical physical-effect envelope to a
-/// currently trusted Xenia authenticated-session receipt.
+/// Opaque proof that exact canonical physical-effect bytes passed current Xenia
+/// transport trust and both signature gates.
 ///
-/// This is still not physical authority by itself. Device-local semantic acceptance
-/// and physical interlock state remain separate requirements.
+/// This remains non-authorizing until composed with device semantic acceptance and
+/// a physical interlock boundary.
 #[derive(Debug)]
 pub struct VerifiedTransportEnvelope {
     envelope: PhysicalEffectEnvelopeV1,
@@ -601,12 +576,12 @@ impl VerifiedTransportEnvelope {
         &self.envelope
     }
 
-    /// Semantic domain-separated physical-envelope commitment.
+    /// Domain-separated semantic envelope commitment.
     pub const fn envelope_digest(&self) -> Digest32 {
         self.envelope_digest
     }
 
-    /// BLAKE3-256 commitment to the exact authenticated raw payload bytes.
+    /// BLAKE3-256 of the exact authenticated raw payload bytes.
     pub const fn payload_digest(&self) -> Digest32 {
         self.payload_digest
     }
@@ -616,17 +591,17 @@ impl VerifiedTransportEnvelope {
         self.receipt_digest
     }
 
-    /// Anti-rollback transport-trust generation used for verification.
+    /// Transport trust generation used to verify the receipt.
     pub const fn trust_head(&self) -> TransportTrustHead {
         self.trust_head
     }
 
-    /// Authenticated Xenia peer identity fingerprint.
+    /// Authenticated remote Xenia peer fingerprint.
     pub const fn peer_identity_fingerprint(&self) -> [u8; 32] {
         self.peer_identity_fingerprint
     }
 
-    /// Commitment to Xenia's opaque authenticated session evidence.
+    /// Commitment to the opaque Xenia authenticated-session evidence.
     pub const fn session_evidence_digest(&self) -> [u8; 32] {
         self.session_evidence_digest
     }
@@ -637,7 +612,7 @@ impl VerifiedTransportEnvelope {
     }
 }
 
-/// Verify raw Xenia receipt bytes and exact raw physical-effect payload bytes.
+/// Verify exact raw Xenia receipt bytes against exact raw physical-envelope bytes.
 pub fn verify_xenia_transport_receipt(
     registry: &TransportTrustRegistry,
     raw_receipt: &[u8],
@@ -745,13 +720,17 @@ pub fn verify_xenia_transport_receipt(
     })
 }
 
+fn valid_label(value: &str) -> bool {
+    !value.is_empty() && value.len() <= 128 && value.trim() == value
+}
+
 fn update_string(h: &mut blake3::Hasher, value: &str) {
     h.update(&(value.len() as u32).to_be_bytes());
     h.update(value.as_bytes());
 }
 
-/// Fail-closed receipt/trust verification errors.
-#[derive(Debug, Error, PartialEq, Eq)]
+/// Fail-closed transport receipt/trust verification failure.
+#[derive(Debug, Error)]
 pub enum TransportReceiptError {
     #[error("unsupported Xenia authenticated-payload receipt schema")]
     UnsupportedReceiptSchema,
@@ -1008,7 +987,10 @@ mod tests {
         .unwrap();
         assert_eq!(verified.envelope().command.sequence, 7);
         assert_eq!(verified.peer_identity_fingerprint(), [0x44; 32]);
-        assert_eq!(verified.payload_digest(), Digest32(*blake3::hash(&payload).as_bytes()));
+        assert_eq!(
+            verified.payload_digest(),
+            Digest32(*blake3::hash(&payload).as_bytes())
+        );
     }
 
     #[test]
@@ -1048,7 +1030,7 @@ mod tests {
     }
 
     #[test]
-    fn trust_lifecycle_cannot_reactivate_or_mutate_same_key_identity() {
+    fn trust_lifecycle_allows_expiry_shortening_but_not_reactivation() {
         let base = registry();
         let mut retired = trusted_key();
         retired.status = TransportAttestorStatus::Retired;
