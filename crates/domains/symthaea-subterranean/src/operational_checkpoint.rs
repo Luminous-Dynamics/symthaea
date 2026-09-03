@@ -22,7 +22,10 @@ pub struct SubterraneanOperationalCheckpoint {
     pub schema_version: u32,
     pub controller: ControllerCheckpoint,
     pub mission: MissionExecutiveCheckpoint,
-    #[serde(default)]
+    /// Operator authority is security-critical restore state and must be present
+    /// explicitly. Missing historical authority is unknown, not nominal, so it
+    /// must not deserialize through `OperatorAuthority::default()` into a wider
+    /// `None` constraint.
     pub operator_authority: OperatorAuthority,
     #[serde(default)]
     pub degraded_supervisor: DegradedOperationsSupervisor,
