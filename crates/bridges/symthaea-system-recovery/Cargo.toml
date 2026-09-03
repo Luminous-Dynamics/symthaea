@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-system-recovery"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Read-only crash recovery and reconciliation for bounded Symthaea system agency"
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-system-broker = { path = "../symthaea-system-broker" }
