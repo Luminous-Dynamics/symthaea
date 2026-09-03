@@ -38,9 +38,9 @@ def git_head() -> str:
 
 
 def source_commit() -> str:
-    # On pull_request workflows GITHUB_SHA is normally the synthetic merge
-    # commit. Preserve the PR head separately so visual evidence can be tied to
-    # the actual patch lineage as well as the tree that CI evaluated.
+    # Preserve an explicitly supplied patch/source identity when a workflow
+    # evaluates a different tree. Exact-head lanes normally set source and
+    # evaluated commit to the same immutable commit.
     explicit = os.environ.get("SPORE_SOURCE_COMMIT", "").strip()
     if explicit:
         return explicit
@@ -51,6 +51,13 @@ def source_commit() -> str:
 
 
 def evaluated_commit() -> str:
+    # GITHUB_SHA is the synthetic merge commit on pull_request events even when
+    # actions/checkout is deliberately pointed at the exact PR head. Focused
+    # exact-head workflows therefore supply this explicit identity. Older
+    # workflows retain the historical GITHUB_SHA -> local HEAD fallback.
+    explicit = os.environ.get("SPORE_EVALUATED_COMMIT", "").strip()
+    if explicit:
+        return explicit
     github_sha = os.environ.get("GITHUB_SHA", "").strip()
     return github_sha or git_head()
 
