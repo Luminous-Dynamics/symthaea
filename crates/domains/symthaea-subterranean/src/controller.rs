@@ -53,6 +53,47 @@ impl fmt::Display for CheckpointError {
 
 impl std::error::Error for CheckpointError {}
 
+impl ControllerCheckpoint {
+    /// Validate portable controller state without mutating a live controller.
+    ///
+    /// Restore preparation needs to reject malformed source state before any
+    /// owner mutation or affine execution authority is created. Keep this pure
+    /// validator as the single source of truth for both preparation and load.
+    pub fn validate(&self) -> Result<(), CheckpointError> {
+        if self.schema_version != CHECKPOINT_SCHEMA_VERSION {
+            return Err(CheckpointError::UnsupportedSchema {
+                found: self.schema_version,
+                expected: CHECKPOINT_SCHEMA_VERSION,
+            });
+        }
+        if self.hdc_dimension != HDC_DIM {
+            return Err(CheckpointError::DimensionMismatch {
+                found: self.hdc_dimension,
+                expected: HDC_DIM,
+            });
+        }
+        if self.num_actuators != NUM_ACTUATORS {
+            return Err(CheckpointError::ActuatorMismatch {
+                found: self.num_actuators,
+                expected: NUM_ACTUATORS,
+            });
+        }
+        let expected_weights = NUM_ACTUATORS * HDC_DIM;
+        if self.weights.len() != expected_weights {
+            return Err(CheckpointError::WeightLengthMismatch {
+                found: self.weights.len(),
+                expected: expected_weights,
+            });
+        }
+        if self.weights.iter().any(|value| !value.is_finite())
+            || self.bias.iter().any(|value| !value.is_finite())
+        {
+            return Err(CheckpointError::NonFiniteParameter);
+        }
+        Ok(())
+    }
+}
+
 pub struct SubterraneanController {
     network: HdcLtcUnifiedNetwork,
     weights: Vec<f32>,
@@ -165,37 +206,7 @@ impl SubterraneanController {
         &mut self,
         checkpoint: &ControllerCheckpoint,
     ) -> Result<(), CheckpointError> {
-        if checkpoint.schema_version != CHECKPOINT_SCHEMA_VERSION {
-            return Err(CheckpointError::UnsupportedSchema {
-                found: checkpoint.schema_version,
-                expected: CHECKPOINT_SCHEMA_VERSION,
-            });
-        }
-        if checkpoint.hdc_dimension != HDC_DIM {
-            return Err(CheckpointError::DimensionMismatch {
-                found: checkpoint.hdc_dimension,
-                expected: HDC_DIM,
-            });
-        }
-        if checkpoint.num_actuators != NUM_ACTUATORS {
-            return Err(CheckpointError::ActuatorMismatch {
-                found: checkpoint.num_actuators,
-                expected: NUM_ACTUATORS,
-            });
-        }
-        let expected_weights = NUM_ACTUATORS * HDC_DIM;
-        if checkpoint.weights.len() != expected_weights {
-            return Err(CheckpointError::WeightLengthMismatch {
-                found: checkpoint.weights.len(),
-                expected: expected_weights,
-            });
-        }
-        if checkpoint.weights.iter().any(|value| !value.is_finite())
-            || checkpoint.bias.iter().any(|value| !value.is_finite())
-        {
-            return Err(CheckpointError::NonFiniteParameter);
-        }
-
+        checkpoint.validate()?;
         self.weights.clone_from(&checkpoint.weights);
         self.bias = checkpoint.bias;
         self.reset();
@@ -248,12 +259,26 @@ mod tests {
     fn checkpoint_rejects_wrong_dimension() {
         let genesis = GenesisSeed::from_phrase("checkpoint-invalid");
         let config = SubterraneanConfig::default();
-        let mut controller = SubterraneanController::new(&genesis, &config);
+        let controller = SubterraneanController::new(&genesis, &config);
         let mut checkpoint = controller.checkpoint();
         checkpoint.hdc_dimension += 1;
         assert!(matches!(
-            controller.load_checkpoint(&checkpoint),
+            checkpoint.validate(),
             Err(CheckpointError::DimensionMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn pure_validation_matches_loader_rejection_without_mutation() {
+        let genesis = GenesisSeed::from_phrase("checkpoint-pure-validation");
+        let config = SubterraneanConfig::default();
+        let mut controller = SubterraneanController::new(&genesis, &config);
+        let mut checkpoint = controller.checkpoint();
+        checkpoint.weights[0] = f32::NAN;
+        assert_eq!(checkpoint.validate(), Err(CheckpointError::NonFiniteParameter));
+        assert_eq!(
+            controller.load_checkpoint(&checkpoint),
+            Err(CheckpointError::NonFiniteParameter)
+        );
     }
 }

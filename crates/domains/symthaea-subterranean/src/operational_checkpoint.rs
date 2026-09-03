@@ -14,6 +14,8 @@ pub(crate) mod restore_merge;
 pub(crate) mod restore_operator;
 #[path = "restore_semantics.rs"]
 pub mod restore_semantics;
+#[path = "operational_checkpoint_validation.rs"]
+mod validation;
 
 use crate::actuator_isolation::ActuatorIsolationSupervisor;
 use crate::controller::{CheckpointError, ControllerCheckpoint};
