@@ -89,11 +89,11 @@ impl OperatorAuthority {
 mod tests {
     use super::*;
     use crate::operator_authority::OperatorConstraint;
+    use crate::operator_authority::recovery_authority::{
+        RecoveryDigest, RecoveryProposalV1, qualify_recovery_basis,
+    };
     use crate::operator_protocol::{
         AuthenticationLevel, OperatorCommand, OperatorCommandEnvelope, OperatorId, OperatorRole,
-    };
-    use crate::operator_authority::recovery_authority::{
-        RecoveryApprovalEnvelopeV1, RecoveryDigest, RecoveryProposalV1, qualify_recovery_basis,
     };
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
