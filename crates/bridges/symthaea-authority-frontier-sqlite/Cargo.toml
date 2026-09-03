@@ -11,8 +11,8 @@ bincode = { workspace = true }
 rusqlite = { workspace = true }
 thiserror = { workspace = true }
 symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-authority = { path = "../../core/symthaea-authority" }
 symthaea-authority-frontier = { path = "../symthaea-authority-frontier" }
 
 [dev-dependencies]
 symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
-symthaea-authority = { path = "../../core/symthaea-authority" }
