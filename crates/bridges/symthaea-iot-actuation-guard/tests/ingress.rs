@@ -241,9 +241,10 @@ fn interlock_envelope_substitution_fails_after_real_xenia_verification() {
 #[test]
 fn interlock_transport_generation_substitution_fails() {
     let mut fixture = fixture();
+    let current_head = fixture.trust_head;
     mutate_report(&mut fixture.request, |report| {
         report.transport_trust_head = TransportTrustHead {
-            sequence: fixture.trust_head.sequence + 1,
+            sequence: current_head.sequence + 1,
             digest: d(0x92),
         };
     });
@@ -270,9 +271,10 @@ fn interlock_device_substitution_fails() {
 #[test]
 fn interlock_observation_cannot_predate_authenticated_transport() {
     let mut fixture = fixture();
+    let opened_at = fixture.opened_at_unix_ms;
     mutate_report(&mut fixture.request, |report| {
-        report.checked_at_unix_ms = fixture.opened_at_unix_ms - 1;
-        report.expires_at_unix_ms = fixture.opened_at_unix_ms + 999;
+        report.checked_at_unix_ms = opened_at - 1;
+        report.expires_at_unix_ms = opened_at + 999;
     });
     let frame = fixture.request.canonical_bytes().unwrap();
     assert!(matches!(
@@ -284,9 +286,11 @@ fn interlock_observation_cannot_predate_authenticated_transport() {
 #[test]
 fn stale_interlock_report_fails_even_while_xenia_receipt_is_fresh() {
     let mut fixture = fixture();
+    let opened_at = fixture.opened_at_unix_ms;
+    let fixture_now = fixture.now_unix_ms;
     mutate_report(&mut fixture.request, |report| {
-        report.checked_at_unix_ms = fixture.opened_at_unix_ms + 1;
-        report.expires_at_unix_ms = fixture.now_unix_ms;
+        report.checked_at_unix_ms = opened_at + 1;
+        report.expires_at_unix_ms = fixture_now;
     });
     let frame = fixture.request.canonical_bytes().unwrap();
     assert!(matches!(
