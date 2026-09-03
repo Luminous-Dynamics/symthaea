@@ -1,0 +1,26 @@
+[package]
+name = "symthaea-iot-durable-runtime"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Atomic action-accounting and per-device sequence checkpoints for cyber-physical dispatch"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "cyber-physical", "checkpoint", "replay"]
+categories = ["embedded", "authentication"]
+
+[dependencies]
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-iot-execution = { path = "../symthaea-iot-execution" }
+symthaea-iot-runtime = { path = "../symthaea-iot-runtime" }
+serde = { workspace = true }
+bincode = { workspace = true }
+blake3 = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+symthaea-iot-authority = { path = "../symthaea-iot-authority" }
