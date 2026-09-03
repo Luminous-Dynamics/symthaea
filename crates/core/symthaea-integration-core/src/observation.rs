@@ -193,9 +193,10 @@ pub struct ObservationLineage {
     /// Parent observations when this value is derived/aggregated.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parent_ids: Vec<ObservationId>,
-    /// Measurements with the same non-empty group are explicitly declared to
-    /// share a measurement lineage. Distinct non-empty groups are treated as
-    /// declared independent; missing groups remain epistemically unknown.
+    /// Measurements with the same non-empty group are conservatively declared
+    /// to share a measurement lineage. Different group labels are descriptive
+    /// only and do not prove independence without a separately qualified
+    /// independence authority.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub independence_group: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -207,6 +208,9 @@ pub struct ObservationLineage {
 pub enum LineageRelationship {
     SameObservation,
     SharedOrigin,
+    /// Reserved for a future relationship established by an explicitly
+    /// qualified independence authority. Adapter-local group labels never
+    /// produce this relationship on their own.
     DeclaredIndependent,
     Unknown,
 }
@@ -305,8 +309,8 @@ impl ObservationEnvelope {
         Ok(())
     }
 
-    /// Assess whether two reports are plausibly independent. Missing lineage
-    /// metadata never gets upgraded to independence.
+    /// Assess whether two reports share known lineage. Positive independence is
+    /// never inferred from different adapter-supplied group labels.
     pub fn lineage_relationship(&self, other: &Self) -> LineageRelationship {
         if self.observation_id == other.observation_id {
             return LineageRelationship::SameObservation;
@@ -327,7 +331,6 @@ impl ObservationEnvelope {
             other.lineage.independence_group.as_deref(),
         ) {
             (Some(a), Some(b)) if a == b => LineageRelationship::SharedOrigin,
-            (Some(_), Some(_)) => LineageRelationship::DeclaredIndependent,
             _ => LineageRelationship::Unknown,
         }
     }
@@ -545,12 +548,19 @@ mod tests {
     }
 
     #[test]
-    fn distinct_declared_groups_are_independent() {
+    fn distinct_self_declared_groups_remain_epistemically_unknown() {
         let a = sample("a", "one", Some("physical-bmc"));
         let b = sample("b", "two", Some("kernel-procfs"));
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
+    }
+
+    #[test]
+    fn same_declared_group_is_conservatively_shared_origin() {
+        let a = sample("a", "one", Some("same-origin"));
+        let b = sample("b", "two", Some("same-origin"));
         assert_eq!(
             a.lineage_relationship(&b),
-            LineageRelationship::DeclaredIndependent
+            LineageRelationship::SharedOrigin
         );
     }
 
