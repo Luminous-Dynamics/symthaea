@@ -186,6 +186,8 @@ impl TemporalAssuranceSupervisor {
             && self.attribution.validate()
             && self.clean_dwell_steps <= TEMPORAL_REVIEW_CLEAN_DWELL_STEPS
             && self.last.reasons.len() <= MAX_TEMPORAL_REASONS
+            && self.last.hold_latched == self.hold_latched
+            && (!self.hold_latched || self.last.authority == TemporalAuthority::HoldForReview)
     }
 
     pub fn assess(
@@ -456,6 +458,37 @@ impl TemporalAssuranceSupervisor {
         command
     }
 
+    /// Preserve only the authority-bearing temporal review latch across restore.
+    ///
+    /// Historical clocks, observations, plans, event assessments, attribution
+    /// state, counters and cached `last` measurements are not imported here.
+    /// Positive clean-dwell recovery credit is deliberately discarded. If either
+    /// side carries a review hold, the live cached authority is immediately
+    /// projected to `HoldForReview` so there is no one-cycle widening window
+    /// before a fresh temporal runtime frame arrives.
+    pub(crate) fn preserve_restore_hold_latch_from(&mut self, checkpoint: &Self) {
+        self.clean_dwell_steps = 0;
+        if self.hold_latched || checkpoint.hold_latched {
+            self.hold_latched = true;
+            self.last.hold_latched = true;
+            promote(
+                &mut self.last.authority,
+                TemporalAuthority::HoldForReview,
+                &mut self.last.reasons,
+                "temporal_review_hold_latched",
+            );
+            self.last.reasons.truncate(MAX_TEMPORAL_REASONS);
+        }
+    }
+
+    pub const fn hold_latched(&self) -> bool {
+        self.hold_latched
+    }
+
+    pub(crate) const fn clean_dwell_steps(&self) -> u32 {
+        self.clean_dwell_steps
+    }
+
     pub fn last(&self) -> &TemporalAssuranceAssessment {
         &self.last
     }
@@ -536,6 +569,19 @@ mod tests {
         }
     }
 
+    fn latched_with_dwell(clean_dwell_steps: u32) -> TemporalAssuranceSupervisor {
+        let mut supervisor = TemporalAssuranceSupervisor::default();
+        supervisor.hold_latched = true;
+        supervisor.clean_dwell_steps = clean_dwell_steps;
+        supervisor.last.authority = TemporalAuthority::HoldForReview;
+        supervisor.last.hold_latched = true;
+        supervisor
+            .last
+            .reasons
+            .push("temporal_review_hold_latched".to_string());
+        supervisor
+    }
+
     #[test]
     fn fresh_frame_keeps_nominal_authority() {
         let revisions = RuntimeRevisions::default();
@@ -558,5 +604,96 @@ mod tests {
         command.set_cutter_head(1.0);
         let constrained = supervisor.constrain_command(command);
         assert_eq!(constrained.cutter_head(), 0.0);
+    }
+
+    #[test]
+    fn restore_hold_join_imports_checkpoint_latch_without_importing_recovery_credit() {
+        let mut live = TemporalAssuranceSupervisor::default();
+        let checkpoint = latched_with_dwell(13);
+
+        live.preserve_restore_hold_latch_from(&checkpoint);
+
+        assert!(live.hold_latched());
+        assert_eq!(live.clean_dwell_steps(), 0);
+        assert_eq!(live.last().authority, TemporalAuthority::HoldForReview);
+        assert!(live.last().hold_latched);
+        assert!(
+            live.last()
+                .reasons
+                .iter()
+                .any(|reason| reason == "temporal_review_hold_latched")
+        );
+        let mut command = SubterraneanCommand::zero();
+        command.set_cutter_head(1.0);
+        assert_eq!(live.constrain_command(command).cutter_head(), 0.0);
+    }
+
+    #[test]
+    fn restore_hold_join_preserves_live_latch_and_resets_live_clean_dwell() {
+        let mut live = latched_with_dwell(9);
+        let checkpoint = TemporalAssuranceSupervisor::default();
+
+        live.preserve_restore_hold_latch_from(&checkpoint);
+
+        assert!(live.hold_latched());
+        assert_eq!(live.clean_dwell_steps(), 0);
+        assert_eq!(live.last().authority, TemporalAuthority::HoldForReview);
+    }
+
+    #[test]
+    fn restore_hold_join_does_not_import_checkpoint_current_truth() {
+        let revisions = RuntimeRevisions::default();
+        let mut live = TemporalAssuranceSupervisor::default();
+        let live_frame = nominal_frame(0, 5_000_000, revisions);
+        live.assess(0.005, 0, revisions, &live_frame, true, false);
+        let live_control_time = live.control_time_ns;
+        let live_last = live.last.clone();
+        let live_total_assessments = live.total_assessments;
+
+        let mut checkpoint = TemporalAssuranceSupervisor::default();
+        checkpoint.control_time_ns = 999_000_000;
+        checkpoint.total_assessments = 999;
+        checkpoint.last.return_feasible = false;
+        checkpoint.last.reasons.push("historical_only".to_string());
+
+        live.preserve_restore_hold_latch_from(&checkpoint);
+
+        assert_eq!(live.control_time_ns, live_control_time);
+        assert_eq!(live.total_assessments, live_total_assessments);
+        assert_eq!(live.last, live_last);
+        assert!(!live.hold_latched());
+    }
+
+    #[test]
+    fn restore_hold_join_is_idempotent_and_commutative_for_authority_projection() {
+        let a = latched_with_dwell(7);
+        let b = TemporalAssuranceSupervisor::default();
+
+        let mut ab = a.clone();
+        ab.preserve_restore_hold_latch_from(&b);
+        let once = (ab.hold_latched(), ab.last().authority, ab.clean_dwell_steps());
+        ab.preserve_restore_hold_latch_from(&b);
+        assert_eq!(
+            (ab.hold_latched(), ab.last().authority, ab.clean_dwell_steps()),
+            once
+        );
+
+        let mut ba = b.clone();
+        ba.preserve_restore_hold_latch_from(&a);
+        assert_eq!(
+            (ba.hold_latched(), ba.last().authority, ba.clean_dwell_steps()),
+            once
+        );
+    }
+
+    #[test]
+    fn temporal_validation_rejects_latch_cache_disagreement() {
+        let mut supervisor = TemporalAssuranceSupervisor::default();
+        supervisor.hold_latched = true;
+        assert!(!supervisor.validate());
+
+        supervisor.last.hold_latched = true;
+        supervisor.last.authority = TemporalAuthority::HoldForReview;
+        assert!(supervisor.validate());
     }
 }
