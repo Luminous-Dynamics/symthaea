@@ -1,12 +1,14 @@
 use std::{
     collections::BTreeMap,
-    fs,
+    fs::{self, File},
+    io::Read,
     path::Path,
     process::Command,
 };
 
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::{
     interoception_actions_archive::verify_actions_archive_closed,
@@ -24,6 +26,25 @@ use crate::{
 
 pub const PROMOTION_AUTHORIZATION_ENVELOPE_SCHEMA_VERSION: u16 = 1;
 pub const FROZEN_V01_SOURCE_COMMIT: &str = "1007949d5c60fd2d7dd650e8bb4521e2b2803c48";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PromotionDecision {
+    PromotionAuthorized,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LiveLocalVerification {
+    pub gate_id: String,
+    pub subject_commit: String,
+    pub command: String,
+    pub repository_tree: String,
+    pub cargo_lock_sha256: String,
+    pub rustc_vv_sha256: String,
+    pub cargo_vv_sha256: String,
+    pub stdout_sha256: String,
+    pub stderr_sha256: String,
+    pub exit_code: i32,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LiveActionsVerification {
@@ -61,8 +82,9 @@ pub struct PromotionAuthorizationEnvelope {
     pub verifier_policy_version: String,
     pub verification_mode: String,
     pub verified_evidence: VerifiedQualificationEvidence,
+    pub live_local_verification: Vec<LiveLocalVerification>,
     pub live_actions_verification: Vec<LiveActionsVerification>,
-    pub decision: String,
+    pub decision: PromotionDecision,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -115,6 +137,7 @@ pub fn authorize_promotion_live(
         );
     }
 
+    require_frozen_clean_checkout(repo_root)?;
     let bundle = read_canonical_bundle(bundle_path)?;
     bundle.validate().map_err(|errors| {
         anyhow::anyhow!(
@@ -160,6 +183,15 @@ pub fn authorize_promotion_live(
         bind_actions_to_bundle(&bundle, verified)?;
     }
 
+    // Historical evidence is not sufficient by itself. Re-run the three fixed
+    // local gates on the exact frozen clean checkout at authorization time.
+    let mut live_local = vec![
+        recheck_local_gate(repo_root, "local_fmt")?,
+        recheck_local_gate(repo_root, "local_test")?,
+        recheck_local_gate(repo_root, "local_clippy")?,
+    ];
+    live_local.sort_by(|left, right| left.gate_id.cmp(&right.gate_id));
+
     let mut live_actions = vec![
         verify_actions_live(workspace_ci_dir, Some(repo_root))?,
         verify_actions_live(showroom_dir, Some(repo_root))?,
@@ -170,12 +202,13 @@ pub fn authorize_promotion_live(
             bail!("live Actions verification resolved a non-frozen source commit");
         }
     }
+    require_frozen_clean_checkout(repo_root)?;
 
     let mut gates = Vec::with_capacity(5);
     for verified in local {
         gates.push(VerifiedGateBinding {
             gate_id: verified.gate_id,
-            evidence_kind: "LocalCommand".into(),
+            evidence_kind: "LocalCommandArchivedAndPromotionTimeRechecked".into(),
             evidence_object_sha256: vec![verified.environment_sha256, verified.transcript_sha256],
         });
     }
@@ -205,11 +238,12 @@ pub fn authorize_promotion_live(
         schema_version: PROMOTION_AUTHORIZATION_ENVELOPE_SCHEMA_VERSION,
         verifier_policy_version: VERIFIER_POLICY_VERSION.into(),
         verification_mode:
-            "frozen-source+canonical-bundle+local-exact-bytes+capsule-bytes+live-github-exact-attempt+content-addressed-archive-v1"
+            "frozen-source+canonical-bundle+local-archived-bytes+promotion-time-local-reexecution+capsule-bytes+live-github-exact-attempt+content-addressed-archive-v1"
                 .into(),
         verified_evidence,
+        live_local_verification: live_local,
         live_actions_verification: live_actions,
-        decision: "PromotionAuthorized".into(),
+        decision: PromotionDecision::PromotionAuthorized,
     };
     let bytes =
         serde_json::to_vec(&envelope).context("serialize promotion authorization envelope")?;
@@ -252,6 +286,9 @@ pub fn verify_actions_live(
             "live GitHub exact-attempt run identity differs from archived run for gate {}",
             manifest.gate_id
         );
+    }
+    if live_run.workflow_id == 0 || live_run.event != "pull_request" {
+        bail!("live GitHub run is not the expected pull_request workflow identity");
     }
     if live_run.status != "completed" || live_run.conclusion.as_deref() != Some("success") {
         bail!("live GitHub run is not a terminal success");
@@ -333,6 +370,92 @@ pub fn verify_actions_live(
         workflow_git_blob_sha1: live_content.sha,
         verification_transport: "GitHub REST API via gh authenticated HTTPS request".into(),
     })
+}
+
+fn recheck_local_gate(repo_root: &Path, gate_id: &str) -> Result<LiveLocalVerification> {
+    require_frozen_clean_checkout(repo_root)?;
+    let (command, program, args) = required_local_command(gate_id)?;
+    let output = Command::new(program)
+        .args(args)
+        .current_dir(repo_root)
+        .output()
+        .with_context(|| format!("promotion-time local recheck: {command}"))?;
+    let exit_code = output.status.code().unwrap_or(-1);
+
+    let subject_commit = git_text(repo_root, &["rev-parse", "HEAD"])?;
+    let repository_tree = git_text(repo_root, &["rev-parse", "HEAD^{tree}"])?;
+    require_frozen_clean_checkout(repo_root)?;
+    if !output.status.success() {
+        bail!(
+            "promotion-time local gate {gate_id} failed with exit code {exit_code}; stderr_sha256={}",
+            sha256_bytes(&output.stderr)
+        );
+    }
+
+    let rustc_vv = command_output(repo_root, "rustc", &["-vV"])?;
+    let cargo_vv = command_output(repo_root, "cargo", &["-Vv"])?;
+    Ok(LiveLocalVerification {
+        gate_id: gate_id.into(),
+        subject_commit,
+        command: command.into(),
+        repository_tree,
+        cargo_lock_sha256: sha256_file(&repo_root.join("Cargo.lock"))?,
+        rustc_vv_sha256: sha256_bytes(&rustc_vv),
+        cargo_vv_sha256: sha256_bytes(&cargo_vv),
+        stdout_sha256: sha256_bytes(&output.stdout),
+        stderr_sha256: sha256_bytes(&output.stderr),
+        exit_code,
+    })
+}
+
+fn required_local_command(
+    gate_id: &str,
+) -> Result<(&'static str, &'static str, &'static [&'static str])> {
+    match gate_id {
+        "local_fmt" => Ok((
+            "cargo fmt --all --check",
+            "cargo",
+            &["fmt", "--all", "--check"],
+        )),
+        "local_test" => Ok((
+            "cargo test -p symthaea-interoception",
+            "cargo",
+            &["test", "-p", "symthaea-interoception"],
+        )),
+        "local_clippy" => Ok((
+            "cargo clippy -p symthaea-interoception --all-targets -- -D warnings",
+            "cargo",
+            &[
+                "clippy",
+                "-p",
+                "symthaea-interoception",
+                "--all-targets",
+                "--",
+                "-D",
+                "warnings",
+            ],
+        )),
+        other => bail!("unsupported promotion-time local gate {other}"),
+    }
+}
+
+fn require_frozen_clean_checkout(repo_root: &Path) -> Result<()> {
+    let head = git_text(repo_root, &["rev-parse", "HEAD"])?;
+    if head != FROZEN_V01_SOURCE_COMMIT {
+        bail!(
+            "promotion checkout HEAD {} is not frozen v0.1 source {}",
+            head,
+            FROZEN_V01_SOURCE_COMMIT
+        );
+    }
+    let status = git_text_allow_empty(
+        repo_root,
+        &["status", "--porcelain=v1", "--untracked-files=all"],
+    )?;
+    if !status.is_empty() {
+        bail!("promotion checkout is not clean:\n{status}");
+    }
+    Ok(())
 }
 
 fn validate_success_jobs(jobs: &[JobIdentity]) -> Result<()> {
@@ -489,6 +612,63 @@ fn git_hash_object(path: &Path) -> Result<String> {
     Ok(value)
 }
 
+fn git_text(repo_root: &Path, args: &[&str]) -> Result<String> {
+    let value = command_output(repo_root, "git", args)?;
+    let text = String::from_utf8(value).context("git identity command emitted non-UTF-8 output")?;
+    Ok(text.trim().to_string())
+}
+
+fn git_text_allow_empty(repo_root: &Path, args: &[&str]) -> Result<String> {
+    let value = command_output(repo_root, "git", args)?;
+    let text = String::from_utf8(value).context("git status emitted non-UTF-8 output")?;
+    Ok(text.trim_end().to_string())
+}
+
+fn command_output(repo_root: &Path, program: &str, args: &[&str]) -> Result<Vec<u8>> {
+    let output = Command::new(program)
+        .args(args)
+        .current_dir(repo_root)
+        .output()
+        .with_context(|| format!("run {program} {}", args.join(" ")))?;
+    if !output.status.success() {
+        bail!(
+            "command failed: {program} {}: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    Ok(output.stdout)
+}
+
+fn sha256_file(path: &Path) -> Result<String> {
+    let mut file =
+        File::open(path).with_context(|| format!("open {} for hashing", path.display()))?;
+    let mut hasher = Sha256::new();
+    let mut buf = [0_u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buf)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buf[..read]);
+    }
+    Ok(hex_digest(hasher.finalize()))
+}
+
+fn sha256_bytes(bytes: &[u8]) -> String {
+    hex_digest(Sha256::digest(bytes))
+}
+
+fn hex_digest(bytes: impl AsRef<[u8]>) -> String {
+    use std::fmt::Write as _;
+    let bytes = bytes.as_ref();
+    let mut encoded = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        write!(&mut encoded, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    encoded
+}
+
 fn validate_sha1(name: &str, value: &str) -> Result<()> {
     if value.len() != 40
         || !value
@@ -548,5 +728,18 @@ mod tests {
         validate_success_jobs(&jobs).expect("all-success jobs should pass");
         let map = jobs_by_id(&jobs, "fixture").expect("unique job ids should map");
         assert_eq!(map.len(), 2);
+    }
+
+    #[test]
+    fn local_gate_command_identities_are_frozen() {
+        let (fmt, _, _) = required_local_command("local_fmt").expect("fmt command");
+        let (test, _, _) = required_local_command("local_test").expect("test command");
+        let (clippy, _, _) = required_local_command("local_clippy").expect("clippy command");
+        assert_eq!(fmt, "cargo fmt --all --check");
+        assert_eq!(test, "cargo test -p symthaea-interoception");
+        assert_eq!(
+            clippy,
+            "cargo clippy -p symthaea-interoception --all-targets -- -D warnings"
+        );
     }
 }
