@@ -1,0 +1,98 @@
+name: IoT Xenia Receipt Wire Vector
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-transport-receipt/tests/xenia_receipt_body_wire.rs'
+      - 'crates/bridges/symthaea-iot-transport-receipt/tests/test-vectors/**'
+      - '.github/workflows/iot-xenia-receipt-wire-vector.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-xenia-receipt-wire-vector-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-format:
+    name: Xenia receipt wire test format (Rust 1.96)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install exact formatter
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+      - name: Format only the qualification test
+        run: rustfmt --edition 2024 --check crates/bridges/symthaea-iot-transport-receipt/tests/xenia_receipt_body_wire.rs
+
+  wire-contract:
+    name: Symthaea/Xenia receipt body wire contract (MSRV 1.94)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.94.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify qualification-only diff scope
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          python3 - <<'PY'
+          import os
+          import subprocess
+
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', os.environ['BASE_SHA'], os.environ['HEAD_SHA']],
+              text=True,
+          ).splitlines())
+          allowed = {
+              '.github/workflows/iot-xenia-receipt-wire-vector.yml',
+              'crates/bridges/symthaea-iot-transport-receipt/tests/xenia_receipt_body_wire.rs',
+              'crates/bridges/symthaea-iot-transport-receipt/tests/test-vectors/AUTHENTICATED_PAYLOAD_RECEIPT_BODY_V1.md',
+              'crates/bridges/symthaea-iot-transport-receipt/tests/test-vectors/authenticated-payload-receipt-body-v1.hex',
+          }
+          print('wire qualification changed files:', sorted(changed))
+          unexpected = changed - allowed
+          assert not unexpected, f'production or unreviewed files changed: {sorted(unexpected)!r}'
+          assert changed, 'wire qualification diff unexpectedly empty'
+          PY
+      - name: Install exact MSRV toolchain
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+      - name: Locked metadata resolves without mutation
+        run: |
+          before=$(sha256sum Cargo.lock | awk '{print $1}')
+          cargo metadata --locked --format-version 1 --no-deps >/dev/null
+          after=$(sha256sum Cargo.lock | awk '{print $1}')
+          test "$before" = "$after"
+          git diff --exit-code -- Cargo.lock
+      - name: Check transport-receipt crate
+        run: cargo check --locked -p symthaea-iot-transport-receipt --all-targets
+      - name: Run neutral Xenia receipt-body wire oracle
+        run: cargo test --locked -p symthaea-iot-transport-receipt --test xenia_receipt_body_wire
+      - name: Test transport-receipt crate
+        run: cargo test --locked -p symthaea-iot-transport-receipt --all-targets
+      - name: Clippy transport-receipt crate
+        run: cargo clippy --locked -p symthaea-iot-transport-receipt --all-targets -- -D warnings
