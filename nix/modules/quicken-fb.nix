@@ -13,6 +13,18 @@ with lib;
 
 let
   cfg = config.services.symthaea-boot;
+  # Prefix checks alone are not confinement checks: `/run/symthaea/../x`
+  # satisfies a string prefix but escapes after path resolution. Keep runtime
+  # paths absolute under the declared directory and reject traversal components.
+  confinedRuntimePath = prefix: path:
+    hasPrefix prefix path
+    && removePrefix prefix path != ""
+    && !(elem ".." (splitString "/" path));
+  directChildPath = parent: path:
+    builtins.dirOf path == parent
+    && baseNameOf path != "."
+    && baseNameOf path != ".."
+    && !(elem ".." (splitString "/" path));
   telemetryArgs = optionals cfg.telemetry.enable [
     "--boot-events-socket ${escapeShellArg cfg.telemetry.eventSocket}"
     "--boot-state-path ${escapeShellArg cfg.telemetry.statePath}"
@@ -23,6 +35,28 @@ let
   performanceArgs = optionals cfg.performance.enable [
     "--performance-receipt ${escapeShellArg cfg.performance.receiptPath}"
   ];
+  seedArgs = if cfg.genesisPhrase == null then [
+    "--visual-seed-file ${escapeShellArg cfg.visualSeedFile}"
+  ] else [
+    # Compatibility only. This value is presentation input and MUST NOT contain
+    # credentials, recovery phrases, key material, or private identity data.
+    "--genesis-phrase ${escapeShellArg cfg.genesisPhrase}"
+  ];
+  visualSeedInit = pkgs.writeShellScript "symthaea-boot-visual-seed-init" ''
+    set -eu
+    seed_file=${escapeShellArg cfg.visualSeedFile}
+    seed_dir="$(${pkgs.coreutils}/bin/dirname -- "$seed_file")"
+    ${pkgs.coreutils}/bin/mkdir -p -- "$seed_dir"
+
+    if [ ! -s "$seed_file" ]; then
+      tmp="$seed_file.tmp.$$"
+      trap '${pkgs.coreutils}/bin/rm -f -- "$tmp"' EXIT
+      ${pkgs.coreutils}/bin/head -c 32 /dev/urandom | ${pkgs.coreutils}/bin/base64 > "$tmp"
+      ${pkgs.coreutils}/bin/chmod 0644 "$tmp"
+      ${pkgs.coreutils}/bin/mv -f -- "$tmp" "$seed_file"
+      trap - EXIT
+    fi
+  '';
 in {
   options.services.symthaea-boot = {
     enable = mkEnableOption "Symthaea/Spore boot animation";
@@ -32,12 +66,27 @@ in {
       description = "The symthaea-quicken-fb package containing the quicken-fb binary.";
     };
 
-    genesisPhrase = mkOption {
+    visualSeedFile = mkOption {
       type = types.str;
-      default = "consciousness awakens";
+      default = "/var/lib/symthaea/boot-visual-seed";
       description = ''
-        Genesis phrase for deterministic boot animation seeding. Each unique
-        phrase produces a distinct mycelial growth pattern via BLAKE3 hashing.
+        Persistent presentation-only seed file for deterministic boot artwork.
+        It must be a direct child of /var/lib/symthaea so the renderer's writable
+        state remains confined to its systemd-managed StateDirectory. The module
+        creates the file from random bytes when absent. This file is not a
+        credential, recovery secret, key-derivation input, or authority-bearing
+        machine identity and should not be reused for any security purpose.
+      '';
+    };
+
+    genesisPhrase = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = ''
+        DEPRECATED compatibility input for historical quicken-fb deployments.
+        When non-null it is passed through the deprecated --genesis-phrase flag.
+        It is presentation-only and MUST NOT contain credentials, recovery
+        phrases, key material, or private identity data. Prefer visualSeedFile.
       '';
     };
 
@@ -126,20 +175,28 @@ in {
     {
       assertions = [
         {
-          assertion = !cfg.telemetry.enable || hasPrefix "/run/symthaea/" cfg.telemetry.eventSocket;
-          message = "services.symthaea-boot.telemetry.eventSocket must stay beneath /run/symthaea";
+          assertion = cfg.genesisPhrase != null || directChildPath "/var/lib/symthaea" cfg.visualSeedFile;
+          message = "services.symthaea-boot.visualSeedFile must be a traversal-free direct child of /var/lib/symthaea";
         }
         {
-          assertion = !cfg.telemetry.enable || hasPrefix "/run/symthaea-boot/" cfg.telemetry.statePath;
-          message = "services.symthaea-boot.telemetry.statePath must stay beneath /run/symthaea-boot";
+          assertion = confinedRuntimePath "/run/symthaea/" cfg.progressPipe;
+          message = "services.symthaea-boot.progressPipe must stay beneath /run/symthaea without '..' traversal";
         }
         {
-          assertion = !cfg.handoff.enable || hasPrefix "/run/symthaea/" cfg.handoff.receiptPath;
-          message = "services.symthaea-boot.handoff.receiptPath must stay beneath /run/symthaea";
+          assertion = !cfg.telemetry.enable || confinedRuntimePath "/run/symthaea/" cfg.telemetry.eventSocket;
+          message = "services.symthaea-boot.telemetry.eventSocket must stay beneath /run/symthaea without '..' traversal";
         }
         {
-          assertion = !cfg.performance.enable || hasPrefix "/run/symthaea/" cfg.performance.receiptPath;
-          message = "services.symthaea-boot.performance.receiptPath must stay beneath /run/symthaea";
+          assertion = !cfg.telemetry.enable || confinedRuntimePath "/run/symthaea-boot/" cfg.telemetry.statePath;
+          message = "services.symthaea-boot.telemetry.statePath must stay beneath /run/symthaea-boot without '..' traversal";
+        }
+        {
+          assertion = !cfg.handoff.enable || confinedRuntimePath "/run/symthaea/" cfg.handoff.receiptPath;
+          message = "services.symthaea-boot.handoff.receiptPath must stay beneath /run/symthaea without '..' traversal";
+        }
+        {
+          assertion = !cfg.performance.enable || confinedRuntimePath "/run/symthaea/" cfg.performance.receiptPath;
+          message = "services.symthaea-boot.performance.receiptPath must stay beneath /run/symthaea without '..' traversal";
         }
       ];
 
@@ -165,46 +222,76 @@ in {
 
           ExecStart = concatStringsSep " " ([
             "${cfg.package}/bin/quicken-fb"
-            "--genesis-phrase ${escapeShellArg cfg.genesisPhrase}"
+          ] ++ seedArgs ++ [
             "--progress-pipe ${escapeShellArg cfg.progressPipe}"
             "--device ${escapeShellArg cfg.device}"
           ] ++ telemetryArgs ++ handoffArgs ++ performanceArgs);
 
           ExecStartPre =
-            optionals cfg.handoff.enable [
+            optional (cfg.genesisPhrase == null) "${visualSeedInit}"
+            ++ optionals cfg.handoff.enable [
               "${pkgs.coreutils}/bin/rm -f -- ${escapeShellArg cfg.handoff.receiptPath}"
             ]
             ++ optionals cfg.performance.enable [
               "${pkgs.coreutils}/bin/rm -f -- ${escapeShellArg cfg.performance.receiptPath}"
             ];
 
-          SupplementaryGroups = [ "video" "render" ]
-            ++ optional cfg.telemetry.enable "symthaea-boot";
-
+          # Unix-domain socket ownership follows the process primary GID, not
+          # supplementary groups. Use the telemetry group as the primary group
+          # so the observer DynamicUser can actually write boot-events.sock.
           User = "root";
+          Group = if cfg.telemetry.enable then "symthaea-boot" else "root";
+          SupplementaryGroups = [ "video" "render" ];
           KillSignal = "SIGTERM";
           TimeoutStopSec = "${toString cfg.handoff.stopTimeoutMs}ms";
 
-          # When telemetry is enabled, Unix sockets created by the renderer are
-          # owner/group accessible but not writable by unrelated local users.
+          # StateDirectory is the only persistent write surface. /run/symthaea
+          # remains writable by the renderer for the socket, FIFO and bounded
+          # diagnostic receipts. The directory itself is not group-writable;
+          # the observer needs search permission plus write permission on the
+          # socket inode, not authority to create sibling runtime files.
+          StateDirectory = "symthaea";
+          StateDirectoryMode = "0755";
+          ReadWritePaths = [ "/run/symthaea" ];
+
+          # When telemetry is enabled, the renderer socket is root:symthaea-boot
+          # and owner/group accessible, but unrelated local users cannot write it.
           UMask = if cfg.telemetry.enable then "0007" else "0022";
 
+          # Keep only the one capability that may still be needed for DRM master
+          # transitions. Physical/OVMF qualification must prove whether even this
+          # can be removed; all unrelated root capabilities are dropped now.
+          CapabilityBoundingSet = [ "CAP_SYS_ADMIN" ];
+
           NoNewPrivileges = true;
+          ProtectSystem = "strict";
           ProtectHome = true;
           ProtectKernelTunables = true;
           ProtectKernelModules = true;
+          ProtectKernelLogs = true;
           ProtectControlGroups = true;
+          ProtectClock = true;
+          ProtectHostname = true;
           RestrictNamespaces = true;
           LockPersonality = true;
+          MemoryDenyWriteExecute = true;
           RestrictRealtime = true;
           RestrictSUIDSGID = true;
+          RestrictAddressFamilies = [ "AF_UNIX" ];
+          SystemCallArchitectures = "native";
           PrivateTmp = true;
+
+          # Presentation needs exactly one DRM primary node. DevicePolicy=closed
+          # retains systemd's standard pseudo-devices (including /dev/urandom)
+          # while denying access to unrelated hardware.
+          DevicePolicy = "closed";
+          DeviceAllow = [ "${cfg.device} rw" ];
         };
       };
 
       systemd.tmpfiles.rules = [
         (if cfg.telemetry.enable
-          then "d /run/symthaea 0770 root symthaea-boot -"
+          then "d /run/symthaea 0750 root symthaea-boot -"
           else "d /run/symthaea 0755 root root -")
         "p ${cfg.progressPipe} 0644 root root -"
       ];

@@ -4,7 +4,7 @@
 /// Symthaea Quicken Framebuffer — mycelial colonization boot animation.
 ///
 /// A bare-metal DRM/KMS framebuffer renderer for the NixOS installer boot sequence.
-/// Renders procedural L-system mycelial growth seeded by the installation's genesis phrase.
+/// Renders procedural presentation from a stable, explicitly non-secret visual seed.
 ///
 /// # Architecture
 ///
@@ -15,6 +15,7 @@
 /// - `mycelium` — L-system branch growth, Bresenham rendering, node pulsing
 /// - `perf` — deterministic timing summaries and opt-in live performance receipts
 /// - `progress` — Named pipe reader for installer progress events
+/// - `visual_seed` — bounded presentation-only seed loading/validation
 /// - `color` — Solarpunk RGBA palette with interpolation and compositing
 pub mod boot_protocol;
 pub mod color;
@@ -30,3 +31,4 @@ pub mod mycelium;
 pub mod perf;
 pub mod progress;
 pub mod renderer_bridge;
+pub mod visual_seed;

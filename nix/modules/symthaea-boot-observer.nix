@@ -13,6 +13,10 @@
 let
   cfg = config.services.symthaea-boot.observer;
   telemetry = config.services.symthaea-boot.telemetry;
+  confinedRuntimePath = prefix: path:
+    lib.hasPrefix prefix path
+    && lib.removePrefix prefix path != ""
+    && !(builtins.elem ".." (lib.splitString "/" path));
   inherit (lib) mkDefault mkEnableOption mkIf mkOption types;
 in {
   options.services.symthaea-boot.observer = {
@@ -46,15 +50,15 @@ in {
 
     assertions = [
       {
-        assertion = lib.hasPrefix "/run/symthaea/" cfg.outputSocket;
-        message = "services.symthaea-boot.observer.outputSocket must stay beneath /run/symthaea";
+        assertion = confinedRuntimePath "/run/symthaea/" cfg.outputSocket;
+        message = "services.symthaea-boot.observer.outputSocket must stay beneath /run/symthaea without '..' traversal";
       }
       {
-        assertion = lib.hasPrefix "/run/symthaea-boot/" cfg.statePath;
+        assertion = confinedRuntimePath "/run/symthaea-boot/" cfg.statePath;
         message = ''
           services.symthaea-boot.observer.statePath must stay beneath
-          /run/symthaea-boot so the observer remains ephemeral and writable by
-          its DynamicUser runtime directory.
+          /run/symthaea-boot without '..' traversal so the observer remains
+          ephemeral and writable only through its DynamicUser runtime directory.
         '';
       }
       {

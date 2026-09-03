@@ -4,16 +4,17 @@
 /// Mycelial colonization boot animation for NixOS installation and system boot.
 ///
 /// Runs on bare-metal DRM/KMS framebuffer — no display server, no GPU acceleration.
-/// Renders procedural mycelial growth seeded by the installation's genesis phrase.
+/// Procedural artwork is seeded only from explicitly presentation-only material.
 ///
-/// Usage:
-///   quicken-fb --genesis-phrase "your sovereign phrase here"
-///   quicken-fb --genesis-phrase "..." --progress-pipe /run/quicken-progress
-///   quicken-fb --genesis-phrase "..." --boot-events-socket /run/symthaea/boot-events.sock \
+/// Preferred usage:
+///   quicken-fb --visual-seed-file /var/lib/symthaea/boot-visual-seed
+///   quicken-fb --visual-seed-file /var/lib/symthaea/boot-visual-seed \
+///       --boot-events-socket /run/symthaea/boot-events.sock \
 ///       --boot-state-path /run/symthaea-boot/state-v1.json
-///   quicken-fb --genesis-phrase "..." --handoff-receipt /run/symthaea/boot-display-released-v1.json
-///   quicken-fb --genesis-phrase "..." --performance-receipt /run/symthaea/boot-performance-v1.json
-///   quicken-fb --genesis-phrase "..." --device /dev/dri/card1
+///
+/// `--visual-seed` is available for explicit non-secret literals. The historical
+/// `--genesis-phrase` flag remains a deprecated compatibility alias only; never
+/// pass credentials, recovery phrases, key material, or private identity data.
 ///
 /// Signal handling:
 ///   SIGTERM — bounded fast display release
@@ -31,6 +32,7 @@ use symthaea_quicken_fb::progress::{ProgressEvent, ProgressMonitor};
 use symthaea_quicken_fb::renderer_bridge::{
     EcologyFallbackReason, EcologyRenderOutcome, EcologyRendererBridge,
 };
+use symthaea_quicken_fb::visual_seed::{load_visual_seed_file, normalize_visual_seed};
 
 /// Target frame rate for the animation.
 const TARGET_FPS: u32 = 30;
@@ -85,8 +87,8 @@ fn main() {
 
     // The legacy network remains live at all times so it can take over on the
     // very next frame if any semantic projection or ecology render step fails.
-    let mut network = MycelialNetwork::new(fb.width, fb.height, &args.genesis_phrase);
-    let mut ecology = match EcologyRendererBridge::new(fb.width, fb.height, &args.genesis_phrase) {
+    let mut network = MycelialNetwork::new(fb.width, fb.height, &args.visual_seed);
+    let mut ecology = match EcologyRendererBridge::new(fb.width, fb.height, &args.visual_seed) {
         Ok(bridge) => Some(bridge),
         Err(error) => {
             eprintln!("quicken-fb: ecology renderer unavailable; using legacy fallback: {error}");
@@ -303,7 +305,7 @@ fn visual_changed(previous: Option<BootVisualState>, current: Option<BootVisualS
 
 /// Parsed command-line arguments.
 struct Args {
-    genesis_phrase: String,
+    visual_seed: String,
     progress_pipe: Option<String>,
     boot_events_socket: Option<String>,
     boot_state_path: Option<String>,
@@ -315,7 +317,9 @@ struct Args {
 /// Minimal argument parser (no clap dependency to keep binary small).
 fn parse_args() -> Args {
     let args: Vec<String> = std::env::args().collect();
-    let mut genesis_phrase = None;
+    let mut visual_seed = None;
+    let mut visual_seed_file = None;
+    let mut legacy_genesis_phrase = None;
     let mut progress_pipe = None;
     let mut boot_events_socket = None;
     let mut boot_state_path = None;
@@ -326,10 +330,22 @@ fn parse_args() -> Args {
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
+            "--visual-seed" => {
+                i += 1;
+                if i < args.len() {
+                    visual_seed = Some(args[i].clone());
+                }
+            }
+            "--visual-seed-file" => {
+                i += 1;
+                if i < args.len() {
+                    visual_seed_file = Some(args[i].clone());
+                }
+            }
             "--genesis-phrase" => {
                 i += 1;
                 if i < args.len() {
-                    genesis_phrase = Some(args[i].clone());
+                    legacy_genesis_phrase = Some(args[i].clone());
                 }
             }
             "--progress-pipe" => {
@@ -381,17 +397,52 @@ fn parse_args() -> Args {
         i += 1;
     }
 
-    let genesis_phrase = match genesis_phrase {
-        Some(p) => p,
-        None => {
-            eprintln!("quicken-fb: --genesis-phrase is required");
-            print_usage();
-            std::process::exit(1);
+    let source_count = usize::from(visual_seed.is_some())
+        + usize::from(visual_seed_file.is_some())
+        + usize::from(legacy_genesis_phrase.is_some());
+    if source_count != 1 {
+        eprintln!(
+            "quicken-fb: choose exactly one of --visual-seed-file, --visual-seed, or deprecated --genesis-phrase"
+        );
+        print_usage();
+        std::process::exit(1);
+    }
+
+    let visual_seed = if let Some(seed) = visual_seed {
+        match normalize_visual_seed(&seed) {
+            Ok(seed) => seed,
+            Err(error) => {
+                eprintln!("quicken-fb: invalid visual seed: {error}");
+                std::process::exit(1);
+            }
+        }
+    } else if let Some(path) = visual_seed_file {
+        match load_visual_seed_file(Path::new(&path)) {
+            Ok(seed) => seed,
+            Err(error) => {
+                eprintln!("quicken-fb: invalid visual seed file {path:?}: {error}");
+                std::process::exit(1);
+            }
+        }
+    } else {
+        eprintln!(
+            "quicken-fb: WARNING: --genesis-phrase is deprecated and presentation-only; never pass credentials, recovery phrases, or key material"
+        );
+        match normalize_visual_seed(
+            legacy_genesis_phrase
+                .as_deref()
+                .expect("exactly one seed source was selected"),
+        ) {
+            Ok(seed) => seed,
+            Err(error) => {
+                eprintln!("quicken-fb: invalid deprecated genesis phrase: {error}");
+                std::process::exit(1);
+            }
         }
     };
 
     Args {
-        genesis_phrase,
+        visual_seed,
         progress_pipe,
         boot_events_socket,
         boot_state_path,
@@ -403,10 +454,14 @@ fn parse_args() -> Args {
 
 fn print_usage() {
     eprintln!(
-        "Usage: quicken-fb --genesis-phrase <PHRASE> [OPTIONS]\n\
+        "Usage: quicken-fb --visual-seed-file <PATH> [OPTIONS]\n\
+         \n\
+         Seed input (choose exactly one):\n\
+         \x20 --visual-seed-file <PATH>  Preferred persistent presentation-only seed file\n\
+         \x20 --visual-seed <VALUE>      Explicit non-secret presentation seed literal\n\
+         \x20 --genesis-phrase <VALUE>   DEPRECATED compatibility alias; never use secrets\n\
          \n\
          Options:\n\
-         \x20 --genesis-phrase <PHRASE>   Genesis phrase for deterministic pattern seeding\n\
          \x20 --progress-pipe <PATH>      Named pipe for installer progress events\n\
          \x20 --boot-events-socket <PATH> Unix datagram socket for typed boot telemetry\n\
          \x20 --boot-state-path <PATH>    Lineage-bound boot snapshot side channel\n\
