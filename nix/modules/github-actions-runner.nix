@@ -81,28 +81,28 @@ let
 
     expected_harness=${lib.escapeShellArg trustedHarnessCommit}
 
-    [ "${GITHUB_REPOSITORY:-}" = ${lib.escapeShellArg repositoryName} ] \
+    [ "''${GITHUB_REPOSITORY:-}" = ${lib.escapeShellArg repositoryName} ] \
       || reject 'wrong repository'
-    [ "${GITHUB_REPOSITORY_ID:-}" = ${lib.escapeShellArg repositoryId} ] \
+    [ "''${GITHUB_REPOSITORY_ID:-}" = ${lib.escapeShellArg repositoryId} ] \
       || reject 'wrong repository id'
-    [ "${GITHUB_SERVER_URL:-}" = 'https://github.com' ] \
+    [ "''${GITHUB_SERVER_URL:-}" = 'https://github.com' ] \
       || reject 'wrong GitHub server'
-    [ "${GITHUB_EVENT_NAME:-}" = 'workflow_dispatch' ] \
+    [ "''${GITHUB_EVENT_NAME:-}" = 'workflow_dispatch' ] \
       || reject 'workflow is not manually dispatched'
-    [ "${GITHUB_REF:-}" = 'refs/heads/main' ] \
+    [ "''${GITHUB_REF:-}" = 'refs/heads/main' ] \
       || reject 'workflow ref is not main'
-    [ "${GITHUB_REF_TYPE:-}" = 'branch' ] \
+    [ "''${GITHUB_REF_TYPE:-}" = 'branch' ] \
       || reject 'workflow ref is not a branch'
-    [ "${GITHUB_REF_PROTECTED:-}" = 'true' ] \
+    [ "''${GITHUB_REF_PROTECTED:-}" = 'true' ] \
       || reject 'main is not protected by GitHub policy'
     [ -n "$expected_harness" ] \
       || reject 'trusted harness commit is not configured'
-    [ "${GITHUB_SHA:-}" = "$expected_harness" ] \
+    [ "''${GITHUB_SHA:-}" = "$expected_harness" ] \
       || reject 'job commit does not match deployed trusted harness'
-    [ "${GITHUB_WORKFLOW_SHA:-}" = "$expected_harness" ] \
+    [ "''${GITHUB_WORKFLOW_SHA:-}" = "$expected_harness" ] \
       || reject 'workflow commit does not match deployed trusted harness'
 
-    case "${GITHUB_WORKFLOW_REF:-}" in
+    case "''${GITHUB_WORKFLOW_REF:-}" in
       '${repositoryName}/.github/workflows/self-hosted-runner-smoke.yml@refs/heads/main'|\
       '${repositoryName}/.github/workflows/self-hosted-ai-assurance-foundation-recovery.yml@refs/heads/main'|\
       '${repositoryName}/.github/workflows/self-hosted-ai-assurance-budget-recovery.yml@refs/heads/main'|\
