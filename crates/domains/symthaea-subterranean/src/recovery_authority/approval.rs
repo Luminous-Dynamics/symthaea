@@ -141,11 +141,11 @@ impl OperatorAuthority {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::{RecoveryDigest, qualify_recovery_basis};
     use crate::operator_authority::OperatorConstraint;
     use crate::operator_protocol::{
         AuthenticationLevel, OperatorCommand, OperatorCommandEnvelope, OperatorRole,
     };
-    use crate::recovery_authority::{RecoveryDigest, qualify_recovery_basis};
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
@@ -344,7 +344,7 @@ mod tests {
             .expect("changed evidence")
             .step;
 
-        assert_eq!(
+        assert!(matches!(
             qualify_recovery_approval(
                 &embodiment,
                 host(),
@@ -354,14 +354,14 @@ mod tests {
             Err(RecoveryApprovalQualificationRejection::Proposal(
                 RecoveryProposalRejection::ActiveConstraintMismatch
             ))
-        );
+        ));
     }
 
     #[test]
     fn future_dated_human_approval_cannot_be_qualified_early() {
         let (embodiment, _authority, proposal, now_step) =
             prepared_hold("future-live-recovery-approval");
-        assert_eq!(
+        assert!(matches!(
             qualify_recovery_approval(
                 &embodiment,
                 host(),
@@ -369,6 +369,6 @@ mod tests {
                 now_step,
             ),
             Err(RecoveryApprovalQualificationRejection::ApprovalNotYetIssued)
-        );
+        ));
     }
 }
