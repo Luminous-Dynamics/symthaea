@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "status": "normative-design-only",
+  "suite_id": "affective-emergence-v0.2-malicious-m01-m14-v1",
+  "promotion_rule": "all implemented malicious fixtures rejected by expected primary gate and paired valid controls accepted",
+  "fixtures": [
+    {"role":"M01","behavior":"future_suffix_reader","primary_gate":"future_suffix_mutation_invariance","failure_class":"FutureInformationLeak","valid_control":"prefix_view_only"},
+    {"role":"M02","behavior":"suffix_sensitive_provenance_reader","primary_gate":"prefix_payload_identity","failure_class":"SuffixSensitiveProvenanceLeak","valid_control":"full_trace_digest_outer_envelope_only"},
+    {"role":"M03","behavior":"semantic_arm_reader","primary_gate":"semantic_label_canary_and_mapping_permutation","failure_class":"SemanticLeak","valid_control":"opaque_blind_codes_only"},
+    {"role":"M04","behavior":"confirmatory_cohort_fitter","primary_gate":"preprocessing_holdout_firewall","failure_class":"ConfirmatoryPreprocessingLeak","valid_control":"structural_or_discovery_frozen_preprocessing"},
+    {"role":"M05","behavior":"cross_scenario_state_carrier","primary_gate":"scenario_order_and_cold_warm_equivalence","failure_class":"CrossScenarioStateLeak","valid_control":"NoneAcrossEvaluationCoordinates"},
+    {"role":"M06","behavior":"cache_key_poisoning","primary_gate":"cache_hit_miss_equivalence_and_key_audit","failure_class":"CacheIdentityViolation","valid_control":"content_addressed_complete_key_or_cache_disabled"},
+    {"role":"M07","behavior":"unavailable_as_zero","primary_gate":"typed_availability_reference_fixture","failure_class":"InvalidUndefinedSemantics","valid_control":"typed_unavailable_or_no_breach"},
+    {"role":"M08","behavior":"off_by_one_temporal_aligner","primary_gate":"forecast_temporal_self_consistency","failure_class":"TemporalAlignmentError","valid_control":"absolute_time_aligned_shared_support"},
+    {"role":"M09","behavior":"rolling_change_registered_as_revision","primary_gate":"relation_formula_compatibility_and_boundary_turnover","failure_class":"RelationSubstitution","valid_control":"R3_neutral_while_R4_changes_in_boundary_fixture"},
+    {"role":"M10","behavior":"precision_times_importance_registered_as_viability_only","primary_gate":"weighting_orthogonalization_reference_fixture","failure_class":"WeightingSubstitution","valid_control":"W1_excludes_precision_W2_reproduces_legacy"},
+    {"role":"M11","behavior":"aggregation_or_denominator_substitution","primary_gate":"aggregation_invariance_reference_fixture","failure_class":"AggregationSubstitution","valid_control":"declared_A0_to_A5_semantics"},
+    {"role":"M12","behavior":"oracle_registered_as_prefix_causal","primary_gate":"authority_capability_and_suffix_redaction","failure_class":"OracleAuthorityEscalation","valid_control":"oracle_diagnostic_namespace_only"},
+    {"role":"M13","behavior":"native_trace_mutating_observer","primary_gate":"observer_no_observer_trace_equality","failure_class":"ObserverFeedback","valid_control":"offline_after_frozen_native_trace"},
+    {"role":"M14","behavior":"frozen_artifact_substitution","primary_gate":"dependency_root_digest_reproduction","failure_class":"ArtifactSubstitution","valid_control":"complete_realized_package_reproduces_upstream_digests"}
+  ],
+  "known_bad_pass_is":"IntegrityFailureOfValidationSystem",
+  "claim_boundary":"known-violation-detection-not-absence-of-all-bugs"
+}
