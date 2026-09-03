@@ -307,8 +307,8 @@ pub struct ActuationGuardServer {
 
 impl ActuationGuardServer {
     /// Bind a fresh socket. The parent directory must already exist, be a real directory
-    /// (not a symlink), be non-world-writable, and have the explicitly provisioned IPC
-    /// group. The socket path itself must not already exist.
+    /// (not a symlink), be searchable by the provisioned IPC group, and be writable only
+    /// by its owner. The socket path itself must not already exist.
     pub async fn bind(
         config: ActuationGuardServerConfig,
         ingress: GuardIngressState,
@@ -327,8 +327,11 @@ impl ActuationGuardServer {
         if !metadata.is_dir() {
             return Err(GuardServerError::RuntimeDirectoryNotDirectory);
         }
-        if metadata.mode() & 0o002 != 0 {
-            return Err(GuardServerError::RuntimeDirectoryWorldWritable);
+        if metadata.mode() & 0o022 != 0 {
+            return Err(GuardServerError::RuntimeDirectoryWritableByNonOwner);
+        }
+        if metadata.mode() & 0o010 == 0 {
+            return Err(GuardServerError::RuntimeDirectoryNotGroupSearchable);
         }
         if metadata.gid() != config.expected_socket_gid {
             return Err(GuardServerError::RuntimeDirectoryGroupMismatch {
@@ -621,9 +624,12 @@ pub enum GuardServerError {
     /// Runtime parent exists but is not a directory.
     #[error("actuation guard runtime parent is not a directory")]
     RuntimeDirectoryNotDirectory,
-    /// World-writable runtime directories permit unsafe path manipulation.
-    #[error("actuation guard runtime directory must not be world-writable")]
-    RuntimeDirectoryWorldWritable,
+    /// Group/world write permission would let a client mutate the socket pathname.
+    #[error("actuation guard runtime directory must be writable only by its owner")]
+    RuntimeDirectoryWritableByNonOwner,
+    /// The IPC group must be able to traverse the protected directory to connect.
+    #[error("actuation guard runtime directory must be searchable by its IPC group")]
+    RuntimeDirectoryNotGroupSearchable,
     /// Runtime directory group differs from deployment provisioning.
     #[error("actuation guard runtime directory group mismatch: expected {expected}, actual {actual}")]
     RuntimeDirectoryGroupMismatch { expected: u32, actual: u32 },
