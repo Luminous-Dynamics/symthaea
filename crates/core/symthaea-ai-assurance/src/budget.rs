@@ -1039,7 +1039,8 @@ mod tests {
         barrier.wait();
         let successes = threads
             .into_iter()
-            .filter(|thread| thread.join().unwrap().is_ok())
+            .map(|thread| thread.join().unwrap())
+            .filter(Result::is_ok)
             .count();
         assert_eq!(successes, 1);
         assert_eq!(domain.remaining().get(BudgetDimension::ComputeUnits), 0);
