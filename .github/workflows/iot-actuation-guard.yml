@@ -45,6 +45,7 @@ jobs:
         run: |
           rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard/src/lib.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard/tests/ingress.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard/tests/socket_boundary.rs
 
       - name: Enforce minimal non-actuating production dependency surface
         run: |
@@ -75,6 +76,9 @@ jobs:
               'verify_xenia_physical_effect_receipt',
               'decode_canonical_guard_request',
               'peer_cred()',
+              'ACTUATION_GUARD_SOCKET_MODE: u32 = 0o660',
+              'metadata.mode() & 0o022 != 0',
+              'metadata.mode() & 0o010 == 0',
           ]
           for needle in required:
               assert needle in source, f'missing guard invariant marker: {needle!r}'
@@ -157,6 +161,9 @@ jobs:
 
       - name: Run fixed hybrid ingress regressions
         run: cargo test -p symthaea-iot-actuation-guard --test ingress
+
+      - name: Run Unix socket isolation regressions
+        run: cargo test -p symthaea-iot-actuation-guard --test socket_boundary
 
       - name: Test guard package
         run: cargo test -p symthaea-iot-actuation-guard --all-targets
