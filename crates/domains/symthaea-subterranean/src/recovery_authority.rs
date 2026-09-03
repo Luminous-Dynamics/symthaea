@@ -75,6 +75,7 @@
 
 pub mod approval;
 pub mod live_gate;
+pub(crate) mod owner_prepare;
 pub mod qualification;
 
 pub use approval::{
