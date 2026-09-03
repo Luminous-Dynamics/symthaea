@@ -51,22 +51,23 @@ impl fmt::Display for VisualSeedError {
 
 impl std::error::Error for VisualSeedError {}
 
-/// Normalize presentation seed text while preserving all non-edge content.
+/// Validate presentation seed text without rewriting literal bytes.
 ///
-/// The returned value is deterministic input material only. Callers must never
-/// reinterpret it as authentication or recovery state.
+/// Preserving the exact string is intentional: the deprecated compatibility
+/// input must render identically even when a historical seed contains leading
+/// or trailing spaces. The returned value remains presentation input only and
+/// must never be reinterpreted as authentication or recovery state.
 pub fn normalize_visual_seed(input: &str) -> Result<String, VisualSeedError> {
-    let trimmed = input.trim();
-    if trimmed.is_empty() {
+    if input.is_empty() {
         return Err(VisualSeedError::Empty);
     }
-    if trimmed.len() > MAX_VISUAL_SEED_BYTES {
+    if input.len() > MAX_VISUAL_SEED_BYTES {
         return Err(VisualSeedError::TooLarge {
-            bytes: trimmed.len(),
+            bytes: input.len(),
             max: MAX_VISUAL_SEED_BYTES,
         });
     }
-    Ok(trimmed.to_owned())
+    Ok(input.to_owned())
 }
 
 /// Load a bounded UTF-8 seed from a dedicated presentation-only regular file.
@@ -74,7 +75,9 @@ pub fn normalize_visual_seed(input: &str) -> Result<String, VisualSeedError> {
 /// `O_NOFOLLOW` prevents a configured path from becoming a root-readable
 /// symlink oracle. Reading is capped at `MAX + 1` bytes from the opened file
 /// descriptor, eliminating the metadata/read replacement race and bounding
-/// allocation even if the file changes while it is being read.
+/// allocation even if the file changes while it is being read. One conventional
+/// terminal LF (or CRLF) is excluded from seed material so text seed files are
+/// stable across ordinary POSIX file writers; all other bytes are preserved.
 pub fn load_visual_seed_file(path: &Path) -> Result<String, VisualSeedError> {
     let file = OpenOptions::new()
         .read(true)
@@ -94,6 +97,10 @@ pub fn load_visual_seed_file(path: &Path) -> Result<String, VisualSeedError> {
         });
     }
     let text = std::str::from_utf8(&bytes).map_err(|_| VisualSeedError::InvalidUtf8)?;
+    let text = text
+        .strip_suffix("\r\n")
+        .or_else(|| text.strip_suffix('\n'))
+        .unwrap_or(text);
     normalize_visual_seed(text)
 }
 
@@ -117,8 +124,8 @@ mod tests {
     }
 
     #[test]
-    fn seed_normalization_rejects_empty_and_oversized_input() {
-        assert!(matches!(normalize_visual_seed("  \n"), Err(VisualSeedError::Empty)));
+    fn seed_validation_rejects_empty_and_oversized_input() {
+        assert!(matches!(normalize_visual_seed(""), Err(VisualSeedError::Empty)));
         let oversized = "x".repeat(MAX_VISUAL_SEED_BYTES + 1);
         assert!(matches!(
             normalize_visual_seed(&oversized),
@@ -127,20 +134,20 @@ mod tests {
     }
 
     #[test]
-    fn seed_normalization_trims_only_edge_whitespace() {
+    fn literal_seed_validation_preserves_legacy_bytes() {
         assert_eq!(
-            normalize_visual_seed("  public visual seed 42\n").unwrap(),
-            "public visual seed 42"
+            normalize_visual_seed("  public visual seed 42  ").unwrap(),
+            "  public visual seed 42  "
         );
     }
 
     #[test]
-    fn file_loader_is_bounded_and_deterministic() {
+    fn file_loader_is_bounded_and_strips_only_terminal_newline() {
         let path = temp_seed_path();
-        fs::write(&path, b"stable-public-visual-seed\n").unwrap();
+        fs::write(&path, b" stable-public-visual-seed \n").unwrap();
         assert_eq!(
             load_visual_seed_file(&path).unwrap(),
-            "stable-public-visual-seed"
+            " stable-public-visual-seed "
         );
 
         fs::write(&path, vec![b'x'; MAX_VISUAL_SEED_BYTES + 1]).unwrap();
