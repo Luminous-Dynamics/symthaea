@@ -10,17 +10,24 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: spore-v032-format-only-baseline
+  cancel-in-progress: true
+
 jobs:
   format-baseline:
     name: Format, verify semantics compile, commit
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout baseline branch
+      - name: Checkout triggering commit exactly
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: spore/boot-ecology-v0.3.2-format-baseline
+          ref: ${{ github.sha }}
           fetch-depth: 1
+
+      - name: Verify event/source identity
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
 
       - name: Install pinned Rust 1.96.0
         uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e
@@ -87,15 +94,21 @@ jobs:
           -p symthaea-boot-state
           -p symthaea-quicken-fb
 
-      - name: Remove one-shot workflow and commit format-only baseline
+      - name: Remove one-shot workflow
+        run: rm .github/workflows/spore-v032-format-baseline.yml
+
+      - name: Commit only if branch has not moved
         run: |
-          rm .github/workflows/spore-v032-format-baseline.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add crates/core/symthaea-boot-ecology \
                   crates/core/symthaea-boot-state \
-                  crates/domains/symthaea-quicken-fb
-          git rm --cached .github/workflows/spore-v032-format-baseline.yml
+                  crates/domains/symthaea-quicken-fb \
+                  .github/workflows/spore-v032-format-baseline.yml
           git diff --cached --check
+          unexpected="$(git diff --cached --name-only | grep -Ev '^(crates/core/symthaea-boot-ecology/|crates/core/symthaea-boot-state/|crates/domains/symthaea-quicken-fb/|\.github/workflows/spore-v032-format-baseline.yml$)' || true)"
+          test -z "$unexpected"
           git commit -m "chore(spore): rustfmt v0.3.2 qualification baseline"
+          git fetch origin spore/boot-ecology-v0.3.2-format-baseline
+          test "$(git rev-parse origin/spore/boot-ecology-v0.3.2-format-baseline)" = "$GITHUB_SHA"
           git push origin HEAD:spore/boot-ecology-v0.3.2-format-baseline
