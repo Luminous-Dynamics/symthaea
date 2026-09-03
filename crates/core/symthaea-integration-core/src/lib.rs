@@ -28,6 +28,7 @@ mod independence_reasoning;
 pub mod limits;
 pub mod manifest;
 pub mod observation;
+pub mod observation_reference;
 pub mod registry;
 pub mod resolution;
 pub mod resolution_pipeline;
@@ -80,6 +81,9 @@ pub use observation::{
     ObservationEnvelope, ObservationId, ObservationKind, ObservationLineage,
     ObservationQuality, ObservationSource, ObservationState, ObservationValidationError,
     ObservationValue, TransformStep, OBSERVATION_SCHEMA_VERSION,
+};
+pub use observation_reference::{
+    SourceQualifiedObservationRef, SourceQualifiedObservationRefError,
 };
 pub use registry::{IntegrationRegistry, RegistryError};
 pub use resolution::{
