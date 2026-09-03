@@ -2,6 +2,19 @@ name: Agency Checkpoint Witness Qualification
 
 on:
   pull_request:
+    paths:
+      - 'crates/core/symthaea-authority/**'
+      - 'crates/core/symthaea-action-*/**'
+      - 'crates/bridges/symthaea-authority-time/**'
+      - 'crates/bridges/symthaea-checkpoint-witness/**'
+      - 'crates/bridges/symthaea-authority-frontier*/**'
+      - 'crates/bridges/symthaea-system-attempt-recovery-index/**'
+      - 'crates/bridges/symthaea-system-crash-recovery/**'
+      - 'crates/bridges/symthaea-witnessed-system-crash-recovery/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/agency-checkpoint-witness-qualification.yml'
   workflow_dispatch:
 
 permissions:
