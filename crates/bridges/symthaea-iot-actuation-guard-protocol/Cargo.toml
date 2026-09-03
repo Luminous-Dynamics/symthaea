@@ -1,0 +1,22 @@
+[package]
+name = "symthaea-iot-actuation-guard-protocol"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Bounded evidence-only IPC protocol for the privileged IoT actuation guard"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "safety", "ipc", "actuation"]
+categories = ["embedded"]
+
+[dependencies]
+bincode = { workspace = true }
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-device-protocol = { path = "../symthaea-iot-device-protocol" }
+symthaea-iot-final-gate = { path = "../symthaea-iot-final-gate" }
+symthaea-iot-transport-receipt = { path = "../symthaea-iot-transport-receipt" }
+thiserror = { workspace = true }
