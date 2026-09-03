@@ -22,7 +22,9 @@ pub mod identity_normalization;
 pub mod identity_provider;
 pub mod independence;
 pub mod independence_authority;
-pub mod independence_reasoning;
+// Positive-independence application remains internal until an authenticated
+// authority-verification boundary is implemented and separately qualified.
+mod independence_reasoning;
 pub mod limits;
 pub mod manifest;
 pub mod observation;
@@ -66,10 +68,6 @@ pub use independence_authority::{
     IndependenceAttestationSet, IndependenceAttestationSetError, IndependenceAuthorityPolicy,
     IndependenceAuthorityQualification, IndependenceBasis,
     INDEPENDENCE_ATTESTATION_SCHEMA_VERSION,
-};
-pub use independence_reasoning::{
-    IndependenceCliqueWitness, QualifiedIndependenceAssessment, QualifiedIndependenceError,
-    QualifiedIndependenceReasoningPolicy, assess_qualified_independence,
 };
 pub use limits::{ObservationBudgetError, ObservationLimits};
 pub use manifest::{
