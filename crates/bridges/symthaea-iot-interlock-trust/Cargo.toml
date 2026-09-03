@@ -15,5 +15,6 @@ categories = ["embedded"]
 blake3 = { workspace = true }
 serde = { workspace = true }
 symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-authority = { path = "../symthaea-iot-authority" }
 symthaea-iot-final-gate = { path = "../symthaea-iot-final-gate" }
 thiserror = { workspace = true }
