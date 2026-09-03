@@ -157,9 +157,8 @@ fn validate_receipts_for_plan(
 ///
 /// Plans are derived canonically from the committed RA-19 decisions. Callers
 /// provide only receipts; they cannot choose or replace restore semantics after
-/// commit. All plans are derived before any receipt is evaluated so an
-/// under-specified domain fails for its semantic reason rather than because an
-/// earlier audited domain happens to lack a receipt.
+/// commit. All plans are derived before any receipt is evaluated so semantic
+/// incompleteness is distinguished from missing execution evidence.
 pub(super) fn validate_restore_execution(
     committed: &CommittedOperationalRestore,
     receipts: &[RestoreActionReceipt],
@@ -364,15 +363,13 @@ mod tests {
     }
 
     #[test]
-    fn full_activation_stays_blocked_at_first_unaudited_domain() {
+    fn complete_semantic_planning_still_requires_execution_receipts() {
         let committed = committed();
         assert_eq!(
             validate_restore_execution(&committed, &[]),
-            Err(RestoreExecutionError::PlanUnavailable {
-                domain: RestoreDomain::ActuatorIsolation,
-                error: RestorePlanError::EvidencePolicyUnderspecified {
-                    domain: RestoreDomain::ActuatorIsolation,
-                },
+            Err(RestoreExecutionError::MissingReceipt {
+                domain: RestoreDomain::Controller,
+                action: RestoreAction::ReplaceValidatedHistorical,
             })
         );
     }

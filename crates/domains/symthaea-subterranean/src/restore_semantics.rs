@@ -74,6 +74,7 @@ const SENSOR_SEMANTICS: &[RestoreSemantics] = &[
 const ACTUATOR_SEMANTICS: &[RestoreSemantics] = &[
     RestoreSemantics::AuthorityMonotone,
     RestoreSemantics::EvidenceMerge,
+    RestoreSemantics::DerivedRequalify,
     RestoreSemantics::TransitionReconcile,
 ];
 const ENVELOPE_SEMANTICS: &[RestoreSemantics] = &[
@@ -83,11 +84,13 @@ const ENVELOPE_SEMANTICS: &[RestoreSemantics] = &[
 const PARTITION_SEMANTICS: &[RestoreSemantics] = &[
     RestoreSemantics::AuthorityMonotone,
     RestoreSemantics::EvidenceMerge,
+    RestoreSemantics::DerivedRequalify,
     RestoreSemantics::TransitionReconcile,
 ];
 const TEMPORAL_SEMANTICS: &[RestoreSemantics] = &[
     RestoreSemantics::AuthorityMonotone,
     RestoreSemantics::EvidenceMerge,
+    RestoreSemantics::DerivedRequalify,
     RestoreSemantics::TransitionReconcile,
 ];
 
@@ -152,10 +155,9 @@ mod tests {
     }
 
     #[test]
-    fn sensor_restore_requires_evidence_merge_fresh_requalification_and_policy_reconcile() {
-        let contract = contract_for(RestoreDomain::SensorFusion);
-        assert!(contract.semantics.contains(&RestoreSemantics::EvidenceMerge));
-        assert!(contract.semantics.contains(&RestoreSemantics::DerivedRequalify));
-        assert!(contract.semantics.contains(&RestoreSemantics::TransitionReconcile));
+    fn current_truth_domains_require_fresh_requalification() {
+        for domain in [RestoreDomain::SensorFusion,RestoreDomain::ActuatorIsolation,RestoreDomain::FieldEnvelope,RestoreDomain::PartitionRecovery,RestoreDomain::TemporalAssurance] {
+            assert!(contract_for(domain).semantics.contains(&RestoreSemantics::DerivedRequalify));
+        }
     }
 }
