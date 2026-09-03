@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod duplicate_scan;
+mod interoception_actions_archive;
 mod interoception_qualification;
 mod manifest;
 mod rhn_sweep;
@@ -53,6 +54,17 @@ enum Commands {
     InteroceptionVerifyLocal {
         #[arg(long)]
         evidence_dir: PathBuf,
+        #[arg(long)]
+        repo_root: Option<PathBuf>,
+    },
+    /// Build and immediately verify an immutable GitHub Actions archive manifest.
+    InteroceptionBuildActionsArchive {
+        #[arg(long)]
+        archive_dir: PathBuf,
+        #[arg(long)]
+        gate: String,
+        #[arg(long, default_value = "Luminous-Dynamics/symthaea")]
+        repository: String,
         #[arg(long)]
         repo_root: Option<PathBuf>,
     },
@@ -205,6 +217,7 @@ fn main() -> anyhow::Result<()> {
             repo_root,
             out,
         } => {
+            guard_external_empty_output_dir(&repo_root, &out)?;
             let verified = interoception_qualification::capture_local_gate(
                 &repo_root,
                 &subject_commit,
@@ -220,6 +233,20 @@ fn main() -> anyhow::Result<()> {
             let verified = interoception_qualification::verify_local_gate(
                 &interoception_qualification::local_manifest_path(&evidence_dir),
                 &interoception_qualification::local_transcript_path(&evidence_dir),
+                repo_root.as_deref(),
+            )?;
+            println!("{}", serde_json::to_string_pretty(&verified)?);
+        }
+        Commands::InteroceptionBuildActionsArchive {
+            archive_dir,
+            gate,
+            repository,
+            repo_root,
+        } => {
+            let verified = interoception_actions_archive::build_actions_archive(
+                &archive_dir,
+                &gate,
+                &repository,
                 repo_root.as_deref(),
             )?;
             println!("{}", serde_json::to_string_pretty(&verified)?);
@@ -260,6 +287,34 @@ fn main() -> anyhow::Result<()> {
             )?;
             println!("{}", serde_json::to_string_pretty(&attestation)?);
         }
+    }
+    Ok(())
+}
+
+fn guard_external_empty_output_dir(repo_root: &std::path::Path, out: &std::path::Path) -> anyhow::Result<()> {
+    let canonical_repo = std::fs::canonicalize(repo_root)?;
+    let created = !out.exists();
+    if created {
+        std::fs::create_dir_all(out)?;
+    }
+    if !out.is_dir() {
+        anyhow::bail!("evidence output path is not a directory: {}", out.display());
+    }
+    if std::fs::read_dir(out)?.next().transpose()?.is_some() {
+        anyhow::bail!(
+            "evidence output directory must be empty to prevent artifact overwrite: {}",
+            out.display()
+        );
+    }
+    let canonical_out = std::fs::canonicalize(out)?;
+    if canonical_out.starts_with(&canonical_repo) {
+        if created {
+            let _ = std::fs::remove_dir_all(out);
+        }
+        anyhow::bail!(
+            "qualification evidence output must live outside the target source checkout: {}",
+            out.display()
+        );
     }
     Ok(())
 }
