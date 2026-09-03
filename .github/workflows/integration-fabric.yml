@@ -74,6 +74,10 @@ jobs:
       # the same pinned toolchain rather than reconstructing console diffs by hand.
       # Tests below then exercise rustfmt-equivalent source, while the job still
       # fails at the end until the exact formatting output is committed.
+      #
+      # This workflow intentionally keeps contents read-only. It does not grant a
+      # pull-request job write authority merely to auto-commit formatting output;
+      # the uploaded artifact must be reviewed/applied through a trusted path.
       - name: Produce exact formatting repair artifact
         if: steps.formatting.outcome == 'failure'
         run: |
