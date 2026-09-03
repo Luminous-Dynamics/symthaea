@@ -104,8 +104,32 @@ mod tests {
 
     use super::*;
 
+    const OPENSSL_PUBLIC_KEY_HEX: &str =
+        include_str!("../test-vectors/openssl-3.5.5-mldsa65-public.hex");
+    const OPENSSL_SIGNATURE_HEX: &str =
+        include_str!("../test-vectors/openssl-3.5.5-mldsa65-signature.hex");
+
     fn digest() -> [u8; 32] {
         [0xA5; 32]
+    }
+
+    fn decode_hex<const N: usize>(input: &str) -> [u8; N] {
+        let input = input.trim().as_bytes();
+        assert_eq!(input.len(), N * 2, "hex vector length");
+        let mut out = [0u8; N];
+        for (index, byte) in out.iter_mut().enumerate() {
+            *byte = (hex_nibble(input[index * 2]) << 4) | hex_nibble(input[index * 2 + 1]);
+        }
+        out
+    }
+
+    fn hex_nibble(byte: u8) -> u8 {
+        match byte {
+            b'0'..=b'9' => byte - b'0',
+            b'a'..=b'f' => byte - b'a' + 10,
+            b'A'..=b'F' => byte - b'A' + 10,
+            _ => panic!("invalid hex vector"),
+        }
     }
 
     #[test]
@@ -154,6 +178,17 @@ mod tests {
             &digest,
             &altered_signature
         ));
+    }
+
+    #[test]
+    fn independent_ml_dsa_verifier_accepts_neutral_openssl_vector() {
+        let public_key =
+            decode_hex::<XENIA_ML_DSA_65_PUBLIC_KEY_LEN>(OPENSSL_PUBLIC_KEY_HEX);
+        let signature =
+            decode_hex::<XENIA_ML_DSA_65_SIGNATURE_LEN>(OPENSSL_SIGNATURE_HEX);
+        let verifier = XeniaHybridReceiptVerifier;
+
+        assert!(verifier.verify_ml_dsa_65(&public_key, &digest(), &signature));
     }
 
     #[test]
