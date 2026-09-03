@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod interoception_actions_archive;
+mod interoception_capsule_archive;
 mod interoception_github_live;
 mod interoception_qualification;
 mod manifest;
@@ -83,17 +84,45 @@ enum Commands {
         #[arg(long)]
         repo_root: Option<PathBuf>,
     },
+    /// Build the external path map that makes every EvidenceCapsuleManifest digest resolvable.
+    InteroceptionBuildCapsuleArchive {
+        #[arg(long)]
+        bundle: PathBuf,
+        #[arg(long)]
+        evidence_root: PathBuf,
+        #[arg(long)]
+        preregistration: String,
+        #[arg(long)]
+        experiment_config: String,
+        #[arg(long)]
+        input_sequence: String,
+        #[arg(long)]
+        evidence_plane: String,
+        #[arg(long)]
+        repo_root: Option<PathBuf>,
+    },
+    /// Verify every logical/raw evidence-capsule object against the bundle's declared digest.
+    InteroceptionVerifyCapsuleArchive {
+        #[arg(long)]
+        bundle: PathBuf,
+        #[arg(long)]
+        evidence_root: PathBuf,
+        #[arg(long)]
+        repo_root: Option<PathBuf>,
+    },
     /// Inspect only the structural v0.1 bundle state. This never authorizes promotion.
     InteroceptionInspectBundle {
         #[arg(long)]
         bundle: PathBuf,
     },
-    /// Verify all five evidence packages plus live exact-attempt GitHub state and authorize promotion.
+    /// Verify the frozen bundle, all local/capsule bytes, archived Actions evidence, and live exact attempts.
     InteroceptionAuthorizePromotion {
         #[arg(long)]
         bundle: PathBuf,
         #[arg(long)]
         repo_root: PathBuf,
+        #[arg(long)]
+        evidence_root: PathBuf,
         #[arg(long)]
         local_fmt: PathBuf,
         #[arg(long)]
@@ -203,7 +232,6 @@ fn main() -> anyhow::Result<()> {
             strict,
             registry,
         } => {
-            // The workspace root is this manifest's parent; xtask always runs from inside it.
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .parent()
                 .expect("xtask always lives one level below the workspace root")
@@ -251,6 +279,9 @@ fn main() -> anyhow::Result<()> {
             repository,
             repo_root,
         } => {
+            if let Some(root) = repo_root.as_deref() {
+                guard_external_existing_dir(root, &archive_dir)?;
+            }
             let verified = interoception_actions_archive::build_actions_archive(
                 &archive_dir,
                 &gate,
@@ -279,6 +310,43 @@ fn main() -> anyhow::Result<()> {
             )?;
             println!("{}", serde_json::to_string_pretty(&verified)?);
         }
+        Commands::InteroceptionBuildCapsuleArchive {
+            bundle,
+            evidence_root,
+            preregistration,
+            experiment_config,
+            input_sequence,
+            evidence_plane,
+            repo_root,
+        } => {
+            if let Some(root) = repo_root.as_deref() {
+                guard_external_existing_dir(root, &evidence_root)?;
+            }
+            let verified = interoception_capsule_archive::build_capsule_archive_manifest(
+                &bundle,
+                &evidence_root,
+                interoception_capsule_archive::EvidenceCapsuleLogicalPaths {
+                    preregistration,
+                    experiment_config,
+                    input_sequence,
+                    evidence_plane,
+                },
+                repo_root.as_deref(),
+            )?;
+            println!("{}", serde_json::to_string_pretty(&verified)?);
+        }
+        Commands::InteroceptionVerifyCapsuleArchive {
+            bundle,
+            evidence_root,
+            repo_root,
+        } => {
+            let verified = interoception_capsule_archive::verify_capsule_archive(
+                &bundle,
+                &evidence_root,
+                repo_root.as_deref(),
+            )?;
+            println!("{}", serde_json::to_string_pretty(&verified)?);
+        }
         Commands::InteroceptionInspectBundle { bundle } => {
             let report = interoception_qualification::inspect_structural_bundle(&bundle)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
@@ -286,6 +354,7 @@ fn main() -> anyhow::Result<()> {
         Commands::InteroceptionAuthorizePromotion {
             bundle,
             repo_root,
+            evidence_root,
             local_fmt,
             local_test,
             local_clippy,
@@ -293,9 +362,12 @@ fn main() -> anyhow::Result<()> {
             showroom_integrity,
             out,
         } => {
+            guard_external_existing_dir(&repo_root, &evidence_root)?;
+            guard_external_new_file(&repo_root, &out)?;
             let envelope = interoception_github_live::authorize_promotion_live(
                 &bundle,
                 &repo_root,
+                &evidence_root,
                 &local_fmt,
                 &local_test,
                 &local_clippy,
@@ -309,7 +381,10 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn guard_external_empty_output_dir(repo_root: &std::path::Path, out: &std::path::Path) -> anyhow::Result<()> {
+fn guard_external_empty_output_dir(
+    repo_root: &std::path::Path,
+    out: &std::path::Path,
+) -> anyhow::Result<()> {
     let canonical_repo = std::fs::canonicalize(repo_root)?;
     let created = !out.exists();
     if created {
@@ -331,6 +406,43 @@ fn guard_external_empty_output_dir(repo_root: &std::path::Path, out: &std::path:
         }
         anyhow::bail!(
             "qualification evidence output must live outside the target source checkout: {}",
+            out.display()
+        );
+    }
+    Ok(())
+}
+
+fn guard_external_existing_dir(
+    repo_root: &std::path::Path,
+    dir: &std::path::Path,
+) -> anyhow::Result<()> {
+    let canonical_repo = std::fs::canonicalize(repo_root)?;
+    let canonical_dir = std::fs::canonicalize(dir)?;
+    if !canonical_dir.is_dir() {
+        anyhow::bail!("expected directory: {}", dir.display());
+    }
+    if canonical_dir.starts_with(canonical_repo) {
+        anyhow::bail!(
+            "qualification evidence/archive directory must live outside the target source checkout: {}",
+            dir.display()
+        );
+    }
+    Ok(())
+}
+
+fn guard_external_new_file(
+    repo_root: &std::path::Path,
+    out: &std::path::Path,
+) -> anyhow::Result<()> {
+    if out.exists() {
+        anyhow::bail!("refusing to overwrite existing output file: {}", out.display());
+    }
+    let canonical_repo = std::fs::canonicalize(repo_root)?;
+    let parent = out.parent().unwrap_or_else(|| std::path::Path::new("."));
+    let canonical_parent = std::fs::canonicalize(parent)?;
+    if canonical_parent.starts_with(canonical_repo) {
+        anyhow::bail!(
+            "promotion authorization output must live outside the target source checkout: {}",
             out.display()
         );
     }
