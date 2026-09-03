@@ -11,10 +11,10 @@
 //! - threshold-authenticated current authority epoch + negative facts.
 //!
 //! A verified Xenia proof is consumed by value immediately before the broker
-//! enters its reservation/checkpoint/effect state machine. Cross-process replay
-//! is constrained by the CAS frontier rather than by relying on Rust affinity
-//! alone. Caller-provided wall-clock time, authority epoch, and revocation lists
-//! are not part of the production effect-entry API.
+//! enters its reservation/checkpoint/effect state machine. The proof itself owns
+//! the exact authority-state snapshot used during Xenia verification, so callers
+//! cannot substitute epoch/revocation state at effect entry. Cross-process replay
+//! is constrained by the CAS frontier rather than Rust affinity alone.
 
 #![deny(unsafe_code)]
 
@@ -27,7 +27,7 @@ use symthaea_authority_frontier::{
     CasCheckpointStoreAdapter, CheckpointCasStore, EstablishedGrantFrontier, FrontierError,
     establish_grant_frontier,
 };
-use symthaea_authority_state::{AuthorityStateError, VerifiedAuthorityState};
+use symthaea_authority_state::AuthorityStateError;
 use symthaea_authority_time::{AuthorityTimeError, VerifiedAuthorityTime};
 use symthaea_system_broker::{
     BrokerError, RecoveryReceipt, RestartPlan, ServiceBackend, SystemdRecoveryBroker,
@@ -49,10 +49,6 @@ pub struct XeniaSystemdRecoveryReceipt {
 }
 
 /// Ready-to-authorize systemd recovery session.
-///
-/// The profile owns one exact capability grant and a broker restored at a
-/// trusted CAS frontier. Xenia should authorize the exact head returned by
-/// [`Self::authorization_checkpoint_head`].
 pub struct XeniaSystemdRecoveryProfile<B, S>
 where
     B: ServiceBackend,
@@ -135,17 +131,14 @@ where
     /// Consume one independently verified Xenia authority proof and attempt the
     /// exact typed recovery.
     ///
-    /// The proof must still bind this profile's exact current checkpoint and
-    /// the exact fresh authority-state snapshot at the instant immediately
-    /// before the broker enters effect admission. Time is re-derived from the
-    /// short-lived challenged fact at this same boundary.
-    ///
-    /// No caller-selected current epoch or negative-fact list is accepted.
+    /// No caller-selected wall clock, current epoch, negative-fact list, or
+    /// authority-state object is accepted. The proof owns the exact state that
+    /// participated in Xenia verification; this method only rechecks that state
+    /// and trusted time remain fresh at the effect boundary.
     pub fn recover_verified_once(
         &mut self,
         verified: VerifiedXeniaCapability,
         authority_time: &VerifiedAuthorityTime,
-        authority_state: VerifiedAuthorityState,
         plan: &RestartPlan,
         execution_id: ExecutionId,
         reservation_id: ReservationId,
@@ -154,12 +147,9 @@ where
             return Err(ProfileRecoveryError::VerifiedGrantMismatch);
         }
         authority_time.require_subject(self.grant_digest.0)?;
-        authority_state.ensure_fresh(&self.grant, authority_time)?;
-        if verified.authority_state_digest() != authority_state.snapshot_digest()
-            || verified.authority_state_sequence() != authority_state.state_sequence()
-        {
-            return Err(ProfileRecoveryError::AuthorityStateChangedAfterXeniaVerification);
-        }
+        verified
+            .authority_state()
+            .ensure_fresh(&self.grant, authority_time)?;
 
         let now_unix_s = authority_time.conservative_now_unix_s()?;
         if now_unix_s > verified.expires_at_unix_s() {
@@ -176,11 +166,7 @@ where
         let authority_state_digest = verified.authority_state_digest();
         let authority_state_sequence = verified.authority_state_sequence();
         let (xenia_ledger_entry_count, xenia_ledger_head_hash) = verified.xenia_frontier();
-
-        // `verified` is intentionally consumed here. Durable/cross-process
-        // single-use semantics come from the broker's subsequent CAS checkpoint
-        // transition rather than from the affine Rust value alone.
-        drop(verified);
+        let current_epoch = verified.authority_state().authority_epoch();
 
         let recovery = self.broker.recover_once(
             plan,
@@ -188,12 +174,12 @@ where
             reservation_id,
             AuthorityContext {
                 now_unix_s,
-                current_epoch: authority_state.authority_epoch(),
+                current_epoch,
                 // The broker explicitly ignores caller use accounting and
                 // substitutes its own durable GrantAccount state.
                 use_state: GrantUseState::default(),
             },
-            authority_state.negative_facts(),
+            verified.authority_state().negative_facts(),
         )?;
 
         Ok(XeniaSystemdRecoveryReceipt {
@@ -232,8 +218,6 @@ pub enum ProfileRecoveryError {
     MissingCheckpoint,
     #[error("verified Xenia proof belongs to a different capability grant")]
     VerifiedGrantMismatch,
-    #[error("fresh authority state differs from the state bound into the verified Xenia proof")]
-    AuthorityStateChangedAfterXeniaVerification,
     #[error("Xenia proof expired before effect entry")]
     XeniaProofExpiredAtEffectEntry,
     #[error("Agency Kernel frontier advanced after Xenia proof verification")]
