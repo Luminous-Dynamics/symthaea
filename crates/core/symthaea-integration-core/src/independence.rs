@@ -5,8 +5,10 @@
 //! Multiple monitoring products frequently re-export the same underlying
 //! measurement. Counting reports is therefore not the same as counting
 //! independent evidence. This module collapses observations that explicitly
-//! share lineage and reports a bounded answer rather than inventing certainty
-//! where provenance is incomplete.
+//! share lineage and reports bounded answers rather than inventing certainty
+//! where provenance is incomplete. Adapter-supplied independence-group labels
+//! are descriptive provenance only: distinct labels do not prove independent
+//! origins without a separately qualified independence authority.
 
 use crate::{EntityRef, LineageRelationship, ObservationEnvelope};
 use serde::{Deserialize, Serialize};
@@ -22,17 +24,21 @@ pub struct IndependenceMetadataConflict {
 
 /// Conservative bounds for one semantic evidence cohort.
 ///
-/// `independent_lower_bound` counts only independence that was explicitly
-/// declared and is not contradicted by shared-origin evidence. Unknown
-/// relationships never increase the lower bound. `independent_upper_bound`
-/// counts shared-origin components, i.e. the most independent the reports
-/// could be without contradicting known lineage.
+/// `independent_lower_bound` is a proof bound. In v0.1, observation-local
+/// metadata can prove that reports share an origin, but it cannot prove that
+/// different declared groups are genuinely independent. Therefore a non-empty
+/// cohort has a lower bound of one until a separately qualified independence
+/// authority is introduced. `independent_upper_bound` counts shared-origin
+/// components: the most independent the reports could be without contradicting
+/// known lineage.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndependenceAssessment {
     pub entity: EntityRef,
     pub signal: String,
     pub reports: usize,
     pub shared_origin_components: usize,
+    /// Number of distinct non-conflicting adapter-declared group labels. This is
+    /// descriptive only and does not raise `independent_lower_bound`.
     pub declared_independent_groups: usize,
     pub unresolved_components: usize,
     pub independent_lower_bound: usize,
@@ -41,10 +47,12 @@ pub struct IndependenceAssessment {
 }
 
 impl IndependenceAssessment {
-    /// True only when every surviving shared-origin component participates in a
-    /// non-conflicting explicit independence declaration.
+    /// True only when the proof bounds collapse to one answer and provenance is
+    /// not internally contradictory. Distinct self-declared group labels alone
+    /// are insufficient to make the assessment fully resolved.
     pub fn fully_resolved(&self) -> bool {
-        self.unresolved_components == 0 && self.metadata_conflicts.is_empty()
+        self.independent_lower_bound == self.independent_upper_bound
+            && self.metadata_conflicts.is_empty()
     }
 
     /// Fraction of raw reports that survive as distinct known/possible origins.
@@ -144,10 +152,11 @@ pub fn assess_independence(
         }
     }
 
-    // An observed cohort contains at least one evidence origin. Unknown
-    // components cannot increase the lower bound; non-conflicting distinct
-    // declared groups can.
-    let independent_lower_bound = valid_declared_groups.len().max(1);
+    // A non-empty observed cohort proves at least one evidence origin. Shared-
+    // origin metadata can collapse the upper bound, but adapter-declared group
+    // names cannot prove positive independence and therefore never raise the
+    // lower bound in v0.1.
+    let independent_lower_bound = 1;
     let independent_upper_bound = components.len();
 
     Ok(IndependenceAssessment {
@@ -256,19 +265,34 @@ mod tests {
         assert_eq!(assessment.reports, 3);
         assert_eq!(assessment.independent_lower_bound, 1);
         assert_eq!(assessment.independent_upper_bound, 1);
+        assert!(assessment.fully_resolved());
     }
 
     #[test]
-    fn distinct_declared_groups_raise_the_conservative_lower_bound() {
+    fn distinct_declared_groups_do_not_prove_independence() {
         let observations = vec![
             observation("a", "lineage-a", Some("bmc"), None),
             observation("b", "lineage-b", Some("kernel"), None),
         ];
         let assessment = assess_independence(&observations).unwrap();
         assert_eq!(assessment.declared_independent_groups, 2);
-        assert_eq!(assessment.independent_lower_bound, 2);
+        assert_eq!(assessment.independent_lower_bound, 1);
         assert_eq!(assessment.independent_upper_bound, 2);
-        assert!(assessment.fully_resolved());
+        assert!(!assessment.fully_resolved());
+    }
+
+    #[test]
+    fn arbitrary_unique_group_names_cannot_manufacture_independent_evidence() {
+        let observations = vec![
+            observation("a", "lineage-a", Some("self-declared-a"), None),
+            observation("b", "lineage-b", Some("self-declared-b"), None),
+            observation("c", "lineage-c", Some("self-declared-c"), None),
+        ];
+        let assessment = assess_independence(&observations).unwrap();
+        assert_eq!(assessment.declared_independent_groups, 3);
+        assert_eq!(assessment.independent_lower_bound, 1);
+        assert_eq!(assessment.independent_upper_bound, 3);
+        assert!(!assessment.fully_resolved());
     }
 
     #[test]
@@ -281,6 +305,7 @@ mod tests {
         assert_eq!(assessment.independent_lower_bound, 1);
         assert_eq!(assessment.independent_upper_bound, 2);
         assert_eq!(assessment.unresolved_components, 1);
+        assert!(!assessment.fully_resolved());
     }
 
     #[test]
