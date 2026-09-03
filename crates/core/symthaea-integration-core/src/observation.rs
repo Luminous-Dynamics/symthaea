@@ -15,8 +15,8 @@ pub const OBSERVATION_SCHEMA_VERSION: u16 = 1;
 /// The library deliberately does not generate IDs internally: collectors that
 /// need replay/deduplication should derive deterministic IDs from their native
 /// event identity or explicitly generate them at the boundary. Cross-source
-/// reasoning must use [`SourceQualifiedObservationRef`] instead of assuming the
-/// raw string is globally unique.
+/// reasoning must use [`SourceQualifiedObservationRef`] rather than assuming the
+/// raw ID string is globally unique.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ObservationId(pub String);
 
@@ -121,20 +121,29 @@ pub enum ObservationValue {
 /// Epistemic/availability state of a measurement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ObservationState {
+    /// A current measurement was successfully obtained.
     Observed,
+    /// A measurement exists but is older than its accepted freshness window.
     Stale,
+    /// The source cannot currently determine the state.
     Unknown,
+    /// The target cannot be observed through this source/capability.
     Unobservable,
+    /// Independent measurements disagree materially.
     Conflicting,
+    /// Only a subset of the expected measurement was obtained.
     Partial,
 }
 
 /// Quality metadata kept separate from the measured value.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ObservationQuality {
+    /// Confidence in this source/mapping for this observation, [0, 1].
     pub source_confidence: f32,
+    /// Fraction of expected fields/samples represented, [0, 1].
     pub completeness: f32,
     pub state: ObservationState,
+    /// Age relative to the collector's expected freshness model, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub staleness_ms: Option<u64>,
 }
@@ -150,53 +159,82 @@ impl ObservationQuality {
     }
 }
 
+/// Describes where a measurement came from, independently of what it measured.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObservationSource {
+    /// Integration manifest id, e.g. `prometheus` or `aws-cloudwatch`.
     pub integration_id: String,
+    /// Concrete collector/process identity when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collector_id: Option<String>,
+    /// Upstream raw origin when multiple products re-export the same signal.
+    /// Example: several vendors may ultimately derive CPU from `/proc/stat`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub upstream_origin: Option<String>,
+    /// Measurement technique/protocol, e.g. `snmp-poll`, `otlp-metric`, `ebpf`.
     pub measurement_method: String,
+    /// Tenant/administrative boundary, if relevant.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tenant: Option<String>,
 }
 
+/// One transformation applied between the raw source and this observation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransformStep {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    /// Whether identical input is expected to produce identical output.
     pub deterministic: bool,
 }
 
+/// Provenance lineage for correlation-resistant evidence handling.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObservationLineage {
+    /// Stable source-local lineage identifier assigned by the source/bridge.
+    /// It is meaningful together with integration, collector, and tenant scope;
+    /// upstream-origin metadata is an independent provenance signal, not part of
+    /// this local identifier's namespace.
     pub lineage_id: String,
+    /// Source-local parent observations when this value is derived/aggregated.
+    /// The enclosing observation source supplies their namespace in v0.1.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parent_ids: Vec<ObservationId>,
+    /// Measurements with the same non-empty group are conservatively declared
+    /// to share a measurement lineage. Different group labels are descriptive
+    /// only and do not prove independence without a separately qualified
+    /// independence authority.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub independence_group: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub transforms: Vec<TransformStep>,
 }
 
+/// Conservative relationship between two observations' measurement lineages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LineageRelationship {
     SameObservation,
     SharedOrigin,
+    /// Reserved for a future relationship established by an explicitly
+    /// qualified independence authority. Adapter-local group labels never
+    /// produce this relationship on their own.
     DeclaredIndependent,
     Unknown,
 }
 
+/// Universal runtime observation passed from integrations into the world model.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ObservationEnvelope {
     pub schema_version: u16,
     pub observation_id: ObservationId,
+    /// Source-native event/measurement time.
     pub observed_at_unix_ms: u64,
+    /// Time the integration admitted the observation into Symthaea.
     pub ingested_at_unix_ms: u64,
     pub entity: EntityRef,
     pub kind: ObservationKind,
+    /// Vendor-neutral semantic name when available, otherwise a stable
+    /// integration-qualified signal name.
     pub signal: String,
     pub value: ObservationValue,
     pub source: ObservationSource,
@@ -250,13 +288,16 @@ impl ObservationEnvelope {
         require_non_empty("source.integration_id", &self.source.integration_id)?;
         require_non_empty("source.measurement_method", &self.source.measurement_method)?;
         require_non_empty("lineage.lineage_id", &self.lineage.lineage_id)?;
+
         validate_probability("quality.source_confidence", self.quality.source_confidence)?;
         validate_probability("quality.completeness", self.quality.completeness)?;
+
         if let ObservationValue::Number { value, .. } = &self.value {
             if !value.is_finite() {
                 return Err(ObservationValidationError::NonFiniteNumber);
             }
         }
+
         let mut parents = BTreeSet::new();
         for parent in &self.lineage.parent_ids {
             require_non_empty("lineage.parent_id", parent.as_str())?;
@@ -267,12 +308,16 @@ impl ObservationEnvelope {
                 return Err(ObservationValidationError::DuplicateParent(parent.clone()));
             }
         }
+
         for transform in &self.lineage.transforms {
             require_non_empty("lineage.transform.name", &transform.name)?;
         }
+
         Ok(())
     }
 
+    /// Assess whether two reports share known lineage. Positive independence is
+    /// never inferred from different adapter-supplied group labels.
     pub fn lineage_relationship(&self, other: &Self) -> LineageRelationship {
         if self.source_qualified_ref() == other.source_qualified_ref() {
             return LineageRelationship::SameObservation;
@@ -311,9 +356,13 @@ impl ObservationEnvelope {
     }
 }
 
+/// One collector result. Batches retain the producing integration identity so
+/// adapters cannot silently mix observations from unrelated manifests.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ObservationBatch {
     pub integration_id: String,
+    /// Local integration time at which this batch was completed/admitted. Source
+    /// event clocks remain independent and are not ordered against this field.
     pub collected_at_unix_ms: u64,
     pub observations: Vec<ObservationEnvelope>,
 }
@@ -323,6 +372,7 @@ impl ObservationBatch {
         if self.integration_id.trim().is_empty() {
             return Err(BatchValidationError::EmptyIntegrationId);
         }
+
         let mut ids = BTreeSet::new();
         for (index, observation) in self.observations.iter().enumerate() {
             observation
@@ -456,7 +506,18 @@ mod tests {
     #[test]
     fn entity_canonical_key_is_length_prefixed_and_versioned() {
         let entity = EntityRef::new("site:lab", "host", "node-1");
-        assert_eq!(entity.canonical_key(), "entity-v1|8:site:lab|4:host|6:node-1");
+        assert_eq!(
+            entity.canonical_key(),
+            "entity-v1|8:site:lab|4:host|6:node-1"
+        );
+    }
+
+    #[test]
+    fn entity_canonical_key_cannot_collide_on_separator_placement() {
+        let left = EntityRef::new("a", "b:c", "d");
+        let right = EntityRef::new("a:b", "c", "d");
+        assert_ne!(left, right);
+        assert_ne!(left.canonical_key(), right.canonical_key());
     }
 
     #[test]
@@ -470,6 +531,7 @@ mod tests {
         obs.observed_at_unix_ms = 1_020;
         obs.ingested_at_unix_ms = 1_010;
         assert!(obs.validate().is_ok());
+
         let batch = ObservationBatch {
             integration_id: "test".into(),
             collected_at_unix_ms: 1_010,
@@ -529,10 +591,42 @@ mod tests {
     }
 
     #[test]
+    fn same_local_lineage_remains_shared_when_upstream_metadata_differs() {
+        let mut a = sample("a", "same", None);
+        let mut b = sample("b", "same", None);
+        a.lineage.lineage_id = "same-lineage".into();
+        b.lineage.lineage_id = "same-lineage".into();
+        a.source.upstream_origin = Some("upstream-a".into());
+        b.source.upstream_origin = Some("upstream-b".into());
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::SharedOrigin);
+    }
+
+    #[test]
+    fn equal_lineage_ids_across_tenants_do_not_collapse() {
+        let mut a = sample("a", "same", None);
+        let mut b = sample("b", "same", None);
+        a.lineage.lineage_id = "same-lineage".into();
+        b.lineage.lineage_id = "same-lineage".into();
+        a.source.tenant = Some("tenant-a".into());
+        b.source.tenant = Some("tenant-b".into());
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
+    }
+
+    #[test]
+    fn distinct_self_declared_groups_remain_epistemically_unknown() {
+        let a = sample("a", "one", Some("physical-bmc"));
+        let b = sample("b", "two", Some("kernel-procfs"));
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
+    }
+
+    #[test]
     fn same_declared_group_is_conservatively_shared_origin() {
         let a = sample("a", "one", Some("same-origin"));
         let b = sample("b", "two", Some("same-origin"));
-        assert_eq!(a.lineage_relationship(&b), LineageRelationship::SharedOrigin);
+        assert_eq!(
+            a.lineage_relationship(&b),
+            LineageRelationship::SharedOrigin
+        );
     }
 
     #[test]
@@ -543,7 +637,10 @@ mod tests {
             collected_at_unix_ms: 2_000,
             observations: vec![obs.clone(), obs],
         };
-        assert!(matches!(batch.validate(), Err(BatchValidationError::DuplicateObservationReference(_))));
+        assert!(matches!(
+            batch.validate(),
+            Err(BatchValidationError::DuplicateObservationReference(_))
+        ));
     }
 
     #[test]
@@ -569,7 +666,10 @@ mod tests {
             collected_at_unix_ms: 2_000,
             observations: vec![obs],
         };
-        assert!(matches!(batch.validate(), Err(BatchValidationError::FutureIngestionTimestamp { .. })));
+        assert!(matches!(
+            batch.validate(),
+            Err(BatchValidationError::FutureIngestionTimestamp { .. })
+        ));
     }
 
     #[test]
