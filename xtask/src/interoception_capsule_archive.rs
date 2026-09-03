@@ -2,7 +2,7 @@ use std::{
     collections::BTreeSet,
     fs::{self, File},
     io::Read,
-    path::{Component, Path, PathBuf},
+    path::{Path, PathBuf},
 };
 
 use anyhow::{bail, Context, Result};
@@ -10,12 +10,15 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{
+    interoception_archive_fs::{canonical_closed_root, closed_relative_file, validate_relative_path},
     interoception_qualification::VERIFIER_POLICY_VERSION,
     symthaea_interoception::QualificationEvidenceBundle,
 };
 
 pub const EVIDENCE_CAPSULE_ARCHIVE_SCHEMA_VERSION: u16 = 1;
 pub const EVIDENCE_CAPSULE_ARCHIVE_MANIFEST: &str = "capsule-archive.json";
+const ARTIFACT_PATH_SEMANTICS: &str =
+    "v1: each EvidenceCapsuleManifest.artifacts[].name is a closed-tree non-symlink relative path beneath evidence_root";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvidenceCapsuleLogicalPaths {
@@ -53,15 +56,8 @@ pub fn build_capsule_archive_manifest(
 ) -> Result<VerifiedEvidenceCapsuleArchive> {
     let bundle = read_bundle(bundle_path)?;
     validate_bundle(&bundle)?;
-    validate_evidence_root(evidence_root)?;
-    for (name, relative) in [
-        ("preregistration", logical_paths.preregistration.as_str()),
-        ("experiment_config", logical_paths.experiment_config.as_str()),
-        ("input_sequence", logical_paths.input_sequence.as_str()),
-        ("evidence_plane", logical_paths.evidence_plane.as_str()),
-    ] {
-        validate_relative_path(name, relative)?;
-    }
+    canonical_closed_root(evidence_root)?;
+    validate_logical_paths(&logical_paths)?;
     validate_artifact_paths(&bundle)?;
 
     let manifest_path = evidence_root.join(EVIDENCE_CAPSULE_ARCHIVE_MANIFEST);
@@ -78,9 +74,7 @@ pub fn build_capsule_archive_manifest(
         source_commit: bundle.source_commit.clone(),
         qualification_bundle_sha256: bundle_sha256(&bundle)?,
         logical_paths,
-        artifact_name_semantics:
-            "v1: each EvidenceCapsuleManifest.artifacts[].name is a safe relative path beneath evidence_root"
-                .into(),
+        artifact_name_semantics: ARTIFACT_PATH_SEMANTICS.into(),
     };
     let bytes = serde_json::to_vec(&manifest).context("serialize capsule archive manifest")?;
     fs::write(&manifest_path, bytes)
@@ -96,10 +90,10 @@ pub fn verify_capsule_archive(
 ) -> Result<VerifiedEvidenceCapsuleArchive> {
     let bundle = read_bundle(bundle_path)?;
     validate_bundle(&bundle)?;
-    validate_evidence_root(evidence_root)?;
+    canonical_closed_root(evidence_root)?;
     validate_artifact_paths(&bundle)?;
 
-    let manifest_path = evidence_root.join(EVIDENCE_CAPSULE_ARCHIVE_MANIFEST);
+    let manifest_path = closed_relative_file(evidence_root, EVIDENCE_CAPSULE_ARCHIVE_MANIFEST)?;
     let manifest_bytes = fs::read(&manifest_path)
         .with_context(|| format!("read capsule archive manifest {}", manifest_path.display()))?;
     let manifest: EvidenceCapsuleArchiveManifest =
@@ -121,11 +115,10 @@ pub fn verify_capsule_archive(
     if manifest.qualification_bundle_sha256 != expected_bundle_sha {
         bail!("capsule archive qualification bundle SHA-256 mismatch");
     }
-    if manifest.artifact_name_semantics
-        != "v1: each EvidenceCapsuleManifest.artifacts[].name is a safe relative path beneath evidence_root"
-    {
+    if manifest.artifact_name_semantics != ARTIFACT_PATH_SEMANTICS {
         bail!("unknown artifact-name path semantics in capsule archive");
     }
+    validate_logical_paths(&manifest.logical_paths)?;
 
     let logical = [
         (
@@ -150,7 +143,6 @@ pub fn verify_capsule_archive(
         ),
     ];
     for (name, relative, expected_digest) in logical {
-        validate_relative_path(name, relative)?;
         verify_relative_object(evidence_root, relative, expected_digest)
             .with_context(|| format!("verify evidence capsule logical object {name}"))?;
     }
@@ -202,25 +194,45 @@ pub fn verify_capsule_archive(
 }
 
 fn read_bundle(path: &Path) -> Result<QualificationEvidenceBundle> {
-    let bytes = fs::read(path).with_context(|| format!("read qualification bundle {}", path.display()))?;
+    let bytes =
+        fs::read(path).with_context(|| format!("read qualification bundle {}", path.display()))?;
     serde_json::from_slice(&bytes).context("parse qualification evidence bundle")
 }
 
 fn validate_bundle(bundle: &QualificationEvidenceBundle) -> Result<()> {
-    bundle
-        .validate()
-        .map_err(|errors| anyhow::anyhow!("qualification bundle validation failed: {}", errors.join("; ")))
+    bundle.validate().map_err(|errors| {
+        anyhow::anyhow!(
+            "qualification bundle validation failed: {}",
+            errors.join("; ")
+        )
+    })
 }
 
 fn bundle_sha256(bundle: &QualificationEvidenceBundle) -> Result<String> {
-    bundle
-        .sha256()
-        .map_err(|errors| anyhow::anyhow!("qualification bundle digest failed: {}", errors.join("; ")))
+    bundle.sha256().map_err(|errors| {
+        anyhow::anyhow!(
+            "qualification bundle digest failed: {}",
+            errors.join("; ")
+        )
+    })
 }
 
-fn validate_evidence_root(root: &Path) -> Result<()> {
-    if !root.is_dir() {
-        bail!("evidence root is not a directory: {}", root.display());
+fn validate_logical_paths(paths: &EvidenceCapsuleLogicalPaths) -> Result<()> {
+    let values = [
+        ("preregistration", paths.preregistration.as_str()),
+        ("experiment_config", paths.experiment_config.as_str()),
+        ("input_sequence", paths.input_sequence.as_str()),
+        ("evidence_plane", paths.evidence_plane.as_str()),
+    ];
+    let mut seen = BTreeSet::new();
+    for (name, relative) in values {
+        validate_relative_path(name, relative)?;
+        if !seen.insert(relative) {
+            bail!("logical evidence roles must use distinct paths; duplicate: {relative}");
+        }
+        if relative == EVIDENCE_CAPSULE_ARCHIVE_MANIFEST {
+            bail!("logical evidence object may not alias the capsule archive manifest");
+        }
     }
     Ok(())
 }
@@ -229,6 +241,9 @@ fn validate_artifact_paths(bundle: &QualificationEvidenceBundle) -> Result<()> {
     let mut seen = BTreeSet::new();
     for artifact in &bundle.evidence.artifacts {
         validate_relative_path("artifact name", &artifact.name)?;
+        if artifact.name == EVIDENCE_CAPSULE_ARCHIVE_MANIFEST {
+            bail!("raw artifact may not alias the capsule archive manifest");
+        }
         if !seen.insert(artifact.name.as_str()) {
             bail!("duplicate artifact path {}", artifact.name);
         }
@@ -236,25 +251,8 @@ fn validate_artifact_paths(bundle: &QualificationEvidenceBundle) -> Result<()> {
     Ok(())
 }
 
-fn validate_relative_path(name: &str, value: &str) -> Result<()> {
-    let path = Path::new(value);
-    if value.trim().is_empty() || path.is_absolute() {
-        bail!("{name} must be a non-empty relative path");
-    }
-    for component in path.components() {
-        if !matches!(component, Component::Normal(_)) {
-            bail!("{name} contains a disallowed path component: {value}");
-        }
-    }
-    Ok(())
-}
-
 fn verify_relative_object(root: &Path, relative: &str, expected_digest: &str) -> Result<()> {
-    validate_relative_path("evidence object path", relative)?;
-    let path = root.join(relative);
-    if !path.is_file() {
-        bail!("evidence object is missing or not a regular file: {}", path.display());
-    }
+    let path = closed_relative_file(root, relative)?;
     let observed = sha256_file(&path)?;
     if observed != expected_digest {
         bail!(
@@ -276,7 +274,8 @@ fn sha256_optional(path: &Path) -> Result<Option<String>> {
 }
 
 fn sha256_file(path: &Path) -> Result<String> {
-    let mut file = File::open(path).with_context(|| format!("open {} for hashing", path.display()))?;
+    let mut file =
+        File::open(path).with_context(|| format!("open {} for hashing", path.display()))?;
     let mut hasher = Sha256::new();
     let mut buf = [0_u8; 64 * 1024];
     loop {
