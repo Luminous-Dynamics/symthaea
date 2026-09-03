@@ -1,0 +1,125 @@
+name: Agency Measured Workload Qualification
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agency-measured-workload-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  measured-workload:
+    name: Measured workload lock + exact package qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy,rustfmt
+
+      - name: Preserve checked-in lockfile
+        run: cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+
+      - name: Ask Cargo to reconcile workspace metadata
+        run: cargo metadata --format-version 1 >/dev/null
+
+      - name: Prove lock reconciliation is additive workspace metadata only
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, sys, tomllib
+          before = tomllib.loads((pathlib.Path(os.environ["RUNNER_TEMP"]) / "Cargo.lock.before").read_text())
+          after = tomllib.loads(pathlib.Path("Cargo.lock").read_text())
+          key = lambda p: (p["name"], p["version"], p.get("source"))
+          b = {key(p): p for p in before.get("package", [])}
+          a = {key(p): p for p in after.get("package", [])}
+          removed = sorted(set(b) - set(a), key=repr)
+          changed = sorted((k for k in b.keys() & a if b[k] != a[k]), key=repr)
+          added = sorted(set(a) - set(b), key=repr)
+          sourced = [k for k in added if k[2] is not None]
+          if removed or changed or sourced:
+              print("Cargo reconciliation changed sourced dependency state")
+              print("removed:", removed)
+              print("changed:", changed)
+              print("new sourced:", sourced)
+              sys.exit(1)
+          print("additive workspace/path nodes:", len(added))
+          for item in added:
+              print(" +", item)
+          PY
+
+      - name: Record lock freshness
+        run: |
+          if git diff --quiet -- Cargo.lock; then
+            echo clean > "$RUNNER_TEMP/agency-lock-status"
+          else
+            echo stale > "$RUNNER_TEMP/agency-lock-status"
+            git --no-pager diff -- Cargo.lock
+          fi
+
+      - name: Upload Cargo-produced lock candidate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agency-measured-workload-cargo-lock-${{ github.sha }}
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Rustfmt measured workload lineage
+        run: >-
+          cargo fmt --check
+          --package symthaea-executor-workload
+          --package symthaea-xenia-authority
+          --package symthaea-xenia-systemd-profile
+          --package symthaea-xenia-systemd-durable-profile
+
+      - name: Test measured workload lineage
+        run: >-
+          cargo test --locked
+          -p symthaea-executor-workload
+          -p symthaea-xenia-authority
+          -p symthaea-xenia-systemd-profile
+          -p symthaea-xenia-systemd-durable-profile
+
+      - name: Clippy measured workload lineage
+        run: >-
+          cargo clippy --locked
+          -p symthaea-executor-workload
+          -p symthaea-xenia-authority
+          -p symthaea-xenia-systemd-profile
+          -p symthaea-xenia-systemd-durable-profile
+          --all-targets -- -D warnings
+
+      - name: Record exact qualification evidence
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/agency-measured-workload-evidence"
+          git rev-parse HEAD > "$RUNNER_TEMP/agency-measured-workload-evidence/HEAD"
+          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/agency-measured-workload-evidence/TREE"
+          rustc -Vv > "$RUNNER_TEMP/agency-measured-workload-evidence/RUSTC.txt"
+          cargo -V > "$RUNNER_TEMP/agency-measured-workload-evidence/CARGO.txt"
+          sha256sum Cargo.lock > "$RUNNER_TEMP/agency-measured-workload-evidence/CARGO_LOCK_SHA256.txt"
+          cp Cargo.lock "$RUNNER_TEMP/agency-measured-workload-evidence/Cargo.lock"
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agency-measured-workload-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/agency-measured-workload-evidence
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Require checked-in Cargo.lock to be fresh
+        run: test "$(cat "$RUNNER_TEMP/agency-lock-status")" = clean
