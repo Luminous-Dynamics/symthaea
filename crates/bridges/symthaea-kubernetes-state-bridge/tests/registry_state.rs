@@ -87,7 +87,7 @@ fn kubernetes_replay_does_not_invent_rollout_age() {
 }
 
 #[test]
-fn replay_history_can_prove_persistent_drift_without_inventing_change_time() {
+fn replay_history_supports_persistence_without_claiming_proof() {
     let first = KubernetesStateReplay::from_objects(
         KubernetesReplayContext::default(),
         &[deployment()],
@@ -140,7 +140,8 @@ fn replay_history_can_prove_persistent_drift_without_inventing_change_time() {
         assessment.drift_continuity.as_ref().unwrap().consecutive_snapshots,
         2
     );
-    assert!(assessment.persistent_drift_proven);
+    assert!(assessment.sampled_persistence_supported);
+    assert!(!assessment.persistent_drift_proven);
 }
 
 #[test]
