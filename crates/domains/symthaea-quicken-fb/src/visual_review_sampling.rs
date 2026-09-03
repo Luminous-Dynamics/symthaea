@@ -7,6 +7,12 @@
 //! sampled at the same semantic stage progress so visual review cannot quietly
 //! cherry-pick flattering frames. This module performs no rendering and carries
 //! no boot authority.
+//!
+//! `docs/design/SPORE_VISUAL_REVIEW_PROTOCOL_V1.json` is the cross-tool protocol
+//! authority. These Rust constants are a zero-runtime-cost compiled mirror and
+//! tests reject drift between the two representations.
+
+pub const VISUAL_REVIEW_PROTOCOL_SCHEMA_V1: &str = "spore.visual.review-protocol.v1";
 
 /// Frozen v0.3.3 contact-sheet sample points in semantic stage progress.
 pub const CONTACT_SHEET_PROGRESS_V1: [f32; 7] = [0.0, 0.15, 0.35, 0.50, 0.65, 0.85, 1.0];
@@ -28,6 +34,9 @@ pub const fn matrix_progress() -> &'static [f32; 3] {
 mod tests {
     use super::*;
 
+    const REVIEW_PROTOCOL_JSON: &str =
+        include_str!("../../../../docs/design/SPORE_VISUAL_REVIEW_PROTOCOL_V1.json");
+
     fn assert_strictly_increasing(values: &[f32]) {
         assert!(!values.is_empty());
         for value in values {
@@ -37,6 +46,20 @@ mod tests {
         for pair in values.windows(2) {
             assert!(pair[0] < pair[1]);
         }
+    }
+
+    fn protocol_progress(protocol: &serde_json::Value, field: &str) -> Vec<f32> {
+        protocol[field]
+            .as_array()
+            .unwrap_or_else(|| panic!("review protocol field {field:?} must be an array"))
+            .iter()
+            .map(|value| {
+                value
+                    .as_f64()
+                    .unwrap_or_else(|| panic!("review protocol {field:?} values must be numbers"))
+                    as f32
+            })
+            .collect()
     }
 
     #[test]
@@ -64,5 +87,27 @@ mod tests {
             [0.0, 0.15, 0.35, 0.50, 0.65, 0.85, 1.0]
         );
         assert_eq!(MATRIX_PROGRESS_V1, [0.20, 0.50, 0.80]);
+    }
+
+    #[test]
+    fn compiled_sampling_matches_cross_tool_protocol() {
+        let protocol: serde_json::Value =
+            serde_json::from_str(REVIEW_PROTOCOL_JSON).expect("valid visual review protocol JSON");
+        assert_eq!(
+            protocol["schema"].as_str(),
+            Some(VISUAL_REVIEW_PROTOCOL_SCHEMA_V1)
+        );
+        assert_eq!(
+            protocol_progress(&protocol, "contact_sheet_progress"),
+            CONTACT_SHEET_PROGRESS_V1
+        );
+        assert_eq!(
+            protocol_progress(&protocol, "matrix_progress"),
+            MATRIX_PROGRESS_V1
+        );
+        assert_eq!(
+            protocol["semantic_basis"].as_str(),
+            Some("BootStageKind + stage-local progress")
+        );
     }
 }
