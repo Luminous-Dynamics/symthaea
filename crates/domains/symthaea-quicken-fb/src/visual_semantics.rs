@@ -3,11 +3,14 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Descriptive semantic signatures for Spore's presentation policy.
 //!
-//! This is a regression guard, not an aesthetic score. It combines the pure
-//! composition and temporal policies into a small numeric signature so tests can
-//! detect accidental semantic collapse (for example repair and mesh return
-//! becoming effectively the same treatment). It performs no rendering and has
-//! no boot authority.
+//! This combines the pure composition and temporal policies into a small
+//! signature so tests and evidence can detect accidental semantic collapse (for
+//! example repair and mesh return becoming the same treatment). It performs no
+//! rendering and has no boot authority.
+//!
+//! Numeric distance is deliberately descriptive. Constitutional regression
+//! gates use categorical identity and domain relationships rather than arbitrary
+//! aesthetic-distance thresholds.
 
 use symthaea_boot_ecology::BootStageKind;
 
@@ -57,8 +60,8 @@ impl VisualSemanticSignature {
 
     /// Descriptive L1 distance across scalar presentation dimensions.
     ///
-    /// Categorical hero/motion identity is intentionally kept separate; callers
-    /// should not interpret this scalar as perceptual quality or beauty.
+    /// This is useful in evidence reports and debugging, but has no universal
+    /// perceptual meaning and must not become an aesthetic pass/fail threshold.
     pub fn scalar_distance(self, other: Self) -> f32 {
         [
             (self.topology - other.topology).abs(),
@@ -81,47 +84,59 @@ impl VisualSemanticSignature {
 mod tests {
     use super::*;
 
+    const EVENT_STAGES: [BootStageKind; 5] = [
+        BootStageKind::Repair,
+        BootStageKind::GrowthRing,
+        BootStageKind::HardwareBud,
+        BootStageKind::RetractFailedGrowth,
+        BootStageKind::MeshLink,
+    ];
+
     fn signature(stage: BootStageKind) -> VisualSemanticSignature {
         VisualSemanticSignature::derive(stage, 0.5, 1.0, VisualProfile::Standard)
     }
 
-    fn assert_distinct(a: BootStageKind, b: BootStageKind, minimum_scalar_distance: f32) {
-        let a = signature(a);
-        let b = signature(b);
-        assert_ne!(a.hero, b.hero, "semantic heroes collapsed: {a:?} vs {b:?}");
-        assert_ne!(
-            a.motion, b.motion,
-            "semantic motion intents collapsed: {a:?} vs {b:?}"
-        );
-        assert!(
-            a.scalar_distance(b) >= minimum_scalar_distance,
-            "scalar treatment too similar: distance={}\na={a:?}\nb={b:?}",
-            a.scalar_distance(b),
-        );
+    #[test]
+    fn major_event_families_keep_distinct_categorical_identity() {
+        for (index, stage) in EVENT_STAGES.iter().enumerate() {
+            let a = signature(*stage);
+            for other in EVENT_STAGES.iter().skip(index + 1) {
+                let b = signature(*other);
+                assert_ne!(
+                    a.hero, b.hero,
+                    "semantic heroes collapsed: {stage:?} vs {other:?}"
+                );
+                assert_ne!(
+                    a.motion, b.motion,
+                    "semantic motion intents collapsed: {stage:?} vs {other:?}"
+                );
+            }
+        }
     }
 
     #[test]
-    fn major_event_families_remain_visually_distinct() {
-        assert_distinct(BootStageKind::Repair, BootStageKind::MeshLink, 0.70);
-        assert_distinct(BootStageKind::Repair, BootStageKind::GrowthRing, 0.20);
-        assert_distinct(
-            BootStageKind::Repair,
-            BootStageKind::RetractFailedGrowth,
-            0.20,
-        );
-        assert_distinct(BootStageKind::GrowthRing, BootStageKind::HardwareBud, 0.20);
-        assert_distinct(BootStageKind::HardwareBud, BootStageKind::MeshLink, 0.60);
+    fn scalar_distance_is_descriptive_math_not_a_quality_gate() {
+        for stage in EVENT_STAGES {
+            let a = signature(stage);
+            assert_eq!(a.scalar_distance(a), 0.0);
+        }
+
+        for (index, stage) in EVENT_STAGES.iter().enumerate() {
+            let a = signature(*stage);
+            for other in EVENT_STAGES.iter().skip(index + 1) {
+                let b = signature(*other);
+                let ab = a.scalar_distance(b);
+                let ba = b.scalar_distance(a);
+                assert!(ab.is_finite());
+                assert!(ab > 0.0, "numeric signatures unexpectedly identical");
+                assert!((ab - ba).abs() <= f32::EPSILON);
+            }
+        }
     }
 
     #[test]
     fn semantics_do_not_depend_on_richness_profile() {
-        for stage in [
-            BootStageKind::Repair,
-            BootStageKind::GrowthRing,
-            BootStageKind::HardwareBud,
-            BootStageKind::RetractFailedGrowth,
-            BootStageKind::MeshLink,
-        ] {
+        for stage in EVENT_STAGES {
             let calm = VisualSemanticSignature::derive(stage, 0.5, 1.0, VisualProfile::Calm);
             let rich = VisualSemanticSignature::derive(stage, 0.5, 1.0, VisualProfile::Rich);
             assert_eq!(calm.hero, rich.hero);
@@ -130,16 +145,28 @@ mod tests {
     }
 
     #[test]
-    fn recovery_and_connection_cannot_collapse_to_same_signature() {
+    fn recovery_connection_and_persistent_change_have_domain_polarity() {
         let repair = signature(BootStageKind::Repair);
         let rollback = signature(BootStageKind::RetractFailedGrowth);
+        let generation = signature(BootStageKind::GrowthRing);
+        let hardware = signature(BootStageKind::HardwareBud);
         let mesh = signature(BootStageKind::MeshLink);
 
+        // Recovery and persistent local change emphasize semantic accent rather
+        // than connectivity spectacle.
         assert!(repair.accent > repair.mesh);
         assert!(rollback.accent > rollback.mesh);
+        assert!(generation.accent > generation.mesh);
+        assert!(hardware.accent > hardware.mesh);
+
+        // Mesh return is the inverse: connection itself is the event.
         assert!(mesh.mesh > mesh.accent);
-        assert!(mesh.ambient_motion > rollback.ambient_motion);
+
+        // Rollback is deliberately quieter/more damped than active repair;
+        // reconnection is allowed more ambient motion than either recovery path.
         assert!(rollback.damping > repair.damping);
+        assert!(mesh.ambient_motion > rollback.ambient_motion);
+        assert!(mesh.ambient_motion > repair.ambient_motion);
     }
 
     #[test]
