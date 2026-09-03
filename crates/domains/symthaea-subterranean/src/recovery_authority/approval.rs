@@ -118,12 +118,11 @@ pub fn qualify_recovery_approval(
 }
 
 impl OperatorAuthority {
-    /// Count a human recovery approval only if its host-local live
-    /// qualification was produced at this exact authority-admission step.
-    ///
-    /// The token is consumed by value. Advancing the host control step requires
-    /// re-running `qualify_recovery_approval` against current embodiment state.
-    pub fn approve_qualified_recovery(
+    /// Internal point-of-use quorum primitive. The token is consumed by value,
+    /// and advancing the host control step requires re-running live qualification.
+    /// Public recovery admission must be owned by the embodiment/control-plane
+    /// that owns the exact authority instance and evidence source.
+    pub(crate) fn approve_qualified_recovery(
         &mut self,
         qualified: QualifiedRecoveryApprovalV1,
         now_step: u64,

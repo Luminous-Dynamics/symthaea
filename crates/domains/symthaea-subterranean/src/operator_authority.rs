@@ -243,9 +243,10 @@ impl OperatorAuthority {
     }
 
     /// Register the exact proposal the local trusted host is willing to let
-    /// operators review. Well-formed proposal bytes received from the network do
-    /// not count unless this host-owned authority state issued them first.
-    pub fn issue_recovery_proposal(
+    /// operators review. This is an internal state-machine primitive: public
+    /// recovery issuance must be owned by the embodiment/control-plane that also
+    /// owns the live evidence source.
+    pub(crate) fn issue_recovery_proposal(
         &mut self,
         proposal: RecoveryProposalV1,
         now_step: u64,
@@ -289,7 +290,9 @@ impl OperatorAuthority {
         Ok(decision)
     }
 
-    pub fn approve_recovery(
+    /// Internal quorum transition. Public recovery admission must first be
+    /// qualified by the authoritative embodiment/control-plane owner.
+    pub(crate) fn approve_recovery(
         &mut self,
         approval: RecoveryApprovalEnvelopeV1,
         now_step: u64,
