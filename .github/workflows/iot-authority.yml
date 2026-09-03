@@ -1,0 +1,105 @@
+name: IoT Authority
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-authority/**'
+      - 'crates/bridges/symthaea-iot-authority/**'
+      - 'src/swarm/mesh/sensor_iot.rs'
+      - 'src/cognitive_loop/managers/survival_manager.rs'
+      - '.github/workflows/iot-authority.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-authority-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  authority-implementation:
+    name: IoT authority implementation
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
+          rustup default 1.94.0
+          rustc --version
+          cargo --version
+
+      - name: Verify exact checkout
+        if: github.event_name == 'pull_request'
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Workspace metadata resolves
+        run: cargo metadata --format-version 1 --no-deps >/dev/null
+
+      - name: Rustfmt bridge crates
+        run: cargo fmt --check -p symthaea-authority -p symthaea-iot-authority
+
+      - name: Check bridge crates
+        run: cargo check -p symthaea-authority -p symthaea-iot-authority --all-targets
+
+      - name: Test bridge crates
+        run: cargo test -p symthaea-authority -p symthaea-iot-authority --all-targets
+
+      - name: Clippy bridge crates
+        run: cargo clippy -p symthaea-authority -p symthaea-iot-authority --all-targets -- -D warnings
+
+  telemetry-boundary:
+    name: Survival telemetry trust boundary
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.94.0 --profile minimal --component rustfmt
+          rustup default 1.94.0
+
+      - name: Verify exact checkout
+        if: github.event_name == 'pull_request'
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Rustfmt touched telemetry source
+        run: rustfmt --edition 2024 --check src/cognitive_loop/managers/survival_manager.rs
+
+      # Compile only the root library with the smallest feature set that owns the
+      # trust boundary. The test filter executes the focused module regressions.
+      - name: Focused survival-manager regressions
+        run: cargo test -p symthaea --no-default-features --features survival --lib survival_manager::tests
+
+  locked-metadata:
+    name: IoT authority locked metadata
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.94.0 --profile minimal
+          rustup default 1.94.0
+
+      - name: Verify exact checkout
+        if: github.event_name == 'pull_request'
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Committed lock resolves without mutation
+        run: |
+          before=$(sha256sum Cargo.lock | awk '{print $1}')
+          cargo metadata --locked --format-version 1 --no-deps >/dev/null
+          after=$(sha256sum Cargo.lock | awk '{print $1}')
+          test "$before" = "$after"
+          git diff --exit-code -- Cargo.lock
