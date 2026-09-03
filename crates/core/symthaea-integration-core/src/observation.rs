@@ -189,7 +189,9 @@ pub struct TransformStep {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObservationLineage {
     /// Stable source-local lineage identifier assigned by the source/bridge.
-    /// It is meaningful only together with the observation's source context.
+    /// It is meaningful together with integration, collector, and tenant scope;
+    /// upstream-origin metadata is an independent provenance signal, not part of
+    /// this local identifier's namespace.
     pub lineage_id: String,
     /// Parent observations when this value is derived/aggregated.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -320,7 +322,6 @@ impl ObservationEnvelope {
             && self.source.integration_id == other.source.integration_id
             && self.source.collector_id == other.source.collector_id
             && self.source.tenant == other.source.tenant
-            && self.source.upstream_origin == other.source.upstream_origin
         {
             return LineageRelationship::SharedOrigin;
         }
@@ -568,6 +569,17 @@ mod tests {
         let mut b = sample("b", "same", None);
         a.lineage.lineage_id = "same-lineage".into();
         b.lineage.lineage_id = "same-lineage".into();
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::SharedOrigin);
+    }
+
+    #[test]
+    fn same_local_lineage_remains_shared_when_upstream_metadata_differs() {
+        let mut a = sample("a", "same", None);
+        let mut b = sample("b", "same", None);
+        a.lineage.lineage_id = "same-lineage".into();
+        b.lineage.lineage_id = "same-lineage".into();
+        a.source.upstream_origin = Some("upstream-a".into());
+        b.source.upstream_origin = Some("upstream-b".into());
         assert_eq!(a.lineage_relationship(&b), LineageRelationship::SharedOrigin);
     }
 
