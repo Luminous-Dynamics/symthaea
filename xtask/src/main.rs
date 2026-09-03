@@ -6,6 +6,7 @@ mod duplicate_scan;
 mod interoception_qualification;
 mod manifest;
 mod rhn_sweep;
+mod symthaea_interoception;
 
 #[derive(Parser)]
 struct Cli {
