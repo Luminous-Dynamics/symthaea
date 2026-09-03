@@ -103,9 +103,11 @@ impl StateAssertion {
         Ok(())
     }
 
+    /// State evidence cannot participate in an assessment before it was
+    /// observed, even when its semantic validity interval covers that time.
     pub fn is_active_at(&self, at_unix_ms: u64) -> bool {
-        self.valid_from_unix_ms
-            .is_none_or(|from| at_unix_ms >= from)
+        self.observed_at_unix_ms <= at_unix_ms
+            && self.valid_from_unix_ms.is_none_or(|from| at_unix_ms >= from)
             && self
                 .valid_until_unix_ms
                 .is_none_or(|until| at_unix_ms <= until)
@@ -146,6 +148,13 @@ impl StateSnapshot {
                     assertion_id: assertion.assertion_id.clone(),
                     expected: self.integration_id.clone(),
                     actual: assertion.source.integration_id.clone(),
+                });
+            }
+            if assertion.observed_at_unix_ms > self.collected_at_unix_ms {
+                return Err(StateBudgetError::FutureAssertionTimestamp {
+                    assertion_id: assertion.assertion_id.clone(),
+                    observed_at_unix_ms: assertion.observed_at_unix_ms,
+                    collected_at_unix_ms: self.collected_at_unix_ms,
                 });
             }
             if !ids.insert(assertion.assertion_id.clone()) {
@@ -443,6 +452,14 @@ pub enum StateBudgetError {
         expected: String,
         actual: String,
     },
+    #[error(
+        "state assertion `{assertion_id}` is observed in the future: {observed_at_unix_ms} > snapshot capture {collected_at_unix_ms}"
+    )]
+    FutureAssertionTimestamp {
+        assertion_id: String,
+        observed_at_unix_ms: u64,
+        collected_at_unix_ms: u64,
+    },
     #[error("duplicate state assertion id `{0}`")]
     DuplicateAssertionId(String),
     #[error("state snapshot has {actual} assertions, limit is {max}")]
@@ -554,6 +571,40 @@ mod tests {
         )
         .unwrap();
         assert_eq!(assessment.status, StateAssessmentStatus::InSync);
+    }
+
+    #[test]
+    fn future_observed_state_does_not_time_travel_into_past_assessment() {
+        let mut desired = assertion("desired", StateRole::Desired, StateValue::Unsigned(3));
+        let mut observed = assertion("observed", StateRole::Observed, StateValue::Unsigned(3));
+        desired.observed_at_unix_ms = 200;
+        observed.observed_at_unix_ms = 200;
+        let assertions = vec![desired, observed];
+
+        assert_eq!(
+            assess_state_dimension(
+                &assertions,
+                &subject(),
+                "replicas",
+                100,
+                StateComparisonPolicy::Exact,
+            )
+            .unwrap()
+            .status,
+            StateAssessmentStatus::NoEvidence
+        );
+        assert_eq!(
+            assess_state_dimension(
+                &assertions,
+                &subject(),
+                "replicas",
+                200,
+                StateComparisonPolicy::Exact,
+            )
+            .unwrap()
+            .status,
+            StateAssessmentStatus::InSync
+        );
     }
 
     #[test]
@@ -755,5 +806,56 @@ mod tests {
             snapshot.validate_with_limits(&tight),
             Err(StateBudgetError::TooManyAssertions { .. })
         ));
+    }
+
+    #[test]
+    fn state_snapshot_rejects_future_observation_timestamp() {
+        let mut future = assertion("future", StateRole::Observed, StateValue::Unsigned(3));
+        future.observed_at_unix_ms = 101;
+        let snapshot = StateSnapshot {
+            integration_id: "fixture".into(),
+            collected_at_unix_ms: 100,
+            assertions: vec![future],
+        };
+        assert!(matches!(
+            snapshot.validate(),
+            Err(StateBudgetError::FutureAssertionTimestamp { .. })
+        ));
+    }
+
+    #[test]
+    fn future_valid_from_is_allowed_for_already_observed_desired_state() {
+        let mut desired = assertion("planned", StateRole::Desired, StateValue::Unsigned(5));
+        desired.valid_from_unix_ms = Some(200);
+        let snapshot = StateSnapshot {
+            integration_id: "fixture".into(),
+            collected_at_unix_ms: 100,
+            assertions: vec![desired],
+        };
+        assert!(snapshot.validate().is_ok());
+        assert_eq!(
+            assess_state_dimension(
+                &snapshot.assertions,
+                &subject(),
+                "replicas",
+                100,
+                StateComparisonPolicy::Exact,
+            )
+            .unwrap()
+            .status,
+            StateAssessmentStatus::NoEvidence
+        );
+        assert_eq!(
+            assess_state_dimension(
+                &snapshot.assertions,
+                &subject(),
+                "replicas",
+                200,
+                StateComparisonPolicy::Exact,
+            )
+            .unwrap()
+            .status,
+            StateAssessmentStatus::MissingObserved
+        );
     }
 }
