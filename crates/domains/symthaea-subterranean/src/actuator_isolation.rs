@@ -285,6 +285,19 @@ impl ActuatorIsolationSupervisor {
         }
     }
 
+    /// Preserve the union of live and checkpointed isolation authority.
+    ///
+    /// This is the restore implementation of `PreserveOrNarrowAuthority` only.
+    /// It cannot clear a live latch and intentionally does not import health,
+    /// mismatch streaks, diagnostic counters, or policy from the checkpoint.
+    /// Those values have different restore semantics and separate obligations.
+    pub(crate) fn preserve_restore_isolation_latches_from(&mut self, checkpoint: &Self) {
+        for actuator in PhysicalActuator::ALL {
+            let index = actuator.index();
+            self.isolated[index] = self.isolated[index] || checkpoint.isolated[index];
+        }
+    }
+
     pub const fn total_isolations(&self) -> u64 {
         self.total_isolations
     }
@@ -361,5 +374,69 @@ mod tests {
         supervisor.isolated[PhysicalActuator::Cutter.index()] = true;
         supervisor.service(PhysicalActuator::Cutter);
         assert!(!supervisor.report().is_isolated(PhysicalActuator::Cutter));
+    }
+
+    #[test]
+    fn restore_isolation_join_preserves_live_and_checkpoint_latches() {
+        let mut live = ActuatorIsolationSupervisor::default();
+        let mut checkpoint = ActuatorIsolationSupervisor::default();
+        live.isolated[PhysicalActuator::Cutter.index()] = true;
+        checkpoint.isolated[PhysicalActuator::LeftTrack.index()] = true;
+
+        live.preserve_restore_isolation_latches_from(&checkpoint);
+
+        let report = live.report();
+        assert!(report.is_isolated(PhysicalActuator::Cutter));
+        assert!(report.is_isolated(PhysicalActuator::LeftTrack));
+        assert_eq!(report.isolated_count, 2);
+    }
+
+    #[test]
+    fn restore_isolation_join_does_not_import_other_checkpoint_state() {
+        let live_policy = ActuatorIsolationPolicy {
+            energized_threshold: 0.42,
+            mismatch_penalty: 0.11,
+            recovery_rate: 0.007,
+            isolation_threshold: 0.17,
+            mismatch_streak_limit: 9,
+        };
+        let mut live = ActuatorIsolationSupervisor::new(live_policy);
+        live.health[PhysicalActuator::Cutter.index()] = 0.61;
+        live.mismatch_streaks[PhysicalActuator::Cutter.index()] = 3;
+        live.total_isolations = 7;
+
+        let mut checkpoint = ActuatorIsolationSupervisor::default();
+        checkpoint.health[PhysicalActuator::Cutter.index()] = 0.02;
+        checkpoint.mismatch_streaks[PhysicalActuator::Cutter.index()] = 99;
+        checkpoint.total_isolations = 999;
+        checkpoint.isolated[PhysicalActuator::Cutter.index()] = true;
+
+        live.preserve_restore_isolation_latches_from(&checkpoint);
+
+        assert_eq!(live.policy, live_policy);
+        assert_eq!(live.health[PhysicalActuator::Cutter.index()], 0.61);
+        assert_eq!(live.mismatch_streaks[PhysicalActuator::Cutter.index()], 3);
+        assert_eq!(live.total_isolations, 7);
+        assert!(live.isolated[PhysicalActuator::Cutter.index()]);
+    }
+
+    #[test]
+    fn restore_isolation_join_is_idempotent_and_commutative_for_authority() {
+        let mut a = ActuatorIsolationSupervisor::default();
+        let mut b = ActuatorIsolationSupervisor::default();
+        a.isolated[PhysicalActuator::Cutter.index()] = true;
+        a.isolated[PhysicalActuator::RoofSupport.index()] = true;
+        b.isolated[PhysicalActuator::LeftTrack.index()] = true;
+        b.isolated[PhysicalActuator::RoofSupport.index()] = true;
+
+        let mut ab = a.clone();
+        ab.preserve_restore_isolation_latches_from(&b);
+        let once = ab.report().isolated;
+        ab.preserve_restore_isolation_latches_from(&b);
+        assert_eq!(ab.report().isolated, once);
+
+        let mut ba = b.clone();
+        ba.preserve_restore_isolation_latches_from(&a);
+        assert_eq!(ab.report().isolated, ba.report().isolated);
     }
 }
