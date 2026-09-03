@@ -3,11 +3,10 @@
 //! Bounded state history and conservative persistence evidence.
 //!
 //! A sequence of snapshots cannot reveal the exact time a desired value changed
-//! before the first observation. It can prove lower bounds about continuously
-//! observed evidence. Critically, unchanged desired state alone does not prove
-//! persistent drift: the observed side might have converged and later regressed.
-//! Persistence from history therefore requires an uninterrupted run in which the
-//! same desired value is present and every sampled state is actually in drift.
+//! before the first observation. It can establish spans across an uninterrupted
+//! *sample sequence*, but it cannot prove that no convergence/regression occurred
+//! between samples. Sampled history therefore supports a persistence hypothesis;
+//! it does not prove continuous persistence by itself.
 
 use crate::{
     EntityRef, StateAssessmentStatus, StateLimits, StateSnapshot, StateValue,
@@ -100,9 +99,9 @@ pub struct DesiredStateContinuity {
     pub consecutive_snapshots: usize,
 }
 
-/// Uninterrupted sampled evidence that the current desired value remained in
-/// disagreement with observed state. This is still a sampling lower bound, not
-/// proof that no unsampled convergence occurred between captures.
+/// Uninterrupted *sample sequence* in which the current desired value remained
+/// in disagreement with observed state. This does not prove that the system did
+/// not converge and regress between samples.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DriftContinuity {
     pub desired_value: StateValue,
@@ -118,17 +117,23 @@ pub struct HistoricalStateAssessment {
     pub desired_continuity: Option<DesiredStateContinuity>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drift_continuity: Option<DriftContinuity>,
-    /// Lower bound on how long the current desired value has been continuously
-    /// observed. This alone is insufficient to prove persistent drift.
+    /// Span from the first through last samples in the uninterrupted sequence
+    /// that carry the current desired value. The field name is retained for the
+    /// v0.1 wire shape; it is a sampled span, not proof of continuous state.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub continuously_observed_desired_age_lower_bound_ms: Option<u64>,
-    /// Lower bound from an uninterrupted run of sampled *drift* states with the
-    /// same desired value. This is the history evidence used for persistence.
+    /// Span from the first through last samples in the uninterrupted sequence
+    /// whose sampled states are all in drift for the same desired value. This is
+    /// supporting evidence only; unsampled convergence may still have occurred.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub continuously_observed_drift_age_lower_bound_ms: Option<u64>,
-    /// True only when persistence is proved either by an exact desired-effective
-    /// timestamp or by a sampled drift lower bound that exceeds the convergence
-    /// window. History never proves `Converging`.
+    /// True when the sampled drift span exceeds the convergence window while the
+    /// current drift age is otherwise unknown. This supports a persistence
+    /// hypothesis but is deliberately weaker than `persistent_drift_proven`.
+    pub sampled_persistence_supported: bool,
+    /// True only when current temporal evidence itself proves the desired value
+    /// became effective before the convergence window and drift exists now.
+    /// Sampled history alone never sets this flag.
     pub persistent_drift_proven: bool,
 }
 
@@ -158,19 +163,17 @@ pub fn assess_state_dimension_with_history(
 
     let desired_continuity = desired_state_continuity(history, subject, dimension, at_unix_ms)?;
     let drift_continuity = drift_state_continuity(history, subject, dimension, at_unix_ms)?;
-    // A sampled continuity lower bound is supported only by the interval between
-    // the first and last supporting snapshots. Querying the same history later
-    // cannot make the evidence older in the absence of another sample.
+    // A sampled span is supported only by the interval between first and last
+    // supporting snapshots. Querying the same history later cannot age evidence.
     let desired_lower_bound = desired_continuity.as_ref().map(|continuity| {
         continuity.last_seen_at_unix_ms - continuity.first_seen_at_unix_ms
     });
     let drift_lower_bound = drift_continuity.as_ref().map(|continuity| {
         continuity.last_seen_at_unix_ms - continuity.first_seen_at_unix_ms
     });
-    let lower_bound_proves_persistence = current.status == TemporalStateStatus::DriftAgeUnknown
+    let sampled_persistence_supported = current.status == TemporalStateStatus::DriftAgeUnknown
         && drift_lower_bound.is_some_and(|age| age > policy.convergence_window_ms);
-    let persistent_drift_proven = current.status == TemporalStateStatus::PersistentDrift
-        || lower_bound_proves_persistence;
+    let persistent_drift_proven = current.status == TemporalStateStatus::PersistentDrift;
 
     Ok(HistoricalStateAssessment {
         current,
@@ -178,11 +181,12 @@ pub fn assess_state_dimension_with_history(
         drift_continuity,
         continuously_observed_desired_age_lower_bound_ms: desired_lower_bound,
         continuously_observed_drift_age_lower_bound_ms: drift_lower_bound,
+        sampled_persistence_supported,
         persistent_drift_proven,
     })
 }
 
-/// Find the uninterrupted history of the current desired value.
+/// Find the uninterrupted sampled history of the current desired value.
 ///
 /// Continuity is deliberately exact at the serialized `StateValue` level even
 /// if an instantaneous assessment uses a numeric tolerance. This is conservative:
@@ -228,9 +232,9 @@ pub fn desired_state_continuity(
     }))
 }
 
-/// Find the uninterrupted sampled run in which the current desired value and
-/// observed state are in actual drift. Any in-sync, missing, conflicting, or
-/// changed-desired snapshot breaks the persistence chain.
+/// Find the uninterrupted sample sequence in which the current desired value
+/// and each sampled observed state are in drift. Any sampled in-sync, missing,
+/// conflicting, or changed-desired state breaks the sequence.
 pub fn drift_state_continuity(
     history: &StateHistory,
     subject: &EntityRef,
@@ -391,7 +395,7 @@ mod tests {
     }
 
     #[test]
-    fn continuous_sampled_drift_can_prove_persistence_lower_bound() {
+    fn continuous_sampled_drift_supports_but_does_not_prove_persistence() {
         let history = history(vec![
             snapshot(100, Some(5), Some(3)),
             snapshot(200, Some(5), Some(3)),
@@ -414,11 +418,12 @@ mod tests {
             result.continuously_observed_drift_age_lower_bound_ms,
             Some(200)
         );
-        assert!(result.persistent_drift_proven);
+        assert!(result.sampled_persistence_supported);
+        assert!(!result.persistent_drift_proven);
     }
 
     #[test]
-    fn intervening_convergence_breaks_persistent_drift_proof() {
+    fn intervening_convergence_breaks_sampled_persistence_support() {
         let history = history(vec![
             snapshot(100, Some(5), Some(3)),
             snapshot(200, Some(5), Some(5)),
@@ -440,6 +445,7 @@ mod tests {
             result.continuously_observed_drift_age_lower_bound_ms,
             Some(0)
         );
+        assert!(!result.sampled_persistence_supported);
         assert!(!result.persistent_drift_proven);
         assert_eq!(result.drift_continuity.as_ref().unwrap().consecutive_snapshots, 1);
     }
@@ -463,6 +469,7 @@ mod tests {
             result.continuously_observed_drift_age_lower_bound_ms,
             Some(0)
         );
+        assert!(!result.sampled_persistence_supported);
         assert!(!result.persistent_drift_proven);
     }
 
@@ -494,7 +501,30 @@ mod tests {
             result.continuously_observed_drift_age_lower_bound_ms,
             Some(100)
         );
+        assert!(!result.sampled_persistence_supported);
         assert!(!result.persistent_drift_proven);
+    }
+
+    #[test]
+    fn exact_effective_time_can_prove_persistent_drift() {
+        let mut latest = snapshot(300, Some(5), Some(3));
+        latest
+            .assertions
+            .iter_mut()
+            .find(|assertion| assertion.role == StateRole::Desired)
+            .unwrap()
+            .valid_from_unix_ms = Some(100);
+        let result = assess_state_dimension_with_history(
+            &history(vec![latest]),
+            &subject(),
+            "workload.replicas",
+            300,
+            policy(),
+        )
+        .unwrap();
+        assert_eq!(result.current.status, TemporalStateStatus::PersistentDrift);
+        assert!(!result.sampled_persistence_supported);
+        assert!(result.persistent_drift_proven);
     }
 
     #[test]
