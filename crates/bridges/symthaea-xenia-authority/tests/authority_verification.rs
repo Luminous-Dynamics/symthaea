@@ -188,9 +188,12 @@ fn verified_time(grant: &CapabilityGrant, witnessed_unix_s: u64) -> VerifiedAuth
             challenge_nonce: challenge.nonce,
             witnessed_unix_s,
             uncertainty_s: 1,
-            signature: [0; 64],
+            signature: Vec::new(),
         };
-        statement.signature = key.sign(&statement.canonical_message().unwrap()).to_bytes();
+        statement.signature = key
+            .sign(&statement.canonical_message().unwrap())
+            .to_bytes()
+            .to_vec();
         statement
     };
 
