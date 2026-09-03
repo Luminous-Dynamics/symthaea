@@ -9,9 +9,9 @@
 
 #![forbid(unsafe_code)]
 
-use std::fs;
-use std::io;
-use std::os::unix::fs::FileTypeExt;
+use std::fs::{self, OpenOptions};
+use std::io::{self, Read};
+use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
 use std::os::unix::net::UnixDatagram;
 use std::path::{Path, PathBuf};
 
@@ -176,7 +176,7 @@ impl BootTelemetry {
         let Some(path) = self.state_path.as_deref() else {
             return false;
         };
-        let Ok(bytes) = fs::read(path) else {
+        let Ok(bytes) = read_bounded_state_file(path) else {
             return false;
         };
         if validate_datagram_size(&bytes).is_err() {
@@ -196,6 +196,32 @@ impl BootTelemetry {
         }
         self.reducer.reset_from_snapshot(&message).is_ok()
     }
+}
+
+/// Read a persisted snapshot without allowing the presentation process to follow
+/// symlinks, block on special files, or allocate beyond the protocol wire budget.
+fn read_bounded_state_file(path: &Path) -> io::Result<Vec<u8>> {
+    let file = OpenOptions::new()
+        .read(true)
+        .custom_flags(nix::libc::O_NOFOLLOW | nix::libc::O_NONBLOCK | nix::libc::O_CLOEXEC)
+        .open(path)?;
+    if !file.metadata()?.file_type().is_file() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "boot state path is not a regular file",
+        ));
+    }
+
+    let mut bytes = Vec::with_capacity(MAX_WIRE_BYTES + 1);
+    file.take((MAX_WIRE_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() > MAX_WIRE_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "boot state file exceeds wire budget",
+        ));
+    }
+    Ok(bytes)
 }
 
 fn bind_nonblocking(path: &Path) -> io::Result<UnixDatagram> {
@@ -244,11 +270,23 @@ fn bind_nonblocking(path: &Path) -> io::Result<UnixDatagram> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use std::os::unix::fs::symlink;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use symthaea_boot_protocol::wire::ObservationId;
 
     const OBS_A: ObservationId = ObservationId::from_bytes([0xA1; 16]);
     const OBS_B: ObservationId = ObservationId::from_bytes([0xB2; 16]);
+
+    fn temp_path(suffix: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after Unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "symthaea-boot-state-{}-{nonce}-{suffix}",
+            std::process::id()
+        ))
+    }
 
     #[test]
     fn health_modulates_growth_without_claiming_authority() {
@@ -304,5 +342,36 @@ mod tests {
         );
         assert_eq!(telemetry.reducer.observation(), Some(OBS_A));
         assert_eq!(report.lineage_resets, 0);
+    }
+
+    #[test]
+    fn persisted_snapshot_read_is_bounded_and_refuses_symlinks() {
+        let target = temp_path("target.json");
+        let link = temp_path("link.json");
+        let oversized = temp_path("oversized.json");
+
+        let snapshot = WireMessage::snapshot(
+            OBS_A,
+            BootSnapshot::new(1, Duration::from_millis(10), BootPhase::Kernel),
+        );
+        let encoded = serde_json::to_vec(&snapshot).unwrap();
+        fs::write(&target, &encoded).unwrap();
+        symlink(&target, &link).unwrap();
+        fs::write(&oversized, vec![b'x'; MAX_WIRE_BYTES + 1]).unwrap();
+
+        assert!(read_bounded_state_file(&target).is_ok());
+        assert!(read_bounded_state_file(&link).is_err());
+        assert!(read_bounded_state_file(&oversized).is_err());
+
+        let telemetry = BootTelemetry::new(None, Some(&target));
+        assert_eq!(telemetry.snapshot().map(|snapshot| snapshot.sequence), Some(1));
+        let telemetry = BootTelemetry::new(None, Some(&link));
+        assert!(telemetry.snapshot().is_none());
+        let telemetry = BootTelemetry::new(None, Some(&oversized));
+        assert!(telemetry.snapshot().is_none());
+
+        let _ = fs::remove_file(link);
+        let _ = fs::remove_file(target);
+        let _ = fs::remove_file(oversized);
     }
 }
