@@ -64,10 +64,15 @@ pub struct ServiceCapacityAssessment {
     pub targetless_endpoint_memberships: usize,
     pub unresolved_target_references: usize,
     pub non_pod_target_references: usize,
+    /// Unique resolved Pod targets observed across all EndpointSlice memberships.
+    /// A Pod repeated during slice churn/rebalancing is counted once here.
     pub pod_targets_observed: usize,
+    /// Unique observed Pod targets with a structural ownership path to the
+    /// requested workload.
     pub workload_owned_pod_targets_confirmed: usize,
-    /// Pod targets for which the partial topology cannot prove an ownership path
-    /// to the requested workload. This is deliberately not labeled "foreign".
+    /// Unique Pod targets for which the partial topology cannot prove an
+    /// ownership path to the requested workload. This is deliberately not
+    /// labeled "foreign".
     pub workload_ownership_unresolved: usize,
 }
 
@@ -187,6 +192,9 @@ pub fn assess_service_capacity(
         workload_owned_pod_targets_confirmed: 0,
         workload_ownership_unresolved: 0,
     };
+    let mut pod_targets = BTreeSet::new();
+    let mut workload_owned_pod_targets = BTreeSet::new();
+    let mut workload_ownership_unresolved = BTreeSet::new();
 
     for membership in memberships {
         let entity = entity_map
@@ -237,11 +245,12 @@ pub fn assess_service_capacity(
                     assessment.non_pod_target_references += 1;
                     continue;
                 }
-                assessment.pod_targets_observed += 1;
+                pod_targets.insert(target.clone());
                 if ownership_reaches(topology, target, &request.workload) {
-                    assessment.workload_owned_pod_targets_confirmed += 1;
-                } else {
-                    assessment.workload_ownership_unresolved += 1;
+                    workload_owned_pod_targets.insert(target.clone());
+                    workload_ownership_unresolved.remove(target);
+                } else if !workload_owned_pod_targets.contains(target) {
+                    workload_ownership_unresolved.insert(target.clone());
                 }
             }
             _ => {
@@ -253,6 +262,9 @@ pub fn assess_service_capacity(
         }
     }
 
+    assessment.pod_targets_observed = pod_targets.len();
+    assessment.workload_owned_pod_targets_confirmed = workload_owned_pod_targets.len();
+    assessment.workload_ownership_unresolved = workload_ownership_unresolved.len();
     Ok(assessment)
 }
 
@@ -397,7 +409,7 @@ mod tests {
     use serde_json::json;
     use std::sync::Arc;
     use symthaea_integration_core::{StateAssessmentStatus, StateValue};
-    use symthaea_kubernetes_bridge::{KubernetesReplayContext, KubernetesReplayDiscoverer};
+    use symthaea_kubernetes_bridge::KubernetesReplayContext;
     use symthaea_kubernetes_endpointslice_bridge::augment_endpoint_slices;
     use symthaea_kubernetes_state_bridge::KubernetesStateReplay;
     use symthaea_kubernetes_state_origin_bridge::normalize_kubernetes_state_origins;
@@ -475,11 +487,24 @@ mod tests {
         })
     }
 
-    fn find_entity(
-        topology: &DiscoverySnapshot,
-        kind: &str,
-        name: &str,
-    ) -> EntityRef {
+    fn duplicate_api_1_slice() -> serde_json::Value {
+        json!({
+            "apiVersion":"discovery.k8s.io/v1",
+            "kind":"EndpointSlice",
+            "metadata":{
+                "name":"api-rebalanced","namespace":"shop","uid":"slice-2",
+                "labels":{"kubernetes.io/service-name":"api"}
+            },
+            "addressType":"IPv4",
+            "endpoints":[{
+                "addresses":["10.0.1.1"],
+                "conditions":{"ready":true,"serving":true,"terminating":false},
+                "targetRef":{"apiVersion":"v1","kind":"Pod","namespace":"shop","name":"api-1","uid":"pod-1"}
+            }]
+        })
+    }
+
+    fn find_entity(topology: &DiscoverySnapshot, kind: &str, name: &str) -> EntityRef {
         topology
             .entities
             .iter()
@@ -492,20 +517,22 @@ mod tests {
             .clone()
     }
 
+    fn request(topology: &DiscoverySnapshot) -> ServiceCapacityRequest {
+        ServiceCapacityRequest {
+            service: find_entity(topology, "Service", "api"),
+            workload: find_entity(topology, "Deployment", "api"),
+            replica_dimension: "workload.replicas".into(),
+        }
+    }
+
     #[test]
     fn replica_convergence_and_endpoint_readiness_remain_independent() {
         let docs = documents();
         let context = KubernetesReplayContext::default();
-        let replay = KubernetesStateReplay::from_objects(context.clone(), &docs, 100).unwrap();
+        let replay = KubernetesStateReplay::from_objects(context, &docs, 100).unwrap();
         let normalized = normalize_kubernetes_state_origins(replay.snapshot()).unwrap();
         let topology = augment_endpoint_slices(replay.topology(), &[endpoints()], 100).unwrap();
-        let service = find_entity(&topology, "Service", "api");
-        let workload = find_entity(&topology, "Deployment", "api");
-        let request = ServiceCapacityRequest {
-            service,
-            workload,
-            replica_dimension: "workload.replicas".into(),
-        };
+        let request = request(&topology);
 
         let mut registry = IntegrationRegistry::new();
         registry
@@ -536,6 +563,30 @@ mod tests {
     }
 
     #[test]
+    fn repeated_pod_across_slices_does_not_inflate_unique_capacity() {
+        let docs = documents();
+        let replay = KubernetesStateReplay::from_objects(
+            KubernetesReplayContext::default(),
+            &docs,
+            100,
+        )
+        .unwrap();
+        let topology = augment_endpoint_slices(
+            replay.topology(),
+            &[endpoints(), duplicate_api_1_slice()],
+            100,
+        )
+        .unwrap();
+        let assessment = assess_service_capacity(&topology, replay.snapshot(), &request(&topology))
+            .unwrap();
+
+        assert_eq!(assessment.endpoint_memberships_observed, 4);
+        assert_eq!(assessment.pod_targets_observed, 3);
+        assert_eq!(assessment.workload_owned_pod_targets_confirmed, 3);
+        assert_eq!(assessment.workload_ownership_unresolved, 0);
+    }
+
+    #[test]
     fn mismatched_capture_times_are_rejected() {
         let docs = documents();
         let replay = KubernetesStateReplay::from_objects(
@@ -547,12 +598,7 @@ mod tests {
         let mut state = replay.snapshot().clone();
         state.collected_at_unix_ms = 101;
         let topology = augment_endpoint_slices(replay.topology(), &[endpoints()], 100).unwrap();
-        let request = ServiceCapacityRequest {
-            service: find_entity(&topology, "Service", "api"),
-            workload: find_entity(&topology, "Deployment", "api"),
-            replica_dimension: "workload.replicas".into(),
-        };
-        assert!(assess_service_capacity(&topology, &state, &request).is_err());
+        assert!(assess_service_capacity(&topology, &state, &request(&topology)).is_err());
     }
 
     #[test]
@@ -578,12 +624,8 @@ mod tests {
             }]
         });
         let topology = augment_endpoint_slices(replay.topology(), &[slice], 100).unwrap();
-        let request = ServiceCapacityRequest {
-            service: find_entity(&topology, "Service", "api"),
-            workload: find_entity(&topology, "Deployment", "api"),
-            replica_dimension: "workload.replicas".into(),
-        };
-        let assessment = assess_service_capacity(&topology, replay.snapshot(), &request).unwrap();
+        let assessment = assess_service_capacity(&topology, replay.snapshot(), &request(&topology))
+            .unwrap();
         assert_eq!(assessment.unresolved_target_references, 1);
         assert_eq!(assessment.workload_ownership_unresolved, 0);
     }
