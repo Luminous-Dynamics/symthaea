@@ -347,6 +347,8 @@ impl ObservationEnvelope {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ObservationBatch {
     pub integration_id: String,
+    /// Local integration time at which this batch was completed/admitted. Source
+    /// event clocks remain independent and are not ordered against this field.
     pub collected_at_unix_ms: u64,
     pub observations: Vec<ObservationEnvelope>,
 }
@@ -367,6 +369,14 @@ impl ObservationBatch {
                     index,
                     batch: self.integration_id.clone(),
                     observation: observation.source.integration_id.clone(),
+                });
+            }
+            if observation.ingested_at_unix_ms > self.collected_at_unix_ms {
+                return Err(BatchValidationError::FutureIngestionTimestamp {
+                    index,
+                    observation_id: observation.observation_id.clone(),
+                    ingested_at_unix_ms: observation.ingested_at_unix_ms,
+                    collected_at_unix_ms: self.collected_at_unix_ms,
                 });
             }
             if !ids.insert(observation.observation_id.clone()) {
@@ -411,6 +421,15 @@ pub enum BatchValidationError {
         index: usize,
         batch: String,
         observation: String,
+    },
+    #[error(
+        "observation {index} `{observation_id}` was ingested at {ingested_at_unix_ms} after batch collection {collected_at_unix_ms}"
+    )]
+    FutureIngestionTimestamp {
+        index: usize,
+        observation_id: ObservationId,
+        ingested_at_unix_ms: u64,
+        collected_at_unix_ms: u64,
     },
     #[error("duplicate observation id {0} in batch")]
     DuplicateObservationId(ObservationId),
@@ -494,6 +513,21 @@ mod tests {
     }
 
     #[test]
+    fn source_clock_ahead_of_ingestion_is_not_structurally_rejected() {
+        let mut obs = sample("clock-skew", "test", None);
+        obs.observed_at_unix_ms = 1_020;
+        obs.ingested_at_unix_ms = 1_010;
+        assert!(obs.validate().is_ok());
+
+        let batch = ObservationBatch {
+            integration_id: "test".into(),
+            collected_at_unix_ms: 1_010,
+            observations: vec![obs],
+        };
+        assert!(batch.validate().is_ok());
+    }
+
+    #[test]
     fn non_finite_number_fails_closed() {
         let mut obs = sample("obs-1", "test", None);
         obs.value = ObservationValue::Number {
@@ -531,6 +565,21 @@ mod tests {
         assert!(matches!(
             batch.validate(),
             Err(BatchValidationError::DuplicateObservationId(_))
+        ));
+    }
+
+    #[test]
+    fn batch_rejects_ingestion_after_its_collection_boundary() {
+        let mut obs = sample("future-ingest", "test", None);
+        obs.ingested_at_unix_ms = 2_001;
+        let batch = ObservationBatch {
+            integration_id: "test".into(),
+            collected_at_unix_ms: 2_000,
+            observations: vec![obs],
+        };
+        assert!(matches!(
+            batch.validate(),
+            Err(BatchValidationError::FutureIngestionTimestamp { .. })
         ));
     }
 
