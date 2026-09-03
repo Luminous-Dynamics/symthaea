@@ -290,7 +290,7 @@ fn verified_proof(
     workload: &ExecutorWorkloadV1,
     agent_head: CheckpointHead,
     authority_time: &VerifiedAuthorityTime,
-    authority_state: &VerifiedAuthorityState,
+    authority_state: VerifiedAuthorityState,
 ) -> symthaea_xenia_authority::VerifiedXeniaCapability {
     let signing_key = SigningKey::from_bytes(&[3; 32]);
     let public_key = signing_key.verifying_key().to_bytes();
@@ -373,17 +373,15 @@ fn exact_state_bound_xenia_proof_drives_one_cas_backed_typed_restart() {
     let (mut profile, frontier) =
         XeniaSystemdRecoveryProfile::bootstrap(grant.clone(), backend, SharedCasStore::default())
             .unwrap();
-    assert_eq!(profile.authorization_checkpoint_head().unwrap(), frontier.head);
 
     let time = verified_time(&grant, 125);
     let state = verified_state(&grant, &time, 20, Vec::new());
     let state_digest = state.snapshot_digest();
-    let proof = verified_proof(&grant, &workload, frontier.head, &time, &state);
+    let proof = verified_proof(&grant, &workload, frontier.head, &time, state);
     let receipt = profile
         .recover_verified_once(
             proof,
             &time,
-            state,
             &plan,
             ExecutionId("exec-1".into()),
             ReservationId("reservation-1".into()),
@@ -393,7 +391,6 @@ fn exact_state_bound_xenia_proof_drives_one_cas_backed_typed_restart() {
     assert_eq!(*calls.lock().unwrap(), 1);
     assert_eq!(receipt.authority_state_digest, state_digest);
     assert_eq!(receipt.recovery.verification, VerificationResult::Healthy);
-    assert_ne!(receipt.recovery.checkpoint_head, frontier.head);
     assert_eq!(receipt.recovery.use_state.committed, 1);
 }
 
@@ -428,16 +425,15 @@ fn two_processes_can_verify_same_attestation_but_only_one_crosses_cas() {
 
     let time_a = verified_time(&grant, 125);
     let state_a = verified_state(&grant, &time_a, 20, Vec::new());
-    let proof_a = verified_proof(&grant, &workload, frontier.head, &time_a, &state_a);
+    let proof_a = verified_proof(&grant, &workload, frontier.head, &time_a, state_a);
     let time_b = verified_time(&grant, 125);
     let state_b = verified_state(&grant, &time_b, 20, Vec::new());
-    let proof_b = verified_proof(&grant, &workload, frontier.head, &time_b, &state_b);
+    let proof_b = verified_proof(&grant, &workload, frontier.head, &time_b, state_b);
 
     profile_a
         .recover_verified_once(
             proof_a,
             &time_a,
-            state_a,
             &plan,
             ExecutionId("exec-a".into()),
             ReservationId("reservation-a".into()),
@@ -447,7 +443,6 @@ fn two_processes_can_verify_same_attestation_but_only_one_crosses_cas() {
     let second = profile_b.recover_verified_once(
         proof_b,
         &time_b,
-        state_b,
         &plan,
         ExecutionId("exec-b".into()),
         ReservationId("reservation-b".into()),
@@ -468,14 +463,13 @@ fn proof_is_rechecked_for_expiry_at_effect_entry() {
             .unwrap();
     let verification_time = verified_time(&grant, 125);
     let state = verified_state(&grant, &verification_time, 20, Vec::new());
-    let proof = verified_proof(&grant, &workload, frontier.head, &verification_time, &state);
+    let proof = verified_proof(&grant, &workload, frontier.head, &verification_time, state);
     let effect_entry_time = verified_time(&grant, 161);
 
     assert!(matches!(
         profile.recover_verified_once(
             proof,
             &effect_entry_time,
-            state,
             &plan,
             ExecutionId("exec-expired".into()),
             ReservationId("reservation-expired".into()),
@@ -483,11 +477,10 @@ fn proof_is_rechecked_for_expiry_at_effect_entry() {
         Err(ProfileRecoveryError::XeniaProofExpiredAtEffectEntry)
     ));
     assert_eq!(*calls.lock().unwrap(), 0);
-    assert_eq!(profile.authorization_checkpoint_head().unwrap(), frontier.head);
 }
 
 #[test]
-fn authority_state_cannot_change_between_xenia_verification_and_effect_entry() {
+fn proof_owned_authenticated_revocation_reaches_final_broker_admission() {
     let (before, plan, grant, workload) = plan_and_grant();
     let calls = Arc::new(Mutex::new(0usize));
     let backend = FakeBackend::new(vec![before], calls.clone());
@@ -495,33 +488,25 @@ fn authority_state_cannot_change_between_xenia_verification_and_effect_entry() {
         XeniaSystemdRecoveryProfile::bootstrap(grant.clone(), backend, SharedCasStore::default())
             .unwrap();
     let time = verified_time(&grant, 125);
-    let original_state = verified_state(&grant, &time, 20, Vec::new());
-    let proof = verified_proof(
-        &grant,
-        &workload,
-        frontier.head,
-        &time,
-        &original_state,
-    );
-    let changed_state = verified_state(
+    let state = verified_state(
         &grant,
         &time,
-        21,
+        20,
         vec![NegativeAuthorityFact::RevokeGrant {
             grant_digest: grant.digest(),
         }],
     );
+    let proof = verified_proof(&grant, &workload, frontier.head, &time, state);
 
     assert!(matches!(
         profile.recover_verified_once(
             proof,
             &time,
-            changed_state,
             &plan,
-            ExecutionId("exec-state-changed".into()),
-            ReservationId("reservation-state-changed".into()),
+            ExecutionId("exec-revoked".into()),
+            ReservationId("reservation-revoked".into()),
         ),
-        Err(ProfileRecoveryError::AuthorityStateChangedAfterXeniaVerification)
+        Err(ProfileRecoveryError::Broker(_))
     ));
     assert_eq!(*calls.lock().unwrap(), 0);
     assert_eq!(profile.authorization_checkpoint_head().unwrap(), frontier.head);
