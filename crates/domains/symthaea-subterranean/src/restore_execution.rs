@@ -6,7 +6,9 @@
 //! restore action must execute against the exact committed generation binding
 //! and produce one owner-minted receipt before activation may proceed.
 
-use super::restore_actions::{RestoreAction, RestoreDomainPlan};
+use super::restore_actions::{
+    canonical_plan_for_decision, RestoreAction, RestoreDomainPlan, RestorePlanError,
+};
 use super::restore_admission::{CommittedOperationalRestore, RestoreDigest, RestoreGenerationFence};
 use super::restore_semantics::RestoreDomain;
 
@@ -17,18 +19,14 @@ pub(super) struct RestoreExecutionBinding {
 }
 
 impl RestoreExecutionBinding {
-    pub(super) const fn new(
-        checkpoint_digest: RestoreDigest,
-        fence: RestoreGenerationFence,
-    ) -> Self {
-        Self {
-            checkpoint_digest,
-            fence,
-        }
-    }
-
+    /// Bind execution only to an actual committed restore transaction. Raw
+    /// digest/fence construction stays unavailable so sibling modules cannot
+    /// self-mint a successful execution context.
     pub(super) fn from_committed(committed: &CommittedOperationalRestore) -> Self {
-        Self::new(committed.checkpoint_digest(), committed.fence())
+        Self {
+            checkpoint_digest: committed.checkpoint_digest(),
+            fence: committed.fence(),
+        }
     }
 }
 
@@ -66,9 +64,10 @@ impl RestoreActionReceipt {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum RestoreExecutionError {
-    MissingPlan(RestoreDomain),
-    DuplicatePlan(RestoreDomain),
-    VerdictMismatch(RestoreDomain),
+    PlanUnavailable {
+        domain: RestoreDomain,
+        error: RestorePlanError,
+    },
     WrongBinding {
         domain: RestoreDomain,
         action: RestoreAction,
@@ -101,25 +100,6 @@ fn outcome_matches(action: RestoreAction, outcome: RestoreActionOutcome) -> bool
         RestoreAction::ReconcileBeforeActivation => outcome == RestoreActionOutcome::Reconciled,
         RestoreAction::DropEphemeral => outcome == RestoreActionOutcome::Dropped,
     }
-}
-
-fn validate_plan_coverage(
-    committed: &CommittedOperationalRestore,
-    plans: &[RestoreDomainPlan],
-) -> Result<(), RestoreExecutionError> {
-    for decision in committed.decisions() {
-        let mut matching = plans.iter().filter(|plan| plan.domain() == decision.domain());
-        let Some(plan) = matching.next() else {
-            return Err(RestoreExecutionError::MissingPlan(decision.domain()));
-        };
-        if matching.next().is_some() {
-            return Err(RestoreExecutionError::DuplicatePlan(decision.domain()));
-        }
-        if plan.verdict() != decision.verdict() {
-            return Err(RestoreExecutionError::VerdictMismatch(decision.domain()));
-        }
-    }
-    Ok(())
 }
 
 fn validate_receipts_for_plan(
@@ -175,19 +155,30 @@ fn validate_receipts_for_plan(
 
 /// Activation gate for a complete restore transaction.
 ///
-/// This function intentionally fails until every committed domain has an
-/// action-complete RA-20 plan. Several domains remain fail-closed while their
-/// evidence polarity is still being audited, so there is deliberately no
-/// synthetic all-green fixture in this tranche.
+/// Plans are derived canonically from the committed RA-19 decisions. Callers
+/// provide only receipts; they cannot choose or replace restore semantics after
+/// commit. All plans are derived before any receipt is evaluated so an
+/// under-specified domain fails for its semantic reason rather than because an
+/// earlier audited domain happens to lack a receipt.
 pub(super) fn validate_restore_execution(
     committed: &CommittedOperationalRestore,
-    plans: &[RestoreDomainPlan],
     receipts: &[RestoreActionReceipt],
 ) -> Result<(), RestoreExecutionError> {
-    validate_plan_coverage(committed, plans)?;
     let binding = RestoreExecutionBinding::from_committed(committed);
+    let plans = committed
+        .decisions()
+        .iter()
+        .map(|decision| {
+            canonical_plan_for_decision(*decision).map_err(|error| {
+                RestoreExecutionError::PlanUnavailable {
+                    domain: decision.domain(),
+                    error,
+                }
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
-    for plan in plans {
+    for plan in &plans {
         let domain_receipts = receipts
             .iter()
             .copied()
@@ -211,7 +202,9 @@ pub(super) fn validate_restore_execution(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::operational_checkpoint::restore_actions::EvidenceRestorePolicy;
+    use crate::operational_checkpoint::restore_actions::{
+        canonical_plan_for_decision, EvidenceRestorePolicy,
+    };
     use crate::operational_checkpoint::restore_admission::{
         commit_operational_restore, prepare_operational_restore, RestoreAdmissionVerdict,
         RestoreDomainDecision, RestorePreparationContext,
@@ -226,67 +219,44 @@ mod tests {
         RestoreGenerationFence::new(1, 2, 3, 4, 5, digest(6))
     }
 
+    fn alternate_fence() -> RestoreGenerationFence {
+        RestoreGenerationFence::new(1, 2, 3, 99, 5, digest(6))
+    }
+
     fn decisions() -> Vec<RestoreDomainDecision> {
         OPERATIONAL_RESTORE_CONTRACTS
             .iter()
             .map(|contract| {
-                let verdict = if matches!(
+                RestoreDomainDecision::new(
                     contract.domain,
-                    RestoreDomain::Controller
-                        | RestoreDomain::Mission
-                        | RestoreDomain::OperatorAuthority
-                ) {
-                    RestoreAdmissionVerdict::ReconciliationRequired
-                } else {
-                    RestoreAdmissionVerdict::ProvenNonWidening
-                };
-                RestoreDomainDecision::new(contract.domain, verdict)
+                    RestoreAdmissionVerdict::ReconciliationRequired,
+                )
             })
             .collect()
     }
 
-    fn committed() -> CommittedOperationalRestore {
+    fn committed_with(
+        checkpoint_byte: u8,
+        live_fence: RestoreGenerationFence,
+    ) -> CommittedOperationalRestore {
         let prepared = prepare_operational_restore(
-            RestorePreparationContext::new(digest(7), fence()),
+            RestorePreparationContext::new(digest(checkpoint_byte), live_fence),
             decisions(),
         )
         .expect("prepare");
-        commit_operational_restore(prepared, fence()).expect("commit")
+        commit_operational_restore(prepared, live_fence).expect("commit")
     }
 
-    fn historical_reconcile_plan(domain: RestoreDomain) -> RestoreDomainPlan {
-        RestoreDomainPlan::new(
-            RestoreDomainDecision::new(domain, RestoreAdmissionVerdict::ReconciliationRequired),
-            vec![
-                RestoreAction::ReplaceValidatedHistorical,
-                RestoreAction::ReconcileBeforeActivation,
-            ],
-        )
-        .expect("historical reconcile plan")
+    fn committed() -> CommittedOperationalRestore {
+        committed_with(7, fence())
     }
 
     fn operator_plan() -> RestoreDomainPlan {
-        RestoreDomainPlan::new(
-            RestoreDomainDecision::new(
-                RestoreDomain::OperatorAuthority,
-                RestoreAdmissionVerdict::ReconciliationRequired,
-            ),
-            vec![
-                RestoreAction::PreserveOrNarrowAuthority,
-                RestoreAction::MergeEvidence(EvidenceRestorePolicy::ReplayBarrier),
-                RestoreAction::ReconcileBeforeActivation,
-                RestoreAction::DropEphemeral,
-            ],
-        )
-        .expect("operator plan")
-    }
-
-    fn audited_prefix_plans() -> Vec<RestoreDomainPlan> {
-        vec![
-            historical_reconcile_plan(RestoreDomain::Controller),
-            historical_reconcile_plan(RestoreDomain::Mission),
-            operator_plan(),
-        ]
+        canonical_plan_for_decision(RestoreDomainDecision::new(
+            RestoreDomain::OperatorAuthority,
+            RestoreAdmissionVerdict::ReconciliationRequired,
+        ))
+        .expect("operator canonical plan")
     }
 
     fn operator_receipts(binding: RestoreExecutionBinding) -> Vec<RestoreActionReceipt> {
@@ -341,14 +311,27 @@ mod tests {
     }
 
     #[test]
-    fn receipt_from_other_commit_binding_is_rejected() {
+    fn receipt_from_other_committed_context_is_rejected() {
         let committed = committed();
-        let binding = RestoreExecutionBinding::from_committed(&committed);
-        let wrong = RestoreExecutionBinding::new(digest(99), fence());
+        let other = committed_with(99, fence());
+        let expected = RestoreExecutionBinding::from_committed(&committed);
+        let wrong = RestoreExecutionBinding::from_committed(&other);
+        assert_ne!(expected, wrong);
         assert!(matches!(
-            validate_receipts_for_plan(wrong, &operator_plan(), &operator_receipts(binding)),
+            validate_receipts_for_plan(expected, &operator_plan(), &operator_receipts(wrong)),
             Err(RestoreExecutionError::WrongBinding { .. })
         ));
+    }
+
+    #[test]
+    fn same_checkpoint_under_different_live_fence_is_different_transaction() {
+        let first = committed_with(7, fence());
+        let second = committed_with(7, alternate_fence());
+        assert_eq!(first.checkpoint_digest(), second.checkpoint_digest());
+        assert_ne!(
+            RestoreExecutionBinding::from_committed(&first),
+            RestoreExecutionBinding::from_committed(&second)
+        );
     }
 
     #[test]
@@ -381,26 +364,16 @@ mod tests {
     }
 
     #[test]
-    fn partial_audited_plan_set_cannot_activate_full_restore() {
+    fn full_activation_stays_blocked_at_first_unaudited_domain() {
         let committed = committed();
         assert_eq!(
-            validate_restore_execution(&committed, &audited_prefix_plans(), &[]),
-            Err(RestoreExecutionError::MissingPlan(
-                RestoreDomain::DegradedSupervisor
-            ))
-        );
-    }
-
-    #[test]
-    fn duplicate_domain_plan_is_rejected_before_execution() {
-        let committed = committed();
-        let mut plans = audited_prefix_plans();
-        plans.insert(1, historical_reconcile_plan(RestoreDomain::Controller));
-        assert_eq!(
-            validate_restore_execution(&committed, &plans, &[]),
-            Err(RestoreExecutionError::DuplicatePlan(
-                RestoreDomain::Controller
-            ))
+            validate_restore_execution(&committed, &[]),
+            Err(RestoreExecutionError::PlanUnavailable {
+                domain: RestoreDomain::ActuatorIsolation,
+                error: RestorePlanError::EvidencePolicyUnderspecified {
+                    domain: RestoreDomain::ActuatorIsolation,
+                },
+            })
         );
     }
 }
