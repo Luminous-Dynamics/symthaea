@@ -13,7 +13,7 @@
 //! qualified reasoning tranche. Known shared-origin evidence always dominates a
 //! positive-independence claim.
 
-use crate::{ObservationEnvelope, SourceQualifiedObservationRef};
+use crate::{ObservationEnvelope, ObservationId, SourceQualifiedObservationRef};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -133,7 +133,7 @@ pub struct IndependenceAttestation {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub valid_until_unix_ms: Option<u64>,
     /// Cross-source supporting evidence must be source-qualified. Equal local
-    /// IDs from different integrations/collectors are therefore distinct refs.
+    /// IDs from different source namespaces are therefore distinct refs.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence_observations: Vec<SourceQualifiedObservationRef>,
 }
@@ -466,6 +466,8 @@ fn attestation_string_bytes(
             Some(reference.integration_id.as_str()),
             reference.collector_id.as_deref(),
             reference.tenant.as_deref(),
+            Some(reference.measurement_method.as_str()),
+            reference.upstream_origin.as_deref(),
             Some(reference.observation_id.as_str()),
         ]
         .into_iter()
@@ -483,8 +485,8 @@ fn attestation_string_bytes(
 mod tests {
     use super::*;
     use crate::{
-        EntityRef, ObservationId, ObservationKind, ObservationLineage, ObservationQuality,
-        ObservationSource, ObservationValue,
+        EntityRef, ObservationKind, ObservationLineage, ObservationQuality, ObservationSource,
+        ObservationValue,
     };
 
     fn authority() -> IndependenceAuthorityQualification {
@@ -492,7 +494,7 @@ mod tests {
     }
 
     fn evidence(integration: &str, id: &str) -> SourceQualifiedObservationRef {
-        SourceQualifiedObservationRef::new(integration, ObservationId::new(id))
+        SourceQualifiedObservationRef::new(integration, "fixture", ObservationId::new(id))
     }
 
     fn attestation() -> IndependenceAttestation {
@@ -639,6 +641,22 @@ mod tests {
             evidence("otlp", "same"),
         ];
         assert!(qualified.validate().is_ok());
+    }
+
+    #[test]
+    fn evidence_source_strings_are_counted_in_attestation_budget() {
+        let mut oversized = attestation();
+        oversized.evidence_observations[0].measurement_method = "m".repeat(128);
+        oversized.evidence_observations[0].upstream_origin = Some("o".repeat(128));
+        let set = IndependenceAttestationSet {
+            attestations: vec![oversized],
+        };
+        let mut constrained = policy();
+        constrained.max_string_bytes_per_attestation = 128;
+        assert!(matches!(
+            set.validate_with_policy(&constrained),
+            Err(IndependenceAttestationSetError::StringBudgetExceeded { .. })
+        ));
     }
 
     #[test]
