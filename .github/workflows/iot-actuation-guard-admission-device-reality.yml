@@ -1,0 +1,173 @@
+name: IoT Actuation Guard Admission Device Reality
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-guard-device-reality/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard-admission-challenge/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard-admission-reservation/**'
+      - '.github/workflows/iot-actuation-guard-admission-device-reality.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-actuation-guard-admission-device-reality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    name: Admission-bound fixed device-reality contract (Rust 1.96)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact formatter
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+
+      - name: Verify exact checkout and formatter
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Check successor source formatting
+        run: |
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-device-reality/src/admission.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-device-reality/src/error.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-device-reality/src/lib.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-device-reality/tests/admission.rs
+
+      - name: Enforce corrected admission-bound TCB
+        run: |
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          root = Path('crates/bridges/symthaea-iot-actuation-guard-device-reality')
+          manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+          deps = set(manifest.get('dependencies', {}))
+          expected = {
+              'blake3', 'ed25519-dalek', 'serde', 'symthaea-authority',
+              'symthaea-iot-actuation-guard-admission-challenge',
+              'symthaea-iot-actuation-guard-admission-reservation',
+              'symthaea-iot-actuation-guard-two-phase-protocol',
+              'symthaea-iot-authority', 'symthaea-iot-posture',
+              'symthaea-iot-transport-receipt', 'thiserror',
+          }
+          assert deps == expected, f'production dependency drift: {sorted(deps)!r}'
+          dev = set(manifest.get('dev-dependencies', {}))
+          expected_dev = {
+              'bincode', 'symthaea-action-checkpoint', 'symthaea-iot-device-protocol',
+              'symthaea-iot-durable-runtime', 'symthaea-iot-policy',
+          }
+          assert dev == expected_dev, f'test dependency drift: {sorted(dev)!r}'
+
+          admission = (root / 'src/admission.rs').read_text()
+          required = [
+              'GuardAdmissionDeviceRealityState',
+              'DecodedAdmissionDeviceRealityEvidence',
+              'AdmissionRealityChallengeV1',
+              'AdmissionReservationHead',
+              'TransportTrustHead',
+              'verify_strict',
+              'exact_active_key',
+              'VerifiedAdmissionDeviceReality',
+              'attestation_object_digest',
+              'reservation_head: challenge.reservation_head()',
+              'envelope_digest: challenge.envelope_digest()',
+              'config_digest: challenge.config_digest()',
+          ]
+          for needle in required:
+              assert needle in admission, f'missing admission device-reality invariant: {needle!r}'
+
+          start = admission.index('pub fn verify_admission_evidence(')
+          end = admission.index(') -> Result<VerifiedAdmissionDeviceReality', start)
+          signature = admission[start:end]
+          assert 'DecodedAdmissionDeviceRealityEvidence' in signature
+          assert 'AdmissionRealityChallengeV1' in signature
+          for needle in ['DeviceRuntimeState', 'public_key', 'verifier:', 'now_unix']:
+              assert needle not in signature, f'caller-controlled admission verifier input: {needle!r}'
+
+          forbidden = [
+              'SemanticReservationChallengeV1',
+              'DeviceSemanticHead',
+              'AttestationResultSignatureVerifier',
+              '&dyn ',
+              'FinalActuatorPermit',
+              'CompleteJitHalLease',
+              'join_final_actuator_gate',
+              'fence_final_permit_for_hal',
+              'TcpListener', 'TcpStream', 'tokio::spawn', 'std::process::Command', 'unsafe {',
+          ]
+          for needle in forbidden:
+              assert needle not in admission, f'forbidden admission device-reality surface: {needle!r}'
+          PY
+
+  implementation:
+    name: Admission-bound fixed device-reality implementation (MSRV 1.94)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.94.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact compiler and Clippy
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      - name: Resolve candidate and reject unreviewed external dependency drift
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          before = tomllib.loads(Path('/tmp/Cargo.lock.before').read_text())
+          after = tomllib.loads(Path('Cargo.lock').read_text())
+          def sourced(doc):
+              return {
+                  (p['name'], p['version'], p['source']): p
+                  for p in doc.get('package', []) if 'source' in p
+              }
+          b = sourced(before); a = sourced(after)
+          added = sorted(set(a) - set(b)); removed = sorted(set(b) - set(a))
+          changed = sorted(k for k in set(a) & set(b) if a[k] != b[k])
+          allowed = {('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')}
+          assert set(added).issubset(allowed), f'unreviewed external package delta: {added!r}'
+          assert not removed, f'external package removal: {removed!r}'
+          assert not changed, f'existing external package mutation: {changed!r}'
+          PY
+
+      - name: Check device-reality package
+        run: cargo check -p symthaea-iot-actuation-guard-device-reality --all-targets
+
+      - name: Run real admission-bound Ed25519 chain first
+        run: >-
+          cargo test -p symthaea-iot-actuation-guard-device-reality
+          --test admission real_ed25519_device_reality_is_bound_to_durable_admission_reservation -- --exact
+
+      - name: Test device-reality package
+        run: cargo test -p symthaea-iot-actuation-guard-device-reality --all-targets
+
+      - name: Strict Clippy device-reality package
+        run: cargo clippy -p symthaea-iot-actuation-guard-device-reality --all-targets -- -D warnings

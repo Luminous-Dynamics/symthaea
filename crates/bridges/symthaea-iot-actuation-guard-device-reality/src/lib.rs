@@ -14,18 +14,23 @@
 //! - one fixed RFC 8032 Ed25519 verification path with no provider argument, fallback
 //!   or caller-selected algorithm.
 //!
-//! Successful verification yields only [`VerifiedPostReservationDeviceReality`]. It is
-//! non-serializable, non-clone and **not actuator authority**. Durable semantic
-//! reservation, controller interlock verification, final-gate composition, JIT fencing
+//! The historical semantic-reservation verifier remains for lineage compatibility. The
+//! current privileged path is [`GuardAdmissionDeviceRealityState`], which consumes the
+//! reservation-bound evidence introduced after durable admission reservation.
+//!
+//! Successful verification is still **not actuator authority**. Durable semantic
+//! acceptance, controller interlock verification, final-gate composition, JIT fencing
 //! and HAL/device I/O remain separate later stages.
 
 #![deny(unsafe_code)]
 
+mod admission;
 mod error;
 mod policy;
 mod trust;
 mod verifier;
 
+pub use admission::{GuardAdmissionDeviceRealityState, VerifiedAdmissionDeviceReality};
 pub use error::DeviceRealityError;
 pub use policy::{
     DEVICE_REALITY_POLICY_SCHEMA_VERSION, DeviceRealityPolicyV1,

@@ -16,7 +16,17 @@ blake3 = { workspace = true }
 ed25519-dalek = { workspace = true }
 serde = { workspace = true }
 symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-actuation-guard-admission-challenge = { path = "../symthaea-iot-actuation-guard-admission-challenge" }
+symthaea-iot-actuation-guard-admission-reservation = { path = "../symthaea-iot-actuation-guard-admission-reservation" }
 symthaea-iot-actuation-guard-two-phase-protocol = { path = "../symthaea-iot-actuation-guard-two-phase-protocol" }
 symthaea-iot-authority = { path = "../symthaea-iot-authority" }
 symthaea-iot-posture = { path = "../symthaea-iot-posture" }
+symthaea-iot-transport-receipt = { path = "../symthaea-iot-transport-receipt" }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+bincode = { workspace = true }
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-iot-device-protocol = { path = "../symthaea-iot-device-protocol" }
+symthaea-iot-durable-runtime = { path = "../symthaea-iot-durable-runtime" }
+symthaea-iot-policy = { path = "../symthaea-iot-policy" }
