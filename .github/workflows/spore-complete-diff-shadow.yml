@@ -1,0 +1,265 @@
+name: Spore Complete-Diff Shadow Router
+
+# SHADOW ONLY: this workflow does not suppress or gate CI.
+#
+# Security boundary:
+# - pull_request_target supplies the workflow from the trusted base context;
+# - only the exact BASE checkout is executable;
+# - PR-head objects are fetched into a detached worktree and inspected as Git
+#   data by BASE scripts; no PR-head script/module/workflow is ever executed;
+# - routing defaults to FULL_CI_REQUIRED before any classifier is invoked.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spore-complete-diff-shadow-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shadow-router:
+    name: Trusted-base complete-diff shadow decision
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PR_NUMBER: ${{ github.event.pull_request.number || '0' }}
+      CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+      UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+
+    outputs:
+      # Structural non-authority: even accidental consumers of the obvious
+      # output can only request full CI. The hypothetical classifier result is
+      # exposed under a deliberately separate shadow-only name.
+      run_full_ci: 'true'
+      candidate_run_full_ci: ${{ steps.decision.outputs.run_full_ci }}
+      decision: ${{ steps.decision.outputs.decision }}
+
+    steps:
+      - name: Checkout exact trusted base
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.BASE_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify trusted execution roots
+        run: |
+          set -euo pipefail
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$|^[0-9a-f]{64}$ ]]
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$|^[0-9a-f]{64}$ ]]
+          [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]
+          test "$(git rev-parse HEAD)" = "$BASE_SHA"
+          test -f scripts/check-spore-ci-routing-contract.py
+          test -f scripts/build-spore-routing-authorization.py
+          test -f scripts/check-spore-focused-validator-authority.py
+          test -f scripts/check-spore-complete-diff-router.py
+
+          if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' \
+              .github/workflows/spore-complete-diff-shadow.yml; then
+            echo 'mutable major-version action reference in shadow router' >&2
+            exit 1
+          fi
+
+          printf 'base=%s\n' "$BASE_SHA"
+          printf 'trusted_policy_blob=%s\n' \
+            "$(git rev-parse HEAD:scripts/check-spore-ci-routing-contract.py)"
+          printf 'trusted_authorization_builder_blob=%s\n' \
+            "$(git rev-parse HEAD:scripts/build-spore-routing-authorization.py)"
+          printf 'trusted_validator_authority_blob=%s\n' \
+            "$(git rev-parse HEAD:scripts/check-spore-focused-validator-authority.py)"
+          printf 'trusted_router_blob=%s\n' \
+            "$(git rev-parse HEAD:scripts/check-spore-complete-diff-router.py)"
+          sha256sum \
+            scripts/check-spore-ci-routing-contract.py \
+            scripts/build-spore-routing-authorization.py \
+            scripts/check-spore-focused-validator-authority.py \
+            scripts/check-spore-complete-diff-router.py \
+            .github/workflows/spore-complete-diff-shadow.yml
+
+      - name: Fetch PR head as inert Git data
+        if: github.event_name == 'pull_request_target'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "+refs/pull/${PR_NUMBER}/head:refs/remotes/spore-pr-head"
+          test "$(git rev-parse refs/remotes/spore-pr-head)" = "$HEAD_SHA"
+          HEAD_WORKTREE="$RUNNER_TEMP/spore-pr-head"
+          git worktree add --detach "$HEAD_WORKTREE" "$HEAD_SHA"
+          test "$(git -C "$HEAD_WORKTREE" rev-parse HEAD)" = "$HEAD_SHA"
+          printf 'HEAD_WORKTREE=%s\n' "$HEAD_WORKTREE" >> "$GITHUB_ENV"
+
+      - name: Use base as synthetic head for manual shadow run
+        if: github.event_name != 'pull_request_target'
+        run: |
+          set -euo pipefail
+          HEAD_WORKTREE="$RUNNER_TEMP/spore-pr-head"
+          git worktree add --detach "$HEAD_WORKTREE" "$BASE_SHA"
+          printf 'HEAD_WORKTREE=%s\n' "$HEAD_WORKTREE" >> "$GITHUB_ENV"
+          printf 'HEAD_SHA=%s\n' "$BASE_SHA" >> "$GITHUB_ENV"
+
+      - name: Exercise trusted routing implementations
+        run: |
+          set -euo pipefail
+          python3 "$GITHUB_WORKSPACE/scripts/build-spore-routing-authorization.py" --self-test
+          python3 "$GITHUB_WORKSPACE/scripts/check-spore-complete-diff-router.py" --self-test
+
+      - name: Derive exact-head authorization from trusted base policy
+        id: authorization
+        run: |
+          set -uo pipefail
+          VALIDATOR="$RUNNER_TEMP/spore-focused-validator-authority-v1.json"
+          AUTH="$RUNNER_TEMP/spore-routing-authorization.json"
+          OWNERSHIP="$RUNNER_TEMP/spore-routing-ownership.json"
+          printf 'validator=%s\n' "$VALIDATOR" >> "$GITHUB_OUTPUT"
+          printf 'authorization=%s\n' "$AUTH" >> "$GITHUB_OUTPUT"
+          printf 'ownership=%s\n' "$OWNERSHIP" >> "$GITHUB_OUTPUT"
+          echo 'ready=false' >> "$GITHUB_OUTPUT"
+
+          # Both programs are BASE copies. HEAD_WORKTREE is only a Git object
+          # database/data source; its Python/shell/workflow files are never run.
+          if python3 "$GITHUB_WORKSPACE/scripts/check-spore-focused-validator-authority.py" \
+              --source-root "$HEAD_WORKTREE" \
+              --head "$HEAD_SHA" \
+              --receipt "$VALIDATOR"; then
+            if python3 "$GITHUB_WORKSPACE/scripts/build-spore-routing-authorization.py" \
+                --source-root "$HEAD_WORKTREE" \
+                --head "$HEAD_SHA" \
+                --receipt "$AUTH" \
+                --ownership-receipt "$OWNERSHIP"; then
+              echo 'ready=true' >> "$GITHUB_OUTPUT"
+            else
+              echo 'authorization builder failed; shadow decision remains FULL_CI_REQUIRED' >&2
+            fi
+          else
+            echo 'focused validator authority is not proven; shadow decision remains FULL_CI_REQUIRED' >&2
+          fi
+
+      - name: Compute shadow complete-diff decision
+        id: decision
+        env:
+          AUTH_READY: ${{ steps.authorization.outputs.ready }}
+          AUTH_RECEIPT: ${{ steps.authorization.outputs.authorization }}
+          OWNERSHIP_RECEIPT: ${{ steps.authorization.outputs.ownership }}
+        run: |
+          set -uo pipefail
+          # Fail-open defaults exist before any authorization/classification step.
+          echo 'run_full_ci=true' >> "$GITHUB_OUTPUT"
+          echo 'decision=FULL_CI_REQUIRED' >> "$GITHUB_OUTPUT"
+
+          DECISION="$RUNNER_TEMP/spore-complete-diff-routing-decision-v1.json"
+          export DECISION
+
+          ROUTER_OK=false
+          if [[ "$AUTH_READY" == 'true' ]]; then
+            if python3 "$GITHUB_WORKSPACE/scripts/check-spore-complete-diff-router.py" \
+                --repo "$HEAD_WORKTREE" \
+                --base "$BASE_SHA" \
+                --head "$HEAD_SHA" \
+                --authorization-receipt "$AUTH_RECEIPT" \
+                --ownership-receipt "$OWNERSHIP_RECEIPT" \
+                --receipt "$DECISION"; then
+              ROUTER_OK=true
+            fi
+          fi
+
+          if [[ "$ROUTER_OK" == 'true' ]]; then
+            ROUTER_DECISION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["decision"])' "$DECISION")"
+            if [[ "$ROUTER_DECISION" == 'FOCUSED_ONLY_ELIGIBLE' ]]; then
+              echo 'run_full_ci=false' >> "$GITHUB_OUTPUT"
+              echo 'decision=FOCUSED_ONLY_ELIGIBLE' >> "$GITHUB_OUTPUT"
+            fi
+          else
+            # Create explicit fallback evidence without executing HEAD code.
+            python3 -c 'import json,os,pathlib; pathlib.Path(os.environ["DECISION"]).write_text(json.dumps({"schema":"spore-complete-diff-routing-decision-v1","status":"PASS","decision":"FULL_CI_REQUIRED","reason":"validator-authorization-or-router-process-failed","base_commit":os.environ["BASE_SHA"],"head_commit":os.environ["HEAD_SHA"]},sort_keys=True,indent=2)+"\n")'
+          fi
+
+          cat "$DECISION"
+          printf 'decision_receipt=%s\n' "$DECISION" >> "$GITHUB_OUTPUT"
+
+      - name: Seal shadow trust-root receipt
+        env:
+          SHADOW_DECISION: ${{ steps.decision.outputs.decision }}
+          SHADOW_RUN_FULL_CI: ${{ steps.decision.outputs.run_full_ci }}
+          VALIDATOR_RECEIPT: ${{ steps.authorization.outputs.validator }}
+        run: |
+          set -euo pipefail
+          RECEIPT="$RUNNER_TEMP/spore-complete-diff-shadow-v1.json"
+          DECISION="$RUNNER_TEMP/spore-complete-diff-routing-decision-v1.json"
+          export RECEIPT DECISION
+          TRUSTED_POLICY_BLOB="$(git rev-parse HEAD:scripts/check-spore-ci-routing-contract.py)"
+          TRUSTED_BUILDER_BLOB="$(git rev-parse HEAD:scripts/build-spore-routing-authorization.py)"
+          TRUSTED_VALIDATOR_BLOB="$(git rev-parse HEAD:scripts/check-spore-focused-validator-authority.py)"
+          TRUSTED_ROUTER_BLOB="$(git rev-parse HEAD:scripts/check-spore-complete-diff-router.py)"
+          export TRUSTED_POLICY_BLOB TRUSTED_BUILDER_BLOB TRUSTED_VALIDATOR_BLOB TRUSTED_ROUTER_BLOB
+
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          workspace = Path(os.environ['GITHUB_WORKSPACE'])
+          decision_path = Path(os.environ['DECISION'])
+          decision = json.loads(decision_path.read_text(encoding='utf-8'))
+          validator_path = Path(os.environ['VALIDATOR_RECEIPT'])
+          value = {
+              'schema': 'spore-complete-diff-shadow-v1',
+              'status': 'PASS',
+              'authority': 'TRUSTED_BASE_PULL_REQUEST_TARGET',
+              'suppression_enabled': False,
+              'base_commit': os.environ['BASE_SHA'],
+              'head_commit': os.environ['HEAD_SHA'],
+              'trusted_policy_blob': os.environ['TRUSTED_POLICY_BLOB'],
+              'trusted_builder_blob': os.environ['TRUSTED_BUILDER_BLOB'],
+              'trusted_validator_blob': os.environ['TRUSTED_VALIDATOR_BLOB'],
+              'trusted_router_blob': os.environ['TRUSTED_ROUTER_BLOB'],
+              'trusted_policy_sha256': hashlib.sha256(
+                  (workspace / 'scripts/check-spore-ci-routing-contract.py').read_bytes()
+              ).hexdigest(),
+              'trusted_builder_sha256': hashlib.sha256(
+                  (workspace / 'scripts/build-spore-routing-authorization.py').read_bytes()
+              ).hexdigest(),
+              'trusted_validator_sha256': hashlib.sha256(
+                  (workspace / 'scripts/check-spore-focused-validator-authority.py').read_bytes()
+              ).hexdigest(),
+              'trusted_router_sha256': hashlib.sha256(
+                  (workspace / 'scripts/check-spore-complete-diff-router.py').read_bytes()
+              ).hexdigest(),
+              'validator_authority_proven': validator_path.is_file(),
+              'validator_receipt_sha256': (
+                  hashlib.sha256(validator_path.read_bytes()).hexdigest()
+                  if validator_path.is_file() else None
+              ),
+              'decision': decision.get('decision'),
+              'decision_receipt_sha256': hashlib.sha256(decision_path.read_bytes()).hexdigest(),
+              'run_full_ci_shadow': os.environ['SHADOW_RUN_FULL_CI'] != 'false',
+              'public_run_full_ci_output': True,
+              'suppression_output_consumed': False,
+          }
+          if value['decision'] != os.environ['SHADOW_DECISION']:
+              raise SystemExit('decision output does not match exact receipt')
+          Path(os.environ['RECEIPT']).write_text(
+              json.dumps(value, sort_keys=True, indent=2) + '\n', encoding='utf-8'
+          )
+          PY
+          cat "$RECEIPT"
+
+      - name: Upload shadow evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: spore-complete-diff-shadow-v1
+          path: |
+            ${{ runner.temp }}/spore-focused-validator-authority-v1.json
+            ${{ runner.temp }}/spore-routing-authorization.json
+            ${{ runner.temp }}/spore-routing-ownership.json
+            ${{ runner.temp }}/spore-complete-diff-routing-decision-v1.json
+            ${{ runner.temp }}/spore-complete-diff-shadow-v1.json
+          if-no-files-found: warn
+          retention-days: 14
