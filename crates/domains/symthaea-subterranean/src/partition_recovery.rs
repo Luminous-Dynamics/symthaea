@@ -230,6 +230,27 @@ impl PartitionRecoverySupervisor {
         self.reconciliations
     }
 
+    /// A runtime restart breaks continuity of team-state authority even when the
+    /// transport currently appears reachable. Enter reconciliation without
+    /// fabricating a network-partition event, preserve historical partition and
+    /// map-gap evidence, and discard only positive reconciliation dwell credit.
+    pub(crate) fn enter_operational_restart_reconciliation(&mut self) {
+        let previous = self.mode;
+        self.mode = PartitionRecoveryMode::Reconciling;
+        self.reconciliation_steps = 0;
+        if self.mode != previous {
+            self.transitions = self.transitions.saturating_add(1);
+        }
+        self.last_assessment = PartitionRecoveryAssessment {
+            mode: PartitionRecoveryMode::Reconciling,
+            partition_steps: self.partition_steps,
+            reconciliation_steps: 0,
+            map_revision_gap: self.last_assessment.map_revision_gap,
+            motion_permitted: false,
+            team_state_authoritative: false,
+        };
+    }
+
     pub fn reset_runtime(&mut self) {
         self.mode = PartitionRecoveryMode::Connected;
         self.partition_steps = 0;
@@ -306,5 +327,18 @@ mod tests {
         let assessment = supervisor.update(diverged);
         assert_eq!(assessment.reconciliation_steps, 0);
         assert_eq!(assessment.map_revision_gap, 5);
+    }
+
+    #[test]
+    fn operational_restart_forces_reconciliation_without_counting_partition() {
+        let mut supervisor = PartitionRecoverySupervisor::default();
+        let partitions_before = supervisor.partitions();
+        supervisor.enter_operational_restart_reconciliation();
+        let assessment = supervisor.assessment();
+        assert_eq!(assessment.mode, PartitionRecoveryMode::Reconciling);
+        assert!(!assessment.motion_permitted);
+        assert!(!assessment.team_state_authoritative);
+        assert_eq!(assessment.reconciliation_steps, 0);
+        assert_eq!(supervisor.partitions(), partitions_before);
     }
 }

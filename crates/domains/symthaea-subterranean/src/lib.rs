@@ -44,6 +44,7 @@ pub mod mission_executive;
 pub mod observation_quality;
 pub mod occupancy;
 pub mod operational_checkpoint;
+pub mod operational_restart;
 pub mod operational_validation;
 pub mod operator_authority;
 pub mod operator_challenge;
@@ -176,6 +177,9 @@ pub use mission_executive::{
 pub use operational_checkpoint::{
     MIN_SUPPORTED_OPERATIONAL_CHECKPOINT_SCHEMA_VERSION, OPERATIONAL_CHECKPOINT_SCHEMA_VERSION,
     OperationalCheckpointError, SubterraneanOperationalCheckpoint,
+};
+pub use operational_restart::{
+    OperationalRestart, OperationalRestartError, OperationalRestartReport, SimulationEpisodeReset,
 };
 
 pub use observation_quality::{ChannelReliabilityMonitor, ObservationQualityReport};
