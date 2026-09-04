@@ -8,8 +8,8 @@
 //! perform restore, reconciliation, requalification, or authority widening.
 
 use super::{
-    MIN_SUPPORTED_OPERATIONAL_CHECKPOINT_SCHEMA_VERSION, OPERATIONAL_CHECKPOINT_SCHEMA_VERSION,
-    OperationalCheckpointError, SubterraneanOperationalCheckpoint,
+    OPERATIONAL_CHECKPOINT_SCHEMA_VERSION, OperationalCheckpointError,
+    SubterraneanOperationalCheckpoint,
 };
 use crate::mission_executive::{
     MISSION_CHECKPOINT_SCHEMA_VERSION, MissionCheckpointError, MissionExecutiveCheckpoint,
@@ -59,10 +59,12 @@ impl SubterraneanOperationalCheckpoint {
     /// RA restore transaction must still compare authority/evidence semantics,
     /// bind the exact source, recheck the live generation fence, execute every
     /// canonical action, and reconcile before activation.
+    ///
+    /// This concrete Rust type accepts exactly the current schema. Supporting a
+    /// historical or future schema requires a separate explicit migration/type;
+    /// source capture must never broaden compatibility through a version range.
     pub fn validate_source(&self) -> Result<(), OperationalCheckpointError> {
-        if self.schema_version < MIN_SUPPORTED_OPERATIONAL_CHECKPOINT_SCHEMA_VERSION
-            || self.schema_version > OPERATIONAL_CHECKPOINT_SCHEMA_VERSION
-        {
+        if self.schema_version != OPERATIONAL_CHECKPOINT_SCHEMA_VERSION {
             return Err(OperationalCheckpointError::UnsupportedSchema {
                 found: self.schema_version,
                 expected: OPERATIONAL_CHECKPOINT_SCHEMA_VERSION,
@@ -119,7 +121,128 @@ mod tests {
 
     #[test]
     fn nominal_operational_checkpoint_passes_pure_source_validation() {
-        assert_eq!(checkpoint().validate_source(), Ok(()));
+        let value = checkpoint();
+        assert_eq!(value.schema_version, OPERATIONAL_CHECKPOINT_SCHEMA_VERSION);
+        assert_eq!(value.validate_source(), Ok(()));
+    }
+
+    #[test]
+    fn current_schema_round_trip_emits_every_required_authority_field() {
+        let value = serde_json::to_value(checkpoint()).expect("serialize current checkpoint");
+        let object = value.as_object().expect("checkpoint object");
+        for field in [
+            "operator_authority",
+            "degraded_supervisor",
+            "update_manager",
+            "sensor_fusion",
+            "actuator_isolation",
+            "field_envelope",
+            "partition_recovery",
+            "temporal",
+        ] {
+            assert!(object.contains_key(field), "missing serialized field {field}");
+        }
+        assert!(object["update_manager"].is_null());
+
+        let decoded: SubterraneanOperationalCheckpoint =
+            serde_json::from_value(value).expect("complete v4 checkpoint must round-trip");
+        assert_eq!(decoded.schema_version, OPERATIONAL_CHECKPOINT_SCHEMA_VERSION);
+        assert!(decoded.update_manager.is_none());
+        assert_eq!(decoded.validate_source(), Ok(()));
+    }
+
+    #[test]
+    fn missing_authority_field_never_defaults_to_nominal_state() {
+        let value = serde_json::to_value(checkpoint()).expect("serialize current checkpoint");
+        for field in [
+            "operator_authority",
+            "degraded_supervisor",
+            "update_manager",
+            "sensor_fusion",
+            "actuator_isolation",
+            "field_envelope",
+            "partition_recovery",
+            "temporal",
+        ] {
+            let mut incomplete = value.clone();
+            incomplete
+                .as_object_mut()
+                .expect("checkpoint object")
+                .remove(field);
+            assert!(
+                serde_json::from_value::<SubterraneanOperationalCheckpoint>(incomplete).is_err(),
+                "missing {field} must fail deserialization rather than synthesize authority"
+            );
+        }
+    }
+
+    #[test]
+    fn explicit_null_update_manager_is_distinct_from_missing_update_manager() {
+        let mut explicit_none = serde_json::to_value(checkpoint()).expect("serialize checkpoint");
+        explicit_none["update_manager"] = serde_json::Value::Null;
+        let decoded: SubterraneanOperationalCheckpoint = serde_json::from_value(explicit_none)
+            .expect("explicit null means known absence");
+        assert!(decoded.update_manager.is_none());
+
+        let mut missing = serde_json::to_value(checkpoint()).expect("serialize checkpoint");
+        missing
+            .as_object_mut()
+            .expect("checkpoint object")
+            .remove("update_manager");
+        assert!(serde_json::from_value::<SubterraneanOperationalCheckpoint>(missing).is_err());
+    }
+
+    #[test]
+    fn complete_legacy_schema_number_is_not_current_restore_source() {
+        let mut value = checkpoint();
+        value.schema_version = OPERATIONAL_CHECKPOINT_SCHEMA_VERSION - 1;
+        assert_eq!(
+            value.validate_source(),
+            Err(OperationalCheckpointError::UnsupportedSchema {
+                found: OPERATIONAL_CHECKPOINT_SCHEMA_VERSION - 1,
+                expected: OPERATIONAL_CHECKPOINT_SCHEMA_VERSION,
+            })
+        );
+    }
+
+    #[test]
+    fn complete_future_schema_number_is_not_current_restore_source() {
+        let mut value = checkpoint();
+        value.schema_version = OPERATIONAL_CHECKPOINT_SCHEMA_VERSION + 1;
+        assert_eq!(
+            value.validate_source(),
+            Err(OperationalCheckpointError::UnsupportedSchema {
+                found: OPERATIONAL_CHECKPOINT_SCHEMA_VERSION + 1,
+                expected: OPERATIONAL_CHECKPOINT_SCHEMA_VERSION,
+            })
+        );
+    }
+
+    #[test]
+    fn historical_schema_three_shape_without_temporal_state_fails_before_validation() {
+        let mut legacy = serde_json::to_value(checkpoint()).expect("serialize checkpoint");
+        legacy["schema_version"] = serde_json::Value::from(3);
+        legacy
+            .as_object_mut()
+            .expect("checkpoint object")
+            .remove("temporal");
+        assert!(serde_json::from_value::<SubterraneanOperationalCheckpoint>(legacy).is_err());
+    }
+
+    #[test]
+    fn current_schema_rejects_unknown_future_authority_field() {
+        let mut future = serde_json::to_value(checkpoint()).expect("serialize checkpoint");
+        future
+            .as_object_mut()
+            .expect("checkpoint object")
+            .insert(
+                "future_authority_domain".to_string(),
+                serde_json::json!({"state": "restricted"}),
+            );
+        assert!(
+            serde_json::from_value::<SubterraneanOperationalCheckpoint>(future).is_err(),
+            "schema v4 must reject unknown fields so one version cannot describe multiple authority contracts"
+        );
     }
 
     #[test]

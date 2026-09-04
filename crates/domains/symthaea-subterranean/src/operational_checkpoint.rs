@@ -30,10 +30,31 @@ use crate::partition_recovery::PartitionRecoverySupervisor;
 use crate::sensor_redundancy::SensorFusionSupervisor;
 use crate::temporal_assurance::TemporalAssuranceSupervisor;
 use crate::update_control::UpdateManager;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
-pub const OPERATIONAL_CHECKPOINT_SCHEMA_VERSION: u32 = 3;
-pub const MIN_SUPPORTED_OPERATIONAL_CHECKPOINT_SCHEMA_VERSION: u32 = 1;
+/// Schema v4 is the first operational checkpoint schema whose version denotes a
+/// complete authority-bearing field contract rather than only a parseable shape.
+///
+/// Older schema numbers are intentionally not accepted directly. Legacy data
+/// requires an explicit conservative migration before it can become current
+/// restore source state.
+pub const OPERATIONAL_CHECKPOINT_SCHEMA_VERSION: u32 = 4;
+pub const MIN_SUPPORTED_OPERATIONAL_CHECKPOINT_SCHEMA_VERSION: u32 = 4;
+
+/// Deserialize an explicitly present optional field.
+///
+/// `Option<T>` normally permits a missing map key to deserialize as `None`.
+/// That is unsafe for authority-bearing checkpoint state because an absent field
+/// means the source never recorded whether the state existed. Applying a custom
+/// deserializer removes that special missing-field behavior: explicit JSON
+/// `null` is still `None`, but an absent `update_manager` key is an error.
+fn deserialize_required_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer)
+}
 
 /// Portable multi-domain checkpoint data.
 ///
@@ -44,6 +65,12 @@ pub const MIN_SUPPORTED_OPERATIONAL_CHECKPOINT_SCHEMA_VERSION: u32 = 1;
 /// In particular, downstream crates cannot invoke the crate-internal legacy
 /// whole-checkpoint loader. Production restore must eventually enter through the
 /// affine admission/execution/activation boundary instead.
+///
+/// Every authority-bearing v4 field is required to be present. Missing state is
+/// unknown, not nominal. For `update_manager`, explicit `null` is the only
+/// representation of a known absence; an omitted key is rejected. Unknown
+/// top-level fields are also rejected so one schema number cannot silently
+/// describe multiple authority contracts.
 ///
 /// ```compile_fail,E0624
 /// use symthaea_subterranean::{
@@ -61,6 +88,7 @@ pub const MIN_SUPPORTED_OPERATIONAL_CHECKPOINT_SCHEMA_VERSION: u32 = 1;
 /// }
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SubterraneanOperationalCheckpoint {
     pub schema_version: u32,
     pub controller: ControllerCheckpoint,
@@ -70,19 +98,23 @@ pub struct SubterraneanOperationalCheckpoint {
     /// must not deserialize through `OperatorAuthority::default()` into a wider
     /// `None` constraint.
     pub operator_authority: OperatorAuthority,
-    #[serde(default)]
+    /// Degraded authority state is required. Missing historical degraded state
+    /// must not synthesize `Normal` authority.
     pub degraded_supervisor: DegradedOperationsSupervisor,
-    #[serde(default)]
+    /// Update lifecycle state is required even though the value itself is
+    /// optional. `null` means explicitly no manager; an absent key is unknown.
+    #[serde(deserialize_with = "deserialize_required_option")]
     pub update_manager: Option<UpdateManager>,
-    #[serde(default)]
+    /// Sensor reliability and replay barriers are durable restore evidence.
     pub sensor_fusion: SensorFusionSupervisor,
-    #[serde(default)]
+    /// Isolation latches remove actuator authority and therefore cannot default
+    /// to an unisolated supervisor when historical state is missing.
     pub actuator_isolation: ActuatorIsolationSupervisor,
-    #[serde(default)]
+    /// Field-envelope restrictions cannot default to nominal on missing history.
     pub field_envelope: FieldEnvelopeSupervisor,
-    #[serde(default)]
+    /// Partition/reconciliation state cannot default to Connected/authoritative.
     pub partition_recovery: PartitionRecoverySupervisor,
-    #[serde(default)]
+    /// Temporal holds and causal history cannot default to nominal authority.
     pub temporal: TemporalAssuranceSupervisor,
 }
 
