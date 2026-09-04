@@ -249,22 +249,34 @@ fn main() {
         }
     }
 
-    // Present one deterministic black frame before releasing the KMS objects.
-    // The authoritative release boundary is the subsequent Drop of `fb`, which
-    // restores the saved CRTC before closing/destroying renderer resources.
+    // Present one deterministic black frame before the explicit KMS release.
+    // Restoration success is observed separately from resource release; neither
+    // result grants boot, login, or session authority.
     render_buf.fill(0);
     fb.blit_from(&render_buf);
 
     let release_start = Instant::now();
-    drop(fb);
+    let restore_outcome = fb.release();
     let release_elapsed = release_start.elapsed();
     let release_us = u64::try_from(release_elapsed.as_micros()).unwrap_or(u64::MAX);
 
+    if let Some(kind) = restore_outcome.error_kind() {
+        // Restoration failure is important diagnostic evidence, but the DRM
+        // resources have already been relinquished and presentation must not
+        // hold login/recovery while trying to repair the display.
+        eprintln!("quicken-fb: original display restore failed ({kind:?}); DRM resources released");
+    }
+
     if let Some(path) = args.handoff_receipt.as_deref() {
-        let receipt = DisplayReleaseReceipt::new(release_elapsed, process_start.elapsed(), exit_reason);
+        let receipt = DisplayReleaseReceipt::new(
+            release_elapsed,
+            process_start.elapsed(),
+            exit_reason,
+            restore_outcome,
+        );
         if let Err(error) = receipt.write_atomic(Path::new(path)) {
             // Receipt failure is diagnostic-only and must never turn a successful
-            // DRM release into a boot/session failure.
+            // DRM resource release into a boot/session failure.
             eprintln!("quicken-fb: failed to write handoff receipt: {error}");
         }
     }
@@ -285,8 +297,9 @@ fn main() {
     }
 
     eprintln!(
-        "quicken-fb: display released in {}us; clean exit ({})",
+        "quicken-fb: display release {}us restore={} clean exit ({})",
         release_elapsed.as_micros(),
+        restore_outcome.as_str(),
         exit_reason.as_str()
     );
 }
