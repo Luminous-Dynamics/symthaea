@@ -45,11 +45,8 @@ fn expectation() -> XeniaWitnessFrontierExpectationV1 {
 
 fn signed_anchor() -> XeniaSignedWitnessFrontierAnchorV1 {
     let key = xenia_key();
-    let source_id = derive_xenia_witness_frontier_source_id(
-        key.verifying_key().to_bytes(),
-        POLICY,
-    )
-    .unwrap();
+    let source_id =
+        derive_xenia_witness_frontier_source_id(key.verifying_key().to_bytes(), POLICY).unwrap();
     let frontier_statement_digest =
         witness_frontier_statement_digest(WITNESS, 9, RESERVATION_HEAD);
     let mut target = XeniaWitnessFrontierAnchorTargetV1 {
@@ -142,9 +139,14 @@ fn time_policy() -> (TrustedTimePolicyV1, SigningKey, SigningKey) {
     )
 }
 
-fn verified_time(subject: [u8; 32], witnessed: u64) -> VerifiedAuthorityTime {
-    let (policy, key_a, key_b) = time_policy();
-    let pending = PendingAuthorityTimeChallenge::new(&policy, subject).unwrap();
+fn verified_time(
+    policy: &TrustedTimePolicyV1,
+    key_a: &SigningKey,
+    key_b: &SigningKey,
+    subject: [u8; 32],
+    witnessed: u64,
+) -> VerifiedAuthorityTime {
+    let pending = PendingAuthorityTimeChallenge::new(policy, subject).unwrap();
     let challenge = pending.wire();
     let sign = |id: TimeAuthorityId, key: &SigningKey| {
         let mut statement = AuthorityTimeStatementV1 {
@@ -164,11 +166,11 @@ fn verified_time(subject: [u8; 32], witnessed: u64) -> VerifiedAuthorityTime {
         statement
     };
     verify_authority_time_v1(
-        &policy,
+        policy,
         pending,
         &[
-            sign(TimeAuthorityId([1; 16]), &key_a),
-            sign(TimeAuthorityId([2; 16]), &key_b),
+            sign(TimeAuthorityId([1; 16]), key_a),
+            sign(TimeAuthorityId([2; 16]), key_b),
         ],
     )
     .unwrap()
@@ -179,17 +181,18 @@ fn public_verifier_requires_subject_bound_verified_time() {
     let anchor = signed_anchor();
     let observation = signed_observation(&anchor);
     let expected = expectation();
-    let subject = xenia_witness_frontier_time_subject_digest_v1(&anchor, expected).unwrap();
-    let time = verified_time(subject, 1_010);
+    let (policy, key_a, key_b) = time_policy();
+    let freshness = XeniaWitnessFrontierFreshnessPolicyV1::strict(
+        policy.digest().unwrap(),
+        30,
+        2,
+    );
+    let subject =
+        xenia_witness_frontier_time_subject_digest_v1(&anchor, expected, freshness).unwrap();
+    let time = verified_time(&policy, &key_a, &key_b, subject, 1_010);
 
-    let verified = verify_xenia_witness_frontier_v1(
-        &anchor,
-        &observation,
-        expected,
-        &time,
-        XeniaWitnessFrontierFreshnessPolicyV1::strict(30, 2),
-    )
-    .unwrap();
+    let verified =
+        verify_xenia_witness_frontier_v1(&anchor, &observation, expected, &time, freshness).unwrap();
     assert_eq!(verified.witness_id(), WITNESS);
     assert_eq!(verified.high_watermark(), 9);
 }
@@ -198,7 +201,13 @@ fn public_verifier_requires_subject_bound_verified_time() {
 fn valid_time_for_another_subject_cannot_establish_currentness() {
     let anchor = signed_anchor();
     let observation = signed_observation(&anchor);
-    let wrong_time = verified_time([0x99; 32], 1_010);
+    let (policy, key_a, key_b) = time_policy();
+    let freshness = XeniaWitnessFrontierFreshnessPolicyV1::strict(
+        policy.digest().unwrap(),
+        30,
+        2,
+    );
+    let wrong_time = verified_time(&policy, &key_a, &key_b, [0x99; 32], 1_010);
 
     assert!(matches!(
         verify_xenia_witness_frontier_v1(
@@ -206,8 +215,38 @@ fn valid_time_for_another_subject_cannot_establish_currentness() {
             &observation,
             expectation(),
             &wrong_time,
-            XeniaWitnessFrontierFreshnessPolicyV1::strict(30, 2),
+            freshness,
         ),
         Err(XeniaWitnessFrontierVerificationError::AuthorityTimeRejected)
+    ));
+}
+
+#[test]
+fn valid_time_under_another_policy_cannot_establish_currentness() {
+    let anchor = signed_anchor();
+    let observation = signed_observation(&anchor);
+    let expected = expectation();
+    let (policy, key_a, key_b) = time_policy();
+    let freshness = XeniaWitnessFrontierFreshnessPolicyV1::strict(
+        policy.digest().unwrap(),
+        30,
+        2,
+    );
+    let subject =
+        xenia_witness_frontier_time_subject_digest_v1(&anchor, expected, freshness).unwrap();
+
+    let mut other_policy = policy.clone();
+    other_policy.policy_id = [34; 16];
+    let other_time = verified_time(&other_policy, &key_a, &key_b, subject, 1_010);
+
+    assert!(matches!(
+        verify_xenia_witness_frontier_v1(
+            &anchor,
+            &observation,
+            expected,
+            &other_time,
+            freshness,
+        ),
+        Err(XeniaWitnessFrontierVerificationError::AuthorityTimePolicyMismatch)
     ));
 }
