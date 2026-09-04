@@ -13,6 +13,7 @@
 
 #![deny(unsafe_code)]
 
+mod currentness_challenge;
 mod protocol;
 mod witness_frontier;
 mod workload;
@@ -24,6 +25,10 @@ use symthaea_authority_state::{AuthorityStateError, VerifiedAuthorityState};
 use symthaea_authority_time::{AuthorityTimeError, VerifiedAuthorityTime};
 use thiserror::Error;
 
+pub use currentness_challenge::{
+    PendingXeniaWitnessCurrentnessChallengeV1, XeniaWitnessCurrentnessChallengeError,
+    XeniaWitnessCurrentnessScopeV1,
+};
 pub use protocol::{
     AGENT_CAPABILITY_ATTESTATION_SCHEMA, AGENT_CAPABILITY_AUTHORIZATION_DOMAIN,
     AGENT_CAPABILITY_AUTHORIZATION_SCHEMA_VERSION, ED25519_SIGNATURE_ALGORITHM, ProtocolError,
@@ -163,7 +168,13 @@ pub fn xenia_witness_frontier_time_subject_digest_v1(
     Ok(*hasher.finalize().as_bytes())
 }
 
-/// Public Xenia witness-frontier verification boundary.
+/// Public low-level Xenia witness-frontier verification boundary.
+///
+/// This compatibility API accepts an already-constructed expectation and
+/// therefore relies on the caller to provide a fresh, one-use challenge. New
+/// production integrations should prefer
+/// [`PendingXeniaWitnessCurrentnessChallengeV1::generate`] and consume that
+/// affine object through its `verify` method.
 ///
 /// Unlike the protocol-only checker inside the private module, this API does not
 /// accept a caller-selected wall-clock interval. It requires a short-lived
