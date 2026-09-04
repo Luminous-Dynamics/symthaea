@@ -1,0 +1,172 @@
+name: IoT Actuation Guard Admission Reservation
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-guard-admission-reservation/**'
+      - '.github/workflows/iot-actuation-guard-admission-reservation.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-actuation-guard-admission-reservation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    name: Crash-durable pre-semantic source contract (Rust 1.96)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact formatter
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+
+      - name: Verify exact checkout and formatter
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Check exact source formatting
+        run: |
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-admission-reservation/src/lib.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-admission-reservation/tests/durable.rs
+
+      - name: Enforce pre-semantic crash-durable TCB
+        run: |
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          root = Path('crates/bridges/symthaea-iot-actuation-guard-admission-reservation')
+          manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+          deps = set(manifest.get('dependencies', {}))
+          expected = {
+              'bincode', 'blake3', 'libc', 'serde', 'symthaea-authority',
+              'symthaea-iot-device-protocol', 'symthaea-iot-transport-receipt', 'thiserror',
+          }
+          assert deps == expected, f'production dependency drift: {sorted(deps)!r}'
+          dev = set(manifest.get('dev-dependencies', {}))
+          expected_dev = {
+              'symthaea-action-checkpoint', 'symthaea-iot-authority',
+              'symthaea-iot-durable-runtime', 'symthaea-iot-policy', 'symthaea-iot-posture',
+          }
+          assert dev == expected_dev, f'test dependency drift: {sorted(dev)!r}'
+          assert 'bin' not in manifest, 'reservation must remain a library proof/storage stage'
+
+          source = (root / 'src/lib.rs').read_text()
+          required = [
+              '#![deny(unsafe_code)]',
+              'VerifiedTransportEnvelope',
+              'AdmissionReservationCheckpointV1',
+              'highest_reserved_sequence',
+              'PersistedAdmissionReservation',
+              'kernel.lock()',
+              'file.sync_all()',
+              'fs::rename',
+              'root.sync_all()',
+              'O_NOFOLLOW',
+              'read_state_locked',
+              'PersistedStateReadbackMismatch',
+          ]
+          for needle in required:
+              assert needle in source, f'missing reservation invariant: {needle!r}'
+
+          public_start = source.index('pub fn reserve_verified_transport(')
+          public_end = source.index(') -> Result<PersistedAdmissionReservation', public_start)
+          public_sig = source[public_start:public_end]
+          assert 'VerifiedTransportEnvelope' in public_sig
+          assert 'PhysicalEffectEnvelopeV1' not in public_sig, 'raw envelope must not be reservable'
+          assert 'now_unix' not in public_sig, 'caller must not choose production reservation time'
+
+          forbidden = [
+              'DeviceRuntimeState',
+              'prepare_semantic_acceptance',
+              'SemanticallyAcceptedEffect',
+              'FinalActuatorPermit',
+              'CompleteJitHalLease',
+              'join_final_actuator_gate',
+              'fence_final_permit_for_hal',
+              'TcpListener',
+              'TcpStream',
+              'tokio::spawn',
+              'std::process::Command',
+              'unsafe {',
+          ]
+          for needle in forbidden:
+              assert needle not in source, f'forbidden pre-semantic surface: {needle!r}'
+          PY
+
+  implementation:
+    name: Restart-durable reservation implementation (MSRV 1.94)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.94.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact compiler and Clippy
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      - name: Resolve candidate and reject unreviewed external dependency drift
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          before = tomllib.loads(Path('/tmp/Cargo.lock.before').read_text())
+          after = tomllib.loads(Path('Cargo.lock').read_text())
+
+          def sourced(doc):
+              return {
+                  (p['name'], p['version'], p['source']): p
+                  for p in doc.get('package', []) if 'source' in p
+              }
+
+          b = sourced(before)
+          a = sourced(after)
+          added = sorted(set(a) - set(b))
+          removed = sorted(set(b) - set(a))
+          changed = sorted(k for k in set(a) & set(b) if a[k] != b[k])
+          allowed = {('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')}
+          assert set(added).issubset(allowed), f'unreviewed external package delta: {added!r}'
+          assert not removed, f'external package removal: {removed!r}'
+          assert not changed, f'existing external package mutation: {changed!r}'
+          PY
+
+      - name: Check reservation package
+        run: cargo check -p symthaea-iot-actuation-guard-admission-reservation --all-targets
+
+      - name: Run restart/replay regression first
+        run: >-
+          cargo test -p symthaea-iot-actuation-guard-admission-reservation
+          --test durable reservation_survives_restart_and_rejects_same_sequence -- --exact
+
+      - name: Test reservation package
+        run: cargo test -p symthaea-iot-actuation-guard-admission-reservation --all-targets
+
+      - name: Strict Clippy reservation package
+        run: cargo clippy -p symthaea-iot-actuation-guard-admission-reservation --all-targets -- -D warnings
