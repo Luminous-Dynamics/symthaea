@@ -114,13 +114,14 @@ The permit borrows the SQLite guard and carries the exact guarded current fronti
 
 ### `GuardedAnchorPermitV1`
 
-Available only for `AnchorRequired` states:
+Available only when #452 returns `AnchorRequired` **and a concrete local frontier exists**. In V0.1 that means:
 
-- `EmptyUnanchored`;
 - `InitialAnchorRequired`;
 - `LocalAheadVerifiedDescendant`.
 
-It borrows the guard and carries the exact local frontier plus recovery relation. Divergence/rollback states cannot obtain it.
+The permit borrows the guard and carries the exact nonempty local frontier plus recovery relation. Divergence/rollback states cannot obtain it.
+
+`EmptyUnanchored` deliberately does **not** obtain an anchor permit: there is no sequence/head statement to write yet and #452's external V1 claim format begins at a nonzero high watermark. The first durable witness reservation creates the initial anchorable frontier.
 
 These types do not make it impossible for arbitrary unreviewed code to ignore the protocol; they provide a structural boundary for the reviewed Xenia/transparency adapter that comes next.
 
@@ -146,6 +147,7 @@ The source suite covers:
 
 - exact current external anchor produces only a guarded publication permit;
 - a trusted sequence-2 prefix of local sequence 3 is proven as `LocalAheadVerifiedDescendant` and produces only an anchor permit;
+- an empty unanchored witness domain produces neither publication nor anchor permit;
 - a second #449 writer cannot reserve sequence 2 while the guard is held and succeeds after guard release.
 
 The parent #452 suite separately covers rollback, same-height divergence, wrong-prefix divergence, missing local history, and no-anchor bootstrap semantics.
