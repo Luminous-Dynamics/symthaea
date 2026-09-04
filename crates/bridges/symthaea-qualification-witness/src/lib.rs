@@ -215,9 +215,10 @@ pub struct QualificationWitnessPolicyV1 {
     pub threshold: u16,
     pub minimum_organizations: u16,
     pub minimum_services: u16,
-    /// Exact accepted SHA/BLAKE3 commitments of evidence-verifier implementations.
+    /// Exact accepted commitments of evidence-verifier implementations.
     pub allowed_verifier_digests: Vec<Digest32>,
-    /// Canonically ordered by witness_id.
+    /// Canonically ordered by witness_id. Public keys must also be unique so
+    /// one private key cannot masquerade as multiple witnesses/organizations.
     pub witnesses: Vec<QualificationWitnessIdentityV1>,
 }
 
@@ -243,9 +244,12 @@ impl QualificationWitnessPolicyV1 {
         let mut previous_witness = None;
         let mut organizations = BTreeSet::new();
         let mut services = BTreeSet::new();
+        let mut public_keys = BTreeSet::new();
         for witness in &self.witnesses {
             witness.validate()?;
-            if previous_witness.is_some_and(|old| old >= witness.witness_id) {
+            if previous_witness.is_some_and(|old| old >= witness.witness_id)
+                || !public_keys.insert(witness.public_key)
+            {
                 return Err(QualificationWitnessError::InvalidWitnessPolicy);
             }
             previous_witness = Some(witness.witness_id);
@@ -279,11 +283,17 @@ impl QualificationWitnessPolicyV1 {
         transcript.u16(self.threshold);
         transcript.u16(self.minimum_organizations);
         transcript.u16(self.minimum_services);
-        transcript.u32(u32::try_from(self.allowed_verifier_digests.len()).map_err(|_| QualificationWitnessError::Encoding)?);
+        transcript.u32(
+            u32::try_from(self.allowed_verifier_digests.len())
+                .map_err(|_| QualificationWitnessError::Encoding)?,
+        );
         for verifier in &self.allowed_verifier_digests {
             transcript.fixed(&verifier.0);
         }
-        transcript.u32(u32::try_from(self.witnesses.len()).map_err(|_| QualificationWitnessError::Encoding)?);
+        transcript.u32(
+            u32::try_from(self.witnesses.len())
+                .map_err(|_| QualificationWitnessError::Encoding)?,
+        );
         for witness in &self.witnesses {
             transcript.fixed(&witness.witness_id);
             transcript.fixed(&witness.organization_id);
@@ -395,7 +405,10 @@ pub fn sign_qualification_acceptance_v1(
         witness_sequence,
         signature: Vec::new(),
     };
-    attestation.signature = signing_key.sign(&attestation.unsigned_message()?).to_bytes().to_vec();
+    attestation.signature = signing_key
+        .sign(&attestation.unsigned_message()?)
+        .to_bytes()
+        .to_vec();
     Ok(attestation)
 }
 
@@ -426,6 +439,14 @@ impl VerifiedQualificationWitnessQuorumV1 {
 
     pub fn witness_count(&self) -> u16 {
         self.witness_count
+    }
+
+    pub fn organization_count(&self) -> u16 {
+        self.organization_count
+    }
+
+    pub fn service_count(&self) -> u16 {
+        self.service_count
     }
 }
 
@@ -493,16 +514,21 @@ pub fn verify_qualification_witness_quorum_v1(
         acceptance_digest,
         verifier_digest,
         policy_digest,
-        witness_count: u16::try_from(seen_witnesses.len()).map_err(|_| QualificationWitnessError::Encoding)?,
-        organization_count: u16::try_from(organizations.len()).map_err(|_| QualificationWitnessError::Encoding)?,
-        service_count: u16::try_from(services.len()).map_err(|_| QualificationWitnessError::Encoding)?,
+        witness_count: u16::try_from(seen_witnesses.len())
+            .map_err(|_| QualificationWitnessError::Encoding)?,
+        organization_count: u16::try_from(organizations.len())
+            .map_err(|_| QualificationWitnessError::Encoding)?,
+        service_count: u16::try_from(services.len())
+            .map_err(|_| QualificationWitnessError::Encoding)?,
     })
 }
 
 fn parse_digest32(value: &str) -> Result<Digest32, QualificationWitnessError> {
     let mut out = [0u8; 32];
     if value.len() != 64
-        || value.bytes().any(|byte| !byte.is_ascii_hexdigit() || byte.is_ascii_uppercase())
+        || value
+            .bytes()
+            .any(|byte| !byte.is_ascii_hexdigit() || byte.is_ascii_uppercase())
         || hex::decode_to_slice(value, &mut out).is_err()
         || out == [0; 32]
     {
@@ -514,7 +540,9 @@ fn parse_digest32(value: &str) -> Result<Digest32, QualificationWitnessError> {
 fn parse_hex20(value: &str) -> Result<[u8; 20], QualificationWitnessError> {
     let mut out = [0u8; 20];
     if value.len() != 40
-        || value.bytes().any(|byte| !byte.is_ascii_hexdigit() || byte.is_ascii_uppercase())
+        || value
+            .bytes()
+            .any(|byte| !byte.is_ascii_hexdigit() || byte.is_ascii_uppercase())
         || hex::decode_to_slice(value, &mut out).is_err()
         || out == [0; 20]
     {
@@ -529,13 +557,22 @@ fn canonical_json_bytes(value: &Value) -> Result<Vec<u8>, QualificationWitnessEr
     Ok(out)
 }
 
-fn canonical_json_into(value: &Value, out: &mut Vec<u8>) -> Result<(), QualificationWitnessError> {
+fn canonical_json_into(
+    value: &Value,
+    out: &mut Vec<u8>,
+) -> Result<(), QualificationWitnessError> {
     if out.len() > MAX_NIXPKGS_LOCKED_CANONICAL_BYTES {
         return Err(QualificationWitnessError::InvalidAcceptance);
     }
     match value {
         Value::Null => out.extend_from_slice(b"null"),
-        Value::Bool(value) => out.extend_from_slice(if *value { b"true" } else { b"false" }),
+        Value::Bool(value) => {
+            if *value {
+                out.extend_from_slice(b"true");
+            } else {
+                out.extend_from_slice(b"false");
+            }
+        }
         Value::Number(number) => {
             if !(number.is_i64() || number.is_u64()) {
                 return Err(QualificationWitnessError::InvalidAcceptance);
@@ -543,7 +580,8 @@ fn canonical_json_into(value: &Value, out: &mut Vec<u8>) -> Result<(), Qualifica
             out.extend_from_slice(number.to_string().as_bytes());
         }
         Value::String(value) => {
-            let encoded = serde_json::to_string(value).map_err(|_| QualificationWitnessError::Encoding)?;
+            let encoded = serde_json::to_string(value)
+                .map_err(|_| QualificationWitnessError::Encoding)?;
             out.extend_from_slice(encoded.as_bytes());
         }
         Value::Array(values) => {
@@ -564,10 +602,14 @@ fn canonical_json_into(value: &Value, out: &mut Vec<u8>) -> Result<(), Qualifica
                 if index != 0 {
                     out.push(b',');
                 }
-                let encoded_key = serde_json::to_string(key).map_err(|_| QualificationWitnessError::Encoding)?;
+                let encoded_key = serde_json::to_string(key)
+                    .map_err(|_| QualificationWitnessError::Encoding)?;
                 out.extend_from_slice(encoded_key.as_bytes());
                 out.push(b':');
-                canonical_json_into(&values[*key], out)?;
+                let child = values
+                    .get(*key)
+                    .ok_or(QualificationWitnessError::InvalidAcceptance)?;
+                canonical_json_into(child, out)?;
             }
             out.push(b'}');
         }
@@ -636,7 +678,9 @@ impl Transcript {
     }
 
     fn bytes(&mut self, value: &[u8]) -> Result<(), QualificationWitnessError> {
-        self.u32(u32::try_from(value.len()).map_err(|_| QualificationWitnessError::Encoding)?);
+        self.u32(
+            u32::try_from(value.len()).map_err(|_| QualificationWitnessError::Encoding)?,
+        );
         self.bytes.extend_from_slice(value);
         Ok(())
     }
@@ -692,7 +736,12 @@ mod tests {
         SigningKey::from_bytes(&[seed; 32])
     }
 
-    fn identity(id: u8, org: u8, service: u8, key: &SigningKey) -> QualificationWitnessIdentityV1 {
+    fn identity(
+        id: u8,
+        org: u8,
+        service: u8,
+        key: &SigningKey,
+    ) -> QualificationWitnessIdentityV1 {
         QualificationWitnessIdentityV1 {
             witness_id: [id; 16],
             organization_id: [org; 16],
@@ -734,8 +783,20 @@ mod tests {
             r#"{"rev":"abc123","repo":"nixpkgs","owner":"NixOS","type":"github","narHash":"sha256-example"}"#,
         )
         .unwrap();
-        let second = parse_release_acceptance_v1(&serde_json::to_vec(&raw).unwrap()).unwrap();
+        let second =
+            parse_release_acceptance_v1(&serde_json::to_vec(&raw).unwrap()).unwrap();
         assert_eq!(first.digest().unwrap(), second.digest().unwrap());
+    }
+
+    #[test]
+    fn duplicate_public_key_cannot_inflate_witness_policy() {
+        let keys = [key(1), key(2), key(3)];
+        let mut policy = policy(&keys);
+        policy.witnesses[1].public_key = policy.witnesses[0].public_key;
+        assert!(matches!(
+            policy.validate(),
+            Err(QualificationWitnessError::InvalidWitnessPolicy)
+        ));
     }
 
     #[test]
@@ -744,10 +805,30 @@ mod tests {
         let keys = [key(1), key(2), key(3)];
         let policy = policy(&keys);
         let verifier = Digest32([0x44; 32]);
-        let a = sign_qualification_acceptance_v1(&acceptance, verifier, &policy, [1; 16], 10, &keys[0]).unwrap();
-        let b = sign_qualification_acceptance_v1(&acceptance, verifier, &policy, [2; 16], 20, &keys[1]).unwrap();
-        let verified = verify_qualification_witness_quorum_v1(&acceptance, verifier, &policy, &[a, b]).unwrap();
+        let a = sign_qualification_acceptance_v1(
+            &acceptance,
+            verifier,
+            &policy,
+            [1; 16],
+            10,
+            &keys[0],
+        )
+        .unwrap();
+        let b = sign_qualification_acceptance_v1(
+            &acceptance,
+            verifier,
+            &policy,
+            [2; 16],
+            20,
+            &keys[1],
+        )
+        .unwrap();
+        let verified =
+            verify_qualification_witness_quorum_v1(&acceptance, verifier, &policy, &[a, b])
+                .unwrap();
         assert_eq!(verified.witness_count(), 2);
+        assert_eq!(verified.organization_count(), 2);
+        assert_eq!(verified.service_count(), 2);
         assert_eq!(verified.acceptance_digest(), acceptance.digest().unwrap());
     }
 
@@ -757,7 +838,15 @@ mod tests {
         let keys = [key(1), key(2), key(3)];
         let policy = policy(&keys);
         let verifier = Digest32([0x44; 32]);
-        let a = sign_qualification_acceptance_v1(&acceptance, verifier, &policy, [1; 16], 10, &keys[0]).unwrap();
+        let a = sign_qualification_acceptance_v1(
+            &acceptance,
+            verifier,
+            &policy,
+            [1; 16],
+            10,
+            &keys[0],
+        )
+        .unwrap();
         assert!(matches!(
             verify_qualification_witness_quorum_v1(&acceptance, verifier, &policy, &[a]),
             Err(QualificationWitnessError::QuorumNotSatisfied)
@@ -774,11 +863,53 @@ mod tests {
         // distinct, but attestations 1 + 2 do not satisfy runtime diversity.
         policy.validate().unwrap();
         let verifier = Digest32([0x44; 32]);
-        let a = sign_qualification_acceptance_v1(&acceptance, verifier, &policy, [1; 16], 10, &keys[0]).unwrap();
-        let b = sign_qualification_acceptance_v1(&acceptance, verifier, &policy, [2; 16], 20, &keys[1]).unwrap();
+        let a = sign_qualification_acceptance_v1(
+            &acceptance,
+            verifier,
+            &policy,
+            [1; 16],
+            10,
+            &keys[0],
+        )
+        .unwrap();
+        let b = sign_qualification_acceptance_v1(
+            &acceptance,
+            verifier,
+            &policy,
+            [2; 16],
+            20,
+            &keys[1],
+        )
+        .unwrap();
         assert!(matches!(
             verify_qualification_witness_quorum_v1(&acceptance, verifier, &policy, &[a, b]),
             Err(QualificationWitnessError::QuorumNotSatisfied)
+        ));
+    }
+
+    #[test]
+    fn duplicate_attestation_cannot_count_twice() {
+        let acceptance = parse_release_acceptance_v1(&acceptance_json(true)).unwrap();
+        let keys = [key(1), key(2), key(3)];
+        let policy = policy(&keys);
+        let verifier = Digest32([0x44; 32]);
+        let a = sign_qualification_acceptance_v1(
+            &acceptance,
+            verifier,
+            &policy,
+            [1; 16],
+            10,
+            &keys[0],
+        )
+        .unwrap();
+        assert!(matches!(
+            verify_qualification_witness_quorum_v1(
+                &acceptance,
+                verifier,
+                &policy,
+                &[a.clone(), a]
+            ),
+            Err(QualificationWitnessError::DuplicateWitness)
         ));
     }
 
@@ -788,12 +919,29 @@ mod tests {
         let keys = [key(1), key(2), key(3)];
         let policy = policy(&keys);
         let verifier = Digest32([0x44; 32]);
-        let a = sign_qualification_acceptance_v1(&acceptance, verifier, &policy, [1; 16], 10, &keys[0]).unwrap();
-        let b = sign_qualification_acceptance_v1(&acceptance, verifier, &policy, [2; 16], 20, &keys[1]).unwrap();
+        let a = sign_qualification_acceptance_v1(
+            &acceptance,
+            verifier,
+            &policy,
+            [1; 16],
+            10,
+            &keys[0],
+        )
+        .unwrap();
+        let b = sign_qualification_acceptance_v1(
+            &acceptance,
+            verifier,
+            &policy,
+            [2; 16],
+            20,
+            &keys[1],
+        )
+        .unwrap();
 
         let mut changed: Value = serde_json::from_slice(&acceptance_json(true)).unwrap();
         changed["archive_sha256"] = Value::String("31".repeat(32));
-        let changed = parse_release_acceptance_v1(&serde_json::to_vec(&changed).unwrap()).unwrap();
+        let changed =
+            parse_release_acceptance_v1(&serde_json::to_vec(&changed).unwrap()).unwrap();
         assert!(matches!(
             verify_qualification_witness_quorum_v1(&changed, verifier, &policy, &[a, b]),
             Err(QualificationWitnessError::InvalidAttestation)
@@ -819,13 +967,47 @@ mod tests {
     }
 
     #[test]
+    fn wrong_private_key_cannot_sign_enrolled_witness_identity() {
+        let acceptance = parse_release_acceptance_v1(&acceptance_json(true)).unwrap();
+        let keys = [key(1), key(2), key(3)];
+        let policy = policy(&keys);
+        assert!(matches!(
+            sign_qualification_acceptance_v1(
+                &acceptance,
+                Digest32([0x44; 32]),
+                &policy,
+                [1; 16],
+                1,
+                &keys[1],
+            ),
+            Err(QualificationWitnessError::WitnessKeyMismatch)
+        ));
+    }
+
+    #[test]
     fn policy_epoch_rotation_invalidates_prior_attestations() {
         let acceptance = parse_release_acceptance_v1(&acceptance_json(true)).unwrap();
         let keys = [key(1), key(2), key(3)];
         let policy = policy(&keys);
         let verifier = Digest32([0x44; 32]);
-        let a = sign_qualification_acceptance_v1(&acceptance, verifier, &policy, [1; 16], 10, &keys[0]).unwrap();
-        let b = sign_qualification_acceptance_v1(&acceptance, verifier, &policy, [2; 16], 20, &keys[1]).unwrap();
+        let a = sign_qualification_acceptance_v1(
+            &acceptance,
+            verifier,
+            &policy,
+            [1; 16],
+            10,
+            &keys[0],
+        )
+        .unwrap();
+        let b = sign_qualification_acceptance_v1(
+            &acceptance,
+            verifier,
+            &policy,
+            [2; 16],
+            20,
+            &keys[1],
+        )
+        .unwrap();
 
         let mut rotated = policy.clone();
         rotated.witness_epoch += 1;
