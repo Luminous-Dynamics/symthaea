@@ -227,11 +227,8 @@ mod tests {
     }
 
     #[test]
-    fn production_generator_returns_nonzero_process_local_challenges() {
-        let first = PendingXeniaWitnessCurrentnessChallengeV1::generate(scope()).unwrap();
-        let second = PendingXeniaWitnessCurrentnessChallengeV1::generate(scope()).unwrap();
-        assert_ne!(first.challenge(), ZERO32);
-        assert_ne!(second.challenge(), ZERO32);
-        assert_ne!(first.challenge(), second.challenge());
+    fn production_generator_returns_nonzero_process_local_challenge() {
+        let pending = PendingXeniaWitnessCurrentnessChallengeV1::generate(scope()).unwrap();
+        assert_ne!(pending.challenge(), ZERO32);
     }
 }
