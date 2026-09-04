@@ -1,0 +1,22 @@
+[package]
+name = "symthaea-iot-actuation-guard-device-reality"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Fixed guard-owned verifier for challenge-bound post-reservation IoT device reality"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "attestation", "safety", "ed25519"]
+categories = ["embedded", "authentication"]
+
+[dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+serde = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-actuation-guard-two-phase-protocol = { path = "../symthaea-iot-actuation-guard-two-phase-protocol" }
+symthaea-iot-authority = { path = "../symthaea-iot-authority" }
+symthaea-iot-posture = { path = "../symthaea-iot-posture" }
+thiserror = { workspace = true }

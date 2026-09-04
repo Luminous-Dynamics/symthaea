@@ -1,0 +1,189 @@
+name: IoT Actuation Guard Device Reality
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-guard-device-reality/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard-two-phase-protocol/**'
+      - '.github/workflows/iot-actuation-guard-device-reality.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-actuation-guard-device-reality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    name: Fixed device-reality TCB contract (Rust 1.96)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact formatter
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Check exact device-reality source formatting
+        run: >-
+          rustfmt --edition 2024 --check
+          crates/bridges/symthaea-iot-actuation-guard-device-reality/src/lib.rs
+          crates/bridges/symthaea-iot-actuation-guard-device-reality/src/error.rs
+          crates/bridges/symthaea-iot-actuation-guard-device-reality/src/policy.rs
+          crates/bridges/symthaea-iot-actuation-guard-device-reality/src/trust.rs
+          crates/bridges/symthaea-iot-actuation-guard-device-reality/src/verifier.rs
+
+      - name: Enforce fixed concrete-key non-actuating TCB
+        run: |
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          root = Path('crates/bridges/symthaea-iot-actuation-guard-device-reality')
+          manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+          deps = set(manifest.get('dependencies', {}))
+          expected = {
+              'blake3',
+              'ed25519-dalek',
+              'serde',
+              'symthaea-authority',
+              'symthaea-iot-actuation-guard-two-phase-protocol',
+              'symthaea-iot-authority',
+              'symthaea-iot-posture',
+              'thiserror',
+          }
+          assert deps == expected, f'device-reality production dependency drift: {sorted(deps)!r}'
+          assert not manifest.get('dev-dependencies'), 'device-reality tests must use only reviewed production dependency graph'
+          assert 'bin' not in manifest, 'device-reality stage must remain a library proof stage'
+
+          source = '\n'.join(
+              path.read_text()
+              for path in sorted((root / 'src').glob('*.rs'))
+          )
+          required = [
+              '#![deny(unsafe_code)]',
+              'public_key: [u8; 32]',
+              'DEVICE_REALITY_ED25519_ALGORITHM',
+              'verify_strict',
+              'signature_message()',
+              'anchored_policy_digest',
+              'anchored_trust_head',
+              'AttestationPredatesCurrentTrustGeneration',
+              'VerifierKeyNotActive',
+              'device_attestation_result_digest',
+              'VerifiedPostReservationDeviceReality',
+          ]
+          for needle in required:
+              assert needle in source, f'missing fixed device-reality invariant: {needle!r}'
+
+          verifier = (root / 'src/verifier.rs').read_text()
+          verify_start = verifier.index('pub fn verify(')
+          verify_end = verifier.index(') -> Result<VerifiedPostReservationDeviceReality', verify_start)
+          public_verify_signature = verifier[verify_start:verify_end]
+          assert 'DeviceRuntimeState' not in public_verify_signature, 'raw DeviceRuntimeState must never be verifier input'
+          assert 'public_key' not in public_verify_signature, 'caller must not supply verifier key'
+          assert 'verifier:' not in public_verify_signature, 'caller must not supply signature provider'
+          assert 'now_unix' not in public_verify_signature, 'caller must not supply relying-party time'
+
+          forbidden = [
+              'AttestationResultSignatureVerifier',
+              '&dyn ',
+              'tokio::spawn',
+              'TcpListener',
+              'TcpStream',
+              'std::process',
+              'Command::new',
+              'FinalActuatorPermit',
+              'CompleteJitHalLease',
+              'join_final_actuator_gate',
+              'fence_final_permit_for_hal',
+              'unsafe {',
+          ]
+          for needle in forbidden:
+              assert needle not in source, f'forbidden device-reality TCB surface: {needle!r}'
+          PY
+
+  implementation:
+    name: Fixed device-reality implementation (MSRV 1.94)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.94.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact compiler and Clippy
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      - name: Resolve candidate and reject unreviewed external dependency drift
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          before = tomllib.loads(Path('/tmp/Cargo.lock.before').read_text())
+          after = tomllib.loads(Path('Cargo.lock').read_text())
+
+          def sourced(doc):
+              return {
+                  (p['name'], p['version'], p['source']): p
+                  for p in doc.get('package', [])
+                  if 'source' in p
+              }
+
+          b = sourced(before)
+          a = sourced(after)
+          added = sorted(set(a) - set(b))
+          removed = sorted(set(b) - set(a))
+          changed = sorted(k for k in set(a) & set(b) if a[k] != b[k])
+
+          allowed = {
+              ('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')
+          }
+          assert set(added).issubset(allowed), f'unreviewed external package delta: {added!r}'
+          assert not removed, f'external package removal is not allowed: {removed!r}'
+          assert not changed, f'existing external package record changed: {changed!r}'
+          if added:
+              package = a[added[0]]
+              assert package.get('checksum') == 'c9fb5a367b9846933e271a3c2a992930743f82ae5e8cb7faa780715a80fa0b15', package
+              families = {dep.split(' ', 1)[0] for dep in package.get('dependencies', [])}
+              assert families == {'rand_core', 'sha2', 'sha3', 'zeroize'}, families
+          PY
+
+      - name: Check exact fixed device-reality package
+        run: cargo check -p symthaea-iot-actuation-guard-device-reality --all-targets
+
+      - name: Run real fixed Ed25519 device-reality regression first
+        run: cargo test -p symthaea-iot-actuation-guard-device-reality verifier::tests::real_ed25519_challenge_bound_device_reality_passes -- --exact
+
+      - name: Test fixed device-reality package
+        run: cargo test -p symthaea-iot-actuation-guard-device-reality --all-targets
+
+      - name: Strict Clippy fixed device-reality package
+        run: cargo clippy -p symthaea-iot-actuation-guard-device-reality --all-targets -- -D warnings
