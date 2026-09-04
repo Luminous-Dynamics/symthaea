@@ -94,6 +94,8 @@ jobs:
           cargo -V > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/CARGO.txt"
           sha256sum Cargo.lock > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/CARGO_LOCK_CANDIDATE_SHA256.txt"
           sha256sum crates/bridges/symthaea-xenia-authority/src/witness_frontier.rs > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/WITNESS_VERIFIER_SHA256.txt"
+          sha256sum crates/bridges/symthaea-xenia-authority/tests/witness_frontier_interop.rs > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/WITNESS_INTEROP_VECTOR_SHA256.txt"
+          sha256sum crates/bridges/symthaea-xenia-authority/tests/witness_frontier_verification.rs > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/WITNESS_CURRENTNESS_TEST_SHA256.txt"
           git --no-pager diff -- Cargo.lock > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/CARGO_LOCK_DIFF.patch"
           cat "$RUNNER_TEMP/agency-lock-status" > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/CARGO_LOCK_STATUS.txt"
 
