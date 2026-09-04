@@ -1,261 +1,302 @@
 #!/usr/bin/env python3
 """
-TRIBE v2 Bridge — fMRI prediction oracle for Symthaea neural validation.
+TRIBE v2 bridge for Symthaea neural-validation research.
 
-Loads Meta FAIR's TRIBE v2 brain encoding model and produces per-region
-activation predictions from video/audio/text stimuli. Output is JSON
-compatible with Symthaea's CorticalActivationMap format.
+This bridge is intentionally provenance-strict:
+
+* Real TRIBE v2 inference emits the native fsaverage5 cortical surface.
+  It does NOT truncate or reinterpret the first 360 vertices as Glasser parcels.
+* Mock mode is explicit and emits a synthetic-only schema that the current
+  empirical Rust loader cannot mistake for external fMRI predictions.
+* If TRIBE v2 is unavailable, real mode fails closed. It never falls back to
+  synthetic data.
+
+The fsaverage5 -> atlas -> Symthaea12 mapping belongs in the next qualified
+bridge layer. Until that mapping exists, real output remains in fsaverage5.
 
 Usage:
     python scripts/tribe_v2_bridge.py --stimulus video.mp4 --output result.json
-    python scripts/tribe_v2_bridge.py --stimulus-dir data/tribe-v2-stimuli/ --output-dir results/
-    python scripts/tribe_v2_bridge.py --mock --output mock_result.json  # No model needed
+    python scripts/tribe_v2_bridge.py --stimulus-dir data/stimuli --output results/
+    python scripts/tribe_v2_bridge.py --mock --output mock_result.json
 
-Requirements:
-    pip install torch torchvision torchaudio numpy
-    # TRIBE v2 model: git clone https://github.com/facebookresearch/tribe
-    # or: pip install tribe-v2  (when available)
+Requirements for real inference:
+    numpy
+    TRIBE v2 from https://github.com/facebookresearch/tribev2
 
 References:
-    - TRIBE v2 (Meta FAIR, 2026). Tri-modal brain encoding for fMRI prediction.
-    - Glasser et al. (2016). Nature, 536, 171-178.
+    - d'Ascoli et al. (2026), TRIBE v2.
+    - Official API: from tribev2 import TribeModel
 """
 
+from __future__ import annotations
+
 import argparse
+import hashlib
 import json
-import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 
-# Glasser atlas 360-parcel → 12-region mapping (mirroring glasser_parcellation.rs)
-# Left hemisphere parcels (1-180); right hemisphere = parcel + 180
-REGION_PARCELS = {
-    "Visual": [1, 2, 3, 4, 5, 6, 13, 14, 15, 18, 19, 153, 154, 155, 156, 160, 163],
-    "Auditory": [24, 104, 105, 124, 125, 126, 173, 174],
-    "Language": [75, 76, 128, 129, 130, 131, 132, 133, 134, 175, 176],
-    "Motor": [8, 55, 56, 57, 58, 59, 60, 61, 62, 78, 79],
-    "Sensory": [9, 51, 52, 53, 54, 106, 107, 108, 109],
-    "Prefrontal": [68, 69, 70, 71, 72, 73, 74, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90],
-    "Memory": [20, 21, 22, 23, 135, 136, 137, 164, 165],
-    "Emotional": [91, 92, 93, 94, 95, 96, 97, 98, 110, 111, 112],
-    "Social": [139, 140, 141, 142, 143, 144, 145],
-    "Executive": [63, 64, 65, 66, 67, 99, 100, 101],
-    "Creative": [26, 27, 28, 29, 30, 31, 146, 147, 148, 149, 150],
-    "Integration": [
-        7, 10, 11, 12, 16, 17, 25, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-        41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 102, 103, 113, 114, 115,
-        116, 117, 118, 119, 120, 121, 122, 123, 127, 138, 151, 152,
-        157, 158, 159, 161, 162, 166, 167, 168, 169, 170, 171, 172,
-        177, 178, 179, 180,
-    ],
+
+MOCK_BASE = {
+    "Visual": 0.70,
+    "Auditory": 0.50,
+    "Language": 0.30,
+    "Motor": 0.15,
+    "Sensory": 0.10,
+    "Prefrontal": 0.35,
+    "Memory": 0.25,
+    "Emotional": 0.30,
+    "Social": 0.20,
+    "Executive": 0.25,
+    "Creative": 0.15,
+    "Integration": 0.40,
 }
 
-# Expand to include right hemisphere mirrors
-REGION_PARCELS_FULL = {}
-for region, parcels in REGION_PARCELS.items():
-    full = []
-    for p in parcels:
-        full.append(p)
-        full.append(p + 180)  # right hemisphere
-    REGION_PARCELS_FULL[region] = full
+VIDEO_SUFFIXES = {".mp4", ".avi", ".mkv", ".mov", ".webm"}
+AUDIO_SUFFIXES = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
+TEXT_SUFFIXES = {".txt", ".md"}
 
 
-def aggregate_voxels_to_regions(
-    voxel_data: np.ndarray,
-) -> dict[str, float]:
-    """Aggregate 360 voxel values to 12 region means."""
-    result = {}
-    for region, parcels in REGION_PARCELS_FULL.items():
-        values = []
-        for p in parcels:
-            idx = p - 1  # 0-based
-            if idx < len(voxel_data):
-                values.append(float(voxel_data[idx]))
-        if values:
-            result[region] = float(np.mean(values))
-        else:
-            result[region] = 0.0
-    return result
+def _stable_seed(text: str) -> int:
+    """Derive a process-independent 64-bit RNG seed from text."""
+    digest = hashlib.blake2b(text.encode("utf-8"), digest_size=8).digest()
+    return int.from_bytes(digest, "little", signed=False)
 
 
-def normalize_activations(activations: dict[str, float]) -> dict[str, float]:
-    """Normalize activations to [0, 1] range."""
-    vals = list(activations.values())
-    if not vals:
-        return activations
-    vmin = min(vals)
-    vmax = max(vals)
-    rng = vmax - vmin
-    if rng < 1e-10:
-        return {k: 0.5 for k in activations}
-    return {k: (v - vmin) / rng for k, v in activations.items()}
+def _to_numpy(value: Any) -> np.ndarray:
+    """Convert a NumPy/Torch-like prediction tensor to a CPU NumPy array."""
+    if hasattr(value, "detach"):
+        value = value.detach()
+    if hasattr(value, "cpu"):
+        value = value.cpu()
+    if hasattr(value, "numpy"):
+        value = value.numpy()
+    return np.asarray(value)
+
+
+def _stimulus_argument(stimulus_path: str) -> dict[str, str]:
+    """Map a file extension to TribeModel.get_events_dataframe arguments."""
+    suffix = Path(stimulus_path).suffix.lower()
+    if suffix in VIDEO_SUFFIXES:
+        return {"video_path": stimulus_path}
+    if suffix in AUDIO_SUFFIXES:
+        return {"audio_path": stimulus_path}
+    if suffix in TEXT_SUFFIXES:
+        return {"text_path": stimulus_path}
+    raise ValueError(
+        f"Unsupported stimulus type {suffix!r}; expected video, audio, or text input"
+    )
 
 
 def run_tribe_v2(
     stimulus_path: str,
     model_path: Optional[str] = None,
-) -> dict[str, float]:
-    """Run TRIBE v2 inference on a stimulus and return per-region activations.
+    cache_folder: Optional[str] = None,
+) -> dict[str, Any]:
+    """Run released TRIBE v2 and return native fsaverage5 predictions.
 
-    Requires the TRIBE v2 model to be installed. Falls back to mock mode
-    if the model is not available.
+    The released model predicts ``(n_timesteps, n_vertices)`` on fsaverage5.
+    We temporally average for this bridge artifact but preserve the native
+    cortical coordinate system. No atlas interpretation is attempted here.
+
+    Raises:
+        RuntimeError: if TRIBE v2 is unavailable or returns an invalid shape.
+        ValueError: if the stimulus type is unsupported.
     """
     try:
-        # Attempt to import TRIBE v2
-        from tribe import TRIBEv2Model  # type: ignore[import-untyped]
+        from tribev2 import TribeModel  # type: ignore[import-untyped]
+    except ImportError as exc:
+        raise RuntimeError(
+            "TRIBE v2 inference was requested, but the 'tribev2' package is not "
+            "available. Refusing synthetic fallback; use --mock explicitly for "
+            "fixture data."
+        ) from exc
 
-        model = TRIBEv2Model.from_pretrained(model_path or "tribe-v2-large")
+    model_id = model_path or "facebook/tribev2"
+    kwargs: dict[str, Any] = {}
+    if cache_folder:
+        kwargs["cache_folder"] = cache_folder
+    model = TribeModel.from_pretrained(model_id, **kwargs)
 
-        import torch
-        import torchaudio
-        import torchvision
+    events = model.get_events_dataframe(**_stimulus_argument(stimulus_path))
+    predictions, _segments = model.predict(events=events)
+    predicted_bold = _to_numpy(predictions)
 
-        # Load video + audio
-        video, audio, info = torchvision.io.read_video(stimulus_path, pts_unit="sec")
-        video = video.float() / 255.0  # [T, H, W, C]
-
-        # Run inference
-        with torch.no_grad():
-            predicted_bold = model.encode(video=video, audio=audio)
-            # predicted_bold shape: [time_points, n_voxels]
-
-        # Average across time, take first 360 voxels (Glasser parcels)
-        mean_bold = predicted_bold.mean(dim=0).cpu().numpy()
-        voxel_360 = mean_bold[:360]
-
-        activations = aggregate_voxels_to_regions(voxel_360)
-        return normalize_activations(activations)
-
-    except ImportError:
-        print(
-            "WARNING: TRIBE v2 model not installed. "
-            "Install from https://github.com/facebookresearch/tribe",
-            file=sys.stderr,
+    if predicted_bold.ndim != 2:
+        raise RuntimeError(
+            "TRIBE v2 returned an unexpected prediction rank: "
+            f"shape={predicted_bold.shape!r}; expected (timesteps, vertices)"
         )
-        print("Falling back to mock mode.", file=sys.stderr)
-        return generate_mock_activations(stimulus_path)
+    if predicted_bold.shape[0] == 0 or predicted_bold.shape[1] == 0:
+        raise RuntimeError(
+            f"TRIBE v2 returned an empty prediction array: {predicted_bold.shape!r}"
+        )
+
+    mean_surface = predicted_bold.mean(axis=0, dtype=np.float64)
+    return {
+        "surface_activations": [float(v) for v in mean_surface],
+        "n_timesteps": int(predicted_bold.shape[0]),
+        "n_vertices": int(predicted_bold.shape[1]),
+    }
 
 
 def generate_mock_activations(stimulus_path: str = "") -> dict[str, float]:
-    """Generate plausible mock activations for testing without the real model.
-
-    Uses stimulus filename to seed the RNG for reproducibility.
-    """
-    seed = hash(stimulus_path) % (2**31)
-    rng = np.random.default_rng(seed)
-
-    # Base pattern: visual and auditory regions high for video stimuli
-    base = {
-        "Visual": 0.7,
-        "Auditory": 0.5,
-        "Language": 0.3,
-        "Motor": 0.15,
-        "Sensory": 0.1,
-        "Prefrontal": 0.35,
-        "Memory": 0.25,
-        "Emotional": 0.3,
-        "Social": 0.2,
-        "Executive": 0.25,
-        "Creative": 0.15,
-        "Integration": 0.4,
-    }
-
-    # Add noise
-    activations = {}
-    for region, base_val in base.items():
-        noise = rng.normal(0, 0.1)
+    """Generate deterministic synthetic 12-region fixture activations."""
+    rng = np.random.default_rng(_stable_seed(stimulus_path))
+    activations: dict[str, float] = {}
+    for region, base_val in MOCK_BASE.items():
+        noise = rng.normal(0.0, 0.1)
         activations[region] = float(np.clip(base_val + noise, 0.0, 1.0))
-
     return activations
 
 
-def make_output(
-    activations: dict[str, float],
+def make_surface_output(
+    surface: dict[str, Any],
     stimulus_id: str,
-    source: str = "FmriPredicted",
-) -> dict:
-    """Format output as Symthaea-compatible JSON."""
+    model_id: str,
+) -> dict[str, Any]:
+    """Format real external-model output without pretending it is observed fMRI."""
     return {
-        "region_activations": activations,
+        "surface_activations": surface["surface_activations"],
         "stimulus_id": stimulus_id,
-        "source": source,
+        "source": "FmriPredicted",
+        "evidence_authority": "ExternalSurrogate",
+        "eligible_for_empirical_benchmarks": True,
         "timestamp_cycles": 0,
-        "model": "tribe-v2",
-        "mapping": "glasser-360-to-12",
+        "model": model_id,
+        "coordinate_system": "fsaverage5",
+        "aggregation": "temporal_mean",
+        "n_timesteps": surface["n_timesteps"],
+        "n_vertices": surface["n_vertices"],
     }
 
 
-def main():
+def make_mock_output(
+    activations: dict[str, float],
+    stimulus_id: str,
+) -> dict[str, Any]:
+    """Format synthetic fixture output in a schema distinct from empirical input."""
+    return {
+        "synthetic_region_activations": activations,
+        "stimulus_id": stimulus_id,
+        "source": "SyntheticFixture",
+        "evidence_authority": "SyntheticFixture",
+        "eligible_for_empirical_benchmarks": False,
+        "timestamp_cycles": 0,
+        "model": "symthaea-tribev2-mock",
+        "coordinate_system": "symthaea12",
+        "aggregation": "synthetic_fixture",
+    }
+
+
+def process_stimulus(
+    stimulus: str,
+    *,
+    mock: bool,
+    model_path: Optional[str],
+    cache_folder: Optional[str],
+) -> dict[str, Any]:
+    stimulus_id = Path(stimulus).stem if stimulus else "mock"
+    if mock:
+        return make_mock_output(generate_mock_activations(stimulus), stimulus_id)
+
+    surface = run_tribe_v2(stimulus, model_path, cache_folder)
+    return make_surface_output(surface, stimulus_id, model_path or "facebook/tribev2")
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2)
+        handle.write("\n")
+
+
+def main() -> int:
     parser = argparse.ArgumentParser(
-        description="TRIBE v2 Bridge — fMRI prediction oracle for Symthaea"
+        description="TRIBE v2 bridge — provenance-strict neural prediction export"
     )
     parser.add_argument(
-        "--stimulus", type=str, help="Path to stimulus file (video/audio)"
+        "--stimulus", type=str, help="Path to video, audio, or text stimulus"
     )
     parser.add_argument(
-        "--stimulus-dir",
+        "--stimulus-dir", type=str, help="Directory of stimulus files (batch mode)"
+    )
+    parser.add_argument(
+        "--output",
         type=str,
-        help="Directory of stimulus files (batch mode)",
+        required=True,
+        help="Output JSON path, or output directory in batch mode",
     )
-    parser.add_argument("--output", type=str, required=True, help="Output JSON path")
     parser.add_argument(
-        "--output-dir",
-        type=str,
-        help="Output directory for batch mode",
+        "--output-dir", type=str, help="Optional explicit output directory for batch mode"
     )
     parser.add_argument(
         "--model-path",
         type=str,
         default=None,
-        help="Path to TRIBE v2 model weights",
+        help="TRIBE v2 HuggingFace model id or compatible local model reference",
+    )
+    parser.add_argument(
+        "--cache-folder",
+        type=str,
+        default=None,
+        help="Optional TRIBE v2 model cache folder",
     )
     parser.add_argument(
         "--mock",
         action="store_true",
-        help="Generate mock activations (no model needed)",
+        help="Generate explicitly synthetic fixture data; never used as fallback",
     )
     args = parser.parse_args()
 
-    if args.stimulus_dir:
-        # Batch mode
-        stim_dir = Path(args.stimulus_dir)
-        out_dir = Path(args.output_dir or args.output)
-        out_dir.mkdir(parents=True, exist_ok=True)
-
-        for stim_file in sorted(stim_dir.glob("*")):
-            if stim_file.suffix in (".mp4", ".avi", ".wav", ".mkv"):
+    try:
+        if args.stimulus_dir:
+            stim_dir = Path(args.stimulus_dir)
+            out_dir = Path(args.output_dir or args.output)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            allowed = VIDEO_SUFFIXES | AUDIO_SUFFIXES | TEXT_SUFFIXES
+            for stim_file in sorted(stim_dir.iterdir()):
+                if not stim_file.is_file() or stim_file.suffix.lower() not in allowed:
+                    continue
                 print(f"Processing: {stim_file.name}")
-                if args.mock:
-                    activations = generate_mock_activations(str(stim_file))
-                else:
-                    activations = run_tribe_v2(str(stim_file), args.model_path)
-                result = make_output(activations, stim_file.stem)
+                result = process_stimulus(
+                    str(stim_file),
+                    mock=args.mock,
+                    model_path=args.model_path,
+                    cache_folder=args.cache_folder,
+                )
                 out_path = out_dir / f"{stim_file.stem}.json"
-                with open(out_path, "w") as f:
-                    json.dump(result, f, indent=2)
-                print(f"  → {out_path}")
+                write_json(out_path, result)
+                print(f"  -> {out_path}")
+            return 0
 
-    elif args.stimulus or args.mock:
-        stimulus = args.stimulus or "mock_stimulus"
-        if args.mock:
-            activations = generate_mock_activations(stimulus)
-        else:
-            activations = run_tribe_v2(stimulus, args.model_path)
+        if args.stimulus or args.mock:
+            stimulus = args.stimulus or "mock_stimulus"
+            result = process_stimulus(
+                stimulus,
+                mock=args.mock,
+                model_path=args.model_path,
+                cache_folder=args.cache_folder,
+            )
+            out_path = Path(args.output)
+            write_json(out_path, result)
+            print(f"Output written to {out_path}")
+            print(
+                "Evidence authority: "
+                f"{result['evidence_authority']} ({result['coordinate_system']})"
+            )
+            return 0
 
-        stim_id = Path(stimulus).stem if args.stimulus else "mock"
-        result = make_output(activations, stim_id)
-
-        with open(args.output, "w") as f:
-            json.dump(result, f, indent=2)
-        print(f"Output written to {args.output}")
-        print(f"Region activations: {json.dumps(activations, indent=2)}")
-
-    else:
         parser.error("Either --stimulus, --stimulus-dir, or --mock is required")
+    except (RuntimeError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
+    return 2
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
