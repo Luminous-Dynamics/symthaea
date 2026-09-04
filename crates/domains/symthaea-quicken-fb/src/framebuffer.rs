@@ -15,6 +15,7 @@ use drm::control::crtc::Handle as CrtcHandle;
 use drm::control::framebuffer::Handle as FbHandle;
 use drm::control::{self, Device as ControlDevice, Mode, ResourceHandles};
 use std::fs::{File, OpenOptions};
+use std::io;
 use std::os::unix::io::{AsFd, BorrowedFd};
 
 /// A DRM card device wrapper implementing the drm traits.
@@ -78,6 +79,37 @@ impl std::fmt::Display for DrmError {
 
 impl std::error::Error for DrmError {}
 
+/// Result of the explicit display-restore attempt performed before renderer
+/// resources are relinquished.
+///
+/// This is diagnostic evidence only. A failed restore must never keep the
+/// renderer alive or acquire login/session authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DisplayRestoreOutcome {
+    Restored,
+    RestoreFailed(io::ErrorKind),
+}
+
+impl DisplayRestoreOutcome {
+    pub const fn succeeded(self) -> bool {
+        matches!(self, Self::Restored)
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Restored => "restored",
+            Self::RestoreFailed(_) => "restore-failed",
+        }
+    }
+
+    pub const fn error_kind(self) -> Option<io::ErrorKind> {
+        match self {
+            Self::Restored => None,
+            Self::RestoreFailed(kind) => Some(kind),
+        }
+    }
+}
+
 /// An active DRM framebuffer with mapped pixel memory.
 pub struct DrmFramebuffer {
     card: Card,
@@ -101,6 +133,10 @@ pub struct DrmFramebuffer {
     /// state. Passing an empty connector array would detach the restored CRTC
     /// from its sinks, so capture this topology before changing anything.
     original_connectors: Vec<ConnectorHandle>,
+    /// True until an explicit release attempt has consumed the restoration
+    /// responsibility. Abnormal destruction keeps this true so Drop remains a
+    /// best-effort safety net.
+    restore_pending: bool,
 }
 
 impl DrmFramebuffer {
@@ -178,6 +214,7 @@ impl DrmFramebuffer {
             dumb_buffer: db,
             original_crtc,
             original_connectors,
+            restore_pending: true,
         })
     }
 
@@ -287,20 +324,45 @@ impl DrmFramebuffer {
         // For a boot animation at ~30fps, direct writes are fine.
         Ok(())
     }
-}
 
-impl Drop for DrmFramebuffer {
-    fn drop(&mut self) {
-        // Restore the complete original legacy KMS state: framebuffer, position,
-        // mode and connector routing. The connector array is semantically part of
-        // SETCRTC; restoring with `&[]` would detach the CRTC from its display.
-        let _ = self.card.set_crtc(
+    /// Explicitly restore the captured display state and relinquish this
+    /// framebuffer.
+    ///
+    /// The returned value reports the actual SETCRTC result. Regardless of that
+    /// result, consuming `self` causes Drop to destroy the renderer framebuffer
+    /// and close the DRM fd before the caller receives the outcome. A failed
+    /// restore therefore remains diagnostic-only and cannot keep presentation
+    /// alive as an authority boundary.
+    pub fn release(mut self) -> DisplayRestoreOutcome {
+        let outcome = match self.restore_original() {
+            Ok(()) => DisplayRestoreOutcome::Restored,
+            Err(error) => DisplayRestoreOutcome::RestoreFailed(error.kind()),
+        };
+        // Do not let Drop silently retry after the explicit result has been
+        // observed: that would make the returned status ambiguous. Abnormal paths
+        // that never call release() retain the best-effort Drop safety net.
+        self.restore_pending = false;
+        outcome
+    }
+
+    fn restore_original(&self) -> io::Result<()> {
+        self.card.set_crtc(
             self.crtc,
             self.original_crtc.framebuffer(),
             self.original_crtc.position(),
             &self.original_connectors,
             self.original_crtc.mode(),
-        );
+        )
+    }
+}
+
+impl Drop for DrmFramebuffer {
+    fn drop(&mut self) {
+        if self.restore_pending {
+            // Abnormal path only: restoration remains best-effort and cannot
+            // panic. Normal shutdown calls release() and reports the result.
+            let _ = self.restore_original();
+        }
 
         // Destroy framebuffer
         let _ = self.card.destroy_framebuffer(self.fb);
