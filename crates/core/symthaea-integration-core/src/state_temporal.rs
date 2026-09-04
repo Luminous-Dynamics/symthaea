@@ -14,7 +14,7 @@
 //! `valid_from_unix_ms` on the active desired evidence.
 
 use crate::{
-    EntityRef, StateAssessment, StateAssessmentError, StateAssessmentStatus, StateAssertion,
+    EntityRef, StateAssertion, StateAssessment, StateAssessmentError, StateAssessmentStatus,
     StateComparisonPolicy, StateRole, assess_state_dimension,
 };
 use serde::{Deserialize, Serialize};
@@ -86,6 +86,23 @@ pub fn assess_state_dimension_temporally(
     at_unix_ms: u64,
     policy: TemporalStatePolicy,
 ) -> Result<TemporalStateAssessment, TemporalStateAssessmentError> {
+    // Historical knowledge-time validation must happen before active-at
+    // filtering. `StateAssertion::is_active_at` correctly excludes assertions
+    // observed after the query time, but silently filtering them here would
+    // turn future evidence into an ordinary MissingDesired/MissingObserved
+    // result instead of surfacing the chronology violation.
+    for assertion in assertions.iter().filter(|assertion| {
+        &assertion.subject == subject && assertion.dimension == dimension
+    }) {
+        if assertion.observed_at_unix_ms > at_unix_ms {
+            return Err(TemporalStateAssessmentError::FutureAssertionTimestamp {
+                assertion_id: assertion.assertion_id.clone(),
+                observed_at_unix_ms: assertion.observed_at_unix_ms,
+                assessment_at_unix_ms: at_unix_ms,
+            });
+        }
+    }
+
     let instantaneous = assess_state_dimension(
         assertions,
         subject,
@@ -102,15 +119,6 @@ pub fn assess_state_dimension_temporally(
                 && assertion.is_active_at(at_unix_ms)
         })
         .collect::<Vec<_>>();
-    for assertion in &active {
-        if assertion.observed_at_unix_ms > at_unix_ms {
-            return Err(TemporalStateAssessmentError::FutureAssertionTimestamp {
-                assertion_id: assertion.assertion_id.clone(),
-                observed_at_unix_ms: assertion.observed_at_unix_ms,
-                assessment_at_unix_ms: at_unix_ms,
-            });
-        }
-    }
 
     let desired = active
         .iter()
@@ -131,9 +139,7 @@ pub fn assess_state_dimension_temporally(
         StateAssessmentStatus::NoEvidence => Some(TemporalStateStatus::NoEvidence),
         StateAssessmentStatus::MissingDesired => Some(TemporalStateStatus::MissingDesired),
         StateAssessmentStatus::MissingObserved => Some(TemporalStateStatus::MissingObserved),
-        StateAssessmentStatus::ConflictingDesired => {
-            Some(TemporalStateStatus::ConflictingDesired)
-        }
+        StateAssessmentStatus::ConflictingDesired => Some(TemporalStateStatus::ConflictingDesired),
         StateAssessmentStatus::ConflictingObserved => {
             Some(TemporalStateStatus::ConflictingObserved)
         }
@@ -231,7 +237,11 @@ fn is_stale(age_ms: Option<u64>, max_age_ms: Option<u64>) -> bool {
 /// carries one. Taking the maximum is conservative for agreeing desired sources:
 /// it starts the convergence window at the most recent asserted change boundary.
 fn desired_effective_time(assertions: &[&StateAssertion]) -> Option<u64> {
-    if assertions.is_empty() || assertions.iter().any(|assertion| assertion.valid_from_unix_ms.is_none()) {
+    if assertions.is_empty()
+        || assertions
+            .iter()
+            .any(|assertion| assertion.valid_from_unix_ms.is_none())
+    {
         return None;
     }
     assertions
