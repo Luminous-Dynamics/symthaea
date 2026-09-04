@@ -2,18 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Independent Xenia authority verifier for the Symthaea Agency Kernel.
 //!
-//! Xenia signs an opaque commitment to a Symthaea [`CapabilityGrant`]. This
-//! crate independently reconstructs Xenia V1 canonical bytes, verifies the
-//! ledger authority signature, binds it to a fresh independently witnessed
-//! executor workload, requires the exact current Symthaea anti-rollback
-//! checkpoint, and requires a fresh signed Xenia ledger checkpoint at the same
-//! frontier.
+//! Xenia signs opaque commitments that Symthaea verifies independently. Live
+//! capability authority and qualification-witness chronology remain separate
+//! verification domains: both may use the trusted Xenia ledger key, but witness
+//! evidence never creates or restores execution authority.
 //!
-//! Signature validity is necessary but not sufficient for live authority.
-//! Trusted time, current authority state, workload identity, and the Xenia
-//! frontier are separate environmental facts. V1 consumes the non-cloneable
-//! authority-state and workload proofs into [`VerifiedXeniaCapability`] so
-//! callers cannot substitute them before effect admission.
+//! Signature validity is necessary but not sufficient for live authority or
+//! current chronology. Trusted time and source state remain separate
+//! environmental facts.
 
 #![deny(unsafe_code)]
 
@@ -30,26 +26,27 @@ use thiserror::Error;
 
 pub use protocol::{
     AGENT_CAPABILITY_ATTESTATION_SCHEMA, AGENT_CAPABILITY_AUTHORIZATION_DOMAIN,
-    AGENT_CAPABILITY_AUTHORIZATION_SCHEMA_VERSION, ED25519_SIGNATURE_ALGORITHM,
-    ProtocolError, TranscriptSignatureSuiteV1, XENIA_LEDGER_CHECKPOINT_SCHEMA,
-    XeniaAgentAuthorizationV1, XeniaAgentCapabilityAttestationV1, XeniaCheckpointAnchorV1,
-    XeniaLedgerCheckpointV1, XeniaSignatureEnvelopeV1,
+    AGENT_CAPABILITY_AUTHORIZATION_SCHEMA_VERSION, ED25519_SIGNATURE_ALGORITHM, ProtocolError,
+    TranscriptSignatureSuiteV1, XENIA_LEDGER_CHECKPOINT_SCHEMA, XeniaAgentAuthorizationV1,
+    XeniaAgentCapabilityAttestationV1, XeniaCheckpointAnchorV1, XeniaLedgerCheckpointV1,
+    XeniaSignatureEnvelopeV1,
 };
 pub use witness_frontier::{
     SYMTHAEA_WITNESS_ANCHOR_OPERATION_DOMAIN, SYMTHAEA_WITNESS_FRONTIER_STATEMENT_DOMAIN,
-    SYMTHAEA_WITNESS_FRONTIER_STATEMENT_SCHEMA_VERSION,
-    VerifiedXeniaWitnessFrontierV1, XENIA_WITNESS_FRONTIER_ANCHOR_DOMAIN,
-    XENIA_WITNESS_FRONTIER_ANCHOR_FINGERPRINT_DOMAIN,
+    SYMTHAEA_WITNESS_FRONTIER_STATEMENT_SCHEMA_VERSION, VerifiedXeniaWitnessFrontierV1,
+    XENIA_WITNESS_FRONTIER_ANCHOR_DOMAIN, XENIA_WITNESS_FRONTIER_ANCHOR_FINGERPRINT_DOMAIN,
     XENIA_WITNESS_FRONTIER_ANCHOR_SCHEMA_VERSION, XENIA_WITNESS_FRONTIER_OBSERVATION_DOMAIN,
-    XENIA_WITNESS_FRONTIER_OBSERVATION_FINGERPRINT_DOMAIN,
-    XENIA_WITNESS_FRONTIER_SOURCE_DOMAIN, XeniaSignedWitnessFrontierAnchorV1,
-    XeniaSignedWitnessFrontierObservationV1, XeniaWitnessFrontierAnchorSummaryV1,
-    XeniaWitnessFrontierAnchorTargetV1, XeniaWitnessFrontierError,
-    XeniaWitnessFrontierExpectationV1, XeniaWitnessObservationFreshnessV1,
-    derive_xenia_witness_frontier_source_id, verify_xenia_witness_frontier_v1,
-    witness_frontier_statement_digest,
+    XENIA_WITNESS_FRONTIER_OBSERVATION_FINGERPRINT_DOMAIN, XENIA_WITNESS_FRONTIER_SOURCE_DOMAIN,
+    XeniaSignedWitnessFrontierAnchorV1, XeniaSignedWitnessFrontierObservationV1,
+    XeniaWitnessFrontierAnchorSummaryV1, XeniaWitnessFrontierAnchorTargetV1,
+    XeniaWitnessFrontierError, XeniaWitnessFrontierExpectationV1,
+    derive_xenia_witness_frontier_source_id, witness_frontier_statement_digest,
 };
 pub use workload::{ExecutorWorkloadV1, VerifiedExecutorWorkload, WorkloadIdentityError};
+
+/// Authority-time subject domain for one exact Xenia witness-currentness check.
+pub const XENIA_WITNESS_FRONTIER_TIME_SUBJECT_DOMAIN: &[u8] =
+    b"symthaea.xenia-witness-frontier.time-subject.v1\0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct XeniaSessionExpectationV1 {
@@ -73,6 +70,135 @@ impl XeniaFreshnessPolicyV1 {
     }
 }
 
+/// Reviewed freshness limits for challenge-bound Xenia witness observations.
+///
+/// The values must be configured together with the trusted Xenia
+/// `anchor_policy_digest`; this type does not reinterpret that opaque source
+/// policy commitment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XeniaWitnessFrontierFreshnessPolicyV1 {
+    pub max_observation_age_s: u64,
+    pub max_future_skew_s: u64,
+}
+
+impl XeniaWitnessFrontierFreshnessPolicyV1 {
+    pub fn strict(max_observation_age_s: u64, max_future_skew_s: u64) -> Self {
+        Self {
+            max_observation_age_s,
+            max_future_skew_s,
+        }
+    }
+
+    fn validate(self) -> Result<(), XeniaWitnessFrontierVerificationError> {
+        if self.max_observation_age_s == 0 {
+            return Err(XeniaWitnessFrontierVerificationError::InvalidFreshnessPolicy);
+        }
+        Ok(())
+    }
+}
+
+/// Build the exact subject that a [`VerifiedAuthorityTime`] fact must bind before
+/// it may establish freshness for one Xenia witness-frontier observation.
+///
+/// The subject commits the trusted Xenia key, derived source namespace, source
+/// epoch, reviewed anchor policy, witness, verifier challenge, and exact signed
+/// durable-anchor fingerprint. The anchor signature is verified before the
+/// subject is returned.
+pub fn xenia_witness_frontier_time_subject_digest_v1(
+    anchor: &XeniaSignedWitnessFrontierAnchorV1,
+    expected: XeniaWitnessFrontierExpectationV1,
+) -> Result<[u8; 32], XeniaWitnessFrontierVerificationError> {
+    if expected.trusted_ledger_public_key == [0; 32]
+        || expected.source_epoch == 0
+        || expected.anchor_policy_digest == [0; 32]
+        || expected.witness_id == [0; 16]
+        || expected.challenge == [0; 32]
+    {
+        return Err(XeniaWitnessFrontierVerificationError::InvalidExpectation);
+    }
+
+    anchor
+        .verify_with_trusted_key(expected.trusted_ledger_public_key)
+        .map_err(XeniaWitnessFrontierVerificationError::Evidence)?;
+    let source_id = derive_xenia_witness_frontier_source_id(
+        expected.trusted_ledger_public_key,
+        expected.anchor_policy_digest,
+    )
+    .map_err(XeniaWitnessFrontierVerificationError::Evidence)?;
+    if anchor.target.source_id != source_id
+        || anchor.target.source_epoch != expected.source_epoch
+        || anchor.target.anchor_policy_digest != expected.anchor_policy_digest
+        || anchor.target.witness_id != expected.witness_id
+    {
+        return Err(XeniaWitnessFrontierVerificationError::InvalidExpectation);
+    }
+    let anchor_fingerprint = anchor
+        .fingerprint()
+        .map_err(XeniaWitnessFrontierVerificationError::Evidence)?;
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(XENIA_WITNESS_FRONTIER_TIME_SUBJECT_DOMAIN);
+    hasher.update(&XENIA_WITNESS_FRONTIER_ANCHOR_SCHEMA_VERSION.to_be_bytes());
+    hasher.update(&expected.trusted_ledger_public_key);
+    hasher.update(&source_id);
+    hasher.update(&expected.source_epoch.to_be_bytes());
+    hasher.update(&expected.anchor_policy_digest);
+    hasher.update(&expected.witness_id);
+    hasher.update(&expected.challenge);
+    hasher.update(&anchor_fingerprint);
+    Ok(*hasher.finalize().as_bytes())
+}
+
+/// Public Xenia witness-frontier verification boundary.
+///
+/// Unlike the protocol-only checker inside the private module, this API does not
+/// accept a caller-selected wall-clock interval. It requires a short-lived
+/// [`VerifiedAuthorityTime`] fact bound to this exact Xenia key/source/witness,
+/// verifier challenge, and signed durable anchor.
+pub fn verify_xenia_witness_frontier_v1(
+    anchor: &XeniaSignedWitnessFrontierAnchorV1,
+    observation: &XeniaSignedWitnessFrontierObservationV1,
+    expected: XeniaWitnessFrontierExpectationV1,
+    authority_time: &VerifiedAuthorityTime,
+    freshness: XeniaWitnessFrontierFreshnessPolicyV1,
+) -> Result<VerifiedXeniaWitnessFrontierV1, XeniaWitnessFrontierVerificationError> {
+    freshness.validate()?;
+    let time_subject = xenia_witness_frontier_time_subject_digest_v1(anchor, expected)?;
+    authority_time
+        .require_subject(time_subject)
+        .map_err(|_| XeniaWitnessFrontierVerificationError::AuthorityTimeRejected)?;
+
+    let (earliest_now_unix_s, _) = authority_time.interval_at_verification();
+    let latest_now_unix_s = authority_time
+        .conservative_now_unix_s()
+        .map_err(|_| XeniaWitnessFrontierVerificationError::AuthorityTimeRejected)?;
+
+    witness_frontier::verify_xenia_witness_frontier_v1(
+        anchor,
+        observation,
+        expected,
+        witness_frontier::XeniaWitnessObservationFreshnessV1 {
+            earliest_now_unix_s,
+            latest_now_unix_s,
+            max_age_s: freshness.max_observation_age_s,
+            max_future_skew_s: freshness.max_future_skew_s,
+        },
+    )
+    .map_err(XeniaWitnessFrontierVerificationError::Evidence)
+}
+
+#[derive(Debug, Error)]
+pub enum XeniaWitnessFrontierVerificationError {
+    #[error("Xenia witness-frontier expectation is invalid")]
+    InvalidExpectation,
+    #[error("Xenia witness-frontier freshness policy is invalid")]
+    InvalidFreshnessPolicy,
+    #[error("verified authority-time fact rejected the witness-currentness check")]
+    AuthorityTimeRejected,
+    #[error("Xenia witness-frontier evidence rejected: {0}")]
+    Evidence(#[from] XeniaWitnessFrontierError),
+}
+
 /// Affine proof that one exact Xenia attestation passed all V1 admission checks.
 ///
 /// The proof owns both environmental objects whose substitution would otherwise
@@ -94,19 +220,39 @@ pub struct VerifiedXeniaCapability {
 }
 
 impl VerifiedXeniaCapability {
-    pub fn authorization_id(&self) -> [u8; 16] { self.authorization_id }
-    pub fn session_id(&self) -> [u8; 16] { self.session_id }
-    pub fn grant_digest(&self) -> Digest32 { self.grant_digest }
-    pub fn workload_digest(&self) -> Digest32 { self.workload_digest }
-    pub fn executor_workload(&self) -> &VerifiedExecutorWorkload { &self.executor_workload }
+    pub fn authorization_id(&self) -> [u8; 16] {
+        self.authorization_id
+    }
+    pub fn session_id(&self) -> [u8; 16] {
+        self.session_id
+    }
+    pub fn grant_digest(&self) -> Digest32 {
+        self.grant_digest
+    }
+    pub fn workload_digest(&self) -> Digest32 {
+        self.workload_digest
+    }
+    pub fn executor_workload(&self) -> &VerifiedExecutorWorkload {
+        &self.executor_workload
+    }
     pub fn xenia_frontier(&self) -> (u64, [u8; 32]) {
         (self.xenia_ledger_entry_count, self.xenia_ledger_head_hash)
     }
-    pub fn prior_checkpoint(&self) -> CheckpointHead { self.prior_checkpoint }
-    pub fn authority_state(&self) -> &VerifiedAuthorityState { &self.authority_state }
-    pub fn authority_state_digest(&self) -> Digest32 { self.authority_state.snapshot_digest() }
-    pub fn authority_state_sequence(&self) -> u64 { self.authority_state.state_sequence() }
-    pub fn expires_at_unix_s(&self) -> u64 { self.expires_at_unix_s }
+    pub fn prior_checkpoint(&self) -> CheckpointHead {
+        self.prior_checkpoint
+    }
+    pub fn authority_state(&self) -> &VerifiedAuthorityState {
+        &self.authority_state
+    }
+    pub fn authority_state_digest(&self) -> Digest32 {
+        self.authority_state.snapshot_digest()
+    }
+    pub fn authority_state_sequence(&self) -> u64 {
+        self.authority_state.state_sequence()
+    }
+    pub fn expires_at_unix_s(&self) -> u64 {
+        self.expires_at_unix_s
+    }
 }
 
 /// Verify a Xenia-bound Symthaea capability before the Action Runtime may
