@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use ed25519_dalek::SigningKey;
-use rusqlite::{params, Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior};
+use rusqlite::{params, Connection, OpenFlags, OptionalExtension, TransactionBehavior};
 use symthaea_authority::Digest32;
 use symthaea_qualification_witness::QualificationWitnessPolicyV1;
 use symthaea_qualification_witness_service::{
@@ -41,6 +41,8 @@ use thiserror::Error;
 pub const WITNESS_SEQUENCE_SCHEMA_VERSION: u16 = 1;
 pub const MAX_SQLITE_INTEGER: u64 = i64::MAX as u64;
 
+const SQLITE_APPLICATION_ID: i64 = 1_398_363_953; // ASCII "SYW1"
+const SQLITE_USER_VERSION: i64 = 1;
 const RESERVATION_DOMAIN: &[u8] = b"symthaea.qualification-witness.sequence-reservation.v1\0";
 const ATTESTATION_STORAGE_DOMAIN: &[u8] = b"symthaea.qualification-witness.persisted-attestation.v1\0";
 const ZERO32: [u8; 32] = [0; 32];
@@ -121,6 +123,18 @@ impl DurableVerifiedThenSignedQualificationV1 {
     pub fn attestation_digest(&self) -> Digest32 {
         self.attestation_digest
     }
+}
+
+/// Request object for one durable notarization attempt. The same `attempt_id`
+/// must be reused when retrying the same logical request after a crash.
+pub struct DurableWitnessNotarizationRequestV1<'a> {
+    pub attempt_id: [u8; 16],
+    pub runtime_policy: &'a QualificationVerifierRuntimePolicyV1,
+    pub witness_policy: &'a QualificationWitnessPolicyV1,
+    pub witness_id: [u8; 16],
+    pub signing_key: &'a SigningKey,
+    pub archive_path: &'a Path,
+    pub release_bindings: ReleaseEvidenceBindingsV1,
 }
 
 /// File-backed SQLite sequence store. A new connection is opened for each
@@ -391,18 +405,22 @@ impl SqliteWitnessSequenceStore {
     }
 }
 
-/// Strong production-shaped orchestration. `attempt_id` must be stable across
-/// retries of the same logical notarization attempt.
+/// Strong production-shaped orchestration. The same request attempt id must be
+/// stable across retries of one logical notarization.
 pub fn verify_reserve_sign_persist_v1(
     store: &SqliteWitnessSequenceStore,
-    attempt_id: [u8; 16],
-    runtime_policy: &QualificationVerifierRuntimePolicyV1,
-    witness_policy: &QualificationWitnessPolicyV1,
-    witness_id: [u8; 16],
-    signing_key: &SigningKey,
-    archive_path: &Path,
-    release_bindings: ReleaseEvidenceBindingsV1,
+    request: DurableWitnessNotarizationRequestV1<'_>,
 ) -> Result<DurableVerifiedThenSignedQualificationV1, WitnessSequenceError> {
+    let DurableWitnessNotarizationRequestV1 {
+        attempt_id,
+        runtime_policy,
+        witness_policy,
+        witness_id,
+        signing_key,
+        archive_path,
+        release_bindings,
+    } = request;
+
     if attempt_id == [0; 16]
         || witness_id == [0; 16]
         || release_bindings.archive_sha256.0 == ZERO32
@@ -473,7 +491,7 @@ fn canonical_store_target(path: &Path) -> Result<PathBuf, WitnessSequenceError> 
     let parent = path
         .parent()
         .filter(|candidate| !candidate.as_os_str().is_empty())
-        .unwrap_or_else(|| Path::new("."));
+        .unwrap_or(Path::new("."));
     let canonical_parent = fs::canonicalize(parent)?;
     let resolved = canonical_parent.join(file_name);
     match fs::symlink_metadata(&resolved) {
@@ -486,32 +504,70 @@ fn canonical_store_target(path: &Path) -> Result<PathBuf, WitnessSequenceError> 
 }
 
 fn initialize_schema(conn: &Connection) -> Result<(), WitnessSequenceError> {
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS witness_sequence_frontier (\n\
-            witness_id BLOB PRIMARY KEY NOT NULL CHECK(length(witness_id)=16),\n\
-            high_watermark INTEGER NOT NULL CHECK(high_watermark >= 1),\n\
-            reservation_head BLOB NOT NULL CHECK(length(reservation_head)=32)\n\
-         ) WITHOUT ROWID;\n\
-         CREATE TABLE IF NOT EXISTS witness_sequence_attempts (\n\
-            witness_id BLOB NOT NULL CHECK(length(witness_id)=16),\n\
-            attempt_id BLOB NOT NULL CHECK(length(attempt_id)=16),\n\
-            sequence INTEGER NOT NULL CHECK(sequence >= 1),\n\
-            witness_epoch INTEGER NOT NULL CHECK(witness_epoch >= 1),\n\
-            archive_sha256 BLOB NOT NULL CHECK(length(archive_sha256)=32),\n\
-            git_head BLOB NOT NULL CHECK(length(git_head)=20),\n\
-            git_tree BLOB NOT NULL CHECK(length(git_tree)=20),\n\
-            verifier_digest BLOB NOT NULL CHECK(length(verifier_digest)=32),\n\
-            witness_policy_digest BLOB NOT NULL CHECK(length(witness_policy_digest)=32),\n\
-            previous_reservation_digest BLOB NOT NULL CHECK(length(previous_reservation_digest)=32),\n\
-            reservation_digest BLOB NOT NULL CHECK(length(reservation_digest)=32),\n\
-            state INTEGER NOT NULL CHECK(state IN (1,2)),\n\
-            acceptance_digest BLOB NULL CHECK(acceptance_digest IS NULL OR length(acceptance_digest)=32),\n\
-            attestation_digest BLOB NULL CHECK(attestation_digest IS NULL OR length(attestation_digest)=32),\n\
-            attestation_json BLOB NULL,\n\
-            PRIMARY KEY(witness_id, attempt_id),\n\
-            UNIQUE(witness_id, sequence)\n\
-         ) WITHOUT ROWID;",
+    let application_id: i64 = conn.query_row("PRAGMA application_id", [], |row| row.get(0))?;
+    let user_version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    let names = user_table_names(conn)?;
+
+    if application_id == 0 && user_version == 0 {
+        if !names.is_empty() {
+            return Err(WitnessSequenceError::SchemaMismatch);
+        }
+        conn.execute_batch(
+            "BEGIN IMMEDIATE;\n\
+             PRAGMA application_id=1398363953;\n\
+             PRAGMA user_version=1;\n\
+             CREATE TABLE witness_sequence_frontier (\n\
+                witness_id BLOB PRIMARY KEY NOT NULL CHECK(length(witness_id)=16),\n\
+                high_watermark INTEGER NOT NULL CHECK(high_watermark >= 1),\n\
+                reservation_head BLOB NOT NULL CHECK(length(reservation_head)=32)\n\
+             ) WITHOUT ROWID;\n\
+             CREATE TABLE witness_sequence_attempts (\n\
+                witness_id BLOB NOT NULL CHECK(length(witness_id)=16),\n\
+                attempt_id BLOB NOT NULL CHECK(length(attempt_id)=16),\n\
+                sequence INTEGER NOT NULL CHECK(sequence >= 1),\n\
+                witness_epoch INTEGER NOT NULL CHECK(witness_epoch >= 1),\n\
+                archive_sha256 BLOB NOT NULL CHECK(length(archive_sha256)=32),\n\
+                git_head BLOB NOT NULL CHECK(length(git_head)=20),\n\
+                git_tree BLOB NOT NULL CHECK(length(git_tree)=20),\n\
+                verifier_digest BLOB NOT NULL CHECK(length(verifier_digest)=32),\n\
+                witness_policy_digest BLOB NOT NULL CHECK(length(witness_policy_digest)=32),\n\
+                previous_reservation_digest BLOB NOT NULL CHECK(length(previous_reservation_digest)=32),\n\
+                reservation_digest BLOB NOT NULL CHECK(length(reservation_digest)=32),\n\
+                state INTEGER NOT NULL CHECK(state IN (1,2)),\n\
+                acceptance_digest BLOB NULL CHECK(acceptance_digest IS NULL OR length(acceptance_digest)=32),\n\
+                attestation_digest BLOB NULL CHECK(attestation_digest IS NULL OR length(attestation_digest)=32),\n\
+                attestation_json BLOB NULL,\n\
+                PRIMARY KEY(witness_id, attempt_id),\n\
+                UNIQUE(witness_id, sequence)\n\
+             ) WITHOUT ROWID;\n\
+             COMMIT;",
+        )?;
+    } else if application_id != SQLITE_APPLICATION_ID || user_version != SQLITE_USER_VERSION {
+        return Err(WitnessSequenceError::SchemaMismatch);
+    }
+
+    verify_required_tables(conn)
+}
+
+fn user_table_names(conn: &Connection) -> Result<Vec<String>, WitnessSequenceError> {
+    let mut statement = conn.prepare(
+        "SELECT name FROM sqlite_schema\n\
+         WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name ASC",
     )?;
+    let names = statement
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(names)
+}
+
+fn verify_required_tables(conn: &Connection) -> Result<(), WitnessSequenceError> {
+    let names = user_table_names(conn)?;
+    if names.len() != 2
+        || names[0] != "witness_sequence_attempts"
+        || names[1] != "witness_sequence_frontier"
+    {
+        return Err(WitnessSequenceError::SchemaMismatch);
+    }
     Ok(())
 }
 
@@ -586,21 +642,21 @@ impl DbAttempt {
     }
 }
 
-type RawAttempt = (
-    i64,
-    i64,
-    Vec<u8>,
-    Vec<u8>,
-    Vec<u8>,
-    Vec<u8>,
-    Vec<u8>,
-    Vec<u8>,
-    Vec<u8>,
-    i64,
-    Option<Vec<u8>>,
-    Option<Vec<u8>>,
-    Option<Vec<u8>>,
-);
+struct RawAttempt {
+    sequence: i64,
+    witness_epoch: i64,
+    archive_sha256: Vec<u8>,
+    git_head: Vec<u8>,
+    git_tree: Vec<u8>,
+    verifier_digest: Vec<u8>,
+    witness_policy_digest: Vec<u8>,
+    previous_reservation_digest: Vec<u8>,
+    reservation_digest: Vec<u8>,
+    state: i64,
+    acceptance_digest: Option<Vec<u8>>,
+    attestation_digest: Option<Vec<u8>>,
+    attestation_json: Option<Vec<u8>>,
+}
 
 fn load_attempt(
     conn: &Connection,
@@ -614,21 +670,21 @@ fn load_attempt(
          FROM witness_sequence_attempts WHERE witness_id=?1 AND attempt_id=?2",
         params![&witness_id[..], &attempt_id[..]],
         |row| {
-            Ok((
-                row.get(0)?,
-                row.get(1)?,
-                row.get(2)?,
-                row.get(3)?,
-                row.get(4)?,
-                row.get(5)?,
-                row.get(6)?,
-                row.get(7)?,
-                row.get(8)?,
-                row.get(9)?,
-                row.get(10)?,
-                row.get(11)?,
-                row.get(12)?,
-            ))
+            Ok(RawAttempt {
+                sequence: row.get(0)?,
+                witness_epoch: row.get(1)?,
+                archive_sha256: row.get(2)?,
+                git_head: row.get(3)?,
+                git_tree: row.get(4)?,
+                verifier_digest: row.get(5)?,
+                witness_policy_digest: row.get(6)?,
+                previous_reservation_digest: row.get(7)?,
+                reservation_digest: row.get(8)?,
+                state: row.get(9)?,
+                acceptance_digest: row.get(10)?,
+                attestation_digest: row.get(11)?,
+                attestation_json: row.get(12)?,
+            })
         },
     )
     .optional()?
@@ -641,45 +697,32 @@ fn db_attempt_from_raw(
     attempt_id: [u8; 16],
     raw: RawAttempt,
 ) -> Result<DbAttempt, WitnessSequenceError> {
-    let (
-        sequence,
-        witness_epoch,
-        archive_sha256,
-        git_head,
-        git_tree,
-        verifier_digest,
-        witness_policy_digest,
-        previous_reservation_digest,
-        reservation_digest,
-        state,
-        acceptance_digest,
-        attestation_digest,
-        attestation_json,
-    ) = raw;
     Ok(DbAttempt {
         witness_id,
         attempt_id,
-        sequence: from_sql_integer(sequence)?,
-        witness_epoch: from_sql_integer(witness_epoch)?,
-        archive_sha256: Digest32(exact_array::<32>(&archive_sha256)?),
-        git_head: exact_array::<20>(&git_head)?,
-        git_tree: exact_array::<20>(&git_tree)?,
-        verifier_digest: Digest32(exact_array::<32>(&verifier_digest)?),
-        witness_policy_digest: Digest32(exact_array::<32>(&witness_policy_digest)?),
-        previous_reservation_digest: Digest32(exact_array::<32>(&previous_reservation_digest)?),
-        reservation_digest: Digest32(exact_array::<32>(&reservation_digest)?),
-        state: match state {
+        sequence: from_sql_integer(raw.sequence)?,
+        witness_epoch: from_sql_integer(raw.witness_epoch)?,
+        archive_sha256: Digest32(exact_array::<32>(&raw.archive_sha256)?),
+        git_head: exact_array::<20>(&raw.git_head)?,
+        git_tree: exact_array::<20>(&raw.git_tree)?,
+        verifier_digest: Digest32(exact_array::<32>(&raw.verifier_digest)?),
+        witness_policy_digest: Digest32(exact_array::<32>(&raw.witness_policy_digest)?),
+        previous_reservation_digest: Digest32(exact_array::<32>(&raw.previous_reservation_digest)?),
+        reservation_digest: Digest32(exact_array::<32>(&raw.reservation_digest)?),
+        state: match raw.state {
             1 => DurableWitnessAttemptStateV1::Reserved,
             2 => DurableWitnessAttemptStateV1::Signed,
             _ => return Err(WitnessSequenceError::AuditFailure),
         },
-        acceptance_digest: acceptance_digest
+        acceptance_digest: raw
+            .acceptance_digest
             .map(|bytes| exact_array::<32>(&bytes).map(Digest32))
             .transpose()?,
-        attestation_digest: attestation_digest
+        attestation_digest: raw
+            .attestation_digest
             .map(|bytes| exact_array::<32>(&bytes).map(Digest32))
             .transpose()?,
-        attestation_json,
+        attestation_json: raw.attestation_json,
     })
 }
 
@@ -688,21 +731,21 @@ fn db_attempt_from_row_with_witness(
     witness_id: [u8; 16],
 ) -> Result<DbAttempt, WitnessSequenceError> {
     let attempt_id: Vec<u8> = row.get(0)?;
-    let raw: RawAttempt = (
-        row.get(1)?,
-        row.get(2)?,
-        row.get(3)?,
-        row.get(4)?,
-        row.get(5)?,
-        row.get(6)?,
-        row.get(7)?,
-        row.get(8)?,
-        row.get(9)?,
-        row.get(10)?,
-        row.get(11)?,
-        row.get(12)?,
-        row.get(13)?,
-    );
+    let raw = RawAttempt {
+        sequence: row.get(1)?,
+        witness_epoch: row.get(2)?,
+        archive_sha256: row.get(3)?,
+        git_head: row.get(4)?,
+        git_tree: row.get(5)?,
+        verifier_digest: row.get(6)?,
+        witness_policy_digest: row.get(7)?,
+        previous_reservation_digest: row.get(8)?,
+        reservation_digest: row.get(9)?,
+        state: row.get(10)?,
+        acceptance_digest: row.get(11)?,
+        attestation_digest: row.get(12)?,
+        attestation_json: row.get(13)?,
+    };
     db_attempt_from_raw(witness_id, exact_array::<16>(&attempt_id)?, raw)
 }
 
@@ -817,6 +860,8 @@ pub enum WitnessSequenceError {
     InvalidStorePath,
     #[error("SQLite durability configuration did not enter WAL mode")]
     DurabilityConfiguration,
+    #[error("witness sequence database schema/application identity mismatch")]
+    SchemaMismatch,
     #[error("invalid witness attempt binding")]
     InvalidAttemptBinding,
     #[error("witness sequence space is exhausted")]
@@ -999,6 +1044,32 @@ mod tests {
             Err(WitnessSequenceError::InvalidStorePath)
         ));
         let _ = fs::remove_file(link_path);
+    }
+
+    #[test]
+    fn claimed_database_missing_required_table_fails_closed() {
+        let db = TestDb::new();
+        let store = SqliteWitnessSequenceStore::open(&db.path).unwrap();
+        drop(store);
+        let conn = Connection::open(&db.path).unwrap();
+        conn.execute_batch("DROP TABLE witness_sequence_attempts;").unwrap();
+        drop(conn);
+        assert!(matches!(
+            SqliteWitnessSequenceStore::open(&db.path),
+            Err(WitnessSequenceError::SchemaMismatch)
+        ));
+    }
+
+    #[test]
+    fn unclaimed_nonempty_database_is_not_adopted() {
+        let db = TestDb::new();
+        let conn = Connection::open(&db.path).unwrap();
+        conn.execute_batch("CREATE TABLE unrelated(value INTEGER);").unwrap();
+        drop(conn);
+        assert!(matches!(
+            SqliteWitnessSequenceStore::open(&db.path),
+            Err(WitnessSequenceError::SchemaMismatch)
+        ));
     }
 
     #[test]
