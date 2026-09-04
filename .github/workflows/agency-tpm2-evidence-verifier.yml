@@ -1,0 +1,40 @@
+name: Agency TPM2 Evidence Verifier
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/agency/verify-tpm2-qualification-evidence.py'
+      - 'scripts/agency/test_verify_tpm2_qualification_evidence.py'
+      - 'docs/architecture/AGENCY_TPM2_EVIDENCE_VERIFIER_V01.md'
+      - '.github/workflows/agency-tpm2-evidence-verifier.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agency-tpm2-evidence-verifier-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Hostile evidence archive tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record exact source
+        run: |
+          git rev-parse HEAD
+          git rev-parse HEAD^{tree}
+          python3 --version
+
+      - name: Compile verifier and tests
+        run: |
+          python3 -m py_compile \
+            scripts/agency/verify-tpm2-qualification-evidence.py \
+            scripts/agency/test_verify_tpm2_qualification_evidence.py
+
+      - name: Run hostile evidence archive regressions
+        run: python3 scripts/agency/test_verify_tpm2_qualification_evidence.py -v
