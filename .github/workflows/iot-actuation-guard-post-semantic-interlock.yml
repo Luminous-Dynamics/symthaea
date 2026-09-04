@@ -1,0 +1,191 @@
+name: IoT Actuation Guard Post-Semantic Interlock
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-guard-interlock/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/**'
+      - '.github/workflows/iot-actuation-guard-post-semantic-interlock.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-actuation-guard-post-semantic-interlock-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    name: Current-trust post-semantic interlock contract (Rust 1.96)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact formatter
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+
+      - name: Verify exact checkout and formatter
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Check exact successor formatting
+        run: |
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-interlock/src/lib.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-interlock/src/post_semantic.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-interlock/tests/post_semantic.rs
+
+      - name: Enforce corrected controller-trust TCB
+        run: |
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          root = Path('crates/bridges/symthaea-iot-actuation-guard-interlock')
+          manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+          deps = set(manifest.get('dependencies', {}))
+          expected = {
+              'symthaea-authority', 'symthaea-iot-actuation-guard',
+              'symthaea-iot-actuation-guard-post-semantic-controller',
+              'symthaea-iot-actuation-guard-protocol', 'symthaea-iot-final-gate',
+              'symthaea-iot-interlock-ed25519', 'symthaea-iot-interlock-trust',
+              'symthaea-iot-transport-receipt', 'thiserror',
+          }
+          assert deps == expected, f'production dependency drift: {sorted(deps)!r}'
+
+          dev = set(manifest.get('dev-dependencies', {}))
+          expected_dev = {
+              'bincode', 'blake3', 'ed25519-dalek', 'fips204',
+              'symthaea-action-checkpoint',
+              'symthaea-iot-actuation-guard-admission-challenge',
+              'symthaea-iot-actuation-guard-admission-reservation',
+              'symthaea-iot-actuation-guard-device-reality',
+              'symthaea-iot-actuation-guard-semantic-persistence',
+              'symthaea-iot-actuation-guard-two-phase-protocol',
+              'symthaea-iot-authority', 'symthaea-iot-device-protocol',
+              'symthaea-iot-durable-runtime', 'symthaea-iot-policy',
+              'symthaea-iot-posture',
+          }
+          assert dev == expected_dev, f'test dependency drift: {sorted(dev)!r}'
+
+          source = (root / 'src/post_semantic.rs').read_text()
+          required = [
+              'verify_post_semantic_controller(',
+              'DecodedPostSemanticControllerEvidence',
+              'PostSemanticControllerChallengeV1',
+              'VerifiedPostSemanticPhysicalInterlock',
+              'self.policy.validate()',
+              'self.policy.digest()',
+              'self.trust_registry.head()',
+              'challenge.issued_at_unix_ms()',
+              'challenge.expires_at_unix_ms()',
+              'statement.digest()',
+              'statement.asserted_interlocks != self.policy.required_interlocks',
+              'statement.checked_at_unix_ms < self.trust_registry.snapshot().issued_at_unix_ms',
+              'verify_interlock_key_binding(',
+              'Ed25519Rfc8032InterlockVerifier',
+              'system_unix_ms()',
+          ]
+          for needle in required:
+              assert needle in source, f'missing post-semantic interlock invariant: {needle!r}'
+
+          start = source.index('pub fn verify_post_semantic_controller(')
+          end = source.index(') -> Result<VerifiedPostSemanticPhysicalInterlock', start)
+          signature = source[start:end]
+          assert 'DecodedPostSemanticControllerEvidence' in signature
+          assert 'PostSemanticControllerChallengeV1' in signature
+          for needle in ['now_unix', 'verifier:', 'public_key', 'PhysicalInterlockReportV1']:
+              assert needle not in signature, f'caller-controlled verifier surface: {needle!r}'
+
+          # Ignore comments when checking whether the corrected module accidentally calls
+          # the legacy constructor whose digest semantics differ from the new statement.
+          code = '\n'.join(
+              line for line in source.splitlines()
+              if not line.lstrip().startswith('//')
+          )
+          forbidden = [
+              'verify_physical_interlock(', 'VerifiedPhysicalInterlock',
+              'HardwareInterlockEvidenceVerifier', 'FinalActuatorPermit',
+              'TrustBoundFinalActuatorPermit', 'CompleteJitHalLease',
+              'join_final_actuator_gate', 'upgrade_final_actuator_permit',
+              'fence_final_permit_for_hal', 'TcpListener', 'TcpStream',
+              'tokio::spawn', 'std::process::Command', 'unsafe {',
+          ]
+          for needle in forbidden:
+              assert needle not in code, f'forbidden corrected interlock surface: {needle!r}'
+          PY
+
+  implementation:
+    name: Current-trust post-semantic interlock implementation (MSRV 1.94)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.94.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact compiler and Clippy
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      - name: Resolve candidate and reject unreviewed external dependency drift
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+          before = tomllib.loads(Path('/tmp/Cargo.lock.before').read_text())
+          after = tomllib.loads(Path('Cargo.lock').read_text())
+          def sourced(doc):
+              return {(p['name'], p['version'], p['source']): p for p in doc.get('package', []) if 'source' in p}
+          b = sourced(before); a = sourced(after)
+          added = sorted(set(a) - set(b)); removed = sorted(set(b) - set(a))
+          changed = sorted(k for k in set(a) & set(b) if a[k] != b[k])
+          allowed = {('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')}
+          assert set(added).issubset(allowed), f'unreviewed external package delta: {added!r}'
+          assert not removed, f'external package removal: {removed!r}'
+          assert not changed, f'existing external package mutation: {changed!r}'
+          PY
+
+      - name: Check guard-interlock package
+        run: cargo check -p symthaea-iot-actuation-guard-interlock --all-targets
+
+      - name: Run full current-key causal chain first
+        run: >-
+          cargo test -p symthaea-iot-actuation-guard-interlock
+          --test post_semantic real_controller_key_and_guard_policy_verify_the_post_semantic_statement -- --exact
+
+      - name: Run wrong-key regression
+        run: >-
+          cargo test -p symthaea-iot-actuation-guard-interlock
+          --test post_semantic wrong_controller_key_is_rejected_even_when_report_commitment_is_self_consistent -- --exact
+
+      - name: Run revoked-key regression
+        run: >-
+          cargo test -p symthaea-iot-actuation-guard-interlock
+          --test post_semantic revoked_controller_key_is_rejected -- --exact
+
+      - name: Test guard-interlock package
+        run: cargo test -p symthaea-iot-actuation-guard-interlock --all-targets
+
+      - name: Strict Clippy guard-interlock package
+        run: cargo clippy -p symthaea-iot-actuation-guard-interlock --all-targets -- -D warnings
