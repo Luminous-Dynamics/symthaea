@@ -79,33 +79,53 @@ impl std::fmt::Display for DrmError {
 
 impl std::error::Error for DrmError {}
 
-/// Result of the explicit display-restore attempt performed before renderer
-/// resources are relinquished.
-///
-/// This is diagnostic evidence only. A failed restore must never keep the
-/// renderer alive or acquire login/session authority.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DisplayRestoreOutcome {
+enum RestoreStatus {
     Restored,
-    RestoreFailed(io::ErrorKind),
+    Failed(io::ErrorKind),
 }
 
-impl DisplayRestoreOutcome {
+/// Opaque evidence minted only by `DrmFramebuffer::release()` after the actual
+/// display-restore ioctl has been attempted.
+///
+/// Callers may inspect or copy this evidence, but cannot construct a successful
+/// value themselves. That keeps `restore_succeeded=true` provenance tied to the
+/// DRM release boundary rather than to a freely constructible public enum.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DisplayReleaseEvidence {
+    restore_status: RestoreStatus,
+}
+
+impl DisplayReleaseEvidence {
     pub const fn succeeded(self) -> bool {
-        matches!(self, Self::Restored)
+        matches!(self.restore_status, RestoreStatus::Restored)
     }
 
     pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Restored => "restored",
-            Self::RestoreFailed(_) => "restore-failed",
+        match self.restore_status {
+            RestoreStatus::Restored => "restored",
+            RestoreStatus::Failed(_) => "restore-failed",
         }
     }
 
     pub const fn error_kind(self) -> Option<io::ErrorKind> {
-        match self {
-            Self::Restored => None,
-            Self::RestoreFailed(kind) => Some(kind),
+        match self.restore_status {
+            RestoreStatus::Restored => None,
+            RestoreStatus::Failed(kind) => Some(kind),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn restored_for_test() -> Self {
+        Self {
+            restore_status: RestoreStatus::Restored,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn failed_for_test(kind: io::ErrorKind) -> Self {
+        Self {
+            restore_status: RestoreStatus::Failed(kind),
         }
     }
 }
@@ -328,21 +348,21 @@ impl DrmFramebuffer {
     /// Explicitly restore the captured display state and relinquish this
     /// framebuffer.
     ///
-    /// The returned value reports the actual SETCRTC result. Regardless of that
-    /// result, consuming `self` causes Drop to destroy the renderer framebuffer
-    /// and close the DRM fd before the caller receives the outcome. A failed
-    /// restore therefore remains diagnostic-only and cannot keep presentation
-    /// alive as an authority boundary.
-    pub fn release(mut self) -> DisplayRestoreOutcome {
-        let outcome = match self.restore_original() {
-            Ok(()) => DisplayRestoreOutcome::Restored,
-            Err(error) => DisplayRestoreOutcome::RestoreFailed(error.kind()),
+    /// The returned opaque evidence reports the actual SETCRTC result. Regardless
+    /// of that result, consuming `self` causes Drop to destroy the renderer
+    /// framebuffer and close the DRM fd before the caller receives the evidence.
+    /// A failed restore therefore remains diagnostic-only and cannot keep
+    /// presentation alive as an authority boundary.
+    pub fn release(mut self) -> DisplayReleaseEvidence {
+        let restore_status = match self.restore_original() {
+            Ok(()) => RestoreStatus::Restored,
+            Err(error) => RestoreStatus::Failed(error.kind()),
         };
         // Do not let Drop silently retry after the explicit result has been
         // observed: that would make the returned status ambiguous. Abnormal paths
         // that never call release() retain the best-effort Drop safety net.
         self.restore_pending = false;
-        outcome
+        DisplayReleaseEvidence { restore_status }
     }
 
     fn restore_original(&self) -> io::Result<()> {

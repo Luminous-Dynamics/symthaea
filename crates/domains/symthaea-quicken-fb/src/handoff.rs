@@ -10,7 +10,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::framebuffer::DisplayRestoreOutcome;
+use crate::framebuffer::DisplayReleaseEvidence;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -41,7 +41,7 @@ pub struct DisplayReleaseReceipt {
     pub release_us: u64,
     pub renderer_uptime_us: u64,
     pub reason: ExitReason,
-    pub restore_outcome: DisplayRestoreOutcome,
+    pub release_evidence: DisplayReleaseEvidence,
 }
 
 impl DisplayReleaseReceipt {
@@ -49,14 +49,14 @@ impl DisplayReleaseReceipt {
         release: Duration,
         renderer_uptime: Duration,
         reason: ExitReason,
-        restore_outcome: DisplayRestoreOutcome,
+        release_evidence: DisplayReleaseEvidence,
     ) -> Self {
         Self {
             renderer_pid: std::process::id(),
             release_us: saturating_micros(release),
             renderer_uptime_us: saturating_micros(renderer_uptime),
             reason,
-            restore_outcome,
+            release_evidence,
         }
     }
 
@@ -73,10 +73,7 @@ impl DisplayReleaseReceipt {
         fs::create_dir_all(parent)?;
 
         let tmp = temporary_path(path, self.renderer_pid);
-        let restore_error_kind = self
-            .restore_outcome
-            .error_kind()
-            .map(|kind| format!("{kind:?}"));
+        let restore_error_class = self.release_evidence.error_kind().map(error_class);
         let value = serde_json::json!({
             "version": HANDOFF_RECEIPT_VERSION,
             "renderer_pid": self.renderer_pid,
@@ -84,15 +81,30 @@ impl DisplayReleaseReceipt {
             "renderer_uptime_us": self.renderer_uptime_us,
             "reason": self.reason.as_str(),
             "restore_attempted": true,
-            "restore_succeeded": self.restore_outcome.succeeded(),
-            "restore_status": self.restore_outcome.as_str(),
-            "restore_error_kind": restore_error_kind,
+            "restore_succeeded": self.release_evidence.succeeded(),
+            "restore_status": self.release_evidence.as_str(),
+            "restore_error_class": restore_error_class,
         });
         let bytes = serde_json::to_vec(&value)
             .map_err(|error| io::Error::other(format!("serialize handoff receipt: {error}")))?;
         fs::write(&tmp, bytes)?;
         fs::rename(tmp, path)?;
         Ok(())
+    }
+}
+
+/// Stable, intentionally coarse receipt vocabulary. Do not serialize Debug or
+/// raw OS/kernel error text into the versioned evidence schema.
+const fn error_class(kind: io::ErrorKind) -> &'static str {
+    match kind {
+        io::ErrorKind::NotFound => "not-found",
+        io::ErrorKind::PermissionDenied => "permission-denied",
+        io::ErrorKind::WouldBlock => "would-block",
+        io::ErrorKind::TimedOut => "timed-out",
+        io::ErrorKind::InvalidInput => "invalid-input",
+        io::ErrorKind::InvalidData => "invalid-data",
+        io::ErrorKind::Unsupported => "unsupported",
+        _ => "other",
     }
 }
 
@@ -119,16 +131,23 @@ mod tests {
     }
 
     #[test]
+    fn error_classes_are_stable_and_coarse() {
+        assert_eq!(error_class(io::ErrorKind::PermissionDenied), "permission-denied");
+        assert_eq!(error_class(io::ErrorKind::InvalidInput), "invalid-input");
+        assert_eq!(error_class(io::ErrorKind::Other), "other");
+    }
+
+    #[test]
     fn durations_saturate_to_u64() {
         let receipt = DisplayReleaseReceipt::new(
             Duration::from_micros(42),
             Duration::from_micros(9001),
             ExitReason::Natural,
-            DisplayRestoreOutcome::Restored,
+            DisplayReleaseEvidence::restored_for_test(),
         );
         assert_eq!(receipt.release_us, 42);
         assert_eq!(receipt.renderer_uptime_us, 9001);
-        assert!(receipt.restore_outcome.succeeded());
+        assert!(receipt.release_evidence.succeeded());
     }
 
     #[test]
@@ -147,7 +166,7 @@ mod tests {
             Duration::from_micros(73),
             Duration::from_millis(250),
             ExitReason::Signal,
-            DisplayRestoreOutcome::RestoreFailed(io::ErrorKind::PermissionDenied),
+            DisplayReleaseEvidence::failed_for_test(io::ErrorKind::PermissionDenied),
         );
         receipt.write_atomic(&path).unwrap();
 
@@ -158,7 +177,7 @@ mod tests {
         assert_eq!(value["restore_attempted"], true);
         assert_eq!(value["restore_succeeded"], false);
         assert_eq!(value["restore_status"], "restore-failed");
-        assert_eq!(value["restore_error_kind"], "PermissionDenied");
+        assert_eq!(value["restore_error_class"], "permission-denied");
 
         let _ = fs::remove_dir_all(directory);
     }
@@ -179,7 +198,7 @@ mod tests {
             Duration::from_micros(11),
             Duration::from_millis(100),
             ExitReason::Natural,
-            DisplayRestoreOutcome::Restored,
+            DisplayReleaseEvidence::restored_for_test(),
         )
         .write_atomic(&path)
         .unwrap();
@@ -188,7 +207,7 @@ mod tests {
         assert_eq!(value["restore_attempted"], true);
         assert_eq!(value["restore_succeeded"], true);
         assert_eq!(value["restore_status"], "restored");
-        assert!(value["restore_error_kind"].is_null());
+        assert!(value["restore_error_class"].is_null());
 
         let _ = fs::remove_dir_all(directory);
     }
