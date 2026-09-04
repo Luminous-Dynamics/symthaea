@@ -75,16 +75,17 @@ in {
         type = types.bool;
         default = false;
         description = ''
-          Emit a diagnostic acknowledgement only after quicken-fb has dropped
-          its DRM framebuffer and restored the saved CRTC. This does not by
-          itself authorize display-manager startup.
+          Emit a diagnostic acknowledgement after quicken-fb explicitly attempts
+          restoration of the captured display topology and releases its DRM
+          resources. Receipt v2 records whether the restore ioctl actually
+          succeeded. This does not by itself authorize display-manager startup.
         '';
       };
 
       receiptPath = mkOption {
         type = types.str;
-        default = "/run/symthaea/boot-display-released-v1.json";
-        description = "Ephemeral post-DRM-release acknowledgement path.";
+        default = "/run/symthaea/boot-display-released-v2.json";
+        description = "Ephemeral v2 DRM release/restore-result acknowledgement path.";
       };
 
       stopTimeoutMs = mkOption {
