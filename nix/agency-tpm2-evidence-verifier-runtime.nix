@@ -4,8 +4,8 @@
 # Production-shaped runtime inputs for symthaea-qualification-witness-service.
 # The caller must construct `pkgs` from the repository's exact locked nixpkgs.
 #
-# We deliberately return the real Python executable and verifier script as two
-# separate immutable Nix-store paths. The Rust witness service measures and
+# We deliberately return the canonical Python interpreter and verifier script as
+# two separate immutable Nix-store paths. The Rust witness service measures and
 # commits both; no shell wrapper or mutable PATH lookup sits between it and the
 # verifier process.
 { pkgs
@@ -18,6 +18,10 @@ let
     (builtins.readFile verifierSource);
 in
 {
-  pythonExecutable = "${pkgs.python3}/bin/python3";
+  # nixpkgs' Python derivation exposes the concrete versioned interpreter path;
+  # use that rather than the potentially symlinked `bin/python3` convenience
+  # name because the Rust policy intentionally requires an already-canonical
+  # reviewed executable path.
+  pythonExecutable = pkgs.python3.interpreter;
   inherit verifierScript;
 }
