@@ -1,0 +1,182 @@
+name: IoT Actuation Guard Semantic Persistence
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-guard-semantic-persistence/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard-device-reality/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard-admission-reservation/**'
+      - '.github/workflows/iot-actuation-guard-semantic-persistence.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-actuation-guard-semantic-persistence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    name: Durable semantic source contract (Rust 1.96)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact formatter
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+
+      - name: Verify exact checkout and formatter
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Check exact source formatting
+        run: |
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-semantic-persistence/src/lib.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-semantic-persistence/tests/durable.rs
+
+      - name: Enforce semantic-persistence TCB
+        run: |
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          root = Path('crates/bridges/symthaea-iot-actuation-guard-semantic-persistence')
+          manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+          deps = set(manifest.get('dependencies', {}))
+          expected = {
+              'bincode', 'libc', 'symthaea-authority',
+              'symthaea-iot-actuation-guard-admission-reservation',
+              'symthaea-iot-actuation-guard-device-reality',
+              'symthaea-iot-device-protocol', 'thiserror',
+          }
+          assert deps == expected, f'production dependency drift: {sorted(deps)!r}'
+          dev = set(manifest.get('dev-dependencies', {}))
+          expected_dev = {
+              'blake3', 'ed25519-dalek', 'symthaea-action-checkpoint',
+              'symthaea-iot-actuation-guard-admission-challenge',
+              'symthaea-iot-authority', 'symthaea-iot-durable-runtime',
+              'symthaea-iot-policy', 'symthaea-iot-posture',
+              'symthaea-iot-transport-receipt',
+          }
+          assert dev == expected_dev, f'test dependency drift: {sorted(dev)!r}'
+          assert 'bin' not in manifest, 'semantic persistence must remain a library proof/storage stage'
+
+          source = (root / 'src/lib.rs').read_text()
+          required = [
+              '#![deny(unsafe_code)]',
+              'PersistedAdmissionReservation',
+              'VerifiedAdmissionDeviceReality',
+              'PersistedSemanticAcceptance',
+              'trusted_current_head: DeviceSemanticHead',
+              'prepare_semantic_acceptance(',
+              'runtime_state()',
+              'kernel.lock()',
+              'file.sync_all()',
+              'fs::rename',
+              'root.sync_all()',
+              'PersistedStateReadbackMismatch',
+              'confirm_persisted(expected_head)',
+              'SystemClockRegressedDuringPersistence',
+          ]
+          for needle in required:
+              assert needle in source, f'missing semantic-persistence invariant: {needle!r}'
+
+          start = source.index('pub fn persist_semantic_acceptance(')
+          end = source.index(') -> Result<PersistedSemanticAcceptance', start)
+          signature = source[start:end]
+          assert 'PersistedAdmissionReservation' in signature
+          assert 'VerifiedAdmissionDeviceReality' in signature
+          for needle in ['DeviceRuntimeState', 'PhysicalEffectEnvelopeV1', 'now_unix', 'verifier:']:
+              assert needle not in signature, f'caller-controlled semantic input: {needle!r}'
+
+          lock_pos = source.index('kernel.lock()')
+          reread_pos = source.index('let current = self.read_state_locked()', lock_pos)
+          now_pos = source.index('let validation_started_at_unix_ms = system_unix_ms()', reread_pos)
+          lineage_pos = source.index('validate_lineage(', now_pos)
+          policy_pos = source.index('prepare_semantic_acceptance(', lineage_pos)
+          write_pos = source.index('self.write_state_locked(&successor)', policy_pos)
+          readback_pos = source.index('let persisted = self.read_state_locked()', write_pos)
+          confirm_pos = source.index('confirm_persisted(expected_head)', readback_pos)
+          assert lock_pos < reread_pos < now_pos < lineage_pos < policy_pos < write_pos < readback_pos < confirm_pos
+
+          forbidden = [
+              'PhysicalInterlockReportV1', 'ControllerInterlock',
+              'FinalActuatorPermit', 'CompleteJitHalLease',
+              'join_final_actuator_gate', 'fence_final_permit_for_hal',
+              'TcpListener', 'TcpStream', 'tokio::spawn',
+              'std::process::Command', 'unsafe {',
+          ]
+          for needle in forbidden:
+              assert needle not in source, f'forbidden semantic-persistence surface: {needle!r}'
+          PY
+
+  implementation:
+    name: Durable semantic implementation (MSRV 1.94)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.94.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact compiler and Clippy
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      - name: Resolve candidate and reject unreviewed external dependency drift
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+          before = tomllib.loads(Path('/tmp/Cargo.lock.before').read_text())
+          after = tomllib.loads(Path('Cargo.lock').read_text())
+          def sourced(doc):
+              return {(p['name'], p['version'], p['source']): p for p in doc.get('package', []) if 'source' in p}
+          b = sourced(before); a = sourced(after)
+          added = sorted(set(a) - set(b)); removed = sorted(set(b) - set(a))
+          changed = sorted(k for k in set(a) & set(b) if a[k] != b[k])
+          allowed = {('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')}
+          assert set(added).issubset(allowed), f'unreviewed external package delta: {added!r}'
+          assert not removed, f'external package removal: {removed!r}'
+          assert not changed, f'existing external package mutation: {changed!r}'
+          PY
+
+      - name: Check semantic-persistence package
+        run: cargo check -p symthaea-iot-actuation-guard-semantic-persistence --all-targets
+
+      - name: Run full durable causal chain first
+        run: >-
+          cargo test -p symthaea-iot-actuation-guard-semantic-persistence
+          --test durable semantic_acceptance_is_durable_only_after_authenticated_device_reality -- --exact
+
+      - name: Run authenticated-unsafe non-mutation regression
+        run: >-
+          cargo test -p symthaea-iot-actuation-guard-semantic-persistence
+          --test durable authenticated_but_unsafe_observation_never_advances_semantic_disk_head -- --exact
+
+      - name: Test semantic-persistence package
+        run: cargo test -p symthaea-iot-actuation-guard-semantic-persistence --all-targets
+
+      - name: Strict Clippy semantic-persistence package
+        run: cargo clippy -p symthaea-iot-actuation-guard-semantic-persistence --all-targets -- -D warnings
