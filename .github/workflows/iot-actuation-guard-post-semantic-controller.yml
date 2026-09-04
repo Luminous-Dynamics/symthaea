@@ -1,0 +1,167 @@
+name: IoT Actuation Guard Post-Semantic Controller
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard-semantic-persistence/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard-two-phase-protocol/**'
+      - '.github/workflows/iot-actuation-guard-post-semantic-controller.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-actuation-guard-post-semantic-controller-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    name: Post-semantic controller source contract (Rust 1.96)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact formatter
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+
+      - name: Verify exact checkout and formatter
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Check exact source formatting
+        run: |
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/src/lib.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/src/error.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/src/challenge.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/src/response.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/src/tests.rs
+
+      - name: Enforce post-semantic causal boundary
+        run: |
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          root = Path('crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller')
+          manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+          deps = set(manifest.get('dependencies', {}))
+          expected = {
+              'bincode', 'blake3', 'getrandom', 'serde', 'symthaea-authority',
+              'symthaea-iot-actuation-guard-admission-reservation',
+              'symthaea-iot-actuation-guard-device-reality',
+              'symthaea-iot-actuation-guard-semantic-persistence',
+              'symthaea-iot-actuation-guard-two-phase-protocol',
+              'symthaea-iot-device-protocol', 'symthaea-iot-transport-receipt', 'thiserror',
+          }
+          assert deps == expected, f'production dependency drift: {sorted(deps)!r}'
+          assert set(manifest.get('dev-dependencies', {})) == {'ed25519-dalek'}
+          assert 'bin' not in manifest
+
+          challenge = (root / 'src/challenge.rs').read_text()
+          response = (root / 'src/response.rs').read_text()
+          source = challenge + '\n' + response
+
+          required = [
+              'PersistedSemanticAcceptance',
+              'issue_from_persisted_semantic_acceptance',
+              'getrandom::getrandom',
+              'system_unix_ms()',
+              'device_reality_expires_at_unix_ms',
+              'effect_deadline_unix_ms',
+              '.min(device_reality_expires_at_unix_ms)',
+              '.min(effect_deadline_unix_ms)',
+              'device_attestation_object_digest',
+              'PostReservationInterlockReportV1',
+              'ControllerObservationPredatesChallenge',
+              'ControllerReportOutlivesChallenge',
+          ]
+          for needle in required:
+              assert needle in source, f'missing post-semantic invariant: {needle!r}'
+
+          assert 'Deserialize' not in challenge, 'privileged outbound challenge must not be reconstructible from caller bytes'
+          start = challenge.index('pub fn issue_from_persisted_semantic_acceptance(')
+          end = challenge.index(') -> Result<Self', start)
+          signature = challenge[start:end]
+          assert 'PersistedSemanticAcceptance' in signature
+          for needle in ['nonce', 'issued_at', 'expires_at', 'DeviceSemanticHead', 'Digest32']:
+              assert needle not in signature, f'caller-controlled challenge input: {needle!r}'
+
+          assert 'raw_device_attestation_result' not in response, 'device appraisal must not be retransmitted after semantic acceptance'
+          assert 'DeviceAttestationResultV1' not in response, 'controller response must reference the accepted appraisal only by committed digest'
+
+          forbidden = [
+              'FinalActuatorPermit', 'CompleteJitHalLease',
+              'join_final_actuator_gate', 'fence_final_permit_for_hal',
+              'TcpListener', 'TcpStream', 'tokio::spawn',
+              'std::process::Command', 'unsafe {',
+          ]
+          for needle in forbidden:
+              assert needle not in source, f'forbidden post-semantic surface: {needle!r}'
+          PY
+
+  implementation:
+    name: Post-semantic controller implementation (MSRV 1.94)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.94.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact compiler and Clippy
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      - name: Resolve candidate and reject unreviewed external dependency drift
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+          before = tomllib.loads(Path('/tmp/Cargo.lock.before').read_text())
+          after = tomllib.loads(Path('Cargo.lock').read_text())
+          def sourced(doc):
+              return {(p['name'], p['version'], p['source']): p for p in doc.get('package', []) if 'source' in p}
+          b = sourced(before); a = sourced(after)
+          added = sorted(set(a) - set(b)); removed = sorted(set(b) - set(a))
+          changed = sorted(k for k in set(a) & set(b) if a[k] != b[k])
+          allowed = {('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')}
+          assert set(added).issubset(allowed), f'unreviewed external package delta: {added!r}'
+          assert not removed, f'external package removal: {removed!r}'
+          assert not changed, f'existing external package mutation: {changed!r}'
+          PY
+
+      - name: Check post-semantic controller package
+        run: cargo check -p symthaea-iot-actuation-guard-post-semantic-controller --all-targets
+
+      - name: Run controller constructibility regression first
+        run: >-
+          cargo test -p symthaea-iot-actuation-guard-post-semantic-controller
+          tests::controller_signature_is_constructible_only_over_post_semantic_statement_shape -- --exact
+
+      - name: Test post-semantic controller package
+        run: cargo test -p symthaea-iot-actuation-guard-post-semantic-controller --all-targets
+
+      - name: Strict Clippy post-semantic controller package
+        run: cargo clippy -p symthaea-iot-actuation-guard-post-semantic-controller --all-targets -- -D warnings
