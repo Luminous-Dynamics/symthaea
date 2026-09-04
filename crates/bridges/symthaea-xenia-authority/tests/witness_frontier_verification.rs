@@ -8,9 +8,10 @@ use symthaea_authority_time::{
     verify_authority_time_v1,
 };
 use symthaea_xenia_authority::{
-    ED25519_SIGNATURE_ALGORITHM, XENIA_WITNESS_FRONTIER_ANCHOR_SCHEMA_VERSION,
-    XeniaSignatureEnvelopeV1, XeniaSignedWitnessFrontierAnchorV1,
-    XeniaSignedWitnessFrontierObservationV1, XeniaWitnessFrontierAnchorSummaryV1,
+    ED25519_SIGNATURE_ALGORITHM, PendingXeniaWitnessCurrentnessChallengeV1,
+    XENIA_WITNESS_FRONTIER_ANCHOR_SCHEMA_VERSION, XeniaSignatureEnvelopeV1,
+    XeniaSignedWitnessFrontierAnchorV1, XeniaSignedWitnessFrontierObservationV1,
+    XeniaWitnessCurrentnessScopeV1, XeniaWitnessFrontierAnchorSummaryV1,
     XeniaWitnessFrontierAnchorTargetV1, XeniaWitnessFrontierExpectationV1,
     XeniaWitnessFrontierFreshnessPolicyV1, XeniaWitnessFrontierVerificationError,
     derive_xenia_witness_frontier_source_id, verify_xenia_witness_frontier_v1,
@@ -40,6 +41,15 @@ fn expectation() -> XeniaWitnessFrontierExpectationV1 {
         anchor_policy_digest: POLICY,
         witness_id: WITNESS,
         challenge: CHALLENGE,
+    }
+}
+
+fn currentness_scope() -> XeniaWitnessCurrentnessScopeV1 {
+    XeniaWitnessCurrentnessScopeV1 {
+        trusted_ledger_public_key: xenia_key().verifying_key().to_bytes(),
+        source_epoch: 3,
+        anchor_policy_digest: POLICY,
+        witness_id: WITNESS,
     }
 }
 
@@ -80,6 +90,13 @@ fn signed_anchor() -> XeniaSignedWitnessFrontierAnchorV1 {
 fn signed_observation(
     anchor: &XeniaSignedWitnessFrontierAnchorV1,
 ) -> XeniaSignedWitnessFrontierObservationV1 {
+    signed_observation_for_challenge(anchor, CHALLENGE)
+}
+
+fn signed_observation_for_challenge(
+    anchor: &XeniaSignedWitnessFrontierAnchorV1,
+    challenge: [u8; 32],
+) -> XeniaSignedWitnessFrontierObservationV1 {
     let key = xenia_key();
     let mut observation = XeniaSignedWitnessFrontierObservationV1 {
         schema_version: XENIA_WITNESS_FRONTIER_ANCHOR_SCHEMA_VERSION,
@@ -87,7 +104,7 @@ fn signed_observation(
         source_epoch: anchor.target.source_epoch,
         anchor_policy_digest: anchor.target.anchor_policy_digest,
         witness_id: anchor.target.witness_id,
-        challenge: CHALLENGE,
+        challenge,
         observed_at_unix_s: 1_010,
         current: Some(XeniaWitnessFrontierAnchorSummaryV1 {
             anchor_sequence: anchor.anchor_sequence,
@@ -193,6 +210,32 @@ fn public_verifier_requires_subject_bound_verified_time() {
 
     let verified =
         verify_xenia_witness_frontier_v1(&anchor, &observation, expected, &time, freshness).unwrap();
+    assert_eq!(verified.witness_id(), WITNESS);
+    assert_eq!(verified.high_watermark(), 9);
+}
+
+#[test]
+fn affine_currentness_challenge_drives_public_verification() {
+    let anchor = signed_anchor();
+    let pending = PendingXeniaWitnessCurrentnessChallengeV1::generate(currentness_scope()).unwrap();
+    let challenge = pending.challenge();
+    assert_ne!(challenge, [0; 32]);
+    let observation = signed_observation_for_challenge(&anchor, challenge);
+
+    let (policy, key_a, key_b) = time_policy();
+    let freshness = XeniaWitnessFrontierFreshnessPolicyV1::strict(
+        policy.digest().unwrap(),
+        30,
+        2,
+    );
+    let subject = pending
+        .authority_time_subject_digest(&anchor, freshness)
+        .unwrap();
+    let time = verified_time(&policy, &key_a, &key_b, subject, 1_010);
+
+    let verified = pending
+        .verify(&anchor, &observation, &time, freshness)
+        .unwrap();
     assert_eq!(verified.witness_id(), WITNESS);
     assert_eq!(verified.high_watermark(), 9);
 }
