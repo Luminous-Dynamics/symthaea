@@ -23,8 +23,6 @@
 
 #![deny(unsafe_code)]
 
-use std::fmt;
-
 use symthaea_authority::Digest32;
 use symthaea_qualification_witness_sequence::WitnessSequenceFrontierStatementV1;
 use thiserror::Error;
@@ -58,11 +56,12 @@ impl WitnessFrontierPointV1 {
             || self.high_watermark == 0
             || self.reservation_head.0 == ZERO32
             || self.statement_digest.0 == ZERO32
-            || self.statement_digest != frontier_statement_digest(
-                self.witness_id,
-                self.high_watermark,
-                self.reservation_head,
-            )
+            || self.statement_digest
+                != frontier_statement_digest(
+                    self.witness_id,
+                    self.high_watermark,
+                    self.reservation_head,
+                )
         {
             return Err(FrontierRecoveryError::MalformedFrontier);
         }
@@ -253,12 +252,16 @@ impl WitnessFrontierRecoveryRelationV1 {
     pub fn publication_disposition(self) -> WitnessFrontierPublicationDispositionV1 {
         match self {
             Self::AnchoredCurrent { .. } => WitnessFrontierPublicationDispositionV1::PublishAllowed,
-            Self::EmptyUnanchored | Self::InitialAnchorRequired { .. } | Self::LocalAheadVerifiedDescendant { .. } => {
+            Self::EmptyUnanchored
+            | Self::InitialAnchorRequired { .. }
+            | Self::LocalAheadVerifiedDescendant { .. } => {
                 WitnessFrontierPublicationDispositionV1::AnchorRequired
             }
             Self::RollbackOrMissingLocal { .. }
             | Self::DivergentAtSameHeight { .. }
-            | Self::DivergentTrustedPrefix { .. } => WitnessFrontierPublicationDispositionV1::Contained,
+            | Self::DivergentTrustedPrefix { .. } => {
+                WitnessFrontierPublicationDispositionV1::Contained
+            }
         }
     }
 }
@@ -434,6 +437,14 @@ mod tests {
                 audit_ok: true,
             }
         }
+
+        fn empty(witness_id: [u8; 16]) -> Self {
+            Self {
+                witness_id,
+                heads: BTreeMap::new(),
+                audit_ok: true,
+            }
+        }
     }
 
     impl LocalWitnessFrontierHistory for FakeHistory {
@@ -500,10 +511,14 @@ mod tests {
         let witness = [1; 16];
         let history = FakeHistory::with_heads(witness, &[(1, 0x11), (2, 0x22)]);
         let anchor = external(witness, 2, Digest32([0x22; 32]));
-        let relation = classify_witness_frontier_recovery_v1(&history, witness, Some(&anchor)).unwrap();
+        let relation =
+            classify_witness_frontier_recovery_v1(&history, witness, Some(&anchor)).unwrap();
         assert!(matches!(
             relation,
-            WitnessFrontierRecoveryRelationV1::AnchoredCurrent { high_watermark: 2, .. }
+            WitnessFrontierRecoveryRelationV1::AnchoredCurrent {
+                high_watermark: 2,
+                ..
+            }
         ));
         assert_eq!(
             relation.publication_disposition(),
@@ -514,9 +529,11 @@ mod tests {
     #[test]
     fn local_ahead_requires_matching_trusted_ancestor() {
         let witness = [1; 16];
-        let history = FakeHistory::with_heads(witness, &[(1, 0x11), (2, 0x22), (3, 0x33)]);
+        let history =
+            FakeHistory::with_heads(witness, &[(1, 0x11), (2, 0x22), (3, 0x33)]);
         let anchor = external(witness, 2, Digest32([0x22; 32]));
-        let relation = classify_witness_frontier_recovery_v1(&history, witness, Some(&anchor)).unwrap();
+        let relation =
+            classify_witness_frontier_recovery_v1(&history, witness, Some(&anchor)).unwrap();
         assert!(matches!(
             relation,
             WitnessFrontierRecoveryRelationV1::LocalAheadVerifiedDescendant {
@@ -534,9 +551,11 @@ mod tests {
     #[test]
     fn larger_local_counter_with_wrong_prefix_is_contained() {
         let witness = [1; 16];
-        let history = FakeHistory::with_heads(witness, &[(1, 0x11), (2, 0x99), (3, 0x33)]);
+        let history =
+            FakeHistory::with_heads(witness, &[(1, 0x11), (2, 0x99), (3, 0x33)]);
         let anchor = external(witness, 2, Digest32([0x22; 32]));
-        let relation = classify_witness_frontier_recovery_v1(&history, witness, Some(&anchor)).unwrap();
+        let relation =
+            classify_witness_frontier_recovery_v1(&history, witness, Some(&anchor)).unwrap();
         assert!(matches!(
             relation,
             WitnessFrontierRecoveryRelationV1::DivergentTrustedPrefix {
@@ -555,7 +574,8 @@ mod tests {
         let witness = [1; 16];
         let history = FakeHistory::with_heads(witness, &[(1, 0x11)]);
         let anchor = external(witness, 2, Digest32([0x22; 32]));
-        let relation = classify_witness_frontier_recovery_v1(&history, witness, Some(&anchor)).unwrap();
+        let relation =
+            classify_witness_frontier_recovery_v1(&history, witness, Some(&anchor)).unwrap();
         assert!(matches!(
             relation,
             WitnessFrontierRecoveryRelationV1::RollbackOrMissingLocal {
@@ -574,7 +594,8 @@ mod tests {
         let witness = [1; 16];
         let history = FakeHistory::with_heads(witness, &[(1, 0x11), (2, 0x99)]);
         let anchor = external(witness, 2, Digest32([0x22; 32]));
-        let relation = classify_witness_frontier_recovery_v1(&history, witness, Some(&anchor)).unwrap();
+        let relation =
+            classify_witness_frontier_recovery_v1(&history, witness, Some(&anchor)).unwrap();
         assert!(matches!(
             relation,
             WitnessFrontierRecoveryRelationV1::DivergentAtSameHeight { high_watermark: 2 }
@@ -584,9 +605,10 @@ mod tests {
     #[test]
     fn missing_local_with_external_anchor_is_contained() {
         let witness = [1; 16];
-        let history = FakeHistory::default();
+        let history = FakeHistory::empty(witness);
         let anchor = external(witness, 1, Digest32([0x11; 32]));
-        let relation = classify_witness_frontier_recovery_v1(&history, witness, Some(&anchor)).unwrap();
+        let relation =
+            classify_witness_frontier_recovery_v1(&history, witness, Some(&anchor)).unwrap();
         assert!(matches!(
             relation,
             WitnessFrontierRecoveryRelationV1::RollbackOrMissingLocal {
@@ -625,7 +647,11 @@ mod tests {
             witness_id: witness,
             high_watermark: 1,
             reservation_head: Digest32([0x11; 32]),
-            frontier_statement_digest: frontier_statement_digest(witness, 1, Digest32([0x11; 32])),
+            frontier_statement_digest: frontier_statement_digest(
+                witness,
+                1,
+                Digest32([0x11; 32]),
+            ),
             freshness_evidence_digest: Digest32([0xee; 32]),
         };
         claim.reservation_head = Digest32([0x99; 32]);
