@@ -179,7 +179,14 @@ impl PhysicalInterlockReportV1 {
         Ok(())
     }
 
-    /// Domain-separated digest that a hardware verifier must authenticate.
+    /// Domain-separated controller-signing digest for the report contents.
+    ///
+    /// The raw evidence commitment is deliberately excluded. For signature-style
+    /// evidence, including `evidence_digest = H(signature)` here would require the
+    /// controller to solve the circular equation `signature = Sign(H(...H(signature)))`.
+    /// Downstream code binds the complete object with the pair
+    /// `(report_digest, evidence_digest)`, so excluding the evidence commitment here
+    /// removes that cycle without weakening exact report/evidence binding.
     pub fn digest(&self) -> Result<Digest32, FinalActuatorGateError> {
         self.validate_structure()?;
         let mut h = blake3::Hasher::new();
@@ -195,7 +202,6 @@ impl PhysicalInterlockReportV1 {
         update_strings(&mut h, &self.asserted_interlocks);
         h.update(&self.checked_at_unix_ms.to_be_bytes());
         h.update(&self.expires_at_unix_ms.to_be_bytes());
-        update_digest(&mut h, self.evidence_digest);
         Ok(Digest32(*h.finalize().as_bytes()))
     }
 }
@@ -204,11 +210,12 @@ impl PhysicalInterlockReportV1 {
 ///
 /// A production provider may verify a TPM/TEE quote, safety-PLC signature, secure
 /// element assertion, or another reviewed hardware evidence format. It must
-/// authenticate the exact report digest and raw evidence supplied here. Returning
-/// `true` is the provider's cryptographic/hardware claim; this crate independently
-/// performs policy, freshness, binding, and composition checks around it.
+/// authenticate the exact report-content digest and raw evidence supplied here. The
+/// evidence's own digest is checked independently before this provider is invoked.
+/// Returning `true` is the provider's cryptographic/hardware claim; this crate
+/// independently performs policy, freshness, binding, and composition checks around it.
 pub trait HardwareInterlockEvidenceVerifier {
-    /// Verify raw hardware evidence for the exact controller/report commitment.
+    /// Verify raw hardware evidence for the exact controller/report-content commitment.
     fn verify_interlock_evidence(
         &self,
         controller_id: &str,
@@ -258,7 +265,8 @@ impl VerifiedPhysicalInterlock {
         self.transport_trust_head
     }
 
-    /// Commitment to the exact interlock report.
+    /// Controller-authenticated report-content commitment. Together with
+    /// [`Self::evidence_digest`] this binds the complete report/evidence pair.
     pub const fn report_digest(&self) -> Digest32 {
         self.report_digest
     }
@@ -391,7 +399,8 @@ impl FinalActuatorPermit {
         &self.interlock_controller_id
     }
 
-    /// Exact hardware interlock report commitment.
+    /// Controller-authenticated interlock report-content commitment. Together with
+    /// [`Self::interlock_evidence_digest`] this binds the complete report/evidence pair.
     pub const fn interlock_report_digest(&self) -> Digest32 {
         self.interlock_report_digest
     }
