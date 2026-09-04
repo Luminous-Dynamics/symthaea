@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-qualification-witness"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Threshold Ed25519 witness attestations for independently verified Agency qualification evidence"
+publish = false
+
+[dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+
+[dev-dependencies]
+rand = { workspace = true }
