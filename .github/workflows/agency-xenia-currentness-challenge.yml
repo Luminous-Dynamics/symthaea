@@ -1,0 +1,150 @@
+name: Agency Xenia Currentness Challenge
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-xenia-authority/**'
+      - 'crates/bridges/symthaea-authority-time/**'
+      - 'docs/architecture/XENIA_WITNESS_CURRENTNESS_CHALLENGE_V01.md'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/agency-xenia-currentness-challenge.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agency-xenia-currentness-challenge-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  source:
+    name: Affine currentness challenge qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy,rustfmt
+
+      - name: Preserve checked-in Cargo.lock
+        run: cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+
+      - name: Let Cargo produce the exact candidate lock
+        run: cargo metadata --format-version 1 >/dev/null
+
+      - name: Permit only the reviewed getrandom package-node delta
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, sys, tomllib
+
+          before_path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'Cargo.lock.before'
+          after_path = pathlib.Path('Cargo.lock')
+          before = tomllib.loads(before_path.read_text())
+          after = tomllib.loads(after_path.read_text())
+
+          if before == after:
+              print('Cargo.lock already fresh')
+              raise SystemExit(0)
+
+          key = lambda p: (p['name'], p['version'], p.get('source'))
+          b = {key(p): p for p in before.get('package', [])}
+          a = {key(p): p for p in after.get('package', [])}
+
+          if set(b) != set(a):
+              print('package-set change is forbidden')
+              print('removed:', sorted(set(b) - set(a), key=repr))
+              print('added:', sorted(set(a) - set(b), key=repr))
+              sys.exit(1)
+
+          target_keys = [k for k in b if k[0] == 'symthaea-xenia-authority']
+          if len(target_keys) != 1:
+              print('expected exactly one symthaea-xenia-authority package node')
+              print('found:', target_keys)
+              sys.exit(1)
+          target = target_keys[0]
+
+          for k in b:
+              if k != target and b[k] != a[k]:
+                  print('unrelated existing package changed:', k)
+                  sys.exit(1)
+
+          before_target = dict(b[target])
+          after_target = dict(a[target])
+          before_deps = set(before_target.pop('dependencies', []))
+          after_deps = set(after_target.pop('dependencies', []))
+          if before_target != after_target:
+              print('symthaea-xenia-authority metadata changed beyond dependencies')
+              sys.exit(1)
+          if not before_deps <= after_deps:
+              print('existing symthaea-xenia-authority dependency removed')
+              print('removed:', sorted(before_deps - after_deps))
+              sys.exit(1)
+
+          added = after_deps - before_deps
+          if len(added) != 1:
+              print('expected exactly one new direct dependency, got:', sorted(added))
+              sys.exit(1)
+          dep = next(iter(added))
+          if dep != 'getrandom' and not dep.startswith('getrandom '):
+              print('only getrandom may be added to symthaea-xenia-authority; got:', dep)
+              sys.exit(1)
+
+          print('accepted Cargo-produced package-node delta:', dep)
+          PY
+
+      - name: Record lock freshness
+        run: |
+          if cmp -s "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock; then
+            echo clean > "$RUNNER_TEMP/agency-lock-status"
+          else
+            echo stale > "$RUNNER_TEMP/agency-lock-status"
+            git --no-pager diff -- Cargo.lock
+          fi
+
+      - name: Format verifier package
+        run: cargo fmt --check --package symthaea-xenia-authority
+
+      - name: Test affine challenge path
+        run: cargo test --locked -p symthaea-xenia-authority
+
+      - name: Clippy affine challenge path
+        run: cargo clippy --locked -p symthaea-xenia-authority --all-targets -- -D warnings
+
+      - name: Record exact-head evidence
+        if: always()
+        run: |
+          E="$RUNNER_TEMP/agency-xenia-currentness-challenge-evidence"
+          mkdir -p "$E"
+          git rev-parse HEAD > "$E/HEAD"
+          git rev-parse HEAD^{tree} > "$E/TREE"
+          rustc -Vv > "$E/RUSTC.txt"
+          cargo -V > "$E/CARGO.txt"
+          sha256sum Cargo.lock > "$E/CARGO_LOCK_CANDIDATE_SHA256.txt"
+          sha256sum crates/bridges/symthaea-xenia-authority/Cargo.toml > "$E/PACKAGE_MANIFEST_SHA256.txt"
+          sha256sum crates/bridges/symthaea-xenia-authority/src/currentness_challenge.rs > "$E/CURRENTNESS_CHALLENGE_SHA256.txt"
+          sha256sum crates/bridges/symthaea-xenia-authority/src/lib.rs > "$E/XENIA_AUTHORITY_LIB_SHA256.txt"
+          sha256sum crates/bridges/symthaea-xenia-authority/tests/witness_frontier_verification.rs > "$E/CURRENTNESS_INTEGRATION_TEST_SHA256.txt"
+          git --no-pager diff -- Cargo.lock > "$E/CARGO_LOCK_DIFF.patch"
+          cat "$RUNNER_TEMP/agency-lock-status" > "$E/CARGO_LOCK_STATUS.txt"
+
+      - name: Upload source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agency-xenia-currentness-challenge-${{ github.sha }}
+          path: ${{ runner.temp }}/agency-xenia-currentness-challenge-evidence
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Require checked-in Cargo.lock to be fresh
+        run: test "$(cat "$RUNNER_TEMP/agency-lock-status")" = clean
