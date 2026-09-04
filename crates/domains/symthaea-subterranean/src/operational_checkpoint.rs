@@ -35,6 +35,31 @@ use serde::{Deserialize, Serialize};
 pub const OPERATIONAL_CHECKPOINT_SCHEMA_VERSION: u32 = 3;
 pub const MIN_SUPPORTED_OPERATIONAL_CHECKPOINT_SCHEMA_VERSION: u32 = 1;
 
+/// Portable multi-domain checkpoint data.
+///
+/// This type is intentionally public because checkpoint data must be exportable,
+/// inspectable and transportable. Possessing or deserializing it does **not**
+/// grant authority to replace a live embodiment's operational state.
+///
+/// In particular, downstream crates cannot invoke the crate-internal legacy
+/// whole-checkpoint loader. Production restore must eventually enter through the
+/// affine admission/execution/activation boundary instead.
+///
+/// ```compile_fail,E0624
+/// use symthaea_subterranean::{
+///     SubterraneanOperationalCheckpoint,
+///     embodiment::SubterraneanEmbodiment,
+/// };
+///
+/// fn bypass_restore(
+///     live: &mut SubterraneanEmbodiment,
+///     checkpoint: &SubterraneanOperationalCheckpoint,
+/// ) {
+///     // This must remain inaccessible to downstream crates. If this snippet
+///     // ever compiles, the RA-33 whole-checkpoint restore bypass has reopened.
+///     live.load_operational_checkpoint(checkpoint).unwrap();
+/// }
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubterraneanOperationalCheckpoint {
     pub schema_version: u32,
