@@ -113,16 +113,20 @@ This is intentionally incompatible with the current `region_activations` empiric
 
 ## Qualification tests
 
-`scripts/test_tribe_v2_bridge.py` establishes three initial gates:
+`scripts/test_tribe_v2_bridge.py` establishes four executable gates:
 
-1. mock output is explicitly synthetic and cannot satisfy the existing `region_activations` schema;
+1. mock output is explicitly synthetic, ineligible for empirical/surrogate use, and cannot satisfy the existing `region_activations` schema;
 2. mock output is reproducible across independent Python processes;
-3. forced TRIBE import failure returns non-zero, produces no artifact, and does not fall back to mock data.
+3. a stand-in implementing the released `tribev2.TribeModel` API proves native surface shape is preserved: a 2×4 prediction remains four `fsaverage5` vertices after temporal averaging and is emitted as `ExternalSurrogate`, never as 12-region data;
+4. forced TRIBE import failure returns non-zero, produces no artifact, and does not fall back to mock data.
+
+`.github/workflows/neural-evidence-provenance.yml` runs these tests plus Python syntax checks whenever the bridge, tests, profile, or workflow changes.
 
 ## Deferred to the next profile
 
 This profile does not claim to solve:
 
+- canonical Rust neural-evidence types in `symthaea-types`;
 - `fsaverage5 -> HCP-MMP1/Glasser` surface parcellation;
 - atlas-to-Symthaea12 scientific validity;
 - real observed fMRI ingestion;
