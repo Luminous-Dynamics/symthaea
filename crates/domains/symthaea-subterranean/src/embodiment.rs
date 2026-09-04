@@ -416,7 +416,7 @@ impl SubterraneanEmbodiment {
         }
     }
 
-    pub fn load_operational_checkpoint(
+    pub(crate) fn load_operational_checkpoint(
         &mut self,
         checkpoint: &SubterraneanOperationalCheckpoint,
     ) -> Result<(), OperationalCheckpointError> {
