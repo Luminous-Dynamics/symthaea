@@ -211,7 +211,7 @@ fn fixture(options: FixtureOptions) -> Fixture {
         transport_trust_head: transport_head,
         asserted_interlocks: BTreeSet::from(["pressure-safe".into()]),
         checked_at_unix_ms: report_checked_at,
-        expires_at_unix_ms: report_checked_at + 1_500,
+        expires_at_unix_ms: report_checked_at + 2_000,
         evidence_digest: d(0xEE),
     };
     let report_digest = report.digest().unwrap();
@@ -238,7 +238,7 @@ fn fixture(options: FixtureOptions) -> Fixture {
         } else {
             BTreeSet::from(["pressure-safe".into()])
         },
-        max_report_lifetime_ms: 1_500,
+        max_report_lifetime_ms: 2_000,
     };
     let policy_digest = policy.digest().unwrap();
 
