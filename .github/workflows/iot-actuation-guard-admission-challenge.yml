@@ -1,0 +1,180 @@
+name: IoT Actuation Guard Admission Challenge
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-guard-admission-challenge/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard-admission-reservation/**'
+      - '.github/workflows/iot-actuation-guard-admission-challenge.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-actuation-guard-admission-challenge-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    name: Reservation-bound challenge source contract (Rust 1.96)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact formatter
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+
+      - name: Verify exact checkout and formatter
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Check exact source formatting
+        run: |
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-admission-challenge/src/lib.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-admission-challenge/src/error.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-admission-challenge/src/challenge.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-admission-challenge/src/response.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-admission-challenge/tests/end_to_end.rs
+
+      - name: Enforce reservation-bound non-authorizing challenge TCB
+        run: |
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          root = Path('crates/bridges/symthaea-iot-actuation-guard-admission-challenge')
+          manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+          deps = set(manifest.get('dependencies', {}))
+          expected = {
+              'bincode', 'blake3', 'getrandom', 'serde', 'symthaea-authority',
+              'symthaea-iot-actuation-guard-admission-reservation', 'symthaea-iot-posture',
+              'symthaea-iot-transport-receipt', 'thiserror',
+          }
+          assert deps == expected, f'production dependency drift: {sorted(deps)!r}'
+          dev = set(manifest.get('dev-dependencies', {}))
+          expected_dev = {
+              'symthaea-action-checkpoint', 'symthaea-iot-authority',
+              'symthaea-iot-device-protocol', 'symthaea-iot-durable-runtime',
+              'symthaea-iot-policy',
+          }
+          assert dev == expected_dev, f'test dependency drift: {sorted(dev)!r}'
+          assert 'bin' not in manifest, 'challenge must remain a library evidence stage'
+
+          challenge = (root / 'src/challenge.rs').read_text()
+          response = (root / 'src/response.rs').read_text()
+          all_source = '\n'.join(p.read_text() for p in sorted((root / 'src').glob('*.rs')))
+
+          required = [
+              '#![deny(unsafe_code)]',
+              'PersistedAdmissionReservation',
+              'AdmissionReservationHead',
+              'issue_from_persisted_reservation',
+              'getrandom::getrandom',
+              'SystemTime::now()',
+              'effect_deadline_unix_ms',
+              'DecodedAdmissionDeviceRealityEvidence',
+              'attestation_object_digest',
+              'NonCanonicalAttestationEncoding',
+          ]
+          for needle in required:
+              assert needle in all_source, f'missing challenge invariant: {needle!r}'
+
+          assert 'Deserialize' not in challenge, 'privileged challenge must not be deserializable'
+          start = challenge.index('pub fn issue_from_persisted_reservation(')
+          end = challenge.index(') -> Result<Self, AdmissionChallengeError>', start)
+          signature = challenge[start:end]
+          assert 'PersistedAdmissionReservation' in signature
+          for forbidden_arg in ['nonce', 'issued_at', 'expires_at', 'AdmissionReservationHead', 'DeviceSemanticHead']:
+              assert forbidden_arg not in signature, f'caller-controlled challenge input: {forbidden_arg!r}'
+
+          forbidden = [
+              'DeviceRuntimeState',
+              'SemanticallyAcceptedEffect',
+              'prepare_semantic_acceptance',
+              'FinalActuatorPermit',
+              'CompleteJitHalLease',
+              'join_final_actuator_gate',
+              'fence_final_permit_for_hal',
+              'TcpListener',
+              'TcpStream',
+              'tokio::spawn',
+              'std::process::Command',
+              'unsafe {',
+          ]
+          for needle in forbidden:
+              assert needle not in all_source, f'forbidden challenge surface: {needle!r}'
+          PY
+
+  implementation:
+    name: Reservation-bound challenge implementation (MSRV 1.94)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.94.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact compiler and Clippy
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      - name: Resolve candidate and reject unreviewed external dependency drift
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          before = tomllib.loads(Path('/tmp/Cargo.lock.before').read_text())
+          after = tomllib.loads(Path('Cargo.lock').read_text())
+
+          def sourced(doc):
+              return {
+                  (p['name'], p['version'], p['source']): p
+                  for p in doc.get('package', []) if 'source' in p
+              }
+
+          b = sourced(before)
+          a = sourced(after)
+          added = sorted(set(a) - set(b))
+          removed = sorted(set(b) - set(a))
+          changed = sorted(k for k in set(a) & set(b) if a[k] != b[k])
+          allowed = {('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')}
+          assert set(added).issubset(allowed), f'unreviewed external package delta: {added!r}'
+          assert not removed, f'external package removal: {removed!r}'
+          assert not changed, f'existing external package mutation: {changed!r}'
+          PY
+
+      - name: Check challenge package
+        run: cargo check -p symthaea-iot-actuation-guard-admission-challenge --all-targets
+
+      - name: Run persisted-reservation constructor regression first
+        run: >-
+          cargo test -p symthaea-iot-actuation-guard-admission-challenge
+          --test end_to_end challenge_commitments_come_from_real_persisted_reservation -- --exact
+
+      - name: Test challenge package
+        run: cargo test -p symthaea-iot-actuation-guard-admission-challenge --all-targets
+
+      - name: Strict Clippy challenge package
+        run: cargo clippy -p symthaea-iot-actuation-guard-admission-challenge --all-targets -- -D warnings
