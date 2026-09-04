@@ -1,0 +1,164 @@
+name: IoT Interlock Signature Contract
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-final-gate/**'
+      - 'crates/bridges/symthaea-iot-interlock-trust/**'
+      - 'crates/bridges/symthaea-iot-interlock-ed25519/**'
+      - 'crates/bridges/symthaea-iot-jit-fence/**'
+      - 'crates/bridges/symthaea-iot-jit-revocation-vector/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard-protocol/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard/**'
+      - '.github/workflows/iot-interlock-signature-contract.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-interlock-signature-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    name: Interlock signature source contract (Rust 1.96)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact formatter
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Check only changed contract source formatting
+        run: |
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-final-gate/src/lib.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-final-gate/tests/interlock_signature_contract.rs
+
+      - name: Assert non-circular source contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('crates/bridges/symthaea-iot-final-gate/src/lib.rs').read_text()
+          start = source.index('pub fn digest(&self) -> Result<Digest32, FinalActuatorGateError> {', source.index('impl PhysicalInterlockReportV1'))
+          end = source.index('\n    }\n}', start)
+          digest_body = source[start:end]
+          assert 'self.evidence_digest' not in digest_body, 'controller-signing digest became self-referential again'
+          assert 'interlock_evidence_digest: interlock.evidence_digest' in source, 'final permit lost independent evidence commitment'
+          assert 'interlock_report_digest: interlock.report_digest' in source, 'final permit lost report-content commitment'
+          PY
+
+  implementation:
+    name: Interlock signature contract + downstream consumers (MSRV 1.94)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.94.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact compiler and Clippy
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      - name: Resolve candidate and reject unreviewed external dependency drift
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          before = tomllib.loads(Path('/tmp/Cargo.lock.before').read_text())
+          after = tomllib.loads(Path('Cargo.lock').read_text())
+
+          def sourced(doc):
+              return {
+                  (p['name'], p['version'], p['source']): p
+                  for p in doc.get('package', [])
+                  if 'source' in p
+              }
+
+          b = sourced(before)
+          a = sourced(after)
+          added = sorted(set(a) - set(b))
+          removed = sorted(set(b) - set(a))
+          changed = sorted(k for k in set(a) & set(b) if a[k] != b[k])
+
+          # The branch is stacked on #402/#427, whose deliberately pending lock
+          # admission is exactly fips204 0.4.6. This corrigendum may inherit that
+          # one delta but may introduce no other sourced package change.
+          allowed = {
+              ('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')
+          }
+          assert set(added).issubset(allowed), f'unreviewed external package delta: {added!r}'
+          assert not removed, f'external package removal is not allowed: {removed!r}'
+          assert not changed, f'existing external package record changed: {changed!r}'
+          if added:
+              package = a[added[0]]
+              assert package.get('checksum') == 'c9fb5a367b9846933e271a3c2a992930743f82ae5e8cb7faa780715a80fa0b15', package
+              families = {dep.split(' ', 1)[0] for dep in package.get('dependencies', [])}
+              assert families == {'rand_core', 'sha2', 'sha3', 'zeroize'}, families
+          PY
+
+      - name: Check corrected interlock consumer chain
+        run: >-
+          cargo check
+          -p symthaea-iot-final-gate
+          -p symthaea-iot-interlock-trust
+          -p symthaea-iot-interlock-ed25519
+          -p symthaea-iot-jit-fence
+          -p symthaea-iot-jit-revocation-vector
+          -p symthaea-iot-actuation-guard-protocol
+          -p symthaea-iot-actuation-guard
+          --all-targets
+
+      - name: Run constructible signature regression first
+        run: cargo test -p symthaea-iot-final-gate --test interlock_signature_contract
+
+      - name: Test corrected interlock consumer chain
+        run: >-
+          cargo test
+          -p symthaea-iot-final-gate
+          -p symthaea-iot-interlock-trust
+          -p symthaea-iot-interlock-ed25519
+          -p symthaea-iot-jit-fence
+          -p symthaea-iot-jit-revocation-vector
+          -p symthaea-iot-actuation-guard-protocol
+          -p symthaea-iot-actuation-guard
+          --all-targets
+
+      - name: Strict Clippy corrected interlock consumer chain
+        run: >-
+          cargo clippy
+          -p symthaea-iot-final-gate
+          -p symthaea-iot-interlock-trust
+          -p symthaea-iot-interlock-ed25519
+          -p symthaea-iot-jit-fence
+          -p symthaea-iot-jit-revocation-vector
+          -p symthaea-iot-actuation-guard-protocol
+          -p symthaea-iot-actuation-guard
+          --all-targets -- -D warnings

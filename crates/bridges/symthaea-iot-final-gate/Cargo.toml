@@ -22,6 +22,7 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 bincode = { workspace = true }
+ed25519-dalek = { workspace = true }
 symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
 symthaea-iot-durable-runtime = { path = "../symthaea-iot-durable-runtime" }
 symthaea-iot-policy = { path = "../symthaea-iot-policy" }
