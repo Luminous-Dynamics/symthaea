@@ -18,6 +18,7 @@
 #![deny(unsafe_code)]
 
 mod protocol;
+mod witness_frontier;
 mod workload;
 
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
@@ -34,9 +35,21 @@ pub use protocol::{
     XeniaAgentAuthorizationV1, XeniaAgentCapabilityAttestationV1, XeniaCheckpointAnchorV1,
     XeniaLedgerCheckpointV1, XeniaSignatureEnvelopeV1,
 };
-pub use workload::{
-    ExecutorWorkloadV1, VerifiedExecutorWorkload, WorkloadIdentityError,
+pub use witness_frontier::{
+    SYMTHAEA_WITNESS_ANCHOR_OPERATION_DOMAIN, SYMTHAEA_WITNESS_FRONTIER_STATEMENT_DOMAIN,
+    SYMTHAEA_WITNESS_FRONTIER_STATEMENT_SCHEMA_VERSION,
+    VerifiedXeniaWitnessFrontierV1, XENIA_WITNESS_FRONTIER_ANCHOR_DOMAIN,
+    XENIA_WITNESS_FRONTIER_ANCHOR_FINGERPRINT_DOMAIN,
+    XENIA_WITNESS_FRONTIER_ANCHOR_SCHEMA_VERSION, XENIA_WITNESS_FRONTIER_OBSERVATION_DOMAIN,
+    XENIA_WITNESS_FRONTIER_OBSERVATION_FINGERPRINT_DOMAIN,
+    XENIA_WITNESS_FRONTIER_SOURCE_DOMAIN, XeniaSignedWitnessFrontierAnchorV1,
+    XeniaSignedWitnessFrontierObservationV1, XeniaWitnessFrontierAnchorSummaryV1,
+    XeniaWitnessFrontierAnchorTargetV1, XeniaWitnessFrontierError,
+    XeniaWitnessFrontierExpectationV1, XeniaWitnessObservationFreshnessV1,
+    derive_xenia_witness_frontier_source_id, verify_xenia_witness_frontier_v1,
+    witness_frontier_statement_digest,
 };
+pub use workload::{ExecutorWorkloadV1, VerifiedExecutorWorkload, WorkloadIdentityError};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct XeniaSessionExpectationV1 {
