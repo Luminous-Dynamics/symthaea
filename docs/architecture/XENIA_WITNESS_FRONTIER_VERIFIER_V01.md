@@ -17,6 +17,8 @@ trusted Xenia ledger public key
         +
 trusted source epoch/policy/witness expectation
         +
+exact reviewed witness-freshness policy
+        +
 subject-bound VerifiedAuthorityTime
         ↓
 VerifiedXeniaWitnessFrontierV1
@@ -101,16 +103,29 @@ BLAKE3(
     || witness_id
     || verifier_challenge
     || exact_signed_anchor_fingerprint
+    || authority_time_policy_digest
+    || u64_be(max_observation_age_s)
+    || u64_be(max_future_skew_s)
 )
 ```
 
-`xenia_witness_frontier_time_subject_digest_v1` verifies the signed anchor and exact source bindings before returning this subject. The caller can then obtain `VerifiedAuthorityTime` for that subject.
+`xenia_witness_frontier_time_subject_digest_v1` verifies the signed anchor and exact source bindings before returning this subject. The caller can then obtain `VerifiedAuthorityTime` for that exact subject and the reviewed time policy.
 
-A valid time fact for another capability, anchor, witness, challenge, key, or source policy cannot be substituted.
+A valid time fact for another capability, anchor, witness, challenge, key, source policy, trusted-time policy, or freshness limit cannot be substituted.
+
+The public verifier also checks:
+
+```text
+authority_time.policy_digest()
+    ==
+reviewed authority_time_policy_digest
+```
+
+before interpreting the time fact.
 
 ## Conservative freshness interval
 
-After the subject binding is checked, the verifier derives time only from `VerifiedAuthorityTime`:
+After the subject and time-policy bindings are checked, the verifier derives time only from `VerifiedAuthorityTime`:
 
 - the consensus lower bound at verification becomes the conservative earliest current time;
 - `conservative_now_unix_s()` becomes the current upper bound and also enforces the time fact's short post-verification lifetime.
@@ -127,13 +142,19 @@ latest acceptable observation
 
 This intentionally fails closed as time uncertainty or post-verification age grows. Greater uncertainty cannot make an old observation live longer.
 
-The raw interval checker exists only inside the private protocol module for unit testing and is not exported as a production verification boundary.
+The raw interval checker exists only inside the private protocol module for source-level unit testing and is not exported as a production verification boundary.
 
 ## Freshness policy binding
 
-`XeniaWitnessFrontierFreshnessPolicyV1` supplies the reviewed maximum observation age and future skew.
+`XeniaWitnessFrontierFreshnessPolicyV1` binds all three reviewed inputs used by currentness admission:
 
-These settings must be configured together with the trusted Xenia `anchor_policy_digest`. Symthaea treats that source policy digest as an opaque reviewed commitment; V0.1 does not claim it can reverse or reinterpret the complete Xenia source-policy document from the digest alone.
+- the exact `authority_time_policy_digest`;
+- `max_observation_age_s`;
+- `max_future_skew_s`.
+
+All three are included in the authority-time subject commitment. Changing the trusted-time policy or either freshness limit therefore requires a new challenged time fact.
+
+These settings must still be configured consistently with the trusted Xenia `anchor_policy_digest`. Symthaea treats that source policy digest as an opaque reviewed commitment; V0.1 does not claim it can reverse or reinterpret the complete Xenia source-policy document from the digest alone.
 
 ## Exact current-anchor binding
 
@@ -230,23 +251,37 @@ Protocol/source tests cover:
 - signed ledger-context regression rejection;
 - observation signature tampering rejection.
 
-The public-boundary integration test additionally proves:
+The public-boundary integration tests additionally prove:
 
 - subject-bound multi-authority `VerifiedAuthorityTime` admits the exact currentness check;
-- an otherwise valid `VerifiedAuthorityTime` for another subject cannot establish Xenia witness currentness.
+- an otherwise valid `VerifiedAuthorityTime` for another subject cannot establish Xenia witness currentness;
+- an otherwise valid `VerifiedAuthorityTime` produced under another time policy cannot satisfy the reviewed witness-freshness policy.
 
 ## Qualification
 
-The dedicated workflow runs against the existing `symthaea-xenia-authority` package without adding dependencies or changing `Cargo.lock`:
+The dedicated workflow runs against the existing `symthaea-xenia-authority` package without adding a dependency family or hand-editing `Cargo.lock`.
+
+The lane:
+
+1. preserves the checked-in `Cargo.lock` bytes;
+2. lets Cargo reconcile workspace metadata;
+3. rejects any removed package, changed existing package, or newly added registry/Git package;
+4. permits only additive local/path workspace nodes as a diagnostic candidate;
+5. runs Rustfmt, tests, and Clippy against that Cargo-owned candidate;
+6. records exact HEAD/tree/toolchain/source and the candidate lock/diff;
+7. finally fails qualification unless the checked-in lock was already byte-fresh.
+
+This keeps compiler diagnostics available without allowing lock staleness to become a qualified result.
+
+The execution profile remains:
 
 - Rust 1.96.0;
-- `cargo metadata --locked` with lock-byte equality;
-- `cargo fmt --check`;
-- `cargo test --locked`;
-- Clippy `--all-targets -D warnings`;
-- exact HEAD/tree/toolchain/lock/source digests retained as evidence.
+- `cargo fmt --check -p symthaea-xenia-authority`;
+- `cargo test --locked -p symthaea-xenia-authority`;
+- `cargo clippy --locked -p symthaea-xenia-authority --all-targets -- -D warnings`;
+- exact HEAD/tree/toolchain/lock/source evidence retained.
 
-No qualification claim exists until that exact-head workflow completes.
+No qualification claim exists until that exact-head workflow completes successfully, including the final checked-in lock freshness gate.
 
 ## Deliberate next boundary
 
