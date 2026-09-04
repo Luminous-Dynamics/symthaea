@@ -1,0 +1,192 @@
+name: IoT Actuation Guard Two-Phase Protocol
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-guard-two-phase-protocol/**'
+      - '.github/workflows/iot-actuation-guard-two-phase-protocol.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-actuation-guard-two-phase-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    name: Two-phase causal wire contract (Rust 1.96)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact formatter
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Check protocol formatting
+        run: |
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-two-phase-protocol/src/lib.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-two-phase-protocol/tests/protocol.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-two-phase-protocol/tests/ed25519_constructibility.rs
+
+      - name: Enforce causal non-actuating source contract
+        run: |
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          manifest_path = Path('crates/bridges/symthaea-iot-actuation-guard-two-phase-protocol/Cargo.toml')
+          source_path = Path('crates/bridges/symthaea-iot-actuation-guard-two-phase-protocol/src/lib.rs')
+          manifest = tomllib.loads(manifest_path.read_text())
+          deps = set(manifest.get('dependencies', {}))
+          expected = {
+              'bincode',
+              'blake3',
+              'serde',
+              'symthaea-authority',
+              'symthaea-iot-device-protocol',
+              'symthaea-iot-final-gate',
+              'symthaea-iot-posture',
+              'symthaea-iot-transport-receipt',
+              'thiserror',
+          }
+          assert deps == expected, f'two-phase protocol production dependency drift: {sorted(deps)!r}'
+          dev_deps = set(manifest.get('dev-dependencies', {}))
+          expected_dev = {
+              'ed25519-dalek',
+              'symthaea-iot-interlock-ed25519',
+              'symthaea-iot-interlock-trust',
+          }
+          assert dev_deps == expected_dev, f'two-phase protocol test dependency drift: {sorted(dev_deps)!r}'
+          assert 'bin' not in manifest, 'two-phase protocol must remain a library/evidence contract'
+
+          source = source_path.read_text()
+          required = [
+              '#![deny(unsafe_code)]',
+              'ActuationGuardAdmissionRequestV2',
+              'SemanticReservationChallengeV1',
+              'PostReservationInterlockStatementV1',
+              'PostReservationInterlockReportV1',
+              'device_attestation_result_digest',
+              'InterlockDeviceAttestationDigestMismatch',
+              'InterlockPredatesSemanticPersistence',
+              'ChallengeSemanticHeadMismatch',
+          ]
+          for needle in required:
+              assert needle in source, f'missing two-phase causal invariant: {needle!r}'
+
+          admission_start = source.index('pub struct ActuationGuardAdmissionRequestV2')
+          admission_end = source.index('impl ActuationGuardAdmissionRequestV2', admission_start)
+          admission_struct = source[admission_start:admission_end]
+          assert 'raw_interlock' not in admission_struct, 'phase 1 must not carry premature interlock evidence'
+          assert 'policy' not in admission_struct.lower(), 'phase 1 must not carry caller-owned policy'
+
+          statement_start = source.index('pub struct PostReservationInterlockStatementV1')
+          statement_end = source.index('impl PostReservationInterlockStatementV1', statement_start)
+          statement_struct = source[statement_start:statement_end]
+          assert 'device_attestation_result_digest' in statement_struct, 'controller statement must bind exact device appraisal object'
+          assert 'evidence_digest' not in statement_struct, 'signed controller statement must be constructible before controller signature evidence exists'
+
+          forbidden = [
+              'tokio::spawn',
+              'TcpListener',
+              'TcpStream',
+              'std::process',
+              'Command::new',
+              'FinalActuatorPermit',
+              'CompleteJitHalLease',
+              'join_final_actuator_gate',
+              'fence_final_permit_for_hal',
+              'unsafe {',
+          ]
+          for needle in forbidden:
+              assert needle not in source, f'forbidden two-phase protocol surface: {needle!r}'
+          PY
+
+  implementation:
+    name: Two-phase protocol implementation (MSRV 1.94)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.94.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact compiler and Clippy
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      - name: Resolve candidate and reject unreviewed external dependency drift
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          before = tomllib.loads(Path('/tmp/Cargo.lock.before').read_text())
+          after = tomllib.loads(Path('Cargo.lock').read_text())
+
+          def sourced(doc):
+              return {
+                  (p['name'], p['version'], p['source']): p
+                  for p in doc.get('package', [])
+                  if 'source' in p
+              }
+
+          b = sourced(before)
+          a = sourced(after)
+          added = sorted(set(a) - set(b))
+          removed = sorted(set(b) - set(a))
+          changed = sorted(k for k in set(a) & set(b) if a[k] != b[k])
+
+          allowed = {
+              ('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')
+          }
+          assert set(added).issubset(allowed), f'unreviewed external package delta: {added!r}'
+          assert not removed, f'external package removal is not allowed: {removed!r}'
+          assert not changed, f'existing external package record changed: {changed!r}'
+          if added:
+              package = a[added[0]]
+              assert package.get('checksum') == 'c9fb5a367b9846933e271a3c2a992930743f82ae5e8cb7faa780715a80fa0b15', package
+              families = {dep.split(' ', 1)[0] for dep in package.get('dependencies', [])}
+              assert families == {'rand_core', 'sha2', 'sha3', 'zeroize'}, families
+          PY
+
+      - name: Check exact two-phase protocol package
+        run: cargo check -p symthaea-iot-actuation-guard-two-phase-protocol --all-targets
+
+      - name: Prove fixed controller profile can construct v2 report/signature order
+        run: cargo test -p symthaea-iot-actuation-guard-two-phase-protocol --test ed25519_constructibility
+
+      - name: Run causal wire regressions
+        run: cargo test -p symthaea-iot-actuation-guard-two-phase-protocol --test protocol
+
+      - name: Test exact two-phase protocol package
+        run: cargo test -p symthaea-iot-actuation-guard-two-phase-protocol --all-targets
+
+      - name: Strict Clippy exact two-phase protocol package
+        run: cargo clippy -p symthaea-iot-actuation-guard-two-phase-protocol --all-targets -- -D warnings
