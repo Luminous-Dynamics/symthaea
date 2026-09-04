@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-neural-evidence"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Typed neural-evidence provenance and authority boundaries for Symthaea neuroscience research"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["neuroscience", "provenance", "evidence", "fmri", "hdc"]
+categories = ["science"]
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
