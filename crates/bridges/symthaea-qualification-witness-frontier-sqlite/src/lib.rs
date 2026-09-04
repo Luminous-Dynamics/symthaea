@@ -3,14 +3,15 @@
 //! Concrete SQLite history adapter for ancestry-aware witness-frontier recovery.
 //!
 //! The guard deliberately trades write availability for a strong point-in-time
-//! claim. It first asks #449's sequence store to perform the authoritative full
-//! chain audit, then acquires `BEGIN IMMEDIATE`, proves the frontier has not
-//! changed since that audit, snapshots only sequence -> reservation-head history,
-//! and keeps the SQLite writer reservation until the guard is dropped/released.
+//! claim. It acquires `BEGIN IMMEDIATE` first, then asks #449's sequence store to
+//! perform the authoritative full chain audit while the writer reservation is
+//! already held. It snapshots only sequence -> reservation-head history and
+//! keeps the SQLite writer reservation until the guard is dropped/released.
 //!
-//! This prevents a local writer from advancing the witness frontier between
-//! recovery classification and an external publication/anchoring decision.
-//! The adapter does not reimplement reservation-digest semantics.
+//! This prevents a local witness writer from changing reservations, persisted
+//! signed-attempt state, or the current frontier between audit, recovery
+//! classification, and a guarded anchoring/publication decision. The adapter
+//! does not reimplement reservation-digest semantics.
 
 #![deny(unsafe_code)]
 
@@ -55,26 +56,29 @@ impl SqliteWitnessFrontierPublicationGuard {
             return Err(SqliteWitnessFrontierGuardError::InvalidWitnessId);
         }
 
-        // #449 remains the authority for complete chain/state validation.
-        let audited = store.audit_witness(witness_id)?;
-        let audited_statement = store.frontier_statement(witness_id)?;
-        match (audited, audited_statement) {
-            (None, None) => {}
-            (Some(frontier), Some(statement))
-                if statement.witness_id() == witness_id
-                    && statement.high_watermark() == frontier.high_watermark
-                    && statement.reservation_head() == frontier.reservation_head => {}
-            _ => return Err(SqliteWitnessFrontierGuardError::AuditStatementMismatch),
-        }
-
         let mut connection = open_guard_connection(store.path())?;
         connection.execute_batch("BEGIN IMMEDIATE;")?;
 
         let result = (|| {
             verify_database_identity(&connection)?;
+
+            // #449 remains authoritative for complete chain/state validation.
+            // Because BEGIN IMMEDIATE is already held, no competing #449 writer
+            // can change the history while these read-only audit connections run.
+            let audited = store.audit_witness(witness_id)?;
+            let audited_statement = store.frontier_statement(witness_id)?;
+            match (audited, audited_statement) {
+                (None, None) => {}
+                (Some(frontier), Some(statement))
+                    if statement.witness_id() == witness_id
+                        && statement.high_watermark() == frontier.high_watermark
+                        && statement.reservation_head() == frontier.reservation_head => {}
+                _ => return Err(SqliteWitnessFrontierGuardError::AuditStatementMismatch),
+            }
+
             let locked_frontier = load_frontier(&connection, witness_id)?;
             if locked_frontier != audited {
-                return Err(SqliteWitnessFrontierGuardError::FrontierChangedDuringAcquisition);
+                return Err(SqliteWitnessFrontierGuardError::FrontierAuditMismatch);
             }
 
             let historical_heads = load_historical_heads(&connection, witness_id)?;
@@ -132,9 +136,9 @@ impl SqliteWitnessFrontierPublicationGuard {
 
     /// Classify against an already authenticated/current-enough external anchor.
     ///
-    /// The SQLite writer barrier remains held after this returns. Callers that
-    /// perform anchoring/publication should keep the guard alive until that
-    /// operation's local-frontier precondition has been consumed.
+    /// The SQLite writer barrier remains held after this returns. Future anchor
+    /// and publication adapters should require the opaque permit types exposed by
+    /// the returned decision rather than accepting a copied enum/disposition.
     pub fn classify(
         &self,
         external: Option<&VerifiedExternalWitnessFrontierV1>,
@@ -164,8 +168,8 @@ impl Drop for SqliteWitnessFrontierPublicationGuard {
     }
 }
 
-/// A classification that borrows the publication guard, making the lock
-/// lifetime visible in the type system while the decision is inspected.
+/// A classification that borrows the publication guard, making the writer-lock
+/// lifetime visible to concrete anchor/publication adapters.
 #[derive(Debug)]
 pub struct GuardedWitnessFrontierDecisionV1<'a> {
     guard: &'a SqliteWitnessFrontierPublicationGuard,
@@ -188,6 +192,62 @@ impl GuardedWitnessFrontierDecisionV1<'_> {
     pub fn local_frontier(&self) -> Option<WitnessFrontierPointV1> {
         self.guard.current
     }
+
+    /// Opaque permit for a future publication adapter. It exists only when the
+    /// external anchor exactly matches the guarded current local frontier and
+    /// borrows the guard so it cannot outlive the writer barrier.
+    pub fn publication_permit(&self) -> Option<GuardedPublicationPermitV1<'_>> {
+        if self.publication_disposition() == WitnessFrontierPublicationDispositionV1::PublishAllowed {
+            Some(GuardedPublicationPermitV1 { decision: self })
+        } else {
+            None
+        }
+    }
+
+    /// Opaque permit for a future anchor writer. Local initial/unanchored or
+    /// verified-descendant state can be anchored while the local writer barrier
+    /// remains held; divergent/rollback states cannot obtain this permit.
+    pub fn anchor_permit(&self) -> Option<GuardedAnchorPermitV1<'_>> {
+        if self.publication_disposition() == WitnessFrontierPublicationDispositionV1::AnchorRequired {
+            Some(GuardedAnchorPermitV1 { decision: self })
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct GuardedPublicationPermitV1<'a> {
+    decision: &'a GuardedWitnessFrontierDecisionV1<'a>,
+}
+
+impl GuardedPublicationPermitV1<'_> {
+    pub fn witness_id(&self) -> [u8; 16] {
+        self.decision.witness_id()
+    }
+
+    pub fn frontier(&self) -> Option<WitnessFrontierPointV1> {
+        self.decision.local_frontier()
+    }
+}
+
+#[derive(Debug)]
+pub struct GuardedAnchorPermitV1<'a> {
+    decision: &'a GuardedWitnessFrontierDecisionV1<'a>,
+}
+
+impl GuardedAnchorPermitV1<'_> {
+    pub fn witness_id(&self) -> [u8; 16] {
+        self.decision.witness_id()
+    }
+
+    pub fn frontier(&self) -> Option<WitnessFrontierPointV1> {
+        self.decision.local_frontier()
+    }
+
+    pub fn relation(&self) -> WitnessFrontierRecoveryRelationV1 {
+        self.decision.relation()
+    }
 }
 
 impl LocalWitnessFrontierHistory for SqliteWitnessFrontierPublicationGuard {
@@ -195,8 +255,7 @@ impl LocalWitnessFrontierHistory for SqliteWitnessFrontierPublicationGuard {
         if witness_id != self.witness_id {
             return Err(history_error("witness id does not match guarded history"));
         }
-        // The full #449 audit completed before the writer barrier was acquired,
-        // and acquisition proved the locked current frontier still matched it.
+        // The full #449 audit completed after the writer barrier was acquired.
         Ok(())
     }
 
@@ -334,8 +393,8 @@ pub enum SqliteWitnessFrontierGuardError {
     AuditStatementMismatch,
     #[error("SQLite witness-sequence schema/application identity mismatch")]
     SchemaIdentityMismatch,
-    #[error("witness frontier changed between full audit and writer-barrier acquisition")]
-    FrontierChangedDuringAcquisition,
+    #[error("guarded SQLite frontier disagreed with the authoritative #449 audit")]
+    FrontierAuditMismatch,
     #[error("guarded historical witness state is malformed or disagrees with the audited frontier")]
     HistoricalStateMismatch,
     #[error(transparent)]
@@ -349,7 +408,7 @@ pub enum SqliteWitnessFrontierGuardError {
 #[cfg(test)]
 mod tests {
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::sync::mpsc;
     use std::thread;
     use std::time::Duration;
@@ -368,9 +427,7 @@ mod tests {
             std::process::id(),
             std::thread::current().name().unwrap_or("test")
         ));
-        let _ = fs::remove_file(&path);
-        let _ = fs::remove_file(format!("{}-wal", path.display()));
-        let _ = fs::remove_file(format!("{}-shm", path.display()));
+        cleanup(&path);
         path
     }
 
@@ -442,13 +499,15 @@ mod tests {
             decision.publication_disposition(),
             WitnessFrontierPublicationDispositionV1::AnchorRequired
         );
+        assert!(decision.anchor_permit().is_some());
+        assert!(decision.publication_permit().is_none());
         drop(decision);
         guard.release().unwrap();
         cleanup(&path);
     }
 
     #[test]
-    fn exact_current_anchor_is_publishable_while_guard_is_held() {
+    fn exact_current_anchor_gets_only_publication_permit() {
         let path = db_path("current");
         let store = SqliteWitnessSequenceStore::open(&path).unwrap();
         store.reserve_attempt(binding(1)).unwrap();
@@ -464,6 +523,8 @@ mod tests {
             decision.publication_disposition(),
             WitnessFrontierPublicationDispositionV1::PublishAllowed
         );
+        assert!(decision.publication_permit().is_some());
+        assert!(decision.anchor_permit().is_none());
         drop(decision);
         guard.release().unwrap();
         cleanup(&path);
