@@ -6,7 +6,7 @@ Authenticate Xenia's typed qualification-witness anchor/currentness evidence ind
 
 This verifier mirrors the commitment-only protocol introduced by `xenia-peer` #293. It deliberately does **not** depend on Xenia source crates.
 
-The trust chain is:
+The public trust chain is:
 
 ```text
 Xenia durable witness anchor
@@ -17,7 +17,7 @@ trusted Xenia ledger public key
         +
 trusted source epoch/policy/witness expectation
         +
-trusted time interval
+subject-bound VerifiedAuthorityTime
         ↓
 VerifiedXeniaWitnessFrontierV1
 ```
@@ -82,29 +82,58 @@ The expectation also fixes:
 
 The verifier rejects a valid signature from the wrong Xenia key, epoch, policy, witness, or challenge.
 
-## Trusted-time interval
+## Trusted time is a typed prerequisite
 
-The verifier does not read ordinary `SystemTime` and call it trusted.
+The public verifier does **not** accept `SystemTime`, caller-supplied `now`, or a caller-constructed time interval.
 
-It consumes a conservative externally established interval:
+It requires Symthaea's existing opaque `VerifiedAuthorityTime`, produced by the challenge-bound multi-authority time path.
+
+That time fact must itself bind a deterministic subject commitment for this exact currentness check:
 
 ```text
-earliest_now_unix_s <= actual trusted now <= latest_now_unix_s
+BLAKE3(
+    "symthaea.xenia-witness-frontier.time-subject.v1\0"
+    || u16_be(1)
+    || trusted_xenia_ledger_public_key
+    || derived_source_id
+    || u64_be(source_epoch)
+    || anchor_policy_digest
+    || witness_id
+    || verifier_challenge
+    || exact_signed_anchor_fingerprint
+)
 ```
 
-and applies:
+`xenia_witness_frontier_time_subject_digest_v1` verifies the signed anchor and exact source bindings before returning this subject. The caller can then obtain `VerifiedAuthorityTime` for that subject.
+
+A valid time fact for another capability, anchor, witness, challenge, key, or source policy cannot be substituted.
+
+## Conservative freshness interval
+
+After the subject binding is checked, the verifier derives time only from `VerifiedAuthorityTime`:
+
+- the consensus lower bound at verification becomes the conservative earliest current time;
+- `conservative_now_unix_s()` becomes the current upper bound and also enforces the time fact's short post-verification lifetime.
+
+It then applies:
 
 ```text
 oldest acceptable observation
-    = latest_now_unix_s - max_age_s
+    = conservative_current_upper_bound - max_observation_age_s
 
 latest acceptable observation
-    = earliest_now_unix_s + max_future_skew_s
+    = consensus_lower_bound_at_time_verification + max_future_skew_s
 ```
 
-This intentionally fails closed as trusted-time uncertainty grows.
+This intentionally fails closed as time uncertainty or post-verification age grows. Greater uncertainty cannot make an old observation live longer.
 
-A production caller should derive this interval from Symthaea's reviewed authority-time/HAL path rather than an unconstrained caller clock.
+The raw interval checker exists only inside the private protocol module for unit testing and is not exported as a production verification boundary.
+
+## Freshness policy binding
+
+`XeniaWitnessFrontierFreshnessPolicyV1` supplies the reviewed maximum observation age and future skew.
+
+These settings must be configured together with the trusted Xenia `anchor_policy_digest`. Symthaea treats that source policy digest as an opaque reviewed commitment; V0.1 does not claim it can reverse or reinterpret the complete Xenia source-policy document from the digest alone.
 
 ## Exact current-anchor binding
 
@@ -161,7 +190,7 @@ These are the fields needed to translate into #452's generic `ExternalWitnessFro
 
 ## Authority boundary
 
-This module does not expose `CapabilityGrant`, reservation, dispatch, retry, budget, executor, shell, systemd, browser, or mutation APIs.
+This module exposes no capability minting, reservation, dispatch, retry, budget, executor, shell, systemd, browser, or mutation path for witness evidence.
 
 Therefore:
 
@@ -191,7 +220,7 @@ It never becomes evidence that an old anchor is current.
 
 ## Tests authored
 
-The source tests cover:
+Protocol/source tests cover:
 
 - exact signed anchor + fresh observation verification;
 - challenge substitution rejection;
@@ -200,6 +229,11 @@ The source tests cover:
 - source relabelling rejection;
 - signed ledger-context regression rejection;
 - observation signature tampering rejection.
+
+The public-boundary integration test additionally proves:
+
+- subject-bound multi-authority `VerifiedAuthorityTime` admits the exact currentness check;
+- an otherwise valid `VerifiedAuthorityTime` for another subject cannot establish Xenia witness currentness.
 
 ## Qualification
 
