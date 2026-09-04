@@ -16,9 +16,13 @@ pub(crate) mod restore_operator;
 pub mod restore_semantics;
 #[path = "operational_checkpoint_validation.rs"]
 mod validation;
+#[path = "operational_checkpoint_wire.rs"]
+mod wire;
 #[cfg(test)]
 #[path = "restore_source_adversarial.rs"]
 mod restore_source_adversarial;
+
+pub use wire::OperationalCheckpointWireError;
 
 use crate::actuator_isolation::ActuatorIsolationSupervisor;
 use crate::controller::{CheckpointError, ControllerCheckpoint};
@@ -71,6 +75,12 @@ where
 /// representation of a known absence; an omitted key is rejected. Unknown
 /// top-level fields are also rejected so one schema number cannot silently
 /// describe multiple authority contracts.
+///
+/// For externally supplied JSON intended for restore, use
+/// [`SubterraneanOperationalCheckpoint::from_strict_v4_json`]. The ordinary
+/// Serde representation remains useful for inspection/transport, but strict
+/// ingress additionally proves that no nested wire state was silently ignored
+/// or default-synthesized before source commitment.
 ///
 /// ```compile_fail,E0624
 /// use symthaea_subterranean::{
