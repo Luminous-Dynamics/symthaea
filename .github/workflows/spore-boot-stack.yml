@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'Cargo.lock'
+      - 'Cargo.toml'
       - 'rust-toolchain.toml'
       - 'crates/domains/symthaea-boot-*/**'
       - 'crates/domains/symthaea-quicken-fb/**'
