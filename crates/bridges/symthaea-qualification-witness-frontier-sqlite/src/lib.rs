@@ -207,19 +207,19 @@ impl GuardedWitnessFrontierDecisionV1<'_> {
         }
     }
 
-    /// Opaque permit for a future anchor writer. Local initial/unanchored or
-    /// verified-descendant state can be anchored while the local writer barrier
-    /// remains held; divergent/rollback states cannot obtain this permit.
+    /// Opaque permit for a future anchor writer. Only states with a concrete
+    /// local frontier can be written as V1 anchors. `EmptyUnanchored` remains
+    /// blocked until the first durable reservation creates a frontier.
     pub fn anchor_permit(&self) -> Option<GuardedAnchorPermitV1<'_>> {
-        if self.publication_disposition() == WitnessFrontierPublicationDispositionV1::AnchorRequired {
-            Some(GuardedAnchorPermitV1 {
-                guard: self.guard,
-                frontier: self.local_frontier(),
-                relation: self.relation,
-            })
-        } else {
-            None
+        if self.publication_disposition() != WitnessFrontierPublicationDispositionV1::AnchorRequired {
+            return None;
         }
+        let frontier = self.local_frontier()?;
+        Some(GuardedAnchorPermitV1 {
+            guard: self.guard,
+            frontier,
+            relation: self.relation,
+        })
     }
 }
 
@@ -242,7 +242,7 @@ impl GuardedPublicationPermitV1<'_> {
 #[derive(Debug)]
 pub struct GuardedAnchorPermitV1<'a> {
     guard: &'a SqliteWitnessFrontierPublicationGuard,
-    frontier: Option<WitnessFrontierPointV1>,
+    frontier: WitnessFrontierPointV1,
     relation: WitnessFrontierRecoveryRelationV1,
 }
 
@@ -251,7 +251,7 @@ impl GuardedAnchorPermitV1<'_> {
         self.guard.witness_id
     }
 
-    pub fn frontier(&self) -> Option<WitnessFrontierPointV1> {
+    pub fn frontier(&self) -> WitnessFrontierPointV1 {
         self.frontier
     }
 
@@ -535,6 +535,23 @@ mod tests {
         );
         assert!(decision.publication_permit().is_some());
         assert!(decision.anchor_permit().is_none());
+        drop(decision);
+        guard.release().unwrap();
+        cleanup(&path);
+    }
+
+    #[test]
+    fn empty_unanchored_has_no_writable_frontier_permit() {
+        let path = db_path("empty");
+        let store = SqliteWitnessSequenceStore::open(&path).unwrap();
+        let guard = SqliteWitnessFrontierPublicationGuard::acquire(&store, [0x51; 16]).unwrap();
+        let decision = guard.classify(None).unwrap();
+        assert_eq!(
+            decision.relation(),
+            WitnessFrontierRecoveryRelationV1::EmptyUnanchored
+        );
+        assert!(decision.anchor_permit().is_none());
+        assert!(decision.publication_permit().is_none());
         drop(decision);
         guard.release().unwrap();
         cleanup(&path);
