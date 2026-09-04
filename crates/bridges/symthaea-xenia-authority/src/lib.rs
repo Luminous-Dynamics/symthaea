@@ -72,25 +72,33 @@ impl XeniaFreshnessPolicyV1 {
 
 /// Reviewed freshness limits for challenge-bound Xenia witness observations.
 ///
-/// The values must be configured together with the trusted Xenia
-/// `anchor_policy_digest`; this type does not reinterpret that opaque source
+/// `authority_time_policy_digest` is the exact trusted-time policy that must
+/// have produced the `VerifiedAuthorityTime` fact used for this check. The
+/// remaining values must be configured together with the trusted Xenia
+/// `anchor_policy_digest`; Symthaea does not reinterpret that opaque source
 /// policy commitment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct XeniaWitnessFrontierFreshnessPolicyV1 {
+    pub authority_time_policy_digest: [u8; 32],
     pub max_observation_age_s: u64,
     pub max_future_skew_s: u64,
 }
 
 impl XeniaWitnessFrontierFreshnessPolicyV1 {
-    pub fn strict(max_observation_age_s: u64, max_future_skew_s: u64) -> Self {
+    pub fn strict(
+        authority_time_policy_digest: [u8; 32],
+        max_observation_age_s: u64,
+        max_future_skew_s: u64,
+    ) -> Self {
         Self {
+            authority_time_policy_digest,
             max_observation_age_s,
             max_future_skew_s,
         }
     }
 
     fn validate(self) -> Result<(), XeniaWitnessFrontierVerificationError> {
-        if self.max_observation_age_s == 0 {
+        if self.authority_time_policy_digest == [0; 32] || self.max_observation_age_s == 0 {
             return Err(XeniaWitnessFrontierVerificationError::InvalidFreshnessPolicy);
         }
         Ok(())
@@ -101,13 +109,16 @@ impl XeniaWitnessFrontierFreshnessPolicyV1 {
 /// it may establish freshness for one Xenia witness-frontier observation.
 ///
 /// The subject commits the trusted Xenia key, derived source namespace, source
-/// epoch, reviewed anchor policy, witness, verifier challenge, and exact signed
-/// durable-anchor fingerprint. The anchor signature is verified before the
-/// subject is returned.
+/// epoch, reviewed anchor policy, witness, verifier challenge, exact signed
+/// durable-anchor fingerprint, exact trusted-time policy, and the freshness
+/// limits under which currentness will be accepted. The anchor signature is
+/// verified before the subject is returned.
 pub fn xenia_witness_frontier_time_subject_digest_v1(
     anchor: &XeniaSignedWitnessFrontierAnchorV1,
     expected: XeniaWitnessFrontierExpectationV1,
+    freshness: XeniaWitnessFrontierFreshnessPolicyV1,
 ) -> Result<[u8; 32], XeniaWitnessFrontierVerificationError> {
+    freshness.validate()?;
     if expected.trusted_ledger_public_key == [0; 32]
         || expected.source_epoch == 0
         || expected.anchor_policy_digest == [0; 32]
@@ -146,6 +157,9 @@ pub fn xenia_witness_frontier_time_subject_digest_v1(
     hasher.update(&expected.witness_id);
     hasher.update(&expected.challenge);
     hasher.update(&anchor_fingerprint);
+    hasher.update(&freshness.authority_time_policy_digest);
+    hasher.update(&freshness.max_observation_age_s.to_be_bytes());
+    hasher.update(&freshness.max_future_skew_s.to_be_bytes());
     Ok(*hasher.finalize().as_bytes())
 }
 
@@ -154,7 +168,8 @@ pub fn xenia_witness_frontier_time_subject_digest_v1(
 /// Unlike the protocol-only checker inside the private module, this API does not
 /// accept a caller-selected wall-clock interval. It requires a short-lived
 /// [`VerifiedAuthorityTime`] fact bound to this exact Xenia key/source/witness,
-/// verifier challenge, and signed durable anchor.
+/// verifier challenge, signed durable anchor, trusted-time policy and freshness
+/// limits.
 pub fn verify_xenia_witness_frontier_v1(
     anchor: &XeniaSignedWitnessFrontierAnchorV1,
     observation: &XeniaSignedWitnessFrontierObservationV1,
@@ -163,7 +178,10 @@ pub fn verify_xenia_witness_frontier_v1(
     freshness: XeniaWitnessFrontierFreshnessPolicyV1,
 ) -> Result<VerifiedXeniaWitnessFrontierV1, XeniaWitnessFrontierVerificationError> {
     freshness.validate()?;
-    let time_subject = xenia_witness_frontier_time_subject_digest_v1(anchor, expected)?;
+    if authority_time.policy_digest() != freshness.authority_time_policy_digest {
+        return Err(XeniaWitnessFrontierVerificationError::AuthorityTimePolicyMismatch);
+    }
+    let time_subject = xenia_witness_frontier_time_subject_digest_v1(anchor, expected, freshness)?;
     authority_time
         .require_subject(time_subject)
         .map_err(|_| XeniaWitnessFrontierVerificationError::AuthorityTimeRejected)?;
@@ -193,6 +211,8 @@ pub enum XeniaWitnessFrontierVerificationError {
     InvalidExpectation,
     #[error("Xenia witness-frontier freshness policy is invalid")]
     InvalidFreshnessPolicy,
+    #[error("verified authority-time policy does not match reviewed witness freshness policy")]
+    AuthorityTimePolicyMismatch,
     #[error("verified authority-time fact rejected the witness-currentness check")]
     AuthorityTimeRejected,
     #[error("Xenia witness-frontier evidence rejected: {0}")]
