@@ -20,7 +20,7 @@
 //! writers on one database. The reservation chain detects inconsistent local
 //! state, but a coherent rollback of the entire database is outside this crate's
 //! threat model; release deployments should externally anchor the returned
-//! frontier commitment.
+//! frontier statement.
 
 #![deny(unsafe_code)]
 
@@ -44,6 +44,7 @@ pub const MAX_SQLITE_INTEGER: u64 = i64::MAX as u64;
 const SQLITE_APPLICATION_ID: i64 = 1_398_363_953; // ASCII "SYW1"
 const SQLITE_USER_VERSION: i64 = 1;
 const RESERVATION_DOMAIN: &[u8] = b"symthaea.qualification-witness.sequence-reservation.v1\0";
+const FRONTIER_DOMAIN: &[u8] = b"symthaea.qualification-witness.sequence-frontier.v1\0";
 const ATTESTATION_STORAGE_DOMAIN: &[u8] = b"symthaea.qualification-witness.persisted-attestation.v1\0";
 const ZERO32: [u8; 32] = [0; 32];
 
@@ -96,6 +97,39 @@ pub struct WitnessSequenceReservationV1 {
 pub struct WitnessSequenceFrontierV1 {
     pub high_watermark: u64,
     pub reservation_head: Digest32,
+}
+
+/// Canonical external-anchor statement. The witness identity is part of the
+/// commitment so a frontier cannot be accidentally attributed to another
+/// witness domain by an integration layer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WitnessSequenceFrontierStatementV1 {
+    witness_id: [u8; 16],
+    high_watermark: u64,
+    reservation_head: Digest32,
+}
+
+impl WitnessSequenceFrontierStatementV1 {
+    pub fn witness_id(&self) -> [u8; 16] {
+        self.witness_id
+    }
+
+    pub fn high_watermark(&self) -> u64 {
+        self.high_watermark
+    }
+
+    pub fn reservation_head(&self) -> Digest32 {
+        self.reservation_head
+    }
+
+    pub fn digest(&self) -> Digest32 {
+        let mut transcript = Transcript::new(FRONTIER_DOMAIN);
+        transcript.u16(WITNESS_SEQUENCE_SCHEMA_VERSION);
+        transcript.fixed(&self.witness_id);
+        transcript.u64(self.high_watermark);
+        transcript.fixed(&self.reservation_head.0);
+        Digest32(transcript.finish())
+    }
 }
 
 #[derive(Debug)]
@@ -175,6 +209,12 @@ impl SqliteWitnessSequenceStore {
              PRAGMA foreign_keys=ON;\n\
              PRAGMA trusted_schema=OFF;",
         )?;
+        let synchronous: i64 = conn.query_row("PRAGMA synchronous", [], |row| row.get(0))?;
+        let foreign_keys: i64 = conn.query_row("PRAGMA foreign_keys", [], |row| row.get(0))?;
+        let trusted_schema: i64 = conn.query_row("PRAGMA trusted_schema", [], |row| row.get(0))?;
+        if synchronous != 2 || foreign_keys != 1 || trusted_schema != 0 {
+            return Err(WitnessSequenceError::DurabilityConfiguration);
+        }
         Ok(conn)
     }
 
@@ -279,6 +319,19 @@ impl SqliteWitnessSequenceStore {
         let conn = self.connect()?;
         initialize_schema(&conn)?;
         load_frontier(&conn, witness_id)
+    }
+
+    pub fn frontier_statement(
+        &self,
+        witness_id: [u8; 16],
+    ) -> Result<Option<WitnessSequenceFrontierStatementV1>, WitnessSequenceError> {
+        Ok(self.frontier(witness_id)?.map(|frontier| {
+            WitnessSequenceFrontierStatementV1 {
+                witness_id,
+                high_watermark: frontier.high_watermark,
+                reservation_head: frontier.reservation_head,
+            }
+        }))
     }
 
     /// Recompute the immutable reservation chain for one witness. This detects
@@ -506,10 +559,10 @@ fn canonical_store_target(path: &Path) -> Result<PathBuf, WitnessSequenceError> 
 fn initialize_schema(conn: &Connection) -> Result<(), WitnessSequenceError> {
     let application_id: i64 = conn.query_row("PRAGMA application_id", [], |row| row.get(0))?;
     let user_version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-    let names = user_table_names(conn)?;
+    let objects = user_schema_objects(conn)?;
 
     if application_id == 0 && user_version == 0 {
-        if !names.is_empty() {
+        if !objects.is_empty() {
             return Err(WitnessSequenceError::SchemaMismatch);
         }
         conn.execute_batch(
@@ -546,25 +599,25 @@ fn initialize_schema(conn: &Connection) -> Result<(), WitnessSequenceError> {
         return Err(WitnessSequenceError::SchemaMismatch);
     }
 
-    verify_required_tables(conn)
+    verify_required_schema(conn)
 }
 
-fn user_table_names(conn: &Connection) -> Result<Vec<String>, WitnessSequenceError> {
+fn user_schema_objects(conn: &Connection) -> Result<Vec<(String, String)>, WitnessSequenceError> {
     let mut statement = conn.prepare(
-        "SELECT name FROM sqlite_schema\n\
-         WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name ASC",
+        "SELECT type, name FROM sqlite_schema\n\
+         WHERE name NOT LIKE 'sqlite_%' ORDER BY type ASC, name ASC",
     )?;
-    let names = statement
-        .query_map([], |row| row.get::<_, String>(0))?
+    let objects = statement
+        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(names)
+    Ok(objects)
 }
 
-fn verify_required_tables(conn: &Connection) -> Result<(), WitnessSequenceError> {
-    let names = user_table_names(conn)?;
-    if names.len() != 2
-        || names[0] != "witness_sequence_attempts"
-        || names[1] != "witness_sequence_frontier"
+fn verify_required_schema(conn: &Connection) -> Result<(), WitnessSequenceError> {
+    let objects = user_schema_objects(conn)?;
+    if objects.len() != 2
+        || objects[0] != ("table".to_string(), "witness_sequence_attempts".to_string())
+        || objects[1] != ("table".to_string(), "witness_sequence_frontier".to_string())
     {
         return Err(WitnessSequenceError::SchemaMismatch);
     }
@@ -858,7 +911,7 @@ impl Transcript {
 pub enum WitnessSequenceError {
     #[error("invalid witness sequence store path")]
     InvalidStorePath,
-    #[error("SQLite durability configuration did not enter WAL mode")]
+    #[error("SQLite durability configuration did not enter the required profile")]
     DurabilityConfiguration,
     #[error("witness sequence database schema/application identity mismatch")]
     SchemaMismatch,
@@ -957,6 +1010,12 @@ mod tests {
         assert_eq!(first.reservation_digest, second.reservation_digest);
         assert_eq!(second.state, DurableWitnessAttemptStateV1::Reserved);
         assert_eq!(store.frontier([0x51; 16]).unwrap().unwrap().high_watermark, 1);
+
+        let statement = store.frontier_statement([0x51; 16]).unwrap().unwrap();
+        assert_eq!(statement.witness_id(), [0x51; 16]);
+        assert_eq!(statement.high_watermark(), 1);
+        assert_eq!(statement.reservation_head(), first.reservation_digest);
+        assert_ne!(statement.digest().0, ZERO32);
     }
 
     #[test]
@@ -1053,6 +1112,24 @@ mod tests {
         drop(store);
         let conn = Connection::open(&db.path).unwrap();
         conn.execute_batch("DROP TABLE witness_sequence_attempts;").unwrap();
+        drop(conn);
+        assert!(matches!(
+            SqliteWitnessSequenceStore::open(&db.path),
+            Err(WitnessSequenceError::SchemaMismatch)
+        ));
+    }
+
+    #[test]
+    fn extra_trigger_in_claimed_database_fails_closed() {
+        let db = TestDb::new();
+        let store = SqliteWitnessSequenceStore::open(&db.path).unwrap();
+        drop(store);
+        let conn = Connection::open(&db.path).unwrap();
+        conn.execute_batch(
+            "CREATE TRIGGER unexpected_trigger AFTER INSERT ON witness_sequence_attempts\n\
+             BEGIN SELECT 1; END;",
+        )
+        .unwrap();
         drop(conn);
         assert!(matches!(
             SqliteWitnessSequenceStore::open(&db.path),
