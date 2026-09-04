@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-kubernetes-state-origin-bridge"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Typed Kubernetes desired-state provenance normalization for the Symthaea integration fabric"
+
+[dependencies]
+symthaea-integration-core = { path = "../../core/symthaea-integration-core" }
+symthaea-kubernetes-bridge = { path = "../symthaea-kubernetes-bridge" }
+blake3 = { workspace = true }
+
+[dev-dependencies]
+symthaea-kubernetes-state-bridge = { path = "../symthaea-kubernetes-state-bridge" }
+symthaea-kubernetes-workload-state-bridge = { path = "../symthaea-kubernetes-workload-state-bridge" }
+serde_json = { workspace = true }

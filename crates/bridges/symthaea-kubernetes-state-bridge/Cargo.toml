@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-kubernetes-state-bridge"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Read-only Kubernetes desired/observed state replay bridge for Symthaea"
+
+[dependencies]
+symthaea-integration-core = { path = "../../core/symthaea-integration-core" }
+symthaea-kubernetes-bridge = { path = "../symthaea-kubernetes-bridge" }
+serde_json = { workspace = true }
+blake3 = { workspace = true }
