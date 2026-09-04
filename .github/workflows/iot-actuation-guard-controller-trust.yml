@@ -1,0 +1,176 @@
+name: IoT Actuation Guard Controller Trust
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-guard-interlock/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard-protocol/**'
+      - 'crates/bridges/symthaea-iot-final-gate/**'
+      - 'crates/bridges/symthaea-iot-interlock-trust/**'
+      - 'crates/bridges/symthaea-iot-interlock-ed25519/**'
+      - 'crates/bridges/symthaea-iot-transport-receipt/**'
+      - '.github/workflows/iot-actuation-guard-controller-trust.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-actuation-guard-controller-trust-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    name: Guard controller-trust source contract (Rust 1.96)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.96.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact formatter
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Check controller-trust stage formatting
+        run: |
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-interlock/src/lib.rs
+          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-interlock/tests/controller_trust.rs
+
+      - name: Enforce non-actuating production TCB and fixed verifier
+        run: |
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          manifest = tomllib.loads(Path('crates/bridges/symthaea-iot-actuation-guard-interlock/Cargo.toml').read_text())
+          deps = set(manifest.get('dependencies', {}))
+          expected = {
+              'symthaea-authority',
+              'symthaea-iot-actuation-guard',
+              'symthaea-iot-actuation-guard-protocol',
+              'symthaea-iot-final-gate',
+              'symthaea-iot-interlock-ed25519',
+              'symthaea-iot-interlock-trust',
+              'symthaea-iot-transport-receipt',
+              'thiserror',
+          }
+          assert deps == expected, f'controller-trust production dependency drift: {sorted(deps)!r}'
+          assert 'bin' not in manifest, 'controller-trust stage must remain a library proof stage'
+
+          source = Path('crates/bridges/symthaea-iot-actuation-guard-interlock/src/lib.rs').read_text()
+          required = [
+              '#![deny(unsafe_code)]',
+              'Ed25519Rfc8032InterlockVerifier',
+              'verify_interlock_key_binding',
+              'verify_physical_interlock',
+              'ReportPredatesCurrentTrustGeneration',
+              'DecodedGuardEvidence',
+          ]
+          for needle in required:
+              assert needle in source, f'missing guard controller-trust invariant: {needle!r}'
+
+          forbidden = [
+              'tokio::spawn',
+              'TcpListener',
+              'TcpStream',
+              'std::process',
+              'Command::new',
+              'FinalActuatorPermit',
+              'CompleteJitHalLease',
+              'join_final_actuator_gate',
+              'fence_final_permit_for_hal',
+              'unsafe {',
+          ]
+          for needle in forbidden:
+              assert needle not in source, f'forbidden controller-trust surface: {needle!r}'
+          PY
+
+  implementation:
+    name: Guard controller trust + real hybrid signatures (MSRV 1.94)
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: 1.94.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install exact compiler and Clippy
+        run: rustup toolchain install 1.94.0 --profile minimal --component clippy
+
+      - name: Verify exact checkout and toolchain
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          rustc --version | grep -F 'rustc 1.94.0'
+          cargo --version | grep -F 'cargo 1.94.0'
+
+      - name: Resolve candidate and reject unreviewed external dependency drift
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          before = tomllib.loads(Path('/tmp/Cargo.lock.before').read_text())
+          after = tomllib.loads(Path('Cargo.lock').read_text())
+
+          def sourced(doc):
+              return {
+                  (p['name'], p['version'], p['source']): p
+                  for p in doc.get('package', [])
+                  if 'source' in p
+              }
+
+          b = sourced(before)
+          a = sourced(after)
+          added = sorted(set(a) - set(b))
+          removed = sorted(set(b) - set(a))
+          changed = sorted(k for k in set(a) & set(b) if a[k] != b[k])
+
+          allowed = {
+              ('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')
+          }
+          assert set(added).issubset(allowed), f'unreviewed external package delta: {added!r}'
+          assert not removed, f'external package removal is not allowed: {removed!r}'
+          assert not changed, f'existing external package record changed: {changed!r}'
+          if added:
+              package = a[added[0]]
+              assert package.get('checksum') == 'c9fb5a367b9846933e271a3c2a992930743f82ae5e8cb7faa780715a80fa0b15', package
+              families = {dep.split(' ', 1)[0] for dep in package.get('dependencies', [])}
+              assert families == {'rand_core', 'sha2', 'sha3', 'zeroize'}, families
+          PY
+
+      - name: Check guard ingress + controller-trust stage
+        run: >-
+          cargo check
+          -p symthaea-iot-actuation-guard
+          -p symthaea-iot-actuation-guard-interlock
+          -p symthaea-iot-final-gate
+          -p symthaea-iot-interlock-trust
+          -p symthaea-iot-interlock-ed25519
+          --all-targets
+
+      - name: Run real Xenia + controller signature regressions first
+        run: cargo test -p symthaea-iot-actuation-guard-interlock --test controller_trust
+
+      - name: Test guard controller-trust package
+        run: cargo test -p symthaea-iot-actuation-guard-interlock --all-targets
+
+      - name: Strict Clippy guard controller-trust package
+        run: cargo clippy -p symthaea-iot-actuation-guard-interlock --all-targets -- -D warnings

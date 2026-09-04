@@ -1,0 +1,34 @@
+[package]
+name = "symthaea-iot-actuation-guard-interlock"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Guard-owned interlock policy and current controller-key verification for cyber-physical ingress"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "security", "interlock", "actuation"]
+categories = ["embedded"]
+
+[dependencies]
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-actuation-guard = { path = "../symthaea-iot-actuation-guard" }
+symthaea-iot-actuation-guard-protocol = { path = "../symthaea-iot-actuation-guard-protocol" }
+symthaea-iot-final-gate = { path = "../symthaea-iot-final-gate" }
+symthaea-iot-interlock-ed25519 = { path = "../symthaea-iot-interlock-ed25519" }
+symthaea-iot-interlock-trust = { path = "../symthaea-iot-interlock-trust" }
+symthaea-iot-transport-receipt = { path = "../symthaea-iot-transport-receipt" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+bincode = { workspace = true }
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+fips204 = { version = "=0.4.6", default-features = false, features = ["ml-dsa-65"] }
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-iot-authority = { path = "../symthaea-iot-authority" }
+symthaea-iot-device-protocol = { path = "../symthaea-iot-device-protocol" }
+symthaea-iot-durable-runtime = { path = "../symthaea-iot-durable-runtime" }
+symthaea-iot-policy = { path = "../symthaea-iot-policy" }
+symthaea-iot-posture = { path = "../symthaea-iot-posture" }
