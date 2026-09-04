@@ -1,0 +1,258 @@
+name: Spore CI Routing Contract
+
+# Deliberately unfiltered. GitHub path-filter evaluation is bounded by the
+# platform's changed-file diff window, so this safety/precondition lane must be
+# created for every pull request. Future fanout reduction belongs inside an
+# always-triggered complete-diff router, not in on.pull_request.paths-ignore.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spore-ci-routing-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  routing-contract:
+    name: Boot routing is coverage-preserving
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+      CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+      UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+      AUDITED_QUALIFICATION_SCRIPT_SHA256: b19c1d6816bacd51d6948171be749b810b6e94871481b2c51e49a1bc9a132efc
+
+    steps:
+      - name: Checkout exact source head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
+          fetch-depth: 1
+
+      - name: Verify exact-head and execution identities
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/spore-ci-routing-contract.yml)" -eq 1
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/spore-ci-routing-contract.yml)" -eq 1
+          if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' .github/workflows/spore-ci-routing-contract.yml; then
+            echo 'mutable major-version GitHub Action tag found in routing-contract workflow' >&2
+            exit 1
+          fi
+          echo "head=$(git rev-parse HEAD)"
+          echo "tree=$(git rev-parse 'HEAD^{tree}')"
+
+      - name: Exercise routing checker positive and negative cases
+        run: python3 scripts/check-spore-ci-routing-contract.py --self-test
+
+      - name: Prove qualification blob identity is byte-derived
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          import tempfile
+          from pathlib import Path
+
+          checker = Path('scripts/check-spore-ci-routing-contract.py')
+          spec = importlib.util.spec_from_file_location('spore_ci_routing_contract', checker)
+          assert spec is not None and spec.loader is not None
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+
+          synthetic = module.qualification_fixture()
+          synthetic_bytes = synthetic.encode('utf-8')
+          synthetic_blob = module.git_blob_sha1(synthetic_bytes)
+          assert synthetic_blob not in module.AUDITED_QUALIFICATION_SCRIPT_BLOBS
+
+          with tempfile.TemporaryDirectory() as directory:
+              qualification = Path(directory) / 'check-spore-boot-stack.sh'
+              qualification.write_bytes(synthetic_bytes)
+              original = module.QUALIFICATION_SCRIPT
+              module.QUALIFICATION_SCRIPT = qualification
+              try:
+                  try:
+                      module.validate('bootstrap')
+                  except ValueError as error:
+                      assert 'not an audited routing authority' in str(error)
+                  else:
+                      raise AssertionError(
+                          'synthetic qualification bytes were accepted as audited authority'
+                      )
+              finally:
+                  module.QUALIFICATION_SCRIPT = original
+          PY
+
+      - name: Require unfiltered general PR CI
+        run: |
+          set -euo pipefail
+          # Production precondition mode deliberately rejects both paths and
+          # paths-ignore on general CI. Native GitHub path filtering is not an
+          # authority boundary because platform diff evaluation is bounded.
+          python3 scripts/check-spore-ci-routing-contract.py \
+            --mode bootstrap \
+            --receipt spore-ci-routing-contract-v3.json
+
+      - name: Verify audited qualification SHA-256
+        run: |
+          set -euo pipefail
+          if [[ -f scripts/check-spore-boot-stack.sh ]]; then
+            actual="$(sha256sum scripts/check-spore-boot-stack.sh | awk '{print $1}')"
+            test "$actual" = "$AUDITED_QUALIFICATION_SCRIPT_SHA256" || {
+              echo "qualification script SHA-256 is not the audited routing authority" >&2
+              echo "expected=$AUDITED_QUALIFICATION_SCRIPT_SHA256" >&2
+              echo "actual=$actual" >&2
+              exit 1
+            }
+          else
+            echo 'pre-boot bootstrap: qualification script absent; no routing exemptions authorized'
+          fi
+
+      - name: Prove candidate path-package ownership
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import importlib.util
+          import json
+          import tomllib
+          from pathlib import Path
+
+          checker = Path('scripts/check-spore-ci-routing-contract.py')
+          spec = importlib.util.spec_from_file_location('spore_ci_routing_contract', checker)
+          assert spec is not None and spec.loader is not None
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+
+          result = {
+              'schema': 'spore-ci-path-package-ownership-v1',
+              'status': 'NOT_APPLICABLE_PREBOOT',
+              'qualification_script_present': module.QUALIFICATION_SCRIPT.exists(),
+              'owners': {},
+          }
+
+          if module.QUALIFICATION_SCRIPT.exists():
+              owners = {}
+              for pattern, (_trigger, expected_package) in module.VALIDATION_OWNERS.items():
+                  assert pattern.endswith('/**'), pattern
+                  root = Path(pattern[:-3])
+                  manifest = root / 'Cargo.toml'
+                  if not manifest.is_file():
+                      raise AssertionError(f'missing candidate manifest: {manifest}')
+                  raw = manifest.read_bytes()
+                  parsed = tomllib.loads(raw.decode('utf-8'))
+                  actual_package = parsed.get('package', {}).get('name')
+                  if actual_package != expected_package:
+                      raise AssertionError(
+                          f'{manifest}: expected package {expected_package!r}, got {actual_package!r}'
+                      )
+                  owners[pattern] = {
+                      'manifest': str(manifest),
+                      'manifest_sha256': hashlib.sha256(raw).hexdigest(),
+                      'package': actual_package,
+                  }
+              result['status'] = 'PASS'
+              result['owners'] = owners
+
+          Path('spore-ci-path-package-ownership-v1.json').write_text(
+              json.dumps(result, sort_keys=True, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(result, sort_keys=True, indent=2))
+          PY
+
+      - name: Seal exact-head routing receipt
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
+          export EVALUATED_TREE="$(git rev-parse 'HEAD^{tree}')"
+          export OS_RELEASE_SHA256="$(sha256sum /etc/os-release | awk '{print $1}')"
+          export KERNEL_RELEASE="$(uname -r)"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          p = Path('spore-ci-routing-contract-v3.json')
+          ownership_path = Path('spore-ci-path-package-ownership-v1.json')
+          value = json.loads(p.read_text())
+          ownership = json.loads(ownership_path.read_text())
+          assert value['schema'] == 'spore-ci-routing-contract-v3'
+          assert value['status'] == 'PASS'
+          assert value['mode'] == 'bootstrap'
+          assert ownership['schema'] == 'spore-ci-path-package-ownership-v1'
+          value['source_commit'] = os.environ['SOURCE_COMMIT']
+          value['evaluated_tree'] = os.environ['EVALUATED_TREE']
+          value['native_pr_path_filter_policy'] = 'PROHIBITED'
+          value['future_fanout_router'] = 'COMPLETE_GIT_DIFF_REQUIRED'
+          value['runner_label'] = 'ubuntu-24.04'
+          value['runner_os'] = os.environ['RUNNER_OS']
+          value['runner_arch'] = os.environ['RUNNER_ARCH']
+          value['runner_image_os'] = os.environ.get('ImageOS', 'unknown')
+          value['runner_image_version'] = os.environ.get('ImageVersion', 'unknown')
+          value['os_release_sha256'] = os.environ['OS_RELEASE_SHA256']
+          value['kernel_release'] = os.environ['KERNEL_RELEASE']
+          value['checkout_action_sha'] = os.environ['CHECKOUT_ACTION_SHA']
+          value['upload_artifact_action_sha'] = os.environ['UPLOAD_ARTIFACT_ACTION_SHA']
+          value['audited_qualification_script_sha256'] = os.environ[
+              'AUDITED_QUALIFICATION_SCRIPT_SHA256'
+          ]
+          value['path_package_ownership_status'] = ownership['status']
+          value['path_package_ownership_sha256'] = hashlib.sha256(
+              ownership_path.read_bytes()
+          ).hexdigest()
+          p.write_text(json.dumps(value, sort_keys=True, indent=2) + '\n')
+          PY
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          receipt_path = Path('spore-ci-routing-contract-v3.json')
+          ownership_path = Path('spore-ci-path-package-ownership-v1.json')
+          value = json.loads(receipt_path.read_text())
+          ownership = json.loads(ownership_path.read_text())
+          assert value['schema'] == 'spore-ci-routing-contract-v3'
+          assert value['status'] == 'PASS'
+          assert value['mode'] == 'bootstrap'
+          assert value['source_commit'] == os.environ['SOURCE_COMMIT']
+          assert value['native_pr_path_filter_policy'] == 'PROHIBITED'
+          assert value['future_fanout_router'] == 'COMPLETE_GIT_DIFF_REQUIRED'
+          assert value['runner_label'] == 'ubuntu-24.04'
+          assert value['checkout_action_sha'] == os.environ['CHECKOUT_ACTION_SHA']
+          assert value['upload_artifact_action_sha'] == os.environ['UPLOAD_ARTIFACT_ACTION_SHA']
+          assert value['audited_qualification_script_sha256'] == os.environ[
+              'AUDITED_QUALIFICATION_SCRIPT_SHA256'
+          ]
+          assert value['path_package_ownership_sha256'] == hashlib.sha256(
+              ownership_path.read_bytes()
+          ).hexdigest()
+          if value['qualification_script_present']:
+              assert value['qualification_script_sha256'] == os.environ[
+                  'AUDITED_QUALIFICATION_SCRIPT_SHA256'
+              ]
+              assert ownership['status'] == 'PASS'
+              assert len(ownership['owners']) == len(value['authorized_boot_only'])
+              assert set(ownership['owners']) == set(value['authorized_boot_only'])
+          else:
+              assert value['qualification_script_sha256'] is None
+              assert ownership['status'] == 'NOT_APPLICABLE_PREBOOT'
+              assert ownership['owners'] == {}
+          PY
+          cat spore-ci-routing-contract-v3.json
+          cat spore-ci-path-package-ownership-v1.json
+
+      - name: Upload routing evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: spore-ci-routing-contract-v3
+          path: |
+            spore-ci-routing-contract-v3.json
+            spore-ci-path-package-ownership-v1.json
+          if-no-files-found: error
+          retention-days: 14
