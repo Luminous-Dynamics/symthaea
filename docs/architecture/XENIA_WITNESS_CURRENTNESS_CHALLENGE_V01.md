@@ -1,0 +1,205 @@
+# Xenia witness-currentness challenge V0.1
+
+## Purpose
+
+Close the remaining caller-supplied freshness-challenge gap in the Symthaea-side Xenia witness-frontier verifier.
+
+PR #465 verifies that a signed Xenia observation binds an exact 32-byte verifier challenge, an exact durable anchor, an exact trusted-time policy and an exact `VerifiedAuthorityTime` subject. Its low-level compatibility API still accepts the challenge as ordinary caller data inside `XeniaWitnessFrontierExpectationV1`.
+
+V0.1 adds a production-shaped affine boundary:
+
+```text
+OS CSPRNG
+   ↓
+PendingXeniaWitnessCurrentnessChallengeV1
+   ├─ exact trusted Xenia key
+   ├─ source epoch
+   ├─ anchor-policy digest
+   ├─ witness ID
+   └─ fresh 32-byte challenge
+          ↓
+challenge bytes sent to Xenia
+          ↓
+fresh signed Xenia observation
+          +
+subject-bound VerifiedAuthorityTime
+          ↓
+consume pending challenge
+          ↓
+VerifiedXeniaWitnessFrontierV1
+```
+
+The Xenia wire protocol is unchanged. Xenia still sees the same raw 32-byte challenge field.
+
+## Entropy source
+
+`PendingXeniaWitnessCurrentnessChallengeV1::generate` uses the workspace-pinned `getrandom 0.2` operating-system entropy boundary.
+
+Generation fails closed if:
+
+- the source/key/policy/witness scope is malformed;
+- the operating-system entropy source fails;
+- the generated challenge is the all-zero value reserved as malformed by the V1 protocol.
+
+The challenge is public protocol material, not a secret. It must be sent to Xenia so Xenia can sign it. The security property is unpredictability/freshness before issuance and exact binding during verification, not confidentiality after issuance.
+
+## Affine process-local state
+
+`PendingXeniaWitnessCurrentnessChallengeV1` deliberately implements neither `Clone` nor `Copy`.
+
+The normal production flow is:
+
+1. create one pending challenge;
+2. read its challenge bytes for the Xenia request;
+3. derive the exact authority-time subject from the same pending object and signed durable anchor;
+4. obtain `VerifiedAuthorityTime` for that subject;
+5. consume the pending object while verifying the Xenia observation.
+
+The typed `verify(self, ...)` call consumes the pending object.
+
+This is accidental-reuse prevention inside one process. V0.1 does not claim that arbitrary code cannot copy the public raw challenge bytes and call the retained low-level compatibility verifier directly.
+
+## Crash behavior
+
+Pending challenges are intentionally not persisted in V0.1.
+
+If the process crashes after issuing a challenge but before verification:
+
+```text
+pending challenge lost
+        ↓
+old response cannot use typed V0.1 path
+        ↓
+issue a new random challenge
+        ↓
+obtain a new signed observation
+```
+
+The integration must not reconstruct the old pending object from logs, timestamps or deterministic derivation.
+
+This trades availability for safer freshness semantics. An outstanding response may be wasted after a crash; it does not become replay permission.
+
+A future durable challenge-attempt protocol may preserve exact pending state across restart, but it would need its own monotonic/attempt-idempotent storage semantics rather than simply serializing this process-local token.
+
+## Stable scope
+
+`XeniaWitnessCurrentnessScopeV1` binds:
+
+- exact trusted Xenia ledger public key;
+- exact source epoch;
+- exact reviewed anchor-policy digest;
+- exact witness ID.
+
+The random challenge is generated only after the scope passes structural/source-ID validation.
+
+The scope does not contain execution authority.
+
+## Trusted-time composition
+
+The pending object's `authority_time_subject_digest` delegates to #465's existing subject construction using the exact generated challenge.
+
+Therefore the time subject still commits:
+
+```text
+trusted Xenia key
++ derived source ID
++ source epoch
++ anchor-policy digest
++ witness ID
++ fresh generated challenge
++ exact signed anchor fingerprint
++ exact authority-time policy digest
++ max observation age
++ max future skew
+```
+
+A trusted-time fact for another challenge cannot be substituted.
+
+## Low-level compatibility path
+
+`verify_xenia_witness_frontier_v1` remains public for compatibility and protocol-level testing.
+
+Its documentation now explicitly states that callers using it directly own the fresh/one-use challenge invariant.
+
+New production integrations should prefer:
+
+```text
+PendingXeniaWitnessCurrentnessChallengeV1::generate
+        ↓
+authority_time_subject_digest
+        ↓
+verify(self, ...)
+```
+
+## Tests authored
+
+Unit/source tests cover:
+
+- deterministic exact challenge/scope binding;
+- all-zero challenge rejection;
+- invalid scope rejection before entropy use;
+- production OS generator returns a nonzero challenge.
+
+The public integration test exercises the complete typed read-side path:
+
+```text
+generate pending challenge
+        ↓
+sign Xenia observation over exact generated bytes
+        ↓
+derive trusted-time subject from pending challenge
+        ↓
+obtain VerifiedAuthorityTime
+        ↓
+consume pending challenge
+        ↓
+VerifiedXeniaWitnessFrontierV1
+```
+
+No test relies on two random outputs being different; deterministic correctness does not depend on a probabilistic assertion.
+
+## Cargo.lock discipline
+
+`getrandom` is already pinned as a workspace dependency, so this PR introduces no new dependency family.
+
+Adding it as a direct dependency of `symthaea-xenia-authority` changes that existing package node in `Cargo.lock`.
+
+The dedicated workflow therefore:
+
+1. preserves the checked-in lock;
+2. lets Cargo generate the candidate;
+3. allows no package-set change;
+4. allows no unrelated existing package change;
+5. permits only the exact direct `getrandom` addition to the `symthaea-xenia-authority` package node;
+6. runs Rustfmt/tests/Clippy against the Cargo-produced candidate;
+7. archives the exact lock diff;
+8. fails the final qualification gate until checked-in `Cargo.lock` is byte-fresh.
+
+The lockfile must be updated from Cargo-produced evidence, never hand-edited to obtain a green result.
+
+## Authority boundary
+
+A pending challenge and a verified witness frontier are freshness/evidence objects only.
+
+```text
+challenge
+    ≠ capability
+    ≠ consent
+    ≠ reservation
+    ≠ retry permission
+    ≠ execution authority
+```
+
+Generating a fresh challenge cannot expand Agency Kernel authority.
+
+## Remaining boundaries
+
+V0.1 does not provide:
+
+- durable pending-challenge recovery across process restart;
+- a global replay cache for callers bypassing the typed API;
+- remote proof that the local OS entropy implementation is healthy;
+- execution authority of any kind;
+- the #465 → #452 transport-neutral frontier translation.
+
+The next architectural step should still wait for compiler feedback. After this child and #465 are compiler-qualified with a fresh Cargo lock, the small evidence-only #452 translation becomes the appropriate next integration boundary.
