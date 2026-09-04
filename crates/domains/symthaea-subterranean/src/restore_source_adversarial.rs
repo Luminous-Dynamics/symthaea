@@ -7,7 +7,9 @@
 //!   normalized object owned by an `OperationalRestoreSource`;
 //! - durable adverse/replay evidence must survive normalization;
 //! - semantically equivalent bounded mission state must have one deterministic
-//!   portable representation regardless of caller insertion order.
+//!   portable representation regardless of caller insertion order;
+//! - skipped diagnostic cache state may disappear only while the durable state
+//!   that actually constrains future scheduling remains intact.
 
 use super::restore_admission::OperationalRestoreSource;
 use crate::embodiment::SubterraneanEmbodiment;
@@ -20,7 +22,8 @@ use crate::operator_protocol::{
 };
 use crate::tunnel_graph::{TunnelEdge, TunnelNode, TunnelNodeId, TunnelNodeKind};
 use crate::work_orders::{
-    WorkKind, WorkOrder, WorkOrderId, WorkPriority, WorkResourceEstimate, WorkStatus,
+    WorkKind, WorkOrder, WorkOrderId, WorkPreemptionReason, WorkPriority, WorkResourceEstimate,
+    WorkStatus,
 };
 use symthaea_core::genesis::GenesisSeed;
 
@@ -284,4 +287,74 @@ fn equivalent_mission_insertion_orders_have_one_portable_source_identity() {
     let reverse_bytes =
         serde_json::to_vec(reverse.checkpoint()).expect("reverse normalized encoding");
     assert_eq!(forward_bytes, reverse_bytes);
+}
+
+#[test]
+fn skipped_scheduler_preemption_diagnostic_drops_but_suspended_work_survives() {
+    let genesis = GenesisSeed::from_phrase("restore-source-skipped-preemption-diagnostic");
+    let mut checkpoint = SubterraneanEmbodiment::new(&genesis).operational_checkpoint();
+    let order = mission_work(77, 0, WorkKind::Survey);
+    checkpoint
+        .mission
+        .scheduler
+        .submit(order)
+        .expect("submit work");
+    assert_eq!(
+        checkpoint.mission.scheduler.select_next(0),
+        Some(WorkOrderId(77))
+    );
+    checkpoint
+        .mission
+        .scheduler
+        .preempt(WorkPreemptionReason::PhysicalHazard)
+        .expect("preempt active work");
+    let before = checkpoint.mission.scheduler.snapshot();
+    assert_eq!(
+        before.last_preemption,
+        Some(WorkPreemptionReason::PhysicalHazard)
+    );
+    assert_eq!(before.active, None);
+    assert_eq!(
+        checkpoint
+            .mission
+            .scheduler
+            .order(WorkOrderId(77))
+            .expect("durable work")
+            .status,
+        WorkStatus::Suspended
+    );
+
+    let portable_before = serde_json::to_vec(&checkpoint).expect("portable checkpoint");
+    let normalized = OperationalRestoreSource::capture(checkpoint).expect("normalized source");
+    let portable_after =
+        serde_json::to_vec(normalized.checkpoint()).expect("normalized checkpoint encoding");
+
+    // The skipped diagnostic must not create hidden source identity.
+    assert_eq!(portable_after, portable_before);
+    assert_eq!(
+        normalized
+            .checkpoint()
+            .mission
+            .scheduler
+            .snapshot()
+            .last_preemption,
+        None
+    );
+
+    // But the durable scheduling consequence remains: the work is still
+    // suspended and no active order was invented by normalization.
+    assert_eq!(
+        normalized
+            .checkpoint()
+            .mission
+            .scheduler
+            .order(WorkOrderId(77))
+            .expect("normalized work")
+            .status,
+        WorkStatus::Suspended
+    );
+    assert_eq!(
+        normalized.checkpoint().mission.scheduler.snapshot().active,
+        None
+    );
 }
