@@ -75,8 +75,9 @@ pub struct BootTelemetry {
 }
 
 impl BootTelemetry {
-    /// Create a receiver. Failure to bind or load state disables only the failed
-    /// capability; callers should continue rendering normally.
+    /// Create a receiver. Failure to bind the datagram socket disables only the
+    /// low-latency event path; the validated persisted snapshot remains an
+    /// independent convergence path when configured.
     pub fn new(socket_path: Option<&Path>, state_path: Option<&Path>) -> Self {
         let mut telemetry = Self {
             socket: None,
@@ -101,41 +102,47 @@ impl BootTelemetry {
 
     pub fn poll(&mut self) -> PollReport {
         let mut report = PollReport::default();
-        let Some(socket) = self.socket.as_ref().and_then(|socket| socket.try_clone().ok()) else {
-            return report;
-        };
-        // MAX + 1 lets us distinguish an oversized datagram from an exact-budget
-        // one before attempting deserialization.
-        let mut buffer = [0_u8; MAX_WIRE_BYTES + 1];
 
-        loop {
-            match socket.recv(&mut buffer) {
-                Ok(bytes) => {
-                    let payload = &buffer[..bytes];
-                    if validate_datagram_size(payload).is_err() {
-                        report.rejected = report.rejected.saturating_add(1);
-                        continue;
-                    }
-                    let message: WireMessage = match serde_json::from_slice(payload) {
-                        Ok(message) => message,
-                        Err(_) => {
+        // Datagrams are the low-latency delta path. They are intentionally not
+        // the only convergence mechanism: after draining them, reconcile the
+        // validated persisted snapshot so a lost trailing datagram cannot leave
+        // presentation permanently behind authoritative observer state.
+        if let Some(socket) = self.socket.as_ref().and_then(|socket| socket.try_clone().ok()) {
+            // MAX + 1 lets us distinguish an oversized datagram from an exact-budget
+            // one before attempting deserialization.
+            let mut buffer = [0_u8; MAX_WIRE_BYTES + 1];
+
+            loop {
+                match socket.recv(&mut buffer) {
+                    Ok(bytes) => {
+                        let payload = &buffer[..bytes];
+                        if validate_datagram_size(payload).is_err() {
                             report.rejected = report.rejected.saturating_add(1);
                             continue;
                         }
-                    };
-                    if message.validate().is_err() {
-                        report.rejected = report.rejected.saturating_add(1);
-                        continue;
+                        let message: WireMessage = match serde_json::from_slice(payload) {
+                            Ok(message) => message,
+                            Err(_) => {
+                                report.rejected = report.rejected.saturating_add(1);
+                                continue;
+                            }
+                        };
+                        if message.validate().is_err() {
+                            report.rejected = report.rejected.saturating_add(1);
+                            continue;
+                        }
+                        self.apply_message(&message, &mut report);
                     }
-                    self.apply_message(&message, &mut report);
-                }
-                Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
-                Err(_) => {
-                    report.rejected = report.rejected.saturating_add(1);
-                    break;
+                    Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
+                    Err(_) => {
+                        report.rejected = report.rejected.saturating_add(1);
+                        break;
+                    }
                 }
             }
         }
+
+        self.reconcile_persisted_state(&mut report);
         report
     }
 
@@ -170,8 +177,33 @@ impl BootTelemetry {
         }
     }
 
+    /// Reconcile the full persisted observer snapshot after the low-latency
+    /// datagram pass. This guarantees eventual convergence when a trailing event
+    /// is lost, and keeps telemetry functional even if the renderer could not
+    /// bind its datagram socket.
+    fn reconcile_persisted_state(&mut self, report: &mut PollReport) {
+        let before_observation = self.reducer.observation();
+        let before_snapshot = self.reducer.snapshot();
+        if !self.refresh_from_state(None) {
+            return;
+        }
+
+        let after_observation = self.reducer.observation();
+        let after_snapshot = self.reducer.snapshot();
+        if after_observation != before_observation {
+            report.lineage_resets = report.lineage_resets.saturating_add(1);
+        } else if after_snapshot != before_snapshot {
+            report.applied = report.applied.saturating_add(1);
+        }
+    }
+
     /// Load only a validated snapshot. When `expected` is supplied, the file must
     /// belong to exactly that observation before it can reset lineage state.
+    ///
+    /// A snapshot from the current observation is applied through the normal wire
+    /// reducer rather than the reset path, so a stale same-lineage file can never
+    /// rewind a newer live state. A different observation may reset only through
+    /// this independently selected snapshot side channel.
     fn refresh_from_state(&mut self, expected: Option<ObservationId>) -> bool {
         let Some(path) = self.state_path.as_deref() else {
             return false;
@@ -191,8 +223,13 @@ impl BootTelemetry {
         if !matches!(message, WireMessage::Snapshot { .. }) {
             return false;
         }
-        if expected.is_some_and(|expected| message.observation() != expected) {
+        let observation = message.observation();
+        if expected.is_some_and(|expected| observation != expected) {
             return false;
+        }
+
+        if self.reducer.observation() == Some(observation) {
+            return matches!(self.reducer.apply(&message), Ok(WireApply::Applied));
         }
         self.reducer.reset_from_snapshot(&message).is_ok()
     }
@@ -288,6 +325,20 @@ mod tests {
         ))
     }
 
+    fn write_snapshot(
+        path: &Path,
+        observation: ObservationId,
+        sequence: u64,
+        elapsed_ms: u64,
+        phase: BootPhase,
+    ) {
+        let wire = WireMessage::snapshot(
+            observation,
+            BootSnapshot::new(sequence, Duration::from_millis(elapsed_ms), phase),
+        );
+        fs::write(path, serde_json::to_vec(&wire).unwrap()).unwrap();
+    }
+
     #[test]
     fn health_modulates_growth_without_claiming_authority() {
         let mut healthy = BootSnapshot::new(2, Duration::from_millis(10), BootPhase::Services);
@@ -373,5 +424,57 @@ mod tests {
         let _ = fs::remove_file(link);
         let _ = fs::remove_file(target);
         let _ = fs::remove_file(oversized);
+    }
+
+    #[test]
+    fn persisted_snapshot_converges_without_datagram_socket() {
+        let state = temp_path("converges.json");
+        write_snapshot(&state, OBS_A, 1, 10, BootPhase::Kernel);
+        let mut telemetry = BootTelemetry::new(None, Some(&state));
+        assert_eq!(telemetry.snapshot().map(|snapshot| snapshot.sequence), Some(1));
+
+        write_snapshot(&state, OBS_A, 4, 40, BootPhase::Services);
+        let report = telemetry.poll();
+        let snapshot = telemetry.snapshot().unwrap();
+        assert_eq!(snapshot.sequence, 4);
+        assert_eq!(snapshot.phase, BootPhase::Services);
+        assert_eq!(report.applied, 1);
+        assert_eq!(report.lineage_resets, 0);
+
+        let _ = fs::remove_file(state);
+    }
+
+    #[test]
+    fn stale_same_lineage_snapshot_cannot_rewind_live_state() {
+        let state = temp_path("no-rewind.json");
+        write_snapshot(&state, OBS_A, 3, 30, BootPhase::Network);
+        let mut telemetry = BootTelemetry::new(None, Some(&state));
+        assert_eq!(telemetry.snapshot().map(|snapshot| snapshot.sequence), Some(3));
+
+        write_snapshot(&state, OBS_A, 2, 20, BootPhase::Storage);
+        let report = telemetry.poll();
+        let snapshot = telemetry.snapshot().unwrap();
+        assert_eq!(snapshot.sequence, 3);
+        assert_eq!(snapshot.phase, BootPhase::Network);
+        assert_eq!(report.applied, 0);
+        assert_eq!(report.lineage_resets, 0);
+
+        let _ = fs::remove_file(state);
+    }
+
+    #[test]
+    fn persisted_snapshot_can_authorize_lineage_replacement_without_socket() {
+        let state = temp_path("lineage-replacement.json");
+        write_snapshot(&state, OBS_A, 5, 50, BootPhase::Services);
+        let mut telemetry = BootTelemetry::new(None, Some(&state));
+        assert_eq!(telemetry.reducer.observation(), Some(OBS_A));
+
+        write_snapshot(&state, OBS_B, 1, 60, BootPhase::Services);
+        let report = telemetry.poll();
+        assert_eq!(telemetry.reducer.observation(), Some(OBS_B));
+        assert_eq!(telemetry.snapshot().map(|snapshot| snapshot.sequence), Some(1));
+        assert_eq!(report.lineage_resets, 1);
+
+        let _ = fs::remove_file(state);
     }
 }
