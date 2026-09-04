@@ -1,0 +1,74 @@
+name: Agency Xenia Witness Frontier Verifier
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-xenia-authority/**'
+      - 'crates/core/symthaea-authority/**'
+      - 'docs/architecture/XENIA_WITNESS_FRONTIER_VERIFIER_V01.md'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/agency-xenia-witness-frontier-verifier.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agency-xenia-witness-frontier-verifier-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  source:
+    name: Independent Xenia witness verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy,rustfmt
+
+      - name: Preserve checked-in Cargo.lock
+        run: cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+
+      - name: Require no dependency or lock drift
+        run: |
+          cargo metadata --locked --format-version 1 >/dev/null
+          cmp "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock
+
+      - name: Format Xenia verifier
+        run: cargo fmt --check --package symthaea-xenia-authority
+
+      - name: Test Xenia verifier
+        run: cargo test --locked -p symthaea-xenia-authority
+
+      - name: Clippy Xenia verifier
+        run: cargo clippy --locked -p symthaea-xenia-authority --all-targets -- -D warnings
+
+      - name: Record exact-head evidence
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence"
+          git rev-parse HEAD > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/HEAD"
+          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/TREE"
+          rustc -Vv > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/RUSTC.txt"
+          cargo -V > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/CARGO.txt"
+          sha256sum Cargo.lock > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/CARGO_LOCK_SHA256.txt"
+          sha256sum crates/bridges/symthaea-xenia-authority/src/witness_frontier.rs > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/WITNESS_VERIFIER_SHA256.txt"
+
+      - name: Upload source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agency-xenia-witness-frontier-verifier-${{ github.sha }}
+          path: ${{ runner.temp }}/agency-xenia-witness-frontier-evidence
+          if-no-files-found: error
+          retention-days: 14
