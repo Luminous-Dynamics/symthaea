@@ -1,0 +1,27 @@
+[package]
+name = "symthaea-iot-transport-exact-evidence"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Ephemeral exact-byte provenance capsule for Xenia-authenticated IoT transport evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "security", "provenance", "xenia"]
+categories = ["embedded"]
+
+[dependencies]
+bincode = { workspace = true }
+blake3 = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-device-protocol = { path = "../symthaea-iot-device-protocol" }
+symthaea-iot-transport-receipt = { path = "../symthaea-iot-transport-receipt" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-iot-authority = { path = "../symthaea-iot-authority" }
+symthaea-iot-durable-runtime = { path = "../symthaea-iot-durable-runtime" }
+symthaea-iot-policy = { path = "../symthaea-iot-policy" }
+symthaea-iot-posture = { path = "../symthaea-iot-posture" }
