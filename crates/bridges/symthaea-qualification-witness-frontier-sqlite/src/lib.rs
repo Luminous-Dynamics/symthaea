@@ -56,7 +56,7 @@ impl SqliteWitnessFrontierPublicationGuard {
             return Err(SqliteWitnessFrontierGuardError::InvalidWitnessId);
         }
 
-        let mut connection = open_guard_connection(store.path())?;
+        let connection = open_guard_connection(store.path())?;
         connection.execute_batch("BEGIN IMMEDIATE;")?;
 
         let result = (|| {
@@ -198,7 +198,10 @@ impl GuardedWitnessFrontierDecisionV1<'_> {
     /// borrows the guard so it cannot outlive the writer barrier.
     pub fn publication_permit(&self) -> Option<GuardedPublicationPermitV1<'_>> {
         if self.publication_disposition() == WitnessFrontierPublicationDispositionV1::PublishAllowed {
-            Some(GuardedPublicationPermitV1 { decision: self })
+            self.local_frontier().map(|frontier| GuardedPublicationPermitV1 {
+                guard: self.guard,
+                frontier,
+            })
         } else {
             None
         }
@@ -209,7 +212,11 @@ impl GuardedWitnessFrontierDecisionV1<'_> {
     /// remains held; divergent/rollback states cannot obtain this permit.
     pub fn anchor_permit(&self) -> Option<GuardedAnchorPermitV1<'_>> {
         if self.publication_disposition() == WitnessFrontierPublicationDispositionV1::AnchorRequired {
-            Some(GuardedAnchorPermitV1 { decision: self })
+            Some(GuardedAnchorPermitV1 {
+                guard: self.guard,
+                frontier: self.local_frontier(),
+                relation: self.relation,
+            })
         } else {
             None
         }
@@ -218,35 +225,38 @@ impl GuardedWitnessFrontierDecisionV1<'_> {
 
 #[derive(Debug)]
 pub struct GuardedPublicationPermitV1<'a> {
-    decision: &'a GuardedWitnessFrontierDecisionV1<'a>,
+    guard: &'a SqliteWitnessFrontierPublicationGuard,
+    frontier: WitnessFrontierPointV1,
 }
 
 impl GuardedPublicationPermitV1<'_> {
     pub fn witness_id(&self) -> [u8; 16] {
-        self.decision.witness_id()
+        self.guard.witness_id
     }
 
-    pub fn frontier(&self) -> Option<WitnessFrontierPointV1> {
-        self.decision.local_frontier()
+    pub fn frontier(&self) -> WitnessFrontierPointV1 {
+        self.frontier
     }
 }
 
 #[derive(Debug)]
 pub struct GuardedAnchorPermitV1<'a> {
-    decision: &'a GuardedWitnessFrontierDecisionV1<'a>,
+    guard: &'a SqliteWitnessFrontierPublicationGuard,
+    frontier: Option<WitnessFrontierPointV1>,
+    relation: WitnessFrontierRecoveryRelationV1,
 }
 
 impl GuardedAnchorPermitV1<'_> {
     pub fn witness_id(&self) -> [u8; 16] {
-        self.decision.witness_id()
+        self.guard.witness_id
     }
 
     pub fn frontier(&self) -> Option<WitnessFrontierPointV1> {
-        self.decision.local_frontier()
+        self.frontier
     }
 
     pub fn relation(&self) -> WitnessFrontierRecoveryRelationV1 {
-        self.decision.relation()
+        self.relation
     }
 }
 
