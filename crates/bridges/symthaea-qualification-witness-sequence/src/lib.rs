@@ -24,15 +24,14 @@
 
 #![deny(unsafe_code)]
 
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use ed25519_dalek::SigningKey;
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior};
 use symthaea_authority::Digest32;
-use symthaea_qualification_witness::{
-    QualificationWitnessAttestationV1, QualificationWitnessPolicyV1,
-};
+use symthaea_qualification_witness::QualificationWitnessPolicyV1;
 use symthaea_qualification_witness_service::{
     verify_archive_then_sign_v1, QualificationVerifierRuntimePolicyV1,
     ReleaseEvidenceBindingsV1, VerifiedThenSignedQualificationV1,
@@ -134,16 +133,8 @@ pub struct SqliteWitnessSequenceStore {
 
 impl SqliteWitnessSequenceStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, WitnessSequenceError> {
-        let path = path.as_ref();
-        if path.as_os_str().is_empty() || path == Path::new(":memory:") {
-            return Err(WitnessSequenceError::InvalidStorePath);
-        }
-        if path.exists() && !path.is_file() {
-            return Err(WitnessSequenceError::InvalidStorePath);
-        }
-        let store = Self {
-            path: path.to_path_buf(),
-        };
+        let path = canonical_store_target(path.as_ref())?;
+        let store = Self { path };
         let conn = store.connect()?;
         initialize_schema(&conn)?;
         Ok(store)
@@ -156,7 +147,9 @@ impl SqliteWitnessSequenceStore {
     fn connect(&self) -> Result<Connection, WitnessSequenceError> {
         let flags = OpenFlags::SQLITE_OPEN_READ_WRITE
             | OpenFlags::SQLITE_OPEN_CREATE
-            | OpenFlags::SQLITE_OPEN_FULL_MUTEX;
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW
+            | OpenFlags::SQLITE_OPEN_EXRESCODE;
         let conn = Connection::open_with_flags(&self.path, flags)?;
         conn.busy_timeout(Duration::from_secs(10))?;
         let mode: String = conn.query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))?;
@@ -271,7 +264,7 @@ impl SqliteWitnessSequenceStore {
         }
         let conn = self.connect()?;
         initialize_schema(&conn)?;
-        load_frontier_connection(&conn, witness_id)
+        load_frontier(&conn, witness_id)
     }
 
     /// Recompute the immutable reservation chain for one witness. This detects
@@ -286,7 +279,7 @@ impl SqliteWitnessSequenceStore {
         }
         let conn = self.connect()?;
         initialize_schema(&conn)?;
-        let frontier = load_frontier_connection(&conn, witness_id)?;
+        let frontier = load_frontier(&conn, witness_id)?;
         let Some(frontier) = frontier else {
             return Ok(None);
         };
@@ -303,11 +296,12 @@ impl SqliteWitnessSequenceStore {
         let mut final_head = Digest32(ZERO32);
         while let Some(row) = rows.next()? {
             let attempt = db_attempt_from_row_with_witness(row, witness_id)?;
-            if attempt.sequence != expected_sequence || attempt.previous_reservation_digest != previous_head {
+            if attempt.sequence != expected_sequence
+                || attempt.previous_reservation_digest != previous_head
+            {
                 return Err(WitnessSequenceError::AuditFailure);
             }
-            let binding = attempt.binding();
-            let expected_digest = reservation_digest(binding, attempt.sequence, previous_head)?;
+            let expected_digest = reservation_digest(attempt.binding(), attempt.sequence, previous_head)?;
             if expected_digest != attempt.reservation_digest {
                 return Err(WitnessSequenceError::AuditFailure);
             }
@@ -417,7 +411,7 @@ pub fn verify_reserve_sign_persist_v1(
     {
         return Err(WitnessSequenceError::InvalidAttemptBinding);
     }
-    let metadata = std::fs::symlink_metadata(archive_path)?;
+    let metadata = fs::symlink_metadata(archive_path)?;
     if !metadata.file_type().is_file() {
         return Err(WitnessSequenceError::ArchiveNotRegularFile);
     }
@@ -469,6 +463,26 @@ pub fn verify_reserve_sign_persist_v1(
         reservation_digest: reservation.reservation_digest,
         attestation_digest,
     })
+}
+
+fn canonical_store_target(path: &Path) -> Result<PathBuf, WitnessSequenceError> {
+    if path.as_os_str().is_empty() || path == Path::new(":memory:") {
+        return Err(WitnessSequenceError::InvalidStorePath);
+    }
+    let file_name = path.file_name().ok_or(WitnessSequenceError::InvalidStorePath)?;
+    let parent = path
+        .parent()
+        .filter(|candidate| !candidate.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let canonical_parent = fs::canonicalize(parent)?;
+    let resolved = canonical_parent.join(file_name);
+    match fs::symlink_metadata(&resolved) {
+        Ok(metadata) if metadata.file_type().is_file() => {}
+        Ok(_) => return Err(WitnessSequenceError::InvalidStorePath),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(WitnessSequenceError::Io(error)),
+    }
+    Ok(resolved)
 }
 
 fn initialize_schema(conn: &Connection) -> Result<(), WitnessSequenceError> {
@@ -545,14 +559,14 @@ impl DbAttempt {
                 }
             }
             DurableWitnessAttemptStateV1::Signed => {
+                let bytes = self
+                    .attestation_json
+                    .as_ref()
+                    .filter(|bytes| !bytes.is_empty())
+                    .ok_or(WitnessSequenceError::AuditFailure)?;
                 if self.acceptance_digest.is_none()
-                    || self.attestation_digest.is_none()
-                    || self.attestation_json.as_ref().is_none_or(Vec::is_empty)
+                    || self.attestation_digest != Some(stored_attestation_digest(bytes))
                 {
-                    return Err(WitnessSequenceError::AuditFailure);
-                }
-                let bytes = self.attestation_json.as_ref().ok_or(WitnessSequenceError::AuditFailure)?;
-                if self.attestation_digest != Some(stored_attestation_digest(bytes)) {
                     return Err(WitnessSequenceError::AuditFailure);
                 }
             }
@@ -572,53 +586,6 @@ impl DbAttempt {
     }
 }
 
-fn load_attempt(
-    tx: &Transaction<'_>,
-    witness_id: [u8; 16],
-    attempt_id: [u8; 16],
-) -> Result<Option<DbAttempt>, WitnessSequenceError> {
-    tx.query_row(
-        "SELECT sequence, witness_epoch, archive_sha256, git_head, git_tree, verifier_digest,\n\
-                witness_policy_digest, previous_reservation_digest, reservation_digest, state,\n\
-                acceptance_digest, attestation_digest, attestation_json\n\
-         FROM witness_sequence_attempts WHERE witness_id=?1 AND attempt_id=?2",
-        params![&witness_id[..], &attempt_id[..]],
-        |row| {
-            let sequence: i64 = row.get(0)?;
-            let witness_epoch: i64 = row.get(1)?;
-            let archive_sha256: Vec<u8> = row.get(2)?;
-            let git_head: Vec<u8> = row.get(3)?;
-            let git_tree: Vec<u8> = row.get(4)?;
-            let verifier_digest: Vec<u8> = row.get(5)?;
-            let witness_policy_digest: Vec<u8> = row.get(6)?;
-            let previous_reservation_digest: Vec<u8> = row.get(7)?;
-            let reservation_digest: Vec<u8> = row.get(8)?;
-            let state: i64 = row.get(9)?;
-            let acceptance_digest: Option<Vec<u8>> = row.get(10)?;
-            let attestation_digest: Option<Vec<u8>> = row.get(11)?;
-            let attestation_json: Option<Vec<u8>> = row.get(12)?;
-            Ok((
-                sequence,
-                witness_epoch,
-                archive_sha256,
-                git_head,
-                git_tree,
-                verifier_digest,
-                witness_policy_digest,
-                previous_reservation_digest,
-                reservation_digest,
-                state,
-                acceptance_digest,
-                attestation_digest,
-                attestation_json,
-            ))
-        },
-    )
-    .optional()?
-    .map(|raw| db_attempt_from_raw(witness_id, attempt_id, raw))
-    .transpose()
-}
-
 type RawAttempt = (
     i64,
     i64,
@@ -634,6 +601,40 @@ type RawAttempt = (
     Option<Vec<u8>>,
     Option<Vec<u8>>,
 );
+
+fn load_attempt(
+    conn: &Connection,
+    witness_id: [u8; 16],
+    attempt_id: [u8; 16],
+) -> Result<Option<DbAttempt>, WitnessSequenceError> {
+    conn.query_row(
+        "SELECT sequence, witness_epoch, archive_sha256, git_head, git_tree, verifier_digest,\n\
+                witness_policy_digest, previous_reservation_digest, reservation_digest, state,\n\
+                acceptance_digest, attestation_digest, attestation_json\n\
+         FROM witness_sequence_attempts WHERE witness_id=?1 AND attempt_id=?2",
+        params![&witness_id[..], &attempt_id[..]],
+        |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+                row.get(5)?,
+                row.get(6)?,
+                row.get(7)?,
+                row.get(8)?,
+                row.get(9)?,
+                row.get(10)?,
+                row.get(11)?,
+                row.get(12)?,
+            ))
+        },
+    )
+    .optional()?
+    .map(|raw| db_attempt_from_raw(witness_id, attempt_id, raw))
+    .transpose()
+}
 
 fn db_attempt_from_raw(
     witness_id: [u8; 16],
@@ -688,8 +689,18 @@ fn db_attempt_from_row_with_witness(
 ) -> Result<DbAttempt, WitnessSequenceError> {
     let attempt_id: Vec<u8> = row.get(0)?;
     let raw: RawAttempt = (
-        row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?,
-        row.get(7)?, row.get(8)?, row.get(9)?, row.get(10)?, row.get(11)?, row.get(12)?,
+        row.get(1)?,
+        row.get(2)?,
+        row.get(3)?,
+        row.get(4)?,
+        row.get(5)?,
+        row.get(6)?,
+        row.get(7)?,
+        row.get(8)?,
+        row.get(9)?,
+        row.get(10)?,
+        row.get(11)?,
+        row.get(12)?,
         row.get(13)?,
     );
     db_attempt_from_raw(witness_id, exact_array::<16>(&attempt_id)?, raw)
@@ -711,25 +722,6 @@ fn verify_existing_binding(
 }
 
 fn load_frontier(
-    tx: &Transaction<'_>,
-    witness_id: [u8; 16],
-) -> Result<Option<WitnessSequenceFrontierV1>, WitnessSequenceError> {
-    tx.query_row(
-        "SELECT high_watermark, reservation_head FROM witness_sequence_frontier WHERE witness_id=?1",
-        params![&witness_id[..]],
-        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?)),
-    )
-    .optional()?
-    .map(|(high, head)| {
-        Ok(WitnessSequenceFrontierV1 {
-            high_watermark: from_sql_integer(high)?,
-            reservation_head: Digest32(exact_array::<32>(&head)?),
-        })
-    })
-    .transpose()
-}
-
-fn load_frontier_connection(
     conn: &Connection,
     witness_id: [u8; 16],
 ) -> Result<Option<WitnessSequenceFrontierV1>, WitnessSequenceError> {
@@ -883,16 +875,16 @@ mod tests {
                 "symthaea-witness-sequence-{}-{id}.sqlite3",
                 std::process::id()
             ));
-            let _ = std::fs::remove_file(&path);
+            let _ = fs::remove_file(&path);
             Self { path }
         }
     }
 
     impl Drop for TestDb {
         fn drop(&mut self) {
-            let _ = std::fs::remove_file(&self.path);
-            let _ = std::fs::remove_file(format!("{}-wal", self.path.display()));
-            let _ = std::fs::remove_file(format!("{}-shm", self.path.display()));
+            let _ = fs::remove_file(&self.path);
+            let _ = fs::remove_file(format!("{}-wal", self.path.display()));
+            let _ = fs::remove_file(format!("{}-shm", self.path.display()));
         }
     }
 
@@ -989,6 +981,24 @@ mod tests {
         assert_eq!(reserved.sequence, 1);
         assert_eq!(same.sequence, 1);
         assert_eq!(next.sequence, 2);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn database_symlink_is_rejected() {
+        use std::os::unix::fs::symlink;
+
+        let target = TestDb::new();
+        let target_store = SqliteWitnessSequenceStore::open(&target.path).unwrap();
+        drop(target_store);
+        let link_path = target.path.with_extension("link.sqlite3");
+        let _ = fs::remove_file(&link_path);
+        symlink(&target.path, &link_path).unwrap();
+        assert!(matches!(
+            SqliteWitnessSequenceStore::open(&link_path),
+            Err(WitnessSequenceError::InvalidStorePath)
+        ));
+        let _ = fs::remove_file(link_path);
     }
 
     #[test]
