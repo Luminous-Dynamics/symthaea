@@ -9,6 +9,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import tarfile
 import tempfile
@@ -51,7 +52,13 @@ def base_files() -> dict[str, bytes]:
     files["FLAKE_LOCK_SHA256.txt"] = f"{h('a')}  flake.lock\n".encode()
     files["RUST_TOOLCHAIN_TOML_SHA256.txt"] = f"{h('b')}  rust-toolchain.toml\n".encode()
 
-    locked = {"type": "github", "owner": "NixOS", "repo": "nixpkgs", "rev": "3" * 40, "narHash": "sha256-fixture"}
+    locked = {
+        "type": "github",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "3" * 40,
+        "narHash": "sha256-fixture",
+    }
     metadata = {"locks": {"nodes": {"nixpkgs": {"locked": locked}}}}
     files["FLAKE_METADATA.json"] = (json.dumps(metadata, sort_keys=True) + "\n").encode()
     files["NIXPKGS_LOCKED.json"] = (json.dumps(locked, sort_keys=True) + "\n").encode()
@@ -66,12 +73,16 @@ def base_files() -> dict[str, bytes]:
     files["CHECKQUOTE_WRAPPER_SHA256.txt"] = f"{h('d')}  {check}\n".encode()
     files["QUOTE_WRAPPER_ELF.txt"] = b"Elf file type is EXEC\nLOAD 0x0\n"
     files["CHECKQUOTE_WRAPPER_ELF.txt"] = b"Elf file type is EXEC\nLOAD 0x0\n"
-    files["TPM2_VERIFIER_REFERENCES.txt"] = b"/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-tpm2-tools\n"
+    files["TPM2_VERIFIER_REFERENCES.txt"] = (
+        b"/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-tpm2-tools\n"
+    )
     files["TPM2_WRAPPER_FILE.txt"] = b"statically linked fixture launchers\n"
     files["QUOTE_TCTI_OVERRIDE.stderr"] = b"option override rejected: -T\n"
     files["QUOTE_FORMAT_OVERRIDE.stderr"] = b"option override rejected: -F\n"
     files["CHECK_TCTI_OVERRIDE.stderr"] = b"option override rejected: -T\n"
-    files["PROBE_SHA256.txt"] = f"{h('e')}  target/debug/tpm2_attestation_probe\n".encode()
+    files["PROBE_SHA256.txt"] = (
+        f"{h('e')}  target/debug/tpm2_attestation_probe\n".encode()
+    )
 
     approved = h("f")
     files["APPROVED_PCR_PROFILE.txt"] = (approved + "\n").encode()
@@ -82,7 +93,9 @@ def base_files() -> dict[str, bytes]:
         f"ak_public_digest={h('2')}\n"
         f"challenge_digest={h('3')}\n"
     ).encode()
-    files["TPM2_MUTATED.stderr"] = b"fresh TPM quote PCR state is not an approved profile\n"
+    files["TPM2_MUTATED.stderr"] = (
+        b"fresh TPM quote PCR state is not an approved profile\n"
+    )
     files["AK_PUBLIC_SHA256.txt"] = f"{h('4')}  /tmp/akpub.pem\n".encode()
 
     files["RESULT.txt"] = b"PASS\n"
@@ -116,7 +129,11 @@ def rebuild_manifest(files: dict[str, bytes]) -> None:
     files["MANIFEST.sha256"] = "".join(lines).encode()
 
 
-def write_archive(files: dict[str, bytes], archive: Path, extra_member: tarfile.TarInfo | None = None) -> None:
+def write_archive(
+    files: dict[str, bytes],
+    archive: Path,
+    extra_member: tarfile.TarInfo | None = None,
+) -> None:
     raw_tar = io.BytesIO()
     with tarfile.open(fileobj=raw_tar, mode="w", format=tarfile.USTAR_FORMAT) as tf:
         root = tarfile.TarInfo(".")
@@ -148,7 +165,9 @@ class EvidenceVerifierTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             archive = Path(td) / "evidence.tar.gz"
             write_archive(files, archive)
-            loaded = verifier.load_archive(archive)
+            snapshot = verifier.read_archive_snapshot(archive)
+            self.assertEqual(sha(snapshot), sha(archive.read_bytes()))
+            loaded = verifier.load_archive_bytes(snapshot)
             verifier.verify_manifest(loaded)
             head, tree = verifier.verify_status(loaded)
             self.assertEqual(head, "1" * 40)
@@ -157,6 +176,30 @@ class EvidenceVerifierTests(unittest.TestCase):
             verifier.verify_flake_evidence(loaded)
             tpm = verifier.verify_tpm_evidence(loaded)
             self.assertEqual(tpm["approved_pcr_profile"], h("f"))
+
+    @unittest.skipUnless(hasattr(os, "O_NOFOLLOW"), "O_NOFOLLOW is Linux/POSIX-specific")
+    def test_archive_path_symlink_is_rejected_before_snapshot(self) -> None:
+        files = base_files()
+        with tempfile.TemporaryDirectory() as td:
+            real = Path(td) / "real.tar.gz"
+            link = Path(td) / "link.tar.gz"
+            write_archive(files, real)
+            link.symlink_to(real)
+            with self.assertRaises(verifier.EvidenceError):
+                verifier.read_archive_snapshot(link)
+
+    def test_bounded_gzip_expansion_is_rejected(self) -> None:
+        raw = b"A" * 4096
+        encoded = io.BytesIO()
+        with gzip.GzipFile(filename="", mode="wb", fileobj=encoded, mtime=0) as gz:
+            gz.write(raw)
+        old_limit = verifier.MAX_TAR_STREAM_BYTES
+        verifier.MAX_TAR_STREAM_BYTES = 1024
+        try:
+            with self.assertRaises(verifier.EvidenceError):
+                verifier.bounded_tar_stream(encoded.getvalue())
+        finally:
+            verifier.MAX_TAR_STREAM_BYTES = old_limit
 
     def test_manifest_tampering_is_rejected(self) -> None:
         files = base_files()
@@ -185,11 +228,25 @@ class EvidenceVerifierTests(unittest.TestCase):
             with self.assertRaises(verifier.EvidenceError):
                 verifier.load_archive(archive)
 
+    def test_noncanonical_nix_store_path_is_rejected(self) -> None:
+        files = base_files()
+        files["TPM2_VERIFIER_STORE.txt"] = (
+            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-agency-tpm2-verifier/../evil\n"
+        ).encode()
+        rebuild_manifest(files)
+        with self.assertRaises(verifier.EvidenceError):
+            verifier.verify_tpm_evidence(files)
+
     def test_self_consistent_stale_cargo_candidate_cannot_be_pass(self) -> None:
         files = base_files()
-        candidate = files["Cargo.lock.candidate"] + b'\n[[package]]\nname = "local-added"\nversion = "0.1.0"\n'
+        candidate = (
+            files["Cargo.lock.candidate"]
+            + b'\n[[package]]\nname = "local-added"\nversion = "0.1.0"\n'
+        )
         files["Cargo.lock.candidate"] = candidate
-        files["CARGO_LOCK_CANDIDATE_SHA256.txt"] = f"{sha(candidate)}  Cargo.lock\n".encode()
+        files["CARGO_LOCK_CANDIDATE_SHA256.txt"] = (
+            f"{sha(candidate)}  Cargo.lock\n".encode()
+        )
         files["CARGO_LOCK_DIFF.patch"] = b"+ local-added\n"
         rebuild_manifest(files)
         with self.assertRaises(verifier.EvidenceError):
@@ -197,7 +254,9 @@ class EvidenceVerifierTests(unittest.TestCase):
 
     def test_verified_pcr_must_equal_reviewed_profile(self) -> None:
         files = base_files()
-        files["TPM2_VERIFIED.txt"] = files["TPM2_VERIFIED.txt"].replace(h("f").encode(), h("e").encode())
+        files["TPM2_VERIFIED.txt"] = files["TPM2_VERIFIED.txt"].replace(
+            h("f").encode(), h("e").encode()
+        )
         rebuild_manifest(files)
         with self.assertRaises(verifier.EvidenceError):
             verifier.verify_tpm_evidence(files)
