@@ -7,6 +7,7 @@ on:
       - 'rust-toolchain.toml'
       - 'crates/domains/symthaea-boot-*/**'
       - 'crates/domains/symthaea-quicken-fb/**'
+      - 'crates/core/symthaea-boot-ecology/**'
       - 'crates/core/symthaea-spore-continuity/**'
       - 'nix/modules/quicken-fb.nix'
       - 'nix/modules/symthaea-boot-*.nix'
