@@ -1,0 +1,32 @@
+[package]
+name = "symthaea-iot-actuation-guard-semantic-persistence"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Crash-durable semantic acceptance after authenticated IoT device reality"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "safety", "durability", "attestation"]
+categories = ["embedded", "filesystem"]
+
+[dependencies]
+bincode = { workspace = true }
+libc = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-actuation-guard-admission-reservation = { path = "../symthaea-iot-actuation-guard-admission-reservation" }
+symthaea-iot-actuation-guard-device-reality = { path = "../symthaea-iot-actuation-guard-device-reality" }
+symthaea-iot-device-protocol = { path = "../symthaea-iot-device-protocol" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-iot-actuation-guard-admission-challenge = { path = "../symthaea-iot-actuation-guard-admission-challenge" }
+symthaea-iot-authority = { path = "../symthaea-iot-authority" }
+symthaea-iot-durable-runtime = { path = "../symthaea-iot-durable-runtime" }
+symthaea-iot-policy = { path = "../symthaea-iot-policy" }
+symthaea-iot-posture = { path = "../symthaea-iot-posture" }
+symthaea-iot-transport-receipt = { path = "../symthaea-iot-transport-receipt" }
