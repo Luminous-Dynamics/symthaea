@@ -18,6 +18,11 @@
 
 #![deny(unsafe_code)]
 
+mod post_semantic;
+pub use post_semantic::{
+    PostSemanticGuardInterlockError, VerifiedPostSemanticPhysicalInterlock,
+};
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use symthaea_authority::Digest32;
