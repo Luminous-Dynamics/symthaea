@@ -15,7 +15,8 @@ use symthaea_qualification_witness::{
     QualificationWitnessIdentityV1, QualificationWitnessPolicyV1, WITNESS_SCHEMA_VERSION,
 };
 use symthaea_qualification_witness_sequence::{
-    verify_reserve_sign_persist_v1, DurableWitnessAttemptStateV1, SqliteWitnessSequenceStore,
+    verify_reserve_sign_persist_v1, DurableWitnessAttemptStateV1,
+    DurableWitnessNotarizationRequestV1, SqliteWitnessSequenceStore,
     WitnessSequenceAttemptBindingV1,
 };
 use symthaea_qualification_witness_service::{
@@ -177,6 +178,25 @@ fn witness_policy(
     }
 }
 
+fn request<'a>(
+    attempt_id: [u8; 16],
+    runtime: &'a QualificationVerifierRuntimePolicyV1,
+    policy: &'a QualificationWitnessPolicyV1,
+    key: &'a SigningKey,
+    archive: &'a Path,
+    release: ReleaseEvidenceBindingsV1,
+) -> DurableWitnessNotarizationRequestV1<'a> {
+    DurableWitnessNotarizationRequestV1 {
+        attempt_id,
+        runtime_policy: runtime,
+        witness_policy: policy,
+        witness_id: [1; 16],
+        signing_key: key,
+        archive_path: archive,
+        release_bindings: release,
+    }
+}
+
 #[test]
 fn same_attempt_retries_same_sequence_and_exact_signature() {
     let release = bindings();
@@ -189,24 +209,12 @@ fn same_attempt_retries_same_sequence_and_exact_signature() {
 
     let first = verify_reserve_sign_persist_v1(
         &store,
-        attempt_id,
-        &runtime,
-        &policy,
-        [1; 16],
-        &key,
-        &fixture.archive,
-        release,
+        request(attempt_id, &runtime, &policy, &key, &fixture.archive, release),
     )
     .unwrap();
     let second = verify_reserve_sign_persist_v1(
         &store,
-        attempt_id,
-        &runtime,
-        &policy,
-        [1; 16],
-        &key,
-        &fixture.archive,
-        release,
+        request(attempt_id, &runtime, &policy, &key, &fixture.archive, release),
     )
     .unwrap();
 
@@ -242,13 +250,7 @@ fn same_attempt_retries_same_sequence_and_exact_signature() {
 
     let next = verify_reserve_sign_persist_v1(
         &store,
-        [10; 16],
-        &runtime,
-        &policy,
-        [1; 16],
-        &key,
-        &fixture.archive,
-        release,
+        request([10; 16], &runtime, &policy, &key, &fixture.archive, release),
     )
     .unwrap();
     assert_eq!(next.sequence(), 2);
