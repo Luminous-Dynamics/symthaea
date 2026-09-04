@@ -2,18 +2,25 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Adversarial qualification for restore-source portable normalization.
 //!
-//! These tests target a subtle RA-32 boundary: host-local state marked with
-//! `serde(skip)` must never survive into the normalized object owned by an
-//! `OperationalRestoreSource`, while durable replay evidence must survive.
+//! These tests target subtle RA-32 boundaries:
+//! - host-local state marked with `serde(skip)` must never survive into the
+//!   normalized object owned by an `OperationalRestoreSource`;
+//! - durable adverse/replay evidence must survive normalization;
+//! - semantically equivalent bounded mission state must have one deterministic
+//!   portable representation regardless of caller insertion order.
 
 use super::restore_admission::OperationalRestoreSource;
 use crate::embodiment::SubterraneanEmbodiment;
-use crate::operator_authority::{OperatorAuthorityRejection, OperatorConstraint, OperatorDecision};
 use crate::operator_authority::recovery_authority::{
     RecoveryApprovalEnvelopeV1, RecoveryDigest, RecoveryProposalV1,
 };
+use crate::operator_authority::{OperatorAuthorityRejection, OperatorConstraint, OperatorDecision};
 use crate::operator_protocol::{
     AuthenticationLevel, OperatorCommand, OperatorCommandEnvelope, OperatorId, OperatorRole,
+};
+use crate::tunnel_graph::{TunnelEdge, TunnelNode, TunnelNodeId, TunnelNodeKind};
+use crate::work_orders::{
+    WorkKind, WorkOrder, WorkOrderId, WorkPriority, WorkResourceEstimate, WorkStatus,
 };
 use symthaea_core::genesis::GenesisSeed;
 
@@ -73,6 +80,91 @@ fn checkpoint_with_hold(phrase: &str) -> super::SubterraneanOperationalCheckpoin
         OperatorConstraint::HoldPosition
     );
     checkpoint
+}
+
+fn mission_node(id: u32, kind: TunnelNodeKind, depth_m: f64) -> TunnelNode {
+    TunnelNode {
+        id: TunnelNodeId(id),
+        kind,
+        depth_m,
+        survey_confidence: 0.95,
+    }
+}
+
+fn mission_edge(from: u32, to: u32, revision: u64) -> TunnelEdge {
+    TunnelEdge {
+        from: TunnelNodeId(from),
+        to: TunnelNodeId(to),
+        length_m: 10.0 + f64::from(to),
+        energy_per_m: 0.001,
+        obstruction_risk: 0.05,
+        water_risk: 0.04,
+        roof_risk: 0.03,
+        confidence: 0.96,
+        traversable: true,
+        bidirectional: true,
+        revision,
+    }
+}
+
+fn mission_work(id: u64, target: u32, kind: WorkKind) -> WorkOrder {
+    WorkOrder {
+        id: WorkOrderId(id),
+        kind,
+        target: TunnelNodeId(target),
+        priority: WorkPriority::Routine,
+        prerequisites: [None; 4],
+        estimated_steps: 10 + id,
+        deadline_step: None,
+        resources: WorkResourceEstimate {
+            battery_fraction: 0.01,
+            sealant_fraction: 0.0,
+            relay_units: 0,
+            roof_support_units: 0,
+            sample_capacity: 0.0,
+            spoil_capacity: 0.02,
+        },
+        status: WorkStatus::Pending,
+        completed_steps: 0,
+    }
+}
+
+fn mission_source(reverse: bool) -> OperationalRestoreSource {
+    let genesis = GenesisSeed::from_phrase("restore-source-canonical-mission");
+    let mut embodiment = SubterraneanEmbodiment::new(&genesis);
+
+    let mut nodes = [
+        mission_node(1, TunnelNodeKind::Junction, 8.0),
+        mission_node(2, TunnelNodeKind::Workface, 16.0),
+    ];
+    if reverse {
+        nodes.reverse();
+    }
+    for node in nodes {
+        embodiment.add_tunnel_node(node).expect("mission node");
+    }
+
+    let mut edges = [mission_edge(0, 1, 1), mission_edge(1, 2, 1)];
+    if reverse {
+        edges.reverse();
+    }
+    for edge in edges {
+        embodiment.upsert_tunnel_edge(edge).expect("mission edge");
+    }
+
+    let mut work = [
+        mission_work(10, 1, WorkKind::Survey),
+        mission_work(20, 2, WorkKind::Bore),
+    ];
+    if reverse {
+        work.reverse();
+    }
+    for order in work {
+        embodiment.submit_work_order(order).expect("work order");
+    }
+
+    OperationalRestoreSource::capture(embodiment.operational_checkpoint())
+        .expect("canonical mission source")
 }
 
 #[test]
@@ -175,4 +267,21 @@ fn partial_recovery_quorum_is_dropped_but_consumed_replay_evidence_survives() {
         restored.ingest(replay, 21, true),
         Err(OperatorAuthorityRejection::Replay)
     );
+}
+
+#[test]
+fn equivalent_mission_insertion_orders_have_one_portable_source_identity() {
+    let forward = mission_source(false);
+    let reverse = mission_source(true);
+
+    // Graph nodes/edges and work orders are canonicalized by their domain
+    // owners. Caller insertion order therefore cannot become hidden restore
+    // identity or make equivalent portable state commit differently.
+    assert_eq!(forward.digest(), reverse.digest());
+
+    let forward_bytes =
+        serde_json::to_vec(forward.checkpoint()).expect("forward normalized encoding");
+    let reverse_bytes =
+        serde_json::to_vec(reverse.checkpoint()).expect("reverse normalized encoding");
+    assert_eq!(forward_bytes, reverse_bytes);
 }
