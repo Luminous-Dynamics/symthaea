@@ -80,6 +80,10 @@ pub enum DeviceRealityError {
     InvalidReservationChallenge,
     #[error("semantic-reservation challenge is not fresh")]
     ReservationChallengeNotFresh,
+    #[error("admission-reservation challenge is invalid")]
+    InvalidAdmissionChallenge,
+    #[error("admission-reservation challenge is not fresh")]
+    AdmissionChallengeNotFresh,
     #[error("device attestation result structure is invalid")]
     InvalidAttestationResult,
     #[error("device attestation signature length is not the fixed Ed25519 length")]
@@ -90,6 +94,8 @@ pub enum DeviceRealityError {
     AttestationDeviceMismatch,
     #[error("device attestation result does not bind the exact semantic-reservation challenge")]
     AttestationChallengeMismatch,
+    #[error("device attestation result does not bind the exact admission-reservation challenge")]
+    AttestationAdmissionChallengeMismatch,
     #[error("device attestation verifier is not allowed by guard-owned policy")]
     AttestationVerifierDenied,
     #[error("device attestation reference-values lineage is not allowed by guard-owned policy")]
@@ -98,6 +104,8 @@ pub enum DeviceRealityError {
     AttestationAppraisalPolicyMismatch,
     #[error("device attestation appraisal predates durable semantic persistence")]
     AttestationPredatesSemanticPersistence,
+    #[error("device attestation appraisal predates durable admission reservation/challenge issuance")]
+    AttestationPredatesAdmissionReservation,
     #[error("device attestation result is stale, future-dated, or outside the challenge window")]
     AttestationNotFreshForReservation,
     #[error("device attestation result lifetime exceeds guard-owned policy")]
