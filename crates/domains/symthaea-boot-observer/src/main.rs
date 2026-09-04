@@ -112,6 +112,52 @@ struct UnitState {
     transition_elapsed_ms: Option<u64>,
 }
 
+/// Convert a raw structured systemd state into the protocol domain state for a
+/// particular watched unit.
+///
+/// A non-critical systemd failure is represented as `Degraded`, not `Failed`,
+/// regardless of whether it was discovered during initial reconstruction or by
+/// a later signal. This keeps semantic truth independent of observer start time.
+fn semantic_domain_state(watched: &WatchedUnit, raw: DomainState) -> DomainState {
+    if raw == DomainState::Failed && watched.criticality != Criticality::Critical {
+        DomainState::Degraded
+    } else {
+        raw
+    }
+}
+
+/// Resolve aggregate health from the currently represented domain facts.
+///
+/// This is intentionally current-state based at the `BootReady` boundary. A
+/// historical failure that has fully recovered may stop claiming Failed or
+/// Degraded, but recovery alone does not prove Normal: absent current negative
+/// evidence resolves to Unknown unless Normal was independently established.
+fn aggregate_health_from_domains(
+    domains: &[DomainSnapshot],
+    previously_established: BootHealth,
+) -> BootHealth {
+    let mut aggregate = BootHealth::Unknown;
+    for domain in domains {
+        let observed = match domain.state {
+            DomainState::Failed => Some(BootHealth::Failed),
+            DomainState::Degraded => Some(BootHealth::Degraded),
+            DomainState::Delayed => Some(BootHealth::Delayed),
+            DomainState::Pending | DomainState::Starting | DomainState::Ready => None,
+        };
+        if let Some(observed) = observed {
+            if observed.severity() > aggregate.severity() {
+                aggregate = observed;
+            }
+        }
+    }
+
+    if aggregate == BootHealth::Unknown && previously_established == BootHealth::Normal {
+        BootHealth::Normal
+    } else {
+        aggregate
+    }
+}
+
 fn build_initial_snapshot(
     connection: &Connection,
     manager: &Proxy<'_>,
@@ -125,15 +171,15 @@ fn build_initial_snapshot(
     );
     let mut highest_phase = BootPhase::Kernel;
     let mut boot_ready = false;
-    let mut aggregate_health = BootHealth::Unknown;
 
     for watched in &config.watched_units {
         let Some(unit) = query_unit_state(connection, manager, &watched.unit)? else {
             continue;
         };
-        let Some(state) = domain_state_from_active_state(&unit.active_state) else {
+        let Some(raw_state) = domain_state_from_active_state(&unit.active_state) else {
             continue;
         };
+        let state = semantic_domain_state(watched, raw_state);
 
         if state != DomainState::Pending {
             upsert_domain(
@@ -152,21 +198,12 @@ fn build_initial_snapshot(
             }
         }
 
-        if state == DomainState::Failed {
-            let observed = match watched.criticality {
-                Criticality::Critical => BootHealth::Failed,
-                Criticality::Informational | Criticality::NonCritical => BootHealth::Degraded,
-            };
-            if observed.severity() > aggregate_health.severity() {
-                aggregate_health = observed;
-            }
-        }
-
         if watched.boot_ready && state == DomainState::Ready {
             boot_ready = true;
         }
     }
 
+    let aggregate_health = aggregate_health_from_domains(&snapshot.domains, BootHealth::Unknown);
     snapshot.phase = if boot_ready {
         BootPhase::Ready
     } else {
@@ -281,9 +318,10 @@ impl EventEmitter {
         watched: &WatchedUnit,
         unit: &UnitState,
     ) -> Result<(), Box<dyn Error>> {
-        let Some(state) = domain_state_from_active_state(&unit.active_state) else {
+        let Some(raw_state) = domain_state_from_active_state(&unit.active_state) else {
             return Ok(());
         };
+        let state = semantic_domain_state(watched, raw_state);
 
         let previous = self
             .reducer
@@ -301,60 +339,102 @@ impl EventEmitter {
             return Ok(());
         }
 
+        // One structured systemd observation can imply several protocol facts
+        // (domain state, semantic phase, and BootReady). Build all of them first
+        // and commit them as one durable observer transaction so persistence
+        // failure cannot leave memory, sequence, or readiness half-advanced.
         let elapsed_ms = boot_elapsed_ms().max(self.reducer.snapshot().elapsed_ms);
-        let sequence = self.sequence();
-        let event = match state {
+        let mut next_sequence = self.next_sequence;
+        let mut events = Vec::with_capacity(3);
+
+        let domain_event = match state {
             DomainState::Starting => BootEvent::DomainStarting {
-                sequence,
+                sequence: next_sequence,
                 elapsed_ms,
                 domain: watched.domain,
             },
             DomainState::Ready if matches!(previous, DomainState::Failed | DomainState::Degraded) => {
                 BootEvent::DomainRecovered {
-                    sequence,
+                    sequence: next_sequence,
                     elapsed_ms,
                     domain: watched.domain,
                 }
             }
             DomainState::Ready => BootEvent::DomainReady {
-                sequence,
+                sequence: next_sequence,
                 elapsed_ms,
                 domain: watched.domain,
             },
-            DomainState::Failed => match watched.criticality {
-                Criticality::Critical => BootEvent::DomainFailed {
-                    sequence,
-                    elapsed_ms,
-                    domain: watched.domain,
-                    criticality: watched.criticality,
-                    detail: None,
-                },
-                Criticality::Informational | Criticality::NonCritical => BootEvent::DomainDegraded {
-                    sequence,
-                    elapsed_ms,
-                    domain: watched.domain,
-                    criticality: watched.criticality,
-                    detail: None,
-                },
+            DomainState::Delayed => BootEvent::DomainDelayed {
+                sequence: next_sequence,
+                elapsed_ms,
+                domain: watched.domain,
             },
-            DomainState::Pending | DomainState::Delayed | DomainState::Degraded => return Ok(()),
+            DomainState::Degraded => BootEvent::DomainDegraded {
+                sequence: next_sequence,
+                elapsed_ms,
+                domain: watched.domain,
+                criticality: watched.criticality,
+                detail: None,
+            },
+            DomainState::Failed => BootEvent::DomainFailed {
+                sequence: next_sequence,
+                elapsed_ms,
+                domain: watched.domain,
+                criticality: watched.criticality,
+                detail: None,
+            },
+            DomainState::Pending => return Ok(()),
         };
-        self.publish_event(event)?;
+        events.push(domain_event);
+        next_sequence = next_sequence.saturating_add(1);
 
-        if let Some(phase) = watched.phase {
-            let current = self.reducer.snapshot().phase;
-            if phase_rank(phase) > phase_rank(current) {
-                let sequence = self.sequence();
-                self.publish_event(BootEvent::PhaseEntered {
-                    sequence,
-                    elapsed_ms: boot_elapsed_ms().max(self.reducer.snapshot().elapsed_ms),
-                    phase,
-                })?;
+        let mut preview = self.reducer.clone();
+        for event in &events {
+            if !preview.try_apply(event)? {
+                return Err(io::Error::other("observer transaction produced a stale event").into());
             }
         }
 
-        if watched.boot_ready && state == DomainState::Ready {
-            self.boot_ready()?;
+        if let Some(phase) = watched.phase {
+            let current_phase = preview.snapshot().phase;
+            if phase_rank(phase) > phase_rank(current_phase) {
+                let event = BootEvent::PhaseEntered {
+                    sequence: next_sequence,
+                    elapsed_ms,
+                    phase,
+                };
+                if !preview.try_apply(&event)? {
+                    return Err(io::Error::other("observer transaction produced a stale phase event").into());
+                }
+                events.push(event);
+                next_sequence = next_sequence.saturating_add(1);
+            }
+        }
+
+        let emits_boot_ready = watched.boot_ready
+            && state == DomainState::Ready
+            && !self.boot_ready_emitted;
+        if emits_boot_ready {
+            let current = preview.snapshot();
+            let health = health_at_boot_ready(aggregate_health_from_domains(
+                &current.domains,
+                current.health,
+            ));
+            let event = BootEvent::BootReady {
+                sequence: next_sequence,
+                elapsed_ms,
+                health,
+            };
+            if !preview.try_apply(&event)? {
+                return Err(io::Error::other("observer transaction produced a stale Ready event").into());
+            }
+            events.push(event);
+        }
+
+        self.publish_transaction(events, preview)?;
+        if emits_boot_ready {
+            self.boot_ready_emitted = true;
         }
         Ok(())
     }
@@ -363,33 +443,51 @@ impl EventEmitter {
         if self.boot_ready_emitted {
             return Ok(());
         }
-        self.boot_ready_emitted = true;
-        let health = health_at_boot_ready(self.reducer.snapshot().health);
-        let sequence = self.sequence();
-        self.publish_event(BootEvent::BootReady {
-            sequence,
-            elapsed_ms: boot_elapsed_ms().max(self.reducer.snapshot().elapsed_ms),
+        let current = self.reducer.snapshot();
+        let health = health_at_boot_ready(aggregate_health_from_domains(
+            &current.domains,
+            current.health,
+        ));
+        let event = BootEvent::BootReady {
+            sequence: self.next_sequence,
+            elapsed_ms: boot_elapsed_ms().max(current.elapsed_ms),
             health,
-        })
-    }
-
-    fn sequence(&mut self) -> u64 {
-        let sequence = self.next_sequence;
-        self.next_sequence = self.next_sequence.saturating_add(1);
-        sequence
-    }
-
-    fn publish_event(&mut self, event: BootEvent) -> Result<(), Box<dyn Error>> {
-        event.validate()?;
-        if !self.reducer.try_apply(&event)? {
-            return Ok(());
+        };
+        let mut preview = self.reducer.clone();
+        if !preview.try_apply(&event)? {
+            return Err(io::Error::other("observer transaction produced a stale Ready event").into());
         }
-        let wire = WireMessage::event(self.observation, event);
-        self.persist_wire_snapshot(&WireMessage::snapshot(
-            self.observation,
-            self.reducer.snapshot(),
-        ))?;
-        self.send_wire(&wire);
+        self.publish_transaction(vec![event], preview)?;
+        self.boot_ready_emitted = true;
+        Ok(())
+    }
+
+    /// Persist the final snapshot for one normalized observation before making
+    /// any in-memory state visible. Datagram events are best-effort presentation
+    /// delivery after the durable side channel and reducer commit agree.
+    fn publish_transaction(
+        &mut self,
+        events: Vec<BootEvent>,
+        candidate: BootStateReducer,
+    ) -> Result<(), Box<dyn Error>> {
+        let Some(last_sequence) = events.last().map(BootEvent::sequence) else {
+            return Ok(());
+        };
+        for event in &events {
+            event.validate()?;
+        }
+
+        let snapshot_wire = WireMessage::snapshot(self.observation, candidate.snapshot());
+        self.persist_wire_snapshot(&snapshot_wire)?;
+
+        // From here onward no fallible truth-state operation remains. Commit the
+        // exact candidate whose snapshot was persisted, then advance sequence.
+        self.reducer = candidate;
+        self.next_sequence = last_sequence.saturating_add(1);
+
+        for event in events {
+            self.send_wire(&WireMessage::event(self.observation, event));
+        }
         Ok(())
     }
 
@@ -531,6 +629,32 @@ const fn domain_state_rank(state: DomainState) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    fn temp_directory(suffix: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after Unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "symthaea-boot-observer-{}-{nonce}-{suffix}",
+            std::process::id()
+        ))
+    }
+
+    fn test_emitter(directory: &Path) -> EventEmitter {
+        fs::create_dir_all(directory).unwrap();
+        let mut config = ObserverConfig::builtin();
+        config.state_path = directory.join("state.json");
+        config.output_socket = directory.join("missing.sock");
+        let initial = BootSnapshot::new(1, Duration::from_millis(1), BootPhase::Kernel);
+        EventEmitter::new(
+            &config,
+            ObservationId::from_bytes([0xA5; 16]),
+            initial,
+        )
+        .unwrap()
+    }
 
     #[test]
     fn duplicate_unit_domains_collapse_in_snapshot() {
@@ -576,5 +700,147 @@ mod tests {
             Some(90),
         );
         assert_eq!(snapshot.domains[0].state, DomainState::Failed);
+    }
+
+    #[test]
+    fn noncritical_failure_has_same_semantics_before_or_after_observer_start() {
+        let watched = WatchedUnit::new(
+            "network.target",
+            BootDomain::Network,
+            Some(BootPhase::Network),
+            Criticality::NonCritical,
+            false,
+        );
+        assert_eq!(
+            semantic_domain_state(&watched, DomainState::Failed),
+            DomainState::Degraded
+        );
+
+        let critical = WatchedUnit::new(
+            "local-fs.target",
+            BootDomain::Filesystems,
+            Some(BootPhase::Filesystems),
+            Criticality::Critical,
+            false,
+        );
+        assert_eq!(
+            semantic_domain_state(&critical, DomainState::Failed),
+            DomainState::Failed
+        );
+    }
+
+    #[test]
+    fn ready_health_uses_current_domains_and_does_not_invent_normal() {
+        let degraded = vec![DomainSnapshot {
+            domain: BootDomain::Network,
+            state: DomainState::Degraded,
+            elapsed_ms: Some(10),
+        }];
+        assert_eq!(
+            aggregate_health_from_domains(&degraded, BootHealth::Failed),
+            BootHealth::Degraded
+        );
+
+        let recovered = vec![DomainSnapshot {
+            domain: BootDomain::Network,
+            state: DomainState::Ready,
+            elapsed_ms: Some(20),
+        }];
+        assert_eq!(
+            aggregate_health_from_domains(&recovered, BootHealth::Failed),
+            BootHealth::Unknown
+        );
+        assert_eq!(
+            aggregate_health_from_domains(&recovered, BootHealth::Normal),
+            BootHealth::Normal
+        );
+    }
+
+    #[test]
+    fn persistence_failure_rolls_back_whole_observation_transaction() {
+        let directory = temp_directory("transaction");
+        let mut emitter = test_emitter(&directory);
+        let watched = WatchedUnit::new(
+            "local-fs-pre.target",
+            BootDomain::Storage,
+            Some(BootPhase::Storage),
+            Criticality::Critical,
+            false,
+        );
+        let unit = UnitState {
+            active_state: "active".to_string(),
+            transition_elapsed_ms: Some(2),
+        };
+        let initial_sequence = emitter.next_sequence;
+        let blocker = emitter.state_path.with_extension("json.tmp");
+        fs::create_dir(&blocker).unwrap();
+
+        assert!(emitter.apply_current_state(&watched, &unit).is_err());
+        let failed_snapshot = emitter.reducer.snapshot();
+        assert_eq!(failed_snapshot.sequence, 1);
+        assert_eq!(failed_snapshot.phase, BootPhase::Kernel);
+        assert!(failed_snapshot.domains.is_empty());
+        assert_eq!(emitter.next_sequence, initial_sequence);
+
+        fs::remove_dir(&blocker).unwrap();
+        emitter.apply_current_state(&watched, &unit).unwrap();
+        let committed = emitter.reducer.snapshot();
+        assert_eq!(committed.sequence, initial_sequence + 1);
+        assert_eq!(committed.phase, BootPhase::Storage);
+        assert_eq!(committed.domains.len(), 1);
+        assert_eq!(committed.domains[0].state, DomainState::Ready);
+        assert_eq!(emitter.next_sequence, initial_sequence + 2);
+
+        let persisted: WireMessage =
+            serde_json::from_slice(&fs::read(&emitter.state_path).unwrap()).unwrap();
+        match persisted {
+            WireMessage::Snapshot { snapshot, .. } => assert_eq!(snapshot, committed),
+            WireMessage::Event { .. } => panic!("observer state path must contain a snapshot"),
+        }
+
+        let _ = fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn ready_publication_failure_remains_retryable() {
+        let directory = temp_directory("ready-transaction");
+        let mut emitter = test_emitter(&directory);
+        let watched = WatchedUnit::new(
+            "graphical.target",
+            BootDomain::Session,
+            Some(BootPhase::Ready),
+            Criticality::Critical,
+            true,
+        );
+        let unit = UnitState {
+            active_state: "active".to_string(),
+            transition_elapsed_ms: Some(2),
+        };
+        let initial_sequence = emitter.next_sequence;
+        let blocker = emitter.state_path.with_extension("json.tmp");
+        fs::create_dir(&blocker).unwrap();
+
+        assert!(emitter.apply_current_state(&watched, &unit).is_err());
+        assert!(!emitter.boot_ready_emitted);
+        assert_eq!(emitter.reducer.snapshot().phase, BootPhase::Kernel);
+        assert_eq!(emitter.next_sequence, initial_sequence);
+
+        fs::remove_dir(&blocker).unwrap();
+        emitter.apply_current_state(&watched, &unit).unwrap();
+        let committed = emitter.reducer.snapshot();
+        assert!(emitter.boot_ready_emitted);
+        assert_eq!(committed.phase, BootPhase::Ready);
+        assert_eq!(committed.health, BootHealth::Unknown);
+        assert_eq!(committed.sequence, initial_sequence + 2);
+        assert_eq!(emitter.next_sequence, initial_sequence + 3);
+
+        let persisted: WireMessage =
+            serde_json::from_slice(&fs::read(&emitter.state_path).unwrap()).unwrap();
+        match persisted {
+            WireMessage::Snapshot { snapshot, .. } => assert_eq!(snapshot, committed),
+            WireMessage::Event { .. } => panic!("observer state path must contain a snapshot"),
+        }
+
+        let _ = fs::remove_dir_all(directory);
     }
 }

@@ -88,12 +88,22 @@ impl ObserverConfig {
         }
 
         let mut names = BTreeSet::new();
+        // The live reducer stores one aggregate state per BootDomain, not one
+        // state per watched unit. Until the observer carries per-unit state, two
+        // units sharing a domain are ambiguous: recovery of one could otherwise
+        // erase a still-failed sibling. Reject that configuration fail-closed.
+        let mut domains = [false; BootDomain::COUNT];
         let mut boot_ready_count = 0usize;
         for watched in &self.watched_units {
             watched.validate()?;
             if !names.insert(watched.unit.as_str()) {
                 return Err(ConfigError::DuplicateUnit(watched.unit.clone()));
             }
+            let domain_index = watched.domain.index();
+            if domains[domain_index] {
+                return Err(ConfigError::DuplicateDomain(watched.domain));
+            }
+            domains[domain_index] = true;
             if watched.boot_ready {
                 boot_ready_count += 1;
                 if watched.phase != Some(BootPhase::Ready) {
@@ -184,11 +194,12 @@ pub fn classify_job_result(result: &str) -> JobOutcome {
     }
 }
 
-pub fn health_at_boot_ready(current: BootHealth) -> BootHealth {
-    match current {
-        BootHealth::Unknown => BootHealth::Normal,
-        other => other,
-    }
+/// Entering the protocol's Ready phase is a readiness fact, not a health proof.
+///
+/// In particular, absent health evidence remains `Unknown`; presentation must
+/// never infer `Normal` merely because the boot-ready unit became active.
+pub const fn health_at_boot_ready(current: BootHealth) -> BootHealth {
+    current
 }
 
 fn validate_absolute(path: &Path, field: &'static str) -> Result<(), ConfigError> {
@@ -204,6 +215,7 @@ pub enum ConfigError {
     NoWatchedUnits,
     InvalidUnit(String),
     DuplicateUnit(String),
+    DuplicateDomain(BootDomain),
     MultipleBootReadyUnits(usize),
     BootReadyMustEnterReady(String),
 }
@@ -215,6 +227,9 @@ impl std::fmt::Display for ConfigError {
             Self::NoWatchedUnits => write!(f, "at least one watched unit is required"),
             Self::InvalidUnit(unit) => write!(f, "invalid systemd unit name: {unit:?}"),
             Self::DuplicateUnit(unit) => write!(f, "systemd unit is watched more than once: {unit}"),
+            Self::DuplicateDomain(domain) => {
+                write!(f, "boot domain {domain:?} is watched by more than one unit")
+            }
             Self::MultipleBootReadyUnits(n) => {
                 write!(f, "at most one boot-ready unit is allowed, found {n}")
             }
@@ -257,10 +272,28 @@ mod tests {
     }
 
     #[test]
-    fn missing_telemetry_only_becomes_normal_at_boot_ready() {
-        assert_eq!(health_at_boot_ready(BootHealth::Unknown), BootHealth::Normal);
+    fn duplicate_domains_are_rejected_until_per_unit_aggregation_exists() {
+        let mut config = ObserverConfig::builtin();
+        config.watched_units.push(WatchedUnit::new(
+            "network-online.target",
+            BootDomain::Network,
+            Some(BootPhase::Network),
+            Criticality::NonCritical,
+            false,
+        ));
+        assert!(matches!(
+            config.validate(),
+            Err(ConfigError::DuplicateDomain(BootDomain::Network))
+        ));
+    }
+
+    #[test]
+    fn boot_ready_does_not_upgrade_unknown_health() {
+        assert_eq!(health_at_boot_ready(BootHealth::Unknown), BootHealth::Unknown);
+        assert_eq!(health_at_boot_ready(BootHealth::Normal), BootHealth::Normal);
         assert_eq!(health_at_boot_ready(BootHealth::Failed), BootHealth::Failed);
         assert_eq!(health_at_boot_ready(BootHealth::Delayed), BootHealth::Delayed);
+        assert_eq!(health_at_boot_ready(BootHealth::Degraded), BootHealth::Degraded);
     }
 
     #[test]
