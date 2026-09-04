@@ -1,0 +1,267 @@
+name: Spore Boot Stack
+
+on:
+  pull_request:
+    paths:
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - 'rust-toolchain.toml'
+      - 'crates/domains/symthaea-boot-*/**'
+      - 'crates/domains/symthaea-quicken-fb/**'
+      - 'crates/core/symthaea-boot-ecology/**'
+      - 'crates/core/symthaea-spore-continuity/**'
+      - 'nix/modules/quicken-fb.nix'
+      - 'nix/modules/symthaea-boot-*.nix'
+      - 'scripts/check-spore-boot-stack.sh'
+      - 'scripts/measure-spore-boot.sh'
+      - 'docs/architecture/BOOT_*.md'
+      - 'docs/architecture/SPORE_*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# This is a latest-head subsystem qualification signal. It is deliberately
+# additive to repository-wide CI until the scoped-routing migration in #400 is
+# separately proven. Once that migration lands, boot-only PRs can rely on this
+# lane plus the governance gate below without spawning unrelated workspace jobs.
+# Changes to this workflow itself remain under general CI during bootstrap; the
+# focused lane starts only when an actual boot/Spore qualification surface moves.
+concurrency:
+  group: spore-boot-stack-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-qualification:
+    name: Focused Rust qualification
+    # Pin the OS generation rather than using the moving ubuntu-latest alias.
+    # The hosted image still receives updates; its reported identity and
+    # /etc/os-release hash are therefore captured in the qualification receipt.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SPORE_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+      CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+      UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+
+    steps:
+      - name: Checkout exact source head
+        # actions/checkout v4 release-line commit resolved 2026-09-04.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SPORE_SOURCE_COMMIT }}
+          # Governance compares the PR against repository history. Keep this
+          # exact-head checkout complete rather than relying on a shallow clone.
+          fetch-depth: 0
+
+      - name: Verify exact-head and execution identities
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SPORE_SOURCE_COMMIT"
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/spore-boot-stack.yml)" -eq 1
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/spore-boot-stack.yml)" -eq 4
+          if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' .github/workflows/spore-boot-stack.yml; then
+            echo 'mutable major-version GitHub Action tag found in focused qualification workflow' >&2
+            exit 1
+          fi
+          echo "head=$(git rev-parse HEAD)"
+          echo "tree=$(git rev-parse 'HEAD^{tree}')"
+          echo "checkout_action_sha=$CHECKOUT_ACTION_SHA"
+          echo "upload_artifact_action_sha=$UPLOAD_ARTIFACT_ACTION_SHA"
+
+      - name: Require focused qualification contract
+        run: |
+          set -euo pipefail
+          test -x scripts/check-class-a-changes.sh || {
+            echo 'missing executable scripts/check-class-a-changes.sh' >&2
+            exit 1
+          }
+          test -x scripts/check-spore-boot-stack.sh || {
+            echo 'boot-scoped PR must carry scripts/check-spore-boot-stack.sh' >&2
+            echo 'until the boot stack itself lands on main, include the exact qualified script in the PR lineage' >&2
+            exit 1
+          }
+
+      - name: Governance check (Class A/B changes)
+        run: bash scripts/check-class-a-changes.sh --ci
+
+      - name: Install repository-pinned Rust toolchain
+        id: toolchain
+        run: |
+          set -euo pipefail
+          RUST_CHANNEL="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$RUST_CHANNEL"
+          echo "channel=$RUST_CHANNEL" >> "$GITHUB_OUTPUT"
+          rustup toolchain install "$RUST_CHANNEL" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --no-self-update
+          rustup override set "$RUST_CHANNEL"
+          test "$(rustc --version | awk '{print $2}')" = "$RUST_CHANNEL"
+          rustc --version
+          cargo --version
+
+      - name: Resolve existing workspace lock minimally
+        id: lock
+        run: |
+          set -euo pipefail
+          # Cargo updates only what the exact source head requires while retaining
+          # the existing lock wherever compatible. A changed file is evidence that
+          # the committed head is not yet lock-qualified, never an implicit repair.
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          if git diff --quiet -- Cargo.lock; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+            git diff --stat -- Cargo.lock
+          fi
+
+      - name: Upload resolver-produced Cargo.lock
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: spore-boot-cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Capture pinned rustfmt candidate
+        id: rustfmt
+        run: |
+          set -euo pipefail
+          SPORE_BOOT_FORMAT_ONLY=1 bash scripts/check-spore-boot-stack.sh
+
+          if git diff --quiet -- . ':(exclude)Cargo.lock'; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+          git diff --binary -- . ':(exclude)Cargo.lock' > spore-boot-rustfmt.patch
+          {
+            echo 'schema=spore-boot-rustfmt-candidate-v1'
+            echo "source_commit=$SPORE_SOURCE_COMMIT"
+            echo "evaluated_commit=$(git rev-parse HEAD)"
+            echo "evaluated_tree=$(git rev-parse 'HEAD^{tree}')"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            sha256sum spore-boot-rustfmt.patch
+          } > spore-boot-rustfmt-evidence.txt
+          git diff --stat -- . ':(exclude)Cargo.lock'
+
+          # Restore formatter-mutated tracked source. Cargo.lock, if the resolver
+          # changed it, intentionally remains as a separate candidate.
+          git diff --name-only -z -- . ':(exclude)Cargo.lock' \
+            | xargs -0 -r git checkout --
+
+      - name: Upload exact rustfmt candidate
+        if: steps.rustfmt.outputs.changed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: spore-boot-rustfmt-candidate
+          path: |
+            spore-boot-rustfmt.patch
+            spore-boot-rustfmt-evidence.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Require committed qualification inputs
+        if: steps.lock.outputs.changed == 'true' || steps.rustfmt.outputs.changed == 'true'
+        env:
+          RUST_CHANNEL: ${{ steps.toolchain.outputs.channel }}
+        run: |
+          if [[ "${{ steps.lock.outputs.changed }}" == 'true' ]]; then
+            echo "Cargo.lock differs from Cargo $RUST_CHANNEL resolver output." >&2
+            echo 'Commit the uploaded spore-boot-cargo-lock candidate unchanged.' >&2
+          fi
+          if [[ "${{ steps.rustfmt.outputs.changed }}" == 'true' ]]; then
+            echo "Rust $RUST_CHANNEL formatting differs from the exact source head." >&2
+            echo 'Apply the uploaded spore-boot-rustfmt-candidate patch unchanged.' >&2
+          fi
+          exit 1
+
+      - name: Run focused locked qualification
+        run: bash scripts/check-spore-boot-stack.sh
+
+      - name: Run standard headless benchmark matrix
+        run: |
+          cargo run --locked -p symthaea-quicken-fb --release --bin spore-boot-bench -- --matrix \
+            > spore-boot-headless-matrix.json
+
+      - name: Seal exact-head qualification receipt
+        env:
+          RUST_CHANNEL: ${{ steps.toolchain.outputs.channel }}
+        run: |
+          set -euo pipefail
+          RECEIPT=spore-boot-qualification-receipt-v1.tsv
+
+          # Qualification may create untracked benchmark/evidence files, but no
+          # tracked byte is allowed to drift from the source head being claimed.
+          git diff --quiet
+          git diff --cached --quiet
+          test "$(git rev-parse HEAD)" = "$SPORE_SOURCE_COMMIT"
+
+          sha() { sha256sum "$1" | awk '{print $1}'; }
+          {
+            printf 'schema\tspore-boot-qualification-receipt-v1\n'
+            printf 'status\tPASS\n'
+            printf 'source_commit\t%s\n' "$SPORE_SOURCE_COMMIT"
+            printf 'evaluated_commit\t%s\n' "$(git rev-parse HEAD)"
+            printf 'evaluated_tree\t%s\n' "$(git rev-parse 'HEAD^{tree}')"
+            printf 'runner_label\tubuntu-24.04\n'
+            printf 'runner_os\t%s\n' "$RUNNER_OS"
+            printf 'runner_arch\t%s\n' "$RUNNER_ARCH"
+            printf 'runner_image_os\t%s\n' "${ImageOS:-unknown}"
+            printf 'runner_image_version\t%s\n' "${ImageVersion:-unknown}"
+            printf 'os_release_sha256\t%s\n' "$(sha /etc/os-release)"
+            printf 'kernel_release\t%s\n' "$(uname -r)"
+            printf 'checkout_action_sha\t%s\n' "$CHECKOUT_ACTION_SHA"
+            printf 'upload_artifact_action_sha\t%s\n' "$UPLOAD_ARTIFACT_ACTION_SHA"
+            printf 'rust_channel\t%s\n' "$RUST_CHANNEL"
+            printf 'rustc_version\t%s\n' "$(rustc --version)"
+            printf 'cargo_version\t%s\n' "$(cargo --version)"
+            printf 'cargo_lock_sha256\t%s\n' "$(sha Cargo.lock)"
+            printf 'workspace_manifest_sha256\t%s\n' "$(sha Cargo.toml)"
+            printf 'rust_toolchain_toml_sha256\t%s\n' "$(sha rust-toolchain.toml)"
+            printf 'qualification_script_sha256\t%s\n' "$(sha scripts/check-spore-boot-stack.sh)"
+            printf 'workflow_sha256\t%s\n' "$(sha .github/workflows/spore-boot-stack.yml)"
+            printf 'benchmark_matrix_sha256\t%s\n' "$(sha spore-boot-headless-matrix.json)"
+            printf 'github_run_id\t%s\n' "$GITHUB_RUN_ID"
+            printf 'github_run_attempt\t%s\n' "$GITHUB_RUN_ATTEMPT"
+          } > "$RECEIPT"
+
+          field() { awk -F '\t' -v key="$1" '$1 == key { print $2 }' "$RECEIPT"; }
+          test "$(field status)" = PASS
+          test "$(field source_commit)" = "$SPORE_SOURCE_COMMIT"
+          test "$(field evaluated_commit)" = "$(git rev-parse HEAD)"
+          test "$(field evaluated_tree)" = "$(git rev-parse 'HEAD^{tree}')"
+          test "$(field runner_label)" = ubuntu-24.04
+          test "$(field checkout_action_sha)" = "$CHECKOUT_ACTION_SHA"
+          test "$(field upload_artifact_action_sha)" = "$UPLOAD_ARTIFACT_ACTION_SHA"
+          test "$(field cargo_lock_sha256)" = "$(sha Cargo.lock)"
+          test "$(field workspace_manifest_sha256)" = "$(sha Cargo.toml)"
+          test "$(field rust_toolchain_toml_sha256)" = "$(sha rust-toolchain.toml)"
+          test "$(field qualification_script_sha256)" = "$(sha scripts/check-spore-boot-stack.sh)"
+          test "$(field workflow_sha256)" = "$(sha .github/workflows/spore-boot-stack.yml)"
+          test "$(field benchmark_matrix_sha256)" = "$(sha spore-boot-headless-matrix.json)"
+          cat "$RECEIPT"
+
+      - name: Upload exact-head qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: spore-boot-exact-head-evidence
+          path: |
+            spore-boot-qualification-receipt-v1.tsv
+            spore-boot-headless-matrix.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload benchmark matrix
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: spore-boot-headless-matrix
+          path: spore-boot-headless-matrix.json
+          if-no-files-found: warn
+          retention-days: 7
