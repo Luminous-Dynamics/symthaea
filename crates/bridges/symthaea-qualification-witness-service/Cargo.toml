@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-qualification-witness-service"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Verify-then-sign service boundary for Agency qualification witnesses"
+publish = false
+
+[dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-qualification-witness = { path = "../symthaea-qualification-witness" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
