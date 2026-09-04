@@ -39,10 +39,41 @@ jobs:
       - name: Preserve checked-in Cargo.lock
         run: cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
 
-      - name: Require no dependency or lock drift
+      - name: Reconcile workspace metadata with Cargo
+        run: cargo metadata --format-version 1 >/dev/null
+
+      - name: Require additive local lock reconciliation only
         run: |
-          cargo metadata --locked --format-version 1 >/dev/null
-          cmp "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock
+          python3 - <<'PY'
+          import os, pathlib, sys, tomllib
+          before = tomllib.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'Cargo.lock.before').read_text())
+          after = tomllib.loads(pathlib.Path('Cargo.lock').read_text())
+          key = lambda p: (p['name'], p['version'], p.get('source'))
+          b = {key(p): p for p in before.get('package', [])}
+          a = {key(p): p for p in after.get('package', [])}
+          removed = set(b) - set(a)
+          changed = {k for k in b.keys() & a if b[k] != a[k]}
+          added = set(a) - set(b)
+          sourced = {k for k in added if k[2] is not None}
+          if removed or changed or sourced:
+              print('forbidden Cargo.lock reconciliation')
+              print('removed:', sorted(removed, key=repr))
+              print('changed:', sorted(changed, key=repr))
+              print('new sourced:', sorted(sourced, key=repr))
+              sys.exit(1)
+          print('additive workspace/path nodes:', len(added))
+          for item in sorted(added, key=repr):
+              print(' +', item)
+          PY
+
+      - name: Record lock freshness
+        run: |
+          if cmp -s "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock; then
+            echo clean > "$RUNNER_TEMP/agency-lock-status"
+          else
+            echo stale > "$RUNNER_TEMP/agency-lock-status"
+            git --no-pager diff -- Cargo.lock
+          fi
 
       - name: Format Xenia verifier
         run: cargo fmt --check --package symthaea-xenia-authority
@@ -61,8 +92,10 @@ jobs:
           git rev-parse HEAD^{tree} > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/TREE"
           rustc -Vv > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/RUSTC.txt"
           cargo -V > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/CARGO.txt"
-          sha256sum Cargo.lock > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/CARGO_LOCK_SHA256.txt"
+          sha256sum Cargo.lock > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/CARGO_LOCK_CANDIDATE_SHA256.txt"
           sha256sum crates/bridges/symthaea-xenia-authority/src/witness_frontier.rs > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/WITNESS_VERIFIER_SHA256.txt"
+          git --no-pager diff -- Cargo.lock > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/CARGO_LOCK_DIFF.patch"
+          cat "$RUNNER_TEMP/agency-lock-status" > "$RUNNER_TEMP/agency-xenia-witness-frontier-evidence/CARGO_LOCK_STATUS.txt"
 
       - name: Upload source evidence
         if: always()
@@ -72,3 +105,6 @@ jobs:
           path: ${{ runner.temp }}/agency-xenia-witness-frontier-evidence
           if-no-files-found: error
           retention-days: 14
+
+      - name: Require checked-in Cargo.lock to be fresh
+        run: test "$(cat "$RUNNER_TEMP/agency-lock-status")" = clean
