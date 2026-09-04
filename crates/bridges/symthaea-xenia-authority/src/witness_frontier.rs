@@ -150,6 +150,11 @@ impl XeniaSignedWitnessFrontierAnchorV1 {
     }
 
     pub fn fingerprint(&self) -> Result<[u8; 32], XeniaWitnessFrontierError> {
+        verify_ed25519_envelope(
+            self.ledger_public_key,
+            &self.canonical_message()?,
+            &self.signature,
+        )?;
         let mut hasher = blake3::Hasher::new();
         hasher.update(XENIA_WITNESS_FRONTIER_ANCHOR_FINGERPRINT_DOMAIN);
         hasher.update(&self.canonical_message()?);
@@ -259,6 +264,11 @@ impl XeniaSignedWitnessFrontierObservationV1 {
     }
 
     pub fn fingerprint(&self) -> Result<[u8; 32], XeniaWitnessFrontierError> {
+        verify_ed25519_envelope(
+            self.ledger_public_key,
+            &self.canonical_message()?,
+            &self.signature,
+        )?;
         let mut hasher = blake3::Hasher::new();
         hasher.update(XENIA_WITNESS_FRONTIER_OBSERVATION_FINGERPRINT_DOMAIN);
         hasher.update(&self.canonical_message()?);
@@ -365,7 +375,7 @@ impl XeniaWitnessObservationFreshnessV1 {
 
 /// Transport-neutral fields produced only after the exact Xenia anchor and fresh
 /// observation have been independently verified.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct VerifiedXeniaWitnessFrontierV1 {
     source_id: [u8; 16],
     source_epoch: u64,
@@ -394,7 +404,6 @@ impl VerifiedXeniaWitnessFrontierV1 {
     pub fn observed_at_unix_s(&self) -> u64 { self.observed_at_unix_s }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn verify_xenia_witness_frontier_v1(
     anchor: &XeniaSignedWitnessFrontierAnchorV1,
     observation: &XeniaSignedWitnessFrontierObservationV1,
@@ -641,7 +650,9 @@ mod tests {
         anchor
     }
 
-    fn signed_observation(anchor: &XeniaSignedWitnessFrontierAnchorV1) -> XeniaSignedWitnessFrontierObservationV1 {
+    fn signed_observation(
+        anchor: &XeniaSignedWitnessFrontierAnchorV1,
+    ) -> XeniaSignedWitnessFrontierObservationV1 {
         let key = signing_key();
         let mut observation = XeniaSignedWitnessFrontierObservationV1 {
             schema_version: XENIA_WITNESS_FRONTIER_ANCHOR_SCHEMA_VERSION,
@@ -702,7 +713,10 @@ mod tests {
         assert_eq!(verified.source_sequence(), 1);
         assert_eq!(verified.high_watermark(), 9);
         assert_eq!(verified.reservation_head(), Digest32(RESERVATION_HEAD));
-        assert_eq!(verified.anchor_fingerprint(), Digest32(anchor.fingerprint().unwrap()));
+        assert_eq!(
+            verified.anchor_fingerprint(),
+            Digest32(anchor.fingerprint().unwrap())
+        );
         assert_eq!(
             verified.freshness_evidence_digest(),
             Digest32(observation.fingerprint().unwrap())
@@ -743,7 +757,8 @@ mod tests {
         let mut observation = signed_observation(&anchor);
         observation.current.as_mut().unwrap().operation_id[0] ^= 1;
         let key = signing_key();
-        observation.signature = envelope(key.sign(&observation.canonical_message().unwrap()).to_bytes());
+        observation.signature =
+            envelope(key.sign(&observation.canonical_message().unwrap()).to_bytes());
         assert_eq!(
             verify_xenia_witness_frontier_v1(
                 &anchor,
@@ -759,8 +774,6 @@ mod tests {
     fn source_relabelling_is_rejected_before_trust() {
         let mut anchor = signed_anchor();
         anchor.target.source_id[0] ^= 1;
-        let key = signing_key();
-        anchor.signature = envelope(key.sign(&anchor.canonical_message().unwrap()).to_bytes());
         assert!(matches!(
             verify_xenia_witness_frontier_v1(
                 &anchor,
@@ -779,7 +792,8 @@ mod tests {
         let mut observation = signed_observation(&anchor);
         observation.ledger_entry_count = anchor.ledger_entry_count - 1;
         let key = signing_key();
-        observation.signature = envelope(key.sign(&observation.canonical_message().unwrap()).to_bytes());
+        observation.signature =
+            envelope(key.sign(&observation.canonical_message().unwrap()).to_bytes());
         assert_eq!(
             verify_xenia_witness_frontier_v1(
                 &anchor,
