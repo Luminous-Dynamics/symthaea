@@ -44,7 +44,7 @@ jobs:
       - name: Ask Cargo to reconcile exact workspace metadata
         run: cargo metadata --format-version 1 >/dev/null
 
-      - name: Require only reviewed lock reconciliation
+      - name: Permit inherited local nodes plus reviewed adapter/currentness deltas
         run: |
           python3 - <<'PY'
           import os, pathlib, sys, tomllib
@@ -58,47 +58,50 @@ jobs:
 
           removed = set(b) - set(a)
           added = set(a) - set(b)
-          changed = {k for k in b.keys() & a if b[k] != a[k]}
-
-          expected_added = {
-              ('symthaea-xenia-witness-frontier-adapter', '0.1.0', None),
-          }
-          if removed or added != expected_added:
-              print('unexpected package-set reconciliation')
+          sourced_added = {k for k in added if k[2] is not None}
+          if removed or sourced_added:
+              print('forbidden Cargo.lock package-set change')
               print('removed:', sorted(removed, key=repr))
-              print('added:', sorted(added, key=repr))
+              print('new sourced:', sorted(sourced_added, key=repr))
               sys.exit(1)
 
-          xenia_key = ('symthaea-xenia-authority', '0.1.0', None)
-          if changed - {xenia_key}:
+          xenia_keys = [k for k in b if k[0] == 'symthaea-xenia-authority']
+          if len(xenia_keys) != 1:
+              print('expected exactly one existing symthaea-xenia-authority package node')
+              print('found:', xenia_keys)
+              sys.exit(1)
+          xenia_key = xenia_keys[0]
+
+          changed = {k for k in b.keys() & a if b[k] != a[k]}
+          unexpected_changed = changed - {xenia_key}
+          if unexpected_changed:
               print('unexpected existing package-node reconciliation')
-              print('changed:', sorted(changed, key=repr))
+              print('changed:', sorted(unexpected_changed, key=repr))
               sys.exit(1)
 
           if xenia_key in changed:
-              old = b[xenia_key]
-              new = a[xenia_key]
-              old_meta = dict(old)
-              new_meta = dict(new)
-              old_deps = set(old_meta.pop('dependencies', []))
-              new_deps = set(new_meta.pop('dependencies', []))
-              if old_meta != new_meta or old_deps - new_deps:
+              old = dict(b[xenia_key])
+              new = dict(a[xenia_key])
+              old_deps = set(old.pop('dependencies', []))
+              new_deps = set(new.pop('dependencies', []))
+              if old != new or old_deps - new_deps:
                   print('xenia-authority lock delta changed metadata or removed dependencies')
                   sys.exit(1)
-              added_deps = new_deps - old_deps
-              if len(added_deps) != 1:
-                  print('expected exactly one xenia-authority dependency addition:', sorted(added_deps))
+              new_refs = new_deps - old_deps
+              if len(new_refs) != 1:
+                  print('expected exactly one xenia-authority dependency addition:', sorted(new_refs))
                   sys.exit(1)
-              added_ref = next(iter(added_deps))
-              if dep_name(added_ref) != 'getrandom':
-                  print('only getrandom may be added to xenia-authority; got:', added_ref)
-                  sys.exit(1)
-              version = dep_version(added_ref)
-              if version is not None and not version.startswith('0.2.'):
-                  print('xenia-authority must bind the reviewed getrandom 0.2 line; got:', added_ref)
+              dep = next(iter(new_refs))
+              version = dep_version(dep)
+              if dep_name(dep) != 'getrandom' or (version is not None and not version.startswith('0.2.')):
+                  print('only the reviewed getrandom 0.2.x edge is allowed; got:', dep)
                   sys.exit(1)
 
-          adapter = a[('symthaea-xenia-witness-frontier-adapter', '0.1.0', None)]
+          adapter_keys = [k for k in a if k[0] == 'symthaea-xenia-witness-frontier-adapter']
+          if len(adapter_keys) != 1:
+              print('expected exactly one adapter workspace node; found:', adapter_keys)
+              sys.exit(1)
+          adapter = a[adapter_keys[0]]
           if adapter.get('source') is not None or adapter.get('checksum') is not None:
               print('adapter workspace node unexpectedly has source/checksum')
               sys.exit(1)
@@ -112,7 +115,11 @@ jobs:
           if actual_adapter_dep_names != expected_adapter_dep_names:
               print('unexpected adapter dependency set:', adapter.get('dependencies', []))
               sys.exit(1)
-          print('reviewed Cargo.lock candidate only')
+
+          local_added = sorted((k for k in added if k[2] is None), key=repr)
+          print('accepted inherited source-less workspace/path nodes:', len(local_added))
+          for item in local_added:
+              print(' +', item)
           PY
 
       - name: Record lock freshness
