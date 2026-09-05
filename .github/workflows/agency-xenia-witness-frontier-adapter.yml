@@ -1,0 +1,144 @@
+name: Agency Xenia Witness Frontier Recovery Adapter
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-xenia-witness-frontier-adapter/**'
+      - 'crates/bridges/symthaea-xenia-authority/**'
+      - 'crates/bridges/symthaea-qualification-witness-frontier/**'
+      - 'crates/core/symthaea-authority/**'
+      - 'docs/architecture/XENIA_WITNESS_FRONTIER_RECOVERY_ADAPTER_V01.md'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/agency-xenia-witness-frontier-adapter.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agency-xenia-witness-frontier-adapter-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  source:
+    name: Xenia-to-recovery adapter qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy,rustfmt
+
+      - name: Preserve checked-in Cargo.lock
+        run: cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+
+      - name: Ask Cargo to reconcile exact workspace metadata
+        run: cargo metadata --format-version 1 >/dev/null
+
+      - name: Require only reviewed lock reconciliation
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, sys, tomllib
+          before = tomllib.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'Cargo.lock.before').read_text())
+          after = tomllib.loads(pathlib.Path('Cargo.lock').read_text())
+          key = lambda p: (p['name'], p['version'], p.get('source'))
+          b = {key(p): p for p in before.get('package', [])}
+          a = {key(p): p for p in after.get('package', [])}
+
+          removed = set(b) - set(a)
+          added = set(a) - set(b)
+          changed = {k for k in b.keys() & a if b[k] != a[k]}
+
+          expected_added = {
+              ('symthaea-xenia-witness-frontier-adapter', '0.1.0', None),
+          }
+          if removed or added != expected_added:
+              print('unexpected package-set reconciliation')
+              print('removed:', sorted(removed, key=repr))
+              print('added:', sorted(added, key=repr))
+              sys.exit(1)
+
+          expected_changed = {('symthaea-xenia-authority', '0.1.0', None)}
+          if changed != expected_changed:
+              print('unexpected existing package-node reconciliation')
+              print('changed:', sorted(changed, key=repr))
+              sys.exit(1)
+
+          old = b[('symthaea-xenia-authority', '0.1.0', None)]
+          new = a[('symthaea-xenia-authority', '0.1.0', None)]
+          old_deps = set(old.get('dependencies', []))
+          new_deps = set(new.get('dependencies', []))
+          if new_deps - old_deps != {'getrandom'} or old_deps - new_deps:
+              print('xenia-authority lock delta is not exactly +getrandom')
+              print('added deps:', sorted(new_deps - old_deps))
+              print('removed deps:', sorted(old_deps - new_deps))
+              sys.exit(1)
+
+          adapter = a[('symthaea-xenia-witness-frontier-adapter', '0.1.0', None)]
+          if adapter.get('source') is not None or adapter.get('checksum') is not None:
+              print('adapter workspace node unexpectedly has source/checksum')
+              sys.exit(1)
+          expected_adapter_deps = {
+              'symthaea-authority',
+              'symthaea-qualification-witness-frontier',
+              'symthaea-xenia-authority',
+              'thiserror',
+          }
+          if set(adapter.get('dependencies', [])) != expected_adapter_deps:
+              print('unexpected adapter dependency set:', adapter.get('dependencies', []))
+              sys.exit(1)
+          print('reviewed Cargo.lock candidate only')
+          PY
+
+      - name: Record lock freshness
+        run: |
+          if cmp -s "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock; then
+            echo clean > "$RUNNER_TEMP/agency-lock-status"
+          else
+            echo stale > "$RUNNER_TEMP/agency-lock-status"
+            git --no-pager diff -- Cargo.lock
+          fi
+
+      - name: Rustfmt adapter
+        run: cargo fmt --check --package symthaea-xenia-witness-frontier-adapter
+
+      - name: Test adapter and dependency-facing API
+        run: cargo test --locked -p symthaea-xenia-witness-frontier-adapter
+
+      - name: Clippy adapter
+        run: cargo clippy --locked -p symthaea-xenia-witness-frontier-adapter --all-targets -- -D warnings
+
+      - name: Record evidence
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/agency-xenia-frontier-adapter-evidence"
+          git rev-parse HEAD > "$RUNNER_TEMP/agency-xenia-frontier-adapter-evidence/HEAD"
+          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/agency-xenia-frontier-adapter-evidence/TREE"
+          rustc -Vv > "$RUNNER_TEMP/agency-xenia-frontier-adapter-evidence/RUSTC.txt"
+          cargo -V > "$RUNNER_TEMP/agency-xenia-frontier-adapter-evidence/CARGO.txt"
+          sha256sum Cargo.lock > "$RUNNER_TEMP/agency-xenia-frontier-adapter-evidence/CARGO_LOCK_CANDIDATE_SHA256.txt"
+          git --no-pager diff -- Cargo.lock > "$RUNNER_TEMP/agency-xenia-frontier-adapter-evidence/CARGO_LOCK_DIFF.patch"
+          sha256sum crates/bridges/symthaea-xenia-witness-frontier-adapter/src/lib.rs > "$RUNNER_TEMP/agency-xenia-frontier-adapter-evidence/ADAPTER_SHA256.txt"
+          sha256sum crates/bridges/symthaea-xenia-authority/src/witness_frontier.rs > "$RUNNER_TEMP/agency-xenia-frontier-adapter-evidence/XENIA_VERIFIER_SHA256.txt"
+          sha256sum crates/bridges/symthaea-qualification-witness-frontier/src/lib.rs > "$RUNNER_TEMP/agency-xenia-frontier-adapter-evidence/RECOVERY_SEMANTICS_SHA256.txt"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agency-xenia-witness-frontier-adapter-${{ github.sha }}
+          path: ${{ runner.temp }}/agency-xenia-frontier-adapter-evidence
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Require checked-in Cargo.lock to be fresh
+        run: test "$(cat "$RUNNER_TEMP/agency-lock-status")" = clean
