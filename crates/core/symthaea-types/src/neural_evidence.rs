@@ -109,6 +109,7 @@ pub struct CoordinateTransformProvenance {
     pub transform_id: String,
     pub transform_version: String,
     /// Immutable digest of the atlas/mapping artifact or controlled transform source.
+    /// Supported forms are `sha256:<64 hex>` and `blake3:<64 hex>`.
     pub source_digest: String,
 }
 
@@ -175,7 +176,8 @@ pub struct NeuralEvidenceProvenance {
     pub coordinate_transforms: Vec<CoordinateTransformProvenance>,
     /// Temporal reduction, independent from spatial transformation lineage.
     pub temporal_aggregation: TemporalAggregation,
-    /// Optional immutable source/content digest, e.g. `sha256:<hex>`.
+    /// Optional immutable source/content digest.
+    /// Supported forms are `sha256:<64 hex>` and `blake3:<64 hex>`.
     pub source_digest: Option<String>,
 }
 
@@ -384,7 +386,10 @@ fn validate_digest(digest: &str) -> Result<(), ProvenanceError> {
     let Some((algorithm, value)) = digest.split_once(':') else {
         return Err(ProvenanceError::MalformedDigest);
     };
-    if algorithm.trim().is_empty() || value.trim().is_empty() {
+    if !matches!(algorithm, "sha256" | "blake3")
+        || value.len() != 64
+        || !value.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
         return Err(ProvenanceError::MalformedDigest);
     }
     Ok(())
@@ -446,9 +451,9 @@ impl std::fmt::Display for ProvenanceError {
             Self::EmpiricalMissingModality => {
                 f.write_str("empirical observed evidence requires an explicit neural modality")
             }
-            Self::MalformedDigest => {
-                f.write_str("source digest must use a non-empty algorithm:value form")
-            }
+            Self::MalformedDigest => f.write_str(
+                "source digest must be sha256:<64 hex> or blake3:<64 hex>",
+            ),
             Self::IdentityCoordinateTransform => {
                 f.write_str("coordinate transforms must change coordinate systems")
             }
@@ -478,6 +483,13 @@ impl std::error::Error for ProvenanceError {}
 mod tests {
     use super::*;
 
+    const SHA256_A: &str =
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const SHA256_B: &str =
+        "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const BLAKE3_C: &str =
+        "blake3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+
     fn synthetic() -> NeuralEvidenceProvenance {
         NeuralEvidenceProvenance {
             schema_version: NEURAL_EVIDENCE_SCHEMA_VERSION,
@@ -493,7 +505,7 @@ mod tests {
             coordinate_system: CoordinateSystem::Symthaea12,
             coordinate_transforms: vec![],
             temporal_aggregation: TemporalAggregation::Native,
-            source_digest: Some("sha256:fixture".into()),
+            source_digest: Some(SHA256_A.into()),
         }
     }
 
@@ -531,7 +543,7 @@ mod tests {
             coordinate_system: CoordinateSystem::FsAverage5,
             coordinate_transforms: vec![],
             temporal_aggregation: TemporalAggregation::TemporalMean,
-            source_digest: Some("sha256:tribe-output".into()),
+            source_digest: Some(SHA256_B.into()),
         }
     }
 
@@ -550,7 +562,7 @@ mod tests {
             coordinate_system: CoordinateSystem::FsAverage5,
             coordinate_transforms: vec![],
             temporal_aggregation: TemporalAggregation::Native,
-            source_digest: Some("sha256:example".into()),
+            source_digest: Some(BLAKE3_C.into()),
         }
     }
 
@@ -561,14 +573,14 @@ mod tests {
                 to: CoordinateSystem::Glasser360,
                 transform_id: "fsaverage5-to-glasser360".into(),
                 transform_version: "1".into(),
-                source_digest: "sha256:atlas".into(),
+                source_digest: SHA256_A.into(),
             },
             CoordinateTransformProvenance {
                 from: CoordinateSystem::Glasser360,
                 to: CoordinateSystem::Symthaea12,
                 transform_id: "glasser360-to-symthaea12".into(),
                 transform_version: "1".into(),
-                source_digest: "sha256:mapping".into(),
+                source_digest: SHA256_B.into(),
             },
         ]
     }
@@ -722,7 +734,7 @@ mod tests {
             to: CoordinateSystem::Glasser360,
             transform_id: "fsaverage5-to-glasser360".into(),
             transform_version: "1".into(),
-            source_digest: "sha256:atlas".into(),
+            source_digest: SHA256_A.into(),
         };
         let validated = valid.clone().validate().unwrap();
         assert_eq!(validated.from(), CoordinateSystem::FsAverage5);
@@ -746,10 +758,25 @@ mod tests {
     }
 
     #[test]
-    fn malformed_digest_is_rejected() {
+    fn digest_validation_requires_supported_256_bit_hex() {
+        for bad in [
+            "not-a-digest",
+            "sha256:abc",
+            "sha512:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sha256:zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        ] {
+            let mut p = empirical();
+            p.source_digest = Some(bad.into());
+            assert_eq!(p.validate(), Err(ProvenanceError::MalformedDigest));
+        }
+
         let mut p = empirical();
-        p.source_digest = Some("not-a-digest".into());
-        assert_eq!(p.validate(), Err(ProvenanceError::MalformedDigest));
+        p.source_digest = Some(SHA256_A.into());
+        assert!(p.validate().is_ok());
+
+        let mut p = empirical();
+        p.source_digest = Some(BLAKE3_C.into());
+        assert!(p.validate().is_ok());
     }
 
     #[test]
@@ -768,7 +795,7 @@ mod tests {
             to: CoordinateSystem::FsAverage5,
             transform_id: "bad".into(),
             transform_version: "1".into(),
-            source_digest: "sha256:atlas".into(),
+            source_digest: SHA256_A.into(),
         };
         let json = serde_json::to_string(&raw).unwrap();
         let parsed = serde_json::from_str::<ValidatedCoordinateTransform>(&json);
