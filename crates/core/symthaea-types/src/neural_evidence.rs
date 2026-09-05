@@ -634,24 +634,38 @@ mod tests {
 
     #[test]
     fn admission_capability_enforces_use_boundary() {
-        let fixture = NeuralObservation::new(vec![0.0_f32], fixture()).unwrap();
-        let admitted = fixture.authorize(EvidenceUse::SoftwareQualification).unwrap();
+        let fixture_observation = NeuralObservation::new(vec![0.0_f32], fixture()).unwrap();
+        let admitted = fixture_observation
+            .authorize(EvidenceUse::SoftwareQualification)
+            .unwrap();
         assert_eq!(admitted.use_case(), EvidenceUse::SoftwareQualification);
 
-        let simulated = NeuralObservation::new(vec![0.0_f32], simulated()).unwrap();
-        assert!(simulated.authorize(EvidenceUse::ModelBehavior).is_ok());
+        let simulated_observation = NeuralObservation::new(vec![0.0_f32], simulated()).unwrap();
+        assert!(
+            simulated_observation
+                .authorize(EvidenceUse::ModelBehavior)
+                .is_ok()
+        );
 
-        let surrogate = NeuralObservation::new(vec![0.0_f32], surrogate()).unwrap();
-        assert!(surrogate.authorize(EvidenceUse::SurrogateAlignment).is_ok());
+        let surrogate_observation = NeuralObservation::new(vec![0.0_f32], surrogate()).unwrap();
+        assert!(
+            surrogate_observation
+                .authorize(EvidenceUse::SurrogateAlignment)
+                .is_ok()
+        );
 
-        let empirical = NeuralObservation::new(vec![0.0_f32], empirical()).unwrap();
-        assert!(empirical.authorize(EvidenceUse::EmpiricalNeuralAnalysis).is_ok());
+        let empirical_observation = NeuralObservation::new(vec![0.0_f32], empirical()).unwrap();
+        assert!(
+            empirical_observation
+                .authorize(EvidenceUse::EmpiricalNeuralAnalysis)
+                .is_ok()
+        );
     }
 
     #[test]
     fn admission_rejects_authority_laundering_and_consciousness_inference() {
-        let surrogate = NeuralObservation::new(vec![0.0_f32], surrogate()).unwrap();
-        let err = surrogate
+        let surrogate_observation = NeuralObservation::new(vec![0.0_f32], surrogate()).unwrap();
+        let err = surrogate_observation
             .authorize(EvidenceUse::EmpiricalNeuralAnalysis)
             .unwrap_err();
         assert_eq!(err.authority, EvidenceAuthority::ExternalSurrogate);
