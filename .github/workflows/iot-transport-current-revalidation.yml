@@ -1,0 +1,160 @@
+name: IoT Transport Current Revalidation
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-transport-current-revalidation/**'
+      - '.github/workflows/iot-transport-current-revalidation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Source and dependency contract
+        shell: python
+        run: |
+          from pathlib import Path
+          import tomllib
+
+          src = Path('crates/bridges/symthaea-iot-transport-current-revalidation/src/lib.rs').read_text()
+          prod = src.split('#[cfg(test)]', 1)[0]
+          required = [
+              'pub struct CurrentXeniaTransportRevalidator',
+              'registry: TransportTrustRegistry',
+              'anchored_current_head: TransportTrustHead',
+              'pub fn revalidate(',
+              'self,',
+              'exact: ExactXeniaTransportEvidence',
+              'SystemTime::now()',
+              'exact.transport_trust_head()',
+              'verify_xenia_physical_effect_receipt(',
+              'let attestor_id = exact.attestor_id().to_owned();',
+              'let key_id = exact.key_id().to_owned();',
+              'let snapshot = self.registry.snapshot();',
+              'current_key.digest()?',
+              'current_key.not_after_unix_ms',
+              'snapshot.expires_at_unix_ms',
+              '.min(transport_key_not_after_unix_ms)',
+              '.min(trust_snapshot_expires_at_unix_ms)',
+              'pub struct RevalidatedXeniaTransport',
+              'transport_key_digest: Digest32',
+              'valid_until_unix_ms: u64',
+          ]
+          missing = [item for item in required if item not in prod]
+          if missing:
+              raise SystemExit(f'missing current-revalidation v0.2 contract: {missing}')
+
+          public_revalidate = prod.split('pub fn revalidate(', 1)[1].split('fn revalidate_at', 1)[0]
+          forbidden_public = ['&self', 'now_unix_ms', 'verifier', 'HybridReceiptSignatureVerifier']
+          found_public = [item for item in forbidden_public if item in public_revalidate]
+          if found_public:
+              raise SystemExit(f'caller-controlled current-revalidation surface: {found_public}')
+
+          forbidden = [
+              'HybridReceiptSignatureVerifier',
+              'XeniaHybridReceiptVerifier',
+              'verify_xenia_transport_receipt(',
+              'ed25519_dalek',
+              'fips204',
+              'FinalActuatorPermit',
+              'CompleteJitHalLease',
+              'TcpStream',
+              'std::net',
+              'std::process::Command',
+              'Command::new',
+              'unsafe {',
+          ]
+          found = [item for item in forbidden if item in prod]
+          if found:
+              raise SystemExit(f'forbidden crypto/authority surface in current revalidator: {found}')
+
+          if 'pub fn revalidate_at' in prod:
+              raise SystemExit('test-time injection helper must not be public')
+
+          output = prod.split('pub struct RevalidatedXeniaTransport', 1)[1]
+          output_header = output.split('impl fmt::Debug', 1)[0]
+          if '#[derive(' in output_header or 'raw_receipt' in output_header or 'raw_payload' in output_header:
+              raise SystemExit('revalidated proof must be non-clone/non-serializable and retain no raw transport bytes')
+
+          manifest = tomllib.loads(Path('crates/bridges/symthaea-iot-transport-current-revalidation/Cargo.toml').read_text())
+          expected = {
+              'symthaea-authority',
+              'symthaea-iot-device-protocol',
+              'symthaea-iot-transport-exact-evidence',
+              'symthaea-iot-transport-receipt',
+              'symthaea-iot-xenia-hybrid-verifier',
+              'thiserror',
+          }
+          actual = set(manifest.get('dependencies', {}))
+          if actual != expected:
+              raise SystemExit(f'production dependency surface changed: {sorted(actual)}')
+
+      - name: Install Rust 1.96 for formatting
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Rustfmt
+        run: cargo +1.96.0 fmt --check -p symthaea-iot-transport-current-revalidation
+
+      - name: Install Rust 1.94 qualification toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: clippy
+
+      - name: Preserve checked-in lock
+        run: cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Reconcile candidate lock and check package
+        run: cargo +1.94.0 check -p symthaea-iot-transport-current-revalidation
+
+      - name: Reject any sourced dependency drift
+        shell: python
+        run: |
+          import tomllib
+          def sourced(path):
+              with open(path, 'rb') as f:
+                  doc = tomllib.load(f)
+              return {
+                  (p['name'], p['version'], p.get('source'))
+                  for p in doc.get('package', [])
+                  if p.get('source') is not None
+              }
+          before = sourced('/tmp/Cargo.lock.before')
+          after = sourced('Cargo.lock')
+          extra = after - before
+          removed = before - after
+          if extra or removed:
+              raise SystemExit(
+                  f'sourced dependency drift: added={sorted(extra)}, removed={sorted(removed)}'
+              )
+
+      - name: Real fixed-verifier positive regression first
+        run: cargo +1.94.0 test --locked -p symthaea-iot-transport-current-revalidation tests::exact_evidence_revalidates_under_same_current_generation -- --exact
+
+      - name: Natural-expiry regression first
+        run: cargo +1.94.0 test --locked -p symthaea-iot-transport-current-revalidation tests::natural_key_and_snapshot_expiry_cap_revalidated_validity -- --exact
+
+      - name: Historical permissive-verifier rejection first
+        run: cargo +1.94.0 test --locked -p symthaea-iot-transport-current-revalidation tests::permissive_historical_verifier_does_not_survive_fixed_current_revalidation -- --exact
+
+      - name: Package tests
+        run: cargo +1.94.0 test --locked -p symthaea-iot-transport-current-revalidation
+
+      - name: Strict Clippy
+        run: cargo +1.94.0 clippy --locked -p symthaea-iot-transport-current-revalidation --all-targets -- -D warnings
+
+      - name: Show candidate lock delta
+        if: always()
+        run: git diff -- Cargo.lock || true
+
+      - name: Checked-in lock must already be fresh
+        run: git diff --exit-code -- Cargo.lock
