@@ -4,9 +4,9 @@
 //!
 //! `VerifiedTransportEnvelope` proves that one receipt/payload pair passed the configured
 //! transport verifier at an earlier boundary, but intentionally retains only interpreted
-//! commitments. This crate binds the exact canonical receipt and payload bytes back to that
-//! opaque proof so a later privileged stage can re-run current-trust cryptography over the
-//! identical evidence rather than over caller-supplied replacement bytes.
+//! commitments. This crate consumes that opaque proof while binding the exact canonical receipt
+//! and payload bytes back to it, so a later privileged stage can re-run current-trust cryptography
+//! over the identical evidence rather than over caller-supplied replacement bytes.
 //!
 //! This capsule is not transport revalidation and is not physical authority. It performs no
 //! signature verification, accepts no trust registry or clock, and exposes no final/JIT/HAL
@@ -25,11 +25,13 @@ use thiserror::Error;
 const EXACT_XENIA_EVIDENCE_DOMAIN: &[u8] = b"symthaea-iot-exact-xenia-transport-evidence-v1\0";
 
 /// Opaque in-memory capsule retaining the exact canonical Xenia receipt and physical payload
-/// represented by one already-opaque `VerifiedTransportEnvelope`.
+/// represented by one consumed `VerifiedTransportEnvelope`.
 ///
 /// It is deliberately neither `Clone` nor serializable. A process restart therefore destroys
 /// this continuation evidence; the already-burned command must be resubmitted instead of
-/// reconstructing a pre-crash actuation attempt from portable bytes.
+/// reconstructing a pre-crash actuation attempt from portable bytes. Construction consumes the
+/// prior opaque transport proof so normal callers cannot mint multiple continuation capsules
+/// from the same in-process proof.
 #[derive(Debug)]
 pub struct ExactXeniaTransportEvidence {
     raw_receipt: Vec<u8>,
@@ -104,13 +106,15 @@ impl ExactXeniaTransportEvidence {
     }
 }
 
-/// Bind exact canonical receipt/payload bytes to one already verified opaque transport proof.
+/// Bind exact canonical receipt/payload bytes by consuming one already verified opaque proof.
 ///
 /// This function deliberately performs no cryptographic verification. Its only claim is that
 /// the retained bytes reproduce every exact transport commitment available from `transport`.
-/// A later fixed current-trust verifier must re-run both receipt signatures over these bytes.
+/// Taking `transport` by value makes this an affine continuation boundary: the same opaque proof
+/// cannot normally be reused to mint multiple exact-evidence capsules. A later fixed current-
+/// trust verifier must re-run both receipt signatures over these bytes.
 pub fn bind_exact_xenia_transport_evidence(
-    transport: &VerifiedTransportEnvelope,
+    transport: VerifiedTransportEnvelope,
     raw_receipt: &[u8],
     raw_payload: &[u8],
 ) -> Result<ExactXeniaTransportEvidence, ExactTransportEvidenceError> {
@@ -407,10 +411,7 @@ mod tests {
         }
     }
 
-    fn verified_for(
-        payload: &[u8],
-        raw_receipt: &[u8],
-    ) -> VerifiedTransportEnvelope {
+    fn verified_for(payload: &[u8], raw_receipt: &[u8]) -> VerifiedTransportEnvelope {
         verify_xenia_transport_receipt(
             &registry(),
             raw_receipt,
@@ -428,17 +429,21 @@ mod tests {
         let original_payload = payload.clone();
         let original_receipt = raw_receipt.clone();
         let verified = verified_for(&payload, &raw_receipt);
+        let expected_receipt_digest = verified.receipt_digest();
+        let expected_payload_digest = verified.payload_digest();
+        let expected_envelope_digest = verified.envelope_digest();
+        let expected_trust_head = verified.trust_head();
 
-        let exact = bind_exact_xenia_transport_evidence(&verified, &raw_receipt, &payload).unwrap();
+        let exact = bind_exact_xenia_transport_evidence(verified, &raw_receipt, &payload).unwrap();
         raw_receipt[0] ^= 1;
         payload[0] ^= 1;
 
         assert_eq!(exact.canonical_receipt_bytes(), original_receipt.as_slice());
         assert_eq!(exact.canonical_payload_bytes(), original_payload.as_slice());
-        assert_eq!(exact.receipt_digest(), verified.receipt_digest());
-        assert_eq!(exact.payload_digest(), verified.payload_digest());
-        assert_eq!(exact.envelope_digest(), verified.envelope_digest());
-        assert_eq!(exact.transport_trust_head(), verified.trust_head());
+        assert_eq!(exact.receipt_digest(), expected_receipt_digest);
+        assert_eq!(exact.payload_digest(), expected_payload_digest);
+        assert_eq!(exact.envelope_digest(), expected_envelope_digest);
+        assert_eq!(exact.transport_trust_head(), expected_trust_head);
         assert_eq!(exact.attestor_id(), "xenia-gateway-a");
         assert_eq!(exact.key_id(), "transport-key-1");
         assert_ne!(exact.exact_evidence_digest(), Digest32([0; 32]));
@@ -448,17 +453,23 @@ mod tests {
     fn another_canonical_receipt_or_payload_cannot_bind_existing_transport_proof() {
         let payload = bincode::serialize(&envelope(7)).unwrap();
         let raw_receipt = bincode::serialize(&receipt(&payload)).unwrap();
-        let verified = verified_for(&payload, &raw_receipt);
-
         let other_payload = bincode::serialize(&envelope(8)).unwrap();
         let other_receipt = bincode::serialize(&receipt(&other_payload)).unwrap();
 
         assert!(matches!(
-            bind_exact_xenia_transport_evidence(&verified, &other_receipt, &payload),
+            bind_exact_xenia_transport_evidence(
+                verified_for(&payload, &raw_receipt),
+                &other_receipt,
+                &payload,
+            ),
             Err(ExactTransportEvidenceError::ReceiptCommitmentMismatch)
         ));
         assert!(matches!(
-            bind_exact_xenia_transport_evidence(&verified, &raw_receipt, &other_payload),
+            bind_exact_xenia_transport_evidence(
+                verified_for(&payload, &raw_receipt),
+                &raw_receipt,
+                &other_payload,
+            ),
             Err(ExactTransportEvidenceError::PayloadCommitmentMismatch)
         ));
     }
@@ -467,12 +478,15 @@ mod tests {
     fn trailing_bytes_cannot_be_retained_as_exact_evidence() {
         let payload = bincode::serialize(&envelope(7)).unwrap();
         let raw_receipt = bincode::serialize(&receipt(&payload)).unwrap();
-        let verified = verified_for(&payload, &raw_receipt);
 
         let mut receipt_with_trailing = raw_receipt.clone();
         receipt_with_trailing.push(0);
         assert!(matches!(
-            bind_exact_xenia_transport_evidence(&verified, &receipt_with_trailing, &payload),
+            bind_exact_xenia_transport_evidence(
+                verified_for(&payload, &raw_receipt),
+                &receipt_with_trailing,
+                &payload,
+            ),
             Err(ExactTransportEvidenceError::NonCanonicalReceiptEncoding)
                 | Err(ExactTransportEvidenceError::ReceiptEncoding)
         ));
@@ -480,7 +494,11 @@ mod tests {
         let mut payload_with_trailing = payload.clone();
         payload_with_trailing.push(0);
         assert!(matches!(
-            bind_exact_xenia_transport_evidence(&verified, &raw_receipt, &payload_with_trailing),
+            bind_exact_xenia_transport_evidence(
+                verified_for(&payload, &raw_receipt),
+                &raw_receipt,
+                &payload_with_trailing,
+            ),
             Err(ExactTransportEvidenceError::PayloadCommitmentMismatch)
                 | Err(ExactTransportEvidenceError::NonCanonicalPayloadEncoding)
                 | Err(ExactTransportEvidenceError::PayloadEncoding)

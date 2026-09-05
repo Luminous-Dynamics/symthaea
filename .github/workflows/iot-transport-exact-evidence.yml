@@ -27,7 +27,7 @@ jobs:
               'raw_receipt: Vec<u8>',
               'raw_payload: Vec<u8>',
               'bind_exact_xenia_transport_evidence(',
-              'transport: &VerifiedTransportEnvelope',
+              'transport: VerifiedTransportEnvelope',
               'canonical_receipt_bytes',
               'canonical_payload_bytes',
               'signing_digest()',
@@ -43,6 +43,7 @@ jobs:
           if missing:
               raise SystemExit(f'missing required exact-evidence contract: {missing}')
           forbidden = [
+              'transport: &VerifiedTransportEnvelope',
               'HybridReceiptSignatureVerifier',
               'verify_xenia_transport_receipt(',
               'TransportTrustRegistry',
@@ -59,7 +60,7 @@ jobs:
           ]
           found = [item for item in forbidden if item in prod]
           if found:
-              raise SystemExit(f'forbidden authority/crypto surface in provenance capsule: {found}')
+              raise SystemExit(f'forbidden authority/crypto/borrowed-proof surface in provenance capsule: {found}')
           header = prod.split('pub struct ExactXeniaTransportEvidence', 1)[0].rsplit('#[derive(', 1)[-1]
           if 'Clone' in header or 'Serialize' in header or 'Deserialize' in header:
               raise SystemExit('exact-evidence capsule must remain non-clone/non-serializable')
