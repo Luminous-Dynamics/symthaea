@@ -10,12 +10,15 @@
 //! lineage are internally consistent; it does not prove that external metadata
 //! is truthful.
 //!
-//! Two boundaries are deliberate:
+//! Three boundaries are deliberate:
 //!
-//! - evidence use is authorized only by [`ValidatedProvenance`], never by a raw
-//!   [`EvidenceAuthority`] value;
-//! - spatial coordinate changes are valid only through an explicit, versioned,
-//!   digest-bound transform chain from native coordinates to payload coordinates.
+//! - raw [`EvidenceAuthority`] values grant no evidence use;
+//! - a [`NeuralObservation`] must pass provenance validation before it exists;
+//! - a downstream scientific consumer can require [`AdmittedNeuralEvidence`],
+//!   a non-deserializable capability earned for one explicit [`EvidenceUse`].
+//!
+//! Spatial coordinate changes are valid only through an explicit, versioned,
+//! digest-bound transform chain from native coordinates to payload coordinates.
 
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -60,7 +63,7 @@ impl EvidenceAuthority {
     }
 }
 
-/// Intended use of a validated evidence artifact.
+/// Intended use of an admitted neural-evidence artifact.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EvidenceUse {
     SoftwareQualification,
@@ -224,9 +227,7 @@ impl ValidatedProvenance {
         &self.0
     }
 
-    /// Evidence permission is deliberately available only after provenance validation.
-    /// No authority automatically permits a consciousness inference.
-    pub const fn permits(&self, use_case: EvidenceUse) -> bool {
+    const fn permits(&self, use_case: EvidenceUse) -> bool {
         match (self.0.authority, use_case) {
             (_, EvidenceUse::SoftwareQualification) => true,
             (EvidenceAuthority::SimulatedModel, EvidenceUse::ModelBehavior) => true,
@@ -325,14 +326,79 @@ impl<T> NeuralObservation<T> {
         &self.provenance
     }
 
-    pub const fn permits(&self, use_case: EvidenceUse) -> bool {
-        self.provenance.permits(use_case)
+    /// Consume this validated observation and earn a capability for one evidence use.
+    ///
+    /// The returned capability intentionally does not implement `Deserialize`;
+    /// persisted data must be validated and admitted again after loading.
+    pub fn authorize(
+        self,
+        use_case: EvidenceUse,
+    ) -> Result<AdmittedNeuralEvidence<T>, EvidenceAdmissionError> {
+        if self.provenance.permits(use_case) {
+            Ok(AdmittedNeuralEvidence {
+                observation: self,
+                use_case,
+            })
+        } else {
+            Err(EvidenceAdmissionError {
+                authority: self.provenance.authority(),
+                requested_use: use_case,
+            })
+        }
     }
 
     pub fn into_parts(self) -> (T, ValidatedProvenance) {
         (self.data, self.provenance)
     }
 }
+
+/// Capability proving that a validated observation was admitted for one use.
+///
+/// There is no public constructor and no `Deserialize` implementation. A caller
+/// must obtain this through [`NeuralObservation::authorize`] each time data crosses
+/// a persistence or trust boundary.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AdmittedNeuralEvidence<T> {
+    observation: NeuralObservation<T>,
+    use_case: EvidenceUse,
+}
+
+impl<T> AdmittedNeuralEvidence<T> {
+    pub const fn use_case(&self) -> EvidenceUse {
+        self.use_case
+    }
+
+    pub fn data(&self) -> &T {
+        self.observation.data()
+    }
+
+    pub fn provenance(&self) -> &ValidatedProvenance {
+        self.observation.provenance()
+    }
+
+    pub fn into_observation(self) -> NeuralObservation<T> {
+        self.observation
+    }
+}
+
+/// A validated observation was not authorized for the requested scientific use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EvidenceAdmissionError {
+    pub authority: EvidenceAuthority,
+    pub requested_use: EvidenceUse,
+}
+
+impl std::fmt::Display for EvidenceAdmissionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:?} neural evidence is not admitted for {:?}",
+            self.authority, self.requested_use
+        )
+    }
+}
+
+impl std::error::Error for EvidenceAdmissionError {}
 
 fn require_nonempty(value: Option<&str>, error: ProvenanceError) -> Result<(), ProvenanceError> {
     if value.is_none_or(|v| v.trim().is_empty()) {
@@ -567,20 +633,36 @@ mod tests {
     }
 
     #[test]
-    fn permissions_require_validated_provenance() {
-        let fixture = fixture().validate().unwrap();
-        let simulated = simulated().validate().unwrap();
-        let surrogate = surrogate().validate().unwrap();
-        let empirical = empirical().validate().unwrap();
+    fn admission_capability_enforces_use_boundary() {
+        let fixture = NeuralObservation::new(vec![0.0_f32], fixture()).unwrap();
+        let admitted = fixture.authorize(EvidenceUse::SoftwareQualification).unwrap();
+        assert_eq!(admitted.use_case(), EvidenceUse::SoftwareQualification);
 
-        assert!(fixture.permits(EvidenceUse::SoftwareQualification));
-        assert!(simulated.permits(EvidenceUse::ModelBehavior));
-        assert!(surrogate.permits(EvidenceUse::SurrogateAlignment));
-        assert!(empirical.permits(EvidenceUse::EmpiricalNeuralAnalysis));
-        assert!(!fixture.permits(EvidenceUse::EmpiricalNeuralAnalysis));
-        assert!(!surrogate.permits(EvidenceUse::EmpiricalNeuralAnalysis));
-        for provenance in [&fixture, &simulated, &surrogate, &empirical] {
-            assert!(!provenance.permits(EvidenceUse::ConsciousnessInference));
+        let simulated = NeuralObservation::new(vec![0.0_f32], simulated()).unwrap();
+        assert!(simulated.authorize(EvidenceUse::ModelBehavior).is_ok());
+
+        let surrogate = NeuralObservation::new(vec![0.0_f32], surrogate()).unwrap();
+        assert!(surrogate.authorize(EvidenceUse::SurrogateAlignment).is_ok());
+
+        let empirical = NeuralObservation::new(vec![0.0_f32], empirical()).unwrap();
+        assert!(empirical.authorize(EvidenceUse::EmpiricalNeuralAnalysis).is_ok());
+    }
+
+    #[test]
+    fn admission_rejects_authority_laundering_and_consciousness_inference() {
+        let surrogate = NeuralObservation::new(vec![0.0_f32], surrogate()).unwrap();
+        let err = surrogate
+            .authorize(EvidenceUse::EmpiricalNeuralAnalysis)
+            .unwrap_err();
+        assert_eq!(err.authority, EvidenceAuthority::ExternalSurrogate);
+
+        for raw in [fixture(), simulated(), surrogate(), empirical()] {
+            let observation = NeuralObservation::new(vec![0.0_f32], raw).unwrap();
+            assert!(
+                observation
+                    .authorize(EvidenceUse::ConsciousnessInference)
+                    .is_err()
+            );
         }
     }
 
@@ -746,10 +828,7 @@ mod tests {
     fn hcp_mmp1_is_only_a_wire_alias_for_glasser360() {
         let parsed: CoordinateSystem = serde_json::from_str("\"hcp_mmp1\"").unwrap();
         assert_eq!(parsed, CoordinateSystem::Glasser360);
-        assert_eq!(
-            serde_json::to_string(&parsed).unwrap(),
-            "\"glasser360\""
-        );
+        assert_eq!(serde_json::to_string(&parsed).unwrap(), "\"glasser360\"");
     }
 
     #[test]
@@ -757,7 +836,10 @@ mod tests {
         let json = serde_json::to_value(surrogate()).unwrap();
         let mut object = json.as_object().unwrap().clone();
         object.insert("unreviewed_field".into(), serde_json::json!(true));
-        assert!(serde_json::from_value::<NeuralEvidenceProvenance>(object.into()).is_err());
+        assert!(
+            serde_json::from_value::<NeuralEvidenceProvenance>(serde_json::Value::Object(object))
+                .is_err()
+        );
     }
 
     #[test]
