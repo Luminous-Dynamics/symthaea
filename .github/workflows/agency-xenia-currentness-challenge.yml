@@ -42,64 +42,66 @@ jobs:
       - name: Let Cargo produce the exact candidate lock
         run: cargo metadata --format-version 1 >/dev/null
 
-      - name: Permit only the reviewed getrandom package-node delta
+      - name: Permit inherited local workspace reconciliation plus reviewed getrandom edge
         run: |
           python3 - <<'PY'
           import os, pathlib, sys, tomllib
 
-          before_path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'Cargo.lock.before'
-          after_path = pathlib.Path('Cargo.lock')
-          before = tomllib.loads(before_path.read_text())
-          after = tomllib.loads(after_path.read_text())
-
-          if before == after:
-              print('Cargo.lock already fresh')
-              raise SystemExit(0)
-
+          before = tomllib.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'Cargo.lock.before').read_text())
+          after = tomllib.loads(pathlib.Path('Cargo.lock').read_text())
           key = lambda p: (p['name'], p['version'], p.get('source'))
           b = {key(p): p for p in before.get('package', [])}
           a = {key(p): p for p in after.get('package', [])}
 
-          if set(b) != set(a):
-              print('package-set change is forbidden')
-              print('removed:', sorted(set(b) - set(a), key=repr))
-              print('added:', sorted(set(a) - set(b), key=repr))
+          removed = set(b) - set(a)
+          added = set(a) - set(b)
+          sourced_added = {k for k in added if k[2] is not None}
+          if removed or sourced_added:
+              print('forbidden Cargo.lock package-set change')
+              print('removed:', sorted(removed, key=repr))
+              print('new sourced:', sorted(sourced_added, key=repr))
               sys.exit(1)
 
           target_keys = [k for k in b if k[0] == 'symthaea-xenia-authority']
           if len(target_keys) != 1:
-              print('expected exactly one symthaea-xenia-authority package node')
+              print('expected exactly one existing symthaea-xenia-authority package node')
               print('found:', target_keys)
               sys.exit(1)
           target = target_keys[0]
 
-          for k in b:
-              if k != target and b[k] != a[k]:
-                  print('unrelated existing package changed:', k)
+          changed = {k for k in b.keys() & a if b[k] != a[k]}
+          unexpected_changed = changed - {target}
+          if unexpected_changed:
+              print('unrelated existing package changed:', sorted(unexpected_changed, key=repr))
+              sys.exit(1)
+
+          if target in changed:
+              old = dict(b[target])
+              new = dict(a[target])
+              old_deps = set(old.pop('dependencies', []))
+              new_deps = set(new.pop('dependencies', []))
+              if old != new:
+                  print('symthaea-xenia-authority metadata changed beyond dependencies')
                   sys.exit(1)
+              if not old_deps <= new_deps:
+                  print('existing symthaea-xenia-authority dependency removed')
+                  print('removed:', sorted(old_deps - new_deps))
+                  sys.exit(1)
+              new_refs = new_deps - old_deps
+              if len(new_refs) != 1:
+                  print('expected exactly one new xenia-authority dependency:', sorted(new_refs))
+                  sys.exit(1)
+              dep = next(iter(new_refs))
+              parts = dep.split()
+              if parts[0] != 'getrandom' or (len(parts) > 1 and not parts[1].startswith('0.2.')):
+                  print('only the reviewed getrandom 0.2.x edge is allowed; got:', dep)
+                  sys.exit(1)
+              print('accepted existing-node delta:', dep)
 
-          before_target = dict(b[target])
-          after_target = dict(a[target])
-          before_deps = set(before_target.pop('dependencies', []))
-          after_deps = set(after_target.pop('dependencies', []))
-          if before_target != after_target:
-              print('symthaea-xenia-authority metadata changed beyond dependencies')
-              sys.exit(1)
-          if not before_deps <= after_deps:
-              print('existing symthaea-xenia-authority dependency removed')
-              print('removed:', sorted(before_deps - after_deps))
-              sys.exit(1)
-
-          added = after_deps - before_deps
-          if len(added) != 1:
-              print('expected exactly one new direct dependency, got:', sorted(added))
-              sys.exit(1)
-          dep = next(iter(added))
-          if dep != 'getrandom' and not dep.startswith('getrandom '):
-              print('only getrandom may be added to symthaea-xenia-authority; got:', dep)
-              sys.exit(1)
-
-          print('accepted Cargo-produced package-node delta:', dep)
+          local_added = sorted((k for k in added if k[2] is None), key=repr)
+          print('accepted inherited source-less workspace/path nodes:', len(local_added))
+          for item in local_added:
+              print(' +', item)
           PY
 
       - name: Record lock freshness
