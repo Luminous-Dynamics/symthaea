@@ -42,7 +42,7 @@ jobs:
       - name: Let Cargo produce the exact candidate lock
         run: cargo metadata --format-version 1 >/dev/null
 
-      - name: Permit inherited local workspace reconciliation plus reviewed getrandom edge
+      - name: Validate Cargo-owned local reconciliation and Xenia after-state
         run: |
           python3 - <<'PY'
           import os, pathlib, sys, tomllib
@@ -50,6 +50,8 @@ jobs:
           before = tomllib.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'Cargo.lock.before').read_text())
           after = tomllib.loads(pathlib.Path('Cargo.lock').read_text())
           key = lambda p: (p['name'], p['version'], p.get('source'))
+          dep_name = lambda d: d.split()[0]
+          dep_version = lambda d: (d.split()[1] if len(d.split()) > 1 and d.split()[1][0].isdigit() else None)
           b = {key(p): p for p in before.get('package', [])}
           a = {key(p): p for p in after.get('package', [])}
 
@@ -62,44 +64,66 @@ jobs:
               print('new sourced:', sorted(sourced_added, key=repr))
               sys.exit(1)
 
-          target_keys = [k for k in b if k[0] == 'symthaea-xenia-authority']
-          if len(target_keys) != 1:
-              print('expected exactly one existing symthaea-xenia-authority package node')
-              print('found:', target_keys)
+          before_xenia = [k for k in b if k[0] == 'symthaea-xenia-authority']
+          after_xenia = [k for k in a if k[0] == 'symthaea-xenia-authority']
+          if len(before_xenia) > 1 or len(after_xenia) != 1:
+              print('unexpected symthaea-xenia-authority node cardinality')
+              print('before:', before_xenia)
+              print('after:', after_xenia)
               sys.exit(1)
-          target = target_keys[0]
+          xenia_key = after_xenia[0]
+          if xenia_key[2] is not None:
+              print('symthaea-xenia-authority must be a source-less workspace node')
+              sys.exit(1)
 
           changed = {k for k in b.keys() & a if b[k] != a[k]}
-          unexpected_changed = changed - {target}
+          allowed_changed = set(before_xenia)
+          unexpected_changed = changed - allowed_changed
           if unexpected_changed:
               print('unrelated existing package changed:', sorted(unexpected_changed, key=repr))
               sys.exit(1)
 
-          if target in changed:
-              old = dict(b[target])
-              new = dict(a[target])
+          if before_xenia and before_xenia[0] in changed:
+              old = dict(b[before_xenia[0]])
+              new = dict(a[xenia_key])
               old_deps = set(old.pop('dependencies', []))
               new_deps = set(new.pop('dependencies', []))
-              if old != new:
-                  print('symthaea-xenia-authority metadata changed beyond dependencies')
+              if old != new or old_deps - new_deps:
+                  print('existing xenia-authority metadata changed or dependency was removed')
                   sys.exit(1)
-              if not old_deps <= new_deps:
-                  print('existing symthaea-xenia-authority dependency removed')
-                  print('removed:', sorted(old_deps - new_deps))
+              added_names = {dep_name(d) for d in new_deps - old_deps}
+              if added_names != {'getrandom'}:
+                  print('existing xenia-authority may add only getrandom:', sorted(new_deps - old_deps))
                   sys.exit(1)
-              new_refs = new_deps - old_deps
-              if len(new_refs) != 1:
-                  print('expected exactly one new xenia-authority dependency:', sorted(new_refs))
-                  sys.exit(1)
-              dep = next(iter(new_refs))
-              parts = dep.split()
-              if parts[0] != 'getrandom' or (len(parts) > 1 and not parts[1].startswith('0.2.')):
-                  print('only the reviewed getrandom 0.2.x edge is allowed; got:', dep)
-                  sys.exit(1)
-              print('accepted existing-node delta:', dep)
+
+          xenia = a[xenia_key]
+          expected_names = {
+              'blake3',
+              'ed25519-dalek',
+              'getrandom',
+              'serde',
+              'thiserror',
+              'symthaea-action-checkpoint',
+              'symthaea-authority',
+              'symthaea-authority-state',
+              'symthaea-authority-time',
+              'symthaea-executor-workload',
+          }
+          actual_names = {dep_name(d) for d in xenia.get('dependencies', [])}
+          if actual_names != expected_names:
+              print('unexpected symthaea-xenia-authority dependency set:', sorted(actual_names))
+              sys.exit(1)
+          getrandom_refs = [d for d in xenia.get('dependencies', []) if dep_name(d) == 'getrandom']
+          if len(getrandom_refs) != 1:
+              print('expected exactly one getrandom dependency reference:', getrandom_refs)
+              sys.exit(1)
+          version = dep_version(getrandom_refs[0])
+          if version is not None and not version.startswith('0.2.'):
+              print('xenia-authority must use reviewed getrandom 0.2.x:', getrandom_refs[0])
+              sys.exit(1)
 
           local_added = sorted((k for k in added if k[2] is None), key=repr)
-          print('accepted inherited source-less workspace/path nodes:', len(local_added))
+          print('accepted source-less workspace/path nodes:', len(local_added))
           for item in local_added:
               print(' +', item)
           PY
