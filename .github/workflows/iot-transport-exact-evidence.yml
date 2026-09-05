@@ -1,0 +1,121 @@
+name: IoT Transport Exact Evidence
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-transport-exact-evidence/**'
+      - '.github/workflows/iot-transport-exact-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Source contract
+        shell: python
+        run: |
+          from pathlib import Path
+          src = Path('crates/bridges/symthaea-iot-transport-exact-evidence/src/lib.rs').read_text()
+          prod = src.split('#[cfg(test)]', 1)[0]
+          required = [
+              'pub struct ExactXeniaTransportEvidence',
+              'raw_receipt: Vec<u8>',
+              'raw_payload: Vec<u8>',
+              'bind_exact_xenia_transport_evidence(',
+              'transport: VerifiedTransportEnvelope',
+              'canonical_receipt_bytes',
+              'canonical_payload_bytes',
+              'signing_digest()',
+              'transport.receipt_digest()',
+              'transport.payload_digest()',
+              'transport.envelope_digest()',
+              'transport.peer_identity_fingerprint()',
+              'transport.session_evidence_digest()',
+              'transport.opened_at_unix_ms()',
+              'transport.trust_head()',
+          ]
+          missing = [item for item in required if item not in prod]
+          if missing:
+              raise SystemExit(f'missing required exact-evidence contract: {missing}')
+          forbidden = [
+              'transport: &VerifiedTransportEnvelope',
+              'HybridReceiptSignatureVerifier',
+              'verify_xenia_transport_receipt(',
+              'TransportTrustRegistry',
+              'SystemTime',
+              'FinalActuatorPermit',
+              'Jit',
+              'JIT',
+              'Hal',
+              'HAL',
+              'TcpStream',
+              'std::process',
+              'Command::new',
+              'unsafe {',
+          ]
+          found = [item for item in forbidden if item in prod]
+          if found:
+              raise SystemExit(f'forbidden authority/crypto/borrowed-proof surface in provenance capsule: {found}')
+          header = prod.split('pub struct ExactXeniaTransportEvidence', 1)[0].rsplit('#[derive(', 1)[-1]
+          if 'Clone' in header or 'Serialize' in header or 'Deserialize' in header:
+              raise SystemExit('exact-evidence capsule must remain non-clone/non-serializable')
+
+      - name: Install Rust 1.96 for formatting
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Rustfmt
+        run: cargo +1.96.0 fmt --check -p symthaea-iot-transport-exact-evidence
+
+      - name: Install Rust 1.94 qualification toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: clippy
+
+      - name: Preserve checked-in lock
+        run: cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Reconcile candidate lock and check package
+        run: cargo +1.94.0 check -p symthaea-iot-transport-exact-evidence
+
+      - name: Reject new sourced dependency families
+        shell: python
+        run: |
+          import tomllib
+          def sourced(path):
+              with open(path, 'rb') as f:
+                  doc = tomllib.load(f)
+              return {
+                  (p['name'], p['version'], p.get('source'))
+                  for p in doc.get('package', [])
+                  if p.get('source') is not None
+              }
+          before = sourced('/tmp/Cargo.lock.before')
+          after = sourced('Cargo.lock')
+          extra = after - before
+          extra = {
+              item for item in extra
+              if not (item[0] == 'fips204' and item[1] == '0.4.6')
+          }
+          if extra:
+              raise SystemExit(f'unreviewed sourced package drift: {sorted(extra)}')
+
+      - name: Exact-byte ownership regression first
+        run: cargo +1.94.0 test --locked -p symthaea-iot-transport-exact-evidence tests::exact_evidence_token_owns_original_canonical_bytes -- --exact
+
+      - name: Package tests
+        run: cargo +1.94.0 test --locked -p symthaea-iot-transport-exact-evidence
+
+      - name: Strict Clippy
+        run: cargo +1.94.0 clippy --locked -p symthaea-iot-transport-exact-evidence --all-targets -- -D warnings
+
+      - name: Checked-in lock must already be fresh
+        run: git diff --exit-code -- Cargo.lock
