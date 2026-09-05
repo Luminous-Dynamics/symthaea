@@ -119,7 +119,7 @@ A trusted-time fact for another challenge cannot be substituted.
 
 `verify_xenia_witness_frontier_v1` remains public for compatibility and protocol-level testing.
 
-Its documentation now explicitly states that callers using it directly own the fresh/one-use challenge invariant.
+Its documentation explicitly states that callers using it directly own the fresh/one-use challenge invariant.
 
 New production integrations should prefer:
 
@@ -158,24 +158,48 @@ VerifiedXeniaWitnessFrontierV1
 
 No test relies on two random outputs being different; deterministic correctness does not depend on a probabilistic assertion.
 
-## Cargo.lock discipline
+## Cargo.lock diagnostic model
 
-`getrandom` is already pinned as a workspace dependency, so this PR introduces no new dependency family.
+`getrandom` is already pinned as a workspace dependency, so this PR introduces no new registry dependency family.
 
-Adding it as a direct dependency of `symthaea-xenia-authority` changes that existing package node in `Cargo.lock`.
+Static inspection later established that the checked-in `Cargo.lock` predates several recent source-less Agency workspace packages. On the current baseline even the local `symthaea-xenia-authority` package node may be absent from the checked-in lock.
 
-The dedicated workflow therefore:
+The dedicated workflow therefore validates Cargo's **after-state** rather than assuming that package node already exists.
 
-1. preserves the checked-in lock;
-2. lets Cargo generate the candidate;
-3. allows no package-set change;
-4. allows no unrelated existing package change;
-5. permits only the exact direct `getrandom` addition to the `symthaea-xenia-authority` package node;
-6. runs Rustfmt/tests/Clippy against the Cargo-produced candidate;
-7. archives the exact lock diff;
-8. fails the final qualification gate until checked-in `Cargo.lock` is byte-fresh.
+Cargo is allowed to materialize committed source-less workspace/path package nodes for diagnostic compilation. The workflow rejects:
 
-The lockfile must be updated from Cargo-produced evidence, never hand-edited to obtain a green result.
+- any package removal;
+- any new registry/Git package;
+- any mutation of an unrelated existing package;
+- a sourced/non-workspace `symthaea-xenia-authority` node;
+- an unexpected Xenia-authority dependency surface;
+- a `getrandom` reference outside the reviewed 0.2 line;
+- removal of dependencies from an already-present Xenia-authority node.
+
+The resulting Xenia-authority package node must match the exact reviewed direct dependency names from its `Cargo.toml`:
+
+```text
+blake3
+ed25519-dalek
+getrandom
+serde
+thiserror
+symthaea-action-checkpoint
+symthaea-authority
+symthaea-authority-state
+symthaea-authority-time
+symthaea-executor-workload
+```
+
+Rustfmt/tests/Clippy run against Cargo's exact candidate. This lets inherited local lock debt remain visible without letting it hide source/compiler failures.
+
+The release qualification rule remains stricter:
+
+```text
+checked-in Cargo.lock == Cargo-generated candidate
+```
+
+If the candidate differs, a compiler-clean run is diagnostic evidence only. The lockfile must eventually be updated from Cargo-produced evidence, never hand-edited to obtain a green result.
 
 ## Authority boundary
 
@@ -199,7 +223,6 @@ V0.1 does not provide:
 - durable pending-challenge recovery across process restart;
 - a global replay cache for callers bypassing the typed API;
 - remote proof that the local OS entropy implementation is healthy;
-- execution authority of any kind;
-- the #465 → #452 transport-neutral frontier translation.
+- execution authority of any kind.
 
-The next architectural step should still wait for compiler feedback. After this child and #465 are compiler-qualified with a fresh Cargo lock, the small evidence-only #452 translation becomes the appropriate next integration boundary.
+The transport-neutral recovery adapter is isolated in child #469, and the guarded provenance-preserving composition is isolated in child #473. This PR remains limited to fresh affine currentness semantics.
