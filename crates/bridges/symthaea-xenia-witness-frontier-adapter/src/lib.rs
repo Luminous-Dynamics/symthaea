@@ -15,6 +15,7 @@
 
 #![deny(unsafe_code)]
 
+use symthaea_authority::Digest32;
 use symthaea_qualification_witness_frontier::{
     EXTERNAL_ANCHOR_SCHEMA_VERSION, ExternalAnchorVerificationError,
     ExternalWitnessFrontierClaimV1, ExternalWitnessFrontierVerifier, FrontierRecoveryError,
@@ -79,9 +80,9 @@ struct XeniaFrontierSnapshotV1 {
     source_sequence: u64,
     witness_id: [u8; 16],
     high_watermark: u64,
-    reservation_head: symthaea_authority::Digest32,
-    frontier_statement_digest: symthaea_authority::Digest32,
-    freshness_evidence_digest: symthaea_authority::Digest32,
+    reservation_head: Digest32,
+    frontier_statement_digest: Digest32,
+    freshness_evidence_digest: Digest32,
 }
 
 impl XeniaFrontierSnapshotV1 {
@@ -153,28 +154,48 @@ pub enum XeniaFrontierAdapterError {
 
 #[cfg(test)]
 mod tests {
-    use symthaea_authority::Digest32;
     use symthaea_qualification_witness_frontier::{
         FrontierRecoveryError, verify_external_witness_frontier_v1,
     };
+    use symthaea_xenia_authority::witness_frontier_statement_digest;
 
     use super::*;
 
     fn snapshot() -> XeniaFrontierSnapshotV1 {
+        let witness_id = [0x22; 16];
+        let high_watermark = 9;
+        let reservation_head = Digest32([0x33; 32]);
         XeniaFrontierSnapshotV1 {
             source_id: [0x11; 16],
             source_epoch: 3,
             source_sequence: 7,
-            witness_id: [0x22; 16],
-            high_watermark: 9,
-            reservation_head: Digest32([0x33; 32]),
-            frontier_statement_digest: Digest32(
-                // Frozen from the shared V1 sequence-frontier transcript for
-                // witness=[0x22;16], sequence=9, head=[0x33;32].
-                [0x44; 32],
-            ),
+            witness_id,
+            high_watermark,
+            reservation_head,
+            frontier_statement_digest: Digest32(witness_frontier_statement_digest(
+                witness_id,
+                high_watermark,
+                reservation_head.0,
+            )),
             freshness_evidence_digest: Digest32([0x55; 32]),
         }
+    }
+
+    #[test]
+    fn exact_projection_passes_generic_structural_and_currentness_checks() {
+        let expected = snapshot();
+        let verifier = ExactVerifiedXeniaSource { expected };
+        let external = verify_external_witness_frontier_v1(expected.claim(), &verifier).unwrap();
+        assert_eq!(external.source_id(), expected.source_id);
+        assert_eq!(external.source_epoch(), expected.source_epoch);
+        assert_eq!(external.source_sequence(), expected.source_sequence);
+        assert_eq!(external.point().witness_id, expected.witness_id);
+        assert_eq!(external.point().high_watermark, expected.high_watermark);
+        assert_eq!(external.point().reservation_head, expected.reservation_head);
+        assert_eq!(
+            external.freshness_evidence_digest(),
+            expected.freshness_evidence_digest
+        );
     }
 
     #[test]
