@@ -8,5 +8,6 @@ publish = false
 
 [dependencies]
 thiserror = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
 symthaea-xenia-authority = { path = "../symthaea-xenia-authority" }
 symthaea-qualification-witness-frontier = { path = "../symthaea-qualification-witness-frontier" }
