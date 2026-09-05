@@ -9,6 +9,7 @@ publish = false
 [dependencies]
 blake3 = { workspace = true }
 ed25519-dalek = { workspace = true }
+getrandom = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 symthaea-authority = { path = "../../core/symthaea-authority" }
