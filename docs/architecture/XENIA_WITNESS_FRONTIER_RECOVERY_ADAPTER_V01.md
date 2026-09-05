@@ -96,6 +96,8 @@ VerifiedExternalWitnessFrontierV1
 #456 guarded publication / re-anchor decision
 ```
 
+The concrete provenance-retaining guarded composition is isolated in child #473.
+
 ## Failure direction
 
 If the Xenia proof cannot be represented as a structurally valid #452 claim, adaptation fails. There is no fallback to a caller-built claim and no "best effort" field dropping.
@@ -104,31 +106,54 @@ If a field is substituted between projection and generic verification, the priva
 
 Failure therefore loses availability rather than weakening chronology evidence.
 
-## Cargo.lock discipline
+## Cargo.lock diagnostic model
 
-The adapter introduces no registry dependency family. It creates one new source-less workspace package node with direct dependencies on:
+The adapter introduces no registry dependency family. Its own source-less workspace node depends exactly on:
 
-- `symthaea-authority`;
-- `symthaea-xenia-authority`;
-- `symthaea-qualification-witness-frontier`;
-- `thiserror`.
+```text
+symthaea-authority
+symthaea-xenia-authority
+symthaea-qualification-witness-frontier
+thiserror
+```
 
-Its parent #467 also adds the already-workspace-pinned `getrandom 0.2` direct edge to `symthaea-xenia-authority` without hand-editing `Cargo.lock`.
+Static inspection established that the checked-in `Cargo.lock` predates several recent source-less Agency workspace packages, including `symthaea-xenia-authority` itself. The dedicated workflow therefore validates Cargo's **after-state** rather than assuming those nodes already exist.
 
-The dedicated workflow allows Cargo to produce a diagnostic candidate only when the candidate contains exactly those reviewed changes. It still fails the final qualification gate until the checked-in lock is byte-identical to Cargo's output.
+For diagnostic compilation Cargo may materialize committed source-less workspace/path nodes. It still rejects:
+
+- any package removal;
+- any new registry/Git package;
+- any mutation of an unrelated existing package;
+- an unexpected/sourced `symthaea-xenia-authority` after-state;
+- `getrandom` outside the reviewed 0.2 line;
+- an unexpected adapter package dependency surface.
+
+The resulting Xenia-authority node must match its exact reviewed manifest dependency names. If it already existed in the checked-in lock, its only permitted dependency addition is the reviewed `getrandom` edge; existing dependencies may not be removed.
+
+The resulting adapter node must be source-less and have exactly the four dependency names listed above.
+
+Rustfmt/tests/Clippy run against Cargo's exact candidate so inherited local lock debt does not hide source/compiler errors.
+
+The final qualification rule remains:
+
+```text
+checked-in Cargo.lock == Cargo-generated candidate
+```
+
+A compiler-clean run against a stale checked-in lock is diagnostic evidence only, never qualification. The eventual lock update must come from Cargo-produced evidence rather than hand editing.
 
 ## Next boundary
 
-After this bridge and its parents compile/qualify, the next useful composition is not another verifier. It is the concrete guarded recovery flow:
+Child #473 composes:
 
 ```text
-XeniaExternalWitnessFrontierV1::external()
+XeniaExternalWitnessFrontierV1
         +
 #456 guarded audited local history
         ↓
 #452 recovery relation
         ↓
-PublishAllowed / AnchorRequired / Contained
+provenance-retaining guarded publication / re-anchor permit
 ```
 
-That composition must continue to treat chronology evidence as distinct from execution authority.
+That composition continues to treat chronology evidence as distinct from execution authority.
