@@ -1,0 +1,31 @@
+[package]
+name = "symthaea-iot-transport-current-revalidation"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "One-shot current-trust revalidation for exact Xenia IoT transport evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "security", "xenia", "revalidation"]
+categories = ["embedded"]
+
+[dependencies]
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-device-protocol = { path = "../symthaea-iot-device-protocol" }
+symthaea-iot-transport-exact-evidence = { path = "../symthaea-iot-transport-exact-evidence" }
+symthaea-iot-transport-receipt = { path = "../symthaea-iot-transport-receipt" }
+symthaea-iot-xenia-hybrid-verifier = { path = "../symthaea-iot-xenia-hybrid-verifier" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+bincode = { workspace = true }
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+fips204 = { version = "=0.4.6", default-features = false, features = ["ml-dsa-65"] }
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-iot-authority = { path = "../symthaea-iot-authority" }
+symthaea-iot-durable-runtime = { path = "../symthaea-iot-durable-runtime" }
+symthaea-iot-policy = { path = "../symthaea-iot-policy" }
+symthaea-iot-posture = { path = "../symthaea-iot-posture" }
