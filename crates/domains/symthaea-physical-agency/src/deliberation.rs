@@ -7,14 +7,62 @@
 //! [`SelectedCandidate`] can only be minted by evaluating a portfolio and then
 //! selecting an id that actually survived onto its Pareto frontier.
 //!
+//! PA-08 additionally binds deliberation to an immutable world-state snapshot
+//! reference. The target frame in the desired transition must match the frame
+//! identified by that snapshot before a frontier receipt can be minted.
+//!
 //! The receipt grants no execution authority. It exists solely to keep
-//! deliberation lineage from being replaced by a caller-assembled proposal at
-//! the later simulation-qualification boundary.
+//! deliberation lineage from being replaced by caller-assembled proposal or
+//! world-state data at the later simulation-qualification boundary.
 
 use crate::portfolio::{
     CandidateAssessment, CandidatePortfolio, PortfolioError, PortfolioOutcome, PortfolioPolicy,
 };
+use serde::{Deserialize, Serialize};
 use symthaea_physical_effects::{AbstentionReason, DesiredTransition};
+use thiserror::Error;
+
+/// Immutable reference to the world/digital-twin state used for deliberation.
+///
+/// The digest algorithm is intentionally not prescribed here. The producing
+/// world-model layer owns that contract; Physical Agency only requires a
+/// non-empty stable digest and exact frame identity.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct WorldSnapshotRef {
+    frame_id: String,
+    snapshot_digest: String,
+}
+
+impl WorldSnapshotRef {
+    pub fn new(frame_id: impl Into<String>, snapshot_digest: impl Into<String>) -> Self {
+        Self {
+            frame_id: frame_id.into(),
+            snapshot_digest: snapshot_digest.into(),
+        }
+    }
+
+    pub fn frame_id(&self) -> &str {
+        &self.frame_id
+    }
+
+    pub fn snapshot_digest(&self) -> &str {
+        &self.snapshot_digest
+    }
+
+    pub fn validate(&self) -> Result<(), DeliberationError> {
+        if self.frame_id.trim().is_empty() {
+            return Err(DeliberationError::EmptySnapshotField(
+                "world_snapshot.frame_id",
+            ));
+        }
+        if self.snapshot_digest.trim().is_empty() {
+            return Err(DeliberationError::EmptySnapshotField(
+                "world_snapshot.snapshot_digest",
+            ));
+        }
+        Ok(())
+    }
+}
 
 /// Pareto frontier produced by an actual portfolio evaluation.
 ///
@@ -22,6 +70,7 @@ use symthaea_physical_effects::{AbstentionReason, DesiredTransition};
 #[derive(Debug, Clone, PartialEq)]
 pub struct DeliberatedFrontier {
     transition: DesiredTransition,
+    world_snapshot: WorldSnapshotRef,
     policy: PortfolioPolicy,
     candidates: Vec<CandidateAssessment>,
 }
@@ -29,6 +78,10 @@ pub struct DeliberatedFrontier {
 impl DeliberatedFrontier {
     pub fn transition(&self) -> &DesiredTransition {
         &self.transition
+    }
+
+    pub fn world_snapshot(&self) -> &WorldSnapshotRef {
+        &self.world_snapshot
     }
 
     pub fn policy(&self) -> PortfolioPolicy {
@@ -50,6 +103,7 @@ impl DeliberatedFrontier {
             .cloned()
             .map(|assessment| SelectedCandidate {
                 transition: self.transition.clone(),
+                world_snapshot: self.world_snapshot.clone(),
                 policy: self.policy,
                 assessment,
             })
@@ -57,10 +111,11 @@ impl DeliberatedFrontier {
 }
 
 /// Non-serializable receipt that a candidate came from a specific evaluated
-/// transition/policy frontier.
+/// transition/policy/world-snapshot frontier.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectedCandidate {
     transition: DesiredTransition,
+    world_snapshot: WorldSnapshotRef,
     policy: PortfolioPolicy,
     assessment: CandidateAssessment,
 }
@@ -68,6 +123,10 @@ pub struct SelectedCandidate {
 impl SelectedCandidate {
     pub fn transition(&self) -> &DesiredTransition {
         &self.transition
+    }
+
+    pub fn world_snapshot(&self) -> &WorldSnapshotRef {
+        &self.world_snapshot
     }
 
     pub fn policy(&self) -> PortfolioPolicy {
@@ -86,22 +145,50 @@ pub enum DeliberationOutcome {
     Abstain(AbstentionReason),
 }
 
-/// Evaluate an ordinary portfolio and convert a surviving frontier into a
-/// non-serializable runtime receipt.
+/// Evaluate an ordinary portfolio against one immutable world snapshot and
+/// convert a surviving frontier into a non-serializable runtime receipt.
 pub fn deliberate(
     portfolio: &CandidatePortfolio,
+    world_snapshot: &WorldSnapshotRef,
     policy: PortfolioPolicy,
-) -> Result<DeliberationOutcome, PortfolioError> {
-    match portfolio.evaluate(policy)? {
+) -> Result<DeliberationOutcome, DeliberationError> {
+    world_snapshot.validate()?;
+    if portfolio.transition.target.frame_id != world_snapshot.frame_id {
+        return Err(DeliberationError::SnapshotFrameMismatch {
+            target_frame: portfolio.transition.target.frame_id.clone(),
+            snapshot_frame: world_snapshot.frame_id.clone(),
+        });
+    }
+
+    match portfolio
+        .evaluate(policy)
+        .map_err(DeliberationError::Portfolio)?
+    {
         PortfolioOutcome::ParetoFrontier(candidates) => {
             Ok(DeliberationOutcome::ParetoFrontier(DeliberatedFrontier {
                 transition: portfolio.transition.clone(),
+                world_snapshot: world_snapshot.clone(),
                 policy,
                 candidates,
             }))
         }
         PortfolioOutcome::Abstain(reason) => Ok(DeliberationOutcome::Abstain(reason)),
     }
+}
+
+#[derive(Debug, Error, Clone, PartialEq)]
+pub enum DeliberationError {
+    #[error("invalid portfolio: {0}")]
+    Portfolio(PortfolioError),
+    #[error("required world-snapshot field is empty: {0}")]
+    EmptySnapshotField(&'static str),
+    #[error(
+        "target frame {target_frame:?} does not match world snapshot frame {snapshot_frame:?}"
+    )]
+    SnapshotFrameMismatch {
+        target_frame: String,
+        snapshot_frame: String,
+    },
 }
 
 #[cfg(test)]
@@ -160,14 +247,38 @@ mod tests {
         }
     }
 
+    fn snapshot() -> WorldSnapshotRef {
+        WorldSnapshotRef::new("world", "snapshot-digest-001")
+    }
+
     #[test]
     fn only_frontier_member_can_mint_selection_receipt() {
-        let frontier = match deliberate(&portfolio(), PortfolioPolicy::default()).unwrap() {
+        let frontier = match deliberate(&portfolio(), &snapshot(), PortfolioPolicy::default()).unwrap()
+        {
             DeliberationOutcome::ParetoFrontier(frontier) => frontier,
             other => panic!("expected frontier, got {other:?}"),
         };
 
+        assert_eq!(frontier.world_snapshot(), &snapshot());
         assert!(frontier.select("acoustic").is_some());
         assert!(frontier.select("not-on-frontier").is_none());
+    }
+
+    #[test]
+    fn mismatched_world_snapshot_frame_fails_closed() {
+        let wrong = WorldSnapshotRef::new("another-world", "snapshot-digest-002");
+        assert!(matches!(
+            deliberate(&portfolio(), &wrong, PortfolioPolicy::default()),
+            Err(DeliberationError::SnapshotFrameMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn empty_snapshot_digest_is_rejected() {
+        let empty = WorldSnapshotRef::new("world", "");
+        assert!(matches!(
+            deliberate(&portfolio(), &empty, PortfolioPolicy::default()),
+            Err(DeliberationError::EmptySnapshotField(_))
+        ));
     }
 }
