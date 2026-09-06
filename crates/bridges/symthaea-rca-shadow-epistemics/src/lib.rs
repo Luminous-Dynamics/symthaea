@@ -43,14 +43,16 @@ pub const RUNTIME_RELEVANCE_CONTRACT_V1: &str = concat!(
     "execution_identity=exact_digest_equality\n",
     "adapter_profile=exact_string_equality\n",
     "adapter_contract=exact_digest_equality\n",
+    "cycle_comparison_requires_exact_execution_lineage\n",
     "cycle_rule=observed_cycle_must_not_exceed_current_cycle\n",
     "lag_rule=current_cycle-observed_cycle<=explicit_max_cycle_lag\n",
-    "all_detected_defects_are_preserved\n",
+    "all_semantically_valid_detected_defects_are_preserved\n",
     "historical_truth_is_not_current_runtime_relevance\n",
     "relevance_is_not_evidence_admission_or_proposition_support\n",
     "relevance_is_not_workspace_action_or_self_improvement_authority\n",
 );
 
+const PROFILE_DOMAIN: &[u8] = b"symthaea:rca-current-runtime-relevance-contract:v1\0";
 const CONTEXT_DOMAIN: &[u8] = b"symthaea:rca-current-runtime-relevance-context:v1\0";
 
 /// Explicit use context against which one runtime observation is evaluated.
@@ -124,7 +126,8 @@ impl<'de> Deserialize<'de> for ValidatedCurrentRuntimeRelevanceContextV1 {
 /// Every reason a candidate fails to describe the requested current execution.
 ///
 /// The assessment preserves all independent defects it can determine rather
-/// than stopping at the first mismatch.
+/// than stopping at the first mismatch. Cycle-age defects are meaningful only
+/// when the execution lineage itself matches.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum RuntimeRelevanceDefectV1 {
@@ -160,6 +163,7 @@ pub enum RuntimeRelevanceDefectV1 {
 pub struct RuntimeRelevanceAssessmentV1 {
     pub schema_version: u16,
     pub profile: String,
+    pub profile_contract_digest: String,
     pub candidate_id: String,
     pub context_commitment: String,
     pub observed_cycle_index: u64,
@@ -172,10 +176,25 @@ impl RuntimeRelevanceAssessmentV1 {
         self.defects.is_empty()
     }
 
+    /// Cycle lag exists only when both cycles belong to the same execution
+    /// lineage and the observation is not from the future.
     pub fn cycle_lag(&self) -> Option<u64> {
+        if self.defects.iter().any(|defect| {
+            matches!(
+                defect,
+                RuntimeRelevanceDefectV1::ExecutionLineageMismatch { .. }
+                    | RuntimeRelevanceDefectV1::FutureObservation { .. }
+            )
+        }) {
+            return None;
+        }
         self.current_cycle_index
             .checked_sub(self.observed_cycle_index)
     }
+}
+
+pub fn runtime_relevance_profile_digest_v1() -> String {
+    domain_hash(PROFILE_DOMAIN, RUNTIME_RELEVANCE_CONTRACT_V1.as_bytes())
 }
 
 /// Pure shadow-only assessment of whether a candidate can describe the current
@@ -197,12 +216,16 @@ pub fn assess_current_runtime_relevance(
             current: current.source_generation_digest.clone(),
         });
     }
-    if observed.execution_lineage_digest != current.execution_lineage_digest {
+
+    let same_execution_lineage =
+        observed.execution_lineage_digest == current.execution_lineage_digest;
+    if !same_execution_lineage {
         defects.push(RuntimeRelevanceDefectV1::ExecutionLineageMismatch {
             observed: observed.execution_lineage_digest.clone(),
             current: current.execution_lineage_digest.clone(),
         });
     }
+
     if observed.adapter_profile != current.adapter_profile {
         defects.push(RuntimeRelevanceDefectV1::AdapterProfileMismatch {
             observed: observed.adapter_profile.clone(),
@@ -216,23 +239,28 @@ pub fn assess_current_runtime_relevance(
         });
     }
 
-    match current.current_cycle_index.checked_sub(observed.cycle_index) {
-        None => defects.push(RuntimeRelevanceDefectV1::FutureObservation {
-            observed_cycle: observed.cycle_index,
-            current_cycle: current.current_cycle_index,
-        }),
-        Some(lag) if lag > current.max_cycle_lag => {
-            defects.push(RuntimeRelevanceDefectV1::StaleByCycleLag {
-                lag,
-                max_cycle_lag: current.max_cycle_lag,
-            });
+    // A cycle index is scoped to its execution lineage. Never compare cycle
+    // numbers across different lineages, even if the integers happen to match.
+    if same_execution_lineage {
+        match current.current_cycle_index.checked_sub(observed.cycle_index) {
+            None => defects.push(RuntimeRelevanceDefectV1::FutureObservation {
+                observed_cycle: observed.cycle_index,
+                current_cycle: current.current_cycle_index,
+            }),
+            Some(lag) if lag > current.max_cycle_lag => {
+                defects.push(RuntimeRelevanceDefectV1::StaleByCycleLag {
+                    lag,
+                    max_cycle_lag: current.max_cycle_lag,
+                });
+            }
+            Some(_) => {}
         }
-        Some(_) => {}
     }
 
     RuntimeRelevanceAssessmentV1 {
         schema_version: RUNTIME_RELEVANCE_SCHEMA_VERSION,
         profile: RUNTIME_RELEVANCE_PROFILE_V1.to_string(),
+        profile_contract_digest: runtime_relevance_profile_digest_v1(),
         candidate_id: candidate.candidate_id().to_string(),
         context_commitment: context.commitment(),
         observed_cycle_index: observed.cycle_index,
@@ -244,6 +272,11 @@ pub fn assess_current_runtime_relevance(
 fn context_commitment_v1(context: &CurrentRuntimeRelevanceContextV1) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(CONTEXT_DOMAIN);
+    hash_field(
+        &mut hasher,
+        b"profile_contract_digest",
+        runtime_relevance_profile_digest_v1().as_bytes(),
+    );
     hash_field(
         &mut hasher,
         b"schema_version",
@@ -287,6 +320,14 @@ fn hash_field(hasher: &mut blake3::Hasher, label: &[u8], value: &[u8]) {
     hasher.update(label);
     hasher.update(&(value.len() as u64).to_le_bytes());
     hasher.update(value);
+}
+
+fn domain_hash(domain: &[u8], bytes: &[u8]) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(domain);
+    hasher.update(&(bytes.len() as u64).to_le_bytes());
+    hasher.update(bytes);
+    format!("blake3:{}", hasher.finalize().to_hex())
 }
 
 fn validate_digest(digest: &str) -> Result<(), RuntimeRelevanceError> {
@@ -397,6 +438,10 @@ mod tests {
         let assessment = assess_current_runtime_relevance(&candidate(40), &context(42, 2));
         assert!(assessment.is_relevant());
         assert_eq!(assessment.cycle_lag(), Some(2));
+        assert_eq!(
+            assessment.profile_contract_digest,
+            runtime_relevance_profile_digest_v1()
+        );
     }
 
     #[test]
@@ -434,6 +479,23 @@ mod tests {
             defect,
             RuntimeRelevanceDefectV1::ExecutionLineageMismatch { .. }
         )));
+        assert_eq!(assessment.cycle_lag(), None);
+    }
+
+    #[test]
+    fn different_lineage_never_compares_cycle_indices() {
+        let mut raw = context(1_000, 0).as_raw().clone();
+        raw.execution_lineage_digest = LINEAGE_B.into();
+        let assessment =
+            assess_current_runtime_relevance(&candidate(1), &raw.validate().unwrap());
+        assert_eq!(
+            assessment.defects,
+            vec![RuntimeRelevanceDefectV1::ExecutionLineageMismatch {
+                observed: LINEAGE_A.into(),
+                current: LINEAGE_B.into(),
+            }]
+        );
+        assert_eq!(assessment.cycle_lag(), None);
     }
 
     #[test]
@@ -479,7 +541,7 @@ mod tests {
     }
 
     #[test]
-    fn independent_identity_and_time_defects_are_all_preserved() {
+    fn independent_identity_defects_are_preserved_without_cross_lineage_lag_math() {
         let mut raw = context(42, 1).as_raw().clone();
         raw.source_generation_digest = SOURCE_B.into();
         raw.execution_lineage_digest = LINEAGE_B.into();
@@ -487,13 +549,26 @@ mod tests {
         raw.adapter_contract_digest = ADAPTER_B.into();
         let assessment =
             assess_current_runtime_relevance(&candidate(30), &raw.validate().unwrap());
-        assert_eq!(assessment.defects.len(), 5);
+        assert_eq!(assessment.defects.len(), 4);
+        assert!(assessment.defects.iter().all(|defect| !matches!(
+            defect,
+            RuntimeRelevanceDefectV1::StaleByCycleLag { .. }
+                | RuntimeRelevanceDefectV1::FutureObservation { .. }
+        )));
         assert!(!assessment.is_relevant());
     }
 
     #[test]
     fn context_commitment_binds_lag_policy() {
         assert_ne!(context(42, 1).commitment(), context(42, 2).commitment());
+    }
+
+    #[test]
+    fn relevance_profile_has_strict_identity() {
+        let digest = runtime_relevance_profile_digest_v1();
+        assert!(digest.starts_with("blake3:"));
+        assert_eq!(digest.len(), "blake3:".len() + 64);
+        assert_eq!(digest, runtime_relevance_profile_digest_v1());
     }
 
     #[test]
