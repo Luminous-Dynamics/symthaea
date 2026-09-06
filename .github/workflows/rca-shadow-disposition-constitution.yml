@@ -1,0 +1,135 @@
+name: RCA Shadow Disposition Constitution
+
+on:
+  pull_request:
+    paths:
+      - 'docs/architecture/RCA_SHADOW_DISPOSITION_CONSTITUTION_V1.md'
+      - '.github/workflows/rca-shadow-disposition-constitution.yml'
+      - 'crates/bridges/symthaea-rca-shadow-disposition/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Freeze disposition constitutional boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          doc=docs/architecture/RCA_SHADOW_DISPOSITION_CONSTITUTION_V1.md
+
+          test -f "$doc"
+
+          # Freeze the actual ordered non-equivalence theorem rather than merely
+          # checking that each symbol appears somewhere in the document.
+          python3 - "$doc" <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          text = Path(sys.argv[1]).read_text()
+          theorem = re.compile(
+              r"BoundShadowEvidenceCaseV1\s*\n\s*!=\s*\n"
+              r"\s*ShadowDispositionV1\s*\n\s*!=\s*\n"
+              r"\s*canonical epistemic state\s*\n\s*!=\s*\n"
+              r"\s*workspace/GWT authority\s*\n\s*!=\s*\n"
+              r"\s*action authority\s*\n\s*!=\s*\n"
+              r"\s*self-improvement promotion"
+          )
+          if not theorem.search(text):
+              raise SystemExit("RCA shadow-disposition non-equivalence theorem drifted")
+          PY
+
+          grep -q 'No canonical belief admission' "$doc"
+          grep -q 'No action authority' "$doc"
+          grep -q 'No recursive-improvement promotion authority' "$doc"
+
+          # Evidence independence and interpretation independence are distinct.
+          grep -q 'Evidence independence is not interpretation independence' "$doc"
+          grep -q 'Evidence-root independence' "$doc"
+          grep -q 'Interpretation-root independence' "$doc"
+          grep -q '5 independent evidence roots' "$doc"
+          grep -q '1 interpretation root' "$doc"
+          grep -q 'must never be counted as five independent interpretive confirmations' "$doc"
+
+          # Provenance is still not qualification.
+          grep -q 'Relation provenance is not relation qualification' "$doc"
+          grep -q 'DispositionEligibleRelationDeclarationV1' "$doc"
+          grep -q 'A declaration producer may not be the sole authority' "$doc"
+
+          # Opaque proposition ids cannot silently become universal semantics.
+          grep -q 'Opaque proposition hashes do not create universal semantics' "$doc"
+          grep -q 'must not infer proposition semantics from a digest' "$doc"
+
+          # Policy must be preregistered and strengths are not probabilities.
+          grep -q 'Disposition policy must be preregistered' "$doc"
+          grep -q 'Post-result threshold changes require a new policy identity' "$doc"
+          grep -q 'Relation strength is not probability' "$doc"
+          grep -q 'No candidate-count voting' "$doc"
+
+          # Qualified defeaters and abstention semantics.
+          grep -q 'Defeaters are qualified blockers, not truth oracles' "$doc"
+          grep -q 'An unqualified or stale `Defeats` label cannot veto the case' "$doc"
+          grep -q 'Abstention/underdetermination is a first-class success state' "$doc"
+          grep -q 'unknown != 0.5 confidence' "$doc"
+
+          # Closed first vocabulary and explicit reason trace.
+          for state in \
+            NoRelevantEvidence \
+            UnqualifiedInterpretation \
+            Underdetermined \
+            TentativelySupported \
+            Supported \
+            TentativelyOpposed \
+            Opposed \
+            Contested \
+            Defeated
+          do
+            grep -q "$state" "$doc"
+          done
+          grep -q 'Required reason trace' "$doc"
+
+          # Disposition identity must bind case, policy, qualification and
+          # interpretation lineage, and persistence does not recreate authority.
+          grep -q 'exact BoundShadowEvidenceCaseV1.case_id' "$doc"
+          grep -q 'exact preregistered policy id' "$doc"
+          grep -q 'exact declarer-qualification-set id' "$doc"
+          grep -q 'exact interpretation-lineage identity' "$doc"
+          grep -q 'no `Deserialize` implementation' "$doc"
+
+      - name: Freeze implementation order
+        shell: bash
+        run: |
+          set -euo pipefail
+          doc=docs/architecture/RCA_SHADOW_DISPOSITION_CONSTITUTION_V1.md
+          grep -q 'RCA-003b.0  Shadow Disposition Constitution' "$doc"
+          grep -q 'RCA-003b.1  Relation-declarer qualification' "$doc"
+          grep -q 'RCA-003b.2  Interpretation lineage + independence' "$doc"
+          grep -q 'RCA-003b.3  Preregistered disposition-policy type' "$doc"
+          grep -q 'RCA-003b.4  Pure shadow disposition engine' "$doc"
+          grep -q 'RCA-003b.5  Qualification benchmark / adversarial cases' "$doc"
+
+          # This tranche is constitutional only. Do not let an engine arrive in
+          # the same change that defines the rules meant to constrain it.
+          if test -e crates/bridges/symthaea-rca-shadow-disposition; then
+            echo 'RCA-003b engine appeared before its prerequisite constitution/qualification tranches.' >&2
+            exit 1
+          fi
+
+      - name: Freeze adversarial qualification targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          doc=docs/architecture/RCA_SHADOW_DISPOSITION_CONSTITUTION_V1.md
+          grep -q 'ten candidate fields from one observation still count as one evidence root' "$doc"
+          grep -q 'ten independent observations interpreted by one rule remain one interpretation root' "$doc"
+          grep -q 'unqualified `Supports` does not contribute to `Supported`' "$doc"
+          grep -q 'unqualified `Defeats` cannot veto' "$doc"
+          grep -q 'mixed qualified support/opposition becomes `Contested`' "$doc"
+          grep -q 'insufficient roots become `Underdetermined`' "$doc"
+          grep -q 'no disposition has a path into GWT, canonical belief, action, or promotion authority' "$doc"
