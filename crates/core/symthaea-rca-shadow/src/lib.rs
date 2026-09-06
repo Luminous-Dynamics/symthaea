@@ -45,10 +45,15 @@ pub struct FrozenCycleObservationV1 {
     /// Monotonic cycle number within the producing execution lineage.
     pub cycle_index: u64,
     pub cycle_time_us: u64,
-    /// Fixed-point value in [0, 1_000_000].
+    /// Prediction error is a unit-interval quantity in the live encoder, so the
+    /// shadow schema stores it as fixed-point ppm in [0, 1_000_000].
     pub prediction_error_ppm: u32,
-    /// Fixed-point value in [0, 1_000_000].
-    pub peak_attention_ppm: u32,
+    /// Exact IEEE-754 f32 bit pattern of the live peak-attention weight.
+    ///
+    /// Peak attention is not a probability: encoder attention weights may exceed
+    /// 1.0. The shadow boundary therefore preserves the exact finite,
+    /// non-negative weight instead of clamping or normalizing it.
+    pub peak_attention_bits: u32,
     pub learning_occurred: bool,
     pub detected_primitive_count: u32,
     /// Exact cycle output commitment.
@@ -112,9 +117,11 @@ impl TryFrom<FrozenCycleObservationV1> for ValidatedFrozenCycleObservationV1 {
                 found: value.prediction_error_ppm,
             });
         }
-        if value.peak_attention_ppm > COGNITIVE_PROBABILITY_SCALE {
-            return Err(ShadowObservationError::PeakAttentionOutOfRange {
-                found: value.peak_attention_ppm,
+
+        let peak_attention = f32::from_bits(value.peak_attention_bits);
+        if !peak_attention.is_finite() || peak_attention < 0.0 {
+            return Err(ShadowObservationError::InvalidPeakAttention {
+                value_bits: value.peak_attention_bits,
             });
         }
 
@@ -166,7 +173,7 @@ pub struct ShadowObservationReceiptV1 {
     pub cycle_index: u64,
     pub cycle_time_us: u64,
     pub prediction_error_ppm: u32,
-    pub peak_attention_ppm: u32,
+    pub peak_attention_bits: u32,
     pub learning_occurred: bool,
     pub detected_primitive_count: u32,
     pub has_language_output: bool,
@@ -194,7 +201,7 @@ pub fn observe(
         cycle_index: raw.cycle_index,
         cycle_time_us: raw.cycle_time_us,
         prediction_error_ppm: raw.prediction_error_ppm,
-        peak_attention_ppm: raw.peak_attention_ppm,
+        peak_attention_bits: raw.peak_attention_bits,
         learning_occurred: raw.learning_occurred,
         detected_primitive_count: raw.detected_primitive_count,
         has_language_output: raw.language_output_digest.is_some(),
@@ -207,7 +214,7 @@ pub enum ShadowObservationError {
     MalformedDigest,
     MissingAdapterProfile,
     PredictionErrorOutOfRange { found: u32 },
-    PeakAttentionOutOfRange { found: u32 },
+    InvalidPeakAttention { value_bits: u32 },
     MissingLanguageSource,
     DanglingLanguageSource,
     Serialization(serde_json::Error),
@@ -226,7 +233,9 @@ impl PartialEq for ShadowObservationError {
             (PredictionErrorOutOfRange { found: a }, PredictionErrorOutOfRange { found: b }) => {
                 a == b
             }
-            (PeakAttentionOutOfRange { found: a }, PeakAttentionOutOfRange { found: b }) => a == b,
+            (InvalidPeakAttention { value_bits: a }, InvalidPeakAttention { value_bits: b }) => {
+                a == b
+            }
             (MissingLanguageSource, MissingLanguageSource) => true,
             (DanglingLanguageSource, DanglingLanguageSource) => true,
             (Serialization(a), Serialization(b)) => a.to_string() == b.to_string(),
@@ -254,9 +263,9 @@ impl std::fmt::Display for ShadowObservationError {
                 f,
                 "prediction error {found} exceeds fixed-point scale {COGNITIVE_PROBABILITY_SCALE}"
             ),
-            Self::PeakAttentionOutOfRange { found } => write!(
+            Self::InvalidPeakAttention { value_bits } => write!(
                 f,
-                "peak attention {found} exceeds fixed-point scale {COGNITIVE_PROBABILITY_SCALE}"
+                "peak attention must be a finite non-negative f32 weight; found bits 0x{value_bits:08x}"
             ),
             Self::MissingLanguageSource => {
                 f.write_str("language output commitment requires explicit language source identity")
@@ -305,7 +314,7 @@ mod tests {
             cycle_index: 42,
             cycle_time_us: 18_000,
             prediction_error_ppm: 125_000,
-            peak_attention_ppm: 810_000,
+            peak_attention_bits: 2.75_f32.to_bits(),
             learning_occurred: true,
             detected_primitive_count: 3,
             output_digest: SHA_B.into(),
@@ -324,6 +333,7 @@ mod tests {
         assert_eq!(receipt.observer_profile, SHADOW_OBSERVER_PROFILE_V1);
         assert_eq!(receipt.execution_lineage_digest, BLAKE_C);
         assert_eq!(receipt.adapter_profile, "cycle-result-shadow-adapter-v1");
+        assert_eq!(receipt.peak_attention_bits, 2.75_f32.to_bits());
         assert!(receipt.observation_commitment.starts_with("blake3:"));
         assert!(receipt.has_language_output);
     }
@@ -381,13 +391,42 @@ mod tests {
     }
 
     #[test]
-    fn invalid_metrics_fail_before_shadow_observation() {
+    fn invalid_prediction_error_fails_before_shadow_observation() {
         let mut invalid = raw();
         invalid.prediction_error_ppm = COGNITIVE_PROBABILITY_SCALE + 1;
         assert_eq!(
             invalid.validate(),
             Err(ShadowObservationError::PredictionErrorOutOfRange {
                 found: COGNITIVE_PROBABILITY_SCALE + 1
+            })
+        );
+    }
+
+    #[test]
+    fn peak_attention_above_one_is_preserved_not_clamped() {
+        let mut observation = raw();
+        observation.peak_attention_bits = 3.0_f32.to_bits();
+        let validated = observation.validate().unwrap();
+        assert_eq!(f32::from_bits(validated.as_raw().peak_attention_bits), 3.0);
+    }
+
+    #[test]
+    fn nonfinite_or_negative_peak_attention_fails_closed() {
+        let mut nan = raw();
+        nan.peak_attention_bits = f32::NAN.to_bits();
+        assert_eq!(
+            nan.validate(),
+            Err(ShadowObservationError::InvalidPeakAttention {
+                value_bits: f32::NAN.to_bits()
+            })
+        );
+
+        let mut negative = raw();
+        negative.peak_attention_bits = (-0.5_f32).to_bits();
+        assert_eq!(
+            negative.validate(),
+            Err(ShadowObservationError::InvalidPeakAttention {
+                value_bits: (-0.5_f32).to_bits()
             })
         );
     }
