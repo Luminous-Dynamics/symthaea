@@ -1,0 +1,127 @@
+name: RCA Runtime Relevance
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-rca-shadow-epistemics/**'
+      - 'crates/bridges/symthaea-rca-evidence-bridge/**'
+      - '.github/workflows/rca-runtime-relevance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze exact current-runtime relevance semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=crates/bridges/symthaea-rca-shadow-epistemics/Cargo.toml
+          src=crates/bridges/symthaea-rca-shadow-epistemics/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'symthaea-rca-evidence-bridge' "$manifest"
+          if grep -Eq '^symthaea[[:space:]]*=|symthaea-rca-observer-bridge|symthaea-types|symthaea-epistemic-governance' "$manifest"; then
+            echo 'Runtime relevance acquired a forbidden live/canonical dependency.' >&2
+            exit 1
+          fi
+
+          grep -q 'RUNTIME_RELEVANCE_CONTRACT_V1' "$production"
+          grep -q 'runtime_relevance_profile_digest_v1' "$production"
+          grep -q 'profile_contract_digest' "$production"
+          grep -q 'source_identity=exact_digest_equality' "$production"
+          grep -q 'execution_identity=exact_digest_equality' "$production"
+          grep -q 'cycle_comparison_requires_exact_execution_lineage' "$production"
+          grep -q 'if same_execution_lineage' "$production"
+          grep -q 'runtime_relevance_profile_digest_v1().as_bytes()' "$production"
+
+          # Content-addressed runtime identities must never be reinterpreted as
+          # numeric epochs merely to fit another currentness API.
+          if grep -Eq 'source_generation:[[:space:]]*Option<u64>|model_generation:[[:space:]]*Option<u64>|environment_generation:[[:space:]]*Option<u64>|EvidenceCurrentnessV1|CurrentnessContextV1' "$production"; then
+            echo 'Runtime relevance collapsed exact RCA identity into numeric currentness.' >&2
+            exit 1
+          fi
+
+          # Relevance is not canonical evidence, belief, action, or promotion.
+          if grep -Eq 'CognitiveEvidenceRefV1|AdmittedCognitiveEvidenceV1|CognitiveEvidenceUseV1|CanonicalBelief|QualifiedEpistemic|GlobalWorkspace|MetaRouter|action_author|external_effect|SelfImprovement|recursive_improvement' "$production"; then
+            echo 'Runtime relevance crossed an epistemic/control authority boundary.' >&2
+            exit 1
+          fi
+
+          # No ambient state or side effects participate in the pure assessment.
+          if grep -Eq 'serde_json::|DefaultHasher|std::hash|std::(fs|net|process)::|tokio::|Mutex|RwLock|mpsc|channel\(|SystemTime|Instant::now|thread::' "$production"; then
+            echo 'Runtime relevance acquired incidental identity or side effects.' >&2
+            exit 1
+          fi
+
+      - name: Freeze issued non-rehydratable assessment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          src = Path('crates/bridges/symthaea-rca-shadow-epistemics/src/lib.rs').read_text()
+          tests = src.find('#[cfg(test)]')
+          prod = src if tests < 0 else src[:tests]
+
+          marker = 'pub struct RuntimeRelevanceAssessmentV1 {'
+          start = prod.index(marker)
+          derive_start = prod.rfind('#[derive(', 0, start)
+          impl_start = prod.index('impl RuntimeRelevanceAssessmentV1', start)
+          block = prod[derive_start:impl_start]
+
+          if 'Deserialize' in block:
+              raise SystemExit('Runtime relevance assessment became deserializable.')
+
+          struct_body = prod[start + len(marker):prod.index('\n}', start)]
+          public_fields = [line for line in struct_body.splitlines() if line.strip().startswith('pub ')]
+          if public_fields:
+              raise SystemExit(f'Runtime relevance assessment exposed forgeable public fields: {public_fields}')
+
+          if 'assess_current_runtime_relevance' not in prod:
+              raise SystemExit('Missing sole runtime relevance issuance function.')
+          if 'assessment_is_issued_non_deserializable_shadow_result' not in prod:
+              raise SystemExit('Issued-result contract is not frozen.')
+          if 'persistence_does_not_recreate_relevance_assessment_authority' not in prod:
+              raise SystemExit('Persistence authority boundary is not frozen.')
+          PY
+
+      - name: Freeze cross-lineage cycle semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-epistemics/src/lib.rs
+          grep -q 'different_lineage_never_compares_cycle_indices' "$src"
+          grep -q 'same_source_but_different_execution_is_not_currently_relevant' "$src"
+          grep -q 'future_observation_fails_closed' "$src"
+          grep -q 'stale_observation_fails_explicit_lag_policy' "$src"
+          grep -q 'issued_assessment_serializes_for_audit_but_is_not_a_persisted_capability' "$src"
+
+      - name: Verify dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -p symthaea-rca-shadow-epistemics -e normal)"
+          printf '%s\n' "$tree" | grep -q 'symthaea-rca-evidence-bridge'
+          if printf '%s\n' "$tree" | grep -Eq 'symthaea-rca-observer-bridge'; then
+            echo 'Relevance must consume detached candidates, not live cognitive wrappers.' >&2
+            exit 1
+          fi
+
+      - name: Format RCA shadow epistemics
+        run: cargo fmt -p symthaea-rca-shadow-epistemics -- --check
+
+      - name: Test RCA shadow epistemics
+        run: cargo test -p symthaea-rca-shadow-epistemics
+
+      - name: Clippy RCA shadow epistemics
+        run: cargo clippy -p symthaea-rca-shadow-epistemics --all-targets -- -D warnings
