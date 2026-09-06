@@ -267,16 +267,11 @@ impl ActionRegistry {
                     payload: content.as_bytes().to_vec(),
                 })
             })
-            .register("WASM_VERIFY", |ctx| {
-                let path = ctx.target_path.clone().ok_or_else(|| {
-                    ActionError::ValidationFailed("WASM_VERIFY requires target_path".into())
-                })?;
-                let func = ctx.args.first().cloned().unwrap_or_else(|| "verify".into());
-                Ok(ActionIR::WasmSandbox {
-                    module_path: path,
-                    function_name: func,
-                    input_data: vec![],
-                })
+            .register("WASM_VERIFY", |_ctx| {
+                Err(ActionError::ValidationFailed(
+                    "WASM_VERIFY requires an explicit Forge capability/profile; legacy standard binding disabled"
+                        .into(),
+                ))
             })
     }
 }
@@ -414,6 +409,36 @@ mod tests {
             }
             other => panic!("unexpected action: {other:?}"),
         }
+    }
+
+    #[test]
+    fn wasm_verify_requires_explicit_forge_profile() {
+        let registry = ActionRegistry::standard();
+        let context = ActionContext {
+            target_path: Some(PathBuf::from("/tmp/module.wasm")),
+            args: vec!["verify".into()],
+            ..Default::default()
+        };
+
+        let err = registry
+            .resolve("WASM_VERIFY", &context)
+            .expect_err("standard WASM_VERIFY must fail closed without Forge authority");
+        assert!(format!("{err}").contains("explicit Forge capability/profile"));
+    }
+
+    #[test]
+    fn forge_denial_aborts_primitive_sequence() {
+        let executor = PrimitiveExecutor::new(ActionRegistry::standard());
+        let context = ActionContext {
+            target_path: Some(PathBuf::from("/tmp/module.wasm")),
+            ..Default::default()
+        };
+
+        let result = executor.translate(
+            &["READ".to_string(), "WASM_VERIFY".to_string()],
+            &context,
+        );
+        assert!(result.is_err());
     }
 
     #[test]
