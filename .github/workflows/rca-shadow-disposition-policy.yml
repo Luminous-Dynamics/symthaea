@@ -41,6 +41,10 @@ jobs:
             echo 'Policy registration acquired a concrete bound-case input.' >&2
             exit 1
           fi
+          if grep -q 'IndependentEvidenceSetWitnessV1' "$production"; then
+            echo 'Policy registration acquired a concrete evidence-witness input.' >&2
+            exit 1
+          fi
           if grep -q 'InterpretationLineageV1' "$production"; then
             echo 'Policy registration acquired a concrete interpretation-lineage input.' >&2
             exit 1
@@ -51,7 +55,7 @@ jobs:
             exit 1
           fi
 
-      - name: Freeze pairwise-independent root-set semantics
+      - name: Freeze evidence-item versus interpretation-root semantics
         shell: bash
         run: |
           set -euo pipefail
@@ -59,16 +63,30 @@ jobs:
           production=$(mktemp)
           sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
 
-          grep -q 'root_set_semantics=pairwise_independent_set_v1' "$production"
-          grep -q 'candidate_count_and_pair_edge_count_do_not_satisfy_root_thresholds' "$production"
-          grep -q 'pub enum RootSetSemanticsV1' "$production"
-          grep -q 'PairwiseIndependentSet' "$production"
-          grep -q 'min_pairwise_independent_evidence_roots' "$production"
+          grep -q 'evidence_threshold_semantics=issued_pairwise_independent_evidence_items_v1' "$production"
+          grep -q 'interpretation_threshold_semantics=pairwise_independent_interpretation_root_set_v1' "$production"
+          grep -q 'distinct_evidence_root_count_does_not_satisfy_evidence_item_threshold' "$production"
+          grep -q 'candidate_module_root_id_and_pair_edge_counts_do_not_substitute_for_required_witnesses' "$production"
+          grep -q 'pub enum EvidenceSetSemanticsV1' "$production"
+          grep -q 'IssuedPairwiseIndependentItems' "$production"
+          grep -q 'pub enum InterpretationRootSetSemanticsV1' "$production"
+          grep -q 'PairwiseIndependentRoots' "$production"
+          grep -q 'min_pairwise_independent_evidence_items' "$production"
           grep -q 'min_pairwise_independent_interpretation_roots' "$production"
+
+          if grep -q 'min_pairwise_independent_evidence_roots' "$production"; then
+            echo 'Policy regressed to ancestry-root count as evidence threshold.' >&2
+            exit 1
+          fi
+          if grep -q 'pub enum RootSetSemanticsV1' "$production"; then
+            echo 'Policy collapsed distinct evidence-item and interpretation-root semantics.' >&2
+            exit 1
+          fi
+
           grep -q 'pair_count_for_roots' "$production"
           grep -q 'root_count.saturating_sub(1)' "$production"
           grep -q 'InterpretationPairCeilingBelowRootRequirement' "$production"
-          grep -q 'CaseCeilingBelowEvidenceRootRequirement' "$production"
+          grep -q 'CaseCeilingBelowEvidenceItemRequirement' "$production"
 
           grep -q 'strength_treatment=diagnostic_only_v1_no_arithmetic' "$production"
           grep -q 'RelationStrengthTreatmentV1::DiagnosticOnly' "$production"
@@ -77,27 +95,7 @@ jobs:
             exit 1
           fi
 
-      - name: Freeze preregistered experiment-contract binding
-        shell: bash
-        run: |
-          set -euo pipefail
-          src=crates/bridges/symthaea-rca-shadow-disposition-policy/src/lib.rs
-          production=$(mktemp)
-          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
-
-          grep -q 'experiment_contract::EXPERIMENT_CONTRACT_SCHEMA_VERSION' "$production"
-          grep -q 'experiment_contract_schema_version' "$production"
-          grep -q 'registered_experiment_contract_digest' "$production"
-          grep -q 'evaluation_binding=exact_registered_rca_experiment_contract_schema+digest' "$production"
-          grep -q 'evaluation_details_are_transitively_bound_by_registered_experiment_contract_not_duplicated' "$production"
-          grep -q 'ExperimentContractSchemaMismatch' "$production"
-
-          if grep -Eq 'pub (evaluation_corpus_digest|seed_plan_digest|metric_contract_digest|evaluator_id|evaluator_version)[[:space:]]*:' "$production"; then
-            echo 'Disposition policy duplicated registered experiment-contract fields.' >&2
-            exit 1
-          fi
-
-      - name: Freeze profile and policy identity
+      - name: Freeze exact lower-layer profile bindings
         shell: bash
         run: |
           set -euo pipefail
@@ -106,18 +104,22 @@ jobs:
           sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
 
           grep -q 'current_bound_case_profile_digest_v1' "$production"
+          grep -q 'current_evidence_set_witness_profile_digest_v1' "$production"
           grep -q 'current_relation_eligibility_profile_digest_v1' "$production"
           grep -q 'current_interpretation_lineage_profile_digest_v1' "$production"
           grep -q 'BoundCaseProfileMismatch' "$production"
+          grep -q 'EvidenceSetWitnessProfileMismatch' "$production"
           grep -q 'RelationEligibilityProfileMismatch' "$production"
           grep -q 'InterpretationLineageProfileMismatch' "$production"
 
           for field in \
             proposition_id \
             bound_case_profile_digest \
+            evidence_set_witness_profile_digest \
             relation_eligibility_profile_digest \
             interpretation_lineage_profile_digest \
-            root_set_semantics \
+            evidence_set_semantics \
+            interpretation_root_set_semantics \
             tentative_support \
             support \
             tentative_opposition \
@@ -141,26 +143,46 @@ jobs:
             exit 1
           fi
 
+      - name: Freeze preregistered experiment-contract binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-policy/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'experiment_contract::EXPERIMENT_CONTRACT_SCHEMA_VERSION' "$production"
+          grep -q 'experiment_contract_schema_version' "$production"
+          grep -q 'registered_experiment_contract_digest' "$production"
+          grep -q 'evaluation_binding=exact_registered_rca_experiment_contract_schema+digest' "$production"
+          grep -q 'evaluation_details_are_transitively_bound_by_registered_experiment_contract_not_duplicated' "$production"
+          grep -q 'ExperimentContractSchemaMismatch' "$production"
+
+          if grep -Eq 'pub (evaluation_corpus_digest|seed_plan_digest|metric_contract_digest|evaluator_id|evaluator_version)[[:space:]]*:' "$production"; then
+            echo 'Disposition policy duplicated registered experiment-contract fields.' >&2
+            exit 1
+          fi
+
       - name: Freeze negative policy tests
         shell: bash
         run: |
           set -euo pipefail
           src=crates/bridges/symthaea-rca-shadow-disposition-policy/src/lib.rs
           grep -q 'policy_registers_against_exact_current_profiles' "$src"
-          grep -q 'root_thresholds_mean_pairwise_independent_sets_not_counts_or_edges' "$src"
+          grep -q 'evidence_item_and_interpretation_root_thresholds_are_distinct' "$src"
           grep -q 'evaluation_binding_uses_exact_registered_experiment_contract_identity' "$src"
           grep -q 'wrong_experiment_contract_schema_fails_closed' "$src"
           grep -q 'strength_semantics_are_diagnostic_only_v1' "$src"
           grep -q 'supported_cannot_be_weaker_than_tentative_support' "$src"
           grep -q 'opposed_cannot_be_weaker_than_tentative_opposition' "$src"
-          grep -q 'zero_root_requirements_fail_closed' "$src"
+          grep -q 'zero_topology_requirements_fail_closed' "$src"
           grep -q 'lower_layer_profile_drift_requires_new_policy' "$src"
           grep -q 'contested_must_preserve_qualified_support_and_opposition' "$src"
           grep -q 'experiment_and_resource_identity_are_policy_bearing' "$src"
           grep -q 'threshold_change_requires_new_policy_identity' "$src"
           grep -q 'registered_policy_revalidates_after_persistence' "$src"
           grep -q 'policy_tampering_fails_closed' "$src"
-          grep -q 'evidence_resource_ceiling_must_make_threshold_feasible' "$src"
+          grep -q 'evidence_resource_ceiling_must_make_item_threshold_feasible' "$src"
           grep -q 'interpretation_pair_ceiling_must_make_root_set_feasible' "$src"
 
       - name: Verify dependency direction
