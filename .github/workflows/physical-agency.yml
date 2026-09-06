@@ -14,7 +14,7 @@ on:
       - 'crates/bridges/symthaea-sim-bridge/**'
       - 'crates/domains/symthaea-formal-safety/**'
       - '.github/workflows/physical-agency.yml'
-      - 'docs/architecture/PHYSICAL_AGENCY_RFC.md'
+      - 'docs/architecture/PHYSICAL_AGENCY_*.md'
   push:
     branches: [main]
     paths:
@@ -23,6 +23,7 @@ on:
       - 'crates/bridges/symthaea-sim-bridge/**'
       - 'crates/domains/symthaea-formal-safety/**'
       - '.github/workflows/physical-agency.yml'
+      - 'docs/architecture/PHYSICAL_AGENCY_*.md'
   workflow_dispatch:
 
 concurrency:
