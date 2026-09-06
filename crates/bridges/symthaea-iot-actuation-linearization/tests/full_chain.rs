@@ -350,6 +350,7 @@ mod fixture {
         device: ResourceRef,
         operation: Operation,
         executor: PrincipalId,
+        fail_after_call: bool,
         calls: usize,
         seen_command_digest: Option<Digest32>,
         seen_envelope_digest: Option<Digest32>,
@@ -363,6 +364,7 @@ mod fixture {
                 device: command.device.clone(),
                 operation: command.operation.clone(),
                 executor: command.executor.clone(),
+                fail_after_call: false,
                 calls: 0,
                 seen_command_digest: None,
                 seen_envelope_digest: None,
@@ -399,6 +401,9 @@ mod fixture {
             self.seen_envelope_digest = Some(request.envelope_digest());
             self.seen_composition_digest = Some(request.composition_digest());
             assert_eq!(request.command().digest(), request.command_digest());
+            if self.fail_after_call {
+                return Err(RecordingPortError);
+            }
             AdapterAttemptAcknowledgement::new(d(0xE7)).map_err(|_| RecordingPortError)
         }
     }
@@ -594,6 +599,81 @@ mod fixture {
             Err(PhysicalEffectDispatchError::PortDeviceMismatch)
         ));
         assert_eq!(port.calls, 0);
+
+        std::fs::remove_dir_all(admission_root).unwrap();
+        std::fs::remove_dir_all(semantic_root).unwrap();
+        std::fs::remove_dir_all(trust_root).unwrap();
+    }
+
+    #[test]
+    fn adapter_error_after_invocation_is_indeterminate_with_exact_correlation() {
+        let admission_root = temp_root("dispatch-indeterminate-admission");
+        let semantic_root = temp_root("dispatch-indeterminate-semantic");
+        let trust_root = temp_root("dispatch-indeterminate-trust");
+        let (composed, transport_guard, device_reality_guard, interlock_guard) =
+            complete_composed_fixture(&admission_root, &semantic_root);
+
+        let expected_command = composed
+            .semantic_acceptance()
+            .admission_reservation()
+            .envelope()
+            .command
+            .clone();
+        let expected_command_digest = expected_command.digest();
+        let expected_envelope_digest = composed.transport().envelope_digest();
+        let expected_composition_digest = composed.composition_digest();
+        let semantic_head = composed.semantic_acceptance().device_head();
+        let roots = published_roots(
+            &composed,
+            &transport_guard,
+            &device_reality_guard,
+            &interlock_guard,
+        );
+        let publication =
+            DurableActuationTrustPublicationStore::initialize(&trust_root, roots).unwrap();
+        let mut port = RecordingPort::from_command(&expected_command);
+        port.fail_after_call = true;
+
+        let result = {
+            let trust_store =
+                DurableActuationTrustPublicationStore::open(&trust_root, publication.head())
+                    .unwrap();
+            let admission_store =
+                DurableAdmissionReservationStore::open(&admission_root, config()).unwrap();
+            let semantic_store =
+                DurableSemanticAcceptanceStore::open(&semantic_root, config(), semantic_head)
+                    .unwrap();
+            let linearizer = ActuationLinearizer::new(
+                &trust_store,
+                &admission_store,
+                &semantic_store,
+                &transport_guard,
+                &device_reality_guard,
+                &interlock_guard,
+            );
+
+            linearizer
+                .with_current_attempt(composed, |attempt| {
+                    dispatch_current_attempt(attempt, &mut port)
+                })
+                .unwrap()
+        };
+
+        match result {
+            Err(PhysicalEffectDispatchError::AdapterAttemptIndeterminate {
+                correlation,
+                source: _,
+            }) => {
+                assert_eq!(correlation.command_digest(), expected_command_digest);
+                assert_eq!(correlation.envelope_digest(), expected_envelope_digest);
+                assert_eq!(correlation.composition_digest(), expected_composition_digest);
+                assert_eq!(correlation.sequence(), expected_command.sequence);
+                assert_eq!(correlation.adapter_id(), "mock-hal:valve-72");
+            }
+            other => panic!("expected indeterminate adapter outcome, got {other:?}"),
+        }
+        assert_eq!(port.calls, 1);
+        assert_eq!(port.seen_command_digest, Some(expected_command_digest));
 
         std::fs::remove_dir_all(admission_root).unwrap();
         std::fs::remove_dir_all(semantic_root).unwrap();
