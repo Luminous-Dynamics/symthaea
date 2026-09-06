@@ -6,10 +6,11 @@
 //!
 //! `symthaea-types` owns canonical cognitive proposal/evidence wire types.
 //! This crate owns policy that reasons over those artifacts: canonical
-//! evidence-object identity, evidence lineage/independence, independent evidence
-//! set witnesses, interpretation lineage/independence, independent interpretation
-//! root-set witnesses, currentness, defeaters, relation-declaration provenance,
-//! use-specific declarer qualification, and experiment qualification.
+//! evidence-object identity, evidence lineage/independence, canonical lineage
+//! graph identity, independent evidence set witnesses, interpretation
+//! lineage/independence, independent interpretation root-set witnesses,
+//! currentness, defeaters, relation-declaration provenance, use-specific declarer
+//! qualification, and experiment qualification.
 //! It does not own action authority or recursive-improvement promotion.
 
 #![deny(unsafe_code)]
@@ -21,5 +22,6 @@ pub mod identity;
 pub mod interpretation_lineage;
 pub mod interpretation_set_witness;
 pub mod lineage;
+pub mod lineage_identity;
 pub mod relation_provenance;
 pub mod relation_qualification;
