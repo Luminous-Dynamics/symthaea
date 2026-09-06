@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -188,6 +190,54 @@ class CrosscheckContracts(unittest.TestCase):
         report["content_digest"] = compiler.sha256_digest(compiler.canonical_json_bytes(body))
         with self.assertRaisesRegex(crosscheck.CrosscheckError, "cannot establish source independence"):
             crosscheck.validate_report(report)
+
+    def test_cli_rejects_self_comparison_when_requested(self) -> None:
+        artifact = self.make_artifact("a")
+        artifact_path = self.write_json("a-map.json", artifact)
+        report_path = self.root / "self-report.json"
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(Path(crosscheck.__file__)),
+                "--lineage-a", str(artifact_path),
+                "--lineage-b", str(artifact_path),
+                "--area-order", str(AREA_ORDER),
+                "--out", str(report_path),
+                "--reject-self-comparison",
+            ],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(proc.returncode, 3)
+        self.assertTrue(report_path.exists())
+        self.assertIn("self-comparison", proc.stderr)
+
+    def test_cli_require_exact_fails_on_mapping_disagreement(self) -> None:
+        a = self.make_artifact("a")
+        b = self.make_artifact("b")
+        b["vertex_to_parcel"][0] = 2
+        b["vertex_to_parcel"][2] = 1
+        body = dict(b)
+        del body["content_digest"]
+        b["content_digest"] = compiler.sha256_digest(compiler.canonical_json_bytes(body))
+        compiler.validate_artifact(b, AREA_ORDER)
+        a_path = self.write_json("a-map.json", a)
+        b_path = self.write_json("b-map.json", b)
+        report_path = self.root / "diff-report.json"
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(Path(crosscheck.__file__)),
+                "--lineage-a", str(a_path),
+                "--lineage-b", str(b_path),
+                "--area-order", str(AREA_ORDER),
+                "--out", str(report_path),
+                "--require-exact",
+            ],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(proc.returncode, 4)
+        self.assertTrue(report_path.exists())
+        self.assertIn("2 mapping disagreements", proc.stderr)
 
 
 if __name__ == "__main__":
