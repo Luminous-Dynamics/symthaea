@@ -38,13 +38,16 @@ jobs:
           fi
 
           grep -q 'RUNTIME_EVIDENCE_CANDIDATE_CONTRACT_V1' "$production"
+          grep -q 'RUNTIME_OBSERVATION_ROOT_CONTRACT_V1' "$production"
           grep -q 'InstrumentedRuntimeEvidenceCandidateV1' "$production"
+          grep -q 'RuntimeCandidateLineageV1' "$production"
           grep -q 'ShadowObservationFieldV1' "$production"
           grep -q 'InstrumentedRuntimeClaimV1' "$production"
           grep -q 'ValidatedFrozenCycleObservationV1' "$production"
           grep -q 'claim_selection=closed_lossless_field_projection_only' "$production"
           grep -q 'candidate_does_not_self_declare_currentness' "$production"
-          grep -q 'lineage_root_is_provenance_only_not_epistemic_admission' "$production"
+          grep -q 'candidate_lineage=transformation_child_of_shared_observation_root' "$production"
+          grep -q 'same_observation_field_candidates_are_not_independent_roots' "$production"
 
           # This layer is intentionally weaker than canonical cognitive evidence.
           # Contract prose may name forbidden types to state non-equivalence, so
@@ -81,12 +84,41 @@ jobs:
           grep -q 'let claim = extract_claim(&observation, field)' "$production"
           grep -q 'let claim_digest = runtime_claim_digest_v1(&claim)' "$production"
 
-          # No serializer, ambient state, or side effect participates in claim or
-          # candidate identity.
+          # No serializer, ambient state, or side effect participates in claim,
+          # root, or candidate identity.
           if grep -Eq 'serde_json::|DefaultHasher|std::hash|std::(fs|net|process)::|tokio::|Mutex|RwLock|mpsc|channel\(|SystemTime|Instant::now|thread::' "$production"; then
             echo 'Runtime evidence candidate acquired incidental identity or side effects.' >&2
             exit 1
           fi
+
+      - name: Freeze shared observation-root lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-evidence-bridge/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'RUNTIME_OBSERVATION_ROOT_PROFILE_V1' "$production"
+          grep -q 'runtime_observation_root_profile_digest_v1' "$production"
+          grep -q 'runtime_observation_root_id_v1_from_receipt' "$production"
+          grep -q 'observation_root_id' "$production"
+          grep -q 'pub fn lineage_fragment' "$production"
+          grep -q 'CognitiveDerivationKindV1::RootObservation' "$production"
+          grep -q 'CognitiveDerivationKindV1::Transformation' "$production"
+          grep -q 'parent_ids: vec!\[self.observation_root_id.clone()\]' "$production"
+
+          # The selected field candidate itself must never be emitted as a root.
+          if grep -q 'pub fn lineage_root' "$production"; then
+            echo 'Field candidate regained root-observation status.' >&2
+            exit 1
+          fi
+
+          grep -q 'different_fields_are_different_candidates_but_share_observation_root' "$src"
+          grep -q 'same_observation_field_candidates_are_not_independent' "$src"
+          grep -q 'different_observation_events_can_be_independent' "$src"
+          grep -q 'lineage_fragment_makes_candidate_a_transformation_child' "$src"
+          grep -q 'tampered_observation_root_fails_closed' "$src"
 
       - name: Freeze closed lossless claim set
         shell: bash
@@ -108,10 +140,8 @@ jobs:
           done
 
           grep -q 'selected_claim_is_lossless_observation_field' "$src"
-          grep -q 'different_fields_are_different_candidate_evidence' "$src"
-          grep -q 'observation_identity_is_candidate_identity_bearing' "$src"
+          grep -q 'observation_identity_is_candidate_and_root_identity_bearing' "$src"
           grep -q 'tampered_claim_fails_closed' "$src"
-          grep -q 'candidate_can_be_a_provenance_root_without_becoming_admitted_evidence' "$src"
           grep -q 'language_absence_is_an_exact_observed_claim' "$src"
 
       - name: Verify dependency direction

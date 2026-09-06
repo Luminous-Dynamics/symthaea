@@ -1,6 +1,6 @@
 # Symthaea RCA Runtime Evidence Candidate Bridge
 
-This crate converts a **validated detached RCA observation** into a narrowly typed **candidate evidence** object.
+This crate converts a **validated detached RCA observation** into narrowly typed **candidate evidence**.
 
 It exists because an observation of Symthaea's own instrumented runtime is not honestly described by the existing canonical evidence authorities:
 
@@ -15,6 +15,8 @@ The bridge therefore stops before `CognitiveEvidenceRefV1`.
 
 ```text
 ValidatedFrozenCycleObservationV1
+        ↓
+shared ObservationEventRoot
         ↓
 closed lossless field selector
         ↓
@@ -31,28 +33,65 @@ provenance lineage bookkeeping only
         ✕ no self-improvement promotion
 ```
 
-## Claim identity versus candidate identity
+## Observation identity versus field-candidate identity
 
-The selected field claim receives its own domain-separated `claim_digest`.
+A frozen cycle is one observation event. It receives a shared domain-separated `observation_root_id` derived from:
 
-The candidate identity additionally binds the exact observation context:
+```text
+runtime-observation-root profile contract
+        +
+shadow-observer contract digest
+        +
+exact observation commitment
+```
+
+Every field candidate extracted from that exact observation shares this same provenance root.
+
+The selected field claim receives its own `claim_digest`, and the candidate identity binds:
 
 ```text
 candidate_id = H(
-    candidate profile contract,
-    shadow observer contract,
-    exact observation commitment,
+    candidate-profile contract,
+    shared observation-root id,
     selected claim digest
 )
 ```
 
-Therefore two cycles that report the same prediction-error value still produce distinct candidate evidence when their full detached observations differ.
-
-This is intentional:
+Therefore:
 
 ```text
-same observed value != same evidence event
+same observation + different selected fields
+        = different candidate claims
+        = same provenance root
+        = NOT independent observations
 ```
+
+while:
+
+```text
+different frozen observation events
+        = different observation roots
+```
+
+This prevents multiple fields from one cycle from being miscounted as independent corroboration.
+
+## Lineage fragment
+
+`lineage_fragment()` yields two generic governance nodes:
+
+```text
+ObservationEventRoot
+    derivation = RootObservation
+    parents = []
+        ↓
+FieldCandidate
+    derivation = Transformation
+    parents = [ObservationEventRoot]
+```
+
+The candidate itself is deliberately **not** a `RootObservation`.
+
+Two candidates from the same frozen observation therefore resolve to `SameRoot` under the RCA lineage/independence policy. Candidates from distinct observation events can be independent when their root sets are disjoint.
 
 ## Closed claim surface
 
@@ -78,9 +117,10 @@ Persisted candidates contain the validated detached observation. Deserialization
 
 1. observer profile and contract;
 2. observation commitment;
-3. selected claim;
-4. claim digest;
-5. candidate identity.
+3. shared observation-root identity;
+4. selected claim;
+5. claim digest;
+6. candidate identity.
 
 Any mismatch fails closed.
 
@@ -88,7 +128,7 @@ Any mismatch fails closed.
 
 This crate deliberately does not construct or assess `EvidenceCurrentnessV1`.
 
-The historical fact that a particular cycle had a particular value and the proposition that the same state is relevant **now** are different claims. Currentness belongs to a later proposition/use-context boundary.
+The historical fact that a particular cycle had a particular value and the proposition that the same state is relevant **now** are different claims. Currentness/relevance belongs to a later proposition/use-context boundary.
 
 ## Dependency direction
 
