@@ -37,15 +37,28 @@ jobs:
           grep -q 'distinct evidence-root count' "$doc"
           grep -q 'independent evidence-item count' "$doc"
 
-          # Issuance accepts validated lineage + selected ids only. Callers do not
-          # supply root sets, pair labels, or independence counts.
           grep -q 'pub fn issue_independent_evidence_set_witness_v1' "$production"
           grep -q 'graph: &ValidatedEvidenceLineageGraphV1' "$production"
           grep -q 'selected_evidence_ids: &\[String\]' "$production"
-          if grep -Eq 'pub fn issue_independent_evidence_set_witness_v1[^\{]*(root_ids|pair_status|independence_count)' "$production"; then
-            echo 'Evidence-set witness issuer acquired caller-authored independence semantics.' >&2
+          if grep -Eq 'pub fn issue_independent_evidence_set_witness_v1[^\{]*(root_ids|pair_status|independence_count|lineage_graph_id)' "$production"; then
+            echo 'Evidence-set witness issuer acquired caller-authored independence or lineage identity semantics.' >&2
             exit 1
           fi
+
+      - name: Freeze canonical lineage-generation binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/evidence_set_witness.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'lineage_generation=canonical_validated_graph_content_identity_v1' "$production"
+          grep -q 'legacy_producer_graph_id_is_not_witness_authority' "$production"
+          grep -q 'canonical_evidence_lineage_graph_id_v1(graph)' "$production"
+          grep -q 'pub fn lineage_graph_id' "$production"
+          grep -q 'b"lineage_graph_id"' "$production"
+          grep -q 'unrelated_lineage_change_changes_witness_identity_even_if_selected_subset_is_same' "$production"
 
       - name: Freeze exact pairwise-independent set witness
         shell: bash
@@ -55,7 +68,7 @@ jobs:
           production=$(mktemp)
           sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
 
-          grep -q 'graph.root_ids' "$production"
+          grep -q 'graph.*root_ids' "$production" || grep -q '.root_ids' "$production"
           grep -q 'graph.*assess_independence' "$production" || grep -q '.assess_independence' "$production"
           grep -q 'status != EvidenceIndependenceV1::Independent' "$production"
           grep -q 'has_root_overlap' "$production"
@@ -64,8 +77,6 @@ jobs:
           grep -q 'selected.sort' "$production"
           grep -q 'pair_count(items.len())' "$production"
 
-          # Exact selected-item topology is exposed; no convenience API may turn
-          # ancestry-root count or pair-edge count into an independence count.
           grep -q 'pub fn items' "$production"
           grep -q 'pub fn pairs' "$production"
           grep -q 'pub fn distinct_root_ids' "$production"
@@ -84,6 +95,7 @@ jobs:
 
           grep -q 'WITNESS_ID_DOMAIN' "$production"
           grep -q 'b"profile_contract_digest"' "$production"
+          grep -q 'b"lineage_graph_id"' "$production"
           grep -q 'b"item_count"' "$production"
           grep -q 'b"evidence_id"' "$production"
           grep -q 'b"item_root_count"' "$production"
@@ -121,6 +133,8 @@ jobs:
           grep -q 'duplicate_selected_item_fails_closed' "$src"
           grep -q 'unknown_item_fails_through_lineage_validation' "$src"
           grep -q 'selected_item_change_changes_witness_identity' "$src"
+          grep -q 'unrelated_lineage_change_changes_witness_identity' "$src"
+          grep -q 'legacy_graph_label_does_not_change_witness_identity' "$src"
           grep -q 'issued_witness_serializes_for_audit_only' "$src"
 
       - name: Verify governance dependency direction
