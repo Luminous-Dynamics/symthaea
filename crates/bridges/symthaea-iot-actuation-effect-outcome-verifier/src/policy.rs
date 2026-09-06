@@ -116,3 +116,41 @@ fn update_string(h: &mut blake3::Hasher, value: &str) {
 fn update_digest(h: &mut blake3::Hasher, Digest32(bytes): Digest32) {
     h.update(&bytes);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn policy(generation: u64) -> EffectOutcomePolicyV1 {
+        EffectOutcomePolicyV1 {
+            schema_version: EFFECT_OUTCOME_POLICY_SCHEMA_VERSION,
+            generation,
+            device: ResourceRef("iot:valve:72".into()),
+            operation: Operation("qualification.effect".into()),
+            allowed_verifier_ids: BTreeSet::from(["verifier:outcome-a".into()]),
+            allowed_claim_kinds: BTreeSet::from([
+                EffectOutcomeClaimKindV1::ExecutionAndPostcondition,
+                EffectOutcomeClaimKindV1::NonExecution,
+            ]),
+            accepted_reference_values: BTreeSet::from([Digest32([0x44; 32])]),
+            exact_outcome_profile_digest: Digest32([0x55; 32]),
+            exact_appraisal_policy_digest: Digest32([0x66; 32]),
+            max_evidence_lifetime_ms: MAX_EFFECT_OUTCOME_EVIDENCE_LIFETIME_MS,
+        }
+    }
+
+    #[test]
+    fn policy_generation_is_part_of_cryptographic_identity() {
+        let first = policy(1);
+        let third = policy(3);
+        assert_ne!(first.digest().unwrap(), third.digest().unwrap());
+    }
+
+    #[test]
+    fn policy_generation_zero_is_rejected() {
+        assert!(matches!(
+            policy(0).validate(),
+            Err(EffectOutcomeError::PolicyGenerationZero)
+        ));
+    }
+}
