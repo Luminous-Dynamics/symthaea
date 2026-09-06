@@ -10,8 +10,10 @@
 //! **not** automatically independent. Independence is established only when an
 //! exact, current, proposition/use-scoped qualification joins the root pair.
 //!
-//! This module intentionally exposes pair topology, not a count of qualified
-//! edges. Edge count is not an independent-root-set witness.
+//! The graph is root-normalized: declarations map to interpretation roots, each
+//! root is represented once, and each distinct unordered root pair is assessed
+//! exactly once. Same-root declarations share identity; they do not create a
+//! synthetic same-root edge. Edge count is not an independent-root-set witness.
 
 use crate::{
     relation_provenance::RelationDeclarationMethodV1,
@@ -34,13 +36,16 @@ pub const INTERPRETATION_LINEAGE_CONTRACT_V1: &str = concat!(
     "input=currently_eligible_relation_declarations+one_exact_eligibility_context\n",
     "interpretation_root=declarer_id+optional_declarer_version+declaration_method\n",
     "same_declarer_version_method=one_interpretation_root\n",
+    "graph_is_normalized_to_unique_interpretation_roots\n",
+    "same_root_declarations_do_not_create_pair_edges\n",
+    "each_distinct_unordered_root_pair_is_assessed_exactly_once\n",
     "distinct_interpretation_roots_do_not_imply_independence\n",
     "distinct_roots_without_exact_current_qualification=independence_unknown\n",
     "independence_qualified_only_by_exact_root_pair+proposition+use+time_join\n",
     "all_eligible_declarations_must_share_exact_context_commitment\n",
-    "lineage_identity=blake3_explicit_entries+pair_assessments+context\n",
+    "lineage_identity=blake3_explicit_entries+roots+root_pair_assessments+context\n",
     "issued_lineage=is_private_non_deserializable_shadow_report\n",
-    "pair_topology_is_exposed_but_qualified_pair_count_is_not_an_api\n",
+    "root_pair_topology_is_exposed_but_qualified_pair_count_is_not_an_api\n",
     "interpretation_independence_is_not_truth_or_evidence_independence\n",
     "lineage_is_not_belief_workspace_action_or_promotion_authority\n",
 );
@@ -69,7 +74,6 @@ const INDEPENDENCE_ID_DOMAIN: &[u8] =
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InterpretationIndependenceStatusV1 {
-    SameInterpretationRoot,
     DistinctRootsIndependenceUnknown,
     IndependenceQualified,
 }
@@ -205,9 +209,6 @@ pub struct InterpretationLineageEntryV1 {
     declaration_id: String,
     eligibility_id: String,
     interpretation_root_id: String,
-    declarer_id: String,
-    declarer_version: Option<String>,
-    declaration_method: RelationDeclarationMethodV1,
 }
 
 impl InterpretationLineageEntryV1 {
@@ -219,6 +220,20 @@ impl InterpretationLineageEntryV1 {
         &self.eligibility_id
     }
 
+    pub fn interpretation_root_id(&self) -> &str {
+        &self.interpretation_root_id
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct InterpretationRootV1 {
+    interpretation_root_id: String,
+    declarer_id: String,
+    declarer_version: Option<String>,
+    declaration_method: RelationDeclarationMethodV1,
+}
+
+impl InterpretationRootV1 {
     pub fn interpretation_root_id(&self) -> &str {
         &self.interpretation_root_id
     }
@@ -237,24 +252,14 @@ impl InterpretationLineageEntryV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct InterpretationPairAssessmentV1 {
-    left_declaration_id: String,
-    right_declaration_id: String,
+pub struct InterpretationRootPairAssessmentV1 {
     left_interpretation_root_id: String,
     right_interpretation_root_id: String,
     status: InterpretationIndependenceStatusV1,
     qualification_id: Option<String>,
 }
 
-impl InterpretationPairAssessmentV1 {
-    pub fn left_declaration_id(&self) -> &str {
-        &self.left_declaration_id
-    }
-
-    pub fn right_declaration_id(&self) -> &str {
-        &self.right_declaration_id
-    }
-
+impl InterpretationRootPairAssessmentV1 {
     pub fn left_interpretation_root_id(&self) -> &str {
         &self.left_interpretation_root_id
     }
@@ -282,7 +287,8 @@ pub struct InterpretationLineageV1 {
     proposition_id: String,
     eligibility_context_commitment: String,
     entries: Vec<InterpretationLineageEntryV1>,
-    pair_assessments: Vec<InterpretationPairAssessmentV1>,
+    roots: Vec<InterpretationRootV1>,
+    root_pair_assessments: Vec<InterpretationRootPairAssessmentV1>,
 }
 
 impl InterpretationLineageV1 {
@@ -310,14 +316,21 @@ impl InterpretationLineageV1 {
         &self.eligibility_context_commitment
     }
 
+    /// Canonical declaration -> root mappings, ordered by declaration id.
     pub fn entries(&self) -> &[InterpretationLineageEntryV1] {
         &self.entries
     }
 
-    /// Exact pair topology only. There is deliberately no public helper that
-    /// counts qualified edges: edge count is not an independent-root-set proof.
-    pub fn pair_assessments(&self) -> &[InterpretationPairAssessmentV1] {
-        &self.pair_assessments
+    /// Canonical unique interpretation roots, ordered by root id.
+    pub fn roots(&self) -> &[InterpretationRootV1] {
+        &self.roots
+    }
+
+    /// Exact unique-root pair topology only. There is deliberately no public
+    /// helper that counts qualified edges: edge count is not an independent-root
+    /// set proof.
+    pub fn root_pair_assessments(&self) -> &[InterpretationRootPairAssessmentV1] {
+        &self.root_pair_assessments
     }
 }
 
@@ -349,6 +362,7 @@ pub fn assemble_interpretation_lineage_v1(
     let mut seen_declarations = HashSet::with_capacity(eligible_declarations.len());
     let mut seen_eligibility_ids = HashSet::with_capacity(eligible_declarations.len());
     let mut entries = Vec::with_capacity(eligible_declarations.len());
+    let mut roots_by_id: HashMap<String, InterpretationRootV1> = HashMap::new();
 
     for eligible in eligible_declarations {
         if eligible.proposition_id() != context_raw.proposition_id {
@@ -370,26 +384,38 @@ pub fn assemble_interpretation_lineage_v1(
         }
 
         let provenance = eligible.declaration().provenance().as_raw();
-        entries.push(InterpretationLineageEntryV1 {
-            declaration_id: declaration_id.to_string(),
-            eligibility_id: eligible.eligibility_id().to_string(),
-            interpretation_root_id: interpretation_root_id_v1(
-                &provenance.declarer_id,
-                provenance.declarer_version.as_deref(),
-                provenance.method,
-            ),
+        let interpretation_root_id = interpretation_root_id_v1(
+            &provenance.declarer_id,
+            provenance.declarer_version.as_deref(),
+            provenance.method,
+        );
+        let root = InterpretationRootV1 {
+            interpretation_root_id: interpretation_root_id.clone(),
             declarer_id: provenance.declarer_id.clone(),
             declarer_version: provenance.declarer_version.clone(),
             declaration_method: provenance.method,
+        };
+        match roots_by_id.get(&interpretation_root_id) {
+            None => {
+                roots_by_id.insert(interpretation_root_id.clone(), root);
+            }
+            Some(existing) if existing == &root => {}
+            Some(_) => return Err(InterpretationLineageError::InterpretationRootIdentityCollision),
+        }
+        entries.push(InterpretationLineageEntryV1 {
+            declaration_id: declaration_id.to_string(),
+            eligibility_id: eligible.eligibility_id().to_string(),
+            interpretation_root_id,
         });
     }
     entries.sort_by(|a, b| a.declaration_id.cmp(&b.declaration_id));
 
-    let roots_by_id: HashMap<&str, &InterpretationLineageEntryV1> = entries
+    let mut roots = roots_by_id.into_values().collect::<Vec<_>>();
+    roots.sort_by(|a, b| a.interpretation_root_id.cmp(&b.interpretation_root_id));
+    let root_lookup: HashMap<&str, &InterpretationRootV1> = roots
         .iter()
-        .map(|entry| (entry.interpretation_root_id.as_str(), entry))
+        .map(|root| (root.interpretation_root_id.as_str(), root))
         .collect();
-    let present_roots: HashSet<&str> = roots_by_id.keys().copied().collect();
 
     let mut qualifications_by_pair: HashMap<
         (&str, &str),
@@ -404,11 +430,12 @@ pub fn assemble_interpretation_lineage_v1(
         if record.permitted_use != context_raw.use_case {
             return Err(InterpretationLineageError::IndependenceQualificationUseMismatch);
         }
-        if !present_roots.contains(record.left_interpretation_root_id.as_str())
-            || !present_roots.contains(record.right_interpretation_root_id.as_str())
-        {
+        let Some(left_owner) = root_lookup.get(record.left_interpretation_root_id.as_str()) else {
             return Err(InterpretationLineageError::UnexpectedIndependenceQualificationPair);
-        }
+        };
+        let Some(right_owner) = root_lookup.get(record.right_interpretation_root_id.as_str()) else {
+            return Err(InterpretationLineageError::UnexpectedIndependenceQualificationPair);
+        };
         if context_raw.now_unix_ms < record.qualified_at_unix_ms {
             return Err(InterpretationLineageError::IndependenceQualificationNotYetValid {
                 qualified_at_unix_ms: record.qualified_at_unix_ms,
@@ -421,19 +448,11 @@ pub fn assemble_interpretation_lineage_v1(
                 now_unix_ms: context_raw.now_unix_ms,
             });
         }
-
-        let left_owner = roots_by_id
-            .get(record.left_interpretation_root_id.as_str())
-            .expect("present root must have owner");
-        let right_owner = roots_by_id
-            .get(record.right_interpretation_root_id.as_str())
-            .expect("present root must have owner");
         if record.qualifier_id == left_owner.declarer_id
             || record.qualifier_id == right_owner.declarer_id
         {
             return Err(InterpretationLineageError::DirectInterpretationSelfQualification);
         }
-
         let key = (
             record.left_interpretation_root_id.as_str(),
             record.right_interpretation_root_id.as_str(),
@@ -443,31 +462,19 @@ pub fn assemble_interpretation_lineage_v1(
         }
     }
 
-    let mut pair_assessments = Vec::new();
-    for left_index in 0..entries.len() {
-        for right_index in (left_index + 1)..entries.len() {
-            let left = &entries[left_index];
-            let right = &entries[right_index];
-            if left.interpretation_root_id == right.interpretation_root_id {
-                pair_assessments.push(InterpretationPairAssessmentV1 {
-                    left_declaration_id: left.declaration_id.clone(),
-                    right_declaration_id: right.declaration_id.clone(),
-                    left_interpretation_root_id: left.interpretation_root_id.clone(),
-                    right_interpretation_root_id: right.interpretation_root_id.clone(),
-                    status: InterpretationIndependenceStatusV1::SameInterpretationRoot,
-                    qualification_id: None,
-                });
-                continue;
-            }
-
-            let (left_root, right_root) = canonical_pair(
-                left.interpretation_root_id.as_str(),
-                right.interpretation_root_id.as_str(),
-            );
-            let qualification = qualifications_by_pair.get(&(left_root, right_root)).copied();
-            pair_assessments.push(InterpretationPairAssessmentV1 {
-                left_declaration_id: left.declaration_id.clone(),
-                right_declaration_id: right.declaration_id.clone(),
+    let mut root_pair_assessments = Vec::with_capacity(pair_count(roots.len()));
+    for left_index in 0..roots.len() {
+        for right_index in (left_index + 1)..roots.len() {
+            let left = &roots[left_index];
+            let right = &roots[right_index];
+            debug_assert!(left.interpretation_root_id < right.interpretation_root_id);
+            let qualification = qualifications_by_pair
+                .get(&(
+                    left.interpretation_root_id.as_str(),
+                    right.interpretation_root_id.as_str(),
+                ))
+                .copied();
+            root_pair_assessments.push(InterpretationRootPairAssessmentV1 {
                 left_interpretation_root_id: left.interpretation_root_id.clone(),
                 right_interpretation_root_id: right.interpretation_root_id.clone(),
                 status: if qualification.is_some() {
@@ -486,7 +493,8 @@ pub fn assemble_interpretation_lineage_v1(
         &context_raw.proposition_id,
         &context_commitment,
         &entries,
-        &pair_assessments,
+        &roots,
+        &root_pair_assessments,
     );
 
     Ok(InterpretationLineageV1 {
@@ -497,7 +505,8 @@ pub fn assemble_interpretation_lineage_v1(
         proposition_id: context_raw.proposition_id.clone(),
         eligibility_context_commitment: context_commitment,
         entries,
-        pair_assessments,
+        roots,
+        root_pair_assessments,
     })
 }
 
@@ -638,7 +647,8 @@ fn interpretation_lineage_id_v1(
     proposition_id: &str,
     context_commitment: &str,
     entries: &[InterpretationLineageEntryV1],
-    pairs: &[InterpretationPairAssessmentV1],
+    roots: &[InterpretationRootV1],
+    root_pairs: &[InterpretationRootPairAssessmentV1],
 ) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(LINEAGE_ID_DOMAIN);
@@ -664,33 +674,31 @@ fn interpretation_lineage_id_v1(
         hash_text(&mut hasher, b"eligibility_id", &entry.eligibility_id);
         hash_text(
             &mut hasher,
-            b"interpretation_root_id",
+            b"entry_interpretation_root_id",
             &entry.interpretation_root_id,
         );
-        hash_text(&mut hasher, b"declarer_id", &entry.declarer_id);
+    }
+    hash_count(&mut hasher, b"root_count", roots.len());
+    for root in roots {
+        hash_text(
+            &mut hasher,
+            b"interpretation_root_id",
+            &root.interpretation_root_id,
+        );
+        hash_text(&mut hasher, b"declarer_id", &root.declarer_id);
         hash_option_text(
             &mut hasher,
             b"declarer_version",
-            entry.declarer_version.as_deref(),
+            root.declarer_version.as_deref(),
         );
         hash_text(
             &mut hasher,
             b"declaration_method",
-            declaration_method_tag(entry.declaration_method),
+            declaration_method_tag(root.declaration_method),
         );
     }
-    hash_count(&mut hasher, b"pair_count", pairs.len());
-    for pair in pairs {
-        hash_text(
-            &mut hasher,
-            b"left_declaration_id",
-            &pair.left_declaration_id,
-        );
-        hash_text(
-            &mut hasher,
-            b"right_declaration_id",
-            &pair.right_declaration_id,
-        );
+    hash_count(&mut hasher, b"root_pair_count", root_pairs.len());
+    for pair in root_pairs {
         hash_text(
             &mut hasher,
             b"left_interpretation_root_id",
@@ -715,14 +723,6 @@ fn interpretation_lineage_id_v1(
     format!("blake3:{}", hasher.finalize().to_hex())
 }
 
-fn canonical_pair<'a>(left: &'a str, right: &'a str) -> (&'a str, &'a str) {
-    if left <= right {
-        (left, right)
-    } else {
-        (right, left)
-    }
-}
-
 fn declaration_method_tag(method: RelationDeclarationMethodV1) -> &'static str {
     match method {
         RelationDeclarationMethodV1::HumanAnnotation => "human_annotation",
@@ -741,12 +741,15 @@ fn relation_use_tag(use_case: RelationDeclarationUseV1) -> &'static str {
 
 fn independence_status_tag(status: InterpretationIndependenceStatusV1) -> &'static str {
     match status {
-        InterpretationIndependenceStatusV1::SameInterpretationRoot => "same_interpretation_root",
         InterpretationIndependenceStatusV1::DistinctRootsIndependenceUnknown => {
             "distinct_roots_independence_unknown"
         }
         InterpretationIndependenceStatusV1::IndependenceQualified => "independence_qualified",
     }
+}
+
+fn pair_count(root_count: usize) -> usize {
+    root_count.saturating_mul(root_count.saturating_sub(1)) / 2
 }
 
 fn validate_nonempty(
@@ -842,6 +845,7 @@ pub enum InterpretationLineageError {
     EligibilityContextMismatch,
     DuplicateDeclarationId { declaration_id: String },
     DuplicateEligibilityId { eligibility_id: String },
+    InterpretationRootIdentityCollision,
     IndependenceQualificationPropositionMismatch,
     IndependenceQualificationUseMismatch,
     UnexpectedIndependenceQualificationPair,
@@ -912,6 +916,9 @@ impl std::fmt::Display for InterpretationLineageError {
                 f,
                 "duplicate eligibility id in interpretation lineage: {eligibility_id}"
             ),
+            Self::InterpretationRootIdentityCollision => {
+                f.write_str("interpretation root identity resolved to inconsistent owner metadata")
+            }
             Self::IndependenceQualificationPropositionMismatch => f.write_str(
                 "interpretation-independence qualification proposition mismatch",
             ),
@@ -1069,14 +1076,12 @@ mod tests {
         let b = eligible("rule-a", "v1", '3', '4', 150);
         let lineage = assemble_interpretation_lineage_v1(&[a, b], &context(150), &[]).unwrap();
         assert_eq!(lineage.entries().len(), 2);
+        assert_eq!(lineage.roots().len(), 1);
         assert_eq!(
             lineage.entries()[0].interpretation_root_id(),
             lineage.entries()[1].interpretation_root_id()
         );
-        assert_eq!(
-            lineage.pair_assessments()[0].status(),
-            InterpretationIndependenceStatusV1::SameInterpretationRoot
-        );
+        assert!(lineage.root_pair_assessments().is_empty());
     }
 
     #[test]
@@ -1084,13 +1089,12 @@ mod tests {
         let a = eligible("rule-a", "v1", '1', '2', 150);
         let b = eligible("rule-b", "v1", '3', '4', 150);
         let lineage = assemble_interpretation_lineage_v1(&[a, b], &context(150), &[]).unwrap();
+        assert_eq!(lineage.roots().len(), 2);
+        assert_eq!(lineage.root_pair_assessments().len(), 1);
         assert_eq!(
-            lineage.pair_assessments()[0].status(),
+            lineage.root_pair_assessments()[0].status(),
             InterpretationIndependenceStatusV1::DistinctRootsIndependenceUnknown
         );
-        assert!(lineage.pair_assessments().iter().all(|pair| {
-            pair.status() != InterpretationIndependenceStatusV1::IndependenceQualified
-        }));
     }
 
     #[test]
@@ -1101,8 +1105,8 @@ mod tests {
             assemble_interpretation_lineage_v1(&[a.clone(), b.clone()], &context(150), &[])
                 .unwrap();
         let qualification = independence_qualification(
-            baseline.entries()[0].interpretation_root_id(),
-            baseline.entries()[1].interpretation_root_id(),
+            baseline.roots()[0].interpretation_root_id(),
+            baseline.roots()[1].interpretation_root_id(),
             "independence-authority",
         );
         let lineage = assemble_interpretation_lineage_v1(
@@ -1112,13 +1116,26 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            lineage.pair_assessments()[0].status(),
+            lineage.root_pair_assessments()[0].status(),
             InterpretationIndependenceStatusV1::IndependenceQualified
         );
         assert_eq!(
-            lineage.pair_assessments()[0].qualification_id(),
+            lineage.root_pair_assessments()[0].qualification_id(),
             Some(qualification.qualification_id())
         );
+    }
+
+    #[test]
+    fn multiple_declarations_do_not_duplicate_root_pair_edges() {
+        let a1 = eligible("rule-a", "v1", '1', '2', 150);
+        let a2 = eligible("rule-a", "v1", '3', '4', 150);
+        let b1 = eligible("rule-b", "v1", '5', '6', 150);
+        let b2 = eligible("rule-b", "v1", '7', '8', 150);
+        let lineage =
+            assemble_interpretation_lineage_v1(&[a1, a2, b1, b2], &context(150), &[]).unwrap();
+        assert_eq!(lineage.entries().len(), 4);
+        assert_eq!(lineage.roots().len(), 2);
+        assert_eq!(lineage.root_pair_assessments().len(), 1);
     }
 
     #[test]
@@ -1126,8 +1143,8 @@ mod tests {
         let a = eligible("rule-a", "v1", '1', '2', 150);
         let b = eligible("rule-b", "v1", '3', '4', 150);
         let baseline = assemble_interpretation_lineage_v1(&[a, b], &context(150), &[]).unwrap();
-        let left = baseline.entries()[0].interpretation_root_id();
-        let right = baseline.entries()[1].interpretation_root_id();
+        let left = baseline.roots()[0].interpretation_root_id();
+        let right = baseline.roots()[1].interpretation_root_id();
         let forward = independence_qualification(left, right, "independence-authority");
         let reverse = independence_qualification(right, left, "independence-authority");
         assert_eq!(forward, reverse);
@@ -1140,7 +1157,7 @@ mod tests {
         let lineage =
             assemble_interpretation_lineage_v1(std::slice::from_ref(&a), &context(150), &[])
                 .unwrap();
-        let root = lineage.entries()[0].interpretation_root_id();
+        let root = lineage.roots()[0].interpretation_root_id();
         let raw = InterpretationIndependenceQualificationV1 {
             schema_version: INTERPRETATION_INDEPENDENCE_QUALIFICATION_SCHEMA_VERSION,
             left_interpretation_root_id: root.into(),
@@ -1170,8 +1187,8 @@ mod tests {
             assemble_interpretation_lineage_v1(&[a.clone(), b.clone()], &context(150), &[])
                 .unwrap();
         let qualification = independence_qualification(
-            baseline.entries()[0].interpretation_root_id(),
-            baseline.entries()[1].interpretation_root_id(),
+            baseline.roots()[0].interpretation_root_id(),
+            baseline.roots()[1].interpretation_root_id(),
             "rule-a",
         );
         assert_eq!(
@@ -1198,8 +1215,8 @@ mod tests {
             assemble_interpretation_lineage_v1(&[a.clone(), b.clone()], &context(250), &[])
                 .unwrap();
         let mut raw = independence_qualification(
-            baseline.entries()[0].interpretation_root_id(),
-            baseline.entries()[1].interpretation_root_id(),
+            baseline.roots()[0].interpretation_root_id(),
+            baseline.roots()[1].interpretation_root_id(),
             "independence-authority",
         )
         .record()
@@ -1218,8 +1235,8 @@ mod tests {
         let b = eligible("rule-b", "v1", '3', '4', 150);
         let baseline = assemble_interpretation_lineage_v1(&[a, b], &context(150), &[]).unwrap();
         let registered = independence_qualification(
-            baseline.entries()[0].interpretation_root_id(),
-            baseline.entries()[1].interpretation_root_id(),
+            baseline.roots()[0].interpretation_root_id(),
+            baseline.roots()[1].interpretation_root_id(),
             "independence-authority",
         );
         let encoded = serde_json::to_string(&registered).unwrap();
