@@ -1,0 +1,158 @@
+name: IoT Transport Current Fence
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-transport-current-fence/**'
+      - '.github/workflows/iot-transport-current-fence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-transport-current-fence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+
+      - name: Current transport fence source contract
+        shell: python
+        run: |
+          from pathlib import Path
+          import tomllib
+
+          root = Path('crates/bridges/symthaea-iot-transport-current-fence')
+          src = (root / 'src/lib.rs').read_text()
+          code = '\n'.join(
+              line for line in src.splitlines()
+              if not line.lstrip().startswith('//')
+          )
+          required = [
+              'pub struct CurrentXeniaTransportFenceGuard',
+              'registry: TransportTrustRegistry',
+              'anchored_current_head: TransportTrustHead',
+              'pub fn fence_current',
+              'SystemTime::now()',
+              'proof.transport_trust_head()',
+              'proof.revalidated_at_unix_ms()',
+              'key.attestor_id == proof.attestor_id()',
+              'key.key_id == proof.key_id()',
+              'current_key.digest()? != proof.transport_key_digest()',
+              'current_key.not_after_unix_ms != proof.transport_key_not_after_unix_ms()',
+              'snapshot.expires_at_unix_ms != proof.trust_snapshot_expires_at_unix_ms()',
+              'proof.receipt_expires_at_unix_ms()',
+              'expected_valid_until != proof.valid_until_unix_ms()',
+              'pub struct CurrentXeniaTransportFence',
+              "_guard: &'a CurrentXeniaTransportFenceGuard",
+              "proof: &'a RevalidatedXeniaTransport",
+          ]
+          missing = [needle for needle in required if needle not in code]
+          if missing:
+              raise SystemExit(f'missing current Xenia transport fence invariant: {missing}')
+
+          public_fence = code.split('pub fn fence_current', 1)[1].split('fn fence_current_at', 1)[0]
+          forbidden_public = ['now_unix_ms', 'TransportTrustRegistry', 'TransportTrustHead']
+          found_public = [needle for needle in forbidden_public if needle in public_fence]
+          if found_public:
+              raise SystemExit(f'caller-controlled current transport input: {found_public}')
+
+          # Lifecycle selection and cryptography remain in the owning upstream stages. Same-head
+          # identity/digest plus #476's captured natural deadline is the complete theorem here.
+          forbidden = [
+              'TransportAttestorStatus', '.active_at(', '.trusted_key(', 'not_before_unix_ms',
+              'HybridReceiptSignatureVerifier', 'verify_xenia_transport_receipt(',
+              'verify_xenia_physical_effect_receipt(', 'ed25519_dalek', 'fips204',
+              'FinalActuatorPermit', 'CompleteJitHalLease', 'JustInTimeHalLease',
+              'TcpListener', 'TcpStream', 'std::process::Command', 'Command::new', 'unsafe {',
+          ]
+          found = [needle for needle in forbidden if needle in code]
+          if found:
+              raise SystemExit(f'forbidden duplicated lifecycle/authority surface: {found}')
+
+          if 'pub fn fence_current_at' in code:
+              raise SystemExit('test-time clock injection must remain private')
+
+          manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+          expected = {
+              'symthaea-iot-transport-current-revalidation',
+              'symthaea-iot-transport-receipt',
+              'thiserror',
+          }
+          actual = set(manifest.get('dependencies', {}))
+          if actual != expected:
+              raise SystemExit(f'production dependency drift: {sorted(actual)}')
+
+      - name: Install Rust 1.96 formatter
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Rustfmt
+        run: cargo +1.96.0 fmt --check -p symthaea-iot-transport-current-fence
+
+      - name: Install Rust 1.94 qualification toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: clippy
+
+      - name: Verify exact qualification toolchain
+        run: |
+          rustc +1.94.0 --version | grep -F 'rustc 1.94.0'
+          cargo +1.94.0 --version | grep -F 'cargo 1.94.0'
+
+      - name: Preserve checked-in lock
+        run: cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Reconcile local workspace bookkeeping and check package
+        run: cargo +1.94.0 check -p symthaea-iot-transport-current-fence --all-targets
+
+      - name: Reject any external sourced dependency drift
+        shell: python
+        run: |
+          import tomllib
+          def sourced(path):
+              with open(path, 'rb') as f:
+                  doc = tomllib.load(f)
+              return {
+                  (p['name'], p['version'], p.get('source'))
+                  for p in doc.get('package', [])
+                  if p.get('source') is not None
+              }
+          before = sourced('/tmp/Cargo.lock.before')
+          after = sourced('Cargo.lock')
+          extra = after - before
+          removed = before - after
+          if extra or removed:
+              raise SystemExit(
+                  f'external sourced dependency drift: added={sorted(extra)}, removed={sorted(removed)}'
+              )
+
+      - name: Run real fixed-crypto current-fence regression first
+        run: >-
+          cargo +1.94.0 test -p symthaea-iot-transport-current-fence
+          --test current fixed_current_transport_can_be_borrowed_fenced_and_generation_advance_kills_it -- --exact
+
+      - name: Package tests
+        run: cargo +1.94.0 test -p symthaea-iot-transport-current-fence --all-targets
+
+      - name: Strict Clippy
+        run: cargo +1.94.0 clippy -p symthaea-iot-transport-current-fence --all-targets -- -D warnings
+
+      - name: Show local Cargo.lock bookkeeping candidate
+        if: always()
+        run: git diff -- Cargo.lock || true
