@@ -37,16 +37,17 @@ jobs:
           grep -q 'peak_attention_bits' "$production"
           grep -q 'prediction_error_ppm' "$production"
 
-          # The adapter may read only an already-completed cycle. It must not
-          # receive a mutable cognition handle or invoke the live wrapper.
-          if grep -Eq '&mut|RcaObservableCognitiveLoopV1|\.cycle\(|service_mut|into_inner|into_parts|issued_lineage|DerefMut' "$production"; then
+          # The adapter may mutate local hashing buffers, but may read only an
+          # already-completed cycle. It must never accept mutable cognition or
+          # invoke/unwrap the live wrapper.
+          if grep -Eq 'completed:[[:space:]]*&mut|&mut[[:space:]]+RcaCompletedCycleV1|RcaObservableCognitiveLoopV1|\.cycle\(|service_mut|into_inner|into_parts|issued_lineage|DerefMut' "$production"; then
             echo 'RCA shadow adapter acquired a live/mutable cognition path.' >&2
             exit 1
           fi
 
           # Shadow receipts and observer results remain downstream data. The
           # adapter returns only a validated detached observation.
-          if grep -Eq 'ShadowObservationReceiptV1|\bobserve[[:space:]]*\(' "$production"; then
+          if grep -Eq 'ShadowObservationReceiptV1|observe[[:space:]]*\(' "$production"; then
             echo 'RCA adapter must not invoke or consume shadow observer receipts.' >&2
             exit 1
           fi
