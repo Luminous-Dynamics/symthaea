@@ -33,6 +33,7 @@ use symthaea_iot_actuation_trust_publication::{
     ActuationTrustPublicationError, CurrentActuationTrustFence,
     DurableActuationTrustPublicationStore,
 };
+use symthaea_iot_authority::DeviceCommand;
 use symthaea_iot_composed_actuation_evidence::ComposedActuationEvidence;
 use symthaea_iot_transport_current_fence::{
     CurrentXeniaTransportFence, CurrentXeniaTransportFenceError, CurrentXeniaTransportFenceGuard,
@@ -208,14 +209,27 @@ impl CurrentActuationAttempt<'_> {
         self.composition.composition_digest()
     }
 
-    pub fn device(&self) -> &ResourceRef {
+    /// Exact command already committed by the composed evidence and all retained current fences.
+    ///
+    /// A physical-effect adapter should consume this view rather than accept a caller-supplied
+    /// command clone, so the bytes/parameters that reach the adapter cannot diverge from the
+    /// lineage that was linearized.
+    pub fn command(&self) -> &DeviceCommand {
         &self
             .composition
             .semantic_acceptance()
             .admission_reservation()
             .envelope()
             .command
-            .device
+    }
+
+    pub fn device(&self) -> &ResourceRef {
+        &self.command().device
+    }
+
+    /// Exact physical-effect envelope commitment shared by the complete linearized lineage.
+    pub fn envelope_digest(&self) -> Digest32 {
+        self.composition.transport().envelope_digest()
     }
 
     pub const fn common_fenced_at_unix_ms(&self) -> u64 {
