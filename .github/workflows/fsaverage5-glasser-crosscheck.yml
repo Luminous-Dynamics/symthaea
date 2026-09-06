@@ -1,0 +1,62 @@
+name: Fsaverage5 Glasser Crosscheck
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/compile_fsaverage5_glasser_map.py'
+      - 'scripts/test_compile_fsaverage5_glasser_map.py'
+      - 'scripts/compare_fsaverage5_glasser_maps.py'
+      - 'scripts/test_compare_fsaverage5_glasser_maps.py'
+      - 'data/neuroscience/hcp_mmp1_area_order_v1.json'
+      - 'docs/neuroscience/FSAVERAGE5_GLASSER_CROSSCHECK_V1.md'
+      - 'docs/neuroscience/FSAVERAGE5_GLASSER_TRANSFORM_QUALIFICATION_V1.md'
+      - '.github/workflows/fsaverage5-glasser-crosscheck.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Qualify independent-lineage comparison mechanism
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax contract
+        run: |
+          python -m py_compile \
+            scripts/compile_fsaverage5_glasser_map.py \
+            scripts/test_compile_fsaverage5_glasser_map.py \
+            scripts/compare_fsaverage5_glasser_maps.py \
+            scripts/test_compare_fsaverage5_glasser_maps.py
+
+      - name: Mapping compiler regression contracts
+        run: python -m unittest scripts/test_compile_fsaverage5_glasser_map.py
+
+      - name: Independent-lineage crosscheck contracts
+        run: python -m unittest scripts/test_compare_fsaverage5_glasser_maps.py
+
+      - name: Scientific authority ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          SCRIPT=scripts/compare_fsaverage5_glasser_maps.py
+          DOC=docs/neuroscience/FSAVERAGE5_GLASSER_CROSSCHECK_V1.md
+
+          grep -Fq 'independence_established": False' "$SCRIPT"
+          grep -Fq 'requires_external_provenance_review' "$SCRIPT"
+          grep -Fq 'no built-in permissive percentage threshold' "$DOC"
+          grep -Fq 'no real independent-lineage comparison has qualified yet' "$DOC"
+          grep -Fq '13 synthetic contract tests' "$DOC"
+
+      - name: CLI contract
+        run: python scripts/compare_fsaverage5_glasser_maps.py --help
