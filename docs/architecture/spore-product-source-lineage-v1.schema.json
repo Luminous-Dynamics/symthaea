@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/spore/spore-product-source-lineage-v1.schema.json",
+  "title": "Spore Product Source Lineage v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "destination_repository",
+    "destination_repository_status",
+    "qualification_transfer_policy",
+    "host_pin",
+    "recovery_source",
+    "artifacts",
+    "findings",
+    "required_pre_extraction_repairs"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema": { "const": "spore-product-source-lineage-v1" },
+    "destination_repository": { "const": "Luminous-Dynamics/spore" },
+    "destination_repository_status": { "const": "not-created" },
+    "qualification_transfer_policy": { "const": "never-inherit" },
+    "host_pin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository","branch","commit","tree","flake_lock_path","flake_lock_blob_sha1","input_name","input_flake","input_repository","input_revision","input_nar_hash"],
+      "properties": {
+        "repository": { "const": "Tristan-Stoltz-ERC/nixos-config" },
+        "branch": { "const": "spore/runtime-expendability-v1.3.2-proof" },
+        "commit": { "const": "5d80360768ee329c50756e71fbce4692ac3a8e45" },
+        "tree": { "const": "51c04910b3a97586ecf88a46699b7de22e3e1b0b" },
+        "flake_lock_path": { "const": "flake.lock" },
+        "flake_lock_blob_sha1": { "const": "2ff122e7f9cc7fde5ad6cb8fcc18453513915b67" },
+        "input_name": { "const": "symthaea" },
+        "input_flake": { "const": false },
+        "input_repository": { "const": "Luminous-Dynamics/luminous-dynamics" },
+        "input_revision": { "const": "4fe8b1e2ca5fb60463de16c0b9ec649e1fc059a2" },
+        "input_nar_hash": { "const": "sha256-G/SffFTFiEyLmQ4Y9O6vEhrEM0kLLi/7lwQ6b22/1JA=" }
+      }
+    },
+    "recovery_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository","branch","commit","tree","historical_qualification","destination_qualification"],
+      "properties": {
+        "repository": { "const": "Luminous-Dynamics/luminous-dynamics" },
+        "branch": { "const": "spore/recovery-v0.3.4f-qualified" },
+        "commit": { "const": "4fe8b1e2ca5fb60463de16c0b9ec649e1fc059a2" },
+        "tree": { "const": "d53df873dd204738fe669066ca9aa22db88b22c1" },
+        "historical_qualification": { "const": "source-lineage-only" },
+        "destination_qualification": { "const": "NOT_ESTABLISHED" }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id","path","blob_sha1","role","target_owner","migration_kind","destination_path"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "blob_sha1": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+          "role": { "type": "string", "minLength": 1 },
+          "target_owner": { "enum": ["spore","split-required"] },
+          "migration_kind": { "enum": ["move-or-transform","transform","split"] },
+          "destination_path": { "type": "null" }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["id","severity","status","statement"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^SRC-[0-9]{3}$" },
+          "severity": { "enum": ["architectural","authority"] },
+          "status": { "const": "OPEN" },
+          "tracking_issue": { "type": "string", "minLength": 1 },
+          "statement": { "type": "string", "minLength": 20 }
+        }
+      }
+    },
+    "required_pre_extraction_repairs": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id","status","statement"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^REPAIR-[0-9]{3}$" },
+          "status": { "const": "REQUIRED" },
+          "statement": { "type": "string", "minLength": 20 }
+        }
+      }
+    }
+  }
+}
