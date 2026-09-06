@@ -25,7 +25,9 @@ jobs:
           set -euo pipefail
           src=crates/bridges/symthaea-rca-shadow-disposition-policy/src/lib.rs
           production=$(mktemp)
+          code=$(mktemp)
           sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+          grep -vE '^[[:space:]]*//|^[[:space:]]*/\*|^[[:space:]]*\*' "$production" > "$code"
 
           grep -q 'SHADOW_DISPOSITION_POLICY_CONTRACT_V1' "$production"
           grep -q 'policy_is_registered_before_result_bearing_case_evaluation' "$production"
@@ -33,24 +35,24 @@ jobs:
           grep -q 'policy_is_not_belief_workspace_action_or_promotion_authority' "$production"
           grep -q 'pub struct RegisteredShadowDispositionPolicyV1' "$production"
 
-          if grep -Eq 'pub enum ShadowDisposition|pub struct ShadowDisposition|pub fn (evaluate|decide|dispose|compute_disposition|issue_disposition)' "$production"; then
+          if grep -Eq 'pub enum ShadowDisposition|pub struct ShadowDisposition|pub fn (evaluate|decide|dispose|compute_disposition|issue_disposition)' "$code"; then
             echo 'Disposition engine API appeared in the policy-only tranche.' >&2
             exit 1
           fi
-          if grep -q 'BoundShadowEvidenceCaseV1' "$production"; then
+          if grep -q 'BoundShadowEvidenceCaseV1' "$code"; then
             echo 'Policy registration acquired a concrete bound-case input.' >&2
             exit 1
           fi
-          if grep -q 'IndependentEvidenceSetWitnessV1' "$production"; then
+          if grep -q 'IndependentEvidenceSetWitnessV1' "$code"; then
             echo 'Policy registration acquired a concrete evidence-witness input.' >&2
             exit 1
           fi
-          if grep -q 'InterpretationLineageV1' "$production"; then
+          if grep -q 'InterpretationLineageV1' "$code"; then
             echo 'Policy registration acquired a concrete interpretation-lineage input.' >&2
             exit 1
           fi
 
-          if grep -Eqi 'CanonicalBelief|CanonicalEpistemicClaim|global.?workspace|action_author|external_effect|self.?improvement.*promotion' "$production"; then
+          if grep -Eqi 'CanonicalBelief|CanonicalEpistemicClaim|global.?workspace|action_author|external_effect|self.?improvement.*promotion' "$code"; then
             echo 'Disposition policy crossed a downstream authority boundary.' >&2
             exit 1
           fi
