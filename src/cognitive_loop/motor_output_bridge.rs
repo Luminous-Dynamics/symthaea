@@ -264,10 +264,30 @@ impl MotorOutputBridge {
         current_phi: f64,
         request: &MotorActionRequest,
     ) -> MotorOutputResult {
+        if !current_phi.is_finite() || !(0.0..=1.0).contains(&current_phi) {
+            return MotorOutputResult::skipped(&format!(
+                "Invalid current Phi {current_phi:?}; expected a finite value in [0, 1]"
+            ));
+        }
+
+        if !motor_confidence.is_finite() || !(0.0..=1.0).contains(&motor_confidence) {
+            return MotorOutputResult::skipped(&format!(
+                "Invalid motor confidence {motor_confidence:?}; expected a finite value in [0, 1]"
+            ));
+        }
+
         // 1. Check minimum Phi gate
         let min_phi = self
             .min_phi_override
             .unwrap_or(self.policy.capabilities.min_phi);
+        if !min_phi.is_finite() || !(0.0..=1.0).contains(&min_phi) {
+            return MotorOutputResult::failure(
+                None,
+                format!(
+                    "Invalid motor Phi threshold {min_phi:?}; expected a finite value in [0, 1]"
+                ),
+            );
+        }
         if current_phi < min_phi {
             return MotorOutputResult::skipped(&format!(
                 "Phi {current_phi:.3} below motor output threshold {min_phi:.3}"
@@ -599,6 +619,71 @@ mod tests {
                 "selector {value:?} must not coerce into an action"
             );
         }
+    }
+
+    #[test]
+    fn test_invalid_phi_fails_closed() {
+        let request = MotorActionRequest {
+            target_path: Some(PathBuf::from("/tmp/symthaea/motor_bridge/test.txt")),
+            ..Default::default()
+        };
+
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -0.1, 1.1] {
+            let mut bridge = MotorOutputBridge::with_defaults().unwrap();
+            let result = bridge.execute(&[0.0], 0.8, value, &request);
+            assert!(!result.success);
+            assert!(
+                result
+                    .error
+                    .as_deref()
+                    .unwrap_or_default()
+                    .contains("Invalid current Phi")
+            );
+            assert!(bridge.telemetry().is_empty());
+        }
+    }
+
+    #[test]
+    fn test_invalid_motor_confidence_fails_closed() {
+        let request = MotorActionRequest {
+            target_path: Some(PathBuf::from("/tmp/symthaea/motor_bridge/test.txt")),
+            ..Default::default()
+        };
+
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -0.1, 1.1] {
+            let mut bridge = MotorOutputBridge::with_defaults().unwrap();
+            let result = bridge.execute(&[0.0], value, 0.9, &request);
+            assert!(!result.success);
+            assert!(
+                result
+                    .error
+                    .as_deref()
+                    .unwrap_or_default()
+                    .contains("Invalid motor confidence")
+            );
+            assert!(bridge.telemetry().is_empty());
+        }
+    }
+
+    #[test]
+    fn test_invalid_effective_min_phi_fails_closed() {
+        let request = MotorActionRequest {
+            target_path: Some(PathBuf::from("/tmp/symthaea/motor_bridge/test.txt")),
+            ..Default::default()
+        };
+        let mut bridge = MotorOutputBridge::with_defaults()
+            .unwrap()
+            .with_min_phi(f64::NAN);
+        let result = bridge.execute(&[0.0], 0.8, 0.9, &request);
+        assert!(!result.success);
+        assert!(
+            result
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("Invalid motor Phi threshold")
+        );
+        assert!(bridge.telemetry().is_empty());
     }
 
     #[test]
