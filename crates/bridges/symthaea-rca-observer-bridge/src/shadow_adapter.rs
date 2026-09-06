@@ -5,17 +5,18 @@
 //! Pure RCA-002.1 projection from a provenance-bound completed cycle into the
 //! isolated shadow-observation contract.
 //!
-//! This module has no route back into `RcaObservableCognitiveLoopV1`. It borrows
-//! one already-completed cycle, produces owned detached data, validates that
-//! data through `symthaea-rca-shadow`, and returns only the validated observation.
+//! This module borrows one already-completed cycle, produces owned detached
+//! data, validates that data through `symthaea-rca-shadow`, and returns only the
+//! validated observation. It has no route back into the live cognitive wrapper.
 
+use symthaea::cognitive_loop::CycleUrgency;
 use symthaea_rca_shadow::{
     COGNITIVE_PROBABILITY_SCALE, FROZEN_CYCLE_OBSERVATION_SCHEMA_VERSION,
     FrozenCycleObservationV1, ShadowObservationError, ValidatedFrozenCycleObservationV1,
 };
 use thiserror::Error;
 
-use super::{RcaCompletedCycleV1, encode_value_v1};
+use super::RcaCompletedCycleV1;
 
 pub const RCA_CYCLE_ADAPTER_PROFILE_V1: &str = "rca-cycle-result-shadow-projection-v1";
 
@@ -36,10 +37,11 @@ pub const RCA_CYCLE_ADAPTER_CONTRACT_V1: &str = concat!(
     "detected_primitive_count=checked_u32_len_only;primitive_identities_excluded_v1\n",
     "output_digest=blake3_domain|u64le_len|ordered_f32_to_bits_le\n",
     "thought_digest=blake3_domain|u64le_len|ordered_f32_to_bits_le\n",
-    "metadata_digest=blake3_domain|canonical_value_tree_v1(CycleMetadata)\n",
+    "metadata_digest=blake3_domain|labelled_exact_fields_v1\n",
+    "metadata_fields=surprise_triggered,prefrontal_veto,reasoning_confidence_bits,reasoning_gate_evaluated,reasoning_gate_blocked,predictive_self_safety_bits,predictive_behavioral_error_bits,narrative_gwt_veto,urgency_code,epistemic_quality_bits,epistemic_conflict_count_u64,epistemic_gate_confidence_bits,epistemic_gate_approved,metacognitive_anomaly,safety_blocked,feedback_conflict_ratio_bits,cross_module_agreement_bits,prediction_coherence_bits,startup_suppressed,self_model_accuracy_bits,predictive_budget_gated\n",
     "language_output_digest=optional_blake3_domain|u64le_utf8_len|exact_utf8\n",
     "language_source=CycleResult.language_source_exact_when_output_present\n",
-    "excluded_v1=training_loss,bits_saved_persist,bits_saved_zero,bits_kappa,recall_fired,recall_similarity,recall_matched_timestamp,wisdom_hv,feature_gated_cycle_payloads,detected_primitive_identities\n",
+    "excluded_v1=training_loss,bits_saved_persist,bits_saved_zero,bits_kappa,recall_fired,recall_similarity,recall_matched_timestamp,wisdom_hv,feature_gated_cycle_payloads,detected_primitive_identities,all_CycleMetadata_fields_not_listed_in_metadata_fields\n",
     "no_shadow_receipt_or_control_value_is_returned_to_cognition\n",
 );
 
@@ -74,11 +76,7 @@ pub fn adapt_completed_cycle_v1(
 
     let output_digest = hash_f32_slice(OUTPUT_DOMAIN, &result.output);
     let thought_digest = hash_f32_slice(THOUGHT_DOMAIN, &result.thought_vector);
-
-    let metadata_value = serde_json::to_value(&result.metadata)?;
-    let mut metadata_bytes = Vec::new();
-    encode_value_v1(&metadata_value, &mut metadata_bytes);
-    let metadata_digest = hash_bytes(METADATA_DOMAIN, &metadata_bytes);
+    let metadata_digest = metadata_digest_v1(&result.metadata)?;
 
     let language_output_digest = result
         .language_output
@@ -113,8 +111,8 @@ pub enum RcaShadowAdapterError {
     PredictionErrorOutsideUnitInterval { value_bits: u32 },
     #[error("detected primitive count {found} does not fit in shadow schema u32")]
     PrimitiveCountOverflow { found: usize },
-    #[error("cannot serialize CycleMetadata for the declared v1 projection: {0}")]
-    MetadataProjection(#[from] serde_json::Error),
+    #[error("metadata field {field} value {found} does not fit canonical u64 encoding")]
+    MetadataCountOverflow { field: &'static str, found: usize },
     #[error("detached shadow observation failed validation: {0}")]
     ShadowValidation(ShadowObservationError),
 }
@@ -128,6 +126,136 @@ fn prediction_error_to_ppm(value: f32) -> Result<u32, RcaShadowAdapterError> {
 
     let scaled = (f64::from(value) * f64::from(COGNITIVE_PROBABILITY_SCALE)).round();
     Ok(scaled as u32)
+}
+
+fn metadata_digest_v1(
+    metadata: &symthaea::cognitive_loop::CycleMetadata,
+) -> Result<String, RcaShadowAdapterError> {
+    let epistemic_conflict_count = u64::try_from(metadata.epistemic_conflict_count).map_err(|_| {
+        RcaShadowAdapterError::MetadataCountOverflow {
+            field: "epistemic_conflict_count",
+            found: metadata.epistemic_conflict_count,
+        }
+    })?;
+
+    let urgency_code = match metadata.urgency {
+        CycleUrgency::Cruise => 0_u8,
+        CycleUrgency::Normal => 1_u8,
+        CycleUrgency::Critical => 2_u8,
+    };
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(METADATA_DOMAIN);
+    hash_field(
+        &mut hasher,
+        b"surprise_triggered",
+        &[u8::from(metadata.surprise_triggered)],
+    );
+    hash_field(
+        &mut hasher,
+        b"prefrontal_veto",
+        &[u8::from(metadata.prefrontal_veto)],
+    );
+    hash_field(
+        &mut hasher,
+        b"reasoning_confidence_bits",
+        &metadata.reasoning_confidence.to_bits().to_le_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"reasoning_gate_evaluated",
+        &[u8::from(metadata.reasoning_gate_evaluated)],
+    );
+    hash_field(
+        &mut hasher,
+        b"reasoning_gate_blocked",
+        &[u8::from(metadata.reasoning_gate_blocked)],
+    );
+    hash_field(
+        &mut hasher,
+        b"predictive_self_safety_bits",
+        &metadata.predictive_self_safety.to_bits().to_le_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"predictive_behavioral_error_bits",
+        &metadata.predictive_behavioral_error.to_bits().to_le_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"narrative_gwt_veto",
+        &[u8::from(metadata.narrative_gwt_veto)],
+    );
+    hash_field(&mut hasher, b"urgency_code", &[urgency_code]);
+    hash_field(
+        &mut hasher,
+        b"epistemic_quality_bits",
+        &metadata.epistemic_quality.to_bits().to_le_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"epistemic_conflict_count_u64",
+        &epistemic_conflict_count.to_le_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"epistemic_gate_confidence_bits",
+        &metadata.epistemic_gate_confidence.to_bits().to_le_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"epistemic_gate_approved",
+        &[u8::from(metadata.epistemic_gate_approved)],
+    );
+    hash_field(
+        &mut hasher,
+        b"metacognitive_anomaly",
+        &[u8::from(metadata.metacognitive_anomaly)],
+    );
+    hash_field(
+        &mut hasher,
+        b"safety_blocked",
+        &[u8::from(metadata.safety_blocked)],
+    );
+    hash_field(
+        &mut hasher,
+        b"feedback_conflict_ratio_bits",
+        &metadata.feedback_conflict_ratio.to_bits().to_le_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"cross_module_agreement_bits",
+        &metadata.cross_module_agreement.to_bits().to_le_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"prediction_coherence_bits",
+        &metadata.prediction_coherence.to_bits().to_le_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"startup_suppressed",
+        &[u8::from(metadata.startup_suppressed)],
+    );
+    hash_field(
+        &mut hasher,
+        b"self_model_accuracy_bits",
+        &metadata.self_model_accuracy.to_bits().to_le_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"predictive_budget_gated",
+        &[u8::from(metadata.predictive_budget_gated)],
+    );
+
+    Ok(format!("blake3:{}", hasher.finalize().to_hex()))
+}
+
+fn hash_field(hasher: &mut blake3::Hasher, label: &[u8], value: &[u8]) {
+    hasher.update(&(label.len() as u64).to_le_bytes());
+    hasher.update(label);
+    hasher.update(&(value.len() as u64).to_le_bytes());
+    hasher.update(value);
 }
 
 fn hash_f32_slice(domain: &[u8], values: &[f32]) -> String {
@@ -219,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    fn metadata_commitment_changes_with_admitted_metadata_projection() {
+    fn admitted_metadata_field_changes_metadata_commitment() {
         let mut completed = completed_cycle();
         let original = adapt_completed_cycle_v1(&completed).unwrap();
         completed.result.metadata.surprise_triggered =
@@ -229,6 +357,16 @@ mod tests {
             original.as_raw().metadata_digest,
             changed.as_raw().metadata_digest
         );
+    }
+
+    #[test]
+    fn unlisted_metadata_field_does_not_silently_widen_v1_projection() {
+        let mut completed = completed_cycle();
+        let original = adapt_completed_cycle_v1(&completed).unwrap();
+        completed.result.metadata.cycle_reward =
+            f32::from_bits(completed.result.metadata.cycle_reward.to_bits() ^ 1);
+        let changed = adapt_completed_cycle_v1(&completed).unwrap();
+        assert_eq!(original, changed);
     }
 
     #[test]
