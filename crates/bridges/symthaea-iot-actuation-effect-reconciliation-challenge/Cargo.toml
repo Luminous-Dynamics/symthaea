@@ -1,0 +1,24 @@
+[package]
+name = "symthaea-iot-actuation-effect-reconciliation-challenge"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Fresh challenge binding for reconciliation of unresolved physical-effect attempts"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "safety", "reconciliation", "attestation"]
+categories = ["embedded"]
+
+[dependencies]
+bincode = { workspace = true }
+blake3 = { workspace = true }
+getrandom = { workspace = true }
+serde = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-actuation-effect-attempt-journal = { path = "../symthaea-iot-actuation-effect-attempt-journal" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+symthaea-iot-actuation-effect-dispatch = { path = "../symthaea-iot-actuation-effect-dispatch", features = ["qualification-legacy-unjournaled"] }
