@@ -1,0 +1,136 @@
+name: HCPMMP neuromaps Lineage B
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/derive_hcpmmp1_neuromaps_lineage_b.py'
+      - 'scripts/hcpmmp_neuromaps_common.py'
+      - 'scripts/hcpmmp_neuromaps_gifti.py'
+      - 'scripts/test_derive_hcpmmp1_neuromaps_lineage_b.py'
+      - 'scripts/test_hcpmmp_neuromaps_source_pair.py'
+      - 'scripts/compile_fsaverage5_glasser_map.py'
+      - 'scripts/test_compile_fsaverage5_glasser_map.py'
+      - 'data/neuroscience/hcp_mmp1_area_order_v1.json'
+      - 'data/neuroscience/hcpmmp1_neuromaps_transform_method_v1.json'
+      - 'docs/neuroscience/HCPMMP1_NEUROMAPS_LINEAGE_B_V1.md'
+      - '.github/workflows/hcpmmp-neuromaps-lineage-b.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify neuromaps-method Lineage B mechanism
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax contract
+        run: |
+          python -m py_compile \
+            scripts/hcpmmp_neuromaps_common.py \
+            scripts/hcpmmp_neuromaps_gifti.py \
+            scripts/derive_hcpmmp1_neuromaps_lineage_b.py \
+            scripts/test_derive_hcpmmp1_neuromaps_lineage_b.py \
+            scripts/test_hcpmmp_neuromaps_source_pair.py
+
+      - name: Lineage B synthetic contracts
+        run: |
+          PYTHONPATH=scripts python -m unittest scripts/test_derive_hcpmmp1_neuromaps_lineage_b.py
+          PYTHONPATH=scripts python -m unittest scripts/test_hcpmmp_neuromaps_source_pair.py
+
+      - name: Preserve mapping compiler contracts
+        run: python -m unittest scripts/test_compile_fsaverage5_glasser_map.py
+
+      - name: Pinned method provenance and exact source pair
+        run: |
+          python - <<'PY'
+          import json
+          d=json.load(open('data/neuroscience/hcpmmp1_neuromaps_transform_method_v1.json'))
+          assert d['schema']=='symthaea-hcpmmp1-neuromaps-method-v1'
+          assert d['target_vertices_per_hemisphere']==10242
+          s=d['source_atlas']
+          assert s=={
+            'automatic_acquisition_permitted':False,
+            'hemisphere_pair_required':True,
+            'left_file_id':'npz0',
+            'left_filename':'Q1-Q6_RelatedParcellation210.L.CorticalAreas_dil_Colors.32k_fs_LR.dlabel.nii',
+            'provider':'BALSA/Human Connectome Project',
+            'right_file_id':'pkN9',
+            'right_filename':'Q1-Q6_RelatedParcellation210.R.CorticalAreas_dil_Colors.32k_fs_LR.dlabel.nii',
+            'scene_id':'WN56',
+            'source_bytes_status':'operator_pinned_required',
+            'study_id':'RVVG',
+          }
+          expected={
+            'hcp_left_dlabel','hcp_right_dlabel',
+            'fslr32k_left_medialwall_roi','fslr32k_left_sphere_to_fsaverage','fslr32k_left_vaavg',
+            'fslr32k_right_medialwall_roi','fslr32k_right_sphere_to_fsaverage','fslr32k_right_vaavg',
+            'fsaverage10k_left_medialwall_roi','fsaverage10k_left_sphere','fsaverage10k_left_vaavg',
+            'fsaverage10k_right_medialwall_roi','fsaverage10k_right_sphere','fsaverage10k_right_vaavg',
+          }
+          assert set(d['required_inputs'])==expected
+          p=d['method_provenance']
+          assert p['repository']=='netneurolab/neuromaps'
+          assert p['commit']=='ffcc2e0f657943ce00a1b6a968396f32250e495c'
+          assert p['transforms_blob_sha']=='cddd03f2f2f6da94119732d57b4e4d0f1f1563bd'
+          assert p['registry_blob_sha']=='f56eebc42375c11b18d4a2fca6c9ea151e1b50af'
+          assert p['atlas_fetcher_blob_sha']=='82259057dbeb847795b2b461699300e0c51f3b55'
+          assert p['label_resample_method']=='ADAP_BARY_AREA'
+          assert p['area_correction']=='average_vertex_area_metrics'
+          assert p['target_mask_profile']=='symthaea-positive-label-mask-v1'
+          assert p['license']=='CC-BY-NC-SA-4.0'
+          assert p['citation_doi']=='10.1038/s41592-022-01625-w'
+          assert d['template_bundles']['fsLR32k']['md5']=='7932b4418f63d28935b5adf67150b16f'
+          assert d['template_bundles']['fsaverage10k']['md5']=='c61384c271ee2e6b5449222281137414'
+          PY
+
+      - name: Authority ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          i=json.load(open('data/neuroscience/hcpmmp1_neuromaps_transform_method_v1.json'))['independence_contract']
+          assert i['same_atlas_root_required'] is True
+          assert i['execution_independence_requires_external_proof'] is True
+          assert i['transform_method_distinct_from_mills'] is True
+          assert i['transform_implementation_family_independent'] is False
+          assert i['semantic_normalizer_independent'] is False
+          assert i['independence_established_by_this_manifest'] is False
+          assert i['external_provenance_review_required'] is True
+          PY
+          grep -Fq 'independence_established = false' docs/neuroscience/HCPMMP1_NEUROMAPS_LINEAGE_B_V1.md
+          grep -Fq 'operator_pinned_required' docs/neuroscience/HCPMMP1_NEUROMAPS_LINEAGE_B_V1.md
+          grep -Fq 'must be distinct' scripts/hcpmmp_neuromaps_common.py
+          if grep -Eq 'independence_established["'"']?[[:space:]]*[:=][[:space:]]*true' scripts/derive_hcpmmp1_neuromaps_lineage_b.py; then
+            echo 'source must not mint independence authority' >&2
+            exit 1
+          fi
+
+      - name: No network acquisition
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Eq '(urllib|requests|http://|https://|curl|wget)' \
+            scripts/hcpmmp_neuromaps_common.py \
+            scripts/hcpmmp_neuromaps_gifti.py \
+            scripts/derive_hcpmmp1_neuromaps_lineage_b.py; then
+            echo 'derivation source must remain network-free' >&2
+            exit 1
+          fi
+
+      - name: CLI contract
+        run: |
+          python scripts/derive_hcpmmp1_neuromaps_lineage_b.py --help
+          python scripts/derive_hcpmmp1_neuromaps_lineage_b.py derive --help
+          python scripts/derive_hcpmmp1_neuromaps_lineage_b.py verify-evidence --help

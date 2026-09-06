@@ -1,0 +1,62 @@
+name: HCPMMP Lineage B Generator Provenance
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/derive_hcpmmp1_neuromaps_lineage_b.py'
+      - 'scripts/hcpmmp_neuromaps_common.py'
+      - 'scripts/hcpmmp_neuromaps_gifti.py'
+      - 'scripts/test_derive_hcpmmp1_neuromaps_lineage_b.py'
+      - 'scripts/test_hcpmmp_neuromaps_generator_provenance.py'
+      - 'docs/neuroscience/HCPMMP1_NEUROMAPS_GENERATOR_PROVENANCE_V1.md'
+      - '.github/workflows/hcpmmp-lineage-b-generator-provenance.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify Lineage B generator provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax
+        run: |
+          python -m py_compile \
+            scripts/hcpmmp_neuromaps_common.py \
+            scripts/hcpmmp_neuromaps_gifti.py \
+            scripts/derive_hcpmmp1_neuromaps_lineage_b.py \
+            scripts/test_hcpmmp_neuromaps_generator_provenance.py
+
+      - name: Generator provenance contracts
+        run: PYTHONPATH=scripts python -m unittest scripts/test_hcpmmp_neuromaps_generator_provenance.py
+
+      - name: Preserve full derivation contracts
+        run: PYTHONPATH=scripts python -m unittest scripts/test_derive_hcpmmp1_neuromaps_lineage_b.py
+
+      - name: Provenance ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=scripts/derive_hcpmmp1_neuromaps_lineage_b.py
+          grep -Fq "GENERATOR_FILE_KEYS={'common','gifti','derive'}" "$f"
+          grep -Fq 'generator_implementation_digest' "$f"
+          grep -Fq 'generator implementation changed during derivation' "$f"
+          grep -Fq 'verify_inputs(run)' "$f"
+          grep -Fq 'exact Symthaea code bytes' docs/neuroscience/HCPMMP1_NEUROMAPS_GENERATOR_PROVENANCE_V1.md
+
+      - name: No generator self-authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'does not itself prove that the code is scientifically valid' docs/neuroscience/HCPMMP1_NEUROMAPS_GENERATOR_PROVENANCE_V1.md
