@@ -107,6 +107,7 @@ fn signing_key() -> SigningKey {
 fn policy() -> EffectOutcomePolicyV1 {
     EffectOutcomePolicyV1 {
         schema_version: EFFECT_OUTCOME_POLICY_SCHEMA_VERSION,
+        generation: 3,
         device: ResourceRef("iot:valve:72".into()),
         operation: Operation("qualification.effect".into()),
         allowed_verifier_ids: BTreeSet::from([VERIFIER_ID.to_owned()]),
@@ -233,11 +234,13 @@ fn execution_and_postcondition_requires_exact_execution_window_and_fresh_observa
     let proof = guard(&policy, snapshot.clone())
         .verify_evidence_at(evidence, &challenge, issued)
         .unwrap();
+    assert_eq!(proof.policy_generation(), policy.generation);
     assert_eq!(proof.challenge_digest(), challenge.digest().unwrap());
     assert_eq!(proof.challenge_journal_generation(), challenge.journal_generation());
     assert_eq!(proof.challenge_journal_digest(), challenge.journal_digest());
 
     let current = current_guard(&policy, snapshot);
+    assert_eq!(current.anchored_policy_generation(), policy.generation);
     let fence = current.fence_current_at(&proof, issued + 1).unwrap();
     assert_eq!(fence.evidence_expires_at_unix_ms(), evidence_expires);
     assert_eq!(fence.valid_until_unix_ms(), evidence_expires);

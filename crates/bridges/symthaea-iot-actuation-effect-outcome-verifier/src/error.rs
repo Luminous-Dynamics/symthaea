@@ -22,6 +22,8 @@ pub enum EffectOutcomeError {
 
     #[error("unsupported physical-effect outcome policy schema")]
     UnsupportedPolicySchema,
+    #[error("physical-effect outcome policy generation is zero")]
+    PolicyGenerationZero,
     #[error("physical-effect outcome policy has an invalid device or operation")]
     InvalidPolicyTarget,
     #[error("physical-effect outcome policy verifier surface is invalid")]
@@ -143,6 +145,8 @@ pub enum EffectOutcomeError {
     #[error("physical-effect outcome signature is invalid")]
     InvalidEvidenceSignature,
 
+    #[error("verified outcome proof policy generation no longer matches current guard policy")]
+    CurrentProofPolicyGenerationMismatch,
     #[error("verified outcome proof policy no longer matches current guard policy")]
     CurrentProofPolicyMismatch,
     #[error("verified outcome proof trust head no longer matches current guard trust")]
