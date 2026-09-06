@@ -18,12 +18,14 @@ const EFFECT_OUTCOME_POLICY_DOMAIN: &[u8] = b"symthaea-iot-effect-outcome-policy
 
 /// Immutable guard-owned policy defining one exact device-class outcome proof profile.
 ///
-/// `exact_outcome_profile_digest` is expected to commit the class-specific semantics of execution
-/// records, postcondition sensing, non-execution log coverage and any anti-tamper assumptions. The
-/// generic guard does not infer those semantics from arbitrary telemetry.
+/// `generation` is part of the policy's cryptographic identity. This prevents policy ABA where
+/// generation N and N+2 contain byte-identical semantic rules but represent distinct authoritative
+/// publication epochs. `exact_outcome_profile_digest` commits the class-specific semantics of
+/// execution records, postcondition sensing, non-execution log coverage and anti-tamper assumptions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EffectOutcomePolicyV1 {
     pub schema_version: u16,
+    pub generation: u64,
     pub device: ResourceRef,
     pub operation: Operation,
     pub allowed_verifier_ids: BTreeSet<String>,
@@ -39,6 +41,9 @@ impl EffectOutcomePolicyV1 {
         if self.schema_version != EFFECT_OUTCOME_POLICY_SCHEMA_VERSION {
             return Err(EffectOutcomeError::UnsupportedPolicySchema);
         }
+        if self.generation == 0 {
+            return Err(EffectOutcomeError::PolicyGenerationZero);
+        }
         if !valid_id(&self.device.0, MAX_EFFECT_OUTCOME_DEVICE_ID_BYTES)
             || !valid_id(&self.operation.0, MAX_EFFECT_OUTCOME_ID_BYTES)
         {
@@ -53,9 +58,7 @@ impl EffectOutcomePolicyV1 {
         {
             return Err(EffectOutcomeError::InvalidPolicyVerifierSurface);
         }
-        if self.allowed_claim_kinds.is_empty()
-            || self.allowed_claim_kinds.len() > 2
-        {
+        if self.allowed_claim_kinds.is_empty() || self.allowed_claim_kinds.len() > 2 {
             return Err(EffectOutcomeError::InvalidPolicyClaimSurface);
         }
         if self.accepted_reference_values.is_empty()
@@ -83,6 +86,7 @@ impl EffectOutcomePolicyV1 {
         let mut h = blake3::Hasher::new();
         h.update(EFFECT_OUTCOME_POLICY_DOMAIN);
         h.update(&self.schema_version.to_be_bytes());
+        h.update(&self.generation.to_be_bytes());
         update_string(&mut h, &self.device.0);
         update_string(&mut h, &self.operation.0);
         h.update(&(self.allowed_verifier_ids.len() as u32).to_be_bytes());
