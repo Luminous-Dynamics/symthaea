@@ -7,6 +7,7 @@ on:
       - 'scripts/test_compile_fsaverage5_glasser_map.py'
       - 'data/neuroscience/hcp_mmp1_area_order_v1.json'
       - 'docs/neuroscience/FSAVERAGE5_GLASSER_TRANSFORM_QUALIFICATION_V1.md'
+      - 'docs/neuroscience/FSAVERAGE5_GLASSER_MAP_COMPILER_V1.md'
       - '.github/workflows/fsaverage5-glasser-map-compiler.yml'
   workflow_dispatch:
 
@@ -56,8 +57,16 @@ jobs:
           assert areas[:6] == ['V1', 'MST', 'V6', 'V2', 'V3', 'V4']
           assert areas[-2:] == ['a32pr', 'p24']
           assert doc['source']['commit'] == 'e3a33a5a50d4ca86ab8fbaa0407d6c3296fcab12'
+          assert doc['source']['blob_sha'] == '78a240b52845dd01c8676ecfabef59e2a0526a85'
           print(compiler.sha256_file(path))
           PY
+
+      - name: Status boundary contract
+        run: |
+          DOC=docs/neuroscience/FSAVERAGE5_GLASSER_MAP_COMPILER_V1.md
+          grep -Fq 'no real atlas-derived mapping is qualified yet' "$DOC"
+          grep -Fq 'semantic labels, not raw `.annot` integers' "$DOC"
+          grep -Fq '14 synthetic contract tests' "$DOC"
 
       - name: CLI contract
         run: |
