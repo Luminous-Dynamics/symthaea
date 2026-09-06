@@ -1,0 +1,132 @@
+name: Futures Dual-Clock Information Timing
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-futures-ledger/tests/dual_clock_information_timing.rs'
+      - '.github/workflows/futures-dual-clock-information.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze dual-clock theorem and qualification-only scope
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          test_path = Path('crates/domains/symthaea-futures-ledger/tests/dual_clock_information_timing.rs')
+          text = test_path.read_text()
+          prospective = Path('crates/domains/symthaea-futures-ledger/src/prospective.rs').read_text()
+
+          required_test = [
+              'struct DualClockAttemptTiming',
+              'information_cutoff_unix_ms',
+              'issued_at_unix_ms',
+              'forecast_window: ForecastWindow',
+              'enum ReleaseCustody',
+              'HistoricalReconstruction',
+              'LiveAcquisition',
+              'enum TimingAdmissionClass',
+              'HistoricalReconstructionOnly',
+              'LiveProspectiveEligible',
+              'struct RealtimeReleaseRef',
+              'source_id: String',
+              'vintage_id: String',
+              'reference_coordinate: ForecastCoordinate',
+              'source_available_at_unix_ms',
+              'acquired_at_unix_ms',
+              'SourceReleaseAfterInformationCutoff',
+              'AcquisitionBeforeSourceAvailability',
+              'AcquisitionAfterInformationCutoff',
+              'OutcomeSourceAlreadyAvailableAtIssue',
+              'OutcomeBeforeSemanticTarget',
+              'SemanticAxisMismatch',
+              'current_prospective_schema_rejects_wall_clock_cutoff_with_semantic_issue_axis',
+              'Err(ProspectiveError::Ledger(LedgerV2Error::TimeAxisMismatch))',
+              'release_identity_reference_availability_and_custody_remain_explicit',
+              'historical_reconstruction_does_not_mint_live_prospective_custody',
+              'live_bytes_must_be_acquired_before_the_information_cutoff',
+              'revised_vintage_is_admitted_only_after_its_actual_source_release_time',
+              'old_reference_period_does_not_make_a_future_revision_historically_available',
+              'outcome_reference_source_availability_and_acquisition_are_checked_separately',
+              'information_cutoff_cannot_follow_attempt_issuance',
+          ]
+          for needle in required_test:
+              if needle not in text:
+                  raise SystemExit(f'missing dual-clock invariant: {needle}')
+
+          # Freeze the exact current single-axis coupling that motivates this spike.
+          required_existing = [
+              'compare_coordinates(&observation_cutoff, forecast_window.issued_at())?',
+              'compare_coordinates(&outcome_cutoff, &forecast_target)?',
+          ]
+          for needle in required_existing:
+              if needle not in prospective:
+                  raise SystemExit(f'current prospective timing boundary changed; re-audit spike: {needle}')
+
+          forbidden = [
+              'SystemTime::now',
+              'Utc::now',
+              'chrono::',
+              'time::OffsetDateTime',
+              'sha2::',
+              'blake3::',
+              'reqwest::',
+              'ureq::',
+          ]
+          for needle in forbidden:
+              if needle in text:
+                  raise SystemExit(f'dual-clock timing spike acquired unrelated authority/dependency: {needle}')
+
+          base = subprocess.check_output(
+              ['git', 'merge-base', 'HEAD', 'origin/' + '${{ github.base_ref }}'],
+              text=True,
+          ).strip()
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', base, 'HEAD'],
+              text=True,
+          ).splitlines())
+          allowed = {
+              '.github/workflows/futures-dual-clock-information.yml',
+              'crates/domains/symthaea-futures-ledger/tests/dual_clock_information_timing.rs',
+          }
+          if changed != allowed:
+              raise SystemExit(f'dual-clock qualification must remain exactly two files; got {sorted(changed)}')
+
+          forbidden_product = {
+              'crates/domains/symthaea-futures-ledger/src/v2.rs',
+              'crates/domains/symthaea-futures-ledger/src/prospective.rs',
+              'crates/domains/symthaea-futures-ledger/src/provenance.rs',
+              'crates/domains/symthaea-futures-ledger/src/lib.rs',
+              'crates/domains/symthaea-futures-ledger/Cargo.toml',
+              'Cargo.lock',
+          }
+          touched = changed & forbidden_product
+          if touched:
+              raise SystemExit(f'qualification spike modified product/manifest state: {sorted(touched)}')
+
+      - name: Locked workspace metadata
+        run: cargo metadata --locked --no-deps > /dev/null
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-futures-ledger -- --check
+
+      - name: Dual-clock qualification test
+        run: cargo test --locked -p symthaea-futures-ledger --test dual_clock_information_timing
+
+      - name: Strict focused Clippy
+        run: cargo clippy --locked -p symthaea-futures-ledger --test dual_clock_information_timing -- -D warnings
