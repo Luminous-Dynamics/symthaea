@@ -687,7 +687,9 @@ fn optional_digest(h: &mut blake3::Hasher, value: Option<Digest32>) {
             h.update(&[1]);
             update_digest(h, value);
         }
-        None => h.update(&[0]),
+        None => {
+            h.update(&[0]);
+        }
     }
 }
 
