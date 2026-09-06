@@ -1,0 +1,43 @@
+name: Substrate Evidence Boundary
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-core/src/hdc/substrate_validation.rs'
+      - 'crates/domains/symthaea-psych-bench/src/benchmarks/substrate/validation.rs'
+      - 'crates/domains/symthaea-psych-bench/src/benchmarks/neural_validation/cortical_similarity.rs'
+      - '.github/workflows/substrate-evidence-boundary.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Qualify no-auto-promotion invariant
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format contract
+        run: cargo fmt --check -p symthaea-core
+
+      - name: Core evidence-boundary tests
+        run: cargo test -p symthaea-core --lib --features neural_validation substrate_validation
+
+      - name: Neural-validation consumer compile/tests
+        run: cargo test -p symthaea-psych-bench --lib --features neural_validation
+
+      - name: Core lint contract
+        run: cargo clippy -p symthaea-core --lib --features neural_validation -- -D warnings
+
+      - name: Consumer lint contract
+        run: cargo clippy -p symthaea-psych-bench --lib --features neural_validation -- -D warnings
