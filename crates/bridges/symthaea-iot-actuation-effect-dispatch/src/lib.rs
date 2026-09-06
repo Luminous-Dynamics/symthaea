@@ -2,22 +2,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! One-shot privileged physical-effect dispatch from a globally linearized actuation attempt.
 //!
-//! This crate is intentionally narrower than the historical final-permit/JIT-lease path. It does
-//! not parse transport receipts, select trust keys, verify signatures, mint a reusable permit or
-//! create a HAL lease. Those currentness questions are already answered by
-//! `CurrentActuationAttempt`, which retains every owner-local current fence and mutation barrier.
+//! The production boundary distinguishes two persistence contracts:
 //!
-//! The only authority-bearing input accepted here is a `CurrentActuationAttempt` **by value**. The
-//! dispatcher binds the privileged port to the exact device, operation and executor already present
-//! in that attempt, builds a request that borrows the exact bound command, performs the attempt's
-//! wall+monotonic dispatch-window check as the final software operation, and immediately invokes one
-//! privileged port method. Whether the port succeeds or returns an error, the attempt is consumed.
+//! - [`DurablePhysicalEffectAttemptJournal`] is a **local crash-durable** journal interface;
+//! - [`RollbackProtectedPhysicalEffectAttemptJournal`] additionally proves that each local journal
+//!   transition reached an independently retained anti-rollback anchor.
 //!
-//! A successful return proves only that the privileged adapter boundary returned an acknowledgement
-//! for the exact request. It does **not** prove that the requested physical state transition was
-//! realized. Likewise, once the port method has been invoked, an adapter error is classified as an
-//! indeterminate physical outcome: callers must reconcile trusted device observations rather than
-//! retry the same command.
+//! Only the rollback-protected interface is accepted by production dispatch. This prevents a crash
+//! plus adversarial storage rollback from erasing a `Prepared` generation after the hardware
+//! boundary may have been entered. The dispatcher still accepts no raw receipts, trust registries,
+//! reusable final permits or JIT leases. Its sole authority-bearing input is a
+//! `CurrentActuationAttempt` consumed by value.
 
 #![deny(unsafe_code)]
 
@@ -30,14 +25,103 @@ use symthaea_iot_actuation_linearization::{
 use symthaea_iot_authority::DeviceCommand;
 use thiserror::Error;
 
-/// Bound adapter identifier size. This is audit/correlation metadata, not authority.
+#[cfg(feature = "qualification-legacy-unjournaled")]
+mod qualification_legacy;
+#[cfg(feature = "qualification-legacy-unjournaled")]
+pub use qualification_legacy::{PhysicalEffectDispatchError, dispatch_current_attempt};
+
 pub const MAX_PRIVILEGED_ADAPTER_ID_BYTES: usize = 128;
 
-/// Request available only after a caller has supplied a live `CurrentActuationAttempt`.
-///
-/// Fields are private and this type has no public constructor. A privileged adapter therefore
-/// receives the exact command already bound by the linearized evidence rather than caller-selected
-/// command data.
+/// Authority-free commitment to one exact physical-attempt journal generation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PhysicalEffectAttemptJournalHead {
+    generation: u64,
+    digest: Digest32,
+}
+
+impl PhysicalEffectAttemptJournalHead {
+    pub fn new(generation: u64, digest: Digest32) -> Result<Self, AttemptJournalHeadError> {
+        if digest == Digest32([0; 32]) {
+            return Err(AttemptJournalHeadError);
+        }
+        Ok(Self { generation, digest })
+    }
+
+    pub const fn generation(self) -> u64 {
+        self.generation
+    }
+
+    pub const fn digest(self) -> Digest32 {
+        self.digest
+    }
+}
+
+/// Opaque proof that an exact attempt correlation reached a journal's `Prepared` state.
+pub trait DurablePreparedPhysicalEffectAttempt {
+    fn journal_head(&self) -> PhysicalEffectAttemptJournalHead;
+}
+
+/// Local crash-durable attempt journal. Implementing this trait alone does not satisfy the
+/// adversarial-rollback requirement for physical I/O.
+pub trait DurablePhysicalEffectAttemptJournal {
+    type Error: StdError + Send + Sync + 'static;
+    type Prepared: DurablePreparedPhysicalEffectAttempt;
+
+    fn persist_prepared(
+        &mut self,
+        correlation: &PhysicalEffectAttemptCorrelation,
+    ) -> Result<Self::Prepared, Self::Error>;
+
+    fn persist_abandoned_before_port(
+        &mut self,
+        prepared: &Self::Prepared,
+    ) -> Result<PhysicalEffectAttemptJournalHead, Self::Error>;
+
+    fn persist_adapter_acknowledged(
+        &mut self,
+        prepared: &Self::Prepared,
+        adapter_evidence_digest: Digest32,
+    ) -> Result<PhysicalEffectAttemptJournalHead, Self::Error>;
+
+    fn persist_adapter_indeterminate(
+        &mut self,
+        prepared: &Self::Prepared,
+    ) -> Result<PhysicalEffectAttemptJournalHead, Self::Error>;
+}
+
+/// Crash-durable attempt journal whose returned heads are also independently retained against
+/// rollback. Production physical dispatch requires this stronger interface.
+pub trait RollbackProtectedPhysicalEffectAttemptJournal {
+    type Error: StdError + Send + Sync + 'static;
+    type Prepared: DurablePreparedPhysicalEffectAttempt;
+
+    /// Persist exact `Prepared` state locally, independently advance the anti-rollback anchor to
+    /// that exact head, verify the anchor confirmation, and only then return the proof.
+    fn persist_prepared_anchored(
+        &mut self,
+        correlation: &PhysicalEffectAttemptCorrelation,
+    ) -> Result<Self::Prepared, Self::Error>;
+
+    /// Persist and independently anchor a proven pre-port abandonment.
+    fn persist_abandoned_before_port_anchored(
+        &mut self,
+        prepared: &Self::Prepared,
+    ) -> Result<PhysicalEffectAttemptJournalHead, Self::Error>;
+
+    /// Persist and independently anchor the adapter acknowledgement state.
+    fn persist_adapter_acknowledged_anchored(
+        &mut self,
+        prepared: &Self::Prepared,
+        adapter_evidence_digest: Digest32,
+    ) -> Result<PhysicalEffectAttemptJournalHead, Self::Error>;
+
+    /// Persist and independently anchor an indeterminate adapter return.
+    fn persist_adapter_indeterminate_anchored(
+        &mut self,
+        prepared: &Self::Prepared,
+    ) -> Result<PhysicalEffectAttemptJournalHead, Self::Error>;
+}
+
 #[derive(Debug)]
 pub struct AuthorizedPhysicalEffectRequest<'a> {
     command: &'a DeviceCommand,
@@ -64,11 +148,6 @@ impl<'a> AuthorizedPhysicalEffectRequest<'a> {
     }
 }
 
-/// Minimal acknowledgement returned by a privileged effect adapter.
-///
-/// The digest should commit to adapter-local evidence such as a bus/controller acknowledgement,
-/// transaction receipt or other device-class-specific attempt evidence. It is an adapter claim,
-/// not proof that the physical world reached the requested state.
 #[derive(Debug, PartialEq, Eq)]
 pub struct AdapterAttemptAcknowledgement {
     evidence_digest: Digest32,
@@ -87,12 +166,6 @@ impl AdapterAttemptAcknowledgement {
     }
 }
 
-/// Narrow privileged effect boundary.
-///
-/// Implementations are trusted adapters owned by the minimal privileged guard process. The
-/// identity methods must describe the exact physical sink reached by `attempt_effect`. The generic
-/// dispatcher checks those identities against the already-linearized command before invoking the
-/// effect method.
 pub trait PrivilegedPhysicalEffectPort {
     type Error: StdError + Send + Sync + 'static;
 
@@ -101,21 +174,12 @@ pub trait PrivilegedPhysicalEffectPort {
     fn operation(&self) -> &Operation;
     fn executor(&self) -> &PrincipalId;
 
-    /// Attempt exactly one physical effect for the supplied linearized request.
-    ///
-    /// Returning `Err` does not establish that no physical effect occurred. The method may have
-    /// crossed the external-effect boundary before the adapter detected or reported the error.
     fn attempt_effect(
         &mut self,
         request: AuthorizedPhysicalEffectRequest<'_>,
     ) -> Result<AdapterAttemptAcknowledgement, Self::Error>;
 }
 
-/// Owned audit correlation captured before the privileged port is invoked.
-///
-/// This record is intentionally non-serializable and confers no authority. On a port error it is
-/// returned inside `AdapterAttemptIndeterminate` so recovery logic can reconcile the exact command
-/// whose physical outcome became uncertain.
 #[derive(Debug, PartialEq, Eq)]
 pub struct PhysicalEffectAttemptCorrelation {
     command_digest: Digest32,
@@ -172,13 +236,12 @@ impl PhysicalEffectAttemptCorrelation {
     }
 }
 
-/// Evidence that the exact privileged adapter boundary acknowledged one consumed attempt.
-///
-/// This remains evidence of an **adapter attempt**, not a certificate of physical realization.
+/// Adapter acknowledgement whose journal transition has also reached its independent anchor.
 #[derive(Debug, PartialEq, Eq)]
 pub struct PhysicalEffectAttemptRecord {
     correlation: PhysicalEffectAttemptCorrelation,
     adapter_evidence_digest: Digest32,
+    journal_head: PhysicalEffectAttemptJournalHead,
 }
 
 impl PhysicalEffectAttemptRecord {
@@ -189,40 +252,39 @@ impl PhysicalEffectAttemptRecord {
     pub const fn adapter_evidence_digest(&self) -> Digest32 {
         self.adapter_evidence_digest
     }
+
+    pub const fn journal_head(&self) -> PhysicalEffectAttemptJournalHead {
+        self.journal_head
+    }
 }
 
-/// Consume one globally current attempt and invoke exactly one matching privileged effect port.
+/// Terminal production dispatch boundary.
 ///
-/// The function deliberately has no raw-receipt, registry, verifier, caller-selected time, permit
-/// or lease inputs. Port binding and request construction happen before the final time check. The
-/// final two operations are normative and intentionally adjacent:
-///
-/// 1. `attempt.validate_dispatch_window_now()`;
-/// 2. `port.attempt_effect(request)`.
-///
-/// After step 2 has been invoked, any adapter error is epistemically indeterminate. The consumed
-/// attempt cannot be retried; callers should obtain fresh trusted device observations and reconcile
-/// the durable command state.
-pub fn dispatch_current_attempt<P>(
+/// `persist_prepared_anchored` must complete before the final time check. The privileged port call
+/// is then immediately adjacent to that final check. Every post-call journal transition is likewise
+/// required to be independently anchored before a stable result is returned.
+pub fn dispatch_current_attempt_durable<P, J>(
     attempt: CurrentActuationAttempt<'_>,
     port: &mut P,
-) -> Result<PhysicalEffectAttemptRecord, PhysicalEffectDispatchError<P::Error>>
+    journal: &mut J,
+) -> Result<PhysicalEffectAttemptRecord, DurablePhysicalEffectDispatchError<P::Error, J::Error>>
 where
     P: PrivilegedPhysicalEffectPort,
+    J: RollbackProtectedPhysicalEffectAttemptJournal,
 {
     let adapter_id = validate_adapter_id(port.adapter_id())
-        .map_err(|_| PhysicalEffectDispatchError::InvalidAdapterIdentity)?
+        .map_err(|_| DurablePhysicalEffectDispatchError::InvalidAdapterIdentity)?
         .to_owned();
 
     let command = attempt.command();
     if port.device() != &command.device {
-        return Err(PhysicalEffectDispatchError::PortDeviceMismatch);
+        return Err(DurablePhysicalEffectDispatchError::PortDeviceMismatch);
     }
     if port.operation() != &command.operation {
-        return Err(PhysicalEffectDispatchError::PortOperationMismatch);
+        return Err(DurablePhysicalEffectDispatchError::PortOperationMismatch);
     }
     if port.executor() != &command.executor {
-        return Err(PhysicalEffectDispatchError::PortExecutorMismatch);
+        return Err(DurablePhysicalEffectDispatchError::PortExecutorMismatch);
     }
 
     let command_digest = command.digest();
@@ -247,24 +309,71 @@ where
         composition_digest,
     };
 
-    // NORMATIVE LAST SOFTWARE CHECK. Keep the privileged call immediately adjacent.
-    attempt
-        .validate_dispatch_window_now()
-        .map_err(PhysicalEffectDispatchError::Linearization)?;
-    let acknowledgement = match port.attempt_effect(request) {
-        Ok(acknowledgement) => acknowledgement,
-        Err(source) => {
-            return Err(PhysicalEffectDispatchError::AdapterAttemptIndeterminate {
-                correlation,
-                source,
-            });
-        }
-    };
+    let prepared = journal
+        .persist_prepared_anchored(&correlation)
+        .map_err(DurablePhysicalEffectDispatchError::ProtectedPreparation)?;
+    let prepared_head = prepared.journal_head();
 
-    Ok(PhysicalEffectAttemptRecord {
-        correlation,
-        adapter_evidence_digest: acknowledgement.evidence_digest(),
-    })
+    // NORMATIVE LAST SOFTWARE CHECK. Keep the privileged call immediately adjacent.
+    if let Err(source) = attempt.validate_dispatch_window_now() {
+        return match journal.persist_abandoned_before_port_anchored(&prepared) {
+            Ok(abandoned_head) => Err(
+                DurablePhysicalEffectDispatchError::LinearizationAfterProtectedPreparation {
+                    source,
+                    abandoned_head,
+                },
+            ),
+            Err(journal_source) => Err(
+                DurablePhysicalEffectDispatchError::PrePortProtectionIndeterminate {
+                    source,
+                    prepared_head,
+                    journal_source,
+                },
+            ),
+        };
+    }
+    let adapter_result = port.attempt_effect(request);
+
+    match adapter_result {
+        Ok(acknowledgement) => {
+            let adapter_evidence_digest = acknowledgement.evidence_digest();
+            let journal_head = match journal
+                .persist_adapter_acknowledged_anchored(&prepared, adapter_evidence_digest)
+            {
+                Ok(head) => head,
+                Err(journal_source) => {
+                    return Err(
+                        DurablePhysicalEffectDispatchError::AdapterAcknowledgedButProtectionIndeterminate {
+                            correlation,
+                            prepared_head,
+                            adapter_evidence_digest,
+                            journal_source,
+                        },
+                    );
+                }
+            };
+            Ok(PhysicalEffectAttemptRecord {
+                correlation,
+                adapter_evidence_digest,
+                journal_head,
+            })
+        }
+        Err(source) => match journal.persist_adapter_indeterminate_anchored(&prepared) {
+            Ok(journal_head) => Err(DurablePhysicalEffectDispatchError::AdapterAttemptIndeterminate {
+                correlation,
+                journal_head,
+                source,
+            }),
+            Err(journal_source) => Err(
+                DurablePhysicalEffectDispatchError::AdapterAndProtectionIndeterminate {
+                    correlation,
+                    prepared_head,
+                    adapter_source: source,
+                    journal_source,
+                },
+            ),
+        },
+    }
 }
 
 fn validate_adapter_id(adapter_id: &str) -> Result<&str, AdapterIdentityError> {
@@ -283,23 +392,21 @@ fn validate_adapter_id(adapter_id: &str) -> Result<&str, AdapterIdentityError> {
 struct AdapterIdentityError;
 
 #[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+#[error("physical-effect attempt journal head has a zero digest")]
+pub struct AttemptJournalHeadError;
+
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
 pub enum AdapterAcknowledgementError {
     #[error("privileged adapter acknowledgement contains a zero evidence digest")]
     ZeroEvidenceDigest,
 }
 
-/// Fail-closed dispatch result.
-///
-/// Variants before `AdapterAttemptIndeterminate` prove the privileged port was not invoked through
-/// this function. `AdapterAttemptIndeterminate` means the port **was invoked** and therefore the
-/// physical result must be reconciled rather than blindly retried.
 #[derive(Debug, Error)]
-pub enum PhysicalEffectDispatchError<E>
+pub enum DurablePhysicalEffectDispatchError<E, J>
 where
     E: StdError + Send + Sync + 'static,
+    J: StdError + Send + Sync + 'static,
 {
-    #[error("linearized attempt expired or became temporally invalid before privileged dispatch: {0}")]
-    Linearization(#[source] ActuationLinearizationError),
     #[error("privileged adapter identity is invalid")]
     InvalidAdapterIdentity,
     #[error("privileged effect port targets another device")]
@@ -308,11 +415,40 @@ where
     PortOperationMismatch,
     #[error("privileged effect port belongs to another executor")]
     PortExecutorMismatch,
-    #[error("privileged adapter returned an error after the physical-attempt boundary was invoked: {source}")]
+    #[error("failed to persist and independently anchor physical-attempt preparation: {0}")]
+    ProtectedPreparation(#[source] J),
+    #[error("linearized attempt became invalid after rollback-protected preparation but before privileged dispatch: {source}")]
+    LinearizationAfterProtectedPreparation {
+        #[source]
+        source: ActuationLinearizationError,
+        abandoned_head: PhysicalEffectAttemptJournalHead,
+    },
+    #[error("linearized attempt failed before port invocation and the protected abandonment transition was not confirmed; anchored Prepared remains unresolved: linearization={source}; protection={journal_source}")]
+    PrePortProtectionIndeterminate {
+        source: ActuationLinearizationError,
+        prepared_head: PhysicalEffectAttemptJournalHead,
+        journal_source: J,
+    },
+    #[error("privileged adapter acknowledged the attempt but the rollback-protected acknowledgement transition was not confirmed; anchored Prepared remains unresolved: {journal_source}")]
+    AdapterAcknowledgedButProtectionIndeterminate {
+        correlation: PhysicalEffectAttemptCorrelation,
+        prepared_head: PhysicalEffectAttemptJournalHead,
+        adapter_evidence_digest: Digest32,
+        journal_source: J,
+    },
+    #[error("privileged adapter returned an error after invocation; the indeterminate outcome is crash-durable and rollback-protected: {source}")]
     AdapterAttemptIndeterminate {
         correlation: PhysicalEffectAttemptCorrelation,
+        journal_head: PhysicalEffectAttemptJournalHead,
         #[source]
         source: E,
+    },
+    #[error("privileged adapter errored and the rollback-protected indeterminate transition was not confirmed; anchored Prepared remains unresolved: adapter={adapter_source}; protection={journal_source}")]
+    AdapterAndProtectionIndeterminate {
+        correlation: PhysicalEffectAttemptCorrelation,
+        prepared_head: PhysicalEffectAttemptJournalHead,
+        adapter_source: E,
+        journal_source: J,
     },
 }
 
@@ -341,5 +477,14 @@ mod tests {
         assert!(validate_adapter_id(" padded").is_err());
         assert!(validate_adapter_id("line\nbreak").is_err());
         assert!(validate_adapter_id(&"x".repeat(MAX_PRIVILEGED_ADAPTER_ID_BYTES + 1)).is_err());
+    }
+
+    #[test]
+    fn journal_heads_allow_genesis_but_reject_zero_digest() {
+        assert!(PhysicalEffectAttemptJournalHead::new(0, Digest32([1; 32])).is_ok());
+        assert!(PhysicalEffectAttemptJournalHead::new(1, Digest32([0; 32])).is_err());
+        let head = PhysicalEffectAttemptJournalHead::new(7, Digest32([2; 32])).unwrap();
+        assert_eq!(head.generation(), 7);
+        assert_eq!(head.digest(), Digest32([2; 32]));
     }
 }

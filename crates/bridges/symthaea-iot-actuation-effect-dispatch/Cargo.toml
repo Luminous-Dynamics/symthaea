@@ -11,6 +11,10 @@ homepage = "https://luminousdynamics.org"
 keywords = ["iot", "security", "actuation", "hal"]
 categories = ["embedded"]
 
+[features]
+default = []
+qualification-legacy-unjournaled = []
+
 [dependencies]
 symthaea-authority = { path = "../../core/symthaea-authority" }
 symthaea-iot-actuation-linearization = { path = "../symthaea-iot-actuation-linearization" }

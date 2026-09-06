@@ -29,7 +29,7 @@ blake3 = { workspace = true }
 ed25519-dalek = { workspace = true }
 fips204 = { version = "=0.4.6", default-features = false, features = ["ml-dsa-65"] }
 symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
-symthaea-iot-actuation-effect-dispatch = { path = "../symthaea-iot-actuation-effect-dispatch" }
+symthaea-iot-actuation-effect-dispatch = { path = "../symthaea-iot-actuation-effect-dispatch", features = ["qualification-legacy-unjournaled"] }
 symthaea-iot-actuation-guard-admission-challenge = { path = "../symthaea-iot-actuation-guard-admission-challenge" }
 symthaea-iot-actuation-guard-post-semantic-controller = { path = "../symthaea-iot-actuation-guard-post-semantic-controller" }
 symthaea-iot-actuation-guard-two-phase-protocol = { path = "../symthaea-iot-actuation-guard-two-phase-protocol" }

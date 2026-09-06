@@ -1,0 +1,247 @@
+name: IoT Actuation Effect Attempt Journal
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-effect-attempt-journal/**'
+      - 'crates/bridges/symthaea-iot-actuation-effect-dispatch/**'
+      - '.github/workflows/iot-actuation-effect-attempt-journal.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-actuation-effect-attempt-journal-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+
+      - name: Freeze local durability and independent rollback protection
+        shell: python
+        run: |
+          from pathlib import Path
+          import tomllib
+
+          root = Path('crates/bridges/symthaea-iot-actuation-effect-attempt-journal')
+
+          def compact(path):
+              text = path.read_text()
+              code = '\n'.join(
+                  line for line in text.splitlines()
+                  if not line.lstrip().startswith('//')
+              )
+              return ''.join(code.split()), code
+
+          local, local_code = compact(root / 'src/lib.rs')
+          protected, protected_code = compact(root / 'src/protected.rs')
+          crate_root, _ = compact(root / 'src/root.rs')
+
+          local_required = [
+              'pubenumDurableEffectAttemptStateV1',
+              'Prepared{', 'AbandonedBeforePort{', 'AdapterAcknowledged{',
+              'AdapterIndeterminate{',
+              'pubfnrequires_reconciliation(&self)->bool',
+              'pubstructDurableEffectAttemptJournalCheckpointV1',
+              'previous_checkpoint_digest:Option<Digest32>',
+              'implDurablePhysicalEffectAttemptJournalforDurableEffectAttemptJournalStore',
+              'kernel.lock()',
+              'libc::O_DIRECTORY|libc::O_CLOEXEC|libc::O_NOFOLLOW',
+              'libc::O_CLOEXEC|libc::O_NOFOLLOW',
+              'file.sync_all()?;',
+              'fs::rename(&temp,&target)?;',
+              'root.sync_all()?;',
+              'ifpersisted!=*successor||persisted.head()?!=expected_head',
+              'UnresolvedAttemptExists', 'TrustedJournalHeadMismatch',
+              'NonCanonicalStateEncoding',
+          ]
+          missing = [x for x in local_required if x not in local]
+          if missing:
+              raise SystemExit(f'missing local durability invariant: {missing}')
+
+          protected_required = [
+              'pubfnfrom_anchor_parts(',
+              'pubtraitIndependentEffectAttemptHeadAnchor',
+              'fncurrent_head(&mutself)',
+              'fncompare_and_swap(',
+              'pubstructRollbackProtectedPreparedEffectAttemptV1',
+              'pubstructRollbackProtectedEffectAttemptJournal',
+              'poisoned:bool',
+              'pubconstfnis_poisoned(&self)->bool',
+              'impl<A>RollbackProtectedPhysicalEffectAttemptJournalforRollbackProtectedEffectAttemptJournal<A>',
+              'fnpersist_prepared_anchored(',
+              'self.local.persist_prepared(correlation)',
+              'self.protect_transition(expected,local_head)',
+              'expected.generation().checked_add(1)',
+              'ifnext.generation()!=expected_generation',
+              'self.anchor.compare_and_swap(expected,next)',
+              'ifconfirmed!=next',
+              'letobserved=matchself.anchor.current_head()',
+              'ifobserved!=next',
+              'AnchorAdvance', 'AnchorConfirmationMismatch',
+              'AnchorPostAdvanceRead', 'AnchorPostAdvanceMismatch',
+              'PreparedAnchorMismatch',
+          ]
+          missing = [x for x in protected_required if x not in protected]
+          if missing:
+              raise SystemExit(f'missing independent rollback-protection invariant: {missing}')
+
+          if 'modlocal;' not in crate_root or 'modprotected;' not in crate_root:
+              raise SystemExit('crate root no longer composes local and protected journal layers')
+
+          forbidden = [
+              'FinalActuatorPermit', 'TrustBoundFinalActuatorPermit', 'JustInTimeHalLease',
+              'CompleteJitHalLease', 'TransportTrustRegistry', 'DeviceRealityTrustRegistry',
+              'InterlockTrustRegistry', 'verify_strict(', 'verify_xenia_', 'TcpListener',
+              'TcpStream', 'UdpSocket', 'tokio::spawn', 'unsafe{',
+              'reconcile_realized', 'reconcile_not_realized', 'observed_applied',
+              'proven_not_dispatched',
+          ]
+          all_code = local_code + '\n' + protected_code
+          found = [x for x in forbidden if x in ''.join(all_code.split())]
+          if found:
+              raise SystemExit(f'journal crossed authority/reconciliation boundary: {found}')
+
+          manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+          if manifest.get('lib', {}).get('path') != 'src/root.rs':
+              raise SystemExit('journal lib path no longer uses composed root')
+          expected = {
+              'bincode', 'blake3', 'libc', 'serde', 'symthaea-authority',
+              'symthaea-iot-actuation-effect-dispatch', 'thiserror',
+          }
+          if set(manifest.get('dependencies', {})) != expected:
+              raise SystemExit('journal production dependency drift')
+          dev = manifest.get('dev-dependencies', {})
+          if set(dev) != {'symthaea-iot-actuation-effect-dispatch'}:
+              raise SystemExit('journal qualification dependency drift')
+          if dev['symthaea-iot-actuation-effect-dispatch'].get('features') != [
+              'qualification-legacy-unjournaled'
+          ]:
+              raise SystemExit('correlation fixture escaped the qualification-only feature')
+
+          dispatch, _ = compact(
+              Path('crates/bridges/symthaea-iot-actuation-effect-dispatch/src/lib.rs')
+          )
+          for required in [
+              'pubtraitRollbackProtectedPhysicalEffectAttemptJournal',
+              'J:RollbackProtectedPhysicalEffectAttemptJournal',
+              '.persist_prepared_anchored(&correlation)',
+              'attempt.validate_dispatch_window_now()',
+              'port.attempt_effect(request)',
+          ]:
+              if required not in dispatch:
+                  raise SystemExit(f'missing terminal protected-dispatch invariant: {required}')
+          ordered = [
+              dispatch.find('.persist_prepared_anchored(&correlation)'),
+              dispatch.find('attempt.validate_dispatch_window_now()'),
+              dispatch.find('port.attempt_effect(request)'),
+          ]
+          if any(x < 0 for x in ordered) or ordered != sorted(ordered):
+              raise SystemExit(f'protected preparation/final-check/port order changed: {ordered}')
+          if dispatch.count('port.attempt_effect(request)') != 1:
+              raise SystemExit('production dispatcher must contain exactly one port call')
+
+      - name: Install Rust 1.96 formatter
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Rustfmt protected attempt surface
+        run: >-
+          cargo +1.96.0 fmt --check
+          -p symthaea-iot-actuation-effect-dispatch
+          -p symthaea-iot-actuation-effect-attempt-journal
+
+      - name: Install Rust 1.94 qualification toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: clippy
+
+      - name: Verify exact qualification toolchain
+        run: |
+          rustc +1.94.0 --version | grep -F 'rustc 1.94.0'
+          cargo +1.94.0 --version | grep -F 'cargo 1.94.0'
+
+      - name: Preserve checked-in lock
+        run: cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Check protected dispatcher and journal
+        run: >-
+          cargo +1.94.0 check
+          -p symthaea-iot-actuation-effect-dispatch
+          -p symthaea-iot-actuation-effect-attempt-journal
+          --all-targets --no-default-features
+
+      - name: Reject unreviewed external dependency drift
+        shell: python
+        run: |
+          import tomllib
+          def sourced(path):
+              with open(path, 'rb') as f:
+                  doc = tomllib.load(f)
+              return {
+                  (p['name'], p['version'], p.get('source')): p
+                  for p in doc.get('package', []) if p.get('source') is not None
+              }
+          before = sourced('/tmp/Cargo.lock.before')
+          after = sourced('Cargo.lock')
+          b = set(before); a = set(after)
+          added = a - b; removed = b - a
+          changed = sorted(k for k in a & b if after[k] != before[k])
+          allowed = {
+              ('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')
+          }
+          if not added.issubset(allowed) or removed or changed:
+              raise SystemExit(
+                  f'external dependency drift: added={sorted(added)}, '
+                  f'removed={sorted(removed)}, changed={changed}'
+              )
+
+      - name: Run independent-anchor recovery regressions first
+        run: >-
+          cargo +1.94.0 test
+          -p symthaea-iot-actuation-effect-attempt-journal
+          --test protected_store --no-default-features
+
+      - name: Run local durable-store regressions
+        run: >-
+          cargo +1.94.0 test
+          -p symthaea-iot-actuation-effect-attempt-journal
+          --test durable_store --no-default-features
+
+      - name: Journal package tests
+        run: >-
+          cargo +1.94.0 test
+          -p symthaea-iot-actuation-effect-attempt-journal
+          --all-targets --no-default-features
+
+      - name: Default dispatch package tests
+        run: >-
+          cargo +1.94.0 test
+          -p symthaea-iot-actuation-effect-dispatch
+          --all-targets --no-default-features
+
+      - name: Strict package-local Clippy
+        run: >-
+          cargo +1.94.0 clippy
+          -p symthaea-iot-actuation-effect-dispatch
+          -p symthaea-iot-actuation-effect-attempt-journal
+          --all-targets --no-default-features --no-deps -- -D warnings
+
+      - name: Show local-only Cargo.lock bookkeeping
+        if: always()
+        run: git diff -- Cargo.lock || true
