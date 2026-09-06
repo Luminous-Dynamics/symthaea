@@ -2,12 +2,14 @@
 
 RCA-003b.3 freezes **policy before interpretation**.
 
-This crate registers the complete policy surface a future pure shadow-disposition engine may consume. It does not evaluate a case and it does not emit `Supported`, `Contested`, `Defeated`, or any other disposition.
+This crate registers the policy surface a future pure shadow-disposition engine may consume. It does not evaluate a case and does not emit `Supported`, `Contested`, `Defeated`, or any other disposition.
 
 ## Boundary
 
 ```text
 BoundShadowEvidenceCaseV1
+        +
+IndependentEvidenceSetWitnessV1
         +
 current eligible relation declarations
         +
@@ -30,66 +32,86 @@ RegisteredShadowDispositionPolicyV1
         != self-improvement promotion
 ```
 
-## Exact scope
+## Exact scope/profile binding
 
-V1 policy is registered for one exact opaque proposition id. A digest is identity, not semantic class. No policy can silently generalize to another proposition.
+V1 policy is registered for one exact opaque proposition id. A digest is identity, not semantic class.
 
-Policy registration also binds the exact semantic profile digests of:
+Policy registration binds the exact semantic profile digests of:
 
 - `BoundShadowEvidenceCaseV1`;
+- `IndependentEvidenceSetWitnessV1`;
 - current relation-declaration eligibility;
 - `InterpretationLineageV1`.
 
-If a lower-layer contract changes, the old policy no longer registers against the new stack. A new policy/qualification lineage is required.
+If a lower-layer contract changes, the old policy no longer registers against the new stack.
 
-## Pairwise-independent root sets
+## Evidence items are not ancestry roots
 
-A central rule is:
+The evidence-side requirement is now explicitly:
 
 ```text
-minimum N roots
-    means
-there exists a set S with |S| >= N
-and every distinct pair in S is established independent
+minimum N pairwise-independent EVIDENCE ITEMS
 ```
 
-This applies independently to evidence roots and interpretation roots.
+not:
 
-Therefore none of these satisfy a root threshold by themselves:
+```text
+minimum N ancestry roots
+```
 
-- N candidate items;
-- N modules;
-- N different ids;
-- N pair edges distributed across a larger graph;
+A single derived evidence item may inherit several roots. Those roots preserve provenance but do not create several confirmations.
+
+V1 freezes:
+
+`EvidenceSetSemanticsV1::IssuedPairwiseIndependentItems`
+
+A future engine may satisfy an evidence threshold only using the selected item set in an issued `IndependentEvidenceSetWitnessV1` bound to the current witness profile.
+
+Therefore these do not satisfy an evidence-item threshold by themselves:
+
+- N ancestry roots inside one derived item;
+- N candidate/module ids;
 - N relation declarations;
-- N high-strength declarations.
+- N pair edges;
+- N high-strength relations.
 
-For interpretation roots, a required set of four pairwise-independent roots needs all six pair relationships to be qualified independent.
+## Interpretation requirements remain root sets
 
-V1 freezes this as `RootSetSemanticsV1::PairwiseIndependentSet`.
+Interpretation independence is structurally different. Each relation declaration maps to one canonical interpretation root, and #527 exposes a normalized unique-root graph.
+
+V1 freezes:
+
+`InterpretationRootSetSemanticsV1::PairwiseIndependentRoots`
+
+A threshold N means there exists a set of at least N interpretation roots where every distinct root pair is `IndependenceQualified` in the exact current `InterpretationLineageV1`.
+
+For four interpretation roots, all six root-pair relationships must be qualified independent.
+
+So the policy intentionally distinguishes:
+
+```text
+evidence:       independent ITEM set witness
+interpretation: independent ROOT set witness/topology
+```
+
+## Outcome topology requirements
+
+Each outcome preregisters:
+
+```text
+min_pairwise_independent_evidence_items
+min_pairwise_independent_interpretation_roots
+```
+
+for tentative support, support, tentative opposition, opposition, defeaters, and each surviving side of a contested result.
+
+`Supported` may not be weaker than `TentativelySupported`; `Opposed` may not be weaker than `TentativelyOpposed`. Every V1 outcome requires at least one evidence item and one interpretation root.
 
 ## Relation strength is diagnostic only
 
 V1 exposes only `RelationStrengthTreatmentV1::DiagnosticOnly`.
 
-A later engine therefore may not derive policy behavior by summing, averaging, normalizing, multiplying, voting on, Bayesian-updating, or treating `strength_ppm` as calibrated probability/confidence.
-
-Any future arithmetic semantics require a new policy contract and separate calibration evidence.
-
-## Outcome root requirements
-
-The policy separately preregisters pairwise-independent root-set requirements for:
-
-- tentative support;
-- support;
-- tentative opposition;
-- opposition;
-- defeaters;
-- each surviving side of a contested result.
-
-`Supported` requirements may not be weaker than `TentativelySupported`; `Opposed` may not be weaker than `TentativelyOpposed`.
-
-All V1 outcomes require at least one evidence root and one interpretation root. A bare declaration therefore cannot satisfy an outcome.
+A later engine may not sum, average, normalize, multiply, vote on, Bayesian-update, or treat `strength_ppm` as calibrated probability/confidence.
 
 ## Defeaters and unknown independence
 
@@ -98,57 +120,52 @@ V1 exposes only:
 - `DefeaterModeV1::QualifiedCurrentBlocker`;
 - `UnknownInterpretationIndependenceModeV1::ForceUnderdetermined`.
 
-A stale/unqualified defeater cannot veto a support case. Distinct interpretation roots whose independence is unknown cannot be silently counted as independent.
+A stale/unqualified defeater cannot veto support. Unknown interpretation independence never becomes a weak vote.
 
 ## Contestation
 
 V1 requires `contested_requires_qualified_support_and_opposition = true`.
 
-Contested cases preserve surviving qualified disagreement rather than collapsing it into one scalar score.
+Qualified disagreement remains disagreement instead of collapsing into one scalar score.
 
 ## Canonical preregistration binding
 
-RCA already has `RegisteredExperimentContractV1`. Its cryptographic `contract_digest()` transitively commits the experiment's hypothesis, baseline/candidate identities, development/held-out corpora, evaluator, primary and secondary metrics, minimum meaningful effect, confidence requirement, seed plan, falsification criteria, allowed outcomes, and experiment resource ceilings.
+RCA already has `RegisteredExperimentContractV1`. Its `contract_digest()` transitively commits hypothesis, baseline/candidate identity, development/held-out corpora, evaluator, metrics, thresholds, seed plan, falsification criteria, allowed outcomes, and experiment resource ceilings.
 
-RCA-003b.3 therefore does **not** duplicate those fields.
-
-`DispositionPolicyEvaluationBindingV1` binds only:
+The policy therefore binds only:
 
 ```text
-exact EXPERIMENT_CONTRACT_SCHEMA_VERSION
-+ exact RegisteredExperimentContractV1.contract_digest()
+EXPERIMENT_CONTRACT_SCHEMA_VERSION
++
+RegisteredExperimentContractV1.contract_digest()
 ```
 
-This avoids a split-brain preregistration where the policy could claim one corpus/seed/metric identity while its registered experiment contract committed another.
-
-Changing the registered experiment contract creates a new policy identity.
+and does not duplicate those fields.
 
 ## Resource feasibility
 
-The policy also binds:
+Policy identity binds:
 
 - `max_case_items`;
 - `max_interpretation_pairs`.
 
-Registration rejects an evidence-root requirement larger than `max_case_items`.
+Registration requires:
 
-For the largest required interpretation-root set N, registration requires:
+```text
+max_case_items >= largest independent-evidence-item requirement
+```
+
+and, for the largest interpretation-root requirement N:
 
 ```text
 max_interpretation_pairs >= N * (N - 1) / 2
 ```
 
-so the declared resource ceiling can actually witness every pair required by the pairwise-independent-set semantics.
+so the policy budget can structurally witness its own thresholds.
 
 ## Persistence
 
-`RegisteredShadowDispositionPolicyV1` is persistable only because deserialization:
-
-1. revalidates the raw policy;
-2. rechecks current lower-layer profile identities;
-3. checks the exact RCA experiment-contract schema;
-4. recomputes the policy contract digest;
-5. recomputes the complete BLAKE3 `policy_id`.
+`RegisteredShadowDispositionPolicyV1` is persistable only because deserialization revalidates the raw policy, all exact lower-layer profiles, the RCA experiment-contract schema/reference, resource feasibility, and the complete BLAKE3 policy identity.
 
 Tampering fails closed.
 
@@ -156,13 +173,11 @@ Tampering fails closed.
 
 This crate intentionally has no:
 
-- case input parameter;
-- `evaluate`/`decide`/`dispose` method;
+- bound-case or evidence-witness evaluation input;
+- `evaluate` / `decide` / `dispose` method;
 - disposition enum;
 - reason-trace generator;
 - belief admission;
 - workspace integration;
 - action path;
 - self-improvement promotion path.
-
-Those belong to later tranches only after this policy contract and all prerequisites qualify.
