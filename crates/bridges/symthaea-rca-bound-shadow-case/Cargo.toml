@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-rca-bound-shadow-case"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Provenance-bound, content-addressed RCA shadow evidence cases"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-epistemic-governance = { path = "../../core/symthaea-epistemic-governance" }
+symthaea-rca-evidence-bridge = { path = "../symthaea-rca-evidence-bridge" }
+symthaea-rca-shadow-case = { path = "../symthaea-rca-shadow-case" }
+symthaea-rca-shadow-epistemics = { path = "../symthaea-rca-shadow-epistemics" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+symthaea-rca-shadow = { path = "../../core/symthaea-rca-shadow" }
