@@ -1,0 +1,184 @@
+name: RCA Shadow Disposition Preflight
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-rca-shadow-disposition-preflight/**'
+      - '.github/workflows/rca-shadow-disposition-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze exact cross-artifact joins
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-preflight/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'SHADOW_DISPOSITION_PREFLIGHT_CONTRACT_V1' "$production"
+          grep -q 'one_exact_proposition_across_case+eligibility+lineage+witnesses+policy' "$production"
+          grep -q 'case_declaration_set_must_exactly_equal_eligible_declaration_set' "$production"
+          grep -q 'lineage_declaration_to_eligibility_entries_must_exactly_equal_current_eligibility_set' "$production"
+          grep -q 'all_eligible_declarations_must_share_exact_lineage_context_commitment' "$production"
+          grep -q 'PolicyPropositionMismatch' "$production"
+          grep -q 'EligibilitySetCardinalityMismatch' "$production"
+          grep -q 'InterpretationEntryCardinalityMismatch' "$production"
+          grep -q 'InterpretationEligibilityMismatch' "$production"
+          grep -q 'EligibilityContextMismatch' "$production"
+
+          grep -q 'bound_case.profile_contract_digest()' "$production"
+          grep -q 'interpretation_lineage.profile_contract_digest()' "$production"
+          grep -q 'effective_policy.interpretation_set_witness_profile_digest()' "$production"
+
+      - name: Freeze evidence and interpretation co-grounding
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-preflight/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'evidence_witness_items_must_be_current_case_candidates_with_exact_single_observation_root_binding_v1' "$production"
+          grep -q 'composite_multiroot_evidence_is_out_of_scope_for_this_preflight_profile' "$production"
+          grep -q 'interpretation_witness_requires_corresponding_evidence_witness_same_slot' "$production"
+          grep -q 'interpretation_witness_root_set_must_exactly_equal_roots_interpreting_same_slot_evidence_items' "$production"
+
+          grep -q 'witness_item.root_ids().len() != 1' "$production"
+          grep -q 'EvidenceWitnessItemNotCurrent' "$production"
+          grep -q 'EvidenceWitnessRelationSideMismatch' "$production"
+          grep -q 'InterpretationWitnessMissingEvidenceWitness' "$production"
+          grep -q 'lineage_root_by_declaration' "$production"
+          grep -q 'actual_roots != expected_roots' "$production"
+          grep -q 'InterpretationWitnessRootSetMismatch' "$production"
+
+          grep -q 'EvidenceRelationKindV1::Supports' "$production"
+          grep -q 'EvidenceRelationKindV1::Corroborates' "$production"
+          grep -q 'EvidenceRelationKindV1::Contradicts' "$production"
+          grep -q 'EvidenceRelationKindV1::Weakens' "$production"
+          grep -q 'EvidenceRelationKindV1::Defeats' "$production"
+
+      - name: Freeze resource and experiment boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-preflight/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'actual_case_items > policy.resources.max_case_items' "$production"
+          grep -q 'actual_pairs > policy.resources.max_interpretation_pairs' "$production"
+          grep -q 'CaseItemCeilingExceeded' "$production"
+          grep -q 'InterpretationPairCeilingExceeded' "$production"
+
+          grep -q '\.verify_integrity()' "$production"
+          grep -q 'EXPERIMENT_CONTRACT_SCHEMA_VERSION' "$production"
+          grep -q 'experiment_contract.contract_digest()' "$production"
+          grep -q 'ExperimentContractDigestMismatch' "$production"
+
+      - name: Freeze preflight identity and current capability semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-preflight/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'pub struct ShadowDispositionPreflightV1' "$production"
+          grep -q 'PREFLIGHT_ID_DOMAIN' "$production"
+          for field in \
+            proposition_id \
+            case_id \
+            case_scope_digest \
+            evidence_lineage_graph_id \
+            relation_eligibility_context_commitment \
+            support_evidence_witness_id \
+            opposition_evidence_witness_id \
+            defeater_evidence_witness_id \
+            support_interpretation_witness_id \
+            opposition_interpretation_witness_id \
+            defeater_interpretation_witness_id \
+            declaration_id \
+            eligibility_id \
+            interpretation_lineage_id \
+            effective_policy_id \
+            registered_experiment_contract_digest
+          do
+            grep -q "b\"$field\"" "$production"
+          done
+
+          if grep -Eq 'serde_json::|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
+            echo 'Preflight identity acquired incidental serializer/debug/Rust Hash semantics.' >&2
+            exit 1
+          fi
+          if grep -Eq 'impl[^\n]*Deserialize[^\n]*ShadowDispositionPreflightV1|derive\([^)]*Deserialize[^)]*\)[[:space:]]*pub struct ShadowDispositionPreflightV1' "$production"; then
+            echo 'Issued current preflight became deserializable.' >&2
+            exit 1
+          fi
+
+      - name: Freeze no-disposition authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-preflight/src/lib.rs
+          production=$(mktemp)
+          code=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+          grep -vE '^[[:space:]]*//|^[[:space:]]*/\*|^[[:space:]]*\*' "$production" > "$code"
+
+          grep -q 'preflight_performs_no_threshold_comparison_or_disposition' "$production"
+          if grep -Eq 'min_pairwise_independent_(evidence_items|interpretation_roots)' "$code"; then
+            echo 'Preflight started comparing preregistered disposition thresholds.' >&2
+            exit 1
+          fi
+          if grep -Eq 'pub enum ShadowDisposition|pub struct ShadowDisposition|pub fn (evaluate|decide|dispose|compute_disposition|issue_disposition)' "$code"; then
+            echo 'Disposition engine API appeared in preflight tranche.' >&2
+            exit 1
+          fi
+          if grep -Eqi 'majority.?vote|sum.*strength|mean.*strength|average.*strength|bayes|posterior|normalize.*strength|multiply.*strength' "$code"; then
+            echo 'Preflight acquired prohibited interpretation arithmetic.' >&2
+            exit 1
+          fi
+          if grep -Eqi 'CanonicalBelief|CanonicalEpistemicClaim|global.?workspace|action_author|external_effect|self.?improvement.*promotion' "$code"; then
+            echo 'Preflight crossed a downstream authority boundary.' >&2
+            exit 1
+          fi
+
+      - name: Freeze focused static tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-preflight/src/lib.rs
+          grep -q 'support_opposition_and_defeater_relation_classes_are_explicit' "$src"
+          grep -q 'canonical_set_equality_is_order_independent' "$src"
+          grep -q 'preflight_profile_identity_is_stable' "$src"
+
+      - name: Verify dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -p symthaea-rca-shadow-disposition-preflight -e normal)"
+          if printf '%s\n' "$tree" | grep -Eq '(^| )symthaea v|symthaea-core'; then
+            echo 'Preflight acquired the live root cognition package.' >&2
+            exit 1
+          fi
+
+      - name: Format preflight crate
+        run: cargo fmt -p symthaea-rca-shadow-disposition-preflight -- --check
+
+      - name: Test preflight crate
+        run: cargo test -p symthaea-rca-shadow-disposition-preflight
+
+      - name: Clippy preflight crate
+        run: cargo clippy -p symthaea-rca-shadow-disposition-preflight --all-targets -- -D warnings
