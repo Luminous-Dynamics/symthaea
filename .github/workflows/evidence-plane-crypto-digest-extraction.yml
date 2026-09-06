@@ -1,0 +1,117 @@
+name: Evidence Plane Crypto Digest Extraction
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-evidence-plane/src/crypto_digest.rs'
+      - 'crates/core/symthaea-evidence-plane/tests/crypto_digest_extraction.rs'
+      - 'crates/domains/symthaea-fabrication-kernel/src/crypto_digest.rs'
+      - '.github/workflows/evidence-plane-crypto-digest-extraction.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze extraction theorem and scope
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          candidate = Path('crates/core/symthaea-evidence-plane/src/crypto_digest.rs').read_text()
+          harness = Path('crates/core/symthaea-evidence-plane/tests/crypto_digest_extraction.rs').read_text()
+
+          required_candidate = [
+              'pub struct Sha256Digest(pub [u8; 32]);',
+              'pub struct Sha256 {',
+              'pub fn sha256(data: &[u8]) -> Sha256Digest',
+              'const INITIAL_STATE: [u32; 8]',
+              'const ROUND_CONSTANTS: [u32; 64]',
+              'fn compress(state: &mut [u32; 8], block: &[u8; 64])',
+              'standard_vectors_match',
+              'incremental_updates_match_one_shot',
+              'chunk_boundaries_around_padding_match_one_shot',
+          ]
+          for needle in required_candidate:
+              if needle not in candidate:
+                  raise SystemExit(f'missing neutral digest invariant: {needle}')
+
+          required_harness = [
+              '#[path = "../src/crypto_digest.rs"]',
+              '#[path = "../../../domains/symthaea-fabrication-kernel/src/crypto_digest.rs"]',
+              'fn neutral_candidate_matches_existing_fabrication_digest()',
+              'candidate::sha256(&bytes).to_hex()',
+              'fabrication::sha256(&bytes).to_hex()',
+              'nist_style_known_answers_match',
+              'padding_boundaries_match_one_shot',
+          ]
+          for needle in required_harness:
+              if needle not in harness:
+                  raise SystemExit(f'missing extraction qualification invariant: {needle}')
+
+          # This is an extraction qualification spike only. It must not acquire
+          # a new external cryptography implementation or migrate consumers yet.
+          forbidden = [
+              'sha2::',
+              'ring::',
+              'openssl::',
+              'blake3::',
+          ]
+          for needle in forbidden:
+              if needle in candidate:
+                  raise SystemExit(f'neutral digest extraction acquired external implementation: {needle}')
+
+          base = subprocess.check_output(
+              ['git', 'merge-base', 'HEAD', 'origin/' + '${{ github.base_ref }}'],
+              text=True,
+          ).strip()
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', base, 'HEAD'],
+              text=True,
+          ).splitlines())
+          allowed = {
+              '.github/workflows/evidence-plane-crypto-digest-extraction.yml',
+              'crates/core/symthaea-evidence-plane/src/crypto_digest.rs',
+              'crates/core/symthaea-evidence-plane/tests/crypto_digest_extraction.rs',
+          }
+          extra = changed - allowed
+          if extra:
+              raise SystemExit(f'unexpected files in digest extraction tranche: {sorted(extra)}')
+
+          forbidden_changes = {
+              'crates/core/symthaea-evidence-plane/Cargo.toml',
+              'crates/core/symthaea-evidence-plane/src/lib.rs',
+              'crates/domains/symthaea-fabrication-kernel/Cargo.toml',
+              'crates/domains/symthaea-fabrication-kernel/src/crypto_digest.rs',
+              'Cargo.lock',
+          }
+          touched = changed & forbidden_changes
+          if touched:
+              raise SystemExit(f'extraction spike changed consumer/public dependency surface: {sorted(touched)}')
+
+      - name: Locked workspace metadata
+        run: cargo metadata --locked --no-deps > /dev/null
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-evidence-plane -- --check
+
+      - name: Focused extraction qualification
+        run: cargo test --locked -p symthaea-evidence-plane --test crypto_digest_extraction
+
+      - name: Existing evidence-plane tests
+        run: cargo test --locked -p symthaea-evidence-plane --lib
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-evidence-plane --test crypto_digest_extraction -- -D warnings
