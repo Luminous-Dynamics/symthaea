@@ -6,6 +6,7 @@
   "hemisphere_area_count": 180,
   "schema": "symthaea-hcp-mmp1-area-order-v1",
   "source": {
+    "blob_sha": "78a240b52845dd01c8676ecfabef59e2a0526a85",
     "commit": "e3a33a5a50d4ca86ab8fbaa0407d6c3296fcab12",
     "path": "HCP-Multi-Modal-Parcellation-1.0.xml",
     "purpose": "semantic area ordering only; not a spatial transform artifact",
