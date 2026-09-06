@@ -122,6 +122,8 @@ pub enum EffectOutcomeError {
     EvidenceClaimKindDenied,
     #[error("outcome evidence predates the fresh reconciliation challenge")]
     EvidencePredatesChallenge,
+    #[error("outcome evidence predates the current outcome-verifier trust generation")]
+    EvidencePredatesCurrentTrustGeneration,
     #[error("outcome evidence outlives the fresh reconciliation challenge")]
     EvidenceOutlivesChallenge,
     #[error("outcome evidence is not currently fresh")]
