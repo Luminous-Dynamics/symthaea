@@ -1,0 +1,161 @@
+name: RCA Relation Declarer Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-epistemic-governance/**'
+      - '.github/workflows/rca-relation-declarer-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze qualification versus eligibility boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/relation_qualification.rs
+          lib=crates/core/symthaea-epistemic-governance/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'pub mod relation_qualification;' "$lib"
+          grep -q 'RELATION_DECLARER_QUALIFICATION_CONTRACT_V1' "$production"
+          grep -q 'RELATION_DECLARATION_ELIGIBILITY_CONTRACT_V1' "$production"
+          grep -q 'qualification_is_use_specific_not_global_trust' "$production"
+          grep -q 'scope=exact_proposition_id_v1' "$production"
+          grep -q 'qualifier_must_not_equal_subject_declarer' "$production"
+          grep -q 'registered_qualification_is_not_current_use_eligibility' "$production"
+          grep -q 'input=bound_relation_declaration+registered_qualification+validated_use_context' "$production"
+          grep -q 'eligibility_requires_exact_declaration_subject_version_method_join' "$production"
+          grep -q 'eligible_result=is_issued_private_non_deserializable_capability' "$production"
+          grep -q 'persistence_does_not_recreate_current_eligibility' "$production"
+
+          # Qualification and eligibility are distinct semantic profiles, not the
+          # same contract hashed under two labels.
+          grep -q 'relation_declarer_qualification_profile_digest_v1' "$production"
+          grep -q 'RELATION_DECLARER_QUALIFICATION_CONTRACT_V1.as_bytes()' "$production"
+          grep -q 'relation_declaration_eligibility_profile_digest_v1' "$production"
+          grep -q 'RELATION_DECLARATION_ELIGIBILITY_CONTRACT_V1.as_bytes()' "$production"
+
+          # V1 qualification must bind the complete use-specific field surface.
+          for field in \
+            subject_declarer_id \
+            subject_declarer_version \
+            subject_method \
+            qualifier_id \
+            qualifier_version \
+            evaluator_id \
+            evaluator_version \
+            proposition_id \
+            allowed_relation_kinds \
+            permitted_use \
+            qualification_policy_digest \
+            qualification_artifact_digest \
+            qualified_at_unix_ms \
+            valid_until_unix_ms
+          do
+            grep -q "$field" "$production"
+          done
+
+          grep -q 'ShadowRuntimeDisposition' "$production"
+          grep -q 'SupersedesNotDispositionRelation' "$production"
+          grep -q 'sort_by_key' "$production"
+
+          # Direct self-signing is structurally rejected. This intentionally does
+          # not claim organizational or causal independence.
+          grep -q 'value.qualifier_id == value.subject_declarer_id' "$production"
+          grep -q 'SelfQualification' "$production"
+
+          # Registered qualification is persistable/revalidated, but current
+          # eligibility is an issued capability and must not be deserializable.
+          grep -q 'pub struct RegisteredRelationDeclarerQualificationV1' "$production"
+          grep -q 'pub struct DispositionEligibleRelationDeclarationV1' "$production"
+          grep -q 'pub fn profile_contract_digest(&self)' "$production"
+          if grep -Eq 'impl[^\n]*Deserialize[^\n]*DispositionEligibleRelationDeclarationV1|derive\([^)]*Deserialize[^)]*\)[[:space:]]*pub struct DispositionEligibleRelationDeclarationV1' "$production"; then
+            echo 'Disposition eligibility became deserializable.' >&2
+            exit 1
+          fi
+
+          # No canonical belief/action/promotion authority may enter this layer.
+          if grep -Eqi 'CanonicalBelief|CanonicalEpistemicClaim|AdmittedCognitiveEvidence|global.?workspace|action_author|external_effect|self.?improvement.*promotion' "$production"; then
+            echo 'Relation qualification crossed a downstream authority boundary.' >&2
+            exit 1
+          fi
+
+      - name: Freeze exact eligibility join
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/relation_qualification.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'pub fn admit_relation_declaration_for_use_v1' "$production"
+          grep -q 'provenance.declarer_id != record.subject_declarer_id' "$production"
+          grep -q 'provenance.declarer_version != record.subject_declarer_version' "$production"
+          grep -q 'provenance.method != record.subject_method' "$production"
+          grep -q 'record.proposition_id != context_raw.proposition_id' "$production"
+          grep -q 'relation_proposition != &context_raw.proposition_id' "$production"
+          grep -q 'record.permitted_use != context_raw.use_case' "$production"
+          grep -q '!record.allowed_relation_kinds.contains(&relation.relation)' "$production"
+          grep -q 'context_raw.now_unix_ms < record.qualified_at_unix_ms' "$production"
+          grep -q 'context_raw.now_unix_ms > record.valid_until_unix_ms' "$production"
+
+          grep -q 'declaration_id' "$production"
+          grep -q 'qualification_id' "$production"
+          grep -q 'context_commitment' "$production"
+
+          if grep -Eq 'serde_json::|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
+            echo 'Qualification/eligibility identity acquired incidental serializer/debug/Rust Hash semantics.' >&2
+            exit 1
+          fi
+
+      - name: Freeze negative qualification tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/relation_qualification.rs
+          grep -q 'qualification_kind_set_is_canonical_not_input_order_identity' "$src"
+          grep -q 'producer_cannot_be_sole_qualifier' "$src"
+          grep -q 'registered_qualification_revalidates_after_persistence' "$src"
+          grep -q 'qualification_tampering_fails_closed' "$src"
+          grep -q 'exact_join_issues_non_persisted_eligibility' "$src"
+          grep -q 'eligibility_has_distinct_semantic_contract_identity' "$src"
+          grep -q 'wrong_subject_fails_exact_join' "$src"
+          grep -q 'wrong_proposition_fails_exact_join' "$src"
+          grep -q 'unqualified_relation_kind_cannot_become_eligible' "$src"
+          grep -q 'expired_or_future_qualification_cannot_become_eligible' "$src"
+          grep -q 'supersedes_cannot_be_qualified_for_v1_disposition' "$src"
+          grep -q 'qualification_identity_binds_policy_artifact_and_validity' "$src"
+
+      - name: Verify governance dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -p symthaea-epistemic-governance -e normal)"
+          if printf '%s\n' "$tree" | grep -Eq 'symthaea-rca-(shadow|observer|evidence|shadow-case|bound-shadow-case|disposition)'; then
+            echo 'Generic epistemic governance acquired an RCA runtime/bridge dependency.' >&2
+            exit 1
+          fi
+
+      - name: Format epistemic governance
+        run: cargo fmt -p symthaea-epistemic-governance -- --check
+
+      - name: Test relation declarer qualification
+        run: cargo test -p symthaea-epistemic-governance --lib relation_qualification
+
+      - name: Test epistemic governance
+        run: cargo test -p symthaea-epistemic-governance
+
+      - name: Clippy epistemic governance
+        run: cargo clippy -p symthaea-epistemic-governance --all-targets -- -D warnings
