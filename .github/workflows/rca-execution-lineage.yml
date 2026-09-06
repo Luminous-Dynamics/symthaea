@@ -28,12 +28,26 @@ jobs:
           sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
 
           grep -q 'pub struct CognitiveExecutionLineageV1' "$src"
+          grep -q 'pub struct IssuedCognitiveExecutionLineageV1' "$src"
           grep -q 'source_generation_digest' "$src"
           grep -q 'config_profile_digest' "$src"
           grep -q 'execution_nonce_commitment' "$src"
           grep -q 'getrandom::getrandom' "$production"
           grep -q 'EntropyUnavailable' "$production"
           grep -q 'IntegrityMismatch' "$production"
+          grep -q 'into_archival_record' "$production"
+
+          # The live-issued capability must not survive persistence. Archival
+          # identity may serialize, but loading it must not recreate issuance.
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('crates/core/symthaea-execution-lineage/src/lib.rs').read_text()
+          marker = 'pub struct IssuedCognitiveExecutionLineageV1'
+          idx = text.index(marker)
+          prefix = text[:idx].rstrip().splitlines()[-1]
+          if 'Serialize' in prefix or 'Deserialize' in prefix:
+              raise SystemExit('IssuedCognitiveExecutionLineageV1 must not derive Serialize/Deserialize')
+          PY
 
           # Exact source identity must be supplied from outside this crate.
           # Never synthesize it from weak local stand-ins.
