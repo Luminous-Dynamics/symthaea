@@ -1,0 +1,172 @@
+name: Observation Evidence Types
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-types/src/observation_evidence.rs"
+      - "crates/core/symthaea-types/src/lib.rs"
+      - ".github/workflows/observation-evidence-types.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/core/symthaea-types/src/observation_evidence.rs"
+      - "crates/core/symthaea-types/src/lib.rs"
+      - ".github/workflows/observation-evidence-types.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install qualification toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+
+      - name: Freeze policy-mediated observation admission boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=crates/core/symthaea-types/src/observation_evidence.rs
+          LIB=crates/core/symthaea-types/src/lib.rs
+
+          grep -Fq 'pub mod observation_evidence;' "$LIB"
+          grep -Fq 'pub enum ObservationOriginV1' "$SRC"
+          grep -Fq 'pub enum ObservationEvidenceUseV1' "$SRC"
+          grep -Fq 'pub struct ObservationEvidenceRefV1' "$SRC"
+          grep -Fq 'pub struct ValidatedObservationEvidenceRefV1' "$SRC"
+          grep -Fq 'pub struct PermittedObservationFormatV1' "$SRC"
+          grep -Fq 'pub struct ObservationAdmissionPolicyConfigV1' "$SRC"
+          grep -Fq 'pub struct ObservationAdmissionPolicyV1' "$SRC"
+          grep -Fq 'pub struct AdmittedObservationEvidenceV1' "$SRC"
+          grep -Fq 'pub fn activate_as_trust_root(' "$SRC"
+          ! grep -Fq 'pub fn activate(self)' "$SRC"
+          grep -Fq 'source identities are logical' "$SRC"
+          grep -Fq 'does not cryptographically authenticate a physical' "$SRC"
+          grep -Fq 'source_generation: NonZeroU64' "$SRC"
+          grep -Fq 'pub claim_digest: String' "$SRC"
+          grep -Fq 'pub calibration_digest: Option<String>' "$SRC"
+          grep -Fq 'pub modality: String' "$SRC"
+          grep -Fq 'pub payload_format: String' "$SRC"
+          grep -Fq 'pub permitted_formats: Vec<PermittedObservationFormatV1>' "$SRC"
+          grep -Fq 'pub policy_generation: NonZeroU64' "$SRC"
+          grep -Fq 'pub policy_source_digest: String' "$SRC"
+          grep -Fq 'freshness_epoch: Option<u64>' "$SRC"
+          grep -Fq 'ObservationEvidenceUseV1::ObservationAdmission' "$SRC"
+          grep -Fq 'ObservationEvidenceUseV1::BeliefSupport' "$SRC"
+          grep -Fq 'ObservationEvidenceUseV1::CanonicalBeliefAdmission' "$SRC"
+          grep -Fq 'ObservationEvidenceUseV1::ActionAuthority' "$SRC"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          src = Path('crates/core/symthaea-types/src/observation_evidence.rs').read_text()
+
+          def adjacent_derive(marker: str) -> set[str]:
+              before = src[:src.index(marker)]
+              raw = before.rsplit('#[derive(', 1)[-1].split(')]', 1)[0]
+              return {part.strip() for part in raw.split(',') if part.strip()}
+
+          for marker in (
+              'pub struct ObservationAdmissionPolicyV1',
+              'pub struct AdmittedObservationEvidenceV1',
+          ):
+              found = {'Serialize', 'Deserialize', 'Clone'} & adjacent_derive(marker)
+              if found:
+                  raise SystemExit(f'{marker} must not derive {sorted(found)}')
+
+          validated_impl = re.search(
+              r'impl ValidatedObservationEvidenceRefV1 \{(?P<body>.*?)\n\}',
+              src,
+              flags=re.S,
+          )
+          if not validated_impl:
+              raise SystemExit('missing validated observation evidence impl')
+          body = validated_impl.group('body')
+          if re.search(r'pub\s+fn\s+(authorize|admit)\b', body):
+              raise SystemExit('validated observation metadata must not self-authorize')
+
+          policy_impl = re.search(
+              r'impl ObservationAdmissionPolicyV1 \{(?P<body>.*?)\n\}',
+              src,
+              flags=re.S,
+          )
+          if not policy_impl:
+              raise SystemExit('missing runtime observation admission policy impl')
+          body = policy_impl.group('body')
+          required = (
+              'ObservationEvidenceUseV1::ObservationAdmission',
+              'ObservationAdmissionError::ReservedUse',
+              'ObservationOriginV1::ExternalObservation',
+              'ObservationAdmissionError::NonExternalOrigin',
+              'source.source_id == evidence.source_id()',
+              'source.source_generation == evidence.source_generation()',
+              'format.modality == evidence.modality()',
+              'format.payload_format == evidence.payload_format()',
+              'ObservationAdmissionError::ObservationFormatNotPermitted',
+          )
+          for token in required:
+              if token not in body:
+                  raise SystemExit(f'missing policy admission guard: {token}')
+
+          digest_impl = re.search(
+              r'fn validate_digest\(digest: &str\).*?\n\}',
+              src,
+              flags=re.S,
+          )
+          if not digest_impl:
+              raise SystemExit('missing digest validator')
+          digest_body = digest_impl.group(0)
+          if 'is_ascii_hexdigit' in digest_body:
+              raise SystemExit('digest validator must not admit uppercase textual aliases')
+          if "b'a'..=b'f'" not in digest_body:
+              raise SystemExit('digest validator must freeze lowercase hex syntax')
+
+          if 'permitted_modalities' in src:
+              raise SystemExit('independent modality allowlist reintroduces format cross-product ambiguity')
+
+          forbidden_tokens = (
+              'NeuralModality',
+              'CoordinateSystem',
+              'ReferenceFrameId',
+              'ClockDomainId',
+              'MetricPoint3',
+              'Pose3',
+          )
+          for token in forbidden_tokens:
+              if token in src:
+                  raise SystemExit(f'generic observation evidence unexpectedly depends on {token}')
+          PY
+
+          grep -Fq 'self_labeled_external_record_cannot_mint_admission_without_policy' "$SRC"
+          grep -Fq 'exact_trusted_source_generation_can_earn_observation_admission' "$SRC"
+          grep -Fq 'simulated_and_fixture_records_cannot_masquerade_as_direct_observations' "$SRC"
+          grep -Fq 'observation_policy_cannot_grant_belief_or_action_transitions' "$SRC"
+          grep -Fq 'source_generation_reset_breaks_admission_even_with_reused_local_id' "$SRC"
+          grep -Fq 'policy_binds_exact_modality_payload_pair_revision_artifact_and_calibration' "$SRC"
+          grep -Fq 'digests_use_one_canonical_lowercase_text_identity' "$SRC"
+          grep -Fq 'identity_and_format_text_reject_whitespace_aliases' "$SRC"
+          grep -Fq 'changed_payload_format_changes_observation_meaning_and_policy_match' "$SRC"
+          grep -Fq 'policy_validation_rejects_ambiguous_or_malformed_trust_sets' "$SRC"
+          grep -Fq 'validated_reference_revalidates_on_deserialization' "$SRC"
+          grep -Fq 'unknown_fields_and_schema_versions_fail_closed' "$SRC"
+          grep -Fq 'freshness_epoch_is_metadata_not_currentness_proof' "$SRC"
+          grep -Fq 'modality_and_payload_format_vocabularies_remain_generic' "$SRC"
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-types
+
+      - name: Focused tests
+        run: cargo test -p symthaea-types --lib observation_evidence
+
+      - name: Full shared-types tests
+        run: cargo test -p symthaea-types --lib
+
+      - name: Strict Clippy
+        run: cargo clippy -p symthaea-types --lib -- -D warnings
