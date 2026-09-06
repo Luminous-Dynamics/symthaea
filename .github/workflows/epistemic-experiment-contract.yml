@@ -1,0 +1,44 @@
+name: Epistemic Experiment Contract
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-epistemic-governance/**'
+      - 'crates/core/symthaea-evidence-plane/**'
+      - '.github/workflows/epistemic-experiment-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+      - name: Freeze preregistration integrity contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/experiment_contract.rs
+          grep -q 'RegisteredExperimentContractV1' "$src"
+          grep -q 'ContractDigestMismatch' "$src"
+          grep -q 'falsification_criteria' "$src"
+          grep -q 'allowed_outcomes' "$src"
+          grep -q 'blake3:' "$src"
+          if grep -q 'config_hash' "$src"; then
+            # The explanatory doc comment is allowed; executable use/import is not.
+            if grep -Eq '(^|[^`])config_hash[[:space:]]*\(' "$src"; then
+              echo 'Experiment authority commitments must not use non-cryptographic config_hash().' >&2
+              exit 1
+            fi
+          fi
+      - name: Format epistemic governance
+        run: cargo fmt --package symthaea-epistemic-governance -- --check
+      - name: Test epistemic governance
+        run: cargo test -p symthaea-epistemic-governance
+      - name: Clippy epistemic governance
+        run: cargo clippy -p symthaea-epistemic-governance --all-targets -- -D warnings
