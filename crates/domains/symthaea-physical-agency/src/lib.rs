@@ -12,6 +12,8 @@
 
 #![deny(unsafe_code)]
 
+pub mod portfolio;
+
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use symthaea_sim_bridge::{SimulationBackend, SolverKind};
