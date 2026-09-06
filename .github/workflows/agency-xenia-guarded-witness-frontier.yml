@@ -202,6 +202,7 @@ jobs:
           cat "$RUNNER_TEMP/agency-lock-status" > "$E/CARGO_LOCK_STATUS.txt"
           sha256sum crates/bridges/symthaea-xenia-guarded-witness-frontier/src/lib.rs > "$E/GUARDED_COMPOSITION_SHA256.txt"
           sha256sum crates/bridges/symthaea-xenia-guarded-witness-frontier/tests/guarded_composition.rs > "$E/GUARDED_TEST_SHA256.txt"
+          sha256sum crates/bridges/symthaea-xenia-guarded-witness-frontier/tests/guarded_containment.rs > "$E/GUARDED_CONTAINMENT_TEST_SHA256.txt"
           sha256sum crates/bridges/symthaea-xenia-witness-frontier-adapter/src/lib.rs > "$E/XENIA_ADAPTER_SHA256.txt"
           sha256sum crates/bridges/symthaea-xenia-authority/src/witness_frontier.rs > "$E/XENIA_VERIFIER_SHA256.txt"
           sha256sum crates/bridges/symthaea-xenia-authority/src/currentness_challenge.rs > "$E/AFFINE_CHALLENGE_SHA256.txt"
