@@ -16,6 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod cognitive_evidence;
 pub mod neural_evidence;
 pub mod threshold_overrides;
 
