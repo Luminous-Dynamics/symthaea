@@ -35,7 +35,14 @@ pub struct FrozenCycleObservationV1 {
     pub schema_version: u16,
     /// Exact architecture/configuration generation that produced this cycle.
     pub source_generation_digest: String,
-    /// Monotonic cycle number within that producing execution lineage.
+    /// Exact execution/session lineage. `cycle_index` is meaningful only within
+    /// this lineage and must never be treated as globally unique by itself.
+    pub execution_lineage_digest: String,
+    /// Named projection implementation that created this detached observation.
+    pub adapter_profile: String,
+    /// Commitment to the exact adapter/projection contract semantics.
+    pub adapter_contract_digest: String,
+    /// Monotonic cycle number within the producing execution lineage.
     pub cycle_index: u64,
     pub cycle_time_us: u64,
     /// Fixed-point value in [0, 1_000_000].
@@ -87,11 +94,17 @@ impl TryFrom<FrozenCycleObservationV1> for ValidatedFrozenCycleObservationV1 {
 
         for digest in [
             value.source_generation_digest.as_str(),
+            value.execution_lineage_digest.as_str(),
+            value.adapter_contract_digest.as_str(),
             value.output_digest.as_str(),
             value.thought_digest.as_str(),
             value.metadata_digest.as_str(),
         ] {
             validate_digest(digest)?;
+        }
+
+        if value.adapter_profile.trim().is_empty() {
+            return Err(ShadowObservationError::MissingAdapterProfile);
         }
 
         if value.prediction_error_ppm > COGNITIVE_PROBABILITY_SCALE {
@@ -147,6 +160,9 @@ pub struct ShadowObservationReceiptV1 {
     /// BLAKE3 commitment over the exact validated observation serialization.
     pub observation_commitment: String,
     pub source_generation_digest: String,
+    pub execution_lineage_digest: String,
+    pub adapter_profile: String,
+    pub adapter_contract_digest: String,
     pub cycle_index: u64,
     pub cycle_time_us: u64,
     pub prediction_error_ppm: u32,
@@ -172,6 +188,9 @@ pub fn observe(
         observer_profile: SHADOW_OBSERVER_PROFILE_V1.to_string(),
         observation_commitment: commitment,
         source_generation_digest: raw.source_generation_digest.clone(),
+        execution_lineage_digest: raw.execution_lineage_digest.clone(),
+        adapter_profile: raw.adapter_profile.clone(),
+        adapter_contract_digest: raw.adapter_contract_digest.clone(),
         cycle_index: raw.cycle_index,
         cycle_time_us: raw.cycle_time_us,
         prediction_error_ppm: raw.prediction_error_ppm,
@@ -186,6 +205,7 @@ pub fn observe(
 pub enum ShadowObservationError {
     UnsupportedObservationSchema { found: u16 },
     MalformedDigest,
+    MissingAdapterProfile,
     PredictionErrorOutOfRange { found: u32 },
     PeakAttentionOutOfRange { found: u32 },
     MissingLanguageSource,
@@ -202,6 +222,7 @@ impl PartialEq for ShadowObservationError {
                 UnsupportedObservationSchema { found: b },
             ) => a == b,
             (MalformedDigest, MalformedDigest) => true,
+            (MissingAdapterProfile, MissingAdapterProfile) => true,
             (PredictionErrorOutOfRange { found: a }, PredictionErrorOutOfRange { found: b }) => {
                 a == b
             }
@@ -225,6 +246,9 @@ impl std::fmt::Display for ShadowObservationError {
             ),
             Self::MalformedDigest => {
                 f.write_str("digest must be sha256:<64 hex> or blake3:<64 hex>")
+            }
+            Self::MissingAdapterProfile => {
+                f.write_str("shadow observation requires explicit adapter profile identity")
             }
             Self::PredictionErrorOutOfRange { found } => write!(
                 f,
@@ -275,6 +299,9 @@ mod tests {
         FrozenCycleObservationV1 {
             schema_version: FROZEN_CYCLE_OBSERVATION_SCHEMA_VERSION,
             source_generation_digest: SHA_A.into(),
+            execution_lineage_digest: BLAKE_C.into(),
+            adapter_profile: "cycle-result-shadow-adapter-v1".into(),
+            adapter_contract_digest: SHA_B.into(),
             cycle_index: 42,
             cycle_time_us: 18_000,
             prediction_error_ppm: 125_000,
@@ -295,6 +322,8 @@ mod tests {
         let receipt = observe(&validated).unwrap();
         assert_eq!(receipt.cycle_index, 42);
         assert_eq!(receipt.observer_profile, SHADOW_OBSERVER_PROFILE_V1);
+        assert_eq!(receipt.execution_lineage_digest, BLAKE_C);
+        assert_eq!(receipt.adapter_profile, "cycle-result-shadow-adapter-v1");
         assert!(receipt.observation_commitment.starts_with("blake3:"));
         assert!(receipt.has_language_output);
     }
@@ -314,6 +343,40 @@ mod tests {
         assert_ne!(
             observe(&a).unwrap().observation_commitment,
             observe(&b).unwrap().observation_commitment
+        );
+    }
+
+    #[test]
+    fn execution_lineage_is_commitment_bound() {
+        let a = raw().validate().unwrap();
+        let mut b_raw = raw();
+        b_raw.execution_lineage_digest = SHA_B.into();
+        let b = b_raw.validate().unwrap();
+        assert_ne!(
+            observe(&a).unwrap().observation_commitment,
+            observe(&b).unwrap().observation_commitment
+        );
+    }
+
+    #[test]
+    fn adapter_semantics_are_commitment_bound() {
+        let a = raw().validate().unwrap();
+        let mut b_raw = raw();
+        b_raw.adapter_contract_digest = BLAKE_C.into();
+        let b = b_raw.validate().unwrap();
+        assert_ne!(
+            observe(&a).unwrap().observation_commitment,
+            observe(&b).unwrap().observation_commitment
+        );
+    }
+
+    #[test]
+    fn adapter_profile_must_be_explicit() {
+        let mut invalid = raw();
+        invalid.adapter_profile = " ".into();
+        assert_eq!(
+            invalid.validate(),
+            Err(ShadowObservationError::MissingAdapterProfile)
         );
     }
 
