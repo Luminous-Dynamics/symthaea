@@ -1,0 +1,88 @@
+name: RCA Shadow Observer
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-rca-shadow/**'
+      - '.github/workflows/rca-shadow-observer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze one-way canonical observation boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=crates/core/symthaea-rca-shadow/Cargo.toml
+          src=crates/core/symthaea-rca-shadow/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          # The shadow observer must not acquire production/control-plane deps.
+          if grep -Eq 'symthaea[[:space:]]*=|symthaea-(core|runtime|workspace|wisdom|memory|action)|tokio|reqwest|holochain|xenia' "$manifest"; then
+            echo 'RCA shadow observer acquired a forbidden production/control dependency.' >&2
+            exit 1
+          fi
+
+          # Reject obvious side-effect/control primitives in executable source.
+          if grep -Eq '^[[:space:]]*use[[:space:]].*(std::(fs|net|process)|tokio|Mutex|RwLock|mpsc)|std::(fs|net|process)::|tokio::' "$production"; then
+            echo 'RCA shadow observer acquired a side-effect/control primitive.' >&2
+            exit 1
+          fi
+
+          # V1 observation identity is an explicit canonical commitment contract,
+          # not whatever bytes a general-purpose serializer happens to emit.
+          grep -q 'SHADOW_OBSERVER_CONTRACT_V1' "$production"
+          grep -q 'observer_contract_digest_v1' "$production"
+          grep -q 'observation_commitment_v1' "$production"
+          grep -q 'observer_contract_digest' "$production"
+          if grep -q 'serde_json::' "$production"; then
+            echo 'Live RCA shadow observation must not delegate commitment identity to serde_json.' >&2
+            exit 1
+          fi
+
+          # Prediction error is a unit-interval quantity. Peak attention is not:
+          # encoder attention weights may exceed 1.0, so preserve exact f32 bits.
+          grep -q 'prediction_error_ppm' "$production"
+          grep -q 'peak_attention_bits' "$production"
+          grep -q 'InvalidPeakAttention' "$production"
+          if grep -q 'peak_attention_ppm' "$production"; then
+            echo 'Peak attention must remain an exact weight, not probability ppm.' >&2
+            exit 1
+          fi
+
+          grep -q 'pub fn observe' "$production"
+          grep -q 'FrozenCycleObservationV1' "$production"
+          grep -q 'ShadowObservationReceiptV1' "$production"
+          grep -q 'observation_commitment' "$production"
+          grep -q 'blake3:' "$production"
+
+      - name: Verify dependency tree has no Symthaea control crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          deps="$(cargo tree -p symthaea-rca-shadow -e normal --prefix none | tail -n +2)"
+          if printf '%s\n' "$deps" | grep -Eq '^symthaea($|-(core|runtime|workspace|wisdom|memory|action)[[:space:]])'; then
+            echo 'RCA shadow observer dependency tree reaches a forbidden Symthaea control crate.' >&2
+            printf '%s\n' "$deps" >&2
+            exit 1
+          fi
+
+      - name: Format shadow observer
+        run: rustfmt --edition 2024 --check crates/core/symthaea-rca-shadow/src/lib.rs
+
+      - name: Test shadow observer
+        run: cargo test -p symthaea-rca-shadow
+
+      - name: Clippy shadow observer
+        run: cargo clippy -p symthaea-rca-shadow --all-targets -- -D warnings
