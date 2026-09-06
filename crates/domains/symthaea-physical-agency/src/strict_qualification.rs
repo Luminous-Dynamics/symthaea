@@ -96,8 +96,11 @@ impl StrictConfirmatorySimulationQualification {
 /// Canonical structural evidence reference a discharged simulation obligation
 /// must contain for PA-14 qualification.
 ///
-/// This reference binds the proposal, request, external input/output digests,
-/// preregistered claim id, and selected world snapshot. It is an exact lineage
+/// This v2 reference binds the proposal, request, external input/output digests,
+/// preregistered claim id, selected world snapshot, and the exact canonical
+/// machine request transcript. Because that transcript already contains the
+/// canonical typed-context set, future geometry/material/calibration contexts
+/// cannot be omitted from safety-evidence identity. It remains an exact lineage
 /// label, not a signature, attestation, or authorization token.
 pub fn required_confirmatory_safety_evidence_ref(
     evidence: &ConfirmatorySimulationEvidence,
@@ -117,7 +120,7 @@ pub fn required_confirmatory_safety_evidence_ref(
         .as_deref()
         .ok_or(StrictConfirmatoryQualificationError::IncompleteExternalProvenance)?;
 
-    let mut reference = String::from("physical-agency-confirmatory:v1");
+    let mut reference = String::from("physical-agency-confirmatory:v2");
     for field in [
         selected.assessment().proposal.id.as_str(),
         result.request_id.as_str(),
@@ -127,12 +130,28 @@ pub fn required_confirmatory_safety_evidence_ref(
         snapshot_algorithm_tag(selected.world_snapshot().digest_algorithm()),
         selected.world_snapshot().snapshot_digest(),
     ] {
-        reference.push('|');
-        reference.push_str(&field.len().to_string());
-        reference.push(':');
-        reference.push_str(field);
+        push_field(&mut reference, field);
     }
+    let transcript_hex = bytes_to_hex(satisfied.request_transcript().as_bytes());
+    push_field(&mut reference, &transcript_hex);
     Ok(reference)
+}
+
+fn push_field(reference: &mut String, field: &str) {
+    reference.push('|');
+    reference.push_str(&field.len().to_string());
+    reference.push(':');
+    reference.push_str(field);
+}
+
+fn bytes_to_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        encoded.push(HEX[(byte >> 4) as usize] as char);
+        encoded.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    encoded
 }
 
 pub fn qualify_confirmatory_simulation(
@@ -422,6 +441,36 @@ mod tests {
         (evidence, satisfied)
     }
 
+    fn confirmatory_run_with_parameter(
+        request_id: &str,
+        parameter_value: f64,
+    ) -> (ConfirmatorySimulationEvidence, SatisfiedSimulationClaim) {
+        let selected = selected();
+        let request = SimulationRequest::new(
+            request_id,
+            EngineeringDomain::Systems,
+            SolverKind::Custom,
+            "strict qualification transcript-binding fixture",
+        )
+        .with_parameter("fixture_parameter", parameter_value, "1", "test fixture");
+        let prepared = prepare_confirmatory_simulation(
+            &selected,
+            request,
+            claim(MetricUncertaintyPolicy::RequireInterval),
+        )
+        .unwrap();
+        let mut registry = StrictSimulationRegistry::new();
+        registry.register(FixtureBackend {
+            interval: Some(Interval::new(0.84, 0.92)),
+        });
+        let evidence = run_confirmatory_simulation(&registry, &prepared).unwrap();
+        let satisfied = match evaluate_confirmatory_claim(&evidence).unwrap() {
+            ConfirmatoryClaimOutcome::Satisfied(receipt) => receipt,
+            other => panic!("expected satisfied claim, got {other:?}"),
+        };
+        (evidence, satisfied)
+    }
+
     fn discharged_case(
         evidence: &ConfirmatorySimulationEvidence,
         satisfied: &SatisfiedSimulationClaim,
@@ -481,6 +530,30 @@ mod tests {
         );
         assert_eq!(
             qualify_confirmatory_simulation(&evidence, &satisfied, &safety).unwrap_err(),
+            StrictConfirmatoryQualificationError::SafetyCaseMissingExactEvidence
+        );
+    }
+
+    #[test]
+    fn safety_case_reference_binds_exact_canonical_request_transcript() {
+        let (evidence_a, satisfied_a) = confirmatory_run_with_parameter("same-run-id", 1.0);
+        let (evidence_b, satisfied_b) = confirmatory_run_with_parameter("same-run-id", 2.0);
+
+        let result_a = evidence_a.selection_evidence().validated().result();
+        let result_b = evidence_b.selection_evidence().validated().result();
+        assert_eq!(result_a.evidence.input_digest, result_b.evidence.input_digest);
+        assert_eq!(result_a.evidence.output_digest, result_b.evidence.output_digest);
+        assert_ne!(satisfied_a.request_transcript(), satisfied_b.request_transcript());
+
+        let reference_a = required_confirmatory_safety_evidence_ref(&evidence_a, &satisfied_a)
+            .unwrap();
+        let reference_b = required_confirmatory_safety_evidence_ref(&evidence_b, &satisfied_b)
+            .unwrap();
+        assert_ne!(reference_a, reference_b);
+
+        let safety_a = discharged_case(&evidence_a, &satisfied_a);
+        assert_eq!(
+            qualify_confirmatory_simulation(&evidence_b, &satisfied_b, &safety_a).unwrap_err(),
             StrictConfirmatoryQualificationError::SafetyCaseMissingExactEvidence
         );
     }
