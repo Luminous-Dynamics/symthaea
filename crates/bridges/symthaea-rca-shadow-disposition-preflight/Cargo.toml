@@ -14,6 +14,7 @@ serde = { workspace = true }
 symthaea-epistemic-governance = { path = "../../core/symthaea-epistemic-governance" }
 symthaea-rca-bound-shadow-case = { path = "../symthaea-rca-bound-shadow-case" }
 symthaea-rca-effective-disposition-policy = { path = "../symthaea-rca-effective-disposition-policy" }
+symthaea-rca-shadow-disposition-policy = { path = "../symthaea-rca-shadow-disposition-policy" }
 
 [dev-dependencies]
 serde_json = { workspace = true }
