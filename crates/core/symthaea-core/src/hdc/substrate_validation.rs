@@ -268,15 +268,13 @@ impl SubstrateValidationFramework {
                 "Consciousness requires biological neurons".to_string(),
                 "Specific molecular mechanisms are essential".to_string(),
             ],
-            predictions: vec![
-                TestablePrediction::new(
-                    "Consciousness requires specific neural architectures",
-                    "Only brains with those architectures show consciousness",
-                    "Consciousness found in diverse neural organizations",
-                    "Compare consciousness markers across species with different brain structures",
-                    5,
-                ),
-            ],
+            predictions: vec![TestablePrediction::new(
+                "Consciousness requires specific neural architectures",
+                "Only brains with those architectures show consciousness",
+                "Consciousness found in diverse neural organizations",
+                "Compare consciousness markers across species with different brain structures",
+                5,
+            )],
             hypothetical_feasibility: 0.92,
             feasibility_rationale: "Based on extensive evidence of biological consciousness existing. \
                                    The 0.92 (not 1.0) acknowledges we don't fully understand the mechanism."
@@ -573,8 +571,10 @@ impl SubstrateValidationFramework {
     /// do not carry the provenance, participant observation, independence, or
     /// replication authority required to promote a substrate-consciousness claim.
     ///
-    /// Returns `true` only when the substrate and prediction index existed and
-    /// the result was recorded.
+    /// The return value preserves the historical API contract: it answers
+    /// whether the evidence level was upgraded. Because automatic promotion is
+    /// now forbidden, this method always returns `false`. Callers that need to
+    /// inspect whether a result was recorded should read the prediction state.
     pub fn record_prediction_result(
         &mut self,
         substrate: &str,
@@ -585,7 +585,6 @@ impl SubstrateValidationFramework {
             && let Some(pred) = knowledge.predictions.get_mut(prediction_idx)
         {
             pred.record_result(passed);
-            return true;
         }
         false
     }
@@ -898,38 +897,47 @@ mod tests {
             EvidenceLevel::Theoretical
         );
 
-        let recorded = framework.record_prediction_result("silicon", 0, true);
-        assert!(recorded);
+        let upgraded = framework.record_prediction_result("silicon", 0, true);
+        assert!(!upgraded);
         assert_eq!(
             framework.get("silicon").unwrap().evidence_level,
             EvidenceLevel::Theoretical
         );
-        assert_eq!(framework.get("silicon").unwrap().predictions[0].result, Some(true));
+        assert_eq!(
+            framework.get("silicon").unwrap().predictions[0].result,
+            Some(true)
+        );
     }
 
     #[test]
     fn test_failed_prediction_result_also_preserves_evidence_level() {
         let mut framework = SubstrateValidationFramework::new();
-        let recorded = framework.record_prediction_result("silicon", 0, false);
-        assert!(recorded);
+        let upgraded = framework.record_prediction_result("silicon", 0, false);
+        assert!(!upgraded);
         assert_eq!(
             framework.get("silicon").unwrap().evidence_level,
             EvidenceLevel::Theoretical
         );
-        assert_eq!(framework.get("silicon").unwrap().predictions[0].result, Some(false));
+        assert_eq!(
+            framework.get("silicon").unwrap().predictions[0].result,
+            Some(false)
+        );
     }
 
     #[test]
     fn test_prediction_summary_records_execution_without_authority_change() {
         let mut framework = SubstrateValidationFramework::new();
-        assert!(framework.record_prediction_result("silicon", 0, true));
+        assert!(!framework.record_prediction_result("silicon", 0, true));
         let summaries = framework.prediction_summary();
         let silicon = summaries.iter().find(|s| s.substrate == "silicon").unwrap();
         assert_eq!(silicon.tested, 1);
         assert_eq!(silicon.passed, 1);
         assert_eq!(silicon.failed, 0);
         assert_eq!(silicon.evidence_level, EvidenceLevel::Theoretical);
-        assert_eq!(silicon.honest_confidence, EvidenceLevel::Theoretical.confidence());
+        assert_eq!(
+            silicon.honest_confidence,
+            EvidenceLevel::Theoretical.confidence()
+        );
     }
 
     #[test]
@@ -937,12 +945,18 @@ mod tests {
         let mut framework = SubstrateValidationFramework::new();
         let n = framework.get("silicon").unwrap().predictions.len();
         for i in 0..n {
-            assert!(framework.record_prediction_result("silicon", i, true));
+            assert!(!framework.record_prediction_result("silicon", i, true));
         }
         assert_eq!(
             framework.get("silicon").unwrap().evidence_level,
             EvidenceLevel::Theoretical
         );
+        assert!(framework
+            .get("silicon")
+            .unwrap()
+            .predictions
+            .iter()
+            .all(|p| p.tested && p.result == Some(true)));
     }
 
     #[test]
@@ -966,7 +980,7 @@ mod tests {
     #[allow(deprecated)]
     fn test_legacy_upgrade_check_is_non_mutating() {
         let mut framework = SubstrateValidationFramework::new();
-        assert!(framework.record_prediction_result("silicon", 0, true));
+        assert!(!framework.record_prediction_result("silicon", 0, true));
         let level = framework.check_evidence_upgrade("silicon");
         assert_eq!(level, Some(EvidenceLevel::Theoretical));
         assert_eq!(
