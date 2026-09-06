@@ -1,0 +1,42 @@
+[package]
+name = "symthaea-iot-composed-actuation-evidence"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Non-authorizing correlation of exact transport, durable semantic acceptance and post-semantic interlock evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "security", "actuation", "evidence"]
+categories = ["embedded"]
+
+[dependencies]
+blake3 = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-actuation-guard-interlock = { path = "../symthaea-iot-actuation-guard-interlock" }
+symthaea-iot-actuation-guard-semantic-persistence = { path = "../symthaea-iot-actuation-guard-semantic-persistence" }
+symthaea-iot-transport-current-revalidation = { path = "../symthaea-iot-transport-current-revalidation" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+bincode = { workspace = true }
+ed25519-dalek = { workspace = true }
+fips204 = { version = "=0.4.6", default-features = false, features = ["ml-dsa-65"] }
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-iot-actuation-guard-admission-challenge = { path = "../symthaea-iot-actuation-guard-admission-challenge" }
+symthaea-iot-actuation-guard-admission-reservation = { path = "../symthaea-iot-actuation-guard-admission-reservation" }
+symthaea-iot-actuation-guard-device-reality = { path = "../symthaea-iot-actuation-guard-device-reality" }
+symthaea-iot-actuation-guard-post-semantic-controller = { path = "../symthaea-iot-actuation-guard-post-semantic-controller" }
+symthaea-iot-actuation-guard-two-phase-protocol = { path = "../symthaea-iot-actuation-guard-two-phase-protocol" }
+symthaea-iot-authority = { path = "../symthaea-iot-authority" }
+symthaea-iot-device-protocol = { path = "../symthaea-iot-device-protocol" }
+symthaea-iot-durable-runtime = { path = "../symthaea-iot-durable-runtime" }
+symthaea-iot-final-gate = { path = "../symthaea-iot-final-gate" }
+symthaea-iot-interlock-ed25519 = { path = "../symthaea-iot-interlock-ed25519" }
+symthaea-iot-interlock-trust = { path = "../symthaea-iot-interlock-trust" }
+symthaea-iot-policy = { path = "../symthaea-iot-policy" }
+symthaea-iot-posture = { path = "../symthaea-iot-posture" }
+symthaea-iot-transport-exact-evidence = { path = "../symthaea-iot-transport-exact-evidence" }
+symthaea-iot-transport-receipt = { path = "../symthaea-iot-transport-receipt" }
+symthaea-iot-xenia-hybrid-verifier = { path = "../symthaea-iot-xenia-hybrid-verifier" }
