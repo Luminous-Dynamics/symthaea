@@ -1,0 +1,121 @@
+name: Economic Sampling Design Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-economics/tests/sampling_design_qualification.rs'
+      - '.github/workflows/economic-sampling-design.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze sampling theorem and qualification-only scope
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          test_path = Path('crates/domains/symthaea-economics/tests/sampling_design_qualification.rs')
+          text = test_path.read_text()
+
+          required = [
+              'enum SamplingClass',
+              'CompleteFrameEnumeration',
+              'ProbabilitySample',
+              'AdministrativeCoverage',
+              'NonProbabilitySample',
+              'target_population_id: String',
+              'sampling_frame_id: String',
+              'inclusion_design_id: Option<String>',
+              'weighting_policy_id: Option<String>',
+              'nonresponse_policy_id: Option<String>',
+              'very_large_nonprobability_sample_does_not_become_probability_evidence',
+              'weighting_a_nonprobability_sample_does_not_upgrade_its_design_class',
+              'administrative_coverage_remains_distinct_from_complete_enumeration',
+              'same_target_population_does_not_make_a_different_frame_equivalent',
+              'probability_design_requires_inclusion_and_nonresponse_contracts',
+              'empty_sample_never_receives_sampling_evidence_credit',
+          ]
+          for needle in required:
+              if needle not in text:
+                  raise SystemExit(f'missing sampling qualification invariant: {needle}')
+
+          # Evidence class must be determined by the preregistered sampling
+          # contract, never by a sample-size threshold or presence of weights.
+          forbidden_shortcuts = [
+              'sample_size >',
+              'sample_size >=',
+              'weighting_policy_id.is_some() &&',
+              'weighting_policy_id.is_some() => SamplingAdmission::ProbabilitySample',
+          ]
+          for needle in forbidden_shortcuts:
+              if needle in text:
+                  raise SystemExit(f'sampling class acquired forbidden shortcut: {needle}')
+
+          forbidden_authority = [
+              'reqwest::',
+              'ureq::',
+              'SystemTime::now',
+              'Utc::now',
+              'EvidenceChannel::',
+              'NormativeProposition',
+              'PolicyRecommendation',
+          ]
+          for needle in forbidden_authority:
+              if needle in text:
+                  raise SystemExit(f'sampling theorem acquired unrelated authority: {needle}')
+
+          base = subprocess.check_output(
+              ['git', 'merge-base', 'HEAD', 'origin/' + '${{ github.base_ref }}'],
+              text=True,
+          ).strip()
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', base, 'HEAD'],
+              text=True,
+          ).splitlines())
+          allowed = {
+              '.github/workflows/economic-sampling-design.yml',
+              'crates/domains/symthaea-economics/tests/sampling_design_qualification.rs',
+          }
+          if changed != allowed:
+              raise SystemExit(
+                  f'sampling qualification must remain exactly two files; got {sorted(changed)}'
+              )
+
+          forbidden_product = {
+              'crates/domains/symthaea-economics/src/ontology.rs',
+              'crates/domains/symthaea-economics/src/etir.rs',
+              'crates/domains/symthaea-economics/src/theory.rs',
+              'crates/domains/symthaea-economics/src/science.rs',
+              'crates/domains/symthaea-economics/src/lib.rs',
+              'crates/domains/symthaea-economics/Cargo.toml',
+              'Cargo.lock',
+          }
+          touched = changed & forbidden_product
+          if touched:
+              raise SystemExit(f'qualification spike modified product/manifest state: {sorted(touched)}')
+
+      - name: Locked workspace metadata
+        run: cargo metadata --locked --no-deps > /dev/null
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-economics -- --check
+
+      - name: Sampling design qualification test
+        run: cargo test --locked -p symthaea-economics --test sampling_design_qualification
+
+      - name: Strict focused Clippy
+        run: cargo clippy --locked -p symthaea-economics --test sampling_design_qualification -- -D warnings
