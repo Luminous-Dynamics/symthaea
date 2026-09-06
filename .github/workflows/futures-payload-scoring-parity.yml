@@ -1,0 +1,94 @@
+name: Futures Payload Scoring Parity
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-futures-calibration/tests/payload_scoring_parity.rs"
+      - ".github/workflows/futures-payload-scoring-parity.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-futures-calibration/tests/payload_scoring_parity.rs"
+      - ".github/workflows/futures-payload-scoring-parity.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: futures-payload-scoring-parity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install qualification toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze neutral scoring theorem
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/domains/symthaea-futures-calibration/tests/payload_scoring_parity.rs")
+          text = path.read_text()
+
+          required = [
+              "fn score_brier(",
+              "fn score_log(",
+              "fn score_crps(",
+              "brier_payload_matches_legacy_bitwise",
+              "log_payload_matches_legacy_bitwise",
+              "crps_payload_matches_legacy_bitwise",
+              "payload_path_preserves_crps_shape_errors",
+              "neutral_scoring_requires_no_temporal_metadata",
+              "assert_eq!(legacy.to_bits(), neutral.to_bits())",
+          ]
+          missing = [item for item in required if item not in text]
+          if missing:
+              raise SystemExit(f"payload scoring qualification drift: {missing}")
+
+          # Inspect only the neutral kernels. The parity fixture is expected to
+          # construct a legacy tick-indexed distribution for the comparison arm.
+          markers = [
+              ("fn score_brier(", "fn score_log("),
+              ("fn score_log(", "fn interval_midpoint("),
+              ("fn score_crps(", "fn pair("),
+          ]
+          for start, end in markers:
+              block = text.split(start, 1)[1].split(end, 1)[0]
+              for forbidden in [
+                  "ForecastDistribution",
+                  "Horizon",
+                  "issued_at_tick",
+                  "SimulationTick",
+                  "UnixMillis",
+                  "ForecastWindow",
+              ]:
+                  if forbidden in block:
+                      raise SystemExit(
+                          f"neutral scoring kernel gained temporal/legacy dependency: {start} -> {forbidden}"
+                      )
+
+          # This is a qualification spike, not an alternate production scorer.
+          production = Path("crates/domains/symthaea-futures-calibration/src/lib.rs").read_text()
+          if "payload_scoring" in production or "score_payload" in production:
+              raise SystemExit("qualification spike unexpectedly changed production scoring API")
+          PY
+
+      - name: Verify locked workspace metadata
+        run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-futures-calibration
+
+      - name: Run payload scoring parity qualification
+        run: cargo test --locked -p symthaea-futures-calibration --test payload_scoring_parity
+
+      - name: Strict focused Clippy
+        run: cargo clippy --locked -p symthaea-futures-calibration --test payload_scoring_parity --no-deps -- -D warnings
