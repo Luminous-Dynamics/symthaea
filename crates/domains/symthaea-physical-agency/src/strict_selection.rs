@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Selection-bound strict simulation preparation and evidence.
 //!
-//! PA-12 removes the caller-written world-snapshot digest from the strict run
-//! path. The world context is derived directly from the non-serializable
-//! [`SelectedCandidate`] minted by deliberation. The prepared request and the
-//! returned evidence receipt are also non-serializable.
+//! PA-12 removes caller-written world-snapshot identity from the strict run
+//! path. The frame, digest bytes, and digest scheme are derived directly from
+//! the non-serializable [`SelectedCandidate`] minted by deliberation. The
+//! prepared request and returned evidence receipt are also non-serializable.
 //!
 //! This is still simulation-only structural evidence. It grants no physical
 //! execution authority and does not authenticate a malicious solver backend.
 
-use crate::deliberation::SelectedCandidate;
+use crate::deliberation::{SelectedCandidate, SnapshotDigestAlgorithm};
 use crate::strict_context::{
     ContextBoundSimulationRequest, ContextDigestAlgorithm, RegistryValidatedContextSimulation,
     SimulationContextKind, SimulationContextRef, StrictSimulationError, StrictSimulationRegistry,
@@ -38,16 +38,15 @@ impl PreparedSelectedSimulation {
 
 /// Build a strict context-bound request directly from the selected world state.
 ///
-/// The caller chooses only the declared digest algorithm. The frame and digest
-/// bytes themselves come exclusively from `SelectedCandidate::world_snapshot`.
-/// A legacy/non-cryptographic snapshot identifier therefore fails closed when it
-/// attempts to enter the strict context path.
+/// The caller supplies no world frame, digest, or digest algorithm. All three
+/// are inherited from `SelectedCandidate::world_snapshot`. Historical
+/// `LegacyOpaque` snapshots remain valid for deliberation but fail closed here.
 pub fn prepare_selected_simulation(
     selected: &SelectedCandidate,
     request: SimulationRequest,
-    digest_algorithm: ContextDigestAlgorithm,
 ) -> Result<PreparedSelectedSimulation, SelectionBoundSimulationError> {
     let snapshot = selected.world_snapshot();
+    let digest_algorithm = strict_digest_algorithm(snapshot.digest_algorithm())?;
     let world_context = SimulationContextRef::world_snapshot(
         format!("world-snapshot:{}", snapshot.frame_id()),
         digest_algorithm,
@@ -63,6 +62,18 @@ pub fn prepare_selected_simulation(
         selected: selected.clone(),
         request,
     })
+}
+
+fn strict_digest_algorithm(
+    algorithm: SnapshotDigestAlgorithm,
+) -> Result<ContextDigestAlgorithm, SelectionBoundSimulationError> {
+    match algorithm {
+        SnapshotDigestAlgorithm::LegacyOpaque => {
+            Err(SelectionBoundSimulationError::LegacySnapshotDigest)
+        }
+        SnapshotDigestAlgorithm::Blake3 => Ok(ContextDigestAlgorithm::Blake3),
+        SnapshotDigestAlgorithm::Sha256 => Ok(ContextDigestAlgorithm::Sha256),
+    }
 }
 
 /// Non-serializable simulation receipt preserving both the deliberative
@@ -118,6 +129,13 @@ fn validate_selected_world_context(
 
     let context = worlds[0];
     let snapshot = selected.world_snapshot();
+    let expected_algorithm = strict_digest_algorithm(snapshot.digest_algorithm())?;
+    if context.digest_algorithm != expected_algorithm {
+        return Err(SelectionBoundSimulationError::SelectedSnapshotAlgorithmMismatch {
+            selected: snapshot.digest_algorithm(),
+            context: context.digest_algorithm,
+        });
+    }
     if context.frame_id.as_deref() != Some(snapshot.frame_id())
         || !context.digest.eq_ignore_ascii_case(snapshot.snapshot_digest())
     {
@@ -135,8 +153,17 @@ fn validate_selected_world_context(
 pub enum SelectionBoundSimulationError {
     #[error("strict simulation context failure: {0}")]
     Strict(StrictSimulationError),
+    #[error("legacy opaque world snapshots cannot enter the strict simulation-evidence path")]
+    LegacySnapshotDigest,
     #[error("strict simulation evidence contains {0} world contexts; exactly one is required")]
     WorldContextCount(usize),
+    #[error(
+        "selected snapshot digest algorithm {selected:?} does not match validated context {context:?}"
+    )]
+    SelectedSnapshotAlgorithmMismatch {
+        selected: SnapshotDigestAlgorithm,
+        context: ContextDigestAlgorithm,
+    },
     #[error(
         "selected snapshot {selected_frame:?}/{selected_digest:?} does not match validated context {context_frame:?}/{context_digest:?}"
     )]
@@ -208,7 +235,7 @@ mod tests {
         }
     }
 
-    fn selected(snapshot_digest: String) -> SelectedCandidate {
+    fn selected_from_snapshot(snapshot: WorldSnapshotRef) -> SelectedCandidate {
         let transition = DesiredTransition::simulation_only(
             "strict-selection-t0",
             "selection-bound diagnostic simulation",
@@ -253,12 +280,19 @@ mod tests {
             transition,
             candidates: vec![candidate],
         };
-        let snapshot = WorldSnapshotRef::new("world", snapshot_digest);
         let frontier = match deliberate(&portfolio, &snapshot, PortfolioPolicy::default()).unwrap() {
             DeliberationOutcome::ParetoFrontier(frontier) => frontier,
             other => panic!("expected frontier, got {other:?}"),
         };
         frontier.select("strict-selection-p0").unwrap()
+    }
+
+    fn cryptographic_selected(algorithm: SnapshotDigestAlgorithm) -> SelectedCandidate {
+        selected_from_snapshot(WorldSnapshotRef::cryptographic(
+            "world",
+            algorithm,
+            "a".repeat(64),
+        ))
     }
 
     fn request() -> SimulationRequest {
@@ -272,13 +306,8 @@ mod tests {
 
     #[test]
     fn world_context_is_derived_from_non_serializable_selection() {
-        let selected = selected("a".repeat(64));
-        let prepared = prepare_selected_simulation(
-            &selected,
-            request(),
-            ContextDigestAlgorithm::Blake3,
-        )
-        .unwrap();
+        let selected = cryptographic_selected(SnapshotDigestAlgorithm::Blake3);
+        let prepared = prepare_selected_simulation(&selected, request()).unwrap();
 
         assert_eq!(prepared.selected(), &selected);
         assert_eq!(prepared.request().contexts.len(), 1);
@@ -286,28 +315,46 @@ mod tests {
         assert_eq!(context.frame_id.as_deref(), Some("world"));
         assert_eq!(context.digest, "a".repeat(64));
         assert_eq!(context.context_id, "world-snapshot:world");
+        assert_eq!(context.digest_algorithm, ContextDigestAlgorithm::Blake3);
+    }
+
+    #[test]
+    fn digest_algorithm_cannot_be_relabelled_by_strict_request_caller() {
+        let blake = cryptographic_selected(SnapshotDigestAlgorithm::Blake3);
+        let sha = cryptographic_selected(SnapshotDigestAlgorithm::Sha256);
+        let blake_prepared = prepare_selected_simulation(&blake, request()).unwrap();
+        let sha_prepared = prepare_selected_simulation(&sha, request()).unwrap();
+
+        assert_eq!(
+            blake_prepared.request().contexts[0].digest_algorithm,
+            ContextDigestAlgorithm::Blake3
+        );
+        assert_eq!(
+            sha_prepared.request().contexts[0].digest_algorithm,
+            ContextDigestAlgorithm::Sha256
+        );
+        assert_ne!(
+            blake_prepared.request().canonical_transcript().unwrap(),
+            sha_prepared.request().canonical_transcript().unwrap()
+        );
     }
 
     #[test]
     fn legacy_non_cryptographic_snapshot_identifier_cannot_enter_strict_path() {
-        let selected = selected("legacy-snapshot-name".into());
-        assert!(matches!(
-            prepare_selected_simulation(&selected, request(), ContextDigestAlgorithm::Blake3),
-            Err(SelectionBoundSimulationError::Strict(
-                StrictSimulationError::InvalidContext(_)
-            ))
+        let selected = selected_from_snapshot(WorldSnapshotRef::new(
+            "world",
+            "legacy-snapshot-name",
         ));
+        assert_eq!(
+            prepare_selected_simulation(&selected, request()).unwrap_err(),
+            SelectionBoundSimulationError::LegacySnapshotDigest
+        );
     }
 
     #[test]
     fn strict_run_retains_exact_selected_lineage() {
-        let selected = selected("a".repeat(64));
-        let prepared = prepare_selected_simulation(
-            &selected,
-            request(),
-            ContextDigestAlgorithm::Blake3,
-        )
-        .unwrap();
+        let selected = cryptographic_selected(SnapshotDigestAlgorithm::Blake3);
+        let prepared = prepare_selected_simulation(&selected, request()).unwrap();
         let mut registry = StrictSimulationRegistry::new();
         registry.register(FixtureBackend);
 
@@ -318,5 +365,9 @@ mod tests {
         );
         assert_eq!(evidence.validated().backend(), "selection-context-fixture");
         assert_eq!(evidence.validated().contexts()[0].digest, "a".repeat(64));
+        assert_eq!(
+            evidence.validated().contexts()[0].digest_algorithm,
+            ContextDigestAlgorithm::Blake3
+        );
     }
 }
