@@ -1,0 +1,84 @@
+name: Fsaverage HCPMMP Semantic Extractor
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/extract_fsaverage_hcpmmp1_semantic_labels.py'
+      - 'scripts/test_extract_fsaverage_hcpmmp1_semantic_labels.py'
+      - 'scripts/compile_fsaverage5_glasser_map.py'
+      - 'scripts/test_compile_fsaverage5_glasser_map.py'
+      - 'data/neuroscience/hcp_mmp1_area_order_v1.json'
+      - 'data/neuroscience/hcpmmp1_mills_figshare_fsaverage_v2.json'
+      - 'docs/neuroscience/FSAVERAGE_HCPMMP1_SEMANTIC_EXTRACTOR_V1.md'
+      - '.github/workflows/fsaverage-hcpmmp-semantic-extractor.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Qualify fsaverage annotation semantic extraction boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax contract
+        run: |
+          python -m py_compile \
+            scripts/extract_fsaverage_hcpmmp1_semantic_labels.py \
+            scripts/test_extract_fsaverage_hcpmmp1_semantic_labels.py
+
+      - name: Semantic extractor contracts
+        run: python -m unittest scripts/test_extract_fsaverage_hcpmmp1_semantic_labels.py
+
+      - name: Preserve mapping compiler contracts
+        run: python -m unittest scripts/test_compile_fsaverage5_glasser_map.py
+
+      - name: Pinned Mills/Figshare lineage contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('data/neuroscience/hcpmmp1_mills_figshare_fsaverage_v2.json')
+          d = json.loads(p.read_text())
+          assert d['schema'] == 'symthaea-hcpmmp1-fsaverage-lineage-v1'
+          assert d['lineage_id'] == 'mills-figshare-hcpmmp1-fsaverage-v2'
+          assert d['files']['left']['url'] == 'https://ndownloader.figshare.com/files/5528816'
+          assert d['files']['left']['md5'] == '46a102b59b2fb1bb4bd62d51bf02e975'
+          assert d['files']['right']['url'] == 'https://ndownloader.figshare.com/files/5528819'
+          assert d['files']['right']['md5'] == '75e96b331940227bbcb07c1c791c2463'
+          assert d['files']['left']['expected_vertices'] == 163842
+          assert d['files']['right']['expected_vertices'] == 163842
+          assert d['acknowledgement_required'] is True
+          assert 'a744af9c9ee9de83d997f17b0c12602b5be4854b' in d['provenance']['source_description']
+          PY
+
+      - name: Authority ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          DOC=docs/neuroscience/FSAVERAGE_HCPMMP1_SEMANTIC_EXTRACTOR_V1.md
+          grep -Fq 'does not auto-download' "$DOC"
+          grep -Fq '`???`' "$DOC"
+          grep -Fq 'does not satisfy FMQ-010' "$DOC"
+          if grep -Eq 'independence_established[[:space:]]*=[[:space:]]*true' "$DOC"; then
+            echo 'extractor documentation must not claim independent lineage qualification' >&2
+            exit 1
+          fi
+
+      - name: CLI contract
+        run: |
+          python scripts/extract_fsaverage_hcpmmp1_semantic_labels.py --help
+          python scripts/extract_fsaverage_hcpmmp1_semantic_labels.py extract --help
+          python scripts/extract_fsaverage_hcpmmp1_semantic_labels.py verify-source --help
