@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/spore/spore-golden-parity-v1.schema.json",
+  "title": "Spore Golden Parity Corpus v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "source_manifest_schema",
+    "destination_repository",
+    "destination_parity_policy",
+    "obligations"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema": { "const": "spore-golden-parity-v1" },
+    "source_manifest_schema": { "const": "spore-migration-manifest-v1" },
+    "destination_repository": { "const": "Luminous-Dynamics/spore" },
+    "destination_parity_policy": { "const": "fresh-execution-required" },
+    "obligations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "domain",
+          "source_artifact_id",
+          "statement",
+          "execution_class",
+          "status",
+          "source_expectation_only"
+        ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^GP-[A-Z]+-[0-9]{3}$" },
+          "domain": { "enum": ["boot", "identity", "helper", "authority", "firmware"] },
+          "source_artifact_id": { "type": "string", "minLength": 1 },
+          "statement": { "type": "string", "minLength": 10 },
+          "execution_class": { "enum": ["vm", "unit", "firmware-vm"] },
+          "status": {
+            "enum": [
+              "DEFINED",
+              "MIGRATED_UNEXECUTED",
+              "EXECUTED_FAILED",
+              "EXECUTED_PASS",
+              "SUPERSEDED_WITH_JUSTIFICATION"
+            ]
+          },
+          "source_expectation_only": { "const": true }
+        }
+      }
+    }
+  }
+}
