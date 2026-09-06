@@ -3,9 +3,10 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Physical-agency composition primitives for Symthaea.
 //!
-//! PA-02 deliberately stops at planning-time simulator capability negotiation.
-//! It does not execute simulations, construct actuator commands, depend on HAL,
-//! or mint execution authority.
+//! PA-04 remains deliberately pre-execution. This crate can negotiate declared
+//! simulator capabilities, preserve multi-objective candidate frontiers, and
+//! qualify simulation-only evidence, but it cannot construct actuator commands,
+//! depend on HAL, or mint physical execution authority.
 //!
 //! Capability manifests are declarations used to choose a suitable modelling
 //! path. They are **not** safety evidence and cannot discharge execution gates.
@@ -13,6 +14,7 @@
 #![deny(unsafe_code)]
 
 pub mod portfolio;
+pub mod qualification;
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
