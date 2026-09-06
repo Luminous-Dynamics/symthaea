@@ -164,11 +164,18 @@ jobs:
                   f'removed={sorted(removed)}, changed={changed}'
               )
 
-      - name: Re-run real two-branch linearization theorem first
+      - name: Real chain reaches matching privileged port exactly once
         run: >-
           cargo +1.94.0 test -p symthaea-iot-actuation-linearization
           --test full_chain
-          fixture::real_two_branch_chain_linearizes_under_all_held_roots_without_hal_io
+          fixture::real_two_branch_chain_reaches_matching_privileged_port_exactly_once
+          -- --exact
+
+      - name: Wrong privileged port is never invoked
+        run: >-
+          cargo +1.94.0 test -p symthaea-iot-actuation-linearization
+          --test full_chain
+          fixture::wrong_privileged_port_binding_never_invokes_effect_method
           -- --exact
 
       - name: Effect-dispatch package tests
