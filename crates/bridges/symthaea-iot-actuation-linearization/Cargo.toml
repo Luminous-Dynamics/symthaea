@@ -1,0 +1,23 @@
+[package]
+name = "symthaea-iot-actuation-linearization"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Closure-scoped linearization of current IoT actuation evidence without HAL I/O"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "security", "actuation", "linearization"]
+categories = ["embedded"]
+
+[dependencies]
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-actuation-guard-admission-reservation = { path = "../symthaea-iot-actuation-guard-admission-reservation" }
+symthaea-iot-actuation-guard-device-reality = { path = "../symthaea-iot-actuation-guard-device-reality" }
+symthaea-iot-actuation-guard-interlock = { path = "../symthaea-iot-actuation-guard-interlock" }
+symthaea-iot-actuation-guard-semantic-persistence = { path = "../symthaea-iot-actuation-guard-semantic-persistence" }
+symthaea-iot-actuation-trust-publication = { path = "../symthaea-iot-actuation-trust-publication" }
+symthaea-iot-composed-actuation-evidence = { path = "../symthaea-iot-composed-actuation-evidence" }
+symthaea-iot-transport-current-fence = { path = "../symthaea-iot-transport-current-fence" }
+thiserror = { workspace = true }
