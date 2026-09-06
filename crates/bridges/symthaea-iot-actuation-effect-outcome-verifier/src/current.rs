@@ -60,7 +60,7 @@ impl CurrentPhysicalEffectOutcomeGuard {
         self.fence_current_at(proof, system_unix_ms()?)
     }
 
-    fn fence_current_at<'a>(
+    pub(crate) fn fence_current_at<'a>(
         &'a self,
         proof: &'a VerifiedPhysicalEffectOutcomeEvidence,
         now_unix_ms: u64,
@@ -96,7 +96,10 @@ impl CurrentPhysicalEffectOutcomeGuard {
         {
             return Err(EffectOutcomeError::CurrentProofPolicyMismatch);
         }
-        if body.digest()? != proof.body_digest() || evidence.digest()? != proof.evidence_digest() {
+        if body.challenge_digest != proof.challenge_digest()
+            || body.digest()? != proof.body_digest()
+            || evidence.digest()? != proof.evidence_digest()
+        {
             return Err(EffectOutcomeError::CurrentProofCommitmentMismatch);
         }
 
