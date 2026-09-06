@@ -1,0 +1,128 @@
+name: Futures Resolution Evaluation Integrity
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-futures-ensemble/tests/prospective_score_integrity.rs'
+      - 'crates/domains/symthaea-futures-ensemble/tests/prospective_calibration_integrity.rs'
+      - '.github/workflows/futures-resolution-score-integrity.yml'
+      - 'crates/domains/symthaea-futures-ledger/**'
+      - 'crates/domains/symthaea-futures-core/**'
+      - 'crates/domains/symthaea-futures-calibration/**'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze tranche scope and evaluation-integrity theorem
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          score_path = Path('crates/domains/symthaea-futures-ensemble/tests/prospective_score_integrity.rs')
+          score = score_path.read_text()
+          calibration_path = Path('crates/domains/symthaea-futures-ensemble/tests/prospective_calibration_integrity.rs')
+          calibration = calibration_path.read_text()
+
+          score_required = [
+              'fn verify_reported_score(',
+              'resolution.validate_against(attempt)?;',
+              'evaluation_protocol.protocol_version() != "eval-v1"',
+              'stored.to_bits() != recomputed.to_bits()',
+              'UnknownEvaluationProtocol',
+              'UnknownScoringRule',
+              'forged_finite_score_passes_linkage_but_fails_score_integrity',
+              'rounded_display_score_gets_no_exact_score_evidence_credit',
+              'unknown_evaluation_protocol_gets_no_score_evidence_credit',
+              'abstention_resolution_cannot_be_misclassified_as_scored_forecast',
+              '"brier" =>',
+              '"log-score" =>',
+              '"crps" =>',
+          ]
+          for needle in score_required:
+              if needle not in score:
+                  raise SystemExit(f'missing score-integrity invariant: {needle}')
+
+          calibration_required = [
+              'fn expected_calibration_bucket(',
+              'fn verify_calibration_assignment(',
+              'ptrue-decile-',
+              'post_outcome_bucket_choice_passes_linkage_but_fails_calibration_integrity',
+              'identical_forecast_has_same_bucket_for_true_and_false_outcomes',
+              'missing_required_boolean_bucket_gets_no_calibration_evidence_credit',
+              'unknown_evaluation_protocol_cannot_define_calibration_semantics_by_accident',
+              'abstention_is_not_assigned_a_forecast_calibration_bucket',
+          ]
+          for needle in calibration_required:
+              if needle not in calibration:
+                  raise SystemExit(f'missing calibration-integrity invariant: {needle}')
+
+          start = calibration.index('fn expected_calibration_bucket(')
+          end = calibration.index('fn verify_calibration_assignment(')
+          derivation = calibration[start:end]
+          for forbidden in ['actual_continuation', 'outcome_cutoff', 'resolution']:
+              if forbidden in derivation:
+                  raise SystemExit(
+                      f'calibration bucket derivation acquired post-outcome input: {forbidden}'
+                  )
+
+          clock_forbidden = [
+              'ForecastDistribution',
+              'Horizon(',
+              'issued_at_tick',
+              'SimulationTick',
+              'UnixMillis',
+          ]
+          for needle in clock_forbidden:
+              if needle in score or needle in calibration:
+                  raise SystemExit(
+                      f'neutral prospective verification acquired fake clock dependency: {needle}'
+                  )
+
+          base = subprocess.check_output(
+              ['git', 'merge-base', 'HEAD', 'origin/' + '${{ github.base_ref }}'],
+              text=True,
+          ).strip()
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', base, 'HEAD'],
+              text=True,
+          ).splitlines())
+          allowed = {
+              '.github/workflows/futures-resolution-score-integrity.yml',
+              'crates/domains/symthaea-futures-ensemble/tests/prospective_score_integrity.rs',
+              'crates/domains/symthaea-futures-ensemble/tests/prospective_calibration_integrity.rs',
+          }
+          extra = changed - allowed
+          if extra:
+              raise SystemExit(f'unexpected files in evaluation-integrity tranche: {sorted(extra)}')
+
+      - name: Locked workspace metadata
+        run: cargo metadata --locked --no-deps > /dev/null
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-futures-ensemble -- --check
+
+      - name: Focused score-integrity tests
+        run: cargo test --locked -p symthaea-futures-ensemble --test prospective_score_integrity
+
+      - name: Focused calibration-integrity tests
+        run: cargo test --locked -p symthaea-futures-ensemble --test prospective_calibration_integrity
+
+      - name: Strict Clippy score integrity
+        run: cargo clippy --locked -p symthaea-futures-ensemble --test prospective_score_integrity -- -D warnings
+
+      - name: Strict Clippy calibration integrity
+        run: cargo clippy --locked -p symthaea-futures-ensemble --test prospective_calibration_integrity -- -D warnings
