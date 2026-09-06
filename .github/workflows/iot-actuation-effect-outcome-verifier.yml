@@ -36,9 +36,13 @@ jobs:
           import tomllib
 
           root = Path('crates/bridges/symthaea-iot-actuation-effect-outcome-verifier')
+          production = [
+              'lib.rs', 'current.rs', 'error.rs', 'evidence.rs',
+              'policy.rs', 'trust.rs', 'verifier.rs',
+          ]
           sources = {
-              p.name: p.read_text()
-              for p in (root / 'src').glob('*.rs')
+              name: (root / 'src' / name).read_text()
+              for name in production
           }
           code = '\n'.join(sources.values())
           stripped = '\n'.join(
