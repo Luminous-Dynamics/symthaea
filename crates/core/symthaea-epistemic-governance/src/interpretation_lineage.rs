@@ -7,8 +7,11 @@
 //! Evidence-root independence answers whether observations share evidence roots.
 //! This module answers a different question: whether evidence -> proposition
 //! judgments share an interpretation root. Distinct interpreter identities are
-//! **not** automatically independent. Independence is counted only when an exact,
-//! current, proposition/use-scoped qualification joins the distinct root pair.
+//! **not** automatically independent. Independence is established only when an
+//! exact, current, proposition/use-scoped qualification joins the root pair.
+//!
+//! This module intentionally exposes pair topology, not a count of qualified
+//! edges. Edge count is not an independent-root-set witness.
 
 use crate::{
     relation_provenance::RelationDeclarationMethodV1,
@@ -37,6 +40,7 @@ pub const INTERPRETATION_LINEAGE_CONTRACT_V1: &str = concat!(
     "all_eligible_declarations_must_share_exact_context_commitment\n",
     "lineage_identity=blake3_explicit_entries+pair_assessments+context\n",
     "issued_lineage=is_private_non_deserializable_shadow_report\n",
+    "pair_topology_is_exposed_but_qualified_pair_count_is_not_an_api\n",
     "interpretation_independence_is_not_truth_or_evidence_independence\n",
     "lineage_is_not_belief_workspace_action_or_promotion_authority\n",
 );
@@ -70,8 +74,6 @@ pub enum InterpretationIndependenceStatusV1 {
     IndependenceQualified,
 }
 
-/// Persistable independence qualification for one exact unordered pair of
-/// distinct interpretation roots.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct InterpretationIndependenceQualificationV1 {
@@ -139,10 +141,8 @@ impl TryFrom<InterpretationIndependenceQualificationV1>
     fn try_from(mut value: InterpretationIndependenceQualificationV1) -> Result<Self, Self::Error> {
         validate_and_canonicalize_independence_qualification(&mut value)?;
         let profile_contract_digest = interpretation_independence_profile_digest_v1();
-        let qualification_id = interpretation_independence_qualification_id_v1(
-            &profile_contract_digest,
-            &value,
-        );
+        let qualification_id =
+            interpretation_independence_qualification_id_v1(&profile_contract_digest, &value);
         Ok(Self {
             schema_version: INTERPRETATION_INDEPENDENCE_QUALIFICATION_SCHEMA_VERSION,
             profile: INTERPRETATION_INDEPENDENCE_QUALIFICATION_PROFILE_V1.to_string(),
@@ -272,10 +272,6 @@ impl InterpretationPairAssessmentV1 {
     }
 }
 
-/// Issued interpretation lineage for one exact eligibility context.
-///
-/// The report is Serialize-only. Persisted bytes are audit material and do not
-/// recreate current interpretation independence.
 #[must_use = "interpretation lineage is shadow epistemic evidence and should be inspected"]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct InterpretationLineageV1 {
@@ -318,15 +314,10 @@ impl InterpretationLineageV1 {
         &self.entries
     }
 
+    /// Exact pair topology only. There is deliberately no public helper that
+    /// counts qualified edges: edge count is not an independent-root-set proof.
     pub fn pair_assessments(&self) -> &[InterpretationPairAssessmentV1] {
         &self.pair_assessments
-    }
-
-    pub fn qualified_independent_pair_count(&self) -> usize {
-        self.pair_assessments
-            .iter()
-            .filter(|pair| pair.status == InterpretationIndependenceStatusV1::IndependenceQualified)
-            .count()
     }
 }
 
@@ -344,8 +335,6 @@ pub fn interpretation_independence_profile_digest_v1() -> String {
     )
 }
 
-/// Assemble the interpretation roots and pairwise independence status for one
-/// exact set of currently eligible relation declarations.
 pub fn assemble_interpretation_lineage_v1(
     eligible_declarations: &[DispositionEligibleRelationDeclarationV1],
     eligibility_context: &ValidatedRelationDeclarationEligibilityContextV1,
@@ -368,9 +357,10 @@ pub fn assemble_interpretation_lineage_v1(
         if eligible.context_commitment() != context_commitment {
             return Err(InterpretationLineageError::EligibilityContextMismatch);
         }
-        if !seen_declarations.insert(eligible.declaration().declaration_id().to_string()) {
+        let declaration_id = eligible.declaration().declaration_id();
+        if !seen_declarations.insert(declaration_id.to_string()) {
             return Err(InterpretationLineageError::DuplicateDeclarationId {
-                declaration_id: eligible.declaration().declaration_id().to_string(),
+                declaration_id: declaration_id.to_string(),
             });
         }
         if !seen_eligibility_ids.insert(eligible.eligibility_id().to_string()) {
@@ -381,7 +371,7 @@ pub fn assemble_interpretation_lineage_v1(
 
         let provenance = eligible.declaration().provenance().as_raw();
         entries.push(InterpretationLineageEntryV1 {
-            declaration_id: eligible.declaration().declaration_id().to_string(),
+            declaration_id: declaration_id.to_string(),
             eligibility_id: eligible.eligibility_id().to_string(),
             interpretation_root_id: interpretation_root_id_v1(
                 &provenance.declarer_id,
@@ -399,13 +389,13 @@ pub fn assemble_interpretation_lineage_v1(
         .iter()
         .map(|entry| (entry.interpretation_root_id.as_str(), entry))
         .collect();
-    let present_roots: HashSet<&str> = entries
-        .iter()
-        .map(|entry| entry.interpretation_root_id.as_str())
-        .collect();
+    let present_roots: HashSet<&str> = roots_by_id.keys().copied().collect();
 
-    let mut qualifications_by_pair: HashMap<(&str, &str), &RegisteredInterpretationIndependenceQualificationV1> =
-        HashMap::with_capacity(independence_qualifications.len());
+    let mut qualifications_by_pair: HashMap<
+        (&str, &str),
+        &RegisteredInterpretationIndependenceQualificationV1,
+    > = HashMap::with_capacity(independence_qualifications.len());
+
     for qualification in independence_qualifications {
         let record = qualification.record();
         if record.proposition_id != context_raw.proposition_id {
@@ -432,9 +422,15 @@ pub fn assemble_interpretation_lineage_v1(
             });
         }
 
-        let left_owner = roots_by_id[record.left_interpretation_root_id.as_str()];
-        let right_owner = roots_by_id[record.right_interpretation_root_id.as_str()];
-        if record.qualifier_id == left_owner.declarer_id || record.qualifier_id == right_owner.declarer_id {
+        let left_owner = roots_by_id
+            .get(record.left_interpretation_root_id.as_str())
+            .expect("present root must have owner");
+        let right_owner = roots_by_id
+            .get(record.right_interpretation_root_id.as_str())
+            .expect("present root must have owner");
+        if record.qualifier_id == left_owner.declarer_id
+            || record.qualifier_id == right_owner.declarer_id
+        {
             return Err(InterpretationLineageError::DirectInterpretationSelfQualification);
         }
 
@@ -877,13 +873,21 @@ impl std::fmt::Display for InterpretationLineageError {
             Self::MalformedDigest => {
                 f.write_str("digest must be sha256:<64 hex> or blake3:<64 hex>")
             }
-            Self::MissingQualifierId => f.write_str("independence qualification requires qualifier id"),
-            Self::EmptyQualifierVersion => f.write_str("qualifier version cannot be empty when present"),
-            Self::MissingEvaluatorId => f.write_str("independence qualification requires evaluator id"),
-            Self::EmptyEvaluatorVersion => f.write_str("evaluator version cannot be empty when present"),
-            Self::SameRootCannotBeQualifiedIndependent => {
-                f.write_str("the same interpretation root cannot be qualified independent from itself")
+            Self::MissingQualifierId => {
+                f.write_str("independence qualification requires qualifier id")
             }
+            Self::EmptyQualifierVersion => {
+                f.write_str("qualifier version cannot be empty when present")
+            }
+            Self::MissingEvaluatorId => {
+                f.write_str("independence qualification requires evaluator id")
+            }
+            Self::EmptyEvaluatorVersion => {
+                f.write_str("evaluator version cannot be empty when present")
+            }
+            Self::SameRootCannotBeQualifiedIndependent => f.write_str(
+                "the same interpretation root cannot be qualified independent from itself",
+            ),
             Self::ValidityEndsBeforeQualification {
                 qualified_at_unix_ms,
                 valid_until_unix_ms,
@@ -897,30 +901,32 @@ impl std::fmt::Display for InterpretationLineageError {
             Self::EligiblePropositionMismatch => {
                 f.write_str("eligible declaration proposition differs from lineage context")
             }
-            Self::EligibilityContextMismatch => {
-                f.write_str("eligible declarations must share the exact lineage eligibility context")
-            }
-            Self::DuplicateDeclarationId { declaration_id } => {
-                write!(f, "duplicate declaration id in interpretation lineage: {declaration_id}")
-            }
-            Self::DuplicateEligibilityId { eligibility_id } => {
-                write!(f, "duplicate eligibility id in interpretation lineage: {eligibility_id}")
-            }
-            Self::IndependenceQualificationPropositionMismatch => {
-                f.write_str("interpretation-independence qualification proposition mismatch")
-            }
+            Self::EligibilityContextMismatch => f.write_str(
+                "eligible declarations must share the exact lineage eligibility context",
+            ),
+            Self::DuplicateDeclarationId { declaration_id } => write!(
+                f,
+                "duplicate declaration id in interpretation lineage: {declaration_id}"
+            ),
+            Self::DuplicateEligibilityId { eligibility_id } => write!(
+                f,
+                "duplicate eligibility id in interpretation lineage: {eligibility_id}"
+            ),
+            Self::IndependenceQualificationPropositionMismatch => f.write_str(
+                "interpretation-independence qualification proposition mismatch",
+            ),
             Self::IndependenceQualificationUseMismatch => {
                 f.write_str("interpretation-independence qualification use mismatch")
             }
-            Self::UnexpectedIndependenceQualificationPair => {
-                f.write_str("independence qualification references roots outside this lineage")
-            }
-            Self::DuplicateIndependenceQualificationPair => {
-                f.write_str("duplicate interpretation-independence qualification for root pair")
-            }
-            Self::DirectInterpretationSelfQualification => {
-                f.write_str("an interpretation root owner cannot directly qualify its own independence pair")
-            }
+            Self::UnexpectedIndependenceQualificationPair => f.write_str(
+                "independence qualification references roots outside this lineage",
+            ),
+            Self::DuplicateIndependenceQualificationPair => f.write_str(
+                "duplicate interpretation-independence qualification for root pair",
+            ),
+            Self::DirectInterpretationSelfQualification => f.write_str(
+                "an interpretation root owner cannot directly qualify its own independence pair",
+            ),
             Self::IndependenceQualificationNotYetValid {
                 qualified_at_unix_ms,
                 now_unix_ms,
@@ -1082,15 +1088,18 @@ mod tests {
             lineage.pair_assessments()[0].status(),
             InterpretationIndependenceStatusV1::DistinctRootsIndependenceUnknown
         );
-        assert_eq!(lineage.qualified_independent_pair_count(), 0);
+        assert!(lineage.pair_assessments().iter().all(|pair| {
+            pair.status() != InterpretationIndependenceStatusV1::IndependenceQualified
+        }));
     }
 
     #[test]
     fn exact_current_pair_qualification_establishes_independence() {
         let a = eligible("rule-a", "v1", '1', '2', 150);
         let b = eligible("rule-b", "v1", '3', '4', 150);
-        let baseline = assemble_interpretation_lineage_v1(&[a.clone(), b.clone()], &context(150), &[])
-            .unwrap();
+        let baseline =
+            assemble_interpretation_lineage_v1(&[a.clone(), b.clone()], &context(150), &[])
+                .unwrap();
         let qualification = independence_qualification(
             baseline.entries()[0].interpretation_root_id(),
             baseline.entries()[1].interpretation_root_id(),
@@ -1128,8 +1137,9 @@ mod tests {
     #[test]
     fn same_root_cannot_be_registered_as_independent() {
         let a = eligible("rule-a", "v1", '1', '2', 150);
-        let lineage = assemble_interpretation_lineage_v1(std::slice::from_ref(&a), &context(150), &[])
-            .unwrap();
+        let lineage =
+            assemble_interpretation_lineage_v1(std::slice::from_ref(&a), &context(150), &[])
+                .unwrap();
         let root = lineage.entries()[0].interpretation_root_id();
         let raw = InterpretationIndependenceQualificationV1 {
             schema_version: INTERPRETATION_INDEPENDENCE_QUALIFICATION_SCHEMA_VERSION,
@@ -1156,8 +1166,9 @@ mod tests {
     fn root_owner_cannot_directly_qualify_pair_independence() {
         let a = eligible("rule-a", "v1", '1', '2', 150);
         let b = eligible("rule-b", "v1", '3', '4', 150);
-        let baseline = assemble_interpretation_lineage_v1(&[a.clone(), b.clone()], &context(150), &[])
-            .unwrap();
+        let baseline =
+            assemble_interpretation_lineage_v1(&[a.clone(), b.clone()], &context(150), &[])
+                .unwrap();
         let qualification = independence_qualification(
             baseline.entries()[0].interpretation_root_id(),
             baseline.entries()[1].interpretation_root_id(),
@@ -1183,8 +1194,9 @@ mod tests {
     fn expired_independence_qualification_cannot_establish_independence() {
         let a = eligible("rule-a", "v1", '1', '2', 250);
         let b = eligible("rule-b", "v1", '3', '4', 250);
-        let baseline = assemble_interpretation_lineage_v1(&[a.clone(), b.clone()], &context(250), &[])
-            .unwrap();
+        let baseline =
+            assemble_interpretation_lineage_v1(&[a.clone(), b.clone()], &context(250), &[])
+                .unwrap();
         let mut raw = independence_qualification(
             baseline.entries()[0].interpretation_root_id(),
             baseline.entries()[1].interpretation_root_id(),
@@ -1220,8 +1232,9 @@ mod tests {
     fn lineage_is_order_independent_and_content_addressed() {
         let a = eligible("rule-a", "v1", '1', '2', 150);
         let b = eligible("rule-b", "v1", '3', '4', 150);
-        let ab = assemble_interpretation_lineage_v1(&[a.clone(), b.clone()], &context(150), &[])
-            .unwrap();
+        let ab =
+            assemble_interpretation_lineage_v1(&[a.clone(), b.clone()], &context(150), &[])
+                .unwrap();
         let ba = assemble_interpretation_lineage_v1(&[b, a], &context(150), &[]).unwrap();
         assert_eq!(ab, ba);
         assert_eq!(ab.lineage_id(), ba.lineage_id());
