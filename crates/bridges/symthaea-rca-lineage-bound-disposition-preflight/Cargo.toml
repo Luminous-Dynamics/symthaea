@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-rca-lineage-bound-disposition-preflight"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Canonical evidence-lineage generation binding for RCA shadow disposition preflight"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-epistemic-governance = { path = "../../core/symthaea-epistemic-governance" }
+symthaea-rca-bound-shadow-case = { path = "../symthaea-rca-bound-shadow-case" }
+symthaea-rca-shadow-disposition-preflight = { path = "../symthaea-rca-shadow-disposition-preflight" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
