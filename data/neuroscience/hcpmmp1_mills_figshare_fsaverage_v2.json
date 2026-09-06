@@ -1,0 +1,27 @@
+{
+  "schema": "symthaea-hcpmmp1-fsaverage-lineage-v1",
+  "lineage_id": "mills-figshare-hcpmmp1-fsaverage-v2",
+  "source_version": "figshare-3498446-v2",
+  "atlas": "HCP-MMP1.0/Glasser360",
+  "input_space": "fsaverage",
+  "license": "CC BY 4.0 on Figshare; HCP-MMP source terms and acknowledgement obligations also apply",
+  "terms_reference": "https://balsa.wustl.edu/WN56",
+  "acknowledgement_required": true,
+  "files": {
+    "left": {
+      "url": "https://ndownloader.figshare.com/files/5528816",
+      "md5": "46a102b59b2fb1bb4bd62d51bf02e975",
+      "expected_vertices": 163842
+    },
+    "right": {
+      "url": "https://ndownloader.figshare.com/files/5528819",
+      "md5": "75e96b331940227bbcb07c1c791c2463",
+      "expected_vertices": 163842
+    }
+  },
+  "provenance": {
+    "article_doi": "10.6084/m9.figshare.3498446.v2",
+    "source_description": "Kathryn Mills HCP-MMP1.0 projected on fsaverage, version 2. Exact Figshare file URLs and MD5 values are independently pinned by MNE-Python mne/datasets/utils.py Git blob a744af9c9ee9de83d997f17b0c12602b5be4854b.",
+    "downsample_rule": "fsaverage5 is the nested ico-5 subset of fsaverage: select vertex indices 0..10241 independently in each hemisphere; no interpolation or relabeling is performed by this extractor"
+  }
+}
