@@ -1,0 +1,184 @@
+name: IoT Actuation Linearization
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-linearization/**'
+      - '.github/workflows/iot-actuation-linearization.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-actuation-linearization-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+
+      - name: Linearization source contract
+        shell: python
+        run: |
+          from pathlib import Path
+          import tomllib
+
+          root = Path('crates/bridges/symthaea-iot-actuation-linearization')
+          src = (root / 'src/lib.rs').read_text()
+          code = '\n'.join(
+              line for line in src.splitlines()
+              if not line.lstrip().startswith('//')
+          )
+          compact = ''.join(code.split())
+
+          required = [
+              "pubstructActuationLinearizer<'a>",
+              'composed:ComposedActuationEvidence',
+              "F:for<'attempt>FnOnce(CurrentActuationAttempt<'attempt>)->R",
+              'validate_publication_bindings(',
+              'admission_fence.checkpoint()!=admission.checkpoint()',
+              'semantic_fence.checkpoint()!=semantic.checkpoint()',
+              'pubstructCurrentActuationAttempt',
+              '_trust_fence:CurrentActuationTrustFence',
+              '_admission_fence:CurrentAdmissionReservationFence',
+              '_semantic_fence:CurrentSemanticHeadFence',
+              '_transport_fence:CurrentXeniaTransportFence',
+              '_device_reality_fence:CurrentAdmissionDeviceRealityFence',
+              '_interlock_fence:CurrentPostSemanticInterlockFence',
+              'send_not_after_unix_s.checked_mul(1_000)',
+              'MAX_LINEARIZED_HANDOFF_MS:u64=250',
+              'validate_dispatch_window_now',
+              'Instant::now()>=self.monotonic_deadline',
+          ]
+          missing = [needle for needle in required if needle not in compact]
+          if missing:
+              raise SystemExit(f'missing linearization invariant: {missing}')
+
+          ordered = [
+              'lettrust_fence=self.trust_store.fence_current()?;',
+              'letadmission_fence=self.admission_store.fence_current(admission.head())?;',
+              'letsemantic_fence=self.semantic_store.fence_current(semantic.device_head())?;',
+              'lettransport_fence=self.transport_guard.fence_current(composed.transport())?;',
+              'letdevice_reality_fence=self.device_reality_guard.fence_current(semantic.device_reality())?;',
+              'letinterlock_fence=self.interlock_guard.fence_current(composed.post_semantic_interlock())?;',
+              'letcommon_fenced_at_unix_ms=system_unix_ms()?;',
+              'letmonotonic_started_at=Instant::now();',
+              'Ok(use_attempt(attempt))',
+          ]
+          positions = []
+          for needle in ordered:
+              pos = compact.find(needle)
+              if pos < 0:
+                  raise SystemExit(f'missing normative acquisition-order step: {needle}')
+              positions.append(pos)
+          if positions != sorted(positions) or len(set(positions)) != len(positions):
+              raise SystemExit(f'linearization acquisition order changed: {positions}')
+
+          forbidden = [
+              '#[derive(Clone', 'impl Clone for CurrentActuationAttempt', 'Serialize', 'Deserialize',
+              'bincode', 'FinalActuatorPermit', 'TrustBoundFinalActuatorPermit', 'CompleteJitHalLease',
+              'JustInTimeHalLease', 'TcpListener', 'TcpStream', 'UdpSocket', 'tokio::spawn',
+              'std::process::Command', 'Command::new', 'std::fs::', 'OpenOptions', 'unsafe {',
+              'verify_strict(', 'verify_xenia_transport_receipt(', 'verify_interlock_key_binding(',
+          ]
+          found = [needle for needle in forbidden if needle in code]
+          if found:
+              raise SystemExit(f'forbidden portable authority/I-O/duplicated verifier surface: {found}')
+
+          manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+          expected = {
+              'symthaea-authority',
+              'symthaea-iot-actuation-guard-admission-reservation',
+              'symthaea-iot-actuation-guard-device-reality',
+              'symthaea-iot-actuation-guard-interlock',
+              'symthaea-iot-actuation-guard-semantic-persistence',
+              'symthaea-iot-actuation-trust-publication',
+              'symthaea-iot-composed-actuation-evidence',
+              'symthaea-iot-transport-current-fence',
+              'thiserror',
+          }
+          actual = set(manifest.get('dependencies', {}))
+          if actual != expected:
+              raise SystemExit(f'production dependency drift: {sorted(actual)}')
+
+      - name: Install Rust 1.96 formatter
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Rustfmt
+        run: cargo +1.96.0 fmt --check -p symthaea-iot-actuation-linearization
+
+      - name: Install Rust 1.94 qualification toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: clippy
+
+      - name: Verify exact qualification toolchain
+        run: |
+          rustc +1.94.0 --version | grep -F 'rustc 1.94.0'
+          cargo +1.94.0 --version | grep -F 'cargo 1.94.0'
+
+      - name: Preserve checked-in lock
+        run: cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Check linearization package
+        run: cargo +1.94.0 check -p symthaea-iot-actuation-linearization --all-targets
+
+      - name: Reject unreviewed external dependency drift
+        shell: python
+        run: |
+          import tomllib
+          def sourced(path):
+              with open(path, 'rb') as f:
+                  doc = tomllib.load(f)
+              return {
+                  (p['name'], p['version'], p.get('source')): p
+                  for p in doc.get('package', [])
+                  if p.get('source') is not None
+              }
+          before = sourced('/tmp/Cargo.lock.before')
+          after = sourced('Cargo.lock')
+          b = set(before); a = set(after)
+          added = a - b; removed = b - a
+          changed = sorted(k for k in a & b if after[k] != before[k])
+          allowed = {
+              ('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')
+          }
+          if not added.issubset(allowed) or removed or changed:
+              raise SystemExit(
+                  f'external dependency drift: added={sorted(added)}, '
+                  f'removed={sorted(removed)}, changed={changed}'
+              )
+
+      - name: Run real two-branch linearization regression first
+        run: >-
+          cargo +1.94.0 test -p symthaea-iot-actuation-linearization
+          --test full_chain
+          fixture::real_two_branch_chain_linearizes_under_all_held_roots_without_hal_io
+          -- --exact
+
+      - name: Linearization package tests
+        run: cargo +1.94.0 test -p symthaea-iot-actuation-linearization --all-targets
+
+      - name: Strict package-local Clippy
+        run: >-
+          cargo +1.94.0 clippy -p symthaea-iot-actuation-linearization
+          --all-targets --no-deps -- -D warnings
+
+      - name: Show local-only Cargo.lock bookkeeping
+        if: always()
+        run: git diff -- Cargo.lock || true
