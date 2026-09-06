@@ -5,12 +5,14 @@
 //! Epistemic-governance policy for Recursive Cognitive Architecture v1.
 //!
 //! `symthaea-types` owns canonical cognitive proposal/evidence wire types.
-//! This crate owns policy that reasons over those artifacts: lineage,
-//! independence, currentness, defeaters, and experiment qualification.
+//! This crate owns policy that reasons over those artifacts: canonical
+//! evidence-object identity, lineage, independence, currentness, defeaters, and
+//! experiment qualification.
 //! It does not own action authority or recursive-improvement promotion.
 
 #![deny(unsafe_code)]
 
 pub mod currentness;
 pub mod experiment_contract;
+pub mod identity;
 pub mod lineage;
