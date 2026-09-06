@@ -12,13 +12,22 @@
 //!   [`InterlockTrustHead`]; and
 //! - the fixed RFC 8032 Ed25519 controller-evidence verifier.
 //!
-//! Success remains **non-authorizing**. Device semantic acceptance, final permit
-//! composition, complete JIT revocation fencing and HAL/device I/O are deliberately
-//! outside this crate.
+//! The corrected post-semantic path remains non-authorizing, and a later physical attempt must
+//! re-establish its exact controller/policy proof under current trust. The owner-local
+//! [`CurrentPostSemanticInterlockGuard`] performs that current fence without exporting key
+//! lifecycle selection to a generic JIT layer.
+//!
+//! Success remains **non-authorizing**. Device semantic acceptance, multi-root actuation
+//! linearization and HAL/device I/O are deliberately outside this crate.
 
 #![deny(unsafe_code)]
 
+mod current_post_semantic;
 mod post_semantic;
+pub use current_post_semantic::{
+    CurrentPostSemanticInterlockError, CurrentPostSemanticInterlockFence,
+    CurrentPostSemanticInterlockGuard,
+};
 pub use post_semantic::{
     PostSemanticGuardInterlockError, VerifiedPostSemanticPhysicalInterlock,
 };
@@ -118,8 +127,6 @@ impl GuardInterlockState {
 
         // Conservative generation fencing: after any controller-trust generation is
         // issued, reports observed before that generation are not accepted under it.
-        // This prevents a newly introduced key with an old not_before timestamp from
-        // retroactively authenticating previously untrusted hardware evidence.
         if report.checked_at_unix_ms < self.trust_registry.snapshot().issued_at_unix_ms {
             return Err(GuardInterlockError::ReportPredatesCurrentTrustGeneration);
         }
@@ -170,11 +177,6 @@ impl GuardInterlockState {
     }
 }
 
-/// Local adapter proving that `verify_physical_interlock` is consuming the exact raw
-/// evidence/report pair already verified under current controller-key trust.
-///
-/// It performs no cryptography itself. The fixed Ed25519 verification occurred in
-/// `verify_interlock_key_binding` immediately before this adapter is constructed.
 struct CurrentBindingEvidence<'a> {
     binding: &'a VerifiedInterlockKeyBinding,
     raw_evidence: &'a [u8],
@@ -193,10 +195,6 @@ impl HardwareInterlockEvidenceVerifier for CurrentBindingEvidence<'_> {
     }
 }
 
-/// Opaque proof that guard ingress evidence also passed current controller-key trust and
-/// the guard-owned physical-interlock policy.
-///
-/// This type is non-clone and non-serializable and is **not** actuator authority.
 #[derive(Debug)]
 pub struct VerifiedGuardInterlockEvidence {
     decoded: DecodedGuardEvidence,
@@ -210,49 +208,38 @@ pub struct VerifiedGuardInterlockEvidence {
 }
 
 impl VerifiedGuardInterlockEvidence {
-    /// Audit-only commitment to the exact portable request accepted by the ingress gate.
     pub const fn request_digest(&self) -> Digest32 {
         self.decoded.request_digest()
     }
 
-    /// Exact guard-owned physical-interlock policy commitment.
     pub const fn policy_digest(&self) -> Digest32 {
         self.policy_digest
     }
 
-    /// Current anti-rollback controller-trust generation used for verification.
     pub const fn interlock_trust_head(&self) -> InterlockTrustHead {
         self.interlock_trust_head
     }
 
-    /// Exact current controller key identity used for the report signature.
     pub fn controller_key_id(&self) -> &str {
         &self.controller_key_id
     }
 
-    /// Commitment to the exact current controller key record.
     pub const fn controller_key_digest(&self) -> Digest32 {
         self.controller_key_digest
     }
 
-    /// Corrected controller-authenticated report-content digest.
     pub const fn report_digest(&self) -> Digest32 {
         self.physical_interlock.report_digest()
     }
 
-    /// Independent commitment to the exact controller evidence/signature bytes.
     pub const fn evidence_digest(&self) -> Digest32 {
         self.physical_interlock.evidence_digest()
     }
 
-    /// Guard-local relying-party time for this current-trust verification.
     pub const fn verified_at_unix_ms(&self) -> u64 {
         self.verified_at_unix_ms
     }
 
-    /// Consume this non-authorizing stage for later device-semantic/final-gate work.
-    /// Exact portable receipt/evidence bytes remain available in `DecodedGuardEvidence`
-    /// for the final JIT re-verification stage.
     pub fn into_parts(
         self,
     ) -> (
@@ -271,42 +258,28 @@ fn system_unix_ms() -> Result<u64, GuardInterlockError> {
     u64::try_from(elapsed.as_millis()).map_err(|_| GuardInterlockError::SystemClockOverflow)
 }
 
-/// Fail-closed guard-local controller-trust/policy errors.
 #[derive(Debug, Error)]
 pub enum GuardInterlockError {
-    /// Local interlock policy failed its own structural/digest contract or final policy
-    /// verification rejected the report.
     #[error("guard-owned physical interlock policy/report verification failed: {0}")]
     FinalGate(#[from] FinalActuatorGateError),
-    /// Current controller-key trust or fixed signature verification failed.
     #[error("guard-owned interlock controller trust verification failed: {0}")]
     InterlockTrust(#[from] InterlockTrustError),
-    /// Loaded local policy differs from its independently retained commitment.
     #[error("guard interlock policy does not match independently anchored digest")]
     AnchoredPolicyDigestMismatch,
-    /// Loaded controller-trust registry differs from its independently retained head.
     #[error("guard interlock trust registry does not match independently anchored head")]
     AnchoredInterlockTrustHeadMismatch,
-    /// Guard-local wall clock moved backwards after ingress verification.
     #[error("guard clock regressed after Xenia ingress verification")]
     ClockRegressedSinceIngress,
-    /// Ingress-carried report object does not reproduce the digest previously checked by
-    /// the guard ingress stage.
     #[error("guard interlock report digest changed between ingress and controller verification")]
     IngressReportDigestMismatch,
-    /// Current controller trust generation was issued after the hardware observation.
     #[error("physical interlock report predates the current controller-trust generation")]
     ReportPredatesCurrentTrustGeneration,
-    /// Report is stale/future-dated before expensive controller verification begins.
     #[error("physical interlock report is not fresh before controller verification")]
     ReportNotFreshBeforeControllerVerification,
-    /// Two local proof objects unexpectedly disagree after consuming the same exact pair.
     #[error("internal controller-trust and physical-interlock bindings disagree")]
     InternalBindingCompositionMismatch,
-    /// System wall clock is before Unix epoch.
     #[error("guard system clock is before Unix epoch")]
     SystemClockBeforeUnixEpoch,
-    /// System wall-clock milliseconds do not fit the protocol time domain.
     #[error("guard system clock overflow")]
     SystemClockOverflow,
 }
