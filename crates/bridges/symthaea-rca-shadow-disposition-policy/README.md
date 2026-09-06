@@ -70,25 +70,15 @@ V1 freezes this as `RootSetSemanticsV1::PairwiseIndependentSet`.
 
 ## Relation strength is diagnostic only
 
-V1 exposes only:
+V1 exposes only `RelationStrengthTreatmentV1::DiagnosticOnly`.
 
-`RelationStrengthTreatmentV1::DiagnosticOnly`
+A later engine therefore may not derive policy behavior by summing, averaging, normalizing, multiplying, voting on, Bayesian-updating, or treating `strength_ppm` as calibrated probability/confidence.
 
-A later engine therefore may not derive policy behavior by:
-
-- summing strengths;
-- averaging strengths;
-- normalizing strengths;
-- multiplying strengths;
-- majority voting;
-- Bayesian updating;
-- treating `strength_ppm` as calibrated confidence or probability.
-
-Any future calibrated arithmetic semantics require a new registered policy contract and qualification evidence.
+Any future arithmetic semantics require a new policy contract and separate calibration evidence.
 
 ## Outcome root requirements
 
-The policy separately preregisters root-set requirements for:
+The policy separately preregisters pairwise-independent root-set requirements for:
 
 - tentative support;
 - support;
@@ -99,7 +89,7 @@ The policy separately preregisters root-set requirements for:
 
 `Supported` requirements may not be weaker than `TentativelySupported`; `Opposed` may not be weaker than `TentativelyOpposed`.
 
-All V1 outcome requirements must require at least one evidence root and one interpretation root. This intentionally keeps a bare declaration from satisfying an outcome.
+All V1 outcomes require at least one evidence root and one interpretation root. A bare declaration therefore cannot satisfy an outcome.
 
 ## Defeaters and unknown independence
 
@@ -108,7 +98,7 @@ V1 exposes only:
 - `DefeaterModeV1::QualifiedCurrentBlocker`;
 - `UnknownInterpretationIndependenceModeV1::ForceUnderdetermined`.
 
-A stale/unqualified defeater cannot veto a support case. Distinct interpretation roots whose independence is not qualified cannot be silently counted as independent.
+A stale/unqualified defeater cannot veto a support case. Distinct interpretation roots whose independence is unknown cannot be silently counted as independent.
 
 ## Contestation
 
@@ -116,26 +106,22 @@ V1 requires `contested_requires_qualified_support_and_opposition = true`.
 
 Contested cases preserve surviving qualified disagreement rather than collapsing it into one scalar score.
 
-## Preregistration/evaluation binding
+## Canonical preregistration binding
 
-Policy identity binds:
+RCA already has `RegisteredExperimentContractV1`. Its cryptographic `contract_digest()` transitively commits the experiment's hypothesis, baseline/candidate identities, development/held-out corpora, evaluator, primary and secondary metrics, minimum meaningful effect, confidence requirement, seed plan, falsification criteria, allowed outcomes, and experiment resource ceilings.
 
-- preregistration-contract digest;
-- evaluation-corpus digest;
-- seed-plan digest;
-- metric-contract digest;
-- evaluator id/version.
+RCA-003b.3 therefore does **not** duplicate those fields.
 
-Changing any of these creates a new policy identity.
-
-This is designed to prevent:
+`DispositionPolicyEvaluationBindingV1` binds only:
 
 ```text
-inspect result
-→ move threshold
-→ reinterpret result
-→ keep same policy identity
+exact EXPERIMENT_CONTRACT_SCHEMA_VERSION
++ exact RegisteredExperimentContractV1.contract_digest()
 ```
+
+This avoids a split-brain preregistration where the policy could claim one corpus/seed/metric identity while its registered experiment contract committed another.
+
+Changing the registered experiment contract creates a new policy identity.
 
 ## Resource feasibility
 
@@ -160,8 +146,9 @@ so the declared resource ceiling can actually witness every pair required by the
 
 1. revalidates the raw policy;
 2. rechecks current lower-layer profile identities;
-3. recomputes the policy contract digest;
-4. recomputes the complete BLAKE3 `policy_id`.
+3. checks the exact RCA experiment-contract schema;
+4. recomputes the policy contract digest;
+5. recomputes the complete BLAKE3 `policy_id`.
 
 Tampering fails closed.
 
