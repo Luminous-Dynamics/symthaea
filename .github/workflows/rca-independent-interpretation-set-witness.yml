@@ -1,0 +1,123 @@
+name: RCA Independent Interpretation Root Set Witness
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-epistemic-governance/**'
+      - '.github/workflows/rca-independent-interpretation-set-witness.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze exact root-set witness semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/interpretation_set_witness.rs
+          lib=crates/core/symthaea-epistemic-governance/src/lib.rs
+          doc=crates/core/symthaea-epistemic-governance/INDEPENDENT_INTERPRETATION_ROOT_SET_WITNESS.md
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'pub mod interpretation_set_witness;' "$lib"
+          grep -q 'INDEPENDENT_INTERPRETATION_ROOT_SET_WITNESS_CONTRACT_V1' "$production"
+          grep -q 'every_selected_root_must_exist_in_exact_lineage' "$production"
+          grep -q 'every_distinct_selected_root_pair_must_be_independence_qualified' "$production"
+          grep -q 'every_qualified_pair_must_carry_exact_qualification_identity' "$production"
+          grep -q 'distinct_roots_with_unknown_independence_fail_closed' "$production"
+          grep -q 'issue_independent_interpretation_root_set_witness_v1' "$production"
+          grep -q 'InterpretationIndependenceStatusV1::IndependenceQualified' "$production"
+          grep -q 'interpretation_lineage_id' "$production"
+          grep -q 'qualification_id' "$production"
+          grep -q 'root count' "$doc"
+          grep -q 'qualified independent-root-set witness' "$doc"
+
+      - name: Freeze no-count and no-authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/interpretation_set_witness.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'pub fn root_ids' "$production"
+          grep -q 'pub fn pairs' "$production"
+          if grep -Eqi 'qualified_.*count|independent_.*count|pair_.*count.*pub fn|root_.*count.*pub fn' "$production"; then
+            echo 'Interpretation witness exposed a count shortcut as public authority surface.' >&2
+            exit 1
+          fi
+          if grep -Eqi 'CanonicalBelief|CanonicalEpistemicClaim|global.?workspace|action_author|external_effect|self.?improvement.*promotion' "$production"; then
+            echo 'Interpretation-set witness crossed a downstream authority boundary.' >&2
+            exit 1
+          fi
+
+          if grep -Eq 'impl[^\n]*Deserialize[^\n]*IndependentInterpretationRootSetWitnessV1|derive\([^)]*Deserialize[^)]*\)[[:space:]]*pub struct IndependentInterpretationRootSetWitnessV1' "$production"; then
+            echo 'Issued interpretation-set witness became deserializable.' >&2
+            exit 1
+          fi
+
+      - name: Freeze canonical identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/interpretation_set_witness.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'WITNESS_ID_DOMAIN' "$production"
+          grep -q 'b"profile_contract_digest"' "$production"
+          grep -q 'b"proposition_id"' "$production"
+          grep -q 'b"interpretation_lineage_id"' "$production"
+          grep -q 'b"selected_root_id"' "$production"
+          grep -q 'b"qualification_id"' "$production"
+          grep -q 'selected.sort()' "$production"
+          grep -q 'canonical_owned_pair' "$production"
+
+          if grep -Eq 'serde_json::|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
+            echo 'Interpretation-set witness identity acquired incidental serializer/debug/Rust Hash semantics.' >&2
+            exit 1
+          fi
+
+      - name: Freeze adversarial tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/interpretation_set_witness.rs
+          grep -q 'selected_root_order_is_canonical' "$src"
+          grep -q 'distinct_roots_with_unknown_independence_fail_closed' "$src"
+          grep -q 'qualified_pair_requires_qualification_identity' "$src"
+          grep -q 'duplicate_selected_root_fails_closed' "$src"
+          grep -q 'unknown_selected_root_fails_closed' "$src"
+          grep -q 'single_root_is_valid_without_pair_edges' "$src"
+
+      - name: Verify governance dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -p symthaea-epistemic-governance -e normal)"
+          if printf '%s\n' "$tree" | grep -Eq 'symthaea-rca-(shadow|observer|evidence|shadow-case|bound-shadow-case|disposition)'; then
+            echo 'Generic epistemic governance acquired an RCA runtime/bridge dependency.' >&2
+            exit 1
+          fi
+
+      - name: Format epistemic governance
+        run: cargo fmt -p symthaea-epistemic-governance -- --check
+
+      - name: Test interpretation set witness
+        run: cargo test -p symthaea-epistemic-governance --lib interpretation_set_witness
+
+      - name: Test epistemic governance
+        run: cargo test -p symthaea-epistemic-governance
+
+      - name: Clippy epistemic governance
+        run: cargo clippy -p symthaea-epistemic-governance --all-targets -- -D warnings
