@@ -1,0 +1,233 @@
+name: Spatial World Foundation
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-spatial-world/**"
+      - ".github/workflows/spatial-world-foundation.yml"
+      - "Cargo.lock"
+  push:
+    branches: [main]
+    paths:
+      - "crates/core/symthaea-spatial-world/**"
+      - ".github/workflows/spatial-world-foundation.yml"
+      - "Cargo.lock"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install qualification toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+
+      - name: Freeze epistemic, coordinate, content, schema, and persistence boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=crates/core/symthaea-spatial-world/src/evidence.rs
+          GEO=crates/core/symthaea-spatial-world/src/geometry.rs
+          TIME=crates/core/symthaea-spatial-world/src/time.rs
+          LIB=crates/core/symthaea-spatial-world/src/lib.rs
+
+          grep -Fq 'pub const SPATIAL_WORLD_SCHEMA_VERSION: u16 = 1;' "$LIB"
+          grep -Fq 'Namespace values in this crate are ordinary identity labels' "$LIB"
+          grep -Fq 'right-handed Cartesian frames' "$LIB"
+          grep -Fq '`MetricPoint3` denotes a position; `MetricVector3` denotes a free' "$LIB"
+          grep -Fq '`Pose3` is interpreted as `T_reference_from_local`' "$LIB"
+          grep -Fq 'quaternion rotation maps vectors from local-frame axes into reference-frame' "$LIB"
+          grep -Fq 'pub struct AdmittedObservationEvidence' "$SRC"
+          grep -Fq 'pub struct AdmittedBeliefSupportEvidence' "$SRC"
+          grep -Fq 'pub struct SpatialObservation<T>' "$SRC"
+          grep -Fq 'pub struct SpatialObservationRecord<T>' "$SRC"
+          grep -Fq 'pub struct SpatialBelief<T>' "$SRC"
+          grep -Fq 'pub struct SpatialBeliefRecord<T>' "$SRC"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          src = Path('crates/core/symthaea-spatial-world/src/evidence.rs').read_text()
+          geo = Path('crates/core/symthaea-spatial-world/src/geometry.rs').read_text()
+
+          def adjacent_derives(text: str, marker: str) -> set[str]:
+              pattern = rf'(?:#\[derive\((?P<derive>[^)]*)\)\]\s*)?{re.escape(marker)}'
+              match = re.search(pattern, text)
+              if not match:
+                  raise SystemExit(f'missing declaration: {marker}')
+              raw = match.group('derive') or ''
+              return {part.strip() for part in raw.split(',') if part.strip()}
+
+          for marker in (
+              'pub struct AdmittedObservationEvidence',
+              'pub struct AdmittedBeliefSupportEvidence',
+          ):
+              found = {'Serialize', 'Deserialize'} & adjacent_derives(src, marker)
+              if found:
+                  raise SystemExit(f'{marker} must not derive {sorted(found)}')
+
+          for token in ('AdmittedObservationEvidence', 'AdmittedBeliefSupportEvidence'):
+              impl_match = re.search(rf'impl {token} \{{(?P<body>.*?)\n\}}', src, flags=re.S)
+              if not impl_match:
+                  raise SystemExit(f'missing impl for {token}')
+              body = impl_match.group('body')
+              if re.search(r'pub(?:\([^)]*\))?\s+(?:const\s+)?fn\s+(new|issue|admit|from_evidence)\b', body):
+                  raise SystemExit(f'{token} exposes a public issuance constructor')
+              if re.search(rf'impl\s+(?:Try)?From<EvidenceRef>\s+for\s+{token}', src):
+                  raise SystemExit(f'{token} can be minted directly from EvidenceRef')
+
+          # Runtime state construction remains inside the reviewed spatial boundary.
+          for runtime in ('SpatialObservation<T>', 'SpatialBelief<T>'):
+              impl_match = re.search(rf'impl<T> {re.escape(runtime)} \{{(?P<body>.*?)\n\}}', src, flags=re.S)
+              if not impl_match:
+                  raise SystemExit(f'missing impl for {runtime}')
+              body = impl_match.group('body')
+              if re.search(r'\bpub\s+fn\s+new\b', body):
+                  raise SystemExit(f'{runtime} exposes a public state-binding constructor')
+              if 'pub(crate) fn new' not in body:
+                  raise SystemExit(f'{runtime} constructor must remain crate-private')
+
+          for marker in ('pub struct SpatialObservation<T>', 'pub struct SpatialBelief<T>'):
+              found = {'Serialize', 'Deserialize'} & adjacent_derives(src, marker)
+              if found:
+                  raise SystemExit(f'{marker} must not derive {sorted(found)}')
+
+          for name in ('SpatialObservation<T>', 'SpatialBelief<T>'):
+              if re.search(rf'impl[^\n]*Serialize[^\n]*for\s+{re.escape(name)}', src):
+                  raise SystemExit(f'{name} must not implement Serialize')
+              if re.search(rf'impl[^\n]*Deserialize[^\n]*for\s+{re.escape(name)}', src):
+                  raise SystemExit(f'{name} must not implement Deserialize')
+
+          forbidden_record_promotions = (
+              r'impl<T>\s+(?:Try)?From<SpatialObservationRecord<T>>\s+for\s+SpatialObservation<T>',
+              r'impl<T>\s+(?:Try)?From<SpatialBeliefRecord<T>>\s+for\s+SpatialBelief<T>',
+              r'fn\s+into_observation\s*\(',
+              r'fn\s+to_observation\s*\(',
+              r'fn\s+into_belief\s*\(',
+              r'fn\s+to_belief\s*\(',
+          )
+          for pattern in forbidden_record_promotions:
+              if re.search(pattern, src):
+                  raise SystemExit(f'forbidden record promotion: {pattern}')
+
+          # Evidence identity is generation-qualified and content-bound.
+          evidence_match = re.search(r'pub struct EvidenceRef \{(?P<body>.*?)\n\}', src, flags=re.S)
+          if not evidence_match:
+              raise SystemExit('missing EvidenceRef')
+          evidence_body = evidence_match.group('body')
+          if 'generation: NonZeroU64' not in evidence_body:
+              raise SystemExit('EvidenceRef must carry a non-zero generation')
+          if 'claim_digest: EvidenceDigest' not in evidence_body:
+              raise SystemExit('EvidenceRef must bind exact evidence content')
+
+          # Digest structure is strict 256-bit SHA-256/BLAKE3 and canonical on wire.
+          if 'pub struct EvidenceDigest' not in src:
+              raise SystemExit('missing EvidenceDigest')
+          if 'EvidenceDigestAlgorithm::Sha256' not in src or 'EvidenceDigestAlgorithm::Blake3' not in src:
+              raise SystemExit('digest algorithms changed unexpectedly')
+          if 'hex.len() != 64' not in src:
+              raise SystemExit('evidence digest must remain exactly 256 bits')
+          if '#[serde(rename_all = "snake_case")]' not in src:
+              raise SystemExit('SpatialEvidenceKind wire names must remain canonical snake_case')
+
+          # Persisted records use a closed, explicitly versioned wire schema.
+          for record in ('SpatialObservationRecord<T>', 'SpatialBeliefRecord<T>'):
+              record_match = re.search(rf'pub struct {re.escape(record)} \{{(?P<body>.*?)\n\}}', src, flags=re.S)
+              if not record_match or 'schema_version: u16' not in record_match.group('body'):
+                  raise SystemExit(f'{record} must carry schema_version')
+          if src.count('#[serde(deny_unknown_fields)]') < 3:
+              raise SystemExit('expected closed EvidenceRef + observation-wire + belief-wire schemas')
+          if 'validate_schema_version(wire.schema_version)' not in src:
+              raise SystemExit('persisted spatial records must revalidate schema version')
+
+          # Point and displacement semantics remain distinct. A pose translation
+          # must not regress to MetricPoint3 merely because both have 3 components.
+          point = re.search(r'pub struct MetricPoint3 \{(?P<body>.*?)\n\}', geo, flags=re.S)
+          vector = re.search(r'pub struct MetricVector3 \{(?P<body>.*?)\n\}', geo, flags=re.S)
+          pose = re.search(r'pub struct Pose3 \{(?P<body>.*?)\n\}', geo, flags=re.S)
+          if not point or not vector or not pose:
+              raise SystemExit('missing metric point/vector/pose type')
+          if 'translation: MetricVector3' not in pose.group('body'):
+              raise SystemExit('Pose3 translation must remain a MetricVector3')
+          if 'translation: MetricPoint3' in pose.group('body'):
+              raise SystemExit('Pose3 must not use a point as a free translation vector')
+
+          # Canonical metric identity must not distinguish IEEE -0.0 from +0.0.
+          if 'fn canonicalize_zero(value: f64) -> f64' not in geo:
+              raise SystemExit('missing signed-zero canonicalization helper')
+          if geo.count('canonicalize_zero(') < 8:
+              raise SystemExit('metric geometry/uncertainty are not consistently canonicalizing zero')
+
+          # Closed-world persistence must remain closed through owned nested
+          # struct-shaped geometry, not just at the outer record envelope.
+          for marker in ('pub struct Pose3', 'pub struct PoseEstimate'):
+              before = geo.split(marker, 1)[0].rstrip().splitlines()
+              if not before or before[-1].strip() != '#[serde(deny_unknown_fields)]':
+                  raise SystemExit(f'{marker} must reject unknown nested fields')
+          PY
+
+          grep -Fq 'pub struct EvidenceNamespaceId' "$SRC"
+          grep -Fq 'namespace: EvidenceNamespaceId' "$SRC"
+          grep -Fq 'digest_contract_is_strict_and_canonical' "$SRC"
+          grep -Fq 'evidence_identity_is_namespace_and_generation_qualified' "$SRC"
+          grep -Fq 'belief_rejects_reused_identity_even_if_claim_digest_changes' "$SRC"
+          grep -Fq 'zero_evidence_namespace_id_and_generation_are_rejected' "$SRC"
+          grep -Fq 'observation_record_rejects_unknown_stale_or_unsupported_schema' "$SRC"
+          grep -Fq 'belief_record_rejects_unknown_stale_or_unsupported_schema' "$SRC"
+
+          grep -Fq 'pub struct ReferenceFrameNamespaceId' "$GEO"
+          grep -Fq 'namespace: ReferenceFrameNamespaceId' "$GEO"
+          grep -Fq 'generation: NonZeroU64' "$GEO"
+          grep -Fq 'frame_identity_is_source_and_generation_qualified' "$GEO"
+          grep -Fq 'pub struct MetricPoint3' "$GEO"
+          grep -Fq 'pub struct MetricVector3' "$GEO"
+          grep -Fq 'pose_translation_is_a_vector_not_a_point' "$GEO"
+          grep -Fq 'metric_geometry_and_uncertainty_canonicalize_signed_zero' "$GEO"
+          grep -Fq 'nested_pose_structs_reject_unknown_fields' "$GEO"
+
+          grep -Fq 'pub struct ClockNamespaceId' "$TIME"
+          grep -Fq 'namespace: ClockNamespaceId' "$TIME"
+          grep -Fq 'generation: NonZeroU64' "$TIME"
+          grep -Fq 'pub fn cmp_same_domain' "$TIME"
+          grep -Fq 'clock_reset_generation_breaks_implicit_continuity' "$TIME"
+
+          grep -Fq 'rotation_tangent_sigma_rad' "$GEO"
+          grep -Fq 'left-multiplicative' "$GEO"
+          grep -Fq 'R_perturbed = Exp(delta_theta^) * R' "$GEO"
+          grep -Fq 'quaternion_normalization_is_safe_for_extreme_finite_components' "$GEO"
+          grep -Fq 'let scale = raw.iter()' "$GEO"
+
+          ! grep -Eq 'symthaea-(vision|perception|renderer|agency|authority|iot)' crates/core/symthaea-spatial-world/Cargo.toml
+          grep -Fq '#![deny(unsafe_code)]' "$LIB"
+
+      - name: Locked workspace metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          if cargo metadata --locked --format-version 1 >/dev/null; then
+            exit 0
+          fi
+
+          echo '::error::checked-in Cargo.lock is stale for the spatial-world candidate'
+          cp Cargo.lock /tmp/spatial-world-Cargo.lock.before
+          cargo metadata --format-version 1 >/dev/null
+          echo '=== CARGO-OWNED LOCK CANDIDATE DIFF (DIAGNOSTIC ONLY) ==='
+          git diff -- Cargo.lock || true
+          cp /tmp/spatial-world-Cargo.lock.before Cargo.lock
+          exit 1
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-spatial-world
+
+      - name: Tests
+        run: cargo test --locked -p symthaea-spatial-world --lib
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-spatial-world --all-targets -- -D warnings
