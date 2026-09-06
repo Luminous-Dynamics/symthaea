@@ -6,15 +6,14 @@
 //! performance claims. No hardware or actuator path is present.
 
 use symthaea_formal_safety::{EvidenceKind, ProofObligation, SafetyCase};
+use symthaea_physical_agency::deliberation::{DeliberationOutcome, deliberate};
 use symthaea_physical_agency::portfolio::{
-    CandidateAssessment, CandidatePortfolio, ModelPrediction, PortfolioOutcome, PortfolioPolicy,
-};
-use symthaea_physical_agency::qualification::{
-    SimulationEvidenceBinding, execute_verified_simulation, qualify_simulation_candidate,
+    CandidateAssessment, CandidatePortfolio, ModelPrediction, PortfolioPolicy,
 };
 use symthaea_physical_agency::{
     BackendCapabilities, BackendCapability, BackendCapabilityManifest, CapabilityCatalog,
-    CapabilityRequirement,
+    CapabilityRequirement, SimulationEvidenceBinding, execute_registry_validated_simulation,
+    qualify_selected_simulation_candidate,
 };
 use symthaea_physical_effects::{
     AbstentionReason, AuthorityClass, DesiredTransition, EffectKind, MechanismRef,
@@ -111,7 +110,7 @@ fn assessment(
 }
 
 #[test]
-fn physis_v0_preserves_cross_modal_tradeoffs_and_qualifies_exact_simulation_lineage() {
+fn physis_v0_preserves_deliberation_lineage_through_simulation_qualification() {
     let backend = PhysisExternalBackend;
 
     let mut capabilities = CapabilityCatalog::new();
@@ -171,61 +170,66 @@ fn physis_v0_preserves_cross_modal_tradeoffs_and_qualifies_exact_simulation_line
 
     let portfolio = CandidatePortfolio {
         transition: transition(),
-        candidates: vec![acoustic.clone(), photonic],
+        candidates: vec![acoustic, photonic],
     };
-    let frontier = match portfolio
-        .evaluate(PortfolioPolicy {
-            min_success_probability: 0.8,
-            max_epistemic_uncertainty: 0.2,
-            max_aleatoric_uncertainty: 0.2,
-            max_model_disagreement: 0.2,
-            min_safety_margin: 0.8,
-        })
-        .unwrap()
-    {
-        PortfolioOutcome::ParetoFrontier(frontier) => frontier,
+    let policy = PortfolioPolicy {
+        min_success_probability: 0.8,
+        max_epistemic_uncertainty: 0.2,
+        max_aleatoric_uncertainty: 0.2,
+        max_model_disagreement: 0.2,
+        min_safety_margin: 0.8,
+    };
+    let frontier = match deliberate(&portfolio, policy).unwrap() {
+        DeliberationOutcome::ParetoFrontier(frontier) => frontier,
         other => panic!("PHYSIS v0 expected a Pareto frontier, got {other:?}"),
     };
-    assert_eq!(frontier.len(), 2, "a real tradeoff must not be scalarized away");
+    assert_eq!(
+        frontier.candidates().len(),
+        2,
+        "a real tradeoff must not be scalarized away"
+    );
 
-    // A higher deliberative layer may select a frontier member for more
-    // evidence. That selection still grants no physical execution authority.
-    let selected = frontier
-        .iter()
-        .find(|candidate| candidate.proposal.id == "acoustic-p")
-        .unwrap();
-    assert!(selected.model_disagreement().unwrap() <= 0.2);
-    assert!(selected.effective_epistemic_uncertainty().unwrap() <= 0.2);
+    // Selection mints a non-serializable receipt only for a candidate that
+    // actually survived the evaluated frontier.
+    let selected = frontier.select("acoustic-p").unwrap();
+    assert!(frontier.select("not-on-frontier").is_none());
+    assert!(selected.assessment().model_disagreement().unwrap() <= 0.2);
+    assert!(
+        selected
+            .assessment()
+            .effective_epistemic_uncertainty()
+            .unwrap()
+            <= 0.2
+    );
 
     let request = SimulationRequest::new(
         "physis-sim-0",
         EngineeringDomain::Systems,
         SolverKind::Custom,
-        "verify selected simulation-only diagnostic candidate",
+        "validate selected simulation-only diagnostic candidate",
     );
     let mut registry = SimulationRegistry::new();
     registry.register(backend);
-    let verified = execute_verified_simulation(&registry, &request).unwrap();
+    let validated = execute_registry_validated_simulation(&registry, &request).unwrap();
 
     let binding = SimulationEvidenceBinding {
-        proposal_id: selected.proposal.id.clone(),
+        proposal_id: selected.assessment().proposal.id.clone(),
         simulation_request_id: request.id.clone(),
         expected_backend: "physis-solver".into(),
     };
-    let mut safety_case = SafetyCase::new(&selected.proposal.id);
+    let mut safety_case = SafetyCase::new(&selected.assessment().proposal.id);
     safety_case.add_obligation(
         ProofObligation::new(
             "exact PHYSIS simulation evidence is attached",
             EvidenceKind::Simulation,
         )
-        .discharge(verified.safety_evidence_ref()),
+        .discharge(validated.safety_evidence_ref()),
     );
 
-    let qualified = qualify_simulation_candidate(
-        &transition(),
-        &selected.proposal,
+    let qualified = qualify_selected_simulation_candidate(
+        &selected,
         &binding,
-        &verified,
+        &validated,
         &safety_case,
     )
     .unwrap();
@@ -233,6 +237,8 @@ fn physis_v0_preserves_cross_modal_tradeoffs_and_qualifies_exact_simulation_line
     assert_eq!(qualified.proposal_id(), "acoustic-p");
     assert_eq!(qualified.backend(), "physis-solver");
     assert_eq!(qualified.output_digest(), "physis-output-digest");
+    assert_eq!(qualified.assessment().model_predictions.len(), 2);
+    assert_eq!(qualified.selection_policy(), policy);
 }
 
 #[test]
@@ -263,8 +269,8 @@ fn physis_v0_model_disagreement_can_force_abstention() {
     };
 
     assert_eq!(
-        portfolio.evaluate(policy).unwrap(),
-        PortfolioOutcome::Abstain(AbstentionReason::NoQualifiedAction)
+        deliberate(&portfolio, policy).unwrap(),
+        DeliberationOutcome::Abstain(AbstentionReason::NoQualifiedAction)
     );
 }
 
@@ -280,7 +286,7 @@ fn physis_v0_unknown_simulator_capability_fails_closed() {
 
 #[test]
 fn physis_v0_transition_contract_rejects_out_of_envelope_candidate() {
-    let mut over_budget = assessment(
+    let over_budget = assessment(
         proposal("over-budget", PhysicalModality::Acoustic, 0.9, 0.1),
         vec![
             ModelPrediction {
@@ -296,11 +302,10 @@ fn physis_v0_transition_contract_rejects_out_of_envelope_candidate() {
         0.7,
         0.9,
     );
-    over_budget.expected_duration_ms = 100;
 
     let portfolio = CandidatePortfolio {
         transition: transition(),
         candidates: vec![over_budget],
     };
-    assert!(portfolio.evaluate(PortfolioPolicy::default()).is_err());
+    assert!(deliberate(&portfolio, PortfolioPolicy::default()).is_err());
 }
