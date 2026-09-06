@@ -12,8 +12,9 @@ use symthaea_physical_agency::portfolio::{
 };
 use symthaea_physical_agency::{
     BackendCapabilities, BackendCapability, BackendCapabilityManifest, CapabilityCatalog,
-    CapabilityRequirement, DeliberationQualificationError, SimulationEvidenceBinding,
-    execute_registry_validated_simulation, qualify_selected_simulation_candidate,
+    CapabilityRequirement, DeliberationQualificationError, DeliberationSimulationBinding,
+    WorldSnapshotRef, execute_registry_validated_simulation,
+    qualify_selected_simulation_candidate,
 };
 use symthaea_physical_effects::{
     AbstentionReason, AuthorityClass, DesiredTransition, EffectKind, MechanismRef,
@@ -49,6 +50,10 @@ impl SimulationBackend for PhysisExternalBackend {
                 parser_version: Some("physis-parser-v0".into()),
             }))
     }
+}
+
+fn snapshot() -> WorldSnapshotRef {
+    WorldSnapshotRef::new("physis-world", "physis-world-snapshot-001")
 }
 
 fn transition() -> DesiredTransition {
@@ -110,7 +115,7 @@ fn assessment(
 }
 
 #[test]
-fn physis_v0_preserves_deliberation_lineage_through_simulation_qualification() {
+fn physis_v0_preserves_world_and_deliberation_lineage_through_simulation_qualification() {
     let backend = PhysisExternalBackend;
 
     let mut capabilities = CapabilityCatalog::new();
@@ -179,7 +184,8 @@ fn physis_v0_preserves_deliberation_lineage_through_simulation_qualification() {
         max_model_disagreement: 0.2,
         min_safety_margin: 0.8,
     };
-    let frontier = match deliberate(&portfolio, policy).unwrap() {
+    let world_snapshot = snapshot();
+    let frontier = match deliberate(&portfolio, &world_snapshot, policy).unwrap() {
         DeliberationOutcome::ParetoFrontier(frontier) => frontier,
         other => panic!("PHYSIS v0 expected a Pareto frontier, got {other:?}"),
     };
@@ -188,11 +194,13 @@ fn physis_v0_preserves_deliberation_lineage_through_simulation_qualification() {
         2,
         "a real tradeoff must not be scalarized away"
     );
+    assert_eq!(frontier.world_snapshot(), &world_snapshot);
 
     // Selection mints a non-serializable receipt only for a candidate that
-    // actually survived the evaluated frontier.
+    // actually survived the evaluated frontier and preserves the world snapshot.
     let selected = frontier.select("acoustic-p").unwrap();
     assert!(frontier.select("not-on-frontier").is_none());
+    assert_eq!(selected.world_snapshot(), &world_snapshot);
     assert!(selected.assessment().model_disagreement().unwrap() <= 0.2);
     assert!(
         selected
@@ -212,11 +220,12 @@ fn physis_v0_preserves_deliberation_lineage_through_simulation_qualification() {
     registry.register(backend);
     let validated = execute_registry_validated_simulation(&registry, &request).unwrap();
 
-    let binding = SimulationEvidenceBinding {
-        proposal_id: selected.assessment().proposal.id.clone(),
-        simulation_request_id: request.id.clone(),
-        expected_backend: "physis-solver".into(),
-    };
+    let binding = DeliberationSimulationBinding::new(
+        &selected.assessment().proposal.id,
+        &request.id,
+        "physis-solver",
+        selected.world_snapshot().snapshot_digest(),
+    );
     let mut safety_case = SafetyCase::new(&selected.assessment().proposal.id);
     safety_case.add_obligation(
         ProofObligation::new(
@@ -237,6 +246,7 @@ fn physis_v0_preserves_deliberation_lineage_through_simulation_qualification() {
     assert_eq!(qualified.proposal_id(), "acoustic-p");
     assert_eq!(qualified.backend(), "physis-solver");
     assert_eq!(qualified.output_digest(), "physis-output-digest");
+    assert_eq!(qualified.world_snapshot(), &world_snapshot);
     assert_eq!(qualified.assessment().model_predictions.len(), 2);
     assert_eq!(qualified.selection_policy(), policy);
 }
@@ -269,7 +279,7 @@ fn physis_v0_model_disagreement_can_force_abstention() {
     };
 
     assert_eq!(
-        deliberate(&portfolio, policy).unwrap(),
+        deliberate(&portfolio, &snapshot(), policy).unwrap(),
         DeliberationOutcome::Abstain(AbstentionReason::NoQualifiedAction)
     );
 }
@@ -307,7 +317,9 @@ fn physis_v0_transition_contract_rejects_out_of_envelope_candidate() {
         transition: transition(),
         candidates: vec![over_budget],
     };
-    assert!(deliberate(&portfolio, PortfolioPolicy::default()).is_err());
+    assert!(
+        deliberate(&portfolio, &snapshot(), PortfolioPolicy::default()).is_err()
+    );
 }
 
 #[test]
@@ -341,6 +353,7 @@ fn physis_v0_transition_uncertainty_gate_overrides_permissive_selection_policy()
     // transition-level gate itself is exercised at qualification.
     let frontier = match deliberate(
         &portfolio,
+        &snapshot(),
         PortfolioPolicy {
             min_success_probability: 0.0,
             max_epistemic_uncertainty: 1.0,
@@ -366,11 +379,12 @@ fn physis_v0_transition_uncertainty_gate_overrides_permissive_selection_policy()
     let mut registry = SimulationRegistry::new();
     registry.register(PhysisExternalBackend);
     let validated = execute_registry_validated_simulation(&registry, &request).unwrap();
-    let binding = SimulationEvidenceBinding {
-        proposal_id: selected.assessment().proposal.id.clone(),
-        simulation_request_id: request.id.clone(),
-        expected_backend: "physis-solver".into(),
-    };
+    let binding = DeliberationSimulationBinding::new(
+        &selected.assessment().proposal.id,
+        &request.id,
+        "physis-solver",
+        selected.world_snapshot().snapshot_digest(),
+    );
     let mut safety_case = SafetyCase::new(&selected.assessment().proposal.id);
     safety_case.add_obligation(
         ProofObligation::new("exact evidence", EvidenceKind::Simulation)
@@ -380,5 +394,60 @@ fn physis_v0_transition_uncertainty_gate_overrides_permissive_selection_policy()
     assert!(matches!(
         qualify_selected_simulation_candidate(&selected, &binding, &validated, &safety_case),
         Err(DeliberationQualificationError::EnsembleUncertaintyOutsideTransitionBudget { .. })
+    ));
+}
+
+#[test]
+fn physis_v0_world_snapshot_mismatch_cannot_qualify() {
+    let candidate = assessment(
+        proposal("snapshot-bound", PhysicalModality::Acoustic, 0.9, 0.1),
+        vec![
+            ModelPrediction {
+                model_id: "snapshot-model-a".into(),
+                success_probability: 0.9,
+            },
+            ModelPrediction {
+                model_id: "snapshot-model-b".into(),
+                success_probability: 0.88,
+            },
+        ],
+        2.0,
+        0.7,
+        0.9,
+    );
+    let portfolio = CandidatePortfolio {
+        transition: transition(),
+        candidates: vec![candidate],
+    };
+    let frontier = match deliberate(&portfolio, &snapshot(), PortfolioPolicy::default()).unwrap() {
+        DeliberationOutcome::ParetoFrontier(frontier) => frontier,
+        other => panic!("expected frontier, got {other:?}"),
+    };
+    let selected = frontier.select("snapshot-bound").unwrap();
+
+    let request = SimulationRequest::new(
+        "physis-sim-snapshot-mismatch",
+        EngineeringDomain::Systems,
+        SolverKind::Custom,
+        "exercise world snapshot binding",
+    );
+    let mut registry = SimulationRegistry::new();
+    registry.register(PhysisExternalBackend);
+    let validated = execute_registry_validated_simulation(&registry, &request).unwrap();
+    let binding = DeliberationSimulationBinding::new(
+        &selected.assessment().proposal.id,
+        &request.id,
+        "physis-solver",
+        "different-world-snapshot",
+    );
+    let mut safety_case = SafetyCase::new(&selected.assessment().proposal.id);
+    safety_case.add_obligation(
+        ProofObligation::new("exact evidence", EvidenceKind::Simulation)
+            .discharge(validated.safety_evidence_ref()),
+    );
+
+    assert!(matches!(
+        qualify_selected_simulation_candidate(&selected, &binding, &validated, &safety_case),
+        Err(DeliberationQualificationError::WorldSnapshotBindingMismatch { .. })
     ));
 }
