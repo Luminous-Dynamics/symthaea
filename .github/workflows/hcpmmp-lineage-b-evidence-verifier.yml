@@ -1,0 +1,84 @@
+name: HCPMMP Lineage B Evidence Verifier
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py'
+      - 'scripts/test_verify_hcpmmp1_neuromaps_lineage_b_evidence.py'
+      - 'scripts/derive_hcpmmp1_neuromaps_lineage_b.py'
+      - 'scripts/hcpmmp_neuromaps_common.py'
+      - 'scripts/hcpmmp_neuromaps_gifti.py'
+      - 'data/neuroscience/hcpmmp1_neuromaps_transform_method_v1.json'
+      - 'data/neuroscience/hcp_mmp1_area_order_v1.json'
+      - 'docs/neuroscience/HCPMMP1_NEUROMAPS_LINEAGE_B_EVIDENCE_VERIFIER_V1.md'
+      - '.github/workflows/hcpmmp-lineage-b-evidence-verifier.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify Lineage-B archival evidence verifier
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax contract
+        run: |
+          PYTHONPATH=scripts python -m py_compile \
+            scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py \
+            scripts/test_verify_hcpmmp1_neuromaps_lineage_b_evidence.py
+
+      - name: Archival verifier contracts
+        run: PYTHONPATH=scripts python -m unittest scripts/test_verify_hcpmmp1_neuromaps_lineage_b_evidence.py
+
+      - name: Non-execution and no-network ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py
+          if grep -Eq '(subprocess|os\.system|Popen|run_wb|verify_inputs)' "$FILE"; then
+            echo 'archival verifier must not execute or replay Workbench' >&2
+            exit 1
+          fi
+          if grep -Eqi '(urllib|requests|http://|https://|curl|wget)' "$FILE"; then
+            echo 'archival verifier must remain network-free' >&2
+            exit 1
+          fi
+
+      - name: Generator rebinding ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py
+          grep -Fq 'validate_generator_implementation' "$FILE"
+          grep -Fq "generator['digest']" "$FILE"
+          grep -Fq 'generator_implementation_digest' "$FILE"
+          grep -Fq 'generator per-module map tamper' docs/neuroscience/HCPMMP1_NEUROMAPS_LINEAGE_B_EVIDENCE_VERIFIER_V1.md
+
+      - name: Authority ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          DOC=docs/neuroscience/HCPMMP1_NEUROMAPS_LINEAGE_B_EVIDENCE_VERIFIER_V1.md
+          grep -Fq 'internal self-hash != retained evidence authority' "$DOC"
+          grep -Fq 'independence_established = false' "$DOC"
+          grep -Fq 'does not execute Workbench' "$DOC"
+          grep -Fq 'not** that those implementation bytes are scientifically correct' "$DOC"
+          if grep -Eq 'independence_established["'"']?[[:space:]]*[:=][[:space:]]*true' \
+            scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py; then
+            echo 'verifier must not mint independence authority' >&2
+            exit 1
+          fi
+
+      - name: CLI contract
+        run: PYTHONPATH=scripts python scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py --help
