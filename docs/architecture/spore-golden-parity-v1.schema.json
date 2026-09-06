@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/spore/spore-golden-parity-v1.schema.json",
+  "title": "Spore Golden Parity Corpus v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "source_manifest_schema",
+    "source_lineage_id",
+    "source_commit",
+    "source_tree",
+    "qualification_transfer_policy",
+    "destination_repository",
+    "destination_parity_policy",
+    "obligations"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema": { "const": "spore-golden-parity-v1" },
+    "source_manifest_schema": { "const": "spore-migration-manifest-v1" },
+    "source_lineage_id": { "const": "nixos-config-runtime-expendability-v1.3.2" },
+    "source_commit": { "const": "5d80360768ee329c50756e71fbce4692ac3a8e45" },
+    "source_tree": { "const": "51c04910b3a97586ecf88a46699b7de22e3e1b0b" },
+    "qualification_transfer_policy": { "const": "never-inherit" },
+    "destination_repository": { "const": "Luminous-Dynamics/spore" },
+    "destination_parity_policy": { "const": "fresh-execution-required" },
+    "obligations": {
+      "type": "array",
+      "minItems": 25,
+      "maxItems": 25,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "domain",
+          "source_artifact_id",
+          "statement",
+          "execution_class",
+          "status",
+          "source_expectation_only",
+          "destination_receipt",
+          "status_justification"
+        ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^GP-[A-Z]+-[0-9]{3}$" },
+          "domain": { "enum": ["boot", "identity", "helper", "authority", "firmware"] },
+          "source_artifact_id": {
+            "enum": [
+              "fail-open-vm",
+              "helper-expendability-vm",
+              "systemd-authority-tests",
+              "ovmf-recovery-vm"
+            ]
+          },
+          "statement": { "type": "string", "minLength": 10 },
+          "execution_class": { "enum": ["vm", "unit", "firmware-vm"] },
+          "status": {
+            "enum": [
+              "DEFINED",
+              "MIGRATED_UNEXECUTED",
+              "EXECUTED_FAILED",
+              "EXECUTED_PASS",
+              "SUPERSEDED_WITH_JUSTIFICATION"
+            ]
+          },
+          "source_expectation_only": { "const": true },
+          "destination_receipt": { "type": ["string", "null"], "minLength": 1 },
+          "status_justification": { "type": ["string", "null"], "minLength": 1 }
+        }
+      }
+    }
+  }
+}
