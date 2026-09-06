@@ -78,6 +78,10 @@ impl CognitiveExecutionLineageV1 {
         config_bytes: &[u8],
         genesis_material: Option<&[u8]>,
     ) -> Result<Self, ExecutionLineageError> {
+        if config_bytes.is_empty() {
+            return Err(ExecutionLineageError::MissingConfigBytes);
+        }
+
         let mut nonce = [0_u8; 32];
         getrandom::getrandom(&mut nonce)
             .map_err(|error| ExecutionLineageError::EntropyUnavailable(error.to_string()))?;
@@ -103,6 +107,9 @@ impl CognitiveExecutionLineageV1 {
         validate_digest("source_generation_digest", source_generation_digest)?;
         validate_digest("config_profile_digest", config_profile_digest)?;
         require_nonempty_config_profile(config_profile)?;
+        if config_bytes.is_empty() {
+            return Err(ExecutionLineageError::MissingConfigBytes);
+        }
 
         let config_digest = domain_hash(DOMAIN_CONFIG, config_bytes);
         let genesis_commitment = genesis_commitment(genesis_material);
@@ -228,6 +235,7 @@ pub enum ExecutionLineageError {
     UnsupportedSchemaVersion { found: u16 },
     UnexpectedIssuerProfile { found: String },
     MissingConfigProfile,
+    MissingConfigBytes,
     MalformedDigest { field: &'static str },
     EntropyUnavailable(String),
     IntegrityMismatch,
@@ -246,6 +254,9 @@ impl std::fmt::Display for ExecutionLineageError {
             ),
             Self::MissingConfigProfile => {
                 f.write_str("execution lineage requires a non-empty config profile")
+            }
+            Self::MissingConfigBytes => {
+                f.write_str("execution lineage requires a non-empty exact config projection")
             }
             Self::MalformedDigest { field } => write!(
                 f,
@@ -296,7 +307,9 @@ fn genesis_commitment(genesis_material: Option<&[u8]>) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(DOMAIN_GENESIS);
     match genesis_material {
-        None => hasher.update(b"none\0"),
+        None => {
+            hasher.update(b"none\0");
+        }
         Some(bytes) => {
             hasher.update(b"some\0");
             hasher.update(&(bytes.len() as u64).to_le_bytes());
@@ -462,6 +475,21 @@ mod tests {
                 [1; 32],
             ),
             Err(ExecutionLineageError::MissingConfigProfile)
+        );
+    }
+
+    #[test]
+    fn empty_config_projection_fails_closed() {
+        assert_eq!(
+            CognitiveExecutionLineageV1::issue_with_nonce(
+                SOURCE_A,
+                "profile",
+                PROFILE_A,
+                b"",
+                None,
+                [1; 32],
+            ),
+            Err(ExecutionLineageError::MissingConfigBytes)
         );
     }
 
