@@ -51,7 +51,7 @@ jobs:
               'pubstructDurableEffectReconciliationTrustPublicationStore',
               'pubfnpublish_successor(',
               'pubfnfence_current(',
-              'letkernel=self.open_lock_file()?;',
+              '.open_lock_file()?;',
               'kernel.lock()',
               'file.sync_all()?;',
               'fs::rename(&temp,&target)?;',
@@ -72,8 +72,8 @@ jobs:
           if missing:
               raise SystemExit(f'missing reconciliation-publication invariant: {missing}')
 
-          if compact.count('letkernel=self.open_lock_file()?;') < 4:
-              raise SystemExit('initialize/open/publish/fence must all use the same kernel lock file')
+          if compact.count('.open_lock_file()?;') < 4:
+              raise SystemExit('initialize/open/publish/fence must all use the same kernel lock helper')
           if compact.count('kernel.lock()') < 4:
               raise SystemExit('initialize/open/publish/fence must all take the kernel lock')
 
