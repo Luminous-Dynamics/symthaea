@@ -1,0 +1,38 @@
+name: Epistemic Currentness
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-epistemic-governance/**'
+      - '.github/workflows/epistemic-currentness.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+      - name: Freeze point-of-use currentness contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/currentness.rs
+          grep -q 'pub fn assess(&self, context: &CurrentnessContextV1)' "$src"
+          grep -q 'DynamicWithoutBoundary' "$src"
+          grep -q 'EvidenceRelationKindV1::Defeats' "$src"
+          if grep -Eq 'current[[:space:]]*:[[:space:]]*bool' "$src"; then
+            echo 'Evidence producers must not self-declare currentness.' >&2
+            exit 1
+          fi
+      - name: Format epistemic governance
+        run: cargo fmt --package symthaea-epistemic-governance -- --check
+      - name: Test epistemic governance
+        run: cargo test -p symthaea-epistemic-governance
+      - name: Clippy epistemic governance
+        run: cargo clippy -p symthaea-epistemic-governance --all-targets -- -D warnings
